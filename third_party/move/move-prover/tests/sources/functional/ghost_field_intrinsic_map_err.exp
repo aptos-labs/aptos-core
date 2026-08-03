@@ -1,0 +1,6 @@
+Move prover returns: exiting with bytecode transformation errors
+error: ghost fields of intrinsic map types are read-only in spec blocks
+   ┌─ tests/sources/functional/ghost_field_intrinsic_map_err.move:14:20
+   │
+14 │             update m.brand = 1; // error: intrinsic map ghosts are read-only
+   │                    ^^^^^^^

@@ -72,19 +72,25 @@ error: bitvector expressions (|, &, ^, int2bv) cannot appear in a ghost field up
    │                          ^^^^^^^
 
 error: ghost fields are not supported on intrinsic types
-   ┌─ tests/sources/functional/ghost_field_err.move:83:9
+   ┌─ tests/sources/functional/ghost_field_err.move:85:9
    │
-83 │         ghost g: u64; // error: ghost on intrinsic type
+85 │         ghost g: u64; // error: ghost on (non-map) intrinsic type
+   │         ^^^^^^^^^^^^^
+
+error: ghost fields on intrinsic map types must have type `num`
+   ┌─ tests/sources/functional/ghost_field_err.move:97:9
+   │
+97 │         ghost bad: K; // error: map ghost references type parameter
    │         ^^^^^^^^^^^^^
 
 error: bitvector expressions (|, &, ^, int2bv) cannot appear in a ghost field initializer (ghost integer fields are modeled as mathematical integers)
-   ┌─ tests/sources/functional/ghost_field_err.move:89:24
-   │
-89 │         ghost g: u64 = int2bv(x); // error: int2bv in ghost initializer
-   │                        ^^^^^^^^^
+    ┌─ tests/sources/functional/ghost_field_err.move:104:24
+    │
+104 │         ghost g: u64 = int2bv(x); // error: int2bv in ghost initializer
+    │                        ^^^^^^^^^
 
 error: bitvector expressions (|, &, ^, int2bv) cannot appear in a ghost field update expression (ghost integer fields are modeled as mathematical integers)
-   ┌─ tests/sources/functional/ghost_field_err.move:94:26
-   │
-94 │             update s.g = int2bv(s.g); // error: int2bv in ghost update
-   │                          ^^^^^^^^^^^
+    ┌─ tests/sources/functional/ghost_field_err.move:109:26
+    │
+109 │             update s.g = int2bv(s.g); // error: int2bv in ghost update
+    │                          ^^^^^^^^^^^

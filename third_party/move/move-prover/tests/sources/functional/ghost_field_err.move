@@ -75,13 +75,28 @@ module 0x42::ghost_field_err {
         };
     }
 
-    // Intrinsic types have no generated Boogie datatype to carry ghost
-    // constructor arguments.
-    struct IntrinsicMap<K, V> has store { dummy: bool }
-    spec IntrinsicMap {
-        pragma intrinsic = map;
-        ghost g: u64; // error: ghost on intrinsic type
+    // Non-map intrinsic types have no generated Boogie datatype to carry
+    // ghost constructor arguments and reject ghosts. (Intrinsic MAP types are
+    // the exception: they gain a carrier datatype, used for iterator
+    // validity.)
+    struct IntrinsicOther has store { dummy: bool }
+    spec IntrinsicOther {
+        pragma intrinsic;
+        ghost g: u64; // error: ghost on (non-map) intrinsic type
     }
+
+    // Intrinsic MAP ghosts are accepted (see ghost_field_intrinsic_map.move)
+    // but cannot reference the map's type parameters (the carrier bakes ghost
+    // types in once per map type). Read-only enforcement is checked in
+    // ghost_field_intrinsic_map_err.move (it is a transformation-stage error,
+    // which this module full of front-end errors never reaches).
+    struct IntrinsicMapG<K: copy + drop, V> has store { dummy: bool }
+    spec IntrinsicMapG {
+        pragma intrinsic = map;
+        ghost brand: num;
+        ghost bad: K; // error: map ghost references type parameter
+    }
+
 
     // int2bv also produces a bitvector and is rejected the same way.
     struct I2bG has copy, drop { x: u64 }

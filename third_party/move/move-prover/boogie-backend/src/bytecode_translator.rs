@@ -7374,6 +7374,11 @@ impl FunctionTranslator<'_> {
                 if matches!(edge, BorrowEdge::Invoke) {
                     emitln!(writer, "call $t{} := $HavocMutation($t{});", idx, idx);
                 } else {
+                    // Type of the value behind the destination reference, for
+                    // ghost-carrier detection along the write-back chain.
+                    let root_ty = self
+                        .inst(self.get_local_type(*idx).skip_reference())
+                        .clone();
                     let update = if let BorrowEdge::Hyper(edges) = edge {
                         self.translate_write_back_update(
                             &mut || dst_value.clone(),
@@ -7381,6 +7386,7 @@ impl FunctionTranslator<'_> {
                             src_value,
                             edges,
                             0,
+                            &root_ty,
                         )
                     } else {
                         self.translate_write_back_update(
@@ -7389,6 +7395,7 @@ impl FunctionTranslator<'_> {
                             src_value,
                             &[edge.to_owned()],
                             0,
+                            &root_ty,
                         )
                     };
                     emitln!(
@@ -7426,6 +7433,10 @@ impl FunctionTranslator<'_> {
         None
     }
 
+    /// `dest_ty` is the type of the value denoted by `mk_dest()` at this edge
+    /// position (threaded from the borrow root), used to detect intrinsic-map
+    /// ghost carriers on `Index(Table)` edges. `Type::Error` when unknown
+    /// (custom index edges), which never matches a carrier.
     fn translate_write_back_update(
         &self,
         mk_dest: &mut dyn FnMut() -> String,
@@ -7433,14 +7444,20 @@ impl FunctionTranslator<'_> {
         src: String,
         edges: &[BorrowEdge],
         at: usize,
+        dest_ty: &Type,
     ) -> String {
         if at >= edges.len() {
             src
         } else {
             match &edges[at] {
-                BorrowEdge::Direct => {
-                    self.translate_write_back_update(mk_dest, get_path_index, src, edges, at + 1)
-                },
+                BorrowEdge::Direct => self.translate_write_back_update(
+                    mk_dest,
+                    get_path_index,
+                    src,
+                    edges,
+                    at + 1,
+                    dest_ty,
+                ),
                 BorrowEdge::Field(memory, variant, offset) => {
                     let memory = memory.to_owned().instantiate(self.type_inst);
                     let struct_env = &self.parent.env.get_struct_qid(memory.to_qualified_id());
@@ -7452,6 +7469,7 @@ impl FunctionTranslator<'_> {
                             *offset,
                         )
                     };
+                    let field_ty = field_env.get_type().instantiate(&memory.inst);
                     let field_sel = boogie_field_sel(&field_env);
                     let new_dest = format!("{}->{}", (*mk_dest)(), field_sel);
                     let mut new_dest_needed = false;
@@ -7464,6 +7482,7 @@ impl FunctionTranslator<'_> {
                         src,
                         edges,
                         at + 1,
+                        &field_ty,
                     );
                     let update_fun = if variant.is_none() {
                         boogie_field_update(&field_env, &memory.inst)
@@ -7509,6 +7528,41 @@ impl FunctionTranslator<'_> {
                             self.get_borrow_native_aggregate_names(name).unwrap()
                         },
                     };
+                    let env = self.parent.env;
+                    // A ghost-carrier map (an intrinsic map declaring ghost
+                    // fields) wraps its table: content is read through `->$t`,
+                    // and the update rebuilds the carrier PRESERVING the ghost
+                    // arguments — a write through a borrowed value entry is not
+                    // a structural mutation and must not disturb e.g. the
+                    // iterator-validity brand.
+                    let carrier = if matches!(index_edge_kind, IndexEdgeKind::Table) {
+                        if let Type::Struct(mid, sid, targs) = dest_ty.skip_reference() {
+                            let struct_env = env.get_struct(mid.qualified(*sid));
+                            let ghost_sels: Vec<String> = struct_env
+                                .get_ghost_fields()
+                                .map(|f| boogie_field_sel(&f))
+                                .collect();
+                            if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP)
+                                && !ghost_sels.is_empty()
+                            {
+                                Some((boogie_struct_name(&struct_env, targs, false), ghost_sels))
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+                    // The element/value type for the recursion step.
+                    let elem_ty = match (index_edge_kind, dest_ty.skip_reference()) {
+                        (IndexEdgeKind::Vector, Type::Vector(elem)) => (**elem).clone(),
+                        (IndexEdgeKind::Table, Type::Struct(_, _, targs)) if targs.len() >= 2 => {
+                            targs[1].clone()
+                        },
+                        _ => Type::Error,
+                    };
 
                     // Compute the offset into the path where to retrieve the index.
                     let offset = edges[0..at]
@@ -7516,7 +7570,12 @@ impl FunctionTranslator<'_> {
                         .filter(|e| !matches!(e, BorrowEdge::Direct))
                         .count();
                     let index = (*get_path_index)(offset);
-                    let new_dest = format!("{}({}, {})", read_aggregate, (*mk_dest)(), index);
+                    let content = |dest: String| match &carrier {
+                        Some(_) => format!("{}->$t", dest),
+                        None => dest,
+                    };
+                    let new_dest =
+                        format!("{}({}, {})", read_aggregate, content((*mk_dest)()), index);
                     let mut new_dest_needed = false;
                     // Recursively perform write backs for next edges
                     let new_src = self.translate_write_back_update(
@@ -7528,25 +7587,32 @@ impl FunctionTranslator<'_> {
                         src,
                         edges,
                         at + 1,
+                        &elem_ty,
                     );
+                    let mk_update = |dest: String, new_src: &str| match &carrier {
+                        Some((carrier_name, ghost_sels)) => {
+                            let ghosts = ghost_sels
+                                .iter()
+                                .map(|sel| format!(", {}->{}", dest, sel))
+                                .join("");
+                            format!(
+                                "{}({}({}->$t, {}, {}){})",
+                                carrier_name, update_aggregate, dest, index, new_src, ghosts
+                            )
+                        },
+                        None => {
+                            format!("{}({}, {}, {})", update_aggregate, dest, index, new_src)
+                        },
+                    };
                     if new_dest_needed {
                         format!(
-                            "(var $$sel{} := {}; {}({}, {}, {}))",
+                            "(var $$sel{} := {}; {})",
                             at,
                             new_dest,
-                            update_aggregate,
-                            (*mk_dest)(),
-                            index,
-                            new_src
+                            mk_update((*mk_dest)(), &new_src)
                         )
                     } else {
-                        format!(
-                            "{}({}, {}, {})",
-                            update_aggregate,
-                            (*mk_dest)(),
-                            index,
-                            new_src
-                        )
+                        mk_update((*mk_dest)(), &new_src)
                     }
                 },
                 BorrowEdge::Hyper(_) | BorrowEdge::Invoke => unreachable!("unexpected borrow edge"),

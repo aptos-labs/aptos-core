@@ -29,7 +29,7 @@ use crate::{
     },
     pragmas::{
         is_pragma_valid_for_block, is_property_valid_for_condition, CONDITION_DEACTIVATED_PROP,
-        CONDITION_EXPORT_PROP, CONDITION_INJECTED_PROP, INTRINSIC_PRAGMA,
+        CONDITION_EXPORT_PROP, CONDITION_INJECTED_PROP, INTRINSIC_PRAGMA, INTRINSIC_TYPE_MAP,
     },
     symbol::{Symbol, SymbolPool},
     ty::{
@@ -4310,6 +4310,11 @@ impl ModuleBuilder<'_, '_> {
                 );
                 return;
             }
+            // Ghost fields on intrinsic map types are read-only from spec
+            // blocks; that check lives in spec instrumentation, where the
+            // intrinsics annotation is reliably complete for same-module
+            // declarations too (the builder's spec tables are not yet
+            // populated when inline code specs are translated here).
             // Bitwise operators on the RHS produce bitvector-typed Boogie
             // expressions, but ghost fields are declared as unbounded integer
             // in Boogie (they are model-only and don't participate in
@@ -5324,18 +5329,37 @@ impl ModuleBuilder<'_, '_> {
             // New struct in this module
             let spec = self.struct_specs.remove(&name.symbol).unwrap_or_default();
             // Intrinsic types have no generated Boogie datatype to carry
-            // ghost constructor arguments; reject ghosts on them. This is
-            // the earliest point where the intrinsic pragma is reliably
-            // known (spec blocks are fully analyzed).
-            if !entry.ghost_fields.is_empty()
-                && spec
-                    .properties
-                    .contains_key(&self.parent.env.symbol_pool().make(INTRINSIC_PRAGMA))
-            {
-                for f in entry.ghost_fields.values() {
-                    self.parent
-                        .env
-                        .error(&f.loc, "ghost fields are not supported on intrinsic types");
+            // ghost constructor arguments; reject ghosts on them — except
+            // intrinsic MAP types, whose backend representation gains a
+            // carrier datatype when ghosts are declared (used for iterator
+            // validity). This is the earliest point where the intrinsic
+            // pragma is reliably known (spec blocks are fully analyzed).
+            if !entry.ghost_fields.is_empty() {
+                let pool = self.parent.env.symbol_pool();
+                let is_intrinsic_map = matches!(
+                    spec.properties.get(&pool.make(INTRINSIC_PRAGMA)),
+                    Some(PropertyValue::Symbol(s))
+                        if pool.string(*s).as_str() == INTRINSIC_TYPE_MAP
+                );
+                if !is_intrinsic_map && spec.properties.contains_key(&pool.make(INTRINSIC_PRAGMA)) {
+                    for f in entry.ghost_fields.values() {
+                        self.parent
+                            .env
+                            .error(&f.loc, "ghost fields are not supported on intrinsic types");
+                    }
+                } else if is_intrinsic_map {
+                    // The carrier datatype is declared once per map type with the
+                    // ghost argument types baked in; map ghosts are restricted to
+                    // `num` (sufficient for identity/version state, and avoids
+                    // per-instance ghost typing in the carrier).
+                    for f in entry.ghost_fields.values() {
+                        if !matches!(f.ty, Type::Primitive(crate::ty::PrimitiveType::Num)) {
+                            self.parent.env.error(
+                                &f.loc,
+                                "ghost fields on intrinsic map types must have type `num`",
+                            );
+                        }
+                    }
                 }
             }
             let mut field_data: BTreeMap<FieldId, FieldData> = BTreeMap::new();

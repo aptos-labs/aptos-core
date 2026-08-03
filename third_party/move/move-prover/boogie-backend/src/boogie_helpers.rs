@@ -59,10 +59,15 @@ pub fn boogie_module_name(env: &ModuleEnv<'_>) -> String {
 
 /// Return boogie name of given structure.
 pub fn boogie_struct_name(struct_env: &StructEnv<'_>, inst: &[Type], bv_flag: bool) -> String {
-    if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
+    if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP)
+        && struct_env.get_ghost_fields().next().is_none()
+    {
         // Map to the theory type representation, which is `Table int V`. The key
         // is encoded as an integer to avoid extensionality problems, and to support
-        // $Mutation paths, which are sequences of ints.
+        // $Mutation paths, which are sequences of ints. Intrinsic maps that
+        // declare ghost fields instead use a per-struct carrier datatype
+        // wrapping the table (the regular-struct naming below), so the ghosts
+        // have constructor arguments to live in.
         let env = struct_env.module_env.env;
         format!("Table int ({})", boogie_type(env, &inst[1], bv_flag))
     } else {

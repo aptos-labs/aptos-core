@@ -1152,6 +1152,25 @@ impl<'a> Instrumenter<'a> {
         let base_ty = self.builder.get_local_type(base_idx);
         let struct_ty = base_ty.skip_reference().clone();
         let inst = self.builder.global_env().get_node_instantiation(sel_node);
+        // Ghost fields on intrinsic map types are managed by the map's
+        // backend model (e.g. an iterator-validity brand havocked by mutating
+        // operations) and are read-only from spec blocks. Checked here rather
+        // than at model building, where same-module intrinsic annotations are
+        // not yet complete.
+        {
+            let env = self.builder.global_env();
+            if env
+                .get_struct(mid.qualified(sid))
+                .is_intrinsic_of(move_model::pragmas::INTRINSIC_TYPE_MAP)
+            {
+                let loc = env.get_node_loc(sel_node);
+                env.error(
+                    &loc,
+                    "ghost fields of intrinsic map types are read-only in spec blocks",
+                );
+                return;
+            }
+        }
         // A bitwise-classified RHS would emit a `bv<N>`-typed argument to
         // `$Update...`, but ghost integer fields translate to Boogie `int`
         // — the resulting Boogie would be ill-typed. Reject up front.

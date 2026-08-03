@@ -6,7 +6,9 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    boogie_helpers::{boogie_module_name, boogie_num_type_base, boogie_type, boogie_type_suffix},
+    boogie_helpers::{
+        boogie_field_sel, boogie_module_name, boogie_num_type_base, boogie_type, boogie_type_suffix,
+    },
     bytecode_translator::has_native_equality,
     options::{BoogieOptions, VectorTheory},
 };
@@ -101,6 +103,12 @@ struct BvInfo {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
+struct GhostArg {
+    sel: String,
+    ty: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
 struct MapImpl {
     struct_name: String,
     insts: Vec<(TypeInfo, TypeInfo)>,
@@ -132,6 +140,20 @@ struct MapImpl {
     has_iterators: bool,
     // Unique key-type suffixes of `insts`, for declaring per-K iterator ghost state.
     iter_ghost_ks: Vec<String>,
+    // Ghost carrier: an intrinsic map that declares ghost fields is
+    // represented as a per-instance datatype wrapping the table, so the
+    // ghosts have constructor arguments to live in. `struct_base` plus the
+    // instance suffix is the carrier datatype name (agreeing with
+    // `boogie_struct_name`); `ghost_args` are the ghost selectors and their
+    // (type-parameter-free) Boogie types.
+    has_ghost_carrier: bool,
+    struct_base: String,
+    ghost_args: Vec<GhostArg>,
+    gb_args: String,
+    gb_decls: String,
+    gb_havoc: String,
+    ghost_preserve_args: String,
+    ghost_zero_args: String,
     fun_get: String,
     fun_borrow_front: String,
     fun_borrow_back: String,
@@ -592,6 +614,38 @@ impl MapImpl {
         } else {
             vec![]
         };
+        let ghost_args: Vec<GhostArg> = struct_env
+            .get_ghost_fields()
+            .map(|f| GhostArg {
+                sel: boogie_field_sel(&f),
+                ty: boogie_type(env, &f.get_type(), false),
+            })
+            .collect();
+        let has_ghost_carrier = !ghost_args.is_empty();
+        let struct_base = struct_name.clone();
+        // Rebuild plumbing for mutating templates: fresh (havoced) ghost
+        // values per rebuild site, shared between the rebuilt value and any
+        // post-state spec-function application describing it.
+        let (gb_args, gb_decls, gb_havoc) = if has_ghost_carrier {
+            let idxs = 0..ghost_args.len();
+            (
+                idxs.clone().map(|i| format!(", $gb{}", i)).join(""),
+                idxs.clone()
+                    .map(|i| format!("\n    var $gb{}: int;", i))
+                    .join(""),
+                idxs.map(|i| format!("havoc $gb{}; ", i)).join(""),
+            )
+        } else {
+            (String::new(), String::new(), String::new())
+        };
+        // Pure spec functions cannot havoc: map-returning spec funs preserve
+        // the input's ghost args (whole-map equalities are ghost-excluding,
+        // so the choice is immaterial) or use zeros when there is no input.
+        let ghost_preserve_args = ghost_args
+            .iter()
+            .map(|g| format!(", t->{}", g.sel))
+            .join("");
+        let ghost_zero_args = ghost_args.iter().map(|_| ", 0".to_string()).join("");
 
         MapImpl {
             struct_name,
@@ -660,6 +714,14 @@ impl MapImpl {
             iter_key_sel: iter_parts.2,
             has_iterators,
             iter_ghost_ks,
+            has_ghost_carrier,
+            struct_base,
+            ghost_args,
+            gb_args,
+            gb_decls,
+            gb_havoc,
+            ghost_preserve_args,
+            ghost_zero_args,
             fun_get: Self::triple_opt_to_name(env, decl.get_fun_triple(env, INTRINSIC_FUN_MAP_GET)),
             fun_borrow_front: Self::triple_opt_to_name(
                 env,

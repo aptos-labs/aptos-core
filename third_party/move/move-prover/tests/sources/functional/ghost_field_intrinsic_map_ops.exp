@@ -1,0 +1,24 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/ghost_field_intrinsic_map_ops.move:84:9
+   │
+84 │         ensures result.brand == 0; // FAILS: fresh brand is unconstrained
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:81: mk_brand_bad
+   =         result = <redacted>
+   =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:84: mk_brand_bad (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/ghost_field_intrinsic_map_ops.move:93:9
+   │
+93 │         ensures m.brand == old(m).brand; // FAILS: mutation havocs the brand
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:88: add_brand_bad
+   =         m = <redacted>
+   =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:89: add_brand_bad
+   =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:88: add_brand_bad
+   =         m = <redacted>
+   =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:92: add_brand_bad (spec)
+   =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:93: add_brand_bad (spec)

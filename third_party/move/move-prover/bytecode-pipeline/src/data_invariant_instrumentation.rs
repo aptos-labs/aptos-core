@@ -187,13 +187,18 @@ impl<'a> Instrumenter<'a> {
             Type::Struct(mid, sid, targs) => {
                 let struct_env = env.get_module(*mid).into_struct(*sid);
                 if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
-                    let decl = env
+                    // Propagating value invariants through a map requires the
+                    // `map_spec_get` binding. A map without it cannot express
+                    // (or reach) its values in the model at all, so there is
+                    // nothing to instrument — skip instead of panicking (a
+                    // ghost-declaring map may legitimately have no bindings).
+                    let Some(spec_fun_get) = env
                         .get_intrinsics()
                         .get_decl_for_struct(&mid.qualified(*sid))
-                        .expect("intrinsic declaration");
-                    let spec_fun_get = decl
-                        .lookup_spec_fun(env, INTRINSIC_FUN_MAP_SPEC_GET)
-                        .expect("intrinsic map_get function");
+                        .and_then(|decl| decl.lookup_spec_fun(env, INTRINSIC_FUN_MAP_SPEC_GET))
+                    else {
+                        return vec![];
+                    };
 
                     // When dealing with a map, we cannot maintain individual locations for
                     // invariants. Instead we choose just one as a representative.

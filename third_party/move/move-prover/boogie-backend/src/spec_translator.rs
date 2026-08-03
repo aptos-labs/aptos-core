@@ -2830,7 +2830,12 @@ impl SpecTranslator<'_> {
         args: &[Exp],
     ) {
         let struct_env = self.env.get_module(module_id).into_struct(struct_id);
-        if struct_env.is_intrinsic() {
+        // Ghost fields of intrinsic maps live in the carrier datatype and are
+        // selectable; runtime fields of intrinsic structs are erased.
+        let is_ghost_sel = struct_env
+            .get_ghost_fields()
+            .any(|f| f.get_id() == field_id);
+        if struct_env.is_intrinsic() && !is_ghost_sel {
             self.env.error(
                 &self.env.get_node_loc(node_id),
                 "cannot select field of intrinsic struct",
