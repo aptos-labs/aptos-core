@@ -54,6 +54,11 @@ pub enum TimedFeatureFlag {
     /// Reject publishing of v5 module bytecode. Publishing only; already-published modules keep
     /// loading and executing at any version.
     RejectV5ModulePublishing,
+
+    /// If enabled, re-resolve a memoized closure when its defining module is
+    /// republished within the same transaction, so it binds to the current
+    /// module version instead of executing stale pre-upgrade code.
+    RevalidateResolvedClosures,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -101,7 +106,8 @@ impl TimedFeatureOverride {
                 | EnableStrictBoundsInProdConfig
                 | RevisedBoundsInProdConfig
                 | ConstantSerializedSizeLocalCache
-                | RejectV5ModulePublishing,
+                | RejectV5ModulePublishing
+                | RevalidateResolvedClosures,
             ) => None,
         }
     }
@@ -247,6 +253,15 @@ impl TimedFeatureFlag {
                 .with_timezone(&Utc),
             (RejectV5ModulePublishing, MAINNET) => Los_Angeles
                 .with_ymd_and_hms(2026, 7, 29, 12, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            (RevalidateResolvedClosures, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 7, 22, 10, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (RevalidateResolvedClosures, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 7, 24, 10, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
 

@@ -80,6 +80,10 @@ pub struct VMConfig {
     /// Without this, two closures over the same function with different masks but identical
     /// captured values are incorrectly treated as equal.
     pub include_closure_mask_in_cmp: bool,
+    /// When enabled, a resolved closure is validated against the current
+    /// version (hash) of its defining module before use, and re-resolved if the
+    /// module was republished since the resolution.
+    pub revalidate_resolved_closures: bool,
 }
 
 impl Default for VMConfig {
@@ -113,6 +117,7 @@ impl Default for VMConfig {
             check_depth_on_type_counts: true,
             enable_public_struct_args: true,
             include_closure_mask_in_cmp: true,
+            revalidate_resolved_closures: true,
         }
     }
 }
