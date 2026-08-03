@@ -134,8 +134,8 @@ use aptos_types::{
     },
     state_store::StateView,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockOutput,
-        SignedTransaction, TransactionOutput, VMValidatorResult,
+        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockError,
+        BlockExecutionResult, BlockOutput, SignedTransaction, TransactionOutput, VMValidatorResult,
     },
     vm_status::VMStatus,
 };
@@ -173,7 +173,7 @@ pub trait VMBlockExecutor: Send + Sync {
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus>;
+    ) -> BlockExecutionResult<SignatureVerifiedTransaction, TransactionOutput>;
 
     /// Executes a block of transactions and returns output for each one of them, without applying
     /// any block limit.
@@ -181,7 +181,7 @@ pub trait VMBlockExecutor: Send + Sync {
         &self,
         txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo>,
         state_view: &(impl StateView + Sync),
-    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+    ) -> Result<Vec<TransactionOutput>, BlockError> {
         self.execute_block(
             txn_provider,
             state_view,

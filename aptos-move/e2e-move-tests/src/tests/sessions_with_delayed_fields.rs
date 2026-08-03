@@ -59,7 +59,6 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
     value::{MoveTypeLayout, MoveValue},
-    vm_status::VMStatus,
 };
 use move_vm_runtime::{
     execution_tracing::Trace,
@@ -268,7 +267,6 @@ impl BeforeMaterializationOutput<TestTransaction> for &TestOutput {
 
 impl ExecutorTask for TestTask {
     type AuxiliaryInfo = AuxiliaryInfo;
-    type Error = VMStatus;
     type Output = TestOutput;
     type Txn = TestTransaction;
 
@@ -291,7 +289,7 @@ impl ExecutorTask for TestTask {
         txn: &Self::Txn,
         _auxiliary_info: &Self::AuxiliaryInfo,
         _txn_idx: TxnIndex,
-    ) -> ExecutionStatus<Self::Output, Self::Error> {
+    ) -> ExecutionStatus<Self::Output> {
         let resolver = self.vm.as_move_resolver_with_group_view(view);
         let mut change_set_1 = self.run(&resolver, view, &txn.session_1);
         println!("  [session_1] change set: {:?}", change_set_1);

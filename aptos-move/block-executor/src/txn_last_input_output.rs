@@ -30,7 +30,6 @@ use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use parking_lot::Mutex;
 use std::{
     collections::{BTreeSet, HashSet},
-    fmt::Debug,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -126,8 +125,8 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> OutputWrapper<T, O> {
         }
     }
 
-    fn from_execution_status<E: Debug>(
-        output: ExecutionStatus<O, E>,
+    fn from_execution_status(
+        output: ExecutionStatus<O>,
         read_set: &TxnInput<T>,
         block_gas_limit_type: &BlockGasLimitType,
         user_txn_bytes_len: u64,
@@ -168,9 +167,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> OutputWrapper<T, O> {
                     },
                 }
             },
-            ExecutionStatus::Abort(err) => {
-                Self::empty_with_status(OutputStatusKind::Abort(format!("{:?}", err)))
-            },
+            ExecutionStatus::Abort(err) => Self::empty_with_status(OutputStatusKind::Abort(err)),
             ExecutionStatus::SpeculativeExecutionAbortError(_) => {
                 Self::empty_with_status(OutputStatusKind::SpeculativeExecutionAbortError)
             },
@@ -227,11 +224,11 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         }
     }
 
-    pub(crate) fn record<E: Debug>(
+    pub(crate) fn record(
         &self,
         txn_idx: TxnIndex,
         input: TxnInput<T>,
-        output: ExecutionStatus<O, E>,
+        output: ExecutionStatus<O>,
         block_gas_limit_type: &BlockGasLimitType,
         user_txn_bytes_len: u64,
     ) -> Result<(), PanicError> {

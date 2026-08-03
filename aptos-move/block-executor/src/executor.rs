@@ -47,8 +47,8 @@ use aptos_types::{
     on_chain_config::Features,
     state_store::TStateView,
     transaction::{
-        block_epilogue::TBlockEndInfoExt, AuxiliaryInfoTrait, BlockExecutableTransaction,
-        BlockOutput, FeeDistribution,
+        block_epilogue::TBlockEndInfoExt, AuxiliaryInfoTrait, BlockError,
+        BlockExecutableTransaction, BlockExecutionResult, BlockOutput, FeeDistribution,
     },
     vm::modules::AptosModuleExtension,
     write_set::TransactionWrite,
@@ -130,7 +130,7 @@ where
 
     // The bool in the result indicates whether execution result is a speculative abort.
     fn process_execution_result<'a>(
-        execution_result: &'a ExecutionStatus<E::Output, E::Error>,
+        execution_result: &'a ExecutionStatus<E::Output>,
         read_set: &mut CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>,
         txn_idx: TxnIndex,
     ) -> Result<(Option<&'a E::Output>, bool), PanicError> {
@@ -2052,7 +2052,7 @@ where
         unsync_map: &UnsyncMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
         output_before_guard: &<E::Output as TransactionOutput>::BeforeMaterializationGuard<'_>,
         resource_write_set: HashMap<T::Key, ValueWithLayout<T::Value>>,
-    ) -> Result<(), SequentialBlockExecutionError<E::Error>> {
+    ) -> Result<(), SequentialBlockExecutionError> {
         for (key, value) in resource_write_set.into_iter() {
             unsync_map.write(key, value);
         }
@@ -2132,7 +2132,7 @@ where
         transaction_slice_metadata: &TransactionSliceMetadata,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
         resource_group_bcs_fallback: bool,
-    ) -> Result<BlockOutput<T, CommittedOutput<E>>, SequentialBlockExecutionError<E::Error>> {
+    ) -> Result<BlockOutput<T, CommittedOutput<E>>, SequentialBlockExecutionError> {
         let num_txns = signature_verified_block.num_txns();
 
         if num_txns == 0 {
@@ -2191,20 +2191,20 @@ where
                     );
                     // Record the status indicating the unrecoverable VM failure.
                     return Err(SequentialBlockExecutionError::ErrorToReturn(
-                        BlockExecutionError::FatalVMError(err),
+                        BlockError::new(err),
                     ));
                 },
                 ExecutionStatus::DelayedFieldsCodeInvariantError(msg) => {
                     alert!("Sequential execution DelayedFieldsCodeInvariantError error by transaction {}: {}", idx as TxnIndex, msg);
-                    return Err(SequentialBlockExecutionError::ErrorToReturn(
-                        BlockExecutionError::FatalBlockExecutorError(code_invariant_error(msg)),
-                    ));
+                    return Err(SequentialBlockExecutionError::from(code_invariant_error(
+                        msg,
+                    )));
                 },
                 ExecutionStatus::SpeculativeExecutionAbortError(msg) => {
                     alert!("Sequential execution SpeculativeExecutionAbortError error by transaction {}: {}", idx as TxnIndex, msg);
-                    return Err(SequentialBlockExecutionError::ErrorToReturn(
-                        BlockExecutionError::FatalBlockExecutorError(code_invariant_error(msg)),
-                    ));
+                    return Err(SequentialBlockExecutionError::from(code_invariant_error(
+                        msg,
+                    )));
                 },
                 ExecutionStatus::Success(mut output) | ExecutionStatus::SkipRest(mut output) => {
                     let output_before_guard = output.before_materialization()?;
@@ -2462,7 +2462,7 @@ where
         base_view: &S,
         transaction_slice_metadata: &TransactionSliceMetadata,
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
-    ) -> BlockExecutionResult<BlockOutput<T, CommittedOutput<E>>, E::Error> {
+    ) -> BlockExecutionResult<T, CommittedOutput<E>> {
         let _timer = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.start_timer();
 
         if self.config.local.concurrency_level > 1 {
@@ -2548,7 +2548,7 @@ where
                         return Ok(output);
                     },
                     Err(SequentialBlockExecutionError::ResourceGroupSerializationError) => {
-                        BlockExecutionError::FatalBlockExecutorError(code_invariant_error(
+                        BlockError::from(code_invariant_error(
                             "resource group serialization during bcs fallback should not happen",
                         ))
                     },
@@ -2561,16 +2561,10 @@ where
         if self.config.local.discard_failed_blocks {
             // We cannot execute block, discard everything (including block metadata and validator transactions)
             // (TODO: maybe we should add fallback here to first try BlockMetadataTransaction alone)
-            let error_code = match sequential_error {
-                BlockExecutionError::FatalBlockExecutorError(_) => {
-                    StatusCode::DELAYED_FIELD_OR_BLOCKSTM_CODE_INVARIANT_ERROR
-                },
-                BlockExecutionError::FatalVMError(_) => {
-                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
-                },
-            };
             let ret = (0..signature_verified_block.num_txns())
-                .map(|_| CommittedOutput::<E>::discard(error_code))
+                .map(|_| {
+                    CommittedOutput::<E>::discard(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                })
                 .collect();
             return Ok(BlockOutput::new(ret, None));
         }

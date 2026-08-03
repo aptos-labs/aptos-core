@@ -77,11 +77,11 @@ use aptos_types::{
         },
         block_epilogue::{BlockEpiloguePayload, FeeDistribution},
         signature_verified_transaction::SignatureVerifiedTransaction,
-        AuxiliaryInfo, BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle,
-        MultisigTransactionPayload, ReplayProtector, Script, SignedTransaction, Transaction,
-        TransactionArgument, TransactionExecutableRef, TransactionExtraConfig, TransactionOutput,
-        TransactionPayload, TransactionStatus, TxnLimitsRequest, VMValidatorResult,
-        ViewFunctionOutput, WriteSetPayload,
+        AuxiliaryInfo, BlockExecutionResult, EntryFunction, ExecutionError, ExecutionStatus,
+        ModuleBundle, MultisigTransactionPayload, ReplayProtector, Script, SignedTransaction,
+        Transaction, TransactionArgument, TransactionExecutableRef, TransactionExtraConfig,
+        TransactionOutput, TransactionPayload, TransactionStatus, TxnLimitsRequest,
+        VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
     },
     vm::module_metadata::{
         get_compilation_metadata, get_metadata, get_randomness_annotation_for_entry_function,
@@ -3384,11 +3384,11 @@ impl AptosVMBlockExecutor {
         state_view: &(impl StateView + Sync),
         config: BlockExecutorConfig,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
+    ) -> BlockExecutionResult<SignatureVerifiedTransaction, TransactionOutput> {
         fail_point!("aptos_vm_block_executor::execute_block_with_config", |_| {
-            Err(VMStatus::error(
-                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                None,
+            use aptos_types::transaction::BlockError;
+            Err(BlockError::new(
+                "fail point: aptos_vm_block_executor::execute_block_with_config".to_string(),
             ))
         });
 
@@ -3432,7 +3432,7 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
+    ) -> BlockExecutionResult<SignatureVerifiedTransaction, TransactionOutput> {
         let config = BlockExecutorConfig {
             local: BlockExecutorLocalConfig {
                 blockstm_v2: AptosVM::get_blockstm_v2_enabled(),
