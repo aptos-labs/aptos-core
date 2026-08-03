@@ -6,10 +6,9 @@
 use crate::{memory_instrumentation::Instrumenter, options::ProverOptions};
 use move_binary_format::file_format::CodeOffset;
 use move_model::{
-    ast::{self, QuantKind, TempIndex},
+    ast::{self, QuantKind},
     exp_generator::ExpGenerator,
-    intrinsics::{find_iterator_map_decl, find_iterator_target, IteratorKind},
-    model::{FunctionEnv, Loc},
+    model::FunctionEnv,
     ty::{PrimitiveType, Type},
 };
 use move_stackless_bytecode::{
@@ -17,17 +16,12 @@ use move_stackless_bytecode::{
     function_data_builder::{FunctionDataBuilder, FunctionDataBuilderOptions},
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
-    livevar_analysis::run_livevar_analysis,
     stackless_bytecode::{Bytecode, HavocKind, Label, Operation, PropKind},
 };
 use std::collections::{BTreeMap, BTreeSet};
 
 const LOOP_INVARIANT_BASE_FAILED: &str = "base case of the loop invariant does not hold";
 const LOOP_INVARIANT_INDUCTION_FAILED: &str = "induction case of the loop invariant does not hold";
-const ITER_VALIDITY_BASE_FAILED: &str =
-    "iterator held across this loop may be invalidated by a map mutation before the loop";
-const ITER_VALIDITY_INDUCTION_FAILED: &str =
-    "iterator held across loop iterations may be invalidated by a map mutation in the loop";
 
 pub struct LoopAnalysisProcessor {}
 
@@ -99,75 +93,10 @@ impl LoopAnalysisProcessor {
 
         let back_edge_locs = loop_annotation.back_edges_locations();
         let invariant_locs = loop_annotation.invariants_locations();
-        let live_var_info = if options.for_interpretation || loop_annotation.fat_loops.is_empty() {
-            BTreeMap::new()
-        } else {
-            run_livevar_analysis(&FunctionTarget::new(func_env, &data), &data.code)
-        };
         let mut builder =
             FunctionDataBuilder::new_with_options(func_env, data, FunctionDataBuilderOptions {
                 no_fallthrough_jump_removal: true,
             });
-        // Locals live at a loop header which are iterators of an intrinsic map
-        // with validity tracking. The epoch ghost backing validity lives in
-        // Boogie globals which a loop body may modify, so it is havocked at
-        // every loop header (the `IterEpochHavoc` markers) and validity of the
-        // live iterators is maintained as an implicit loop invariant: asserted
-        // at loop entry (base case), assumed after the havoc (which constrains
-        // the havocked iterator value's ghost stamp), and asserted in the
-        // invariant-checking block (induction case). Liveness is the exact
-        // filter: a live iterator will be read (in the loop or after it) and
-        // is definitely assigned; iterators created and consumed within the
-        // body re-establish validity at their creation and need no invariant.
-        let env = func_env.module_env.env;
-        let mut tracked_targets: BTreeMap<Label, Vec<TempIndex>> = BTreeMap::new();
-        let mut havoc_witnesses: BTreeMap<Label, Vec<TempIndex>> = BTreeMap::new();
-        for (offset, bc) in builder.data.code.iter().enumerate() {
-            let Bytecode::Label(_, label) = bc else {
-                continue;
-            };
-            if !loop_annotation.fat_loops.contains_key(label) {
-                continue;
-            }
-            let Some(live) = live_var_info.get(&(offset as CodeOffset)) else {
-                continue;
-            };
-            let tracked: Vec<TempIndex> = live
-                .before
-                .iter()
-                .copied()
-                .filter(|idx| find_iterator_target(env, &builder.data.local_types[*idx]).is_some())
-                .collect();
-            let mut seen_ghosts = BTreeSet::new();
-            let witnesses: Vec<TempIndex> = tracked
-                .iter()
-                .copied()
-                .filter(|idx| {
-                    let ty = &builder.data.local_types[*idx];
-                    let Some((iter_ty, _)) = find_iterator_target(env, ty) else {
-                        return false;
-                    };
-                    let Some((map_qid, kind)) = find_iterator_map_decl(env, &iter_ty) else {
-                        return false;
-                    };
-                    // Ghost state is per (map, key type) for keyed iterators and
-                    // per map type for unkeyed ones.
-                    let key_ty = match kind {
-                        IteratorKind::Keyed => {
-                            let Type::Struct(_, _, targs) = &iter_ty else {
-                                return false;
-                            };
-                            Some(targs[0].clone())
-                        },
-                        IteratorKind::Unkeyed => None,
-                    };
-                    seen_ghosts.insert((map_qid, key_ty))
-                })
-                .collect();
-            tracked_targets.insert(*label, tracked);
-            havoc_witnesses.insert(*label, witnesses);
-        }
-        let mut header_locs: BTreeMap<Label, Loc> = BTreeMap::new();
         let mut goto_fixes = vec![];
         let code = std::mem::take(&mut builder.data.code);
         for (offset, bytecode) in code.into_iter().enumerate() {
@@ -176,7 +105,6 @@ impl LoopAnalysisProcessor {
                     builder.emit(bytecode);
                     builder.set_loc_from_attr(attr_id);
                     if let Some(loop_info) = loop_annotation.fat_loops.get(&label) {
-                        header_locs.insert(label, builder.get_loc(attr_id));
                         // assert loop invariants -> this is the base case
                         for (i, (attr_id, exp)) in
                             loop_info.spec_info().invariants.values().enumerate()
@@ -202,20 +130,6 @@ impl LoopAnalysisProcessor {
                             builder.emit_with(|attr_id| {
                                 Bytecode::Prop(attr_id, PropKind::Assert, exp.clone())
                             });
-                        }
-
-                        // assert iterator validity of tracked locals -> base case
-                        for idx in tracked_targets.get(&label).into_iter().flatten() {
-                            builder.set_loc_and_vc_info(
-                                builder.get_loc(attr_id),
-                                ITER_VALIDITY_BASE_FAILED,
-                            );
-                            let exp = builder.mk_call(
-                                &Type::Primitive(PrimitiveType::Bool),
-                                ast::Operation::IterValid,
-                                vec![builder.mk_temporary(*idx)],
-                            );
-                            builder.emit_with(move |id| Bytecode::Prop(id, PropKind::Assert, exp));
                         }
 
                         // havoc all loop targets
@@ -297,25 +211,6 @@ impl LoopAnalysisProcessor {
                                     });
                                 }
                             }
-                        }
-
-                        // havoc the iterator-validity ghost state the loop body may
-                        // modify, then re-assume validity of the tracked locals
-                        for idx in havoc_witnesses.get(&label).into_iter().flatten() {
-                            let exp = builder.mk_call(
-                                &Type::Primitive(PrimitiveType::Bool),
-                                ast::Operation::IterEpochHavoc,
-                                vec![builder.mk_temporary(*idx)],
-                            );
-                            builder.emit_with(move |id| Bytecode::Prop(id, PropKind::Assume, exp));
-                        }
-                        for idx in tracked_targets.get(&label).into_iter().flatten() {
-                            let exp = builder.mk_call(
-                                &Type::Primitive(PrimitiveType::Bool),
-                                ast::Operation::IterValid,
-                                vec![builder.mk_temporary(*idx)],
-                            );
-                            builder.emit_with(move |id| Bytecode::Prop(id, PropKind::Assume, exp));
                         }
 
                         // trace implicitly reassigned variables after havocking
@@ -453,21 +348,6 @@ impl LoopAnalysisProcessor {
                     LOOP_INVARIANT_INDUCTION_FAILED,
                 );
                 builder.emit_with(|attr_id| Bytecode::Prop(attr_id, PropKind::Assert, exp.clone()));
-            }
-
-            // assert iterator validity of tracked locals -> induction case
-            let header_loc = header_locs
-                .get(label)
-                .cloned()
-                .unwrap_or_else(|| func_env.get_loc());
-            for idx in tracked_targets.get(label).into_iter().flatten() {
-                builder.set_loc_and_vc_info(header_loc.clone(), ITER_VALIDITY_INDUCTION_FAILED);
-                let exp = builder.mk_call(
-                    &Type::Primitive(PrimitiveType::Bool),
-                    ast::Operation::IterValid,
-                    vec![builder.mk_temporary(*idx)],
-                );
-                builder.emit_with(move |id| Bytecode::Prop(id, PropKind::Assert, exp));
             }
 
             // stop the checking in proving mode (branch back to loop header for interpretation mode)

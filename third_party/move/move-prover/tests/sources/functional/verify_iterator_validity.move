@@ -1,10 +1,12 @@
-// Tests iterator-validity tracking for intrinsic maps: the `iterator_create`,
-// `iterator_use`, and `iterator_invalidate` pragmas plus the intrinsic
-// `map_iter_borrow_mut` role. Using an iterator after a structural map
-// mutation must fail verification; uses without intervening mutation must
-// verify.
+// Tests per-object iterator-validity for intrinsic maps: the map carries a
+// ghost `brand` (identity and version fused — fresh at creation, havocked by
+// every structural mutation), iterators carry a ghost `stamp`, and validity
+// (`stamp == brand`) is stated as ordinary `requires`/`ensures` on the
+// iterator API. Using an iterator after a structural mutation of its map —
+// or against a different map object — must fail verification; uses without
+// intervening mutation must verify.
 module 0x42::iter_table {
-    struct Table<phantom K: copy + drop, phantom V> has store, drop {}
+    struct Table<phantom K: copy + drop, phantom V> has store, drop, copy {}
 
     enum IteratorPtr<K: copy + drop> has copy, drop {
         End,
@@ -30,6 +32,7 @@ module 0x42::iter_table {
             map_spec_del = spec_remove,
             map_spec_len = spec_len,
             map_spec_has_key = spec_contains;
+        ghost brand: num;
     }
 
     public native fun new<K: copy + drop, V: store>(): Table<K, V>;
@@ -49,8 +52,16 @@ module 0x42::iter_table {
         (self is IteratorPtr::End<K>) || !spec_contains(t, self.key)
     }
 
+    spec fun spec_iter_valid<K, V>(it: IteratorPtr<K>, t: Table<K, V>): bool {
+        (it is IteratorPtr::End<K>) || it.stamp == t.brand
+    }
+
+    spec fun spec_node_valid<K, V>(it: NodePtr, t: Table<K, V>): bool {
+        it.stamp == t.brand
+    }
+
     spec iter_borrow_mut {
-        pragma iterator_use;
+        requires spec_iter_valid(self, t);
     }
 
     public fun find<K: copy + drop, V>(_t: &Table<K, V>, _key: K): IteratorPtr<K> {
@@ -59,8 +70,8 @@ module 0x42::iter_table {
     spec find {
         pragma opaque;
         pragma verify = false;
-        pragma iterator_create;
         aborts_if false;
+        ensures result.stamp == _t.brand;
         ensures (result is IteratorPtr::Some<K>) <==> spec_contains(_t, _key);
         ensures (result is IteratorPtr::Some<K>) ==> result.key == _key;
     }
@@ -71,7 +82,7 @@ module 0x42::iter_table {
     spec iter_borrow {
         pragma opaque;
         pragma verify = false;
-        pragma iterator_use;
+        requires spec_iter_valid(self, _t);
         aborts_if (self is IteratorPtr::End<K>) || !spec_contains(_t, self.key);
         ensures result == spec_get(_t, self.key);
     }
@@ -84,17 +95,19 @@ module 0x42::iter_table {
     spec erase {
         pragma opaque;
         pragma verify = false;
-        pragma iterator_use;
-        pragma iterator_invalidate;
+        requires spec_iter_valid(self, _t);
         aborts_if (self is IteratorPtr::End<K>) || !spec_contains(_t, self.key);
+        // The whole-map equality is ghost-excluding: the brand stays havoced
+        // (an opaque `&mut` map loses its ghost state), which IS the
+        // invalidation — no annotation needed.
         ensures _t == spec_remove(old(_t), self.key);
     }
 
     // A wrapper carrying an iterator in a field (like `IteratorPtrWithPath`).
-    // Shadows follow the iterator through field writes and write-backs, so
-    // implanting a stale iterator into a fresh wrapper is caught even though
-    // the wrapper itself was created at the current epoch. Field access
-    // requires this module, so the scenario tests live here.
+    // The stamp travels inside the iterator value through field writes and
+    // write-backs, so implanting a stale iterator into a fresh wrapper is
+    // caught even though the wrapper itself was created at the current brand.
+    // Field access requires this module, so the scenario tests live here.
     struct IterBox<K: copy + drop> has copy, drop {
         it: IteratorPtr<K>,
         tag: u64,
@@ -106,8 +119,8 @@ module 0x42::iter_table {
     spec box_find {
         pragma opaque;
         pragma verify = false;
-        pragma iterator_create = it;
         aborts_if false;
+        ensures result.it.stamp == _t.brand;
     }
 
     public fun box_use<K: copy + drop, V>(_self: IterBox<K>, _t: &Table<K, V>): u64 {
@@ -116,13 +129,14 @@ module 0x42::iter_table {
     spec box_use {
         pragma opaque;
         pragma verify = false;
-        pragma iterator_use = it;
+        requires spec_iter_valid(_self.it, _t);
         aborts_if false;
     }
 
-    // Forwarding without a pragma: the returned iterator's lineage is unknown,
-    // so the destination's shadow is havocked (fail-closed) — even when the
-    // result overwrites a local that previously held a fresh iterator.
+    // Forwarding without a lineage contract: the opaque result's ghost stamp
+    // is unconstrained (fail-closed) — even when the result overwrites a
+    // local that previously held a fresh iterator, and although the ensures
+    // equates the values (Move equality excludes ghosts).
     public fun box_project<K: copy + drop>(_self: &IterBox<K>): IteratorPtr<K> {
         abort 0
     }
@@ -133,18 +147,18 @@ module 0x42::iter_table {
         ensures result == _self.it;
     }
 
-    // Annotated projection: consumes the wrapper's validity and creates an
-    // equally-valid iterator.
+    // Projection with an explicit lineage contract: the result inherits the
+    // wrapper's iterator stamp (validity is checked where it is used).
     public fun box_get<K: copy + drop>(_self: &IterBox<K>): IteratorPtr<K> {
         abort 0
     }
     spec box_get {
         pragma opaque;
         pragma verify = false;
-        pragma iterator_use = it;
-        pragma iterator_create;
         aborts_if false;
         ensures result == _self.it;
+        // Move equality excludes ghosts; preserve the lineage explicitly.
+        ensures result.stamp == _self.it.stamp;
     }
 
     fun forward_stale_fails(): u64 {
@@ -194,7 +208,7 @@ module 0x42::iter_table {
     }
 
     // A key-agnostic (unkeyed) iterator, mirroring a leaf/node walk: validity
-    // is tracked against the per-map-type epoch.
+    // is the same per-object stamp-equals-brand model.
     enum NodePtr has copy, drop {
         Node { node_index: u64 },
     }
@@ -209,8 +223,8 @@ module 0x42::iter_table {
     spec node_begin {
         pragma opaque;
         pragma verify = false;
-        pragma iterator_create;
         aborts_if false;
+        ensures result.stamp == _t.brand;
     }
 
     public fun node_next<K: copy + drop, V>(self: NodePtr, _t: &Table<K, V>): NodePtr {
@@ -219,13 +233,14 @@ module 0x42::iter_table {
     spec node_next {
         pragma opaque;
         pragma verify = false;
-        pragma iterator_use;
-        pragma iterator_create;
+        requires spec_node_valid(self, _t);
         aborts_if false;
+        ensures result.stamp == _t.brand;
     }
 }
 
 module 0x42::VerifyIteratorValidity {
+    use std::vector;
     use 0x42::iter_table::{Self, Table};
     use 0x42::iter_table::spec_get;
 
@@ -252,7 +267,7 @@ module 0x42::VerifyIteratorValidity {
         ensures spec_get(result, 1) == 5;
     }
 
-    // Structural mutation between create and use: `iterator_use` assert fails.
+    // Structural mutation between create and use: the validity requires fails.
     fun stale_use_fails(): u64 {
         let t = iter_table::new<u8, u64>();
         iter_table::add(&mut t, 1, 2);
@@ -272,8 +287,8 @@ module 0x42::VerifyIteratorValidity {
         t
     }
 
-    // `iterator_invalidate` bumps the epoch: an iterator created before the
-    // erase cannot be used after it.
+    // An invalidating operation havocs the brand: an iterator created before
+    // the erase cannot be used after it.
     fun use_after_invalidate_fails(): u64 {
         let t = iter_table::new<u8, u64>();
         iter_table::add(&mut t, 1, 2);
@@ -298,8 +313,8 @@ module 0x42::VerifyIteratorValidity {
         ensures result == 3;
     }
 
-    // Tracking applies in generic functions too (against the skolemized
-    // instantiation's ghost state): stale use fails, fresh use verifies.
+    // Tracking applies in generic functions too: stale use fails, fresh use
+    // verifies.
     fun generic_stale_fails<K: copy + drop>(t: &mut Table<K, u64>, k1: K, k2: K): u64 {
         iter_table::add(t, k1, 2);
         let it = iter_table::find(t, k1);
@@ -334,9 +349,9 @@ module 0x42::VerifyIteratorValidity {
     }
 
     // Creating another iterator with the same key does not re-validate a stale
-    // one: validity follows the lineage of each iterator-holding local, not
-    // the iterator's value (here both iterators are equal as values, since
-    // this iterator type is fully determined by the key).
+    // one: the stamp is ghost state of each iterator value, and ghost state is
+    // excluded from value equality (here both iterators are equal as runtime
+    // values, since this iterator type is fully determined by the key).
     fun revalidation_by_alias_fails(): u64 {
         let t = iter_table::new<u8, u64>();
         iter_table::add(&mut t, 1, 2);
@@ -347,7 +362,8 @@ module 0x42::VerifyIteratorValidity {
     }
 
     // An iterator held across loop iterations stays valid when the loop does
-    // not mutate the map (validity is maintained as an implicit loop invariant).
+    // not mutate the map: neither the iterator nor the map is a loop target,
+    // so no havoc touches the stamp or the brand — no loop invariant needed.
     fun loop_no_mutation(n: u8): u64 {
         let t = iter_table::new<u8, u64>();
         iter_table::add(&mut t, 1, 2);
@@ -361,8 +377,138 @@ module 0x42::VerifyIteratorValidity {
         sum
     }
 
+    // An iterator ADVANCED in the loop is a loop target and gets havocked;
+    // a user-written validity invariant re-establishes it (expressible since
+    // validity is a plain spec function).
+    fun node_loop_with_invariant(rounds: u8): u64 {
+        let t = iter_table::new<u8, u64>();
+        iter_table::add(&mut t, 1, 2);
+        let np = iter_table::node_begin(&t);
+        let i = 0;
+        while ({
+            spec {
+                invariant iter_table::spec_node_valid(np, t);
+            };
+            i < rounds
+        }) {
+            np = iter_table::node_next(np, &t);
+            i += 1;
+        };
+        7
+    }
+
+    // ---- Per-object identity: the cells the brand model exists for ----
+
+    // An iterator from map A used against same-type map B fails, even with no
+    // intervening mutation: B's brand is an independent unconstrained value.
+    fun cross_map_fails(): u64 {
+        let a = iter_table::new<u8, u64>();
+        let b = iter_table::new<u8, u64>();
+        iter_table::add(&mut a, 1, 2);
+        iter_table::add(&mut b, 1, 9);
+        let it = iter_table::find(&a, 1);
+        *iter_table::iter_borrow(it, &b)
+    }
+
+    // Mutating a same-type sibling does NOT invalidate this map's iterators
+    // (per-object state; a type-level scheme would reject this).
+    fun sibling_independent(): u64 {
+        let a = iter_table::new<u8, u64>();
+        let b = iter_table::new<u8, u64>();
+        iter_table::add(&mut a, 1, 2);
+        let it = iter_table::find(&a, 1);
+        iter_table::add(&mut b, 7, 7);
+        *iter_table::iter_borrow(it, &a)
+    }
+    spec sibling_independent {
+        ensures result == 2;
+    }
+
+    // Vector of same-type maps: an iterator from element 0 fails against
+    // element 1 (no type-level scheme can distinguish the elements) ...
+    fun vector_cross_element_fails(): u64 {
+        let v = vector[iter_table::new<u8, u64>(), iter_table::new<u8, u64>()];
+        iter_table::add(vector::borrow_mut(&mut v, 0), 1, 2);
+        iter_table::add(vector::borrow_mut(&mut v, 1), 1, 9);
+        let it = iter_table::find(vector::borrow(&v, 0), 1);
+        let r = *iter_table::iter_borrow(it, vector::borrow(&v, 1));
+        let (a, b) = (vector::pop_back(&mut v), vector::pop_back(&mut v));
+        let (_, _) = (a, b);
+        r
+    }
+
+    // ... and verifies against its own element.
+    fun vector_same_element(): u64 {
+        let v = vector[iter_table::new<u8, u64>(), iter_table::new<u8, u64>()];
+        iter_table::add(vector::borrow_mut(&mut v, 0), 1, 2);
+        let it = iter_table::find(vector::borrow(&v, 0), 1);
+        let r = *iter_table::iter_borrow(it, vector::borrow(&v, 0));
+        let (a, b) = (vector::pop_back(&mut v), vector::pop_back(&mut v));
+        let (_, _) = (a, b);
+        r
+    }
+    spec vector_same_element {
+        ensures result == 2;
+    }
+
+    // A COPY shares the brand — correct: an iterator navigates a bit-identical
+    // copy exactly as the original ...
+    fun copy_shares_brand(): u64 {
+        let t = iter_table::new<u8, u64>();
+        iter_table::add(&mut t, 1, 2);
+        let it = iter_table::find(&t, 1);
+        let t2 = t;
+        *iter_table::iter_borrow(it, &t2)
+    }
+    spec copy_shares_brand {
+        ensures result == 2;
+    }
+
+    // ... until the copy diverges: mutating it havocs ITS brand only; the
+    // iterator dies on the copy but stays valid on the original.
+    fun copy_diverges_fails(): u64 {
+        let t = iter_table::new<u8, u64>();
+        iter_table::add(&mut t, 1, 2);
+        let it = iter_table::find(&t, 1);
+        let t2 = t;
+        iter_table::add(&mut t2, 2, 3);
+        *iter_table::iter_borrow(it, &t2)
+    }
+
+    fun copy_diverges_original_ok(): u64 {
+        let t = iter_table::new<u8, u64>();
+        iter_table::add(&mut t, 1, 2);
+        let it = iter_table::find(&t, 1);
+        let t2 = t;
+        iter_table::add(&mut t2, 2, 3);
+        *iter_table::iter_borrow(it, &t)
+    }
+    spec copy_diverges_original_ok {
+        ensures result == 2;
+    }
+
+    // An opaque wrapper taking `&mut` map (no contract about the brand):
+    // fail-closed, iterators die — the formerly-documented gap is closed by
+    // construction.
+    fun opaque_mut_wrapper_fails(): u64 {
+        let t = iter_table::new<u8, u64>();
+        iter_table::add(&mut t, 1, 2);
+        let it = iter_table::find(&t, 1);
+        opaque_touch(&mut t);
+        *iter_table::iter_borrow(it, &t)
+    }
+
+    fun opaque_touch(_t: &mut Table<u8, u64>) {
+    }
+    spec opaque_touch {
+        pragma opaque;
+        pragma verify = false;
+        aborts_if false;
+    }
+
     // A loop body that structurally mutates the map invalidates an iterator
-    // held across iterations: the implicit invariant's induction case fails.
+    // held across iterations: the map is a loop target, its havoc loses the
+    // brand, and the validity requires in the next iteration fails.
     fun loop_mutation_fails(n: u8): u64 {
         let t = iter_table::new<u8, u64>();
         iter_table::add(&mut t, 1, 2);

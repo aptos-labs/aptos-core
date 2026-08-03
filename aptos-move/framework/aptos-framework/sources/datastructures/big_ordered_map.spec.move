@@ -17,12 +17,16 @@ spec aptos_framework::big_ordered_map {
     // model reads and writes at the iterator's cached key; at runtime a stale
     // iterator navigates by its retained position, so it may abort, return
     // arbitrary results, or read/mutate a DIFFERENT entry than modeled. The
-    // prover enforces this contract mechanically: each iterator value carries
-    // a ghost creation stamp (see `spec IteratorPtr`), the
-    // `iterator_create`/`iterator_use`/`iterator_invalidate` pragmas below
-    // stamp and check it against a per-map epoch bumped by every structural
-    // mutation (for both `IteratorPtr` and `LeafNodeIteratorPtr`), and any
-    // use of a possibly-stale iterator fails verification.
+    // prover enforces this contract mechanically and per map OBJECT: the map
+    // carries a ghost `brand` (identity and version fused — fresh at
+    // creation, havocked by every structural mutation), each iterator value
+    // carries a ghost creation `stamp`, and validity
+    // (`spec_iter_valid`: stamp equals the map's current brand) is stated as
+    // ordinary `requires`/`ensures` on the iterator API below. Any use of a
+    // stale iterator, or of an iterator against a different map object (also
+    // a sibling of the same type, or another element of a vector of maps),
+    // fails verification. Iterators held across loops need a loop invariant
+    // (`invariant spec_iter_valid(it, map)`).
     spec BigOrderedMap {
         pragma intrinsic = map,
             map_new = new,
@@ -70,11 +74,30 @@ spec aptos_framework::big_ordered_map {
     // Iterator-validity ghost state: each iterator value carries its creation
     // epoch in a ghost field; every structural mutation bumps a per-(map, key
     // type) epoch, and every iterator use asserts the stamp is current.
+    spec BigOrderedMap {
+        // Identity and version of this map object, fused: fresh-unconstrained
+        // at creation, havocked by every structural mutation. An iterator is
+        // valid iff its ghost `stamp` equals its map's current `brand` —
+        // which simultaneously proves it came from THIS map object and that
+        // no structural mutation intervened.
+        ghost brand: num;
+    }
     spec IteratorPtr {
         ghost stamp: num;
     }
     spec LeafNodeIteratorPtr {
         ghost stamp: num;
+    }
+
+    /// An iterator is valid for `map` iff it was created from this map object
+    /// and the object has not been structurally mutated since. End iterators
+    /// carry no position and are always valid.
+    spec fun spec_iter_valid<K, V>(it: IteratorPtr<K>, map: BigOrderedMap<K, V>): bool {
+        (it is IteratorPtr::End<K>) || it.stamp == map.brand
+    }
+
+    spec fun spec_leaf_iter_valid<K, V>(it: LeafNodeIteratorPtr, map: BigOrderedMap<K, V>): bool {
+        it.stamp == map.brand
     }
 
     spec native fun spec_len<K, V>(t: BigOrderedMap<K, V>): num;
@@ -191,7 +214,7 @@ spec aptos_framework::big_ordered_map {
     spec iter_borrow {
         pragma opaque;
         pragma verify = false;
-        pragma iterator_use;
+        requires spec_iter_valid(self, map);
         aborts_if iter_is_end(self, map);
         ensures result == spec_get(map, self.key);
     }
@@ -202,7 +225,7 @@ spec aptos_framework::big_ordered_map {
     // assert is covered by the size presumption above.
     spec iter_borrow_mut {
         pragma intrinsic;
-        pragma iterator_use;
+        requires spec_iter_valid(self, map);
     }
 
     spec fun spec_aborts_iter_borrow_mut<K, V>(self: IteratorPtr<K>, map: BigOrderedMap<K, V>): bool {
@@ -226,7 +249,7 @@ spec aptos_framework::big_ordered_map {
     spec iter_is_begin {
         pragma opaque;
         pragma verify = false;
-        pragma iterator_use;
+        requires spec_iter_valid(self, map);
         aborts_if false;
         ensures result <==> spec_iter_is_begin(self, map);
     }
@@ -236,8 +259,8 @@ spec aptos_framework::big_ordered_map {
     spec internal_lower_bound {
         pragma opaque;
         pragma verify = false;
-        pragma iterator_create;
         aborts_if false;
+        ensures result.stamp == self.brand;
         // End iff no key >= input exists (all keys are Less than input).
         ensures iter_is_end(result, self) <==>
             (forall k: K where spec_contains_key(self, k):
@@ -334,8 +357,8 @@ spec aptos_framework::big_ordered_map {
     spec internal_find {
         pragma opaque;
         pragma verify = false;
-        pragma iterator_create;
         aborts_if false;
+        ensures result.stamp == self.brand;
         ensures iter_is_end(result, self) <==> !spec_contains_key(self, key);
         ensures !iter_is_end(result, self) ==> result.key == key;
     }
@@ -343,8 +366,8 @@ spec aptos_framework::big_ordered_map {
     spec internal_new_begin_iter {
         pragma opaque;
         pragma verify = false;
-        pragma iterator_create;
         aborts_if false;
+        ensures result.stamp == self.brand;
         ensures iter_is_end(result, self) <==> spec_len(self) == 0;
         ensures !iter_is_end(result, self) ==> spec_contains_key(self, result.key);
         // result.key is the smallest key in the map.
@@ -363,9 +386,9 @@ spec aptos_framework::big_ordered_map {
     spec iter_next {
         pragma opaque;
         pragma verify = false;
-        pragma iterator_use;
-        pragma iterator_create;
+        requires spec_iter_valid(self, map);
         aborts_if iter_is_end(self, map);
+        ensures result.stamp == map.brand;
         // End iff self.key has no strict successor in the map.
         ensures (result is IteratorPtr::End<K>) <==>
             (forall k: K where spec_contains_key(map, k):
@@ -383,9 +406,9 @@ spec aptos_framework::big_ordered_map {
     spec iter_prev {
         pragma opaque;
         pragma verify = false;
-        pragma iterator_use;
-        pragma iterator_create;
+        requires spec_iter_valid(self, map);
         aborts_if spec_iter_is_begin(self, map);
+        ensures result.stamp == map.brand;
         // A predecessor always exists when self is not begin; from End the result
         // is the largest key. The result always points at an in-map key.
         ensures !(result is IteratorPtr::End<K>);
@@ -410,9 +433,11 @@ spec aptos_framework::big_ordered_map {
     spec iter_modify {
         pragma opaque;
         pragma verify = false;
-        pragma iterator_use;
+        requires spec_iter_valid(self, map);
         aborts_if iter_is_end(self, map);
         aborts_if aborts_of<f>(spec_get(map, self.key));
+        // A value modification is not a structural mutation: iterators stay valid.
+        ensures map.brand == old(map).brand;
         // iter_modify mutates the value at self.key via the closure. Containment is
         // unchanged for every key; values for keys other than self.key are preserved;
         // the closure's contract relates the old value, the new value, and the result.
@@ -425,8 +450,8 @@ spec aptos_framework::big_ordered_map {
     spec internal_find_with_path {
         pragma opaque;
         pragma verify = false;
-        pragma iterator_create = iterator;
         aborts_if false;
+        ensures result.iterator.stamp == self.brand;
         ensures iter_is_end(result.iterator, self) <==> !spec_contains_key(self, key);
         ensures !iter_is_end(result.iterator, self) ==> result.iterator.key == key;
     }
@@ -434,17 +459,17 @@ spec aptos_framework::big_ordered_map {
     spec iter_with_path_get_iter {
         pragma opaque;
         pragma verify = false;
-        pragma iterator_use = iterator;
-        pragma iterator_create;
         aborts_if false;
         ensures result == self.iterator;
+        // Move equality excludes ghosts; the projected iterator's lineage is
+        // preserved explicitly (validity is checked where it is used).
+        ensures result.stamp == self.iterator.stamp;
     }
 
     spec iter_remove {
         pragma opaque;
         pragma verify = false;
-        pragma iterator_use = iterator;
-        pragma iterator_invalidate;
+        requires spec_iter_valid(self.iterator, map);
         aborts_if iter_is_end(self.iterator, map);
         ensures result == spec_get(old(map), self.iterator.key);
         ensures !spec_contains_key(map, self.iterator.key);
@@ -455,8 +480,8 @@ spec aptos_framework::big_ordered_map {
     spec internal_leaf_new_begin_iter {
         pragma opaque;
         pragma verify = false;
-        pragma iterator_create;
         aborts_if false;
+        ensures result.stamp == self.brand;
         // Points at `min_leaf_index`, which is never NULL_INDEX: an empty map's
         // leaf walk visits the (empty) root leaf once.
         ensures !internal_leaf_iter_is_end(result);
@@ -478,9 +503,9 @@ spec aptos_framework::big_ordered_map {
     spec internal_leaf_iter_borrow_entries_and_next_leaf_index {
         pragma opaque;
         pragma verify = false;
-        pragma iterator_use;
-        pragma iterator_create;
+        requires spec_leaf_iter_valid(self, map);
         aborts_if internal_leaf_iter_is_end(self);
+        ensures result_2.stamp == map.brand;
         // Soundness direction only: every entry in the returned leaf is a real
         // map entry (a Leaf child with contained key and matching value).
         // Completeness — that the leaves together visit every key — is not modeled.

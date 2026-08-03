@@ -8,11 +8,9 @@ use crate::{
     builder::module_builder::SpecBlockContext,
     model::{IntrinsicId, QualifiedId, SpecFunId},
     pragmas::{
-        IntrinsicFunDef, INTRINSIC_FUN_MAP_ITER_BORROW_MUT, INTRINSIC_PRAGMA, INTRINSIC_TYPE_MAP,
-        INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS,
+        IntrinsicFunDef, INTRINSIC_PRAGMA, INTRINSIC_TYPE_MAP, INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS,
     },
     symbol::{Symbol, SymbolPool},
-    ty::Type,
     FunId, GlobalEnv, Loc, ModuleBuilder, StructId,
 };
 use std::{collections::BTreeMap, ops::Deref};
@@ -404,126 +402,4 @@ impl IntrinsicsAnnotation {
             })
             .is_some_and(|sym| sym == &symbol_pool.make(intrinsic_name))
     }
-}
-
-/// The flavor of a tracked map iterator type.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum IteratorKind {
-    /// Key-typed iterator (the parameter-0 enum of the map's bound
-    /// `map_iter_borrow_mut`); validity is tracked per (map, key type).
-    Keyed,
-    /// Key-agnostic iterator, identified by its use at a plain (non
-    /// field-indirected) `iterator_use`/`iterator_create` position of a
-    /// function taking a tracked map (e.g. a leaf iterator); validity is
-    /// tracked per map type.
-    Unkeyed,
-}
-
-/// If `ty` is an iterator type of an intrinsic map with iterator-validity
-/// tracking declared in the same module, returns the map struct and the
-/// iterator's kind. Backends key the validity ghost state by the map struct
-/// and, for keyed iterators, the key type.
-pub fn find_iterator_map_decl(
-    env: &GlobalEnv,
-    ty: &Type,
-) -> Option<(QualifiedId<StructId>, IteratorKind)> {
-    let Type::Struct(mid, sid, targs) = ty else {
-        return None;
-    };
-    let iter_qid = mid.qualified(*sid);
-    // Keyed: the parameter-0 enum of a map's bound `map_iter_borrow_mut`.
-    if !targs.is_empty() && env.get_struct(iter_qid).has_variants() {
-        for map_struct in env.get_module(*mid).get_structs() {
-            let map_qid = map_struct.get_qualified_id();
-            let Some(decl) = env.intrinsics.get_decl_for_struct(&map_qid) else {
-                continue;
-            };
-            let Some(fun_qid) = decl.lookup_move_fun(env, INTRINSIC_FUN_MAP_ITER_BORROW_MUT) else {
-                continue;
-            };
-            if let Some(param0) = env.get_function(fun_qid).get_parameter_types().first() {
-                if let Type::Struct(pmid, psid, _) = param0.skip_reference() {
-                    if pmid.qualified(*psid) == iter_qid {
-                        return Some((map_qid, IteratorKind::Keyed));
-                    }
-                }
-            }
-        }
-    }
-    // Unkeyed: appears directly as the consumed parameter 0 of a function with
-    // a plain `iterator_use` pragma, or in the result of one with a plain
-    // `iterator_create` pragma, where the function also takes a tracked map.
-    // Field-indirected (symbol-valued) pragmas are excluded: there the
-    // parameter/result is a container of an iterator, not an iterator itself.
-    let pool = env.symbol_pool();
-    let use_sym = pool.make(crate::pragmas::ITERATOR_USE_PRAGMA);
-    let create_sym = pool.make(crate::pragmas::ITERATOR_CREATE_PRAGMA);
-    let is_iter_ty = |t: &Type| {
-        matches!(t.skip_reference(),
-            Type::Struct(pmid, psid, _) if pmid.qualified(*psid) == iter_qid)
-    };
-    for fun in env.get_module(*mid).get_functions() {
-        let spec = fun.get_spec();
-        let plain_pragma = |sym: &Symbol| matches!(spec.properties.get(sym), Some(v) if !matches!(v, PropertyValue::Symbol(_)));
-        let mut positions = vec![];
-        if plain_pragma(&use_sym) {
-            positions.extend(fun.get_parameter_types().first().cloned());
-        }
-        if plain_pragma(&create_sym) {
-            match fun.get_result_type() {
-                Type::Tuple(ts) => positions.extend(ts),
-                t => positions.push(t),
-            }
-        }
-        if !positions.iter().any(is_iter_ty) {
-            continue;
-        }
-        let map_qid = fun.get_parameter_types().iter().find_map(|p| {
-            let Type::Struct(pmid, psid, _) = p.skip_reference() else {
-                return None;
-            };
-            let q = pmid.qualified(*psid);
-            (env.get_struct(q).is_intrinsic_of(INTRINSIC_TYPE_MAP)
-                && map_has_iterator_tracking(env, q))
-            .then_some(q)
-        });
-        if let Some(map_qid) = map_qid {
-            return Some((map_qid, IteratorKind::Unkeyed));
-        }
-    }
-    None
-}
-
-/// Whether an intrinsic map struct has iterator-validity tracking, i.e. binds
-/// the `map_iter_borrow_mut` role. Only such maps declare validity ghost state.
-pub fn map_has_iterator_tracking(env: &GlobalEnv, map_qid: QualifiedId<StructId>) -> bool {
-    env.intrinsics
-        .get_decl_for_struct(&map_qid)
-        .and_then(|decl| decl.lookup_move_fun(env, INTRINSIC_FUN_MAP_ITER_BORROW_MUT))
-        .is_some()
-}
-
-/// If `ty` holds a tracked map iterator — directly, behind a reference, or as
-/// a plain struct with a direct iterator field (e.g. the `IteratorPtrWithPath`
-/// companion) — returns the iterator's type together with the projection
-/// field for wrapped iterators. Temps of such types carry validity shadows
-/// and participate in the implicit loop invariant.
-pub fn find_iterator_target(env: &GlobalEnv, ty: &Type) -> Option<(Type, Option<Symbol>)> {
-    let ty = ty.skip_reference();
-    if find_iterator_map_decl(env, ty).is_some() {
-        return Some((ty.clone(), None));
-    }
-    let Type::Struct(mid, sid, targs) = ty else {
-        return None;
-    };
-    let struct_env = env.get_struct(mid.qualified(*sid));
-    if struct_env.has_variants() {
-        return None;
-    }
-    struct_env.get_fields().find_map(|f| {
-        let field_ty = f.get_type().instantiate(targs);
-        find_iterator_map_decl(env, &field_ty)
-            .is_some()
-            .then(|| (field_ty, Some(f.get_name())))
-    })
 }

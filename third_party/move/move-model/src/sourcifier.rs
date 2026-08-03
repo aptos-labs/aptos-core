@@ -3002,16 +3002,6 @@ impl<'a> ExpSourcifier<'a> {
                 self.print_exp(Prio::General, false, &args[0]);
                 emit!(self.wr(), ")")
             }),
-            Operation::IterValid => self.parenthesize(context_prio, Prio::Postfix, || {
-                emit!(self.wr(), "IterValid(");
-                self.print_exp(Prio::General, false, &args[0]);
-                emit!(self.wr(), ")")
-            }),
-            Operation::IterEpochHavoc => self.parenthesize(context_prio, Prio::Postfix, || {
-                emit!(self.wr(), "IterEpochHavoc(");
-                self.print_exp(Prio::General, false, &args[0]);
-                emit!(self.wr(), ")")
-            }),
             Operation::Behavior(kind, range) => {
                 // `WriteOf(j)` is WP-internal and is expected to be eliminated
                 // before sourcification; if it leaks here we still render via

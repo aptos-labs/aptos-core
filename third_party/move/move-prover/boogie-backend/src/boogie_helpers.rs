@@ -15,10 +15,9 @@ use move_core_types::{
 };
 use move_model::{
     ast::{Address, BehaviorKind, MemoryLabel, TempIndex, Value},
-    intrinsics::{find_iterator_map_decl, IteratorKind},
     model::{
-        FieldEnv, FieldId, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, QualifiedId,
-        QualifiedInstId, SpecFunId, StructEnv, StructId, SCRIPT_MODULE_NAME,
+        FieldEnv, FieldId, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, QualifiedInstId,
+        SpecFunId, StructEnv, StructId, SCRIPT_MODULE_NAME,
     },
     pragmas::INTRINSIC_TYPE_MAP,
     symbol::Symbol,
@@ -59,15 +58,24 @@ pub fn boogie_module_name(env: &ModuleEnv<'_>) -> String {
 
 /// Return boogie name of given structure.
 pub fn boogie_struct_name(struct_env: &StructEnv<'_>, inst: &[Type], bv_flag: bool) -> String {
-    if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP)
-        && struct_env.get_ghost_fields().next().is_none()
-    {
+    if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
+        if struct_env.get_ghost_fields().next().is_some() {
+            // Intrinsic maps that declare ghost fields use a per-instance
+            // carrier datatype wrapping the table, so the ghosts have
+            // constructor arguments to live in. The name must agree with the
+            // suffix convention (`boogie_type_suffix_for_struct`), including
+            // the bv twin of the value type, so twin instances reference
+            // their own carrier consistently.
+            return format!(
+                "${}_{}{}",
+                boogie_module_name(&struct_env.module_env),
+                struct_env.get_name().display(struct_env.symbol_pool()),
+                boogie_inst_suffix(struct_env.module_env.env, inst, &[false, bv_flag])
+            );
+        }
         // Map to the theory type representation, which is `Table int V`. The key
         // is encoded as an integer to avoid extensionality problems, and to support
-        // $Mutation paths, which are sequences of ints. Intrinsic maps that
-        // declare ghost fields instead use a per-struct carrier datatype
-        // wrapping the table (the regular-struct naming below), so the ghosts
-        // have constructor arguments to live in.
+        // $Mutation paths, which are sequences of ints.
         let env = struct_env.module_env.env;
         format!("Table int ({})", boogie_type(env, &inst[1], bv_flag))
     } else {
@@ -1538,91 +1546,4 @@ pub fn compute_evaluator_memory_union(
     }
 
     (union_used_memory, union_old_memory)
-}
-
-/// Ghost state for iterator-validity tracking of an intrinsic map: the
-/// per-(map, key type) epoch counter declared in the prelude, plus the
-/// key-carrying variant of the iterator enum (variants without a key,
-/// e.g. `End`, are exempt from validity).
-pub struct IterGhostState {
-    pub epoch: String,
-    pub key_variant: Option<String>,
-}
-
-/// Resolves the validity ghost state for an iterator type. Returns `None` if
-/// the type is not an iterator of an intrinsic map with validity tracking.
-/// Open key types resolve to the ghost state of the skolemized instantiation.
-pub fn boogie_iter_ghost_state(env: &GlobalEnv, iter_ty: &Type) -> Option<IterGhostState> {
-    let iter_ty = iter_ty.skip_reference();
-    let (map_qid, kind) = find_iterator_map_decl(env, iter_ty)?;
-    let Type::Struct(mid, sid, targs) = iter_ty else {
-        return None;
-    };
-    match kind {
-        IteratorKind::Keyed => {
-            let epoch = boogie_iter_epoch_name(env, map_qid, &targs[0]);
-            let iter_env = env.get_struct(mid.qualified(*sid));
-            let key_variant = iter_env.get_variants().find_map(|variant| {
-                iter_env
-                    .get_fields_of_variant(variant)
-                    .any(|f| f.get_type() == Type::TypeParameter(0))
-                    .then(|| boogie_struct_variant_name(&iter_env, targs, variant))
-            });
-            Some(IterGhostState { epoch, key_variant })
-        },
-        IteratorKind::Unkeyed => Some(IterGhostState {
-            epoch: boogie_iter_epoch_all_name(env, map_qid),
-            key_variant: None,
-        }),
-    }
-}
-
-/// Epoch ghost variable name for a tracked intrinsic map and a concrete key
-/// type. Must agree with the prelude declaration.
-pub fn boogie_iter_epoch_name(
-    env: &GlobalEnv,
-    map_qid: QualifiedId<StructId>,
-    key_ty: &Type,
-) -> String {
-    let map_env = env.get_struct(map_qid);
-    format!(
-        "${}_{}_iter_epoch'{}'",
-        boogie_module_name(&map_env.module_env),
-        map_env.get_name().display(map_env.symbol_pool()),
-        boogie_type_suffix(env, key_ty, false)
-    )
-}
-
-/// Key-independent epoch ghost variable name for a tracked intrinsic map,
-/// used by unkeyed (e.g. leaf) iterators. Bumped by structural mutations of
-/// any instantiation of the map. Must agree with the prelude declaration.
-pub fn boogie_iter_epoch_all_name(env: &GlobalEnv, map_qid: QualifiedId<StructId>) -> String {
-    let map_env = env.get_struct(map_qid);
-    format!(
-        "${}_{}_iter_epoch$all",
-        boogie_module_name(&map_env.module_env),
-        map_env.get_name().display(map_env.symbol_pool())
-    )
-}
-
-/// Name of the ghost field carrying an iterator's creation epoch. A tracked
-/// iterator type declares `ghost stamp: num;` in its spec block; validity of
-/// an iterator value is `value->stamp == <epoch>`. The ghost travels with the
-/// value through copies, borrows, write-backs and calls, so no out-of-band
-/// lineage tracking is needed.
-pub const ITER_STAMP_GHOST_FIELD: &str = "stamp";
-
-/// Boogie selector of a tracked iterator's `stamp` ghost field, or `None` if
-/// the type does not declare it. Ghost fields on enums use a shared selector
-/// across variants, so the selector applies to any variant of the value.
-pub fn boogie_iter_stamp_sel(env: &GlobalEnv, iter_ty: &Type) -> Option<String> {
-    let Type::Struct(mid, sid, _) = iter_ty.skip_reference() else {
-        return None;
-    };
-    let struct_env = env.get_struct(mid.qualified(*sid));
-    let stamp_sym = env.symbol_pool().make(ITER_STAMP_GHOST_FIELD);
-    struct_env
-        .get_ghost_fields()
-        .find(|f| f.get_name() == stamp_sym)
-        .map(|f| boogie_field_sel(&f))
 }

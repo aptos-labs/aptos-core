@@ -1,24 +1,37 @@
 Move prover returns: exiting with verification errors
 error: post-condition does not hold
-   ┌─ tests/sources/functional/ghost_field_intrinsic_map_ops.move:84:9
+   ┌─ tests/sources/functional/ghost_field_intrinsic_map_ops.move:98:9
    │
-84 │         ensures result.brand == 0; // FAILS: fresh brand is unconstrained
+98 │         ensures result.brand == 0; // FAILS: fresh brand is unconstrained
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
-   =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:81: mk_brand_bad
+   =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:95: mk_brand_bad
    =         result = <redacted>
-   =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:84: mk_brand_bad (spec)
+   =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:98: mk_brand_bad (spec)
 
 error: post-condition does not hold
-   ┌─ tests/sources/functional/ghost_field_intrinsic_map_ops.move:93:9
-   │
-93 │         ensures m.brand == old(m).brand; // FAILS: mutation havocs the brand
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   │
-   =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:88: add_brand_bad
-   =         m = <redacted>
-   =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:89: add_brand_bad
-   =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:88: add_brand_bad
-   =         m = <redacted>
-   =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:92: add_brand_bad (spec)
-   =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:93: add_brand_bad (spec)
+    ┌─ tests/sources/functional/ghost_field_intrinsic_map_ops.move:107:9
+    │
+107 │         ensures m.brand == old(m).brand; // FAILS: mutation havocs the brand
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:102: add_brand_bad
+    =         m = <redacted>
+    =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:103: add_brand_bad
+    =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:102: add_brand_bad
+    =         m = <redacted>
+    =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:106: add_brand_bad (spec)
+    =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:107: add_brand_bad (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/ghost_field_intrinsic_map_ops.move:135:9
+    │
+135 │         ensures m.brand == old(m).brand; // FAILS: mutation havocs the brand
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:131: addall_brand_bad
+    =         m = <redacted>
+    =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:132: addall_brand_bad
+    =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:131: addall_brand_bad
+    =         m = <redacted>
+    =     at tests/sources/functional/ghost_field_intrinsic_map_ops.move:135: addall_brand_bad (spec)
