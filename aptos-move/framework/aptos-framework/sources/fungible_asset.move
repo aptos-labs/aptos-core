@@ -1,7 +1,7 @@
 /// This defines the fungible asset module that can issue fungible asset of any `Metadata` object. The
 /// metadata object can be any object that equipped with `Metadata` resource.
 module aptos_framework::fungible_asset {
-    use aptos_framework::aggregator_v2::{Self, Aggregator};
+    use aptos_framework::aggregator_v2::{Self, Aggregator, AggregatorSnapshot};
     use aptos_framework::create_signer;
     use aptos_framework::event;
     use aptos_framework::function_info::{Self, FunctionInfo};
@@ -674,28 +674,56 @@ module aptos_framework::fungible_asset {
     ///       Use `dispatchable_fungible_asset::balance` instead if you intend to work with those FAs.
     public fun balance<T: key>(
         store: Object<T>
-    ): u64 acquires FungibleStore, ConcurrentFungibleBalance, DispatchFunctionStore {
-        let fa_store = borrow_store_resource(&store);
-        assert!(
-            !has_balance_dispatch_function(fa_store.metadata),
-            error::invalid_argument(EINVALID_DISPATCHABLE_OPERATIONS)
-        );
-        balance_impl(store)
+    ): u64 {
+        balance_impl(
+            store,
+            |store| {
+                assert!(
+                    !has_balance_dispatch_function(store.metadata),
+                    error::invalid_argument(EINVALID_DISPATCHABLE_OPERATIONS)
+                );
+            }
+        )
     }
 
-    fun balance_impl<T: key>(store: Object<T>): u64 acquires FungibleStore, ConcurrentFungibleBalance {
+    inline fun balance_impl<T: key>(store: Object<T>, check: |&FungibleStore|): u64 {
         let store_addr = store.object_address();
         if (store_exists_inline(store_addr)) {
-            let store_balance = borrow_store_resource(&store).balance;
+            let store = &FungibleStore[store_addr];
+            check(store);
+            let store_balance = store.balance;
             if (store_balance == 0
                 && concurrent_fungible_balance_exists_inline(store_addr)) {
-                let balance_resource =
-                    borrow_global<ConcurrentFungibleBalance>(store_addr);
-                balance_resource.balance.read()
+                ConcurrentFungibleBalance[store_addr].balance.read()
             } else {
                 store_balance
             }
         } else { 0 }
+    }
+
+    /// Get the balance of a given store, as AggregatorSnapshot.
+    /// Allows us to obtain a balance object, without issuing a read - which would reduce parallelism.
+    ///
+    /// Note: This function will abort on FAs with `derived_balance` hook set up.
+    ///       Use `dispatchable_fungible_asset::derived_balance_snapshot` instead if you intend to work with those FAs.
+    public fun balance_snapshot<T: key>(store: Object<T>): AggregatorSnapshot<u64> {
+        let store_addr = object::object_address(&store);
+        if (store_exists_inline(store_addr)) {
+            let fa_store = &FungibleStore[store_addr];
+            assert!(
+                !has_balance_dispatch_function(fa_store.metadata),
+                error::invalid_argument(EINVALID_DISPATCHABLE_OPERATIONS)
+            );
+
+            let store_balance = fa_store.balance;
+            if (store_balance == 0 && concurrent_fungible_balance_exists_inline(store_addr)) {
+                ConcurrentFungibleBalance[store_addr].balance.snapshot()
+            } else {
+                aggregator_v2::create_snapshot(store_balance)
+            }
+        } else {
+            aggregator_v2::create_snapshot(0)
+        }
     }
 
     #[view]
@@ -1120,11 +1148,15 @@ module aptos_framework::fungible_asset {
     public fun balance_with_ref<T: key>(
         self: &RawBalanceRef, store: Object<T>
     ): u64 acquires FungibleStore, ConcurrentFungibleBalance {
-        assert!(
-            self.metadata == store_metadata(store),
-            error::invalid_argument(ERAW_BALANCE_REF_AND_FUNGIBLE_ASSET_MISMATCH)
-        );
-        balance_impl(store)
+        balance_impl(
+            store,
+            |store| {
+                assert!(
+                    self.metadata == store.metadata,
+                    error::invalid_argument(ERAW_BALANCE_REF_AND_FUNGIBLE_ASSET_MISMATCH)
+                );
+            }
+        )
     }
 
     /// Access raw supply of a FA using `RawSupplyRef`
@@ -1407,17 +1439,29 @@ module aptos_framework::fungible_asset {
         move_to(&metadata_object_signer, supply);
     }
 
+    #[view]
+    public fun is_concurrent<T: key>(store: Object<T>): bool {
+        exists<ConcurrentFungibleBalance>(object::object_address(&store))
+    }
+
+    /// Opts-in the given store into tracking balance in a concurrent manner (through Aggregators),
+    /// This allows witdraw, deposit, transfer, is_balance_at_least and balance_snapshot to
+    /// not create conflicts and maintain parallelism.
     public entry fun upgrade_store_to_concurrent<T: key>(
         owner: &signer, store: Object<T>
     ) acquires FungibleStore {
+        let fungible_store_address = store.object_address();
+        // be graceful if ConcurrentFungibleBalance already exists, but flag is off
+        if (exists<ConcurrentFungibleBalance>(fungible_store_address)) {
+            // skip checks, to make opt-in efficient if done before operation.
+            return;
+        };
+
         assert!(
             object::owns(store, signer::address_of(owner)),
             error::permission_denied(ENOT_STORE_OWNER)
         );
         assert!(!is_frozen(store), error::invalid_argument(ESTORE_IS_FROZEN));
-        let fungible_store_address = store.object_address();
-        // be graceful if ConcurrentFungibleBalance already exists, but flag is off
-        if (exists<ConcurrentFungibleBalance>(fungible_store_address)) { return };
         assert!(
             allow_upgrade_to_concurrent_fungible_balance(),
             error::invalid_argument(ECONCURRENT_BALANCE_NOT_ENABLED)
@@ -1980,6 +2024,55 @@ module aptos_framework::fungible_asset {
             ).balance.read() == 30,
             12
         );
+    }
+
+    #[test(creator = @0xcafe)]
+    fun test_balance_snapshot(
+        creator: &signer
+    ) acquires FungibleStore, Supply, ConcurrentSupply, DispatchFunctionStore, ConcurrentFungibleBalance {
+        let (mint_ref, _, _, _, metadata) = create_fungible_asset(creator);
+        let creator_store = create_test_store(creator, metadata);
+
+        // Empty (non-concurrent) store yields a snapshot of 0.
+        assert!(!concurrent_fungible_balance_exists_inline(creator_store.object_address()), 1);
+        assert!(aggregator_v2::read_snapshot(&balance_snapshot(creator_store)) == 0, 2);
+
+        let fa = mint_ref.mint(100);
+        deposit(creator_store, fa);
+        assert!(aggregator_v2::read_snapshot(&balance_snapshot(creator_store)) == 100, 3);
+
+        let fa = withdraw(creator, creator_store, 40);
+        assert!(aggregator_v2::read_snapshot(&balance_snapshot(creator_store)) == 60, 4);
+        deposit(creator_store, fa);
+        assert!(aggregator_v2::read_snapshot(&balance_snapshot(creator_store)) == 100, 5);
+    }
+
+    #[test(fx = @aptos_framework, creator = @0xcafe)]
+    fun test_balance_snapshot_concurrent(
+        fx: &signer, creator: &signer
+    ) acquires FungibleStore, Supply, ConcurrentSupply, DispatchFunctionStore, ConcurrentFungibleBalance {
+        let supply_feature = features::get_concurrent_fungible_assets_feature();
+        let balance_feature = features::get_concurrent_fungible_balance_feature();
+        let default_balance_feature =
+            features::get_default_to_concurrent_fungible_balance_feature();
+        features::change_feature_flags_for_testing(
+            fx,
+            vector[supply_feature, balance_feature, default_balance_feature],
+            vector[]
+        );
+
+        let (mint_ref, _, _, _, metadata) = create_fungible_asset(creator);
+        let creator_store = create_test_store(creator, metadata);
+
+        // Balance is tracked in the concurrent aggregator, so the snapshot is
+        // taken directly from it (without issuing a read).
+        assert!(concurrent_fungible_balance_exists_inline(creator_store.object_address()), 1);
+        assert!(aggregator_v2::read_snapshot(&balance_snapshot(creator_store)) == 0, 2);
+
+        let fa = mint_ref.mint(100);
+        deposit(creator_store, fa);
+        assert!(borrow_store_resource(&creator_store).balance == 0, 3);
+        assert!(aggregator_v2::read_snapshot(&balance_snapshot(creator_store)) == 100, 4);
     }
 
     #[deprecated]

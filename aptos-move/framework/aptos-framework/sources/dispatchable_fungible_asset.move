@@ -22,6 +22,7 @@ module aptos_framework::dispatchable_fungible_asset {
     use std::error;
     use std::features;
     use std::option::Option;
+    use aptos_framework::aggregator_v2::{AggregatorSnapshot, Self};
 
     /// TransferRefStore doesn't exist on the fungible asset type.
     const ESTORE_NOT_FOUND: u64 = 1;
@@ -157,6 +158,21 @@ module aptos_framework::dispatchable_fungible_asset {
             dispatched_derived_balance(store, func_opt.borrow())
         } else {
             fungible_asset::balance(store)
+        }
+    }
+
+    /// Get the derived value of store using the overloaded hook, as AggregatorSnapshot.
+    /// Allows us to obtain a balance object, without issuing a read - which would reduce parallelism,
+    /// if the dispatchable asset doesn't have a derived balance hook. If it has a derived balance hook,
+    /// full read is performed, without parallelism.
+    ///
+    /// The semantics of value will be governed by the function specified in DispatchFunctionStore.
+    public fun derived_balance_snapshot<T: key>(store: Object<T>): AggregatorSnapshot<u64> {
+        let func_opt = fungible_asset::derived_balance_dispatch_function(store);
+        if (func_opt.is_some()) {
+            aggregator_v2::create_snapshot(dispatched_derived_balance(store, func_opt.borrow()))
+        } else {
+            fungible_asset::balance_snapshot(store)
         }
     }
 
