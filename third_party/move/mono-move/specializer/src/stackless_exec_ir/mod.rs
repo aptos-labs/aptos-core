@@ -9,7 +9,7 @@
 mod display;
 pub(crate) mod instr_utils;
 
-use crate::gas::BlockCost;
+use crate::{gas::BlockCost, validate::TranslationWitness};
 pub use mono_move_core::CmpKind;
 use mono_move_core::{
     types::{InternedType, InternedTypeList},
@@ -740,8 +740,21 @@ impl<SlotForm> Instr<SlotForm> {
 /// A basic block of instructions, generic over the slot form like
 /// [`Instr`].
 ///
-/// Every block has a label. The last instruction is a terminator.
-/// (`Branch`, `BrTrue`, `BrFalse`, `Ret`, `Abort`, `AbortMsg`).
+/// Every block has a label. A block ends with a terminator (a branch,
+/// return, or abort) OR falls through — possibly with no instructions at
+/// all — to the next block in layout order:
+///
+/// ```text
+/// LL1:  op
+///       br_true LL3
+///       // fallthrough to LL2
+/// LL2:  op
+///       ...
+/// LL3:  op
+///       ...
+/// ```
+///
+/// See `instr_utils::classify_exit` for the derived exit classification.
 pub struct BasicBlock<SlotForm> {
     /// Label identifying this block.
     pub label: Label,
@@ -772,6 +785,9 @@ pub struct FunctionIR {
     pub home_slot_types: Vec<InternedType>,
     /// Gas cost of each block as an unresolved formula, indexed by block label.
     pub(crate) block_costs: Vec<BlockCost>,
+    /// Untrusted witness for translation validation — never read by
+    /// execution or lowering. See [`TranslationWitness`].
+    pub(crate) witness: TranslationWitness,
 }
 
 impl FunctionIR {

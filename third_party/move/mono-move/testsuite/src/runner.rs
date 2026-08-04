@@ -206,7 +206,7 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
 
     // Publish the Move stdlib into both VMs so tests can call real stdlib
     // natives.
-    for module in stdlib_modules().iter().chain(test_utils_modules()) {
+    for module in prelude_modules() {
         let mut blob = vec![];
         module.serialize(&mut blob).expect("module serializes");
         storage.add_module_bytes(module.self_addr(), module.self_name(), blob.into());
@@ -319,6 +319,12 @@ fn v1_native_table() -> NativeFunctionTable {
     );
     table.extend(crate::v1_test_natives::make_all_v1_test_natives());
     table
+}
+
+/// The prelude every differential test publishes before its own modules:
+/// the Move stdlib plus the `test_utils` library.
+fn prelude_modules() -> impl Iterator<Item = &'static CompiledModule> {
+    stdlib_modules().iter().chain(test_utils_modules())
 }
 
 /// The compiled Move stdlib, compiled once and shared across tests.

@@ -33,7 +33,9 @@
 //!   caller-provided closures (`impl FnMut`) are monomorphized and inlined
 //!   at each call site.
 
-use super::{BinaryOp, CallClosureData, CallData, FieldPath, Instr, PackClosureData};
+use super::{
+    BasicBlock, BinaryOp, CallClosureData, CallData, FieldPath, Instr, Label, PackClosureData,
+};
 use mono_move_core::types::InternedType;
 use smallvec::SmallVec;
 
@@ -535,20 +537,65 @@ pub(crate) fn chain_field_path<SlotForm>(instr: &Instr<SlotForm>) -> Option<&Fie
     }
 }
 
-/// Whether `instr` is a terminator that falls through to the next block.
-#[inline]
-pub(crate) fn is_fallthrough_terminator<SlotForm>(instr: &Instr<SlotForm>) -> bool {
-    match instr {
-        Instr::BrTrue { .. }
-        | Instr::BrFalse { .. }
-        | Instr::BrCmp { .. }
-        | Instr::BrCmpImm { .. } => true,
+/// Which conditional terminator ends a block.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum CondJumpKind {
+    BrTrue,
+    BrFalse,
+    BrCmp,
+    BrCmpImm,
+}
 
-        Instr::Branch { .. }
-        | Instr::Ret { .. }
-        | Instr::Abort { .. }
-        | Instr::AbortMsg { .. }
-        | Instr::LdConst { .. }
+/// Which function-exit terminator ends a block.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ExitKind {
+    Ret,
+    Abort,
+    AbortMsg,
+}
+
+/// Derived classification of how a basic block ends.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum BlockExit {
+    /// Unconditional jump.
+    Jump { target: Label },
+    /// Conditional jump; falls through to the next block in layout order
+    /// when not taken.
+    CondJump { taken: Label, kind: CondJumpKind },
+    /// No instructions, or the last instruction is not a terminator:
+    /// control continues at the next block in layout order.
+    FallThrough,
+    /// Function exit.
+    Exit(ExitKind),
+}
+
+/// The [`BlockExit`] contributed by `instr` when it is a block's last
+/// instruction; `None` when `instr` is not a terminator.
+pub(crate) fn exit_of_instr<SlotForm>(instr: &Instr<SlotForm>) -> Option<BlockExit> {
+    match instr {
+        Instr::Branch { target } => Some(BlockExit::Jump { target: *target }),
+        Instr::BrTrue { target, .. } => Some(BlockExit::CondJump {
+            taken: *target,
+            kind: CondJumpKind::BrTrue,
+        }),
+        Instr::BrFalse { target, .. } => Some(BlockExit::CondJump {
+            taken: *target,
+            kind: CondJumpKind::BrFalse,
+        }),
+        Instr::BrCmp { target, .. } => Some(BlockExit::CondJump {
+            taken: *target,
+            kind: CondJumpKind::BrCmp,
+        }),
+        Instr::BrCmpImm { target, .. } => Some(BlockExit::CondJump {
+            taken: *target,
+            kind: CondJumpKind::BrCmpImm,
+        }),
+        Instr::Ret { .. } => Some(BlockExit::Exit(ExitKind::Ret)),
+        Instr::Abort { .. } => Some(BlockExit::Exit(ExitKind::Abort)),
+        Instr::AbortMsg { .. } => Some(BlockExit::Exit(ExitKind::AbortMsg)),
+
+        // Every other instruction: not a terminator.
+        Instr::LdConst { .. }
         | Instr::LdImm { .. }
         | Instr::Copy { .. }
         | Instr::Move { .. }
@@ -600,8 +647,25 @@ pub(crate) fn is_fallthrough_terminator<SlotForm>(instr: &Instr<SlotForm>) -> bo
         | Instr::VecPopBack { .. }
         | Instr::VecUnpack { .. }
         | Instr::VecSwap { .. }
-        | Instr::ForceGC => false,
+        | Instr::ForceGC => None,
     }
+}
+
+/// Classify how `block` ends. An empty block falls through.
+#[inline]
+pub(crate) fn classify_exit<SlotForm>(block: &BasicBlock<SlotForm>) -> BlockExit {
+    block
+        .instrs
+        .last()
+        .and_then(exit_of_instr)
+        .unwrap_or(BlockExit::FallThrough)
+}
+
+/// Whether `instr` is a terminator that falls through to the next block
+/// when not taken — i.e., a conditional branch.
+#[inline]
+pub(crate) fn is_fallthrough_terminator<SlotForm>(instr: &Instr<SlotForm>) -> bool {
+    matches!(exit_of_instr(instr), Some(BlockExit::CondJump { .. }))
 }
 
 /// Whether a binary operation is commutative (i.e., operands can be swapped

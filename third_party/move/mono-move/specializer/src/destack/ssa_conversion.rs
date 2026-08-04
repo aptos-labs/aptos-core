@@ -8,9 +8,12 @@
 //! are mutable across blocks and keep their original slot indices.
 
 use super::ssa_function::SSAFunction;
-use crate::stackless_exec_ir::{
-    BasicBlock, BinaryOp, CallClosureData, CallData, CmpKind, HomeIndex, ImmValue, Instr, Label,
-    PackClosureData, SsaSlot, UnaryOp,
+use crate::{
+    stackless_exec_ir::{
+        BasicBlock, BinaryOp, CallClosureData, CallData, CmpKind, HomeIndex, ImmValue, Instr,
+        Label, PackClosureData, SsaSlot, UnaryOp,
+    },
+    validate::TranslationWitness,
 };
 use mono_move_core::{
     convert_mut_to_immut_ref, strip_ref,
@@ -372,15 +375,21 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
         }
     }
 
-    /// Converts the function's bytecode into SSA form, consuming the converter.
+    /// Converts the function's bytecode into SSA form, consuming the
+    /// converter. Also returns the translation witness: the label-to-offset
+    /// map recorded here, carried on the final IR for translation
+    /// validation.
     pub(crate) fn convert_function(
         mut self,
         module: &PreparedModule,
         code: &[Bytecode],
-    ) -> VMResult<SSAFunction> {
+    ) -> VMResult<(SSAFunction, TranslationWitness)> {
         self.assign_labels(code);
 
         let block_boundaries = split_bytecode_into_blocks(code, &self.label_map)?;
+
+        // Labels are dense over block starts, so one entry per block.
+        let mut label_to_offset: Vec<CodeOffset> = vec![0; block_boundaries.len()];
 
         for block in block_boundaries {
             if !self.stack.is_empty() {
@@ -391,6 +400,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
 
             // Every block gets a label (assigned on-demand if not already a branch target).
             let label = self.get_or_create_label(block.start as CodeOffset);
+            label_to_offset[label.0 as usize] = block.start as CodeOffset;
             self.start_new_block(label);
 
             for bc in &code[block] {
@@ -399,11 +409,12 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
         }
         self.finalize_current_block();
 
-        Ok(SSAFunction {
+        let ssa = SSAFunction {
             blocks: self.blocks,
             value_id_types: self.value_id_types,
             local_types: self.local_types,
-        })
+        };
+        Ok((ssa, TranslationWitness { label_to_offset }))
     }
 
     /// Converts a single stack-based bytecode into slot-based SSA instruction(s).
