@@ -13,6 +13,7 @@ use aptos_types::{
     state_store::state_key::StateKey,
     write_set::{TransactionWrite, WriteOp, WriteOpKind},
 };
+use move_core_types::vm_status::AbortLocation;
 use std::collections::BTreeMap;
 
 /// A transaction's writes, keyed by [`StateKey`]. `BTreeMap` gives a canonical order for free.
@@ -58,8 +59,12 @@ pub enum ExecOutcome {
         writes: WriteSet,
     },
     /// The function executed a Move `abort` with this code. `message` is the optional abort message
-    /// (populated only for the message form of abort).
-    Aborted { code: u64, message: Option<String> },
+    /// (populated only for the message form of abort); `location` is the module that raised it.
+    Aborted {
+        code: u64,
+        message: Option<String>,
+        location: AbortLocation,
+    },
     /// A non-abort runtime failure, classified by kind (with detail for reporting).
     Failure { kind: FailureKind, detail: String },
 }
@@ -104,10 +109,12 @@ pub fn compare_outcomes(v1: &ExecOutcome, v2: Result<&ExecOutcome, &str>) -> Cor
             ExecOutcome::Aborted {
                 code: c1,
                 message: m1,
+                location: l1,
             },
             ExecOutcome::Aborted {
                 code: c2,
                 message: m2,
+                location: l2,
             },
         ) => {
             if c1 != c2 {
@@ -122,6 +129,13 @@ pub fn compare_outcomes(v1: &ExecOutcome, v2: Result<&ExecOutcome, &str>) -> Cor
                     detail: format!(
                         "both aborted with code {} but different messages: V1={:?}, V2={:?}",
                         c1, m1, m2
+                    ),
+                }
+            } else if l1 != l2 {
+                Correctness::Mismatch {
+                    detail: format!(
+                        "both aborted with code {} but in different locations: V1={}, V2={}",
+                        c1, l1, l2
                     ),
                 }
             } else {
@@ -150,7 +164,9 @@ pub fn compare_outcomes(v1: &ExecOutcome, v2: Result<&ExecOutcome, &str>) -> Cor
 fn describe(outcome: &ExecOutcome) -> String {
     match outcome {
         ExecOutcome::Success { .. } => "success".to_string(),
-        ExecOutcome::Aborted { code, .. } => format!("abort(code={})", code),
+        ExecOutcome::Aborted { code, location, .. } => {
+            format!("abort(code={} in {})", code, location)
+        },
         ExecOutcome::Failure { kind, .. } => format!("failure({})", kind),
     }
 }
@@ -284,10 +300,37 @@ mod tests {
         matches!(compare_outcomes(v1, Ok(v2)), Correctness::Match)
     }
 
+    fn abort_in(code: u64, module_name: &str) -> ExecOutcome {
+        use move_core_types::{account_address::AccountAddress, identifier::Identifier};
+        ExecOutcome::Aborted {
+            code,
+            message: None,
+            location: AbortLocation::Module(move_core_types::language_storage::ModuleId::new(
+                AccountAddress::ONE,
+                Identifier::new(module_name).expect("valid identifier"),
+            )),
+        }
+    }
+
     #[test]
     fn identical_write_sets_match() {
         let w = || ws(vec![("A", WriteOp::legacy_creation(vec![1, 2, 3].into()))]);
         assert!(is_match(&success(w()), &success(w())));
+    }
+
+    #[test]
+    fn identical_aborts_match() {
+        assert!(is_match(&abort_in(7, "coin"), &abort_in(7, "coin")));
+    }
+
+    #[test]
+    fn abort_location_difference_is_a_mismatch() {
+        let Correctness::Mismatch { detail } =
+            compare_outcomes(&abort_in(7, "coin"), Ok(&abort_in(7, "account")))
+        else {
+            panic!("expected Mismatch");
+        };
+        assert!(detail.contains("different locations"), "{detail}");
     }
 
     #[test]

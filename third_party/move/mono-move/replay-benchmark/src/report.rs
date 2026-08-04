@@ -129,9 +129,13 @@ fn describe_outcome(outcome: &ExecOutcome) -> String {
                 writes.len()
             )
         },
-        ExecOutcome::Aborted { code, message } => match message {
-            Some(m) => format!("Move abort (code {}: {})", code, m),
-            None => format!("Move abort (code {})", code),
+        ExecOutcome::Aborted {
+            code,
+            message,
+            location,
+        } => match message {
+            Some(m) => format!("Move abort (code {} in {}: {})", code, location, m),
+            None => format!("Move abort (code {} in {})", code, location),
         },
         ExecOutcome::Failure { kind, detail } => format!("failure [{}] {}", kind, detail),
     }

@@ -94,13 +94,13 @@ module 0x1::main {
 // Malformed input aborts with EFROM_BYTES on both VMs.
 
 // RUN: execute 0x1::main::truncated
-// CHECK: aborted: code 65537
+// CHECK: aborted: code 65537 in 0x1::from_bcs
 
 // RUN: execute 0x1::main::trailing
-// CHECK: aborted: code 65537
+// CHECK: aborted: code 65537 in 0x1::from_bcs
 
 // RUN: execute 0x1::main::signer_roundtrip
-// CHECK: aborted: code 65537
+// CHECK: aborted: code 65537 in 0x1::from_bcs
 
 // RUN: execute 0x1::main::signer_in_vector
-// CHECK: aborted: code 65537
+// CHECK: aborted: code 65537 in 0x1::from_bcs

@@ -43,6 +43,17 @@ pub enum NativeName {
     },
 }
 
+impl NativeName {
+    /// The module the native is declared in.
+    pub fn module(&self) -> InternedModuleId {
+        match self {
+            NativeName::Polymorphic { module, .. } | NativeName::Monomorphic { module, .. } => {
+                *module
+            },
+        }
+    }
+}
+
 /// Describes a family of [`NativeContext`] types indexed by a lifetime.
 ///
 /// See [`NativeFunction`] for why this is needed.
@@ -96,9 +107,15 @@ pub enum NativeRegistryError {
     DuplicateName,
 }
 
+/// A registered native: its fully-qualified name and function pointer.
+struct NativeEntry<F: NativeContextFamily> {
+    name: NativeName,
+    func: NativeFunction<F>,
+}
+
 /// Lookup table of native functions, generic over a [`NativeContextFamily`] `F`.
 pub struct NativeRegistry<F: NativeContextFamily> {
-    entries: Vec<NativeFunction<F>>,
+    entries: Vec<NativeEntry<F>>,
     by_name: UnorderedMap<NativeName, NativeIdx>,
 }
 
@@ -130,7 +147,7 @@ impl<F: NativeContextFamily> NativeRegistry<F> {
             return Err(NativeRegistryError::DuplicateName);
         }
         let idx = NativeIdx(self.entries.len() as u32);
-        self.entries.push(func);
+        self.entries.push(NativeEntry { name, func });
         self.by_name.insert(name, idx);
         Ok(idx)
     }
@@ -150,7 +167,14 @@ impl<F: NativeContextFamily> NativeRegistry<F> {
     /// Look up the function pointer for a [`NativeIdx`].
     #[inline]
     pub fn lookup_by_idx(&self, idx: NativeIdx) -> Option<&NativeFunction<F>> {
-        self.entries.get(idx.0 as usize)
+        self.entries.get(idx.0 as usize).map(|entry| &entry.func)
+    }
+
+    /// The module of the native registered at [`NativeIdx`].
+    pub fn module_by_idx(&self, idx: NativeIdx) -> Option<InternedModuleId> {
+        self.entries
+            .get(idx.0 as usize)
+            .map(|entry| entry.name.module())
     }
 
     /// Look up the [`NativeIdx`] of a fully-qualified name.

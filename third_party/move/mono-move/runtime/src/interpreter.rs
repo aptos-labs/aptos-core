@@ -30,7 +30,7 @@ use crate::{
 use aptos_types::write_set::WriteSet;
 use mono_move_core::{
     captured_values_size,
-    interner::{InternedIdentifier, InternedModuleId},
+    interner::{module_id_of, InternedIdentifier, InternedModuleId},
     native::{NativeABI, NativeExtensions, NativeIdx, NativeStatus, ObjectHandle, RootPool},
     next_captured_value_offset,
     storage::resource_provider::InMemoryStorageKey,
@@ -46,7 +46,10 @@ use mono_move_core::{
     FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
 };
 use mono_move_loader::{Loader, ModuleReadSet};
-use move_core_types::int256::{I256, U256};
+use move_core_types::{
+    int256::{I256, U256},
+    vm_status::AbortLocation,
+};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::ptr::{null, NonNull};
 // ---------------------------------------------------------------------------
@@ -103,6 +106,17 @@ impl SessionEffects {
     /// The transaction's write set.
     pub fn write_set(&self, layouts: &impl LayoutProvider) -> VMResult<WriteSet> {
         crate::write_set::build_write_set(&self.read_write_set, layouts)
+    }
+}
+
+/// Materializes the [`AbortLocation`] naming the module that raised an abort.
+// TODO(completeness): return `AbortLocation::Script` for script aborts.
+fn abort_location(module_id: InternedModuleId) -> VMResult<AbortLocation> {
+    match module_id_of(module_id) {
+        Some(module_id) => Ok(AbortLocation::Module(module_id)),
+        None => invariant_violation!(Unreachable(
+            "interned module name is not a valid identifier".to_string()
+        )),
     }
 }
 
@@ -1143,7 +1157,21 @@ impl InterpreterContext<'_> {
                         if let Some((code, message)) =
                             self.exec_call_native(func, regs, native_idx, ty_args, abi)?
                         {
-                            break RuntimeStatus::Aborted { code, message };
+                            // Attribute the abort to the native's own module
+                            // (not the caller's, which `regs.func` names here)
+                            // — the same rule as a Move-level abort.
+                            let location = match self.natives.module_by_idx(native_idx) {
+                                Some(module_id) => abort_location(module_id)?,
+                                None => invariant_violation!(NativeIdxOutOfBounds {
+                                    idx: native_idx.0,
+                                    registry_size: self.natives.len(),
+                                }),
+                            };
+                            break RuntimeStatus::Aborted {
+                                code,
+                                message,
+                                location,
+                            };
                         }
                     },
 
@@ -1394,6 +1422,7 @@ impl InterpreterContext<'_> {
                         break RuntimeStatus::Aborted {
                             code,
                             message: None,
+                            location: abort_location(func.module_id)?,
                         };
                     },
 
@@ -1423,6 +1452,7 @@ impl InterpreterContext<'_> {
                         break RuntimeStatus::Aborted {
                             code,
                             message: Some(message),
+                            location: abort_location(func.module_id)?,
                         };
                     },
 

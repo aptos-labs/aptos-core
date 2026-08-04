@@ -189,7 +189,15 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun
             });
             ExecOutcome::Success { events, writes }
         },
-        Ok(RuntimeStatus::Aborted { code, message }) => ExecOutcome::Aborted { code, message },
+        Ok(RuntimeStatus::Aborted {
+            code,
+            message,
+            location,
+        }) => ExecOutcome::Aborted {
+            code,
+            message,
+            location,
+        },
         Err(err) => classify_error(&err),
     };
 

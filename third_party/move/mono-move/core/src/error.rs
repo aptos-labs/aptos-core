@@ -20,6 +20,7 @@
 //! maps each internal variant to one of these categories. The internal
 //! enums and conversions live in their own crates.
 
+use move_core_types::vm_status::AbortLocation;
 use std::{any::Any, fmt};
 use thiserror::Error;
 
@@ -119,6 +120,10 @@ pub enum ExecutionResult {
         /// Populated when the abort uses the message form; [`None`] for
         /// code-only aborts.
         message: Option<String>,
+        /// The module that raised the abort.
+        // TODO(perf, cleanup): materialize `AbortLocation` only at the output
+        // boundary; needs guard-lifetime.
+        location: AbortLocation,
     },
 
     /// VM-detected failure. See [`ExecutionError`] for the category and

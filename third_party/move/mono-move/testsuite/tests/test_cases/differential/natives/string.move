@@ -100,13 +100,13 @@ module 0x1::main {
 // CHECK: results: "é"
 
 // RUN: execute 0x1::main::invalid_byte
-// CHECK: aborted: code 1
+// CHECK: aborted: code 1 in 0x1::string
 
 // RUN: execute 0x1::main::lone_continuation
-// CHECK: aborted: code 1
+// CHECK: aborted: code 1 in 0x1::string
 
 // RUN: execute 0x1::main::truncated
-// CHECK: aborted: code 1
+// CHECK: aborted: code 1 in 0x1::string
 
 // RUN: execute 0x1::main::index_found
 // CHECK: results: 6
@@ -139,11 +139,11 @@ module 0x1::main {
 
 // End index past the length aborts with EINVALID_INDEX (2).
 // RUN: execute 0x1::main::sub --args 0, 12
-// CHECK: aborted: code 2
+// CHECK: aborted: code 2 in 0x1::string
 
 // Start index after the end aborts with EINVALID_INDEX (2).
 // RUN: execute 0x1::main::sub --args 5, 3
-// CHECK: aborted: code 2
+// CHECK: aborted: code 2 in 0x1::string
 
 // Both indices are char boundaries: bytes [0, 3) of "héllo" is "hé".
 // RUN: execute 0x1::main::sub_multibyte --args 0, 3
@@ -155,8 +155,8 @@ module 0x1::main {
 
 // End index 2 splits the 'é' code point: not a char boundary, aborts.
 // RUN: execute 0x1::main::sub_multibyte --args 0, 2
-// CHECK: aborted: code 2
+// CHECK: aborted: code 2 in 0x1::string
 
 // Start index 2 splits the 'é' code point: not a char boundary, aborts.
 // RUN: execute 0x1::main::sub_multibyte --args 2, 3
-// CHECK: aborted: code 2
+// CHECK: aborted: code 2 in 0x1::string

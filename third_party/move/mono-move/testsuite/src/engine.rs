@@ -19,7 +19,9 @@ use mono_move_natives::{make_all_production_natives, make_all_test_natives, Disp
 use mono_move_runtime::{
     InterpreterContext, ProductionContextFamily, ProductionNativeRegistry, RuntimeStatus,
 };
-use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
+use move_core_types::{
+    account_address::AccountAddress, identifier::IdentStr, vm_status::AbortLocation,
+};
 
 /// Gas budget for engine runs. Effectively unbounded.
 const GAS_BUDGET: u64 = u64::MAX;
@@ -29,7 +31,11 @@ pub enum RunResult<R> {
     /// The function returned a value of type `R`.
     Success(R),
     /// The function aborted with this code and optional message.
-    Aborted { code: u64, message: Option<String> },
+    Aborted {
+        code: u64,
+        message: Option<String>,
+        location: AbortLocation,
+    },
     /// An internal VM error.
     Error(String),
 }
@@ -66,7 +72,15 @@ impl<'guard> MonoRunner<'guard> {
         let result = match self.interp.run() {
             Err(err) => RunResult::Error(format!("{}", err)),
             Ok(RuntimeStatus::Success) => RunResult::Success(extract_returns(&self.interp)),
-            Ok(RuntimeStatus::Aborted { code, message }) => RunResult::Aborted { code, message },
+            Ok(RuntimeStatus::Aborted {
+                code,
+                message,
+                location,
+            }) => RunResult::Aborted {
+                code,
+                message,
+                location,
+            },
         };
         self.gc_count = self.interp.gc_count();
         result
@@ -86,7 +100,7 @@ impl<'guard> MonoRunner<'guard> {
             |interp| interp.root_result(),
         ) {
             RunResult::Success(value) => Ok(value),
-            RunResult::Aborted { code, message } => match message {
+            RunResult::Aborted { code, message, .. } => match message {
                 Some(message) => bail!("aborted: code {} ({})", code, message),
                 None => bail!("aborted: code {}", code),
             },

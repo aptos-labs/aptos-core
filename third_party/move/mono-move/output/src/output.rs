@@ -12,7 +12,6 @@ use aptos_types::{
 };
 use mono_move_core::{value_layout::LayoutProvider, ExecutionErrorKind, ExecutionResult, VMResult};
 use mono_move_runtime::SessionEffects;
-use move_core_types::vm_status::AbortLocation;
 
 /// Builds the [`TransactionOutput`] for a finished MonoMove transaction from its
 /// [`SessionEffects`] and run `result`. `layouts` serializes the written values
@@ -52,16 +51,17 @@ pub fn to_transaction_output(
 
 /// Maps a MonoMove [`ExecutionResult`] to an Aptos [`TransactionStatus`].
 ///
-/// The abort location is a placeholder (the runtime status carries none yet),
-/// and non-abort failures other than out-of-gas collapse to a miscellaneous
+/// Non-abort failures other than out-of-gas collapse to a miscellaneous
 /// error.
 pub fn to_transaction_status(result: ExecutionResult) -> TransactionStatus {
     let status = match result {
         ExecutionResult::Success => ExecutionStatus::Success,
-        // TODO(completeness): report the real abort location (module or script)
-        // once the runtime status carries it, rather than always Script.
-        ExecutionResult::Aborted { code, message } => ExecutionStatus::MoveAbort {
-            location: AbortLocation::Script,
+        ExecutionResult::Aborted {
+            code,
+            message,
+            location,
+        } => ExecutionStatus::MoveAbort {
+            location,
             code,
             info: message.map(|description| AbortInfo {
                 // TODO(completeness): `reason_name` is filled from the module error map by a later
@@ -90,6 +90,10 @@ pub fn to_transaction_status(result: ExecutionResult) -> TransactionStatus {
 mod tests {
     use super::*;
     use mono_move_core::ExecutionError;
+    use move_core_types::{
+        account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
+        vm_status::AbortLocation,
+    };
 
     #[test]
     fn status_mapping() {
@@ -97,12 +101,18 @@ mod tests {
             to_transaction_status(ExecutionResult::Success),
             TransactionStatus::Keep(ExecutionStatus::Success)
         ));
+        let abort_in_coin = AbortLocation::Module(ModuleId::new(
+            AccountAddress::ONE,
+            Identifier::new("coin").expect("valid identifier"),
+        ));
         assert!(matches!(
             to_transaction_status(ExecutionResult::Aborted {
                 code: 42,
-                message: None
+                message: None,
+                location: abort_in_coin.clone(),
             }),
-            TransactionStatus::Keep(ExecutionStatus::MoveAbort { code: 42, .. })
+            TransactionStatus::Keep(ExecutionStatus::MoveAbort { code: 42, location, .. })
+                if location == abort_in_coin
         ));
         assert!(matches!(
             to_transaction_status(ExecutionResult::Failed(ExecutionError {

@@ -15,4 +15,4 @@ module 0x1::main {
 // CHECK: results: 0
 
 // RUN: execute 0x1::main::wrap --args 18446744073709551615, 1
-// CHECK: aborted: code 1
+// CHECK: aborted: code 1 in 0x1::test_natives

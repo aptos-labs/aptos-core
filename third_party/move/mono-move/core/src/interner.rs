@@ -12,7 +12,7 @@ use move_core_types::{
     ability::AbilitySet,
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
-    language_storage::{StructTag, TypeTag},
+    language_storage::{self, StructTag, TypeTag},
 };
 use thiserror::Error;
 
@@ -226,6 +226,16 @@ pub fn type_tag_of(ty: InternedType) -> Option<TypeTag> {
         | Type::Function { .. }
         | Type::TypeParam { .. } => return None,
     })
+}
+
+/// The owned [`language_storage::ModuleId`] for an interned module ID, or
+/// [`None`] if the interned name is not a valid identifier.
+pub fn module_id_of(module_id: InternedModuleId) -> Option<language_storage::ModuleId> {
+    let module_id = view_module_id(module_id);
+    Some(language_storage::ModuleId::new(
+        *module_id.address(),
+        Identifier::new(view_name(module_id.name())).ok()?,
+    ))
 }
 
 /// The [`StructTag`] for an interned nominal (struct/enum) type, or [`None`] if
