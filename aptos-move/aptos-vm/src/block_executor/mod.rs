@@ -376,7 +376,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     }
 
     fn incorporate_materialized_txn_output(
-        &mut self,
+        mut self,
         materialized_resource_write_set: Vec<(StateKey, WriteOp)>,
         materialized_events: Vec<ContractEvent>,
     ) -> Result<(Self::CommittedOutput, Trace), PanicError> {

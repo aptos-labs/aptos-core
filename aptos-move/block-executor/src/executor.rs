@@ -128,35 +128,6 @@ where
         }
     }
 
-    // The bool in the result indicates whether execution result is a speculative abort.
-    fn process_execution_result<'a>(
-        execution_result: &'a ExecutionStatus<E::Output>,
-        read_set: &mut CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>,
-        txn_idx: TxnIndex,
-    ) -> Result<(Option<&'a E::Output>, bool), PanicError> {
-        match execution_result {
-            ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
-                Ok((Some(output), false))
-            },
-            ExecutionStatus::SpeculativeExecutionAbortError(_msg) => {
-                // TODO(BlockSTMv2): cleaner to rename or distinguish V2 early abort
-                // from DeltaApplicationFailure. This is also why we return the bool
-                // separately for now instead of relying on the read set.
-                read_set.capture_delayed_field_read_error(&PanicOr::Or(
-                    MVDelayedFieldsError::DeltaApplicationFailure,
-                ));
-                Ok((None, true))
-            },
-            ExecutionStatus::Abort(_err) => Ok((None, false)),
-            ExecutionStatus::DelayedFieldsCodeInvariantError(msg) => {
-                Err(code_invariant_error(format!(
-                    "[Execution] At txn {}, failed with DelayedFieldsCodeInvariantError: {:?}",
-                    txn_idx, msg
-                )))
-            },
-        }
-    }
-
     /// Verifies that all pre-written keys are present in the actual write set.
     ///
     /// Pre-write optimization populates the MVHashMap with expected writes before execution.
@@ -437,7 +408,7 @@ where
             idx_to_execute,
         );
         let execution_result =
-            executor.execute_transaction(&sync_view, txn, auxiliary_info, idx_to_execute);
+            executor.execute_transaction(&sync_view, txn, auxiliary_info, idx_to_execute)?;
 
         let mut read_set = sync_view.take_parallel_reads();
         if read_set.is_incorrect_use() {
@@ -446,10 +417,7 @@ where
             )));
         }
 
-        let (maybe_output, is_speculative_failure) =
-            Self::process_execution_result(&execution_result, &mut read_set, idx_to_execute)?;
-
-        if is_speculative_failure {
+        if execution_result.is_speculative_failure() {
             // Recording in order to check the invariant that the final, committed incarnation
             // of each transaction is not a speculative failure.
             last_input_output.record_speculative_failure(idx_to_execute);
@@ -468,6 +436,8 @@ where
             }
             return Ok(());
         }
+
+        let maybe_output = execution_result.get_output();
 
         // Verify that all pre-written keys were actually written by the transaction.
         // If not, fallback to sequential execution to avoid speculative reads seeing
@@ -569,7 +539,7 @@ where
             idx_to_execute,
         );
         let execution_result =
-            executor.execute_transaction(&sync_view, txn, auxiliary_info, idx_to_execute);
+            executor.execute_transaction(&sync_view, txn, auxiliary_info, idx_to_execute)?;
 
         let mut read_set = sync_view.take_parallel_reads();
         if read_set.is_incorrect_use() {
@@ -578,8 +548,17 @@ where
                 idx_to_execute, incarnation
             )));
         }
-        let (processed_output, _) =
-            Self::process_execution_result(&execution_result, &mut read_set, idx_to_execute)?;
+        if execution_result.is_speculative_failure() {
+            // BlockSTMv1 relies on the read set carrying the speculative failure so
+            // that its own validation fails and it re-executes.
+            // TODO(BlockSTMv2): cleaner to rename or distinguish V2 early abort
+            // from DeltaApplicationFailure. This is also why V2 records the
+            // speculative failure separately instead of relying on the read set.
+            read_set.capture_delayed_field_read_error(&PanicOr::Or(
+                MVDelayedFieldsError::DeltaApplicationFailure,
+            ));
+        }
+        let processed_output = execution_result.get_output();
 
         // Verify that all pre-written keys were actually written by the transaction.
         // If not, fallback to sequential execution to avoid speculative reads seeing
@@ -2180,33 +2159,35 @@ where
                 ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
                 idx as TxnIndex,
             );
-            let res =
-                executor.execute_transaction(&latest_view, txn, &auxiliary_info, idx as TxnIndex);
-            let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
-            match res {
-                ExecutionStatus::Abort(err) => {
+            let res = executor
+                .execute_transaction(&latest_view, txn, &auxiliary_info, idx as TxnIndex)
+                .inspect_err(|err| {
+                    alert!(
+                        "Sequential execution failed to execute transaction {}: {}",
+                        idx as TxnIndex,
+                        err
+                    );
+                })?;
+            let must_skip = match res {
+                ExecutionStatus::Aborted(msg) => {
                     error!(
                         "Sequential execution FatalVMError by transaction {}",
                         idx as TxnIndex
                     );
-                    // Record the status indicating the unrecoverable VM failure.
                     return Err(SequentialBlockExecutionError::ErrorToReturn(
-                        BlockError::new(err),
+                        BlockError::new(msg),
                     ));
                 },
-                ExecutionStatus::DelayedFieldsCodeInvariantError(msg) => {
-                    alert!("Sequential execution DelayedFieldsCodeInvariantError error by transaction {}: {}", idx as TxnIndex, msg);
+                ExecutionStatus::SpeculativeFailure => {
+                    alert!(
+                        "Sequential execution observed a speculative failure at transaction {}",
+                        idx as TxnIndex
+                    );
                     return Err(SequentialBlockExecutionError::from(code_invariant_error(
-                        msg,
+                        "Speculative failure must not occur during sequential execution",
                     )));
                 },
-                ExecutionStatus::SpeculativeExecutionAbortError(msg) => {
-                    alert!("Sequential execution SpeculativeExecutionAbortError error by transaction {}: {}", idx as TxnIndex, msg);
-                    return Err(SequentialBlockExecutionError::from(code_invariant_error(
-                        msg,
-                    )));
-                },
-                ExecutionStatus::Success(mut output) | ExecutionStatus::SkipRest(mut output) => {
+                ExecutionStatus::Executed { output, skips_rest } => {
                     let output_before_guard = output.before_materialization()?;
                     // Calculating the accumulated gas costs of the committed txns.
 
@@ -2362,17 +2343,14 @@ where
                     )?;
 
                     // The guard borrows the output immutably; drop it before
-                    // materialization, which needs the output mutably.
+                    // materialization, which consumes the output by value.
                     drop(output_before_guard);
 
                     // If dynamic change set materialization part (indented for clarity/variable scope):
                     let committed_output = {
                         let materializer = SequentialMaterializer::new(&latest_view);
-                        let (committed_output, trace) = materialize_output(
-                            &mut output,
-                            &materializer,
-                        )
-                        .map_err(|e| match e {
+                        let (committed_output, trace) = materialize_output(output, &materializer)
+                            .map_err(|e| match e {
                             PanicOr::CodeInvariantError(msg) => {
                                 SequentialBlockExecutionError::from(PanicError::CodeInvariantError(
                                     msg,
@@ -2406,6 +2384,7 @@ where
                         commit_hook.on_transaction_committed(idx as TxnIndex, &committed_output);
                     }
                     ret.push(committed_output);
+                    skips_rest
                 },
             };
 

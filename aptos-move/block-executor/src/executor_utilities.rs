@@ -182,7 +182,7 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> Materializer<T>
 /// results into the output.
 /// !!! [CAUTION] !!!: May not be concurrent with any other accesses to the output.
 pub(crate) fn materialize_output<T, O, M>(
-    output: &mut O,
+    output: O,
     materializer: &M,
 ) -> Result<(O::CommittedOutput, Trace), PanicOr<ResourceGroupSerializationError>>
 where

@@ -32,23 +32,31 @@ use std::{
 };
 use triomphe::Arc as TriompheArc;
 
-/// The execution result of a transaction
+/// The outcome of executing a transaction.
 #[derive(Debug)]
 pub enum ExecutionStatus<O> {
     /// Transaction was executed successfully.
-    Success(O),
+    Executed { output: O, skips_rest: bool },
     /// Transaction hit a non-recoverable error during execution. Halts execution
     /// and returns the error message to the caller.
-    Abort(String),
-    /// Transaction was executed successfully, but will skip the execution of the trailing
-    /// transactions in the list
-    SkipRest(O),
-    /// Transaction detected that it is in inconsistent state due to speculative
-    /// reads it did, and needs to be re-executed.
-    SpeculativeExecutionAbortError(String),
-    /// Code invariant error was detected during transaction execution, which
-    /// can only be caused by the bug in the code.
-    DelayedFieldsCodeInvariantError(String),
+    Aborted(String),
+    /// Speculative failure during parallel execution; the transaction
+    /// re-executes.
+    SpeculativeFailure,
+}
+
+impl<O> ExecutionStatus<O> {
+    /// The output, present only for an executed transaction.
+    pub(crate) fn get_output(&self) -> Option<&O> {
+        match self {
+            ExecutionStatus::Executed { output, .. } => Some(output),
+            ExecutionStatus::Aborted(_) | ExecutionStatus::SpeculativeFailure => None,
+        }
+    }
+
+    pub(crate) fn is_speculative_failure(&self) -> bool {
+        matches!(self, ExecutionStatus::SpeculativeFailure)
+    }
 }
 
 /// Trait for single threaded transaction executor.
@@ -90,7 +98,7 @@ pub trait ExecutorTask {
         txn: &Self::Txn,
         auxiliary_info: &Self::AuxiliaryInfo,
         txn_idx: TxnIndex,
-    ) -> ExecutionStatus<Self::Output>;
+    ) -> Result<ExecutionStatus<Self::Output>, PanicError>;
 
     fn pre_write_values(
         _txn: &Self::Txn,
@@ -219,7 +227,7 @@ pub trait TransactionOutput: Send + Debug {
     /// !!! [CAUTION] !!!: This method must be called in quiescence, i.e. may not be
     /// concurrent with any other method that accesses the output.
     fn incorporate_materialized_txn_output(
-        &mut self,
+        self,
         patched_resource_write_set: Vec<(
             <Self::Txn as Transaction>::Key,
             <Self::Txn as Transaction>::Value,

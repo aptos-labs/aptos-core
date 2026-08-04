@@ -68,10 +68,10 @@ use triomphe::Arc as TriompheArc;
 pub(crate) static MOCK_LAYOUT: once_cell::sync::Lazy<MoveTypeLayout> =
     once_cell::sync::Lazy::new(|| MoveTypeLayout::new_struct(MoveStructLayout::new(vec![])));
 
-/// Macro for returning an error directly when Result is an error
+/// Macro for early-returning the `Err` value as a successful output.
 ///
-/// This macro unwraps a Result or returns the error directly.
-/// Used when the function returns the same error type as the Result.
+/// This macro unwraps the `Ok` value of a Result. On `Err`, the error value is
+/// itself a valid `ExecutionStatus`, so it is returned wrapped in `Ok`.
 ///
 /// Usage:
 ///   try_with_direct!(result_expr)
@@ -80,7 +80,7 @@ macro_rules! try_with_direct {
     ($expr:expr) => {
         match $expr {
             Ok(val) => val,
-            Err(e) => return e,
+            Err(e) => return Ok(e),
         }
     };
 }
@@ -105,7 +105,7 @@ macro_rules! try_with_error {
 /// Macro for returning an ExecutionStatus with error message
 ///
 /// This macro unwraps a Result or returns an error wrapped in
-/// ExecutionStatus::Success(MockOutput::with_error(...)).
+/// executed status.
 ///
 /// Usage:
 ///   try_with_status!(result_expr, "error message")
@@ -115,10 +115,10 @@ macro_rules! try_with_status {
         match $expr {
             Ok(val) => val,
             Err(e) => {
-                return Err(ExecutionStatus::Success(MockOutput::with_error(&format!(
-                    "{}: {:?}",
-                    $msg, e
-                ))))
+                return Err(ExecutionStatus::Executed {
+                    output: MockOutput::with_error(&format!("{}: {:?}", $msg, e)),
+                    skips_rest: false,
+                })
             },
         }
     };
@@ -703,18 +703,18 @@ where
     }
 
     fn incorporate_materialized_txn_output(
-        &mut self,
+        self,
         patched_resource_write_set: Vec<(K, ValueType)>,
         _patched_events: Vec<E>,
     ) -> Result<(Self::CommittedOutput, Trace), PanicError> {
         assert_ok!(self
             .patched_resource_write_set
-            .set(patched_resource_write_set.clone().into_iter().collect()));
+            .set(patched_resource_write_set.into_iter().collect()));
         // TODO: Also test patched events
 
         // The mock's committed output is a snapshot of itself, carrying the reads
         // and patched writes the baseline verifies.
-        Ok((self.clone(), Trace::empty()))
+        Ok((self, Trace::empty()))
     }
 }
 
@@ -962,8 +962,8 @@ where
         txn: &Self::Txn,
         _auxiliary_info: &Self::AuxiliaryInfo,
         txn_idx: TxnIndex,
-    ) -> ExecutionStatus<Self::Output> {
-        match txn {
+    ) -> Result<ExecutionStatus<Self::Output>, PanicError> {
+        Ok(match txn {
             MockTransaction::Write {
                 incarnation_counter,
                 incarnation_behaviors,
@@ -1015,25 +1015,34 @@ where
                     .and_then(|b| b.add_deltas(view, &behavior.deltas, *delta_test_kind))
                     .finish();
 
-                // Use the direct return variant for ExecutionStatus functions
                 try_with_direct!(builder_result);
 
-                ExecutionStatus::Success(builder.build())
+                ExecutionStatus::Executed {
+                    output: builder.build(),
+                    skips_rest: false,
+                }
             },
             MockTransaction::SkipRest(gas) => {
                 let mut mock_output = MockOutput::retry();
                 mock_output.total_gas = *gas;
-                ExecutionStatus::SkipRest(mock_output)
+                ExecutionStatus::Executed {
+                    output: mock_output,
+                    skips_rest: true,
+                }
             },
-            MockTransaction::Abort => ExecutionStatus::Abort(txn_idx.to_string()),
+            MockTransaction::Abort => ExecutionStatus::Aborted(txn_idx.to_string()),
             MockTransaction::InterruptRequested => {
                 while !view.interrupt_requested() {}
-                ExecutionStatus::SkipRest(MockOutput::skip_output())
+                ExecutionStatus::Executed {
+                    output: MockOutput::skip_output(),
+                    skips_rest: true,
+                }
             },
-            MockTransaction::StateCheckpoint => {
-                ExecutionStatus::Success(MockOutput::empty_success_output())
+            MockTransaction::StateCheckpoint => ExecutionStatus::Executed {
+                output: MockOutput::empty_success_output(),
+                skips_rest: false,
             },
-        }
+        })
     }
 
     fn pre_write_values(txn: &Self::Txn) -> Vec<(K, ValueWithLayout<ValueType>)> {

@@ -32,6 +32,7 @@ use aptos_types::{
         transaction_slice_metadata::TransactionSliceMetadata,
     },
     contract_event::ContractEvent,
+    error::PanicError,
     fee_statement::FeeStatement,
     move_utils::move_event_v2::MoveEventV2Type,
     state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView},
@@ -138,24 +139,27 @@ impl ExecutorTask for NativeVMExecutorTask {
         txn: &SignatureVerifiedTransaction,
         _auxiliary_info: &AuxiliaryInfo,
         _txn_idx: TxnIndex,
-    ) -> ExecutionStatus<AptosTransactionOutput> {
-        match self.execute_transaction_impl(executor_with_group_view, txn) {
-            Ok((change_set, gas_units)) => {
-                ExecutionStatus::Success(AptosTransactionOutput::new(VMOutput::new(
-                    change_set,
-                    ModuleWriteSet::empty(),
-                    FeeStatement::builder()
-                        .total_charge_gas_units(gas_units)
-                        .execution_gas_units(gas_units)
-                        .io_gas_units(0)
-                        .storage_fee_octas(0)
-                        .storage_fee_refund_octas(0)
-                        .build(),
-                    TransactionStatus::Keep(aptos_types::transaction::ExecutionStatus::Success),
-                )))
+    ) -> Result<ExecutionStatus<AptosTransactionOutput>, PanicError> {
+        Ok(
+            match self.execute_transaction_impl(executor_with_group_view, txn) {
+                Ok((change_set, gas_units)) => ExecutionStatus::Executed {
+                    output: AptosTransactionOutput::new(VMOutput::new(
+                        change_set,
+                        ModuleWriteSet::empty(),
+                        FeeStatement::builder()
+                            .total_charge_gas_units(gas_units)
+                            .execution_gas_units(gas_units)
+                            .io_gas_units(0)
+                            .storage_fee_octas(0)
+                            .storage_fee_refund_octas(0)
+                            .build(),
+                        TransactionStatus::Keep(aptos_types::transaction::ExecutionStatus::Success),
+                    )),
+                    skips_rest: false,
+                },
+                Err(_) => ExecutionStatus::SpeculativeFailure,
             },
-            Err(_) => ExecutionStatus::SpeculativeExecutionAbortError("something".to_string()),
-        }
+        )
     }
 }
 
