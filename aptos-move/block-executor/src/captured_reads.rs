@@ -1201,27 +1201,34 @@ pub trait TxnInput: Send + Sync {
     type Tag;
     type Value: SpeculativeValue;
 
+    /// Returns true if the data reads are still consistent with the multi-version
+    /// data map at the given validation index.
     fn validate_data_reads(
         &self,
         data_map: &VersionedData<Self::Key, Self::Value>,
         idx_to_validate: TxnIndex,
     ) -> bool;
 
+    /// Returns true if the resource group reads are still consistent with the
+    /// multi-version group data map at the given validation index.
     fn validate_group_reads(
         &self,
         group_map: &VersionedGroupData<Self::Key, Self::Tag, Self::Value>,
         idx_to_validate: TxnIndex,
     ) -> bool;
 
+    /// Returns true if the delayed-field reads are still consistent with the
+    /// versioned delayed fields at the given validation index.
     fn validate_delayed_field_reads(
         &self,
         delayed_fields: &dyn TVersionedDelayedFieldView<DelayedFieldID>,
         idx_to_validate: TxnIndex,
     ) -> Result<bool, PanicError>;
 
-    // SEAM: typed against the legacy Move VM code cache; a VM with its own code
-    // caching generalizes this method when it lands.
-    fn validate_module_reads(
+    /// Returns true if the module reads are still consistent with the code caches.
+    /// Used for the legacy publishing flow when modules may have been upgraded
+    /// concurrently within the block.
+    fn legacy_validate_module_reads(
         &self,
         global_module_cache: &GlobalModuleCache<
             ModuleId,
@@ -1246,8 +1253,11 @@ pub trait TxnInput: Send + Sync {
     /// The incarnation whose reads were captured, used for BlockSTMv2 module validation.
     fn incarnation(&self) -> Option<Incarnation>;
 
+    /// Returns true if capturing the read set hit a code-invariant violation.
+    /// Such a read set is invalid and must be handled by the caller.
     fn is_incorrect_use(&self) -> bool;
 
+    /// Keys read by this transaction.
     fn get_read_summary(&self) -> HashSet<InputOutputKey<Self::Key, Self::Tag>>;
 }
 
@@ -1284,7 +1294,7 @@ impl<T: Transaction> TxnInput for CapturedReadSet<T> {
         CapturedReads::validate_delayed_field_reads(self, delayed_fields, idx_to_validate)
     }
 
-    fn validate_module_reads(
+    fn legacy_validate_module_reads(
         &self,
         global_module_cache: &GlobalModuleCache<
             ModuleId,
@@ -1377,13 +1387,13 @@ impl<T: Transaction> TxnInput for LegacyReads<T> {
             LegacyReads::Parallel(reads) => {
                 reads.validate_delayed_field_reads(delayed_fields, idx_to_validate)
             },
-            LegacyReads::Sequential(_) => {
-                unreachable!("Sequential execution does not validate reads")
-            },
+            LegacyReads::Sequential(_) => Err(code_invariant_error(
+                "Sequential execution does not validate reads",
+            )),
         }
     }
 
-    fn validate_module_reads(
+    fn legacy_validate_module_reads(
         &self,
         global_module_cache: &GlobalModuleCache<
             ModuleId,

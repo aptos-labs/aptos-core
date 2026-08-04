@@ -170,6 +170,8 @@ pub trait TransactionOutput: Send + Debug {
         callback: &mut dyn FnMut(&ModuleId, StateValue) -> Result<(), PanicError>,
     ) -> Result<(), PanicError>;
 
+    /// Returns the key and member tags for each resource group modified. Only
+    /// used by Block-STM v1.
     fn legacy_v1_resource_group_tags(&self) -> Vec<(Self::Key, HashSet<Self::Tag>)> {
         self.resource_group_write_set()
             .into_iter()
@@ -188,6 +190,7 @@ pub trait TransactionOutput: Send + Debug {
     /// Sum of all sizes of writes (keys + write_ops) and events.
     fn output_approx_size(&self) -> u64;
 
+    /// Keys written by transaction.
     fn get_write_summary(&self) -> HashSet<InputOutputKey<Self::Key, Self::Tag>>;
 
     /// State keys read by the VM during the execution that produced this output.
@@ -203,9 +206,8 @@ pub trait TransactionOutput: Send + Debug {
     fn check_materialization(&self, materializer: &impl Materializer<Self::Txn>) -> bool;
 }
 
-/// Output accessors used only by the legacy Move VM's materialization
-/// (`executor_utilities::materialize_output`); a VM that materializes its own
-/// output does not implement this.
+/// Output accessors used only by the legacy Move VM's materialization; a VM that
+/// materializes its own output does not implement this.
 pub trait LegacyTxnOutput: TransactionOutput {
     fn reads_needing_delayed_field_exchange(
         &self,

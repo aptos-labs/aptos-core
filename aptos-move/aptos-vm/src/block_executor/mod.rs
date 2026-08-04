@@ -349,7 +349,8 @@ impl BlockExecutorLegacyTxnOutput for AptosTransactionOutput {
         self.vm_output.events().to_vec()
     }
 
-    /// More efficient implementation to avoid unnecessarily cloning inner_ops.
+    /// Extracts only the metadata write ops of each resource group, without
+    /// cloning the group's inner_ops.
     fn resource_group_metadata_ops(&self) -> Vec<(StateKey, WriteOp)> {
         self.vm_output
             .resource_write_set()

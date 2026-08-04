@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    captured_reads::CapturedReads,
+    captured_reads::CapturedReadSet,
     code_cache_global::{add_module_write_to_module_cache, GlobalModuleCache},
     errors::{ParallelBlockExecutionError, ResourceGroupSerializationError},
     executor_utilities::{materialize_output, Materializer},
@@ -36,8 +36,6 @@ use std::{
     },
 };
 
-type TxnInput<T> = CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>;
-
 struct OutputWrapper<
     T: Transaction,
     O: TransactionOutput<Txn = T, Key = T::Key, Tag = T::Tag, Value = ValueWithLayout<T::Value>>,
@@ -66,7 +64,7 @@ impl<
 
     fn from_execution_status(
         output: ExecutionStatus<O>,
-        read_set: &TxnInput<T>,
+        read_set: &CapturedReadSet<T>,
         block_gas_limit_type: &BlockGasLimitType,
         user_txn_bytes_len: u64,
     ) -> Self {
@@ -106,7 +104,7 @@ pub struct TxnLastInputOutput<
     T: Transaction,
     O: TransactionOutput<Txn = T, Key = T::Key, Tag = T::Tag, Value = ValueWithLayout<T::Value>>,
 > {
-    inputs: Vec<CachePadded<Mutex<Option<Arc<TxnInput<T>>>>>>, // txn_idx -> input (read set).
+    inputs: Vec<CachePadded<Mutex<Option<Arc<CapturedReadSet<T>>>>>>, // txn_idx -> input (read set).
 
     output_wrappers: Vec<CachePadded<Mutex<OutputWrapper<T, O>>>>,
     // Used to record if the latest incarnation of a txn was a failure due to the
@@ -138,7 +136,7 @@ impl<
     pub(crate) fn record(
         &self,
         txn_idx: TxnIndex,
-        input: TxnInput<T>,
+        input: CapturedReadSet<T>,
         output: ExecutionStatus<O>,
         block_gas_limit_type: &BlockGasLimitType,
         user_txn_bytes_len: u64,
@@ -163,7 +161,7 @@ impl<
         self.speculative_failures[txn_idx as usize].load(Ordering::Relaxed)
     }
 
-    pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<TxnInput<T>>> {
+    pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<CapturedReadSet<T>>> {
         Some(Arc::clone(self.inputs[txn_idx as usize].lock().as_ref()?))
     }
 
