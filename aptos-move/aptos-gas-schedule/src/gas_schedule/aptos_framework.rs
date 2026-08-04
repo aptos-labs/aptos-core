@@ -317,6 +317,8 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [transaction_context_multisig_payload_base: InternalGas, {RELEASE_V1_12.. => "transaction_context.multisig_payload.base"}, 7350],
         [transaction_context_multisig_payload_per_byte_in_str: InternalGasPerByte, {RELEASE_V1_12.. => "transaction_context.multisig_payload.per_abstract_memory_unit"}, 180],
         [transaction_context_is_encrypted_txn_base: InternalGas, {RELEASE_V1_45.. => "transaction_context.is_encrypted_txn.base"}, 7350],
+        [transaction_context_is_orderless_txn_base: InternalGas, {RELEASE_V1_50.. => "transaction_context.is_orderless_txn.base"}, 7350],
+        [transaction_context_is_multisig_payload_txn_base: InternalGas, {RELEASE_V1_50.. => "transaction_context.is_multisig_payload_txn.base"}, 7350],
 
         [code_request_publish_base: InternalGas, "code.request_publish.base", 18380],
         [code_request_publish_per_byte: InternalGasPerByte, "code.request_publish.per_byte", 70],
