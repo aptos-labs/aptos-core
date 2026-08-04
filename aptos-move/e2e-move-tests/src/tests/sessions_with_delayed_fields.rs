@@ -14,7 +14,7 @@ use aptos_aggregator::{
 use aptos_block_executor::{
     code_cache_global_manager::AptosModuleCacheManagerGuard,
     executor::BlockExecutor,
-    task::{BeforeMaterializationOutput, ExecutionStatus, ExecutorTask, TransactionOutput},
+    task::{ExecutionStatus, ExecutorTask, TransactionOutput},
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::default::DefaultTxnProvider,
     types::InputOutputKey,
@@ -159,16 +159,11 @@ impl BlockExecutableTransaction for TestTransaction {
 struct TestOutput;
 
 impl TransactionOutput for TestOutput {
-    type BeforeMaterializationGuard<'a> = &'a Self;
     type CommittedOutput = aptos_types::transaction::TransactionOutput;
     type Txn = TestTransaction;
 
     fn skip_output() -> Self {
         Self
-    }
-
-    fn before_materialization(&self) -> Result<Self::BeforeMaterializationGuard<'_>, PanicError> {
-        Ok(self)
     }
 
     fn incorporate_materialized_txn_output(
@@ -181,9 +176,7 @@ impl TransactionOutput for TestOutput {
             Trace::empty(),
         ))
     }
-}
 
-impl BeforeMaterializationOutput<TestTransaction> for &TestOutput {
     fn resource_write_set(&self) -> HashMap<StateKey, ValueWithLayout<WriteOp>> {
         HashMap::new()
     }
