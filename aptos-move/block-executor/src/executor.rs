@@ -2021,9 +2021,8 @@ where
         >,
         unsync_map: &UnsyncMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
         output: &E::Output,
-        resource_write_set: HashMap<T::Key, ValueWithLayout<T::Value>>,
     ) -> Result<(), SequentialBlockExecutionError> {
-        for (key, value) in resource_write_set.into_iter() {
+        for (key, value) in output.resource_write_set().into_iter() {
             unsync_map.write(key, value);
         }
 
@@ -2328,7 +2327,6 @@ where
                         module_cache_manager_guard.module_cache(),
                         &unsync_map,
                         &output,
-                        output.resource_write_set(),
                     )?;
 
                     // If dynamic change set materialization part (indented for clarity/variable scope):

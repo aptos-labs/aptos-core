@@ -62,7 +62,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> OutputWrapper<T, O> {
         read_set: &TxnInput<T>,
         block_gas_limit_type: &BlockGasLimitType,
         user_txn_bytes_len: u64,
-    ) -> Result<Self, PanicError> {
+    ) -> Self {
         // Summaries are only meaningful for an executed output.
         let (maybe_approx_output_size, maybe_read_write_summary) = match &output {
             ExecutionStatus::Executed { output, .. } => {
@@ -87,11 +87,11 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> OutputWrapper<T, O> {
             ExecutionStatus::Aborted(_) | ExecutionStatus::SpeculativeFailure => (None, None),
         };
 
-        Ok(Self {
+        Self {
             output: Some(output),
             maybe_read_write_summary,
             maybe_approx_output_size,
-        })
+        }
     }
 }
 
@@ -135,7 +135,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
             &input,
             block_gas_limit_type,
             user_txn_bytes_len,
-        )?;
+        );
         *self.inputs[txn_idx as usize].lock() = Some(Arc::new(input));
 
         Ok(())
@@ -371,10 +371,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
     // Called when a transaction is committed to materialize its recorded output:
     // resource group updates are finalized and serialized, and delayed field
     // identifiers are replaced with committed values in resource writes and events.
-    //
-    // !!! [CAUTION] !!!: This finalizes the output and may not be concurrent with
-    // any other accesses to the output (e.g. querying the write-set, events, etc),
-    // as these read accesses are not synchronized and assumed to have terminated.
     pub(crate) fn materialize<M: Materializer<T>>(
         &self,
         txn_idx: TxnIndex,

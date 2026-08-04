@@ -180,7 +180,6 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> Materializer<T>
 /// finalizes and serializes resource group updates, replaces delayed field
 /// identifiers with values in resource writes and events, and incorporates the
 /// results into the output.
-/// !!! [CAUTION] !!!: May not be concurrent with any other accesses to the output.
 pub(crate) fn materialize_output<T, O, M>(
     output: O,
     materializer: &M,

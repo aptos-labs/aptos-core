@@ -273,7 +273,6 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .collect()
     }
 
-    /// Should never be called after incorporating materialized output, as that consumes vm_output.
     fn for_each_module_write(
         &self,
         callback: &mut dyn FnMut(&ModuleId, StateValue) -> Result<(), PanicError>,
@@ -288,7 +287,6 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         Ok(())
     }
 
-    /// Should never be called after incorporating materialized output, as that consumes vm_output.
     fn delayed_field_change_set(&self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
         self.vm_output.delayed_field_change_set().clone()
     }
@@ -325,7 +323,6 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .collect()
     }
 
-    /// Should never be called after incorporating materialized output, as that consumes vm_output.
     fn get_events(&self) -> Vec<(ContractEvent, Option<MoveTypeLayout>)> {
         self.vm_output.events().to_vec()
     }
