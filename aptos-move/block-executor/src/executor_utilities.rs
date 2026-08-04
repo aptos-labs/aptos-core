@@ -264,10 +264,11 @@ where
     )?)
 }
 
-/// Checks that every resource group this transaction finalizes BCS-serializes to
-/// its recorded size, merging the transaction's own group ops onto the group's
-/// committed contents. Returns false if any group's size does not match, so the
-/// caller can discard the transaction.
+/// Checks that every resource group this transaction finalizes will
+/// BCS-serialize to its recorded size, merging the transaction's own group ops
+/// onto the group's committed contents. Returns false if a finalized group
+/// fails to serialize to its recorded size, so the caller can discard the
+/// transaction.
 pub fn check_resource_group_serialization<T, O, M>(output: &O, materializer: &M) -> bool
 where
     T: Transaction,
@@ -314,6 +315,9 @@ where
             Ok(finalized) => finalized,
             Err(_) => return false,
         };
+        // The finalized size and the output's recorded size come from the same
+        // output, so they are expected to be equal; this guard is defensive and
+        // skips the group in the unexpected case that they diverge.
         if output_size.get() != size.get() {
             continue;
         }
@@ -325,7 +329,12 @@ where
             if op.is_deletion() {
                 group.remove(&tag);
             } else {
-                group.insert(tag, raw_bytes(op));
+                group.insert(
+                    tag,
+                    op.extract_value()
+                        .extract_raw_bytes()
+                        .expect("Non-deletion op must have raw bytes"),
+                );
             }
         }
         if !serializes(&group, size) {
