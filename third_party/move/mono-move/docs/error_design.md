@@ -32,7 +32,7 @@ MonoMove starts from a clean slate, so the error system can be redesigned around
 
 4. **Compile-time category decisions.** The internal-to-public mapping is a single exhaustive `match` per subsystem (e.g. a `From` impl). Adding an internal variant fails to compile until the corresponding public category is chosen explicitly.
 
-5. **No untyped error propagation inside the VM.** No `anyhow::Error`, no `Box<dyn std::error::Error>`, no `Result<T, String>`, no `?`-on-anyhow inside VM code paths. Goal 3 only holds if the typed chain is unbroken from error site to conversion point — a single anyhow-returning function in the middle erases the variant for everyone above it. anyhow is acceptable at outer harness boundaries (e.g. testsuite glue); it is not acceptable inside the VM.
+5. **Uniform propagation through a single boundary error.** Inside the VM, errors propagate as `VMInternalError` — a boxed `IntoExecutionError` — so `?` works across functions and components without every signature naming (and depending on) the concrete error type. This erasure is *not* lossy: the concrete typed error is recoverable (`downcast_ref`) and its public category is always available, so the typed taxonomy of Goal 3 is preserved. What stays banned is *lossy* erasure — `anyhow::Error`, `Result<T, String>`, `?`-on-anyhow — which drops the variant with no way to recover it. anyhow remains acceptable at outer harness boundaries (e.g. testsuite glue).
 
 6. **Aborts and errors are structurally separate end-to-end.** A user abort is the program asking to stop; an error is the VM unable to continue. They flow through distinct types and distinct return channels at every layer — different categories of result, not different cases of the same error type.
 

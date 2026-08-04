@@ -9,13 +9,17 @@
 
 use super::ssa_function::SSAFunction;
 use crate::{
-    error::{SsaConversionError, SsaConversionResult},
-    stackless_exec_ir::{BasicBlock, BinaryOp, CmpKind, Instr, Label, Slot, UnaryOp},
+    stackless_exec_ir::{
+        BasicBlock, BinaryOp, CallClosureData, CallData, CmpKind, HomeIndex, ImmValue, Instr,
+        Label, PackClosureData, SsaSlot, UnaryOp,
+    },
+    validate::TranslationWitness,
 };
 use mono_move_core::{
     convert_mut_to_immut_ref, strip_ref,
     types::{self as ty, view_type, view_type_list, InternedType, InternedTypeList, Type},
-    IntTy, Interner, PreparedModule,
+    ExecutionErrorKind, IntTy, Interner, IntoExecutionError, PreparedModule, VMInternalError,
+    VMResult,
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -28,6 +32,67 @@ use move_binary_format::{
 };
 use shared_dsa::{Entry, UnorderedMap};
 use std::ops::Range;
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+enum SsaConversionError {
+    // TODO(security): consider verifying this at publish time?
+    #[error("too many SSA values (ValueId u16 overflow)")]
+    TooManySsaValues,
+
+    #[error("verified bytecode must end with a terminator")]
+    MissingTerminator,
+
+    #[error("operand stack underflow")]
+    StackUnderflow,
+
+    #[error("ValueId {value_id} out of range")]
+    ValueIdOutOfRange { value_id: u16 },
+
+    #[error("expected a ValueId slot on the operand stack")]
+    ExpectedValueIdOnStack,
+
+    #[error("operand stack must be empty at a block boundary")]
+    StackNotEmptyAtBlockBoundary,
+
+    #[error("expected a struct type")]
+    ExpectedStructType,
+
+    #[error("expected an enum type")]
+    ExpectedEnumType,
+
+    #[error("CallClosure signature is empty")]
+    ClosureSignatureEmpty,
+
+    #[error("CallClosure signature must start with a Function type")]
+    ClosureSignatureNotFunction,
+
+    #[error("expected a reference type")]
+    ExpectedReferenceType,
+
+    #[error("expected a mutable reference type")]
+    ExpectedMutableReference,
+}
+
+impl IntoExecutionError for SsaConversionError {
+    fn kind(&self) -> ExecutionErrorKind {
+        use SsaConversionError::*;
+        match self {
+            TooManySsaValues => ExecutionErrorKind::RuntimeLimitExceeded,
+            MissingTerminator
+            | StackUnderflow
+            | ValueIdOutOfRange { .. }
+            | ExpectedValueIdOnStack
+            | StackNotEmptyAtBlockBoundary
+            | ExpectedStructType
+            | ExpectedEnumType
+            | ClosureSignatureEmpty
+            | ClosureSignatureNotFunction
+            | ExpectedReferenceType
+            | ExpectedMutableReference => ExecutionErrorKind::InvariantViolation,
+        }
+    }
+}
 
 // ================================================================================================
 // Pass: Bytecode -> Intra-Block SSA
@@ -40,7 +105,7 @@ use std::ops::Range;
 fn split_bytecode_into_blocks(
     code: &[Bytecode],
     label_map: &UnorderedMap<CodeOffset, Label>,
-) -> SsaConversionResult<Vec<Range<usize>>> {
+) -> VMResult<Vec<Range<usize>>> {
     let mut blocks = Vec::new();
     let mut start = 0;
 
@@ -66,26 +131,26 @@ fn split_bytecode_into_blocks(
     // instruction is not an unconditional branch (Ret/Abort/Branch), so every
     // block-ending terminator in the loop above will have consumed all code.
     if start < code.len() {
-        return Err(SsaConversionError::MissingTerminator);
+        return Err(VMInternalError::new(SsaConversionError::MissingTerminator));
     }
     Ok(blocks)
 }
 
 pub(crate) struct SsaConverter<'a, I: Interner> {
     /// Next value ID number (0-based, monotonically increasing across blocks).
-    next_vid: u16,
+    next_value_id: u16,
     /// Simulated operand stack.
-    stack: Vec<Slot>,
+    stack: Vec<SsaSlot>,
     /// Types of all locals (params ++ declared locals).
     local_types: Vec<InternedType>,
     /// Types of value IDs, indexed directly by value ID number.
-    vid_types: Vec<InternedType>,
+    value_id_types: Vec<InternedType>,
     /// Interner for composite type construction.
     interner: &'a I,
     /// Completed basic blocks.
-    blocks: Vec<BasicBlock>,
+    blocks: Vec<BasicBlock<SsaSlot>>,
     /// Instructions for the current block being built.
-    current_block_instrs: Vec<Instr>,
+    current_block_instrs: Vec<Instr<SsaSlot>>,
     /// Label for the current block being built. `None` before the first block starts.
     current_block_label: Option<Label>,
     /// Map from bytecode offset to label
@@ -97,10 +162,10 @@ pub(crate) struct SsaConverter<'a, I: Interner> {
 impl<'a, I: Interner> SsaConverter<'a, I> {
     pub(crate) fn new(local_types: Vec<InternedType>, interner: &'a I) -> Self {
         Self {
-            next_vid: 0,
+            next_value_id: 0,
             stack: Vec::new(),
             local_types,
-            vid_types: Vec::new(),
+            value_id_types: Vec::new(),
             interner,
             blocks: Vec::new(),
             current_block_instrs: Vec::new(),
@@ -110,46 +175,63 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
         }
     }
 
-    fn alloc_vid(&mut self, ty: InternedType) -> SsaConversionResult<Slot> {
-        let vid = Slot::Vid(self.next_vid);
-        self.next_vid = self
-            .next_vid
+    fn alloc_value_id(&mut self, ty: InternedType) -> VMResult<SsaSlot> {
+        let value_id = SsaSlot::ValueId(self.next_value_id);
+        self.next_value_id = self
+            .next_value_id
             .checked_add(1)
             .ok_or(SsaConversionError::TooManySsaValues)?;
-        self.vid_types.push(ty);
-        Ok(vid)
+        self.value_id_types.push(ty);
+        Ok(value_id)
     }
 
-    fn push_slot(&mut self, r: Slot) {
-        debug_assert!(r.is_vid(), "only Vid slots belong on the operand stack");
+    fn push_slot(&mut self, r: SsaSlot) {
+        debug_assert!(
+            r.is_value_id(),
+            "only ValueId slots belong on the operand stack"
+        );
         self.stack.push(r);
     }
 
-    fn pop_slot(&mut self) -> SsaConversionResult<Slot> {
-        self.stack.pop().ok_or(SsaConversionError::StackUnderflow)
+    fn pop_slot(&mut self) -> VMResult<SsaSlot> {
+        self.stack
+            .pop()
+            .ok_or_else(|| VMInternalError::new(SsaConversionError::StackUnderflow))
     }
 
-    fn pop_n_reverse(&mut self, n: usize) -> SsaConversionResult<Vec<Slot>> {
+    fn pop_n_reverse(&mut self, n: usize) -> VMResult<Box<[SsaSlot]>> {
         if self.stack.len() < n {
-            return Err(SsaConversionError::StackUnderflow);
+            return Err(VMInternalError::new(SsaConversionError::StackUnderflow));
         }
         let start = self.stack.len() - n;
         Ok(self.stack.drain(start..).collect())
     }
 
-    /// Returns the type of a Vid slot by looking it up in `vid_types`.
-    /// Invariant: only Vid slots appear on the operand stack.
-    fn vid_type(&self, slot: Slot) -> SsaConversionResult<InternedType> {
+    /// Freeze a result-slot list, push each result onto the simulated stack,
+    /// and return the frozen list for the emitted instruction's operand.
+    fn push_results(&mut self, results: Vec<SsaSlot>) -> Box<[SsaSlot]> {
+        let results = results.into_boxed_slice();
+        for &slot in &results {
+            self.push_slot(slot);
+        }
+        results
+    }
+
+    /// Returns the type of a ValueId slot by looking it up in `value_id_types`.
+    /// Invariant: only ValueId slots appear on the operand stack.
+    fn value_id_type(&self, slot: SsaSlot) -> VMResult<InternedType> {
         match slot {
-            Slot::Vid(id) => self
-                .vid_types
-                .get(id as usize)
-                .copied()
-                .ok_or(SsaConversionError::VidOutOfRange { vid: id }),
-            other => {
-                let _ = other;
-                Err(SsaConversionError::ExpectedVidOnStack)
+            SsaSlot::ValueId(id) => {
+                self.value_id_types
+                    .get(id as usize)
+                    .copied()
+                    .ok_or_else(|| {
+                        VMInternalError::new(SsaConversionError::ValueIdOutOfRange { value_id: id })
+                    })
             },
+            SsaSlot::Home(_) => Err(VMInternalError::new(
+                SsaConversionError::ExpectedValueIdOnStack,
+            )),
         }
     }
 
@@ -187,7 +269,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
         &self,
         module: &PreparedModule,
         idx: StructDefInstantiationIndex,
-    ) -> SsaConversionResult<InternedType> {
+    ) -> VMResult<InternedType> {
         let inst = &module.struct_def_instantiations[idx.0 as usize];
         let generic_ty = module.interned_nominal_def_type_at(inst.def);
         let ty_args = self
@@ -202,7 +284,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
         &self,
         module: &PreparedModule,
         idx: StructVariantInstantiationIndex,
-    ) -> SsaConversionResult<(InternedType, u16, InternedTypeList)> {
+    ) -> VMResult<(InternedType, u16, InternedTypeList)> {
         let inst = &module.struct_variant_instantiations[idx.0 as usize];
         let handle = &module.struct_variant_handles[inst.handle.0 as usize];
         let generic_ty = module.interned_nominal_def_type_at(handle.struct_index);
@@ -221,7 +303,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
         &self,
         module: &PreparedModule,
         idx: FieldInstantiationIndex,
-    ) -> SsaConversionResult<(FieldHandleIndex, InternedType, InternedType)> {
+    ) -> VMResult<(FieldHandleIndex, InternedType, InternedType)> {
         let inst = &module.field_instantiations[idx.0 as usize];
         let ty_args = self
             .interner
@@ -244,7 +326,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
         &self,
         module: &PreparedModule,
         idx: VariantFieldInstantiationIndex,
-    ) -> SsaConversionResult<(VariantFieldHandleIndex, InternedType, InternedType)> {
+    ) -> VMResult<(VariantFieldHandleIndex, InternedType, InternedType)> {
         let inst = &module.variant_field_instantiations[idx.0 as usize];
         let ty_args = self
             .interner
@@ -293,23 +375,32 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
         }
     }
 
-    /// Converts the function's bytecode into SSA form, consuming the converter.
+    /// Converts the function's bytecode into SSA form, consuming the
+    /// converter. Also returns the translation witness: the label-to-offset
+    /// map recorded here, carried on the final IR for translation
+    /// validation.
     pub(crate) fn convert_function(
         mut self,
         module: &PreparedModule,
         code: &[Bytecode],
-    ) -> SsaConversionResult<SSAFunction> {
+    ) -> VMResult<(SSAFunction, TranslationWitness)> {
         self.assign_labels(code);
 
         let block_boundaries = split_bytecode_into_blocks(code, &self.label_map)?;
 
+        // Labels are dense over block starts, so one entry per block.
+        let mut label_to_offset: Vec<CodeOffset> = vec![0; block_boundaries.len()];
+
         for block in block_boundaries {
             if !self.stack.is_empty() {
-                return Err(SsaConversionError::StackNotEmptyAtBlockBoundary);
+                return Err(VMInternalError::new(
+                    SsaConversionError::StackNotEmptyAtBlockBoundary,
+                ));
             }
 
             // Every block gets a label (assigned on-demand if not already a branch target).
             let label = self.get_or_create_label(block.start as CodeOffset);
+            label_to_offset[label.0 as usize] = block.start as CodeOffset;
             self.start_new_block(label);
 
             for bc in &code[block] {
@@ -318,123 +409,67 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
         }
         self.finalize_current_block();
 
-        Ok(SSAFunction {
+        let ssa = SSAFunction {
             blocks: self.blocks,
-            vid_types: self.vid_types,
+            value_id_types: self.value_id_types,
             local_types: self.local_types,
-        })
+        };
+        Ok((ssa, TranslationWitness { label_to_offset }))
     }
 
     /// Converts a single stack-based bytecode into slot-based SSA instruction(s).
     ///
-    /// Each bytecode pops its operands from the simulated stack, allocates a fresh
-    /// value ID for each result, emits the corresponding slot-based instruction, and
-    /// pushes the results back. The stack is only a compile-time simulation — the
-    /// emitted IR is purely slot-based.
-    fn convert_bytecode(
-        &mut self,
-        module: &PreparedModule,
-        bc: &Bytecode,
-    ) -> SsaConversionResult<()> {
+    /// Each bytecode pops its operands from the simulated stack, allocates a
+    /// fresh value ID for each result, emits the corresponding slot-based
+    /// instruction, and pushes the results back. The stack is only a compile-time
+    /// simulation — the emitted IR is purely slot-based.
+    fn convert_bytecode(&mut self, module: &PreparedModule, bc: &Bytecode) -> VMResult<()> {
         use Bytecode as B;
         match bc {
             // --- Loads ---
-            B::LdU8(v) => {
-                let dst = self.alloc_vid(ty::U8_TY)?;
-                self.current_block_instrs.push(Instr::LdU8(dst, *v));
-                self.push_slot(dst);
-            },
-            B::LdU16(v) => {
-                let dst = self.alloc_vid(ty::U16_TY)?;
-                self.current_block_instrs.push(Instr::LdU16(dst, *v));
-                self.push_slot(dst);
-            },
-            B::LdU32(v) => {
-                let dst = self.alloc_vid(ty::U32_TY)?;
-                self.current_block_instrs.push(Instr::LdU32(dst, *v));
-                self.push_slot(dst);
-            },
-            B::LdU64(v) => {
-                let dst = self.alloc_vid(ty::U64_TY)?;
-                self.current_block_instrs.push(Instr::LdU64(dst, *v));
-                self.push_slot(dst);
-            },
-            B::LdU128(v) => {
-                let dst = self.alloc_vid(ty::U128_TY)?;
-                self.current_block_instrs.push(Instr::LdU128(dst, *v));
-                self.push_slot(dst);
-            },
-            B::LdU256(v) => {
-                let dst = self.alloc_vid(ty::U256_TY)?;
-                self.current_block_instrs.push(Instr::LdU256(dst, *v));
-                self.push_slot(dst);
-            },
-            B::LdI8(v) => {
-                let dst = self.alloc_vid(ty::I8_TY)?;
-                self.current_block_instrs.push(Instr::LdI8(dst, *v));
-                self.push_slot(dst);
-            },
-            B::LdI16(v) => {
-                let dst = self.alloc_vid(ty::I16_TY)?;
-                self.current_block_instrs.push(Instr::LdI16(dst, *v));
-                self.push_slot(dst);
-            },
-            B::LdI32(v) => {
-                let dst = self.alloc_vid(ty::I32_TY)?;
-                self.current_block_instrs.push(Instr::LdI32(dst, *v));
-                self.push_slot(dst);
-            },
-            B::LdI64(v) => {
-                let dst = self.alloc_vid(ty::I64_TY)?;
-                self.current_block_instrs.push(Instr::LdI64(dst, *v));
-                self.push_slot(dst);
-            },
-            B::LdI128(v) => {
-                let dst = self.alloc_vid(ty::I128_TY)?;
-                self.current_block_instrs.push(Instr::LdI128(dst, *v));
-                self.push_slot(dst);
-            },
-            B::LdI256(v) => {
-                let dst = self.alloc_vid(ty::I256_TY)?;
-                self.current_block_instrs.push(Instr::LdI256(dst, *v));
-                self.push_slot(dst);
-            },
+            B::LdU8(value) => self.convert_load(ty::U8_TY, ImmValue::U8(*value))?,
+            B::LdU16(value) => self.convert_load(ty::U16_TY, ImmValue::U16(*value))?,
+            B::LdU32(value) => self.convert_load(ty::U32_TY, ImmValue::U32(*value))?,
+            B::LdU64(value) => self.convert_load(ty::U64_TY, ImmValue::U64(*value))?,
+            B::LdU128(value) => self.convert_load(ty::U128_TY, ImmValue::U128(Box::new(*value)))?,
+            B::LdU256(value) => self.convert_load(ty::U256_TY, ImmValue::U256(Box::new(*value)))?,
+            B::LdI8(value) => self.convert_load(ty::I8_TY, ImmValue::I8(*value))?,
+            B::LdI16(value) => self.convert_load(ty::I16_TY, ImmValue::I16(*value))?,
+            B::LdI32(value) => self.convert_load(ty::I32_TY, ImmValue::I32(*value))?,
+            B::LdI64(value) => self.convert_load(ty::I64_TY, ImmValue::I64(*value))?,
+            B::LdI128(value) => self.convert_load(ty::I128_TY, ImmValue::I128(Box::new(*value)))?,
+            B::LdI256(value) => self.convert_load(ty::I256_TY, ImmValue::I256(Box::new(*value)))?,
+            B::LdTrue => self.convert_load(ty::BOOL_TY, ImmValue::Bool(true))?,
+            B::LdFalse => self.convert_load(ty::BOOL_TY, ImmValue::Bool(false))?,
             B::LdConst(idx) => {
                 let ty = module.interned_constant_type_at(*idx);
-                let dst = self.alloc_vid(ty)?;
-                self.current_block_instrs.push(Instr::LdConst(dst, *idx));
-                self.push_slot(dst);
-            },
-            B::LdTrue => {
-                let dst = self.alloc_vid(ty::BOOL_TY)?;
-                self.current_block_instrs.push(Instr::LdTrue(dst));
-                self.push_slot(dst);
-            },
-            B::LdFalse => {
-                let dst = self.alloc_vid(ty::BOOL_TY)?;
-                self.current_block_instrs.push(Instr::LdFalse(dst));
+                let dst = self.alloc_value_id(ty)?;
+                self.current_block_instrs.push(Instr::LdConst {
+                    dst,
+                    const_idx: *idx,
+                });
                 self.push_slot(dst);
             },
 
             // --- Locals ---
             B::CopyLoc(idx) => {
-                let src = Slot::Home(*idx as u16);
+                let src = SsaSlot::Home(HomeIndex(*idx as u16));
                 let ty = self.local_types[*idx as usize];
-                let dst = self.alloc_vid(ty)?;
-                self.current_block_instrs.push(Instr::Copy(dst, src));
+                let dst = self.alloc_value_id(ty)?;
+                self.current_block_instrs.push(Instr::Copy { dst, src });
                 self.push_slot(dst);
             },
             B::MoveLoc(idx) => {
-                let src = Slot::Home(*idx as u16);
+                let src = SsaSlot::Home(HomeIndex(*idx as u16));
                 let ty = self.local_types[*idx as usize];
-                let dst = self.alloc_vid(ty)?;
-                self.current_block_instrs.push(Instr::Move(dst, src));
+                let dst = self.alloc_value_id(ty)?;
+                self.current_block_instrs.push(Instr::Move { dst, src });
                 self.push_slot(dst);
             },
             B::StLoc(idx) => {
                 let src = self.pop_slot()?;
-                let dst = Slot::Home(*idx as u16);
-                self.current_block_instrs.push(Instr::Move(dst, src));
+                let dst = SsaSlot::Home(HomeIndex(*idx as u16));
+                self.current_block_instrs.push(Instr::Move { dst, src });
             },
 
             // --- Pop ---
@@ -479,7 +514,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             B::Not => self.convert_unop(UnaryOp::Not, ty::BOOL_TY)?,
             // --- Unary ops (result type derived from operand) ---
             B::Negate => {
-                let src_ty = self.vid_type(
+                let src_ty = self.value_id_type(
                     *self
                         .stack
                         .last()
@@ -488,7 +523,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 self.convert_unop(UnaryOp::Negate, src_ty)?;
             },
             B::FreezeRef => {
-                let src_ty = self.vid_type(
+                let src_ty = self.value_id_type(
                     *self
                         .stack
                         .last()
@@ -503,21 +538,27 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             // --- Struct ops ---
             B::Pack(idx) => {
                 let n = struct_field_count(module, *idx);
-                let fields = self.pop_n_reverse(n)?;
-                let result_ty = module.interned_nominal_def_type_at(*idx);
-                let dst = self.alloc_vid(result_ty)?;
-                self.current_block_instrs
-                    .push(Instr::Pack(dst, result_ty, fields));
+                let srcs = self.pop_n_reverse(n)?;
+                let struct_ty = module.interned_nominal_def_type_at(*idx);
+                let dst = self.alloc_value_id(struct_ty)?;
+                self.current_block_instrs.push(Instr::Pack {
+                    dst,
+                    struct_ty,
+                    srcs,
+                });
                 self.push_slot(dst);
             },
             B::PackGeneric(idx) => {
                 let inst = &module.struct_def_instantiations[idx.0 as usize];
                 let n = struct_field_count(module, inst.def);
-                let fields = self.pop_n_reverse(n)?;
-                let result_ty = self.struct_inst_ty(module, *idx)?;
-                let dst = self.alloc_vid(result_ty)?;
-                self.current_block_instrs
-                    .push(Instr::Pack(dst, result_ty, fields));
+                let srcs = self.pop_n_reverse(n)?;
+                let struct_ty = self.struct_inst_ty(module, *idx)?;
+                let dst = self.alloc_value_id(struct_ty)?;
+                self.current_block_instrs.push(Instr::Pack {
+                    dst,
+                    struct_ty,
+                    srcs,
+                });
                 self.push_slot(dst);
             },
             B::Unpack(idx) => {
@@ -527,14 +568,15 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                     .ok_or(SsaConversionError::ExpectedStructType)?;
                 let mut dsts = Vec::with_capacity(ftypes.len());
                 for &fty in ftypes {
-                    dsts.push(self.alloc_vid(fty)?);
+                    dsts.push(self.alloc_value_id(fty)?);
                 }
+                let dsts = self.push_results(dsts);
                 let struct_ty = module.interned_nominal_def_type_at(*idx);
-                self.current_block_instrs
-                    .push(Instr::Unpack(dsts.clone(), struct_ty, src));
-                for dst in dsts {
-                    self.push_slot(dst);
-                }
+                self.current_block_instrs.push(Instr::Unpack {
+                    dsts,
+                    struct_ty,
+                    src,
+                });
             },
             B::UnpackGeneric(idx) => {
                 let src = self.pop_slot()?;
@@ -542,20 +584,21 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let fields = module
                     .interned_struct_field_types_at(inst.def)
                     .ok_or(SsaConversionError::ExpectedStructType)?;
-                let inst_ty = self.struct_inst_ty(module, *idx)?;
+                let struct_ty = self.struct_inst_ty(module, *idx)?;
                 let ty_args = self
                     .interner
                     .type_list_of(module.interned_types_at(inst.type_parameters));
                 let mut dsts = Vec::with_capacity(fields.len());
                 for &fty in fields {
                     let fty = self.interner.subst_type(fty, ty_args)?;
-                    dsts.push(self.alloc_vid(fty)?);
+                    dsts.push(self.alloc_value_id(fty)?);
                 }
-                self.current_block_instrs
-                    .push(Instr::Unpack(dsts.clone(), inst_ty, src));
-                for dst in dsts {
-                    self.push_slot(dst);
-                }
+                let dsts = self.push_results(dsts);
+                self.current_block_instrs.push(Instr::Unpack {
+                    dsts,
+                    struct_ty,
+                    src,
+                });
             },
 
             // --- Variant ops ---
@@ -563,11 +606,15 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let handle = module.struct_variant_handle_at(*idx);
                 let variant = handle.variant;
                 let n = variant_field_count(module, handle.struct_index, variant);
-                let fields = self.pop_n_reverse(n)?;
-                let result_ty = module.interned_nominal_def_type_at(handle.struct_index);
-                let dst = self.alloc_vid(result_ty)?;
-                self.current_block_instrs
-                    .push(Instr::PackVariant(dst, result_ty, variant, fields));
+                let srcs = self.pop_n_reverse(n)?;
+                let enum_ty = module.interned_nominal_def_type_at(handle.struct_index);
+                let dst = self.alloc_value_id(enum_ty)?;
+                self.current_block_instrs.push(Instr::PackVariant {
+                    dst,
+                    enum_ty,
+                    variant,
+                    srcs,
+                });
                 self.push_slot(dst);
             },
             B::PackVariantGeneric(idx) => {
@@ -575,15 +622,15 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let handle = &module.struct_variant_handles[inst.handle.0 as usize];
                 let variant = handle.variant;
                 let n = variant_field_count(module, handle.struct_index, variant);
-                let fields = self.pop_n_reverse(n)?;
-                let (inst_ty, variant_ord, _) = self.variant_inst_parts(module, *idx)?;
-                let dst = self.alloc_vid(inst_ty)?;
-                self.current_block_instrs.push(Instr::PackVariant(
+                let srcs = self.pop_n_reverse(n)?;
+                let (enum_ty, variant_ord, _) = self.variant_inst_parts(module, *idx)?;
+                let dst = self.alloc_value_id(enum_ty)?;
+                self.current_block_instrs.push(Instr::PackVariant {
                     dst,
-                    inst_ty,
-                    variant_ord,
-                    fields,
-                ));
+                    enum_ty,
+                    variant: variant_ord,
+                    srcs,
+                });
                 self.push_slot(dst);
             },
             B::UnpackVariant(idx) => {
@@ -595,18 +642,16 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                     .ok_or(SsaConversionError::ExpectedEnumType)?;
                 let mut dsts = Vec::with_capacity(ftypes.len());
                 for &fty in ftypes {
-                    dsts.push(self.alloc_vid(fty)?);
+                    dsts.push(self.alloc_value_id(fty)?);
                 }
+                let dsts = self.push_results(dsts);
                 let enum_ty = module.interned_nominal_def_type_at(handle.struct_index);
-                self.current_block_instrs.push(Instr::UnpackVariant(
-                    dsts.clone(),
+                self.current_block_instrs.push(Instr::UnpackVariant {
+                    dsts,
                     enum_ty,
                     variant,
                     src,
-                ));
-                for dst in dsts {
-                    self.push_slot(dst);
-                }
+                });
             },
             B::UnpackVariantGeneric(idx) => {
                 let src = self.pop_slot()?;
@@ -616,236 +661,309 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let fields = module
                     .interned_variant_field_types_at(handle.struct_index, variant)
                     .ok_or(SsaConversionError::ExpectedEnumType)?;
-                let (inst_ty, variant_ord, ty_args) = self.variant_inst_parts(module, *idx)?;
+                let (enum_ty, variant_ord, ty_args) = self.variant_inst_parts(module, *idx)?;
                 let mut dsts = Vec::with_capacity(fields.len());
                 for &fty in fields {
                     let fty = self.interner.subst_type(fty, ty_args)?;
-                    dsts.push(self.alloc_vid(fty)?);
+                    dsts.push(self.alloc_value_id(fty)?);
                 }
-                self.current_block_instrs.push(Instr::UnpackVariant(
-                    dsts.clone(),
-                    inst_ty,
-                    variant_ord,
+                let dsts = self.push_results(dsts);
+                self.current_block_instrs.push(Instr::UnpackVariant {
+                    dsts,
+                    enum_ty,
+                    variant: variant_ord,
                     src,
-                ));
-                for dst in dsts {
-                    self.push_slot(dst);
-                }
+                });
             },
             B::TestVariant(idx) => {
                 let src = self.pop_slot()?;
                 let handle = &module.struct_variant_handles[idx.0 as usize];
                 let variant = handle.variant;
                 let enum_ty = module.interned_nominal_def_type_at(handle.struct_index);
-                let dst = self.alloc_vid(ty::BOOL_TY)?;
-                self.current_block_instrs
-                    .push(Instr::TestVariant(dst, enum_ty, variant, src));
+                let dst = self.alloc_value_id(ty::BOOL_TY)?;
+                self.current_block_instrs.push(Instr::TestVariant {
+                    dst,
+                    enum_ty,
+                    variant,
+                    src,
+                });
                 self.push_slot(dst);
             },
             B::TestVariantGeneric(idx) => {
                 let src = self.pop_slot()?;
-                let (inst_ty, variant, _) = self.variant_inst_parts(module, *idx)?;
-                let dst = self.alloc_vid(ty::BOOL_TY)?;
-                self.current_block_instrs
-                    .push(Instr::TestVariant(dst, inst_ty, variant, src));
+                let (enum_ty, variant, _) = self.variant_inst_parts(module, *idx)?;
+                let dst = self.alloc_value_id(ty::BOOL_TY)?;
+                self.current_block_instrs.push(Instr::TestVariant {
+                    dst,
+                    enum_ty,
+                    variant,
+                    src,
+                });
                 self.push_slot(dst);
             },
 
             // --- References ---
             B::ImmBorrowLoc(idx) => {
-                let src = Slot::Home(*idx as u16);
+                let local = SsaSlot::Home(HomeIndex(*idx as u16));
                 let inner = self.local_types[*idx as usize];
                 let ty = self.interner.immut_ref_of(inner);
-                let dst = self.alloc_vid(ty)?;
+                let dst = self.alloc_value_id(ty)?;
                 self.current_block_instrs
-                    .push(Instr::ImmBorrowLoc(dst, src));
+                    .push(Instr::ImmBorrowLoc { dst, local });
                 self.push_slot(dst);
             },
             B::MutBorrowLoc(idx) => {
-                let src = Slot::Home(*idx as u16);
+                let local = SsaSlot::Home(HomeIndex(*idx as u16));
                 let inner = self.local_types[*idx as usize];
                 let ty = self.interner.mut_ref_of(inner);
-                let dst = self.alloc_vid(ty)?;
+                let dst = self.alloc_value_id(ty)?;
                 self.current_block_instrs
-                    .push(Instr::MutBorrowLoc(dst, src));
+                    .push(Instr::MutBorrowLoc { dst, local });
                 self.push_slot(dst);
             },
             B::ImmBorrowField(idx) => {
                 let src = self.pop_slot()?;
                 let owner_idx = module.field_handle_at(*idx).owner;
-                let owner = module.interned_nominal_def_type_at(owner_idx);
+                let owner_ty = module.interned_nominal_def_type_at(owner_idx);
                 let fty = module.interned_field_type_at(*idx);
                 let ty = self.interner.immut_ref_of(fty);
-                let dst = self.alloc_vid(ty)?;
-                self.current_block_instrs
-                    .push(Instr::ImmBorrowField(dst, owner, *idx, src));
+                let dst = self.alloc_value_id(ty)?;
+                self.current_block_instrs.push(Instr::ImmBorrowField {
+                    dst,
+                    owner_ty,
+                    field: *idx,
+                    src,
+                });
                 self.push_slot(dst);
             },
             B::MutBorrowField(idx) => {
                 let src = self.pop_slot()?;
                 let owner_idx = module.field_handle_at(*idx).owner;
-                let owner = module.interned_nominal_def_type_at(owner_idx);
+                let owner_ty = module.interned_nominal_def_type_at(owner_idx);
                 let fty = module.interned_field_type_at(*idx);
                 let ty = self.interner.mut_ref_of(fty);
-                let dst = self.alloc_vid(ty)?;
-                self.current_block_instrs
-                    .push(Instr::MutBorrowField(dst, owner, *idx, src));
+                let dst = self.alloc_value_id(ty)?;
+                self.current_block_instrs.push(Instr::MutBorrowField {
+                    dst,
+                    owner_ty,
+                    field: *idx,
+                    src,
+                });
                 self.push_slot(dst);
             },
             B::ImmBorrowFieldGeneric(idx) => {
                 let src = self.pop_slot()?;
-                let (handle, owner, fty) = self.field_inst_parts(module, *idx)?;
+                let (field, owner_ty, fty) = self.field_inst_parts(module, *idx)?;
                 let ty = self.interner.immut_ref_of(fty);
-                let dst = self.alloc_vid(ty)?;
-                self.current_block_instrs
-                    .push(Instr::ImmBorrowField(dst, owner, handle, src));
+                let dst = self.alloc_value_id(ty)?;
+                self.current_block_instrs.push(Instr::ImmBorrowField {
+                    dst,
+                    owner_ty,
+                    field,
+                    src,
+                });
                 self.push_slot(dst);
             },
             B::MutBorrowFieldGeneric(idx) => {
                 let src = self.pop_slot()?;
-                let (handle, owner, fty) = self.field_inst_parts(module, *idx)?;
+                let (field, owner_ty, fty) = self.field_inst_parts(module, *idx)?;
                 let ty = self.interner.mut_ref_of(fty);
-                let dst = self.alloc_vid(ty)?;
-                self.current_block_instrs
-                    .push(Instr::MutBorrowField(dst, owner, handle, src));
+                let dst = self.alloc_value_id(ty)?;
+                self.current_block_instrs.push(Instr::MutBorrowField {
+                    dst,
+                    owner_ty,
+                    field,
+                    src,
+                });
                 self.push_slot(dst);
             },
             B::ImmBorrowVariantField(idx) => {
                 let src = self.pop_slot()?;
                 let owner_idx = module.variant_field_handle_at(*idx).struct_index;
-                let owner = module.interned_nominal_def_type_at(owner_idx);
+                let owner_ty = module.interned_nominal_def_type_at(owner_idx);
                 let fty = module.interned_variant_field_type_at(*idx);
                 let ty = self.interner.immut_ref_of(fty);
-                let dst = self.alloc_vid(ty)?;
+                let dst = self.alloc_value_id(ty)?;
                 self.current_block_instrs
-                    .push(Instr::ImmBorrowVariantField(dst, owner, *idx, src));
+                    .push(Instr::ImmBorrowVariantField {
+                        dst,
+                        owner_ty,
+                        field: *idx,
+                        src,
+                    });
                 self.push_slot(dst);
             },
             B::MutBorrowVariantField(idx) => {
                 let src = self.pop_slot()?;
                 let owner_idx = module.variant_field_handle_at(*idx).struct_index;
-                let owner = module.interned_nominal_def_type_at(owner_idx);
+                let owner_ty = module.interned_nominal_def_type_at(owner_idx);
                 let fty = module.interned_variant_field_type_at(*idx);
                 let ty = self.interner.mut_ref_of(fty);
-                let dst = self.alloc_vid(ty)?;
+                let dst = self.alloc_value_id(ty)?;
                 self.current_block_instrs
-                    .push(Instr::MutBorrowVariantField(dst, owner, *idx, src));
+                    .push(Instr::MutBorrowVariantField {
+                        dst,
+                        owner_ty,
+                        field: *idx,
+                        src,
+                    });
                 self.push_slot(dst);
             },
             B::ImmBorrowVariantFieldGeneric(idx) => {
                 let src = self.pop_slot()?;
-                let (handle, owner, fty) = self.variant_field_inst_parts(module, *idx)?;
+                let (field, owner_ty, fty) = self.variant_field_inst_parts(module, *idx)?;
                 let ty = self.interner.immut_ref_of(fty);
-                let dst = self.alloc_vid(ty)?;
+                let dst = self.alloc_value_id(ty)?;
                 self.current_block_instrs
-                    .push(Instr::ImmBorrowVariantField(dst, owner, handle, src));
+                    .push(Instr::ImmBorrowVariantField {
+                        dst,
+                        owner_ty,
+                        field,
+                        src,
+                    });
                 self.push_slot(dst);
             },
             B::MutBorrowVariantFieldGeneric(idx) => {
                 let src = self.pop_slot()?;
-                let (handle, owner, fty) = self.variant_field_inst_parts(module, *idx)?;
+                let (field, owner_ty, fty) = self.variant_field_inst_parts(module, *idx)?;
                 let ty = self.interner.mut_ref_of(fty);
-                let dst = self.alloc_vid(ty)?;
+                let dst = self.alloc_value_id(ty)?;
                 self.current_block_instrs
-                    .push(Instr::MutBorrowVariantField(dst, owner, handle, src));
+                    .push(Instr::MutBorrowVariantField {
+                        dst,
+                        owner_ty,
+                        field,
+                        src,
+                    });
                 self.push_slot(dst);
             },
             B::ReadRef => {
                 let src = self.pop_slot()?;
-                let src_ty = self.vid_type(src)?;
+                let src_ty = self.value_id_type(src)?;
                 // The bytecode verifier guarantees the operand is `&T` or `&mut T`.
                 let ty = strip_ref(src_ty).ok_or(SsaConversionError::ExpectedReferenceType)?;
-                let dst = self.alloc_vid(ty)?;
-                self.current_block_instrs.push(Instr::ReadRef(dst, src));
+                let dst = self.alloc_value_id(ty)?;
+                self.current_block_instrs.push(Instr::ReadRef { dst, src });
                 self.push_slot(dst);
             },
             B::WriteRef => {
-                let ref_r = self.pop_slot()?;
+                let dst_ref = self.pop_slot()?;
                 let val = self.pop_slot()?;
-                self.current_block_instrs.push(Instr::WriteRef(ref_r, val));
+                self.current_block_instrs
+                    .push(Instr::WriteRef { dst_ref, val });
             },
 
             // --- Globals ---
             B::Exists(idx) => {
                 let addr = self.pop_slot()?;
-                let struct_ty = module.interned_nominal_def_type_at(*idx);
-                let dst = self.alloc_vid(ty::BOOL_TY)?;
-                self.current_block_instrs
-                    .push(Instr::Exists(dst, struct_ty, addr));
+                let resource_ty = module.interned_nominal_def_type_at(*idx);
+                let dst = self.alloc_value_id(ty::BOOL_TY)?;
+                self.current_block_instrs.push(Instr::Exists {
+                    dst,
+                    resource_ty,
+                    addr,
+                });
                 self.push_slot(dst);
             },
             B::ExistsGeneric(idx) => {
                 let addr = self.pop_slot()?;
-                let inst_ty = self.struct_inst_ty(module, *idx)?;
-                let dst = self.alloc_vid(ty::BOOL_TY)?;
-                self.current_block_instrs
-                    .push(Instr::Exists(dst, inst_ty, addr));
+                let resource_ty = self.struct_inst_ty(module, *idx)?;
+                let dst = self.alloc_value_id(ty::BOOL_TY)?;
+                self.current_block_instrs.push(Instr::Exists {
+                    dst,
+                    resource_ty,
+                    addr,
+                });
                 self.push_slot(dst);
             },
             B::MoveFrom(idx) => {
                 let addr = self.pop_slot()?;
-                let ty = module.interned_nominal_def_type_at(*idx);
-                let dst = self.alloc_vid(ty)?;
-                self.current_block_instrs
-                    .push(Instr::MoveFrom(dst, ty, addr));
+                let resource_ty = module.interned_nominal_def_type_at(*idx);
+                let dst = self.alloc_value_id(resource_ty)?;
+                self.current_block_instrs.push(Instr::MoveFrom {
+                    dst,
+                    resource_ty,
+                    addr,
+                });
                 self.push_slot(dst);
             },
             B::MoveFromGeneric(idx) => {
                 let addr = self.pop_slot()?;
-                let ty = self.struct_inst_ty(module, *idx)?;
-                let dst = self.alloc_vid(ty)?;
-                self.current_block_instrs
-                    .push(Instr::MoveFrom(dst, ty, addr));
+                let resource_ty = self.struct_inst_ty(module, *idx)?;
+                let dst = self.alloc_value_id(resource_ty)?;
+                self.current_block_instrs.push(Instr::MoveFrom {
+                    dst,
+                    resource_ty,
+                    addr,
+                });
                 self.push_slot(dst);
             },
             B::MoveTo(idx) => {
                 let val = self.pop_slot()?;
                 let signer = self.pop_slot()?;
-                let struct_ty = module.interned_nominal_def_type_at(*idx);
-                self.current_block_instrs
-                    .push(Instr::MoveTo(struct_ty, signer, val));
+                let resource_ty = module.interned_nominal_def_type_at(*idx);
+                self.current_block_instrs.push(Instr::MoveTo {
+                    resource_ty,
+                    signer,
+                    val,
+                });
             },
             B::MoveToGeneric(idx) => {
                 let val = self.pop_slot()?;
                 let signer = self.pop_slot()?;
-                let inst_ty = self.struct_inst_ty(module, *idx)?;
-                self.current_block_instrs
-                    .push(Instr::MoveTo(inst_ty, signer, val));
+                let resource_ty = self.struct_inst_ty(module, *idx)?;
+                self.current_block_instrs.push(Instr::MoveTo {
+                    resource_ty,
+                    signer,
+                    val,
+                });
             },
             B::ImmBorrowGlobal(idx) => {
                 let addr = self.pop_slot()?;
-                let inner = module.interned_nominal_def_type_at(*idx);
-                let ty = self.interner.immut_ref_of(inner);
-                let dst = self.alloc_vid(ty)?;
-                self.current_block_instrs
-                    .push(Instr::ImmBorrowGlobal(dst, inner, addr));
+                let resource_ty = module.interned_nominal_def_type_at(*idx);
+                let ty = self.interner.immut_ref_of(resource_ty);
+                let dst = self.alloc_value_id(ty)?;
+                self.current_block_instrs.push(Instr::ImmBorrowGlobal {
+                    dst,
+                    resource_ty,
+                    addr,
+                });
                 self.push_slot(dst);
             },
             B::ImmBorrowGlobalGeneric(idx) => {
                 let addr = self.pop_slot()?;
-                let inner = self.struct_inst_ty(module, *idx)?;
-                let ty = self.interner.immut_ref_of(inner);
-                let dst = self.alloc_vid(ty)?;
-                self.current_block_instrs
-                    .push(Instr::ImmBorrowGlobal(dst, inner, addr));
+                let resource_ty = self.struct_inst_ty(module, *idx)?;
+                let ty = self.interner.immut_ref_of(resource_ty);
+                let dst = self.alloc_value_id(ty)?;
+                self.current_block_instrs.push(Instr::ImmBorrowGlobal {
+                    dst,
+                    resource_ty,
+                    addr,
+                });
                 self.push_slot(dst);
             },
             B::MutBorrowGlobal(idx) => {
                 let addr = self.pop_slot()?;
-                let inner = module.interned_nominal_def_type_at(*idx);
-                let ty = self.interner.mut_ref_of(inner);
-                let dst = self.alloc_vid(ty)?;
-                self.current_block_instrs
-                    .push(Instr::MutBorrowGlobal(dst, inner, addr));
+                let resource_ty = module.interned_nominal_def_type_at(*idx);
+                let ty = self.interner.mut_ref_of(resource_ty);
+                let dst = self.alloc_value_id(ty)?;
+                self.current_block_instrs.push(Instr::MutBorrowGlobal {
+                    dst,
+                    resource_ty,
+                    addr,
+                });
                 self.push_slot(dst);
             },
             B::MutBorrowGlobalGeneric(idx) => {
                 let addr = self.pop_slot()?;
-                let inner = self.struct_inst_ty(module, *idx)?;
-                let ty = self.interner.mut_ref_of(inner);
-                let dst = self.alloc_vid(ty)?;
-                self.current_block_instrs
-                    .push(Instr::MutBorrowGlobal(dst, inner, addr));
+                let resource_ty = self.struct_inst_ty(module, *idx)?;
+                let ty = self.interner.mut_ref_of(resource_ty);
+                let dst = self.alloc_value_id(ty)?;
+                self.current_block_instrs.push(Instr::MutBorrowGlobal {
+                    dst,
+                    resource_ty,
+                    addr,
+                });
                 self.push_slot(dst);
             },
 
@@ -858,17 +976,17 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let args = self.pop_n_reverse(num_args)?;
                 let mut rets = Vec::with_capacity(ret_types.len());
                 for &rty in ret_types {
-                    rets.push(self.alloc_vid(rty)?);
+                    rets.push(self.alloc_value_id(rty)?);
                 }
-                self.current_block_instrs.push(Instr::Call(
-                    rets.clone(),
-                    *idx,
-                    ty::EMPTY_TYPE_LIST,
-                    args,
-                ));
-                for r in rets {
-                    self.push_slot(r);
-                }
+                let rets = self.push_results(rets);
+                self.current_block_instrs.push(Instr::Call {
+                    data: Box::new(CallData {
+                        rets,
+                        function_handle: *idx,
+                        ty_args: ty::EMPTY_TYPE_LIST,
+                        args,
+                    }),
+                });
             },
             B::CallGeneric(idx) => {
                 let (handle_idx, ty_args) = self.fun_inst_parts(module, *idx);
@@ -880,17 +998,17 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let mut rets = Vec::with_capacity(ret_types.len());
                 for &rty in ret_types {
                     let rty = self.interner.subst_type(rty, ty_args)?;
-                    rets.push(self.alloc_vid(rty)?);
+                    rets.push(self.alloc_value_id(rty)?);
                 }
-                self.current_block_instrs.push(Instr::Call(
-                    rets.clone(),
-                    handle_idx,
-                    ty_args,
-                    args,
-                ));
-                for r in rets {
-                    self.push_slot(r);
-                }
+                let rets = self.push_results(rets);
+                self.current_block_instrs.push(Instr::Call {
+                    data: Box::new(CallData {
+                        rets,
+                        function_handle: handle_idx,
+                        ty_args,
+                        args,
+                    }),
+                });
             },
 
             // --- Closures ---
@@ -909,14 +1027,16 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                     returns,
                     move_core_types::ability::AbilitySet::EMPTY,
                 );
-                let dst = self.alloc_vid(ty)?;
-                self.current_block_instrs.push(Instr::PackClosure(
-                    dst,
-                    *fhi,
-                    ty::EMPTY_TYPE_LIST,
-                    *mask,
-                    captured,
-                ));
+                let dst = self.alloc_value_id(ty)?;
+                self.current_block_instrs.push(Instr::PackClosure {
+                    data: Box::new(PackClosureData {
+                        dst,
+                        function_handle: *fhi,
+                        ty_args: ty::EMPTY_TYPE_LIST,
+                        mask: *mask,
+                        captured,
+                    }),
+                });
                 self.push_slot(dst);
             },
             B::PackClosureGeneric(fii, mask) => {
@@ -938,98 +1058,116 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                     returns,
                     move_core_types::ability::AbilitySet::EMPTY,
                 );
-                let dst = self.alloc_vid(ty)?;
-                self.current_block_instrs.push(Instr::PackClosure(
-                    dst, handle_idx, ty_args, *mask, captured,
-                ));
+                let dst = self.alloc_value_id(ty)?;
+                self.current_block_instrs.push(Instr::PackClosure {
+                    data: Box::new(PackClosureData {
+                        dst,
+                        function_handle: handle_idx,
+                        ty_args,
+                        mask: *mask,
+                        captured,
+                    }),
+                });
                 self.push_slot(dst);
             },
             B::CallClosure(sig_idx) => {
-                let sig_types = module.interned_types_at(*sig_idx);
-                let first = sig_types
+                // The bytecode verifier pins the instruction's signature to a
+                // single element: the closure's function type.
+                let closure_ty = module
+                    .interned_types_at(*sig_idx)
                     .first()
                     .copied()
                     .ok_or(SsaConversionError::ClosureSignatureEmpty)?;
-                let (num_args, ret_types) =
-                    if let Type::Function { args, results, .. } = view_type(first) {
-                        (
-                            view_type_list(*args).len(),
-                            view_type_list(*results).to_vec(),
-                        )
-                    } else {
-                        return Err(SsaConversionError::ClosureSignatureNotFunction);
-                    };
-                let closure = self.pop_slot()?;
-                let mut all_args = self.pop_n_reverse(num_args)?;
-                all_args.push(closure);
+                let Type::Function { args, results, .. } = view_type(closure_ty) else {
+                    return Err(VMInternalError::new(
+                        SsaConversionError::ClosureSignatureNotFunction,
+                    ));
+                };
+                let num_args = view_type_list(*args).len();
+                let ret_types = view_type_list(*results);
+                // The closure sits on top of its arguments, so it lands last —
+                // as `CallClosureData::args` requires.
+                let all_args = self.pop_n_reverse(num_args + 1)?;
                 let mut rets = Vec::with_capacity(ret_types.len());
-                for rty in &ret_types {
-                    rets.push(self.alloc_vid(*rty)?);
+                for &rty in ret_types {
+                    rets.push(self.alloc_value_id(rty)?);
                 }
-                let signature_types = self.interner.type_list_of(sig_types);
-                self.current_block_instrs.push(Instr::CallClosure(
-                    rets.clone(),
-                    signature_types,
-                    all_args,
-                ));
-                for r in rets {
-                    self.push_slot(r);
-                }
+                let rets = self.push_results(rets);
+                self.current_block_instrs.push(Instr::CallClosure {
+                    data: Box::new(CallClosureData::new(rets, closure_ty, all_args)),
+                });
             },
 
             // --- Vector ops ---
             B::VecPack(sig_idx, count) => {
                 // The bytecode verifier bounds the count to u16::MAX, so this cast is lossless.
                 let count = *count as u16;
-                let elems = self.pop_n_reverse(count as usize)?;
+                let srcs = self.pop_n_reverse(count as usize)?;
                 let elem_ty = module.interned_types_at(*sig_idx)[0];
                 let ty = self.interner.vector_of(elem_ty);
-                let dst = self.alloc_vid(ty)?;
+                let dst = self.alloc_value_id(ty)?;
                 self.current_block_instrs
-                    .push(Instr::VecPack(dst, elem_ty, elems));
+                    .push(Instr::VecPack { dst, elem_ty, srcs });
                 self.push_slot(dst);
             },
             B::VecLen(sig_idx) => {
                 let vec_ref = self.pop_slot()?;
                 let elem_ty = module.interned_types_at(*sig_idx)[0];
-                let dst = self.alloc_vid(ty::U64_TY)?;
-                self.current_block_instrs
-                    .push(Instr::VecLen(dst, elem_ty, vec_ref));
+                let dst = self.alloc_value_id(ty::U64_TY)?;
+                self.current_block_instrs.push(Instr::VecLen {
+                    dst,
+                    elem_ty,
+                    vec_ref,
+                });
                 self.push_slot(dst);
             },
             B::VecImmBorrow(sig_idx) => {
-                let idx_r = self.pop_slot()?;
+                let idx = self.pop_slot()?;
                 let vec_ref = self.pop_slot()?;
                 let elem_ty = module.interned_types_at(*sig_idx)[0];
                 let ty = self.interner.immut_ref_of(elem_ty);
-                let dst = self.alloc_vid(ty)?;
-                self.current_block_instrs
-                    .push(Instr::VecImmBorrow(dst, elem_ty, vec_ref, idx_r));
+                let dst = self.alloc_value_id(ty)?;
+                self.current_block_instrs.push(Instr::VecImmBorrow {
+                    dst,
+                    elem_ty,
+                    vec_ref,
+                    idx,
+                });
                 self.push_slot(dst);
             },
             B::VecMutBorrow(sig_idx) => {
-                let idx_r = self.pop_slot()?;
+                let idx = self.pop_slot()?;
                 let vec_ref = self.pop_slot()?;
                 let elem_ty = module.interned_types_at(*sig_idx)[0];
                 let ty = self.interner.mut_ref_of(elem_ty);
-                let dst = self.alloc_vid(ty)?;
-                self.current_block_instrs
-                    .push(Instr::VecMutBorrow(dst, elem_ty, vec_ref, idx_r));
+                let dst = self.alloc_value_id(ty)?;
+                self.current_block_instrs.push(Instr::VecMutBorrow {
+                    dst,
+                    elem_ty,
+                    vec_ref,
+                    idx,
+                });
                 self.push_slot(dst);
             },
             B::VecPushBack(sig_idx) => {
                 let val = self.pop_slot()?;
                 let vec_ref = self.pop_slot()?;
                 let elem_ty = module.interned_types_at(*sig_idx)[0];
-                self.current_block_instrs
-                    .push(Instr::VecPushBack(elem_ty, vec_ref, val));
+                self.current_block_instrs.push(Instr::VecPushBack {
+                    vec_ref,
+                    elem_ty,
+                    val,
+                });
             },
             B::VecPopBack(sig_idx) => {
                 let vec_ref = self.pop_slot()?;
                 let elem_ty = module.interned_types_at(*sig_idx)[0];
-                let dst = self.alloc_vid(elem_ty)?;
-                self.current_block_instrs
-                    .push(Instr::VecPopBack(dst, elem_ty, vec_ref));
+                let dst = self.alloc_value_id(elem_ty)?;
+                self.current_block_instrs.push(Instr::VecPopBack {
+                    dst,
+                    elem_ty,
+                    vec_ref,
+                });
                 self.push_slot(dst);
             },
             B::VecUnpack(sig_idx, count) => {
@@ -1039,50 +1177,55 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let elem_ty = module.interned_types_at(*sig_idx)[0];
                 let mut dsts = Vec::with_capacity(count as usize);
                 for _ in 0..count {
-                    dsts.push(self.alloc_vid(elem_ty)?);
+                    dsts.push(self.alloc_value_id(elem_ty)?);
                 }
+                let dsts = self.push_results(dsts);
                 self.current_block_instrs
-                    .push(Instr::VecUnpack(dsts.clone(), elem_ty, src));
-                for dst in dsts {
-                    self.push_slot(dst);
-                }
+                    .push(Instr::VecUnpack { dsts, elem_ty, src });
             },
             B::VecSwap(sig_idx) => {
-                let j = self.pop_slot()?;
-                let i = self.pop_slot()?;
+                let idx_b = self.pop_slot()?;
+                let idx_a = self.pop_slot()?;
                 let vec_ref = self.pop_slot()?;
                 let elem_ty = module.interned_types_at(*sig_idx)[0];
-                self.current_block_instrs
-                    .push(Instr::VecSwap(elem_ty, vec_ref, i, j));
+                self.current_block_instrs.push(Instr::VecSwap {
+                    vec_ref,
+                    elem_ty,
+                    idx_a,
+                    idx_b,
+                });
             },
 
             // --- Control flow ---
-            B::Branch(target) => {
-                let label = *self.label_map.get(target).expect("branch target label");
-                self.current_block_instrs.push(Instr::Branch(label));
+            B::Branch(offset) => {
+                let target = *self.label_map.get(offset).expect("branch target label");
+                self.current_block_instrs.push(Instr::Branch { target });
             },
-            B::BrTrue(target) => {
+            B::BrTrue(offset) => {
                 let cond = self.pop_slot()?;
-                let label = *self.label_map.get(target).expect("branch target label");
-                self.current_block_instrs.push(Instr::BrTrue(label, cond));
+                let target = *self.label_map.get(offset).expect("branch target label");
+                self.current_block_instrs
+                    .push(Instr::BrTrue { target, cond });
             },
-            B::BrFalse(target) => {
+            B::BrFalse(offset) => {
                 let cond = self.pop_slot()?;
-                let label = *self.label_map.get(target).expect("branch target label");
-                self.current_block_instrs.push(Instr::BrFalse(label, cond));
+                let target = *self.label_map.get(offset).expect("branch target label");
+                self.current_block_instrs
+                    .push(Instr::BrFalse { target, cond });
             },
             B::Ret => {
-                let rets: Vec<Slot> = self.stack.drain(..).collect();
-                self.current_block_instrs.push(Instr::Ret(rets));
+                let srcs: Box<[SsaSlot]> = self.stack.drain(..).collect();
+                self.current_block_instrs.push(Instr::Ret { srcs });
             },
             B::Abort => {
                 let code = self.pop_slot()?;
-                self.current_block_instrs.push(Instr::Abort(code));
+                self.current_block_instrs.push(Instr::Abort { code });
             },
             B::AbortMsg => {
                 let msg = self.pop_slot()?;
                 let code = self.pop_slot()?;
-                self.current_block_instrs.push(Instr::AbortMsg(code, msg));
+                self.current_block_instrs
+                    .push(Instr::AbortMsg { code, msg });
             },
 
             B::Nop => {},
@@ -1090,31 +1233,39 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
         Ok(())
     }
 
-    fn convert_binop(&mut self, op: BinaryOp, result_is_bool: bool) -> SsaConversionResult<()> {
+    fn convert_load(&mut self, result_ty: InternedType, imm: ImmValue) -> VMResult<()> {
+        let dst = self.alloc_value_id(result_ty)?;
+        self.current_block_instrs.push(Instr::LdImm { dst, imm });
+        self.push_slot(dst);
+        Ok(())
+    }
+
+    fn convert_binop(&mut self, op: BinaryOp, result_is_bool: bool) -> VMResult<()> {
         let rhs = self.pop_slot()?;
         let lhs = self.pop_slot()?;
         let result_ty = if result_is_bool {
             ty::BOOL_TY
         } else {
-            self.vid_type(lhs)?
+            self.value_id_type(lhs)?
         };
-        let dst = self.alloc_vid(result_ty)?;
+        let dst = self.alloc_value_id(result_ty)?;
         self.current_block_instrs
-            .push(Instr::BinaryOp(dst, op, lhs, rhs));
+            .push(Instr::BinaryOp { dst, op, lhs, rhs });
         self.push_slot(dst);
         Ok(())
     }
 
-    fn convert_unop(&mut self, op: UnaryOp, result_ty: InternedType) -> SsaConversionResult<()> {
+    fn convert_unop(&mut self, op: UnaryOp, result_ty: InternedType) -> VMResult<()> {
         let src = self.pop_slot()?;
-        let dst = self.alloc_vid(result_ty)?;
-        self.current_block_instrs.push(Instr::UnaryOp(dst, op, src));
+        let dst = self.alloc_value_id(result_ty)?;
+        self.current_block_instrs
+            .push(Instr::UnaryOp { dst, op, src });
         self.push_slot(dst);
         Ok(())
     }
 
     /// Convert a cast op, whose result type is the cast target itself.
-    fn convert_cast(&mut self, to: IntTy) -> SsaConversionResult<()> {
+    fn convert_cast(&mut self, to: IntTy) -> VMResult<()> {
         self.convert_unop(UnaryOp::Cast(to), to.interned_ty())
     }
 }

@@ -13,7 +13,16 @@ use triomphe::Arc as TriompheArc;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum AbstractResourceWriteOp {
-    Write(WriteOp),
+    /// A resource write.
+    ///
+    /// The boolean field is set to true if this is a materialized aggregator
+    /// V1 delta. Historically, deltas are excluded from gas metering and do
+    /// not have their metadata set. The flag ensures this continues to be the
+    /// case: writes with flag set are excluded from metadata calculations and
+    /// gas metering.
+    ///
+    /// For all other resources, always set to false.
+    Write(WriteOp, bool),
     WriteWithDelayedFields(WriteWithDelayedFieldsOp),
     // Prior to adding a dedicated write-set for resource groups, all resource group
     // updates are merged into a single WriteOp included in the resource_write_set.
@@ -25,8 +34,26 @@ pub enum AbstractResourceWriteOp {
 }
 
 impl AbstractResourceWriteOp {
+    /// Returns true if this write should be treated as aggregator V1 delta.
+    ///
+    /// For deltas, legacy behavior is:
+    ///   - they keep legacy (none) metadata
+    ///   - they are excluded from storage-fee charging and write-set size/count accounting.
+    ///
+    /// For compatibility, this behavior is maintained.
+    pub fn is_aggregator_v1_delta(&self) -> bool {
+        use AbstractResourceWriteOp::*;
+        match self {
+            Write(_, is_aggregator_v1_delta) => *is_aggregator_v1_delta,
+            InPlaceDelayedFieldChange(op) => op.is_aggregator_v1_delta,
+            WriteWithDelayedFields(_)
+            | WriteResourceGroup(_)
+            | ResourceGroupInPlaceDelayedFieldChange(_) => false,
+        }
+    }
+
     pub fn try_as_concrete_write(&self) -> Option<&WriteOp> {
-        if let AbstractResourceWriteOp::Write(write_op) = self {
+        if let AbstractResourceWriteOp::Write(write_op, _) = self {
             Some(write_op)
         } else {
             None
@@ -34,7 +61,7 @@ impl AbstractResourceWriteOp {
     }
 
     pub fn try_into_concrete_write(self) -> Option<WriteOp> {
-        if let AbstractResourceWriteOp::Write(write_op) = self {
+        if let AbstractResourceWriteOp::Write(write_op, _) = self {
             Some(write_op)
         } else {
             None
@@ -44,7 +71,7 @@ impl AbstractResourceWriteOp {
     pub fn materialized_size(&self) -> WriteOpSize {
         use AbstractResourceWriteOp::*;
         match self {
-            Write(write) => write.write_op_size(),
+            Write(write, _) => write.write_op_size(),
             WriteWithDelayedFields(WriteWithDelayedFieldsOp {
                 write_op,
                 materialized_size,
@@ -76,7 +103,7 @@ impl AbstractResourceWriteOp {
         use AbstractResourceWriteOp::*;
         let size = if fix_prev_materialized_size {
             match self {
-                Write(_) | WriteWithDelayedFields(_) => {
+                Write(..) | WriteWithDelayedFields(_) => {
                     executor_view.get_resource_state_value_size(state_key)?
                 },
                 InPlaceDelayedFieldChange(InPlaceDelayedFieldChangeOp {
@@ -94,7 +121,7 @@ impl AbstractResourceWriteOp {
             }
         } else {
             match self {
-                Write(_)
+                Write(..)
                 | WriteWithDelayedFields(WriteWithDelayedFieldsOp { .. })
                 | InPlaceDelayedFieldChange(_)
                 | ResourceGroupInPlaceDelayedFieldChange(_) => {
@@ -113,7 +140,7 @@ impl AbstractResourceWriteOp {
     pub fn metadata_mut(&mut self) -> &mut StateValueMetadata {
         use AbstractResourceWriteOp::*;
         match self {
-            Write(write_op)
+            Write(write_op, _)
             | WriteWithDelayedFields(WriteWithDelayedFieldsOp { write_op, .. })
             | WriteResourceGroup(GroupWrite {
                 metadata_op: write_op,
@@ -140,7 +167,7 @@ impl AbstractResourceWriteOp {
                     materialized_size,
                 })
             },
-            None => Self::Write(write_op),
+            None => Self::Write(write_op, false),
         }
     }
 }
@@ -242,6 +269,12 @@ pub struct InPlaceDelayedFieldChangeOp {
     pub layout: TriompheArc<MoveTypeLayout>,
     pub materialized_size: u64,
     pub metadata: StateValueMetadata,
+    /// Set to true only for aggregator V1 deltas. The flag enforces the legacy
+    /// behavior:
+    ///   - legacy (none) metadata,
+    ///   - delta is excluded from storage-fee charging.
+    /// False for all other in-place changes.
+    pub is_aggregator_v1_delta: bool,
 }
 
 /// Actual information of which individual tag has delayed fields was read,

@@ -20,6 +20,7 @@ path = "src/main.rs"
 anyhow = { workspace = true }
 aptos-block-executor = { workspace = true }
 aptos-cached-packages = { workspace = true }
+aptos-framework-natives = { workspace = true }
 aptos-move-debugger = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-types = { workspace = true }
@@ -33,6 +34,7 @@ mono-move-core = { workspace = true }
 mono-move-global-context = { workspace = true }
 mono-move-loader = { workspace = true }
 mono-move-natives = { workspace = true }
+mono-move-output = { workspace = true }
 mono-move-runtime = { workspace = true }
 mono-move-testsuite = { workspace = true }
 move-binary-format = { workspace = true }

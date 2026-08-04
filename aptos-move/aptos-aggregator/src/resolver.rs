@@ -2,19 +2,16 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    aggregator_v1_extension::{addition_v1_error, subtraction_v1_error},
     bounded_math::SignedU128,
-    delta_change_set::{serialize, DeltaOp},
-    types::{DelayedFieldValue, DelayedFieldsSpeculativeError, DeltaApplicationFailureReason},
+    types::{DelayedFieldValue, DelayedFieldsSpeculativeError},
 };
 use aptos_types::{
-    error::{code_invariant_error, PanicError, PanicOr},
+    error::{PanicError, PanicOr},
     state_store::{
         state_key::StateKey,
         state_value::{StateValue, StateValueMetadata},
         StateView,
     },
-    write_set::WriteOp,
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::StatusCode};
@@ -38,6 +35,9 @@ pub trait TAggregatorV1View {
     ///   -  Ok(Some(...))    if aggregator value exists in storage,
     ///   -  Err(...)         otherwise (e.g. storage error or failed delta
     ///                       application).
+    ///
+    /// Used when delayed field optimization is not enabled (implementation is
+    /// sequential).
     fn get_aggregator_v1_state_value(
         &self,
         id: &Self::Identifier,
@@ -60,49 +60,20 @@ pub trait TAggregatorV1View {
         &self,
         id: &Self::Identifier,
     ) -> PartialVMResult<Option<StateValueMetadata>> {
-        // When getting state value metadata for aggregator V1, we need to do a
-        // precise read.
         let maybe_state_value = self.get_aggregator_v1_state_value(id)?;
         Ok(maybe_state_value.map(StateValue::into_metadata))
     }
 
-    fn get_aggregator_v1_state_value_size(
+    /// Used **ONLY** if delayed field optimization is enabled.
+    ///
+    /// Returns an ID corresponding to the exchanged value of the aggregator.
+    fn get_aggregator_v1_delayed_field_id(
         &self,
-        id: &Self::Identifier,
-    ) -> PartialVMResult<Option<u64>> {
-        let maybe_state_value = self.get_aggregator_v1_state_value(id)?;
-        Ok(maybe_state_value.map(|v| v.size() as u64))
-    }
-
-    /// Consumes a single delta of aggregator V1, and tries to materialize it
-    /// with a given identifier (state key). If materialization succeeds, a
-    /// write op is produced.
-    fn try_convert_aggregator_v1_delta_into_write_op(
-        &self,
-        id: &Self::Identifier,
-        delta_op: &DeltaOp,
-    ) -> PartialVMResult<WriteOp> {
-        let base = self.get_aggregator_v1_value(id)?.ok_or_else(|| {
-            PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)
-                .with_message("Cannot convert delta for deleted aggregator".to_string())
-        })?;
-        delta_op
-            .apply_to(base)
-            .map_err(|e| match &e {
-                PanicOr::Or(DelayedFieldsSpeculativeError::DeltaApplication {
-                    reason: DeltaApplicationFailureReason::Overflow,
-                    ..
-                }) => addition_v1_error(e),
-                PanicOr::Or(DelayedFieldsSpeculativeError::DeltaApplication {
-                    reason: DeltaApplicationFailureReason::Underflow,
-                    ..
-                }) => subtraction_v1_error(e),
-                // Because aggregator V1 never underflows or overflows, all other
-                // application errors are bugs.
-                _ => code_invariant_error(format!("Unexpected delta application error: {:?}", e))
-                    .into(),
-            })
-            .map(|result| WriteOp::legacy_modification(serialize(&result).into()))
+        _id: &Self::Identifier,
+    ) -> PartialVMResult<Option<DelayedFieldID>> {
+        // By default - there is no ID (optimization not enabled). Callers
+        // handle this case as an error gracefully.
+        Ok(None)
     }
 }
 

@@ -2,7 +2,7 @@
 \label{sec:intro}
 
 The Move Prover (\MVP)~\cite{DillGPQXZ22} is a formal verification tool for Move smart contracts~\cite{blackshear2020resources,MoveOnAptosBook}, designed for routine use during development with response times comparable to type checkers and linters.
-\MVP is deployed at Aptos to verify core protocol logic --- staking, metering, code deployment, and supporting data structures~\cite{ParkZGXGCLC24, AptosFrameworkBook} --- and was originally developed for the Libra/Diem blockchain at Meta.
+\MVP is deployed at Aptos, a public layer-1 blockchain whose smart contracts are written in Move, where it verifies core protocol logic --- staking, metering, code deployment, and supporting data structures~\cite{ParkZGXGCLC24, AptosFrameworkBook}; it was originally developed for the Libra/Diem blockchain at Meta.
 
 Recently, Move was extended with \emph{higher-order functions}~\cite{grieskamp2025movehigherorder}: functions are now first-class values that can be passed, returned, stored in struct fields, and persisted in global storage.
 Combined with Move's resource model, persisted function values give a principled account of \emph{dynamic dispatch}.

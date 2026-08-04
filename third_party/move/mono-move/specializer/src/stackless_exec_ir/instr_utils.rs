@@ -5,15 +5,18 @@
 //!
 //! Provides read-only slot visitors (`for_each_def`, `for_each_use`,
 //! `for_each_slot`, `collect_defs_and_uses`), in-place slot rewriters
-//! (`remap_all_slots_with`, `remap_source_slots_with`), and miscellaneous
-//! instruction helpers (`extract_imm_value`, `is_commutative`).
+//! (`remap_all_slots_with`, `remap_source_slots_with`), the consuming
+//! slot-form converter (`try_map_slots`), and miscellaneous instruction
+//! helpers (`call_boundary_rets_and_args`, `is_commutative`). Everything is
+//! generic over the slot form `SlotForm` of `Instr<SlotForm>`.
 //!
 //! # Architecture
 //!
-//! All slot traversal is built on two const-generic core functions
-//! (`visit_slots` for reading, `rewrite_instr_slots` for mutation) so that
-//! adding a new `Instr` variant requires updating exactly two match blocks.
-//! Public functions are thin wrappers that select const-generic parameters.
+//! All slot traversal is built on three core functions (`visit_slots` for
+//! reading, `rewrite_instr_slots` for in-place mutation, `try_map_slots` for
+//! consuming form conversion) so that adding a new `Instr` variant
+//! requires updating exactly three match blocks. Public functions are thin
+//! wrappers that select const-generic parameters.
 //!
 //! # Performance
 //!
@@ -30,12 +33,14 @@
 //!   caller-provided closures (`impl FnMut`) are monomorphized and inlined
 //!   at each call site.
 
-use super::{BinaryOp, ImmValue, Instr, Slot};
+use super::{
+    BasicBlock, BinaryOp, CallClosureData, CallData, FieldPath, Instr, Label, PackClosureData,
+};
 use mono_move_core::types::InternedType;
 use smallvec::SmallVec;
 
 /// Most instructions have at most 4 defs or uses.
-pub(crate) type SlotList = SmallVec<[Slot; 4]>;
+pub(crate) type SlotList<SlotForm> = SmallVec<[SlotForm; 4]>;
 
 /// Whether a visited slot is a def (written) or a use (read).
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -56,21 +61,24 @@ enum SlotRole {
 // =============================================================================
 
 /// Apply `f` to each slot defined (written) by an instruction.
-pub(crate) fn for_each_def(instr: &Instr, mut f: impl FnMut(Slot)) {
-    visit_slots::<true, false>(instr, |slot, _| f(slot));
+pub(crate) fn for_each_def<SlotForm: Copy>(instr: &Instr<SlotForm>, mut f: impl FnMut(SlotForm)) {
+    visit_slots::<true, false, SlotForm>(instr, |slot, _| f(slot));
 }
 
 /// Apply `f` to each slot used (read) by an instruction. Includes
 /// both value uses and place uses — the full union of
 /// read-side operands.
-pub(crate) fn for_each_use(instr: &Instr, mut f: impl FnMut(Slot)) {
-    visit_slots::<false, true>(instr, |slot, _| f(slot));
+pub(crate) fn for_each_use<SlotForm: Copy>(instr: &Instr<SlotForm>, mut f: impl FnMut(SlotForm)) {
+    visit_slots::<false, true, SlotForm>(instr, |slot, _| f(slot));
 }
 
 /// Apply `f` to each slot whose value an instruction consumes,
 /// skipping place uses.
-pub(crate) fn for_each_value_use(instr: &Instr, mut f: impl FnMut(Slot)) {
-    visit_slots::<false, true>(instr, |slot, role| {
+pub(crate) fn for_each_value_use<SlotForm: Copy>(
+    instr: &Instr<SlotForm>,
+    mut f: impl FnMut(SlotForm),
+) {
+    visit_slots::<false, true, SlotForm>(instr, |slot, role| {
         if role == SlotRole::ValueUse {
             f(slot);
         }
@@ -78,16 +86,18 @@ pub(crate) fn for_each_value_use(instr: &Instr, mut f: impl FnMut(Slot)) {
 }
 
 /// Apply `f` to every slot (defs and uses) in an instruction.
-pub(crate) fn for_each_slot(instr: &Instr, mut f: impl FnMut(Slot)) {
-    visit_slots::<true, true>(instr, |slot, _| f(slot));
+pub(crate) fn for_each_slot<SlotForm: Copy>(instr: &Instr<SlotForm>, mut f: impl FnMut(SlotForm)) {
+    visit_slots::<true, true, SlotForm>(instr, |slot, _| f(slot));
 }
 
 /// Collect defs and uses into separate lists in a single pass.
 /// Place uses are grouped with value uses.
-pub(crate) fn collect_defs_and_uses(instr: &Instr) -> (SlotList, SlotList) {
+pub(crate) fn collect_defs_and_uses<SlotForm: Copy>(
+    instr: &Instr<SlotForm>,
+) -> (SlotList<SlotForm>, SlotList<SlotForm>) {
     let mut defs = SlotList::new();
     let mut uses = SlotList::new();
-    visit_slots::<true, true>(instr, |slot, role| match role {
+    visit_slots::<true, true, SlotForm>(instr, |slot, role| match role {
         SlotRole::Def => defs.push(slot),
         SlotRole::ValueUse | SlotRole::PlaceUse => uses.push(slot),
     });
@@ -101,26 +111,179 @@ pub(crate) fn collect_defs_and_uses(instr: &Instr) -> (SlotList, SlotList) {
 /// Rewrite all slot operands of an instruction by applying `f`.
 ///
 /// Each slot is rewritten exactly once — `f` is not applied transitively.
-pub(crate) fn remap_all_slots_with(instr: &mut Instr, f: impl FnMut(Slot) -> Slot) {
-    rewrite_instr_slots::<true, true, false>(instr, f);
+pub(crate) fn remap_all_slots_with<SlotForm: Copy>(
+    instr: &mut Instr<SlotForm>,
+    f: impl FnMut(SlotForm) -> SlotForm,
+) {
+    rewrite_instr_slots::<true, true, false, SlotForm>(instr, f);
 }
 
 /// Rewrite source (use) operands of an instruction by applying `f`,
 /// skipping defs and BorrowLoc sources.
 ///
 /// Each slot is rewritten exactly once — `f` is not applied transitively.
-pub(crate) fn remap_source_slots_with(instr: &mut Instr, f: impl FnMut(Slot) -> Slot) {
-    rewrite_instr_slots::<false, true, true>(instr, f);
+pub(crate) fn remap_source_slots_with<SlotForm: Copy>(
+    instr: &mut Instr<SlotForm>,
+    f: impl FnMut(SlotForm) -> SlotForm,
+) {
+    rewrite_instr_slots::<false, true, true, SlotForm>(instr, f);
 }
 
 // =============================================================================
 // Other instruction utilities
 // =============================================================================
 
-/// Call-like instructions (`Call`, `CallClosure`) that clobber Xfer slots.
+/// `(rets, args)` of a call-boundary instruction (`Call`, `CallClosure`),
+/// `None` for everything else.
 #[inline]
-pub(crate) fn clobbers_xfer(instr: &Instr) -> bool {
-    matches!(instr, Instr::Call(..) | Instr::CallClosure(..))
+pub(crate) fn call_boundary_rets_and_args<SlotForm>(
+    instr: &Instr<SlotForm>,
+) -> Option<(&[SlotForm], &[SlotForm])> {
+    match instr {
+        Instr::Call { data } => Some((&data.rets, &data.args)),
+        Instr::CallClosure { data } => Some((&data.rets, &data.args)),
+
+        // Every other instruction: not a call boundary.
+        Instr::LdConst { .. }
+        | Instr::LdImm { .. }
+        | Instr::Copy { .. }
+        | Instr::Move { .. }
+        | Instr::UnaryOp { .. }
+        | Instr::BinaryOp { .. }
+        | Instr::BinaryOpImm { .. }
+        | Instr::Pack { .. }
+        | Instr::Unpack { .. }
+        | Instr::PackVariant { .. }
+        | Instr::UnpackVariant { .. }
+        | Instr::TestVariant { .. }
+        | Instr::ImmBorrowLoc { .. }
+        | Instr::MutBorrowLoc { .. }
+        | Instr::ImmBorrowField { .. }
+        | Instr::MutBorrowField { .. }
+        | Instr::ImmBorrowVariantField { .. }
+        | Instr::MutBorrowVariantField { .. }
+        | Instr::ReadRef { .. }
+        | Instr::WriteRef { .. }
+        | Instr::ReadField { .. }
+        | Instr::WriteField { .. }
+        | Instr::ReadVariantField { .. }
+        | Instr::WriteVariantField { .. }
+        | Instr::ImmBorrowLocField { .. }
+        | Instr::MutBorrowLocField { .. }
+        | Instr::ReadLocField { .. }
+        | Instr::WriteLocField { .. }
+        | Instr::ReadFieldChain { .. }
+        | Instr::WriteFieldChain { .. }
+        | Instr::ImmBorrowFieldChain { .. }
+        | Instr::MutBorrowFieldChain { .. }
+        | Instr::ReadLocFieldChain { .. }
+        | Instr::WriteLocFieldChain { .. }
+        | Instr::ImmBorrowLocFieldChain { .. }
+        | Instr::MutBorrowLocFieldChain { .. }
+        | Instr::Exists { .. }
+        | Instr::MoveFrom { .. }
+        | Instr::MoveTo { .. }
+        | Instr::ImmBorrowGlobal { .. }
+        | Instr::MutBorrowGlobal { .. }
+        | Instr::PackClosure { .. }
+        | Instr::VecPack { .. }
+        | Instr::VecLen { .. }
+        | Instr::VecImmBorrow { .. }
+        | Instr::VecMutBorrow { .. }
+        | Instr::VecPushBack { .. }
+        | Instr::VecPopBack { .. }
+        | Instr::VecUnpack { .. }
+        | Instr::VecSwap { .. }
+        | Instr::Branch { .. }
+        | Instr::BrTrue { .. }
+        | Instr::BrFalse { .. }
+        | Instr::BrCmp { .. }
+        | Instr::BrCmpImm { .. }
+        | Instr::Ret { .. }
+        | Instr::Abort { .. }
+        | Instr::AbortMsg { .. }
+        | Instr::ForceGC => None,
+    }
+}
+
+/// Call-like instructions (`Call`, `CallClosure`) that clobber Transfer
+/// slots.
+#[inline]
+pub(crate) fn clobbers_transfer<SlotForm>(instr: &Instr<SlotForm>) -> bool {
+    call_boundary_rets_and_args(instr).is_some()
+}
+
+/// The local whose storage `instr` mutably borrows, if any. A later write
+/// through that borrow mutates the local without a def at the write site (a
+/// hidden write), so coalescing and copy propagation both derive their
+/// guards from this single predicate.
+pub(crate) fn mut_local_borrow_target<SlotForm: Copy>(instr: &Instr<SlotForm>) -> Option<SlotForm> {
+    match instr {
+        // Mutable borrows of a local's storage.
+        Instr::MutBorrowLoc { local, .. }
+        | Instr::MutBorrowLocField { local, .. }
+        | Instr::MutBorrowLocFieldChain { local, .. } => Some(*local),
+
+        // Every other instruction: no local storage is mutably borrowed.
+        Instr::Pack { .. }
+        | Instr::Unpack { .. }
+        | Instr::PackVariant { .. }
+        | Instr::UnpackVariant { .. }
+        | Instr::TestVariant { .. }
+        | Instr::ImmBorrowField { .. }
+        | Instr::MutBorrowField { .. }
+        | Instr::ReadField { .. }
+        | Instr::WriteField { .. }
+        | Instr::ImmBorrowLocField { .. }
+        | Instr::ReadLocField { .. }
+        | Instr::WriteLocField { .. }
+        | Instr::ReadFieldChain { .. }
+        | Instr::WriteFieldChain { .. }
+        | Instr::ImmBorrowFieldChain { .. }
+        | Instr::MutBorrowFieldChain { .. }
+        | Instr::ReadLocFieldChain { .. }
+        | Instr::WriteLocFieldChain { .. }
+        | Instr::ImmBorrowLocFieldChain { .. }
+        | Instr::ImmBorrowVariantField { .. }
+        | Instr::MutBorrowVariantField { .. }
+        | Instr::ReadVariantField { .. }
+        | Instr::WriteVariantField { .. }
+        | Instr::PackClosure { .. }
+        | Instr::CallClosure { .. }
+        | Instr::Exists { .. }
+        | Instr::MoveFrom { .. }
+        | Instr::MoveTo { .. }
+        | Instr::ImmBorrowGlobal { .. }
+        | Instr::MutBorrowGlobal { .. }
+        | Instr::VecPack { .. }
+        | Instr::VecLen { .. }
+        | Instr::VecImmBorrow { .. }
+        | Instr::VecMutBorrow { .. }
+        | Instr::VecPushBack { .. }
+        | Instr::VecPopBack { .. }
+        | Instr::VecUnpack { .. }
+        | Instr::VecSwap { .. }
+        | Instr::LdConst { .. }
+        | Instr::LdImm { .. }
+        | Instr::Copy { .. }
+        | Instr::Move { .. }
+        | Instr::UnaryOp { .. }
+        | Instr::BinaryOp { .. }
+        | Instr::BinaryOpImm { .. }
+        | Instr::ImmBorrowLoc { .. }
+        | Instr::ReadRef { .. }
+        | Instr::WriteRef { .. }
+        | Instr::Call { .. }
+        | Instr::Branch { .. }
+        | Instr::BrTrue { .. }
+        | Instr::BrFalse { .. }
+        | Instr::BrCmp { .. }
+        | Instr::BrCmpImm { .. }
+        | Instr::Ret { .. }
+        | Instr::Abort { .. }
+        | Instr::AbortMsg { .. }
+        | Instr::ForceGC => None,
+    }
 }
 
 /// Resource type carried by a global-storage instruction (`exists`,
@@ -128,76 +291,71 @@ pub(crate) fn clobbers_xfer(instr: &Instr) -> bool {
 /// is the interned resource nominal embedded in the instruction; it may still
 /// contain type parameters that the caller substitutes with the function's
 /// type arguments.
-pub(crate) fn resource_type_in_instr(instr: &Instr) -> Option<InternedType> {
+pub(crate) fn resource_type_in_instr<SlotForm>(instr: &Instr<SlotForm>) -> Option<InternedType> {
     match instr {
         // Global-storage ops carry the resource nominal directly.
-        Instr::Exists(_, ty, _)
-        | Instr::MoveFrom(_, ty, _)
-        | Instr::MoveTo(ty, _, _)
-        | Instr::ImmBorrowGlobal(_, ty, _)
-        | Instr::MutBorrowGlobal(_, ty, _) => Some(*ty),
+        Instr::Exists { resource_ty, .. }
+        | Instr::MoveFrom { resource_ty, .. }
+        | Instr::MoveTo { resource_ty, .. }
+        | Instr::ImmBorrowGlobal { resource_ty, .. }
+        | Instr::MutBorrowGlobal { resource_ty, .. } => Some(*resource_ty),
 
         // Every other instruction: no resource type involved.
-        Instr::Pack(..)
-        | Instr::Unpack(..)
-        | Instr::PackVariant(..)
-        | Instr::UnpackVariant(..)
-        | Instr::TestVariant(..)
-        | Instr::ImmBorrowField(..)
-        | Instr::MutBorrowField(..)
-        | Instr::ReadField(..)
-        | Instr::WriteField(..)
-        | Instr::ImmBorrowLocField(..)
-        | Instr::MutBorrowLocField(..)
-        | Instr::ReadLocalField(..)
-        | Instr::WriteLocalField(..)
-        | Instr::ImmBorrowVariantField(..)
-        | Instr::MutBorrowVariantField(..)
-        | Instr::ReadVariantField(..)
-        | Instr::WriteVariantField(..)
-        | Instr::PackClosure(..)
-        | Instr::CallClosure(..)
-        | Instr::VecPack(..)
-        | Instr::VecLen(..)
-        | Instr::VecImmBorrow(..)
-        | Instr::VecMutBorrow(..)
-        | Instr::VecPushBack(..)
-        | Instr::VecPopBack(..)
-        | Instr::VecUnpack(..)
-        | Instr::VecSwap(..)
-        | Instr::LdConst(..)
-        | Instr::LdTrue(..)
-        | Instr::LdFalse(..)
-        | Instr::LdU8(..)
-        | Instr::LdU16(..)
-        | Instr::LdU32(..)
-        | Instr::LdU64(..)
-        | Instr::LdU128(..)
-        | Instr::LdU256(..)
-        | Instr::LdI8(..)
-        | Instr::LdI16(..)
-        | Instr::LdI32(..)
-        | Instr::LdI64(..)
-        | Instr::LdI128(..)
-        | Instr::LdI256(..)
-        | Instr::Copy(..)
-        | Instr::Move(..)
-        | Instr::UnaryOp(..)
-        | Instr::BinaryOp(..)
-        | Instr::BinaryOpImm(..)
-        | Instr::ImmBorrowLoc(..)
-        | Instr::MutBorrowLoc(..)
-        | Instr::ReadRef(..)
-        | Instr::WriteRef(..)
-        | Instr::Call(..)
-        | Instr::Branch(..)
-        | Instr::BrTrue(..)
-        | Instr::BrFalse(..)
-        | Instr::BrCmp(..)
-        | Instr::BrCmpImm(..)
-        | Instr::Ret(..)
-        | Instr::Abort(..)
-        | Instr::AbortMsg(..)
+        Instr::LdImm { .. }
+        | Instr::Pack { .. }
+        | Instr::Unpack { .. }
+        | Instr::PackVariant { .. }
+        | Instr::UnpackVariant { .. }
+        | Instr::TestVariant { .. }
+        | Instr::ImmBorrowField { .. }
+        | Instr::MutBorrowField { .. }
+        | Instr::ReadField { .. }
+        | Instr::WriteField { .. }
+        | Instr::ImmBorrowLocField { .. }
+        | Instr::MutBorrowLocField { .. }
+        | Instr::ReadLocField { .. }
+        | Instr::WriteLocField { .. }
+        | Instr::ReadFieldChain { .. }
+        | Instr::WriteFieldChain { .. }
+        | Instr::ImmBorrowFieldChain { .. }
+        | Instr::MutBorrowFieldChain { .. }
+        | Instr::ReadLocFieldChain { .. }
+        | Instr::WriteLocFieldChain { .. }
+        | Instr::ImmBorrowLocFieldChain { .. }
+        | Instr::MutBorrowLocFieldChain { .. }
+        | Instr::ImmBorrowVariantField { .. }
+        | Instr::MutBorrowVariantField { .. }
+        | Instr::ReadVariantField { .. }
+        | Instr::WriteVariantField { .. }
+        | Instr::PackClosure { .. }
+        | Instr::CallClosure { .. }
+        | Instr::VecPack { .. }
+        | Instr::VecLen { .. }
+        | Instr::VecImmBorrow { .. }
+        | Instr::VecMutBorrow { .. }
+        | Instr::VecPushBack { .. }
+        | Instr::VecPopBack { .. }
+        | Instr::VecUnpack { .. }
+        | Instr::VecSwap { .. }
+        | Instr::LdConst { .. }
+        | Instr::Copy { .. }
+        | Instr::Move { .. }
+        | Instr::UnaryOp { .. }
+        | Instr::BinaryOp { .. }
+        | Instr::BinaryOpImm { .. }
+        | Instr::ImmBorrowLoc { .. }
+        | Instr::MutBorrowLoc { .. }
+        | Instr::ReadRef { .. }
+        | Instr::WriteRef { .. }
+        | Instr::Call { .. }
+        | Instr::Branch { .. }
+        | Instr::BrTrue { .. }
+        | Instr::BrFalse { .. }
+        | Instr::BrCmp { .. }
+        | Instr::BrCmpImm { .. }
+        | Instr::Ret { .. }
+        | Instr::Abort { .. }
+        | Instr::AbortMsg { .. }
         | Instr::ForceGC => None,
     }
 }
@@ -220,242 +378,294 @@ pub(crate) enum NominalKind {
 /// and captured-data discovery.
 ///
 /// TODO(cleanup): reconcile various type-in-instr discovery methods.
-pub(crate) fn field_layout_nominal_in_instr(instr: &Instr) -> Option<(InternedType, NominalKind)> {
+pub(crate) fn field_layout_nominal_in_instr<SlotForm>(
+    instr: &Instr<SlotForm>,
+) -> Option<(InternedType, NominalKind)> {
     match instr {
         // Carry the instantiated struct type directly.
-        Instr::Pack(_, ty, _) | Instr::Unpack(_, ty, _) => Some((*ty, NominalKind::Struct)),
+        Instr::Pack { struct_ty, .. } | Instr::Unpack { struct_ty, .. } => {
+            Some((*struct_ty, NominalKind::Struct))
+        },
 
         // Field ops carry the instantiated owner struct type.
-        Instr::ImmBorrowField(_, owner, _, _)
-        | Instr::MutBorrowField(_, owner, _, _)
-        | Instr::ReadField(_, owner, _, _)
-        | Instr::WriteField(owner, _, _, _)
-        | Instr::ImmBorrowLocField(_, owner, _, _)
-        | Instr::MutBorrowLocField(_, owner, _, _)
-        | Instr::ReadLocalField(_, owner, _, _)
-        | Instr::WriteLocalField(owner, _, _, _) => Some((*owner, NominalKind::Struct)),
+        Instr::ImmBorrowField { owner_ty, .. }
+        | Instr::MutBorrowField { owner_ty, .. }
+        | Instr::ReadField { owner_ty, .. }
+        | Instr::WriteField { owner_ty, .. }
+        | Instr::ImmBorrowLocField { owner_ty, .. }
+        | Instr::MutBorrowLocField { owner_ty, .. }
+        | Instr::ReadLocField { owner_ty, .. }
+        | Instr::WriteLocField { owner_ty, .. } => Some((*owner_ty, NominalKind::Struct)),
+
+        // A struct chain's first owner contains every later owner as an inline
+        // field (each later owner is the previous hop's field type), so
+        // discovering it transitively lays out the whole path. The containment
+        // invariant is debug-checked at the discovery site.
+        Instr::ReadFieldChain { path, .. }
+        | Instr::WriteFieldChain { path, .. }
+        | Instr::ImmBorrowFieldChain { path, .. }
+        | Instr::MutBorrowFieldChain { path, .. }
+        | Instr::ReadLocFieldChain { path, .. }
+        | Instr::WriteLocFieldChain { path, .. }
+        | Instr::ImmBorrowLocFieldChain { path, .. }
+        | Instr::MutBorrowLocFieldChain { path, .. } => {
+            path.first().map(|(owner, _)| (*owner, NominalKind::Struct))
+        },
 
         // Variant ops carry the instantiated enum type directly.
-        Instr::PackVariant(_, ty, _, _)
-        | Instr::UnpackVariant(_, ty, _, _)
-        | Instr::TestVariant(_, ty, _, _) => Some((*ty, NominalKind::Enum)),
+        Instr::PackVariant { enum_ty, .. }
+        | Instr::UnpackVariant { enum_ty, .. }
+        | Instr::TestVariant { enum_ty, .. } => Some((*enum_ty, NominalKind::Enum)),
 
         // Variant-field ops carry the instantiated owner enum type.
-        Instr::ImmBorrowVariantField(_, owner, _, _)
-        | Instr::MutBorrowVariantField(_, owner, _, _)
-        | Instr::ReadVariantField(_, owner, _, _)
-        | Instr::WriteVariantField(owner, _, _, _) => Some((*owner, NominalKind::Enum)),
+        Instr::ImmBorrowVariantField { owner_ty, .. }
+        | Instr::MutBorrowVariantField { owner_ty, .. }
+        | Instr::ReadVariantField { owner_ty, .. }
+        | Instr::WriteVariantField { owner_ty, .. } => Some((*owner_ty, NominalKind::Enum)),
 
         // Global-resource ops surface their type via `resource_type_in_instr`
         // (they need whole-value size, not field offsets); vector ops need only
         // element stride and closure ops a capture-object layout, so none has a
         // field-layout nominal to report here.
-        Instr::Exists(..)
-        | Instr::MoveFrom(..)
-        | Instr::MoveTo(..)
-        | Instr::ImmBorrowGlobal(..)
-        | Instr::MutBorrowGlobal(..)
-        | Instr::PackClosure(..)
-        | Instr::CallClosure(..)
-        | Instr::VecPack(..)
-        | Instr::VecLen(..)
-        | Instr::VecImmBorrow(..)
-        | Instr::VecMutBorrow(..)
-        | Instr::VecPushBack(..)
-        | Instr::VecPopBack(..)
-        | Instr::VecUnpack(..)
-        | Instr::VecSwap(..) => None,
+        Instr::Exists { .. }
+        | Instr::MoveFrom { .. }
+        | Instr::MoveTo { .. }
+        | Instr::ImmBorrowGlobal { .. }
+        | Instr::MutBorrowGlobal { .. }
+        | Instr::PackClosure { .. }
+        | Instr::CallClosure { .. }
+        | Instr::VecPack { .. }
+        | Instr::VecLen { .. }
+        | Instr::VecImmBorrow { .. }
+        | Instr::VecMutBorrow { .. }
+        | Instr::VecPushBack { .. }
+        | Instr::VecPopBack { .. }
+        | Instr::VecUnpack { .. }
+        | Instr::VecSwap { .. } => None,
 
         // No struct type involved.
-        Instr::LdConst(..)
-        | Instr::LdTrue(..)
-        | Instr::LdFalse(..)
-        | Instr::LdU8(..)
-        | Instr::LdU16(..)
-        | Instr::LdU32(..)
-        | Instr::LdU64(..)
-        | Instr::LdU128(..)
-        | Instr::LdU256(..)
-        | Instr::LdI8(..)
-        | Instr::LdI16(..)
-        | Instr::LdI32(..)
-        | Instr::LdI64(..)
-        | Instr::LdI128(..)
-        | Instr::LdI256(..)
-        | Instr::Copy(..)
-        | Instr::Move(..)
-        | Instr::UnaryOp(..)
-        | Instr::BinaryOp(..)
-        | Instr::BinaryOpImm(..)
-        | Instr::ImmBorrowLoc(..)
-        | Instr::MutBorrowLoc(..)
-        | Instr::ReadRef(..)
-        | Instr::WriteRef(..)
-        | Instr::Call(..)
-        | Instr::Branch(..)
-        | Instr::BrTrue(..)
-        | Instr::BrFalse(..)
-        | Instr::BrCmp(..)
-        | Instr::BrCmpImm(..)
-        | Instr::Ret(..)
-        | Instr::Abort(..)
-        | Instr::AbortMsg(..)
+        Instr::LdConst { .. }
+        | Instr::LdImm { .. }
+        | Instr::Copy { .. }
+        | Instr::Move { .. }
+        | Instr::UnaryOp { .. }
+        | Instr::BinaryOp { .. }
+        | Instr::BinaryOpImm { .. }
+        | Instr::ImmBorrowLoc { .. }
+        | Instr::MutBorrowLoc { .. }
+        | Instr::ReadRef { .. }
+        | Instr::WriteRef { .. }
+        | Instr::Call { .. }
+        | Instr::Branch { .. }
+        | Instr::BrTrue { .. }
+        | Instr::BrFalse { .. }
+        | Instr::BrCmp { .. }
+        | Instr::BrCmpImm { .. }
+        | Instr::Ret { .. }
+        | Instr::Abort { .. }
+        | Instr::AbortMsg { .. }
         | Instr::ForceGC => None,
     }
 }
 
-/// Whether `instr` is a terminator that falls through to the next block.
+/// The fused-chain `FieldPath` carried by `instr`, if any.
+pub(crate) fn chain_field_path<SlotForm>(instr: &Instr<SlotForm>) -> Option<&FieldPath> {
+    match instr {
+        Instr::ReadFieldChain { path, .. }
+        | Instr::WriteFieldChain { path, .. }
+        | Instr::ImmBorrowFieldChain { path, .. }
+        | Instr::MutBorrowFieldChain { path, .. }
+        | Instr::ReadLocFieldChain { path, .. }
+        | Instr::WriteLocFieldChain { path, .. }
+        | Instr::ImmBorrowLocFieldChain { path, .. }
+        | Instr::MutBorrowLocFieldChain { path, .. } => Some(path),
+
+        // Every other instruction: no fused chain.
+        Instr::Pack { .. }
+        | Instr::Unpack { .. }
+        | Instr::PackVariant { .. }
+        | Instr::UnpackVariant { .. }
+        | Instr::TestVariant { .. }
+        | Instr::ImmBorrowField { .. }
+        | Instr::MutBorrowField { .. }
+        | Instr::ReadField { .. }
+        | Instr::WriteField { .. }
+        | Instr::ImmBorrowLocField { .. }
+        | Instr::MutBorrowLocField { .. }
+        | Instr::ReadLocField { .. }
+        | Instr::WriteLocField { .. }
+        | Instr::ImmBorrowVariantField { .. }
+        | Instr::MutBorrowVariantField { .. }
+        | Instr::ReadVariantField { .. }
+        | Instr::WriteVariantField { .. }
+        | Instr::PackClosure { .. }
+        | Instr::CallClosure { .. }
+        | Instr::Exists { .. }
+        | Instr::MoveFrom { .. }
+        | Instr::MoveTo { .. }
+        | Instr::ImmBorrowGlobal { .. }
+        | Instr::MutBorrowGlobal { .. }
+        | Instr::VecPack { .. }
+        | Instr::VecLen { .. }
+        | Instr::VecImmBorrow { .. }
+        | Instr::VecMutBorrow { .. }
+        | Instr::VecPushBack { .. }
+        | Instr::VecPopBack { .. }
+        | Instr::VecUnpack { .. }
+        | Instr::VecSwap { .. }
+        | Instr::LdConst { .. }
+        | Instr::LdImm { .. }
+        | Instr::Copy { .. }
+        | Instr::Move { .. }
+        | Instr::UnaryOp { .. }
+        | Instr::BinaryOp { .. }
+        | Instr::BinaryOpImm { .. }
+        | Instr::ImmBorrowLoc { .. }
+        | Instr::MutBorrowLoc { .. }
+        | Instr::ReadRef { .. }
+        | Instr::WriteRef { .. }
+        | Instr::Call { .. }
+        | Instr::Branch { .. }
+        | Instr::BrTrue { .. }
+        | Instr::BrFalse { .. }
+        | Instr::BrCmp { .. }
+        | Instr::BrCmpImm { .. }
+        | Instr::Ret { .. }
+        | Instr::Abort { .. }
+        | Instr::AbortMsg { .. }
+        | Instr::ForceGC => None,
+    }
+}
+
+/// Which conditional terminator ends a block.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum CondJumpKind {
+    BrTrue,
+    BrFalse,
+    BrCmp,
+    BrCmpImm,
+}
+
+/// Which function-exit terminator ends a block.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ExitKind {
+    Ret,
+    Abort,
+    AbortMsg,
+}
+
+/// Derived classification of how a basic block ends.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum BlockExit {
+    /// Unconditional jump.
+    Jump { target: Label },
+    /// Conditional jump; falls through to the next block in layout order
+    /// when not taken.
+    CondJump { taken: Label, kind: CondJumpKind },
+    /// No instructions, or the last instruction is not a terminator:
+    /// control continues at the next block in layout order.
+    FallThrough,
+    /// Function exit.
+    Exit(ExitKind),
+}
+
+/// The [`BlockExit`] contributed by `instr` when it is a block's last
+/// instruction; `None` when `instr` is not a terminator.
+pub(crate) fn exit_of_instr<SlotForm>(instr: &Instr<SlotForm>) -> Option<BlockExit> {
+    match instr {
+        Instr::Branch { target } => Some(BlockExit::Jump { target: *target }),
+        Instr::BrTrue { target, .. } => Some(BlockExit::CondJump {
+            taken: *target,
+            kind: CondJumpKind::BrTrue,
+        }),
+        Instr::BrFalse { target, .. } => Some(BlockExit::CondJump {
+            taken: *target,
+            kind: CondJumpKind::BrFalse,
+        }),
+        Instr::BrCmp { target, .. } => Some(BlockExit::CondJump {
+            taken: *target,
+            kind: CondJumpKind::BrCmp,
+        }),
+        Instr::BrCmpImm { target, .. } => Some(BlockExit::CondJump {
+            taken: *target,
+            kind: CondJumpKind::BrCmpImm,
+        }),
+        Instr::Ret { .. } => Some(BlockExit::Exit(ExitKind::Ret)),
+        Instr::Abort { .. } => Some(BlockExit::Exit(ExitKind::Abort)),
+        Instr::AbortMsg { .. } => Some(BlockExit::Exit(ExitKind::AbortMsg)),
+
+        // Every other instruction: not a terminator.
+        Instr::LdConst { .. }
+        | Instr::LdImm { .. }
+        | Instr::Copy { .. }
+        | Instr::Move { .. }
+        | Instr::UnaryOp { .. }
+        | Instr::BinaryOp { .. }
+        | Instr::BinaryOpImm { .. }
+        | Instr::Pack { .. }
+        | Instr::Unpack { .. }
+        | Instr::PackVariant { .. }
+        | Instr::UnpackVariant { .. }
+        | Instr::TestVariant { .. }
+        | Instr::ImmBorrowLoc { .. }
+        | Instr::MutBorrowLoc { .. }
+        | Instr::ImmBorrowField { .. }
+        | Instr::MutBorrowField { .. }
+        | Instr::ImmBorrowVariantField { .. }
+        | Instr::MutBorrowVariantField { .. }
+        | Instr::ReadRef { .. }
+        | Instr::WriteRef { .. }
+        | Instr::ReadField { .. }
+        | Instr::WriteField { .. }
+        | Instr::ReadVariantField { .. }
+        | Instr::WriteVariantField { .. }
+        | Instr::ImmBorrowLocField { .. }
+        | Instr::MutBorrowLocField { .. }
+        | Instr::ReadLocField { .. }
+        | Instr::WriteLocField { .. }
+        | Instr::ReadFieldChain { .. }
+        | Instr::WriteFieldChain { .. }
+        | Instr::ImmBorrowFieldChain { .. }
+        | Instr::MutBorrowFieldChain { .. }
+        | Instr::ReadLocFieldChain { .. }
+        | Instr::WriteLocFieldChain { .. }
+        | Instr::ImmBorrowLocFieldChain { .. }
+        | Instr::MutBorrowLocFieldChain { .. }
+        | Instr::Exists { .. }
+        | Instr::MoveFrom { .. }
+        | Instr::MoveTo { .. }
+        | Instr::ImmBorrowGlobal { .. }
+        | Instr::MutBorrowGlobal { .. }
+        | Instr::Call { .. }
+        | Instr::PackClosure { .. }
+        | Instr::CallClosure { .. }
+        | Instr::VecPack { .. }
+        | Instr::VecLen { .. }
+        | Instr::VecImmBorrow { .. }
+        | Instr::VecMutBorrow { .. }
+        | Instr::VecPushBack { .. }
+        | Instr::VecPopBack { .. }
+        | Instr::VecUnpack { .. }
+        | Instr::VecSwap { .. }
+        | Instr::ForceGC => None,
+    }
+}
+
+/// Classify how `block` ends. An empty block falls through.
 #[inline]
-pub(crate) fn is_fallthrough_terminator(instr: &Instr) -> bool {
-    match instr {
-        Instr::BrTrue(..) | Instr::BrFalse(..) | Instr::BrCmp(..) | Instr::BrCmpImm(..) => true,
-
-        Instr::Branch(..)
-        | Instr::Ret(..)
-        | Instr::Abort(..)
-        | Instr::AbortMsg(..)
-        | Instr::LdConst(..)
-        | Instr::LdTrue(..)
-        | Instr::LdFalse(..)
-        | Instr::LdU8(..)
-        | Instr::LdU16(..)
-        | Instr::LdU32(..)
-        | Instr::LdU64(..)
-        | Instr::LdU128(..)
-        | Instr::LdU256(..)
-        | Instr::LdI8(..)
-        | Instr::LdI16(..)
-        | Instr::LdI32(..)
-        | Instr::LdI64(..)
-        | Instr::LdI128(..)
-        | Instr::LdI256(..)
-        | Instr::Copy(..)
-        | Instr::Move(..)
-        | Instr::UnaryOp(..)
-        | Instr::BinaryOp(..)
-        | Instr::BinaryOpImm(..)
-        | Instr::Pack(..)
-        | Instr::Unpack(..)
-        | Instr::PackVariant(..)
-        | Instr::UnpackVariant(..)
-        | Instr::TestVariant(..)
-        | Instr::ImmBorrowLoc(..)
-        | Instr::MutBorrowLoc(..)
-        | Instr::ImmBorrowField(..)
-        | Instr::MutBorrowField(..)
-        | Instr::ImmBorrowVariantField(..)
-        | Instr::MutBorrowVariantField(..)
-        | Instr::ReadRef(..)
-        | Instr::WriteRef(..)
-        | Instr::ReadField(..)
-        | Instr::WriteField(..)
-        | Instr::ReadVariantField(..)
-        | Instr::WriteVariantField(..)
-        | Instr::ImmBorrowLocField(..)
-        | Instr::MutBorrowLocField(..)
-        | Instr::ReadLocalField(..)
-        | Instr::WriteLocalField(..)
-        | Instr::Exists(..)
-        | Instr::MoveFrom(..)
-        | Instr::MoveTo(..)
-        | Instr::ImmBorrowGlobal(..)
-        | Instr::MutBorrowGlobal(..)
-        | Instr::Call(..)
-        | Instr::PackClosure(..)
-        | Instr::CallClosure(..)
-        | Instr::VecPack(..)
-        | Instr::VecLen(..)
-        | Instr::VecImmBorrow(..)
-        | Instr::VecMutBorrow(..)
-        | Instr::VecPushBack(..)
-        | Instr::VecPopBack(..)
-        | Instr::VecUnpack(..)
-        | Instr::VecSwap(..)
-        | Instr::ForceGC => false,
-    }
+pub(crate) fn classify_exit<SlotForm>(block: &BasicBlock<SlotForm>) -> BlockExit {
+    block
+        .instrs
+        .last()
+        .and_then(exit_of_instr)
+        .unwrap_or(BlockExit::FallThrough)
 }
 
-/// Extract the destination slot and immediate value from a load instruction.
-// TODO(perf): the wide arms (`LdU128`/`LdU256`/`LdI128`/`LdI256`) each allocate
-// a `Box` here, even when `try_fuse_immediate_binop` decides not to fuse.
-// Consider splitting `extract_imm_value` into a cheap "would this fuse?"
-// check + a separate constructor, or otherwise pulling allocation behind
-// the fusion-eligibility check.
-pub(crate) fn extract_imm_value(instr: &Instr) -> Option<(Slot, ImmValue)> {
-    match instr {
-        Instr::LdTrue(dst) => Some((*dst, ImmValue::Bool(true))),
-        Instr::LdFalse(dst) => Some((*dst, ImmValue::Bool(false))),
-        Instr::LdU8(dst, val) => Some((*dst, ImmValue::U8(*val))),
-        Instr::LdU16(dst, val) => Some((*dst, ImmValue::U16(*val))),
-        Instr::LdU32(dst, val) => Some((*dst, ImmValue::U32(*val))),
-        Instr::LdU64(dst, val) => Some((*dst, ImmValue::U64(*val))),
-        Instr::LdU128(dst, val) => Some((*dst, ImmValue::U128(Box::new(*val)))),
-        Instr::LdU256(dst, val) => Some((*dst, ImmValue::U256(Box::new(*val)))),
-        Instr::LdI8(dst, val) => Some((*dst, ImmValue::I8(*val))),
-        Instr::LdI16(dst, val) => Some((*dst, ImmValue::I16(*val))),
-        Instr::LdI32(dst, val) => Some((*dst, ImmValue::I32(*val))),
-        Instr::LdI64(dst, val) => Some((*dst, ImmValue::I64(*val))),
-        Instr::LdI128(dst, val) => Some((*dst, ImmValue::I128(Box::new(*val)))),
-        Instr::LdI256(dst, val) => Some((*dst, ImmValue::I256(Box::new(*val)))),
-
-        // `LdConst` loads from the constant pool — its payload isn't a
-        // fixed-width integer literal, so it's never fusible into
-        // `BinaryOpImm`.
-        Instr::LdConst(_, _) => None,
-
-        // Non-load instructions.
-        Instr::Copy(_, _)
-        | Instr::Move(_, _)
-        | Instr::UnaryOp(_, _, _)
-        | Instr::BinaryOp(_, _, _, _)
-        | Instr::BinaryOpImm(_, _, _, _)
-        | Instr::Pack(_, _, _)
-        | Instr::Unpack(_, _, _)
-        | Instr::PackVariant(_, _, _, _)
-        | Instr::UnpackVariant(_, _, _, _)
-        | Instr::TestVariant(_, _, _, _)
-        | Instr::ImmBorrowLoc(_, _)
-        | Instr::MutBorrowLoc(_, _)
-        | Instr::ImmBorrowField(_, _, _, _)
-        | Instr::MutBorrowField(_, _, _, _)
-        | Instr::ImmBorrowVariantField(_, _, _, _)
-        | Instr::MutBorrowVariantField(_, _, _, _)
-        | Instr::ReadRef(_, _)
-        | Instr::WriteRef(_, _)
-        | Instr::ReadField(_, _, _, _)
-        | Instr::WriteField(_, _, _, _)
-        | Instr::ReadVariantField(_, _, _, _)
-        | Instr::WriteVariantField(_, _, _, _)
-        | Instr::ImmBorrowLocField(_, _, _, _)
-        | Instr::MutBorrowLocField(_, _, _, _)
-        | Instr::ReadLocalField(_, _, _, _)
-        | Instr::WriteLocalField(_, _, _, _)
-        | Instr::Exists(_, _, _)
-        | Instr::MoveFrom(_, _, _)
-        | Instr::MoveTo(_, _, _)
-        | Instr::ImmBorrowGlobal(_, _, _)
-        | Instr::MutBorrowGlobal(_, _, _)
-        | Instr::Call(_, _, _, _)
-        | Instr::PackClosure(_, _, _, _, _)
-        | Instr::CallClosure(_, _, _)
-        | Instr::VecPack(_, _, _)
-        | Instr::VecLen(_, _, _)
-        | Instr::VecImmBorrow(_, _, _, _)
-        | Instr::VecMutBorrow(_, _, _, _)
-        | Instr::VecPushBack(_, _, _)
-        | Instr::VecPopBack(_, _, _)
-        | Instr::VecUnpack(_, _, _)
-        | Instr::VecSwap(_, _, _, _)
-        | Instr::Branch(_)
-        | Instr::BrTrue(_, _)
-        | Instr::BrFalse(_, _)
-        | Instr::BrCmp(_, _, _, _)
-        | Instr::BrCmpImm(_, _, _, _)
-        | Instr::Ret(_)
-        | Instr::Abort(_)
-        | Instr::AbortMsg(_, _)
-        | Instr::ForceGC => None,
-    }
+/// Whether `instr` is a terminator that falls through to the next block
+/// when not taken — i.e., a conditional branch.
+#[inline]
+pub(crate) fn is_fallthrough_terminator<SlotForm>(instr: &Instr<SlotForm>) -> bool {
+    matches!(exit_of_instr(instr), Some(BlockExit::CondJump { .. }))
 }
 
 /// Whether a binary operation is commutative (i.e., operands can be swapped
@@ -483,7 +693,7 @@ pub(crate) fn is_commutative(op: &BinaryOp) -> bool {
 
 /// Emit a def slot if `ACTIVE` is true.
 #[inline]
-fn def<const ACTIVE: bool>(slot: Slot, f: &mut impl FnMut(Slot, SlotRole)) {
+fn def<const ACTIVE: bool, SlotForm>(slot: SlotForm, f: &mut impl FnMut(SlotForm, SlotRole)) {
     if ACTIVE {
         f(slot, SlotRole::Def);
     }
@@ -491,7 +701,7 @@ fn def<const ACTIVE: bool>(slot: Slot, f: &mut impl FnMut(Slot, SlotRole)) {
 
 /// Emit a use slot if `ACTIVE` is true.
 #[inline]
-fn used<const ACTIVE: bool>(slot: Slot, f: &mut impl FnMut(Slot, SlotRole)) {
+fn used<const ACTIVE: bool, SlotForm>(slot: SlotForm, f: &mut impl FnMut(SlotForm, SlotRole)) {
     if ACTIVE {
         f(slot, SlotRole::ValueUse);
     }
@@ -500,7 +710,10 @@ fn used<const ACTIVE: bool>(slot: Slot, f: &mut impl FnMut(Slot, SlotRole)) {
 /// Emit a place use slot if `ACTIVE` is true. The slot's
 /// identity matters but its bytes are NOT consumed by the instruction.
 #[inline]
-fn storage_use<const ACTIVE: bool>(slot: Slot, f: &mut impl FnMut(Slot, SlotRole)) {
+fn storage_use<const ACTIVE: bool, SlotForm>(
+    slot: SlotForm,
+    f: &mut impl FnMut(SlotForm, SlotRole),
+) {
     if ACTIVE {
         f(slot, SlotRole::PlaceUse);
     }
@@ -508,7 +721,10 @@ fn storage_use<const ACTIVE: bool>(slot: Slot, f: &mut impl FnMut(Slot, SlotRole
 
 /// Emit each slot in a slice as defs if `ACTIVE` is true.
 #[inline]
-fn defs<const ACTIVE: bool>(slots: &[Slot], f: &mut impl FnMut(Slot, SlotRole)) {
+fn defs<const ACTIVE: bool, SlotForm: Copy>(
+    slots: &[SlotForm],
+    f: &mut impl FnMut(SlotForm, SlotRole),
+) {
     if ACTIVE {
         slots.iter().for_each(|slot| f(*slot, SlotRole::Def));
     }
@@ -516,7 +732,10 @@ fn defs<const ACTIVE: bool>(slots: &[Slot], f: &mut impl FnMut(Slot, SlotRole)) 
 
 /// Emit each slot in a slice as uses if `ACTIVE` is true.
 #[inline]
-fn uses<const ACTIVE: bool>(slots: &[Slot], f: &mut impl FnMut(Slot, SlotRole)) {
+fn uses<const ACTIVE: bool, SlotForm: Copy>(
+    slots: &[SlotForm],
+    f: &mut impl FnMut(SlotForm, SlotRole),
+) {
     if ACTIVE {
         slots.iter().for_each(|slot| f(*slot, SlotRole::ValueUse));
     }
@@ -526,160 +745,171 @@ fn uses<const ACTIVE: bool>(slots: &[Slot], f: &mut impl FnMut(Slot, SlotRole)) 
 ///
 /// `DEFS`/`USES` select which slots to visit. The `def`/`used`/`defs`/`uses`
 /// helpers pair the role tag with the const generic by convention.
-fn visit_slots<const DEFS: bool, const USES: bool>(
-    instr: &Instr,
-    mut f: impl FnMut(Slot, SlotRole),
+fn visit_slots<const DEFS: bool, const USES: bool, SlotForm: Copy>(
+    instr: &Instr<SlotForm>,
+    mut f: impl FnMut(SlotForm, SlotRole),
 ) {
     match instr {
-        Instr::LdConst(dst, _)
-        | Instr::LdTrue(dst)
-        | Instr::LdFalse(dst)
-        | Instr::LdU8(dst, _)
-        | Instr::LdU16(dst, _)
-        | Instr::LdU32(dst, _)
-        | Instr::LdU64(dst, _)
-        | Instr::LdU128(dst, _)
-        | Instr::LdU256(dst, _)
-        | Instr::LdI8(dst, _)
-        | Instr::LdI16(dst, _)
-        | Instr::LdI32(dst, _)
-        | Instr::LdI64(dst, _)
-        | Instr::LdI128(dst, _)
-        | Instr::LdI256(dst, _) => def::<DEFS>(*dst, &mut f),
+        Instr::LdConst { dst, .. } | Instr::LdImm { dst, .. } => def::<DEFS, _>(*dst, &mut f),
 
-        Instr::Copy(dst, src) | Instr::Move(dst, src) | Instr::UnaryOp(dst, _, src) => {
-            def::<DEFS>(*dst, &mut f);
-            used::<USES>(*src, &mut f);
+        Instr::Copy { dst, src } | Instr::Move { dst, src } | Instr::UnaryOp { dst, src, .. } => {
+            def::<DEFS, _>(*dst, &mut f);
+            used::<USES, _>(*src, &mut f);
         },
-        Instr::BinaryOp(dst, _, lhs, rhs) => {
-            def::<DEFS>(*dst, &mut f);
-            used::<USES>(*lhs, &mut f);
-            used::<USES>(*rhs, &mut f);
+        Instr::BinaryOp { dst, lhs, rhs, .. } => {
+            def::<DEFS, _>(*dst, &mut f);
+            used::<USES, _>(*lhs, &mut f);
+            used::<USES, _>(*rhs, &mut f);
         },
-        Instr::BinaryOpImm(dst, _, lhs, _) => {
-            def::<DEFS>(*dst, &mut f);
-            used::<USES>(*lhs, &mut f);
+        Instr::BinaryOpImm { dst, lhs, .. } => {
+            def::<DEFS, _>(*dst, &mut f);
+            used::<USES, _>(*lhs, &mut f);
         },
 
-        Instr::Pack(dst, _, fields) | Instr::PackVariant(dst, _, _, fields) => {
-            def::<DEFS>(*dst, &mut f);
-            uses::<USES>(fields, &mut f);
+        Instr::Pack { dst, srcs, .. } | Instr::PackVariant { dst, srcs, .. } => {
+            def::<DEFS, _>(*dst, &mut f);
+            uses::<USES, _>(srcs, &mut f);
         },
-        Instr::Unpack(dsts, _, src) | Instr::UnpackVariant(dsts, _, _, src) => {
-            defs::<DEFS>(dsts, &mut f);
-            used::<USES>(*src, &mut f);
+        Instr::Unpack { dsts, src, .. } | Instr::UnpackVariant { dsts, src, .. } => {
+            defs::<DEFS, _>(dsts, &mut f);
+            used::<USES, _>(*src, &mut f);
         },
-        Instr::TestVariant(dst, _, _, src) => {
-            def::<DEFS>(*dst, &mut f);
-            used::<USES>(*src, &mut f);
+        Instr::TestVariant { dst, src, .. } => {
+            def::<DEFS, _>(*dst, &mut f);
+            used::<USES, _>(*src, &mut f);
         },
 
-        // `src` is a place use: the local's identity is
+        // `local` is a place use: the local's identity is
         // taken, its bytes are not consumed.
-        Instr::ImmBorrowLoc(dst, src) | Instr::MutBorrowLoc(dst, src) => {
-            def::<DEFS>(*dst, &mut f);
-            storage_use::<USES>(*src, &mut f);
+        Instr::ImmBorrowLoc { dst, local } | Instr::MutBorrowLoc { dst, local } => {
+            def::<DEFS, _>(*dst, &mut f);
+            storage_use::<USES, _>(*local, &mut f);
         },
-        Instr::ImmBorrowField(dst, _, _, src)
-        | Instr::MutBorrowField(dst, _, _, src)
-        | Instr::ImmBorrowVariantField(dst, _, _, src)
-        | Instr::MutBorrowVariantField(dst, _, _, src)
-        | Instr::ReadRef(dst, src) => {
-            def::<DEFS>(*dst, &mut f);
-            used::<USES>(*src, &mut f);
+        // Field chains share the slot shape of their single-field counterparts;
+        // only the carried `path` differs.
+        Instr::ImmBorrowField { dst, src, .. }
+        | Instr::MutBorrowField { dst, src, .. }
+        | Instr::ImmBorrowVariantField { dst, src, .. }
+        | Instr::MutBorrowVariantField { dst, src, .. }
+        | Instr::ImmBorrowFieldChain { dst, src, .. }
+        | Instr::MutBorrowFieldChain { dst, src, .. }
+        | Instr::ReadRef { dst, src } => {
+            def::<DEFS, _>(*dst, &mut f);
+            used::<USES, _>(*src, &mut f);
         },
-        Instr::WriteRef(ref_slot, val) => {
-            used::<USES>(*ref_slot, &mut f);
-            used::<USES>(*val, &mut f);
+        Instr::WriteRef { dst_ref, val } => {
+            used::<USES, _>(*dst_ref, &mut f);
+            used::<USES, _>(*val, &mut f);
         },
 
-        Instr::ReadField(dst, _, _, src) | Instr::ReadVariantField(dst, _, _, src) => {
-            def::<DEFS>(*dst, &mut f);
-            used::<USES>(*src, &mut f);
+        Instr::ReadField { dst, src, .. }
+        | Instr::ReadVariantField { dst, src, .. }
+        | Instr::ReadFieldChain { dst, src, .. } => {
+            def::<DEFS, _>(*dst, &mut f);
+            used::<USES, _>(*src, &mut f);
         },
-        Instr::WriteField(_, _, ref_slot, val) | Instr::WriteVariantField(_, _, ref_slot, val) => {
-            used::<USES>(*ref_slot, &mut f);
-            used::<USES>(*val, &mut f);
+        Instr::WriteField { dst_ref, val, .. }
+        | Instr::WriteVariantField { dst_ref, val, .. }
+        | Instr::WriteFieldChain { dst_ref, val, .. } => {
+            used::<USES, _>(*dst_ref, &mut f);
+            used::<USES, _>(*val, &mut f);
         },
 
         // `local` names the inline-struct frame slot, not a reference:
         // a place use.
-        Instr::ImmBorrowLocField(dst, _, _, local)
-        | Instr::MutBorrowLocField(dst, _, _, local)
-        | Instr::ReadLocalField(dst, _, _, local) => {
-            def::<DEFS>(*dst, &mut f);
-            storage_use::<USES>(*local, &mut f);
+        Instr::ImmBorrowLocField { dst, local, .. }
+        | Instr::MutBorrowLocField { dst, local, .. }
+        | Instr::ReadLocField { dst, local, .. }
+        | Instr::ImmBorrowLocFieldChain { dst, local, .. }
+        | Instr::MutBorrowLocFieldChain { dst, local, .. }
+        | Instr::ReadLocFieldChain { dst, local, .. } => {
+            def::<DEFS, _>(*dst, &mut f);
+            storage_use::<USES, _>(*local, &mut f);
         },
         // `local` is both a def (a field is written in-place) and a
         // place use (the other fields persist, so the slot
         // stays live with the same type after the write).
-        Instr::WriteLocalField(_, _, local, val) => {
-            def::<DEFS>(*local, &mut f);
-            storage_use::<USES>(*local, &mut f);
-            used::<USES>(*val, &mut f);
+        Instr::WriteLocField { local, val, .. } | Instr::WriteLocFieldChain { local, val, .. } => {
+            def::<DEFS, _>(*local, &mut f);
+            storage_use::<USES, _>(*local, &mut f);
+            used::<USES, _>(*val, &mut f);
         },
 
-        Instr::Exists(dst, _, addr) | Instr::MoveFrom(dst, _, addr) => {
-            def::<DEFS>(*dst, &mut f);
-            used::<USES>(*addr, &mut f);
+        Instr::Exists { dst, addr, .. } | Instr::MoveFrom { dst, addr, .. } => {
+            def::<DEFS, _>(*dst, &mut f);
+            used::<USES, _>(*addr, &mut f);
         },
-        Instr::MoveTo(_, signer, val) => {
-            used::<USES>(*signer, &mut f);
-            used::<USES>(*val, &mut f);
+        Instr::MoveTo { signer, val, .. } => {
+            used::<USES, _>(*signer, &mut f);
+            used::<USES, _>(*val, &mut f);
         },
-        Instr::ImmBorrowGlobal(dst, _, addr) | Instr::MutBorrowGlobal(dst, _, addr) => {
-            def::<DEFS>(*dst, &mut f);
-            used::<USES>(*addr, &mut f);
-        },
-
-        Instr::Call(rets, _, _, args) | Instr::CallClosure(rets, _, args) => {
-            defs::<DEFS>(rets, &mut f);
-            uses::<USES>(args, &mut f);
-        },
-        Instr::PackClosure(dst, _, _, _, captured) => {
-            def::<DEFS>(*dst, &mut f);
-            uses::<USES>(captured, &mut f);
+        Instr::ImmBorrowGlobal { dst, addr, .. } | Instr::MutBorrowGlobal { dst, addr, .. } => {
+            def::<DEFS, _>(*dst, &mut f);
+            used::<USES, _>(*addr, &mut f);
         },
 
-        Instr::VecPack(dst, _, elems) => {
-            def::<DEFS>(*dst, &mut f);
-            uses::<USES>(elems, &mut f);
+        Instr::Call { data } => {
+            defs::<DEFS, _>(&data.rets, &mut f);
+            uses::<USES, _>(&data.args, &mut f);
         },
-        Instr::VecLen(dst, _, src) | Instr::VecPopBack(dst, _, src) => {
-            def::<DEFS>(*dst, &mut f);
-            used::<USES>(*src, &mut f);
+        Instr::CallClosure { data } => {
+            defs::<DEFS, _>(&data.rets, &mut f);
+            uses::<USES, _>(&data.args, &mut f);
         },
-        Instr::VecImmBorrow(dst, _, vec_ref, idx) | Instr::VecMutBorrow(dst, _, vec_ref, idx) => {
-            def::<DEFS>(*dst, &mut f);
-            used::<USES>(*vec_ref, &mut f);
-            used::<USES>(*idx, &mut f);
-        },
-        Instr::VecPushBack(_, vec_ref, val) => {
-            used::<USES>(*vec_ref, &mut f);
-            used::<USES>(*val, &mut f);
-        },
-        Instr::VecUnpack(dsts, _, src) => {
-            defs::<DEFS>(dsts, &mut f);
-            used::<USES>(*src, &mut f);
-        },
-        Instr::VecSwap(_, vec_ref, idx_a, idx_b) => {
-            used::<USES>(*vec_ref, &mut f);
-            used::<USES>(*idx_a, &mut f);
-            used::<USES>(*idx_b, &mut f);
+        Instr::PackClosure { data } => {
+            def::<DEFS, _>(data.dst, &mut f);
+            uses::<USES, _>(&data.captured, &mut f);
         },
 
-        Instr::Branch(_) => {},
-        Instr::BrTrue(_, cond) | Instr::BrFalse(_, cond) => used::<USES>(*cond, &mut f),
-        Instr::BrCmp(_, _, lhs, rhs) => {
-            used::<USES>(*lhs, &mut f);
-            used::<USES>(*rhs, &mut f);
+        Instr::VecPack { dst, srcs, .. } => {
+            def::<DEFS, _>(*dst, &mut f);
+            uses::<USES, _>(srcs, &mut f);
         },
-        Instr::BrCmpImm(_, _, src, _) => used::<USES>(*src, &mut f),
-        Instr::Ret(rets) => uses::<USES>(rets, &mut f),
-        Instr::Abort(code) => used::<USES>(*code, &mut f),
-        Instr::AbortMsg(code, msg) => {
-            used::<USES>(*code, &mut f);
-            used::<USES>(*msg, &mut f);
+        Instr::VecLen { dst, vec_ref, .. } | Instr::VecPopBack { dst, vec_ref, .. } => {
+            def::<DEFS, _>(*dst, &mut f);
+            used::<USES, _>(*vec_ref, &mut f);
+        },
+        Instr::VecImmBorrow {
+            dst, vec_ref, idx, ..
+        }
+        | Instr::VecMutBorrow {
+            dst, vec_ref, idx, ..
+        } => {
+            def::<DEFS, _>(*dst, &mut f);
+            used::<USES, _>(*vec_ref, &mut f);
+            used::<USES, _>(*idx, &mut f);
+        },
+        Instr::VecPushBack { vec_ref, val, .. } => {
+            used::<USES, _>(*vec_ref, &mut f);
+            used::<USES, _>(*val, &mut f);
+        },
+        Instr::VecUnpack { dsts, src, .. } => {
+            defs::<DEFS, _>(dsts, &mut f);
+            used::<USES, _>(*src, &mut f);
+        },
+        Instr::VecSwap {
+            vec_ref,
+            idx_a,
+            idx_b,
+            ..
+        } => {
+            used::<USES, _>(*vec_ref, &mut f);
+            used::<USES, _>(*idx_a, &mut f);
+            used::<USES, _>(*idx_b, &mut f);
+        },
+
+        Instr::Branch { .. } => {},
+        Instr::BrTrue { cond, .. } | Instr::BrFalse { cond, .. } => used::<USES, _>(*cond, &mut f),
+        Instr::BrCmp { lhs, rhs, .. } => {
+            used::<USES, _>(*lhs, &mut f);
+            used::<USES, _>(*rhs, &mut f);
+        },
+        Instr::BrCmpImm { lhs, .. } => used::<USES, _>(*lhs, &mut f),
+        Instr::Ret { srcs } => uses::<USES, _>(srcs, &mut f),
+        Instr::Abort { code } => used::<USES, _>(*code, &mut f),
+        Instr::AbortMsg { code, msg } => {
+            used::<USES, _>(*code, &mut f);
+            used::<USES, _>(*msg, &mut f);
         },
 
         // No slot operands.
@@ -693,13 +923,13 @@ fn visit_slots<const DEFS: bool, const USES: bool>(
 
 /// Rewrite a slot in-place by applying `f`.
 #[inline]
-fn rewrite_slot(slot: &mut Slot, f: &mut impl FnMut(Slot) -> Slot) {
+fn rewrite_slot<SlotForm: Copy>(slot: &mut SlotForm, f: &mut impl FnMut(SlotForm) -> SlotForm) {
     *slot = f(*slot);
 }
 
 /// Rewrite each slot in a slice by applying `f`.
 #[inline]
-fn rewrite_slots(slots: &mut [Slot], f: &mut impl FnMut(Slot) -> Slot) {
+fn rewrite_slots<SlotForm: Copy>(slots: &mut [SlotForm], f: &mut impl FnMut(SlotForm) -> SlotForm) {
     for slot in slots.iter_mut() {
         rewrite_slot(slot, f);
     }
@@ -710,32 +940,23 @@ fn rewrite_slots(slots: &mut [Slot], f: &mut impl FnMut(Slot) -> Slot) {
 /// - `DEFS` / `USES`: select which slots to rewrite (compile-time).
 /// - `SKIP_PLACE_USE`: when true, place uses are not
 ///   rewritten.
-fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE: bool>(
-    instr: &mut Instr,
-    mut f: impl FnMut(Slot) -> Slot,
+fn rewrite_instr_slots<
+    const DEFS: bool,
+    const USES: bool,
+    const SKIP_PLACE_USE: bool,
+    SlotForm: Copy,
+>(
+    instr: &mut Instr<SlotForm>,
+    mut f: impl FnMut(SlotForm) -> SlotForm,
 ) {
     match instr {
-        Instr::LdConst(dst, _)
-        | Instr::LdTrue(dst)
-        | Instr::LdFalse(dst)
-        | Instr::LdU8(dst, _)
-        | Instr::LdU16(dst, _)
-        | Instr::LdU32(dst, _)
-        | Instr::LdU64(dst, _)
-        | Instr::LdU128(dst, _)
-        | Instr::LdU256(dst, _)
-        | Instr::LdI8(dst, _)
-        | Instr::LdI16(dst, _)
-        | Instr::LdI32(dst, _)
-        | Instr::LdI64(dst, _)
-        | Instr::LdI128(dst, _)
-        | Instr::LdI256(dst, _) => {
+        Instr::LdConst { dst, .. } | Instr::LdImm { dst, .. } => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }
         },
 
-        Instr::Copy(dst, src) | Instr::Move(dst, src) | Instr::UnaryOp(dst, _, src) => {
+        Instr::Copy { dst, src } | Instr::Move { dst, src } | Instr::UnaryOp { dst, src, .. } => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }
@@ -743,7 +964,7 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
                 rewrite_slot(src, &mut f);
             }
         },
-        Instr::BinaryOp(dst, _, lhs, rhs) => {
+        Instr::BinaryOp { dst, lhs, rhs, .. } => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }
@@ -752,7 +973,7 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
                 rewrite_slot(rhs, &mut f);
             }
         },
-        Instr::BinaryOpImm(dst, _, lhs, _) => {
+        Instr::BinaryOpImm { dst, lhs, .. } => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }
@@ -761,15 +982,15 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
             }
         },
 
-        Instr::Pack(dst, _, fields) | Instr::PackVariant(dst, _, _, fields) => {
+        Instr::Pack { dst, srcs, .. } | Instr::PackVariant { dst, srcs, .. } => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }
             if USES {
-                rewrite_slots(fields, &mut f);
+                rewrite_slots(srcs, &mut f);
             }
         },
-        Instr::Unpack(dsts, _, src) | Instr::UnpackVariant(dsts, _, _, src) => {
+        Instr::Unpack { dsts, src, .. } | Instr::UnpackVariant { dsts, src, .. } => {
             if DEFS {
                 rewrite_slots(dsts, &mut f);
             }
@@ -777,7 +998,7 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
                 rewrite_slot(src, &mut f);
             }
         },
-        Instr::TestVariant(dst, _, _, src) => {
+        Instr::TestVariant { dst, src, .. } => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }
@@ -786,54 +1007,8 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
             }
         },
 
-        // `src` is a place use; skip it under SKIP_PLACE_USE.
-        Instr::ImmBorrowLoc(dst, src) | Instr::MutBorrowLoc(dst, src) => {
-            if DEFS {
-                rewrite_slot(dst, &mut f);
-            }
-            if USES && !SKIP_PLACE_USE {
-                rewrite_slot(src, &mut f);
-            }
-        },
-        Instr::ImmBorrowField(dst, _, _, src)
-        | Instr::MutBorrowField(dst, _, _, src)
-        | Instr::ImmBorrowVariantField(dst, _, _, src)
-        | Instr::MutBorrowVariantField(dst, _, _, src)
-        | Instr::ReadRef(dst, src) => {
-            if DEFS {
-                rewrite_slot(dst, &mut f);
-            }
-            if USES {
-                rewrite_slot(src, &mut f);
-            }
-        },
-        Instr::WriteRef(ref_slot, val) => {
-            if USES {
-                rewrite_slot(ref_slot, &mut f);
-                rewrite_slot(val, &mut f);
-            }
-        },
-
-        Instr::ReadField(dst, _, _, src) | Instr::ReadVariantField(dst, _, _, src) => {
-            if DEFS {
-                rewrite_slot(dst, &mut f);
-            }
-            if USES {
-                rewrite_slot(src, &mut f);
-            }
-        },
-        Instr::WriteField(_, _, ref_slot, val) | Instr::WriteVariantField(_, _, ref_slot, val) => {
-            if USES {
-                rewrite_slot(ref_slot, &mut f);
-                rewrite_slot(val, &mut f);
-            }
-        },
-
-        // `local` is a place use, so skip it under
-        // SKIP_PLACE_USE.
-        Instr::ImmBorrowLocField(dst, _, _, local)
-        | Instr::MutBorrowLocField(dst, _, _, local)
-        | Instr::ReadLocalField(dst, _, _, local) => {
+        // `local` is a place use; skip it under SKIP_PLACE_USE.
+        Instr::ImmBorrowLoc { dst, local } | Instr::MutBorrowLoc { dst, local } => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }
@@ -841,7 +1016,63 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
                 rewrite_slot(local, &mut f);
             }
         },
-        Instr::WriteLocalField(_, _, local, val) => {
+        // Field chains share the slot shape of their single-field counterparts.
+        Instr::ImmBorrowField { dst, src, .. }
+        | Instr::MutBorrowField { dst, src, .. }
+        | Instr::ImmBorrowVariantField { dst, src, .. }
+        | Instr::MutBorrowVariantField { dst, src, .. }
+        | Instr::ImmBorrowFieldChain { dst, src, .. }
+        | Instr::MutBorrowFieldChain { dst, src, .. }
+        | Instr::ReadRef { dst, src } => {
+            if DEFS {
+                rewrite_slot(dst, &mut f);
+            }
+            if USES {
+                rewrite_slot(src, &mut f);
+            }
+        },
+        Instr::WriteRef { dst_ref, val } => {
+            if USES {
+                rewrite_slot(dst_ref, &mut f);
+                rewrite_slot(val, &mut f);
+            }
+        },
+
+        Instr::ReadField { dst, src, .. }
+        | Instr::ReadVariantField { dst, src, .. }
+        | Instr::ReadFieldChain { dst, src, .. } => {
+            if DEFS {
+                rewrite_slot(dst, &mut f);
+            }
+            if USES {
+                rewrite_slot(src, &mut f);
+            }
+        },
+        Instr::WriteField { dst_ref, val, .. }
+        | Instr::WriteVariantField { dst_ref, val, .. }
+        | Instr::WriteFieldChain { dst_ref, val, .. } => {
+            if USES {
+                rewrite_slot(dst_ref, &mut f);
+                rewrite_slot(val, &mut f);
+            }
+        },
+
+        // `local` is a place use, so skip it under
+        // SKIP_PLACE_USE.
+        Instr::ImmBorrowLocField { dst, local, .. }
+        | Instr::MutBorrowLocField { dst, local, .. }
+        | Instr::ReadLocField { dst, local, .. }
+        | Instr::ImmBorrowLocFieldChain { dst, local, .. }
+        | Instr::MutBorrowLocFieldChain { dst, local, .. }
+        | Instr::ReadLocFieldChain { dst, local, .. } => {
+            if DEFS {
+                rewrite_slot(dst, &mut f);
+            }
+            if USES && !SKIP_PLACE_USE {
+                rewrite_slot(local, &mut f);
+            }
+        },
+        Instr::WriteLocField { local, val, .. } | Instr::WriteLocFieldChain { local, val, .. } => {
             // `local` is both a def and a place use of one
             // operand: rewrite once when either role is active. Under
             // SKIP_PLACE_USE only the use side is suppressed.
@@ -853,7 +1084,7 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
             }
         },
 
-        Instr::Exists(dst, _, addr) | Instr::MoveFrom(dst, _, addr) => {
+        Instr::Exists { dst, addr, .. } | Instr::MoveFrom { dst, addr, .. } => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }
@@ -861,13 +1092,13 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
                 rewrite_slot(addr, &mut f);
             }
         },
-        Instr::MoveTo(_, signer, val) => {
+        Instr::MoveTo { signer, val, .. } => {
             if USES {
                 rewrite_slot(signer, &mut f);
                 rewrite_slot(val, &mut f);
             }
         },
-        Instr::ImmBorrowGlobal(dst, _, addr) | Instr::MutBorrowGlobal(dst, _, addr) => {
+        Instr::ImmBorrowGlobal { dst, addr, .. } | Instr::MutBorrowGlobal { dst, addr, .. } => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }
@@ -876,40 +1107,53 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
             }
         },
 
-        Instr::Call(rets, _, _, args) | Instr::CallClosure(rets, _, args) => {
+        Instr::Call { data } => {
             if DEFS {
-                rewrite_slots(rets, &mut f);
+                rewrite_slots(&mut data.rets, &mut f);
             }
             if USES {
-                rewrite_slots(args, &mut f);
+                rewrite_slots(&mut data.args, &mut f);
             }
         },
-        Instr::PackClosure(dst, _, _, _, captured) => {
+        Instr::CallClosure { data } => {
             if DEFS {
-                rewrite_slot(dst, &mut f);
+                rewrite_slots(&mut data.rets, &mut f);
             }
             if USES {
-                rewrite_slots(captured, &mut f);
+                rewrite_slots(&mut data.args, &mut f);
+            }
+        },
+        Instr::PackClosure { data } => {
+            if DEFS {
+                rewrite_slot(&mut data.dst, &mut f);
+            }
+            if USES {
+                rewrite_slots(&mut data.captured, &mut f);
             }
         },
 
-        Instr::VecPack(dst, _, elems) => {
+        Instr::VecPack { dst, srcs, .. } => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }
             if USES {
-                rewrite_slots(elems, &mut f);
+                rewrite_slots(srcs, &mut f);
             }
         },
-        Instr::VecLen(dst, _, src) | Instr::VecPopBack(dst, _, src) => {
+        Instr::VecLen { dst, vec_ref, .. } | Instr::VecPopBack { dst, vec_ref, .. } => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }
             if USES {
-                rewrite_slot(src, &mut f);
+                rewrite_slot(vec_ref, &mut f);
             }
         },
-        Instr::VecImmBorrow(dst, _, vec_ref, idx) | Instr::VecMutBorrow(dst, _, vec_ref, idx) => {
+        Instr::VecImmBorrow {
+            dst, vec_ref, idx, ..
+        }
+        | Instr::VecMutBorrow {
+            dst, vec_ref, idx, ..
+        } => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }
@@ -918,13 +1162,13 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
                 rewrite_slot(idx, &mut f);
             }
         },
-        Instr::VecPushBack(_, vec_ref, val) => {
+        Instr::VecPushBack { vec_ref, val, .. } => {
             if USES {
                 rewrite_slot(vec_ref, &mut f);
                 rewrite_slot(val, &mut f);
             }
         },
-        Instr::VecUnpack(dsts, _, src) => {
+        Instr::VecUnpack { dsts, src, .. } => {
             if DEFS {
                 rewrite_slots(dsts, &mut f);
             }
@@ -932,7 +1176,12 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
                 rewrite_slot(src, &mut f);
             }
         },
-        Instr::VecSwap(_, vec_ref, idx_a, idx_b) => {
+        Instr::VecSwap {
+            vec_ref,
+            idx_a,
+            idx_b,
+            ..
+        } => {
             if USES {
                 rewrite_slot(vec_ref, &mut f);
                 rewrite_slot(idx_a, &mut f);
@@ -940,34 +1189,34 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
             }
         },
 
-        Instr::Branch(_) => {},
-        Instr::BrTrue(_, cond) | Instr::BrFalse(_, cond) => {
+        Instr::Branch { .. } => {},
+        Instr::BrTrue { cond, .. } | Instr::BrFalse { cond, .. } => {
             if USES {
                 rewrite_slot(cond, &mut f);
             }
         },
-        Instr::BrCmp(_, _, lhs, rhs) => {
+        Instr::BrCmp { lhs, rhs, .. } => {
             if USES {
                 rewrite_slot(lhs, &mut f);
                 rewrite_slot(rhs, &mut f);
             }
         },
-        Instr::BrCmpImm(_, _, src, _) => {
+        Instr::BrCmpImm { lhs, .. } => {
             if USES {
-                rewrite_slot(src, &mut f);
+                rewrite_slot(lhs, &mut f);
             }
         },
-        Instr::Ret(rets) => {
+        Instr::Ret { srcs } => {
             if USES {
-                rewrite_slots(rets, &mut f);
+                rewrite_slots(srcs, &mut f);
             }
         },
-        Instr::Abort(code) => {
+        Instr::Abort { code } => {
             if USES {
                 rewrite_slot(code, &mut f);
             }
         },
-        Instr::AbortMsg(code, msg) => {
+        Instr::AbortMsg { code, msg } => {
             if USES {
                 rewrite_slot(code, &mut f);
                 rewrite_slot(msg, &mut f);
@@ -977,4 +1226,512 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE:
         // No slot operands.
         Instr::ForceGC => {},
     }
+}
+
+// =============================================================================
+// Consuming slot-form conversion
+// =============================================================================
+
+/// Map a boxed slot slice through `f`, preserving order.
+fn try_map_slot_box<FromForm, ToForm, E>(
+    slots: Box<[FromForm]>,
+    f: &mut impl FnMut(FromForm) -> Result<ToForm, E>,
+) -> Result<Box<[ToForm]>, E> {
+    slots.into_vec().into_iter().map(f).collect()
+}
+
+/// Consume `instr`, converting every slot operand from form `FromForm` to
+/// form `ToForm` through `f`. The sole conversion path between slot forms;
+/// the output type guarantees no operand escapes unconverted.
+pub(crate) fn try_map_slots<FromForm, ToForm, E>(
+    instr: Instr<FromForm>,
+    mut f: impl FnMut(FromForm) -> Result<ToForm, E>,
+) -> Result<Instr<ToForm>, E> {
+    Ok(match instr {
+        Instr::LdConst { dst, const_idx } => Instr::LdConst {
+            dst: f(dst)?,
+            const_idx,
+        },
+        Instr::LdImm { dst, imm } => Instr::LdImm { dst: f(dst)?, imm },
+
+        Instr::Copy { dst, src } => Instr::Copy {
+            dst: f(dst)?,
+            src: f(src)?,
+        },
+        Instr::Move { dst, src } => Instr::Move {
+            dst: f(dst)?,
+            src: f(src)?,
+        },
+
+        Instr::UnaryOp { dst, op, src } => Instr::UnaryOp {
+            dst: f(dst)?,
+            op,
+            src: f(src)?,
+        },
+        Instr::BinaryOp { dst, op, lhs, rhs } => Instr::BinaryOp {
+            dst: f(dst)?,
+            op,
+            lhs: f(lhs)?,
+            rhs: f(rhs)?,
+        },
+        Instr::BinaryOpImm { dst, op, lhs, imm } => Instr::BinaryOpImm {
+            dst: f(dst)?,
+            op,
+            lhs: f(lhs)?,
+            imm,
+        },
+
+        Instr::Pack {
+            dst,
+            struct_ty,
+            srcs,
+        } => Instr::Pack {
+            dst: f(dst)?,
+            struct_ty,
+            srcs: try_map_slot_box(srcs, &mut f)?,
+        },
+        Instr::Unpack {
+            dsts,
+            struct_ty,
+            src,
+        } => Instr::Unpack {
+            dsts: try_map_slot_box(dsts, &mut f)?,
+            struct_ty,
+            src: f(src)?,
+        },
+
+        Instr::PackVariant {
+            dst,
+            enum_ty,
+            variant,
+            srcs,
+        } => Instr::PackVariant {
+            dst: f(dst)?,
+            enum_ty,
+            variant,
+            srcs: try_map_slot_box(srcs, &mut f)?,
+        },
+        Instr::UnpackVariant {
+            dsts,
+            enum_ty,
+            variant,
+            src,
+        } => Instr::UnpackVariant {
+            dsts: try_map_slot_box(dsts, &mut f)?,
+            enum_ty,
+            variant,
+            src: f(src)?,
+        },
+        Instr::TestVariant {
+            dst,
+            enum_ty,
+            variant,
+            src,
+        } => Instr::TestVariant {
+            dst: f(dst)?,
+            enum_ty,
+            variant,
+            src: f(src)?,
+        },
+
+        Instr::ImmBorrowLoc { dst, local } => Instr::ImmBorrowLoc {
+            dst: f(dst)?,
+            local: f(local)?,
+        },
+        Instr::MutBorrowLoc { dst, local } => Instr::MutBorrowLoc {
+            dst: f(dst)?,
+            local: f(local)?,
+        },
+        Instr::ImmBorrowField {
+            dst,
+            owner_ty,
+            field,
+            src,
+        } => Instr::ImmBorrowField {
+            dst: f(dst)?,
+            owner_ty,
+            field,
+            src: f(src)?,
+        },
+        Instr::MutBorrowField {
+            dst,
+            owner_ty,
+            field,
+            src,
+        } => Instr::MutBorrowField {
+            dst: f(dst)?,
+            owner_ty,
+            field,
+            src: f(src)?,
+        },
+        Instr::ImmBorrowVariantField {
+            dst,
+            owner_ty,
+            field,
+            src,
+        } => Instr::ImmBorrowVariantField {
+            dst: f(dst)?,
+            owner_ty,
+            field,
+            src: f(src)?,
+        },
+        Instr::MutBorrowVariantField {
+            dst,
+            owner_ty,
+            field,
+            src,
+        } => Instr::MutBorrowVariantField {
+            dst: f(dst)?,
+            owner_ty,
+            field,
+            src: f(src)?,
+        },
+        Instr::ReadRef { dst, src } => Instr::ReadRef {
+            dst: f(dst)?,
+            src: f(src)?,
+        },
+        Instr::WriteRef { dst_ref, val } => Instr::WriteRef {
+            dst_ref: f(dst_ref)?,
+            val: f(val)?,
+        },
+
+        Instr::ReadField {
+            dst,
+            owner_ty,
+            field,
+            src,
+        } => Instr::ReadField {
+            dst: f(dst)?,
+            owner_ty,
+            field,
+            src: f(src)?,
+        },
+        Instr::WriteField {
+            dst_ref,
+            owner_ty,
+            field,
+            val,
+        } => Instr::WriteField {
+            dst_ref: f(dst_ref)?,
+            owner_ty,
+            field,
+            val: f(val)?,
+        },
+        Instr::ReadVariantField {
+            dst,
+            owner_ty,
+            field,
+            src,
+        } => Instr::ReadVariantField {
+            dst: f(dst)?,
+            owner_ty,
+            field,
+            src: f(src)?,
+        },
+        Instr::WriteVariantField {
+            dst_ref,
+            owner_ty,
+            field,
+            val,
+        } => Instr::WriteVariantField {
+            dst_ref: f(dst_ref)?,
+            owner_ty,
+            field,
+            val: f(val)?,
+        },
+
+        Instr::ImmBorrowLocField {
+            dst,
+            owner_ty,
+            field,
+            local,
+        } => Instr::ImmBorrowLocField {
+            dst: f(dst)?,
+            owner_ty,
+            field,
+            local: f(local)?,
+        },
+        Instr::MutBorrowLocField {
+            dst,
+            owner_ty,
+            field,
+            local,
+        } => Instr::MutBorrowLocField {
+            dst: f(dst)?,
+            owner_ty,
+            field,
+            local: f(local)?,
+        },
+        Instr::ReadLocField {
+            dst,
+            owner_ty,
+            field,
+            local,
+        } => Instr::ReadLocField {
+            dst: f(dst)?,
+            owner_ty,
+            field,
+            local: f(local)?,
+        },
+        Instr::WriteLocField {
+            local,
+            owner_ty,
+            field,
+            val,
+        } => Instr::WriteLocField {
+            local: f(local)?,
+            owner_ty,
+            field,
+            val: f(val)?,
+        },
+
+        Instr::ReadFieldChain { dst, path, src } => Instr::ReadFieldChain {
+            dst: f(dst)?,
+            path,
+            src: f(src)?,
+        },
+        Instr::WriteFieldChain { dst_ref, path, val } => Instr::WriteFieldChain {
+            dst_ref: f(dst_ref)?,
+            path,
+            val: f(val)?,
+        },
+        Instr::ImmBorrowFieldChain { dst, path, src } => Instr::ImmBorrowFieldChain {
+            dst: f(dst)?,
+            path,
+            src: f(src)?,
+        },
+        Instr::MutBorrowFieldChain { dst, path, src } => Instr::MutBorrowFieldChain {
+            dst: f(dst)?,
+            path,
+            src: f(src)?,
+        },
+        Instr::ReadLocFieldChain { dst, path, local } => Instr::ReadLocFieldChain {
+            dst: f(dst)?,
+            path,
+            local: f(local)?,
+        },
+        Instr::WriteLocFieldChain { local, path, val } => Instr::WriteLocFieldChain {
+            local: f(local)?,
+            path,
+            val: f(val)?,
+        },
+        Instr::ImmBorrowLocFieldChain { dst, path, local } => Instr::ImmBorrowLocFieldChain {
+            dst: f(dst)?,
+            path,
+            local: f(local)?,
+        },
+        Instr::MutBorrowLocFieldChain { dst, path, local } => Instr::MutBorrowLocFieldChain {
+            dst: f(dst)?,
+            path,
+            local: f(local)?,
+        },
+
+        Instr::Exists {
+            dst,
+            resource_ty,
+            addr,
+        } => Instr::Exists {
+            dst: f(dst)?,
+            resource_ty,
+            addr: f(addr)?,
+        },
+        Instr::MoveFrom {
+            dst,
+            resource_ty,
+            addr,
+        } => Instr::MoveFrom {
+            dst: f(dst)?,
+            resource_ty,
+            addr: f(addr)?,
+        },
+        Instr::MoveTo {
+            resource_ty,
+            signer,
+            val,
+        } => Instr::MoveTo {
+            resource_ty,
+            signer: f(signer)?,
+            val: f(val)?,
+        },
+        Instr::ImmBorrowGlobal {
+            dst,
+            resource_ty,
+            addr,
+        } => Instr::ImmBorrowGlobal {
+            dst: f(dst)?,
+            resource_ty,
+            addr: f(addr)?,
+        },
+        Instr::MutBorrowGlobal {
+            dst,
+            resource_ty,
+            addr,
+        } => Instr::MutBorrowGlobal {
+            dst: f(dst)?,
+            resource_ty,
+            addr: f(addr)?,
+        },
+
+        Instr::Call { data } => {
+            let CallData {
+                rets,
+                function_handle,
+                ty_args,
+                args,
+            } = *data;
+            Instr::Call {
+                data: Box::new(CallData {
+                    rets: try_map_slot_box(rets, &mut f)?,
+                    function_handle,
+                    ty_args,
+                    args: try_map_slot_box(args, &mut f)?,
+                }),
+            }
+        },
+        Instr::PackClosure { data } => {
+            let PackClosureData {
+                dst,
+                function_handle,
+                ty_args,
+                mask,
+                captured,
+            } = *data;
+            Instr::PackClosure {
+                data: Box::new(PackClosureData {
+                    dst: f(dst)?,
+                    function_handle,
+                    ty_args,
+                    mask,
+                    captured: try_map_slot_box(captured, &mut f)?,
+                }),
+            }
+        },
+        Instr::CallClosure { data } => {
+            let CallClosureData {
+                rets,
+                closure_ty,
+                args,
+            } = *data;
+            Instr::CallClosure {
+                data: Box::new(CallClosureData::new(
+                    try_map_slot_box(rets, &mut f)?,
+                    closure_ty,
+                    try_map_slot_box(args, &mut f)?,
+                )),
+            }
+        },
+
+        Instr::VecPack { dst, elem_ty, srcs } => Instr::VecPack {
+            dst: f(dst)?,
+            elem_ty,
+            srcs: try_map_slot_box(srcs, &mut f)?,
+        },
+        Instr::VecLen {
+            dst,
+            elem_ty,
+            vec_ref,
+        } => Instr::VecLen {
+            dst: f(dst)?,
+            elem_ty,
+            vec_ref: f(vec_ref)?,
+        },
+        Instr::VecImmBorrow {
+            dst,
+            elem_ty,
+            vec_ref,
+            idx,
+        } => Instr::VecImmBorrow {
+            dst: f(dst)?,
+            elem_ty,
+            vec_ref: f(vec_ref)?,
+            idx: f(idx)?,
+        },
+        Instr::VecMutBorrow {
+            dst,
+            elem_ty,
+            vec_ref,
+            idx,
+        } => Instr::VecMutBorrow {
+            dst: f(dst)?,
+            elem_ty,
+            vec_ref: f(vec_ref)?,
+            idx: f(idx)?,
+        },
+        Instr::VecPushBack {
+            vec_ref,
+            elem_ty,
+            val,
+        } => Instr::VecPushBack {
+            vec_ref: f(vec_ref)?,
+            elem_ty,
+            val: f(val)?,
+        },
+        Instr::VecPopBack {
+            dst,
+            elem_ty,
+            vec_ref,
+        } => Instr::VecPopBack {
+            dst: f(dst)?,
+            elem_ty,
+            vec_ref: f(vec_ref)?,
+        },
+        Instr::VecUnpack { dsts, elem_ty, src } => Instr::VecUnpack {
+            dsts: try_map_slot_box(dsts, &mut f)?,
+            elem_ty,
+            src: f(src)?,
+        },
+        Instr::VecSwap {
+            vec_ref,
+            elem_ty,
+            idx_a,
+            idx_b,
+        } => Instr::VecSwap {
+            vec_ref: f(vec_ref)?,
+            elem_ty,
+            idx_a: f(idx_a)?,
+            idx_b: f(idx_b)?,
+        },
+
+        Instr::Branch { target } => Instr::Branch { target },
+        Instr::BrTrue { target, cond } => Instr::BrTrue {
+            target,
+            cond: f(cond)?,
+        },
+        Instr::BrFalse { target, cond } => Instr::BrFalse {
+            target,
+            cond: f(cond)?,
+        },
+        Instr::BrCmp {
+            target,
+            op,
+            lhs,
+            rhs,
+        } => Instr::BrCmp {
+            target,
+            op,
+            lhs: f(lhs)?,
+            rhs: f(rhs)?,
+        },
+        Instr::BrCmpImm {
+            target,
+            op,
+            lhs,
+            imm,
+        } => Instr::BrCmpImm {
+            target,
+            op,
+            lhs: f(lhs)?,
+            imm,
+        },
+        Instr::Ret { srcs } => Instr::Ret {
+            srcs: try_map_slot_box(srcs, &mut f)?,
+        },
+        Instr::Abort { code } => Instr::Abort { code: f(code)? },
+        Instr::AbortMsg { code, msg } => Instr::AbortMsg {
+            code: f(code)?,
+            msg: f(msg)?,
+        },
+
+        Instr::ForceGC => Instr::ForceGC,
+    })
 }

@@ -6,8 +6,8 @@
 //! Builds frame layout information (slot offsets/sizes) needed by the lowerer.
 //! All lookups are O(1) via indexed Vecs — no maps.
 
+use super::LoweringError;
 use crate::{
-    error::{LoweringError, LoweringResult},
     lower::{
         gc_layout::{
             derive_frame_layout, gc_layout_supports, shifted_field_pointer_offsets,
@@ -16,7 +16,9 @@ use crate::{
         translate::{lower_function, LoweredFunction},
     },
     stackless_exec_ir::{
-        instr_utils::{field_layout_nominal_in_instr, resource_type_in_instr, NominalKind},
+        instr_utils::{
+            chain_field_path, field_layout_nominal_in_instr, resource_type_in_instr, NominalKind,
+        },
         FunctionIR, Instr, ModuleIR,
     },
 };
@@ -32,7 +34,7 @@ use mono_move_core::{
     value_layout::REF_LAYOUT_ID,
     Code, DescriptorId, FieldTypes, FieldValueLayout, FrameLayoutInfo, FrameOffset, Function,
     Interner, LayoutFlags, LayoutId, LayoutProvider, PreparedModule, SizedSlot,
-    SortedSafePointEntries, ValueLayout, FRAME_METADATA_SIZE, MAX_ALIGN,
+    SortedSafePointEntries, VMInternalError, VMResult, ValueLayout, FRAME_METADATA_SIZE, MAX_ALIGN,
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -59,7 +61,7 @@ pub fn concrete_type_size(
     layouts: &dyn LayoutProvider,
     ty: InternedType,
     label: &'static str,
-) -> LoweringResult<u32> {
+) -> VMResult<u32> {
     let (size, _) = layouts
         .size_and_align(ty)
         .ok_or(LoweringError::NoConcreteSize { label })?;
@@ -68,7 +70,7 @@ pub fn concrete_type_size(
 
 /// Byte width of the pointee of reference type `ref_ty`. Errors when `ref_ty`
 /// is not a reference, or when its pointee isn't concrete.
-pub fn ref_pointee_size(layouts: &dyn LayoutProvider, ref_ty: InternedType) -> LoweringResult<u32> {
+pub fn ref_pointee_size(layouts: &dyn LayoutProvider, ref_ty: InternedType) -> VMResult<u32> {
     let pointee = strip_ref(ref_ty).ok_or(LoweringError::ExpectedReferenceType)?;
     concrete_type_size(layouts, pointee, "ref pointee type")
 }
@@ -146,7 +148,7 @@ fn publish_struct_descriptor_for(
     ctx: &impl SpecializerContext,
     ty: InternedType,
     descriptors: &mut UnorderedMap<InternedType, DescriptorId>,
-) -> LoweringResult<()> {
+) -> VMResult<()> {
     if let Some((size, _)) = ctx.size_and_align(ty)
         && let Ok(ptr_offsets) = type_pointer_offsets(ctx, ty)
     {
@@ -218,8 +220,7 @@ pub(crate) struct VariantFieldAccess {
     /// variant tag; length is the enum's variant count.
     pub offsets: Vec<Option<u32>>,
     /// `Some(off)` when every variant declares the field at the same offset:
-    /// the static fast path (no tag dispatch, membership check, or scratch
-    /// reference needed).
+    /// the static fast path (no tag dispatch or membership check).
     pub uniform_offset: Option<u32>,
 }
 
@@ -234,7 +235,7 @@ pub(crate) fn resolve_variant_field_access(
     enum_layouts: &UnorderedMap<InternedType, EnumLayout>,
     enum_ty: InternedType,
     vfh: VariantFieldHandleIndex,
-) -> LoweringResult<VariantFieldAccess> {
+) -> VMResult<VariantFieldAccess> {
     let handle = module.variant_field_handle_at(vfh);
     let field_pos = handle.field as usize;
     let layout = enum_layouts
@@ -313,7 +314,7 @@ pub struct LoweringContext<'a> {
     /// Where `Instr::Ret` writes before the `Return` micro-op. Laid out
     /// from offset 0 so addresses match the caller's `ret_slots`.
     pub return_slots: Vec<SizedSlot>,
-    pub num_xfer_positions: u16,
+    pub num_transfer_positions: u16,
     /// TODO(cleanup): we should consider unifying the various scratch slots below,
     /// even though they are used for different purposes, only one is ever
     /// live at a time, and they have the same GC invariant.
@@ -338,14 +339,6 @@ pub struct LoweringContext<'a> {
     /// deep copy for [`Instr::MoveFrom`]) collects *before* the write, so it
     /// does not need GC tracking.
     pub resource_box_slot: Option<FrameOffset>,
-    /// 16-byte scratch fat-pointer slot for by-reference variant-field
-    /// read/write (`ReadVariantField`/`WriteVariantField`): the `enum_borrow`
-    /// (a heap deref) writes the field reference here, then `ReadRef`/
-    /// `WriteRef` consumes it. `None` when the function has no such ops.
-    ///
-    /// Invariant: like `scratch`, its live range (borrow → deref) never spans
-    /// an allocating micro-op, so it needs no GC tracking.
-    pub variant_field_scratch: Option<FrameOffset>,
     /// 8-byte scratch heap-pointer slot for enum `PackVariant`/`UnpackVariant`
     /// when the slot-allocator aliases the enum-pointer slot with a field slot.
     /// `PackVariant` stages the freshly allocated pointer here and publishes it
@@ -435,7 +428,7 @@ fn instantiate_callee_signature(
     interner: &impl Interner,
     handle_idx: FunctionHandleIndex,
     ty_args: InternedTypeList,
-) -> LoweringResult<(InternedTypeList, InternedTypeList)> {
+) -> VMResult<(InternedTypeList, InternedTypeList)> {
     let sig = module.function_signature_at(handle_idx);
     Ok((
         interner.subst_type_list(sig.params, ty_args)?,
@@ -459,7 +452,7 @@ pub fn try_build_context<'a>(
     layouts: &'a dyn LayoutProvider,
     descriptors: LoweringDescriptors,
     natives: &dyn NativeResolver,
-) -> LoweringResult<BuildContextOutcome<'a>> {
+) -> VMResult<BuildContextOutcome<'a>> {
     // 1. Reject `ty_args` whose length doesn't match the declared type
     // parameter count.
     // TODO(correctness): this should not be reachable from valid execution, but the current
@@ -581,13 +574,12 @@ pub fn try_build_context<'a>(
     //    GC-tracked.
     let needs_resource_box_slot = func_ir
         .instrs()
-        .any(|instr| matches!(instr, Instr::MoveTo(..) | Instr::MoveFrom(..)));
+        .any(|instr| matches!(instr, Instr::MoveTo { .. } | Instr::MoveFrom { .. }));
     let resource_box_slot = needs_resource_box_slot.then(|| reserve_slot(&mut frame_data_size, 8));
 
     // 6. Single IR pass over the function's enum ops: (1) verify each one's enum
-    //    layout was derivable during discovery, and (2) detect which scratch
-    //    slots the lowering needs.
-    let mut needs_variant_field_scratch = false;
+    //    layout was derivable during discovery, and (2) detect whether
+    //    pack/unpack needs the enum-pointer scratch slot.
     let mut needs_enum_ptr_scratch = false;
     for instr in func_ir.instrs() {
         let Some((enum_ty, NominalKind::Enum)) = field_layout_nominal_in_instr(instr) else {
@@ -600,27 +592,16 @@ pub fn try_build_context<'a>(
             // layout was not derivable.
             return Ok(BuildContextOutcome::Skipped("enum layout not derivable"));
         }
-        // A by-reference variant-field read/write may need the 16-byte scratch
-        // fat-pointer slot: only the divergent-offset path uses it (the
-        // tag-dispatched borrow writes the field reference there for the
-        // following `ReadRef`/`WriteRef`, both non-allocating, so it never spans
-        // a safe point), but reserve conservatively for any such op rather than
-        // re-resolving each access here just to learn whether it is uniform.
-        if matches!(
-            instr,
-            Instr::ReadVariantField(..) | Instr::WriteVariantField(..)
-        ) {
-            needs_variant_field_scratch = true;
-        }
         // Pack/unpack may need an 8-byte scratch to keep the enum pointer out of
         // an aliased field slot (resolved per-instruction in lowering; the exact
         // alias depends on final slot offsets, which aren't known yet here).
-        if matches!(instr, Instr::PackVariant(..) | Instr::UnpackVariant(..)) {
+        if matches!(
+            instr,
+            Instr::PackVariant { .. } | Instr::UnpackVariant { .. }
+        ) {
             needs_enum_ptr_scratch = true;
         }
     }
-    let variant_field_scratch =
-        needs_variant_field_scratch.then(|| reserve_slot(&mut frame_data_size, 16));
     let enum_ptr_scratch = needs_enum_ptr_scratch.then(|| reserve_slot(&mut frame_data_size, 8));
 
     // TODO(perf): we need to revisit the complexity and performance of this function
@@ -635,31 +616,31 @@ pub fn try_build_context<'a>(
     let mut closure_pack_idx = 0usize;
     for instr in func_ir.instrs() {
         let (handle_idx, param_list, ret_list, call_ty_args) = match instr {
-            Instr::Call(_, handle_idx, call_ty_args, _) => {
-                let resolved_ty_args = interner.subst_type_list(*call_ty_args, ty_args)?;
+            Instr::Call { data } => {
+                let resolved_ty_args = interner.subst_type_list(data.ty_args, ty_args)?;
                 let (params, returns) = instantiate_callee_signature(
                     &module_ir.module,
                     interner,
-                    *handle_idx,
+                    data.function_handle,
                     resolved_ty_args,
                 )?;
-                (*handle_idx, params, returns, resolved_ty_args)
+                (data.function_handle, params, returns, resolved_ty_args)
             },
-            Instr::PackClosure(_, handle_idx, call_ty_args, _, _) => {
-                let closure_ty_args = interner.subst_type_list(*call_ty_args, ty_args)?;
+            Instr::PackClosure { data } => {
+                let closure_ty_args = interner.subst_type_list(data.ty_args, ty_args)?;
                 // Bytecode verifier's instruction consistency check should
                 // guarantee the invariant below.
                 debug_assert!(
-                    !call_ty_args.is_empty()
+                    !data.ty_args.is_empty()
                         || module_ir
                             .module
-                            .function_handle_at(*handle_idx)
+                            .function_handle_at(data.function_handle)
                             .type_parameters
                             .is_empty(),
                     "non-generic PackClosure must target a non-generic function"
                 );
                 let (callee_module_id, callee_func_name) =
-                    callee_identity(&module_ir.module, *handle_idx);
+                    callee_identity(&module_ir.module, data.function_handle);
                 // TODO(completeness): support native closure targets. `CallClosure` resolves
                 // via `load_function`, which has no IR for natives, so skip them.
                 if natives
@@ -692,13 +673,11 @@ pub fn try_build_context<'a>(
                 });
                 continue;
             },
-            Instr::CallClosure(_, sig_types, _) => {
-                let first = view_type_list(*sig_types)
-                    .first()
-                    .copied()
-                    .ok_or(LoweringError::ClosureSignatureEmpty)?;
-                let Type::Function { results, .. } = view_type(first) else {
-                    return Err(LoweringError::ClosureSignatureNotFunction);
+            Instr::CallClosure { data } => {
+                let Type::Function { results, .. } = view_type(data.closure_ty) else {
+                    return Err(VMInternalError::new(
+                        LoweringError::ClosureSignatureNotFunction,
+                    ));
                 };
                 let ret_list = interner.subst_type_list(*results, ty_args)?;
                 let ret_slots =
@@ -724,11 +703,10 @@ pub fn try_build_context<'a>(
             CalleeRegion::Skip(reason) => return Ok(BuildContextOutcome::Skipped(reason)),
         };
         let (callee_module_id, callee_func_name) = callee_identity(&module_ir.module, handle_idx);
-        // TODO(correctness): The native registry is trusted unconditionally here.
-        //
-        // Consider cross-checking against the callee module's `is_native` flag
-        // against the callee module's `is_native` flag so a registered impl cannot
-        // shadow a Move-body function with the same qualified name.
+        // TODO(correctness): The native registry is trusted unconditionally
+        // here. Consider cross-checking against the callee module's
+        // `is_native` flag so a registered impl cannot shadow a Move-body
+        // function with the same qualified name.
         let native_idx = natives.resolve(callee_module_id, callee_func_name, call_ty_args);
         // Descriptor IDs for the native's resource types (published by the
         // discovery pass, keyed on the concrete type); e.g. `add_box` uses its
@@ -772,10 +750,9 @@ pub fn try_build_context<'a>(
         frame_data_size,
         call_sites,
         return_slots,
-        num_xfer_positions: func_ir.num_xfer_positions,
+        num_transfer_positions: func_ir.num_transfer_positions,
         scratch,
         resource_box_slot,
-        variant_field_scratch,
         enum_ptr_scratch,
         descriptors: descriptors.vec,
         enum_layouts: descriptors.enum_layouts,
@@ -862,7 +839,7 @@ pub trait SpecializerContext: LayoutProvider {
         &mut self,
         module_id: &InternedModuleId,
         nominal_name: &InternedIdentifier,
-    ) -> LoweringResult<Option<FieldTypes>>;
+    ) -> VMResult<Option<FieldTypes>>;
 
     /// Publishes a vector descriptor for `elem_ty` (with byte width
     /// `elem_size` and intra-element heap-pointer offsets
@@ -939,7 +916,7 @@ fn captured_types_of(
     function_handle_idx: FunctionHandleIndex,
     mask: ClosureMask,
     ty_args: InternedTypeList,
-) -> LoweringResult<Option<InternedTypeList>> {
+) -> VMResult<Option<InternedTypeList>> {
     if mask.captured_count() == 0 {
         return Ok(None);
     }
@@ -978,7 +955,7 @@ pub fn try_lower_function(
     layouts: &dyn LayoutProvider,
     descriptors: LoweringDescriptors,
     natives: &dyn NativeResolver,
-) -> LoweringResult<LoweringOutcome> {
+) -> VMResult<LoweringOutcome> {
     let ctx = match try_build_context(
         module_ir,
         func_ir,
@@ -1053,7 +1030,7 @@ pub fn try_discover_types_for_lowering_in_module(
     ctx: &mut impl SpecializerContext,
     interner: &impl Interner,
     module_ir: &ModuleIR,
-) -> LoweringResult<LoweringDescriptors> {
+) -> VMResult<LoweringDescriptors> {
     let mut visited = UnorderedSet::new();
     let mut descriptors = LoweringDescriptors::default();
     for func_ir in module_ir.functions.iter().filter_map(|f| f.as_ref()) {
@@ -1078,7 +1055,7 @@ pub fn try_discover_types_for_lowering_in_function(
     module_ir: &ModuleIR,
     func_ir: &FunctionIR,
     ty_args: InternedTypeList,
-) -> LoweringResult<LoweringDescriptors> {
+) -> VMResult<LoweringDescriptors> {
     let mut visited = UnorderedSet::new();
     let mut descriptors = LoweringDescriptors::default();
     try_discover_types_for_lowering_in_function_impl(
@@ -1101,7 +1078,7 @@ fn try_discover_types_for_lowering_in_function_impl(
     ty_args: InternedTypeList,
     visited: &mut UnorderedSet<InternedType>,
     descriptors: &mut LoweringDescriptors,
-) -> LoweringResult<()> {
+) -> VMResult<()> {
     for &ty in func_ir.home_slot_types.iter() {
         discover_type_metadata(ctx, interner, ty, ty_args, visited, descriptors)?;
     }
@@ -1119,18 +1096,18 @@ fn try_discover_types_for_lowering_in_function_impl(
         // still discovered. Otherwise, we need to feed `CallClosure` signature
         // types here and recurse into `Type::Function`.
         let (params, returns, handle_idx, callee_ty_args) = match instr {
-            Instr::Call(_, handle_idx, call_ty_args, _) => {
+            Instr::Call { data } => {
                 let (params, returns) = instantiate_callee_signature(
                     &module_ir.module,
                     interner,
-                    *handle_idx,
-                    *call_ty_args,
+                    data.function_handle,
+                    data.ty_args,
                 )?;
                 (
                     Some(params),
                     Some(returns),
-                    Some(*handle_idx),
-                    *call_ty_args,
+                    Some(data.function_handle),
+                    data.ty_args,
                 )
             },
             _ => (None, None, None, EMPTY_TYPE_LIST),
@@ -1167,21 +1144,27 @@ fn try_discover_types_for_lowering_in_function_impl(
         }
 
         // Catch the field-layout nominal an instruction references directly
-        // that isn't reached by the home/call walks above.
+        // that isn't reached by the home/call walks above. For fused chains
+        // this is the first owner only: walking it transitively reaches every
+        // later owner because each is the previous hop's field type.
+        debug_assert!(
+            chain_path_is_inline_contained(interner, &module_ir.module, instr),
+            "chain path owner is not the previous hop's field type"
+        );
         if let Some((ty, _kind)) = field_layout_nominal_in_instr(instr) {
             discover_type_metadata(ctx, interner, ty, ty_args, visited, descriptors)?;
         }
 
         // `PackClosure`: resolve the captured-data layout and record it
         // positionally, in IR order, for the build pass.
-        if let Instr::PackClosure(_, handle_idx, call_ty_args, mask, _) = instr {
-            let closure_ty_args = interner.subst_type_list(*call_ty_args, ty_args)?;
+        if let Instr::PackClosure { data } = instr {
+            let closure_ty_args = interner.subst_type_list(data.ty_args, ty_args)?;
             let layout = discover_captured_data_descriptor(
                 ctx,
                 interner,
                 module_ir,
-                *handle_idx,
-                *mask,
+                data.function_handle,
+                data.mask,
                 closure_ty_args,
             )?;
             descriptors.closure_captured.push(layout);
@@ -1201,8 +1184,8 @@ fn try_discover_types_for_lowering_in_function_impl(
         // constant needs its (possibly nested) vector descriptors published
         // so `StoreImmVec` can resolve them at runtime, so discover the
         // constant's type here.
-        if let Instr::LdConst(_, idx) = instr {
-            let ty = module_ir.module.interned_constant_type_at(*idx);
+        if let Instr::LdConst { const_idx, .. } = instr {
+            let ty = module_ir.module.interned_constant_type_at(*const_idx);
             discover_type_metadata(ctx, interner, ty, ty_args, visited, descriptors)?;
         }
     }
@@ -1225,7 +1208,7 @@ fn discover_captured_data_descriptor(
     fhi: FunctionHandleIndex,
     mask: ClosureMask,
     ty_args: InternedTypeList,
-) -> LoweringResult<CapturedDataLayout> {
+) -> VMResult<CapturedDataLayout> {
     let Some(captured_list) = captured_types_of(interner, module_ir, fhi, mask, ty_args)? else {
         return Ok(CapturedDataLayout::NonCapturing);
     };
@@ -1288,7 +1271,7 @@ fn try_build_inline_value_layout(
     field_ids: &[Option<LayoutId>],
     total: u32,
     align: u32,
-) -> LoweringResult<Option<ValueLayout>> {
+) -> VMResult<Option<ValueLayout>> {
     let mut layout_fields = Vec::with_capacity(field_layouts.len());
     let mut fixed_bcs_total: u64 = 0;
     let mut data_dependent = false;
@@ -1300,7 +1283,7 @@ fn try_build_inline_value_layout(
             return Ok(None);
         };
         let Some(child) = ctx.layout(id) else {
-            return Err(LoweringError::LayoutIdUnresolved);
+            return Err(VMInternalError::new(LoweringError::LayoutIdUnresolved));
         };
         layout_fields.push(FieldValueLayout {
             offset: field.offset,
@@ -1339,6 +1322,28 @@ fn try_build_inline_value_layout(
     )))
 }
 
+/// Invariant behind first-owner-only chain discovery: each later `path` owner
+/// must be the previous hop's field type, so the transitive walk of the first
+/// owner reaches every later one. Trivially true for non-chain instructions.
+fn chain_path_is_inline_contained<SlotForm>(
+    interner: &impl Interner,
+    module: &PreparedModule,
+    instr: &Instr<SlotForm>,
+) -> bool {
+    let Some(path) = chain_field_path(instr) else {
+        return true;
+    };
+    path.windows(2).all(|hops| {
+        let ((owner, field_handle), (next_owner, _)) = (hops[0], hops[1]);
+        let Type::Nominal { ty_args, .. } = view_type(owner) else {
+            return false;
+        };
+        interner
+            .subst_type(module.interned_field_type_at(field_handle), *ty_args)
+            .is_ok_and(|field_ty| field_ty == next_owner)
+    })
+}
+
 /// Recursive post-order DFS that visits every nominal reachable from the given
 /// type and, as a side effect, publishes its GC vector descriptors and
 /// `ValueLayout`s. Returns the type's [`LayoutId`] when one could be built, or
@@ -1358,7 +1363,7 @@ fn discover_type_metadata(
     ty_args: InternedTypeList,
     visited: &mut UnorderedSet<InternedType>,
     descriptors: &mut LoweringDescriptors,
-) -> LoweringResult<Option<LayoutId>> {
+) -> VMResult<Option<LayoutId>> {
     let ty = interner.subst_type(ty, ty_args)?;
     if !visited.insert(ty) {
         return Ok(ctx.layout_id(ty));

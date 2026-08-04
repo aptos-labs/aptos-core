@@ -41,6 +41,8 @@ env:
   # It is also used to pull the docker images for the CI.
   IMAGE_TAG: ${{ inputs.GIT_SHA }}
   GIT_SHA: ${{ inputs.GIT_SHA || github.event.pull_request.head.sha || github.sha }} # default to PR branch sha when not running on workflow_call
+permissions:
+  contents: read
 
 jobs:
   # These tests ensure that the faucet works with a node built from main. If we only
@@ -50,6 +52,8 @@ jobs:
   run-tests-main:
     if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    permissions:
+      id-token: write
     steps:
       - uses: actions/checkout@v4
         if: ${{ !inputs.SKIP_JOB }}

@@ -1447,17 +1447,12 @@ impl StateStore {
         start_idx: usize,
     ) -> Result<impl Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync + use<>> {
         let store = Arc::clone(self);
-        Ok(JellyfishMerkleIterator::new_by_index(
+        jmt_leaves_with_values(
             Arc::clone(&self.state_merkle_db),
             version,
             start_idx,
-        )?
-        .map(move |res| match res {
-            Ok((_hashed_key, (key, version))) => {
-                Ok((key.clone(), store.expect_value_by_version(&key, version)?))
-            },
-            Err(err) => Err(err),
-        }))
+            move |key, version| store.expect_value_by_version(key, version),
+        )
     }
 
     pub fn get_value_chunk_with_proof(
@@ -1482,14 +1477,9 @@ impl StateStore {
         first_index: usize,
         chunk_size: usize,
     ) -> Result<impl Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync + use<>> {
-        let store = Arc::clone(self);
-        Ok(jmt_leaves_with_values(
-            Arc::clone(&self.state_merkle_db),
-            version,
-            first_index,
-            move |key, version| store.expect_value_by_version(key, version),
-        )?
-        .take(chunk_size))
+        Ok(self
+            .get_state_key_and_value_iter(version, first_index)?
+            .take(chunk_size))
     }
 
     pub fn get_value_chunk_proof(

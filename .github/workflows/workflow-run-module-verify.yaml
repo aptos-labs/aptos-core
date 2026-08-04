@@ -31,6 +31,9 @@ on:
         type: number
         required: true
         default: 720
+permissions:
+  contents: read
+
 
 jobs:
   module-verify:

@@ -43,7 +43,7 @@ fun three_args(r0, r1, r2): u64 {
 }
 
 fun simple_promotion(): u64 {
-  slots: params(0), locals(0), temps(0), xfer(1)
+  slots: params(0), locals(0), temps(0), transfer(1)
   code:
   L0:
     0: x0 := ld_u64 42
@@ -52,7 +52,7 @@ fun simple_promotion(): u64 {
 }
 
 fun multi_arg(): u64 {
-  slots: params(0), locals(0), temps(0), xfer(2)
+  slots: params(0), locals(0), temps(0), transfer(2)
   code:
   L0:
     0: x0 := ld_u64 1
@@ -62,7 +62,7 @@ fun multi_arg(): u64 {
 }
 
 fun nested_fg(): u64 {
-  slots: params(0), locals(0), temps(0), xfer(1)
+  slots: params(0), locals(0), temps(0), transfer(1)
   code:
   L0:
     0: x0 := ld_u64 7
@@ -72,7 +72,7 @@ fun nested_fg(): u64 {
 }
 
 fun two_inner_calls(): u64 {
-  slots: params(0), locals(0), temps(1), xfer(2)
+  slots: params(0), locals(0), temps(1), transfer(2)
     r0: u64
   code:
   L0:
@@ -85,7 +85,7 @@ fun two_inner_calls(): u64 {
 }
 
 fun computed_arg(r0): u64 {
-  slots: params(1), locals(0), temps(0), xfer(1)
+  slots: params(1), locals(0), temps(0), transfer(1)
     r0: u64
   code:
   L0:
@@ -95,7 +95,7 @@ fun computed_arg(r0): u64 {
 }
 
 fun partial_promotion(r0): u64 {
-  slots: params(1), locals(0), temps(0), xfer(2)
+  slots: params(1), locals(0), temps(0), transfer(2)
     r0: u64
   code:
   L0:
@@ -105,7 +105,7 @@ fun partial_promotion(r0): u64 {
 }
 
 fun call_with_param(r0): u64 {
-  slots: params(1), locals(0), temps(0), xfer(1)
+  slots: params(1), locals(0), temps(0), transfer(1)
     r0: u64
   code:
   L0:
@@ -114,7 +114,7 @@ fun call_with_param(r0): u64 {
 }
 
 fun arg_live_after_call(r0): u64 {
-  slots: params(1), locals(1), temps(1), xfer(1)
+  slots: params(1), locals(1), temps(1), transfer(1)
     r0: u64
     r1: u64
     r2: u64
@@ -126,7 +126,7 @@ fun arg_live_after_call(r0): u64 {
 }
 
 fun ret_used_past_next_call(): u64 {
-  slots: params(0), locals(1), temps(1), xfer(1)
+  slots: params(0), locals(1), temps(1), transfer(1)
     r0: u64
     r1: u64
   code:
@@ -140,7 +140,7 @@ fun ret_used_past_next_call(): u64 {
 }
 
 fun multi_ret(): u64 {
-  slots: params(0), locals(0), temps(0), xfer(2)
+  slots: params(0), locals(0), temps(0), transfer(2)
   code:
   L0:
     0: x0 := ld_u64 3
@@ -151,7 +151,7 @@ fun multi_ret(): u64 {
 }
 
 fun width_from_max(): u64 {
-  slots: params(0), locals(0), temps(1), xfer(3)
+  slots: params(0), locals(0), temps(1), transfer(3)
     r0: u64
   code:
   L0:
@@ -166,7 +166,7 @@ fun width_from_max(): u64 {
 }
 
 fun call_in_loop(r0): u64 {
-  slots: params(1), locals(1), temps(0), xfer(1)
+  slots: params(1), locals(1), temps(0), transfer(1)
     r0: u64
     r1: u64
   code:
@@ -184,7 +184,7 @@ fun call_in_loop(r0): u64 {
 }
 
 fun mixed_at_callsite(r0): u64 {
-  slots: params(1), locals(0), temps(0), xfer(3)
+  slots: params(1), locals(0), temps(0), transfer(3)
     r0: u64
   code:
   L0:
@@ -195,7 +195,7 @@ fun mixed_at_callsite(r0): u64 {
 }
 
 fun mixed_intervening_call(): u64 {
-  slots: params(0), locals(0), temps(1), xfer(3)
+  slots: params(0), locals(0), temps(1), transfer(3)
     r0: u64
   code:
   L0:

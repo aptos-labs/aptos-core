@@ -12,9 +12,8 @@ module aptos_framework::code {
     use std::option::Option;
     use std::string;
     use aptos_framework::event;
+    use aptos_framework::init;
     use aptos_framework::object::{Self, Object};
-
-    friend aptos_framework::object_code_deployment;
 
     // ----------------------------------------------------------------------
     // Code Publishing
@@ -176,6 +175,16 @@ module aptos_framework::code {
         // To avoid prover compiler error on spec
         // the package need to be an immutable variable
         let module_names = get_module_names(&pack);
+
+        // Record, per module in this package, the object's transitive root owner at (re)publish, so
+        // lazy self-init can detect a later transfer of the object or an ancestor since that module
+        // was published (see `init::internal_maybe_initialize`). Objects only; feature-gated.
+        if (features::is_lazy_module_initialization_enabled() && object::is_object(addr)) {
+            let owner = object::address_to_object<object::ObjectCore>(addr).root_owner();
+            module_names.for_each_ref(|name| {
+                init::record_deploy_owner(addr, *name.bytes(), owner);
+            });
+        };
         let package_immutable = &borrow_global<PackageRegistry>(addr).packages;
         let len = package_immutable.length();
         let index = len;
@@ -198,6 +207,10 @@ module aptos_framework::code {
         // Update registry
         let policy = pack.upgrade_policy;
         if (index < len) {
+            pack.modules.for_each_ref(|m| {
+                let m: &ModuleMetadata = m;
+                init::reset_initialized(addr, *m.name.bytes());
+            });
             *packages.borrow_mut(index) = pack
         } else {
             packages.push_back(pack)

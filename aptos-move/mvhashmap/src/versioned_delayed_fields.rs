@@ -28,7 +28,7 @@ pub enum CommitError {
 // a potential bypass (based on the previously stored entry), which may allow a read
 // operation to not wait for the corresponding dependency.
 #[derive(Clone, Debug, PartialEq)]
-enum EstimatedEntry<K: Clone> {
+enum EstimatedEntry<K> {
     NoBypass,
     // If applicable, can bypass the Estimate by considering a apply change instead.
     Bypass(DelayedApplyEntry<K>),
@@ -38,7 +38,7 @@ enum EstimatedEntry<K: Clone> {
 // aggregator (as the ID will not be contained in a resource anymore). The write on the
 // previously holding resource and Block-STM read validation ensures correctness.
 #[derive(Debug)]
-enum VersionEntry<K: Clone> {
+enum VersionEntry<K> {
     // If the value is determined by a delta applied to a value read during the execution
     // of the same transaction, the delta may also be kept in the entry. This is useful
     // if speculative execution aborts and the entry is marked as estimate, as the delta
@@ -58,7 +58,7 @@ enum VersionEntry<K: Clone> {
 // A VersionedValue internally contains a BTreeMap from indices of transactions
 // that update a given aggregator, alongside the corresponding entries.
 #[derive(Debug)]
-struct VersionedValue<K: Clone> {
+struct VersionedValue<K> {
     versioned_map: BTreeMap<TxnIndex, Box<CachePadded<VersionEntry<K>>>>,
 
     // The value of the given aggregator prior to the block execution. None implies that
@@ -72,7 +72,7 @@ struct VersionedValue<K: Clone> {
 }
 
 #[derive(Debug, PartialEq)]
-enum VersionedRead<K: Clone> {
+enum VersionedRead<K> {
     Value(DelayedFieldValue),
     // The transaction index records the index at which the Snapshot was encountered.
     // This is required for the caller to resolve the value of the aggregator (with the
@@ -145,7 +145,7 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
     }
 
     // Insert value computed from speculative transaction execution,
-    // potentially overwritting a previous entry.
+    // potentially overwriting a previous entry.
     fn insert_speculative_value(
         &mut self,
         txn_idx: TxnIndex,
@@ -404,7 +404,7 @@ pub trait TVersionedDelayedFieldView<K> {
 /// between Aggregator and AggregatorSnapshot. It is easy to provide this property from the
 /// caller side, even if IDs are re-used (say among incarnations) by e.g. assigning odd and
 /// even ids to Aggregators and AggregatorSnapshots, and it allows asserting the uses strictly.
-pub struct VersionedDelayedFields<K: Clone> {
+pub struct VersionedDelayedFields<K> {
     values: DashMap<K, VersionedValue<K>>,
 
     /// No deltas are allowed below next_idx_to_commit version, as all deltas (and snapshots)

@@ -14,9 +14,14 @@ on:
         description: The network to provision storage for.
         type: string
         required: true
+permissions:
+  contents: read
+
 jobs:
   provision:
     runs-on: 2cpu-gh-ubuntu24-x64
+    permissions:
+      id-token: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -57,5 +62,6 @@ jobs:
       - name: "Provision Storage"
         env:
           GOOGLE_CLOUD_PROJECT: aptos-devinfra-0
-        run: cd testsuite/replay-verify && poetry run python archive_disk_utils.py --network ${{ inputs.NETWORK }}
+          NETWORK: ${{ inputs.NETWORK }}
+        run: cd testsuite/replay-verify && poetry run python archive_disk_utils.py --network "$NETWORK"
         

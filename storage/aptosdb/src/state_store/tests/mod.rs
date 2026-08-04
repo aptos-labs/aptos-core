@@ -17,7 +17,7 @@ use aptos_jellyfish_merkle::{
     node_type::{Node, NodeKey},
     TreeReader,
 };
-use aptos_storage_interface::{DbReader, DbWriter, StateSnapshotReceiver};
+use aptos_storage_interface::{DbReader, DbWriter, StateKind, StateSnapshotReceiver};
 use aptos_temppath::TempPath;
 use aptos_types::nibble::nibble_path::NibblePath;
 use proptest::{collection::hash_map, prelude::*};
@@ -457,7 +457,13 @@ proptest! {
             // Check db restore calculates usage correctly as well.
             let tmp_dir = TempPath::new();
             let db2 = AptosDB::new_for_test(&tmp_dir);
-            let mut restore = db2.get_state_snapshot_receiver(100, root_hash).unwrap();
+            let mut restore = db2
+                .get_state_snapshot_receiver(
+                    100,
+                    root_hash,
+                    StateKind::MainState,
+                )
+                .unwrap();
             let proof = if let Some((k, _v)) = snapshot.last() {
                 db.get_backup_handler().get_account_state_range_proof(k.hash(), last_version).unwrap()
             } else {

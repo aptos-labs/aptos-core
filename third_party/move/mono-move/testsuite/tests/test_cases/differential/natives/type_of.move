@@ -57,4 +57,4 @@ module 0x1::type_info {
 // CHECK: results: 0x4261723c7536343e
 
 // RUN: execute 0x1::type_info::non_struct_aborts
-// CHECK: aborted: code 1 (Expected a struct type, found: u64)
+// CHECK: aborted: code 1 (Expected a struct type, found: u64) in 0x1::type_info

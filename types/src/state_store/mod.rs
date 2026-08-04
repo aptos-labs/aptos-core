@@ -14,6 +14,7 @@ use crate::{
 use aptos_crypto::HashValue;
 use bytes::Bytes;
 use move_core_types::{language_storage::StructTag, move_resource::MoveResource};
+use serde::{Deserialize, Serialize};
 #[cfg(any(test, feature = "testing"))]
 use std::hash::Hash;
 use std::ops::Deref;
@@ -28,6 +29,13 @@ pub mod state_value;
 pub mod table;
 
 pub const NUM_STATE_SHARDS: usize = 16;
+
+/// Identifies which snapshot store an operation targets.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+pub enum StateKind {
+    MainState,
+    Position,
+}
 
 pub type StateViewResult<T, E = StateViewError> = std::result::Result<T, E>;
 

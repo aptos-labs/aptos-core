@@ -8,8 +8,8 @@ mod common;
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    native::{NativeExtension, NativeExtensions, VMInternalError},
-    Code, FrameLayoutInfo, Function, MicroOp, SortedSafePointEntries,
+    native::{NativeExtension, NativeExtensions},
+    Code, FrameLayoutInfo, Function, MicroOp, SortedSafePointEntries, VMResult,
 };
 
 /// Test extension that records the checkpoint hooks the interpreter fires, so
@@ -29,7 +29,7 @@ impl NativeExtension for CheckpointProbe {
         self.checkpoints += 1;
     }
 
-    fn on_rollback(&mut self, n: usize) -> Result<(), VMInternalError> {
+    fn on_rollback(&mut self, n: usize) -> VMResult<()> {
         self.depth -= n;
         self.rolled_back += n;
         Ok(())

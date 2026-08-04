@@ -3,12 +3,19 @@
 
 //! Gas metering primitives for MonoMove.
 
+use crate::error::{ExecutionErrorKind, IntoExecutionError};
 use thiserror::Error;
 
 /// Gas exhaustion: the transaction ran out of budget.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
 #[error("out of gas")]
 pub struct GasExhaustedError;
+
+impl IntoExecutionError for GasExhaustedError {
+    fn kind(&self) -> ExecutionErrorKind {
+        ExecutionErrorKind::OutOfGas
+    }
+}
 
 /// A simple flat-budget gas meter, called by the interpreter at charge points.
 pub struct GasMeter {

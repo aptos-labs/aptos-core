@@ -1,0 +1,302 @@
+=== stackless ===
+// module 0x66::chained_field_fusion
+
+fun mk(r0, r1): S {
+  slots: params(2), locals(0), temps(5)
+    r0: u64
+    r1: u64
+    r2: u64
+    r3: u64
+    r4: 0x66::chained_field_fusion::B
+    r5: 0x66::chained_field_fusion::A
+    r6: 0x66::chained_field_fusion::S
+  code:
+  L0:
+    0: r2 := ld_u64 0
+    1: r3 := ld_u64 0
+    2: r4 := pack 0x66::chained_field_fusion::B, [r3, r0]
+    3: r5 := pack 0x66::chained_field_fusion::A, [r2, r4, r1]
+    4: r6 := pack 0x66::chained_field_fusion::S, [r5]
+    5: ret [r6]
+}
+
+fun read_by_value(r0): u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: 0x66::chained_field_fusion::S
+    r1: u64
+  code:
+  L0:
+    0: r1 := read_loc_field_chain S::x.A::y.B::z, r0
+    1: ret [r1]
+}
+
+fun read_by_ref(r0): u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: &0x66::chained_field_fusion::S
+    r1: u64
+  code:
+  L0:
+    0: r1 := read_field_chain S::x.A::y.B::z, r0
+    1: ret [r1]
+}
+
+fun write_by_ref(r0, r1) {
+  slots: params(2), locals(0), temps(0)
+    r0: &mut 0x66::chained_field_fusion::S
+    r1: u64
+  code:
+  L0:
+    0: write_field_chain S::x.A::y.B::z, r0, r1
+    1: ret []
+}
+
+fun borrow_chain(r0): &u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: &0x66::chained_field_fusion::S
+    r1: &u64
+  code:
+  L0:
+    0: r1 := imm_borrow_field_chain S::x.A::y.B::z, r0
+    1: ret [r1]
+}
+
+fun use_borrow_chain(r0): u64 {
+  slots: params(1), locals(0), temps(1), transfer(1)
+    r0: &0x66::chained_field_fusion::S
+    r1: u64
+  code:
+  L0:
+    0: [x0] := call borrow_chain, [r0]
+    1: r1 := read_ref x0
+    2: ret [r1]
+}
+
+fun read_shared(r0): u64 {
+  slots: params(1), locals(1), temps(2)
+    r0: &0x66::chained_field_fusion::S
+    r1: &0x66::chained_field_fusion::A
+    r2: u64
+    r3: u64
+  code:
+  L0:
+    0: r1 := imm_borrow_field S::x, r0
+    1: r2 := read_field_chain A::y.B::z, r1
+    2: r3 := read_field A::w, r1
+    3: r3 := add r2, r3
+    4: ret [r3]
+}
+
+fun test_read_by_value(r0): u64 {
+  slots: params(1), locals(1), temps(0), transfer(2)
+    r0: u64
+    r1: 0x66::chained_field_fusion::S
+  code:
+  L0:
+    0: x1 := ld_u64 0
+    1: [r1] := call mk, [r0, x1]
+    2: [x0] := call read_by_value, [r1]
+    3: ret [x0]
+}
+
+fun test_read_by_ref(r0): u64 {
+  slots: params(1), locals(1), temps(0), transfer(2)
+    r0: u64
+    r1: 0x66::chained_field_fusion::S
+  code:
+  L0:
+    0: x1 := ld_u64 0
+    1: [r1] := call mk, [r0, x1]
+    2: x0 := imm_borrow_loc r1
+    3: [x0] := call read_by_ref, [x0]
+    4: ret [x0]
+}
+
+fun test_write_by_ref(r0, r1): u64 {
+  slots: params(2), locals(1), temps(0), transfer(2)
+    r0: u64
+    r1: u64
+    r2: 0x66::chained_field_fusion::S
+  code:
+  L0:
+    0: x1 := ld_u64 0
+    1: [r2] := call mk, [r0, x1]
+    2: x0 := mut_borrow_loc r2
+    3: [] := call write_by_ref, [x0, r1]
+    4: [x0] := call read_by_value, [r2]
+    5: ret [x0]
+}
+
+fun test_borrow_chain(r0): u64 {
+  slots: params(1), locals(1), temps(0), transfer(2)
+    r0: u64
+    r1: 0x66::chained_field_fusion::S
+  code:
+  L0:
+    0: x1 := ld_u64 0
+    1: [r1] := call mk, [r0, x1]
+    2: x0 := imm_borrow_loc r1
+    3: [x0] := call use_borrow_chain, [x0]
+    4: ret [x0]
+}
+
+fun test_read_shared(r0, r1): u64 {
+  slots: params(2), locals(1), temps(0), transfer(2)
+    r0: u64
+    r1: u64
+    r2: 0x66::chained_field_fusion::S
+  code:
+  L0:
+    0: [r2] := call mk, [r0, r1]
+    1: x0 := imm_borrow_loc r2
+    2: [x0] := call read_shared, [x0]
+    3: ret [x0]
+}
+=== micro-ops ===
+// module 0x66::chained_field_fusion
+
+fun mk() {
+  frame_data_size: 112
+  entry_gas: 448
+  code:
+    0: StoreImm8 [16] <- #0
+    1: StoreImm8 [24] <- #0
+    2: Move8 [40] <- [0]
+    3: Move8 [32] <- [24]
+    4: Move8 [72] <- [8]
+    5: Move(16) [56] <- [32]
+    6: Move8 [48] <- [16]
+    7: Move(32) [80] <- [48]
+    8: Move(32) [0] <- [80]
+    9: Return
+}
+
+fun read_by_value() {
+  frame_data_size: 40
+  entry_gas: 84
+  code:
+    0: Move8 [32] <- [16]
+    1: Move8 [0] <- [32]
+    2: Return
+}
+
+fun read_by_ref() {
+  frame_data_size: 24
+  entry_gas: 84
+  code:
+    0: ReadRefOffset [16] <- *([0]+16) (size=8)
+    1: Move8 [0] <- [16]
+    2: Return
+}
+
+fun write_by_ref() {
+  frame_data_size: 24
+  entry_gas: 32
+  code:
+    0: WriteRefOffset *([0]+16) <- [16] (size=8)
+    1: Return
+}
+
+fun borrow_chain() {
+  frame_data_size: 32
+  entry_gas: 108
+  code:
+    0: DeriveRefOffsetImm [16] <- [0]+16
+    1: Move(16) [0] <- [16]
+    2: Return
+}
+
+fun use_borrow_chain() {
+  frame_data_size: 24
+  entry_gas: 140
+  code:
+    0: Move(16) [48] <- [0]
+    1: CallIndirect 0x66::chained_field_fusion::borrow_chain
+    2: ReadRef [16] <- *[48] (size=8)
+    3: Move8 [0] <- [16]
+    4: Return
+}
+
+fun read_shared() {
+  frame_data_size: 48
+  entry_gas: 115
+  code:
+    0: DeriveRefOffsetImm [16] <- [0]+0
+    1: ReadRefOffset [32] <- *([16]+16) (size=8)
+    2: ReadRefOffset [40] <- *([16]+24) (size=8)
+    3: AddU64 [40] <- [32] + [40]
+    4: Move8 [0] <- [40]
+    5: Return
+}
+
+fun test_read_by_value() {
+  frame_data_size: 40
+  entry_gas: 324
+  code:
+    0: StoreImm8 [72] <- #0
+    1: Move8 [64] <- [0]
+    2: CallIndirect 0x66::chained_field_fusion::mk
+    3: Move(32) [8] <- [64]
+    4: Move(32) [64] <- [8]
+    5: CallIndirect 0x66::chained_field_fusion::read_by_value
+    6: Move8 [0] <- [64]
+    7: Return
+}
+
+fun test_read_by_ref() {
+  frame_data_size: 40
+  entry_gas: 278
+  code:
+    0: StoreImm8 [72] <- #0
+    1: Move8 [64] <- [0]
+    2: CallIndirect 0x66::chained_field_fusion::mk
+    3: Move(32) [8] <- [64]
+    4: SlotBorrow [64] <- &[8]
+    5: CallIndirect 0x66::chained_field_fusion::read_by_ref
+    6: Move8 [0] <- [64]
+    7: Return
+}
+
+fun test_write_by_ref() {
+  frame_data_size: 48
+  entry_gas: 412
+  code:
+    0: StoreImm8 [80] <- #0
+    1: Move8 [72] <- [0]
+    2: CallIndirect 0x66::chained_field_fusion::mk
+    3: Move(32) [16] <- [72]
+    4: SlotBorrow [72] <- &[16]
+    5: Move8 [88] <- [8]
+    6: CallIndirect 0x66::chained_field_fusion::write_by_ref
+    7: Move(32) [72] <- [16]
+    8: CallIndirect 0x66::chained_field_fusion::read_by_value
+    9: Move8 [0] <- [72]
+    10: Return
+}
+
+fun test_borrow_chain() {
+  frame_data_size: 40
+  entry_gas: 278
+  code:
+    0: StoreImm8 [72] <- #0
+    1: Move8 [64] <- [0]
+    2: CallIndirect 0x66::chained_field_fusion::mk
+    3: Move(32) [8] <- [64]
+    4: SlotBorrow [64] <- &[8]
+    5: CallIndirect 0x66::chained_field_fusion::use_borrow_chain
+    6: Move8 [0] <- [64]
+    7: Return
+}
+
+fun test_read_shared() {
+  frame_data_size: 48
+  entry_gas: 276
+  code:
+    0: Move8 [80] <- [8]
+    1: Move8 [72] <- [0]
+    2: CallIndirect 0x66::chained_field_fusion::mk
+    3: Move(32) [16] <- [72]
+    4: SlotBorrow [72] <- &[16]
+    5: CallIndirect 0x66::chained_field_fusion::read_shared
+    6: Move8 [0] <- [72]
+    7: Return
+}

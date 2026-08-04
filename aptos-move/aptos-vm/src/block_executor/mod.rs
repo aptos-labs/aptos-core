@@ -4,50 +4,48 @@
 pub(crate) mod vm_wrapper;
 
 use crate::counters::{BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS};
-use aptos_aggregator::{
-    delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::TAggregatorV1View,
-};
+use aptos_aggregator::delayed_change::DelayedChange;
 use aptos_block_executor::{
+    check_resource_group_serialization,
     code_cache_global_manager::AptosModuleCacheManager,
-    errors::BlockExecutionError,
     executor::BlockExecutor,
-    task::{
-        AfterMaterializationOutput, BeforeMaterializationOutput, ExecutorTask,
-        TransactionOutput as BlockExecutorTransactionOutput,
-    },
+    task::{ExecutorTask, TransactionOutput as BlockExecutorTransactionOutput},
     txn_commit_hook::TransactionCommitHook,
     txn_provider::TxnProvider,
     types::InputOutputKey,
+    Materializer,
 };
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
+        value::ValueWithLayout,
     },
     contract_event::ContractEvent,
     error::{code_invariant_error, PanicError},
     fee_statement::FeeStatement,
-    state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView, StateViewId},
-    transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockOutput,
-        TransactionOutput, TransactionStatus,
+    state_store::{
+        state_key::StateKey,
+        state_value::{StateValue, StateValueMetadata},
+        StateView, StateViewId,
     },
-    write_set::WriteOp,
+    transaction::{
+        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockError,
+        BlockExecutionResult, BlockOutput, TransactionOutput, TransactionStatus,
+    },
+    write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use aptos_vm_types::{
     abstract_write_op::AbstractResourceWriteOp,
-    module_write_set::ModuleWrite,
     output::{UnorderedReadSet, VMOutput},
     resolver::ResourceGroupSize,
 };
 use move_core_types::{
-    language_storage::StructTag,
+    language_storage::{ModuleId, StructTag},
     value::MoveTypeLayout,
-    vm_status::{StatusCode, VMStatus},
 };
 use move_vm_runtime::execution_tracing::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use once_cell::sync::OnceCell;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     marker::PhantomData,
@@ -55,12 +53,11 @@ use std::{
 use triomphe::Arc as TriompheArc;
 use vm_wrapper::AptosExecutorTask;
 
-/// Output type wrapper used by block executor. VM output is stored first, then
-/// transformed into TransactionOutput type that is returned.
+/// Output type wrapper used by block executor. VM output is stored, and
+/// transformed into TransactionOutput type on materialization.
 #[derive(Debug)]
 pub struct AptosTransactionOutput {
-    vm_output: Option<VMOutput>,
-    committed_output: OnceCell<TransactionOutput>,
+    vm_output: VMOutput,
     /// State keys read by the VM during the execution (incarnation) that produced this output.
     ///
     /// TODO(HotState): also consider recording the read kind (exists/metadata/value) and the
@@ -75,60 +72,32 @@ impl AptosTransactionOutput {
 
     pub fn new_with_read_set(output: VMOutput, read_set: UnorderedReadSet) -> Self {
         Self {
-            vm_output: Some(output),
-            committed_output: OnceCell::new(),
+            vm_output: output,
             read_set,
         }
     }
+}
 
-    fn take_output(mut self) -> TransactionOutput {
-        match self.committed_output.take() {
-            Some(output) => output,
-            // TODO: revisit whether we should always get it via committed, or o.w. create a
-            // dedicated API without creating empty data structures.
-            // This is currently used because we do not commit skip_output() transactions.
-            None => self
-                .vm_output
-                .take()
-                .expect("Output must be set")
-                .into_transaction_output()
-                .expect("Transaction output is not already materialized"),
-        }
+impl BlockExecutorTransactionOutput for AptosTransactionOutput {
+    type CommittedOutput = TransactionOutput;
+    type Txn = SignatureVerifiedTransaction;
+
+    /// Execution output for transactions that comes after SkipRest signal or when there was a
+    /// problem creating the output (e.g. group serialization issue).
+    fn skip_output() -> Self {
+        Self::new(VMOutput::empty_with_status(TransactionStatus::Retry))
     }
-}
 
-pub struct AfterMaterializationGuard<'a> {
-    output: &'a TransactionOutput,
-}
+    fn check_materialization(&self, materializer: &impl Materializer<Self::Txn>) -> bool {
+        check_resource_group_serialization(self, materializer)
+    }
 
-impl<'a> AfterMaterializationOutput<SignatureVerifiedTransaction>
-    for AfterMaterializationGuard<'a>
-{
     fn fee_statement(&self) -> FeeStatement {
-        if let Ok(Some(fee_statement)) = self.output.try_extract_fee_statement() {
-            return fee_statement;
-        }
-        FeeStatement::zero()
+        *self.vm_output.fee_statement()
     }
 
     fn has_new_epoch_event(&self) -> bool {
-        self.output.has_new_epoch_event()
-    }
-}
-
-/// Before materialization guard wrapper that holds a read lock.
-pub struct BeforeMaterializationGuard<'a> {
-    guard: &'a VMOutput,
-    read_set: &'a UnorderedReadSet,
-}
-
-impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMaterializationGuard<'_> {
-    fn fee_statement(&self) -> FeeStatement {
-        *self.guard.fee_statement()
-    }
-
-    fn has_new_epoch_event(&self) -> bool {
-        self.guard
+        self.vm_output
             .events()
             .iter()
             .map(|(event, _)| event)
@@ -136,15 +105,15 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
     }
 
     fn output_approx_size(&self) -> u64 {
-        self.guard.materialized_size()
+        self.vm_output.materialized_size()
     }
 
     fn get_write_summary(&self) -> HashSet<InputOutputKey<StateKey, StructTag>> {
         let mut writes = HashSet::new();
 
-        for (state_key, write) in self.guard.resource_write_set() {
+        for (state_key, write) in self.vm_output.resource_write_set() {
             match write {
-                AbstractResourceWriteOp::Write(_)
+                AbstractResourceWriteOp::Write(..)
                 | AbstractResourceWriteOp::WriteWithDelayedFields(_) => {
                     writes.insert(InputOutputKey::Resource(state_key.clone()));
                 },
@@ -162,7 +131,7 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
             }
         }
 
-        for identifier in self.guard.delayed_field_change_set().keys() {
+        for identifier in self.vm_output.delayed_field_change_set().keys() {
             writes.insert(InputOutputKey::DelayedField(*identifier));
         }
 
@@ -177,14 +146,12 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
         // Every key receiving a value write becomes hot via the write itself, so the hot
         // state accumulator must treat it as written and not promote it separately. Unlike
         // get_write_summary (conflict detection), this includes in-place delayed field
-        // rewrites, aggregator v1 writes/deltas and module writes. The accumulator dedups,
-        // so the chained keys need not be unique.
-        self.guard
+        // rewrites and module writes. The accumulator dedups, so the chained keys need not
+        // be unique.
+        self.vm_output
             .resource_write_set()
             .keys()
-            .chain(self.guard.module_write_set().keys())
-            .chain(self.guard.aggregator_v1_write_set().keys())
-            .chain(self.guard.aggregator_v1_delta_set().keys())
+            .chain(self.vm_output.module_write_set().keys())
     }
 
     // TODO: get rid of the cloning data-structures in the following APIs.
@@ -193,12 +160,12 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
     ) -> HashMap<
         StateKey,
         (
-            WriteOp,
+            ValueWithLayout<WriteOp>,
             ResourceGroupSize,
-            BTreeMap<StructTag, (WriteOp, Option<TriompheArc<MoveTypeLayout>>)>,
+            BTreeMap<StructTag, ValueWithLayout<WriteOp>>,
         ),
     > {
-        self.guard
+        self.vm_output
             .resource_write_set()
             .iter()
             .flat_map(|(key, write)| {
@@ -206,7 +173,10 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
                     Some((
                         key.clone(),
                         (
-                            group_write.metadata_op().clone(),
+                            ValueWithLayout::Exchanged(
+                                TriompheArc::new(group_write.metadata_op().clone()),
+                                None,
+                            ),
                             group_write
                                 .maybe_group_op_size()
                                 .unwrap_or(ResourceGroupSize::zero_combined()),
@@ -214,7 +184,13 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
                                 .inner_ops()
                                 .iter()
                                 .map(|(tag, (op, maybe_layout))| {
-                                    (tag.clone(), (op.clone(), maybe_layout.clone()))
+                                    (
+                                        tag.clone(),
+                                        ValueWithLayout::Exchanged(
+                                            TriompheArc::new(op.clone()),
+                                            maybe_layout.clone(),
+                                        ),
+                                    )
                                 })
                                 .collect(),
                         ),
@@ -226,16 +202,16 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
             .collect()
     }
 
-    fn for_each_resource_key_no_aggregator_v1(
+    fn for_each_resource_key(
         &self,
         callback: &mut dyn FnMut(&StateKey) -> Result<(), PanicError>,
     ) -> Result<(), PanicError> {
         for key in self
-            .guard
+            .vm_output
             .resource_write_set()
             .iter()
             .flat_map(|(key, write)| match write {
-                AbstractResourceWriteOp::Write(_)
+                AbstractResourceWriteOp::Write(..)
                 | AbstractResourceWriteOp::WriteWithDelayedFields(_) => Some(key),
                 _ => None,
             })
@@ -250,7 +226,7 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
         callback: &mut dyn FnMut(&StateKey, HashSet<&StructTag>) -> Result<(), PanicError>,
     ) -> Result<(), PanicError> {
         for (key, tags) in self
-            .guard
+            .vm_output
             .resource_write_set()
             .iter()
             .flat_map(|(key, write)| {
@@ -269,7 +245,7 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
 
     /// More efficient implementation to avoid unnecessarily cloning inner_ops.
     fn resource_group_metadata_ops(&self) -> Vec<(StateKey, WriteOp)> {
-        self.guard
+        self.vm_output
             .resource_write_set()
             .iter()
             .flat_map(|(key, write)| {
@@ -282,19 +258,18 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
             .collect()
     }
 
-    fn resource_write_set(
-        &self,
-    ) -> HashMap<StateKey, (TriompheArc<WriteOp>, Option<TriompheArc<MoveTypeLayout>>)> {
-        self.guard
+    fn resource_write_set(&self) -> HashMap<StateKey, ValueWithLayout<WriteOp>> {
+        self.vm_output
             .resource_write_set()
             .iter()
             .flat_map(|(key, write)| match write {
-                AbstractResourceWriteOp::Write(write_op) => {
-                    Some((key.clone(), (TriompheArc::new(write_op.clone()), None)))
-                },
+                AbstractResourceWriteOp::Write(write_op, _) => Some((
+                    key.clone(),
+                    ValueWithLayout::Exchanged(TriompheArc::new(write_op.clone()), None),
+                )),
                 AbstractResourceWriteOp::WriteWithDelayedFields(write) => Some((
                     key.clone(),
-                    (
+                    ValueWithLayout::Exchanged(
                         TriompheArc::new(write.write_op.clone()),
                         Some(write.layout.clone()),
                     ),
@@ -304,30 +279,28 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
             .collect()
     }
 
-    /// Should never be called after incorporating materialized output, as that consumes vm_output.
-    fn module_write_set(&self) -> &BTreeMap<StateKey, ModuleWrite<WriteOp>> {
-        self.guard.module_write_set()
+    fn for_each_module_write(
+        &self,
+        callback: &mut dyn FnMut(&ModuleId, StateValue) -> Result<(), PanicError>,
+    ) -> Result<(), PanicError> {
+        for write in self.vm_output.module_write_set().values() {
+            let state_value = write
+                .write_op()
+                .as_state_value()
+                .ok_or_else(|| code_invariant_error("Modules cannot be deleted"))?;
+            callback(write.module_id(), state_value)?;
+        }
+        Ok(())
     }
 
-    /// Should never be called after incorporating materialized output, as that consumes vm_output.
-    fn aggregator_v1_write_set(&self) -> BTreeMap<StateKey, WriteOp> {
-        self.guard.aggregator_v1_write_set().clone()
-    }
-
-    /// Should never be called after incorporating materialized output, as that consumes vm_output.
-    fn aggregator_v1_delta_set(&self) -> BTreeMap<StateKey, DeltaOp> {
-        self.guard.aggregator_v1_delta_set().clone()
-    }
-
-    /// Should never be called after incorporating materialized output, as that consumes vm_output.
     fn delayed_field_change_set(&self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
-        self.guard.delayed_field_change_set().clone()
+        self.vm_output.delayed_field_change_set().clone()
     }
 
     fn reads_needing_delayed_field_exchange(
         &self,
     ) -> Vec<(StateKey, StateValueMetadata, TriompheArc<MoveTypeLayout>)> {
-        self.guard
+        self.vm_output
             .resource_write_set()
             .iter()
             .flat_map(|(key, write)| {
@@ -341,7 +314,7 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
     }
 
     fn group_reads_needing_delayed_field_exchange(&self) -> Vec<(StateKey, StateValueMetadata)> {
-        self.guard
+        self.vm_output
             .resource_write_set()
             .iter()
             .flat_map(|(key, write)| {
@@ -356,9 +329,8 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
             .collect()
     }
 
-    /// Should never be called after incorporating materialized output, as that consumes vm_output.
     fn get_events(&self) -> Vec<(ContractEvent, Option<MoveTypeLayout>)> {
-        self.guard.events().to_vec()
+        self.vm_output.events().to_vec()
     }
 
     // For legacy interfaces, there are more efficient alternatives in BlockSTMv2.
@@ -368,7 +340,7 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
     //
     // Internally clones and also allocates a new vector. Used for BlockSTMv1 only.
     fn legacy_v1_resource_group_tags(&self) -> Vec<(StateKey, HashSet<StructTag>)> {
-        self.guard
+        self.vm_output
             .resource_write_set()
             .iter()
             .flat_map(|(key, write)| {
@@ -383,143 +355,26 @@ impl BeforeMaterializationOutput<SignatureVerifiedTransaction> for BeforeMateria
             })
             .collect()
     }
-}
-
-impl BlockExecutorTransactionOutput for AptosTransactionOutput {
-    type AfterMaterializationGuard<'a> = AfterMaterializationGuard<'a>;
-    type BeforeMaterializationGuard<'a> = BeforeMaterializationGuard<'a>;
-    type Txn = SignatureVerifiedTransaction;
-
-    fn committed_output(&self) -> &OnceCell<TransactionOutput> {
-        &self.committed_output
-    }
-
-    /// Execution output for transactions that comes after SkipRest signal or when there was a
-    /// problem creating the output (e.g. group serialization issue).
-    fn skip_output() -> Self {
-        Self::new(VMOutput::empty_with_status(TransactionStatus::Retry))
-    }
-
-    fn discard_output(discard_code: StatusCode) -> Self {
-        Self::new(VMOutput::empty_with_status(TransactionStatus::Discard(
-            discard_code,
-        )))
-    }
-
-    fn before_materialization<'a>(&'a self) -> Result<BeforeMaterializationGuard<'a>, PanicError> {
-        Ok(BeforeMaterializationGuard {
-            guard: self
-                .vm_output
-                .as_ref()
-                .ok_or_else(|| code_invariant_error("Output must be set but not materialized"))?,
-            read_set: &self.read_set,
-        })
-    }
-
-    fn after_materialization<'a>(&'a self) -> Result<AfterMaterializationGuard<'a>, PanicError> {
-        Ok(AfterMaterializationGuard {
-            output: self
-                .committed_output
-                .get()
-                .ok_or_else(|| code_invariant_error("Output must be materialized"))?,
-        })
-    }
-
-    fn is_materialized_and_success(&self) -> bool {
-        if let Some(output) = self.committed_output.get() {
-            return output
-                .status()
-                .as_kept_status()
-                .is_ok_and(|status| status.is_success());
-        }
-        false
-    }
-
-    fn check_materialization(&self) -> Result<bool, PanicError> {
-        if let Some(output) = self.committed_output.get() {
-            if output.status().is_retry() {
-                return Err(code_invariant_error(
-                    "Committed output must not have is_retry set.",
-                ));
-            }
-            Ok(true)
-        } else {
-            if !self
-                .vm_output
-                .as_ref()
-                .is_some_and(|output| output.status().is_retry())
-            {
-                return Err(code_invariant_error(
-                    "Non-committed output must exist with is_retry set.",
-                ));
-            }
-            Ok(false)
-        }
-    }
 
     fn incorporate_materialized_txn_output(
-        &mut self,
-        aggregator_v1_writes: Vec<(StateKey, WriteOp)>,
+        self,
         materialized_resource_write_set: Vec<(StateKey, WriteOp)>,
         materialized_events: Vec<ContractEvent>,
-    ) -> Result<Trace, PanicError> {
+    ) -> Result<(Self::CommittedOutput, Trace), PanicError> {
         // Before creating the output, extract the trace for replay.
-        let mut vm_output = self
-            .vm_output
-            .take()
-            .expect("Output must be set to incorporate materialized data");
+        let mut vm_output = self.vm_output;
         let trace = vm_output.take_trace();
 
-        self.committed_output
-            .set(
-                vm_output.into_transaction_output_with_materialized_write_set(
-                    aggregator_v1_writes,
-                    materialized_resource_write_set,
-                    materialized_events,
-                )?,
-            )
-            .map_err(|_| {
-                code_invariant_error(
-                    "Could not combine VMOutput with the materialized resource and event data",
-                )
-            })?;
-        Ok(trace)
-    }
-
-    fn set_txn_output_for_non_dynamic_change_set(&mut self) {
-        assert!(
-            self.committed_output
-                .set(
-                    self.vm_output
-                        .take()
-                        .expect("Output must be set to incorporate materialized data")
-                        .into_transaction_output()
-                        .expect("We should be able to always convert to transaction output"),
-                )
-                .is_ok(),
-            "Could not combine VMOutput with the materialized resource and event data"
-        );
-    }
-
-    // Used only by the sequential execution, does not set committed_output.
-    fn legacy_sequential_materialize_agg_v1(
-        &mut self,
-        view: &impl TAggregatorV1View<Identifier = StateKey>,
-    ) {
-        self.vm_output
-            .as_mut()
-            .expect("Output must be set to incorporate materialized data")
-            .try_materialize(view)
-            .expect("Delta materialization failed");
+        let committed_output = vm_output.into_transaction_output_with_materialized_write_set(
+            materialized_resource_write_set,
+            materialized_events,
+        )?;
+        Ok((committed_output, trace))
     }
 }
 
 pub struct AptosBlockExecutorWrapper<
-    E: ExecutorTask<
-        Txn = SignatureVerifiedTransaction,
-        Error = VMStatus,
-        Output = AptosTransactionOutput,
-    >,
+    E: ExecutorTask<Txn = SignatureVerifiedTransaction, Output = AptosTransactionOutput>,
 > {
     _phantom: PhantomData<E>,
 }
@@ -528,14 +383,13 @@ impl<
         E: ExecutorTask<
             Txn = SignatureVerifiedTransaction,
             AuxiliaryInfo = AuxiliaryInfo,
-            Error = VMStatus,
             Output = AptosTransactionOutput,
         >,
     > AptosBlockExecutorWrapper<E>
 {
     pub fn execute_block<
         S: StateView + Sync,
-        L: TransactionCommitHook,
+        L: TransactionCommitHook<TransactionOutput>,
         TP: TxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo> + Sync,
     >(
         signature_verified_block: &TP,
@@ -544,7 +398,7 @@ impl<
         config: BlockExecutorConfig,
         transaction_slice_metadata: TransactionSliceMetadata,
         transaction_commit_listener: Option<L>,
-    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
+    ) -> BlockExecutionResult<SignatureVerifiedTransaction, TransactionOutput> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
 
         let num_txns = signature_verified_block.num_txns();
@@ -556,11 +410,13 @@ impl<
 
         BLOCK_EXECUTOR_CONCURRENCY.set(config.local.concurrency_level as i64);
 
-        let mut module_cache_manager_guard = module_cache_manager.try_lock(
-            &state_view,
-            &config.local.module_cache_config,
-            transaction_slice_metadata,
-        )?;
+        let mut module_cache_manager_guard = module_cache_manager
+            .try_lock(
+                &state_view,
+                &config.local.module_cache_config,
+                transaction_slice_metadata,
+            )
+            .map_err(|status| BlockError::new(status.to_string()))?;
 
         let executor =
             BlockExecutor::<SignatureVerifiedTransaction, E, S, L, TP, AuxiliaryInfo>::new(
@@ -577,13 +433,9 @@ impl<
         match ret {
             Ok(block_output) => {
                 let (transaction_outputs, block_epilogue_txn) = block_output.into_inner();
-                let output_vec: Vec<_> = transaction_outputs
-                    .into_iter()
-                    .map(|output| output.take_output())
-                    .collect();
 
                 // Flush the speculative logs of the committed transactions.
-                let pos = output_vec.partition_point(|o| !o.status().is_retry());
+                let pos = transaction_outputs.partition_point(|o| !o.status().is_retry());
 
                 if state_view.id() != StateViewId::Miscellaneous {
                     // Speculation is disabled in Miscellaneous context, which is used by testing and
@@ -591,16 +443,9 @@ impl<
                     flush_speculative_logs(pos);
                 }
 
-                Ok(BlockOutput::new(output_vec, block_epilogue_txn))
+                Ok(BlockOutput::new(transaction_outputs, block_epilogue_txn))
             },
-            Err(BlockExecutionError::FatalBlockExecutorError(PanicError::CodeInvariantError(
-                err_msg,
-            ))) => Err(VMStatus::Error {
-                status_code: StatusCode::DELAYED_FIELD_OR_BLOCKSTM_CODE_INVARIANT_ERROR,
-                sub_status: None,
-                message: Some(err_msg),
-            }),
-            Err(BlockExecutionError::FatalVMError(err)) => Err(err),
+            Err(err) => Err(err),
         }
     }
 }

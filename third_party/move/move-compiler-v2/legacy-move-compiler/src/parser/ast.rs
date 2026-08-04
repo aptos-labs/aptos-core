@@ -806,9 +806,16 @@ pub enum Exp_ {
     // if (eb) et else ef
     IfElse(Box<Exp>, Box<Exp>, Option<Box<Exp>>),
     // [label] while (eb) eloop
+    // TODO: give `while` a dedicated spec field like `For` below, instead of
+    // folding a trailing spec into the condition (see `parse_spec_while_loop`).
     While(Option<Label>, Box<Exp>, Box<Exp>),
     // [label] loop eloop
     Loop(Option<Label>, Box<Exp>),
+    // for (iter in lb..ub [spec]) ebody [spec]
+    // The optional spec expression (`Exp_::Spec`) holds loop invariants declared
+    // either in the loop header (before the body) or in a trailing spec block
+    // (after the body); the two forms are mutually exclusive.
+    For(Var, Box<Exp>, Box<Exp>, Box<Exp>, Option<Box<Exp>>),
     // match (e) { b1 [ if c_1] => e1, ... }
     Match(Box<Exp>, Vec<Spanned<(BindList, Option<Exp>, Exp)>>),
 
@@ -2271,6 +2278,20 @@ impl AstDebug for Exp_ {
                 }
                 w.write("loop ");
                 e.ast_debug(w);
+            },
+            E::For(iter, lb, ub, body, spec) => {
+                w.write("for (");
+                w.write(iter.0.value.as_str());
+                w.write(" in ");
+                lb.ast_debug(w);
+                w.write("..");
+                ub.ast_debug(w);
+                if let Some(spec) = spec {
+                    w.write(" ");
+                    spec.ast_debug(w);
+                }
+                w.write(") ");
+                body.ast_debug(w);
             },
             E::Block(seq) => w.block(|w| seq.ast_debug(w)),
             E::Lambda(sp!(_, tbs), e, capture_kind, spec_opt) => {

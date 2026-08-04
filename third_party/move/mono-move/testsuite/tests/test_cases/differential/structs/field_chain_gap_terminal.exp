@@ -1,0 +1,136 @@
+=== stackless ===
+// module 0x67::field_chain_gap_terminal
+
+fun mk(r0): S {
+  slots: params(1), locals(0), temps(5)
+    r0: u64
+    r1: u64
+    r2: u64
+    r3: 0x67::field_chain_gap_terminal::B
+    r4: 0x67::field_chain_gap_terminal::A
+    r5: 0x67::field_chain_gap_terminal::S
+  code:
+  L0:
+    0: r1 := ld_u64 0
+    1: r2 := ld_u64 0
+    2: r3 := pack 0x67::field_chain_gap_terminal::B, [r2, r0]
+    3: r4 := pack 0x67::field_chain_gap_terminal::A, [r1, r3]
+    4: r5 := pack 0x67::field_chain_gap_terminal::S, [r4]
+    5: ret [r5]
+}
+
+fun read_gap(r0): u64 {
+  slots: params(1), locals(1), temps(1)
+    r0: &0x67::field_chain_gap_terminal::S
+    r1: u64
+    r2: u64
+  code:
+  L0:
+    0: r1 := ld_u64 5
+    1: r2 := read_field_chain S::x.A::y.B::z, r0
+    2: ret [r2]
+}
+
+fun write_gap(r0, r1) {
+  slots: params(2), locals(1), temps(0)
+    r0: &mut 0x67::field_chain_gap_terminal::S
+    r1: u64
+    r2: u64
+  code:
+  L0:
+    0: r2 := ld_u64 9
+    1: write_field_chain S::x.A::y.B::z, r0, r1
+    2: ret []
+}
+
+fun test_read_gap(r0): u64 {
+  slots: params(1), locals(1), temps(0), transfer(1)
+    r0: u64
+    r1: 0x67::field_chain_gap_terminal::S
+  code:
+  L0:
+    0: [r1] := call mk, [r0]
+    1: x0 := imm_borrow_loc r1
+    2: [x0] := call read_gap, [x0]
+    3: ret [x0]
+}
+
+fun test_write_gap(r0, r1): u64 {
+  slots: params(2), locals(1), temps(0), transfer(2)
+    r0: u64
+    r1: u64
+    r2: 0x67::field_chain_gap_terminal::S
+  code:
+  L0:
+    0: [r2] := call mk, [r0]
+    1: x0 := mut_borrow_loc r2
+    2: [] := call write_gap, [x0, r1]
+    3: x0 := imm_borrow_loc r2
+    4: [x0] := call read_gap, [x0]
+    5: ret [x0]
+}
+=== micro-ops ===
+// module 0x67::field_chain_gap_terminal
+
+fun mk() {
+  frame_data_size: 88
+  entry_gas: 352
+  code:
+    0: StoreImm8 [8] <- #0
+    1: StoreImm8 [16] <- #0
+    2: Move8 [32] <- [0]
+    3: Move8 [24] <- [16]
+    4: Move(16) [48] <- [24]
+    5: Move8 [40] <- [8]
+    6: Move(24) [64] <- [40]
+    7: Move(24) [0] <- [64]
+    8: Return
+}
+
+fun read_gap() {
+  frame_data_size: 32
+  entry_gas: 86
+  code:
+    0: StoreImm8 [16] <- #5
+    1: ReadRefOffset [24] <- *([0]+16) (size=8)
+    2: Move8 [0] <- [24]
+    3: Return
+}
+
+fun write_gap() {
+  frame_data_size: 32
+  entry_gas: 34
+  code:
+    0: StoreImm8 [24] <- #9
+    1: WriteRefOffset *([0]+16) <- [16] (size=8)
+    2: Return
+}
+
+fun test_read_gap() {
+  frame_data_size: 32
+  entry_gas: 226
+  code:
+    0: Move8 [56] <- [0]
+    1: CallIndirect 0x67::field_chain_gap_terminal::mk
+    2: Move(24) [8] <- [56]
+    3: SlotBorrow [56] <- &[8]
+    4: CallIndirect 0x67::field_chain_gap_terminal::read_gap
+    5: Move8 [0] <- [56]
+    6: Return
+}
+
+fun test_write_gap() {
+  frame_data_size: 40
+  entry_gas: 314
+  code:
+    0: Move8 [64] <- [0]
+    1: CallIndirect 0x67::field_chain_gap_terminal::mk
+    2: Move(24) [16] <- [64]
+    3: SlotBorrow [64] <- &[16]
+    4: Move8 [80] <- [8]
+    5: CallIndirect 0x67::field_chain_gap_terminal::write_gap
+    6: SlotBorrow [64] <- &[16]
+    7: CallIndirect 0x67::field_chain_gap_terminal::read_gap
+    8: Move8 [0] <- [64]
+    9: Return
+}

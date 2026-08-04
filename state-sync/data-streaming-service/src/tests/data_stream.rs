@@ -39,6 +39,7 @@ use aptos_data_client::{
 };
 use aptos_id_generator::U64IdGenerator;
 use aptos_infallible::Mutex;
+use aptos_storage_interface::StateKind;
 use aptos_storage_service_types::responses::CompleteDataRange;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{
@@ -358,7 +359,7 @@ async fn test_state_stream_out_of_order_responses() {
         let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
         assert_matches!(
             data_notification.data_payload,
-            DataPayload::StateValuesWithProof(_)
+            DataPayload::StateValuesWithProof(_, _)
         );
     }
     assert_none!(stream_listener.select_next_some().now_or_never());
@@ -370,7 +371,7 @@ async fn test_state_stream_out_of_order_responses() {
     let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
     assert_matches!(
         data_notification.data_payload,
-        DataPayload::StateValuesWithProof(_)
+        DataPayload::StateValuesWithProof(_, _)
     );
     assert_none!(stream_listener.select_next_some().now_or_never());
 
@@ -382,7 +383,7 @@ async fn test_state_stream_out_of_order_responses() {
         let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
         assert_matches!(
             data_notification.data_payload,
-            DataPayload::StateValuesWithProof(_)
+            DataPayload::StateValuesWithProof(_, _)
         );
     }
     assert_none!(stream_listener.select_next_some().now_or_never());
@@ -446,7 +447,7 @@ async fn test_state_stream_out_of_order_responses_dynamic() {
         let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
         assert_matches!(
             data_notification.data_payload,
-            DataPayload::StateValuesWithProof(_)
+            DataPayload::StateValuesWithProof(_, _)
         );
     }
     assert_none!(stream_listener.select_next_some().now_or_never());
@@ -464,7 +465,7 @@ async fn test_state_stream_out_of_order_responses_dynamic() {
     let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
     assert_matches!(
         data_notification.data_payload,
-        DataPayload::StateValuesWithProof(_)
+        DataPayload::StateValuesWithProof(_, _)
     );
     assert_none!(stream_listener.select_next_some().now_or_never());
 
@@ -482,7 +483,7 @@ async fn test_state_stream_out_of_order_responses_dynamic() {
         let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
         assert_matches!(
             data_notification.data_payload,
-            DataPayload::StateValuesWithProof(_)
+            DataPayload::StateValuesWithProof(_, _)
         );
     }
     assert_none!(stream_listener.select_next_some().now_or_never());
@@ -3319,6 +3320,7 @@ fn create_state_value_stream(
     let stream_request = StreamRequest::GetAllStates(GetAllStatesRequest {
         version,
         start_index: 0,
+        state_kind: StateKind::MainState,
     });
     let (data_stream, data_stream_listener, _) =
         create_data_stream(data_client_config, streaming_service_config, stream_request);

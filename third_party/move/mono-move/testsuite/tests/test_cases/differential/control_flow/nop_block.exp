@@ -1,0 +1,30 @@
+=== stackless ===
+// module 0x66::nop_block
+
+fun taken(): u64 {
+  slots: params(0), locals(0), temps(2)
+    r0: bool
+    r1: u64
+  code:
+  L2:
+    0: r0 := ld_true
+    1: br_true L0, r0
+  L1:
+  L0:
+    2: r1 := ld_u64 7
+    3: ret [r1]
+}
+
+fun not_taken(): u64 {
+  slots: params(0), locals(0), temps(2)
+    r0: bool
+    r1: u64
+  code:
+  L2:
+    0: r0 := ld_false
+    1: br_true L0, r0
+  L1:
+  L0:
+    2: r1 := ld_u64 8
+    3: ret [r1]
+}

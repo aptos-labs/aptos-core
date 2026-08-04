@@ -2,7 +2,41 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::BlockExecutableTransaction;
-use std::fmt::Debug;
+use crate::error::PanicError;
+use std::fmt::{self, Debug, Display};
+
+/// Unrecoverable error that aborts execution of an entire block.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BlockError {
+    message: String,
+}
+
+impl BlockError {
+    pub fn new(message: String) -> Self {
+        Self { message }
+    }
+
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+}
+
+impl Display for BlockError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+impl std::error::Error for BlockError {}
+
+impl From<PanicError> for BlockError {
+    fn from(err: PanicError) -> Self {
+        Self::new(err.to_string())
+    }
+}
+
+/// Result of executing a block: either its output, or an unrecoverable [BlockError].
+pub type BlockExecutionResult<T, Output> = Result<BlockOutput<T, Output>, BlockError>;
 
 #[derive(Debug)]
 pub struct BlockOutput<T, Output>

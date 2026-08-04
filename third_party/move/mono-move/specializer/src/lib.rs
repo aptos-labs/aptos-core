@@ -4,14 +4,10 @@
 pub mod stackless_exec_ir;
 
 pub mod destack;
-pub mod error;
 mod gas;
 pub mod lower;
+pub mod validate;
 
 pub use destack::destack;
-pub use error::{
-    GasInstrumentationError, GasInstrumentationResult, LoweringError, LoweringResult,
-    SlotAllocError, SlotAllocResult, SpecializerError, SpecializerResult, SsaConversionError,
-    SsaConversionResult, XferVerifierError, XferVerifierResult,
-};
 pub use stackless_exec_ir::{FunctionIR, ModuleIR};
+pub use validate::{validate_module, ValidationError, ValidationResult};

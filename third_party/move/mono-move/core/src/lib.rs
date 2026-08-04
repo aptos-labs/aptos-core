@@ -39,7 +39,8 @@ pub use instruction::{
     VEC_LENGTH_OFFSET,
 };
 pub use interner::{
-    view_function_ref, FunctionRef, InternedFunctionRef, Interner, ModuleId, TypeSubstitutionError,
+    module_id_of, struct_tag_of, type_tag_of, view_function_ref, view_module_id, FunctionRef,
+    InternedFunctionRef, Interner, ModuleId, TypeSubstitutionError,
 };
 pub use move_binary_format::file_format::ConstantPoolIndex;
 pub use object_descriptor::{
@@ -60,10 +61,4 @@ pub use value_layout::{
     reserved_layout_id, reserved_layouts, FieldValueLayout, LayoutFlags, LayoutId, LayoutKind,
     LayoutProvider, ValueLayout, ValueLayoutTable,
 };
-pub use vm_error::{
-    ArithOp, GasInstrumentationError, GasInstrumentationResult, GlobalStorageOp, LoaderError,
-    LoaderInvariantViolation, LoaderResult, LoweringError, LoweringResult, RuntimeError,
-    RuntimeInvariantViolation, RuntimeResult, Signedness, SlotAllocError, SlotAllocResult,
-    SpecializerError, SpecializerResult, SsaConversionError, SsaConversionResult, VecOp,
-    XferVerifierError, XferVerifierResult,
-};
+pub use vm_error::{VMInternalError, VMResult};

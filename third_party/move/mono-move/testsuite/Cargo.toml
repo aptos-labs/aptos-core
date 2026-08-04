@@ -43,6 +43,7 @@ move-vm-types = { workspace = true }
 smallvec = { workspace = true }
 specializer = { workspace = true }
 tempfile = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }

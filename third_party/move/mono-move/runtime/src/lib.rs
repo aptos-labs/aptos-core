@@ -12,10 +12,12 @@ mod native_context;
 mod types;
 mod value_utils;
 mod verifier;
+mod write_set;
 
 pub use error::{RuntimeError, RuntimeStatus};
+pub use global_storage::ResourceReadWriteSet;
 pub use heap::Heap;
-pub use interpreter::InterpreterContext;
+pub use interpreter::{InterpreterContext, SessionEffects};
 pub use memory::{
     read_ptr, read_u32, read_u64, vec_elem_ptr, write_object_header, write_ptr, write_u32,
     write_u64, MemoryRegion,

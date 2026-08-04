@@ -72,7 +72,7 @@ use crate::{
     validator_txn::ValidatorTransaction,
     write_set::TransactionWrite,
 };
-pub use block_output::BlockOutput;
+pub use block_output::{BlockError, BlockExecutionResult, BlockOutput};
 pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
 pub use move_core_types::transaction_argument::TransactionArgument;
@@ -3568,10 +3568,6 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         _to_make_hot: BTreeSet<Self::Key>,
     ) -> Self {
         unimplemented!()
-    }
-
-    fn pre_write_values(&self) -> Vec<(Self::Key, Self::Value)> {
-        vec![]
     }
 }
 

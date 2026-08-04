@@ -25,7 +25,7 @@ fun sink(r0, r1, r2) {
 }
 
 fun caller(r0) {
-  slots: params(1), locals(0), temps(1), xfer(3)
+  slots: params(1), locals(0), temps(1), transfer(3)
     r0: u64
     r1: u64
   code:

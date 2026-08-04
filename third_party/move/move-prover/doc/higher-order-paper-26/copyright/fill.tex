@@ -1,0 +1,22 @@
+% Overlay-fills the FMCAD copyright transfer form (copyright-blank.pdf,
+% from https://fmcad.or.at/pdf/copyright.pdf) with the paper 116 details.
+% Built by ../make-camera-ready.sh; the corresponding author still has to
+% add ORCIDs (if desired), date, and signature.
+\documentclass{article}
+\usepackage[paperwidth=595.276pt,paperheight=841.89pt,margin=0pt]{geometry}
+\usepackage{pdfpages}
+\usepackage{helvet}\renewcommand{\familydefault}{\sfdefault}
+\begin{document}
+\includepdf[pages=1,picturecommand*={%
+  \put(112,383){\small 2026}%
+  \put(228,383){\small Bruno Dutertre and Bettina K\"onighofer}%
+  \put(215,350){\small Formal Verification of Imperative First-Class Functions in Move}%
+  \put(148,259){\small Wolfgang Grieskamp}%
+  \put(148,229){\small Teng Zhang}%
+  \put(148,199){\small Vineeth Kashyap}%
+  \put(148,169){\small Jake Silverman}%
+}]{copyright-blank.pdf}
+\includepdf[pages=2,picturecommand*={%
+  \put(95,183){\small Wolfgang Grieskamp, Aptos Labs, Palo Alto, USA, \texttt{wg@aptoslabs.com}}%
+}]{copyright-blank.pdf}
+\end{document}

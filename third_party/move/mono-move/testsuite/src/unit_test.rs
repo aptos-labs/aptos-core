@@ -13,15 +13,18 @@ use aptos_types::on_chain_config::{Features, OnChainConfig};
 use legacy_move_compiler::unit_test::{
     ExpectedFailure, ExpectedMoveError, NamedOrBytecodeModule, TestCase,
 };
-use mono_move_core::{types::EMPTY_TYPE_LIST, Function, GasMeter, Interner};
+use mono_move_core::{types::EMPTY_TYPE_LIST, Function, GasMeter, Interner, VMInternalError};
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoaderError, LoadingPolicy, LoweringPolicy, ModuleReadSet};
 use mono_move_runtime::{
     InterpreterContext, ProductionNativeRegistry, RuntimeError, RuntimeStatus,
 };
-use move_binary_format::CompiledModule;
+use move_binary_format::{errors::Location, CompiledModule};
 use move_core_types::{
-    identifier::IdentStr, language_storage::ModuleId, value::MoveValue, vm_status::StatusCode,
+    identifier::IdentStr,
+    language_storage::ModuleId,
+    value::MoveValue,
+    vm_status::{AbortLocation, StatusCode},
 };
 use move_model::metadata::LanguageVersion;
 use move_package::BuildConfig;
@@ -171,7 +174,7 @@ fn execute(
         EMPTY_TYPE_LIST,
     ) {
         Ok(ptr) => unsafe { ptr.as_ref_unchecked() },
-        Err(err) => return classify_loader_error(&err),
+        Err(err) => return classify_error(&err),
     };
 
     let mut interpreter = InterpreterContext::new(
@@ -189,8 +192,16 @@ fn execute(
 
     match interpreter.run() {
         Ok(RuntimeStatus::Success) => TestResult::Success,
-        Ok(RuntimeStatus::Aborted { code, message }) => TestResult::Abort { code, message },
-        Err(err) => classify_runtime_error(&err),
+        Ok(RuntimeStatus::Aborted {
+            code,
+            message,
+            location,
+        }) => TestResult::Abort {
+            code,
+            message,
+            location,
+        },
+        Err(err) => classify_error(&err),
     }
 }
 
@@ -272,8 +283,13 @@ fn inline_bytes(value: &MoveValue) -> Vec<u8> {
 enum TestResult {
     /// Ran to completion.
     Success,
-    /// An explicit Move `abort`, with its code and optional message.
-    Abort { code: u64, message: Option<String> },
+    /// An explicit Move `abort`, with its code, optional message, and the
+    /// module that raised it.
+    Abort {
+        code: u64,
+        message: Option<String>,
+        location: AbortLocation,
+    },
     /// An implicit runtime failure: arithmetic overflow, index out of bounds, etc.
     RuntimeFailure(String),
     /// Cannot build or run this yet: missing native, unlowered construct, etc.
@@ -290,6 +306,20 @@ pub enum TestOutcome {
     Unsupported(String),
 }
 
+/// Classifies a boundary error by recovering its concrete component type.
+/// Loader and runtime errors keep their precise per-variant meaning; anything
+/// else (specializer/lowering pass errors) means mono-move cannot lower this
+/// input yet.
+fn classify_error(err: &VMInternalError) -> TestResult {
+    if let Some(e) = err.downcast_ref::<LoaderError>() {
+        classify_loader_error(e)
+    } else if let Some(e) = err.downcast_ref::<RuntimeError>() {
+        classify_runtime_error(e)
+    } else {
+        TestResult::Error(err.to_string())
+    }
+}
+
 fn classify_loader_error(err: &LoaderError) -> TestResult {
     match err {
         // mono-move can't build or resolve this yet: a native it doesn't
@@ -297,25 +327,17 @@ fn classify_loader_error(err: &LoaderError) -> TestResult {
         // no body to lower), or a feature the specializer/verifier can't lower.
         LoaderError::FunctionIrMissing
         | LoaderError::LoweringSkipped { .. }
-        | LoaderError::Specializer(_)
-        | LoaderError::Deserialization(_)
-        | LoaderError::Verification(_)
         | LoaderError::ModuleNotFound { .. }
         | LoaderError::FunctionNotFound { .. } => TestResult::Unsupported(err.to_string()),
-        // Genuine problems: a runaway against the (effectively unbounded)
-        // budget, storage/context infrastructure errors, or a VM bug.
-        LoaderError::GasExhausted(_)
-        | LoaderError::ModuleProvider(_)
-        | LoaderError::GlobalContext(_)
-        | LoaderError::InvariantViolation(_) => TestResult::Error(err.to_string()),
+        // Genuine problems: storage/context infrastructure errors, or a VM bug.
+        LoaderError::GlobalContext(_) | LoaderError::InvariantViolation(_) => {
+            TestResult::Error(err.to_string())
+        },
     }
 }
 
 fn classify_runtime_error(err: &RuntimeError) -> TestResult {
     match err {
-        // A loader error surfaced during lazy dispatch keeps its precise meaning.
-        RuntimeError::Loader(inner) => classify_loader_error(inner),
-
         // The program failed at runtime: overflow, OOB, missing resource, a hit
         // limit, ... mono-move matches the existing VM's behaviour and limits,
         // so these are real failures a `#[expected_failure]` test may want.
@@ -339,24 +361,26 @@ fn classify_runtime_error(err: &RuntimeError) -> TestResult {
         | RuntimeError::BCSInvalidBool { .. }
         | RuntimeError::BCSSequenceTooLong { .. }
         | RuntimeError::BCSRemainingInput { .. }
+        | RuntimeError::BCSSignerNotDeserializable
         | RuntimeError::StackOverflow
         | RuntimeError::OutOfHeapMemory { .. }
         | RuntimeError::AllocationTooLarge { .. }
         | RuntimeError::VecAllocSizeOverflow
-        | RuntimeError::AbortMessageTooLong { .. } => TestResult::RuntimeFailure(err.to_string()),
+        | RuntimeError::AbortMessageTooLong { .. }
+        | RuntimeError::StateKeyTypeTooDeep => TestResult::RuntimeFailure(err.to_string()),
 
-        // Genuine problems: runaway gas, infrastructure failure, or a VM bug.
-        RuntimeError::GasExhausted(_)
-        | RuntimeError::InvariantViolation(_)
-        | RuntimeError::ResourceProvider(_) => TestResult::Error(err.to_string()),
+        // Genuine problems: infrastructure failure, or a VM bug.
+        RuntimeError::InvariantViolation(_) | RuntimeError::ResourceProvider(_) => {
+            TestResult::Error(err.to_string())
+        },
     }
 }
 
 fn adjudicate(result: TestResult, expected: &Option<ExpectedFailure>) -> TestOutcome {
     // Outcomes that don't depend on the expectation; otherwise normalize the
-    // failure to (abort code, detail) — an explicit abort carries a code, an
-    // implicit runtime failure carries none.
-    let (code, detail) = match result {
+    // failure to (abort, detail) — an explicit abort carries a code and
+    // location, an implicit runtime failure carries neither.
+    let (abort, detail) = match result {
         TestResult::Success => {
             return match expected {
                 None => TestOutcome::Pass,
@@ -365,31 +389,54 @@ fn adjudicate(result: TestResult, expected: &Option<ExpectedFailure>) -> TestOut
                 },
             };
         },
-        TestResult::Abort { code, message } => (Some(code), message),
+        TestResult::Abort {
+            code,
+            message,
+            location,
+        } => (Some((code, location)), message),
         TestResult::RuntimeFailure(failure) => (None, Some(failure)),
         TestResult::Unsupported(reason) => return TestOutcome::Unsupported(reason),
         TestResult::Error(error) => return TestOutcome::Fail(error),
     };
 
-    // The program failed; judge it against the expectation, matching on the
-    // abort code only.
+    // The program failed; judge it against the expectation: the abort code
+    // must match, and so must the abort location when the expectation pins
+    // one. The abort message is never compared: `#[expected_failure]` cannot
+    // specify one, so it only feeds the failure diagnostics below.
     //
-    // TODO(completeness): a non-abort expected error (e.g. `arithmetic_error`) is currently
-    // satisfied by any failure; match it against mono-move's own error
-    // categories instead. Fine for now: move-stdlib and aptos-framework only
-    // use abort-code (or bare) expected failures.
+    // TODO(completeness): only abort expectations are fully checked. A
+    // non-ABORTED expectation (`arithmetic_error`, `vector_error`,
+    // `major_status = ..`, `out_of_gas`) — or ABORTED without `minor_status` —
+    // is satisfied by any failure; its status, minor status, and location go
+    // unchecked. Checking them requires mapping `RuntimeError` variants to
+    // status codes and attaching a location to non-abort failures.
     let reason = match expected {
         // No failure was expected.
-        None => match code {
-            Some(code) => format!("unexpected abort with code {code}"),
+        None => match abort {
+            Some((code, _)) => format!("unexpected abort with code {code}"),
             None => "unexpected runtime failure".to_string(),
         },
         // A failure was expected; if it requires a specific abort code, check it.
         Some(expected) => match expected_abort_code(expected) {
             None => return TestOutcome::Pass,
-            Some(want) if code == Some(want) => return TestOutcome::Pass,
-            Some(want) => match code {
-                Some(got) => format!("expected abort with code {want}, got code {got}"),
+            Some(want) => match &abort {
+                Some((got, got_location)) if *got == want => {
+                    match expected_abort_location(expected) {
+                        None => return TestOutcome::Pass,
+                        Some(want_location) => {
+                            if location_matches(want_location, got_location) {
+                                return TestOutcome::Pass;
+                            }
+                            format!(
+                                "expected abort with code {want} originating in {}, \
+                                 but it aborted in {}",
+                                render_expected_location(want_location),
+                                render_abort_location(got_location),
+                            )
+                        },
+                    }
+                },
+                Some((got, _)) => format!("expected abort with code {want}, got code {got}"),
                 None => format!("expected abort with code {want}, got a runtime failure"),
             },
         },
@@ -415,6 +462,46 @@ fn expected_abort_code(expected: &ExpectedFailure) -> Option<u64> {
                 None
             }
         },
+    }
+}
+
+/// The abort location the `#[expected_failure]` annotation pins, if any.
+fn expected_abort_location(expected: &ExpectedFailure) -> Option<&Location> {
+    match expected {
+        ExpectedFailure::Expected | ExpectedFailure::ExpectedWithCodeDEPRECATED(_) => None,
+        ExpectedFailure::ExpectedWithError(ExpectedMoveError(status, _, location, _)) => {
+            (*status == StatusCode::ABORTED).then_some(location)
+        },
+    }
+}
+
+/// Whether the actual abort location satisfies the expected one.
+fn location_matches(expected: &Location, actual: &AbortLocation) -> bool {
+    match (expected, actual) {
+        (Location::Module(expected), AbortLocation::Module(actual)) => expected == actual,
+        (Location::Script, AbortLocation::Script) => true,
+        (Location::Undefined, _)
+        | (Location::Script, AbortLocation::Module(_))
+        | (Location::Module(_), AbortLocation::Script) => false,
+    }
+}
+
+/// Renders a [`Location`] as `script`/`undefined`/`0x<address>::<module>`
+/// (unlike its `Display`).
+fn render_expected_location(location: &Location) -> String {
+    match location {
+        Location::Undefined => "undefined".to_string(),
+        Location::Script => "script".to_string(),
+        Location::Module(module_id) => crate::runner::render_module_location(module_id),
+    }
+}
+
+/// Renders an actual [`AbortLocation`] in the same form as
+/// [`render_expected_location`].
+fn render_abort_location(location: &AbortLocation) -> String {
+    match location {
+        AbortLocation::Script => "script".to_string(),
+        AbortLocation::Module(module_id) => crate::runner::render_module_location(module_id),
     }
 }
 
@@ -519,5 +606,105 @@ impl RunSummary {
         }
 
         out
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use move_core_types::{account_address::AccountAddress, identifier::Identifier};
+
+    fn module(name: &str) -> ModuleId {
+        ModuleId::new(
+            AccountAddress::ONE,
+            Identifier::new(name).expect("valid identifier"),
+        )
+    }
+
+    fn abort_in(code: u64, name: &str) -> TestResult {
+        TestResult::Abort {
+            code,
+            message: None,
+            location: AbortLocation::Module(module(name)),
+        }
+    }
+
+    fn expect_abort_in(code: u64, name: &str) -> Option<ExpectedFailure> {
+        Some(ExpectedFailure::ExpectedWithError(ExpectedMoveError(
+            StatusCode::ABORTED,
+            Some(code),
+            Location::Module(module(name)),
+            None,
+        )))
+    }
+
+    #[test]
+    fn abort_code_and_location_match() {
+        assert!(matches!(
+            adjudicate(abort_in(7, "a"), &expect_abort_in(7, "a")),
+            TestOutcome::Pass
+        ));
+    }
+
+    #[test]
+    fn abort_location_mismatch_fails() {
+        let TestOutcome::Fail(reason) = adjudicate(abort_in(7, "a"), &expect_abort_in(7, "b"))
+        else {
+            panic!("expected Fail");
+        };
+        assert!(
+            reason.contains("0x1::a") && reason.contains("0x1::b"),
+            "{reason}"
+        );
+    }
+
+    #[test]
+    fn abort_code_mismatch_reported_before_location() {
+        let TestOutcome::Fail(reason) = adjudicate(abort_in(8, "b"), &expect_abort_in(7, "a"))
+        else {
+            panic!("expected Fail");
+        };
+        assert!(reason.contains("got code 8"), "{reason}");
+    }
+
+    #[test]
+    fn expected_script_location_fails_module_abort() {
+        let expected = Some(ExpectedFailure::ExpectedWithError(ExpectedMoveError(
+            StatusCode::ABORTED,
+            Some(7),
+            Location::Script,
+            None,
+        )));
+        assert!(matches!(
+            adjudicate(abort_in(7, "a"), &expected),
+            TestOutcome::Fail(_)
+        ));
+    }
+
+    #[test]
+    fn deprecated_code_expectation_ignores_location() {
+        let expected = Some(ExpectedFailure::ExpectedWithCodeDEPRECATED(7));
+        assert!(matches!(
+            adjudicate(abort_in(7, "a"), &expected),
+            TestOutcome::Pass
+        ));
+    }
+
+    #[test]
+    fn non_abort_expectation_satisfied_by_any_failure() {
+        // Pins the under-checking documented at the TODO in `adjudicate`.
+        let expected = Some(ExpectedFailure::ExpectedWithError(ExpectedMoveError(
+            StatusCode::ARITHMETIC_ERROR,
+            None,
+            Location::Module(module("a")),
+            None,
+        )));
+        assert!(matches!(
+            adjudicate(
+                TestResult::RuntimeFailure("overflow".to_string()),
+                &expected
+            ),
+            TestOutcome::Pass
+        ));
     }
 }

@@ -144,10 +144,16 @@ env:
 
 # TODO: should we migrate this to a composite action, so that we can skip it
 # at the call site, and don't need to wrap each step in an if statement?
+permissions:
+  contents: read
+
 jobs:
   forge:
     runs-on: runs-on,cpu=4,ram=16,family=m7a+m7i-flex,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=co
     timeout-minutes: ${{ inputs.TIMEOUT_MINUTES }}
+    permissions:
+      id-token: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
         if: ${{ !inputs.SKIP_JOB }}
@@ -206,6 +212,10 @@ jobs:
       - name: Check for Forge images
         if: ${{ !inputs.SKIP_JOB }}
         id: check-forge-images
+        env:
+          INPUT_GIT_SHA: ${{ inputs.GIT_SHA }}
+          INPUT_IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
+          INPUT_FORGE_IMAGE_TAG: ${{ inputs.FORGE_IMAGE_TAG }}
         run: |
           check_image_exists() {
             local tag=$1
@@ -223,10 +233,10 @@ jobs:
             fi
           }
 
-          check_image_exists "${{ inputs.GIT_SHA }}" "validator" "VALIDATOR_GIT_SHA"
-          check_image_exists "${{ inputs.IMAGE_TAG }}" "validator" "VALIDATOR_IMAGE_TAG"
-          check_image_exists "${{ inputs.GIT_SHA }}" "forge" "FORGE_GIT_SHA"
-          check_image_exists "${{ inputs.FORGE_IMAGE_TAG }}" "forge" "FORGE_IMAGE_TAG"
+          check_image_exists "$INPUT_GIT_SHA" "validator" "VALIDATOR_GIT_SHA"
+          check_image_exists "$INPUT_IMAGE_TAG" "validator" "VALIDATOR_IMAGE_TAG"
+          check_image_exists "$INPUT_GIT_SHA" "forge" "FORGE_GIT_SHA"
+          check_image_exists "$INPUT_FORGE_IMAGE_TAG" "forge" "FORGE_IMAGE_TAG"
 
           echo "ℹ️ If testing Forge changes, ensure the 'CICD: build-images' label is added to your PR and the image build workflow has completed successfully." >> $GITHUB_STEP_SUMMARY
 

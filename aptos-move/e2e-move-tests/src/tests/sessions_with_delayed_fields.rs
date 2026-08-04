@@ -9,30 +9,32 @@
 
 use crate::{assert_success, tests::common, MoveHarness};
 use aptos_aggregator::{
-    delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::TDelayedFieldView,
-    types::DelayedFieldValue,
+    delayed_change::DelayedChange, resolver::TDelayedFieldView, types::DelayedFieldValue,
 };
 use aptos_block_executor::{
     code_cache_global_manager::AptosModuleCacheManagerGuard,
     executor::BlockExecutor,
-    task::{
-        AfterMaterializationOutput, BeforeMaterializationOutput, ExecutionStatus, ExecutorTask,
-        TransactionOutput,
-    },
+    task::{ExecutionStatus, ExecutorTask, TransactionOutput},
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::default::DefaultTxnProvider,
     types::InputOutputKey,
+    Materializer,
 };
 use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
+        value::ValueWithLayout,
     },
     contract_event::ContractEvent,
     error::PanicError,
     fee_statement::FeeStatement,
-    state_store::{state_key::StateKey, state_value::StateValueMetadata, TStateView},
+    state_store::{
+        state_key::StateKey,
+        state_value::{StateValue, StateValueMetadata},
+        TStateView,
+    },
     transaction::{AuxiliaryInfo, BlockExecutableTransaction},
     write_set::WriteOp,
 };
@@ -47,7 +49,6 @@ use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::{
     change_set::VMChangeSet,
     module_and_script_storage::code_storage::AptosCodeStorage,
-    module_write_set::ModuleWrite,
     resolver::{
         BlockSynchronizationKillSwitch, ExecutorView, ResourceGroupSize, ResourceGroupView,
     },
@@ -59,7 +60,6 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
     value::{MoveTypeLayout, MoveValue},
-    vm_status::{StatusCode, VMStatus},
 };
 use move_vm_runtime::{
     execution_tracing::Trace,
@@ -67,7 +67,6 @@ use move_vm_runtime::{
     ModuleStorage,
 };
 use move_vm_types::{delayed_values::delayed_field_id::DelayedFieldID, gas::UnmeteredGasMeter};
-use once_cell::sync::OnceCell;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     str::FromStr,
@@ -158,83 +157,40 @@ impl BlockExecutableTransaction for TestTransaction {
 }
 
 #[derive(Debug)]
-struct TestOutput {
-    committed: OnceCell<aptos_types::transaction::TransactionOutput>,
-}
+struct TestOutput;
 
 impl TransactionOutput for TestOutput {
-    type AfterMaterializationGuard<'a> = &'a Self;
-    type BeforeMaterializationGuard<'a> = &'a Self;
+    type CommittedOutput = aptos_types::transaction::TransactionOutput;
     type Txn = TestTransaction;
 
-    fn committed_output(&self) -> &OnceCell<aptos_types::transaction::TransactionOutput> {
-        &self.committed
-    }
-
     fn skip_output() -> Self {
-        Self {
-            committed: OnceCell::new(),
-        }
+        Self
     }
 
-    fn discard_output(_discard_code: StatusCode) -> Self {
-        Self {
-            committed: OnceCell::new(),
-        }
-    }
-
-    fn before_materialization(&self) -> Result<Self::BeforeMaterializationGuard<'_>, PanicError> {
-        Ok(self)
-    }
-
-    fn after_materialization(&self) -> Result<Self::AfterMaterializationGuard<'_>, PanicError> {
-        Ok(self)
-    }
-
-    fn is_materialized_and_success(&self) -> bool {
+    fn check_materialization(&self, _materializer: &impl Materializer<Self::Txn>) -> bool {
         true
     }
 
-    fn check_materialization(&self) -> Result<bool, PanicError> {
-        Ok(true)
-    }
-
     fn incorporate_materialized_txn_output(
-        &mut self,
-        _aggregator_v1_writes: Vec<(StateKey, WriteOp)>,
+        self,
         _patched_resource_write_set: Vec<(StateKey, WriteOp)>,
         _patched_events: Vec<ContractEvent>,
-    ) -> Result<Trace, PanicError> {
-        Ok(Trace::empty())
+    ) -> Result<(Self::CommittedOutput, Trace), PanicError> {
+        Ok((
+            aptos_types::transaction::TransactionOutput::new_empty_success(),
+            Trace::empty(),
+        ))
     }
 
-    fn set_txn_output_for_non_dynamic_change_set(&mut self) {}
-
-    fn legacy_sequential_materialize_agg_v1(
-        &mut self,
-        _view: &impl aptos_aggregator::resolver::TAggregatorV1View<Identifier = StateKey>,
-    ) {
-    }
-}
-
-impl BeforeMaterializationOutput<TestTransaction> for &TestOutput {
-    fn resource_write_set(
-        &self,
-    ) -> HashMap<StateKey, (TriompheArc<WriteOp>, Option<TriompheArc<MoveTypeLayout>>)> {
+    fn resource_write_set(&self) -> HashMap<StateKey, ValueWithLayout<WriteOp>> {
         HashMap::new()
     }
 
-    fn module_write_set(&self) -> &BTreeMap<StateKey, ModuleWrite<WriteOp>> {
-        static EMPTY: OnceCell<BTreeMap<StateKey, ModuleWrite<WriteOp>>> = OnceCell::new();
-        EMPTY.get_or_init(BTreeMap::new)
-    }
-
-    fn aggregator_v1_write_set(&self) -> BTreeMap<StateKey, WriteOp> {
-        BTreeMap::new()
-    }
-
-    fn aggregator_v1_delta_set(&self) -> BTreeMap<StateKey, DeltaOp> {
-        BTreeMap::new()
+    fn for_each_module_write(
+        &self,
+        _callback: &mut dyn FnMut(&ModuleId, StateValue) -> Result<(), PanicError>,
+    ) -> Result<(), PanicError> {
+        Ok(())
     }
 
     fn delayed_field_change_set(&self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
@@ -260,15 +216,15 @@ impl BeforeMaterializationOutput<TestTransaction> for &TestOutput {
     ) -> HashMap<
         StateKey,
         (
-            WriteOp,
+            ValueWithLayout<WriteOp>,
             ResourceGroupSize,
-            BTreeMap<StructTag, (WriteOp, Option<TriompheArc<MoveTypeLayout>>)>,
+            BTreeMap<StructTag, ValueWithLayout<WriteOp>>,
         ),
     > {
         HashMap::new()
     }
 
-    fn for_each_resource_key_no_aggregator_v1(
+    fn for_each_resource_key(
         &self,
         _callback: &mut dyn FnMut(&StateKey) -> Result<(), PanicError>,
     ) -> Result<(), PanicError> {
@@ -307,19 +263,8 @@ impl BeforeMaterializationOutput<TestTransaction> for &TestOutput {
     }
 }
 
-impl AfterMaterializationOutput<TestTransaction> for &TestOutput {
-    fn fee_statement(&self) -> FeeStatement {
-        FeeStatement::zero()
-    }
-
-    fn has_new_epoch_event(&self) -> bool {
-        false
-    }
-}
-
 impl ExecutorTask for TestTask {
     type AuxiliaryInfo = AuxiliaryInfo;
-    type Error = VMStatus;
     type Output = TestOutput;
     type Txn = TestTransaction;
 
@@ -342,7 +287,7 @@ impl ExecutorTask for TestTask {
         txn: &Self::Txn,
         _auxiliary_info: &Self::AuxiliaryInfo,
         _txn_idx: TxnIndex,
-    ) -> ExecutionStatus<Self::Output, Self::Error> {
+    ) -> Result<ExecutionStatus<Self::Output>, PanicError> {
         let resolver = self.vm.as_move_resolver_with_group_view(view);
         let mut change_set_1 = self.run(&resolver, view, &txn.session_1);
         println!("  [session_1] change set: {:?}", change_set_1);
@@ -391,13 +336,10 @@ impl ExecutorTask for TestTask {
         };
         *outcome_cell().lock().unwrap() = Some(outcome);
 
-        ExecutionStatus::Success(TestOutput {
-            committed: OnceCell::new(),
+        Ok(ExecutionStatus::Executed {
+            output: TestOutput,
+            skips_rest: false,
         })
-    }
-
-    fn is_transaction_dynamic_change_set_capable(_txn: &Self::Txn) -> bool {
-        unreachable!("Never used for tests")
     }
 }
 

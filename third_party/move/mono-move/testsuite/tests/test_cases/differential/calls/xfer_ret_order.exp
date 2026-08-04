@@ -26,7 +26,7 @@ fun two_args(r0, r1): u64 {
 }
 
 fun caller(): u64 {
-  slots: params(0), locals(0), temps(3), xfer(3)
+  slots: params(0), locals(0), temps(3), transfer(3)
     r0: u64
     r1: u64
     r2: u64

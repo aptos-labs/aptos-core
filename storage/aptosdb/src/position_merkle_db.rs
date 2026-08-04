@@ -11,7 +11,7 @@ use crate::{
     utils::truncation_helper::find_closest_node_version_at_or_before,
 };
 use aptos_config::config::{RocksdbConfig, StorageDirPaths};
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_crypto::HashValue;
 use aptos_jellyfish_merkle::{
     iterator::JellyfishMerkleIterator, node_type::NodeKey, JellyfishMerkleTree, TreeReader,
     TreeWriter,
@@ -195,18 +195,7 @@ impl PositionMerkleDb {
             Arc::clone(self),
             version,
             start_idx,
-            move |state_key, leaf_version| {
-                let key_hash = state_key.hash();
-                position_db
-                    .get_position_value(key_hash, leaf_version)?
-                    .map(|(_v, value)| value)
-                    .ok_or_else(|| {
-                        AptosDbError::Other(format!(
-                            "JMT leaf at v={version} references missing position_value row \
-                             (state_key_hash={key_hash}, leaf_version={leaf_version})"
-                        ))
-                    })
-            },
+            move |key, leaf_version| position_db.expect_value_by_version(key, leaf_version),
         )
     }
 

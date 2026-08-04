@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/checking/control_flow/for_header_spec_needs_semicolon.move:9:9
+  │
+9 │         s
+  │         ^
+  │         │
+  │         Unexpected 's'
+  │         Expected ';'

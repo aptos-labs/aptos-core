@@ -7,8 +7,9 @@ use crate::{
     address_derivation::object_address_from_object, monomorphic_natives, polymorphic_natives,
     NativeEntry,
 };
-use mono_move_core::native::{
-    NativeContext, NativeContextFamily, NativeExtension, NativeStatus, VMInternalError,
+use mono_move_core::{
+    native::{NativeContext, NativeContextFamily, NativeExtension, NativeStatus},
+    VMResult,
 };
 use move_core_types::account_address::AccountAddress;
 use std::collections::HashMap;
@@ -33,7 +34,7 @@ impl NativeExtension for ObjectContextExtension {
 
     fn on_checkpoint(&mut self) {}
 
-    fn on_rollback(&mut self, _n: usize) -> Result<(), VMInternalError> {
+    fn on_rollback(&mut self, _n: usize) -> VMResult<()> {
         Ok(())
     }
 }
@@ -43,7 +44,7 @@ impl NativeExtension for ObjectContextExtension {
 // TODO(metering): charge gas (constant cost) once the gas API lands.
 pub fn native_create_user_derived_object_address_impl<C: NativeContext>(
     ctx: &C,
-) -> Result<NativeStatus, VMInternalError> {
+) -> VMResult<NativeStatus> {
     // SAFETY: args 0 and 1 are both `address` per the Move declaration.
     let source: AccountAddress = unsafe { ctx.arg(0)? };
     let derive_from: AccountAddress = unsafe { ctx.arg(1)? };
@@ -66,7 +67,7 @@ pub fn native_create_user_derived_object_address_impl<C: NativeContext>(
 // TODO(metering): charge gas (base + per-byte-loaded) once the gas API lands.
 // TODO(perf): consider lowering this in the specializer to the `Exists` micro-op
 // directly, dropping the native path.
-pub fn native_exists_at<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
+pub fn native_exists_at<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     // SAFETY: arg 0 is `address`.
     let address: AccountAddress = unsafe { ctx.arg(0)? };
     let exists = ctx.resource_exists(address, ctx.ty_arg(0)?)?;

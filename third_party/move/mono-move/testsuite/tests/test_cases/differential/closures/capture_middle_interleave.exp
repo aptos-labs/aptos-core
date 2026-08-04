@@ -31,7 +31,7 @@ fun g(r0, r1, r2): u64 {
 }
 
 fun caller(): u64 {
-  slots: params(0), locals(1), temps(3), xfer(3)
+  slots: params(0), locals(1), temps(3), transfer(3)
     r0: |u64, u64|u64
     r1: u64
     r2: u64

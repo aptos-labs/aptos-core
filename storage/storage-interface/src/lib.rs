@@ -49,7 +49,7 @@ use crate::{
         state_with_summary::LedgerWithSummary,
     },
 };
-pub use aptos_types::block_info::BlockHeight;
+pub use aptos_types::{block_info::BlockHeight, state_store::StateKind};
 pub use errors::AptosDbError;
 pub use ledger_summary::LedgerSummary;
 
@@ -457,31 +457,36 @@ pub trait DbReader: Send + Sync {
             ledger_version: Version,
         ) -> Result<TransactionAccumulatorSummary>;
 
-        /// Returns total number of state items in state store at given version.
-        fn get_state_item_count(&self, version: Version) -> Result<usize>;
+        /// Returns the number of items in the given snapshot store at `version`.
+        fn get_state_item_count(&self, version: Version, kind: StateKind) -> Result<usize>;
 
-        /// Get a chunk of state store value, addressed by the index.
+        /// Get a chunk of values from the given snapshot store, addressed by the index.
         fn get_state_value_chunk_with_proof(
             &self,
             version: Version,
             start_idx: usize,
             chunk_size: usize,
+            kind: StateKind,
         ) -> Result<StateValueChunkWithProof>;
 
-        /// Returns an iterator of state key value pairs starting from the index.
+        /// Returns an iterator of value pairs from the given snapshot store,
+        /// starting from the index.
         fn get_state_value_chunk_iter(
             &self,
             version: Version,
             first_index: usize,
             chunk_size: usize,
+            kind: StateKind,
         ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>>;
 
-        /// Returns a state value chunk proof for the given state key values.
+        /// Returns a value chunk proof for the given values from the given
+        /// snapshot store.
         fn get_state_value_chunk_proof(
             &self,
             version: Version,
             first_index: usize,
             state_key_values: Vec<(StateKey, StateValue)>,
+            kind: StateKind,
         ) -> Result<StateValueChunkWithProof>;
 
         /// Returns the total number of hot state items (leaves of the hot state Merkle tree) at
@@ -585,13 +590,14 @@ pub trait DbReader: Send + Sync {
 /// expected of an Aptos DB. This adds write APIs to DbReader.
 #[allow(unused_variables)]
 pub trait DbWriter: Send + Sync {
-    /// Get a (stateful) state snapshot receiver.
+    /// Get a (stateful) snapshot receiver for the given snapshot store.
     ///
     /// Chunk of accounts need to be added via `add_chunk()` before finishing up with `finish_box()`
     fn get_state_snapshot_receiver(
         &self,
         version: Version,
         expected_root_hash: HashValue,
+        kind: StateKind,
     ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, StateValue>>> {
         unimplemented!()
     }

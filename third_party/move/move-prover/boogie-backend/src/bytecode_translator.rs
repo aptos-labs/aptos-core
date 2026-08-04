@@ -6439,6 +6439,16 @@ impl FunctionTranslator<'_> {
                         let var_str = str_local(dests[0]);
                         emitln!(writer, "havoc {};", var_str);
                     },
+                    HavocGlobal(mid, sid, inst) => {
+                        let mem = mid
+                            .qualified_inst(*sid, inst.to_owned())
+                            .instantiate(self.type_inst);
+                        emitln!(
+                            writer,
+                            "havoc {};",
+                            boogie_resource_memory_name(env, &mem, &None)
+                        );
+                    },
                     Havoc(HavocKind::MutationValue) => {
                         let ty = &self.get_local_type(dests[0]);
                         let num_oper = global_state

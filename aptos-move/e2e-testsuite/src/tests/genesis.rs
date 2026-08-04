@@ -7,7 +7,6 @@ use aptos_types::{
     transaction::{ChangeSet, Transaction, TransactionStatus, WriteSetPayload},
     write_set::TransactionWrite,
 };
-use move_core_types::vm_status::StatusCode;
 
 #[test]
 fn no_deletion_in_genesis() {
@@ -63,5 +62,7 @@ fn fail_no_epoch_change_write_set() {
     let output_err = executor
         .execute_transaction_block(vec![txn, Transaction::UserTransaction(txn2)])
         .unwrap_err();
-    assert_eq!(StatusCode::INVALID_WRITE_SET, output_err.status_code());
+    // Block execution no longer threads the original StatusCode; the specific
+    // failure reason survives only in the stringified error message.
+    assert!(output_err.message().unwrap().contains("INVALID_WRITE_SET"));
 }

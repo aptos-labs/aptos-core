@@ -15,7 +15,7 @@ use crate::{
             create_epoch_ending_ledger_info_for_epoch, create_full_node_driver_configuration,
             create_global_summary, create_global_summary_with_version,
             create_output_list_with_proof, create_random_epoch_ending_ledger_info,
-            create_transaction_list_with_proof,
+            create_state_value_chunk_with_proof, create_transaction_list_with_proof,
         },
     },
     utils::OutputFallbackHandler,
@@ -26,6 +26,7 @@ use aptos_data_streaming_service::{
     data_notification::{DataNotification, DataPayload, NotificationId},
     streaming_client::{NotificationAndFeedback, NotificationFeedback},
 };
+use aptos_storage_interface::StateKind;
 use aptos_time_service::TimeService;
 use aptos_types::{
     transaction::{TransactionOutputListWithProofV2, Version},
@@ -33,7 +34,10 @@ use aptos_types::{
 };
 use claims::{assert_matches, assert_none, assert_ok};
 use futures::{channel::oneshot, FutureExt, SinkExt};
-use mockall::{predicate::eq, Sequence};
+use mockall::{
+    predicate::{always, eq},
+    Sequence,
+};
 use std::{sync::Arc, time::Duration};
 
 #[tokio::test]
@@ -973,8 +977,12 @@ async fn test_snapshot_sync_epoch_change() {
     mock_streaming_client
         .expect_get_all_state_values()
         .times(1)
-        .with(eq(target_version), eq(Some(last_persisted_index)))
-        .return_once(move |_, _| Ok(data_stream_listener_1));
+        .with(
+            eq(target_version),
+            eq(Some(last_persisted_index)),
+            eq(StateKind::MainState),
+        )
+        .return_once(move |_, _, _| Ok(data_stream_listener_1));
 
     // Create the mock metadata storage
     let mut metadata_storage = MockMetadataStorage::new();
@@ -982,13 +990,13 @@ async fn test_snapshot_sync_epoch_change() {
     let last_persisted_index_clone = last_persisted_index;
     metadata_storage
         .expect_previous_snapshot_sync_target()
-        .returning(move || Ok(Some(target_ledger_info_clone.clone())));
+        .returning(move |_| Ok(Some(target_ledger_info_clone.clone())));
     metadata_storage
         .expect_is_snapshot_sync_complete()
-        .returning(|_| Ok(false));
+        .returning(|_, _| Ok(false));
     metadata_storage
-        .expect_get_last_persisted_state_value_index()
-        .returning(move |_| Ok(last_persisted_index_clone));
+        .expect_get_last_persisted_index()
+        .returning(move |_, _| Ok(last_persisted_index_clone));
 
     // Create the bootstrapper
     let mut bootstrapper = create_bootstrapper_with_storage(
@@ -1036,14 +1044,14 @@ async fn test_snapshot_sync_epoch_change_genesis() {
     mock_streaming_client
         .expect_get_all_state_values()
         .times(1)
-        .with(eq(target_version), eq(Some(0)))
-        .return_once(move |_, _| Ok(data_stream_listener_1));
+        .with(eq(target_version), eq(Some(0)), eq(StateKind::MainState))
+        .return_once(move |_, _, _| Ok(data_stream_listener_1));
 
     // Create the mock metadata storage
     let mut metadata_storage = MockMetadataStorage::new();
     metadata_storage
         .expect_previous_snapshot_sync_target()
-        .returning(move || Ok(None));
+        .returning(move |_| Ok(None));
 
     // Create the bootstrapper
     let mut bootstrapper = create_bootstrapper_with_storage(
@@ -1076,6 +1084,102 @@ async fn test_snapshot_sync_epoch_change_genesis() {
 }
 
 #[tokio::test]
+async fn test_snapshot_sync_state_values_invalid_chunk_retries() {
+    // Create test data
+    let synced_version = GENESIS_TRANSACTION_VERSION;
+    let highest_version = 10000;
+    let notification_id = 54321;
+    let highest_ledger_info = create_random_epoch_ending_ledger_info(highest_version, 1);
+
+    // Create a driver configuration with a genesis waypoint and fast syncing
+    let mut driver_configuration = create_full_node_driver_configuration();
+    driver_configuration.config.bootstrapping_mode = BootstrappingMode::DownloadLatestStates;
+
+    // Create the mock streaming client. A first chunk with a bad root hash must
+    // cause the state value stream to be retried (not wedge the bootstrapper),
+    // so the state value stream is expected to be requested twice.
+    let mut mock_streaming_client = create_mock_streaming_client();
+    let mut expectation_sequence = Sequence::new();
+    let (mut notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
+    let (_notification_sender_2, data_stream_listener_2) = create_data_stream_listener();
+    let data_stream_id_1 = data_stream_listener_1.data_stream_id;
+    for data_stream_listener in [data_stream_listener_1, data_stream_listener_2] {
+        mock_streaming_client
+            .expect_get_all_state_values()
+            .times(1)
+            .with(always(), eq(Some(0)), eq(StateKind::MainState))
+            .return_once(move |_, _, _| Ok(data_stream_listener))
+            .in_sequence(&mut expectation_sequence);
+    }
+    mock_streaming_client
+        .expect_terminate_stream_with_feedback()
+        .with(
+            eq(data_stream_id_1),
+            eq(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::InvalidPayloadData,
+            ))),
+        )
+        .return_const(Ok(()));
+
+    // Create the mock metadata storage (no snapshot progress recorded yet)
+    let mut metadata_storage = MockMetadataStorage::new();
+    metadata_storage
+        .expect_previous_snapshot_sync_target()
+        .returning(move |_| Ok(None));
+
+    // Create the bootstrapper
+    let mut bootstrapper = create_bootstrapper_with_storage(
+        driver_configuration,
+        mock_streaming_client,
+        metadata_storage,
+        None,
+        synced_version,
+        true,
+    );
+
+    // Insert an epoch ending ledger info into the verified states of the bootstrapper
+    manipulate_verified_epoch_states(&mut bootstrapper, true, true, Some(highest_version));
+
+    // Manually insert a transaction output to sync
+    bootstrapper
+        .get_state_value_syncer()
+        .set_transaction_output_to_sync(create_output_list_with_proof());
+
+    // Create a global data summary
+    let mut global_data_summary = create_global_summary(1);
+    global_data_summary.advertised_data.synced_ledger_infos = vec![highest_ledger_info.clone()];
+
+    // Drive progress to start the state value stream
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
+
+    // Send a state value chunk whose root hash does not match the expected root
+    let data_notification = DataNotification::new(
+        notification_id,
+        DataPayload::StateValuesWithProof(
+            StateKind::MainState,
+            create_state_value_chunk_with_proof(false),
+        ),
+    );
+    notification_sender_1.send(data_notification).await.unwrap();
+
+    // Drive progress and ensure we get a verification error for the bad root
+    let error = drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap_err();
+    assert_matches!(error, Error::VerificationError(_));
+
+    // Drive progress again: the stream must be retried, not wedged. (Regression:
+    // a bad first chunk previously left the in-memory sync state believing the
+    // stream had ended empty, permanently erroring on the non-empty root.)
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
 async fn test_snapshot_sync_epoch_change_genesis_restart() {
     // Create test data
     let synced_version = GENESIS_TRANSACTION_VERSION; // Genesis is the highest synced version
@@ -1095,8 +1199,12 @@ async fn test_snapshot_sync_epoch_change_genesis_restart() {
     mock_streaming_client
         .expect_get_all_state_values()
         .times(1)
-        .with(eq(target_version), eq(Some(last_persisted_index)))
-        .return_once(move |_, _| Ok(data_stream_listener_1));
+        .with(
+            eq(target_version),
+            eq(Some(last_persisted_index)),
+            eq(StateKind::MainState),
+        )
+        .return_once(move |_, _, _| Ok(data_stream_listener_1));
 
     // Create the mock metadata storage
     let mut metadata_storage = MockMetadataStorage::new();
@@ -1104,13 +1212,13 @@ async fn test_snapshot_sync_epoch_change_genesis_restart() {
     let last_persisted_index_clone = last_persisted_index;
     metadata_storage
         .expect_previous_snapshot_sync_target()
-        .returning(move || Ok(Some(target_ledger_info_clone.clone())));
+        .returning(move |_| Ok(Some(target_ledger_info_clone.clone())));
     metadata_storage
         .expect_is_snapshot_sync_complete()
-        .returning(|_| Ok(false));
+        .returning(|_, _| Ok(false));
     metadata_storage
-        .expect_get_last_persisted_state_value_index()
-        .returning(move |_| Ok(last_persisted_index_clone));
+        .expect_get_last_persisted_index()
+        .returning(move |_, _| Ok(last_persisted_index_clone));
 
     // Create the bootstrapper
     let mut bootstrapper = create_bootstrapper_with_storage(
@@ -1163,8 +1271,12 @@ async fn test_snapshot_sync_existing_state() {
     mock_streaming_client
         .expect_get_all_state_values()
         .times(1)
-        .with(eq(highest_version), eq(Some(last_persisted_index)))
-        .return_once(move |_, _| Ok(data_stream_listener_1))
+        .with(
+            eq(highest_version),
+            eq(Some(last_persisted_index)),
+            eq(StateKind::MainState),
+        )
+        .return_once(move |_, _, _| Ok(data_stream_listener_1))
         .in_sequence(&mut expectation_sequence);
     let notification_id = 100;
     mock_streaming_client
@@ -1182,8 +1294,12 @@ async fn test_snapshot_sync_existing_state() {
     mock_streaming_client
         .expect_get_all_state_values()
         .times(1)
-        .with(eq(highest_version), eq(Some(last_persisted_index)))
-        .return_once(move |_, _| Ok(data_stream_listener_2))
+        .with(
+            eq(highest_version),
+            eq(Some(last_persisted_index)),
+            eq(StateKind::MainState),
+        )
+        .return_once(move |_, _, _| Ok(data_stream_listener_2))
         .in_sequence(&mut expectation_sequence);
 
     // Create the mock metadata storage
@@ -1192,13 +1308,13 @@ async fn test_snapshot_sync_existing_state() {
     let last_persisted_index_clone = last_persisted_index;
     metadata_storage
         .expect_previous_snapshot_sync_target()
-        .returning(move || Ok(Some(highest_ledger_info_clone.clone())));
+        .returning(move |_| Ok(Some(highest_ledger_info_clone.clone())));
     metadata_storage
         .expect_is_snapshot_sync_complete()
-        .returning(|_| Ok(false));
+        .returning(|_, _| Ok(false));
     metadata_storage
-        .expect_get_last_persisted_state_value_index()
-        .returning(move |_| Ok(last_persisted_index_clone));
+        .expect_get_last_persisted_index()
+        .returning(move |_, _| Ok(last_persisted_index_clone));
 
     // Create the bootstrapper
     let mut bootstrapper = create_bootstrapper_with_storage(
@@ -1263,14 +1379,14 @@ async fn test_snapshot_sync_fresh_state() {
     mock_streaming_client
         .expect_get_all_state_values()
         .times(1)
-        .with(eq(highest_version), eq(Some(0)))
-        .return_once(move |_, _| Ok(data_stream_listener_1));
+        .with(eq(highest_version), eq(Some(0)), eq(StateKind::MainState))
+        .return_once(move |_, _, _| Ok(data_stream_listener_1));
 
     // Create the mock metadata storage
     let mut metadata_storage = MockMetadataStorage::new();
     metadata_storage
         .expect_previous_snapshot_sync_target()
-        .returning(move || Ok(None));
+        .returning(move |_| Ok(None));
 
     // Create the bootstrapper
     let mut bootstrapper = create_bootstrapper_with_storage(
@@ -1301,11 +1417,11 @@ async fn test_snapshot_sync_fresh_state() {
 }
 
 #[tokio::test]
-#[should_panic(
-    expected = "The snapshot sync for the target was marked as complete but the highest synced version is genesis!"
-)]
-async fn test_snapshot_sync_invalid_state() {
-    // Create test data
+async fn test_snapshot_sync_main_complete_refetches_output() {
+    // The main state snapshot is already written, but the fast sync isn't
+    // finalized yet (highest synced is still genesis). On resume the
+    // bootstrapper has no cached target output, so it must re-fetch the target
+    // transaction output before driving the remaining snapshots + finalize.
     let synced_version = GENESIS_TRANSACTION_VERSION; // Genesis is the highest synced
     let highest_version = 1000000;
     let highest_ledger_info = create_random_epoch_ending_ledger_info(highest_version, 1);
@@ -1314,18 +1430,28 @@ async fn test_snapshot_sync_invalid_state() {
     let mut driver_configuration = create_full_node_driver_configuration();
     driver_configuration.config.bootstrapping_mode = BootstrappingMode::DownloadLatestStates;
 
-    // Create the mock streaming client
-    let mock_streaming_client = create_mock_streaming_client();
+    // Create the mock streaming client (it must re-fetch the target output)
+    let mut mock_streaming_client = create_mock_streaming_client();
+    let (_notification_sender, data_stream_listener) = create_data_stream_listener();
+    mock_streaming_client
+        .expect_get_all_transaction_outputs()
+        .times(1)
+        .with(
+            eq(highest_version),
+            eq(highest_version),
+            eq(highest_version),
+        )
+        .return_once(move |_, _, _| Ok(data_stream_listener));
 
     // Create the mock metadata storage
     let mut metadata_storage = MockMetadataStorage::new();
     let highest_ledger_info_clone = highest_ledger_info.clone();
     metadata_storage
         .expect_previous_snapshot_sync_target()
-        .return_once(move || Ok(Some(highest_ledger_info_clone)));
+        .return_once(move |_| Ok(Some(highest_ledger_info_clone)));
     metadata_storage
         .expect_is_snapshot_sync_complete()
-        .returning(|_| Ok(true));
+        .returning(|_, _| Ok(true));
 
     // Create the bootstrapper
     let mut bootstrapper = create_bootstrapper_with_storage(
@@ -1344,7 +1470,7 @@ async fn test_snapshot_sync_invalid_state() {
     let mut global_data_summary = create_global_summary(1);
     global_data_summary.advertised_data.synced_ledger_infos = vec![highest_ledger_info.clone()];
 
-    // Drive progress and verify that the bootstrapper panics (due to invalid state)
+    // Drive progress and verify the bootstrapper re-fetches the target output
     drive_progress(&mut bootstrapper, &global_data_summary, false)
         .await
         .unwrap();
@@ -1372,7 +1498,7 @@ async fn test_snapshot_sync_lag() {
     let mut metadata_storage = MockMetadataStorage::new();
     metadata_storage
         .expect_previous_snapshot_sync_target()
-        .returning(|| Ok(None));
+        .returning(|_| Ok(None));
 
     // Create the bootstrapper
     let mut bootstrapper = create_bootstrapper_with_storage(
@@ -1425,7 +1551,7 @@ async fn test_snapshot_sync_lag_panic() {
     let mut metadata_storage = MockMetadataStorage::new();
     metadata_storage
         .expect_previous_snapshot_sync_target()
-        .returning(|| Ok(None));
+        .returning(|_| Ok(None));
 
     // Create the bootstrapper
     let mut bootstrapper = create_bootstrapper_with_storage(
@@ -1603,7 +1729,7 @@ fn create_bootstrapper(
     let mut metadata_storage = MockMetadataStorage::new();
     metadata_storage
         .expect_previous_snapshot_sync_target()
-        .returning(|| Ok(None));
+        .returning(|_| Ok(None));
 
     // Create the mock db reader with only genesis loaded
     let mut mock_database_reader = create_mock_db_reader();

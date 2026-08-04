@@ -33,6 +33,7 @@ use aptos_data_client::{
 };
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_logger::prelude::*;
+use aptos_storage_interface::StateKind;
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
 use enum_dispatch::enum_dispatch;
 use std::{cmp, cmp::min, sync::Arc};
@@ -168,6 +169,9 @@ pub struct StateStreamEngine {
     // The original states request made by the client
     pub request: GetAllStatesRequest,
 
+    // Which snapshot store this engine streams
+    pub kind: StateKind,
+
     // True iff a request has been created to fetch the number of states
     pub state_num_requested: bool,
 
@@ -190,6 +194,7 @@ impl StateStreamEngine {
     fn new(request: &GetAllStatesRequest) -> Result<Self, Error> {
         Ok(StateStreamEngine {
             request: request.clone(),
+            kind: request.state_kind,
             state_num_requested: false,
             number_of_states: None,
             next_stream_index: request.start_index,
@@ -277,11 +282,11 @@ impl DataStreamEngine for StateStreamEngine {
 
         // Return the request
         self.state_num_requested = true;
-        Ok(vec![DataClientRequest::NumberOfStates(
-            NumberOfStatesRequest {
-                version: self.request.version,
-            },
-        )])
+        let number_request = DataClientRequest::NumberOfStates(NumberOfStatesRequest {
+            version: self.request.version,
+            state_kind: self.kind,
+        });
+        Ok(vec![number_request])
     }
 
     fn is_remaining_data_available(&self, advertised_data: &AdvertisedData) -> Result<bool, Error> {
@@ -376,9 +381,23 @@ impl DataStreamEngine for StateStreamEngine {
                             total number of states. Next index: {:?}, total states: {:?}",
                             self.next_request_index, number_of_states
                         )));
-                    } else {
-                        self.number_of_states = Some(number_of_states);
                     }
+                    // The number of states is an internal planning value, not
+                    // consumer data. An empty tree (count 0) has no chunks: just
+                    // end the stream (no notification). The bootstrapper detects
+                    // the zero-chunk end and verifies emptiness against the
+                    // committed snapshot root. Main state at a real snapshot is
+                    // never empty, so a 0 there is an invalid response.
+                    if number_of_states == 0 {
+                        if self.kind == StateKind::MainState {
+                            return Err(Error::AptosDataClientResponseIsInvalid(
+                                "Received a state count of 0 for the main state snapshot!".into(),
+                            ));
+                        }
+                        self.stream_is_complete = true;
+                        return Ok(None);
+                    }
+                    self.number_of_states = Some(number_of_states);
                 }
             },
             request => invalid_client_request!(request, self),
@@ -2111,6 +2130,7 @@ fn create_data_client_request(
                 version: stream_engine.request.version,
                 start_index,
                 end_index,
+                state_kind: stream_engine.kind,
             })
         },
         StreamEngine::ContinuousTransactionStreamEngine(stream_engine) => {
@@ -2194,9 +2214,15 @@ fn create_data_notification(
     // Get the data payload
     let client_response_type = client_response.get_label();
     let data_payload = match client_response {
-        ResponsePayload::StateValuesWithProof(states_chunk) => {
-            DataPayload::StateValuesWithProof(states_chunk)
+        ResponsePayload::StateValuesWithProof(states_chunk) => match &stream_engine {
+            StreamEngine::StateStreamEngine(engine) => {
+                DataPayload::StateValuesWithProof(engine.kind, states_chunk)
+            },
+            _ => invalid_response_type!(client_response_type),
         },
+        // The number of states is consumed internally by the engine for chunk
+        // planning; it is never surfaced to the consumer as a notification.
+        ResponsePayload::NumberOfStates(_) => invalid_response_type!(client_response_type),
         ResponsePayload::EpochEndingLedgerInfos(ledger_infos) => {
             DataPayload::EpochEndingLedgerInfos(ledger_infos)
         },
@@ -2256,7 +2282,6 @@ fn create_data_notification(
                 _ => invalid_response_type!(client_response_type),
             }
         },
-        _ => invalid_response_type!(client_response_type),
     };
 
     // Create and return the data notification

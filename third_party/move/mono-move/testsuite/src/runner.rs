@@ -38,14 +38,14 @@ use mono_move_core::{native::NativeExtensions, types::type_to_string};
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_natives::{EventKind, EventStore};
 use mono_move_runtime::serialize;
-use move_binary_format::CompiledModule;
+use move_binary_format::{errors::Location, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::IdentStr,
     int256::{I256, U256},
     language_storage::{ModuleId, TypeTag},
     value::MoveValue,
-    vm_status::StatusCode,
+    vm_status::{AbortLocation, StatusCode},
 };
 use move_vm_runtime::{
     data_cache::{MoveVmDataCacheAdapter, TransactionDataCache},
@@ -206,7 +206,7 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
 
     // Publish the Move stdlib into both VMs so tests can call real stdlib
     // natives.
-    for module in stdlib_modules().iter().chain(test_utils_modules()) {
+    for module in prelude_modules() {
         let mut blob = vec![];
         module.serialize(&mut blob).expect("module serializes");
         storage.add_module_bytes(module.self_addr(), module.self_name(), blob.into());
@@ -319,6 +319,12 @@ fn v1_native_table() -> NativeFunctionTable {
     );
     table.extend(crate::v1_test_natives::make_all_v1_test_natives());
     table
+}
+
+/// The prelude every differential test publishes before its own modules:
+/// the Move stdlib plus the `test_utils` library.
+fn prelude_modules() -> impl Iterator<Item = &'static CompiledModule> {
+    stdlib_modules().iter().chain(test_utils_modules())
 }
 
 /// The compiled Move stdlib, compiled once and shared across tests.
@@ -461,7 +467,8 @@ fn execute_function_v1(
         TransactionIndexKind::BlockExecution {
             transaction_index: TEST_TXN_INDEX,
         },
-        false,
+        false, // is_encrypted_txn
+        false, // is_orderless_txn
     );
     extensions.add(NativeTransactionContext::new(
         TEST_TXN_HASH.to_vec(),
@@ -496,6 +503,9 @@ fn execute_function_v1(
                     PrimitiveKind::ByteVector => {
                         render_bytes(&bcs::from_bytes::<Vec<u8>>(bytes).expect("BCS vector<u8>"))
                     },
+                    PrimitiveKind::U64Vector => render_u64_list(
+                        &bcs::from_bytes::<Vec<u64>>(bytes).expect("BCS vector<u64>"),
+                    ),
                     _ => kind.format_bytes(bytes),
                 })
                 .collect::<Vec<_>>();
@@ -506,11 +516,14 @@ fn execute_function_v1(
         },
         Err(err) if err.major_status() == StatusCode::ABORTED => {
             let code = err.sub_status().unwrap();
-            let display = match err.message() {
-                Some(m) => format!("aborted: code {} ({})", code, m),
-                None => format!("aborted: code {}", code),
+            let location = match err.location() {
+                Location::Module(module_id) => render_module_location(module_id),
+                Location::Script => "script".to_string(),
+                Location::Undefined => "undefined".to_string(),
             };
-            Output { display }
+            Output {
+                display: render_abort(code, err.message().map(String::as_str), &location),
+            }
         },
         Err(err) => Output {
             display: format!("error: {}", err),
@@ -575,6 +588,10 @@ fn execute_function_v2(
                                 let content = interpreter.root_result_byte_vector_for_test(ret_off);
                                 vals.push(render_bytes(&content));
                             },
+                            PrimitiveKind::U64Vector => {
+                                let content = interpreter.root_result_u64_vector_for_test(ret_off);
+                                vals.push(render_u64_list(&content));
+                            },
                             _ => {
                                 let bytes =
                                     interpreter.root_result_bytes_for_test(ret_off, kind.size());
@@ -597,13 +614,38 @@ fn execute_function_v2(
     let display = match outcome {
         Err(err) => format!("error: {}", err),
         Ok(RunResult::Error(err)) => format!("error: {}", err),
-        Ok(RunResult::Aborted { code, message }) => match message {
-            Some(m) => format!("aborted: code {} ({})", code, m),
-            None => format!("aborted: code {}", code),
+        Ok(RunResult::Aborted {
+            code,
+            message,
+            location,
+        }) => {
+            let location = match &location {
+                AbortLocation::Module(module_id) => render_module_location(module_id),
+                AbortLocation::Script => "script".to_string(),
+            };
+            render_abort(code, message.as_deref(), &location)
         },
         Ok(RunResult::Success((vals, events))) => render_execution_output(&vals, &events),
     };
     (Output { display }, gc_count)
+}
+
+/// Renders an abort outcome. Both VMs go through this so the abort location
+/// participates in the differential comparison.
+fn render_abort(code: u64, message: Option<&str>, location: &str) -> String {
+    match message {
+        Some(message) => format!("aborted: code {} ({}) in {}", code, message, location),
+        None => format!("aborted: code {} in {}", code, location),
+    }
+}
+
+/// The common rendering of a module abort location: `0x<address>::<module>`.
+pub(crate) fn render_module_location(module_id: &ModuleId) -> String {
+    format!(
+        "0x{}::{}",
+        module_id.address().short_str_lossless(),
+        module_id.name()
+    )
 }
 
 /// Kind supported as an argument or return value in differential tests
@@ -633,6 +675,9 @@ enum PrimitiveKind {
     /// A `vector<u8>` return value (return-only). Rendered as a `0x…` hex dump
     /// of its bytes, read from the heap (V2) or the BCS return (V1).
     ByteVector,
+    /// A `vector<u64>` return value (return-only). Rendered as a decimal list
+    /// `[a, b, …]`, read from the heap (V2) or decoded from the BCS return (V1).
+    U64Vector,
 }
 
 impl PrimitiveKind {
@@ -664,11 +709,14 @@ impl PrimitiveKind {
         if let Some(kind) = Self::from_type(ty) {
             return kind;
         }
-        // `vector<u8>` renders as a hex byte dump (distinct from `String`).
-        if let Type::Vector(elem) = ty
-            && matches!(&**elem, Type::U8)
-        {
-            return PrimitiveKind::ByteVector;
+        // `vector<u8>` renders as a hex byte dump (distinct from `String`);
+        // `vector<u64>` as a decimal list.
+        if let Type::Vector(elem) = ty {
+            match &**elem {
+                Type::U8 => return PrimitiveKind::ByteVector,
+                Type::U64 => return PrimitiveKind::U64Vector,
+                _ => {},
+            }
         }
         if let Ok(TypeTag::Struct(s)) = env.ty_to_ty_tag(ty)
             && s.address == AccountAddress::ONE
@@ -677,7 +725,7 @@ impl PrimitiveKind {
         {
             return PrimitiveKind::Utf8String;
         }
-        panic!("Only primitive, vector<u8>, and String return types are supported");
+        panic!("Only primitive, vector<u8>, vector<u64>, and String return types are supported");
     }
 
     fn size(self) -> u32 {
@@ -688,7 +736,8 @@ impl PrimitiveKind {
             PrimitiveKind::U64
             | PrimitiveKind::I64
             | PrimitiveKind::Utf8String
-            | PrimitiveKind::ByteVector => 8,
+            | PrimitiveKind::ByteVector
+            | PrimitiveKind::U64Vector => 8,
             PrimitiveKind::U128 | PrimitiveKind::I128 => 16,
             PrimitiveKind::U256
             | PrimitiveKind::I256
@@ -705,7 +754,8 @@ impl PrimitiveKind {
             PrimitiveKind::U64
             | PrimitiveKind::I64
             | PrimitiveKind::Utf8String
-            | PrimitiveKind::ByteVector => 8,
+            | PrimitiveKind::ByteVector
+            | PrimitiveKind::U64Vector => 8,
             // Wide integers and addresses are 8-byte aligned in the
             // frame even though their size is larger.
             PrimitiveKind::U128
@@ -740,8 +790,8 @@ impl PrimitiveKind {
                 let addr = AccountAddress::from_hex_literal(s).expect("invalid signer literal");
                 MoveValue::Signer(addr)
             },
-            PrimitiveKind::Utf8String | PrimitiveKind::ByteVector => {
-                unreachable!("String / vector<u8> are return-only kinds")
+            PrimitiveKind::Utf8String | PrimitiveKind::ByteVector | PrimitiveKind::U64Vector => {
+                unreachable!("String / vector are return-only kinds")
             },
         }
     }
@@ -809,8 +859,8 @@ impl PrimitiveKind {
                 .expect("invalid address literal")
                 .into_bytes()
                 .to_vec(),
-            PrimitiveKind::Utf8String | PrimitiveKind::ByteVector => {
-                unreachable!("String / vector<u8> are return-only kinds")
+            PrimitiveKind::Utf8String | PrimitiveKind::ByteVector | PrimitiveKind::U64Vector => {
+                unreachable!("String / vector are return-only kinds")
             },
         }
     }
@@ -836,10 +886,8 @@ impl PrimitiveKind {
                 let arr: [u8; AccountAddress::LENGTH] = bytes[..32].try_into().unwrap();
                 AccountAddress::new(arr).to_hex_literal()
             },
-            PrimitiveKind::Utf8String | PrimitiveKind::ByteVector => {
-                unreachable!(
-                    "String / vector<u8> returns are rendered from the heap, not format_bytes"
-                )
+            PrimitiveKind::Utf8String | PrimitiveKind::ByteVector | PrimitiveKind::U64Vector => {
+                unreachable!("String / vector returns are rendered from the heap, not format_bytes")
             },
         }
     }
@@ -848,6 +896,12 @@ impl PrimitiveKind {
 /// Renders raw UTF-8 bytes as a quoted string for cross-VM comparison.
 fn render_utf8(bytes: &[u8]) -> String {
     format!("{:?}", String::from_utf8_lossy(bytes))
+}
+
+/// Renders a `vector<u64>` as a decimal list `[a, b, …]` for cross-VM comparison.
+fn render_u64_list(vals: &[u64]) -> String {
+    let elems: Vec<String> = vals.iter().map(u64::to_string).collect();
+    format!("[{}]", elems.join(", "))
 }
 
 /// Renders raw bytes as a `0x…` hex string for cross-VM comparison.

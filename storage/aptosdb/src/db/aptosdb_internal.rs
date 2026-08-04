@@ -472,6 +472,42 @@ impl AptosDB {
         Ok(())
     }
 
+    /// Mirrors [`Self::error_if_state_merkle_pruned`] for the native-position
+    /// snapshot store. When the subsystem or its pruner isn't attached (disabled
+    /// / read-only), there's nothing to enforce here.
+    pub(super) fn error_if_position_pruned(&self, data_type: &str, version: Version) -> Result<()> {
+        let Some(position_pruner) = self
+            .position
+            .as_ref()
+            .and_then(|position| position.position_pruner.as_ref())
+        else {
+            return Ok(());
+        };
+
+        let min_readable_version = position_pruner
+            .state_merkle_pruner
+            .get_min_readable_version();
+        if version >= min_readable_version {
+            return Ok(());
+        }
+
+        let min_readable_epoch_snapshot_version = position_pruner
+            .epoch_snapshot_pruner
+            .get_min_readable_version();
+        if version >= min_readable_epoch_snapshot_version {
+            self.ledger_db.metadata_db().ensure_epoch_ending(version)
+        } else {
+            bail!(
+                "{} at version {} is pruned. position snapshots are available at >= {}, \
+                 position epoch snapshots are available at >= {}",
+                data_type,
+                version,
+                min_readable_version,
+                min_readable_epoch_snapshot_version,
+            )
+        }
+    }
+
     pub(super) fn get_raw_block_info_by_height(&self, block_height: u64) -> Result<BlockInfo> {
         self.ledger_db
             .metadata_db()

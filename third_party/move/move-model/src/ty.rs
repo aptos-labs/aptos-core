@@ -1851,6 +1851,21 @@ impl Type {
         matches!(self, Type::Tuple(ts) if ts.is_empty())
     }
 
+    /// Normalize a function type into the canonical form used to index and
+    /// compare function types: abilities are stripped (they are abstracted by
+    /// the prover) and both argument and result tuples are unwrapped-if-
+    /// singleton. Panics if not called on a function type.
+    pub fn normalize_fun(self) -> Type {
+        let Type::Fun(params, results, _) = self else {
+            panic!("expected fun type")
+        };
+        Type::Fun(
+            Box::new(Type::tuple(params.flatten())),
+            Box::new(Type::tuple(results.flatten())),
+            AbilitySet::EMPTY,
+        )
+    }
+
     /// If this is a vector of more than one type, make a tuple out of it, otherwise return the
     /// type.
     pub fn tuple(mut tys: Vec<Type>) -> Type {

@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{error, error::Error, global_summary::GlobalDataSummary};
+use aptos_storage_interface::StateKind;
 use aptos_storage_service_types::{responses::TransactionOrOutputListWithProofV2, Epoch};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -67,24 +68,27 @@ pub trait AptosDataClientInterface {
         request_timeout_ms: u64,
     ) -> error::Result<Response<(TransactionOrOutputListWithProofV2, LedgerInfoWithSignatures)>>;
 
-    /// Fetches the number of states at the specified version.
+    /// Fetches the number of states at the specified version, for the given
+    /// snapshot store.
     async fn get_number_of_states(
         &self,
         version: Version,
         request_timeout_ms: u64,
+        kind: StateKind,
     ) -> error::Result<Response<u64>>;
 
-    /// Fetches a single state value chunk with proof, containing the values
-    /// from start to end index (inclusive) at the specified version. The proof
-    /// version is the same as the specified version. In some cases, fewer
-    /// state values may be returned (e.g., to tolerate network or chunk
-    /// limits). If the data cannot be fetched, an error is returned.
+    /// Fetches a single state value chunk with proof, containing the values from
+    /// start to end index (inclusive) at the specified version, for the given
+    /// snapshot store. The proof version is the same as the specified version. In
+    /// some cases, fewer state values may be returned (e.g., to tolerate network
+    /// or chunk limits). If the data cannot be fetched, an error is returned.
     async fn get_state_values_with_proof(
         &self,
         version: u64,
         start_index: u64,
         end_index: u64,
         request_timeout_ms: u64,
+        kind: StateKind,
     ) -> error::Result<Response<StateValueChunkWithProof>>;
 
     /// Fetches a transaction output list with proof, with transaction
