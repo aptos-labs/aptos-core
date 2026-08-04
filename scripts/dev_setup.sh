@@ -28,6 +28,7 @@ Z3_VERSION=4.13.0
 CVC5_VERSION=0.0.3
 DOTNET_VERSION=8.0
 BOOGIE_VERSION=3.5.6
+LEAN_VERSION=4.32.2
 ALLURE_VERSION=2.15.pr1135
 # this is 3.21.4; the "3" is silent
 PROTOC_VERSION=21.4
@@ -44,14 +45,15 @@ function usage {
   echo "-t install build tools"
   echo "-o install operations tooling as well: helm, terraform, yamllint, vault, docker, kubectl, python3"
   echo "-y install or update Move Prover tools: z3, cvc5, dotnet, boogie"
+  echo "-l install or update the Lean toolchain"
   echo "-d install tools for the Move documentation generator: graphviz"
   echo "-P install PostgreSQL"
   echo "-J install js/ts tools"
   echo "-v verbose mode"
   echo "-i installs an individual tool by name"
-  echo "-n will target the /opt/ dir rather than the $HOME dir.  /opt/bin/, /opt/rustup/, and /opt/dotnet/ rather than $HOME/bin/, $HOME/.rustup/, and $HOME/.dotnet/"
+  echo "-n will target the /opt/ dir rather than the $HOME dir. This includes /opt/lean instead of $HOME/.lean."
   echo "-k skip pre-commit"
-  echo "If no toolchain component is selected with -t, -o, -y, -d, or -p, the behavior is as if -t had been provided."
+  echo "If no toolchain component is selected with -t, -o, -y, -l, -d, or -p, the behavior is as if -t had been provided."
   echo "This command must be called from the root folder of the Aptos-core project."
 }
 
@@ -60,6 +62,22 @@ function add_to_profile {
   FOUND=$(grep -c "$1" <"${HOME}/.profile" || true) # grep error return would kill the script.
   if [ "$FOUND" == "0" ]; then
     echo "$1" >>"${HOME}"/.profile
+  fi
+}
+
+function lean_package {
+  MACHINE=$(uname -m)
+  if [[ "$(uname)" == "Linux" && "$MACHINE" == "x86_64" ]]; then
+    echo "lean-${LEAN_VERSION}-linux"
+  elif [[ "$(uname)" == "Linux" && ("$MACHINE" == "aarch64" || "$MACHINE" == "arm64") ]]; then
+    echo "lean-${LEAN_VERSION}-linux_aarch64"
+  elif [[ "$(uname)" == "Darwin" && "$MACHINE" == "x86_64" ]]; then
+    echo "lean-${LEAN_VERSION}-darwin"
+  elif [[ "$(uname)" == "Darwin" && ("$MACHINE" == "aarch64" || "$MACHINE" == "arm64") ]]; then
+    echo "lean-${LEAN_VERSION}-darwin_aarch64"
+  else
+    echo "Lean support not configured for $(uname) $MACHINE" >&2
+    return 1
   fi
 }
 
@@ -591,6 +609,80 @@ function install_boogie {
   fi
 }
 
+function install_lean {
+  echo "Installing Lean"
+  EXPECTED_TOOLCHAIN="leanprover/lean4:v${LEAN_VERSION}"
+  CONFIGURED_TOOLCHAIN=$(<third_party/move/lean/lean-toolchain)
+  if [[ "$CONFIGURED_TOOLCHAIN" != "$EXPECTED_TOOLCHAIN" ]]; then
+    echo "Lean installer version ${LEAN_VERSION} does not match ${CONFIGURED_TOOLCHAIN}" >&2
+    return 1
+  fi
+  LEAN_PKG=$(lean_package)
+  LEAN_ROOT="${HOME}/.lean"
+  if [[ "$OPT_DIR" == "true" ]]; then
+    LEAN_ROOT="/opt/lean"
+  fi
+  LEAN_DIR="${LEAN_ROOT}/${LEAN_PKG}"
+
+  LEAN_INSTALLED=false
+  if [[ -x "${LEAN_DIR}/bin/lean" ]] &&
+    [[ "$("${LEAN_DIR}/bin/lean" --version || true)" == *"version ${LEAN_VERSION}"* ]]; then
+    echo "Lean ${LEAN_VERSION} already installed"
+    LEAN_INSTALLED=true
+  fi
+
+  if [[ "$LEAN_INSTALLED" == "false" ]]; then
+    case "$LEAN_PKG" in
+    "lean-${LEAN_VERSION}-linux")
+      LEAN_SHA256="fb97c65730b22927951dadae964f06b2b0e6cfb2cc60f3abe26d8c99f27aa02b"
+      ;;
+    "lean-${LEAN_VERSION}-linux_aarch64")
+      LEAN_SHA256="593f5d95f6c37fd54e871b683d8efbb42c4224bdfe8ac0170592c30f1321798c"
+      ;;
+    "lean-${LEAN_VERSION}-darwin")
+      LEAN_SHA256="35c117b3eb9baf5588e6e97bd319df891b71aa6f4ba2e5bf164cd798096c82de"
+      ;;
+    "lean-${LEAN_VERSION}-darwin_aarch64")
+      LEAN_SHA256="fb62ba1a932ac2266c91d0f14ab5620a7e13823a751eae79bb9a776c707a9cdc"
+      ;;
+    *)
+      echo "No checksum configured for $LEAN_PKG" >&2
+      return 1
+      ;;
+    esac
+
+    LEAN_TMP=$(mktemp -d)
+    curl --proto '=https' --tlsv1.2 -sSfL \
+      -o "${LEAN_TMP}/${LEAN_PKG}.zip" \
+      "https://github.com/leanprover/lean4/releases/download/v${LEAN_VERSION}/${LEAN_PKG}.zip"
+    if command -v sha256sum &>/dev/null; then
+      echo "${LEAN_SHA256}  ${LEAN_TMP}/${LEAN_PKG}.zip" | sha256sum --check --strict
+    else
+      echo "${LEAN_SHA256}  ${LEAN_TMP}/${LEAN_PKG}.zip" | shasum --algorithm 256 --check
+    fi
+    unzip -q "${LEAN_TMP}/${LEAN_PKG}.zip" -d "$LEAN_TMP"
+
+    LEAN_INSTALL_COMMAND=()
+    if [[ "$OPT_DIR" == "true" ]]; then
+      LEAN_INSTALL_COMMAND=("${PRE_COMMAND[@]}")
+    fi
+    "${LEAN_INSTALL_COMMAND[@]}" mkdir -p "$LEAN_ROOT"
+    "${LEAN_INSTALL_COMMAND[@]}" rm -rf "$LEAN_DIR"
+    "${LEAN_INSTALL_COMMAND[@]}" mv "${LEAN_TMP}/${LEAN_PKG}" "$LEAN_DIR"
+    rm -rf "$LEAN_TMP"
+  fi
+
+  LEAN_INSTALL_COMMAND=()
+  if [[ "$OPT_DIR" == "true" ]]; then
+    LEAN_INSTALL_COMMAND=("${PRE_COMMAND[@]}")
+  fi
+  "${LEAN_INSTALL_COMMAND[@]}" mkdir -p "$INSTALL_DIR"
+  for TOOL in lake lean leanc leanchecker leanir leanmake leantar; do
+    "${LEAN_INSTALL_COMMAND[@]}" ln -sfn "${LEAN_DIR}/bin/${TOOL}" "${INSTALL_DIR}${TOOL}"
+  done
+  "${LEAN_DIR}/bin/lean" --version
+}
+
 function install_z3 {
   echo "Installing Z3"
   if command -v /usr/local/bin/z3 &>/dev/null; then
@@ -797,6 +889,14 @@ Move prover tools (since -y was provided):
 EOF
   fi
 
+  if [[ "$INSTALL_LEAN" == "true" ]]; then
+    cat <<EOF
+Lean tools (since -l was provided):
+  * lean
+  * lake
+EOF
+  fi
+
   if [[ "$INSTALL_DOC" == "true" ]]; then
     cat <<EOF
 tools for the Move documentation generator (since -d was provided):
@@ -848,6 +948,7 @@ INSTALL_BUILD_TOOLS=false
 OPERATIONS=false
 INSTALL_PROFILE=false
 INSTALL_PROVER=false
+INSTALL_LEAN=false
 INSTALL_DOC=false
 INSTALL_PROTOC=false
 INSTALL_POSTGRES=false
@@ -859,7 +960,7 @@ OPT_DIR="false"
 SKIP_PRE_COMMIT=false
 
 #parse args
-while getopts "btoprvydaPJh:i:nk" arg; do
+while getopts "btoprvyldaPJh:i:nk" arg; do
   case "$arg" in
   b)
     BATCH_MODE="true"
@@ -881,6 +982,9 @@ while getopts "btoprvydaPJh:i:nk" arg; do
     ;;
   y)
     INSTALL_PROVER="true"
+    ;;
+  l)
+    INSTALL_LEAN="true"
     ;;
   d)
     INSTALL_DOC="true"
@@ -917,6 +1021,7 @@ if [[ "$INSTALL_BUILD_TOOLS" == "false" ]] &&
   [[ "$OPERATIONS" == "false" ]] &&
   [[ "$INSTALL_PROFILE" == "false" ]] &&
   [[ "$INSTALL_PROVER" == "false" ]] &&
+  [[ "$INSTALL_LEAN" == "false" ]] &&
   [[ "$INSTALL_DOC" == "false" ]] &&
   [[ "$INSTALL_POSTGRES" == "false" ]] &&
   [[ "$INSTALL_JSTS" == "false" ]] &&
@@ -1072,6 +1177,10 @@ if [[ "$INSTALL_PROVER" == "true" ]]; then
   install_cvc5
   install_dotnet
   install_boogie
+fi
+
+if [[ "$INSTALL_LEAN" == "true" ]]; then
+  install_lean
 fi
 
 if [[ "$INSTALL_DOC" == "true" ]]; then

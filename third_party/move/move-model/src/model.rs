@@ -947,6 +947,25 @@ impl GlobalEnv {
         &self.symbol_pool
     }
 
+    /// Creates an empty source map for a module loaded without sources,
+    /// with a virtual location constructed from `name` (the file name of
+    /// the module) and `unique_bytes` (bytes identifying it, e.g. the
+    /// serialized module).  The internal logic of the environments
+    /// currently needs both pieces of information to create new locations
+    /// (related to differences in Loc representation with legacy code).
+    pub fn empty_source_map(&mut self, name: &str, unique_bytes: &[u8]) -> SourceMap {
+        let file_id = self.add_source(
+            FileHash::new_from_bytes(unique_bytes),
+            Rc::new(BTreeMap::new()),
+            name,
+            "",
+            /*is_target*/ true,
+            /*is_primary_target*/ true,
+        );
+        let loc = Loc::new(file_id, Span::new(0, 0));
+        SourceMap::new(self.to_ir_loc(&loc), None)
+    }
+
     /// Adds a source to this environment, returning a FileId for it.
     pub fn add_source(
         &mut self,
