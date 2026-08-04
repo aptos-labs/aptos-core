@@ -6,12 +6,14 @@ pub(crate) mod vm_wrapper;
 use crate::counters::{BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS};
 use aptos_aggregator::delayed_change::DelayedChange;
 use aptos_block_executor::{
+    check_resource_group_serialization,
     code_cache_global_manager::AptosModuleCacheManager,
     executor::BlockExecutor,
     task::{ExecutorTask, TransactionOutput as BlockExecutorTransactionOutput},
     txn_commit_hook::TransactionCommitHook,
     txn_provider::TxnProvider,
     types::InputOutputKey,
+    Materializer,
 };
 use aptos_types::{
     block_executor::{
@@ -84,6 +86,10 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     /// problem creating the output (e.g. group serialization issue).
     fn skip_output() -> Self {
         Self::new(VMOutput::empty_with_status(TransactionStatus::Retry))
+    }
+
+    fn check_materialization(&self, materializer: &impl Materializer<Self::Txn>) -> bool {
+        check_resource_group_serialization(self, materializer)
     }
 
     fn fee_statement(&self) -> FeeStatement {

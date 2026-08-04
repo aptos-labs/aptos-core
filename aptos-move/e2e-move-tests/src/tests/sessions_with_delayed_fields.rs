@@ -18,6 +18,7 @@ use aptos_block_executor::{
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::default::DefaultTxnProvider,
     types::InputOutputKey,
+    Materializer,
 };
 use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_mvhashmap::types::TxnIndex;
@@ -164,6 +165,10 @@ impl TransactionOutput for TestOutput {
 
     fn skip_output() -> Self {
         Self
+    }
+
+    fn check_materialization(&self, _materializer: &impl Materializer<Self::Txn>) -> bool {
+        true
     }
 
     fn incorporate_materialized_txn_output(
