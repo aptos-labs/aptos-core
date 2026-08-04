@@ -120,6 +120,16 @@ pub fn assemble<'a>(
     context_modules: impl Iterator<Item = &'a CompiledModule>,
 ) -> AsmResult<ModuleOrScript> {
     let ast = syntax::parse_asm(input)?;
+    assemble_unit(options, ast, context_modules)
+}
+
+/// Assembles an already-parsed unit (the AST-level entry of [`assemble`],
+/// for callers which also process the AST themselves).
+pub fn assemble_unit<'a>(
+    options: &Options,
+    ast: Unit,
+    context_modules: impl Iterator<Item = &'a CompiledModule>,
+) -> AsmResult<ModuleOrScript> {
     compile(options.module_builder_options.clone(), context_modules, ast)
 }
 

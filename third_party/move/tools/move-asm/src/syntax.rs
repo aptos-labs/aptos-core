@@ -33,7 +33,26 @@
 //!
 //! fun_def :=
 //!   fun_modifier "fun" ID [ type_args ] "(" [ LIST(local) ] ")" [ tuple_type ] LF
-//!   { INDENT "local" local LF } { instruction LF }
+//!   { INDENT "local" local LF } { INDENT spec_clause LF } { instruction LF }
+//!
+//! spec_clause :=
+//!   "requires" spec_exp
+//! | "aborts_if" spec_exp
+//! | "ensures" spec_exp
+//! | "modifies" "global" "<" ID ">" "(" spec_exp ")"
+//! | "invariant" ID ":" spec_exp        # ID names the loop header label
+//!
+//! spec_exp :=      # usual precedences; "==>" binds weakest, right-assoc
+//!   ( "forall" | "exists" ) ID ":" ID "." spec_exp
+//! | spec_exp (" ==> " | "||" | "&&" | "==" | "!=" | "<" | "<=" | ">" | ">="
+//!             | "+" | "-" | "*" | "/" | "%") spec_exp
+//! | "!" spec_exp
+//! | spec_exp "." ID                    # field selection
+//! | NUMBER | "true" | "false" | ID | "result" | "result_N"
+//! | "old" "(" spec_exp ")"
+//! | "global" "<" ID ">" "(" spec_exp ")"
+//! | "exists" "<" ID ">" "(" spec_exp ")"
+//! | "(" spec_exp ")"
 //!
 //! fun_modifier :=
 //!   [ "#[" attribute "]"
@@ -180,6 +199,7 @@ pub struct Fun {
     pub locals: Vec<Decl>,
     pub result: Vec<Type>,
     pub acquires: Vec<Identifier>,
+    pub spec_clauses: Vec<SpecClause>,
     pub instrs: Vec<Instruction>,
 }
 
@@ -206,6 +226,72 @@ pub struct Decl {
     pub ty: Type,
 }
 
+/// A specification clause attached to a function.  Clauses are surface
+/// syntax only: the assembler ignores them; downstream tools (e.g. the
+/// Lean formalization's masm frontend) consume them from the AST.
+#[derive(Debug)]
+pub enum SpecClause {
+    Requires(SpecExp),
+    AbortsIf(SpecExp),
+    Ensures(SpecExp),
+    Modifies { resource: Identifier, addr: SpecExp },
+    Invariant { label: Identifier, exp: SpecExp },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpecQuantKind {
+    Forall,
+    Exists,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpecBinOp {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    Eq,
+    Neq,
+    And,
+    Or,
+    Implies,
+}
+
+/// Specification expressions (see the grammar in the module docs).
+#[derive(Debug)]
+pub enum SpecExp {
+    Number(U256),
+    Bool(bool),
+    Ident(Identifier),
+    Result(usize),
+    Old(Box<SpecExp>),
+    Global {
+        resource: Identifier,
+        addr: Box<SpecExp>,
+    },
+    ResourceExists {
+        resource: Identifier,
+        addr: Box<SpecExp>,
+    },
+    Select {
+        exp: Box<SpecExp>,
+        field: Identifier,
+    },
+    Not(Box<SpecExp>),
+    Binary(SpecBinOp, Box<SpecExp>, Box<SpecExp>),
+    Quant {
+        kind: SpecQuantKind,
+        var: Identifier,
+        ty: Identifier,
+        body: Box<SpecExp>,
+    },
+}
+
 #[derive(Debug)]
 pub struct Instruction {
     pub loc: Loc,
@@ -219,6 +305,299 @@ pub enum Argument {
     Constant(AsmValue),
     Id(PartialIdent, Option<Vec<Type>>),
     Type(Type),
+}
+
+// ==========================================================================================
+// Specification clause parsing
+
+/// The keywords which can start a specification clause (each has a parse
+/// arm in `AsmParser::spec_clause`).
+const SPEC_CLAUSE_KEYWORDS: &[&str] =
+    &["requires", "aborts_if", "ensures", "modifies", "invariant"];
+
+impl AsmParser {
+    fn is_spec_clause_start(&self) -> bool {
+        !self.lookahead_special(":") && SPEC_CLAUSE_KEYWORDS.iter().any(|kw| self.is_soft_kw(kw))
+    }
+
+    fn spec_clause(&mut self) -> AsmResult<SpecClause> {
+        let kw = self.ident()?;
+        match kw.as_str() {
+            "requires" => Ok(SpecClause::Requires(self.spec_exp()?)),
+            "aborts_if" => Ok(SpecClause::AbortsIf(self.spec_exp()?)),
+            "ensures" => Ok(SpecClause::Ensures(self.spec_exp()?)),
+            "modifies" => {
+                self.expect_soft_kw("global")?;
+                let (resource, addr) = self.spec_resource_call()?;
+                Ok(SpecClause::Modifies { resource, addr })
+            },
+            "invariant" => {
+                let label = self.ident()?;
+                self.expect_special(":")?;
+                Ok(SpecClause::Invariant {
+                    label,
+                    exp: self.spec_exp()?,
+                })
+            },
+            _ => Err(error(self.previous_loc, "unexpected spec clause keyword")),
+        }
+    }
+
+    /// Recognizes the longest specification operator at the current
+    /// position.  The scanner produces single-character specials; multi
+    /// character operators are recognized by adjacency of their parts
+    /// (no whitespace in between).
+    fn peek_spec_op(&self) -> Option<(&'static str, usize)> {
+        let Token::Special(s0) = &self.next else {
+            return None;
+        };
+        let adjacent = |i: usize, upper: Loc| -> Option<&str> {
+            match self.tokens.get(i) {
+                Some((l, Token::Special(s))) if l.start() == upper.end() => Some(s.as_str()),
+                _ => None,
+            }
+        };
+        let adj1 = adjacent(0, self.next_loc);
+        let adj2 = self.tokens.front().and_then(|(l, _)| adjacent(1, *l));
+        match (s0.as_str(), adj1, adj2) {
+            ("=", Some("="), Some(">")) => Some(("==>", 3)),
+            ("=", Some("="), _) => Some(("==", 2)),
+            ("!", Some("="), _) => Some(("!=", 2)),
+            ("<", Some("="), _) => Some(("<=", 2)),
+            (">", Some("="), _) => Some((">=", 2)),
+            ("&", Some("&"), _) => Some(("&&", 2)),
+            ("|", Some("|"), _) => Some(("||", 2)),
+            ("<", _, _) => Some(("<", 1)),
+            (">", _, _) => Some((">", 1)),
+            ("+", _, _) => Some(("+", 1)),
+            ("-", _, _) => Some(("-", 1)),
+            ("*", _, _) => Some(("*", 1)),
+            ("/", _, _) => Some(("/", 1)),
+            ("%", _, _) => Some(("%", 1)),
+            ("!", _, _) => Some(("!", 1)),
+            (".", _, _) => Some((".", 1)),
+            _ => None,
+        }
+    }
+
+    fn consume_tokens(&mut self, n: usize) -> AsmResult<()> {
+        for _ in 0..n {
+            self.advance()?;
+        }
+        Ok(())
+    }
+
+    /// `<R>(exp)` after `global`/`exists`/`modifies global`.
+    fn spec_resource_call(&mut self) -> AsmResult<(Identifier, SpecExp)> {
+        self.expect_special("<")?;
+        let resource = self.ident()?;
+        self.expect_special(">")?;
+        self.expect_special("(")?;
+        let addr = self.spec_exp()?;
+        self.expect_special(")")?;
+        Ok((resource, addr))
+    }
+
+    fn spec_exp(&mut self) -> AsmResult<SpecExp> {
+        // Quantifiers bind weakest.  `exists<R>(..)` (resource test) is
+        // distinguished from the `exists` quantifier by the type argument.
+        if (self.is_soft_kw("forall") || self.is_soft_kw("exists")) && !self.lookahead_special("<")
+        {
+            let kind = if self.is_soft_kw("forall") {
+                SpecQuantKind::Forall
+            } else {
+                SpecQuantKind::Exists
+            };
+            self.advance()?;
+            let var = self.ident()?;
+            self.expect_special(":")?;
+            let ty = self.ident()?;
+            self.expect_special(".")?;
+            let body = self.spec_exp()?;
+            return Ok(SpecExp::Quant {
+                kind,
+                var,
+                ty,
+                body: Box::new(body),
+            });
+        }
+        self.spec_implies()
+    }
+
+    fn spec_implies(&mut self) -> AsmResult<SpecExp> {
+        let lhs = self.spec_or()?;
+        if let Some(("==>", n)) = self.peek_spec_op() {
+            self.consume_tokens(n)?;
+            // Right-associative; the right-hand side may be a quantifier.
+            let rhs = self.spec_exp()?;
+            Ok(SpecExp::Binary(
+                SpecBinOp::Implies,
+                Box::new(lhs),
+                Box::new(rhs),
+            ))
+        } else {
+            Ok(lhs)
+        }
+    }
+
+    fn spec_or(&mut self) -> AsmResult<SpecExp> {
+        let mut lhs = self.spec_and()?;
+        while let Some(("||", n)) = self.peek_spec_op() {
+            self.consume_tokens(n)?;
+            let rhs = self.spec_and()?;
+            lhs = SpecExp::Binary(SpecBinOp::Or, Box::new(lhs), Box::new(rhs));
+        }
+        Ok(lhs)
+    }
+
+    fn spec_and(&mut self) -> AsmResult<SpecExp> {
+        let mut lhs = self.spec_cmp()?;
+        while let Some(("&&", n)) = self.peek_spec_op() {
+            self.consume_tokens(n)?;
+            let rhs = self.spec_cmp()?;
+            lhs = SpecExp::Binary(SpecBinOp::And, Box::new(lhs), Box::new(rhs));
+        }
+        Ok(lhs)
+    }
+
+    fn spec_cmp(&mut self) -> AsmResult<SpecExp> {
+        let lhs = self.spec_add()?;
+        let op = match self.peek_spec_op() {
+            Some(("==", n)) => Some((SpecBinOp::Eq, n)),
+            Some(("!=", n)) => Some((SpecBinOp::Neq, n)),
+            Some(("<=", n)) => Some((SpecBinOp::Le, n)),
+            Some((">=", n)) => Some((SpecBinOp::Ge, n)),
+            Some(("<", n)) => Some((SpecBinOp::Lt, n)),
+            Some((">", n)) => Some((SpecBinOp::Gt, n)),
+            _ => None,
+        };
+        if let Some((op, n)) = op {
+            self.consume_tokens(n)?;
+            let rhs = self.spec_add()?;
+            Ok(SpecExp::Binary(op, Box::new(lhs), Box::new(rhs)))
+        } else {
+            Ok(lhs)
+        }
+    }
+
+    fn spec_add(&mut self) -> AsmResult<SpecExp> {
+        let mut lhs = self.spec_mul()?;
+        loop {
+            let op = match self.peek_spec_op() {
+                Some(("+", n)) => Some((SpecBinOp::Add, n)),
+                Some(("-", n)) => Some((SpecBinOp::Sub, n)),
+                _ => None,
+            };
+            let Some((op, n)) = op else {
+                return Ok(lhs);
+            };
+            self.consume_tokens(n)?;
+            let rhs = self.spec_mul()?;
+            lhs = SpecExp::Binary(op, Box::new(lhs), Box::new(rhs));
+        }
+    }
+
+    fn spec_mul(&mut self) -> AsmResult<SpecExp> {
+        let mut lhs = self.spec_unary()?;
+        loop {
+            let op = match self.peek_spec_op() {
+                Some(("*", n)) => Some((SpecBinOp::Mul, n)),
+                Some(("/", n)) => Some((SpecBinOp::Div, n)),
+                Some(("%", n)) => Some((SpecBinOp::Mod, n)),
+                _ => None,
+            };
+            let Some((op, n)) = op else {
+                return Ok(lhs);
+            };
+            self.consume_tokens(n)?;
+            let rhs = self.spec_unary()?;
+            lhs = SpecExp::Binary(op, Box::new(lhs), Box::new(rhs));
+        }
+    }
+
+    fn spec_unary(&mut self) -> AsmResult<SpecExp> {
+        if let Some(("!", n)) = self.peek_spec_op() {
+            self.consume_tokens(n)?;
+            Ok(SpecExp::Not(Box::new(self.spec_unary()?)))
+        } else {
+            self.spec_postfix()
+        }
+    }
+
+    fn spec_postfix(&mut self) -> AsmResult<SpecExp> {
+        let mut exp = self.spec_primary()?;
+        while let Some((".", n)) = self.peek_spec_op() {
+            self.consume_tokens(n)?;
+            let field = self.ident()?;
+            exp = SpecExp::Select {
+                exp: Box::new(exp),
+                field,
+            };
+        }
+        Ok(exp)
+    }
+
+    fn spec_primary(&mut self) -> AsmResult<SpecExp> {
+        if let Token::Number(n) = &self.next {
+            let n = *n;
+            self.advance()?;
+            return Ok(SpecExp::Number(n));
+        }
+        if self.is_special("(") {
+            self.advance()?;
+            let exp = self.spec_exp()?;
+            self.expect_special(")")?;
+            return Ok(exp);
+        }
+        if !self.is_ident() {
+            return Err(error(self.next_loc, "expected a spec expression"));
+        }
+        if self.is_soft_kw("true") {
+            self.advance()?;
+            return Ok(SpecExp::Bool(true));
+        }
+        if self.is_soft_kw("false") {
+            self.advance()?;
+            return Ok(SpecExp::Bool(false));
+        }
+        if self.is_soft_kw("old") && self.lookahead_special("(") {
+            self.advance()?;
+            self.advance()?;
+            let exp = self.spec_exp()?;
+            self.expect_special(")")?;
+            return Ok(SpecExp::Old(Box::new(exp)));
+        }
+        if self.is_soft_kw("global") && self.lookahead_special("<") {
+            self.advance()?;
+            let (resource, addr) = self.spec_resource_call()?;
+            return Ok(SpecExp::Global {
+                resource,
+                addr: Box::new(addr),
+            });
+        }
+        if self.is_soft_kw("exists") && self.lookahead_special("<") {
+            self.advance()?;
+            let (resource, addr) = self.spec_resource_call()?;
+            return Ok(SpecExp::ResourceExists {
+                resource,
+                addr: Box::new(addr),
+            });
+        }
+        let id = self.ident()?;
+        let name = id.as_str();
+        if name == "result" {
+            return Ok(SpecExp::Result(0));
+        }
+        if let Some(rest) = name.strip_prefix("result_") {
+            if let Ok(i) = rest.parse::<usize>() {
+                if i == 0 {
+                    return Err(error(self.previous_loc, "result positions are 1-based"));
+                }
+                return Ok(SpecExp::Result(i - 1));
+            }
+        }
+        Ok(SpecExp::Ident(id))
+    }
 }
 
 // ==========================================================================================
@@ -853,6 +1232,7 @@ impl AsmParser {
         };
         self.expect_newline()?;
         let mut locals = vec![];
+        let mut spec_clauses = vec![];
         let mut instrs = vec![];
         while self.is_indent() || self.is_ident() && self.lookahead_special(":") {
             if self.is_indent() {
@@ -868,6 +1248,14 @@ impl AsmParser {
                 self.advance()?;
                 let local = self.decl()?;
                 locals.push(local);
+            } else if self.is_spec_clause_start() {
+                if !instrs.is_empty() {
+                    return Err(error(
+                        self.next_loc,
+                        "spec clauses must precede instructions",
+                    ));
+                }
+                spec_clauses.push(self.spec_clause()?);
             } else {
                 instrs.push(self.instr()?)
             }
@@ -891,6 +1279,7 @@ impl AsmParser {
             locals,
             result,
             acquires,
+            spec_clauses,
             instrs,
         })
     }
@@ -1114,7 +1503,24 @@ fn id_cont(ch: char) -> bool {
 fn special(ch: char) -> bool {
     matches!(
         ch,
-        '(' | ')' | '<' | '>' | '[' | ']' | ',' | ':' | '|' | '+' | '=' | '&' | '#' | '-'
+        '(' | ')'
+            | '<'
+            | '>'
+            | '['
+            | ']'
+            | ','
+            | ':'
+            | '|'
+            | '+'
+            | '='
+            | '&'
+            | '#'
+            | '-'
+            | '!'
+            | '*'
+            | '/'
+            | '%'
+            | '.'
     )
 }
 

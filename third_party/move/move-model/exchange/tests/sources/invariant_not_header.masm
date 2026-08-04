@@ -1,0 +1,15 @@
+module 0x42::inv
+
+fun f(x: u64): u64
+    invariant l2: x < 10
+l1: copy_loc x
+    ld_u64 0
+    gt
+    br_false l2
+    copy_loc x
+    ld_u64 1
+    sub
+    st_loc x
+    branch l1
+l2: move_loc x
+    ret
