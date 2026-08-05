@@ -108,10 +108,16 @@ impl EpochChangeProof {
             // While the original verification could've been via waypoints,
             // all the next epoch changes are verified using the (already
             // trusted) validator sets.
-            verifier_ref = ledger_info_with_sigs
+            let next_epoch_state = ledger_info_with_sigs
                 .ledger_info()
                 .next_epoch_state()
                 .ok_or_else(|| format_err!("LedgerInfo doesn't carry a ValidatorSet"))?;
+            // The ledger info has now been authenticated. Materialize its next
+            // validator set only after that cheap gate, preserving the trusted
+            // epoch-state invariant without decompressing attacker-selected
+            // keys during network deserialization.
+            next_epoch_state.verifier.validate_public_keys()?;
+            verifier_ref = next_epoch_state;
         }
 
         Ok(self.ledger_info_with_sigs.last().unwrap())
