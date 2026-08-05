@@ -40,6 +40,8 @@ pub struct ConsensusConfig {
     pub max_sending_inline_bytes: u64,
     pub max_receiving_block_txns: u64,
     pub max_receiving_block_bytes: u64,
+    // Maximum number of batch entries allowed in a single received proposal payload
+    pub max_receiving_num_batch_entries: u64,
     pub max_pruned_blocks_in_mem: usize,
     // Timeout for consensus to get an ack from mempool for executed transactions (in milliseconds)
     pub mempool_executed_txn_timeout_ms: u64,
@@ -250,6 +252,7 @@ impl Default for ConsensusConfig {
             max_sending_inline_txns: 100,
             max_sending_inline_bytes: 200 * 1024,       // 200 KB
             max_receiving_block_bytes: 6 * 1024 * 1024, // 6MB
+            max_receiving_num_batch_entries: 100,
             max_pruned_blocks_in_mem: 100,
             mempool_executed_txn_timeout_ms: 1000,
             mempool_txn_pull_timeout_ms: 1000,
