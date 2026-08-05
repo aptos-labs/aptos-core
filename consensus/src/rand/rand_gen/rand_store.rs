@@ -87,9 +87,8 @@ impl<S: TShare> ShareAggregator<S> {
         drop(_verify_timer);
         for author in &bad_authors {
             if self.shares.remove(author).is_some() {
-                self.total_weight = self
-                    .total_weight
-                    .saturating_sub(rand_config.get_peer_weight(author));
+                let peer_weight = rand_config.get_peer_weight(author).unwrap_or(0);
+                self.total_weight = self.total_weight.saturating_sub(peer_weight);
             }
         }
         if self.total_weight < rand_config.threshold() {
@@ -138,12 +137,14 @@ impl<S: TShare> ShareAggregator<S> {
     }
 
     fn retain(&mut self, rand_config: &RandConfig, rand_metadata: &FullRandMetadata) {
-        self.shares
-            .retain(|_, share| share.metadata() == &rand_metadata.metadata);
+        self.shares.retain(|author, share| {
+            share.metadata() == &rand_metadata.metadata
+                && rand_config.get_peer_weight(author).is_ok()
+        });
         self.total_weight = self
             .shares
             .keys()
-            .map(|author| rand_config.get_peer_weight(author))
+            .filter_map(|author| rand_config.get_peer_weight(author).ok())
             .sum();
     }
 
@@ -190,7 +191,8 @@ impl<S: TShare> RandItem<S> {
     fn add_share(&mut self, share: RandShare<S>, rand_config: &RandConfig) -> anyhow::Result<()> {
         match self {
             RandItem::PendingMetadata(aggr) => {
-                aggr.add_share(rand_config.get_peer_weight(share.author()), share);
+                let weight = rand_config.get_peer_weight(share.author())?;
+                aggr.add_share(weight, share);
                 Ok(())
             },
             RandItem::PendingDecision {
@@ -203,7 +205,8 @@ impl<S: TShare> RandItem<S> {
                     "[RandStore] RandShare metadata from {} mismatch with block metadata!",
                     share.author(),
                 );
-                share_aggregator.add_share(rand_config.get_peer_weight(share.author()), share);
+                let weight = rand_config.get_peer_weight(share.author())?;
+                share_aggregator.add_share(weight, share);
                 Ok(())
             },
             RandItem::Decided { .. } => Ok(()),
