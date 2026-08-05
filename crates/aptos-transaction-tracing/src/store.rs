@@ -39,6 +39,24 @@ const MAX_TRACES: usize = 10_000;
 pub struct ApiTraceToken {
     hash: HashValue,
     generation: u64,
+    /// When true, dropping the token removes a still-pending pre-mempool trace.
+    /// Disarmed after mempool accepts so the trace can be promoted asynchronously.
+    cancel_on_drop: bool,
+}
+
+impl ApiTraceToken {
+    /// Prevents drop-time cleanup for traces handed off to mempool successfully.
+    pub fn disarm(&mut self) {
+        self.cancel_on_drop = false;
+    }
+}
+
+impl Drop for ApiTraceToken {
+    fn drop(&mut self) {
+        if self.cancel_on_drop {
+            GLOBAL_STORE.remove_pending_api_trace(self.hash, self.generation);
+        }
+    }
 }
 
 /// Global store for transaction lifecycle traces.
@@ -124,7 +142,11 @@ impl TransactionTraceStore {
                     handler_enter_usecs,
                     generation,
                 ));
-                Some(ApiTraceToken { hash, generation })
+                Some(ApiTraceToken {
+                    hash,
+                    generation,
+                    cancel_on_drop: true,
+                })
             },
         }
     }
@@ -196,12 +218,15 @@ impl TransactionTraceStore {
 
     /// Removes a pre-mempool trace when its owning API request is rejected or
     /// cancelled. Once mempool has promoted the trace, cleanup is a no-op.
-    pub fn cancel_api_trace(&self, token: ApiTraceToken) -> bool {
-        if let Entry::Occupied(entry) = self.traces.entry(token.hash) {
+    pub fn cancel_api_trace(&self, mut token: ApiTraceToken) -> bool {
+        token.disarm();
+        self.remove_pending_api_trace(token.hash, token.generation)
+    }
+
+    fn remove_pending_api_trace(&self, hash: HashValue, generation: u64) -> bool {
+        if let Entry::Occupied(entry) = self.traces.entry(hash) {
             let trace = entry.get();
-            if trace.api_generation == Some(token.generation)
-                && trace.insertion_time_usecs.is_none()
-            {
+            if trace.api_generation == Some(generation) && trace.insertion_time_usecs.is_none() {
                 entry.remove();
                 self.maybe_gc();
                 return true;
@@ -1208,6 +1233,7 @@ mod tests {
         let stale_token = ApiTraceToken {
             hash,
             generation: token.generation.wrapping_add(1),
+            cancel_on_drop: true,
         };
         assert!(!store.record_api_stage(&stale_token, TransactionStage::ApiTransactionDecoded));
         assert!(!store.cancel_api_trace(stale_token));
@@ -1215,6 +1241,52 @@ mod tests {
 
         assert!(store.cancel_api_trace(token));
         assert!(store.get_trace(&hash).is_none());
+    }
+
+    #[test]
+    fn test_dropped_api_trace_token_cleans_up_abandoned_pending_trace() {
+        let store = TransactionTraceStore::global();
+        let sender = AccountAddress::random();
+        let hash = HashValue::random();
+
+        let mut allowlist = std::collections::HashSet::new();
+        allowlist.insert(sender);
+        store.update_filter(TransactionFilter::new(true, allowlist, 1.0, 1.0));
+
+        let token = store
+            .maybe_start_api_trace(hash, sender, 100_000)
+            .expect("API trace should start");
+        drop(token);
+        assert!(store.get_trace(&hash).is_none());
+
+        let retry_token = store
+            .maybe_start_api_trace(hash, sender, 200_000)
+            .expect("retry should start a fresh API trace");
+        assert!(store.maybe_start_trace(hash, sender, 300_000));
+        assert_eq!(
+            store.get_trace(&hash).unwrap().trace_start_time_usecs,
+            200_000
+        );
+        drop(retry_token);
+        store.finalize_trace(&hash);
+    }
+
+    #[test]
+    fn test_disarmed_api_trace_token_keeps_pending_trace_on_drop() {
+        let store = TransactionTraceStore::new();
+        let sender = AccountAddress::random();
+        let hash = HashValue::random();
+
+        let mut allowlist = std::collections::HashSet::new();
+        allowlist.insert(sender);
+        store.update_filter(TransactionFilter::new(true, allowlist, 1.0, 1.0));
+
+        let mut token = store
+            .maybe_start_api_trace(hash, sender, 100_000)
+            .expect("API trace should start");
+        token.disarm();
+        drop(token);
+        assert!(store.get_trace(&hash).is_some());
     }
 
     #[test]
