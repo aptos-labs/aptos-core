@@ -10,12 +10,12 @@ use crate::{
         boogie_address, boogie_address_blob, boogie_behavioral_eval_fun_name,
         boogie_behavioral_fun_result_name, boogie_byte_blob, boogie_choice_fun_name,
         boogie_closure_pack_name, boogie_declare_global, boogie_field_sel, boogie_field_update,
-        boogie_inst_suffix, boogie_modifies_memory_name, boogie_num_type_base,
-        boogie_reflection_type_info, boogie_reflection_type_is_struct, boogie_reflection_type_name,
-        boogie_resource_memory_name, boogie_spec_fun_name, boogie_spec_var_name,
-        boogie_struct_name, boogie_struct_variant_name, boogie_type, boogie_type_suffix,
-        boogie_value_blob, boogie_variant_field_update, boogie_well_formed_expr,
-        compute_evaluator_memory_union, MAX_TUPLE_SIZE,
+        boogie_fun_ty_carries_mutations, boogie_inst_suffix, boogie_modifies_memory_name,
+        boogie_num_type_base, boogie_reflection_type_info, boogie_reflection_type_is_struct,
+        boogie_reflection_type_name, boogie_resource_memory_name, boogie_spec_fun_name,
+        boogie_spec_var_name, boogie_struct_name, boogie_struct_variant_name, boogie_type,
+        boogie_type_suffix, boogie_value_blob, boogie_variant_field_update,
+        boogie_well_formed_expr, compute_evaluator_memory_union, MAX_TUPLE_SIZE,
     },
     options::BoogieOptions,
 };
@@ -1852,8 +1852,38 @@ impl SpecTranslator<'_> {
 
         let eval_fun_name = boogie_behavioral_eval_fun_name(self.env, &inst_fun_type, kind);
 
+        // Whether the fun type carries mutations (mutable reference captures), in
+        // which case ensures_of/result_of have a trailing `f_post` slot, and whether
+        // `wrap_mut_ref_bp_inputs` appended a live fun-value clone as final trailing
+        // arg. The clone is detected by shape: a temporary whose type is the
+        // evaluator's own function type — no other trailing slot can have that type
+        // (a capture or result of the same type would be infinitely recursive).
+        // Note that spec expressions not passing through the bytecode instrumentation
+        // (e.g. behavioral spec function bodies) carry no clone.
+        let carries_mutations = boogie_fun_ty_carries_mutations(self.env, &inst_fun_type);
+        let has_fun_clone = matches!(kind, BehaviorKind::EnsuresOf | BehaviorKind::ResultOf)
+            && matches!(fun_exp.as_ref(), ExpData::Temporary(..))
+            && pred_args.last().is_some_and(|last| {
+                matches!(last.as_ref(), ExpData::Temporary(..))
+                    && boogie_type(
+                        self.env,
+                        &self
+                            .env
+                            .get_node_type(last.node_id())
+                            .instantiate(&self.type_inst),
+                        false,
+                    ) == boogie_type(self.env, &inst_fun_type, false)
+            });
+        if carries_mutations && kind == BehaviorKind::EnsuresOf && !has_fun_clone {
+            self.error(
+                &self.env.get_node_loc(node_id),
+                "ensures_of over a function value carrying mutable reference captures \
+                 is only supported for directly referenced function values",
+            );
+        }
+
         // The `ResultOf`/`WriteOf(j)` evaluator shares a single tuple Skolem
-        // returning `(declared..., post_states...)`. Compute the projection
+        // returning `(declared..., post_states...[, f_post])`. Compute the projection
         // needed at this call site — matches `translate_behavior_for_closure`.
         let (num_explicit_results, num_mut_refs) = match &inst_fun_type {
             Type::Fun(arg_ty, result_ty, _) => {
@@ -1867,7 +1897,7 @@ impl SpecTranslator<'_> {
             },
             _ => (0, 0),
         };
-        let total_outputs = num_explicit_results + num_mut_refs;
+        let total_outputs = num_explicit_results + num_mut_refs + carries_mutations as usize;
         let multi_in_boogie = total_outputs > 1;
         let projection = match kind {
             BehaviorKind::ResultOf if multi_in_boogie && total_outputs > num_explicit_results => {
@@ -1884,9 +1914,11 @@ impl SpecTranslator<'_> {
         };
 
         // For `ResultOf`, `wrap_mut_ref_bp_inputs` appends trailing post-state
-        // clones to `pred_args`. The tuple Skolem doesn't take them — the
-        // post-state is in its output tuple instead — so skip them here.
-        // `WriteOf(j)` never has trailing post-state clones.
+        // clones (and possibly the fun-value clone) to `pred_args`. The tuple
+        // Skolem doesn't take them — the post-state is in its output tuple
+        // instead — so skip them here. `WriteOf(j)` never has trailing clones.
+        // For `EnsuresOf`, the fun-value clone is dropped when the type does
+        // not carry mutations (the evaluator then has no `f_post` slot).
         let emit_arg_count = match kind {
             BehaviorKind::ResultOf => {
                 let num_inputs = match &inst_fun_type {
@@ -1895,6 +1927,7 @@ impl SpecTranslator<'_> {
                 };
                 num_inputs.min(pred_args.len())
             },
+            BehaviorKind::EnsuresOf if has_fun_clone && !carries_mutations => pred_args.len() - 1,
             _ => pred_args.len(),
         };
 
@@ -1955,13 +1988,18 @@ impl SpecTranslator<'_> {
             (None, None)
         };
         // Only `EnsuresOf` has a synthetic trailing post-state clone that
-        // `post_sub` should rewrite. For other kinds, the post-side witness
-        // belongs at the same `&mut` input slot that `pre_sub` would target.
+        // `post_sub` should rewrite; when a fun-value clone is appended after
+        // it, the post-state clone sits one position earlier. For other
+        // kinds, the post-side witness belongs at the same `&mut` input slot
+        // that `pre_sub` would target.
         let (post_slot_sub, input_witness) = if matches!(kind, BehaviorKind::EnsuresOf) {
             (
-                post_sub
-                    .clone()
-                    .map(|v| (v, pred_args.len().saturating_sub(1))),
+                post_sub.clone().map(|v| {
+                    (
+                        v,
+                        pred_args.len().saturating_sub(1 + has_fun_clone as usize),
+                    )
+                }),
                 pre_sub.clone(),
             )
         } else {
@@ -2086,6 +2124,17 @@ impl SpecTranslator<'_> {
         let inst = Type::instantiate_slice(&inst, &self.type_inst);
         let fun_qid = mid.qualified_inst(fid, inst);
         let fun_env = self.env.get_function(fun_qid.to_qualified_id());
+        if closure_args
+            .iter()
+            .any(|arg| self.env.get_node_type(arg.node_id()).is_mutable_reference())
+        {
+            self.error(
+                &self.env.get_node_loc(node_id),
+                "closures capturing mutable references are not supported in \
+                 specification expressions",
+            );
+            return;
+        }
         let num_params = fun_env.get_parameter_count();
         let num_explicit_results = fun_env.get_return_count();
         let num_mut_refs = fun_env

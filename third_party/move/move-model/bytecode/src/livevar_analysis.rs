@@ -7,6 +7,7 @@
 // computation of new Destroy instructions.
 
 use crate::{
+    borrow_analysis::mut_capture_carrying_temps,
     dataflow_analysis::{DataflowAnalysis, TransferFunctions},
     dataflow_domains::{AbstractDomain, JoinResult},
     function_target::{FunctionData, FunctionTarget},
@@ -190,6 +191,10 @@ struct LiveVarAnalysis<'a> {
     func_target: &'a FunctionTarget<'a>,
     next_label_id: usize,
     next_attr_id: usize,
+    /// Temps holding closure values which capture mutable references. Like plain
+    /// references, they must be dropped explicitly along branch edges so that the
+    /// captured mutations are written back (set by `transform_code`).
+    carrying_temps: BTreeSet<TempIndex>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
@@ -221,6 +226,7 @@ impl<'a> LiveVarAnalysis<'a> {
             func_target,
             next_label_id,
             next_attr_id,
+            carrying_temps: BTreeSet::new(),
         }
     }
 
@@ -229,6 +235,7 @@ impl<'a> LiveVarAnalysis<'a> {
         annotations: &BTreeMap<CodeOffset, LiveVarInfoAtCodeOffset>,
         mut code: Vec<Bytecode>,
     ) -> Vec<Bytecode> {
+        self.carrying_temps = mut_capture_carrying_temps(self.func_target, &code);
         let label_to_code_offset = Bytecode::label_offsets(&code);
         let mut transformed_code = vec![];
         let mut new_bytecodes = vec![];
@@ -392,7 +399,8 @@ impl<'a> LiveVarAnalysis<'a> {
             .after
             .iter()
             .filter(|x| {
-                self.func_target.get_local_type(**x).is_reference()
+                (self.func_target.get_local_type(**x).is_reference()
+                    || self.carrying_temps.contains(x))
                     && !annotations[&dest_code_offset].before.contains(x)
             })
             .copied()

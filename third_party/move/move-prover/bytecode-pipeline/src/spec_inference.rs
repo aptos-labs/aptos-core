@@ -2584,7 +2584,13 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
 
                     // WP[dest := closure<f>(captured_args)](Q) = Q[dest ↦ |provided| f(captured, provided)]
                     Operation::Closure(module_id, fun_id, type_inst, mask) => {
-                        if dests.len() == 1 {
+                        // Closures capturing mutable references cannot appear in
+                        // specification expressions; leave the destination
+                        // unsubstituted so inference degrades conservatively.
+                        let has_mut_capture = srcs
+                            .iter()
+                            .any(|&s| self.get_local_type(s).is_mutable_reference());
+                        if dests.len() == 1 && !has_mut_capture {
                             let captured_args: Vec<Exp> =
                                 srcs.iter().map(|&s| self.mk_temporary(s)).collect();
                             let (closure_exp, _) = self.mk_closure(
@@ -5456,7 +5462,10 @@ impl<'env> SpecInferenceAnalyzer<'env> {
                 Some(self.mk_field_update(&field_env, type_args, old_exp, new_exp))
             },
             // Other edge types not yet supported
-            BorrowEdge::Index(_) | BorrowEdge::Invoke | BorrowEdge::Hyper(_) => None,
+            BorrowEdge::Index(_)
+            | BorrowEdge::Invoke
+            | BorrowEdge::Capture(..)
+            | BorrowEdge::Hyper(_) => None,
         }
     }
 

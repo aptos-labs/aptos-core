@@ -10,19 +10,21 @@ use crate::{
         boogie_address, boogie_address_blob, boogie_behavioral_eval_fun_name,
         boogie_behavioral_fun_result_name, boogie_behavioral_fun_spec_name,
         boogie_behavioral_result_fun_name, boogie_behavioral_spec_fun_name, boogie_byte_blob,
-        boogie_closure_pack_name, boogie_constant_blob, boogie_debug_track_abort,
+        boogie_closure_capture_field, boogie_closure_infos, boogie_closure_pack_name,
+        boogie_closure_variant_index, boogie_constant_blob, boogie_debug_track_abort,
         boogie_debug_track_local, boogie_debug_track_return, boogie_equality_for_type,
         boogie_field_sel, boogie_field_update, boogie_fun_apply_name, boogie_fun_param_name,
-        boogie_function_name, boogie_int_suffix, boogie_make_vec_from_strings,
-        boogie_modifies_memory_name, boogie_native_spec_fun_name, boogie_num_literal,
-        boogie_num_type_base, boogie_reflection_type_info, boogie_reflection_type_name,
-        boogie_resource_memory_name, boogie_spec_fun_name, boogie_struct_field_name,
-        boogie_struct_field_result_fun_name, boogie_struct_field_spec_fun_name, boogie_struct_name,
-        boogie_struct_variant_name, boogie_temp, boogie_temp_from_suffix, boogie_type,
-        boogie_type_for_struct_field, boogie_type_param, boogie_type_suffix,
-        boogie_type_suffix_for_struct, boogie_type_suffix_for_struct_variant,
-        boogie_variant_field_update, boogie_well_formed_check, boogie_well_formed_expr,
-        compute_evaluator_memory_union, field_bv_flag_global_state, TypeIdentToken,
+        boogie_fun_ty_carries_mutations, boogie_function_name, boogie_int_suffix,
+        boogie_make_vec_from_strings, boogie_modifies_memory_name, boogie_native_spec_fun_name,
+        boogie_num_literal, boogie_num_type_base, boogie_reflection_type_info,
+        boogie_reflection_type_name, boogie_resource_memory_name, boogie_spec_fun_name,
+        boogie_struct_field_name, boogie_struct_field_result_fun_name,
+        boogie_struct_field_spec_fun_name, boogie_struct_name, boogie_struct_variant_name,
+        boogie_temp, boogie_temp_from_suffix, boogie_type, boogie_type_for_struct_field,
+        boogie_type_param, boogie_type_suffix, boogie_type_suffix_for_struct,
+        boogie_type_suffix_for_struct_variant, boogie_variant_field_update,
+        boogie_well_formed_check, boogie_well_formed_expr, compute_evaluator_memory_union,
+        field_bv_flag_global_state, TypeIdentToken,
     },
     options::BoogieOptions,
     spec_translator::{LabelInfo, SpecTranslator},
@@ -98,6 +100,24 @@ enum ApplyFrameAccess {
     WritesAll,
     /// Resource may be written at specific Boogie address expressions only
     WritesAt(Vec<String>),
+}
+
+/// Output layout for a closure variant capturing mutable references in the apply
+/// procedure. The result Skolem of the variant's target carries post-state slots for
+/// all of the target's `&mut` parameters, captured ones included; this struct maps
+/// them onto apply outputs and describes the repack of the closure value.
+struct CaptureOutputs {
+    /// In target `&mut` parameter order: `Some(field)` if the parameter is captured,
+    /// with `field` the Boogie access of its capture slot (a `$Mutation`); `None` if
+    /// non-captured (consuming the next apply result local).
+    mut_slots: Vec<Option<String>>,
+    /// The constructor for repacking the closure value.
+    ctor_name: String,
+    /// Per capture slot in slot order: the Boogie access of the slot and, for
+    /// mutation slots, the index of its post value in the result Skolem tuple.
+    capture_fields: Vec<(String, Option<usize>)>,
+    /// Name of the apply output variable receiving the repacked value.
+    fun_out: String,
 }
 
 pub struct BoogieTranslator<'env> {
@@ -728,9 +748,8 @@ impl<'env> BoogieTranslator<'env> {
                 };
                 emit!(
                     self.writer,
-                    "p{}_v{}: {}",
-                    pos,
-                    idx,
+                    "{}: {}",
+                    boogie_closure_capture_field(pos, idx),
                     boogie_type(self.env, captured_ty, false)
                 )
             }
@@ -905,6 +924,18 @@ impl<'env> BoogieTranslator<'env> {
             );
             result_locals.push(local_name)
         }
+        // If closure variants of this type capture mutable references, the fun value
+        // carries mutations and is threaded in-out: the apply procedure returns the
+        // updated value as trailing output.
+        let carries_mutations = closure_infos
+            .iter()
+            .any(|info| !info.mut_capture_slots(self.env).is_empty());
+        if carries_mutations {
+            if !result_locals.is_empty() {
+                emit!(self.writer, ",");
+            }
+            emit!(self.writer, "fun_out: {}", fun_ty_boogie_name);
+        }
         emitln!(self.writer, ") {");
         self.writer.indent();
         let result_str = result_locals.iter().cloned().join(", ");
@@ -963,6 +994,24 @@ impl<'env> BoogieTranslator<'env> {
                 emitln!(self.writer, "var {}_$pre: {};", mem_name, mem_type);
             }
         }
+        // Declare locals receiving the updated captured mutations in the inline path
+        // of mut-capturing closure variants.
+        for (idx, info) in closure_infos.iter().enumerate() {
+            for (pos, target_ty) in info.mut_capture_slots(self.env) {
+                emitln!(
+                    self.writer,
+                    "var $$cap_upd{}_{}: $Mutation ({});",
+                    idx,
+                    pos,
+                    boogie_type(self.env, &target_ty, false)
+                );
+            }
+        }
+        if carries_mutations {
+            // Default: the fun value is unchanged; mut-capturing variants overwrite
+            // this with a repacked value carrying the updated mutations.
+            emitln!(self.writer, "fun_out := fun;");
+        }
 
         // Generate branches for all variants. Since the datatype is closed,
         // the last variant uses `else` without an explicit check (unless it's the only variant,
@@ -992,7 +1041,7 @@ impl<'env> BoogieTranslator<'env> {
             // Captured slots are not necessarily a prefix of the callee's
             // parameters.
             let captured_args: Vec<String> = (0..info.mask.captured_count())
-                .map(|pos| format!("fun->p{}_v{}", pos, idx))
+                .map(|pos| format!("fun->{}", boogie_closure_capture_field(pos as usize, idx)))
                 .collect();
             let non_captured_args: Vec<String> =
                 (0..params.len()).map(|pos| format!("p{}", pos)).collect();
@@ -1011,6 +1060,7 @@ impl<'env> BoogieTranslator<'env> {
                 .get(&(info.fun.to_qualified_id(), FunctionVariant::Baseline))
                 .map(|insts| !insts.is_empty())
                 .unwrap_or(false);
+            let mut_capture_slots = info.mut_capture_slots(self.env);
             if fun_env.is_opaque() || !has_inline {
                 self.emit_opaque_closure_body(
                     info,
@@ -1021,8 +1071,53 @@ impl<'env> BoogieTranslator<'env> {
                     &result_locals,
                     memory,
                 );
-            } else {
+            } else if mut_capture_slots.is_empty() {
                 emitln!(self.writer, "call {}{}({});", call_prefix, fun_name, args);
+            } else {
+                // The target returns updated mutations for all its `&mut` parameters,
+                // captured ones included, interleaved in parameter order. Collect the
+                // captured ones and repack the closure value into `fun_out`.
+                let param_tys =
+                    Type::instantiate_vec(fun_env.get_parameter_types(), &info.fun.inst);
+                let explicit_count = results.clone().flatten().len();
+                let mut call_outs: Vec<String> = result_locals[0..explicit_count].to_vec();
+                let mut apply_mut_pos = explicit_count;
+                let mut capture_slot = 0;
+                for (i, ty) in param_tys.iter().enumerate() {
+                    let captured = info.mask.is_captured(i);
+                    if ty.is_mutable_reference() {
+                        if captured {
+                            call_outs.push(format!("$$cap_upd{}_{}", idx, capture_slot));
+                        } else {
+                            call_outs.push(result_locals[apply_mut_pos].clone());
+                            apply_mut_pos += 1;
+                        }
+                    }
+                    if captured {
+                        capture_slot += 1;
+                    }
+                }
+                emitln!(
+                    self.writer,
+                    "call {} := {}({});",
+                    call_outs.iter().join(", "),
+                    fun_name,
+                    args
+                );
+                let repack_args = param_tys
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, _)| info.mask.is_captured(*i))
+                    .enumerate()
+                    .map(|(slot, (_, ty))| {
+                        if ty.is_mutable_reference() {
+                            format!("$$cap_upd{}_{}", idx, slot)
+                        } else {
+                            format!("fun->{}", boogie_closure_capture_field(slot, idx))
+                        }
+                    })
+                    .join(", ");
+                emitln!(self.writer, "fun_out := {}({});", ctor_name, repack_args);
             }
             if is_only {
                 // Single variant: no closing needed
@@ -1119,6 +1214,7 @@ impl<'env> BoogieTranslator<'env> {
                 &params,
                 memory,
                 &frame_access,
+                None,
             );
             if is_only {
                 // Single variant: no outer block to close
@@ -1216,6 +1312,7 @@ impl<'env> BoogieTranslator<'env> {
                 &params,
                 memory,
                 &frame_access,
+                None,
             );
             if is_only {
                 // Single variant: no outer block to close
@@ -1286,11 +1383,23 @@ impl<'env> BoogieTranslator<'env> {
         memory: &[(QualifiedInstId<StructId>, String)],
     ) {
         // Build args for ALL callee params by interleaving captured and non-captured
-        // using ClosureMask::compose.
-        let captured_args: Vec<String> = (0..info.mask.captured_count())
-            .map(|pos| format!("fun->p{}_v{}", pos, variant_idx))
-            .collect();
+        // using ClosureMask::compose. Mutation-carrying capture slots contribute their
+        // value component, since behavioral predicates reason over plain values.
         let callee_param_tys = fun_env.get_parameter_types();
+        let captured_args: Vec<String> = info
+            .mask
+            .extract(&callee_param_tys, true)
+            .into_iter()
+            .enumerate()
+            .map(|(pos, ty)| {
+                let field = format!("fun->{}", boogie_closure_capture_field(pos, variant_idx));
+                if ty.is_mutable_reference() {
+                    format!("{}->v", field)
+                } else {
+                    field
+                }
+            })
+            .collect();
         let non_captured_args: Vec<String> = callee_param_tys
             .iter()
             .enumerate()
@@ -1343,6 +1452,50 @@ impl<'env> BoogieTranslator<'env> {
             .map(|m| m.clone().instantiate(&info.fun.inst))
             .collect();
 
+        // For a variant capturing mutable references, describe the target's `&mut`
+        // output layout (the result Skolem carries post-state slots for all of the
+        // target's `&mut` params, captured ones included) and the repack of the
+        // closure value.
+        let capture_outputs = if info.mut_capture_slots(self.env).is_empty() {
+            None
+        } else {
+            let explicit_count = explicit_results.len();
+            let mut mut_slots = vec![];
+            let mut capture_fields = vec![];
+            let mut slot = 0;
+            let mut mut_pos = 0;
+            for (i, ty) in callee_param_tys.iter().enumerate() {
+                let captured = info.mask.is_captured(i);
+                let is_mut = ty.is_mutable_reference();
+                if captured {
+                    let field = format!("fun->{}", boogie_closure_capture_field(slot, variant_idx));
+                    capture_fields.push((
+                        field.clone(),
+                        if is_mut {
+                            Some(explicit_count + mut_pos)
+                        } else {
+                            None
+                        },
+                    ));
+                    if is_mut {
+                        mut_slots.push(Some(field));
+                    }
+                    slot += 1;
+                } else if is_mut {
+                    mut_slots.push(None);
+                }
+                if is_mut {
+                    mut_pos += 1;
+                }
+            }
+            Some(CaptureOutputs {
+                mut_slots,
+                ctor_name: boogie_closure_pack_name(self.env, &info.fun, info.mask),
+                capture_fields,
+                fun_out: "fun_out".to_string(),
+            })
+        };
+
         self.emit_behavioral_predicate_body(
             &aborts_name,
             &ensures_name,
@@ -1357,6 +1510,7 @@ impl<'env> BoogieTranslator<'env> {
             params,
             memory,
             &frame_access,
+            capture_outputs.as_ref(),
         );
     }
 
@@ -1464,6 +1618,7 @@ impl<'env> BoogieTranslator<'env> {
         params: &[Type],
         memory: &[(QualifiedInstId<StructId>, String)],
         frame_access: &BTreeMap<QualifiedInstId<StructId>, ApplyFrameAccess>,
+        capture_outputs: Option<&CaptureOutputs>,
     ) {
         let env = self.env;
         let explicit_result_count = explicit_results.len();
@@ -1474,6 +1629,12 @@ impl<'env> BoogieTranslator<'env> {
             .map(|(idx, _)| idx)
             .collect();
         let first_mut_ref_param = mut_ref_param_indices.first().copied();
+        // The `&mut` output count of the result Skolem: for a mut-capturing closure
+        // variant this is determined by the target's `&mut` parameters (captured ones
+        // included); otherwise by the function type's `&mut` parameters.
+        let mut_output_count =
+            capture_outputs.map_or(mut_ref_param_indices.len(), |c| c.mut_slots.len());
+        let total_outputs = explicit_result_count + mut_output_count;
 
         // Compute which memory names are covered by frame_access
         let covered_by_frame: BTreeSet<String> = frame_access
@@ -1596,97 +1757,93 @@ impl<'env> BoogieTranslator<'env> {
         );
         let result_bp_args = post_mem_args.iter().chain(data_args.iter()).join(", ");
 
-        // Assign results using result_of function (now using post-state args)
-        if !result_locals.is_empty() {
-            if result_locals.len() == 1 {
-                let result_local = &result_locals[0];
-                if explicit_result_count == 1 {
-                    if explicit_results[0].is_mutable_reference() {
-                        let base_param = first_mut_ref_param.unwrap_or(0);
-                        emitln!(
-                            self.writer,
-                            "{} := $ChildMutation(p{}, -1, {}({}));",
-                            result_local,
-                            base_param,
-                            result_fun_name,
-                            result_bp_args
-                        );
-                    } else {
-                        emitln!(
-                            self.writer,
-                            "{} := {}({});",
-                            result_local,
-                            result_fun_name,
-                            result_bp_args
-                        );
-                    }
-                } else {
-                    // Mutable reference param output: wrap in $UpdateMutation
-                    let param_idx = mut_ref_param_indices[0];
-                    emitln!(
-                        self.writer,
-                        "{} := $UpdateMutation(p{}, {}({}));",
-                        result_local,
-                        param_idx,
-                        result_fun_name,
-                        result_bp_args
-                    );
-                }
+        // Helper for accessing the i-th output of the result Skolem (using post-state
+        // args). The Skolem is deterministic, so repeated application is equal.
+        let tuple_access = |i: usize| {
+            if total_outputs == 1 {
+                format!("{}({})", result_fun_name, result_bp_args)
             } else {
-                // Multiple results: use tuple projection
-                for (i, result_local) in result_locals.iter().enumerate() {
-                    if i < explicit_result_count {
-                        if explicit_results[i].is_mutable_reference() {
-                            let base_param = first_mut_ref_param.unwrap_or(0);
-                            emitln!(
-                                self.writer,
-                                "{} := $ChildMutation(p{}, -1, {}({})->${});",
-                                result_local,
-                                base_param,
-                                multi_result_fun_name,
-                                result_bp_args,
-                                i
-                            );
-                        } else {
-                            emitln!(
-                                self.writer,
-                                "{} := {}({})->${};",
-                                result_local,
-                                multi_result_fun_name,
-                                result_bp_args,
-                                i
-                            );
-                        }
-                    } else {
-                        let mut_ref_idx = i - explicit_result_count;
-                        let param_idx = mut_ref_param_indices[mut_ref_idx];
-                        emitln!(
-                            self.writer,
-                            "{} := $UpdateMutation(p{}, {}({})->${});",
-                            result_local,
-                            param_idx,
-                            multi_result_fun_name,
-                            result_bp_args,
-                            i
-                        );
-                    }
-                }
+                format!("{}({})->${}", multi_result_fun_name, result_bp_args, i)
             }
+        };
+
+        // Assign explicit results using the result Skolem.
+        for i in 0..explicit_result_count {
+            let result_local = &result_locals[i];
+            if explicit_results[i].is_mutable_reference() {
+                let base_param = first_mut_ref_param.unwrap_or(0);
+                emitln!(
+                    self.writer,
+                    "{} := $ChildMutation(p{}, -1, {});",
+                    result_local,
+                    base_param,
+                    tuple_access(i)
+                );
+            } else {
+                emitln!(self.writer, "{} := {};", result_local, tuple_access(i));
+            }
+        }
+        // Assign `&mut` outputs. Non-captured ones update the corresponding parameter
+        // mutation into a result local; captured ones are consumed by the repack of
+        // the closure value below.
+        let mut apply_mut_pos = 0;
+        for j in 0..mut_output_count {
+            let captured = capture_outputs.is_some_and(|c| c.mut_slots[j].is_some());
+            if captured {
+                continue;
+            }
+            let param_idx = mut_ref_param_indices[apply_mut_pos];
+            let result_local = &result_locals[explicit_result_count + apply_mut_pos];
+            apply_mut_pos += 1;
+            emitln!(
+                self.writer,
+                "{} := $UpdateMutation(p{}, {});",
+                result_local,
+                param_idx,
+                tuple_access(explicit_result_count + j)
+            );
+        }
+        // Repack the closure value with the updated captured mutations.
+        if let Some(outputs) = capture_outputs {
+            let repack_args = outputs
+                .capture_fields
+                .iter()
+                .map(|(field, tuple_idx)| match tuple_idx {
+                    Some(i) => format!("$UpdateMutation({}, {})", field, tuple_access(*i)),
+                    None => field.clone(),
+                })
+                .join(", ");
+            emitln!(
+                self.writer,
+                "{} := {}({});",
+                outputs.fun_out,
+                outputs.ctor_name,
+                repack_args
+            );
         }
 
         // Build result args for ensures_of, dereferencing mutable reference results.
-        // Behavioral predicates reason over plain values, not mutation types.
+        // Behavioral predicates reason over plain values, not mutation types. For a
+        // captured `&mut` output the post value comes directly from the Skolem.
         let mut ensures_result_args: Vec<String> = Vec::new();
-        for (i, result_local) in result_locals.iter().enumerate() {
-            if i < explicit_result_count {
-                if explicit_results[i].is_mutable_reference() {
-                    ensures_result_args.push(format!("$Dereference({})", result_local));
-                } else {
-                    ensures_result_args.push(result_local.clone());
-                }
+        for (i, ty) in explicit_results.iter().enumerate() {
+            if ty.is_mutable_reference() {
+                ensures_result_args.push(format!("$Dereference({})", result_locals[i]));
             } else {
-                // Mut ref param output: always a mutation, need dereference
-                ensures_result_args.push(format!("$Dereference({})", result_local));
+                ensures_result_args.push(result_locals[i].clone());
+            }
+        }
+        let mut apply_mut_pos = 0;
+        for j in 0..mut_output_count {
+            let captured = capture_outputs.is_some_and(|c| c.mut_slots[j].is_some());
+            if captured {
+                ensures_result_args.push(tuple_access(explicit_result_count + j));
+            } else {
+                ensures_result_args.push(format!(
+                    "$Dereference({})",
+                    result_locals[explicit_result_count + apply_mut_pos]
+                ));
+                apply_mut_pos += 1;
             }
         }
 
@@ -1757,7 +1914,16 @@ impl<'env> BoogieTranslator<'env> {
         // full parameter list, while the specialized closure and
         // fun_param axioms substitute a concrete constructor term for
         // `f` and therefore need the memory and data portions independently.
-        let (data_decls, data_args) = Self::data_param_decls_and_args(env, &params, kind, &results);
+        let carries_mutations = closure_infos
+            .iter()
+            .any(|info| !info.mut_capture_slots(env).is_empty());
+        let (data_decls, data_args) = Self::data_param_decls_and_args(
+            env,
+            &params,
+            kind,
+            &results,
+            carries_mutations.then_some(fun_ty_boogie_name.as_str()),
+        );
         let mut param_decls: Vec<String> = eval_mem_decls.to_vec();
         let mut arg_names: Vec<String> = eval_mem_args.to_vec();
         param_decls.push(format!("f: {}", fun_ty_boogie_name));
@@ -1790,7 +1956,7 @@ impl<'env> BoogieTranslator<'env> {
         // that matches in that case. Pool's `IsValid` pins such values to
         // the field variant, making the other variants' guards simplify to
         // false without materializing their right-hand sides.
-        for info in closure_infos {
+        for (variant_idx, info) in closure_infos.iter().enumerate() {
             self.emit_closure_variant_axiom(
                 &eval_fun_name,
                 &eval_mem_decls,
@@ -1798,6 +1964,7 @@ impl<'env> BoogieTranslator<'env> {
                 &data_decls,
                 &data_args,
                 info,
+                variant_idx,
                 &params,
                 &results,
                 kind,
@@ -1835,12 +2002,16 @@ impl<'env> BoogieTranslator<'env> {
     /// evaluator's signature: input parameters `p0..pn` and, for ensures_of,
     /// result values `r0..rm`. Memory and the function value `f` are handled
     /// separately because they vary between the general and specialized
-    /// axiom forms.
+    /// axiom forms. For function types carrying mutations, the ensures_of
+    /// evaluator additionally takes the updated fun value `f_post` as final
+    /// parameter, from which the closure variant axioms extract the post
+    /// values of captured mutations.
     fn data_param_decls_and_args(
         env: &GlobalEnv,
         params: &[Type],
         kind: BehaviorKind,
         results: &[Type],
+        carrying_fun_ty: Option<&str>,
     ) -> (Vec<String>, Vec<String>) {
         let behavioral_outputs = Self::behavioral_output_types(params, results);
         let mut decls = Vec::with_capacity(params.len() + behavioral_outputs.len());
@@ -1857,6 +2028,10 @@ impl<'env> BoogieTranslator<'env> {
             for (pos, ty) in behavioral_outputs.iter().enumerate() {
                 decls.push(format!("r{}: {}", pos, boogie_type(env, ty, false)));
                 args.push(format!("r{}", pos));
+            }
+            if let Some(fun_ty_name) = carrying_fun_ty {
+                decls.push(format!("f_post: {}", fun_ty_name));
+                args.push("f_post".to_string());
             }
         }
         (decls, args)
@@ -1875,6 +2050,7 @@ impl<'env> BoogieTranslator<'env> {
         data_decls: &[String],
         data_args: &[String],
         info: &ClosureInfo,
+        variant_idx: usize,
         params: &[Type],
         results: &[Type],
         kind: BehaviorKind,
@@ -1887,20 +2063,24 @@ impl<'env> BoogieTranslator<'env> {
             .map(|ty| ty.instantiate(&info.fun.inst))
             .collect();
         let ctor_name = boogie_closure_pack_name(env, &info.fun, info.mask);
+        let has_mut_captures = !info.mut_capture_slots(env).is_empty();
 
         // Captures become quantifier-bound variables `c0..cK`. The
-        // constructor term in the trigger takes them as arguments.
+        // constructor term in the trigger takes them as arguments. Slots
+        // capturing mutable references have `$Mutation` type, matching the
+        // datatype field.
         let mut capture_decls = Vec::new();
         let mut capture_args = Vec::new();
         let mut captured_pos = 0usize;
         for (i, ty) in callee_param_tys.iter().enumerate() {
             if info.mask.is_captured(i) {
                 let name = format!("c{}", captured_pos);
-                capture_decls.push(format!(
-                    "{}: {}",
-                    name,
+                let slot_ty = if ty.is_mutable_reference() {
+                    boogie_type(env, ty, false)
+                } else {
                     boogie_type(env, ty.skip_reference(), false)
-                ));
+                };
+                capture_decls.push(format!("{}: {}", name, slot_ty));
                 capture_args.push(name);
                 captured_pos += 1;
             }
@@ -1922,24 +2102,75 @@ impl<'env> BoogieTranslator<'env> {
         // Build the RHS call to the per-function spec function. Captured
         // params are taken directly from the bound `cK` variables, not
         // from `f->pK`, because the trigger commits `f = ctor(c0..cK)`.
+        // Mutation-carrying capture slots contribute their value component,
+        // since behavioral predicates reason over plain values.
         let bp_name = boogie_behavioral_fun_spec_name(env, &info.fun, kind);
         let mut rhs_args: Vec<String> =
             Self::build_instantiated_memory_args(env, &fun_env, &info.fun.inst);
         let mut captured_pos = 0usize;
         let mut non_captured_pos = 0usize;
-        for i in 0..callee_param_tys.len() {
+        for (i, ty) in callee_param_tys.iter().enumerate() {
             if info.mask.is_captured(i) {
-                rhs_args.push(format!("c{}", captured_pos));
+                if ty.is_mutable_reference() {
+                    rhs_args.push(format!("c{}->v", captured_pos));
+                } else {
+                    rhs_args.push(format!("c{}", captured_pos));
+                }
                 captured_pos += 1;
             } else {
                 rhs_args.push(format!("p{}", non_captured_pos));
                 non_captured_pos += 1;
             }
         }
+        // For ensures_of, the per-target result slots cover declared results
+        // plus post-states of all the target's `&mut` params in parameter
+        // order. Post values of captured mutations come from `f_post`'s
+        // capture slots, conjoined with the identity constraints matching
+        // the operational model (variant and mutation identity preserved).
+        let mut identity_conjuncts: Vec<String> = vec![];
         if kind == BehaviorKind::EnsuresOf {
-            rhs_args.extend(Self::behavioral_output_args(params, results));
+            if has_mut_captures {
+                identity_conjuncts.push(format!("(f_post is {})", ctor_name));
+                let explicit_count = results.len();
+                let mut fun_mut_pos = 0usize;
+                let mut slot = 0usize;
+                for i in 0..explicit_count {
+                    rhs_args.push(format!("r{}", i));
+                }
+                for (i, ty) in callee_param_tys.iter().enumerate() {
+                    let captured = info.mask.is_captured(i);
+                    if ty.is_mutable_reference() {
+                        if captured {
+                            let field = format!(
+                                "f_post->{}",
+                                boogie_closure_capture_field(slot, variant_idx)
+                            );
+                            identity_conjuncts
+                                .push(format!("$IsSameMutation(c{}, {})", slot, field));
+                            rhs_args.push(format!("{}->v", field));
+                        } else {
+                            rhs_args.push(format!("r{}", explicit_count + fun_mut_pos));
+                            fun_mut_pos += 1;
+                        }
+                    }
+                    if captured {
+                        slot += 1;
+                    }
+                }
+            } else {
+                rhs_args.extend(Self::behavioral_output_args(params, results));
+            }
         }
-        let rhs = format!("{}({})", bp_name, rhs_args.join(", "));
+        let rhs = if identity_conjuncts.is_empty() {
+            format!("{}({})", bp_name, rhs_args.join(", "))
+        } else {
+            format!(
+                "({} && {}({}))",
+                identity_conjuncts.join(" && "),
+                bp_name,
+                rhs_args.join(", ")
+            )
+        };
 
         // Build the evaluator application used in trigger and body, with
         // the concrete constructor term substituted for `f`.
@@ -2011,14 +2242,21 @@ impl<'env> BoogieTranslator<'env> {
             .collect();
         let eval_call = format!("{}({})", eval_fun_name, eval_call_args.join(", "));
 
-        emitln!(
-            self.writer,
-            "axiom (forall {} :: {{{}}} {} <==> {});",
-            quantifier.join(", "),
-            eval_call,
-            eval_call,
-            rhs
-        );
+        if quantifier.is_empty() {
+            // No bound variables (e.g. requires_of/aborts_of of a zero-argument
+            // function type without memory): emit a plain axiom, since Boogie
+            // requires at least one bound variable in a quantifier.
+            emitln!(self.writer, "axiom {} <==> {};", eval_call, rhs);
+        } else {
+            emitln!(
+                self.writer,
+                "axiom (forall {} :: {{{}}} {} <==> {});",
+                quantifier.join(", "),
+                eval_call,
+                eval_call,
+                rhs
+            );
+        }
     }
 
     /// Emit a guarded evaluator axiom for a struct-field variant. Struct
@@ -2158,11 +2396,18 @@ impl<'env> BoogieTranslator<'env> {
         }
 
         // Output tuple: declared results followed by `&mut` post-states.
-        // References are stripped — spec predicates work on values.
+        // References are stripped — spec predicates work on values. For
+        // function types carrying mutations, the updated fun value is
+        // appended as final component, matching the `f_post` slot of
+        // `ensures_of`.
+        let carries_mutations = closure_infos
+            .iter()
+            .any(|info| !info.mut_capture_slots(env).is_empty());
         let output_types: Vec<Type> = declared_results
             .iter()
             .chain(post_state_types.iter())
             .cloned()
+            .chain(carries_mutations.then(|| fun_type.clone()))
             .collect();
         let result_type = if output_types.len() == 1 {
             boogie_type(env, &output_types[0], false)
@@ -5846,6 +6091,33 @@ impl FunctionTranslator<'_> {
                     WriteBack(node, edge) => {
                         self.translate_write_back(node, edge, srcs[0]);
                     },
+                    IsParent(node, BorrowEdge::Capture(fun, mask, slot)) => {
+                        // The src is a closure value; the parent test holds if the
+                        // value is packed from the expected closure variant and the
+                        // mutation in its capture slot roots at the parent. The
+                        // variant test matters when packs of different variants merge
+                        // into the same temp at a control flow join.
+                        if let BorrowNode::Reference(parent) = node {
+                            let src_str = str_local(srcs[0]);
+                            let fun = fun.to_owned().instantiate(self.type_inst);
+                            let fun_ty = self.get_local_type(srcs[0]);
+                            let variant_idx =
+                                boogie_closure_variant_index(env, &fun_ty, &fun, *mask);
+                            let ctor_name = boogie_closure_pack_name(env, &fun, *mask);
+                            emitln!(
+                                writer,
+                                "{} := ({} is {}) && $IsSameMutation({}, {}->{});",
+                                str_local(dests[0]),
+                                src_str,
+                                ctor_name,
+                                str_local(*parent),
+                                src_str,
+                                boogie_closure_capture_field(*slot, variant_idx)
+                            );
+                        } else {
+                            panic!("inconsistent IsParent instruction: expected a reference node")
+                        }
+                    },
                     IsParent(node, edge) => {
                         if let BorrowNode::Reference(parent) = node {
                             let src_str = str_local(srcs[0]);
@@ -5860,13 +6132,27 @@ impl FunctionTranslator<'_> {
                                 })
                                 .collect_vec();
                             if edge_pattern.is_empty() {
-                                emitln!(
-                                    writer,
-                                    "{} := $IsSameMutation({}, {});",
-                                    str_local(dests[0]),
-                                    str_local(*parent),
-                                    src_str
-                                );
+                                if self.get_local_type(srcs[0]).is_function() {
+                                    // Between closure values carrying mutations (from
+                                    // an assignment): value equality is the correct
+                                    // parent test, since the carried mutations'
+                                    // location/path identity distinguishes the values.
+                                    emitln!(
+                                        writer,
+                                        "{} := ({} == {});",
+                                        str_local(dests[0]),
+                                        str_local(*parent),
+                                        src_str
+                                    );
+                                } else {
+                                    emitln!(
+                                        writer,
+                                        "{} := $IsSameMutation({}, {});",
+                                        str_local(dests[0]),
+                                        str_local(*parent),
+                                        src_str
+                                    );
+                                }
                             } else if edge_pattern.len() == 1 {
                                 emitln!(
                                     writer,
@@ -5922,7 +6208,28 @@ impl FunctionTranslator<'_> {
                             str_local(value),
                         );
                     },
-                    Function(mid, fid, inst) | Closure(mid, fid, inst, _) => {
+                    Closure(mid, fid, inst, mask) => {
+                        // Closure construction. Unlike for calls, `&mut` srcs are not
+                        // chained as implicit outputs: a captured mutation is moved
+                        // into the closure value as a whole `$Mutation` and comes back
+                        // via the `Capture` write-back when the closure dies.
+                        let inst = &self.inst_slice(inst);
+                        let args_str = srcs.iter().cloned().map(str_local).join(", ");
+                        let dest_str = dests.iter().cloned().map(str_local).join(",");
+                        let closure_ctor_name = boogie_closure_pack_name(
+                            env,
+                            &mid.qualified_inst(*fid, inst.clone()),
+                            *mask,
+                        );
+                        emitln!(
+                            writer,
+                            "{} := {}({});",
+                            dest_str,
+                            closure_ctor_name,
+                            args_str
+                        );
+                    },
+                    Function(mid, fid, inst) => {
                         let inst = &self.inst_slice(inst);
                         let module_env = env.get_module(*mid);
                         let callee_env = module_env.get_function(*fid);
@@ -5944,20 +6251,6 @@ impl FunctionTranslator<'_> {
 
                         if self.try_reflection_call(writer, env, inst, &callee_env, &dest_str) {
                             // Special case of reflection call, code is generated
-                        } else if let Closure(_, _, _, mask) = oper {
-                            // Special case of closure construction
-                            let closure_ctor_name = boogie_closure_pack_name(
-                                env,
-                                &mid.qualified_inst(*fid, inst.clone()),
-                                *mask,
-                            );
-                            emitln!(
-                                writer,
-                                "{} := {}({});",
-                                dest_str,
-                                closure_ctor_name,
-                                args_str
-                            );
                         } else {
                             // regular path
                             let targeted = self.fun_target.module_env().is_target();
@@ -6142,8 +6435,13 @@ impl FunctionTranslator<'_> {
                     },
                     Invoke => {
                         // Function is last argument
-                        let fun_type = self.inst(fun_target.get_local_type(*srcs.last().unwrap()));
+                        let fun_temp = *srcs.last().unwrap();
+                        let fun_type = self.inst(fun_target.get_local_type(fun_temp));
                         let args_str = srcs.iter().cloned().map(str_local).join(", ");
+                        // If the fun type carries mutations, the apply procedure
+                        // returns the updated fun value as trailing output.
+                        let fun_out = boogie_fun_ty_carries_mutations(env, &fun_type)
+                            .then(|| str_local(fun_temp));
                         let dest_str = dests
                             .iter()
                             .cloned()
@@ -6156,6 +6454,7 @@ impl FunctionTranslator<'_> {
                                     .cloned()
                                     .map(str_local),
                             )
+                            .chain(fun_out)
                             .join(",");
                         let apply_fun = boogie_fun_apply_name(env, &fun_type);
                         let call_prefix = if dest_str.is_empty() {
@@ -6465,6 +6764,56 @@ impl FunctionTranslator<'_> {
                             var_str,
                             temp_str
                         );
+                    },
+                    Havoc(HavocKind::CaptureValues) => {
+                        // Havoc the value parts of all mutations captured in the
+                        // closure value, preserving their location/path identity and
+                        // all other captured values, by repacking the variant with
+                        // `$UpdateMutation` per mutation slot.
+                        let var_str = str_local(dests[0]);
+                        let fun_ty = self.get_local_type(dests[0]);
+                        for (variant_idx, info) in
+                            boogie_closure_infos(env, &fun_ty).iter().enumerate()
+                        {
+                            if info.mut_capture_slots(env).is_empty() {
+                                continue;
+                            }
+                            let ctor_name = boogie_closure_pack_name(env, &info.fun, info.mask);
+                            emitln!(writer, "if ({} is {}) {{", var_str, ctor_name);
+                            writer.indent();
+                            let fun_env = env.get_function(info.fun.to_qualified_id());
+                            let param_tys = Type::instantiate_vec(
+                                fun_env.get_parameter_types(),
+                                &info.fun.inst,
+                            );
+                            let mut temp_counts: BTreeMap<String, usize> = BTreeMap::new();
+                            let mut args = vec![];
+                            for (pos, ty) in
+                                info.mask.extract(&param_tys, true).into_iter().enumerate()
+                            {
+                                let field = format!(
+                                    "{}->{}",
+                                    var_str,
+                                    boogie_closure_capture_field(pos, variant_idx)
+                                );
+                                if ty.is_mutable_reference() {
+                                    // Note: capture slot values default to the
+                                    // non-bv number representation.
+                                    let target_ty = ty.skip_reference();
+                                    let suffix = boogie_type_suffix(env, target_ty, false);
+                                    let instance = temp_counts.entry(suffix).or_insert(0);
+                                    let temp = boogie_temp(env, target_ty, *instance, false);
+                                    *instance += 1;
+                                    emitln!(writer, "havoc {};", temp);
+                                    args.push(format!("$UpdateMutation({}, {})", field, temp));
+                                } else {
+                                    args.push(field);
+                                }
+                            }
+                            emitln!(writer, "{} := {}({});", var_str, ctor_name, args.join(", "));
+                            writer.unindent();
+                            emitln!(writer, "}");
+                        }
                     },
                     Stop => {
                         // the two statements combined terminate any execution trace that reaches it
@@ -7191,7 +7540,27 @@ impl FunctionTranslator<'_> {
                         format!("ReadVec({}->p, LenVec($t{}->p) + {})", src_str, idx, offset)
                     }
                 };
-                if matches!(edge, BorrowEdge::Invoke) {
+                if let BorrowEdge::Capture(fun, mask, slot) = edge {
+                    // The source is a closure value carrying the captured mutation:
+                    // take the (updated) mutation back out of its capture slot. The
+                    // mutation's location and path are unchanged by packing, so the
+                    // remainder of the write-back chain works on it as usual.
+                    let fun = fun.to_owned().instantiate(self.type_inst);
+                    let fun_ty = self.get_local_type(src);
+                    let variant_idx = boogie_closure_variant_index(env, &fun_ty, &fun, *mask);
+                    emitln!(
+                        writer,
+                        "$t{} := {}->{};",
+                        idx,
+                        src_str,
+                        boogie_closure_capture_field(*slot, variant_idx)
+                    );
+                } else if self.get_local_type(src).is_function() {
+                    // Write-back between closure values carrying mutations, resulting
+                    // from an assignment: move the value back.
+                    assert!(matches!(edge, BorrowEdge::Direct));
+                    emitln!(writer, "$t{} := {};", idx, src_str);
+                } else if matches!(edge, BorrowEdge::Invoke) {
                     emitln!(writer, "call $t{} := $HavocMutation($t{});", idx, idx);
                 } else {
                     let update = if let BorrowEdge::Hyper(edges) = edge {
@@ -7369,7 +7738,12 @@ impl FunctionTranslator<'_> {
                         )
                     }
                 },
-                BorrowEdge::Hyper(_) | BorrowEdge::Invoke => unreachable!("unexpected borrow edge"),
+                // Capture edges are always the first hop off the closure temp and
+                // handled directly in `translate_write_back`; they never occur in
+                // hyper edges since closure values do not cross call boundaries.
+                BorrowEdge::Hyper(_) | BorrowEdge::Invoke | BorrowEdge::Capture(..) => {
+                    unreachable!("unexpected borrow edge")
+                },
             }
         }
     }
@@ -7528,6 +7902,23 @@ impl FunctionTranslator<'_> {
                             .unwrap();
                         let bv_flag = self.bv_flag(num_oper);
                         need(ty, bv_flag, 1)
+                    },
+                    Havoc(HavocKind::CaptureValues) => {
+                        // Temps for havocing capture slot values, counted per closure
+                        // variant (variant branches are exclusive, so temps are shared
+                        // across variants).
+                        let fun_ty = self.get_local_type(dests[0]);
+                        for info in boogie_closure_infos(env, &fun_ty) {
+                            let mut counts: BTreeMap<String, (Type, usize)> = BTreeMap::new();
+                            for (_, target_ty) in info.mut_capture_slots(env) {
+                                let suffix = boogie_type_suffix(env, &target_ty, false);
+                                let entry = counts.entry(suffix).or_insert((target_ty, 0));
+                                entry.1 += 1;
+                            }
+                            for (ty, n) in counts.into_values() {
+                                need(&ty, false, n);
+                            }
+                        }
                     },
                     _ => {},
                 },

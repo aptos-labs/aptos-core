@@ -1,0 +1,98 @@
+Move prover returns: exiting with compilation errors
+error: local `x` is mutated through more than one argument of this call
+   ┌─ tests/sources/functional/closures/inline/opaque_inline_alias_fail.move:23:9
+   │
+23 │ ╭         call2( // error: mutated through more than one argument
+24 │ │             |i| x = x + i spec { ensures x == old(x) + i; },
+25 │ │             |i| x = x + 2 * i spec { ensures x == old(x) + 2 * i; }
+26 │ │         );
+   │ ╰─────────^
+   │
+   = the behavioral predicates in the callee's opaque spec relate the call's entry and exit states and cannot express sequential effects on the same location; combine the accesses in one lambda
+
+error: local `x` is mutated through more than one argument of this call
+   ┌─ tests/sources/functional/closures/inline/opaque_inline_alias_fail.move:45:9
+   │
+45 │ ╭         update_via(|q| { // error: mutated through more than one argument
+46 │ │             *q = *q + 1;
+47 │ │             x = x + 2;
+48 │ │         } spec {
+49 │ │             ensures q == old(q) + 1;
+50 │ │             ensures x == old(x) + 2;
+51 │ │         }, &mut x);
+   │ ╰──────────────────^
+   │
+   = the behavioral predicates in the callee's opaque spec relate the call's entry and exit states and cannot express sequential effects on the same location; combine the accesses in one lambda
+
+error: local `x` is mutated through one argument of this call and referenced or captured through another
+   ┌─ tests/sources/functional/closures/inline/opaque_inline_alias_fail.move:72:17
+   │
+72 │         let r = observe(|i| x = x + i spec { ensures x == old(x) + i; }, &x); // error: mutated and referenced
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = the behavioral predicates in the callee's opaque spec relate the call's entry and exit states and cannot express sequential effects on the same location; combine the accesses in one lambda
+
+error: local `x` is mutated through one argument of this call and referenced or captured through another
+   ┌─ tests/sources/functional/closures/inline/opaque_inline_alias_fail.move:85:9
+   │
+85 │ ╭         call2( // error: mutated and captured
+86 │ │             |i| x = x + i spec { ensures x == old(x) + i; },
+87 │ │             |_i| y = x spec { ensures y == x; }
+88 │ │         );
+   │ ╰─────────^
+   │
+   = the behavioral predicates in the callee's opaque spec relate the call's entry and exit states and cannot express sequential effects on the same location; combine the accesses in one lambda
+
+error: local `x` is mutated through one argument of this call and referenced or captured through another
+   ┌─ tests/sources/functional/closures/inline/opaque_inline_alias_fail.move:99:17
+   │
+99 │         let r = observe(|i| x = x + i spec { ensures x == old(x) + i; }, rx); // error: mutated and referenced
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = the behavioral predicates in the callee's opaque spec relate the call's entry and exit states and cannot express sequential effects on the same location; combine the accesses in one lambda
+
+error: local `s` is mutated through one argument of this call and referenced or captured through another
+    ┌─ tests/sources/functional/closures/inline/opaque_inline_alias_fail.move:116:17
+    │
+116 │           let r = observe(|i| s.x = s.x + i spec { // error: mutated and referenced
+    │ ╭─────────────────^
+117 │ │             ensures s.x == old(s).x + i;
+118 │ │             ensures s.y == old(s).y;
+119 │ │         }, rx);
+    │ ╰──────────────^
+    │
+    = the behavioral predicates in the callee's opaque spec relate the call's entry and exit states and cannot express sequential effects on the same location; combine the accesses in one lambda
+
+error: local `x` is mutated through one argument of this call and referenced or captured through another
+    ┌─ tests/sources/functional/closures/inline/opaque_inline_alias_fail.move:132:17
+    │
+132 │         let r = observe(|i| x = x + i spec { ensures x == old(x) + i; }, rx); // error: mutated and referenced
+    │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = the behavioral predicates in the callee's opaque spec relate the call's entry and exit states and cannot express sequential effects on the same location; combine the accesses in one lambda
+
+error: local `v` is mutated through one argument of this call and referenced or captured through another
+    ┌─ tests/sources/functional/closures/inline/opaque_inline_alias_fail.move:145:17
+    │
+145 │           let r = observe(|i| { // error: mutated through more than one argument
+    │ ╭─────────────────^
+146 │ │             let e = std::vector::borrow_mut(&mut v, 0);
+147 │ │             *e = *e + i;
+148 │ │         } spec {
+    · │
+151 │ │             ensures len(v) == len(old(v));
+152 │ │         }, std::vector::borrow(&v, 1));
+    │ ╰──────────────────────────────────────^
+    │
+    = the behavioral predicates in the callee's opaque spec relate the call's entry and exit states and cannot express sequential effects on the same location; combine the accesses in one lambda
+
+error: local `s` is mutated through more than one argument of this call
+    ┌─ tests/sources/functional/closures/inline/opaque_inline_alias_fail.move:172:9
+    │
+172 │ ╭         update_field(|i| s.x = s.x + i spec { // error: mutated through more than one argument
+173 │ │             ensures s.x == old(s).x + i;
+174 │ │             ensures s.y == old(s).y;
+175 │ │         }, &mut s.y);
+    │ ╰────────────────────^
+    │
+    = the behavioral predicates in the callee's opaque spec relate the call's entry and exit states and cannot express sequential effects on the same location; combine the accesses in one lambda

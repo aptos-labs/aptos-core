@@ -1,5 +1,12 @@
 // -- Model dump before first bytecode pipeline
 module 0x42::retained_mut_capture {
+    struct S {
+        x: u64,
+        y: u64,
+    }
+    struct V {
+        items: vector<u64>,
+    }
     private inline fun call_once(f: |u64|) {
         (f)(1)
     }
@@ -24,10 +31,100 @@ module 0x42::retained_mut_capture {
       ensures Eq<u64>(result0(), 1);
     }
 
+    private inline fun count(self: &V,f: |u64|) {
+        (f)(1)
+    }
+    spec {
+      ensures ensures_of($t1, 1);
+    }
+
+    private fun field_caller(): u64 {
+        {
+          let s: S = pack retained_mut_capture::S(1, 7);
+          {
+            let (): ();
+            {
+              let (i: u64): (u64) = Tuple(1);
+              select retained_mut_capture::S.x<S>(s) = Add<u64>(select retained_mut_capture::S.x<S>(s), i)
+            }
+          };
+          Add<u64>(select retained_mut_capture::S.x<S>(s), select retained_mut_capture::S.y<S>(s))
+        }
+    }
+    spec {
+      ensures Eq<u64>(result0(), 9);
+    }
+
+    private fun freeze_caller(): u64 {
+        {
+          let x: u64 = 1;
+          {
+            let (): ();
+            {
+              let (i: u64): (u64) = Tuple(1);
+              x: u64 = Add<u64>(Add<u64>(x, retained_mut_capture::read(Borrow(Immutable)(x))), i)
+            }
+          };
+          x
+        }
+    }
+    spec {
+      ensures Eq<u64>(result0(), 3);
+    }
+
+    private fun param_caller(x: u64): u64 {
+        {
+          let (): ();
+          {
+            let (i: u64): (u64) = Tuple(1);
+            x: u64 = Add<u64>(x, i)
+          }
+        };
+        x
+    }
+    spec {
+      requires Lt($t0, 1000);
+      ensures Eq<u64>(result0(), Add($t0, 1));
+    }
+
+    private fun read(r: &u64): u64 {
+        Deref(r)
+    }
+    spec {
+      ensures Eq<u64>(result0(), $t0);
+    }
+
+    private fun receiver_caller(v: &V): u64 {
+        {
+          let n: u64 = 0;
+          {
+            let (self: &V): (&V) = Tuple(v);
+            {
+              let (_x: u64): (u64) = Tuple(1);
+              {
+                let $t: u64 = 1;
+                n: u64 = Add<u64>(n, $t)
+              }
+            }
+          };
+          n
+        }
+    }
+    spec {
+      ensures Eq<u64>(result0(), 1);
+    }
+
 } // end 0x42::retained_mut_capture
 
 // -- Sourcified model before first bytecode pipeline
 module 0x42::retained_mut_capture {
+    struct S has copy, drop {
+        x: u64,
+        y: u64,
+    }
+    struct V has drop {
+        items: vector<u64>,
+    }
     inline fun call_once(f: |u64|) {
         f(1)
     }
@@ -51,10 +148,91 @@ module 0x42::retained_mut_capture {
         ensures result == 1;
     }
 
+    inline fun count(self: &V, f: |u64|) {
+        f(1)
+    }
+
+    spec count(self: &V, f: |u64|) {
+        pragma opaque = true;
+        ensures ensures_of<f>(1);
+    }
+
+    fun field_caller(): u64 {
+        let s = S{x: 1, y: 7};
+        {
+            let ();
+            let i = 1;
+            s.x = s.x + i
+        };
+        s.x + s.y
+    }
+
+    spec field_caller(): u64 {
+        ensures result == 9;
+    }
+
+    fun freeze_caller(): u64 {
+        let x = 1;
+        {
+            let ();
+            let i = 1;
+            x = x + read(&x) + i
+        };
+        x
+    }
+
+    spec freeze_caller(): u64 {
+        ensures result == 3;
+    }
+
+    fun param_caller(x: u64): u64 {
+        {
+            let ();
+            let i = 1;
+            x = x + i
+        };
+        x
+    }
+
+    spec param_caller(x: u64): u64 {
+        requires x < 1000;
+        ensures result == x + 1;
+    }
+
+    fun read(r: &u64): u64 {
+        *r
+    }
+
+    spec read(r: &u64): u64 {
+        ensures result == r;
+    }
+
+    fun receiver_caller(v: &V): u64 {
+        let n = 0;
+        {
+            let self = v;
+            let _x = 1;
+            let _t = 1;
+            n = n + _t
+        };
+        n
+    }
+
+    spec receiver_caller(v: &V): u64 {
+        ensures result == 1;
+    }
+
 }
 
 // -- Model dump before second bytecode pipeline
 module 0x42::retained_mut_capture {
+    struct S {
+        x: u64,
+        y: u64,
+    }
+    struct V {
+        items: vector<u64>,
+    }
     private inline fun call_once(f: |u64|) {
         (f)(1)
     }
@@ -73,17 +251,147 @@ module 0x42::retained_mut_capture {
       ensures Eq<u64>(result0(), 1);
     }
 
+    private inline fun count(self: &V,f: |u64|) {
+        (f)(1)
+    }
+    spec {
+      ensures ensures_of($t1, 1);
+    }
+
+    private fun field_caller(): u64 {
+        {
+          let s: S = pack retained_mut_capture::S(1, 7);
+          select retained_mut_capture::S.x<S>(s) = Add<u64>(select retained_mut_capture::S.x<S>(s), 1);
+          Add<u64>(select retained_mut_capture::S.x<S>(s), select retained_mut_capture::S.y<S>(s))
+        }
+    }
+    spec {
+      ensures Eq<u64>(result0(), 9);
+    }
+
+    private fun freeze_caller(): u64 {
+        {
+          let x: u64 = 1;
+          x: u64 = Add<u64>(Add<u64>(x, retained_mut_capture::read(Borrow(Immutable)(x))), 1);
+          x
+        }
+    }
+    spec {
+      ensures Eq<u64>(result0(), 3);
+    }
+
+    private fun param_caller(x: u64): u64 {
+        x: u64 = Add<u64>(x, 1);
+        x
+    }
+    spec {
+      requires Lt($t0, 1000);
+      ensures Eq<u64>(result0(), Add($t0, 1));
+    }
+
+    private fun read(r: &u64): u64 {
+        Deref(r)
+    }
+    spec {
+      ensures Eq<u64>(result0(), $t0);
+    }
+
+    private fun receiver_caller(v: &V): u64 {
+        {
+          let n: u64 = 0;
+          {
+            let (self: &V): (&V) = Tuple(v);
+            n: u64 = Add<u64>(n, 1)
+          };
+          n
+        }
+    }
+    spec {
+      ensures Eq<u64>(result0(), 1);
+    }
+
 } // end 0x42::retained_mut_capture
 
 
 ============ disassembled file-format ==================
 // Bytecode version v10
 module 0x42::retained_mut_capture
+struct S has copy + drop
+  x: u64
+  y: u64
+
+struct V has drop
+  items: vector<u64>
+
 // Function definition at index 0
 fun caller(): u64
     ld_u64 0
     ld_u64 1
     add
+    ret
+
+// Function definition at index 1
+fun field_caller(): u64
+    local l0: S
+    ld_u64 1
+    ld_u64 7
+    pack S
+    st_loc l0
+    borrow_loc l0
+    // @5
+    borrow_field S, x
+    read_ref
+    ld_u64 1
+    add
+    mut_borrow_loc l0
+    // @10
+    mut_borrow_field S, x
+    write_ref
+    borrow_loc l0
+    borrow_field S, x
+    read_ref
+    // @15
+    borrow_loc l0
+    borrow_field S, y
+    read_ref
+    add
+    ret
+
+// Function definition at index 2
+fun freeze_caller(): u64
+    local l0: u64
+    ld_u64 1
+    st_loc l0
+    copy_loc l0
+    borrow_loc l0
+    call read
+    // @5
+    add
+    ld_u64 1
+    add
+    ret
+
+// Function definition at index 3
+fun param_caller(l0: u64): u64
+    move_loc l0
+    ld_u64 1
+    add
+    ret
+
+// Function definition at index 4
+fun read(l0: &u64): u64
+    move_loc l0
+    read_ref
+    ret
+
+// Function definition at index 5
+fun receiver_caller(l0: &V): u64
+    ld_u64 0
+    move_loc l0
+    pop
+    ld_u64 1
+    add
+    // @5
     ret
 
 

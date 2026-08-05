@@ -1,0 +1,62 @@
+Move prover returns: exiting with verification errors
+error: global memory invariant does not hold
+   ┌─ tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:12:9
+   │
+12 │         invariant forall a: address where exists<R>(a): global<R>(a).value < 1000;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:69: test_invariant_violated
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:70: test_invariant_violated
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:71: test_invariant_violated
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:20: modify (spec)
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:71: test_invariant_violated
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:12
+
+error: precondition does not hold at this call
+   ┌─ tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:20:9
+   │
+20 │         requires !aborts_of<f>(1);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:40: test_abort_not_discharged
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:41: test_abort_not_discharged
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:42: test_abort_not_discharged
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:20: modify (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:36:9
+   │
+36 │         ensures result == 12; // error: post-condition does not hold
+   │         ^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:27: test_wrong_post
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:28: test_wrong_post
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:29: test_wrong_post
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:20: modify (spec)
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:29: test_wrong_post
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:33: test_wrong_post
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:26: test_wrong_post
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:36: test_wrong_post (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:63:9
+   │
+63 │         ensures global<R>(a).value == old(global<R>(a).value) + 2; // error: post-condition does not hold
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:53: test_wrong_global_post
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:61: test_wrong_global_post (spec)
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:53: test_wrong_global_post
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:54: test_wrong_global_post
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:55: test_wrong_global_post
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:20: modify (spec)
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:55: test_wrong_global_post
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:12
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:62: test_wrong_global_post (spec)
+   =     at tests/sources/functional/closures/inline/opaque_inline_mut_ref_capture_fail.move:63: test_wrong_global_post (spec)

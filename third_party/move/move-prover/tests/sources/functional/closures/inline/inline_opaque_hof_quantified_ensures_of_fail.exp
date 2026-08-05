@@ -1,0 +1,8 @@
+Move prover returns: exiting with compilation errors
+error: cannot capture a mutable reference in a closure requiring the `copy` ability
+   ┌─ tests/sources/functional/closures/inline/inline_opaque_hof_quantified_ensures_of_fail.move:36:29
+   │
+36 │         for_each_ref(v, |e| s = s + *e spec { // error: cannot capture a mutable reference in a closure requiring the `copy` ability
+   │                             ^
+   │
+   = expected function type: `|&u64| has copy + drop`

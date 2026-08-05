@@ -10,7 +10,7 @@ use itertools::Itertools;
 use move_core_types::function::ClosureMask;
 use move_model::{
     ast,
-    ast::{Exp, ExpData, MemoryLabel, QuantKind, RewriteResult, TempIndex, Value},
+    ast::{BehaviorKind, Exp, ExpData, MemoryLabel, QuantKind, RewriteResult, TempIndex, Value},
     exp_generator::ExpGenerator,
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     memory_labels::all_labels_in_exp,
@@ -21,6 +21,7 @@ use move_model::{
     ty::{ReferenceKind, Type, TypeDisplayContext, BOOL_TYPE, NUM_TYPE},
 };
 use move_stackless_bytecode::{
+    borrow_analysis::mut_capture_carrying_temps,
     function_data_builder::FunctionDataBuilder,
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{
@@ -373,6 +374,8 @@ struct Instrumenter<'a> {
     /// Counter for deterministic label freshening across opaque call sites.
     /// Starts at 0 so that freshened labels are independent of the global counter.
     freshen_counter: usize,
+    /// Temps holding closure values which capture mutable references.
+    carrying_temps: BTreeSet<TempIndex>,
 }
 
 // =================================================================================================
@@ -440,6 +443,7 @@ impl<'a> Instrumenter<'a> {
         let spec = SpecTranslator::translate_fun_spec(
             auto_trace,
             false,
+            options.inference,
             &mut builder,
             fun_env,
             &[],
@@ -458,6 +462,7 @@ impl<'a> Instrumenter<'a> {
                     SpecTranslator::translate_inline_property(
                         &loc,
                         auto_trace,
+                        options.inference,
                         &mut builder,
                         &prop,
                     ),
@@ -475,6 +480,14 @@ impl<'a> Instrumenter<'a> {
                     .get_all_inst(&builder.data.type_args);
         }
 
+        // Temps holding closure values which capture mutable references. They are
+        // treated like `&mut` arguments at opaque call sites (captured mutation
+        // values havoced, constrained by behavioral post conditions).
+        let carrying_temps = mut_capture_carrying_temps(
+            &FunctionTarget::new(fun_env, &builder.data),
+            &builder.data.code,
+        );
+
         // Create and run the instrumenter.
         let mut instrumenter = Instrumenter {
             options,
@@ -486,6 +499,7 @@ impl<'a> Instrumenter<'a> {
             mem_info: &mem_info,
             split_points: vec![],
             freshen_counter: 0,
+            carrying_temps,
         };
         // Always inline spec lets in proof actions, independent of the
         // `inline_spec_lets` option. Proof-action exps are recorded in
@@ -763,6 +777,7 @@ impl<'a> Instrumenter<'a> {
         let mut callee_spec = SpecTranslator::translate_fun_spec(
             self.options.auto_trace_level.functions(),
             true,
+            self.options.inference,
             &mut self.builder,
             &callee_env,
             targs,
@@ -980,9 +995,40 @@ impl<'a> Instrumenter<'a> {
                 });
             }
 
+            // Havoc the captured mutation values of closure arguments which capture
+            // mutable references; like for `&mut` parameters, their post-values are
+            // determined by the callee's (behavioral) post conditions.
+            let carrying_srcs = srcs
+                .iter()
+                .cloned()
+                .filter(|src| self.carrying_temps.contains(src))
+                .collect_vec();
+            for src in &carrying_srcs {
+                self.builder.emit_with(|id| {
+                    Call(
+                        id,
+                        vec![*src],
+                        Operation::Havoc(HavocKind::CaptureValues),
+                        vec![],
+                        None,
+                    )
+                });
+            }
+
+            // A closure carrying captured mutations has a single havoced post
+            // value per captured location, so more than one `ensures_of` condition
+            // over it would assume constraints about different applications on the
+            // same value, which is unsatisfiable in general (vacuity). Reject.
+            let call_loc = self.builder.get_loc(id);
+            self.check_single_ensures_of_for_carrying(&callee_spec, &carrying_srcs, &call_loc);
+
             // Emit placeholders for assuming well-formedness of return values and mutable ref
             // parameters.
-            for idx in mut_srcs.into_iter().chain(dests.iter().cloned()) {
+            for idx in mut_srcs
+                .into_iter()
+                .chain(carrying_srcs)
+                .chain(dests.iter().cloned())
+            {
                 let exp = self
                     .builder
                     .mk_call(&BOOL_TYPE, ast::Operation::WellFormed, vec![self
@@ -1110,6 +1156,56 @@ impl<'a> Instrumenter<'a> {
 // # Spec Condition Emission
 
 impl<'a> Instrumenter<'a> {
+    /// Checks that at most one `ensures_of` condition constrains each closure
+    /// argument carrying captured mutations. The call-site model havocs each
+    /// captured location once and threads a single post value, so multiple
+    /// `ensures_of` conditions over the same closure would assume constraints
+    /// about different applications on that one value, which is unsatisfiable
+    /// in general and makes the verification context vacuous.
+    fn check_single_ensures_of_for_carrying(
+        &self,
+        callee_spec: &TranslatedSpec,
+        carrying_srcs: &[TempIndex],
+        loc: &Loc,
+    ) {
+        if carrying_srcs.is_empty() {
+            return;
+        }
+        // Behavioral predicate args may reference the pre-state snapshot temp of
+        // the closure argument; resolve those back to the original temp.
+        let unsaved: BTreeMap<TempIndex, TempIndex> = callee_spec
+            .saved_params
+            .iter()
+            .map(|(orig, saved)| (*saved, *orig))
+            .collect();
+        let mut counts: BTreeMap<TempIndex, usize> = BTreeMap::new();
+        for (_, cond) in &callee_spec.post {
+            cond.visit_pre_order(&mut |e| {
+                if let ExpData::Call(
+                    _,
+                    ast::Operation::Behavior(BehaviorKind::EnsuresOf, _),
+                    args,
+                ) = e
+                {
+                    if let Some(ExpData::Temporary(_, idx)) = args.first().map(|a| a.as_ref()) {
+                        let orig = unsaved.get(idx).copied().unwrap_or(*idx);
+                        if carrying_srcs.contains(&orig) {
+                            *counts.entry(orig).or_insert(0) += 1;
+                        }
+                    }
+                }
+                true
+            });
+        }
+        if counts.values().any(|count| *count > 1) {
+            self.builder.global_env().error(
+                loc,
+                "more than one `ensures_of` condition over a function value carrying \
+                 mutable reference captures cannot be used in an opaque spec",
+            );
+        }
+    }
+
     fn emit_save_for_old(&mut self, vars: &BTreeMap<TempIndex, TempIndex>) {
         use Bytecode::*;
         for (idx, saved_idx) in vars {
