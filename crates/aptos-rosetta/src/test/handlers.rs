@@ -9,12 +9,12 @@
 //! Phase 1a seam enables offline handler testing).
 
 use crate::{
-    common::{get_account, native_coin},
+    common::get_account,
     error::ApiError,
     node_client::MockNodeClient,
     types::{
         get_stake_balances, AccountIdentifier, NetworkIdentifier, NetworkListResponse,
-        NetworkOptionsResponse, NetworkRequest,
+        NetworkOptionsResponse, NetworkRequest, OperationType,
     },
     RosettaContext,
 };
@@ -155,6 +155,22 @@ async fn get_stake_balances_returns_none_when_pool_missing() {
         .await
         .expect("missing pool should be Ok(None), not an error");
     assert!(result.is_none());
-    // Sanity: the native coin currency is what stake balances report in.
-    let _ = native_coin();
+}
+
+/// The BC-6 guard: `OperationType::all()` drives
+/// `network/options.allow.operation_types`, and it is a hand-maintained `Vec` —
+/// exactly how `update_commission` went missing.  A `len()` assertion alone
+/// can't catch the next omission, so compare against the real variant list.
+#[test]
+fn all_lists_every_operation_type_variant() {
+    use strum::IntoEnumIterator;
+
+    let from_iter: HashSet<OperationType> = OperationType::iter().collect();
+    let from_all: HashSet<OperationType> = OperationType::all().into_iter().collect();
+
+    assert_eq!(
+        from_all, from_iter,
+        "OperationType::all() is out of sync with the enum; a variant was added \
+         without listing it in all(), so /network/options would never advertise it"
+    );
 }

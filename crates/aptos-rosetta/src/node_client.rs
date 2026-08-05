@@ -114,10 +114,6 @@ impl RestNodeClient {
             inner: Arc::new(client),
         }
     }
-
-    pub fn from_arc(client: Arc<Client>) -> Self {
-        Self { inner: client }
-    }
 }
 
 #[async_trait::async_trait]

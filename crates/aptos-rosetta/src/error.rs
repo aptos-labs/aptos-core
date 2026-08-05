@@ -14,7 +14,11 @@ pub type ApiResult<T> = Result<T, ApiError>;
 
 /// All Rosetta API errors.  Note that all details must be `Option<T>` to make it easier to list all
 /// error messages in the `ApiError::all()` call required by the Rosetta spec.
+///
+/// `EnumIter` is derived under `cfg(test)` only, so `test::errors` can prove
+/// [`ApiError::all()`] lists every variant (see BC-6 for the bug class it guards).
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(strum_macros::EnumIter))]
 pub enum ApiError {
     TransactionIsPending,
     NetworkIdentifierMismatch,
@@ -214,6 +218,11 @@ impl ApiError {
     }
 
     /// Details are optional, but give more details for each error message
+    ///
+    /// Exhaustive on purpose (no `_` arm): a new variant must decide whether it
+    /// surfaces details, rather than silently defaulting to `None`.  See the
+    /// `NO DETAILS ON THE WIRE` group below for three variants that carry an
+    /// `Option<String>` payload which is deliberately *not* surfaced today.
     pub fn details(self) -> Option<ErrorDetails> {
         match self {
             ApiError::DeserializationFailed(inner) => inner,
@@ -241,7 +250,27 @@ impl ApiError {
             ApiError::MempoolIsFull(inner) => inner,
             ApiError::GasEstimationFailed(inner) => inner,
             ApiError::MaxGasFeeTooLow(inner) => inner,
-            _ => None,
+
+            // ---- NO DETAILS ON THE WIRE ----
+            // Variants with no payload to surface.
+            ApiError::TransactionIsPending
+            | ApiError::NetworkIdentifierMismatch
+            | ApiError::ChainIdMismatch
+            | ApiError::InvalidSignatureType
+            | ApiError::InvalidMaxGasFees
+            | ApiError::InvalidGasMultiplier
+            | ApiError::MissingPayloadMetadata
+            | ApiError::NodeIsOffline => None,
+
+            // These three DO carry an `Option<String>` (e.g. `From<RestError>`
+            // populates them from the node's error message) but have never
+            // surfaced it, because the old `_ => None` arm swallowed them.
+            // Preserved as-is to keep this change behavior-neutral; surfacing
+            // them would add a `details` field to codes 34/35/36 and needs its
+            // own BEHAVIOR_CHANGES entry + golden update.
+            ApiError::StateValueNotFound(_)
+            | ApiError::RejectedByFilter(_)
+            | ApiError::RateLimited(_) => None,
         }
         .map(|details| ErrorDetails { details })
     }
@@ -258,9 +287,14 @@ impl ApiError {
 
 impl From<ApiError> for types::Error {
     fn from(error: ApiError) -> Self {
-        let message = error.message().to_string();
-        let code = error.code();
-        let retriable = error.retriable();
+        // One `info()` lookup for all three wire fields (BC-3's whole point);
+        // `details()` consumes `error`, so it has to come last.
+        let ErrorInfo {
+            code,
+            retriable,
+            message,
+        } = error.info();
+        let message = message.to_string();
         let details = error.details();
         types::Error {
             message,

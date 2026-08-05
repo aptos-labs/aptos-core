@@ -95,7 +95,15 @@ async fn network_status_reports_current_oldest_and_genesis() {
     });
     // Only the current (non-genesis) block requires a node fetch; oldest = 0 and
     // genesis are hardcoded.
+    //
+    // `network_status` calls `get_block_info_by_height` three times (genesis,
+    // oldest, current), but that helper short-circuits `height == 0` with a
+    // hardcoded genesis `BlockInfo` (`block.rs`), and `oldest_block_height` is 0
+    // here -- so exactly ONE call reaches the node.  Pinned at 1 so losing that
+    // short-circuit (3 fetches instead of 1) fails here instead of silently
+    // tripling round trips on every /network/status.
     mock.expect_get_block_by_height_bcs()
+        .times(1)
         .returning(move |height, _with_txns| {
             Box::pin(async move {
                 Ok(Response::new(
@@ -140,6 +148,7 @@ async fn block_drops_empty_transactions_by_default() {
     let mut mock = MockNodeClient::new();
     // Full block (with transactions) for the requested height...
     mock.expect_get_full_block_by_height_bcs()
+        .times(1)
         .returning(move |h, _page| {
             Box::pin(async move {
                 Ok(Response::new(
@@ -150,6 +159,7 @@ async fn block_drops_empty_transactions_by_default() {
         });
     // ...and the parent block (without transactions) for the identifier.
     mock.expect_get_block_by_height_bcs()
+        .times(1)
         .returning(move |h, _with| {
             Box::pin(async move { Ok(Response::new(bcs_block(h, ts_usecs, None), dummy_state())) })
         });

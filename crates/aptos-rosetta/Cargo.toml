@@ -42,4 +42,6 @@ warp = { workspace = true }
 
 [dev-dependencies]
 mockall = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
 wiremock = { workspace = true }

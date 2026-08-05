@@ -13,6 +13,7 @@ use aptos_rest_client::{
     aptos_api_types::{AptosError, AptosErrorCode},
     error::{AptosErrorResponse, RestError},
 };
+use strum::IntoEnumIterator;
 
 /// The golden error table: (code, retriable, message).  Ordered by code.
 /// Any change to a message/code/retriable flag must be reflected here.
@@ -104,6 +105,29 @@ fn every_error_is_http_500() {
             warp::http::StatusCode::INTERNAL_SERVER_ERROR
         );
     }
+}
+
+/// Guards the BC-6 bug class: `all()` is a hand-maintained `Vec`, so a newly
+/// added variant can be forgotten there and silently vanish from
+/// `network/options.allow.errors`.  `error_codes_are_unique_and_cover_1_through_36`
+/// does NOT catch that (a 37th variant leaves 1..=36 intact), so compare against
+/// the real variant list instead.
+///
+/// Every payload is `Option<_>`, whose `Default` is `None` — exactly what `all()`
+/// constructs — so `EnumIter`'s values compare equal to `all()`'s.
+#[test]
+fn all_lists_every_api_error_variant() {
+    let mut from_iter: Vec<ApiError> = ApiError::iter().collect();
+    let mut from_all = ApiError::all();
+    from_iter.sort_by_key(|err| err.code());
+    from_all.sort_by_key(|err| err.code());
+
+    assert_eq!(
+        from_all, from_iter,
+        "ApiError::all() is out of sync with the enum; a variant was added \
+         without listing it in all(), so it would never be advertised on \
+         /network/options"
+    );
 }
 
 #[test]

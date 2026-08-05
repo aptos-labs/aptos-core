@@ -108,7 +108,14 @@ pub struct BalanceResult {
 /// NOTE: Order is important here for sorting later, this order must not change, and if there are new
 /// types added, they should be added before Fee.  We sort the sub operations so that they have a
 /// stable order for things like transfers.
+///
+/// `EnumIter` is derived under `cfg(test)` only, so `test::handlers` can prove
+/// [`OperationType::all()`] lists every variant.  It is deliberately NOT used to
+/// generate `all()`: this declaration order differs from `all()`'s (Fee is last
+/// here, 4th there), and `all()` feeds `network/options`, so generating it would
+/// reorder that JSON array.  See BC-6.
 #[derive(Clone, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+#[cfg_attr(test, derive(strum_macros::EnumIter))]
 pub enum OperationType {
     // Create must always be first for ordering
     CreateAccount,

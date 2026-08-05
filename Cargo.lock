@@ -4139,6 +4139,8 @@ dependencies = [
  "reqwest 0.11.23",
  "serde",
  "serde_json",
+ "strum 0.27.1",
+ "strum_macros 0.27.1",
  "tokio",
  "url",
  "warp",
