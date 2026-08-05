@@ -11,7 +11,7 @@ use aptos_crypto::HashValue;
 use aptos_logger::{info, warn};
 use aptos_types::account_address::AccountAddress;
 use arc_swap::ArcSwap;
-use dashmap::DashMap;
+use dashmap::{mapref::entry::Entry, DashMap};
 use once_cell::sync::Lazy;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
@@ -31,10 +31,20 @@ const GC_TTL_USECS: u64 = 60_000_000;
 /// traces ≈ 10MB — well within safe limits.
 const MAX_TRACES: usize = 10_000;
 
+/// Identifies the API request that owns a pending pre-mempool trace.
+///
+/// A token prevents concurrent submissions of the same signed transaction
+/// from recording stages on, or cleaning up, another request's trace.
+#[derive(Debug)]
+pub struct ApiTraceToken {
+    hash: HashValue,
+    generation: u64,
+}
+
 /// Global store for transaction lifecycle traces.
 ///
 /// Thread-safe via DashMap. Only traces transactions whose sender is in the
-/// allowlist (checked at mempool insertion time via `maybe_start_trace`).
+/// allowlist (checked at API handler entry or mempool insertion).
 pub struct TransactionTraceStore {
     /// Active traces keyed by transaction hash.
     traces: DashMap<HashValue, TransactionTrace>,
@@ -51,6 +61,7 @@ pub struct TransactionTraceStore {
     /// Timestamp (usecs) of the last GC sweep. Used by `finalize_trace()` to
     /// throttle periodic GC to once per `GC_INTERVAL_USECS`.
     last_gc_usecs: AtomicU64,
+    next_api_generation: AtomicU64,
 }
 
 impl TransactionTraceStore {
@@ -61,6 +72,7 @@ impl TransactionTraceStore {
             block_txns: DashMap::new(),
             filter: ArcSwap::new(Arc::new(TransactionFilter::default())),
             last_gc_usecs: AtomicU64::new(0),
+            next_api_generation: AtomicU64::new(1),
         }
     }
 
@@ -83,31 +95,119 @@ impl TransactionTraceStore {
         self.filter.load().should_sample_batch(pull_round)
     }
 
+    /// Starts a trace after the API has decoded enough of the request to know
+    /// the transaction hash. The supplied timestamp should be captured at API
+    /// handler entry so it includes API verification and conversion time.
+    pub fn maybe_start_api_trace(
+        &self,
+        hash: HashValue,
+        sender: AccountAddress,
+        handler_enter_usecs: u64,
+    ) -> Option<ApiTraceToken> {
+        if !self.filter.load().should_trace(&sender, &hash) {
+            return None;
+        }
+        // API futures can be cancelled after creating pending state. Running
+        // the throttled GC here ensures those entries are eventually reclaimed
+        // even if no trace reaches a terminal pipeline stage.
+        self.maybe_gc();
+        if self.traces.len() >= MAX_TRACES {
+            return None;
+        }
+        let generation = self.next_api_generation.fetch_add(1, Ordering::Relaxed);
+        match self.traces.entry(hash) {
+            Entry::Occupied(_) => None,
+            Entry::Vacant(entry) => {
+                entry.insert(TransactionTrace::new_at_api(
+                    hash,
+                    sender,
+                    handler_enter_usecs,
+                    generation,
+                ));
+                Some(ApiTraceToken { hash, generation })
+            },
+        }
+    }
+
     /// Called at mempool insertion. Checks if sender is in allowlist + txn sampling,
-    /// creates trace if matched. Returns true if trace was started.
+    /// creates a trace if matched, or continues one started by the API.
+    /// Returns true if the mempool-relative timeline was started.
     pub fn maybe_start_trace(
         &self,
         hash: HashValue,
         sender: AccountAddress,
         now_usecs: u64,
     ) -> bool {
-        let filter = self.filter.load();
-        if !filter.should_trace(&sender, &hash) {
-            return false;
+        let should_start_new =
+            self.filter.load().should_trace(&sender, &hash) && self.traces.len() < MAX_TRACES;
+        match self.traces.entry(hash) {
+            Entry::Occupied(mut entry) => {
+                let trace = entry.get_mut();
+                if trace.sender != sender || !trace.start_at_mempool(now_usecs) {
+                    return false;
+                }
+                observe_stage_latency(
+                    now_usecs,
+                    &trace.sender_str,
+                    TransactionStage::MempoolInsert.as_ref(),
+                );
+                true
+            },
+            Entry::Vacant(entry) => {
+                if !should_start_new {
+                    return false;
+                }
+                let mut trace = TransactionTrace::new(hash, sender, now_usecs);
+                trace.record(TransactionStage::MempoolInsert, now_usecs);
+                observe_stage_latency(
+                    now_usecs,
+                    &trace.sender_str,
+                    TransactionStage::MempoolInsert.as_ref(),
+                );
+                entry.insert(trace);
+                true
+            },
         }
-        // Cap concurrent traces to prevent unbounded memory growth.
-        if self.traces.len() >= MAX_TRACES {
-            return false;
+    }
+
+    /// Records an API stage only for a trace started at API handler entry.
+    /// Each API stage is idempotent so duplicate submissions cannot append
+    /// ambiguous timestamps to an already-active trace.
+    pub fn record_api_stage(&self, token: &ApiTraceToken, stage: TransactionStage) -> bool {
+        self.record_api_stage_at(token, stage, now_usecs())
+    }
+
+    pub fn record_api_stage_at(
+        &self,
+        token: &ApiTraceToken,
+        stage: TransactionStage,
+        timestamp_usecs: u64,
+    ) -> bool {
+        debug_assert!(stage.is_api_stage());
+        if let Some(mut trace) = self.traces.get_mut(&token.hash)
+            && trace.api_generation == Some(token.generation)
+            && !trace.has_stage(stage)
+        {
+            trace.record(stage, timestamp_usecs);
+            return true;
         }
-        let mut trace = TransactionTrace::new(hash, sender, now_usecs);
-        trace.record(TransactionStage::MempoolInsert, now_usecs);
-        observe_stage_latency(
-            now_usecs,
-            &trace.sender_str,
-            TransactionStage::MempoolInsert.as_ref(),
-        );
-        self.traces.insert(hash, trace);
-        true
+        false
+    }
+
+    /// Removes a pre-mempool trace when its owning API request is rejected or
+    /// cancelled. Once mempool has promoted the trace, cleanup is a no-op.
+    pub fn cancel_api_trace(&self, token: ApiTraceToken) -> bool {
+        if let Entry::Occupied(entry) = self.traces.entry(token.hash) {
+            let trace = entry.get();
+            if trace.api_generation == Some(token.generation)
+                && trace.insertion_time_usecs.is_none()
+            {
+                entry.remove();
+                self.maybe_gc();
+                return true;
+            }
+        }
+        false
     }
 
     /// Record a stage for a traced transaction using the local clock.
@@ -118,11 +218,12 @@ impl TransactionTraceStore {
     /// Record a stage with an explicit timestamp (e.g., block.timestamp_usecs).
     pub fn record_stage_at(&self, hash: &HashValue, stage: TransactionStage, timestamp_usecs: u64) {
         if let Some(mut trace) = self.traces.get_mut(hash) {
-            observe_stage_latency(
-                trace.insertion_time_usecs,
-                &trace.sender_str,
-                stage.as_ref(),
-            );
+            let Some(insertion_time_usecs) = trace.insertion_time_usecs else {
+                return;
+            };
+            if !stage.is_api_stage() {
+                observe_stage_latency(insertion_time_usecs, &trace.sender_str, stage.as_ref());
+            }
             trace.record(stage, timestamp_usecs);
         }
     }
@@ -146,6 +247,9 @@ impl TransactionTraceStore {
         timestamp_usecs: u64,
     ) {
         if let Some(mut trace) = self.traces.get_mut(hash) {
+            let Some(insertion_time_usecs) = trace.insertion_time_usecs else {
+                return;
+            };
             let stage_label = match &metadata {
                 StageMetadata::Execution(status) => {
                     format!("{}({})", stage.as_ref(), status.as_ref())
@@ -156,7 +260,7 @@ impl TransactionTraceStore {
                 StageMetadata::BatchPull(_) => stage.as_ref().to_string(),
                 StageMetadata::BlockProposal(_) => stage.as_ref().to_string(),
             };
-            observe_stage_latency(trace.insertion_time_usecs, &trace.sender_str, &stage_label);
+            observe_stage_latency(insertion_time_usecs, &trace.sender_str, &stage_label);
             trace.record_with_metadata(stage, timestamp_usecs, metadata);
         }
     }
@@ -229,7 +333,7 @@ impl TransactionTraceStore {
     pub fn register_batch(&self, batch_digest: HashValue, txn_hashes: &[HashValue]) {
         let traced: Vec<HashValue> = txn_hashes
             .iter()
-            .filter(|h| self.traces.contains_key(*h))
+            .filter(|h| self.is_traced(h))
             .copied()
             .collect();
         if !traced.is_empty() {
@@ -380,21 +484,26 @@ impl TransactionTraceStore {
 
     /// Check if a transaction hash has an active trace.
     pub fn is_traced(&self, hash: &HashValue) -> bool {
-        self.traces.contains_key(hash)
+        self.traces
+            .get(hash)
+            .is_some_and(|trace| trace.insertion_time_usecs.is_some())
     }
 
     /// Record the gas unit price for a traced transaction (set once at first pull).
     pub fn set_gas_unit_price(&self, hash: &HashValue, gas_unit_price: u64) {
-        if let Some(mut trace) = self.traces.get_mut(hash) {
-            if trace.gas_unit_price.is_none() {
-                trace.gas_unit_price = Some(gas_unit_price);
-            }
+        if let Some(mut trace) = self.traces.get_mut(hash)
+            && trace.insertion_time_usecs.is_some()
+            && trace.gas_unit_price.is_none()
+        {
+            trace.gas_unit_price = Some(gas_unit_price);
         }
     }
 
     /// Mark a transaction for retry: increment its attempt counter.
     pub fn mark_retry(&self, hash: &HashValue) {
-        if let Some(mut trace) = self.traces.get_mut(hash) {
+        if let Some(mut trace) = self.traces.get_mut(hash)
+            && trace.insertion_time_usecs.is_some()
+        {
             trace.current_attempt += 1;
         }
     }
@@ -432,6 +541,7 @@ impl TransactionTraceStore {
     pub fn get_all_traces(&self) -> Vec<(HashValue, TransactionTrace)> {
         self.traces
             .iter()
+            .filter(|entry| entry.value().insertion_time_usecs.is_some())
             .map(|entry| (*entry.key(), entry.value().clone()))
             .collect()
     }
@@ -452,14 +562,14 @@ impl TransactionTraceStore {
         let cutoff = now_usecs().saturating_sub(ttl_usecs);
         let mut evicted = 0u64;
         self.traces.retain(|_, trace| {
-            if trace.insertion_time_usecs > cutoff {
+            if trace.trace_start_time_usecs > cutoff {
                 return true;
             }
             // Log the orphaned trace before evicting so partial pipeline data is visible.
             warn!(LogSchema::new(LogEvent::TxnTraceEvicted)
                 .hash(trace.hash)
                 .sender(trace.sender)
-                .age_ms(now_usecs().saturating_sub(trace.insertion_time_usecs) / 1000)
+                .age_ms(now_usecs().saturating_sub(trace.trace_start_time_usecs) / 1000)
                 .num_stages(trace.stages.len()));
             evicted += 1;
             false
@@ -655,7 +765,9 @@ fn build_wait_summary(
 }
 
 fn log_trace(trace: &TransactionTrace) {
-    let base = trace.insertion_time_usecs;
+    let base = trace
+        .insertion_time_usecs
+        .unwrap_or(trace.trace_start_time_usecs);
 
     // Sort stages by timestamp so concurrent pipeline stages appear in order.
     let mut sorted_stages = trace.stages.clone();
@@ -680,10 +792,10 @@ fn log_trace(trace: &TransactionTrace) {
     let mut first_pull_per_attempt: std::collections::HashMap<u32, &crate::types::BatchPullInfo> =
         std::collections::HashMap::new();
     for record in &sorted_stages {
-        if record.stage == TransactionStage::QsBatchPull {
-            if let Some(StageMetadata::BatchPull(info)) = &record.metadata {
-                first_pull_per_attempt.entry(record.attempt).or_insert(info);
-            }
+        if record.stage == TransactionStage::QsBatchPull
+            && let Some(StageMetadata::BatchPull(info)) = &record.metadata
+        {
+            first_pull_per_attempt.entry(record.attempt).or_insert(info);
         }
     }
     for record in &sorted_stages {
@@ -701,20 +813,20 @@ fn log_trace(trace: &TransactionTrace) {
             }
             // Emit wait() at the start of the new attempt (using the first
             // QsBatchPull's metadata), before whatever stage comes first.
-            if display_attempt > shown_wait_for_attempt {
-                if let Some(info) = first_pull_per_attempt.get(&display_attempt) {
-                    // Find the QsBatchPull timestamp for this attempt.
-                    if let Some(pull_record) = sorted_stages.iter().find(|r| {
-                        r.stage == TransactionStage::QsBatchPull && r.attempt == display_attempt
-                    }) {
-                        stage_parts.push(build_wait_summary(
-                            info,
-                            prev_stage_usecs,
-                            pull_record.timestamp_usecs,
-                        ));
-                    }
-                    shown_wait_for_attempt = display_attempt;
+            if display_attempt > shown_wait_for_attempt
+                && let Some(info) = first_pull_per_attempt.get(&display_attempt)
+            {
+                // Find the QsBatchPull timestamp for this attempt.
+                if let Some(pull_record) = sorted_stages.iter().find(|r| {
+                    r.stage == TransactionStage::QsBatchPull && r.attempt == display_attempt
+                }) {
+                    stage_parts.push(build_wait_summary(
+                        info,
+                        prev_stage_usecs,
+                        pull_record.timestamp_usecs,
+                    ));
                 }
+                shown_wait_for_attempt = display_attempt;
             }
         }
 
@@ -785,7 +897,27 @@ fn log_trace(trace: &TransactionTrace) {
         }
     };
 
-    let scalars = build_first_attempt_scalars(&sorted_stages, base);
+    let mut scalars = build_first_attempt_scalars(&sorted_stages, base);
+    let api_handler_enter_timestamp_usecs = sorted_stages
+        .iter()
+        .find(|record| record.stage == TransactionStage::ApiHandlerEnter)
+        .map(|record| record.timestamp_usecs);
+    let api_transaction_decoded_timestamp_usecs = sorted_stages
+        .iter()
+        .find(|record| record.stage == TransactionStage::ApiTransactionDecoded)
+        .map(|record| record.timestamp_usecs);
+    let api_mempool_submit_timestamp_usecs = sorted_stages
+        .iter()
+        .find(|record| record.stage == TransactionStage::ApiMempoolSubmit)
+        .map(|record| record.timestamp_usecs);
+    let api_mempool_accepted_timestamp_usecs = sorted_stages
+        .iter()
+        .find(|record| record.stage == TransactionStage::ApiMempoolAccepted)
+        .map(|record| record.timestamp_usecs);
+    let mempool_insert_timestamp_usecs = trace.insertion_time_usecs;
+    scalars.api_to_mempool_ms = api_handler_enter_timestamp_usecs
+        .zip(mempool_insert_timestamp_usecs)
+        .map(|(api_usecs, mempool_usecs)| mempool_usecs.saturating_sub(api_usecs) as i64 / 1000);
 
     let mut schema = LogSchema::new(LogEvent::TxnTrace)
         .hash(trace.hash)
@@ -807,8 +939,28 @@ fn log_trace(trace: &TransactionTrace) {
         };
     }
     set_if_some!(trace, gas_unit_price);
+    if let Some(timestamp_usecs) = api_handler_enter_timestamp_usecs {
+        schema = schema.api_handler_enter_timestamp_usecs(timestamp_usecs);
+    }
+    if let Some(timestamp_usecs) = api_transaction_decoded_timestamp_usecs {
+        schema = schema.api_transaction_decoded_timestamp_usecs(timestamp_usecs);
+    }
+    if let Some(timestamp_usecs) = api_mempool_submit_timestamp_usecs {
+        schema = schema.api_mempool_submit_timestamp_usecs(timestamp_usecs);
+    }
+    if let Some(timestamp_usecs) = api_mempool_accepted_timestamp_usecs {
+        schema = schema.api_mempool_accepted_timestamp_usecs(timestamp_usecs);
+    }
+    if let Some(timestamp_usecs) = mempool_insert_timestamp_usecs {
+        schema = schema.mempool_insert_timestamp_usecs(timestamp_usecs);
+    }
     set_if_some!(
         scalars,
+        api_handler_enter_ms,
+        api_transaction_decoded_ms,
+        api_mempool_submit_ms,
+        api_mempool_accepted_ms,
+        api_to_mempool_ms,
         mempool_insert_ms,
         qs_batch_pull_ms,
         qs_batch_created_ms,
@@ -838,6 +990,11 @@ fn log_trace(trace: &TransactionTrace) {
 /// detail lives in the `stages` text string.
 #[derive(Debug, Default)]
 struct StageScalars {
+    api_handler_enter_ms: Option<i64>,
+    api_transaction_decoded_ms: Option<i64>,
+    api_mempool_submit_ms: Option<i64>,
+    api_mempool_accepted_ms: Option<i64>,
+    api_to_mempool_ms: Option<i64>,
     mempool_insert_ms: Option<i64>,
     qs_batch_pull_ms: Option<i64>,
     qs_batch_created_ms: Option<i64>,
@@ -893,10 +1050,14 @@ fn build_first_attempt_scalars(
         if effective_attempt != 1 {
             continue;
         }
-        // Absolute latency in ms from `base` (MempoolInsert time). Can be
-        // negative for `BlockProposed` (proposer's clock).
+        // Absolute latency in ms from `base` (MempoolInsert time). API stages
+        // and BlockProposed (on the proposer's clock) can be negative.
         let abs_ms = (record.timestamp_usecs as i64 - base as i64) / 1000;
         let slot: &mut Option<i64> = match record.stage {
+            TransactionStage::ApiHandlerEnter => &mut scalars.api_handler_enter_ms,
+            TransactionStage::ApiTransactionDecoded => &mut scalars.api_transaction_decoded_ms,
+            TransactionStage::ApiMempoolSubmit => &mut scalars.api_mempool_submit_ms,
+            TransactionStage::ApiMempoolAccepted => &mut scalars.api_mempool_accepted_ms,
             TransactionStage::MempoolInsert => &mut scalars.mempool_insert_ms,
             TransactionStage::QsBatchPull => &mut scalars.qs_batch_pull_ms,
             TransactionStage::QsBatchCreated => &mut scalars.qs_batch_created_ms,
@@ -960,6 +1121,100 @@ mod tests {
         let other = AccountAddress::random();
         let other_hash = HashValue::random();
         assert!(!store.maybe_start_trace(other_hash, other, 1000));
+    }
+
+    #[test]
+    fn test_api_trace_continues_at_mempool_without_changing_base_semantics() {
+        let store = TransactionTraceStore::new();
+        let sender = AccountAddress::random();
+        let hash = HashValue::random();
+
+        let mut allowlist = std::collections::HashSet::new();
+        allowlist.insert(sender);
+        store.update_filter(TransactionFilter::new(true, allowlist, 1.0, 1.0));
+
+        let token = store
+            .maybe_start_api_trace(hash, sender, 100_000)
+            .expect("API trace should start");
+        assert!(store.record_api_stage_at(
+            &token,
+            TransactionStage::ApiTransactionDecoded,
+            105_000
+        ));
+        assert!(store.record_api_stage_at(&token, TransactionStage::ApiMempoolSubmit, 110_000));
+
+        let api_trace = store.get_trace(&hash).unwrap();
+        assert_eq!(api_trace.trace_start_time_usecs, 100_000);
+        assert_eq!(api_trace.insertion_time_usecs, None);
+        assert!(!store.is_traced(&hash));
+        assert!(store.maybe_start_api_trace(hash, sender, 120_000).is_none());
+        store.record_stage_at(&hash, TransactionStage::QsBatchPull, 125_000);
+        assert!(!store
+            .get_trace(&hash)
+            .unwrap()
+            .has_stage(TransactionStage::QsBatchPull));
+
+        assert!(store.maybe_start_trace(hash, sender, 215_000));
+        assert!(store.record_api_stage_at(&token, TransactionStage::ApiMempoolAccepted, 220_000));
+        assert!(store.is_traced(&hash));
+
+        let trace = store.get_trace(&hash).unwrap();
+        assert_eq!(trace.insertion_time_usecs, Some(215_000));
+        assert_eq!(
+            trace
+                .stages
+                .iter()
+                .map(|record| record.stage)
+                .collect::<Vec<_>>(),
+            vec![
+                TransactionStage::ApiHandlerEnter,
+                TransactionStage::ApiTransactionDecoded,
+                TransactionStage::ApiMempoolSubmit,
+                TransactionStage::MempoolInsert,
+                TransactionStage::ApiMempoolAccepted,
+            ]
+        );
+
+        let mut sorted = trace.stages.clone();
+        sorted.sort_by_key(|record| record.timestamp_usecs);
+        let scalars = build_first_attempt_scalars(&sorted, 215_000);
+        assert_eq!(scalars.api_handler_enter_ms, Some(-115));
+        assert_eq!(scalars.api_transaction_decoded_ms, Some(-110));
+        assert_eq!(scalars.api_mempool_submit_ms, Some(-105));
+        assert_eq!(scalars.mempool_insert_ms, Some(0));
+        assert_eq!(scalars.api_mempool_accepted_ms, Some(5));
+
+        // A duplicate insertion must not reset the original mempool base.
+        assert!(!store.maybe_start_trace(hash, sender, 300_000));
+        assert_eq!(
+            store.get_trace(&hash).unwrap().insertion_time_usecs,
+            Some(215_000)
+        );
+    }
+
+    #[test]
+    fn test_api_rejection_cleans_up_only_the_owning_pending_trace() {
+        let store = TransactionTraceStore::new();
+        let sender = AccountAddress::random();
+        let hash = HashValue::random();
+
+        let mut allowlist = std::collections::HashSet::new();
+        allowlist.insert(sender);
+        store.update_filter(TransactionFilter::new(true, allowlist, 1.0, 1.0));
+
+        let token = store
+            .maybe_start_api_trace(hash, sender, now_usecs())
+            .expect("API trace should start");
+        let stale_token = ApiTraceToken {
+            hash,
+            generation: token.generation.wrapping_add(1),
+        };
+        assert!(!store.record_api_stage(&stale_token, TransactionStage::ApiTransactionDecoded));
+        assert!(!store.cancel_api_trace(stale_token));
+        assert!(store.get_trace(&hash).is_some());
+
+        assert!(store.cancel_api_trace(token));
+        assert!(store.get_trace(&hash).is_none());
     }
 
     #[test]
