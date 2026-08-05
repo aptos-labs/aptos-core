@@ -206,21 +206,28 @@ fn p2p_transfer_insufficient_balance_aborts_like_v1() {
         .sign();
 
     let v1_output = fx.execute_transaction(txn.clone());
-    let TransactionStatus::Keep(ExecutionStatus::MoveAbort { code: v1_code, .. }) =
-        v1_output.status()
+    let TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+        code: v1_code,
+        location: v1_location,
+        ..
+    }) = v1_output.status()
     else {
         panic!("v1 did not abort: {:?}", v1_output.status());
     };
 
     let v2_output = execute_v2(fx.get_state_view(), &txn);
-    // TODO(correctness): compare the abort location and info once MonoMove
-    // aborts carry their module.
-    let TransactionStatus::Keep(ExecutionStatus::MoveAbort { code: v2_code, .. }) =
-        v2_output.status()
+    // TODO(correctness): compare the abort info too, once the executor resolves
+    // it from the aborting module's metadata the way the legacy VM does.
+    let TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+        code: v2_code,
+        location: v2_location,
+        ..
+    }) = v2_output.status()
     else {
         panic!("v2 did not abort: {:?}", v2_output.status());
     };
     assert_eq!(v1_code, v2_code, "abort codes differ");
+    assert_eq!(v1_location, v2_location, "abort locations differ");
 
     compare_outputs(&v1_output, &v2_output, *alice.address());
 }

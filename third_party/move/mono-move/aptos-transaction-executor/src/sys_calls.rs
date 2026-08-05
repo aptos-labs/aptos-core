@@ -106,7 +106,15 @@ pub(crate) fn run_prologue(
 
     match status {
         CallStatus::Success => Ok(()),
-        CallStatus::Abort { code, message } => Err(PrologueFailure::Abort { code, message }),
+        CallStatus::Abort {
+            code,
+            message,
+            location,
+        } => Err(PrologueFailure::Abort {
+            code,
+            message,
+            location,
+        }),
     }
 }
 
@@ -131,6 +139,14 @@ pub(crate) fn run_epilogue(
 
     match status {
         CallStatus::Success => Ok(()),
-        CallStatus::Abort { code, message } => Err(EpilogueFailure::Abort { code, message }),
+        CallStatus::Abort {
+            code,
+            message,
+            location,
+        } => Err(EpilogueFailure::Abort {
+            code,
+            message,
+            location,
+        }),
     }
 }

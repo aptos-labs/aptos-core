@@ -16,7 +16,9 @@ use mono_move_runtime::{
     error::{RuntimeError, RuntimeInvariantViolation},
     InterpreterContext, RuntimeStatus,
 };
-use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
+use move_core_types::{
+    account_address::AccountAddress, identifier::IdentStr, vm_status::AbortLocation,
+};
 
 /// The parameter types of a loaded module's function, instantiated with
 /// `ty_args`.
@@ -119,7 +121,11 @@ pub(crate) fn place_args(
 /// channel instead.
 pub(crate) enum CallStatus {
     Success,
-    Abort { code: u64, message: Option<String> },
+    Abort {
+        code: u64,
+        message: Option<String>,
+        location: AbortLocation,
+    },
 }
 
 /// Loads `module::function<ty_args>`, places arguments, and runs it in the
@@ -151,13 +157,15 @@ pub(crate) fn call_function(
 
     Ok(match interp.run()? {
         RuntimeStatus::Success => CallStatus::Success,
-        // TODO(correctness): `location` is dropped here, so aborts surface with
-        // a placeholder location. Thread it through the failure taxonomy.
         RuntimeStatus::Aborted {
             code,
             message,
-            location: _,
-        } => CallStatus::Abort { code, message },
+            location,
+        } => CallStatus::Abort {
+            code,
+            message,
+            location,
+        },
     })
 }
 

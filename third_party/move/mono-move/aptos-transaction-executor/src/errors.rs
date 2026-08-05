@@ -72,7 +72,11 @@ pub enum ExecutionStatus {
 #[derive(Debug)]
 pub enum PrologueFailure {
     /// The prologue aborted: the transaction failed validation.
-    Abort { code: u64, message: Option<String> },
+    Abort {
+        code: u64,
+        message: Option<String>,
+        location: AbortLocation,
+    },
     /// The prologue must not fail any other way.
     Unexpected(String),
 }
@@ -83,7 +87,11 @@ pub enum PrologueFailure {
 #[derive(Debug)]
 pub(crate) enum PayloadFailure {
     /// The payload executed a Move abort.
-    Abort { code: u64, message: Option<String> },
+    Abort {
+        code: u64,
+        message: Option<String>,
+        location: AbortLocation,
+    },
     /// The payload failed with a VM error.
     Internal(VMInternalError),
 }
@@ -93,7 +101,11 @@ pub(crate) enum PayloadFailure {
 #[derive(Debug)]
 pub enum EpilogueFailure {
     /// The epilogue executed a Move abort.
-    Abort { code: u64, message: Option<String> },
+    Abort {
+        code: u64,
+        message: Option<String>,
+        location: AbortLocation,
+    },
     /// The epilogue failed with a VM error.
     Internal(VMInternalError),
 }

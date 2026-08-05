@@ -24,10 +24,6 @@ use mono_move_core::{
 use mono_move_global_context::ExecutionGuard;
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
 use mono_move_runtime::{InterpreterContext, ProductionNativeRegistry};
-use move_core_types::{
-    account_address::AccountAddress, ident_str, language_storage::ModuleId,
-    vm_status::AbortLocation,
-};
 
 /// The Aptos transaction executor on MonoMove (the legacy AptosVM's role).
 ///
@@ -162,14 +158,16 @@ impl<'a> AptosTransactionExecutor<'a> {
         let payload_succeeded = payload_result.is_ok();
         let execution_status = match payload_result {
             Ok(()) => ExecutionStatus::Success,
-            Err(PayloadFailure::Abort { code, message }) => {
+            Err(PayloadFailure::Abort {
+                code,
+                message,
+                location,
+            }) => {
                 rollback(&mut interp, 1)?;
                 ExecutionStatus::Abort {
                     code,
                     message,
-                    // TODO(correctness): MonoMove does not carry the aborting
-                    // module yet, so the location is a placeholder for now.
-                    location: AbortLocation::Script,
+                    location,
                 }
             },
             Err(PayloadFailure::Internal(err)) => {
@@ -211,17 +209,14 @@ impl<'a> AptosTransactionExecutor<'a> {
                 match failure {
                     // The fee payer can no longer cover the fee. This is the one
                     // epilogue abort that survives as the transaction's status.
-                    EpilogueFailure::Abort { code, message } if is_cant_pay_fee_abort(code) => {
-                        ExecutionStatus::Abort {
-                            code,
-                            message,
-                            // The abort is raised by
-                            // `transaction_validation.move`'s balance assert.
-                            location: AbortLocation::Module(ModuleId::new(
-                                AccountAddress::ONE,
-                                ident_str!("transaction_validation").to_owned(),
-                            )),
-                        }
+                    EpilogueFailure::Abort {
+                        code,
+                        message,
+                        location,
+                    } if is_cant_pay_fee_abort(code) => ExecutionStatus::Abort {
+                        code,
+                        message,
+                        location,
                     },
                     // Any other epilogue failure is the framework misbehaving.
                     // Treat it as an invariant violation (with gas charged) rather than discarding.
@@ -275,7 +270,15 @@ impl<'a> AptosTransactionExecutor<'a> {
 
         match status {
             CallStatus::Success => Ok(()),
-            CallStatus::Abort { code, message } => Err(PayloadFailure::Abort { code, message }),
+            CallStatus::Abort {
+                code,
+                message,
+                location,
+            } => Err(PayloadFailure::Abort {
+                code,
+                message,
+                location,
+            }),
         }
     }
 }
