@@ -3,8 +3,8 @@
 
 use crate::{
     captured_reads::TxnInput,
-    code_cache_global::{add_module_write_to_module_cache, GlobalModuleCache},
-    code_cache_global_manager::AptosModuleCacheManagerGuard,
+    code_cache_global::add_module_write_to_module_cache,
+    code_cache_global_manager::{AptosModuleCacheManagerGuard, LegacyModuleCache},
     counters::{
         self, BLOCKSTM_VERSION_NUMBER, BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK,
         PARALLEL_EXECUTION_SECONDS, PARALLEL_FINALIZE_SECONDS, RAYON_EXECUTION_SECONDS,
@@ -47,15 +47,13 @@ use aptos_types::{
         block_epilogue::TBlockEndInfoExt, AuxiliaryInfoTrait, BlockError,
         BlockExecutableTransaction, BlockExecutionResult, BlockOutput, FeeDistribution,
     },
-    vm::modules::AptosModuleExtension,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::{alert, init_speculative_logs, prelude::*};
 use claims::assert_none;
 use core::panic;
-use move_binary_format::CompiledModule;
 use move_core_types::{language_storage::ModuleId, vm_status::StatusCode};
-use move_vm_runtime::{Module, RuntimeEnvironment, WithRuntimeEnvironment};
+use move_vm_runtime::{RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use num_cpus;
 use once_cell::sync::Lazy;
@@ -66,24 +64,24 @@ use std::{
     sync::atomic::{AtomicBool, AtomicU32, Ordering},
 };
 
-type CommittedOutput<E> = <<E as SingleTransactionExecutor>::Output as TxnOutput>::CommittedOutput;
+type CommittedOutput<'ctx, E> =
+    <<E as SingleTransactionExecutor<'ctx>>::Output as TxnOutput>::CommittedOutput;
 
-struct SharedSyncParams<'a, T, E, S>
+struct SharedSyncParams<'a, 'ctx, T, E, S>
 where
     T: BlockExecutableTransaction,
-    E: SingleTransactionExecutor<Txn = T>,
+    E: SingleTransactionExecutor<'ctx, Txn = T>,
     S: TStateView<Key = T::Key> + Sync,
 {
     // TODO: should not need to pass base view.
     base_view: &'a S,
     versioned_cache: &'a MVHashMap<E::Key, E::Tag, E::Value, DelayedFieldID>,
-    global_module_cache:
-        &'a GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
+    global_module_cache: &'a LegacyModuleCache,
     last_input_output: &'a TxnLastInputOutput<T, E::Input, E::Output>,
     start_shared_counter: u32,
     delayed_field_id_counter: &'a AtomicU32,
     block_limit_processor: &'a ExplicitSyncWrapper<BlockGasLimitProcessor<E::Key, E::Tag>>,
-    final_results: &'a ExplicitSyncWrapper<Vec<CommittedOutput<E>>>,
+    final_results: &'a ExplicitSyncWrapper<Vec<CommittedOutput<'ctx, E>>>,
     maybe_block_epilogue_txn_idx: &'a ExplicitSyncWrapper<Option<TxnIndex>>,
 }
 
@@ -96,17 +94,14 @@ pub struct BlockExecutor<T, E, S, L, TP, A> {
     phantom: PhantomData<fn() -> (T, E, S, L, TP, A)>,
 }
 
-impl<T, E, S, L, TP, A> BlockExecutor<T, E, S, L, TP, A>
+impl<'ctx, T, E, S, L, TP, A> BlockExecutor<T, E, S, L, TP, A>
 where
     T: BlockExecutableTransaction,
-    E: SingleTransactionExecutor<Txn = T, AuxiliaryInfo = A>,
+    E: SingleTransactionExecutor<'ctx, Txn = T, AuxiliaryInfo = A>,
     S: TStateView<Key = T::Key> + Sync,
-    L: TransactionCommitHook<CommittedOutput<E>>,
+    L: TransactionCommitHook<CommittedOutput<'ctx, E>>,
     TP: TxnProvider<T, A> + Sync,
     A: AuxiliaryInfoTrait,
-    // The block epilogue persists the hot keys as storage keys; the in-memory key
-    // converts to the storage key at that boundary (identity for the legacy VM).
-    <T as BlockExecutableTransaction>::Key: From<E::Key>,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
@@ -373,12 +368,7 @@ where
         versioned_cache: &MVHashMap<E::Key, E::Tag, E::Value, DelayedFieldID>,
         executor: &E,
         base_view: &S,
-        global_module_cache: &GlobalModuleCache<
-            ModuleId,
-            CompiledModule,
-            Module,
-            AptosModuleExtension,
-        >,
+        global_module_cache: &LegacyModuleCache,
         runtime_environment: &RuntimeEnvironment,
         mode: ViewMode<E::Input>,
         scheduler: &SchedulerV2,
@@ -502,12 +492,7 @@ where
         versioned_cache: &MVHashMap<E::Key, E::Tag, E::Value, DelayedFieldID>,
         executor: &E,
         base_view: &S,
-        global_module_cache: &GlobalModuleCache<
-            ModuleId,
-            CompiledModule,
-            Module,
-            AptosModuleExtension,
-        >,
+        global_module_cache: &LegacyModuleCache,
         runtime_environment: &RuntimeEnvironment,
         mode: ViewMode<E::Input>,
         config: &BlockExecutorConfig,
@@ -675,12 +660,7 @@ where
         scheduler: &SchedulerV2,
         updated_module_keys: &BTreeSet<ModuleId>,
         last_input_output: &TxnLastInputOutput<T, E::Input, E::Output>,
-        global_module_cache: &GlobalModuleCache<
-            ModuleId,
-            CompiledModule,
-            Module,
-            AptosModuleExtension,
-        >,
+        global_module_cache: &LegacyModuleCache,
         versioned_cache: &MVHashMap<E::Key, E::Tag, E::Value, DelayedFieldID>,
     ) -> Result<bool, PanicError> {
         // The previous read-set must be recorded because:
@@ -733,12 +713,7 @@ where
     fn validate(
         idx_to_validate: TxnIndex,
         last_input_output: &TxnLastInputOutput<T, E::Input, E::Output>,
-        global_module_cache: &GlobalModuleCache<
-            ModuleId,
-            CompiledModule,
-            Module,
-            AptosModuleExtension,
-        >,
+        global_module_cache: &LegacyModuleCache,
         versioned_cache: &MVHashMap<E::Key, E::Tag, E::Value, DelayedFieldID>,
         skip_module_reads_validation: bool,
     ) -> bool {
@@ -849,12 +824,7 @@ where
         shared_counter: &AtomicU32,
         executor: &E,
         base_view: &S,
-        global_module_cache: &GlobalModuleCache<
-            ModuleId,
-            CompiledModule,
-            Module,
-            AptosModuleExtension,
-        >,
+        global_module_cache: &LegacyModuleCache,
         runtime_environment: &RuntimeEnvironment,
         config: &BlockExecutorConfig,
     ) -> Result<(), PanicError> {
@@ -936,7 +906,7 @@ where
         num_workers: usize,
         runtime_environment: &RuntimeEnvironment,
         scheduler: SchedulerWrapper,
-        shared_sync_params: &SharedSyncParams<T, E, S>,
+        shared_sync_params: &SharedSyncParams<'_, 'ctx, T, E, S>,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let versioned_cache = shared_sync_params.versioned_cache;
         let last_input_output = shared_sync_params.last_input_output;
@@ -1012,8 +982,8 @@ where
         scheduler: SchedulerWrapper,
         environment: &AptosEnvironment,
         executor: &E,
-        shared_sync_params: &SharedSyncParams<T, E, S>,
-    ) -> Result<CommittedOutput<E>, PanicError> {
+        shared_sync_params: &SharedSyncParams<'_, 'ctx, T, E, S>,
+    ) -> Result<CommittedOutput<'ctx, E>, PanicError> {
         let last_input_output = shared_sync_params.last_input_output;
 
         // Do a final validation for safety as a part of (parallel) post-processing.
@@ -1072,8 +1042,8 @@ where
         &self,
         txn_idx: TxnIndex,
         output_idx: TxnIndex,
-        committed_output: CommittedOutput<E>,
-        shared_sync_params: &SharedSyncParams<T, E, S>,
+        committed_output: CommittedOutput<'ctx, E>,
+        shared_sync_params: &SharedSyncParams<'_, 'ctx, T, E, S>,
     ) -> Result<(), PanicError> {
         if output_idx < txn_idx {
             return Err(code_invariant_error(format!(
@@ -1098,7 +1068,7 @@ where
         block: &TP,
         scheduler: &Scheduler,
         skip_module_reads_validation: &AtomicBool,
-        shared_sync_params: &SharedSyncParams<T, E, S>,
+        shared_sync_params: &SharedSyncParams<'_, 'ctx, T, E, S>,
         num_workers: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let num_txns = block.num_txns();
@@ -1244,7 +1214,7 @@ where
         worker_id: u32,
         num_workers: u32,
         scheduler: &SchedulerV2,
-        shared_sync_params: &SharedSyncParams<'_, T, E, S>,
+        shared_sync_params: &SharedSyncParams<'_, 'ctx, T, E, S>,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let num_txns = block.num_txns() as u32;
 
@@ -1376,7 +1346,7 @@ where
         transaction_slice_metadata: &TransactionSliceMetadata,
         scheduler: SchedulerWrapper,
         environment: &AptosEnvironment,
-        shared_sync_params: &SharedSyncParams<T, E, S>,
+        shared_sync_params: &SharedSyncParams<'_, 'ctx, T, E, S>,
     ) -> Result<Option<T>, PanicError> {
         let _timer = PARALLEL_FINALIZE_SECONDS.start_timer();
         let mut maybe_block_epilogue_txn = None;
@@ -1432,6 +1402,10 @@ where
                 )));
             }
 
+            let executor = maybe_executor.as_ref().ok_or_else(|| {
+                code_invariant_error("Block epilogue txn requires executor to be initialized")
+            })?;
+
             if let Some(epilogue_txn) = self.generate_block_epilogue_if_needed(
                 signature_verified_block,
                 transaction_slice_metadata,
@@ -1439,6 +1413,7 @@ where
                 epilogue_txn_idx,
                 block_limit_processor,
                 environment,
+                executor,
             )? {
                 let block_epilogue_aux_info = if num_txns > 0 {
                     // Sample a few transactions to check the auxiliary info pattern
@@ -1461,10 +1436,6 @@ where
                     // Fallback if no transactions in block
                     A::new_empty()
                 };
-
-                let executor = maybe_executor.as_ref().ok_or_else(|| {
-                    code_invariant_error("Block epilogue txn requires executor to be initialized")
-                })?;
 
                 let module_cache = shared_sync_params.global_module_cache;
                 let runtime_environment = environment.runtime_environment();
@@ -1521,8 +1492,8 @@ where
         signature_verified_block: &TP,
         base_view: &S,
         transaction_slice_metadata: &TransactionSliceMetadata,
-        module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
-    ) -> Result<BlockOutput<T, CommittedOutput<E>>, ()> {
+        module_cache_manager_guard: &mut AptosModuleCacheManagerGuard<'ctx>,
+    ) -> Result<BlockOutput<T, CommittedOutput<'ctx, E>>, ()> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // BlockSTMv2 should have less restrictions on the number of workers but we
         // still sanity check that it is not instantiated w. concurrency level 1.
@@ -1541,7 +1512,7 @@ where
         // +1 for potential BlockEpilogue txn.
         let final_results = ExplicitSyncWrapper::new(
             (0..num_txns + 1)
-                .map(|_| CommittedOutput::<E>::retry())
+                .map(|_| CommittedOutput::<'_, E>::retry())
                 .collect::<Vec<_>>(),
         );
 
@@ -1577,7 +1548,7 @@ where
         }
         let scheduler = SchedulerV2::new(num_txns, num_workers);
 
-        let shared_sync_params: SharedSyncParams<'_, T, E, S> = SharedSyncParams {
+        let shared_sync_params: SharedSyncParams<'_, '_, T, E, S> = SharedSyncParams {
             base_view,
             versioned_cache: &versioned_cache,
             global_module_cache: module_cache_manager_guard.module_cache(),
@@ -1600,11 +1571,14 @@ where
         WORKER_POOL.scope(num_workers as usize, |worker_id| {
             let worker_id = worker_id as u32;
             let environment = module_cache_manager_guard.environment();
+            let ctx = module_cache_manager_guard.global_context();
             let executor = {
                 let _init_timer = VM_INIT_SECONDS.start_timer();
                 E::init(
                     &environment.clone(),
+                    ctx,
                     shared_sync_params.base_view,
+                    worker_id,
                     async_runtime_checks_enabled,
                 )
             };
@@ -1689,8 +1663,8 @@ where
         signature_verified_block: &TP,
         base_view: &S,
         transaction_slice_metadata: &TransactionSliceMetadata,
-        module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
-    ) -> Result<BlockOutput<T, CommittedOutput<E>>, ()> {
+        module_cache_manager_guard: &mut AptosModuleCacheManagerGuard<'ctx>,
+    ) -> Result<BlockOutput<T, CommittedOutput<'ctx, E>>, ()> {
         self.execute_transactions_parallel(
             signature_verified_block,
             base_view,
@@ -1704,8 +1678,8 @@ where
         signature_verified_block: &TP,
         base_view: &S,
         transaction_slice_metadata: &TransactionSliceMetadata,
-        module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
-    ) -> Result<BlockOutput<T, CommittedOutput<E>>, ()> {
+        module_cache_manager_guard: &mut AptosModuleCacheManagerGuard<'ctx>,
+    ) -> Result<BlockOutput<T, CommittedOutput<'ctx, E>>, ()> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // Using parallel execution with 1 thread currently will not work as it
         // will only have a coordinator role but no workers for rolling commit.
@@ -1749,7 +1723,7 @@ where
         let final_results = ExplicitSyncWrapper::new(
             // +1 for potential BlockEpilogue txn.
             (0..(num_txns + 1))
-                .map(|_| CommittedOutput::<E>::retry())
+                .map(|_| CommittedOutput::<'_, E>::retry())
                 .collect::<Vec<_>>(),
         );
 
@@ -1765,7 +1739,7 @@ where
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         let maybe_executor = ExplicitSyncWrapper::new(None);
 
-        let shared_sync_params: SharedSyncParams<'_, T, E, S> = SharedSyncParams {
+        let shared_sync_params: SharedSyncParams<'_, '_, T, E, S> = SharedSyncParams {
             base_view,
             versioned_cache: &versioned_cache,
             global_module_cache: module_cache_manager_guard.module_cache(),
@@ -1786,11 +1760,14 @@ where
         WORKER_POOL.scope(num_workers, |worker_id| {
             let worker_id = worker_id as u32;
             let environment = module_cache_manager_guard.environment();
+            let ctx = module_cache_manager_guard.global_context();
             let executor = {
                 let _init_timer = VM_INIT_SECONDS.start_timer();
                 E::init(
                     &environment.clone(),
+                    ctx,
                     base_view,
+                    worker_id,
                     async_runtime_checks_enabled,
                 )
             };
@@ -1867,10 +1844,11 @@ where
         &self,
         block_id: HashValue,
         signature_verified_block: &TP,
-        outputs: impl Iterator<Item = &'a CommittedOutput<E>>,
+        outputs: impl Iterator<Item = &'a CommittedOutput<'ctx, E>>,
         epilogue_txn_idx: TxnIndex,
         block_end_info: TBlockEndInfoExt<E::Key>,
         features: &Features,
+        executor: &E,
     ) -> Result<T, PanicError> {
         // TODO(grao): Remove this check once AIP-88 is fully enabled.
         if !self
@@ -1938,11 +1916,13 @@ where
         }
         let fee_distribution = FeeDistribution::new(amount);
         // Convert the in-memory hot keys to storage keys for the on-chain epilogue.
+        // Fallible for MonoMove (a deeply-nested type may not fit a StateKey);
+        // identity/infallible for the legacy VM.
         let (inner, to_make_hot) = block_end_info.into_parts();
         let to_make_hot = to_make_hot
             .into_iter()
-            .map(<T::Key>::from)
-            .collect::<BTreeSet<_>>();
+            .map(|k| executor.materialize_storage_key(k))
+            .collect::<Result<BTreeSet<_>, PanicError>>()?;
         if self.config.onchain.hotness_in_epilogue() {
             Ok(T::block_epilogue_v2(
                 block_id,
@@ -1962,12 +1942,7 @@ where
     fn apply_output_sequential(
         txn_idx: TxnIndex,
         runtime_environment: &RuntimeEnvironment,
-        global_module_cache: &GlobalModuleCache<
-            ModuleId,
-            CompiledModule,
-            Module,
-            AptosModuleExtension,
-        >,
+        global_module_cache: &LegacyModuleCache,
         unsync_map: &UnsyncMap<E::Key, E::Tag, E::Value, DelayedFieldID>,
         output: &E::Output,
     ) -> Result<(), SequentialBlockExecutionError> {
@@ -2048,9 +2023,9 @@ where
         signature_verified_block: &TP,
         base_view: &S,
         transaction_slice_metadata: &TransactionSliceMetadata,
-        module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
+        module_cache_manager_guard: &mut AptosModuleCacheManagerGuard<'ctx>,
         resource_group_bcs_fallback: bool,
-    ) -> Result<BlockOutput<T, CommittedOutput<E>>, SequentialBlockExecutionError> {
+    ) -> Result<BlockOutput<T, CommittedOutput<'ctx, E>>, SequentialBlockExecutionError> {
         let num_txns = signature_verified_block.num_txns();
 
         if num_txns == 0 {
@@ -2059,7 +2034,8 @@ where
 
         let init_timer = VM_INIT_SECONDS.start_timer();
         let environment = module_cache_manager_guard.environment();
-        let executor = E::init(environment, base_view, false);
+        let ctx = module_cache_manager_guard.global_context();
+        let executor = E::init(environment, ctx, base_view, 0, false);
         drop(init_timer);
 
         let runtime_environment = environment.runtime_environment();
@@ -2202,7 +2178,7 @@ where
                             // The corresponding error / alert must already be triggered, the goal in sequential
                             // fallback is to just skip any transactions that would cause such serialization errors.
                             alert!("Discarding transaction because serialization failed in bcs fallback");
-                            ret.push(CommittedOutput::<E>::discard(
+                            ret.push(CommittedOutput::<'_, E>::discard(
                                 StatusCode::DELAYED_FIELD_OR_BLOCKSTM_CODE_INVARIANT_ERROR,
                             ));
                             idx += 1;
@@ -2283,7 +2259,7 @@ where
                         has_reconfig = true;
                     }
                 }
-                ret.resize_with(num_txns, CommittedOutput::<E>::retry);
+                ret.resize_with(num_txns, CommittedOutput::<'_, E>::retry);
                 if let Some(block_id) =
                     transaction_slice_metadata.append_state_checkpoint_to_block()
                 {
@@ -2295,6 +2271,7 @@ where
                             idx as TxnIndex,
                             block_limit_processor.get_block_end_info(),
                             module_cache_manager_guard.environment().features(),
+                            &executor,
                         )?);
                     } else {
                         info!("Reach epoch ending, do not append BlockEpilogue txn, block_id: {block_id:?}.");
@@ -2322,8 +2299,8 @@ where
         signature_verified_block: &TP,
         base_view: &S,
         transaction_slice_metadata: &TransactionSliceMetadata,
-        module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
-    ) -> BlockExecutionResult<T, CommittedOutput<E>> {
+        module_cache_manager_guard: &mut AptosModuleCacheManagerGuard<'ctx>,
+    ) -> BlockExecutionResult<T, CommittedOutput<'ctx, E>> {
         let _timer = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.start_timer();
 
         if self.config.local.concurrency_level > 1 {
@@ -2424,7 +2401,7 @@ where
             // (TODO: maybe we should add fallback here to first try BlockMetadataTransaction alone)
             let ret = (0..signature_verified_block.num_txns())
                 .map(|_| {
-                    CommittedOutput::<E>::discard(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    CommittedOutput::<'_, E>::discard(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                 })
                 .collect();
             return Ok(BlockOutput::new(ret, None));
@@ -2441,10 +2418,11 @@ where
         &self,
         block: &TP,
         transaction_slice_metadata: &TransactionSliceMetadata,
-        outputs: impl Iterator<Item = &'a CommittedOutput<E>>,
+        outputs: impl Iterator<Item = &'a CommittedOutput<'ctx, E>>,
         epilogue_txn_idx: TxnIndex,
         block_limit_processor: &ExplicitSyncWrapper<BlockGasLimitProcessor<E::Key, E::Tag>>,
         environment: &AptosEnvironment,
+        executor: &E,
     ) -> Result<Option<T>, PanicError> {
         // We only do this for block (when the block_id is returned). For other cases
         // like state sync or replay, the BlockEpilogue txn should already in the input
@@ -2457,6 +2435,7 @@ where
                 epilogue_txn_idx,
                 block_limit_processor.acquire().get_block_end_info(),
                 environment.features(),
+                executor,
             )?;
 
             Ok(Some(epilogue_txn))
