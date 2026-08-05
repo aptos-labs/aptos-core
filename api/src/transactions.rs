@@ -1480,7 +1480,7 @@ impl TransactionsApi {
     async fn create_internal(
         &self,
         txn: SignedTransaction,
-        api_trace: Option<ApiTraceToken>,
+        mut api_trace: Option<ApiTraceToken>,
     ) -> Result<(), AptosError> {
         let trace_store = TransactionTraceStore::global();
         if let Some(token) = api_trace.as_ref() {
@@ -1504,8 +1504,9 @@ impl TransactionsApi {
             },
         };
         if mempool_status.code == MempoolStatusCode::Accepted {
-            if let Some(token) = api_trace.as_ref() {
+            if let Some(token) = api_trace.as_mut() {
                 trace_store.record_api_stage(token, TransactionStage::ApiMempoolAccepted);
+                token.disarm();
             }
         } else if let Some(token) = api_trace {
             trace_store.cancel_api_trace(token);
