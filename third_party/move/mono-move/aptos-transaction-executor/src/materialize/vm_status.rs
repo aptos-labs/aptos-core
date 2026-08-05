@@ -18,7 +18,12 @@ use aptos_types::{
 use mono_move_core::{ExecutionErrorKind, VMInternalError};
 use mono_move_loader::LoaderError;
 use mono_move_runtime::RuntimeError;
-use move_core_types::vm_status::{StatusCode, VMStatus};
+use move_core_types::{
+    account_address::AccountAddress,
+    ident_str,
+    language_storage::ModuleId,
+    vm_status::{AbortLocation, StatusCode, VMStatus},
+};
 
 /// Converts a type-erased VM error into `VMStatus`: fine-grained for the
 /// error types with known legacy mappings, by public category otherwise.
@@ -100,17 +105,23 @@ fn unsupported_status(msg: &str) -> VMStatus {
 /// Mirrors the legacy VM's `convert_prologue_error`: recognized validation
 /// aborts map to their discard codes.
 //
-// TODO(correctness): MonoMove aborts carry no location yet, so every prologue
-// abort is treated as coming from the transaction-validation module. The
-// multisig- and transaction-limits-module branches need locations to be
-// distinguishable.
+// TODO(completeness): the legacy VM also recognizes aborts from
+// `transaction_limits` and the multisig account module. Neither is reachable
+// here yet, so they land in the unexpected-abort branch below.
 fn prologue_failure_to_status(failure: PrologueFailure) -> VMStatus {
-    let (code, message) = match failure {
-        PrologueFailure::Abort { code, message } => (code, message),
+    let (code, message, location) = match failure {
+        PrologueFailure::Abort {
+            code,
+            message,
+            location,
+        } => (code, message, location),
         PrologueFailure::Unexpected(detail) => {
             return unexpected_validation_error("prologue", detail)
         },
     };
+    if location != validation_module() {
+        return unexpected_prologue_abort(code, message, location);
+    }
     let new_major_status = match split_canonical(code) {
         (INVALID_ARGUMENT, EBAD_ACCOUNT_AUTHENTICATION_KEY) => StatusCode::INVALID_AUTH_KEY,
         (INVALID_ARGUMENT, ESEQUENCE_NUMBER_TOO_OLD) => StatusCode::SEQUENCE_NUMBER_TOO_OLD,
@@ -133,22 +144,30 @@ fn prologue_failure_to_status(failure: PrologueFailure) -> VMStatus {
             StatusCode::TRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE
         },
         (INVALID_ARGUMENT, ENONCE_ALREADY_USED) => StatusCode::NONCE_ALREADY_USED,
-        (category, reason) => {
-            let mut err_msg = format!(
-                "Unexpected prologue Move abort: {:?} (Category: {:?} Reason: {:?})",
-                code, category, reason
-            );
-            if let Some(abort_msg) = message {
-                err_msg.push_str(" Message: ");
-                err_msg.push_str(&abort_msg);
-            }
-            return VMStatus::error(
-                StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
-                Some(err_msg),
-            );
-        },
+        _ => return unexpected_prologue_abort(code, message, location),
     };
     VMStatus::error(new_major_status, None)
+}
+
+fn validation_module() -> AbortLocation {
+    AbortLocation::Module(ModuleId::new(
+        AccountAddress::ONE,
+        ident_str!("transaction_validation").to_owned(),
+    ))
+}
+
+fn unexpected_prologue_abort(
+    code: u64,
+    message: Option<String>,
+    location: AbortLocation,
+) -> VMStatus {
+    let (category, reason) = split_canonical(code);
+    let mut detail = format!("{location:?}::{code} (Category: {category:?} Reason: {reason:?})");
+    if let Some(abort_msg) = message {
+        detail.push_str(" Message: ");
+        detail.push_str(&abort_msg);
+    }
+    unexpected_validation_error("prologue Move abort:", detail)
 }
 
 fn unexpected_validation_error(msg: &str, detail: String) -> VMStatus {
@@ -166,8 +185,9 @@ fn epilogue_failure_status(run: &str, detail: &str) -> VMStatus {
     unexpected_validation_error(&format!("epilogue {run}"), detail.to_string())
 }
 
-// TODO(correctness): the mapping is coarse; several kinds need location info
-// (`ExecutionFailure`) and exact status codes to match the legacy VM.
+// TODO(correctness): the mapping is coarse; several kinds should be
+// `ExecutionFailure`, which needs the location, function and code offset the
+// legacy VM reports. Currently,`RuntimeError` carries none of those.
 fn runtime_error_to_status(err: &RuntimeError) -> VMStatus {
     use RuntimeError as E;
     let code = match err {
