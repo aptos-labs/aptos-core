@@ -1,13 +1,18 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::transaction_metadata::TransactionMetadata;
-use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use aptos_types::{
+//! Identifies a VM session within a transaction.
+//!
+//! The BCS crypto-hash of a `SessionId` seeds unique-address (AUID) generation,
+//! so it is consensus-visible: neither the variant order nor the field layout
+//! may change.
+
+use crate::{
     block_metadata::BlockMetadata, block_metadata_ext::BlockMetadataExt,
     transaction::ReplayProtector, validator_txn::ValidatorTransaction,
 };
+use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 
@@ -88,18 +93,23 @@ impl SessionId {
             .expect("HashValue should convert to [u8; 32]")
     }
 
-    pub fn txn_meta(txn_metadata: &TransactionMetadata) -> Self {
-        match txn_metadata.replay_protector() {
+    pub fn txn(
+        sender: AccountAddress,
+        replay_protector: ReplayProtector,
+        script_hash: Vec<u8>,
+        expiration_time: u64,
+    ) -> Self {
+        match replay_protector {
             ReplayProtector::SequenceNumber(sequence_number) => Self::Txn {
-                sender: txn_metadata.sender,
+                sender,
                 sequence_number,
-                script_hash: txn_metadata.script_hash.clone(),
+                script_hash,
             },
             ReplayProtector::Nonce(nonce) => Self::OrderlessTxn {
-                sender: txn_metadata.sender,
+                sender,
                 nonce,
-                expiration_time: txn_metadata.expiration_timestamp_secs,
-                script_hash: txn_metadata.script_hash.clone(),
+                expiration_time,
+                script_hash,
             },
         }
     }
@@ -124,50 +134,65 @@ impl SessionId {
         Self::BlockEpilogue { id }
     }
 
-    pub fn prologue_meta(txn_metadata: &TransactionMetadata) -> Self {
-        match txn_metadata.replay_protector() {
+    pub fn prologue(
+        sender: AccountAddress,
+        replay_protector: ReplayProtector,
+        script_hash: Vec<u8>,
+        expiration_time: u64,
+    ) -> Self {
+        match replay_protector {
             ReplayProtector::SequenceNumber(sequence_number) => Self::Prologue {
-                sender: txn_metadata.sender,
+                sender,
                 sequence_number,
-                script_hash: txn_metadata.script_hash.clone(),
+                script_hash,
             },
             ReplayProtector::Nonce(nonce) => Self::OrderlessTxnProlouge {
-                sender: txn_metadata.sender,
+                sender,
                 nonce,
-                expiration_time: txn_metadata.expiration_timestamp_secs,
-                script_hash: txn_metadata.script_hash.clone(),
+                expiration_time,
+                script_hash,
             },
         }
     }
 
-    pub fn run_on_abort(txn_metadata: &TransactionMetadata) -> Self {
-        match txn_metadata.replay_protector() {
+    pub fn run_on_abort(
+        sender: AccountAddress,
+        replay_protector: ReplayProtector,
+        script_hash: Vec<u8>,
+        expiration_time: u64,
+    ) -> Self {
+        match replay_protector {
             ReplayProtector::SequenceNumber(sequence_number) => Self::RunOnAbort {
-                sender: txn_metadata.sender,
+                sender,
                 sequence_number,
-                script_hash: txn_metadata.script_hash.clone(),
+                script_hash,
             },
             ReplayProtector::Nonce(nonce) => Self::OrderlessRunOnAbort {
-                sender: txn_metadata.sender,
+                sender,
                 nonce,
-                expiration_time: txn_metadata.expiration_timestamp_secs,
-                script_hash: txn_metadata.script_hash.clone(),
+                expiration_time,
+                script_hash,
             },
         }
     }
 
-    pub fn epilogue_meta(txn_metadata: &TransactionMetadata) -> Self {
-        match txn_metadata.replay_protector() {
+    pub fn epilogue(
+        sender: AccountAddress,
+        replay_protector: ReplayProtector,
+        script_hash: Vec<u8>,
+        expiration_time: u64,
+    ) -> Self {
+        match replay_protector {
             ReplayProtector::SequenceNumber(sequence_number) => Self::Epilogue {
-                sender: txn_metadata.sender,
+                sender,
                 sequence_number,
-                script_hash: txn_metadata.script_hash.clone(),
+                script_hash,
             },
             ReplayProtector::Nonce(nonce) => Self::OrderlessTxnEpilogue {
-                sender: txn_metadata.sender,
+                sender,
                 nonce,
-                expiration_time: txn_metadata.expiration_timestamp_secs,
-                script_hash: txn_metadata.script_hash.clone(),
+                expiration_time,
+                script_hash,
             },
         }
     }
@@ -186,7 +211,7 @@ impl SessionId {
         self.hash()
     }
 
-    pub(crate) fn into_script_hash(self) -> Vec<u8> {
+    pub fn into_script_hash(self) -> Vec<u8> {
         match self {
             Self::Txn { script_hash, .. }
             | Self::Prologue { script_hash, .. }
