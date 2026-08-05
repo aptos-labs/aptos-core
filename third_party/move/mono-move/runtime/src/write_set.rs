@@ -43,10 +43,17 @@ pub(crate) fn build_write_set<L: LayoutProvider + ?Sized>(
         // `StateValueMetadata` (slot deposit / refund) carried over from the pre-state.
         let op = match class {
             WriteClass::Creation(ptr) => {
-                WriteOp::legacy_creation(serialize_value(layouts, ptr, value_type(key))?.into())
+                WriteOp::legacy_creation(
+                    // SAFETY: `ptr` is the current value of a `LocalHeap` entry and no
+                    // GC runs during write-set generation.
+                    unsafe { serialize_value(layouts, ptr, value_type(key)) }?.into(),
+                )
             },
             WriteClass::Modification(ptr) => {
-                WriteOp::legacy_modification(serialize_value(layouts, ptr, value_type(key))?.into())
+                WriteOp::legacy_modification(
+                    // SAFETY: as above.
+                    unsafe { serialize_value(layouts, ptr, value_type(key)) }?.into(),
+                )
             },
             WriteClass::Deletion => WriteOp::legacy_deletion(),
         };
@@ -89,14 +96,16 @@ fn value_type(key: &InMemoryStorageKey) -> InternedType {
 }
 
 /// BCS-serializes the value at `ptr` of type `ty`.
-fn serialize_value<L: LayoutProvider + ?Sized>(
+///
+/// # Safety
+///
+/// `ptr` must be a fully initialized value of type `ty` in a live heap, and no
+/// GC may run for the duration of the call.
+pub unsafe fn serialize_value<L: LayoutProvider + ?Sized>(
     layouts: &L,
     ptr: NonNull<u8>,
     ty: InternedType,
 ) -> VMResult<Vec<u8>> {
-    // SAFETY: `ptr` is the current value of a `LocalHeap` entry — a fully
-    // initialized value of type `ty` living in this transaction's heap. The
-    // heap stays alive for the call and no GC runs during write-set
-    // generation, so the value (and everything it reaches) remains valid.
+    // SAFETY: forwarded from this function's contract.
     unsafe { value_utils::serialize(layouts, ptr.as_ptr(), ty) }
 }
