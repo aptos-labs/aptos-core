@@ -267,7 +267,16 @@ impl TAugmentedData for AugmentedData {
         // entry only loses that peer's APK certification — their shares fail
         // share-verification downstream, the network proceeds with the
         // remaining contributions.
-        let pk_len = rand_config.get_pk_share(author).len();
+        let pk_len = match rand_config.get_pk_share(author) {
+            Ok(pk_share) => pk_share.len(),
+            Err(error) => {
+                error!(
+                    "[AugmentedData::augment] get_pk_share failed for {}: {}",
+                    author, error,
+                );
+                return;
+            },
+        };
         let delta = match self.delta.validate_and_decompress(pk_len) {
             Ok(delta) => delta,
             Err(e) => {
@@ -291,7 +300,7 @@ impl TAugmentedData for AugmentedData {
             self.fast_delta.is_none(),
             "fast_delta is no longer supported (removed by PR #18870); rejecting",
         );
-        let pk_len = rand_config.get_pk_share(author).len();
+        let pk_len = rand_config.get_pk_share(author)?.len();
         let delta = self.delta.validate_and_decompress(pk_len)?;
         rand_config.derive_apk(author, delta).map(|_| ())?;
         Ok(())
@@ -686,16 +695,16 @@ impl RandConfig {
         self.author
     }
 
-    pub fn get_id(&self, peer: &Author) -> usize {
-        *self
-            .validator
+    pub fn get_id(&self, peer: &Author) -> anyhow::Result<usize> {
+        self.validator
             .address_to_validator_index()
             .get(peer)
-            .expect("Peer should be in the index!")
+            .copied()
+            .ok_or_else(|| anyhow!("get_id failed with unknown peer {}", peer))
     }
 
     pub fn get_certified_apk(&self, peer: &Author) -> Option<&APK> {
-        let index = self.get_id(peer);
+        let index = self.get_id(peer).ok()?;
         self.keys.certified_apks[index].get()
     }
 
@@ -708,12 +717,13 @@ impl RandConfig {
     }
 
     pub fn add_certified_apk(&self, peer: &Author, apk: APK) -> anyhow::Result<()> {
-        let index = self.get_id(peer);
+        let index = self.get_id(peer)?;
         self.keys.add_certified_apk(index, apk)
     }
 
     fn derive_apk(&self, peer: &Author, delta: Delta) -> anyhow::Result<APK> {
-        let apk = WVUF::augment_pubkey(&self.vuf_pp, self.get_pk_share(peer).clone(), delta)?;
+        let pk_share = self.get_pk_share(peer)?.clone();
+        let apk = WVUF::augment_pubkey(&self.vuf_pp, pk_share, delta)?;
         Ok(apk)
     }
 
@@ -727,18 +737,23 @@ impl RandConfig {
         WVUF::get_public_delta(&self.keys.apk)
     }
 
-    pub fn get_pk_share(&self, peer: &Author) -> &PKShare {
-        let index = self.get_id(peer);
-        &self.keys.pk_shares[index]
+    pub fn get_pk_share(&self, peer: &Author) -> anyhow::Result<&PKShare> {
+        let index = self.get_id(peer)?;
+        Ok(&self.keys.pk_shares[index])
     }
 
-    pub fn get_peer_weight(&self, peer: &Author) -> u64 {
+    pub fn get_peer_weight(&self, peer: &Author) -> anyhow::Result<u64> {
         let player = Player {
-            id: self.get_id(peer),
+            id: self.get_id(peer)?,
         };
-        self.wconfig
-            .get_player_weight(&player)
-            .expect("peer's player id is in bounds") as u64
+        let weight = self.wconfig.get_player_weight(&player).map_err(|error| {
+            anyhow!(
+                "get_peer_weight failed with out-of-bounds player {}: {}",
+                peer,
+                error
+            )
+        })?;
+        Ok(weight as u64)
     }
 
     pub fn threshold(&self) -> u64 {
@@ -1072,7 +1087,11 @@ mod tests {
         let valid_weight: u64 = shares
             .iter()
             .filter(|s| !bad_authors.contains(s.author()))
-            .map(|s| ctx.rand_configs[0].get_peer_weight(s.author()))
+            .map(|s| {
+                ctx.rand_configs[0]
+                    .get_peer_weight(s.author())
+                    .expect("author should be a known validator")
+            })
             .sum();
         assert!(
             valid_weight < ctx.rand_configs[0].threshold(),
@@ -1249,7 +1268,10 @@ mod tests {
         use crate::rand::rand_gen::lazy_types::LazyG1;
 
         let ctx = MultiValidatorTestContext::new(vec![1, 1, 1, 1], false);
-        let pk_len = ctx.rand_configs[1].get_pk_share(&ctx.authors[0]).len();
+        let pk_len = ctx.rand_configs[1]
+            .get_pk_share(&ctx.authors[0])
+            .expect("author should be a known validator")
+            .len();
 
         // 0xFF in the first byte forces an invalid compressed encoding;
         // `G1Affine::from_compressed` returns `None` and `decompress` errors.
@@ -1276,7 +1298,10 @@ mod tests {
         use group::Group;
 
         let ctx = MultiValidatorTestContext::new(vec![1, 1, 1, 1], false);
-        let pk_len = ctx.rand_configs[1].get_pk_share(&ctx.authors[0]).len();
+        let pk_len = ctx.rand_configs[1]
+            .get_pk_share(&ctx.authors[0])
+            .expect("author should be a known validator")
+            .len();
 
         // Construct a malicious LazyDelta with an intentionally oversized rks
         // vector. The byte content is valid G1 (so decompression *would*
@@ -1306,5 +1331,50 @@ mod tests {
             "verify took {}ms; expected <100ms (no per-element decompression on length mismatch)",
             elapsed.as_millis(),
         );
+    }
+
+    /// An `AugData` whose author is not in the current epoch's validator
+    /// set must be rejected with an error, never a panic.
+    #[test]
+    fn test_augmented_data_rejects_unknown_author() {
+        let ctx = MultiValidatorTestContext::new(vec![1, 1, 1, 1], false);
+
+        // An author that is not part of the validator set, i.e. a validator that
+        // was just removed at the epoch boundary.
+        let outsider = Author::from_str("dead").unwrap();
+        assert!(
+            !ctx.rand_configs[1]
+                .validator
+                .address_to_validator_index()
+                .contains_key(&outsider),
+            "test setup: outsider must not be in the validator set",
+        );
+
+        // Create the aug data with the outsider as the author
+        let AugData { data, .. } = AugmentedData::generate(&ctx.rand_configs[0]);
+        let aug_data = AugData::new(ctx.rand_configs[0].epoch(), outsider, data);
+
+        // Verify that the outsider is rejected with an error
+        let error = aug_data.verify(&ctx.rand_configs[1], outsider).unwrap_err();
+        assert!(error.to_string().contains("unknown peer"),);
+    }
+
+    /// All `RandConfig` accessors that resolve an author to a validator index must also degrade gracefully
+    #[test]
+    fn test_rand_config_accessors_reject_unknown_peer() {
+        let ctx = MultiValidatorTestContext::new(vec![1, 1, 1, 1], false);
+        let config = &ctx.rand_configs[0];
+        let outsider = Author::from_str("dead").unwrap();
+
+        // Verify that all accessors return an error or None for the outsider
+        assert!(config.get_id(&outsider).is_err());
+        assert!(config.get_pk_share(&outsider).is_err());
+        assert!(config.get_peer_weight(&outsider).is_err());
+        assert!(config.get_certified_apk(&outsider).is_none());
+        assert!(config.verify_structural(&outsider).is_err());
+
+        // Verify that all accessors succeed for a known author
+        assert!(config.get_id(&ctx.authors[2]).is_ok());
+        assert_eq!(config.get_peer_weight(&ctx.authors[2]).unwrap(), 1);
     }
 }
