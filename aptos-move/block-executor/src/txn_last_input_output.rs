@@ -2,14 +2,14 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    captured_reads::CapturedReads,
+    captured_reads::CapturedReadSet,
     code_cache_global::{add_module_write_to_module_cache, GlobalModuleCache},
     errors::{ParallelBlockExecutionError, ResourceGroupSerializationError},
     executor_utilities::{materialize_output, Materializer},
     explicit_sync_wrapper::ExplicitSyncWrapper,
     limit_processor::BlockGasLimitProcessor,
     scheduler_wrapper::SchedulerWrapper,
-    task::{ExecutionStatus, TransactionOutput},
+    task::{ExecutionStatus, LegacyTxnOutput, TransactionOutput},
     types::ReadWriteSummary,
 };
 use aptos_logger::error;
@@ -36,15 +36,20 @@ use std::{
     },
 };
 
-type TxnInput<T> = CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>;
-
-struct OutputWrapper<T: Transaction, O: TransactionOutput<Txn = T>> {
+struct OutputWrapper<
+    T: Transaction,
+    O: TransactionOutput<Txn = T, Key = T::Key, Tag = T::Tag, Value = ValueWithLayout<T::Value>>,
+> {
     output: Option<ExecutionStatus<O>>,
     maybe_read_write_summary: Option<ReadWriteSummary<T>>,
     maybe_approx_output_size: Option<u64>,
 }
 
-impl<T: Transaction, O: TransactionOutput<Txn = T>> OutputWrapper<T, O> {
+impl<
+        T: Transaction,
+        O: TransactionOutput<Txn = T, Key = T::Key, Tag = T::Tag, Value = ValueWithLayout<T::Value>>,
+    > OutputWrapper<T, O>
+{
     fn empty() -> Self {
         Self {
             output: None,
@@ -59,7 +64,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> OutputWrapper<T, O> {
 
     fn from_execution_status(
         output: ExecutionStatus<O>,
-        read_set: &TxnInput<T>,
+        read_set: &CapturedReadSet<T>,
         block_gas_limit_type: &BlockGasLimitType,
         user_txn_bytes_len: u64,
     ) -> Self {
@@ -95,8 +100,11 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> OutputWrapper<T, O> {
     }
 }
 
-pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>> {
-    inputs: Vec<CachePadded<Mutex<Option<Arc<TxnInput<T>>>>>>, // txn_idx -> input (read set).
+pub struct TxnLastInputOutput<
+    T: Transaction,
+    O: TransactionOutput<Txn = T, Key = T::Key, Tag = T::Tag, Value = ValueWithLayout<T::Value>>,
+> {
+    inputs: Vec<CachePadded<Mutex<Option<Arc<CapturedReadSet<T>>>>>>, // txn_idx -> input (read set).
 
     output_wrappers: Vec<CachePadded<Mutex<OutputWrapper<T, O>>>>,
     // Used to record if the latest incarnation of a txn was a failure due to the
@@ -104,7 +112,11 @@ pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>> {
     speculative_failures: Vec<CachePadded<AtomicBool>>,
 }
 
-impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
+impl<
+        T: Transaction,
+        O: TransactionOutput<Txn = T, Key = T::Key, Tag = T::Tag, Value = ValueWithLayout<T::Value>>,
+    > TxnLastInputOutput<T, O>
+{
     /// num_txns passed here is typically larger than the number of txns in the block,
     /// currently by 1 to account for the block epilogue txn.
     pub fn new(num_txns: TxnIndex) -> Self {
@@ -124,7 +136,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
     pub(crate) fn record(
         &self,
         txn_idx: TxnIndex,
-        input: TxnInput<T>,
+        input: CapturedReadSet<T>,
         output: ExecutionStatus<O>,
         block_gas_limit_type: &BlockGasLimitType,
         user_txn_bytes_len: u64,
@@ -149,7 +161,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         self.speculative_failures[txn_idx as usize].load(Ordering::Relaxed)
     }
 
-    pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<TxnInput<T>>> {
+    pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<CapturedReadSet<T>>> {
         Some(Arc::clone(self.inputs[txn_idx as usize].lock().as_ref()?))
     }
 
@@ -375,7 +387,10 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         &self,
         txn_idx: TxnIndex,
         materializer: &M,
-    ) -> Result<(O::CommittedOutput, Trace), PanicOr<ResourceGroupSerializationError>> {
+    ) -> Result<(O::CommittedOutput, Trace), PanicOr<ResourceGroupSerializationError>>
+    where
+        O: LegacyTxnOutput,
+    {
         let output = self.output_wrappers[txn_idx as usize].lock().output.take();
         match output {
             Some(ExecutionStatus::Executed { output, .. }) => {

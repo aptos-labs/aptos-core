@@ -7,7 +7,7 @@ use crate::{
         DeltaTestKind, GroupSizeOrMetadata, MockIncarnation, MockTransaction, ValueType,
         RESERVED_TAG,
     },
-    task::{ExecutionStatus, ExecutorTask, TransactionOutput},
+    task::{ExecutionStatus, ExecutorTask, LegacyTxnOutput, TransactionOutput},
     types::delayed_field_mock_serialization::{
         deserialize_to_delayed_field_id, serialize_from_delayed_field_id,
     },
@@ -693,7 +693,10 @@ where
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
 {
     type CommittedOutput = MockOutput<K, E>;
+    type Key = K;
+    type Tag = u32;
     type Txn = MockTransaction<K, E>;
+    type Value = ValueWithLayout<ValueType>;
 
     fn skip_output() -> Self {
         Self::skipped_output(None)
@@ -701,21 +704,6 @@ where
 
     fn check_materialization(&self, materializer: &impl Materializer<Self::Txn>) -> bool {
         check_resource_group_serialization(self, materializer)
-    }
-
-    fn incorporate_materialized_txn_output(
-        self,
-        patched_resource_write_set: Vec<(K, ValueType)>,
-        _patched_events: Vec<E>,
-    ) -> Result<(Self::CommittedOutput, Trace), PanicError> {
-        assert_ok!(self
-            .patched_resource_write_set
-            .set(patched_resource_write_set.into_iter().collect()));
-        // TODO: Also test patched events
-
-        // The mock's committed output is a snapshot of itself, carrying the reads
-        // and patched writes the baseline verifies.
-        Ok((self, Trace::empty()))
     }
 
     fn resource_write_set(&self) -> HashMap<K, ValueWithLayout<ValueType>> {
@@ -768,22 +756,6 @@ where
         } else {
             BTreeMap::new()
         }
-    }
-
-    fn reads_needing_delayed_field_exchange(
-        &self,
-    ) -> Vec<(K, StateValueMetadata, TriompheArc<MoveTypeLayout>)> {
-        self.reads_needing_exchange
-            .iter()
-            .map(|(key, (metadata, layout))| (key.clone(), metadata.clone(), layout.clone()))
-            .collect()
-    }
-
-    fn group_reads_needing_delayed_field_exchange(&self) -> Vec<(K, StateValueMetadata)> {
-        self.group_reads_needing_exchange
-            .iter()
-            .map(|(key, metadata)| (key.clone(), metadata.clone()))
-            .collect()
     }
 
     fn resource_group_write_set(
@@ -859,10 +831,6 @@ where
         std::iter::empty()
     }
 
-    fn get_events(&self) -> Vec<(E, Option<MoveTypeLayout>)> {
-        self.events.iter().map(|e| (e.clone(), None)).collect()
-    }
-
     fn fee_statement(&self) -> FeeStatement {
         mock_fee_statement(self.total_gas)
     }
@@ -870,6 +838,54 @@ where
     fn has_new_epoch_event(&self) -> bool {
         // For tests, it is ok to return false.
         false
+    }
+}
+
+impl<K, E> LegacyTxnOutput for MockOutput<K, E>
+where
+    K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
+    E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
+{
+    fn reads_needing_delayed_field_exchange(
+        &self,
+    ) -> Vec<(K, StateValueMetadata, TriompheArc<MoveTypeLayout>)> {
+        self.reads_needing_exchange
+            .iter()
+            .map(|(key, (metadata, layout))| (key.clone(), metadata.clone(), layout.clone()))
+            .collect()
+    }
+
+    fn group_reads_needing_delayed_field_exchange(&self) -> Vec<(K, StateValueMetadata)> {
+        self.group_reads_needing_exchange
+            .iter()
+            .map(|(key, metadata)| (key.clone(), metadata.clone()))
+            .collect()
+    }
+
+    fn get_events(&self) -> Vec<(E, Option<MoveTypeLayout>)> {
+        self.events.iter().map(|e| (e.clone(), None)).collect()
+    }
+
+    fn resource_group_metadata_ops(&self) -> Vec<(K, ValueType)> {
+        self.resource_group_write_set()
+            .into_iter()
+            .map(|(key, (op, _, _))| (key, op.extract_value().clone()))
+            .collect()
+    }
+
+    fn incorporate_materialized_txn_output(
+        self,
+        patched_resource_write_set: Vec<(K, ValueType)>,
+        _patched_events: Vec<E>,
+    ) -> Result<(Self::CommittedOutput, Trace), PanicError> {
+        assert_ok!(self
+            .patched_resource_write_set
+            .set(patched_resource_write_set.into_iter().collect()));
+        // TODO: Also test patched events
+
+        // The mock's committed output is a snapshot of itself, carrying the reads
+        // and patched writes the baseline verifies.
+        Ok((self, Trace::empty()))
     }
 }
 

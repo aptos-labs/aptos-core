@@ -136,6 +136,7 @@ due to the ESTIMATE markers on memory locations, instead of waiting for a
 subsequent incarnation to finish.
 **/
 mod captured_reads;
+pub use captured_reads::{CapturedReadSet, LegacyReads, TxnInput};
 mod code_cache;
 pub mod code_cache_global;
 pub mod code_cache_global_manager;
