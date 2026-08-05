@@ -8,6 +8,7 @@ use crate::{
     ledger_info::SignatureWithStatus, on_chain_config::ValidatorSet,
 };
 use anyhow::{ensure, Result};
+use aptos_bcs_utils::BoundedVec;
 use aptos_bitvec::BitVec;
 use aptos_crypto::{
     bls12381,
@@ -27,6 +28,9 @@ use std::{
     fmt,
 };
 use thiserror::Error;
+
+/// The on-chain validator set cannot exceed the `u16` index space used by `BitVec`.
+pub const MAX_VALIDATOR_SET_SIZE: usize = (u16::MAX as usize) + 1;
 
 /// Errors possible during signature verification.
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -169,13 +173,13 @@ impl<'de> Deserialize<'de> for ValidatorVerifier {
         #[derive(Deserialize)]
         #[serde(rename = "ValidatorVerifier")]
         struct RawValidatorVerifier {
-            validator_infos: Vec<ValidatorConsensusInfo>,
+            validator_infos: BoundedVec<ValidatorConsensusInfo, MAX_VALIDATOR_SET_SIZE>,
         }
 
         let RawValidatorVerifier { validator_infos } =
             RawValidatorVerifier::deserialize(deserializer)?;
 
-        Ok(ValidatorVerifier::new(validator_infos))
+        Ok(ValidatorVerifier::new(validator_infos.into_inner()))
     }
 }
 
@@ -786,6 +790,23 @@ mod tests {
         assert_eq!(
             validator.verify(validator_signer.author(), &dummy_struct, &unknown_signature),
             Err(VerifyError::InvalidMultiSignature)
+        );
+    }
+
+    #[test]
+    fn test_rejects_oversized_validator_set_before_elements() {
+        // ValidatorVerifier's only serialized field is validator_infos. This is the
+        // canonical ULEB128 encoding of a vector length of 65,537, with no elements.
+        // A length-first rejection returns the bound error instead of reaching EOF
+        // while attempting to deserialize the first public key.
+        let bytes = [0x81, 0x80, 0x04];
+        let error = bcs::from_bytes::<ValidatorVerifier>(&bytes).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("sequence length 65537 exceeds maximum 65536"),
+            "unexpected error: {}",
+            error
         );
     }
 
