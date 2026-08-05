@@ -243,12 +243,19 @@ impl InternalIndexerDB {
                 break;
             }
             if seq != cur_seq {
-                let msg = if cur_seq == start_seq_num {
-                    "First requested event is probably pruned."
-                } else {
-                    "DB corruption: Sequence number not continuous."
-                };
-                bail!("{} expected: {}, actual: {}", msg, cur_seq, seq);
+                // Sequence numbers are contiguous per event key, so a gap at the very
+                // first requested entry means the caller asked for a pruned range.
+                if cur_seq == start_seq_num {
+                    return Err(AptosDbError::EventPruned {
+                        requested_seq_num: start_seq_num,
+                        min_available_seq_num: seq,
+                    });
+                }
+                bail!(
+                    "DB corruption: Sequence number not continuous. expected: {}, actual: {}",
+                    cur_seq,
+                    seq
+                );
             }
             result.push((seq, ver, idx));
             cur_seq += 1;
@@ -751,5 +758,118 @@ impl DBIndexer {
         }
 
         Ok(events_with_version)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db_ops::open_internal_indexer_db;
+    use aptos_config::config::RocksdbConfig;
+    use aptos_temppath::TempPath;
+    use aptos_types::account_address::AccountAddress;
+
+    const EVENT_KEY_CREATION_NUM: u64 = 3;
+
+    /// Builds an indexer db holding only the given `(seq_num, version, index)`
+    /// event index entries, standing in for a db whose older entries were pruned.
+    fn indexer_db_with_events(
+        tmp_dir: &TempPath,
+        event_key: &EventKey,
+        entries: &[(u64, Version, u64)],
+    ) -> InternalIndexerDB {
+        tmp_dir.create_as_dir().unwrap();
+        let db =
+            Arc::new(open_internal_indexer_db(tmp_dir.path(), &RocksdbConfig::default()).unwrap());
+        let mut batch = SchemaBatch::new();
+        for (seq, version, index) in entries {
+            batch
+                .put::<EventByKeySchema>(&(*event_key, *seq), &(*version, *index))
+                .unwrap();
+        }
+        db.write_schemas(batch).unwrap();
+        InternalIndexerDB::new(
+            db,
+            InternalIndexerDBConfig::new(true, true, true, 0, true, 10),
+        )
+    }
+
+    fn test_event_key() -> EventKey {
+        EventKey::new(EVENT_KEY_CREATION_NUM, AccountAddress::ONE)
+    }
+
+    /// The API downcasts to this variant to return a 410 rather than a 500, so the
+    /// structure (not just the message) is load bearing.
+    #[test]
+    fn lookup_from_pruned_sequence_number_reports_pruned() {
+        let tmp_dir = TempPath::new();
+        let event_key = test_event_key();
+        // Sequence numbers below 100 have been pruned away.
+        let db = indexer_db_with_events(&tmp_dir, &event_key, &[(100, 5000, 0), (101, 5001, 0)]);
+
+        let err = db
+            .lookup_events_by_key(&event_key, 0, 1, u64::MAX)
+            .unwrap_err();
+
+        assert!(
+            matches!(err, AptosDbError::EventPruned {
+                requested_seq_num: 0,
+                min_available_seq_num: 100,
+            }),
+            "expected EventPruned, got: {:?}",
+            err
+        );
+    }
+
+    #[test]
+    fn lookup_from_retained_sequence_number_succeeds() {
+        let tmp_dir = TempPath::new();
+        let event_key = test_event_key();
+        let db = indexer_db_with_events(&tmp_dir, &event_key, &[(100, 5000, 0), (101, 5001, 7)]);
+
+        let events = db
+            .lookup_events_by_key(&event_key, 100, 2, u64::MAX)
+            .unwrap();
+
+        assert_eq!(events, vec![(100, 5000, 0), (101, 5001, 7)]);
+    }
+
+    /// A sequence number past the newest entry is not pruning, and must not be
+    /// reported as such -- the seek simply runs off the end of the key's range.
+    #[test]
+    fn lookup_past_the_newest_sequence_number_is_not_pruned() {
+        let tmp_dir = TempPath::new();
+        let event_key = test_event_key();
+        let db = indexer_db_with_events(&tmp_dir, &event_key, &[(100, 5000, 0)]);
+
+        let events = db
+            .lookup_events_by_key(&event_key, 500, 1, u64::MAX)
+            .unwrap();
+
+        assert!(events.is_empty());
+    }
+
+    /// A gap after the first entry is corruption, not pruning: it must stay a 500
+    /// rather than being laundered into a 410 telling the client to try archival.
+    #[test]
+    fn gap_after_the_first_entry_is_not_reported_as_pruned() {
+        let tmp_dir = TempPath::new();
+        let event_key = test_event_key();
+        let db = indexer_db_with_events(&tmp_dir, &event_key, &[
+            (100, 5000, 0),
+            (101, 5001, 0),
+            (103, 5003, 0),
+        ]);
+
+        let err = db
+            .lookup_events_by_key(&event_key, 100, 4, u64::MAX)
+            .unwrap_err();
+
+        assert!(
+            !matches!(err, AptosDbError::EventPruned { .. }),
+            "corruption must not be reported as pruned, got: {:?}",
+            err
+        );
+        assert!(err.to_string().contains("DB corruption"));
     }
 }
