@@ -14,7 +14,7 @@ use aptos_aggregator::{
 use aptos_block_executor::{
     code_cache_global_manager::AptosModuleCacheManagerGuard,
     executor::BlockExecutor,
-    task::{ExecutionStatus, ExecutorTask, TransactionOutput},
+    task::{ExecutionStatus, ExecutorTask, LegacyTxnOutput, TransactionOutput},
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::default::DefaultTxnProvider,
     types::InputOutputKey,
@@ -161,7 +161,10 @@ struct TestOutput;
 
 impl TransactionOutput for TestOutput {
     type CommittedOutput = aptos_types::transaction::TransactionOutput;
+    type Key = StateKey;
+    type Tag = StructTag;
     type Txn = TestTransaction;
+    type Value = ValueWithLayout<WriteOp>;
 
     fn skip_output() -> Self {
         Self
@@ -169,17 +172,6 @@ impl TransactionOutput for TestOutput {
 
     fn check_materialization(&self, _materializer: &impl Materializer<Self::Txn>) -> bool {
         true
-    }
-
-    fn incorporate_materialized_txn_output(
-        self,
-        _patched_resource_write_set: Vec<(StateKey, WriteOp)>,
-        _patched_events: Vec<ContractEvent>,
-    ) -> Result<(Self::CommittedOutput, Trace), PanicError> {
-        Ok((
-            aptos_types::transaction::TransactionOutput::new_empty_success(),
-            Trace::empty(),
-        ))
     }
 
     fn resource_write_set(&self) -> HashMap<StateKey, ValueWithLayout<WriteOp>> {
@@ -195,20 +187,6 @@ impl TransactionOutput for TestOutput {
 
     fn delayed_field_change_set(&self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
         BTreeMap::new()
-    }
-
-    fn reads_needing_delayed_field_exchange(
-        &self,
-    ) -> Vec<(StateKey, StateValueMetadata, TriompheArc<MoveTypeLayout>)> {
-        vec![]
-    }
-
-    fn group_reads_needing_delayed_field_exchange(&self) -> Vec<(StateKey, StateValueMetadata)> {
-        vec![]
-    }
-
-    fn get_events(&self) -> Vec<(ContractEvent, Option<MoveTypeLayout>)> {
-        vec![]
     }
 
     fn resource_group_write_set(
@@ -260,6 +238,37 @@ impl TransactionOutput for TestOutput {
 
     fn storage_keys_written(&self) -> impl Iterator<Item = &StateKey> {
         std::iter::empty()
+    }
+}
+
+impl LegacyTxnOutput for TestOutput {
+    fn reads_needing_delayed_field_exchange(
+        &self,
+    ) -> Vec<(StateKey, StateValueMetadata, TriompheArc<MoveTypeLayout>)> {
+        vec![]
+    }
+
+    fn group_reads_needing_delayed_field_exchange(&self) -> Vec<(StateKey, StateValueMetadata)> {
+        vec![]
+    }
+
+    fn get_events(&self) -> Vec<(ContractEvent, Option<MoveTypeLayout>)> {
+        vec![]
+    }
+
+    fn resource_group_metadata_ops(&self) -> Vec<(StateKey, WriteOp)> {
+        vec![]
+    }
+
+    fn incorporate_materialized_txn_output(
+        self,
+        _patched_resource_write_set: Vec<(StateKey, WriteOp)>,
+        _patched_events: Vec<ContractEvent>,
+    ) -> Result<(Self::CommittedOutput, Trace), PanicError> {
+        Ok((
+            aptos_types::transaction::TransactionOutput::new_empty_success(),
+            Trace::empty(),
+        ))
     }
 }
 
