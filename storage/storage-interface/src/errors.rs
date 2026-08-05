@@ -84,7 +84,20 @@ impl From<AptosDbError> for StateViewError {
         match error {
             AptosDbError::NotFound(msg) => StateViewError::NotFound(msg),
             AptosDbError::Other(msg) => StateViewError::Other(msg),
-            _ => StateViewError::Other(format!("{}", error)),
+            // StateViewError has no pruned variant, so structure is necessarily
+            // lost here. Listed explicitly so that adding a variant that callers
+            // need to distinguish forces a decision at this boundary.
+            AptosDbError::TooManyRequested(..)
+            | AptosDbError::MissingRootError(..)
+            | AptosDbError::LedgerPruned { .. }
+            | AptosDbError::EventPruned { .. }
+            | AptosDbError::RocksDbIncompleteResult(..)
+            | AptosDbError::OtherRocksDbError(..)
+            | AptosDbError::BcsError(..)
+            | AptosDbError::IoError(..)
+            | AptosDbError::RecvError(..)
+            | AptosDbError::ParseIntError(..)
+            | AptosDbError::HotStateError => StateViewError::Other(format!("{}", error)),
         }
     }
 }

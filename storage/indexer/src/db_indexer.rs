@@ -216,6 +216,31 @@ impl InternalIndexerDB {
         ))
     }
 
+    /// Like [`Self::lookup_events_by_key`], but returns the events that are still
+    /// retained instead of failing when the requested range starts below the
+    /// pruner's window.
+    ///
+    /// This is for callers whose `start_seq_num` is a derived lower bound rather
+    /// than a client-requested position: reporting such a range as pruned would
+    /// withhold events the caller asked for and that the node can still serve.
+    pub fn lookup_events_by_key_clamped(
+        &self,
+        event_key: &EventKey,
+        start_seq_num: u64,
+        limit: u64,
+        ledger_version: u64,
+    ) -> Result<Vec<(u64, Version, u64)>> {
+        match self.lookup_events_by_key(event_key, start_seq_num, limit, ledger_version) {
+            Err(AptosDbError::EventPruned {
+                min_available_seq_num,
+                ..
+            }) => {
+                self.lookup_events_by_key(event_key, min_available_seq_num, limit, ledger_version)
+            },
+            result => result,
+        }
+    }
+
     /// Given `event_key` and `start_seq_num`, returns events identified by transaction version and
     /// index among all events emitted by the same transaction. Result won't contain records with a
     /// transaction version > `ledger_version` and is in ascending order.
@@ -704,13 +729,25 @@ impl DBIndexer {
         // Convert requested range and order to a range in ascending order.
         let (first_seq, real_limit) = get_first_seq_num_and_limit(order, cursor, limit)?;
 
-        // Query the index.
-        let mut event_indices = self.indexer_db.lookup_events_by_key(
-            event_key,
-            first_seq,
-            real_limit,
-            ledger_version,
-        )?;
+        // Query the index. For a descending query `first_seq` is derived from the
+        // latest sequence number rather than requested by the caller, so a pruned
+        // prefix only means fewer events are available, not that the request is
+        // unservable.
+        let mut event_indices = if order == Order::Descending {
+            self.indexer_db.lookup_events_by_key_clamped(
+                event_key,
+                first_seq,
+                real_limit,
+                ledger_version,
+            )?
+        } else {
+            self.indexer_db.lookup_events_by_key(
+                event_key,
+                first_seq,
+                real_limit,
+                ledger_version,
+            )?
+        };
 
         // When descending, it's possible that user is asking for something beyond the latest
         // sequence number, in which case we will consider it a bad request and return an empty
@@ -847,6 +884,64 @@ mod tests {
             .unwrap();
 
         assert!(events.is_empty());
+    }
+
+    /// A descending query derives its start from the latest sequence number, so a
+    /// pruned prefix must yield the events that remain rather than a 410 naming a
+    /// sequence number the caller never asked for.
+    #[test]
+    fn clamped_lookup_returns_retained_events_instead_of_reporting_pruned() {
+        let tmp_dir = TempPath::new();
+        let event_key = test_event_key();
+        // Only seqs 100-102 survive; a descending page of 25 derives start = 78.
+        let db = indexer_db_with_events(&tmp_dir, &event_key, &[
+            (100, 5000, 0),
+            (101, 5001, 0),
+            (102, 5002, 0),
+        ]);
+
+        assert!(matches!(
+            db.lookup_events_by_key(&event_key, 78, 25, u64::MAX),
+            Err(AptosDbError::EventPruned { .. })
+        ));
+
+        let events = db
+            .lookup_events_by_key_clamped(&event_key, 78, 25, u64::MAX)
+            .unwrap();
+
+        assert_eq!(events, vec![(100, 5000, 0), (101, 5001, 0), (102, 5002, 0)]);
+    }
+
+    #[test]
+    fn clamped_lookup_matches_plain_lookup_when_nothing_is_pruned() {
+        let tmp_dir = TempPath::new();
+        let event_key = test_event_key();
+        let db = indexer_db_with_events(&tmp_dir, &event_key, &[(0, 10, 0), (1, 11, 0)]);
+
+        assert_eq!(
+            db.lookup_events_by_key_clamped(&event_key, 0, 2, u64::MAX)
+                .unwrap(),
+            db.lookup_events_by_key(&event_key, 0, 2, u64::MAX).unwrap(),
+        );
+    }
+
+    /// Corruption must not be clamped away: only a gap at the very first entry is
+    /// pruning, so the clamped variant still surfaces a mid-range gap as an error.
+    #[test]
+    fn clamped_lookup_still_surfaces_corruption() {
+        let tmp_dir = TempPath::new();
+        let event_key = test_event_key();
+        let db = indexer_db_with_events(&tmp_dir, &event_key, &[
+            (100, 5000, 0),
+            (101, 5001, 0),
+            (103, 5003, 0),
+        ]);
+
+        let err = db
+            .lookup_events_by_key_clamped(&event_key, 100, 4, u64::MAX)
+            .unwrap_err();
+
+        assert!(err.to_string().contains("DB corruption"));
     }
 
     /// A gap after the first entry is corruption, not pruning: it must stay a 500
