@@ -235,7 +235,20 @@ impl InternalIndexerDB {
                 min_available_seq_num,
                 ..
             }) => {
-                self.lookup_events_by_key(event_key, min_available_seq_num, limit, ledger_version)
+                // Shrink the limit by the pruned prefix so the window keeps its
+                // original end. Reusing `limit` from the clamped start would slide
+                // the window forward and return entries past what was requested.
+                let skipped = min_available_seq_num.saturating_sub(start_seq_num);
+                let remaining = limit.saturating_sub(skipped);
+                if remaining == 0 {
+                    return Ok(Vec::new());
+                }
+                self.lookup_events_by_key(
+                    event_key,
+                    min_available_seq_num,
+                    remaining,
+                    ledger_version,
+                )
             },
             result => result,
         }
@@ -729,11 +742,12 @@ impl DBIndexer {
         // Convert requested range and order to a range in ascending order.
         let (first_seq, real_limit) = get_first_seq_num_and_limit(order, cursor, limit)?;
 
-        // Query the index. For a descending query `first_seq` is derived from the
+        // Query the index. Only when `get_latest` is `first_seq` derived from the
         // latest sequence number rather than requested by the caller, so a pruned
-        // prefix only means fewer events are available, not that the request is
-        // unservable.
-        let mut event_indices = if order == Order::Descending {
+        // prefix there means fewer events are available rather than an unservable
+        // request. A caller-supplied start, in either order, is still reported as
+        // pruned.
+        let mut event_indices = if get_latest {
             self.indexer_db.lookup_events_by_key_clamped(
                 event_key,
                 first_seq,
@@ -907,6 +921,29 @@ mod tests {
 
         let events = db
             .lookup_events_by_key_clamped(&event_key, 78, 25, u64::MAX)
+            .unwrap();
+
+        assert_eq!(events, vec![(100, 5000, 0), (101, 5001, 0), (102, 5002, 0)]);
+    }
+
+    /// Clamping moves the start forward, so the limit has to shrink by the same
+    /// amount. Reusing the original limit would return entries past the end of
+    /// the window the caller asked for.
+    #[test]
+    fn clamped_lookup_does_not_extend_past_the_requested_window() {
+        let tmp_dir = TempPath::new();
+        let event_key = test_event_key();
+        let db = indexer_db_with_events(&tmp_dir, &event_key, &[
+            (100, 5000, 0),
+            (101, 5001, 0),
+            (102, 5002, 0),
+            (103, 5003, 0),
+        ]);
+
+        // Requested [98, 102]; seqs 98-99 are pruned, so the result must stop at
+        // 102 and must not slide forward to include 103.
+        let events = db
+            .lookup_events_by_key_clamped(&event_key, 98, 5, u64::MAX)
             .unwrap();
 
         assert_eq!(events, vec![(100, 5000, 0), (101, 5001, 0), (102, 5002, 0)]);

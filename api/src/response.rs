@@ -681,6 +681,13 @@ pub fn version_pruned<E: GoneError>(ledger_version: u64, ledger_info: &LedgerInf
     )
 }
 
+/// Reports pruned events under `VersionPruned` rather than a code of their own.
+///
+/// A sequence number is not a version, so this is imprecise, but every new
+/// `AptosErrorCode` value is a breaking change for existing clients: `AptosErrorCode`
+/// has no serde catch-all, so an older `aptos-rest-client` fails to deserialize the
+/// body, discards the 410, and retries a terminal error. The message carries the
+/// sequence numbers a caller actually needs.
 pub fn events_pruned<E: GoneError>(
     requested_seq_num: u64,
     min_available_seq_num: u64,
@@ -691,7 +698,7 @@ pub fn events_pruned<E: GoneError>(
             "Events at sequence number({}) have been pruned, the oldest available sequence number is {}",
             requested_seq_num, min_available_seq_num
         ),
-        AptosErrorCode::EventPruned,
+        AptosErrorCode::VersionPruned,
         ledger_info,
     )
 }
@@ -917,18 +924,7 @@ mod tests {
             min_available_seq_num: 4_000_000,
         })
         .context("Failed to find events by key 0x300000000000000000000000000000001");
-        assert_eq!(map(err), (410, AptosErrorCode::EventPruned));
-    }
-
-    /// Events are addressed by sequence number, so they must not borrow the
-    /// version-shaped code and hand clients a number they cannot use as a cursor.
-    #[test]
-    fn pruned_events_do_not_report_a_version_code() {
-        let err = anyhow::Error::new(AptosDbError::EventPruned {
-            requested_seq_num: 0,
-            min_available_seq_num: 4_000_000,
-        });
-        assert_ne!(map(err).1, AptosErrorCode::VersionPruned);
+        assert_eq!(map(err), (410, AptosErrorCode::VersionPruned));
     }
 
     #[test]
