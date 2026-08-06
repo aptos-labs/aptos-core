@@ -1,0 +1,58 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/ghost_field_closure_equality_ext.move:34:9
+   │
+34 │         ensures result_1 != result_2; // FAILS: they are Move-equal
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/ghost_field_closure_equality_ext.move:31: vec_neq
+   =     at tests/sources/functional/ghost_field_closure_equality_ext.move:13: mk
+   =         gv = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality_ext.move:14: mk
+   =         s = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality_ext.move:16: mk
+   =         s = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality_ext.move:18: mk
+   =     at tests/sources/functional/ghost_field_closure_equality_ext.move:13: mk
+   =         result = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality_ext.move:13: mk
+   =         gv = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality_ext.move:14: mk
+   =         s = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality_ext.move:16: mk
+   =         s = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality_ext.move:18: mk
+   =     at tests/sources/functional/ghost_field_closure_equality_ext.move:13: mk
+   =         result = <redacted>
+   =         result_1 = <redacted>
+   =         result_2 = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality_ext.move:34: vec_neq (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/ghost_field_closure_equality_ext.move:48:9
+   │
+48 │         ensures result_1 != result_2; // FAILS: they are Move-equal
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/ghost_field_closure_equality_ext.move:45: fs_neq
+   =     at tests/sources/functional/ghost_field_closure_equality_ext.move:13: mk
+   =         gv = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality_ext.move:14: mk
+   =         s = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality_ext.move:16: mk
+   =         s = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality_ext.move:18: mk
+   =     at tests/sources/functional/ghost_field_closure_equality_ext.move:13: mk
+   =         result = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality_ext.move:13: mk
+   =         gv = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality_ext.move:14: mk
+   =         s = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality_ext.move:16: mk
+   =         s = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality_ext.move:18: mk
+   =     at tests/sources/functional/ghost_field_closure_equality_ext.move:13: mk
+   =         result = <redacted>
+   =         result_1 = <redacted>
+   =         result_2 = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality_ext.move:48: fs_neq (spec)

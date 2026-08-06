@@ -148,6 +148,48 @@ module 0x42::loop_memory_havoc {
         ensures gcount == n;
     }
 
+    // Ghost *fields* follow the same rules as ghost memory: an update inside
+    // a loop havocs the base local's ghost state at the loop header, so a
+    // false frame claim over the ghost field must not verify.
+    struct GS has copy, drop { x: u64 }
+    spec GS {
+        ghost gf: u64;
+    }
+    fun ghost_field_loop_fails(n: u64): GS {
+        let s = GS { x: 0 };
+        spec { update s.gf = 0; };
+        let i = 0;
+        while (i < n) {
+            spec { update s.gf = 1; };
+            i = i + 1;
+        };
+        s
+    }
+    spec ghost_field_loop_fails {
+        ensures result.gf == 0;
+    }
+
+    // Positive: an invariant re-establishes the exact final ghost-field value.
+    fun ghost_field_loop_with_invariant(n: u64): GS {
+        let s = GS { x: 0 };
+        spec { update s.gf = 0; };
+        let i = 0;
+        while ({
+            spec {
+                invariant i <= n;
+                invariant s.gf == i;
+            };
+            i < n
+        }) {
+            spec { update s.gf = s.gf + 1; };
+            i = i + 1;
+        };
+        s
+    }
+    spec ghost_field_loop_with_invariant {
+        ensures result.gf == n;
+    }
+
     // A ghost variable not updated by the loop is framed across it.
     fun ghost_untouched_framed(addr: address, n: u64) acquires R {
         spec {

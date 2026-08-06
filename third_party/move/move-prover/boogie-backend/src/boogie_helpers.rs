@@ -143,6 +143,11 @@ pub fn field_bv_flag_global_state(
     global_state: &GlobalNumberOperationState,
     field_env: &FieldEnv,
 ) -> bool {
+    // Ghost fields are model-only and never participate in number-operation
+    // (bitvector) analysis; on enums they also carry no variant.
+    if field_env.is_ghost() {
+        return false;
+    }
     let operation_map = &global_state.struct_operation_map;
     let mid = field_env.struct_env.module_env.get_id();
     let sid = field_env.struct_env.get_id();

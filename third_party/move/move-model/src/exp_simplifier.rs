@@ -3762,12 +3762,16 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpRewriterFunctions for ExpSimplifier<'a,
         }
 
         // 7c. Select-of-Pack: Pack(S, e1, ..., en).fi => e_i
+        // Ghost fields are excluded: their offsets index the separate ghost
+        // namespace, not the Pack's runtime arguments, and a ghost select on
+        // a pack denotes an arbitrary (or initializer-derived) value.
         if let Operation::Select(mid, sid, fid) = oper {
             if let ExpData::Call(_, Operation::Pack(mid2, sid2, _), inner_args) = args[0].as_ref() {
                 if mid == mid2 && sid == sid2 {
                     let struct_env = self.env().get_module(*mid).into_struct(*sid);
-                    let offset = struct_env.get_field(*fid).get_offset();
-                    if offset < inner_args.len() {
+                    let field_env = struct_env.get_field(*fid);
+                    let offset = field_env.get_offset();
+                    if !field_env.is_ghost() && offset < inner_args.len() {
                         return Some(inner_args[offset].clone());
                     }
                 }
@@ -3775,14 +3779,17 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpRewriterFunctions for ExpSimplifier<'a,
         }
 
         // 7d. UpdateField-of-Pack: update_field(Pack(S, e1,...,en), fi, v) => Pack(S, e1,...,v,...,en)
+        // Ghost fields are excluded for the same reason as in 7c: folding by
+        // ghost-namespace offset would overwrite an unrelated runtime argument.
         if let Operation::UpdateField(mid, sid, fid) = oper {
             if let ExpData::Call(pid, Operation::Pack(mid2, sid2, var), inner_args) =
                 args[0].as_ref()
             {
                 if mid == mid2 && sid == sid2 {
                     let struct_env = self.env().get_module(*mid).into_struct(*sid);
-                    let offset = struct_env.get_field(*fid).get_offset();
-                    if offset < inner_args.len() {
+                    let field_env = struct_env.get_field(*fid);
+                    let offset = field_env.get_offset();
+                    if !field_env.is_ghost() && offset < inner_args.len() {
                         let mut new_args = inner_args.clone();
                         new_args[offset] = args[1].clone();
                         return Some(

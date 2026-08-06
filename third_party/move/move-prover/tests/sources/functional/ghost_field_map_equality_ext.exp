@@ -1,0 +1,56 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/ghost_field_map_equality_ext.move:68:9
+   │
+68 │         ensures result_1 != result_2; // FAILS: they are Move-equal
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/ghost_field_map_equality_ext.move:55: mk_wrapped_neq
+   =         v1 = <redacted>
+   =     at tests/sources/functional/ghost_field_map_equality_ext.move:56: mk_wrapped_neq
+   =         v2 = <redacted>
+   =     at tests/sources/functional/ghost_field_map_equality_ext.move:58: mk_wrapped_neq
+   =         v1 = <redacted>
+   =     at tests/sources/functional/ghost_field_map_equality_ext.move:59: mk_wrapped_neq
+   =         v2 = <redacted>
+   =     at tests/sources/functional/ghost_field_map_equality_ext.move:61: mk_wrapped_neq
+   =         m1 = <redacted>
+   =     at tests/sources/functional/ghost_field_map_equality_ext.move:62: mk_wrapped_neq
+   =         m2 = <redacted>
+   =     at tests/sources/functional/ghost_field_map_equality_ext.move:63: mk_wrapped_neq
+   =         m1 = <redacted>
+   =     at tests/sources/functional/ghost_field_map_equality_ext.move:64: mk_wrapped_neq
+   =         m2 = <redacted>
+   =     at tests/sources/functional/ghost_field_map_equality_ext.move:65: mk_wrapped_neq
+   =     at tests/sources/functional/ghost_field_map_equality_ext.move:54: mk_wrapped_neq
+   =         result_1 = <redacted>
+   =         result_2 = <redacted>
+   =     at tests/sources/functional/ghost_field_map_equality_ext.move:68: mk_wrapped_neq (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/ghost_field_map_equality_ext.move:109:9
+    │
+109 │         ensures result_1 != result_2; // FAILS: they are Move-equal
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/ghost_field_map_equality_ext.move:96: mk_vec_neq
+    =         v1 = <redacted>
+    =     at tests/sources/functional/ghost_field_map_equality_ext.move:97: mk_vec_neq
+    =         v2 = <redacted>
+    =     at tests/sources/functional/ghost_field_map_equality_ext.move:99: mk_vec_neq
+    =         v1 = <redacted>
+    =     at tests/sources/functional/ghost_field_map_equality_ext.move:100: mk_vec_neq
+    =         v2 = <redacted>
+    =     at tests/sources/functional/ghost_field_map_equality_ext.move:102: mk_vec_neq
+    =         m1 = <redacted>
+    =     at tests/sources/functional/ghost_field_map_equality_ext.move:103: mk_vec_neq
+    =         m2 = <redacted>
+    =     at tests/sources/functional/ghost_field_map_equality_ext.move:104: mk_vec_neq
+    =         m1 = <redacted>
+    =     at tests/sources/functional/ghost_field_map_equality_ext.move:105: mk_vec_neq
+    =         m2 = <redacted>
+    =     at tests/sources/functional/ghost_field_map_equality_ext.move:106: mk_vec_neq
+    =     at tests/sources/functional/ghost_field_map_equality_ext.move:95: mk_vec_neq
+    =         result_1 = <redacted>
+    =         result_2 = <redacted>
+    =     at tests/sources/functional/ghost_field_map_equality_ext.move:109: mk_vec_neq (spec)

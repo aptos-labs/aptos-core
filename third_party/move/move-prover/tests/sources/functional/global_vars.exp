@@ -1,74 +1,74 @@
 Move prover returns: exiting with verification errors
 error: post-condition does not hold
-    ┌─ tests/sources/functional/global_vars.move:120:9
+    ┌─ tests/sources/functional/global_vars.move:123:9
     │
-120 │         ensures sum_of_T2 == 2;
+123 │         ensures sum_of_T2 == 2;
     │         ^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/global_vars.move:116: opaque_call_add_sub_invalid
-    =     at tests/sources/functional/global_vars.move:117: opaque_call_add_sub_invalid
-    =     at tests/sources/functional/global_vars.move:96: opaque_add (spec)
-    =     at tests/sources/functional/global_vars.move:117: opaque_call_add_sub_invalid
-    =     at tests/sources/functional/global_vars.move:106: opaque_sub (spec)
-    =     at tests/sources/functional/global_vars.move:117: opaque_call_add_sub_invalid
-    =     at tests/sources/functional/global_vars.move:96: opaque_add (spec)
-    =     at tests/sources/functional/global_vars.move:120: opaque_call_add_sub_invalid (spec)
+    =     at tests/sources/functional/global_vars.move:119: opaque_call_add_sub_invalid
+    =     at tests/sources/functional/global_vars.move:120: opaque_call_add_sub_invalid
+    =     at tests/sources/functional/global_vars.move:99: opaque_add (spec)
+    =     at tests/sources/functional/global_vars.move:120: opaque_call_add_sub_invalid
+    =     at tests/sources/functional/global_vars.move:109: opaque_sub (spec)
+    =     at tests/sources/functional/global_vars.move:120: opaque_call_add_sub_invalid
+    =     at tests/sources/functional/global_vars.move:99: opaque_add (spec)
+    =     at tests/sources/functional/global_vars.move:123: opaque_call_add_sub_invalid (spec)
 
 error: precondition does not hold at this call
-    ┌─ tests/sources/functional/global_vars.move:145:9
+    ┌─ tests/sources/functional/global_vars.move:148:9
     │
-145 │         requires access_verified;
+148 │         requires access_verified;
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/global_vars.move:153: do_privileged_invalid
+    =     at tests/sources/functional/global_vars.move:156: do_privileged_invalid
     =         _s = <redacted>
-    =     at tests/sources/functional/global_vars.move:145: requires_access (spec)
+    =     at tests/sources/functional/global_vars.move:148: requires_access (spec)
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/global_vars.move:181:9
+    ┌─ tests/sources/functional/global_vars.move:184:9
     │
-181 │         ensures type_has_property<u64>;
+184 │         ensures type_has_property<u64>;
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/global_vars.move:177: expect_property_of_u64_invalid
-    =     at tests/sources/functional/global_vars.move:178: expect_property_of_u64_invalid
-    =     at tests/sources/functional/global_vars.move:167: give_property_to (spec)
-    =     at tests/sources/functional/global_vars.move:164: give_property_to
-    =     at tests/sources/functional/global_vars.move:181: expect_property_of_u64_invalid (spec)
+    =     at tests/sources/functional/global_vars.move:180: expect_property_of_u64_invalid
+    =     at tests/sources/functional/global_vars.move:181: expect_property_of_u64_invalid
+    =     at tests/sources/functional/global_vars.move:170: give_property_to (spec)
+    =     at tests/sources/functional/global_vars.move:167: give_property_to
+    =     at tests/sources/functional/global_vars.move:184: expect_property_of_u64_invalid (spec)
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/global_vars.move:205:9
+    ┌─ tests/sources/functional/global_vars.move:208:9
     │
-205 │         ensures type_has_property<u64>;
+208 │         ensures type_has_property<u64>;
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/global_vars.move:201: opaque_expect_property_of_u64_invalid
-    =     at tests/sources/functional/global_vars.move:202: opaque_expect_property_of_u64_invalid
-    =     at tests/sources/functional/global_vars.move:191: opaque_give_property_to (spec)
-    =     at tests/sources/functional/global_vars.move:205: opaque_expect_property_of_u64_invalid (spec)
+    =     at tests/sources/functional/global_vars.move:204: opaque_expect_property_of_u64_invalid
+    =     at tests/sources/functional/global_vars.move:205: opaque_expect_property_of_u64_invalid
+    =     at tests/sources/functional/global_vars.move:194: opaque_give_property_to (spec)
+    =     at tests/sources/functional/global_vars.move:208: opaque_expect_property_of_u64_invalid (spec)
 
 error: global memory invariant does not hold
-    ┌─ tests/sources/functional/global_vars.move:218:5
+    ┌─ tests/sources/functional/global_vars.move:221:5
     │
-218 │     invariant global<R>(@0).v <= limit;
+221 │     invariant global<R>(@0).v <= limit;
     │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/global_vars.move:228: limit_change_invalid
+    =     at tests/sources/functional/global_vars.move:231: limit_change_invalid
     =         s = <redacted>
-    =     at tests/sources/functional/global_vars.move:229: limit_change_invalid
-    =     at tests/sources/functional/global_vars.move:220: publish
+    =     at tests/sources/functional/global_vars.move:232: limit_change_invalid
+    =     at tests/sources/functional/global_vars.move:223: publish
     =         s = <redacted>
-    =     at tests/sources/functional/global_vars.move:221: publish
-    =     at tests/sources/functional/global_vars.move:220: publish
-    =     at tests/sources/functional/global_vars.move:232: limit_change_invalid (spec)
-    =     at tests/sources/functional/global_vars.move:218
+    =     at tests/sources/functional/global_vars.move:224: publish
+    =     at tests/sources/functional/global_vars.move:223: publish
+    =     at tests/sources/functional/global_vars.move:235: limit_change_invalid (spec)
+    =     at tests/sources/functional/global_vars.move:221
 
 error: global memory invariant does not hold
-    ┌─ tests/sources/functional/global_vars.move:218:5
+    ┌─ tests/sources/functional/global_vars.move:221:5
     │
-218 │     invariant global<R>(@0).v <= limit;
+221 │     invariant global<R>(@0).v <= limit;
     │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/global_vars.move:224: update_invalid
-    =     at tests/sources/functional/global_vars.move:225: update_invalid
-    =     at tests/sources/functional/global_vars.move:218
+    =     at tests/sources/functional/global_vars.move:227: update_invalid
+    =     at tests/sources/functional/global_vars.move:228: update_invalid
+    =     at tests/sources/functional/global_vars.move:221

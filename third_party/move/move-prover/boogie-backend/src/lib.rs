@@ -79,6 +79,11 @@ struct TypeInfo {
     name: String,
     suffix: String,
     has_native_equality: bool,
+    /// True iff the type transitively carries a ghost field. Templates
+    /// comparing values of this type must use `$IsEqual'<suffix>'` instead of
+    /// raw `==`: ghosts are constructor arguments, so raw equality would
+    /// include them, while Move equality is the quotient over runtime state.
+    has_ghost: bool,
     is_bv: bool,
     is_type_param: bool,
     /// True iff `$1_cmp_$compare'<suffix>'` is emitted in the prelude. Only set on K
@@ -92,6 +97,7 @@ struct TupleInfo {
     arity: usize,
     suffix: String,
     elements: Vec<TypeInfo>,
+    has_ghost: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
@@ -513,6 +519,7 @@ impl TypeInfo {
             name: boogie_type(env, ty, bv_flag),
             suffix: boogie_type_suffix(env, ty, bv_flag),
             has_native_equality: has_native_equality(env, options, ty),
+            has_ghost: crate::bytecode_translator::type_has_ghost_transitively(env, ty),
             is_bv: bv_flag && ty.is_number(),
             is_type_param: matches!(ty, Type::TypeParameter(_)),
             cmp_available: false,
@@ -527,10 +534,12 @@ impl TupleInfo {
             .map(|ty| TypeInfo::new(env, options, ty, false))
             .collect();
         let suffix = elements.iter().map(|e| e.suffix.as_str()).join("_");
+        let has_ghost = elements.iter().any(|e| e.has_ghost);
         Self {
             arity: elems.len(),
             suffix,
             elements,
+            has_ghost,
         }
     }
 }
