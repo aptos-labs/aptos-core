@@ -7,7 +7,7 @@ use super::super::{
 };
 use crate::{
     errors::MissingEvalProofError,
-    group::{Fr, G1Affine, G2Affine, G2Prepared, PairingOutput, PairingSetting},
+    group::{Fr, G1Affine, G2Affine, PairingOutput, PairingSetting},
     shared::{digest::EvalProof, encryption_key::EncryptionKey, ids::Id},
     traits::Plaintext,
 };
@@ -54,7 +54,7 @@ pub struct PreparedBIBECiphertext {
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub(crate) pairing_output: PairingOutput,
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    pub(crate) ct_g2: G2Prepared,
+    pub(crate) ct_g2: G2Affine,
     pub(crate) padded_key: OneTimePaddedKey,
     pub(crate) symmetric_ciphertext: SymmetricCiphertext,
 }
@@ -100,15 +100,16 @@ impl InnerCiphertext for BIBECiphertext {
         digest: &Digest,
         eval_proof: &EvalProof,
     ) -> PreparedBIBECiphertext {
-        let pairing_output = PairingSetting::multi_pairing([digest.as_g1(), **eval_proof], [
-            self.ct_g2[0],
-            self.ct_g2[1],
-        ]);
+        let pairing_output =
+            crate::shared::blst_ops::multi_pairing(&[digest.as_g1(), **eval_proof], &[
+                self.ct_g2[0],
+                self.ct_g2[1],
+            ]);
 
         PreparedBIBECiphertext {
             id: self.id,
             pairing_output,
-            ct_g2: self.ct_g2[2].into(),
+            ct_g2: self.ct_g2[2],
             padded_key: self.padded_key.clone(),
             symmetric_ciphertext: self.symmetric_ciphertext.clone(),
         }
@@ -163,7 +164,7 @@ impl BIBECTEncrypt for EncryptionKey {
 
 impl<P: Plaintext> BIBECTDecrypt<P> for BIBEDecryptionKey {
     fn bibe_decrypt(&self, ct: &PreparedBIBECiphertext) -> Result<P> {
-        let otp_source_1 = PairingSetting::pairing(self.signature_g1, ct.ct_g2.clone());
+        let otp_source_1 = crate::shared::blst_ops::pairing(&self.signature_g1, &ct.ct_g2);
         let otp_source_gt = otp_source_1 + ct.pairing_output;
 
         let mut otp_source_bytes = Vec::new();
