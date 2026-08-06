@@ -84,9 +84,9 @@ impl From<AptosDbError> for StateViewError {
         match error {
             AptosDbError::NotFound(msg) => StateViewError::NotFound(msg),
             AptosDbError::Other(msg) => StateViewError::Other(msg),
-            // StateViewError has no pruned variant, so structure is necessarily
-            // lost here. Listed explicitly so that adding a variant that callers
-            // need to distinguish forces a decision at this boundary.
+            // Listed explicitly rather than with a wildcard: everything below
+            // collapses into an opaque string, so a new variant whose structure
+            // callers depend on would otherwise be absorbed here silently.
             AptosDbError::TooManyRequested(..)
             | AptosDbError::MissingRootError(..)
             | AptosDbError::LedgerPruned { .. }
