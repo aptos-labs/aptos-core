@@ -343,7 +343,7 @@ impl<
         toeplitz
     }
 
-    fn compute_h_term_commitments(&self, f: &[F], round: usize) -> Vec<T> {
+    pub(crate) fn compute_h_term_commitments(&self, f: &[F], round: usize) -> Vec<T> {
         let mut f = Vec::from(f);
         f.extend(std::iter::repeat_n(
             F::zero(),
@@ -388,6 +388,55 @@ impl<
                 .collect::<Vec<T::MulBase>>(),
             x_coords,
         )
+    }
+}
+
+impl FKDomain<crate::group::Fr, crate::group::G1Projective> {
+    /// Same as [`Self::compute_h_term_commitments`], but with all G1 point
+    /// operations (the Hadamard-product scalar multiplications and the group
+    /// iFFT butterflies) routed through blst via [`crate::shared::blst_ops::BlstG1`].
+    /// Returns blst-native points so callers can feed them straight into a
+    /// blst MSM without round-tripping through arkworks.
+    pub(crate) fn compute_h_term_commitments_blst(
+        &self,
+        f: &[crate::group::Fr],
+        round: usize,
+    ) -> Vec<crate::shared::blst_ops::BlstG1> {
+        use crate::{
+            group::{Fr, G1Projective},
+            shared::blst_ops::BlstG1,
+        };
+        use ark_ec::CurveGroup as _;
+        use ark_ff::Zero as _;
+
+        let mut f = Vec::from(f);
+        f.extend(std::iter::repeat_n(
+            Fr::zero(),
+            self.toeplitz_domain.dimension() + 1 - f.len(),
+        ));
+        debug_assert_eq!(self.toeplitz_domain.dimension(), f.len() - 1);
+
+        let toeplitz = self.toeplitz_for_poly(&f);
+        let circulant = self.toeplitz_domain.toeplitz_to_circulant(&toeplitz);
+        let prepared_input = &self.prepared_toeplitz_inputs[round];
+        let circulant_domain = &self.toeplitz_domain.circulant_domain;
+
+        assert_eq!(circulant.len(), prepared_input.y.len());
+        assert_eq!(circulant.len(), circulant_domain.dimension());
+
+        let v = circulant_domain.fft_domain.fft(&circulant);
+
+        // One batch inversion to move the prepared (already-FFT'd) tau powers
+        // into blst representation.
+        let y_affine = G1Projective::normalize_batch(&prepared_input.y);
+        let mut u: Vec<BlstG1> = y_affine.iter().map(BlstG1::from_ark).collect();
+
+        u.par_iter_mut().zip(v.par_iter()).for_each(|(u, v)| {
+            *u *= *v;
+        });
+
+        let h = circulant_domain.fft_domain.ifft(&u);
+        Vec::from(&h[..self.toeplitz_domain.dimension()])
     }
 }
 
@@ -562,6 +611,44 @@ mod tests {
             let fk_domain2: FKDomain<Fr, G1Projective> = serde_json::from_str(&json).unwrap();
 
             assert_eq!(fk_domain, fk_domain2);
+        }
+    }
+
+    #[test]
+    fn compute_h_term_commitments_blst_matches_generic() {
+        for poly_degree_exp in 1..5 {
+            let poly_degree = 2usize.pow(poly_degree_exp);
+            let mut rng = thread_rng();
+
+            let tau = Fr::rand(&mut rng);
+
+            let mut tau_powers_fr = vec![Fr::one()];
+            let mut cur = tau;
+            for _ in 0..poly_degree {
+                tau_powers_fr.push(cur);
+                cur *= &tau;
+            }
+
+            let poly: DensePolynomial<Fr> = DensePolynomial::from_coefficients_vec(
+                (0..(poly_degree + 1)).map(|_| Fr::rand(&mut rng)).collect(),
+            );
+
+            let tau_powers_g1 = G1Projective::from(G1Affine::generator()).batch_mul(&tau_powers_fr);
+            let tau_powers_g1_projective: Vec<Vec<G1Projective>> = vec![tau_powers_g1
+                .iter()
+                .map(|g| G1Projective::from(*g))
+                .collect()];
+
+            let fk_domain =
+                FKDomain::new(poly_degree, poly_degree, tau_powers_g1_projective).unwrap();
+
+            let expected = fk_domain.compute_h_term_commitments(&poly.coeffs, 0);
+            let actual = fk_domain.compute_h_term_commitments_blst(&poly.coeffs, 0);
+
+            assert_eq!(expected.len(), actual.len());
+            for (e, a) in expected.iter().zip(&actual) {
+                assert_eq!(*e, a.to_ark());
+            }
         }
     }
 
