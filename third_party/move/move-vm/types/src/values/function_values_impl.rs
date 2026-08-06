@@ -127,11 +127,6 @@ impl VMValueCast<Closure> for Value {
 
 impl serde::Serialize for SerializationReadyValue<'_, '_, '_, (), Closure> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        if self.ctx.closure_serialization_disabled {
-            return Err(S::Error::custom(
-                "serialization of function values is disabled",
-            ));
-        }
         let Closure(fun, captured) = self.value;
         let fun_ext = self
             .ctx
@@ -140,6 +135,13 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, (), Closure> {
         let data = fun_ext
             .get_serialization_data(fun.as_ref())
             .map_err(S::Error::custom)?;
+
+        if self.ctx.closure_serialization_disabled && data.mask.captured_count() != 0 {
+            return Err(S::Error::custom(
+                "serialization of function values is disabled",
+            ));
+        }
+
         let mut seq = serializer.serialize_seq(Some(5 + captured.len() * 2))?;
         seq.serialize_element(&data.format_version)?;
         seq.serialize_element(&data.module_id)?;
