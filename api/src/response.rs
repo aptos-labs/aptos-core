@@ -691,7 +691,7 @@ pub fn events_pruned<E: GoneError>(
             "Events at sequence number({}) have been pruned, the oldest available sequence number is {}",
             requested_seq_num, min_available_seq_num
         ),
-        AptosErrorCode::VersionPruned,
+        AptosErrorCode::EventPruned,
         ledger_info,
     )
 }
@@ -917,7 +917,18 @@ mod tests {
             min_available_seq_num: 4_000_000,
         })
         .context("Failed to find events by key 0x300000000000000000000000000000001");
-        assert_eq!(map(err), (410, AptosErrorCode::VersionPruned));
+        assert_eq!(map(err), (410, AptosErrorCode::EventPruned));
+    }
+
+    /// Events are addressed by sequence number, so they must not borrow the
+    /// version-shaped code and hand clients a number they cannot use as a cursor.
+    #[test]
+    fn pruned_events_do_not_report_a_version_code() {
+        let err = anyhow::Error::new(AptosDbError::EventPruned {
+            requested_seq_num: 0,
+            min_available_seq_num: 4_000_000,
+        });
+        assert_ne!(map(err).1, AptosErrorCode::VersionPruned);
     }
 
     #[test]

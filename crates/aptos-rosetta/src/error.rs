@@ -47,6 +47,7 @@ pub enum ApiError {
     StateValueNotFound(Option<String>),
     VersionPruned(Option<String>),
     BlockPruned(Option<String>),
+    EventPruned(Option<String>),
     InvalidInput(Option<String>),
     InvalidTransactionUpdate(Option<String>),
     SequenceNumberTooOld(Option<String>),
@@ -98,6 +99,7 @@ impl ApiError {
             StateValueNotFound(None),
             VersionPruned(None),
             BlockPruned(None),
+            EventPruned(None),
             InvalidInput(None),
             InvalidTransactionUpdate(None),
             SequenceNumberTooOld(None),
@@ -148,6 +150,7 @@ impl ApiError {
             StateValueNotFound(_) => 34,
             RejectedByFilter(_) => 35,
             RateLimited(_) => 36,
+            EventPruned(_) => 37,
         }
     }
 
@@ -202,6 +205,7 @@ impl ApiError {
             ApiError::TableItemNotFound(_) => "Table item not found",
             ApiError::VersionPruned(_) => "Version pruned",
             ApiError::BlockPruned(_) => "Block pruned",
+            ApiError::EventPruned(_) => "Events pruned",
             ApiError::InvalidInput(_) => "Invalid input",
             ApiError::InvalidTransactionUpdate(_) => "Invalid transaction update.  Can only update gas unit price",
             ApiError::SequenceNumberTooOld(_) => "Sequence number too old.  Please create a new transaction with an updated sequence number",
@@ -234,6 +238,7 @@ impl ApiError {
             ApiError::BlockNotFound(inner) => inner,
             ApiError::VersionPruned(inner) => inner,
             ApiError::BlockPruned(inner) => inner,
+            ApiError::EventPruned(inner) => inner,
             ApiError::InvalidInput(inner) => inner,
             ApiError::InvalidTransactionUpdate(inner) => inner,
             ApiError::SequenceNumberTooOld(inner) => inner,
@@ -301,6 +306,7 @@ impl From<RestError> for ApiError {
                 },
                 AptosErrorCode::VersionPruned => ApiError::VersionPruned(Some(err.error.message)),
                 AptosErrorCode::BlockPruned => ApiError::BlockPruned(Some(err.error.message)),
+                AptosErrorCode::EventPruned => ApiError::EventPruned(Some(err.error.message)),
                 AptosErrorCode::InvalidInput => ApiError::InvalidInput(Some(err.error.message)),
                 AptosErrorCode::InvalidTransactionUpdate => {
                     ApiError::InvalidInput(Some(err.error.message))

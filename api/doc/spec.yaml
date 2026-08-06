@@ -12885,6 +12885,7 @@ components:
       - state_value_not_found
       - version_pruned
       - block_pruned
+      - event_pruned
       - invalid_input
       - invalid_transaction_update
       - sequence_number_too_old

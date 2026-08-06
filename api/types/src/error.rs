@@ -85,6 +85,11 @@ pub enum AptosErrorCode {
     VersionPruned = 200,
     /// Block is fully or partially pruned
     BlockPruned = 201,
+    /// The requested events are pruned
+    ///
+    /// Events are addressed by sequence number rather than by ledger version, so
+    /// this reports the oldest sequence number still available rather than a version
+    EventPruned = 202,
 
     /// The API's inputs were invalid
     InvalidInput = 300,
