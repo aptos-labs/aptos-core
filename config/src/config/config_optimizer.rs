@@ -27,36 +27,18 @@ const VALIDATOR_NETWORK_OPTIMIZER_NAME: &str = "ValidatorNetworkConfigOptimizer"
 
 const IDENTITY_KEY_FILE: &str = "ephemeral_identity_key";
 
-// Mainnet seed peers. Each seed peer entry is a tuple
-// of (account address, public key, network address).
-const MAINNET_SEED_PEERS: [(&str, &str, &str); 1] = [(
-    "568fdb6acf26aae2a84419108ff13baa3ebf133844ef18e23a9f47b5af16b698",
-    "0x003cc2ed36e7d486539ac2c411b48d962f1ef17d884c3a7109cad43f16bd5008",
-    "/dns/node1.cloud-b.mainnet.aptoslabs.com/tcp/6182/noise-ik/0x003cc2ed36e7d486539ac2c411b48d962f1ef17d884c3a7109cad43f16bd5008/handshake/0",
-)];
-
 // Testnet seed peers. Each seed peer entry is a tuple
 // of (account address, public key, network address).
-const TESTNET_SEED_PEERS: [(&str, &str, &str); 4] = [
-    (
-        "9d5af3ffdff04f7cd51aa9f902253067a40594c7831bf1265503220d585b4d20",
-        "0x9d5af3ffdff04f7cd51aa9f902253067a40594c7831bf1265503220d585b4d20",
-        "/dns/pfn0.euwe4-seed.fullnode.testnet.aptoslabs.com/tcp/6182/noise-ik/0x9d5af3ffdff04f7cd51aa9f902253067a40594c7831bf1265503220d585b4d20/handshake/0",
-    ),
-    (
-        "64d807a57c289fb26aab73bfe1f192cdc0baa25c0ec72f707aefeff97300d434",
-        "0x64d807a57c289fb26aab73bfe1f192cdc0baa25c0ec72f707aefeff97300d434",
-        "/dns/pfn0.usce1.fullnode.testnet.aptoslabs.com/tcp/6182/noise-ik/0x64d807a57c289fb26aab73bfe1f192cdc0baa25c0ec72f707aefeff97300d434/handshake/0",
-    ),
+const TESTNET_SEED_PEERS: [(&str, &str, &str); 2] = [
     (
         "0058220de6ba1af4c4a803e8727d9ed372104d2e60057cb16d6a99e646512826",
         "0x0058220de6ba1af4c4a803e8727d9ed372104d2e60057cb16d6a99e646512826",
         "/dns/pfn0.euwe4.fullnode.testnet.aptoslabs.com/tcp/6182/noise-ik/0x0058220de6ba1af4c4a803e8727d9ed372104d2e60057cb16d6a99e646512826/handshake/0",
     ),
     (
-        "18fe71c4253468e40c540e31e5127d1e341e20494bc0de8b4e4d434c14b54608",
-        "0x18fe71c4253468e40c540e31e5127d1e341e20494bc0de8b4e4d434c14b54608",
-        "/dns/pfn0.apne1.fullnode.testnet.aptoslabs.com/tcp/6182/noise-ik/0x18fe71c4253468e40c540e31e5127d1e341e20494bc0de8b4e4d434c14b54608/handshake/0",
+        "64d807a57c289fb26aab73bfe1f192cdc0baa25c0ec72f707aefeff97300d434",
+        "0x64d807a57c289fb26aab73bfe1f192cdc0baa25c0ec72f707aefeff97300d434",
+        "/dns/pfn0.usce1.fullnode.testnet.aptoslabs.com/tcp/6182/noise-ik/0x64d807a57c289fb26aab73bfe1f192cdc0baa25c0ec72f707aefeff97300d434/handshake/0",
     ),
 ];
 
@@ -211,10 +193,6 @@ fn optimize_public_network_config(
                     if chain_id.is_testnet() {
                         fullnode_network_config.seeds =
                             create_seed_peers(TESTNET_SEED_PEERS.into())?;
-                        modified_config = true;
-                    } else if chain_id.is_mainnet() {
-                        fullnode_network_config.seeds =
-                            create_seed_peers(MAINNET_SEED_PEERS.into())?;
                         modified_config = true;
                     }
                 }
@@ -446,52 +424,6 @@ mod tests {
         )
         .unwrap();
         assert!(!modified_config);
-    }
-
-    #[test]
-    fn test_optimize_public_network_config_mainnet() {
-        // Create a public network config with no seeds
-        let mut node_config = NodeConfig {
-            storage: setup_storage_config_with_temp_dir().0,
-            full_node_networks: vec![NetworkConfig {
-                network_id: NetworkId::Public,
-                seeds: HashMap::new(),
-                ..Default::default()
-            }],
-            ..Default::default()
-        };
-
-        // Optimize the public network config and verify modifications are made
-        let modified_config = optimize_public_network_config(
-            &mut node_config,
-            &serde_yaml::from_str("{}").unwrap(), // An empty local config
-            NodeType::ValidatorFullnode,
-            Some(ChainId::mainnet()),
-        )
-        .unwrap();
-        assert!(modified_config);
-
-        // Verify that the mainnet seed peers have been added to the config
-        let public_network_config = &node_config.full_node_networks[0];
-        let public_seeds = &public_network_config.seeds;
-        assert_eq!(public_seeds.len(), MAINNET_SEED_PEERS.len());
-
-        // Verify that the seed peers contain the expected values
-        for (account_address, public_key, network_address) in MAINNET_SEED_PEERS {
-            // Fetch the seed peer
-            let seed_peer = public_seeds
-                .get(&AccountAddress::from_hex(account_address).unwrap())
-                .unwrap();
-
-            // Verify the seed peer properties
-            assert_eq!(seed_peer.role, PeerRole::Upstream);
-            assert!(seed_peer
-                .addresses
-                .contains(&NetworkAddress::from_str(network_address).unwrap()));
-            assert!(seed_peer
-                .keys
-                .contains(&x25519::PublicKey::from_encoded_string(public_key).unwrap()));
-        }
     }
 
     #[test]
