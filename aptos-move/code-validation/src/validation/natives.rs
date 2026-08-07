@@ -9,7 +9,7 @@ use move_binary_format::{
 use move_core_types::vm_status::StatusCode;
 
 /// Validate that only system address can publish new non-entry natives.
-pub(crate) fn validate_module_natives(modules: &[CompiledModule]) -> VMResult<()> {
+pub fn validate_module_natives(modules: &[CompiledModule]) -> VMResult<()> {
     for module in modules {
         let module_address = module.self_addr();
         for native in module.function_defs().iter().filter(|def| def.is_native()) {

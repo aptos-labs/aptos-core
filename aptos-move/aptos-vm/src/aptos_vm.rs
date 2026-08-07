@@ -26,16 +26,17 @@ use crate::{
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
     transaction_validation,
-    verifier::{
-        event_validation, native_validation, resource_groups, transaction_arg_validation,
-        view_function,
-    },
+    verifier::{transaction_arg_validation, view_function},
     VMBlockExecutor, VMValidator,
 };
 use aptos_block_executor::{
     code_cache_global_manager::AptosModuleCacheManager,
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::{default::DefaultTxnProvider, TxnProvider},
+};
+use aptos_code_validation::{
+    publishing,
+    validation::{bytecode, events},
 };
 use aptos_crypto::HashValue;
 use aptos_framework_natives::code::PublishRequest;
@@ -83,10 +84,7 @@ use aptos_types::{
         TransactionOutput, TransactionPayload, TransactionStatus, TxnLimitsRequest,
         VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
     },
-    vm::module_metadata::{
-        get_compilation_metadata, get_metadata, get_randomness_annotation_for_entry_function,
-        verify_module_metadata_for_module_publishing,
-    },
+    vm::module_metadata::{get_metadata, get_randomness_annotation_for_entry_function},
     vm_status::{AbortLocation, StatusCode, VMStatus},
     write_set::WriteOp,
 };
@@ -119,8 +117,6 @@ use move_binary_format::{
     compatibility::Compatibility,
     deserializer::DeserializerConfig,
     errors::{Location, PartialVMError, PartialVMResult, VMError, VMResult},
-    file_format::CompiledScript,
-    file_format_common::VERSION_5,
     CompiledModule,
 };
 use move_core_types::{
@@ -984,8 +980,8 @@ impl AptosVM {
 
             // Check that unstable bytecode cannot be executed on mainnet and verify events.
             let script = func.owner_as_script()?;
-            self.reject_unstable_bytecode_for_script(script)?;
-            event_validation::verify_no_event_emission_in_compiled_script(script)?;
+            bytecode::reject_unstable_bytecode_for_script(self.chain_id().is_mainnet(), script)?;
+            events::verify_no_event_emission_in_compiled_script(script)?;
 
             // Record the script's declared module dependencies as reads. These are a function of
             // the script bytecode, so recording them here keeps the read set independent of the
@@ -1808,121 +1804,21 @@ impl AptosVM {
         traversal_context: &mut TraversalContext,
         gas_meter: &mut impl GasMeter,
         modules: &[CompiledModule],
-        mut expected_modules: BTreeSet<String>,
+        expected_modules: BTreeSet<String>,
         allowed_deps: Option<BTreeMap<AccountAddress, BTreeSet<String>>>,
     ) -> VMResult<()> {
-        self.reject_unstable_bytecode(modules)?;
-        self.reject_legacy_module_bytecode(modules)?;
-        native_validation::validate_module_natives(modules)?;
-
-        for m in modules {
-            if !expected_modules.remove(m.self_id().name().as_str()) {
-                return Err(Self::metadata_validation_error(&format!(
-                    "unregistered module: '{}'",
-                    m.self_id().name()
-                )));
-            }
-            if let Some(allowed) = &allowed_deps {
-                for dep in m.immediate_dependencies() {
-                    if !allowed
-                        .get(dep.address())
-                        .map(|modules| {
-                            modules.contains("") || modules.contains(dep.name().as_str())
-                        })
-                        .unwrap_or(false)
-                    {
-                        return Err(Self::metadata_validation_error(&format!(
-                            "unregistered dependency: '{}'",
-                            dep
-                        )));
-                    }
-                }
-            }
-            verify_module_metadata_for_module_publishing(m, self.features())
-                .map_err(|err| Self::metadata_validation_error(&err.to_string()))?;
-        }
-
-        resource_groups::validate_resource_groups(
+        publishing::validate_publish_request(
             self.features(),
+            self.chain_id().is_mainnet(),
+            self.timed_features()
+                .is_enabled(TimedFeatureFlag::RejectV5ModulePublishing),
             module_storage,
             traversal_context,
             gas_meter,
             modules,
-        )?;
-        event_validation::validate_module_events(
-            self.features(),
-            module_storage,
-            traversal_context,
-            modules,
-        )?;
-
-        if !expected_modules.is_empty() {
-            return Err(Self::metadata_validation_error(
-                "not all registered modules published",
-            ));
-        }
-        Ok(())
-    }
-
-    /// Reject publishing of legacy (v5) module bytecode. Publishing only; modules already on chain
-    /// keep loading and executing at any version.
-    fn reject_legacy_module_bytecode(&self, modules: &[CompiledModule]) -> VMResult<()> {
-        if self
-            .timed_features()
-            .is_enabled(TimedFeatureFlag::RejectV5ModulePublishing)
-        {
-            for module in modules {
-                if module.version <= VERSION_5 {
-                    return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
-                        .with_message(format!(
-                            "publishing module bytecode version {} is not allowed; the minimum \
-                             publishable version is {}",
-                            module.version,
-                            VERSION_5 + 1
-                        ))
-                        .finish(Location::Undefined));
-                }
-            }
-        }
-        Ok(())
-    }
-
-    /// Check whether the bytecode can be published to mainnet based on the unstable tag in the metadata
-    fn reject_unstable_bytecode(&self, modules: &[CompiledModule]) -> VMResult<()> {
-        if self.chain_id().is_mainnet() {
-            for module in modules {
-                if let Some(metadata) = get_compilation_metadata(module) {
-                    if metadata.unstable {
-                        return Err(PartialVMError::new(StatusCode::UNSTABLE_BYTECODE_REJECTED)
-                            .with_message(
-                                "code marked unstable is not published on mainnet".to_string(),
-                            )
-                            .finish(Location::Undefined));
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-
-    /// Check whether the script can be run on mainnet based on the unstable tag in the metadata
-    pub fn reject_unstable_bytecode_for_script(&self, script: &CompiledScript) -> VMResult<()> {
-        if self.chain_id().is_mainnet() {
-            if let Some(metadata) = get_compilation_metadata(script) {
-                if metadata.unstable {
-                    return Err(PartialVMError::new(StatusCode::UNSTABLE_BYTECODE_REJECTED)
-                        .with_message("script marked unstable cannot be run on mainnet".to_string())
-                        .finish(Location::Script));
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn metadata_validation_error(msg: &str) -> VMError {
-        PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED)
-            .with_message(format!("metadata and code bundle mismatch: {}", msg))
-            .finish(Location::Undefined)
+            expected_modules,
+            allowed_deps,
+        )
     }
 
     fn validate_signed_transaction(
