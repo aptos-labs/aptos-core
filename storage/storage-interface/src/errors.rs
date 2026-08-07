@@ -96,8 +96,7 @@ impl From<AptosDbError> for StateViewError {
             | AptosDbError::BcsError(..)
             | AptosDbError::IoError(..)
             | AptosDbError::RecvError(..)
-            | AptosDbError::ParseIntError(..)
-            | AptosDbError::HotStateError => StateViewError::Other(format!("{}", error)),
+            | AptosDbError::ParseIntError(..) => StateViewError::Other(format!("{}", error)),
         }
     }
 }
