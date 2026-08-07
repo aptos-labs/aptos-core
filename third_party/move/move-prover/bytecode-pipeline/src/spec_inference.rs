@@ -684,6 +684,17 @@ impl FunctionTargetProcessor for LambdaSpecInferenceProcessor {
         let _ = run_spec_inference_on_data(
             fun_env, &data, /*annotate=*/ false, /*silent=*/ true,
         );
+        // The function's spec memory summaries were computed by the
+        // compiler's spec rewriter when this lambda had no spec; the
+        // conditions attached above can reference global memory (directly or
+        // through behavioral predicates over callees), and the behavioral
+        // evaluator functions derive their memory parameters from the
+        // summaries — stale-empty summaries would make the evaluators
+        // reference memory globals, which Boogie rejects inside functions.
+        if fun_env.get_spec().has_conditions() {
+            let (used, old, uses_old) = fun_env.compute_spec_memory_usage();
+            fun_env.set_spec_memory_usage(used, old, uses_old);
+        }
         data
     }
 }
@@ -4467,19 +4478,29 @@ impl<'env> SpecInferenceAnalyzer<'env> {
                     extract_top_ensures_of_clause(clause)
                 {
                     let args2_natural: Vec<Exp> = args2.iter().map(strip_all_olds).collect();
-                    if calls_match(fun_exp, args_natural, &fun2, &args2_natural)
+                    // Anchors come in two shapes: void/state anchors carry
+                    // the inputs only; discarded-result anchors additionally
+                    // carry synthesized `result_of` projections. Both must be
+                    // replaced by the full-arity canonical (the evaluator
+                    // encoding expects trailing post-state slots), so match
+                    // on the input prefix.
+                    let shape_ok = args2.len() == num_inputs
+                        || args2.len() == num_inputs + num_declared_results;
+                    if shape_ok
+                        && calls_match(fun_exp, args_natural, &fun2, &args2_natural[..num_inputs])
                         && range2 == *range
-                        && args2.len() == num_inputs
                     {
                         anchors_for_site.push((idx, guard2));
                     }
                 }
             }
 
-            // Non-void calls need at least one captured `dest` to anchor
-            // on; otherwise leave any discarded-result anchor in place.
+            // Build a canonical only when something anchors this site: a
+            // captured `dest`, or an anchor clause — including the
+            // discarded-result shape, which cannot be left in place (its
+            // arity lacks the post-state slots).
             let has_result_of = !dests_by_idx.is_empty();
-            if !is_void && !has_result_of {
+            if !is_void && !has_result_of && anchors_for_site.is_empty() {
                 continue;
             }
 

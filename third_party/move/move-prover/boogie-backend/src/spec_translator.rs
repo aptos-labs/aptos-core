@@ -2236,6 +2236,60 @@ impl SpecTranslator<'_> {
                 }
                 self.translate_behavior_arg(arg);
             }
+            // Inferred lambda specs can carry PARTIAL trailing arity: state
+            // anchors reference `ensures_of` with the inputs only, or inputs
+            // plus result projections, without the post-state slots. The
+            // predicate's signature is total-arity, so pad the missing slots
+            // with the callee's ensures-results Skolem projections — the
+            // Skolem-tying axiom makes that the canonical witness, which is
+            // the anchor's meaning.
+            let emitted_trailing = pred_args.len() - non_captured_pos;
+            if emitted_trailing < total_outputs {
+                let results_name =
+                    boogie_behavioral_fun_result_name(self.env, &fun_qid, multi_in_boogie);
+                for k in emitted_trailing..total_outputs {
+                    emit!(self.writer, ", ");
+                    if k == num_explicit_results {
+                        if let Some(ref var) = post_sub {
+                            emit!(self.writer, "{}", var);
+                            continue;
+                        }
+                    }
+                    if multi_in_boogie {
+                        emit!(self.writer, "(");
+                    }
+                    emit!(self.writer, "{}(", results_name);
+                    // Same (memory, inputs) prefix as the predicate call.
+                    let mut has_inner =
+                        self.emit_fun_spec_memory_args(node_id, &fun_qid, kind, range);
+                    let mut cap_pos = 0;
+                    let mut non_cap_pos = 0;
+                    for i in 0..num_params {
+                        if has_inner {
+                            emit!(self.writer, ", ");
+                        }
+                        has_inner = true;
+                        if mask.is_captured(i) {
+                            self.translate_behavior_arg(&closure_args[cap_pos]);
+                            cap_pos += 1;
+                        } else {
+                            if Some(i) == first_non_cap_mut_pos {
+                                if let Some(ref var) = pre_sub {
+                                    emit!(self.writer, "{}", var);
+                                    non_cap_pos += 1;
+                                    continue;
+                                }
+                            }
+                            self.translate_behavior_arg(&pred_args[non_cap_pos]);
+                            non_cap_pos += 1;
+                        }
+                    }
+                    emit!(self.writer, ")");
+                    if multi_in_boogie {
+                        emit!(self.writer, ")->${}", k);
+                    }
+                }
+            }
         }
 
         emit!(self.writer, ")");
@@ -2266,7 +2320,7 @@ impl SpecTranslator<'_> {
         let pre = range.pre;
         let post = range.post;
         let fun_env = self.env.get_function(fun_qid.to_qualified_id());
-        let used_memory = fun_env.get_spec_used_memory();
+        let used_memory = fun_env.get_spec_used_memory().clone();
         let old_memory: BTreeSet<_> = fun_env
             .get_spec_old_memory()
             .iter()
@@ -2278,7 +2332,7 @@ impl SpecTranslator<'_> {
             BehaviorKind::EnsuresOf | BehaviorKind::ResultOf | BehaviorKind::WriteOf(_) => post,
         };
         let mut first = true;
-        for memory in used_memory {
+        for memory in used_memory.iter() {
             let memory = &memory.clone().instantiate(&fun_qid.inst);
             if uses_old && old_memory.contains(memory) {
                 // Check that the pre-state memory reference will be declared.
@@ -3020,13 +3074,13 @@ impl SpecTranslator<'_> {
                             let inst = env.get_node_instantiation(*closure_id);
                             let inst = Type::instantiate_slice(&inst, type_inst);
                             let fun_env = env.get_function(mid.qualified(*fid));
-                            for mem in fun_env.get_spec_used_memory() {
+                            for mem in fun_env.get_spec_used_memory().iter() {
                                 let mem = mem.clone().instantiate(&inst);
                                 for label in range.labels() {
                                     result.insert((label, mem.clone()));
                                 }
                             }
-                            for mem in fun_env.get_spec_old_memory() {
+                            for mem in fun_env.get_spec_old_memory().iter() {
                                 let mem = mem.clone().instantiate(&inst);
                                 for label in range.labels() {
                                     result.insert((label, mem.clone()));
