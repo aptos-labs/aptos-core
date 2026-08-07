@@ -98,6 +98,27 @@ function update_path_and_profile {
   fi
 }
 
+# Download a URL over HTTPS to a temp file (avoids piping remote scripts into a shell).
+function download_https_to_temp {
+  local url="$1"
+  local tmp
+  tmp="$(mktemp)"
+  if command -v curl &>/dev/null; then
+    curl --proto '=https' --tlsv1.2 -sSf "$url" -o "$tmp"
+  elif command -v wget &>/dev/null; then
+    if wget --help 2>&1 | grep -q -- '--https-only'; then
+      wget --https-only --secure-protocol=TLSv1_2 -qO "$tmp" "$url"
+    else
+      wget -qO "$tmp" "$url"
+    fi
+  else
+    rm -f "$tmp"
+    echo "Need curl or wget to download $url" >&2
+    return 1
+  fi
+  echo "$tmp"
+}
+
 function install_build_essentials {
   PACKAGE_MANAGER=$1
   #Differently named packages for pkg-config
@@ -134,7 +155,9 @@ function install_clang_lld {
       echo "clang-${VERSION} already installed, skipping."
     else
       "${PRE_COMMAND[@]}" apt-get install -y gnupg lsb-release software-properties-common wget
-      "${PRE_COMMAND[@]}" bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" llvm.sh "${VERSION}"
+      llvm_sh="$(download_https_to_temp https://apt.llvm.org/llvm.sh)"
+      "${PRE_COMMAND[@]}" bash "$llvm_sh" "${VERSION}"
+      rm -f "$llvm_sh"
     fi
     "${PRE_COMMAND[@]}" update-alternatives --install /usr/bin/clang clang "/usr/bin/clang-${VERSION}" 100
     "${PRE_COMMAND[@]}" update-alternatives --install /usr/bin/clang++ clang++ "/usr/bin/clang++-${VERSION}" 100
@@ -210,7 +233,9 @@ function install_rustup {
       echo "Rustup is already installed, version: $VERSION"
     fi
   else
-    curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
+    rustup_init="$(download_https_to_temp https://sh.rustup.rs)"
+    sh "$rustup_init" -s -- -y --default-toolchain stable
+    rm -f "$rustup_init"
     if [[ -n "${CARGO_HOME}" ]]; then
       PATH="${CARGO_HOME}/bin:${PATH}"
     else
