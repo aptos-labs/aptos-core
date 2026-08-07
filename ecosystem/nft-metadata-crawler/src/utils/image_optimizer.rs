@@ -13,7 +13,7 @@ use crate::{
 };
 use anyhow::Context;
 use backoff::{future::retry, ExponentialBackoff};
-use futures::FutureExt;
+use futures::{FutureExt, StreamExt};
 use image::{
     imageops::{resize, FilterType},
     DynamicImage, GenericImageView, ImageBuffer, ImageFormat, ImageOutputFormat,
@@ -64,10 +64,24 @@ impl ImageOptimizer {
                     .await
                     .context("Failed to get image")?;
 
-                let img_bytes = response
-                    .bytes()
-                    .await
-                    .context("Failed to load image bytes")?;
+                // The size check above uses the HEAD Content-Length, which the
+                // origin controls and can omit or understate. Cap the body as it
+                // streams so the GET can't exceed max_file_size_bytes.
+                let mut img_bytes = Vec::new();
+                let mut stream = response.bytes_stream();
+                while let Some(chunk) = stream.next().await {
+                    let chunk = chunk.context("Failed to load image bytes")?;
+                    if img_bytes.len() + chunk.len() > max_file_size_bytes as usize {
+                        FAILED_TO_OPTIMIZE_IMAGE_COUNT
+                            .with_label_values(&["Image file too large"])
+                            .inc();
+                        return Err(backoff::Error::permanent(anyhow::anyhow!(
+                            "Image optimizer received file exceeding {} bytes, skipping",
+                            max_file_size_bytes
+                        )));
+                    }
+                    img_bytes.extend_from_slice(&chunk);
+                }
 
                 let format =
                     image::guess_format(&img_bytes).context("Failed to guess image format")?;
