@@ -20,8 +20,13 @@ unsafe extern "C" fn write_cb(buf: *mut c_void, s: *const c_char) {
     let out = unsafe { &mut *(buf as *mut Vec<u8>) };
     let stats_cstr = unsafe { CStr::from_ptr(s).to_bytes() };
     // We do not want any memory allocation in the callback.
-    let len = std::cmp::min(out.capacity(), stats_cstr.len());
-    out.extend_from_slice(&stats_cstr[0..len]);
+    let remaining = out.capacity().saturating_sub(out.len());
+    if remaining == 0 {
+        return;
+    }
+
+    let len = std::cmp::min(remaining, stats_cstr.len());
+    out.extend_from_slice(&stats_cstr[..len]);
 }
 
 fn get_jemalloc_stats_string(max_len: usize) -> anyhow::Result<String> {
