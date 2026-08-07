@@ -130,3 +130,46 @@ fn serde_serialize_no_wrapper() {
     let s = serde_json::to_string(&foobar).expect("Identifier should serialize correctly");
     assert_eq!(s, "\"foobar\"");
 }
+
+#[test]
+fn bcs_deserialize_valid_identifier_roundtrips() {
+    // An `Identifier` is BCS-encoded exactly like its inner string.
+    for valid in ["foo", "FOO", "_foo", "$foo", "x_y$z123", "<SELF>", "<SELF>_0"] {
+        let bytes = bcs::to_bytes(valid).unwrap();
+        let id: Identifier = bcs::from_bytes(&bytes).unwrap();
+        assert_eq!(id.as_str(), valid);
+    }
+}
+
+#[test]
+fn bcs_deserialize_invalid_identifier_rejected() {
+    for invalid in [
+        "", "_", "0", "0foo", "foo bar", "fo\no", "\n\n\ng\n", "foo-bar", "<SELF>_",
+    ] {
+        let bytes = bcs::to_bytes(invalid).unwrap();
+        bcs::from_bytes::<Identifier>(&bytes).expect_err(&format!(
+            "deserializing invalid identifier {:?} should fail",
+            invalid
+        ));
+    }
+}
+
+#[test]
+fn bcs_deserialize_unchecked_identifier_rejected() {
+    // `new_unchecked` can construct invalid in-memory identifiers (e.g., for
+    // move-asm); those must not survive a serialization roundtrip.
+    let id = Identifier::new_unchecked("not valid");
+    let bytes = bcs::to_bytes(&id).unwrap();
+    bcs::from_bytes::<Identifier>(&bytes)
+        .expect_err("deserializing an unchecked invalid identifier should fail");
+}
+
+#[test]
+fn serde_json_deserialize_invalid_identifier_rejected() {
+    for invalid in ["\"\"", "\"_\"", "\"123foo\"", "\"foo bar\"", "\"fo\\no\""] {
+        serde_json::from_str::<Identifier>(invalid).expect_err(&format!(
+            "deserializing invalid identifier {} should fail",
+            invalid
+        ));
+    }
+}
