@@ -2078,17 +2078,16 @@ impl SpecTranslator<'_> {
         // The `ResultOf`/`WriteOf(j)` evaluator shares a single tuple Skolem
         // returning `(declared..., post_states...)`. Compute the projection
         // needed at this call site — matches `translate_behavior_for_closure`.
-        let (num_explicit_results, num_mut_refs) = match &inst_fun_type {
+        let (num_explicit_results, num_mut_refs, num_inputs) = match &inst_fun_type {
             Type::Fun(arg_ty, result_ty, _) => {
-                let n_args = arg_ty
-                    .clone()
-                    .flatten()
+                let arg_tys = arg_ty.clone().flatten();
+                let n_args = arg_tys
                     .iter()
                     .filter(|ty| ty.is_mutable_reference())
                     .count();
-                ((*result_ty).clone().flatten().len(), n_args)
+                ((*result_ty).clone().flatten().len(), n_args, arg_tys.len())
             },
-            _ => (0, 0),
+            _ => (0, 0, pred_args.len()),
         };
         let total_outputs = num_explicit_results + num_mut_refs;
         let multi_in_boogie = total_outputs > 1;
@@ -2111,13 +2110,7 @@ impl SpecTranslator<'_> {
         // post-state is in its output tuple instead — so skip them here.
         // `WriteOf(j)` never has trailing post-state clones.
         let emit_arg_count = match kind {
-            BehaviorKind::ResultOf => {
-                let num_inputs = match &inst_fun_type {
-                    Type::Fun(arg_ty, _, _) => arg_ty.clone().flatten().len(),
-                    _ => pred_args.len(),
-                };
-                num_inputs.min(pred_args.len())
-            },
+            BehaviorKind::ResultOf => num_inputs.min(pred_args.len()),
             _ => pred_args.len(),
         };
 
@@ -2205,6 +2198,59 @@ impl SpecTranslator<'_> {
                 }
             }
             self.translate_behavior_arg(arg);
+        }
+        // Inferred lambda specs can carry PARTIAL trailing arity over a
+        // captured function value (state anchors without post-state slots).
+        // Pad the missing slots with the per-type result-of Skolem — its
+        // tying axiom makes that the canonical witness (mirrors the
+        // per-function padding in `translate_behavior_for_closure`).
+        if kind == BehaviorKind::EnsuresOf {
+            let emitted_trailing = emit_arg_count.saturating_sub(num_inputs);
+            if emitted_trailing < total_outputs {
+                let result_name = boogie_behavioral_eval_fun_name(
+                    self.env,
+                    &inst_fun_type,
+                    BehaviorKind::ResultOf,
+                );
+                for k in emitted_trailing..total_outputs {
+                    emit!(self.writer, ", ");
+                    if k == num_explicit_results {
+                        if let Some(ref var) = post_sub {
+                            emit!(self.writer, "{}", var);
+                            continue;
+                        }
+                    }
+                    if multi_in_boogie {
+                        emit!(self.writer, "(");
+                    }
+                    emit!(self.writer, "{}(", result_name);
+                    let has_mem2 = self.emit_evaluator_memory_args(
+                        node_id,
+                        &inst_fun_type,
+                        BehaviorKind::ResultOf,
+                        &range.pre,
+                        &range.post,
+                    );
+                    if has_mem2 {
+                        emit!(self.writer, ", ");
+                    }
+                    self.translate_exp(fun_exp);
+                    for (i, arg) in pred_args.iter().take(num_inputs).enumerate() {
+                        emit!(self.writer, ", ");
+                        if let Some(ref var) = input_witness {
+                            if Some(i) == mut_input_pos {
+                                emit!(self.writer, "{}", var);
+                                continue;
+                            }
+                        }
+                        self.translate_behavior_arg(arg);
+                    }
+                    emit!(self.writer, ")");
+                    if multi_in_boogie {
+                        emit!(self.writer, ")->${}", k);
+                    }
+                }
+            }
         }
         emit!(self.writer, ")");
         match projection {
@@ -2404,29 +2450,36 @@ impl SpecTranslator<'_> {
             (0..num_params).find(|&i| !mask.is_captured(i) && param_tys[i].is_mutable_reference());
 
         // Memory args, then interleave captured + non-captured input args.
-        let mut has_args = self.emit_fun_spec_memory_args(node_id, &fun_qid, kind, range);
-        let mut captured_pos = 0;
-        let mut non_captured_pos = 0;
-        for i in 0..num_params {
-            if has_args {
-                emit!(self.writer, ", ");
-            }
-            has_args = true;
-            if mask.is_captured(i) {
-                self.translate_behavior_arg(&closure_args[captured_pos]);
-                captured_pos += 1;
-            } else {
-                if Some(i) == first_non_cap_mut_pos {
-                    if let Some(ref var) = pre_sub {
-                        emit!(self.writer, "{}", var);
-                        non_captured_pos += 1;
-                        continue;
-                    }
+        // Returns how many of `pred_args` were consumed as inputs. The
+        // trailing-slot padding below re-emits the same prefix for the
+        // callee's results Skolem, so this must stay a single definition.
+        let emit_memory_and_inputs = || -> usize {
+            let mut has_args = self.emit_fun_spec_memory_args(node_id, &fun_qid, kind, range);
+            let mut captured_pos = 0;
+            let mut non_captured_pos = 0;
+            for i in 0..num_params {
+                if has_args {
+                    emit!(self.writer, ", ");
                 }
-                self.translate_behavior_arg(&pred_args[non_captured_pos]);
-                non_captured_pos += 1;
+                has_args = true;
+                if mask.is_captured(i) {
+                    self.translate_behavior_arg(&closure_args[captured_pos]);
+                    captured_pos += 1;
+                } else {
+                    if Some(i) == first_non_cap_mut_pos {
+                        if let Some(ref var) = pre_sub {
+                            emit!(self.writer, "{}", var);
+                            non_captured_pos += 1;
+                            continue;
+                        }
+                    }
+                    self.translate_behavior_arg(&pred_args[non_captured_pos]);
+                    non_captured_pos += 1;
+                }
             }
-        }
+            non_captured_pos
+        };
+        let non_captured_pos = emit_memory_and_inputs();
 
         // `EnsuresOf` carries trailing post-state clones after the input
         // slots — emit them. `ResultOf` also carries them in `pred_args`, but
@@ -2445,6 +2498,37 @@ impl SpecTranslator<'_> {
                     }
                 }
                 self.translate_behavior_arg(arg);
+            }
+            // Inferred lambda specs can carry PARTIAL trailing arity: state
+            // anchors reference `ensures_of` with the inputs only, or inputs
+            // plus result projections, without the post-state slots. The
+            // predicate's signature is total-arity, so pad the missing slots
+            // with the callee's ensures-results Skolem projections — the
+            // Skolem-tying axiom makes that the canonical witness, which is
+            // the anchor's meaning.
+            let emitted_trailing = pred_args.len() - non_captured_pos;
+            if emitted_trailing < total_outputs {
+                let results_name =
+                    boogie_behavioral_fun_result_name(self.env, &fun_qid, multi_in_boogie);
+                for k in emitted_trailing..total_outputs {
+                    emit!(self.writer, ", ");
+                    if k == num_explicit_results {
+                        if let Some(ref var) = post_sub {
+                            emit!(self.writer, "{}", var);
+                            continue;
+                        }
+                    }
+                    if multi_in_boogie {
+                        emit!(self.writer, "(");
+                    }
+                    emit!(self.writer, "{}(", results_name);
+                    // Same (memory, inputs) prefix as the predicate call.
+                    emit_memory_and_inputs();
+                    emit!(self.writer, ")");
+                    if multi_in_boogie {
+                        emit!(self.writer, ")->${}", k);
+                    }
+                }
             }
         }
 
@@ -2492,7 +2576,7 @@ impl SpecTranslator<'_> {
             | BehaviorKind::WriteOf(_) => post,
         };
         let mut first = true;
-        for memory in used_memory {
+        for memory in used_memory.iter() {
             let memory = &memory.clone().instantiate(&fun_qid.inst);
             if uses_old && old_memory.contains(memory) {
                 // Check that the pre-state memory reference will be declared.
@@ -3292,13 +3376,13 @@ impl SpecTranslator<'_> {
                             let inst = env.get_node_instantiation(*closure_id);
                             let inst = Type::instantiate_slice(&inst, type_inst);
                             let fun_env = env.get_function(mid.qualified(*fid));
-                            for mem in fun_env.get_spec_used_memory() {
+                            for mem in fun_env.get_spec_used_memory().iter() {
                                 let mem = mem.clone().instantiate(&inst);
                                 for label in range.labels() {
                                     result.insert((label, mem.clone()));
                                 }
                             }
-                            for mem in fun_env.get_spec_old_memory() {
+                            for mem in fun_env.get_spec_old_memory().iter() {
                                 let mem = mem.clone().instantiate(&inst);
                                 for label in range.labels() {
                                     result.insert((label, mem.clone()));
