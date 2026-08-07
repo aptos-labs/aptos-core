@@ -5,5 +5,6 @@ pub mod types;
 pub mod utils;
 
 pub use types::{
-    Authenticator, ExecVariant, FundAmount, RunnableState, RunnableStateWithOperations, UserAccount,
+    Authenticator, BlockExecVariantV2, ExecVariant, FundAmount, RunnableBlockStateV2,
+    RunnableBlockTransactionV2, RunnableState, RunnableStateWithOperations, UserAccount,
 };

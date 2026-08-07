@@ -50,6 +50,9 @@ struct IndexMap<T: Clone + Ord> {
 /// guarantees that the same struct name identifier always corresponds to a unique index.
 pub struct StructNameIndexMap(RwLock<IndexMap<StructIdentifier>>);
 
+#[cfg(fuzzing)]
+pub struct StructNameIndexMapSnapshot(IndexMap<StructIdentifier>);
+
 impl StructNameIndexMap {
     /// Returns an empty map with no entries.
     pub fn empty() -> Self {
@@ -64,6 +67,16 @@ impl StructNameIndexMap {
         let mut index_map = self.0.write();
         index_map.backward_map.clear();
         index_map.forward_map.clear();
+    }
+
+    #[cfg(fuzzing)]
+    pub fn snapshot_for_fuzzing(&self) -> StructNameIndexMapSnapshot {
+        StructNameIndexMapSnapshot(self.0.read().clone())
+    }
+
+    #[cfg(fuzzing)]
+    pub fn restore_for_fuzzing(&self, snapshot: StructNameIndexMapSnapshot) {
+        *self.0.write() = snapshot.0;
     }
 
     /// Maps the struct identifier into an index. If the identifier already exists returns the

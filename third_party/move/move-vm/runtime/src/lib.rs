@@ -36,6 +36,8 @@ pub use runtime_type_checks_async::TypeChecker;
 mod storage;
 
 pub use loader::{Function, LoadedFunction, LoadedFunctionOwner, Module, Script};
+#[cfg(fuzzing)]
+pub use storage::environment::RuntimeEnvironmentSnapshot;
 pub use storage::{
     code_storage::CodeStorage,
     dependencies_gas_charging::check_dependencies_and_charge_gas,

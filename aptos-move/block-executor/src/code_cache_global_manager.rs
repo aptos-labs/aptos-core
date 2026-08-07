@@ -29,6 +29,8 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress, ident_str, language_storage::ModuleId, vm_status::VMStatus,
 };
+#[cfg(fuzzing)]
+use move_vm_runtime::RuntimeEnvironmentSnapshot;
 use move_vm_runtime::{Module, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_types::code::WithSize;
 use parking_lot::{Mutex, MutexGuard};
@@ -49,12 +51,14 @@ macro_rules! alert_or_println {
     };
 }
 
-#[cfg(fuzzing)]
 /// This snapshot of the global module cache for fuzzing allows comparison of parallel and sequential
 /// executions of the same block. It captures the cache state before the block is executed for the first
 /// time and rolls it back afterwards.
-pub type ModuleHotCacheSnapshot =
-    GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>;
+#[cfg(fuzzing)]
+pub struct ModuleHotCacheSnapshot {
+    module_cache: GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
+    runtime_environment: RuntimeEnvironmentSnapshot,
+}
 
 /// Manages module caches and the execution environment, possibly across multiple blocks.
 pub struct ModuleCacheManager<K, D, V, E> {
@@ -327,17 +331,27 @@ impl AptosModuleCacheManagerGuard<'_> {
     }
 
     /// Takes a shallow snapshot of the current global module cache (hot cache).
-    /// Only available under fuzzing. The snapshot shares underlying Arc module code.
+    /// Only available under fuzzing. The snapshot shares underlying Arc module code and restores the
+    /// runtime interner/tag caches that cached modules/layouts index into.
     #[cfg(fuzzing)]
     pub fn snapshot_hot_cache(&self) -> ModuleHotCacheSnapshot {
-        self.module_cache().clone_for_fuzzing()
+        ModuleHotCacheSnapshot {
+            module_cache: self.module_cache().clone_for_fuzzing(),
+            runtime_environment: self
+                .environment()
+                .runtime_environment()
+                .snapshot_caches_for_fuzzing(),
+        }
     }
 
-    /// Rolls back the global module cache to a previously captured snapshot.
+    /// Rolls back the global module cache and runtime cache state to a previously captured snapshot.
     /// Only available under fuzzing.
     #[cfg(fuzzing)]
     pub fn rollback_hot_cache(&mut self, snapshot: ModuleHotCacheSnapshot) {
-        *self.module_cache_mut() = snapshot;
+        self.environment()
+            .runtime_environment()
+            .restore_caches_for_fuzzing(snapshot.runtime_environment);
+        *self.module_cache_mut() = snapshot.module_cache;
     }
 }
 

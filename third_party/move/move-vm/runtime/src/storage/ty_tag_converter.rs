@@ -153,6 +153,9 @@ pub struct TypeTagCache {
     cache: RwLock<HashMap<StructKey, PricedStructTag>>,
 }
 
+#[cfg(fuzzing)]
+pub(crate) struct TypeTagCacheSnapshot(HashMap<StructKey, PricedStructTag>);
+
 impl TypeTagCache {
     /// Creates a new empty cache without any entries.
     pub(crate) fn empty() -> Self {
@@ -164,6 +167,16 @@ impl TypeTagCache {
     /// Removes all entries from the cache.
     pub(crate) fn flush(&self) {
         self.cache.write().clear();
+    }
+
+    #[cfg(fuzzing)]
+    pub(crate) fn snapshot_for_fuzzing(&self) -> TypeTagCacheSnapshot {
+        TypeTagCacheSnapshot(self.cache.read().clone())
+    }
+
+    #[cfg(fuzzing)]
+    pub(crate) fn restore_for_fuzzing(&self, snapshot: TypeTagCacheSnapshot) {
+        *self.cache.write() = snapshot.0;
     }
 
     /// Returns the number of entries in the cache.
