@@ -1,16 +1,17 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
-use aptos_gas_schedule::gas_params::natives::{
-    aptos_framework::{
-        IS_PERMISSIONED_SIGNER_BASE, PERMISSION_ADDRESS_BASE, SIGNER_FROM_PERMISSIONED_HANDLE_BASE,
-    },
-    move_stdlib::SIGNER_BORROW_ADDRESS_BASE,
-};
+
+//! The permissioned signer feature has been removed and the current framework no longer
+//! declares these natives. The registrations must remain so that historical versions of
+//! `0x1::permissioned_signer`, which declare them, can still be loaded (e.g. during replay).
+//! The feature flag was never enabled on a public network, so the observable behavior of
+//! every historical call is the flag-disabled path preserved below.
+
+use aptos_gas_schedule::gas_params::natives::move_stdlib::SIGNER_BORROW_ADDRESS_BASE;
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
     SafeNativeResult,
 };
-use move_core_types::account_address::AccountAddress;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
@@ -19,104 +20,17 @@ use move_vm_types::{
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
-mod abort_codes {
-    /// Access permission information from a master signer
-    pub const ENOT_PERMISSIONED_SIGNER: u64 = 3;
-}
-
 const EPERMISSION_SIGNER_DISABLED: u64 = 9;
 
-/***************************************************************************************************
- * native fun is_permissioned_signer_impl
- *
- *   Returns true if the signer passed in is a permissioned signer
- *   gas cost: base_cost
- *
- **************************************************************************************************/
-fn native_is_permissioned_signer_impl(
-    context: &mut SafeNativeContext,
+/// Shared implementation for the removed permissioned signer natives: abort exactly like
+/// the historical implementations did when the feature flag was disabled (no gas charged,
+/// abort code 9).
+fn native_permissioned_signer_removed(
+    _context: &mut SafeNativeContext,
     _ty_args: &[Type],
-    mut arguments: VecDeque<Value>,
+    _arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    debug_assert!(arguments.len() == 1);
-
-    if !context
-        .get_feature_flags()
-        .is_enabled(aptos_types::on_chain_config::FeatureFlag::_DEPRECATED_PERMISSIONED_SIGNER)
-    {
-        return SafeNativeResult::Err(SafeNativeError::abort(EPERMISSION_SIGNER_DISABLED));
-    }
-
-    let signer = safely_pop_arg!(arguments, SignerRef);
-
-    context.charge(IS_PERMISSIONED_SIGNER_BASE)?;
-    let result = signer.is_permissioned()?;
-
-    Ok(smallvec![Value::bool(result)])
-}
-
-/***************************************************************************************************
- * native fun permission_address
- *
- *   Returns the permission storage address if the signer passed in is a permissioned signer
- *   gas cost: base_cost
- *
- **************************************************************************************************/
-fn native_permission_address(
-    context: &mut SafeNativeContext,
-    _ty_args: &[Type],
-    mut args: VecDeque<Value>,
-) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    debug_assert!(args.len() == 1);
-
-    if !context
-        .get_feature_flags()
-        .is_enabled(aptos_types::on_chain_config::FeatureFlag::_DEPRECATED_PERMISSIONED_SIGNER)
-    {
-        return SafeNativeResult::Err(SafeNativeError::abort(EPERMISSION_SIGNER_DISABLED));
-    }
-
-    let signer = safely_pop_arg!(args, SignerRef);
-
-    context.charge(PERMISSION_ADDRESS_BASE)?;
-    if !signer.is_permissioned()? {
-        return Err(SafeNativeError::abort(
-            abort_codes::ENOT_PERMISSIONED_SIGNER,
-        ));
-    }
-
-    Ok(smallvec![signer.permission_address()?])
-}
-
-/***************************************************************************************************
- * native fun signer_from_permissioned_handle_impl
- *
- *   Returns the permission signer from a master signer.
- *   gas cost: base_cost
- *
- **************************************************************************************************/
-fn native_signer_from_permissioned(
-    context: &mut SafeNativeContext,
-    _ty_args: &[Type],
-    mut arguments: VecDeque<Value>,
-) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    debug_assert!(arguments.len() == 2);
-
-    if !context
-        .get_feature_flags()
-        .is_enabled(aptos_types::on_chain_config::FeatureFlag::_DEPRECATED_PERMISSIONED_SIGNER)
-    {
-        return SafeNativeResult::Err(SafeNativeError::abort(EPERMISSION_SIGNER_DISABLED));
-    }
-
-    let permission_addr = safely_pop_arg!(arguments, AccountAddress);
-    let master_addr = safely_pop_arg!(arguments, AccountAddress);
-    context.charge(SIGNER_FROM_PERMISSIONED_HANDLE_BASE)?;
-
-    Ok(smallvec![Value::permissioned_signer(
-        master_addr,
-        permission_addr
-    )])
+    Err(SafeNativeError::abort(EPERMISSION_SIGNER_DISABLED))
 }
 
 /***************************************************************************************************
@@ -136,14 +50,6 @@ fn native_borrow_address(
 
     let signer_reference = safely_pop_arg!(arguments, SignerRef);
 
-    if !context
-        .get_feature_flags()
-        .is_enabled(aptos_types::on_chain_config::FeatureFlag::_DEPRECATED_PERMISSIONED_SIGNER)
-        && signer_reference.is_permissioned()?
-    {
-        return SafeNativeResult::Err(SafeNativeError::abort(EPERMISSION_SIGNER_DISABLED));
-    }
-
     context.charge(SIGNER_BORROW_ADDRESS_BASE)?;
 
     Ok(smallvec![signer_reference.borrow_signer()?])
@@ -159,16 +65,16 @@ pub fn make_all(
     let natives = [
         (
             "is_permissioned_signer_impl",
-            native_is_permissioned_signer_impl as RawSafeNative,
+            native_permissioned_signer_removed as RawSafeNative,
         ),
         (
             "is_permissioned_signer",
-            native_is_permissioned_signer_impl as RawSafeNative,
+            native_permissioned_signer_removed as RawSafeNative,
         ),
-        ("permission_address", native_permission_address),
+        ("permission_address", native_permissioned_signer_removed),
         (
             "signer_from_permissioned_handle_impl",
-            native_signer_from_permissioned,
+            native_permissioned_signer_removed,
         ),
         ("borrow_address", native_borrow_address),
     ];
