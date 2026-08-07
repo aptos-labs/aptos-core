@@ -7,17 +7,19 @@ use crate::{
     utils::{create_test_accounts, execute_transactions, MAX_HEALTHY_WAIT_SECS},
 };
 use anyhow::bail;
+use aptos_api_types::AptosErrorCode;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::config::{BootstrappingMode, NodeConfig, OverrideNodeConfig};
 use aptos_db_indexer_schemas::{
     metadata::MetadataKey,
     schema::{indexer_metadata::InternalIndexerMetadataSchema, state_keys::StateKeysSchema},
 };
-use aptos_forge::{NodeExt, Result, Swarm, SwarmExt};
+use aptos_forge::{FullNode, NodeExt, Result, Swarm, SwarmExt};
 use aptos_indexer_grpc_table_info::internal_indexer_db_service::InternalIndexerDBService;
-use aptos_rest_client::Client as RestClient;
+use aptos_rest_client::{error::RestError, Client as RestClient};
 use aptos_schemadb::DB;
 use aptos_types::{account_address::AccountAddress, state_store::state_key::StateKey};
+use reqwest::StatusCode;
 use std::{
     collections::HashSet,
     sync::Arc,
@@ -165,9 +167,86 @@ async fn test_internal_indexer_with_fast_sync() {
         .await
         .unwrap();
     let node = swarm.full_node(peer_id).unwrap();
+    check_pruned_reads_are_gone(node).await;
     let node_config = node.config().to_owned();
     node.stop().await.unwrap();
     check_indexer_db(&node_config);
+}
+
+/// Verifies that reads below the pruning window report the pruned error rather
+/// than an opaque internal error. The unit tests cover the mapping in isolation;
+/// this is the only coverage that the typed storage error actually survives the
+/// full path to the handler, which is what a stray `.context(..)` would break.
+async fn check_pruned_reads_are_gone(node: &dyn FullNode) {
+    // Wait for the pruner to advance, so that version 0 is genuinely unavailable.
+    let inspection_client = node.inspection_client();
+    let start = Instant::now();
+    loop {
+        let min_readable = inspection_client
+            .get_node_metric_i64(
+                "aptos_pruner_versions{pruner_name=ledger_pruner,tag=min_readable}",
+            )
+            .await
+            .unwrap()
+            .unwrap_or(0);
+        if min_readable > 0 {
+            break;
+        }
+        assert!(
+            start.elapsed() < Duration::from_secs(MAX_HEALTHY_WAIT_SECS),
+            "the ledger pruner never advanced past version 0"
+        );
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
+
+    let rest_client = node.rest_client();
+
+    // A transaction range starting below the window. Reported as a pruned
+    // version, which is what the by_version endpoint already returns.
+    let error = rest_client
+        .get_transactions(Some(0), Some(1))
+        .await
+        .expect_err("reading a pruned transaction range should fail");
+    assert_pruned_error(error, "GET /transactions?start=0");
+
+    // Events are addressed by sequence number rather than version, so this
+    // exercises a different detection site in storage than the range read above.
+    let error = rest_client
+        .get_account_events(
+            AccountAddress::ONE,
+            "0x1::block::BlockResource",
+            "new_block_events",
+            Some(0),
+            Some(1),
+        )
+        .await
+        .expect_err("reading pruned events should fail");
+    assert_pruned_error(error, "GET /accounts/0x1/events/..?start=0");
+}
+
+/// Asserts that a REST error is the structured 410 pruned error. The API Gateway
+/// keys its archival hint off the error code, so an opaque 500 here is the bug.
+fn assert_pruned_error(error: RestError, request: &str) {
+    match error {
+        RestError::Api(response) => {
+            assert_eq!(
+                response.error.error_code,
+                AptosErrorCode::VersionPruned,
+                "{} returned error code {:?}, expected version_pruned. Message: {}",
+                request,
+                response.error.error_code,
+                response.error.message
+            );
+            assert_eq!(
+                response.status_code,
+                StatusCode::GONE,
+                "{} returned status {}, expected 410",
+                request,
+                response.status_code
+            );
+        },
+        other => panic!("{} returned an unexpected error: {:?}", request, other),
+    }
 }
 
 fn check_indexer_db(vfn_config: &NodeConfig) {
