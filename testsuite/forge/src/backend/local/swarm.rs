@@ -63,7 +63,7 @@ impl SwarmDirectory {
 
     pub fn into_persistent(self) -> Self {
         match self {
-            SwarmDirectory::Temporary(tempdir) => SwarmDirectory::Persistent(tempdir.into_path()),
+            SwarmDirectory::Temporary(tempdir) => SwarmDirectory::Persistent(tempdir.keep()),
             SwarmDirectory::Persistent(dir) => SwarmDirectory::Persistent(dir),
         }
     }
