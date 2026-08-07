@@ -22,7 +22,7 @@ pub fn native_create_signers_for_testing<C: NativeContext>(ctx: &C) -> VMResult<
 
     // A `signer` has the same 32-byte layout as its `address`, and addresses are
     // pointer-free, so pack the addresses back-to-back and build the vector once.
-    let mut data = vec![];
+    let mut data = Vec::with_capacity(num_signers as usize * AccountAddress::LENGTH);
     for i in 0..num_signers {
         let mut bytes = [0u8; AccountAddress::LENGTH];
         bytes[..8].copy_from_slice(&i.to_le_bytes());

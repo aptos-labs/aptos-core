@@ -36,8 +36,9 @@ fn v1_native_u64_identity(
     ]))
 }
 
-/// The little-endian encoding of `i` in the first 8 bytes of an address.
-fn to_le_bytes(i: u64) -> [u8; AccountAddress::LENGTH] {
+/// The address byte array for index `i`, with `i` little-endian encoded in the
+/// first 8 bytes.
+fn address_bytes_for_index(i: u64) -> [u8; AccountAddress::LENGTH] {
     let bytes = i.to_le_bytes();
     let mut result = [0u8; AccountAddress::LENGTH];
     result[..bytes.len()].clone_from_slice(bytes.as_ref());
@@ -59,7 +60,8 @@ fn v1_native_create_signers_for_testing(
 ) -> PartialVMResult<NativeResult> {
     let num_signers = pop_arg!(args, u64);
     let signers = Value::vector_unchecked(
-        (0..num_signers).map(|i| Value::master_signer(AccountAddress::new(to_le_bytes(i)))),
+        (0..num_signers)
+            .map(|i| Value::master_signer(AccountAddress::new(address_bytes_for_index(i)))),
     )?;
     Ok(NativeResult::ok(InternalGas::zero(), smallvec![signers]))
 }

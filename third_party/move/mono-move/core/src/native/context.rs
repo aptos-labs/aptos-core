@@ -108,8 +108,8 @@ pub trait NativeContext {
     /// native call.
     fn new_byte_vector<'a>(&'a self, bytes: &[u8]) -> VMResult<Vector<'a, u8>> {
         let vec = self.new_vector_no_pointers(1, bytes.len() as u64, bytes)?;
-        // SAFETY: Vec<8> has element size of 1, and its length is exactly
-        // the length of the supplied byte buffer.
+        // SAFETY: the vector was allocated with element size 1 and no internal
+        // pointers, matching the layout of `u8`.
         Ok(unsafe { vec.transmute_unchecked() })
     }
 
