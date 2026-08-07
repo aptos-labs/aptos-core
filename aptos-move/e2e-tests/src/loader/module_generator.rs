@@ -3,6 +3,7 @@
 
 //! Logic for loader module universes.
 
+use anyhow::Context;
 use move_core_types::language_storage::ModuleId;
 use move_model::{code_writer::CodeWriter, emit, emitln, model::Loc};
 use std::{
@@ -16,7 +17,7 @@ pub fn generate_package(
     self_addr: &ModuleId,
     deps: &[ModuleId],
     self_val: u64,
-) -> PathBuf {
+) -> anyhow::Result<PathBuf> {
     let mut package_path = base_path.to_path_buf();
     package_path.push(self_addr.name().as_str());
 
@@ -24,17 +25,21 @@ pub fn generate_package(
     source_path.push("sources");
 
     if !package_path.exists() {
-        create_dir(&package_path).unwrap();
-        create_dir(&source_path).unwrap();
+        create_dir(&package_path)
+            .with_context(|| format!("Failed to create package directory at {:?}", package_path))?;
+        create_dir(&source_path)
+            .with_context(|| format!("Failed to create sources directory at {:?}", source_path))?;
     }
 
     source_path.push(format!("{}.move", self_addr.name()));
-    std::fs::write(&source_path, generate_module(self_addr, deps, self_val)).unwrap();
+    std::fs::write(&source_path, generate_module(self_addr, deps, self_val))
+        .with_context(|| format!("Failed to write generated module to {:?}", source_path))?;
 
     package_path.push("Move.toml");
-    std::fs::write(&package_path, generate_package_toml(self_addr, deps)).unwrap();
+    std::fs::write(&package_path, generate_package_toml(self_addr, deps))
+        .with_context(|| format!("Failed to write package manifest to {:?}", package_path))?;
     package_path.pop();
-    package_path
+    Ok(package_path)
 }
 
 pub fn generate_package_toml(self_addr: &ModuleId, deps: &[ModuleId]) -> String {
