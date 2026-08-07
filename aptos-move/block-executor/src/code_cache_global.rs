@@ -12,7 +12,7 @@ use dashmap::DashMap;
 use hashbrown::{Equivalent, HashMap};
 use move_binary_format::{errors::PartialVMResult, CompiledModule};
 use move_core_types::language_storage::ModuleId;
-use move_vm_runtime::{LayoutCacheEntry, Module, RuntimeEnvironment, StructKey};
+use move_vm_runtime::{LayoutCacheEntry, LayoutCacheKey, Module, RuntimeEnvironment};
 use move_vm_types::code::{ModuleCache, ModuleCode, WithSize};
 use std::{
     hash::Hash,
@@ -93,7 +93,7 @@ pub struct GlobalModuleCache<K, D, V, E> {
     size: usize,
     /// Cached layouts of structs or enums. This cache stores roots only and is invalidated when
     /// modules are published.
-    struct_layouts: DashMap<StructKey, LayoutCacheEntry>,
+    struct_layouts: DashMap<LayoutCacheKey, LayoutCacheEntry>,
 }
 
 impl<K, D, V, E> GlobalModuleCache<K, D, V, E>
@@ -169,7 +169,7 @@ where
     }
 
     /// Returns layout entry if it exists in global cache.
-    pub(crate) fn get_struct_layout_entry(&self, key: &StructKey) -> Option<LayoutCacheEntry> {
+    pub(crate) fn get_struct_layout_entry(&self, key: &LayoutCacheKey) -> Option<LayoutCacheEntry> {
         match self.struct_layouts.get(key) {
             None => {
                 GLOBAL_LAYOUT_CACHE_MISSES.inc();
@@ -181,7 +181,7 @@ where
 
     pub(crate) fn store_struct_layout_entry(
         &self,
-        key: &StructKey,
+        key: &LayoutCacheKey,
         entry: LayoutCacheEntry,
     ) -> PartialVMResult<()> {
         if let dashmap::Entry::Vacant(e) = self.struct_layouts.entry(*key) {
@@ -190,7 +190,7 @@ where
         Ok(())
     }
 
-    pub(crate) fn remove_struct_layout_entry(&self, key: &StructKey) {
+    pub(crate) fn remove_struct_layout_entry(&self, key: &LayoutCacheKey) {
         self.struct_layouts.remove(key);
     }
 
