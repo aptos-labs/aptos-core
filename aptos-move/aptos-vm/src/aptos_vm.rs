@@ -145,7 +145,10 @@ use move_vm_runtime::{
     InstantiatedFunctionLoader, LegacyLoaderConfig, ModuleStorage, RuntimeEnvironment,
     ScriptLoader, WithRuntimeEnvironment,
 };
-use move_vm_types::gas::{DependencyKind, GasMeter, UnmeteredGasMeter};
+use move_vm_types::{
+    gas::{DependencyKind, GasMeter, UnmeteredGasMeter},
+    sha3_256,
+};
 use num_cpus;
 use once_cell::sync::OnceCell;
 use rand::RngCore;
@@ -970,6 +973,26 @@ impl AptosVM {
         }
 
         dispatch_loader!(code_storage, loader, {
+            // Record the script's declared dependencies before any fallible step: a
+            // kept-but-failed script still feeds its reads into the consensus-visible promotion
+            // set, which must not depend on verified-script-cache warmth. Probing the script
+            // cache is fine (it is keyed by the byte hash), and if deserialization fails,
+            // `load_script` fails the same way below.
+            let hash = sha3_256(serialized_script.code());
+            let compiled_script = match code_storage.get_script(&hash) {
+                Some(code) => Some(Arc::clone(code.deserialized())),
+                None => code_storage
+                    .runtime_environment()
+                    .deserialize_into_script(serialized_script.code())
+                    .ok()
+                    .map(|script| code_storage.insert_deserialized_script(hash, script)),
+            };
+            if let Some(compiled_script) = compiled_script {
+                for (address, module_name) in compiled_script.immediate_dependencies_iter() {
+                    code_storage.record_module_read(address, module_name);
+                }
+            }
+
             let legacy_loader_config = LegacyLoaderConfig {
                 charge_for_dependencies: self.gas_feature_version() >= RELEASE_V1_10,
                 charge_for_ty_tag_dependencies: self.gas_feature_version() >= RELEASE_V1_27,
@@ -986,15 +1009,6 @@ impl AptosVM {
             let script = func.owner_as_script()?;
             self.reject_unstable_bytecode_for_script(script)?;
             event_validation::verify_no_event_emission_in_compiled_script(script)?;
-
-            // Record the script's declared module dependencies as reads. These are a function of
-            // the script bytecode, so recording them here keeps the read set independent of the
-            // verified-script cache: its warmth depends on the execution schedule (parallel
-            // interleaving, aborts), so deriving these reads from cache-gated dependency fetches
-            // would make the hot-state promotion set nondeterministic across nodes.
-            for (address, module_name) in script.immediate_dependencies_iter() {
-                code_storage.record_module_read(address, module_name);
-            }
 
             let args = dispatch_transaction_arg_validation!(
                 session,

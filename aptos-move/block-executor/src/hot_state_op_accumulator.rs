@@ -45,6 +45,10 @@ where
         }
     }
 
+    // TODO(HotState): one transaction can contribute an arbitrarily large read set here (e.g. a
+    // failed-but-kept script recording all its declared dependencies), so a single cheap
+    // transaction can dominate the per-block promotion budget. Consider a per-transaction cap, or
+    // not promoting reads from failed-but-kept transactions.
     pub fn add_transaction<'a>(
         &mut self,
         writes: impl Iterator<Item = &'a Key>,
