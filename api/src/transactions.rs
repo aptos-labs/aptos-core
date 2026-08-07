@@ -30,6 +30,7 @@ use aptos_api_types::{
 };
 use aptos_crypto::signing_message;
 use aptos_logger::error;
+use aptos_transaction_tracing::{ApiTraceToken, TransactionStage, TransactionTraceStore};
 use aptos_types::{
     account_address::AccountAddress,
     mempool_status::MempoolStatusCode,
@@ -478,6 +479,7 @@ impl TransactionsApi {
         accept_type: AcceptType,
         data: SubmitTransactionPost,
     ) -> SubmitTransactionResult<PendingTransaction> {
+        let api_handler_enter_usecs = api_now_usecs();
         fail_point_poem("endpoint_submit_transaction")?;
         if !self.context.node_config.api.transaction_submission_enabled {
             return Err(api_disabled("Submit transaction"));
@@ -494,7 +496,17 @@ impl TransactionsApi {
             })?;
         let ledger_info = self.context.get_latest_ledger_info()?;
         let signed_transaction = self.get_signed_transaction(&ledger_info, data)?;
-        self.create(&accept_type, &ledger_info, signed_transaction)
+        let txn_hash = signed_transaction.committed_hash();
+        let api_trace = TransactionTraceStore::global().maybe_start_api_trace(
+            txn_hash,
+            signed_transaction.sender(),
+            api_handler_enter_usecs,
+        );
+        if let Some(token) = api_trace.as_ref() {
+            TransactionTraceStore::global()
+                .record_api_stage(token, TransactionStage::ApiTransactionDecoded);
+        }
+        self.create(&accept_type, &ledger_info, signed_transaction, api_trace)
             .await
     }
 
@@ -1486,15 +1498,40 @@ impl TransactionsApi {
     }
 
     /// Submits a single transaction, and converts mempool codes to errors
-    async fn create_internal(&self, txn: SignedTransaction) -> Result<(), AptosError> {
-        let (mempool_status, vm_status_opt) = self
+    async fn create_internal(
+        &self,
+        txn: SignedTransaction,
+        mut api_trace: Option<ApiTraceToken>,
+    ) -> Result<(), AptosError> {
+        let trace_store = TransactionTraceStore::global();
+        if let Some(token) = api_trace.as_ref() {
+            trace_store.record_api_stage(token, TransactionStage::ApiMempoolSubmit);
+        }
+        let submission_result = self
             .context
             .submit_transaction(txn)
             .await
             .context("Mempool failed to initially evaluate submitted transaction")
             .map_err(|err| {
                 aptos_api_types::AptosError::new_with_error_code(err, AptosErrorCode::InternalError)
-            })?;
+            });
+        let (mempool_status, vm_status_opt) = match submission_result {
+            Ok(result) => result,
+            Err(error) => {
+                if let Some(token) = api_trace {
+                    trace_store.cancel_api_trace(token);
+                }
+                return Err(error);
+            },
+        };
+        if mempool_status.code == MempoolStatusCode::Accepted {
+            if let Some(token) = api_trace.as_mut() {
+                trace_store.record_api_stage(token, TransactionStage::ApiMempoolAccepted);
+                token.disarm();
+            }
+        } else if let Some(token) = api_trace {
+            trace_store.cancel_api_trace(token);
+        }
         match mempool_status.code {
             MempoolStatusCode::Accepted => Ok(()),
             MempoolStatusCode::MempoolIsFull | MempoolStatusCode::TooManyTransactions => {
@@ -1551,8 +1588,9 @@ impl TransactionsApi {
         accept_type: &AcceptType,
         ledger_info: &LedgerInfo,
         txn: SignedTransaction,
+        api_trace: Option<ApiTraceToken>,
     ) -> SubmitTransactionResult<PendingTransaction> {
-        match self.create_internal(txn.clone()).await {
+        match self.create_internal(txn.clone(), api_trace).await {
             Ok(()) => match accept_type {
                 AcceptType::Json => {
                     let state_view = self
@@ -1625,7 +1663,7 @@ impl TransactionsApi {
         // Iterate through transactions keeping track of failures
         let mut txn_failures = Vec::new();
         for (idx, txn) in txns.iter().enumerate() {
-            if let Err(error) = self.create_internal(txn.clone()).await {
+            if let Err(error) = self.create_internal(txn.clone(), None).await {
                 txn_failures.push(TransactionsBatchSingleSubmissionFailure {
                     error,
                     transaction_index: idx,
@@ -1955,6 +1993,13 @@ impl TransactionsApi {
             },
         }
     }
+}
+
+fn api_now_usecs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_micros() as u64
 }
 
 fn override_gas_parameters(
