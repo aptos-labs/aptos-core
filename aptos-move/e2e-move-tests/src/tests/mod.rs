@@ -73,6 +73,7 @@ mod remote_state;
 mod resource_groups;
 mod rotate_auth_key;
 mod scripts;
+mod serialize_effects_determinism;
 mod sessions_with_delayed_fields;
 mod simple_defi;
 mod smart_data_structures;
