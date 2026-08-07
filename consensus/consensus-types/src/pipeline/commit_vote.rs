@@ -98,8 +98,8 @@ impl CommitVote {
         self.ledger_info.epoch()
     }
 
-    /// Verifies that the consensus data hash of LedgerInfo corresponds to the commit proposal,
-    /// and then verifies the signature.
+    /// Verifies the sender matches the author and the signature is valid over this
+    /// vote's own `ledger_info`. Binding *which* LedgerInfo is the aggregator's job.
     pub fn verify(&self, sender: Author, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         ensure!(
             self.author() == sender,
