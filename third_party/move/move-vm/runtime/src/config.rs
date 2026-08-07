@@ -105,7 +105,7 @@ impl Default for VMConfig {
             enable_lazy_loading: true,
             enable_depth_checks: true,
             optimize_trusted_code: false,
-            paranoid_ref_checks: false,
+            paranoid_ref_checks: true,
             enable_enum_option: true,
             enable_layout_caches: true,
             propagate_dependency_limit_error: true,
