@@ -74,6 +74,14 @@ impl InMemoryStorageKey {
             InMemoryStorageKey::TableItem { handle, .. } => handle.address(),
         }
     }
+
+    /// The type of the value stored at this key.
+    pub fn value_ty(&self) -> InternedType {
+        match self {
+            InMemoryStorageKey::Resource { ty, .. } => *ty,
+            InMemoryStorageKey::TableItem { value_ty, .. } => *value_ty,
+        }
+    }
 }
 
 impl From<&InMemoryStorageKey> for InMemoryStorageKey {

@@ -3535,7 +3535,7 @@ impl VMValidator for AptosVM {
 
         let mut session = self.new_session(
             &resolver,
-            SessionId::prologue_meta(&txn_data),
+            txn_data.prologue_session_id(),
             Some(txn_data.as_user_transaction_context()),
         );
 
