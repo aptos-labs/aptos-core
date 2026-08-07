@@ -140,24 +140,28 @@ impl<'a> Instrumenter<'a> {
             // We leave the old WellFormed check for the backend to process any type related
             // assumptions.
             Prop(id, PropKind::Assume, exp) => {
-                let mut rewriter = |e: Exp| {
-                    if let ExpData::Call(_, ast::Operation::WellFormed, args) = e.as_ref() {
-                        let inv = self.builder.mk_join_bool(
-                            ast::Operation::And,
-                            self.translate_invariant(true, args[0].clone())
-                                .into_iter()
-                                .map(|(_, e)| e),
-                        );
-                        let e = self
-                            .builder
-                            .mk_join_opt_bool(ast::Operation::And, Some(e), inv)
-                            .unwrap();
-                        RewriteResult::Rewritten(e)
-                    } else {
-                        RewriteResult::Unchanged(e)
-                    }
+                let exp = if self.builder.data.shallow_wellformed_assumes.contains(&id) {
+                    exp
+                } else {
+                    let mut rewriter = |e: Exp| {
+                        if let ExpData::Call(_, ast::Operation::WellFormed, args) = e.as_ref() {
+                            let inv = self.builder.mk_join_bool(
+                                ast::Operation::And,
+                                self.translate_invariant(true, args[0].clone())
+                                    .into_iter()
+                                    .map(|(_, e)| e),
+                            );
+                            let e = self
+                                .builder
+                                .mk_join_opt_bool(ast::Operation::And, Some(e), inv)
+                                .unwrap();
+                            RewriteResult::Rewritten(e)
+                        } else {
+                            RewriteResult::Unchanged(e)
+                        }
+                    };
+                    ExpData::rewrite(exp, &mut rewriter)
                 };
-                let exp = ExpData::rewrite(exp, &mut rewriter);
                 self.builder.emit(Prop(id, PropKind::Assume, exp));
             },
             _ => self.builder.emit(bc),
