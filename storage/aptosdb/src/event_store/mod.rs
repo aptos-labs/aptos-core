@@ -128,12 +128,22 @@ impl EventStore {
                 break;
             }
             if seq != cur_seq {
-                let msg = if cur_seq == start_seq_num {
-                    "First requested event is probably pruned."
-                } else {
-                    "DB corruption: Sequence number not continuous."
-                };
-                db_other_bail!("{} expected: {}, actual: {}", msg, cur_seq, seq);
+                // Sequence numbers are contiguous per event key, so a gap at the very
+                // first requested entry means the caller asked for a pruned range.
+                // Kept in sync with InternalIndexerDB::lookup_events_by_key, which
+                // runs the same heuristic over the internal indexer's copy of this
+                // index; whichever of the two is pruned depends on node config.
+                if cur_seq == start_seq_num {
+                    return Err(AptosDbError::EventPruned {
+                        requested_seq_num: start_seq_num,
+                        min_available_seq_num: seq,
+                    });
+                }
+                db_other_bail!(
+                    "DB corruption: Sequence number not continuous. expected: {}, actual: {}",
+                    cur_seq,
+                    seq
+                );
             }
             result.push((seq, ver, idx));
             cur_seq += 1;
