@@ -19,7 +19,7 @@ use aptos_config::{
 use aptos_crypto::{ed25519::Ed25519PrivateKey, hash::HashValue, SigningKey};
 use aptos_db::AptosDB;
 use aptos_executor::{block_executor::BlockExecutor, db_bootstrapper};
-use aptos_executor_types::BlockExecutorTrait;
+use aptos_executor_types::{state_compute_result::StateComputeResult, BlockExecutorTrait};
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_indexer_grpc_table_info::internal_indexer_db_service::MockInternalIndexerDBService;
 use aptos_mempool::mocks::MockSharedMempool;
@@ -38,18 +38,18 @@ use aptos_storage_interface::{
 use aptos_temppath::TempPath;
 use aptos_types::{
     account_address::{create_multisig_account_address, AccountAddress},
-    aggregate_signature::AggregateSignature,
     block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     function_info::FunctionInfo,
     indexer::indexer_db_reader::IndexerReader,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
     transaction::{
         signature_verified_transaction::into_signature_verified_block, AuxiliaryInfo,
         AuxiliaryInfoTrait, Transaction, TransactionPayload, TransactionStatus, Version,
     },
+    validator_signer::ValidatorSigner,
 };
 use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use aptos_vm_validator::vm_validator::PooledVMValidator;
@@ -146,8 +146,10 @@ pub fn new_test_context_inner(
     .with_randomize_first_validator_ports(false);
 
     let (root_key, genesis, genesis_waypoint, validators) = builder.build(&mut rng).unwrap();
-    let (validator_identity, _, _, _) = validators[0].get_key_objects(None).unwrap();
+    let (validator_identity, _, private_identity, _) = validators[0].get_key_objects(None).unwrap();
     let validator_owner = validator_identity.account_address.unwrap();
+    let validator_signer_author = private_identity.account_address;
+    let validator_signer_private_key = Arc::new(private_identity.consensus_private_key);
     let (sender, recver) = channel::<(Instant, Version)>((Instant::now(), 0 as Version));
     let (db, db_rw) = if use_db_with_indexer {
         let mut aptos_db = AptosDB::new_for_test(&tmp_dir);
@@ -224,6 +226,8 @@ pub fn new_test_context_inner(
         rng,
         root_key,
         validator_owner,
+        validator_signer_author,
+        validator_signer_private_key,
         Box::new(BlockExecutor::<AptosVMBlockExecutor>::new(db_rw)),
         mempool,
         db,
@@ -238,6 +242,8 @@ pub fn new_test_context_inner(
 pub struct TestContext {
     pub context: Context,
     pub validator_owner: AccountAddress,
+    validator_signer_author: AccountAddress,
+    validator_signer_private_key: Arc<aptos_crypto::bls12381::PrivateKey>,
     pub mempool: Arc<MockSharedMempool>,
     pub db: Arc<AptosDB>,
     pub rng: rand::rngs::StdRng,
@@ -258,6 +264,8 @@ impl TestContext {
         rng: rand::rngs::StdRng,
         root_key: Ed25519PrivateKey,
         validator_owner: AccountAddress,
+        validator_signer_author: AccountAddress,
+        validator_signer_private_key: Arc<aptos_crypto::bls12381::PrivateKey>,
         executor: Box<dyn BlockExecutorTrait>,
         mempool: MockSharedMempool,
         db: Arc<AptosDB>,
@@ -271,6 +279,8 @@ impl TestContext {
             rng,
             root_key: ConfigKey::new(root_key),
             validator_owner,
+            validator_signer_author,
+            validator_signer_private_key,
             executor: executor.into(),
             mempool: Arc::new(mempool),
             expect_status_code: 200,
@@ -960,8 +970,7 @@ impl TestContext {
             self.executor
                 .commit_blocks(
                     vec![metadata.id()],
-                    // BlockEpilogue is added on top of the input transactions.
-                    self.new_ledger_info(&metadata, result.root_hash(), txns.len() + 1),
+                    self.new_ledger_info(&metadata, &result),
                 )
                 .unwrap();
 
@@ -1420,28 +1429,30 @@ impl TestContext {
     fn new_ledger_info(
         &self,
         metadata: &BlockMetadata,
-        root_hash: HashValue,
-        block_size: usize,
+        result: &StateComputeResult,
     ) -> LedgerInfoWithSignatures {
         let parent = self
             .context
             .get_latest_ledger_info_with_signatures()
             .unwrap();
         let epoch = parent.ledger_info().next_block_epoch();
-        let version = parent.ledger_info().version() + (block_size as u64);
         let info = LedgerInfo::new(
             BlockInfo::new(
                 epoch,
                 metadata.round(),
                 metadata.id(),
-                root_hash,
-                version,
+                result.root_hash(),
+                result.expect_last_version(),
                 metadata.timestamp_usecs(),
-                None,
+                result.epoch_state().clone(),
             ),
             HashValue::zero(),
         );
-        LedgerInfoWithSignatures::new(info, AggregateSignature::empty())
+        let signer = ValidatorSigner::new(
+            self.validator_signer_author,
+            self.validator_signer_private_key.clone(),
+        );
+        generate_ledger_info_with_sig(std::slice::from_ref(&signer), info)
     }
 
     pub fn get_expiration_time(&self) -> u64 {
