@@ -12984,10 +12984,13 @@ dependencies = [
 name = "mono-move-natives"
 version = "0.1.0"
 dependencies = [
+ "aptos-crypto",
  "blake2-rfc",
+ "curve25519-dalek-ng",
  "libsecp256k1",
  "mono-move-core",
  "move-core-types",
+ "rand_core 0.5.1",
  "ripemd",
  "sha2 0.9.9",
  "sha3 0.9.1",
@@ -13078,6 +13081,7 @@ name = "mono-move-testsuite"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-crypto",
  "aptos-framework-natives",
  "aptos-gas-schedule",
  "aptos-move-stdlib",
@@ -13107,6 +13111,7 @@ dependencies = [
  "move-vm-runtime",
  "move-vm-test-utils",
  "move-vm-types",
+ "rand_core 0.5.1",
  "smallvec",
  "specializer",
  "tempfile",
