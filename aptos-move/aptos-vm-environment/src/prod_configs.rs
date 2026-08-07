@@ -70,9 +70,9 @@ pub fn set_paranoid_ref_checks(enable: bool) {
     PARANOID_REF_CHECKS.set(enable).ok();
 }
 
-/// Returns the paranoid reference check flag if already set, and false otherwise.
+/// Returns the paranoid reference check flag if already set, and true otherwise.
 pub fn get_paranoid_ref_checks() -> bool {
-    PARANOID_REF_CHECKS.get().cloned().unwrap_or(false)
+    PARANOID_REF_CHECKS.get().cloned().unwrap_or(true)
 }
 
 /// Set whether debugging is enabled. This can be called from multiple threads. If there
