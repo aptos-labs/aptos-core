@@ -301,9 +301,15 @@ impl SubmissionWorker {
         check_account_sleep_duration: Duration,
         loop_stats: &StatsAccumulator,
     ) {
+        // Per worker-cycle cap for the orderless per-hash fallback sweep. Sized so a
+        // normal cycle's pending tail can fully recover, but a runaway cycle cannot
+        // fan out unbounded API calls. Hashes beyond the cap become `unresolved`.
+        let orderless_fallback_cap =
+            max(self.params.transactions_per_account.saturating_mul(4), 64);
+
         let (
             (latest_fetched_counts, sum_of_completion_timestamps_millis_seq_nums),
-            (failed_orderless_txns, sum_of_completion_timestamps_millis_orderless),
+            orderless_outcome,
         ) = join!(
             wait_for_accounts_sequence(
                 start_time,
@@ -318,6 +324,7 @@ impl SubmissionWorker {
                 &account_to_orderless_txns,
                 txn_expiration_ts_secs,
                 check_account_sleep_duration,
+                orderless_fallback_cap,
             )
         );
 
@@ -328,15 +335,20 @@ impl SubmissionWorker {
                 &latest_fetched_counts,
             );
         }
-        let (num_committed, num_expired) = count_committed_expired_stats(
+        let (num_committed, num_expired, num_unresolved) = count_stats(
             account_to_start_and_end_seq_num,
             latest_fetched_counts,
             account_to_orderless_txns,
-            failed_orderless_txns,
+            &orderless_outcome.expired,
+            &orderless_outcome.unresolved,
         );
 
         // Record Prometheus metrics for commit stats
-        record_commit_stats(num_committed as u64, num_expired as u64);
+        record_commit_stats(
+            num_committed as u64,
+            num_expired as u64,
+            num_unresolved as u64,
+        );
 
         if num_expired > 0 {
             loop_stats
@@ -356,28 +368,52 @@ impl SubmissionWorker {
             );
         }
 
+        if num_unresolved > 0 {
+            loop_stats
+                .unresolved
+                .fetch_add(num_unresolved as u64, Ordering::Relaxed);
+            sample!(
+                SampleRate::Duration(Duration::from_secs(60)),
+                warn!(
+                    "[{:?}] {} orderless transactions left unresolved (fallback budget {} per cycle)",
+                    self.client().path_prefix_string(),
+                    num_unresolved,
+                    orderless_fallback_cap,
+                )
+            );
+        }
+
         if num_committed > 0 {
             loop_stats
                 .committed
                 .fetch_add(num_committed as u64, Ordering::Relaxed);
 
             if !skip_latency_stats {
-                let sum_latency = sum_of_completion_timestamps_millis_seq_nums
-                    .saturating_add(sum_of_completion_timestamps_millis_orderless)
-                    .saturating_sub(avg_txn_offset_time as u128 * num_committed as u128);
-                let avg_latency = (sum_latency / num_committed as u128) as u64;
-                loop_stats
-                    .latency
-                    .fetch_add(sum_latency as u64, Ordering::Relaxed);
-                loop_stats
-                    .latency_samples
-                    .fetch_add(num_committed as u64, Ordering::Relaxed);
-                loop_stats
-                    .latencies
-                    .record_data_point(avg_latency, num_committed as u64);
+                // Fallback-recovered orderless txns are counted as committed for TPS, but
+                // we have no meaningful commit time for them (the per-hash sweep runs past
+                // the expiration deadline). Exclude them from latency so they don't corrupt
+                // the cycle average / percentiles. `latency_count` therefore matches exactly
+                // the txns that contributed a completion timestamp to the sums above.
+                let latency_count =
+                    num_committed.saturating_sub(orderless_outcome.recovered as usize);
+                if latency_count > 0 {
+                    let sum_latency = sum_of_completion_timestamps_millis_seq_nums
+                        .saturating_add(orderless_outcome.sum_of_completion_timestamps_millis)
+                        .saturating_sub(avg_txn_offset_time as u128 * latency_count as u128);
+                    let avg_latency = (sum_latency / latency_count as u128) as u64;
+                    loop_stats
+                        .latency
+                        .fetch_add(sum_latency as u64, Ordering::Relaxed);
+                    loop_stats
+                        .latency_samples
+                        .fetch_add(latency_count as u64, Ordering::Relaxed);
+                    loop_stats
+                        .latencies
+                        .record_data_point(avg_latency, latency_count as u64);
 
-                // Record Prometheus latency metric (once per committed txn for accurate percentiles)
-                record_latency_ms(avg_latency, num_committed as u64);
+                    // Record Prometheus latency metric (once per committed txn for accurate percentiles)
+                    record_latency_ms(avg_latency, latency_count as u64);
+                }
             }
         }
     }
@@ -443,13 +479,21 @@ fn update_account_seq_num(
     }
 }
 
-fn count_committed_expired_stats(
+/// Returns (committed, expired, unresolved).
+///
+/// Sequence-number txns only produce committed/expired — the on-chain sequence number
+/// is authoritative, so any txn not committed by the wait-loop's expiration is
+/// definitively expired. Orderless txns can additionally land in `unresolved` when
+/// the per-hash fallback sweep couldn't determine their state (over cap, or lookup
+/// errored).
+fn count_stats(
     account_to_start_and_end_seq_num: HashMap<AccountAddress, (u64, u64)>,
     latest_fetched_counts: HashMap<AccountAddress, u64>,
     account_to_orderless_txns: HashMap<AccountAddress, HashSet<HashValue>>,
-    failed_orderless_txns: HashMap<AccountAddress, HashSet<HashValue>>,
-) -> (usize, usize) {
-    let (seq_num_committed, seq_num_failed) = account_to_start_and_end_seq_num
+    expired_orderless_txns: &HashMap<AccountAddress, HashSet<HashValue>>,
+    unresolved_orderless_txns: &HashMap<AccountAddress, HashSet<HashValue>>,
+) -> (usize, usize, usize) {
+    let (seq_num_committed, seq_num_expired) = account_to_start_and_end_seq_num
         .iter()
         .map(
             |(address, (start_seq_num, end_seq_num))| match latest_fetched_counts.get(address) {
@@ -480,16 +524,23 @@ fn count_committed_expired_stats(
                 (committed + cur_committed, expired + cur_expired)
             },
         );
-    let total_orderless_txns: usize = account_to_orderless_txns
+
+    let total_orderless: usize = account_to_orderless_txns
         .values()
         .map(|txns| txns.len())
         .sum();
-    let failed_orderless_txns: usize = failed_orderless_txns.values().map(|txns| txns.len()).sum();
-    let committed_orderless_txns = total_orderless_txns - failed_orderless_txns;
+    let expired_orderless: usize = expired_orderless_txns.values().map(|txns| txns.len()).sum();
+    let unresolved_orderless: usize = unresolved_orderless_txns
+        .values()
+        .map(|txns| txns.len())
+        .sum();
+    let committed_orderless =
+        total_orderless.saturating_sub(expired_orderless + unresolved_orderless);
 
     (
-        seq_num_committed + committed_orderless_txns,
-        seq_num_failed + failed_orderless_txns,
+        seq_num_committed + committed_orderless,
+        seq_num_expired + expired_orderless,
+        unresolved_orderless,
     )
 }
 
