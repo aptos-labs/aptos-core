@@ -23,6 +23,11 @@ spec:
           value: "info"
         - name: RUST_BACKTRACE
           value: "full"
+        # Replay executes Move on rayon/std worker threads that don't set an
+        # explicit stack size, so they inherit RUST_MIN_STACK. Bump above the
+        # 2 MiB default to avoid stack overflows replaying deeply nested values.
+        - name: RUST_MIN_STACK
+          value: "33554432" # 32 MiB
       resources:
         requests:
           memory: "100Gi"

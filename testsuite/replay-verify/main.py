@@ -138,9 +138,9 @@ class LocalPhase(Enum):
 
     Scheduler treatment of terminal states:
       SUCCEEDED — task marked succeeded, slot freed
-      FAILED    — if evicted → reschedule task (up to MAX_RETRIES),
+      FAILED    — if evicted → reschedule task (up to max_retries),
                   else → treat as permanent failure
-      LOST      — reschedule task (up to MAX_RETRIES), else → permanent failure
+      LOST      — reschedule task (up to max_retries), else → permanent failure
     """
     UNKNOWN = "Unknown"
     PENDING = "Pending"
@@ -201,8 +201,13 @@ class ReplayConfig:
             self.workers_per_pvc = 10
             self.min_range_size = 10_000
             self.range_size = 5_000_000
-            # Testnet has the 6.7B-6.8B heavy zone; some 1M chunks take ~33m.
-            self.running_timeout = 40 * 60
+            # Testnet has the 6.7B-6.8B heavy zone; a few outlier 1M chunks
+            # consistently run past 40m, so give the Running phase 60m here.
+            self.running_timeout = 60 * 60
+            # Those outliers tend to blow the budget on every attempt, so cap
+            # reschedules below mainnet to avoid burning the CI budget retrying
+            # the same doomed range.
+            self.max_retries = 3
         else:
             self.concurrent_replayer = 35
             self.pvc_number = 10
@@ -210,6 +215,7 @@ class ReplayConfig:
             self.min_range_size = 10_000
             self.range_size = 2_000_000
             self.running_timeout = 30 * 60
+            self.max_retries = MAX_RETRIES
         # Timeout chain for the Running phase — each layer is a backstop:
         #   scheduler (running_timeout) -> binary (+10m) -> K8s TTL (+10m).
         self.binary_timeout = self.running_timeout + 10 * 60
@@ -907,9 +913,9 @@ class ReplayScheduler:
                                 f"phase={worker.get_phase()}, "
                                 f"container={worker.get_container_status_summary()}, "
                                 f"age={int(timeout_age)}s > {timeout_threshold}s, "
-                                f"attempt {retries}/{MAX_RETRIES}"
+                                f"attempt {retries}/{self.config.max_retries}"
                             )
-                            if retries < MAX_RETRIES:
+                            if retries < self.config.max_retries:
                                 self.kill_pod_and_reschedule_task(worker, i)
                             else:
                                 logger.error(
@@ -989,11 +995,11 @@ class ReplayScheduler:
         if worker_pod.is_failed():
             reason = worker_pod.get_failure_reason()
             retries = self.task_stats[worker_pod.name].retry_count + 1
-            if worker_pod.should_reschedule() and retries < MAX_RETRIES:
+            if worker_pod.should_reschedule() and retries < self.config.max_retries:
                 logger.info(
                     f"Worker {worker_idx} completed: {worker_pod.name}, "
                     f"status=Failed({reason}), duration={duration}s, "
-                    f"rescheduling (attempt {retries}/{MAX_RETRIES})"
+                    f"rescheduling (attempt {retries}/{self.config.max_retries})"
                 )
                 # Don't set end_time — task will be re-dispatched
                 self.kill_pod_and_reschedule_task(worker_pod, worker_idx)
