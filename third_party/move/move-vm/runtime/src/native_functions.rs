@@ -12,7 +12,7 @@ use crate::{
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     storage::{
-        layout_cache::StructKey,
+        layout_cache::LayoutCacheKey,
         loader::traits::NativeModuleLoader,
         module_storage::FunctionValueExtensionAdapter,
         ty_layout_converter::{LayoutConverter, LayoutWithDelayedFields},
@@ -535,15 +535,19 @@ struct ModuleStorageWrapper<'a> {
 }
 
 impl<'a> LayoutCache for ModuleStorageWrapper<'a> {
-    fn get_struct_layout(&self, key: &StructKey) -> Option<LayoutCacheEntry> {
+    fn get_struct_layout(&self, key: &LayoutCacheKey) -> Option<LayoutCacheEntry> {
         self.module_storage.get_struct_layout(key)
     }
 
-    fn store_struct_layout(&self, key: &StructKey, entry: LayoutCacheEntry) -> PartialVMResult<()> {
+    fn store_struct_layout(
+        &self,
+        key: &LayoutCacheKey,
+        entry: LayoutCacheEntry,
+    ) -> PartialVMResult<()> {
         self.module_storage.store_struct_layout(key, entry)
     }
 
-    fn remove_struct_layout(&self, key: &StructKey) {
+    fn remove_struct_layout(&self, key: &LayoutCacheKey) {
         self.module_storage.remove_struct_layout(key)
     }
 }
