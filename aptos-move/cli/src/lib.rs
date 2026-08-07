@@ -12,6 +12,7 @@ mod bytecode;
 mod commands;
 pub mod coverage;
 mod fmt;
+mod fuzz;
 mod lint;
 pub mod local_simulation;
 mod manifest;
