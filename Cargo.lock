@@ -755,6 +755,7 @@ dependencies = [
  "proptest-derive",
  "rand 0.7.3",
  "rayon",
+ "serde",
  "test-case",
  "triomphe",
 ]
