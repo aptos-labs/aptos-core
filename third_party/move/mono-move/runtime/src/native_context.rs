@@ -318,14 +318,23 @@ impl NativeContext for ProductionNativeContext<'_> {
         }
     }
 
-    fn new_byte_vector<'a>(&'a self, bytes: &[u8]) -> VMResult<Vector<'a, u8>> {
+    fn new_vector_no_pointers<'a>(
+        &'a self,
+        elem_size: u32,
+        count: u64,
+        data: &[u8],
+    ) -> VMResult<Vector<'a, Opaque>> {
         if self.returns_started.get() {
             return Err(native_invariant_violation(
-                "new_byte_vector called after a return value was written".into(),
+                "new_vector_no_pointers called after a return value was written".into(),
             ));
         }
-        let len = bytes.len() as u64;
-        if len == 0 {
+        if (count as usize).checked_mul(elem_size as usize) != Some(data.len()) {
+            return Err(native_invariant_violation(
+                "new_vector_no_pointers: data length must equal count * elem_size".into(),
+            ));
+        }
+        if count == 0 {
             // TODO(correctness): audit empty <=> null vector invariant
             // SAFETY: passing `null` is always safe.
             let handle = unsafe { self.pool.root_object(std::ptr::null_mut()) };
@@ -337,14 +346,14 @@ impl NativeContext for ProductionNativeContext<'_> {
         // live (see the type-level aliasing rule).
         let heap = unsafe { &mut **self.heap.get() };
         let rws = unsafe { &mut **self.rws.get() };
-        // A heap-aliasing `bytes` would be invalidated by the GC `alloc_vec` may
+        // A heap-aliasing `data` would be invalidated by the GC `alloc_vec` may
         // trigger, before the copy below.
-        if is_heap_ptr(heap, bytes.as_ptr()) {
+        if is_heap_ptr(heap, data.as_ptr()) {
             return Err(native_invariant_violation(
-                "new_byte_vector: bytes must not alias the VM heap".into(),
+                "new_vector_no_pointers: data must not alias the VM heap".into(),
             ));
         }
-        // A `vector<u8>` has no inner pointers, so it uses the trivial descriptor.
+        // Pointer-free elements, so the vector uses the trivial descriptor.
         let ptr = alloc_vec(
             heap,
             self.desc_provider,
@@ -354,14 +363,14 @@ impl NativeContext for ProductionNativeContext<'_> {
             self.frame_ptr,
             TopFrame::Native(self.abi),
             TRIVIAL_DESCRIPTOR_ID,
-            1,
-            len,
+            elem_size,
+            count,
         )?;
-        // SAFETY: `ptr` is a fresh vector with room for `len` bytes; no GC runs
-        // between here and these writes, so the raw pointer is valid.
+        // SAFETY: `ptr` is a fresh vector with room for `count` elements; no GC
+        // runs between here and these writes, so the raw pointer is valid.
         unsafe {
-            write_u64(ptr, VEC_LENGTH_OFFSET, len);
-            std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr.add(VEC_DATA_OFFSET), bytes.len());
+            write_u64(ptr, VEC_LENGTH_OFFSET, count);
+            std::ptr::copy_nonoverlapping(data.as_ptr(), ptr.add(VEC_DATA_OFFSET), data.len());
         }
         // Root it so it survives later allocations and is GC-relocated.
         // SAFETY: `ptr` is the data pointer of the freshly allocated vector.
