@@ -27,6 +27,14 @@ const VALIDATOR_NETWORK_OPTIMIZER_NAME: &str = "ValidatorNetworkConfigOptimizer"
 
 const IDENTITY_KEY_FILE: &str = "ephemeral_identity_key";
 
+// Mainnet seed peers. Each seed peer entry is a tuple
+// of (account address, public key, network address).
+const MAINNET_SEED_PEERS: [(&str, &str, &str); 1] = [(
+    "a118b9bbbb8670d026c59c494317f7b6aa449a8e1b6ae0f9a6d434478ad1cc35",
+    "0xa118b9bbbb8670d026c59c494317f7b6aa449a8e1b6ae0f9a6d434478ad1cc35",
+    "/dns/pfn1.usce1.fullnode.mainnet.aptoslabs.com/tcp/6182/noise-ik/0xa118b9bbbb8670d026c59c494317f7b6aa449a8e1b6ae0f9a6d434478ad1cc35/handshake/0",
+)];
+
 // Testnet seed peers. Each seed peer entry is a tuple
 // of (account address, public key, network address).
 const TESTNET_SEED_PEERS: [(&str, &str, &str); 2] = [
@@ -193,6 +201,10 @@ fn optimize_public_network_config(
                     if chain_id.is_testnet() {
                         fullnode_network_config.seeds =
                             create_seed_peers(TESTNET_SEED_PEERS.into())?;
+                        modified_config = true;
+                    } else if chain_id.is_mainnet() {
+                        fullnode_network_config.seeds =
+                            create_seed_peers(MAINNET_SEED_PEERS.into())?;
                         modified_config = true;
                     }
                 }
@@ -424,6 +436,52 @@ mod tests {
         )
         .unwrap();
         assert!(!modified_config);
+    }
+
+    #[test]
+    fn test_optimize_public_network_config_mainnet() {
+        // Create a public network config with no seeds
+        let mut node_config = NodeConfig {
+            storage: setup_storage_config_with_temp_dir().0,
+            full_node_networks: vec![NetworkConfig {
+                network_id: NetworkId::Public,
+                seeds: HashMap::new(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+
+        // Optimize the public network config and verify modifications are made
+        let modified_config = optimize_public_network_config(
+            &mut node_config,
+            &serde_yaml::from_str("{}").unwrap(), // An empty local config
+            NodeType::ValidatorFullnode,
+            Some(ChainId::mainnet()),
+        )
+        .unwrap();
+        assert!(modified_config);
+
+        // Verify that the mainnet seed peers have been added to the config
+        let public_network_config = &node_config.full_node_networks[0];
+        let public_seeds = &public_network_config.seeds;
+        assert_eq!(public_seeds.len(), MAINNET_SEED_PEERS.len());
+
+        // Verify that the seed peers contain the expected values
+        for (account_address, public_key, network_address) in MAINNET_SEED_PEERS {
+            // Fetch the seed peer
+            let seed_peer = public_seeds
+                .get(&AccountAddress::from_hex(account_address).unwrap())
+                .unwrap();
+
+            // Verify the seed peer properties
+            assert_eq!(seed_peer.role, PeerRole::Upstream);
+            assert!(seed_peer
+                .addresses
+                .contains(&NetworkAddress::from_str(network_address).unwrap()));
+            assert!(seed_peer
+                .keys
+                .contains(&x25519::PublicKey::from_encoded_string(public_key).unwrap()));
+        }
     }
 
     #[test]
