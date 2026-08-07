@@ -56,6 +56,8 @@ use aptos_vm_validator::vm_validator::PooledVMValidator;
 use bytes::Bytes;
 use hyper::{HeaderMap, Response};
 use rand::{Rng, SeedableRng};
+use reqwest::header::CONTENT_TYPE;
+use serde::Serialize;
 use serde_json::{json, Value};
 use std::{
     boxed::Box,
@@ -65,8 +67,6 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::watch::channel;
-use warp::{http::header::CONTENT_TYPE, Filter, Rejection, Reply};
-use warp_reverse_proxy::reverse_proxy_filter;
 
 const TRANSFER_AMOUNT: u64 = 200_000_000;
 
@@ -1322,17 +1322,13 @@ impl TestContext {
     }
 
     pub async fn get(&self, path: &str) -> Value {
-        self.execute(
-            warp::test::request()
-                .method("GET")
-                .path(&self.prepend_path(path)),
-        )
-        .await
+        self.execute(request().method("GET").path(&self.prepend_path(path)))
+            .await
     }
 
     pub async fn post(&self, path: &str, body: Value) -> Value {
         self.execute(
-            warp::test::request()
+            request()
                 .method("POST")
                 .path(&self.prepend_path(path))
                 .json(&body),
@@ -1342,7 +1338,7 @@ impl TestContext {
 
     pub async fn post_bcs_txn(&self, path: &str, body: impl AsRef<[u8]>) -> Value {
         self.execute(
-            warp::test::request()
+            request()
                 .method("POST")
                 .path(&self.prepend_path(path))
                 .header(CONTENT_TYPE, mime_types::BCS_SIGNED_TRANSACTION)
@@ -1351,25 +1347,47 @@ impl TestContext {
         .await
     }
 
-    pub async fn reply(&self, req: warp::test::RequestBuilder) -> Response<Bytes> {
-        match self.api_specific_config {
-            ApiSpecificConfig::V1(address) => req.reply(&self.get_routes_with_poem(address)).await,
+    /// Executes a [`TestRequest`] directly against the running poem server and
+    /// returns the raw response. Replaces the previous warp-reverse-proxy shim
+    /// (https://github.com/aptos-labs/aptos-core/issues/2966).
+    ///
+    /// Note: the workspace `reqwest` does not enable the `gzip` feature, so
+    /// `content-encoding`/compressed bodies pass through verbatim (relied on by
+    /// `test_compression_middleware`). Redirects are not followed so 3xx
+    /// responses are observable.
+    pub async fn reply(&self, req: TestRequest) -> Response<Bytes> {
+        let ApiSpecificConfig::V1(address) = self.api_specific_config;
+        let url = format!("http://{}{}", address, req.path);
+        let method = reqwest::Method::from_bytes(req.method.as_bytes())
+            .expect("test request has a valid HTTP method");
+        let client = reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .expect("reqwest client builds");
+
+        let mut builder = client.request(method, &url);
+        for (name, value) in &req.headers {
+            builder = builder.header(name, value);
         }
+        let resp = builder
+            .body(req.body)
+            .send()
+            .await
+            .expect("request to poem server succeeds");
+
+        // Rebuild an `http::Response<Bytes>` preserving status, headers, and the
+        // (non-decompressed) body so the existing assertion helpers still work.
+        let status = resp.status();
+        let headers = resp.headers().clone();
+        let body = resp.bytes().await.expect("response body is readable");
+        let mut out = Response::builder().status(status);
+        if let Some(out_headers) = out.headers_mut() {
+            *out_headers = headers;
+        }
+        out.body(body).expect("response builds")
     }
 
-    // Currently we still run our tests with warp.
-    // https://github.com/aptos-labs/aptos-core/issues/2966
-    pub fn get_routes_with_poem(
-        &self,
-        poem_address: SocketAddr,
-    ) -> impl Filter<Extract = (impl Reply + use<>,), Error = Rejection> + Clone + use<> {
-        warp::path!("v1" / ..).and(reverse_proxy_filter(
-            "v1".to_string(),
-            format!("http://{}/v1", poem_address),
-        ))
-    }
-
-    pub async fn execute(&self, req: warp::test::RequestBuilder) -> Value {
+    pub async fn execute(&self, req: TestRequest) -> Value {
         self.wait_for_internal_indexer_caught_up().await;
         let resp = self.reply(req).await;
 
@@ -1446,5 +1464,58 @@ impl TestContext {
 
     pub fn get_expiration_time(&self) -> u64 {
         Duration::from_micros(self.fake_time_usecs).as_secs() + 60
+    }
+}
+
+/// A minimal HTTP request builder used by the API tests, replacing the previous
+/// `warp::test::request()` builder. Requests are executed against the live poem
+/// server by [`TestContext::reply`].
+#[derive(Clone, Debug)]
+pub struct TestRequest {
+    method: String,
+    path: String,
+    headers: Vec<(String, String)>,
+    body: Vec<u8>,
+}
+
+/// Starts building a [`TestRequest`]. Mirrors `warp::test::request()`.
+pub fn request() -> TestRequest {
+    TestRequest {
+        method: "GET".to_string(),
+        path: "/".to_string(),
+        headers: Vec::new(),
+        body: Vec::new(),
+    }
+}
+
+impl TestRequest {
+    pub fn method(mut self, method: &str) -> Self {
+        self.method = method.to_string();
+        self
+    }
+
+    pub fn path(mut self, path: &str) -> Self {
+        self.path = path.to_string();
+        self
+    }
+
+    pub fn header(mut self, name: impl AsRef<str>, value: impl AsRef<str>) -> Self {
+        self.headers
+            .push((name.as_ref().to_string(), value.as_ref().to_string()));
+        self
+    }
+
+    pub fn json<T: Serialize>(mut self, body: &T) -> Self {
+        self.body = serde_json::to_vec(body).expect("request body serializes to JSON");
+        self.headers.push((
+            CONTENT_TYPE.as_str().to_string(),
+            "application/json".to_string(),
+        ));
+        self
+    }
+
+    pub fn body(mut self, body: impl AsRef<[u8]>) -> Self {
+        self.body = body.as_ref().to_vec();
+        self
     }
 }

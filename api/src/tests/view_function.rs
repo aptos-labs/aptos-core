@@ -57,7 +57,7 @@ async fn test_view_gas_used_header() {
     context.commit_block(&[txn1, txn2]).await;
     context.wait_for_internal_indexer_caught_up().await;
 
-    let req = warp::test::request()
+    let req = aptos_api_test_context::request()
         .method("POST")
         .path("/v1/view")
         .json(&build_coin_balance_request(&owner.address()));

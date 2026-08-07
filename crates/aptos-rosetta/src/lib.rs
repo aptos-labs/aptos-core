@@ -7,20 +7,25 @@
 
 use crate::{
     block::BlockRetriever,
-    common::{handle_request, native_coin, usdc_currency, usdc_testnet_currency, with_context},
+    common::{native_coin, usdc_currency, usdc_testnet_currency},
     error::{ApiError, ApiResult},
     types::Currency,
 };
+use aptos_axum_webserver::{log_middleware, Error, WebServer};
 use aptos_config::config::ApiConfig;
-use aptos_logger::debug;
+use aptos_logger::{debug, error};
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
-use aptos_warp_webserver::{logger, Error, WebServer};
-use std::{collections::HashSet, convert::Infallible, sync::Arc};
-use tokio::task::JoinHandle;
-use warp::{
-    http::{HeaderValue, Method, StatusCode},
-    reply, Filter, Rejection, Reply,
+use axum::{
+    extract::{Query, State},
+    http::{Method, StatusCode},
+    middleware::from_fn,
+    response::IntoResponse,
+    routing::get,
+    Json, Router,
 };
+use std::{collections::HashSet, sync::Arc};
+use tokio::task::JoinHandle;
+use tower_http::cors::{Any, CorsLayer};
 
 mod account;
 mod block;
@@ -93,7 +98,7 @@ impl RosettaContext {
     }
 }
 
-/// Creates HTTP server (warp-based) for Rosetta
+/// Creates HTTP server (axum-based) for Rosetta
 pub fn bootstrap(
     chain_id: ChainId,
     api_config: ApiConfig,
@@ -155,50 +160,50 @@ pub async fn bootstrap_async(
             supported_currencies,
         )
         .await;
-        api.serve(routes(context)).await;
+        if let Err(e) = api.serve(routes(context)).await {
+            error!("Rosetta server failed to serve: {:?}", e);
+        }
     });
     Ok(handle)
 }
 
 /// Collection of all routes for the server
-pub fn routes(
-    context: RosettaContext,
-) -> impl Filter<Extract = (impl Reply,), Error = Infallible> + Clone {
-    account::routes(context.clone())
-        .or(block::block_route(context.clone()))
-        .or(construction::combine_route(context.clone()))
-        .or(construction::derive_route(context.clone()))
-        .or(construction::hash_route(context.clone()))
-        .or(construction::metadata_route(context.clone()))
-        .or(construction::parse_route(context.clone()))
-        .or(construction::payloads_route(context.clone()))
-        .or(construction::preprocess_route(context.clone()))
-        .or(construction::submit_route(context.clone()))
-        .or(network::list_route(context.clone()))
-        .or(network::options_route(context.clone()))
-        .or(network::status_route(context.clone()))
-        .or(health_check_route(context))
-        .with(
-            warp::cors()
-                .allow_any_origin()
-                .allow_methods(vec![Method::GET, Method::POST])
-                .allow_headers(vec![warp::http::header::CONTENT_TYPE]),
-        )
-        .with(logger())
-        .recover(handle_rejection)
+pub fn routes(context: RosettaContext) -> Router {
+    // Mirrors the previous `warp::cors()` configuration.
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods([Method::GET, Method::POST])
+        .allow_headers([axum::http::header::CONTENT_TYPE]);
+
+    Router::new()
+        .merge(account::routes())
+        .merge(block::block_route())
+        .merge(construction::combine_route())
+        .merge(construction::derive_route())
+        .merge(construction::hash_route())
+        .merge(construction::metadata_route())
+        .merge(construction::parse_route())
+        .merge(construction::payloads_route())
+        .merge(construction::preprocess_route())
+        .merge(construction::submit_route())
+        .merge(network::list_route())
+        .merge(network::options_route())
+        .merge(network::status_route())
+        .merge(health_check_route())
+        .fallback(handle_fallback)
+        .layer(cors)
+        .layer(from_fn(log_middleware))
+        .with_state(context)
 }
 
-/// Handle error codes from warp
-async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
-    debug!("Failed with: {:?}", err);
-    let body = reply::json(&Error::new(
+/// Fallback handler for unmatched routes. Mirrors the previous warp
+/// `handle_rejection` behavior of returning a 500 + JSON error body. CORS
+/// headers are applied by the surrounding [`CorsLayer`].
+async fn handle_fallback() -> impl IntoResponse {
+    Error::new(
         StatusCode::INTERNAL_SERVER_ERROR,
-        format!("unexpected error: {:?}", err),
-    ));
-    let mut rep = reply::with_status(body, StatusCode::INTERNAL_SERVER_ERROR).into_response();
-    rep.headers_mut()
-        .insert("access-control-allow-origin", HeaderValue::from_static("*"));
-    Ok(rep)
+        "unexpected error".to_string(),
+    )
 }
 
 /// These parameters are directly passed onto the underlying rest server for a healthcheck
@@ -210,14 +215,16 @@ struct HealthCheckParams {
 /// Default amount of time the fullnode is accepted to be behind (arbitrarily it's 5 minutes)
 const HEALTH_CHECK_DEFAULT_SECS: u64 = 300;
 
-pub fn health_check_route(
-    server_context: RosettaContext,
-) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
-    warp::path!("-" / "healthy")
-        .and(warp::path::end())
-        .and(warp::query().map(move |params: HealthCheckParams| params))
-        .and(with_context(server_context))
-        .and_then(handle_request(health_check))
+pub fn health_check_route() -> Router<RosettaContext> {
+    Router::new().route(
+        "/-/healthy",
+        get(
+            |State(server_context): State<RosettaContext>,
+             Query(params): Query<HealthCheckParams>| async move {
+                health_check(params, server_context).await.map(Json)
+            },
+        ),
+    )
 }
 
 /// Calls the underlying REST health check

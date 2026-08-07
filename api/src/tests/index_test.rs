@@ -37,7 +37,11 @@ async fn test_return_bad_request_if_method_not_allowed() {
 async fn test_health_check() {
     let context = new_test_context(current_function_name!());
     let resp = context
-        .reply(warp::test::request().method("GET").path("/v1/-/healthy"))
+        .reply(
+            aptos_api_test_context::request()
+                .method("GET")
+                .path("/v1/-/healthy"),
+        )
         .await;
     assert_eq!(resp.status(), 200)
 }
@@ -47,7 +51,7 @@ async fn test_openapi_spec() {
     let context = new_test_context(current_function_name!());
     let paths = ["/spec.yaml", "/spec.json", "/spec"];
     for path in paths {
-        let req = warp::test::request()
+        let req = aptos_api_test_context::request()
             .method("GET")
             .path(&format!("/v1{}", path));
         let resp = context.reply(req).await;
@@ -60,7 +64,7 @@ async fn test_cors() {
     let context = new_test_context(current_function_name!());
     let paths = ["/spec.yaml", "/spec", "/", "/transactions"];
     for path in paths {
-        let req = warp::test::request()
+        let req = aptos_api_test_context::request()
             .header("origin", "test")
             .header("Access-Control-Request-Headers", "Content-Type")
             .header("Access-Control-Request-Method", "POST")
@@ -78,7 +82,7 @@ async fn test_cors_forbidden() {
     let mut context = new_test_context(current_function_name!());
     let paths = ["/spec.yaml", "/spec", "/", "/transactions"];
     for path in paths {
-        let req = warp::test::request()
+        let req = aptos_api_test_context::request()
             .header("origin", "test")
             .header("Access-Control-Request-Headers", "Content-Type")
             .header("Access-Control-Request-Method", "PUT")
@@ -95,7 +99,7 @@ async fn test_cors_forbidden() {
 async fn test_cors_on_non_200_responses() {
     let context = new_test_context(current_function_name!());
     // Preflight must work no matter what
-    let preflight_req = warp::test::request()
+    let preflight_req = aptos_api_test_context::request()
         .header("origin", "test")
         .header("Access-Control-Request-Headers", "Content-Type")
         .header("Access-Control-Request-Method", "GET")
@@ -110,7 +114,7 @@ async fn test_cors_on_non_200_responses() {
     assert_eq!(cors_header, "test");
 
     // Actual request should also have correct CORS headers set
-    let req = warp::test::request()
+    let req = aptos_api_test_context::request()
         .header("origin", "test")
         .header("Access-Control-Request-Headers", "Content-Type")
         .header("Access-Control-Request-Method", "GET")
@@ -127,7 +131,7 @@ async fn test_cors_on_non_200_responses() {
 async fn test_compression_middleware() {
     let context = new_test_context(current_function_name!());
 
-    let req = warp::test::request()
+    let req = aptos_api_test_context::request()
         .header("accept-encoding", "gzip")
         .method("GET")
         .path("/v1/info");
@@ -137,7 +141,9 @@ async fn test_compression_middleware() {
     let content_encoding = resp.headers().get("content-encoding").unwrap();
     assert_eq!(content_encoding, "gzip");
 
-    let req = warp::test::request().method("GET").path("/v1/info");
+    let req = aptos_api_test_context::request()
+        .method("GET")
+        .path("/v1/info");
     let resp = context.reply(req).await;
     assert_eq!(resp.status(), 200);
     assert!(resp.headers().get("content-encoding").is_none());
