@@ -63,6 +63,9 @@ impl KeyTool {
 /// a `private-network-key-file` or a `public-network-key-file` can be given to read from.
 /// The `output-file` will be a YAML serialized peer information for use in network config.
 #[derive(Debug, Parser)]
+#[clap(after_help = "Examples:
+  # Build peer config YAML from a private network key file
+  $ aptos key extract-peer --private-network-key-file validator.key --host-name example.com:6180 --output-file peer.yaml")]
 pub struct ExtractPeer {
     /// Host and port of the full node
     ///
@@ -173,6 +176,12 @@ impl NetworkKeyInputOptions {
 /// key encoded with the `encoding` and `output_file.pub` will contain the public
 /// key encoded with the `encoding`.
 #[derive(Debug, Parser)]
+#[clap(after_help = "Examples:
+  # Generate an ed25519 key pair into account.key and account.key.pub
+  $ aptos key generate --output-file account.key
+
+  # Generate a bls12381 key pair, overwriting existing files without prompting
+  $ aptos key generate --key-type bls12381 --output-file validator.key --assume-yes")]
 pub struct GenerateKey {
     /// Key type to generate. Must be one of [x25519, ed25519, bls12381]
     #[clap(long, default_value_t = KeyType::Ed25519)]
@@ -319,6 +328,12 @@ impl GenerateKey {
 /// aptos key extract-public-key --private-key-file ./path-to-key --output-file ./path-to-output --key-type bls12381
 /// ```
 #[derive(Debug, Parser)]
+#[clap(after_help = "Examples:
+  # Extract the public key from a private key file
+  $ aptos key extract-public-key --private-key-file account.key --output-file account.key.pub
+
+  # Extract a bls12381 public key (with proof of possession)
+  $ aptos key extract-public-key --private-key-file validator.key --output-file validator.key.pub --key-type bls12381")]
 pub struct ExtractPublicKey {
     /// Key type to generate. Must be one of [x25519, ed25519, bls12381]
     #[clap(long, default_value_t = KeyType::Ed25519)]

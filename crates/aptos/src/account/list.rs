@@ -49,6 +49,15 @@ impl FromStr for ListQuery {
 /// This allows you to list the current resources at the time of query.  This can change due to
 /// any transactions that have occurred after the request.
 #[derive(Debug, Parser)]
+#[clap(after_help = "Examples:
+  # List the resources of the current profile's account
+  $ aptos account list
+
+  # List the modules published under a specific account
+  $ aptos account list --account 0xc0ffee --query modules
+
+  # List the balances of a specific account
+  $ aptos account list --account 0xc0ffee --query balance")]
 pub struct ListAccount {
     /// Address of the account you want to list resources/modules/balance for
     #[clap(long, value_parser = crate::common::types::load_account_arg)]
