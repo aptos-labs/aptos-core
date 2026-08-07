@@ -4,7 +4,9 @@
 //! This module defines the gas parameters for all Move instructions.
 
 use crate::{
-    gas_feature_versions::{RELEASE_V1_18, RELEASE_V1_33, RELEASE_V1_38, RELEASE_V1_40},
+    gas_feature_versions::{
+        RELEASE_V1_18, RELEASE_V1_33, RELEASE_V1_38, RELEASE_V1_40, RELEASE_V1_50,
+    },
     gas_schedule::VMGasParameters,
 };
 use aptos_gas_algebra::{
@@ -93,10 +95,13 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [unpack_per_field: InternalGasPerArg, "unpack.per_field", 1470],
         [unpack_generic_base: InternalGas, "unpack_generic.base", 8080],
         [unpack_generic_per_field: InternalGasPerArg, "unpack_generic.per_field", 1470],
+        // closure
         [pack_closure_base: InternalGas, { RELEASE_V1_33.. => "pack_closure.base" }, 9080],
         [pack_closure_per_arg: InternalGasPerArg,  { RELEASE_V1_33.. => "pack.closure.per_arg" }, 1470],
         [pack_closure_generic_base: InternalGas,  { RELEASE_V1_33.. => "pack_closure_generic.base" }, 9080],
         [pack_closure_generic_per_arg: InternalGasPerArg,  { RELEASE_V1_33.. => "pack_closure_generic.per_arg" }, 1470],
+        [materialize_closure_base: InternalGas, { RELEASE_V1_50.. => "materialize_closure.base" }, 1102],
+        [materialize_closure_per_byte: InternalGasPerByte, { RELEASE_V1_50.. => "materialize_closure.per_byte" }, 18],
         // ref
         [read_ref_base: InternalGas, "read_ref.base", 7350],
         [read_ref_per_abs_val_unit: InternalGasPerAbstractValueUnit, "read_ref.per_abs_val_unit", 140],

@@ -7,7 +7,10 @@ use crate::{
     loader::{Module, Script},
     module_traversal::TraversalContext,
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
-    storage::{loader::traits::Loader, ty_layout_converter::LayoutConverter},
+    storage::{
+        loader::traits::Loader, module_storage::FunctionValueExtensionAdapter,
+        ty_layout_converter::LayoutConverter,
+    },
     RuntimeEnvironment,
 };
 use better_any::{Tid, TidAble, TidExt};
@@ -22,6 +25,7 @@ use move_binary_format::{
 use move_core_types::{
     ability::AbilitySet,
     function::ClosureMask,
+    gas_algebra::NumBytes,
     identifier::{IdentStr, Identifier},
     language_storage,
     language_storage::{ModuleId, TypeTag},
@@ -30,12 +34,13 @@ use move_core_types::{
 };
 use move_vm_profiler::ProfilerFunction;
 use move_vm_types::{
-    gas::DependencyGasMeter,
+    gas::{DependencyGasMeter, NativeGasMeter},
     instr::Instruction,
     loaded_data::runtime_types::Type,
     module_id_interner::InternedModuleId,
     ty_interner::TypeVecId,
-    values::{AbstractFunction, SerializedFunctionData},
+    value_serde::{FunctionValueExtension as _, ValueSerDeContext},
+    values::{AbstractFunction, Closure, ClosureCapturedArgsMaterializer, SerializedFunctionData},
 };
 use std::{
     cell::RefCell,
@@ -266,6 +271,10 @@ pub(crate) enum LazyLoadedFunctionState {
         // closures at construction time. Non-storable closures just have None as they will not be
         // serialized anyway.
         captured_layouts: Option<Vec<MoveTypeLayout>>,
+        // Cached nesting depth of the captured arguments (see `SerializedFunctionData::depth`).
+        // Computed at pack time and carried across re-resolution; used to see through opaque
+        // captured blobs during depth checks and written to storage on serialization.
+        captured_depth: u16,
         // Hash of the defining module when resolved; a mismatch with the module's current hash
         // triggers re-resolution so a stored closure never binds to pre-upgrade code. Recorded
         // only for persistent functions (the only closures that are storable and can thus observe
@@ -288,6 +297,7 @@ impl LazyLoadedFunction {
         traversal_context: &mut TraversalContext,
         fun: Rc<LoadedFunction>,
         mask: ClosureMask,
+        captured_depth: u16,
     ) -> PartialVMResult<Self> {
         let runtime_environment = layout_converter.runtime_environment();
         let ty_args = fun
@@ -341,6 +351,7 @@ impl LazyLoadedFunction {
                 ty_args,
                 mask,
                 captured_layouts,
+                captured_depth,
                 module_hash,
             })),
         })
@@ -364,6 +375,7 @@ impl LazyLoadedFunction {
                 ty_args,
                 mask: ClosureMask::empty(),
                 captured_layouts: Some(vec![]),
+                captured_depth: 0,
                 module_hash,
             })),
         })
@@ -456,7 +468,6 @@ impl LazyLoadedFunction {
         traversal_context: &mut TraversalContext,
     ) -> PartialVMResult<Rc<LoadedFunction>> {
         let mut state = self.state.borrow_mut();
-
         if let LazyLoadedFunctionState::Resolved {
             fun, module_hash, ..
         } = &*state
@@ -549,16 +560,18 @@ impl LazyLoadedFunction {
             (fun, module_hash)
         };
 
-        let (ty_args, mask, captured_layouts) = match &mut *state {
+        let (ty_args, mask, captured_layouts, captured_depth) = match &mut *state {
             LazyLoadedFunctionState::Unresolved { data } => (
                 mem::take(&mut data.ty_args),
                 data.mask,
-                Some(mem::take(&mut data.captured_layouts)),
+                mem::take(&mut data.captured_layouts),
+                data.captured_depth,
             ),
             LazyLoadedFunctionState::Resolved {
                 ty_args,
                 mask,
                 captured_layouts,
+                captured_depth,
                 ..
             } => (
                 mem::take(ty_args),
@@ -568,6 +581,7 @@ impl LazyLoadedFunction {
                 // upgrades. They may be out of date (e.g. missing enum variants added later) but
                 // remain valid for the already-captured data, so reusing them is sound.
                 captured_layouts.take(),
+                *captured_depth,
             ),
         };
         *state = LazyLoadedFunctionState::Resolved {
@@ -575,9 +589,146 @@ impl LazyLoadedFunction {
             ty_args,
             mask,
             captured_layouts,
+            captured_depth,
             module_hash,
         };
         Ok(fun)
+    }
+
+    /// Ensures the captured arguments of the closure are decoded. No-op when they
+    /// already are. Resolves (loads) the function if needed, derives the layouts of
+    /// the captured arguments from its signature unless they are already known, and
+    /// decodes the blob. Charges gas for loading, layout derivation and decoding.
+    pub fn materialize_captured_values(
+        closure: &Closure,
+        loader: &impl Loader,
+        gas_meter: &mut impl NativeGasMeter,
+        traversal_context: &mut TraversalContext,
+    ) -> PartialVMResult<()> {
+        if closure.has_deserialized_captured_args() {
+            return Ok(());
+        }
+        let lazy_function = Self::expect_this_impl(closure.function())?;
+        let fun = lazy_function.as_resolved(loader, gas_meter, traversal_context)?;
+        let mask = lazy_function.closure_mask();
+
+        // The empty blob of a closure without captured arguments decodes without
+        // layouts.
+        if mask.captured_count() == 0 {
+            return closure.materialize_with(|_blob| Ok(vec![]));
+        }
+
+        // Derive the layouts from the function signature if this is the first
+        // materialization; store them back so serialization (which cannot load or
+        // charge gas) and other copies of this closure can use them.
+        let layouts = {
+            let state = lazy_function.state.borrow();
+            match &*state {
+                LazyLoadedFunctionState::Resolved {
+                    captured_layouts: Some(layouts),
+                    ..
+                } => layouts.clone(),
+                LazyLoadedFunctionState::Resolved {
+                    captured_layouts: None,
+                    ..
+                } => {
+                    drop(state);
+                    let layouts = Self::construct_captured_layouts(
+                        &LayoutConverter::new(loader),
+                        gas_meter,
+                        traversal_context,
+                        &fun,
+                        mask,
+                    )?
+                    .ok_or_else(|| {
+                        PartialVMError::new(StatusCode::UNABLE_TO_CAPTURE_DELAYED_FIELDS)
+                            .with_message(
+                                "Function values cannot capture delayed fields".to_string(),
+                            )
+                    })?;
+                    match &mut *lazy_function.state.borrow_mut() {
+                        LazyLoadedFunctionState::Resolved {
+                            captured_layouts, ..
+                        } => *captured_layouts = Some(layouts.clone()),
+                        LazyLoadedFunctionState::Unresolved { .. } => {
+                            return Err(PartialVMError::new_invariant_violation(
+                                "closure must be resolved after loading",
+                            ))
+                        },
+                    }
+                    layouts
+                },
+                LazyLoadedFunctionState::Unresolved { .. } => {
+                    return Err(PartialVMError::new_invariant_violation(
+                        "closure must be resolved after loading",
+                    ))
+                },
+            }
+        };
+        if layouts.len() != mask.captured_count() as usize {
+            return Err(
+                PartialVMError::new(StatusCode::VALUE_DESERIALIZATION_ERROR).with_message(
+                    "count of captured arguments does not match the function signature".to_string(),
+                ),
+            );
+        }
+
+        closure.materialize_with(|blob| {
+            let function_value_extension = FunctionValueExtensionAdapter {
+                module_storage: loader.unmetered_module_storage(),
+            };
+            let values = ValueSerDeContext::new(function_value_extension.max_value_nest_depth())
+                .with_func_args_deserialization(&function_value_extension)
+                .deserialize_captured_values(blob, &layouts)?;
+            // Charge after decoding so the heap-memory quota reflects the decoded values,
+            // not just the compact encoded blob.
+            gas_meter.charge_closure_materialization(NumBytes::new(blob.len() as u64), &values)?;
+            let vm_config = loader.runtime_environment().vm_config();
+            if vm_config.enable_closure_depth_check {
+                if let Some(max_depth) = vm_config.max_value_nest_depth {
+                    for value in &values {
+                        // Captured values sit one level below the closure itself.
+                        value.check_depth_of_value(max_depth.saturating_sub(1))?;
+                    }
+                }
+            }
+            Ok(values)
+        })
+    }
+}
+
+/// [ClosureCapturedArgsMaterializer] backed by the runtime loader, used where closures with
+/// serialized captured arguments can be encountered (equality and comparison).
+pub struct RuntimeClosureMaterializer<'a, 'b, L, G> {
+    loader: &'a L,
+    gas_meter: &'a mut G,
+    traversal_context: &'a mut TraversalContext<'b>,
+}
+
+impl<'a, 'b, L: Loader, G: NativeGasMeter> RuntimeClosureMaterializer<'a, 'b, L, G> {
+    pub fn new(
+        loader: &'a L,
+        gas_meter: &'a mut G,
+        traversal_context: &'a mut TraversalContext<'b>,
+    ) -> Self {
+        Self {
+            loader,
+            gas_meter,
+            traversal_context,
+        }
+    }
+}
+
+impl<L: Loader, G: NativeGasMeter> ClosureCapturedArgsMaterializer
+    for RuntimeClosureMaterializer<'_, '_, L, G>
+{
+    fn materialize_captured_args(&mut self, closure: &Closure) -> PartialVMResult<()> {
+        LazyLoadedFunction::materialize_captured_values(
+            closure,
+            self.loader,
+            self.gas_meter,
+            self.traversal_context,
+        )
     }
 }
 
@@ -590,6 +741,21 @@ impl AbstractFunction for LazyLoadedFunction {
                 data: SerializedFunctionData { mask, .. },
                 ..
             } => *mask,
+        }
+    }
+
+    fn captured_depth(&self) -> u16 {
+        let state = self.state.borrow();
+        match &*state {
+            LazyLoadedFunctionState::Resolved { captured_depth, .. } => *captured_depth,
+            LazyLoadedFunctionState::Unresolved {
+                data:
+                    SerializedFunctionData {
+                        captured_depth: depth,
+                        ..
+                    },
+                ..
+            } => *depth,
         }
     }
 

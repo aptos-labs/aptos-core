@@ -9,7 +9,10 @@ use crate::{
     delayed_values::delayed_field_id::{DelayedFieldID, TryFromMoveValue, TryIntoMoveValue},
     loaded_data::runtime_types::Type,
     value_serde::ValueSerDeContext,
-    values::function_values_impl::{AbstractFunction, Closure, ClosureVisitor},
+    values::function_values_impl::{
+        AbstractFunction, Closure, ClosureCapturedArgs, ClosureCapturedArgsMaterializer,
+        ClosureVisitor,
+    },
     views::{ValueView, ValueVisitor},
 };
 use itertools::Itertools;
@@ -17,6 +20,8 @@ use move_binary_format::{
     errors::*,
     file_format::{Constant, SignatureToken, VariantIndex},
 };
+// Change the canonical definition in `move_core_types::value` if this needs updating.
+pub use move_core_types::value::DEFAULT_MAX_VM_VALUE_NESTED_DEPTH;
 #[cfg(any(test, feature = "fuzzing", feature = "testing"))]
 use move_core_types::value::{MoveStruct, MoveValue};
 use move_core_types::{
@@ -47,15 +52,6 @@ use std::{
     rc::Rc,
 };
 use triomphe::Arc as TriompheArc;
-
-/// Values can be recursive, and so it is important that we do not use recursive algorithms over
-/// deeply nested values as it can cause stack overflow. Since it is not always possible to avoid
-/// recursion, we opt for a reasonable limit on VM value depth. It is defined in Move VM config,
-/// but since it is difficult to propagate config context everywhere, we use this constant.
-///
-/// IMPORTANT: When changing this constant, make sure it is in-sync with one in VM config (it is
-/// used there now).
-pub const DEFAULT_MAX_VM_VALUE_NESTED_DEPTH: u64 = 128;
 
 /***************************************************************************************
  *
@@ -772,12 +768,24 @@ impl Value {
             // and copying is an internal API.
             DelayedFieldID { id } => DelayedFieldID { id: *id },
 
-            ClosureValue(Closure(fun, captured)) => {
-                let captured = captured
-                    .iter()
-                    .map(|v| v.copy_value(depth + 1, max_depth))
-                    .collect::<PartialVMResult<_>>()?;
-                ClosureValue(Closure(fun.clone_dyn()?, Box::new(captured)))
+            ClosureValue(Closure(fun, captured_args)) => {
+                let captured_args = match &*captured_args.borrow() {
+                    ClosureCapturedArgs::Serialized(blob) => {
+                        ClosureCapturedArgs::Serialized(blob.clone())
+                    },
+                    ClosureCapturedArgs::Deserialized(captured) => {
+                        ClosureCapturedArgs::Deserialized(
+                            captured
+                                .iter()
+                                .map(|v| v.copy_value(depth + 1, max_depth))
+                                .collect::<PartialVMResult<_>>()?,
+                        )
+                    },
+                };
+                ClosureValue(Closure(
+                    fun.clone_dyn()?,
+                    Box::new(RefCell::new(captured_args)),
+                ))
             },
         })
     }
@@ -1005,12 +1013,24 @@ impl Value {
 impl Value {
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn equals(&self, other: &Self) -> PartialVMResult<bool> {
-        self.equals_with_depth(other, 1, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH), true)
+        self.equals_with_depth(
+            other,
+            1,
+            Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH),
+            true,
+            None,
+        )
     }
 
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn compare(&self, other: &Self) -> PartialVMResult<Ordering> {
-        self.compare_with_depth(other, 1, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH), true)
+        self.compare_with_depth(
+            other,
+            1,
+            Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH),
+            true,
+            None,
+        )
     }
 
     /// Returns true if two Move values are equal.
@@ -1018,6 +1038,9 @@ impl Value {
     /// Additional parameters:
     ///   - Maximum allowed depth of the traversal of value trees.
     ///   - Whether to include closure mask in closure comparison or not.
+    ///   - An optional materializer for closures with serialized captured arguments.
+    ///     Without one, comparing such closures fails with an invariant violation, so
+    ///     callers that can reach closures must provide it.
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn equals_with_depth(
         &self,
@@ -1025,6 +1048,7 @@ impl Value {
         depth: u64,
         max_depth: Option<u64>,
         include_closure_mask: bool,
+        materializer: Option<&mut (dyn ClosureCapturedArgsMaterializer + '_)>,
     ) -> PartialVMResult<bool> {
         use Value::*;
 
@@ -1045,14 +1069,16 @@ impl Value {
             (Bool(l), Bool(r)) => l == r,
             (Address(l), Address(r)) => l == r,
 
-            (Container(l), Container(r)) => l.equals(r, depth, max_depth, include_closure_mask)?,
+            (Container(l), Container(r)) => {
+                l.equals(r, depth, max_depth, include_closure_mask, materializer)?
+            },
 
             // We count references as +1 in nesting, hence increasing the depth.
             (ContainerRef(l), ContainerRef(r)) => {
-                l.equals(r, depth + 1, max_depth, include_closure_mask)?
+                l.equals(r, depth + 1, max_depth, include_closure_mask, materializer)?
             },
             (IndexedRef(l), IndexedRef(r)) => {
-                l.equals(r, depth + 1, max_depth, include_closure_mask)?
+                l.equals(r, depth + 1, max_depth, include_closure_mask, materializer)?
             },
 
             // Disallow equality for delayed values. The rationale behind this
@@ -1065,17 +1091,18 @@ impl Value {
                     .with_message("cannot compare delayed values".to_string()))
             },
 
-            (ClosureValue(Closure(fun1, captured1)), ClosureValue(Closure(fun2, captured2))) => {
-                if fun1.cmp_dyn(fun2.as_ref())? == Ordering::Equal
-                    && (!include_closure_mask || fun1.closure_mask() == fun2.closure_mask())
-                    && captured1.len() == captured2.len()
+            (ClosureValue(c1), ClosureValue(c2)) => {
+                if c1.0.cmp_dyn(c2.0.as_ref())? == Ordering::Equal
+                    && (!include_closure_mask || c1.0.closure_mask() == c2.0.closure_mask())
                 {
-                    for (v1, v2) in captured1.iter().zip(captured2.iter()) {
-                        if !v1.equals_with_depth(v2, depth + 1, max_depth, include_closure_mask)? {
-                            return Ok(false);
-                        }
-                    }
-                    true
+                    closure_captured_equals(
+                        c1,
+                        c2,
+                        depth,
+                        max_depth,
+                        include_closure_mask,
+                        materializer,
+                    )?
                 } else {
                     false
                 }
@@ -1118,12 +1145,16 @@ impl Value {
     /// Additional parameters:
     ///   - Maximum allowed depth of the traversal of value trees.
     ///   - Whether to include closure mask in closure comparison or not.
+    ///   - An optional materializer for closures with serialized captured arguments.
+    ///     Without one, comparing such closures fails with an invariant violation, so
+    ///     callers that can reach closures must provide it.
     pub fn compare_with_depth(
         &self,
         other: &Self,
         depth: u64,
         max_depth: Option<u64>,
         include_closure_mask: bool,
+        materializer: Option<&mut (dyn ClosureCapturedArgsMaterializer + '_)>,
     ) -> PartialVMResult<Ordering> {
         use Value::*;
 
@@ -1144,14 +1175,16 @@ impl Value {
             (Bool(l), Bool(r)) => l.cmp(r),
             (Address(l), Address(r)) => l.cmp(r),
 
-            (Container(l), Container(r)) => l.compare(r, depth, max_depth, include_closure_mask)?,
+            (Container(l), Container(r)) => {
+                l.compare(r, depth, max_depth, include_closure_mask, materializer)?
+            },
 
             // We count references as +1 in nesting, hence increasing the depth.
             (ContainerRef(l), ContainerRef(r)) => {
-                l.compare(r, depth + 1, max_depth, include_closure_mask)?
+                l.compare(r, depth + 1, max_depth, include_closure_mask, materializer)?
             },
             (IndexedRef(l), IndexedRef(r)) => {
-                l.compare(r, depth + 1, max_depth, include_closure_mask)?
+                l.compare(r, depth + 1, max_depth, include_closure_mask, materializer)?
             },
 
             // Disallow comparison for delayed values.
@@ -1161,20 +1194,20 @@ impl Value {
                     .with_message("cannot compare delayed values".to_string()))
             },
 
-            (ClosureValue(Closure(fun1, captured1)), ClosureValue(Closure(fun2, captured2))) => {
-                let mut o = fun1.cmp_dyn(fun2.as_ref())?;
+            (ClosureValue(c1), ClosureValue(c2)) => {
+                let mut o = c1.0.cmp_dyn(c2.0.as_ref())?;
                 if include_closure_mask {
-                    o = o.then_with(|| fun1.closure_mask().cmp(&fun2.closure_mask()));
+                    o = o.then_with(|| c1.0.closure_mask().cmp(&c2.0.closure_mask()));
                 }
                 if o == Ordering::Equal {
-                    for (v1, v2) in captured1.iter().zip(captured2.iter()) {
-                        let o =
-                            v1.compare_with_depth(v2, depth + 1, max_depth, include_closure_mask)?;
-                        if o != Ordering::Equal {
-                            return Ok(o);
-                        }
-                    }
-                    captured1.iter().len().cmp(&captured2.len())
+                    closure_captured_compare(
+                        c1,
+                        c2,
+                        depth,
+                        max_depth,
+                        include_closure_mask,
+                        materializer,
+                    )?
                 } else {
                     o
                 }
@@ -1219,7 +1252,7 @@ impl Value {
         other: &Self,
         max_depth: u64,
     ) -> PartialVMResult<bool> {
-        self.equals_with_depth(other, 1, Some(max_depth), true)
+        self.equals_with_depth(other, 1, Some(max_depth), true, None)
     }
 
     // Test-only API to test depth checks.
@@ -1229,7 +1262,7 @@ impl Value {
         other: &Self,
         max_depth: u64,
     ) -> PartialVMResult<Ordering> {
-        self.compare_with_depth(other, 1, Some(max_depth), true)
+        self.compare_with_depth(other, 1, Some(max_depth), true, None)
     }
 }
 
@@ -1240,6 +1273,7 @@ impl Container {
         depth: u64,
         max_depth: Option<u64>,
         include_closure_mask: bool,
+        mut materializer: Option<&mut (dyn ClosureCapturedArgsMaterializer + '_)>,
     ) -> PartialVMResult<bool> {
         use Container::*;
 
@@ -1252,7 +1286,13 @@ impl Container {
                     return Ok(false);
                 }
                 for (v1, v2) in l.iter().zip(r.iter()) {
-                    if !v1.equals_with_depth(v2, depth + 1, max_depth, include_closure_mask)? {
+                    if !v1.equals_with_depth(
+                        v2,
+                        depth + 1,
+                        max_depth,
+                        include_closure_mask,
+                        materializer.as_deref_mut(),
+                    )? {
                         return Ok(false);
                     }
                 }
@@ -1308,6 +1348,7 @@ impl Container {
         depth: u64,
         max_depth: Option<u64>,
         include_closure_mask: bool,
+        mut materializer: Option<&mut (dyn ClosureCapturedArgsMaterializer + '_)>,
     ) -> PartialVMResult<Ordering> {
         use Container::*;
 
@@ -1317,8 +1358,13 @@ impl Container {
                 let r = &r.borrow();
 
                 for (v1, v2) in l.iter().zip(r.iter()) {
-                    let value_cmp =
-                        v1.compare_with_depth(v2, depth + 1, max_depth, include_closure_mask)?;
+                    let value_cmp = v1.compare_with_depth(
+                        v2,
+                        depth + 1,
+                        max_depth,
+                        include_closure_mask,
+                        materializer.as_deref_mut(),
+                    )?;
                     if value_cmp.is_ne() {
                         return Ok(value_cmp);
                     }
@@ -1371,6 +1417,124 @@ impl Container {
     }
 }
 
+/// Compares the captured arguments of two closures for equality. Assumes the
+/// function identities (and, if requested, masks) already compared equal. Serialized
+/// captured arguments with equal blobs are equal without decoding: equal identity
+/// implies equal layouts, and equal bytes under equal layouts decode to equal values.
+/// Unequal blobs do not imply unequal values (nested closures may be encoded in
+/// different format versions), so any other combination involving serialized
+/// arguments is materialized first.
+fn closure_captured_equals(
+    c1: &Closure,
+    c2: &Closure,
+    depth: u64,
+    max_depth: Option<u64>,
+    include_closure_mask: bool,
+    mut materializer: Option<&mut (dyn ClosureCapturedArgsMaterializer + '_)>,
+) -> PartialVMResult<bool> {
+    if c1.0.closure_mask().captured_count() == 0 && c2.0.closure_mask().captured_count() == 0 {
+        return Ok(true);
+    }
+    materialize_closures_for_cmp(c1, c2, &mut materializer)?;
+    match (&*c1.1.borrow(), &*c2.1.borrow()) {
+        (
+            ClosureCapturedArgs::Deserialized(captured1),
+            ClosureCapturedArgs::Deserialized(captured2),
+        ) => {
+            if captured1.len() != captured2.len() {
+                return Ok(false);
+            }
+            for (v1, v2) in captured1.iter().zip(captured2.iter()) {
+                if !v1.equals_with_depth(
+                    v2,
+                    depth + 1,
+                    max_depth,
+                    include_closure_mask,
+                    materializer.as_deref_mut(),
+                )? {
+                    return Ok(false);
+                }
+            }
+            Ok(true)
+        },
+        (ClosureCapturedArgs::Serialized(b1), ClosureCapturedArgs::Serialized(b2)) => Ok(b1 == b2),
+        (ClosureCapturedArgs::Serialized(_), ClosureCapturedArgs::Deserialized(_))
+        | (ClosureCapturedArgs::Deserialized(_), ClosureCapturedArgs::Serialized(_)) => Err(
+            PartialVMError::new_invariant_violation("closures must be materialized"),
+        ),
+    }
+}
+
+/// Same as [closure_captured_equals], for ordered comparison.
+fn closure_captured_compare(
+    c1: &Closure,
+    c2: &Closure,
+    depth: u64,
+    max_depth: Option<u64>,
+    include_closure_mask: bool,
+    mut materializer: Option<&mut (dyn ClosureCapturedArgsMaterializer + '_)>,
+) -> PartialVMResult<Ordering> {
+    if c1.0.closure_mask().captured_count() == 0 && c2.0.closure_mask().captured_count() == 0 {
+        return Ok(Ordering::Equal);
+    }
+    materialize_closures_for_cmp(c1, c2, &mut materializer)?;
+    match (&*c1.1.borrow(), &*c2.1.borrow()) {
+        (
+            ClosureCapturedArgs::Deserialized(captured1),
+            ClosureCapturedArgs::Deserialized(captured2),
+        ) => {
+            for (v1, v2) in captured1.iter().zip(captured2.iter()) {
+                let o = v1.compare_with_depth(
+                    v2,
+                    depth + 1,
+                    max_depth,
+                    include_closure_mask,
+                    materializer.as_deref_mut(),
+                )?;
+                if o != Ordering::Equal {
+                    return Ok(o);
+                }
+            }
+            Ok(captured1.len().cmp(&captured2.len()))
+        },
+        // Reachable only when the blobs are equal; unequal blobs are materialized.
+        (ClosureCapturedArgs::Serialized(b1), ClosureCapturedArgs::Serialized(b2)) if b1 == b2 => {
+            Ok(Ordering::Equal)
+        },
+        (ClosureCapturedArgs::Serialized(_), ClosureCapturedArgs::Serialized(_))
+        | (ClosureCapturedArgs::Serialized(_), ClosureCapturedArgs::Deserialized(_))
+        | (ClosureCapturedArgs::Deserialized(_), ClosureCapturedArgs::Serialized(_)) => Err(
+            PartialVMError::new_invariant_violation("closures must be materialized"),
+        ),
+    }
+}
+
+/// Materializes both closures if either has serialized captured arguments, unless
+/// both are serialized with equal blobs (in which case comparison can shortcut
+/// without decoding).
+fn materialize_closures_for_cmp(
+    c1: &Closure,
+    c2: &Closure,
+    materializer: &mut Option<&mut (dyn ClosureCapturedArgsMaterializer + '_)>,
+) -> PartialVMResult<()> {
+    let needs_materialization = match (&*c1.1.borrow(), &*c2.1.borrow()) {
+        (ClosureCapturedArgs::Deserialized(_), ClosureCapturedArgs::Deserialized(_)) => false,
+        (ClosureCapturedArgs::Serialized(b1), ClosureCapturedArgs::Serialized(b2)) => b1 != b2,
+        (ClosureCapturedArgs::Serialized(_), ClosureCapturedArgs::Deserialized(_))
+        | (ClosureCapturedArgs::Deserialized(_), ClosureCapturedArgs::Serialized(_)) => true,
+    };
+    if needs_materialization {
+        let materializer = materializer.as_deref_mut().ok_or_else(|| {
+            PartialVMError::new_invariant_violation(
+                "comparison of serialized closures requires a materializer",
+            )
+        })?;
+        materializer.materialize_captured_args(c1)?;
+        materializer.materialize_captured_args(c2)?;
+    }
+    Ok(())
+}
+
 impl ContainerRef {
     #[cfg_attr(feature = "force-inline", inline(always))]
     fn equals(
@@ -1379,11 +1543,17 @@ impl ContainerRef {
         depth: u64,
         max_depth: Option<u64>,
         include_closure_mask: bool,
+        materializer: Option<&mut (dyn ClosureCapturedArgsMaterializer + '_)>,
     ) -> PartialVMResult<bool> {
         // Note: the depth passed in accounts for the container.
         check_depth(depth, max_depth)?;
-        self.container()
-            .equals(other.container(), depth, max_depth, include_closure_mask)
+        self.container().equals(
+            other.container(),
+            depth,
+            max_depth,
+            include_closure_mask,
+            materializer,
+        )
     }
 
     fn compare(
@@ -1392,11 +1562,17 @@ impl ContainerRef {
         depth: u64,
         max_depth: Option<u64>,
         include_closure_mask: bool,
+        materializer: Option<&mut (dyn ClosureCapturedArgsMaterializer + '_)>,
     ) -> PartialVMResult<Ordering> {
         // Note: the depth passed in accounts for the container.
         check_depth(depth, max_depth)?;
-        self.container()
-            .compare(other.container(), depth, max_depth, include_closure_mask)
+        self.container().compare(
+            other.container(),
+            depth,
+            max_depth,
+            include_closure_mask,
+            materializer,
+        )
     }
 }
 
@@ -1408,6 +1584,7 @@ impl IndexedRef {
         depth: u64,
         max_depth: Option<u64>,
         include_closure_mask: bool,
+        materializer: Option<&mut (dyn ClosureCapturedArgsMaterializer + '_)>,
     ) -> PartialVMResult<bool> {
         use Container::*;
 
@@ -1434,6 +1611,7 @@ impl IndexedRef {
                 depth + 1,
                 max_depth,
                 include_closure_mask,
+                materializer,
             )?,
 
             (VecU8(r1), VecU8(r2)) => r1.borrow()[self_index] == r2.borrow()[other_index],
@@ -1583,6 +1761,7 @@ impl IndexedRef {
         depth: u64,
         max_depth: Option<u64>,
         include_closure_mask: bool,
+        materializer: Option<&mut (dyn ClosureCapturedArgsMaterializer + '_)>,
     ) -> PartialVMResult<Ordering> {
         use Container::*;
 
@@ -1609,6 +1788,7 @@ impl IndexedRef {
                 depth + 1,
                 max_depth,
                 include_closure_mask,
+                materializer,
             )?,
 
             (VecU8(r1), VecU8(r2)) => r1.borrow()[self_index].cmp(&r2.borrow()[other_index]),
@@ -5998,11 +6178,26 @@ impl Container {
 
 impl Closure {
     fn visit_impl(&self, visitor: &mut impl ValueVisitor, depth: u64) -> PartialVMResult<()> {
-        let Self(_, captured) = self;
-        if visitor.visit_closure(depth, captured.len())? {
-            for val in captured.iter() {
-                val.visit_impl(visitor, depth + 1)?;
-            }
+        let Self(fun, captured_args) = self;
+        match &*captured_args.borrow() {
+            ClosureCapturedArgs::Serialized(blob) => {
+                let num_captured = fun.closure_mask().captured_count() as usize;
+                if visitor.visit_closure(depth, num_captured)? {
+                    // The captured arguments are still an opaque blob. Use the
+                    // closure's cached depth so the traversal sees through the blob
+                    // instead of counting it as a single level.
+                    let stored_depth = fun.captured_depth() as u64;
+                    visitor
+                        .visit_closure_captured_serialized_args(depth + stored_depth, blob.len())?;
+                }
+            },
+            ClosureCapturedArgs::Deserialized(captured) => {
+                if visitor.visit_closure(depth, captured.len())? {
+                    for val in captured.iter() {
+                        val.visit_impl(visitor, depth + 1)?;
+                    }
+                }
+            },
         }
         Ok(())
     }
@@ -6576,23 +6771,37 @@ impl Value {
 
             (L::Function, Value::ClosureValue(closure)) => {
                 use better_any::TidExt;
-                use move_core_types::function::MoveClosure;
+                use move_core_types::function::{MoveClosure, MoveClosureCapturedArgs};
 
                 // Downcast to MockAbstractFunction to access data directly
                 if let Some(mock_fun) = closure.0.downcast_ref::<MockAbstractFunction>() {
+                    let captured = match &*closure.1.borrow() {
+                        ClosureCapturedArgs::Deserialized(captured) => {
+                            let captured_layouts =
+                                mock_fun.data.captured_layouts.as_ref().expect("layouts");
+                            MoveClosureCapturedArgs::Deserialized(
+                                captured
+                                    .iter()
+                                    .zip(captured_layouts.iter())
+                                    .map(|(captured_val, layout)| {
+                                        (layout.clone(), captured_val.as_move_value(layout))
+                                    })
+                                    .collect(),
+                            )
+                        },
+                        ClosureCapturedArgs::Serialized(blob) => {
+                            MoveClosureCapturedArgs::Serialized {
+                                depth: mock_fun.data.captured_depth,
+                                blob: blob.clone(),
+                            }
+                        },
+                    };
                     let move_closure = MoveClosure {
                         module_id: mock_fun.data.module_id.clone(),
                         fun_id: mock_fun.data.fun_id.clone(),
                         ty_args: mock_fun.data.ty_args.clone(),
                         mask: mock_fun.data.mask,
-                        captured: closure
-                            .1
-                            .iter()
-                            .zip(mock_fun.data.captured_layouts.iter())
-                            .map(|(captured_val, layout)| {
-                                (layout.clone(), captured_val.as_move_value(layout))
-                            })
-                            .collect(),
+                        captured,
                     };
                     MoveValue::closure(move_closure)
                 } else {
@@ -6628,14 +6837,18 @@ fn check_depth(depth: u64, max_depth: Option<u64>) -> PartialVMResult<()> {
     Ok(())
 }
 
-/// A visitor that checks the depth of values does not exceed a maximum.
+/// A visitor that checks the depth of values does not exceed a maximum, and
+/// records the maximum depth actually observed so callers can reuse it (e.g. to
+/// cache a closure's captured-argument depth).
 struct DepthCheckingVisitor {
     max_depth: u64,
+    depth: u64,
 }
 
 impl DepthCheckingVisitor {
     #[inline]
-    fn check(&self, depth: u64) -> PartialVMResult<()> {
+    fn check(&mut self, depth: u64) -> PartialVMResult<()> {
+        self.depth = self.depth.max(depth);
         if depth > self.max_depth {
             return Err(PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED));
         }
@@ -6722,6 +6935,14 @@ impl ValueVisitor for DepthCheckingVisitor {
         Ok(true) // continue into captured values
     }
 
+    fn visit_closure_captured_serialized_args(
+        &mut self,
+        depth: u64,
+        _num_bytes: usize,
+    ) -> PartialVMResult<()> {
+        self.check(depth)
+    }
+
     fn visit_vec(&mut self, depth: u64, _len: usize) -> PartialVMResult<bool> {
         self.check(depth)?;
         Ok(true) // continue into elements
@@ -6734,9 +6955,16 @@ impl ValueVisitor for DepthCheckingVisitor {
 }
 
 impl Value {
-    /// Check that the depth of this value does not exceed `max_depth`.
-    /// Returns an error with `VM_MAX_VALUE_DEPTH_REACHED` if the depth is exceeded.
-    pub fn check_depth_of_value(&self, max_depth: u64) -> PartialVMResult<()> {
-        self.visit(&mut DepthCheckingVisitor { max_depth })
+    /// Check that the depth of this value does not exceed `max_depth`, and return
+    /// the maximum depth actually observed. Returns an error with
+    /// `VM_MAX_VALUE_DEPTH_REACHED` if the depth is exceeded. Pass `u64::MAX` to
+    /// compute the depth without enforcing a limit.
+    pub fn check_depth_of_value(&self, max_depth: u64) -> PartialVMResult<u64> {
+        let mut visitor = DepthCheckingVisitor {
+            max_depth,
+            depth: 0,
+        };
+        self.visit(&mut visitor)?;
+        Ok(visitor.depth)
     }
 }

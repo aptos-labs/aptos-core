@@ -178,6 +178,7 @@ pub enum FeatureFlag {
     FunctionValueDispatch,
     DisableClosureBcsSerialization,
     LazyModuleInitialization,
+    EnableFunctionDataFormatV2,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -463,6 +464,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::DISABLE_CLOSURE_BCS_SERIALIZATION
             },
             FeatureFlag::LazyModuleInitialization => AptosFeatureFlag::LAZY_MODULE_INITIALIZATION,
+            FeatureFlag::EnableFunctionDataFormatV2 => {
+                AptosFeatureFlag::ENABLE_FUNCTION_DATA_FORMAT_V2
+            },
         }
     }
 }
@@ -675,6 +679,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::DisableClosureBcsSerialization
             },
             AptosFeatureFlag::LAZY_MODULE_INITIALIZATION => FeatureFlag::LazyModuleInitialization,
+            AptosFeatureFlag::ENABLE_FUNCTION_DATA_FORMAT_V2 => {
+                FeatureFlag::EnableFunctionDataFormatV2
+            },
         }
     }
 }

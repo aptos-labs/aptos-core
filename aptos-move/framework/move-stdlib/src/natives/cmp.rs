@@ -56,11 +56,14 @@ fn native_compare(
         .runtime_environment()
         .vm_config()
         .include_closure_mask_in_cmp;
+    // The context materializes closures with serialized captured arguments on the
+    // way, loading their functions and charging gas.
     let ordering = args[0].compare_with_depth(
         &args[1],
         1,
         Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH),
         check_mask,
+        Some(&mut **context),
     )?;
     let ordering_move_variant = match ordering {
         std::cmp::Ordering::Less => ORDERING_LESS_THAN_VARIANT,

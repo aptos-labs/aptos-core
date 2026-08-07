@@ -15,7 +15,7 @@ use aptos_types::account_address::AccountAddress;
 use claims::assert_ok;
 use move_core_types::{
     ability::AbilitySet,
-    function::{ClosureMask, MoveClosure},
+    function::{ClosureMask, MoveClosure, MoveClosureCapturedArgs},
     identifier::Identifier,
     language_storage::{FunctionParamOrReturnTag, FunctionTag, ModuleId, TypeTag},
     value::{MoveStruct, MoveStructLayout, MoveTypeLayout, MoveValue},
@@ -90,7 +90,33 @@ fn serialize_closure(
         fun_id: Identifier::new(fun).unwrap(),
         ty_args,
         mask,
-        captured,
+        captured: MoveClosureCapturedArgs::Deserialized(captured),
+    }))
+    .simple_serialize()
+    .unwrap()
+}
+
+/// Serializes a closure in storage format V2: captured arguments as one blob,
+/// without layouts.
+fn serialize_closure_v2(
+    addr: AccountAddress,
+    module: &str,
+    fun: &str,
+    ty_args: Vec<TypeTag>,
+    mask: ClosureMask,
+    captured: Vec<(MoveTypeLayout, MoveValue)>,
+) -> Vec<u8> {
+    let blob = captured
+        .into_iter()
+        .flat_map(|(_, v)| v.simple_serialize().unwrap())
+        .collect::<Vec<u8>>();
+    MoveValue::Closure(Box::new(MoveClosure {
+        module_id: ModuleId::new(addr, Identifier::new(module).unwrap()),
+        fun_id: Identifier::new(fun).unwrap(),
+        ty_args,
+        mask,
+        // The annotator ignores the cached depth; any value round-trips here.
+        captured: MoveClosureCapturedArgs::Serialized { depth: 0, blob },
     }))
     .simple_serialize()
     .unwrap()
@@ -123,6 +149,28 @@ fn struct_fields(value: &AnnotatedMoveValue) -> (String, Vec<(String, String)>) 
         ),
         other => panic!("expected a struct, got {:?}", other),
     }
+}
+
+/// The V2 storage format (captured arguments as one opaque blob) annotates exactly
+/// like V1: the blob is decoded with layouts resolved from the function signature.
+#[test]
+fn named_struct_captured_arg_v2_blob() {
+    let (h, addr) = publish();
+
+    let captured = runtime_struct(vec![
+        (MoveTypeLayout::U64, MoveValue::U64(42)),
+        (MoveTypeLayout::Bool, MoveValue::Bool(true)),
+    ]);
+    let blob = serialize_closure_v2(addr, "m", "cap_named", vec![], ClosureMask::new(0b1), vec![
+        captured,
+    ]);
+
+    let (name, fields) = struct_fields(&annotate_single_captured(&h, &blob));
+    assert_eq!(name, "S");
+    assert_eq!(fields, vec![
+        ("x".to_string(), "U64(42)".to_string()),
+        ("y".to_string(), "Bool(true)".to_string()),
+    ]);
 }
 
 /// The captured struct `S { x: 42, y: true }` annotates with its real field names.
