@@ -90,7 +90,7 @@ use aptos_storage_interface::{db_ensure as ensure, db_other_bail, AptosDbError, 
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble, ROOT_NIBBLE_HEIGHT},
     proof::{SparseMerkleProof, SparseMerkleProofExt, SparseMerkleRangeProof},
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{hot_state::HotStateValue, state_key::StateKey, state_value::StateValue},
     transaction::Version,
 };
 use arr_macro::arr;
@@ -172,6 +172,12 @@ impl Key for StateKey {
 impl Value for StateValue {
     fn value_size(&self) -> usize {
         self.size()
+    }
+}
+
+impl Value for HotStateValue {
+    fn value_size(&self) -> usize {
+        self.value_opt().map_or(0, StateValue::size)
     }
 }
 
