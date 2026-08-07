@@ -2934,16 +2934,18 @@ impl Transfer {
         let deposit_value = i128::from_str(&deposit_amount.value)
             .map_err(|_| ApiError::InvalidTransferOperations(Some("Deposit amount is invalid")))?;
 
-        // We can't create or destroy coins, they must be negatives of each other
-        if -withdraw_value != deposit_value {
+        // We can't create or destroy coins, they must be negatives of each other.
+        // checked_neg guards against i128::MIN, whose negation does not fit in i128.
+        if withdraw_value.checked_neg() != Some(deposit_value) {
             return Err(ApiError::InvalidTransferOperations(Some(
                 "Withdraw amount must be equal to negative of deposit amount",
             )));
         }
 
-        // We converted to u128 to ensure no loss of precision in comparison,
-        // but now we actually have to check it's a u64
-        if deposit_value > u64::MAX as i128 {
+        // The deposit is the transfer amount. It must be a non-negative value that
+        // fits in a u64 before narrowing, otherwise the cast below would wrap (e.g.
+        // a deposit of -1 would become u64::MAX).
+        if deposit_value < 0 || deposit_value > u64::MAX as i128 {
             return Err(ApiError::InvalidTransferOperations(Some(
                 "Transfer amount must not be greater than u64 max",
             )));
