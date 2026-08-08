@@ -728,6 +728,10 @@ module aptos_framework::big_ordered_map {
             let child_iter2 = children2.internal_new_begin_iter();
 
             loop {
+                spec {
+                    invariant spec_leaf_iter_valid(iter1, self);
+                    invariant spec_leaf_iter_valid(iter2, other);
+                };
                 let key1 = child_iter1.iter_borrow_key(children1);
                 let key2 = child_iter2.iter_borrow_key(children2);
                 let inc1 = false;
@@ -772,7 +776,12 @@ module aptos_framework::big_ordered_map {
     /// Apply the function to a mutable reference of each key-value pair in the map.
     public inline fun for_each_mut<K: copy + drop + store, V: store>(self: &mut BigOrderedMap<K, V>, f: |&K, &mut V|) {
         let iter = self.internal_new_begin_iter();
-        while (!iter.iter_is_end(self)) {
+        while ({
+            spec {
+                invariant spec_iter_valid(iter, self);
+            };
+            !iter.iter_is_end(self)
+        }) {
             let key = *iter.iter_borrow_key();
             f(&key, iter.iter_borrow_mut(self));
             iter = iter.iter_next(self);
@@ -1000,7 +1009,12 @@ module aptos_framework::big_ordered_map {
     inline fun for_each_leaf_node_children_ref<K: store, V: store>(self: &BigOrderedMap<K, V>, f: |&OrderedMap<K, Child<V>>|) {
         let iter = self.internal_leaf_new_begin_iter();
 
-        while (!iter.internal_leaf_iter_is_end()) {
+        while ({
+            spec {
+                invariant spec_leaf_iter_valid(iter, self);
+            };
+            !iter.internal_leaf_iter_is_end()
+        }) {
             let (node, next_iter) = iter.internal_leaf_iter_borrow_entries_and_next_leaf_index(self);
             f(node);
             iter = next_iter;
@@ -1890,6 +1904,30 @@ module aptos_framework::big_ordered_map {
     }
 
     spec test_verify_upsert {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_iter_across_upsert() {
+        let map = new_from(vector[1u64, 2u64], vector[10u64, 20u64]);
+        let iter = map.internal_find(&1);
+        // An existing-key upsert replaces the value in place: the iterator
+        // stays valid across it.
+        let old_value = map.upsert(2, 21);
+        spec {
+            assert old_value.is_some();
+            assert spec_iter_valid(iter, map);
+        };
+        let v = *iter.iter_borrow(&map);
+        spec {
+            assert v == 10;
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.destroy_empty();
+    }
+
+    spec test_verify_iter_across_upsert {
         pragma verify = true;
     }
 

@@ -995,7 +995,9 @@ procedure {:inline 2} {{impl.fun_add_override_if_exists}}{{S}}(m: $Mutation ({{S
     enc_k := {{ENC}}(k);
     t := $Dereference(m);
     if (ContainsTable(t{{U}}, enc_k)) {
-        {{GH}}m' := $UpdateMutation(m, {{W1}}UpdateTable(t{{U}}, enc_k, v){{W2}});
+        {#- Existing key: an in-place value replacement, not a structural
+            mutation — ghosts (the validity slot) are preserved. -#}
+        m' := $UpdateMutation(m, {{SW1}}UpdateTable(t{{U}}, enc_k, v){{SW2}});
     } else {
         {{GH}}m' := $UpdateMutation(m, {{W1}}AddTable(t{{U}}, enc_k, v){{W2}});
     }
@@ -1012,8 +1014,10 @@ returns (prev_v: $1_option_Option{{SV}}, m': $Mutation ({{Self}})) {
     enc_k := {{ENC}}(k);
     t := $Dereference(m);
     if (ContainsTable(t{{U}}, enc_k)) {
+        {#- Existing key: an in-place value replacement, not a structural
+            mutation — ghosts (the validity slot) are preserved. -#}
         prev_v := $1_option_Option{{SV}}_Some(GetTable(t{{U}}, enc_k));
-        {{GH}}m' := $UpdateMutation(m, {{W1}}UpdateTable(t{{U}}, enc_k, v){{W2}});
+        m' := $UpdateMutation(m, {{SW1}}UpdateTable(t{{U}}, enc_k, v){{SW2}});
     } else {
         prev_v := $1_option_Option{{SV}}_None();
         {{GH}}m' := $UpdateMutation(m, {{W1}}AddTable(t{{U}}, enc_k, v){{W2}});
