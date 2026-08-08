@@ -1773,6 +1773,35 @@ module aptos_framework::big_ordered_map {
     // ========== Verify only functions ==========
 
     #[verify_only]
+    fun test_verify_modify() {
+        let map = new_from(vector[1u64], vector[10u64]);
+        // Closure without `requires`: `iter_modify`'s precondition on the
+        // closure is trivially dischargeable.
+        map.modify(&1, |v| { *v = 11; });
+        spec {
+            assert spec_get(map, 1) == 11;
+        };
+        // Constrained closure used within its precondition: the caller
+        // discharges `requires_of` from the map's current content and gets
+        // the closure's postcondition in return.
+        let iter = map.internal_find(&1);
+        let r = iter.iter_modify(&mut map, |v| {
+            *v = 12;
+            true
+        } spec {
+            requires v == 11;
+            ensures v == 12;
+            ensures result == true;
+        });
+        spec {
+            assert spec_get(map, 1) == 12;
+            assert r;
+        };
+        map.remove(&1);
+        map.destroy_empty();
+    }
+
+    #[verify_only]
     fun test_verify_borrow_front_key() {
         let keys: vector<u64> = vector[1, 2, 3];
         let values: vector<u64> = vector[4, 5, 6];
@@ -1986,5 +2015,138 @@ module aptos_framework::big_ordered_map {
         pragma verify = true;
         aborts_if !spec_contains_key(map, 1);
      }
+
+    #[verify_only]
+    fun test_verify_iter_next() {
+        let map = new_from(vector[1, 2, 3], vector[4, 5, 6]);
+        let it = map.internal_find(&1);
+        let it2 = it.iter_next(&map);
+        let k2 = *it2.iter_borrow_key();
+        let it3 = it2.iter_next(&map);
+        let k3 = *it3.iter_borrow_key();
+        let it_end = it3.iter_next(&map);
+        spec {
+            assert k2 == (2 as u64);
+            assert k3 == (3 as u64);
+            assert iter_is_end(it_end, map);
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_iter_next {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_iter_prev() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let it_end = map.internal_new_end_iter();
+        let it3 = it_end.iter_prev(&map);
+        let k3 = *it3.iter_borrow_key();
+        let it2 = it3.iter_prev(&map);
+        let k2 = *it2.iter_borrow_key();
+        spec {
+            assert k3 == (3 as u64);
+            // Materialize the ground fact so the maximality quantifier of
+            // iter_prev's contract instantiates at k == 2.
+            assert keys[1] == 2;
+            assert vector::spec_contains(keys, 2);
+            assert spec_contains_key(map, 2);
+            assert k2 == (2 as u64);
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_iter_prev {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_iter_modify() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let it = map.internal_find(&2);
+        let old_v = it.iter_modify(&mut map, |v| { let o = *v; *v = 50; o });
+        spec {
+            assert old_v == (5 as u64);
+            assert spec_get(map, 2) == (50 as u64);
+            assert spec_len(map) == 3;
+            // Materialize ground membership facts so the frame quantifier
+            // (spec_unchanged_except_at) instantiates at keys 1 and 3.
+            assert keys[0] == 1;
+            assert vector::spec_contains(keys, 1);
+            assert keys[2] == 3;
+            assert vector::spec_contains(keys, 3);
+            // Frame: other keys are untouched.
+            assert spec_get(map, 1) == (4 as u64);
+            assert spec_get(map, 3) == (6 as u64);
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_iter_modify {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_keys_sorted() {
+        let map = new_from(vector[3, 1, 2], vector[6, 4, 5]);
+        let ks = map.keys();
+        spec {
+            assert len(ks) == 3;
+            // Sortedness and membership come from the keys() contract.
+            assert ks[0] < ks[1];
+            assert ks[1] < ks[2];
+            assert spec_contains_key(map, ks[0]);
+            assert spec_contains_key(map, ks[1]);
+            assert spec_contains_key(map, ks[2]);
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_keys_sorted {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_leaf_iter() {
+        let map = new_from(vector[1, 2, 3], vector[4, 5, 6]);
+        let lit = map.internal_leaf_new_begin_iter();
+        // The begin leaf iterator is never end, so this cannot abort.
+        let (entries, _next) = lit.internal_leaf_iter_borrow_entries_and_next_leaf_index(&map);
+        // Leaves of a nonempty map are nonempty, so borrowing the first leaf
+        // key cannot abort; the entry is a real map entry with matching value.
+        let ks = entries.keys();
+        let k0 = *ks.borrow(0);
+        let child = entries.borrow(&k0);
+        let v0 = *child.internal_leaf_borrow_value();
+        spec {
+            assert spec_contains_key(map, k0);
+            assert v0 == spec_get(map, k0);
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_leaf_iter {
+        pragma verify = true;
+    }
 
 }

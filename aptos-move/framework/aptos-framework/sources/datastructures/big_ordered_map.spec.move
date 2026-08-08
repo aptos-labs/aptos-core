@@ -10,6 +10,21 @@ spec aptos_framework::big_ordered_map {
     // aborts when exceeded. These size-based aborts — including `borrow_mut`'s
     // constant-value-size requirement — are presumed not to fire and are not
     // modeled by the bindings below.
+    //
+    // Structural presumption: the tree's internal invariants — node shapes,
+    // child kinds (leaf nodes hold only `Child::Leaf`), and index validity
+    // (the `EINTERNAL_INVARIANT_BROKEN` asserts and variant field accesses) —
+    // are maintained by construction by this module, presumed to hold, and
+    // not modeled. Traversal specs' abort conditions are exhaustive modulo
+    // this presumption.
+    //
+    // Iterator staleness presumption: the iterator overlay specs apply to an
+    // iterator only for the map state it was created from (the documented API
+    // contract: the map must not be mutated while iterators are held). All
+    // iterator specs model reads and writes at the iterator's cached key; at
+    // runtime a stale iterator navigates by its retained position, so it may
+    // abort, return arbitrary results, or read/mutate a DIFFERENT entry than
+    // modeled (e.g. `iter_borrow_mut`, `iter_modify`, `iter_remove`).
     spec BigOrderedMap {
         pragma intrinsic = map,
             map_new = new,
@@ -36,6 +51,8 @@ spec aptos_framework::big_ordered_map {
             map_add_all = add_all,
             map_borrow = borrow,
             map_borrow_mut = borrow_mut,
+            map_iter_borrow_mut = iter_borrow_mut,
+            map_spec_aborts_iter_borrow_mut = spec_aborts_iter_borrow_mut,
             map_spec_get = spec_get,
             map_spec_set = spec_set,
             map_spec_del = spec_remove,
@@ -106,7 +123,22 @@ spec aptos_framework::big_ordered_map {
     spec new_with_type_size_hints {
         pragma verify = false;
         pragma opaque;
-        aborts_if false;
+        // Exhaustive over the hint-validation aborts (parameter ordering,
+        // division by zero, u64 overflow of the entry-size sums, and the
+        // hint-derived degree thresholds). The internal storage-allocator
+        // alignment asserts fall under the structural presumption above, and
+        // the degrees passed on to `new_with_config` are within its bounds by
+        // construction (clamped between the *_MIN_DEGREE thresholds asserted
+        // here and `MAX_DEGREE`).
+        aborts_if avg_key_bytes > max_key_bytes;
+        aborts_if avg_value_bytes > max_value_bytes;
+        aborts_if avg_key_bytes == 0;
+        aborts_if max_key_bytes > 0
+            && HINT_MAX_NODE_BYTES / max_key_bytes < INNER_MIN_DEGREE;
+        aborts_if avg_key_bytes + avg_value_bytes > MAX_U64;
+        aborts_if max_key_bytes + max_value_bytes > MAX_U64;
+        aborts_if max_key_bytes + max_value_bytes > 0
+            && HINT_MAX_NODE_BYTES / (max_key_bytes + max_value_bytes) < LEAF_MIN_DEGREE;
         ensures spec_len(result) == 0;
         ensures forall k: K: !spec_contains_key(result, k);
     }
@@ -170,13 +202,16 @@ spec aptos_framework::big_ordered_map {
         ensures result == spec_get(map, self.key);
     }
 
-    // Body also asserts constant_kv_size OR bcs::constant_serialized_size<V>().is_some()
-    // which is not expressible from spec context. Caller-side, iter_is_end is what's discharged.
+    // Intrinsic (`map_iter_borrow_mut`): the returned `&mut V` carries a table
+    // index edge, so caller write-back updates the abstract map at `self.key`
+    // instead of traversing intrinsic internals. The body's constant-value-size
+    // assert is covered by the size presumption above.
     spec iter_borrow_mut {
-        pragma opaque;
-        pragma verify = false;
-        aborts_if iter_is_end(self, map);
-        ensures result == spec_get(map, self.key);
+        pragma intrinsic;
+    }
+
+    spec fun spec_aborts_iter_borrow_mut<K, V>(self: IteratorPtr<K>, map: BigOrderedMap<K, V>): bool {
+        (self is IteratorPtr::End<K>) || !spec_contains_key(map, self.key)
     }
 
     // Spec-level mirror of `iter_is_begin`. The Move body reads intrinsic map
@@ -330,12 +365,39 @@ spec aptos_framework::big_ordered_map {
         pragma opaque;
         pragma verify = false;
         aborts_if iter_is_end(self, map);
+        // End iff self.key has no strict successor in the map.
+        ensures (result is IteratorPtr::End<K>) <==>
+            (forall k: K where spec_contains_key(map, k):
+                std::cmp::compare(k, self.key) != std::cmp::Ordering::Greater);
+        // Otherwise result.key is the smallest in-map key strictly greater than self.key.
+        ensures !(result is IteratorPtr::End<K>) ==> spec_contains_key(map, result.key);
+        ensures !(result is IteratorPtr::End<K>) ==>
+            std::cmp::compare(result.key, self.key) == std::cmp::Ordering::Greater;
+        ensures !(result is IteratorPtr::End<K>) ==>
+            (forall k: K where spec_contains_key(map, k)
+                && std::cmp::compare(k, self.key) == std::cmp::Ordering::Greater:
+                std::cmp::compare(result.key, k) != std::cmp::Ordering::Greater);
     }
 
     spec iter_prev {
         pragma opaque;
         pragma verify = false;
         aborts_if spec_iter_is_begin(self, map);
+        // A predecessor always exists when self is not begin; from End the result
+        // is the largest key. The result always points at an in-map key.
+        ensures !(result is IteratorPtr::End<K>);
+        ensures spec_contains_key(map, result.key);
+        // From End: result.key is the largest key in the map.
+        ensures (self is IteratorPtr::End<K>) ==>
+            (forall k: K where spec_contains_key(map, k) && k != result.key:
+                std::cmp::compare(k, result.key) == std::cmp::Ordering::Less);
+        // Otherwise result.key is the largest in-map key strictly less than self.key.
+        ensures !(self is IteratorPtr::End<K>) ==>
+            std::cmp::compare(result.key, self.key) == std::cmp::Ordering::Less;
+        ensures !(self is IteratorPtr::End<K>) ==>
+            (forall k: K where spec_contains_key(map, k)
+                && std::cmp::compare(k, self.key) == std::cmp::Ordering::Less:
+                std::cmp::compare(k, result.key) != std::cmp::Ordering::Greater);
     }
 
     spec compute_length {
@@ -345,12 +407,25 @@ spec aptos_framework::big_ordered_map {
     spec iter_modify {
         pragma opaque;
         pragma verify = false;
+        // The closure's contract (`aborts_of`/`ensures_of` below) is only
+        // established for inputs satisfying its precondition — the closure is
+        // verified under `requires_of` — so importing it is sound only when
+        // the caller establishes that precondition on the current value. The
+        // end-iterator disjunct exempts calls that abort at the end-check
+        // before the closure is ever invoked (`self.key` does not exist
+        // there). Trivially true for closures without a `requires`. The
+        // body's post-callback size validation is covered by the size
+        // presumption above.
+        requires iter_is_end(self, map) || requires_of<f>(spec_get(map, self.key));
         aborts_if iter_is_end(self, map);
+        aborts_if aborts_of<f>(spec_get(map, self.key));
         // iter_modify mutates the value at self.key via the closure. Containment is
-        // unchanged for every key; values for keys other than self.key are preserved.
+        // unchanged for every key; values for keys other than self.key are preserved;
+        // the closure's contract relates the old value, the new value, and the result.
         ensures spec_contains_key(map, self.key);
         ensures spec_len(map) == spec_len(old(map));
         ensures spec_unchanged_except_at(map, self.key);
+        ensures ensures_of<f>(old(spec_get(map, self.key)), result, spec_get(map, self.key));
     }
 
     spec internal_find_with_path {
@@ -382,12 +457,15 @@ spec aptos_framework::big_ordered_map {
         pragma opaque;
         pragma verify = false;
         aborts_if false;
+        // Points at `min_leaf_index`, which is never NULL_INDEX: an empty map's
+        // leaf walk visits the (empty) root leaf once.
+        ensures !internal_leaf_iter_is_end(result);
     }
 
     spec internal_leaf_iter_is_end {
         pragma opaque;
-        pragma verify = false;
         aborts_if false;
+        ensures result == (self.node_index == NULL_INDEX);
     }
 
     spec internal_leaf_borrow_value {
@@ -401,5 +479,15 @@ spec aptos_framework::big_ordered_map {
         pragma opaque;
         pragma verify = false;
         aborts_if internal_leaf_iter_is_end(self);
+        // Soundness direction only: every entry in the returned leaf is a real
+        // map entry (a Leaf child with contained key and matching value).
+        // Completeness — that the leaves together visit every key — is not modeled.
+        ensures forall k: K where ordered_map::spec_contains_key(result_1, k):
+            spec_contains_key(map, k);
+        ensures forall k: K where ordered_map::spec_contains_key(result_1, k):
+            (ordered_map::spec_get(result_1, k) is Child::Leaf<V>)
+                && ordered_map::spec_get(result_1, k).value == spec_get(map, k);
+        // Leaves of a nonempty map are nonempty.
+        ensures spec_len(map) > 0 ==> ordered_map::spec_len(result_1) > 0;
     }
 }

@@ -1,0 +1,6 @@
+Move prover returns: exiting with bytecode transformation errors
+error: a `map_iter_borrow_mut` function must take a mutable reference to the intrinsic map (instantiated with the function's type parameters) and return a mutable reference to the value type parameter
+   ┌─ tests/sources/functional/intrinsic_iter_role_err4.move:20:5
+   │
+20 │     native fun ibm<K: copy + drop, V>(it: Iter<K>, m: &mut Map<K, V>): &mut K;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
