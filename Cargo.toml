@@ -36,6 +36,7 @@ members = [
     "aptos-move/aptos-workspace-server",
     "aptos-move/block-executor",
     "aptos-move/cli",
+    "aptos-move/code-validation",
     "aptos-move/e2e-benchmark",
     "aptos-move/e2e-move-test-harness",
     "aptos-move/e2e-move-tests",
@@ -329,6 +330,7 @@ aptos-cached-packages = { path = "aptos-move/framework/cached-packages" }
 aptos-cargo-cli = { path = "devtools/aptos-cargo-cli" }
 aptos-channels = { path = "crates/channel" }
 aptos-cli-common = { path = "crates/aptos-cli-common" }
+aptos-code-validation = { path = "aptos-move/code-validation" }
 aptos-collections = { path = "crates/aptos-collections" }
 aptos-compression = { path = "crates/aptos-compression" }
 aptos-config = { path = "config" }
