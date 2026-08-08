@@ -1,0 +1,846 @@
+-- Copyright © Aptos Foundation
+-- SPDX-License-Identifier: Apache-2.0
+
+import Move.IR.Syntax
+import Move.IR.Semantics
+
+/-!
+# Source Code Typing
+
+The typing discipline of the bytecode the prover verifies — the semantic
+counterpart of what the bytecode verifier guarantees.  The adequacy proof
+(`Translate/Adequacy.lean`) needs it because the contract facts of an
+opaque call (`SatisfiesContract`, the `callRel` havoc) are stated relative
+to *well-typed* boundary states: to cover a concrete callee execution, the
+call site must pass well-typed arguments over well-typed memory, and the
+callee must return well-typed results — the *type preservation* of the
+source language.
+
+The judgment is deliberately *semantic* where it can be: subtyping
+(`TySub`) is inclusion of `IsValid` value sets, which absorbs the
+reference-transparency of declared types (a `&signer` parameter holds an
+address value) and the signer/address identification.
+
+Reference instructions carry no typing obligations: they compile to failing
+assertions (`refFail`), so the simulation escapes through the
+assertion-failure disjunct before ever stepping past one.
+
+`TypedLocals` is the runtime invariant threaded through the simulation:
+every *defined* local is well-formed for its declared type.
+-/
+
+namespace Move.IR
+
+/-- Semantic subtyping: every value valid at `t` is valid at `t'`. -/
+def TySub (Δ : StructDecls) (t t' : Ty) : Prop :=
+  ∀ v, IsValid Δ t v → IsValid Δ t' v
+
+theorem TySub.refl (Δ : StructDecls) (t : Ty) : TySub Δ t t := fun _ h => h
+
+/-- Pointwise semantic subtyping of type lists. -/
+inductive TySubs (Δ : StructDecls) : List Ty → List Ty → Prop where
+  | nil : TySubs Δ [] []
+  | cons {t t' : Ty} {ts ts' : List Ty} :
+      TySub Δ t t' → TySubs Δ ts ts' → TySubs Δ (t :: ts) (t' :: ts')
+
+/-- Decompose `mapM` over `Option` on a cons cell. -/
+theorem mapM_cons_eq_some {α β : Type} {f : α → Option β} {x : α}
+    {xs : List α} {ys : List β} :
+    (x :: xs).mapM f = some ys ↔
+      ∃ y ys', f x = some y ∧ xs.mapM f = some ys' ∧ ys = y :: ys' := by
+  simp only [List.mapM_cons, Option.bind_eq_bind, Option.bind_eq_some_iff,
+    Option.pure_def, Option.some.injEq]
+  constructor
+  · rintro ⟨y, hy, ys', hys, rfl⟩
+    exact ⟨y, ys', hy, hys, rfl⟩
+  · rintro ⟨y, ys', hy, hys, rfl⟩
+    exact ⟨y, hy, ys', hys, rfl⟩
+
+/-- Operation typing: operand types and result types of the non-call,
+non-reference operations. -/
+inductive WfOp (Δ : StructDecls) : Oper → List Ty → List Ty → Prop where
+  | add : WfOp Δ .add [.u64, .u64] [.u64]
+  | sub : WfOp Δ .sub [.u64, .u64] [.u64]
+  | mul : WfOp Δ .mul [.u64, .u64] [.u64]
+  | div : WfOp Δ .div [.u64, .u64] [.u64]
+  | mod : WfOp Δ .mod [.u64, .u64] [.u64]
+  | lt : WfOp Δ .lt [.u64, .u64] [.bool]
+  | le : WfOp Δ .le [.u64, .u64] [.bool]
+  | eq (t : Ty) : WfOp Δ .eq [t, t] [.bool]
+  | and : WfOp Δ .and [.bool, .bool] [.bool]
+  | or : WfOp Δ .or [.bool, .bool] [.bool]
+  | not : WfOp Δ .not [.bool] [.bool]
+  | pack {r : ResourceId} {sd : StructDecl} :
+      Δ r = some sd → WfOp Δ .pack sd.fields [.struct r]
+  | unpack {r : ResourceId} {sd : StructDecl} :
+      Δ r = some sd → WfOp Δ .unpack [.struct r] sd.fields
+  | getField {r : ResourceId} {sd : StructDecl} {i : Nat} {t : Ty} :
+      Δ r = some sd → sd.fields[i]? = some t →
+      WfOp Δ (.getField i) [.struct r] [t]
+  | updateField {r : ResourceId} {sd : StructDecl} {i : Nat} {t : Ty} :
+      Δ r = some sd → sd.fields[i]? = some t →
+      WfOp Δ (.updateField i) [.struct r, t] [.struct r]
+  | vecPack {t : Ty} {n : Nat} :
+      n < U64_SIZE → WfOp Δ .vecPack (List.replicate n t) [.vector t]
+  | vecLen (t : Ty) : WfOp Δ .vecLen [.vector t] [.u64]
+  | vecGet (t : Ty) : WfOp Δ .vecGet [.vector t, .u64] [t]
+  | vecSet (t : Ty) : WfOp Δ .vecSet [.vector t, .u64, t] [.vector t]
+  | vecPush (t : Ty) : WfOp Δ .vecPush [.vector t, t] [.vector t]
+  | vecPop (t : Ty) : WfOp Δ .vecPop [.vector t] [.vector t, t]
+  | mkMutLoc (x : LocalIndex) (t : Ty) :
+      WfOp Δ (.mkMutLoc x) [t] [.mutRef t]
+  | mkMutGlobal {r : ResourceId} {sd : StructDecl} :
+      Δ r = some sd →
+      WfOp Δ (.mkMutGlobal r) [.address] [.mutRef (.struct r)]
+  | childMutField {r : ResourceId} {sd : StructDecl} {i : Nat} {t : Ty} :
+      Δ r = some sd → sd.fields[i]? = some t →
+      WfOp Δ (.childMutField i) [.mutRef (.struct r)] [.mutRef t]
+  | childMutIndex (t : Ty) :
+      WfOp Δ .childMutIndex [.mutRef (.vector t), .u64] [.mutRef t]
+  | getMut (t : Ty) : WfOp Δ .getMut [.mutRef t] [t]
+  | setMut (t : Ty) : WfOp Δ .setMut [.mutRef t, t] [.mutRef t]
+  | isParent (pat : List (Option Nat)) (t₁ t₂ : Ty) :
+      WfOp Δ (.isParent pat) [.mutRef t₁, .mutRef t₂] [.bool]
+  | mutPathIndex (k : Nat) (t₁ t₂ : Ty) :
+      WfOp Δ (.mutPathIndex k) [.mutRef t₁, .mutRef t₂] [.u64]
+  | isMutLoc (x : LocalIndex) (t : Ty) :
+      WfOp Δ (.isMutLoc x) [.mutRef t] [.bool]
+  | isMutGlobal (r : ResourceId) (t : Ty) :
+      WfOp Δ (.isMutGlobal r) [.mutRef t] [.bool]
+  | mutAddr (t : Ty) : WfOp Δ .mutAddr [.mutRef t] [.address]
+  | getGlobal {r : ResourceId} {sd : StructDecl} :
+      Δ r = some sd → WfOp Δ (.getGlobal r) [.address] [.struct r]
+  | writeGlobal {r : ResourceId} {sd : StructDecl} :
+      Δ r = some sd → WfOp Δ (.writeGlobal r) [.address, .struct r] []
+  | moveTo {r : ResourceId} {sd : StructDecl} :
+      Δ r = some sd → WfOp Δ (.moveTo r) [.signer, .struct r] []
+  | moveFrom {r : ResourceId} {sd : StructDecl} :
+      Δ r = some sd → WfOp Δ (.moveFrom r) [.address] [.struct r]
+  | exists_ (r : ResourceId) : WfOp Δ (.exists_ r) [.address] [.bool]
+
+/-- The reference operations (which compile to failing assertions and
+therefore need no typing). -/
+def Oper.isRefOp : Oper → Bool
+  | .borrowLoc | .borrowField _ | .borrowGlobal _ | .borrowVecElem
+  | .readRef | .writeRef | .freezeRef => true
+  | .add | .sub | .mul | .div | .mod
+  | .lt | .le | .eq | .and | .or | .not
+  | .pack | .unpack | .getField _ | .updateField _
+  | .vecPack | .vecLen | .vecGet | .vecSet | .vecPush | .vecPop
+  | .mkMutLoc _ | .mkMutGlobal _ | .childMutField _ | .childMutIndex
+  | .getMut | .setMut | .isParent _ | .mutPathIndex _
+  | .isMutLoc _ | .isMutGlobal _ | .mutAddr
+  | .getGlobal _ | .writeGlobal _ | .moveTo _ | .moveFrom _ | .exists_ _
+  | .function _ => false
+
+/-- Instruction typing, relative to the declared local types `decl` of the
+enclosing function and the program (for callee lookups). -/
+inductive WfInstr (P : Program) (decl : LocalIndex → Option Ty) :
+    Instr → Prop where
+  | load {dst : LocalIndex} {v : Value} {t : Ty} :
+      decl dst = some t → IsValid P.structs t v →
+      WfInstr P decl (.load dst v)
+  | assign {dst src : LocalIndex} {ts td : Ty} :
+      decl src = some ts → decl dst = some td → TySub P.structs ts td →
+      WfInstr P decl (.assign dst src)
+  | op {dsts srcs : List LocalIndex} {oper : Oper}
+      {sts dts ots rts : List Ty} :
+      srcs.mapM decl = some sts → dsts.mapM decl = some dts →
+      WfOp P.structs oper ots rts →
+      TySubs P.structs sts ots → TySubs P.structs rts dts →
+      WfInstr P decl (.call dsts oper srcs)
+  | callFun {f : FunId} {d' : FunDecl} {dsts srcs : List LocalIndex}
+      {sts dts : List Ty} :
+      P.funs f = some d' →
+      srcs.mapM decl = some sts →
+      sts.length = d'.numParams →
+      (∀ i t t', sts[i]? = some t → d'.locals i = some t' →
+        TySub P.structs t t') →
+      dsts.mapM decl = some dts →
+      TySubs P.structs d'.returns dts →
+      WfInstr P decl (.call dsts (.function f) srcs)
+  | refInstr {dsts srcs : List LocalIndex} {oper : Oper} :
+      oper.isRefOp → WfInstr P decl (.call dsts oper srcs)
+  | nop : WfInstr P decl .nop
+
+/-- Terminator typing: only `ret` carries an obligation (the returned
+locals must be well-typed for the declared result types, feeding the
+type preservation at the boundary). -/
+inductive WfTerm (Δ : StructDecls) (d : FunDecl) : Term → Prop where
+  | jump {b : BlockId} : WfTerm Δ d (.jump b)
+  | branch {c : LocalIndex} {b₁ b₂ : BlockId} : WfTerm Δ d (.branch c b₁ b₂)
+  | ret {srcs : List LocalIndex} {sts : List Ty} :
+      srcs.mapM d.locals = some sts → TySubs Δ sts d.returns →
+      WfTerm Δ d (.ret srcs)
+  | abort {code : LocalIndex} : WfTerm Δ d (.abort code)
+
+/-- A well-typed function declaration: every declared block is within the
+declared size (so the compiled label `b + 1` never collides with the exit
+labels), and its instructions and terminator are well-typed. -/
+structure WfFunDecl (P : Program) (d : FunDecl) : Prop where
+  blocksLt : ∀ b, d.body.blocks b ≠ none → b < d.body.size
+  wfInstr : ∀ b blk, d.body.blocks b = some blk →
+    ∀ i ∈ blk.instrs, WfInstr P d.locals i
+  wfTerm : ∀ b blk, d.body.blocks b = some blk → WfTerm P.structs d blk.term
+
+/-- A well-typed program: what the bytecode verifier guarantees for the
+code the prover verifies. -/
+def WfProg (P : Program) : Prop :=
+  ∀ f d, P.funs f = some d → WfFunDecl P d
+
+/-! ## The runtime typing invariant -/
+
+/-- Every *defined* local is well-formed for its declared type. -/
+def TypedLocals (Δ : StructDecls) (decl : LocalIndex → Option Ty)
+    (locals : Locals) : Prop :=
+  ∀ i t v, decl i = some t → locals i = some v → IsValid Δ t v
+
+theorem TypedLocals.initLocals {Δ : StructDecls} {d : FunDecl}
+    {args : List Value} (h : TypedArgs Δ d args) :
+    TypedLocals Δ d.locals (Move.IR.initLocals args) :=
+  fun i t v ht hv => h.2 i t v ht hv
+
+theorem TypedLocals.writeLocal {Δ : StructDecls}
+    {decl : LocalIndex → Option Ty} {s : MoveState} {x : LocalIndex}
+    {v : Value}
+    (h : TypedLocals Δ decl s.locals)
+    (hv : ∀ t, decl x = some t → IsValid Δ t v) :
+    TypedLocals Δ decl (s.writeLocal x v).locals := by
+  intro i t w ht hw
+  simp only [MoveState.writeLocal] at hw
+  by_cases hix : i = x
+  · rw [if_pos hix] at hw
+    cases hw
+    exact hv t (hix ▸ ht)
+  · rw [if_neg hix] at hw
+    exact h i t w ht hw
+
+/-- Writing values that are valid at the declared types of their
+destinations preserves the invariant. -/
+theorem TypedLocals.writeLocals {Δ : StructDecls}
+    {decl : LocalIndex → Option Ty} :
+    ∀ {s : MoveState} {xs : List LocalIndex} {vs : List Value}
+      {ts : List Ty},
+    TypedLocals Δ decl s.locals →
+    xs.mapM decl = some ts → IsValidList Δ ts vs →
+    TypedLocals Δ decl (MoveState.writeLocals s xs vs).locals := by
+  intro s xs
+  induction xs generalizing s with
+  | nil =>
+    intro vs ts h _ _
+    match vs with
+    | [] => simpa [MoveState.writeLocals] using h
+    | _ :: _ => simpa [MoveState.writeLocals] using h
+  | cons x xs ih =>
+    intro vs ts h hts hvs
+    rw [mapM_cons_eq_some] at hts
+    obtain ⟨t, ts', hxt, hts', rfl⟩ := hts
+    cases hvs with
+    | cons hv hvs =>
+      simp only [MoveState.writeLocals]
+      exact ih (h.writeLocal fun t' ht' => by rw [hxt] at ht'; cases ht'; exact hv)
+        hts' hvs
+
+/-- Extract listwise validity of looked-up operand values from the locals
+invariant and their declared types. -/
+theorem TypedLocals.mapM_isValidList {Δ : StructDecls}
+    {decl : LocalIndex → Option Ty} {locals : Locals}
+    (h : TypedLocals Δ decl locals) :
+    ∀ {srcs : List LocalIndex} {vs : List Value} {ts : List Ty},
+    srcs.mapM locals = some vs → srcs.mapM decl = some ts →
+    IsValidList Δ ts vs := by
+  intro srcs
+  induction srcs with
+  | nil =>
+    intro vs ts hv ht
+    cases hv; cases ht; exact .nil
+  | cons x xs ih =>
+    intro vs ts hv ht
+    rw [mapM_cons_eq_some] at hv ht
+    obtain ⟨v, vs', hxv, hvs, rfl⟩ := hv
+    obtain ⟨t, ts', hxt, hts, rfl⟩ := ht
+    exact .cons (h x t v hxt hxv) (ih hvs hts)
+
+/-! ## `IsValidList` utilities -/
+
+theorem IsValidList.length {Δ : StructDecls} :
+    ∀ {ts : List Ty} {vs : List Value}, IsValidList Δ ts vs →
+      vs.length = ts.length := by
+  intro ts
+  induction ts with
+  | nil => intro vs h; cases h; rfl
+  | cons t ts ih =>
+    intro vs h
+    cases h with
+    | cons _ hvs => simpa using ih hvs
+
+theorem IsValidList.getElem? {Δ : StructDecls} :
+    ∀ {ts : List Ty} {vs : List Value}, IsValidList Δ ts vs →
+    ∀ {i : Nat} {v : Value}, vs[i]? = some v →
+    ∃ t, ts[i]? = some t ∧ IsValid Δ t v := by
+  intro ts
+  induction ts with
+  | nil => intro vs h; cases h; intro i v hv; simp at hv
+  | cons t ts ih =>
+    intro vs h
+    cases h with
+    | cons hv hvs =>
+      intro i w hw
+      match i with
+      | 0 => cases hw; exact ⟨_, rfl, hv⟩
+      | i + 1 => simpa using ih hvs (by simpa using hw)
+
+theorem IsValidList.set {Δ : StructDecls} :
+    ∀ {ts : List Ty} {vs : List Value}, IsValidList Δ ts vs →
+    ∀ {i : Nat} {t : Ty} {v : Value}, ts[i]? = some t → IsValid Δ t v →
+    IsValidList Δ ts (vs.set i v) := by
+  intro ts
+  induction ts with
+  | nil => intro vs h; cases h; intro i t v ht _; simp at ht
+  | cons t₀ ts ih =>
+    intro vs h
+    cases h with
+    | cons hv hvs =>
+      intro i t v ht hval
+      match i with
+      | 0 => cases ht; exact .cons hval hvs
+      | i + 1 =>
+        simp only [List.set_cons_succ]
+        exact .cons hv (ih hvs (by simpa using ht) hval)
+
+/-- Validity at a replicated (homogeneous) type list: the length matches
+and every element is valid at the element type. -/
+theorem IsValidList.replicate {Δ : StructDecls} :
+    ∀ {n : Nat} {t : Ty} {vs : List Value},
+    IsValidList Δ (List.replicate n t) vs →
+    vs.length = n ∧ ∀ v ∈ vs, IsValid Δ t v := by
+  intro n
+  induction n with
+  | zero =>
+    intro t vs h
+    rw [List.replicate_zero] at h
+    cases h
+    exact ⟨rfl, by intro v hv; cases hv⟩
+  | succ n ih =>
+    intro t vs h
+    rw [List.replicate_succ] at h
+    cases h with
+    | cons hv hvs =>
+      obtain ⟨hlen, hes⟩ := ih hvs
+      refine ⟨by simp [hlen], ?_⟩
+      intro w hw
+      rcases List.mem_cons.mp hw with rfl | hw
+      · exact hv
+      · exact hes w hw
+
+/-- A well-typed value list carries no loc-rooted reference values
+(reference values are never `IsValid`), so the checkout call rules do not
+fire on well-typed calls. -/
+theorem IsValidList.locRefTargets_eq_nil {Δ : StructDecls} :
+    ∀ {ts : List Ty} {vs : List Value}, IsValidList Δ ts vs →
+    locRefTargets vs = [] := by
+  intro ts
+  induction ts with
+  | nil => intro vs h; cases h; rfl
+  | cons t ts ih =>
+    intro vs h
+    cases h with
+    | @cons _ v _ vs' hv hvs =>
+      have hnone : v.locRefTarget? = none := by
+        cases hv' : v.locRefTarget? with
+        | none => rfl
+        | some rt =>
+          rw [Value.locRefTarget?_some hv'] at hv
+          exact absurd hv IsValid.not_ref
+      show locRefTargets (v :: vs') = []
+      rw [locRefTargets, List.filterMap_cons, hnone]
+      exact ih hvs
+
+/-- Transport listwise validity along pointwise subtyping. -/
+theorem IsValidList.sub {Δ : StructDecls} :
+    ∀ {ts ts' : List Ty} {vs : List Value},
+    TySubs Δ ts ts' → IsValidList Δ ts vs → IsValidList Δ ts' vs := by
+  intro ts ts' vs hsub
+  induction hsub generalizing vs with
+  | nil => intro h; cases h; exact .nil
+  | cons hst _ ih =>
+    intro h
+    cases h with
+    | cons hv hvs => exact .cons (hst _ hv) (ih hvs)
+
+/-! ## Memory typing utilities -/
+
+theorem TypedMemory.memWrite {Δ : StructDecls} {m : Memory}
+    {r : ResourceId} {a : Address} {v : Value}
+    (h : TypedMemory Δ m) (hv : IsValid Δ (.struct r) v) :
+    TypedMemory Δ (memWrite m r a v) := by
+  intro r' sd a' w hsd hw
+  simp only [Move.IR.memWrite] at hw
+  by_cases hcase : r' = r ∧ a' = a
+  · rw [if_pos hcase] at hw
+    cases hw
+    exact hcase.1 ▸ hv
+  · rw [if_neg hcase] at hw
+    exact h r' sd a' w hsd hw
+
+theorem TypedMemory.memRemove {Δ : StructDecls} {m : Memory}
+    {r : ResourceId} {a : Address}
+    (h : TypedMemory Δ m) : TypedMemory Δ (memRemove m r a) := by
+  intro r' sd a' w hsd hw
+  simp only [Move.IR.memRemove] at hw
+  by_cases hcase : r' = r ∧ a' = a
+  · rw [if_pos hcase] at hw; cases hw
+  · rw [if_neg hcase] at hw
+    exact h r' sd a' w hsd hw
+
+/-! ## Semantic preservation of the operations -/
+
+/-- **Operation preservation**: a well-typed operation applied to
+well-typed operands over well-typed memory yields well-typed results and
+well-typed memory. -/
+theorem WfOp.sem_preserves {Δ : StructDecls} {op : Oper}
+    {ots rts : List Ty} {vs rets : List Value} {m m' : Memory}
+    {deref : RefTarget → Option Value}
+    (hop : WfOp Δ op ots rts)
+    (hvs : IsValidList Δ ots vs)
+    (hm : TypedMemory Δ m)
+    (hsem : op.sem deref vs m = some (.ok rets m')) :
+    IsValidList Δ rts rets ∧ TypedMemory Δ m' := by
+  cases hop with
+  | add =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    rw [isValid_u64_iff] at hv₁ hv₂
+    obtain ⟨i, rfl, hi⟩ := hv₁
+    obtain ⟨j, rfl, hj⟩ := hv₂
+    simp only [Oper.sem] at hsem
+    split at hsem
+    next h => cases hsem; exact ⟨.cons (.u64 h) .nil, hm⟩
+    next => cases hsem
+  | sub =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    rw [isValid_u64_iff] at hv₁ hv₂
+    obtain ⟨i, rfl, hi⟩ := hv₁
+    obtain ⟨j, rfl, hj⟩ := hv₂
+    simp only [Oper.sem] at hsem
+    split at hsem
+    next =>
+      cases hsem
+      exact ⟨.cons (.u64 (Nat.lt_of_le_of_lt (Nat.sub_le i j) hi)) .nil, hm⟩
+    next => cases hsem
+  | mul =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    rw [isValid_u64_iff] at hv₁ hv₂
+    obtain ⟨i, rfl, hi⟩ := hv₁
+    obtain ⟨j, rfl, hj⟩ := hv₂
+    simp only [Oper.sem] at hsem
+    split at hsem
+    next h => cases hsem; exact ⟨.cons (.u64 h) .nil, hm⟩
+    next => cases hsem
+  | div =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    rw [isValid_u64_iff] at hv₁ hv₂
+    obtain ⟨i, rfl, hi⟩ := hv₁
+    obtain ⟨j, rfl, hj⟩ := hv₂
+    simp only [Oper.sem] at hsem
+    split at hsem
+    next => cases hsem
+    next =>
+      cases hsem
+      exact ⟨.cons (.u64 (Nat.lt_of_le_of_lt (Nat.div_le_self i j) hi)) .nil,
+        hm⟩
+  | mod =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    rw [isValid_u64_iff] at hv₁ hv₂
+    obtain ⟨i, rfl, hi⟩ := hv₁
+    obtain ⟨j, rfl, hj⟩ := hv₂
+    simp only [Oper.sem] at hsem
+    split at hsem
+    next => cases hsem
+    next =>
+      cases hsem
+      exact ⟨.cons (.u64 (Nat.lt_of_le_of_lt (Nat.mod_le i j) hi)) .nil, hm⟩
+  | lt =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    rw [isValid_u64_iff] at hv₁ hv₂
+    obtain ⟨i, rfl, hi⟩ := hv₁
+    obtain ⟨j, rfl, hj⟩ := hv₂
+    simp only [Oper.sem] at hsem
+    cases hsem
+    exact ⟨.cons (.bool _) .nil, hm⟩
+  | le =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    rw [isValid_u64_iff] at hv₁ hv₂
+    obtain ⟨i, rfl, hi⟩ := hv₁
+    obtain ⟨j, rfl, hj⟩ := hv₂
+    simp only [Oper.sem] at hsem
+    cases hsem
+    exact ⟨.cons (.bool _) .nil, hm⟩
+  | eq =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    simp only [Oper.sem, Option.bind_eq_bind, Option.bind_eq_some_iff,
+      Option.pure_def, Option.some.injEq] at hsem
+    obtain ⟨a, -, b, -, hsem⟩ := hsem
+    cases hsem
+    exact ⟨.cons (.bool _) .nil, hm⟩
+  | and =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    rw [isValid_bool_iff] at hv₁ hv₂
+    obtain ⟨a, rfl⟩ := hv₁
+    obtain ⟨b, rfl⟩ := hv₂
+    simp only [Oper.sem] at hsem
+    cases hsem
+    exact ⟨.cons (.bool _) .nil, hm⟩
+  | or =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    rw [isValid_bool_iff] at hv₁ hv₂
+    obtain ⟨a, rfl⟩ := hv₁
+    obtain ⟨b, rfl⟩ := hv₂
+    simp only [Oper.sem] at hsem
+    cases hsem
+    exact ⟨.cons (.bool _) .nil, hm⟩
+  | not =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl
+    rw [isValid_bool_iff] at hv₁
+    obtain ⟨a, rfl⟩ := hv₁
+    simp only [Oper.sem] at hsem
+    cases hsem
+    exact ⟨.cons (.bool _) .nil, hm⟩
+  | pack hsd =>
+    simp only [Oper.sem] at hsem
+    split at hsem
+    next =>
+      cases hsem
+      exact ⟨.cons (.struct hsd hvs) .nil, hm⟩
+    next => cases hsem
+  | unpack hsd =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl
+    rw [isValid_struct_iff] at hv₁
+    obtain ⟨sd', fs, hsd', rfl, hfs⟩ := hv₁
+    rw [hsd] at hsd'
+    cases hsd'
+    simp only [Oper.sem] at hsem
+    cases hsem
+    exact ⟨hfs, hm⟩
+  | @getField r sd i t hsd hf =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl
+    rw [isValid_struct_iff] at hv₁
+    obtain ⟨sd', fs, hsd', rfl, hfs⟩ := hv₁
+    rw [hsd] at hsd'
+    cases hsd'
+    simp only [Oper.sem] at hsem
+    cases hfv : fs[i]? with
+    | none => rw [hfv] at hsem; simp only [Option.map] at hsem; cases hsem
+    | some v =>
+      rw [hfv] at hsem
+      simp only [Option.map] at hsem
+      cases hsem
+      obtain ⟨t', ht', hval⟩ := hfs.getElem? hfv
+      rw [hf] at ht'
+      cases ht'
+      exact ⟨.cons hval .nil, hm⟩
+  | updateField hsd hf =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    rw [isValid_struct_iff] at hv₁
+    obtain ⟨sd', fs, hsd', rfl, hfs⟩ := hv₁
+    rw [hsd] at hsd'
+    cases hsd'
+    simp only [Oper.sem] at hsem
+    split at hsem
+    next =>
+      cases hsem
+      exact ⟨.cons (.struct hsd (hfs.set hf hv₂)) .nil, hm⟩
+    next => cases hsem
+  | vecPack hn =>
+    simp only [Oper.sem] at hsem
+    split at hsem
+    next =>
+      cases hsem
+      obtain ⟨hlen, hes⟩ := hvs.replicate
+      exact ⟨.cons (.vector (by rw [hlen]; exact hn) hes) .nil, hm⟩
+    next => cases hsem
+  | vecLen =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl
+    rw [isValid_vector_iff] at hv₁
+    obtain ⟨es, rfl, hlen, hes⟩ := hv₁
+    simp only [Oper.sem] at hsem
+    cases hsem
+    exact ⟨.cons (.u64 hlen) .nil, hm⟩
+  | vecGet =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    rw [isValid_vector_iff] at hv₁
+    obtain ⟨es, rfl, hlen, hes⟩ := hv₁
+    rw [isValid_u64_iff] at hv₂
+    obtain ⟨i, rfl, hi⟩ := hv₂
+    simp only [Oper.sem] at hsem
+    split at hsem
+    next v hv =>
+      cases hsem
+      exact ⟨.cons (hes v (List.mem_of_getElem? hv)) .nil, hm⟩
+    next => cases hsem
+  | vecSet =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl with | cons hv₃ htl =>
+    cases htl
+    rw [isValid_vector_iff] at hv₁
+    obtain ⟨es, rfl, hlen, hes⟩ := hv₁
+    rw [isValid_u64_iff] at hv₂
+    obtain ⟨i, rfl, hi⟩ := hv₂
+    simp only [Oper.sem] at hsem
+    split at hsem
+    next => cases hsem
+    next =>
+      split at hsem
+      next =>
+        cases hsem
+        refine ⟨.cons (.vector (by simpa using hlen) ?_) .nil, hm⟩
+        intro w hw
+        rcases List.mem_or_eq_of_mem_set hw with hw | rfl
+        · exact hes w hw
+        · exact hv₃
+      next => cases hsem
+  | vecPush =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    rw [isValid_vector_iff] at hv₁
+    obtain ⟨es, rfl, hlen, hes⟩ := hv₁
+    simp only [Oper.sem] at hsem
+    split at hsem
+    next => cases hsem
+    next =>
+      split at hsem
+      next h =>
+        cases hsem
+        refine ⟨.cons (.vector (by simpa using h) ?_) .nil, hm⟩
+        intro w hw
+        rcases List.mem_append.mp hw with hw | hw
+        · exact hes w hw
+        · rw [List.mem_singleton] at hw
+          subst hw
+          exact hv₂
+      next => cases hsem
+  | vecPop =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl
+    rw [isValid_vector_iff] at hv₁
+    obtain ⟨es, rfl, hlen, hes⟩ := hv₁
+    simp only [Oper.sem] at hsem
+    split at hsem
+    next v hv =>
+      cases hsem
+      refine ⟨.cons (.vector ?_ ?_) (.cons (hes v ?_) .nil), hm⟩
+      · rw [List.length_dropLast]
+        exact Nat.lt_of_le_of_lt (Nat.sub_le _ _) hlen
+      · intro w hw
+        exact hes w (List.dropLast_subset _ hw)
+      · exact List.mem_of_getElem? (List.getLast?_eq_getElem? ▸ hv)
+    next => cases hsem
+  | mkMutLoc x t =>
+    cases hvs with | @cons _ v _ _ hv₁ htl =>
+    cases htl
+    simp only [Oper.sem] at hsem
+    split at hsem
+    next =>
+      cases hsem
+      exact ⟨.cons (.mutRef hv₁) .nil, hm⟩
+    next => cases hsem
+  | mkMutGlobal hsd =>
+    cases hvs with | @cons _ v _ _ hv₁ htl =>
+    cases htl
+    rw [isValid_address_iff] at hv₁
+    obtain ⟨a, rfl⟩ := hv₁
+    simp only [Oper.sem] at hsem
+    split at hsem
+    next v hv =>
+      cases hsem
+      exact ⟨.cons (.mutRef (hm _ _ _ _ hsd hv)) .nil, hm⟩
+    next => cases hsem
+  | childMutField hsd hf =>
+    cases hvs with | @cons _ v _ _ hv₁ htl =>
+    cases htl
+    cases v <;> try simp [Oper.sem] at hsem
+    rename_i rt w
+    cases w <;> try simp at hsem
+    rename_i fs
+    obtain ⟨w, hfv, hrets, rfl⟩ := hsem
+    subst hrets
+    have hpay := hv₁.mutRef_payload
+    rw [isValid_struct_iff] at hpay
+    obtain ⟨sd', fs', hsd', heq, hfs⟩ := hpay
+    cases heq
+    rw [hsd] at hsd'
+    cases hsd'
+    obtain ⟨t', ht', hval⟩ := hfs.getElem? hfv
+    rw [hf] at ht'
+    cases ht'
+    exact ⟨.cons (.mutRef hval) .nil, hm⟩
+  | childMutIndex =>
+    cases hvs with | @cons _ v₁ _ _ hv₁ htl =>
+    cases htl with | @cons _ v₂ _ _ hv₂ htl =>
+    cases htl
+    rw [isValid_u64_iff] at hv₂
+    obtain ⟨n, rfl, hn⟩ := hv₂
+    cases v₁ <;> try simp [Oper.sem] at hsem
+    rename_i rt w
+    cases w <;> try simp at hsem
+    rename_i es
+    have hpay := hv₁.mutRef_payload
+    rw [isValid_vector_iff] at hpay
+    obtain ⟨es', heq, -, hes⟩ := hpay
+    cases heq
+    split at hsem
+    next u hu =>
+      cases hsem
+      exact ⟨.cons (.mutRef (hes u (List.mem_of_getElem? hu))) .nil, hm⟩
+    next => cases hsem
+  | getMut =>
+    cases hvs with | @cons _ v _ _ hv₁ htl =>
+    cases htl
+    cases v <;> try simp [Oper.sem] at hsem
+    obtain ⟨hrets, rfl⟩ := hsem
+    subst hrets
+    exact ⟨.cons hv₁.mutRef_payload .nil, hm⟩
+  | setMut =>
+    cases hvs with | @cons _ v₁ _ _ hv₁ htl =>
+    cases htl with | @cons _ v₂ _ _ hv₂ htl =>
+    cases htl
+    cases v₁ <;> try simp [Oper.sem] at hsem
+    obtain ⟨-, hrets, rfl⟩ := hsem
+    subst hrets
+    exact ⟨.cons (.mutRef hv₂) .nil, hm⟩
+  | isParent pat t₁ t₂ =>
+    cases hvs with | @cons _ v₁ _ _ hv₁ htl =>
+    cases htl with | @cons _ v₂ _ _ hv₂ htl =>
+    cases htl
+    cases v₁ <;> try simp [Oper.sem] at hsem
+    cases v₂ <;> try simp at hsem
+    obtain ⟨hrets, rfl⟩ := hsem
+    subst hrets
+    exact ⟨.cons (.bool _) .nil, hm⟩
+  | mutPathIndex k t₁ t₂ =>
+    cases hvs with | @cons _ v₁ _ _ hv₁ htl =>
+    cases htl with | @cons _ v₂ _ _ hv₂ htl =>
+    cases htl
+    cases v₁ <;> try simp [Oper.sem] at hsem
+    cases v₂ <;> try simp at hsem
+    split at hsem
+    next n hn =>
+      split at hsem
+      next h =>
+        cases hsem
+        exact ⟨.cons (.u64 h) .nil, hm⟩
+      next => cases hsem
+    next => cases hsem
+  | isMutLoc x t =>
+    cases hvs with | @cons _ v _ _ hv₁ htl =>
+    cases htl
+    cases v <;> try simp [Oper.sem] at hsem
+    obtain ⟨hrets, rfl⟩ := hsem
+    subst hrets
+    exact ⟨.cons (.bool _) .nil, hm⟩
+  | isMutGlobal r t =>
+    cases hvs with | @cons _ v _ _ hv₁ htl =>
+    cases htl
+    cases v <;> try simp [Oper.sem] at hsem
+    obtain ⟨hrets, rfl⟩ := hsem
+    subst hrets
+    exact ⟨.cons (.bool _) .nil, hm⟩
+  | mutAddr =>
+    cases hvs with | @cons _ v _ _ hv₁ htl =>
+    cases htl
+    cases v <;> try simp [Oper.sem] at hsem
+    rename_i rt w
+    obtain ⟨root, p⟩ := rt
+    cases root with
+    | loc x => simp at hsem
+    | global r' a =>
+      simp at hsem
+      obtain ⟨hrets, rfl⟩ := hsem
+      subst hrets
+      exact ⟨.cons (.address a) .nil, hm⟩
+  | getGlobal hsd =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl
+    rw [isValid_address_iff] at hv₁
+    obtain ⟨a, rfl⟩ := hv₁
+    simp only [Oper.sem] at hsem
+    split at hsem
+    next v hv => cases hsem; exact ⟨.cons (hm _ _ _ _ hsd hv) .nil, hm⟩
+    next => cases hsem
+  | writeGlobal hsd =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    rw [isValid_address_iff] at hv₁
+    obtain ⟨a, rfl⟩ := hv₁
+    simp only [Oper.sem] at hsem
+    split at hsem
+    next =>
+      cases hsem
+      exact ⟨.nil, hm.memWrite hv₂⟩
+    next => cases hsem
+  | moveTo hsd =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    rw [isValid_signer_iff] at hv₁
+    obtain ⟨a, rfl⟩ := hv₁
+    simp only [Oper.sem] at hsem
+    split at hsem
+    next => cases hsem
+    next =>
+      split at hsem
+      next => cases hsem
+      next =>
+        cases hsem
+        exact ⟨.nil, hm.memWrite hv₂⟩
+  | moveFrom hsd =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl
+    rw [isValid_address_iff] at hv₁
+    obtain ⟨a, rfl⟩ := hv₁
+    simp only [Oper.sem] at hsem
+    split at hsem
+    next v hv =>
+      cases hsem
+      exact ⟨.cons (hm _ _ _ _ hsd hv) .nil, hm.memRemove⟩
+    next => cases hsem
+  | exists_ =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl
+    rw [isValid_address_iff] at hv₁
+    obtain ⟨a, rfl⟩ := hv₁
+    simp only [Oper.sem] at hsem
+    cases hsem
+    exact ⟨.cons (.bool _) .nil, hm⟩
+
+end Move.IR

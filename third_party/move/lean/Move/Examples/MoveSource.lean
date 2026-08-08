@@ -1,0 +1,228 @@
+-- Copyright © Aptos Foundation
+-- SPDX-License-Identifier: Apache-2.0
+
+import Move.Frontend.Elab
+import Move.IR.Interp
+import Move.Prover.Ivl.Wp
+import Move.Prover.Translate.Compile
+
+/-!
+# Examples Authored in Move Source
+
+Embedded *Move source* (not masm): the `move%` elaborator compiles the
+self-contained module with compiler v2 — specifications come from the
+genuine `spec` blocks, loop invariants from inline `spec { invariant … }`
+blocks, and the typing assumptions the prover injects as `WellFormed` are
+synthesized automatically — then lifts it with the real stackless
+generator and splices the result.
+
+Two examples: a loop (`count_down`, exercising the invariant rule) and a
+global-memory function (`take`, exercising `move_from`, `old(..)` and the
+`modifies` frame).  Both are evaluated with the interpreter and verified
+through the Lean WP calculus.
+-/
+
+namespace Move.Examples.MoveSource
+
+open Move.Prover.Ivl
+open Move.IR
+open Move.Frontend
+open Move.Prover.Translate
+
+def countDown : Program := move% "
+module 0x42::count_down {
+    fun count_down(x: u64): u64 {
+        while (0 < x) {
+            x = x - 1;
+        } spec {
+            invariant x <= 18446744073709551615;
+        };
+        x
+    }
+    spec count_down {
+        ensures result == 0;
+    }
+}
+"
+
+-- Evaluation: `count_down 5` returns `0`.
+#guard interpFun countDown 100 0 [] [.u64 5] matches .ok (.ret [] [.u64 0])
+
+def take : Program := move% "
+module 0x42::account {
+    struct Account has key { balance: u64 }
+
+    fun take(addr: address): u64 acquires Account {
+        let Account { balance } = move_from<Account>(addr);
+        balance
+    }
+    spec take {
+        aborts_if !exists<Account>(addr);
+        ensures result == old(global<Account>(addr).balance);
+        ensures !exists<Account>(addr);
+        modifies global<Account>(addr);
+    }
+}
+"
+
+-- Evaluation: taking from a balance of 10 returns 10 and removes the
+-- resource.
+#guard interpFun take 100 0 [(0, 3, .struct [.u64 10])] [.address 3]
+  matches .ok (.ret [] [.u64 10])
+
+-- Evaluation: aborts if the account is absent.
+#guard interpFun take 100 0 [] [.address 3] matches .ok (.abort _ 0)
+
+set_option maxHeartbeats 1000000 in
+/-- **`count_down` verifies**, from Move source. -/
+theorem count_down_verified : Verified countDown 0 := by
+  refine ⟨_, rfl, 5, ?_⟩
+  intro m args
+  simp only [wpB, compileFun, compAnns, countDown, MProgram.toProgram,
+    MFun.toFunDecl, MLoop.toLoopSpec, MContract.toContract, andAll, orAll,
+    compileBlock, termCmds, termGoto, retExitBlock, abortExitBlock, initVState, wpBlock,
+    wpTerm, wpEdge, wpCmds, onOk, denoteLoopSpec, Option.elim, Option.map,
+    List.mem_cons, List.not_mem_nil, or_false, List.find?,
+    List.length_cons, List.length_nil,
+    reduceIte, Nat.reduceAdd,
+    Nat.reduceEqDiff]
+  intro htyped _hreq gt hgt _
+  rcases hgt with rfl
+  simp only [reduceIte, Nat.reduceSub, Nat.reduceLT, Nat.reduceEqDiff]
+  -- Typing of the argument from the injected `WellFormed` assumption.
+  simp only [typedEntry, TypedArgs] at htyped
+  obtain ⟨⟨hlen, hvalid⟩, -⟩ := htyped
+  obtain ⟨v0, rfl⟩ : ∃ v, args = [v] := by
+    cases args with
+    | nil => simp at hlen
+    | cons a as =>
+      cases as with
+      | nil => exact ⟨a, rfl⟩
+      | cons b bs => simp at hlen
+  have hv0 := hvalid 0 .u64 v0 rfl rfl
+  simp only [isValid_u64_iff] at hv0
+  obtain ⟨n, rfl, hn⟩ := hv0
+  simp only [U64_SIZE] at hn
+  constructor
+  · -- Base case: the invariant holds at loop entry (`n ≤ u64::MAX` from
+    -- typing).
+    refine ⟨rfl, ?_⟩
+    simp [Holds, VState.curEnv, andAll, initLocals]
+    omega
+  · -- Inductive case.
+    intro s' hT hInv
+    obtain ⟨hsnaps, hargs, -, -, hmem, -⟩ := hT
+    obtain ⟨hab, hu⟩ := hInv
+    simp [Holds, VState.curEnv, andAll] at hu
+    obtain ⟨i, ⟨v0, hl0, hveq⟩, hk⟩ := hu
+    cases v0 <;> simp at hveq
+    case u64 k =>
+    subst hveq
+    intro gt2 hgt2 hg2
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at hgt2
+    rcases hgt2 with rfl | rfl | rfl
+    · -- abort-exit edge: the flag is clear
+      simp [hab, hl0, Oper.sem, MoveState.writeLocal,
+        MoveState.writeLocals, flagSet] at hg2
+    · -- loop-body edge (0 < k)
+      simp [hab, hl0, Oper.sem, MoveState.writeLocal,
+        MoveState.writeLocals] at hg2
+      have hk1 : 1 ≤ k := hg2
+      simp [wpCmds, compileInstr, onOk, hab, hl0, hg2, hk1,
+        Oper.sem, MoveState.writeLocal, MoveState.writeLocals, Holds,
+        VState.curEnv, VState.doAbort]
+      intro g' b' hedge hg'
+      rcases hedge with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
+      · simp [flagSet] at hg'
+      · -- back edge: the invariant is re-established for `k - 1`
+        simp [andAll]
+        omega
+    · -- exit edge (k = 0): the exit assertions hold
+      simp [hab, hl0, Oper.sem, MoveState.writeLocal,
+        MoveState.writeLocals] at hg2
+      simp [wpCmds, compileInstr, onOk, hab, hl0, hg2, Oper.sem,
+        MoveState.writeLocal, MoveState.writeLocals, Holds,
+        VState.preEnvOf, VState.postEnvOf, VState.curEnv, VState.doAbort,
+        preEnv, postEnv, agreesOutside, Contract.footprint,
+        Contract.abortsFalse, hsnaps, hargs]
+      intro g' b' hedge hg'
+      rcases hedge with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
+      · simp [flagSet] at hg'
+      · simp [wpCmds]
+        intro r a'
+        exact hmem r a' (fun h => nomatch h)
+
+set_option maxHeartbeats 8000000 in
+/-- **`take` verifies**, from Move source: aborts exactly when the account
+is absent; returns the old balance; removes the resource; touches nothing
+else. -/
+theorem take_verified : Verified take 0 := by
+  refine ⟨_, rfl, 3, ?_⟩
+  intro m args
+  simp only [wpB, compileFun, compAnns, take, MProgram.toProgram,
+    MFun.toFunDecl, MLoop.toLoopSpec, MContract.toContract, andAll, orAll,
+    compileBlock, termCmds, termGoto, retExitBlock, abortExitBlock, initVState, wpBlock,
+    wpTerm, wpEdge, wpCmds, onOk, Option.elim, Option.map,
+    List.mem_cons, List.not_mem_nil, or_false, List.find?,
+    List.length_cons, List.length_nil,
+    reduceIte, Nat.reduceAdd,
+    Nat.reduceEqDiff]
+  intro htyped _hreq gt hgt _
+  rcases hgt with rfl
+  simp only [reduceIte, Nat.reduceSub, Nat.reduceLT, Nat.reduceEqDiff]
+  -- Typing of the boundary state from the injected `WellFormed`
+  -- assumption: the argument shape and the canonical form of `Account`
+  -- resources in memory.
+  simp only [typedEntry, TypedArgs, TypedMemory] at htyped
+  obtain ⟨⟨hlen, hvalid⟩, hmem⟩ := htyped
+  obtain ⟨v0, rfl⟩ : ∃ v, args = [v] := by
+    cases args with
+    | nil => simp at hlen
+    | cons a as =>
+      cases as with
+      | nil => exact ⟨a, rfl⟩
+      | cons b bs => simp at hlen
+  have hv0 := hvalid 0 .address v0 rfl rfl
+  simp only [isValid_address_iff] at hv0
+  obtain ⟨a, rfl⟩ := hv0
+  -- Canonical form of the account state at the target address.
+  have hacct : m 0 a = none ∨
+      ∃ b, b < U64_SIZE ∧ m 0 a = some (.struct [.u64 b]) := by
+    match hm : m 0 a with
+    | none => exact .inl rfl
+    | some v =>
+      have hval := hmem 0 ⟨[.u64]⟩ a v rfl hm
+      simp only [isValid_struct_iff] at hval
+      obtain ⟨d, fs, hd, rfl, hfs⟩ := hval
+      obtain rfl : d = ⟨[Ty.u64]⟩ := by
+        simp [MStruct.toStructDecl] at hd
+        exact hd.symm
+      simp only [isValidList_cons_iff, isValidList_nil_iff,
+        isValid_u64_iff] at hfs
+      obtain ⟨v', vs', rfl, ⟨b, rfl, hb⟩, rfl⟩ := hfs
+      exact .inr ⟨b, hb, rfl⟩
+  clear hmem hvalid hlen
+  rcases hacct with habs | ⟨b, hb, hpres⟩
+  · -- Account absent: `move_from` aborts; the abort exit's assert holds.
+    intro gt hgt hg
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at hgt
+    rcases hgt with rfl | rfl
+    · simp [wpCmds, Holds, VState.preEnvOf, VState.doAbort, preEnv,
+        initLocals, habs, Oper.sem, SpecEnv.memAt,
+        Contract.abortsHolds, MoveState.writeLocal]
+    · simp [initLocals, habs, Oper.sem, VState.doAbort,
+        MoveState.writeLocal, flagClear] at hg
+  · -- Account present: normal path through the return exit.
+    intro gt hgt hg
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at hgt
+    rcases hgt with rfl | rfl
+    · simp [initLocals, hpres, Oper.sem, flagSet,
+        MoveState.writeLocal, MoveState.writeLocals] at hg
+    · simp [wpCmds, Holds, VState.preEnvOf, VState.postEnvOf, preEnv,
+        postEnv, initLocals, hpres, Oper.sem, SpecEnv.memAt,
+        Contract.abortsFalse, memRemove, MoveState.writeLocal,
+        MoveState.writeLocals, agreesOutside, Contract.footprint]
+      intro r a' hout hr ha'
+      exact absurd ha' (hout hr.symm)
+
+end Move.Examples.MoveSource

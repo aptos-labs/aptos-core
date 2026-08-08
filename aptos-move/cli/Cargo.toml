@@ -46,7 +46,10 @@ async-recursion = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true, features = ["env", "unstable-styles", "wrap_help"] }
+codespan = { workspace = true }
+codespan-reporting = { workspace = true }
 colored = { workspace = true }
+either = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
@@ -54,6 +57,7 @@ legacy-move-compiler = { workspace = true }
 move-asm = { workspace = true }
 move-binary-format = { workspace = true }
 move-bytecode-source-map = { workspace = true }
+move-bytecode-verifier = { workspace = true }
 move-command-line-common = { workspace = true }
 move-compiler-v2 = { workspace = true }
 move-core-types = { workspace = true }
@@ -61,10 +65,13 @@ move-coverage = { workspace = true }
 move-decompiler = { workspace = true }
 move-linter = { workspace = true }
 move-model = { workspace = true }
+move-model-exchange = { workspace = true }
 move-package = { workspace = true }
+move-stackless-bytecode = { workspace = true }
 move-symbol-pool = { workspace = true }
 move-unit-test = { workspace = true }
 move-vm-runtime = { workspace = true }
+num = { workspace = true }
 pathsearch = { workspace = true }
 rand = { workspace = true }
 reqwest = { workspace = true }

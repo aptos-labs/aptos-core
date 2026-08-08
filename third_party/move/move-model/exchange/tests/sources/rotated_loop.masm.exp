@@ -1,0 +1,1 @@
+error: in function `f`: unsupported loop shape: a cycle is not headed by its lowest-numbered block (rotated or irreducible control flow)
