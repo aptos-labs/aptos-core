@@ -81,12 +81,10 @@ impl VMRegisters {
     const IDLE_PC: usize = usize::MAX;
 
     /// Registers initialized with a fresh root frame, ready to begin execution.
-    fn new(stack_base: *mut u8, func: &Function) -> Self {
+    fn new(stack: &MemoryRegion, func: &Function) -> Self {
         Self {
             pc: 0,
-            // SAFETY: `stack_base` points to a stack allocation far larger than
-            // `FRAME_METADATA_SIZE`, so the offset stays in bounds.
-            fp: unsafe { stack_base.add(FRAME_METADATA_SIZE) },
+            fp: root_frame_base(stack),
             func: NonNull::from(func),
         }
     }
@@ -97,12 +95,10 @@ impl VMRegisters {
     // TODO(cleanup): `func` has no value until the first call, so this hands
     // out a dangling pointer and leans on `is_idle` instead of the `NonNull`
     // invariant. Look for ways to get rid of this workaround in the future.
-    fn idle(stack_base: *mut u8) -> Self {
+    fn idle(stack: &MemoryRegion) -> Self {
         Self {
             pc: Self::IDLE_PC,
-            // SAFETY: `stack_base` points to a stack allocation far larger than
-            // `FRAME_METADATA_SIZE`, so the offset stays in bounds.
-            fp: unsafe { stack_base.add(FRAME_METADATA_SIZE) },
+            fp: root_frame_base(stack),
             func: NonNull::dangling(),
         }
     }
@@ -110,6 +106,17 @@ impl VMRegisters {
     fn is_idle(&self) -> bool {
         self.pc == Self::IDLE_PC
     }
+}
+
+/// Frame pointer of the root call frame, which sits above the stack's sentinel
+/// frame metadata.
+fn root_frame_base(stack: &MemoryRegion) -> *mut u8 {
+    assert!(
+        stack.len() > FRAME_METADATA_SIZE,
+        "stack is too small to hold a root frame"
+    );
+    // SAFETY: the offset is within `stack`, checked above.
+    unsafe { stack.as_ptr().add(FRAME_METADATA_SIZE) }
 }
 
 /// What a finished transaction leaves behind: the frozen heap, the
@@ -252,7 +259,7 @@ impl<'guard> InterpreterContext<'guard> {
             natives,
             extensions: NativeExtensions::new(),
             resource_provider,
-            registers: VMRegisters::new(base, entry),
+            registers: VMRegisters::new(&stack, entry),
             stack,
             heap: Heap::new(heap_size),
             root_pool: RootPool::new(),
@@ -286,7 +293,7 @@ impl<'guard> InterpreterContext<'guard> {
             natives,
             extensions: NativeExtensions::new(),
             resource_provider,
-            registers: VMRegisters::idle(base),
+            registers: VMRegisters::idle(&stack),
             stack,
             heap: Heap::new(DEFAULT_HEAP_SIZE),
             root_pool: RootPool::new(),
@@ -432,7 +439,7 @@ impl<'guard> InterpreterContext<'guard> {
         let base = self.stack.as_ptr();
 
         // Reset execution state to root frame.
-        self.registers = VMRegisters::new(base, func);
+        self.registers = VMRegisters::new(&self.stack, func);
 
         // Re-write sentinel metadata so Return from root triggers Done.
         unsafe {
