@@ -18,6 +18,7 @@ use aptos_types::{
     vm::module_metadata::{get_metadata, RuntimeModuleMetadataV1},
 };
 use bytes::Bytes;
+use fxhash::FxHashMap;
 use mono_move_aptos_transaction_executor::{
     decode_group_members, AptosDataProvider, GroupMembers, StorageLocation,
 };
@@ -42,7 +43,7 @@ use move_core_types::{
     move_resource::MoveStructType,
 };
 use specializer::lower::gc_layout::type_pointer_offsets;
-use std::{cell::RefCell, collections::HashMap, sync::Arc};
+use std::{cell::RefCell, sync::Arc};
 use thiserror::Error;
 
 /// Size of the provider's value arena.
@@ -148,20 +149,20 @@ pub struct StateViewResourceProvider<'a, 'ctx, S> {
 
 /// The provider's interior-mutable state: caches and the value arena.
 struct ProviderState {
-    /// Bump arena holding the flat values served to reads, which
-    /// `ExternalHeap` pointers point into. Never collected or reset; must stay
-    /// alive as long as those pointers (through materialization).
+    /// Bump arena holding the flat values that reads hand out pointers into.
+    /// Never collected or reset; must stay alive as long as those pointers
+    /// (through materialization).
     arena: Heap,
     /// Resource-group membership per resource type, resolved from the defining
     /// module's metadata. `None` = not a group member.
-    group_membership: HashMap<InternedType, Option<InternedType>>,
+    group_membership: FxHashMap<InternedType, Option<InternedType>>,
     /// Aptos metadata of each module consulted for group membership so far,
     /// keyed by the module's state key. `None` = module absent or without
     /// metadata.
-    module_metadata: HashMap<StateKey, Option<Arc<RuntimeModuleMetadataV1>>>,
+    module_metadata: FxHashMap<StateKey, Option<Arc<RuntimeModuleMetadataV1>>>,
     /// Stored members of each resource group read so far, keyed by the
     /// group's state key.
-    groups: HashMap<StateKey, Option<Arc<GroupMembers>>>,
+    groups: FxHashMap<StateKey, Option<Arc<GroupMembers>>>,
 }
 
 impl<'a, 'ctx, S: StateView> StateViewResourceProvider<'a, 'ctx, S> {
@@ -171,9 +172,9 @@ impl<'a, 'ctx, S: StateView> StateViewResourceProvider<'a, 'ctx, S> {
             state_view,
             inner: RefCell::new(ProviderState {
                 arena: Heap::new(arena_size),
-                group_membership: HashMap::new(),
-                module_metadata: HashMap::new(),
-                groups: HashMap::new(),
+                group_membership: FxHashMap::default(),
+                module_metadata: FxHashMap::default(),
+                groups: FxHashMap::default(),
             }),
         }
     }

@@ -2,10 +2,6 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Identifies a VM session within a transaction.
-//!
-//! The BCS crypto-hash of a `SessionId` seeds unique-address (AUID) generation,
-//! so it is consensus-visible: neither the variant order nor the field layout
-//! may change.
 
 use crate::{
     block_metadata::BlockMetadata, block_metadata_ext::BlockMetadataExt,
@@ -16,6 +12,11 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 
+/// Identifies a VM session within a transaction.
+///
+/// Its BCS crypto-hash seeds unique-address (AUID) generation, so this enum is
+/// consensus-visible: neither the variant order nor the field layout may
+/// change, and a new session kind must be a new variant.
 #[derive(BCSCryptoHash, Clone, CryptoHasher, Deserialize, Serialize)]
 pub enum SessionId {
     Txn {

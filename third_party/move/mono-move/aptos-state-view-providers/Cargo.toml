@@ -18,6 +18,7 @@ aptos-framework = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
+fxhash = { workspace = true }
 mono-move-aptos-transaction-executor = { workspace = true }
 mono-move-core = { workspace = true }
 mono-move-global-context = { workspace = true }

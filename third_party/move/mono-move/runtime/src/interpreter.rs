@@ -93,6 +93,10 @@ impl VMRegisters {
 
     /// Registers of an idle context; [`Self::new`] via `prepare_call` must run
     /// before execution.
+    //
+    // TODO(cleanup): `func` has no value until the first call, so this hands
+    // out a dangling pointer and leans on `is_idle` instead of the `NonNull`
+    // invariant. Look for ways to get rid of this workaround in the future.
     fn idle(stack_base: *mut u8) -> Self {
         Self {
             pc: Self::IDLE_PC,

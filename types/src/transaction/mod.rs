@@ -990,7 +990,10 @@ impl TransactionPayload {
             Ok(TransactionExecutableRef::Script(script)) => {
                 HashValue::sha3_256_of(script.code()).to_vec()
             },
-            _ => vec![],
+            Ok(TransactionExecutableRef::EntryFunction(_))
+            | Ok(TransactionExecutableRef::Empty)
+            | Ok(TransactionExecutableRef::Encrypted)
+            | Err(_) => vec![],
         }
     }
 

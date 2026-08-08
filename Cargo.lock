@@ -12889,6 +12889,7 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4",
  "bytes",
+ "fxhash",
  "mono-move-aptos-transaction-executor",
  "mono-move-core",
  "mono-move-global-context",
