@@ -175,7 +175,8 @@ pub(crate) fn call_function(
     interp.run()
 }
 
-fn invariant_violation(err: anyhow::Error) -> VMInternalError {
+/// An error that should not be reachable, as a VM error.
+pub(crate) fn invariant_violation(err: anyhow::Error) -> VMInternalError {
     VMInternalError::new(RuntimeError::InvariantViolation(
         RuntimeInvariantViolation::Unreachable(err.to_string()),
     ))

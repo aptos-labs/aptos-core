@@ -7,7 +7,7 @@ use crate::{
     metadata::TxnMetadata,
     natives::transaction_extensions,
     outcome::TxnOutcome,
-    sys_calls::{run_epilogue, run_prologue, validation_signers},
+    sys_calls::{run_epilogue, run_prologue, TxnSigners},
 };
 use aptos_types::{
     fee_statement::FeeStatement,
@@ -138,7 +138,7 @@ impl<'a> AptosTransactionExecutor<'a> {
         )
         .with_extensions(extensions);
 
-        let signers = validation_signers(&txn_data);
+        let signers = TxnSigners::for_validation(&txn_data);
 
         // ============================ Prologue ==============================
         // Validate the transaction (auth key, sequence number or nonce, fee coverage etc.)
@@ -237,12 +237,8 @@ impl<'a> AptosTransactionExecutor<'a> {
         // arguments (`String`, `Object<T>`, `Option<..>`) from
         // `transaction_arg_validation`.
 
-        // Signers: the sender plus any secondary signers.
         // TODO(completeness): multi-agent transactions are untested.
-        let mut signer_bufs = vec![txn_data.sender.into_bytes()];
-        for secondary in &txn_data.secondary_signers {
-            signer_bufs.push(secondary.into_bytes());
-        }
+        let signers = TxnSigners::for_payload(txn_data);
 
         let status = call_function(
             self.guard,
@@ -251,7 +247,7 @@ impl<'a> AptosTransactionExecutor<'a> {
             entry.module().name(),
             entry.function(),
             ty_args,
-            &signer_bufs,
+            signers.as_slice(),
             entry.args(),
         )
         .map_err(MoveExecutionFailure::RuntimeError)?;

@@ -7,7 +7,12 @@
 //! here too. Only the versioned validation path is supported; the many legacy
 //! prologue/epilogue variants are intentionally not ported.
 
-use crate::{calls::call_function, errors::MoveExecutionFailure, metadata::TxnMetadata};
+use crate::{
+    calls::{call_function, invariant_violation},
+    errors::MoveExecutionFailure,
+    metadata::TxnMetadata,
+};
+use anyhow::anyhow;
 use aptos_types::{
     fee_statement::FeeStatement,
     transaction::{EpilogueArgs, PrologueArgs},
@@ -22,15 +27,31 @@ const TRANSACTION_VALIDATION: &IdentStr = ident_str!("transaction_validation");
 const VERSIONED_PROLOGUE: &IdentStr = ident_str!("versioned_prologue");
 const VERSIONED_EPILOGUE: &IdentStr = ident_str!("versioned_epilogue");
 
-/// The sender and fee-payer signer buffers every validation call takes.
-pub(crate) fn validation_signers(txn_data: &TxnMetadata) -> [[u8; AccountAddress::LENGTH]; 2] {
-    let fee_payer = txn_data.fee_payer.unwrap_or(txn_data.sender);
-    [txn_data.sender.into_bytes(), fee_payer.into_bytes()]
+/// The signer buffers a Move call receives, in parameter order.
+pub(crate) struct TxnSigners(Vec<[u8; AccountAddress::LENGTH]>);
+
+impl TxnSigners {
+    /// Sender and fee payer, as the prologue and epilogue take them.
+    pub(crate) fn for_validation(txn_data: &TxnMetadata) -> Self {
+        let fee_payer = txn_data.fee_payer.unwrap_or(txn_data.sender);
+        Self(vec![txn_data.sender.into_bytes(), fee_payer.into_bytes()])
+    }
+
+    /// Sender and any secondary signers, as an entry function takes them.
+    pub(crate) fn for_payload(txn_data: &TxnMetadata) -> Self {
+        let mut signers = vec![txn_data.sender.into_bytes()];
+        signers.extend(txn_data.secondary_signers.iter().map(|s| s.into_bytes()));
+        Self(signers)
+    }
+
+    pub(crate) fn as_slice(&self) -> &[[u8; AccountAddress::LENGTH]] {
+        &self.0
+    }
 }
 
-/// Like `call_function`, but unmetered: system code never consumes the
-/// transaction's gas budget, including its module loads.
-fn call_system_function(
+/// Like `call_function`, but system code never consumes the transaction's gas
+/// budget, including its module loads.
+fn call_system_function_unmetered(
     guard: &ExecutionGuard<'_>,
     interp: &mut InterpreterContext<'_>,
     address: &AccountAddress,
@@ -54,24 +75,24 @@ fn call_system_function(
     })
 }
 
-/// Calls `0x1::transaction_validation::<function>(signers…, args)`,
-/// unmetered.
-fn call_validation_function(
+/// Calls `0x1::transaction_validation::<function>(signers…, args)`.
+fn call_validation_function_unmetered(
     guard: &ExecutionGuard<'_>,
     interp: &mut InterpreterContext<'_>,
     function: &IdentStr,
-    signers: &[[u8; AccountAddress::LENGTH]; 2],
+    signers: &TxnSigners,
     args: &impl Serialize,
 ) -> Result<RuntimeStatus, VMInternalError> {
-    let args_blob = bcs::to_bytes(args).expect("validation args serialize");
-    call_system_function(
+    let args_blob = bcs::to_bytes(args)
+        .map_err(|e| invariant_violation(anyhow!("validation args do not serialize: {e}")))?;
+    call_system_function_unmetered(
         guard,
         interp,
         &AccountAddress::ONE,
         TRANSACTION_VALIDATION,
         function,
         guard.type_list_of(&[]),
-        signers,
+        signers.as_slice(),
         &[args_blob],
     )
 }
@@ -79,7 +100,7 @@ fn call_validation_function(
 pub(crate) fn run_prologue(
     interp: &mut InterpreterContext<'_>,
     guard: &ExecutionGuard<'_>,
-    signers: &[[u8; AccountAddress::LENGTH]; 2],
+    signers: &TxnSigners,
     txn_data: &TxnMetadata,
 ) -> Result<(), MoveExecutionFailure> {
     let args = PrologueArgs::V1 {
@@ -97,8 +118,9 @@ pub(crate) fn run_prologue(
         // TODO(completeness): transaction limits requests (staking multipliers).
         txn_limits_request: None,
     };
-    let status = call_validation_function(guard, interp, VERSIONED_PROLOGUE, signers, &args)
-        .map_err(MoveExecutionFailure::RuntimeError)?;
+    let status =
+        call_validation_function_unmetered(guard, interp, VERSIONED_PROLOGUE, signers, &args)
+            .map_err(MoveExecutionFailure::RuntimeError)?;
 
     match status {
         RuntimeStatus::Success => Ok(()),
@@ -117,7 +139,7 @@ pub(crate) fn run_prologue(
 pub(crate) fn run_epilogue(
     interp: &mut InterpreterContext<'_>,
     guard: &ExecutionGuard<'_>,
-    signers: &[[u8; AccountAddress::LENGTH]; 2],
+    signers: &TxnSigners,
     txn_data: &TxnMetadata,
     fee_statement: FeeStatement,
     gas_units_remaining: u64,
@@ -130,8 +152,9 @@ pub(crate) fn run_epilogue(
         is_simulation: false,
         is_orderless_txn: txn_data.is_orderless(),
     };
-    let status = call_validation_function(guard, interp, VERSIONED_EPILOGUE, signers, &args)
-        .map_err(MoveExecutionFailure::RuntimeError)?;
+    let status =
+        call_validation_function_unmetered(guard, interp, VERSIONED_EPILOGUE, signers, &args)
+            .map_err(MoveExecutionFailure::RuntimeError)?;
 
     match status {
         RuntimeStatus::Success => Ok(()),
