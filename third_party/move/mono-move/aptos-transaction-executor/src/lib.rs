@@ -20,7 +20,7 @@ mod providers;
 mod sys_calls;
 
 pub use errors::{
-    DiscardReason, EpilogueFailure, ExecutionStatus, MaterializationError, PrologueFailure,
+    DiscardReason, ExecutionStage, ExecutionStatus, MaterializationError, MoveExecutionFailure,
 };
 pub use executor::AptosTransactionExecutor;
 pub use natives::production_natives;

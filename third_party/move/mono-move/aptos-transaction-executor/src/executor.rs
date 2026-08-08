@@ -3,9 +3,7 @@
 
 use crate::{
     calls::{call_function, CallStatus},
-    errors::{
-        is_cant_pay_fee_abort, DiscardReason, EpilogueFailure, ExecutionStatus, PayloadFailure,
-    },
+    errors::{DiscardReason, ExecutionStage, ExecutionStatus, MoveExecutionFailure},
     metadata::TxnMetadata,
     natives::transaction_extensions,
     outcome::TxnOutcome,
@@ -144,7 +142,12 @@ impl<'a> AptosTransactionExecutor<'a> {
 
         // ============================ Prologue ==============================
         // Validate the transaction (auth key, sequence number or nonce, fee coverage etc.)
-        run_prologue(&mut interp, guard, &signers, &txn_data).map_err(DiscardReason::Prologue)?;
+        run_prologue(&mut interp, guard, &signers, &txn_data).map_err(|failure| {
+            DiscardReason::Failure {
+                stage: ExecutionStage::Prologue,
+                failure,
+            }
+        })?;
         // A failed payload rolls back to here, so prologue effects (e.g. nonce insertion) survive.
         checkpoint(&mut interp)?;
 
@@ -155,24 +158,17 @@ impl<'a> AptosTransactionExecutor<'a> {
 
         // TODO(metering): charge gas for global storage writes and events.
 
+        // A failed payload keeps only the prologue's effects; the epilogue below
+        // still charges the fee.
         let payload_succeeded = payload_result.is_ok();
         let execution_status = match payload_result {
             Ok(()) => ExecutionStatus::Success,
-            Err(PayloadFailure::Abort {
-                code,
-                message,
-                location,
-            }) => {
+            Err(failure) => {
                 rollback(&mut interp, 1)?;
-                ExecutionStatus::Abort {
-                    code,
-                    message,
-                    location,
+                ExecutionStatus::Failure {
+                    stage: ExecutionStage::Payload,
+                    failure,
                 }
-            },
-            Err(PayloadFailure::Internal(err)) => {
-                rollback(&mut interp, 1)?;
-                ExecutionStatus::Failure(err)
             },
         };
 
@@ -194,35 +190,27 @@ impl<'a> AptosTransactionExecutor<'a> {
             // Payload failed + epilogue failed => no choice but to discard.
             // This should not happen unless there is a bug in the executor.
             Err(failure) if !payload_succeeded => {
-                return Err(DiscardReason::Epilogue {
-                    run: "after a rolled-back payload",
+                return Err(DiscardReason::Failure {
+                    stage: ExecutionStage::EpilogueAfterRollback,
                     failure,
                 })
             },
-            // Payload succeeded + epilogue failed => rollback payload effects and retry.
+            // Payload succeeded + epilogue failed => rollback payload effects and
+            // retry. The transaction still commits, charging the fee; which
+            // epilogue failures are legitimate is decided when the status is
+            // converted.
+            //
+            // TODO(correctness): audit this against the legacy VM, which may
+            // discard here instead.
             Err(failure) => {
                 rollback(&mut interp, 1)?;
-                epilogue(&mut interp).map_err(|failure| DiscardReason::Epilogue {
-                    run: "on the retry",
+                epilogue(&mut interp).map_err(|failure| DiscardReason::Failure {
+                    stage: ExecutionStage::EpilogueRetry,
                     failure,
                 })?;
-                match failure {
-                    // The fee payer can no longer cover the fee. This is the one
-                    // epilogue abort that survives as the transaction's status.
-                    EpilogueFailure::Abort {
-                        code,
-                        message,
-                        location,
-                    } if is_cant_pay_fee_abort(code) => ExecutionStatus::Abort {
-                        code,
-                        message,
-                        location,
-                    },
-                    // Any other epilogue failure is the framework misbehaving.
-                    // Treat it as an invariant violation (with gas charged) rather than discarding.
-                    failure @ (EpilogueFailure::Abort { .. } | EpilogueFailure::Internal(_)) => {
-                        ExecutionStatus::RecoveredEpilogueFailure(failure)
-                    },
+                ExecutionStatus::Failure {
+                    stage: ExecutionStage::Epilogue,
+                    failure,
                 }
             },
         };
@@ -243,7 +231,7 @@ impl<'a> AptosTransactionExecutor<'a> {
         txn_data: &TxnMetadata,
         entry: &EntryFunction,
         ty_args: InternedTypeList,
-    ) -> Result<(), PayloadFailure> {
+    ) -> Result<(), MoveExecutionFailure> {
         // TODO(security, completeness): entry-function validation -- `entry`
         // visibility, no return values, allowed argument types, and constructed
         // arguments (`String`, `Object<T>`, `Option<..>`) from
@@ -266,7 +254,7 @@ impl<'a> AptosTransactionExecutor<'a> {
             &signer_bufs,
             entry.args(),
         )
-        .map_err(PayloadFailure::Internal)?;
+        .map_err(MoveExecutionFailure::RuntimeError)?;
 
         match status {
             CallStatus::Success => Ok(()),
@@ -274,7 +262,7 @@ impl<'a> AptosTransactionExecutor<'a> {
                 code,
                 message,
                 location,
-            } => Err(PayloadFailure::Abort {
+            } => Err(MoveExecutionFailure::Abort {
                 code,
                 message,
                 location,

@@ -3,7 +3,9 @@
 
 //! Converts the typed outcome taxonomy into `VMStatus`.
 
-use crate::errors::{DiscardReason, ExecutionStatus, PrologueFailure};
+use crate::errors::{
+    is_cant_pay_fee_abort, DiscardReason, ExecutionStage, ExecutionStatus, MoveExecutionFailure,
+};
 use aptos_types::{
     error::{split_canonical, INVALID_ARGUMENT, INVALID_STATE, OUT_OF_RANGE},
     transaction::validation::{
@@ -57,9 +59,12 @@ pub(crate) fn discard_to_vm_status(reason: DiscardReason) -> VMStatus {
         DiscardReason::InvalidTypeArgument(detail) => {
             VMStatus::error(StatusCode::TYPE_RESOLUTION_FAILURE, Some(detail))
         },
-        DiscardReason::Prologue(failure) => prologue_failure_to_status(failure),
-        DiscardReason::Epilogue { run, failure } => {
-            epilogue_failure_status(run, &format!("{failure:?}"))
+        DiscardReason::Failure {
+            stage: ExecutionStage::Prologue,
+            failure,
+        } => prologue_failure_to_status(failure),
+        DiscardReason::Failure { stage, failure } => {
+            stage_failure_status(&stage, &format!("{failure:?}"))
         },
         DiscardReason::InvariantViolation(detail) => invariant_status(detail),
     }
@@ -67,21 +72,29 @@ pub(crate) fn discard_to_vm_status(reason: DiscardReason) -> VMStatus {
 
 /// Converts an executed transaction's conclusion into its `VMStatus`.
 pub(crate) fn executed_vm_status(status: &ExecutionStatus) -> VMStatus {
-    match status {
-        ExecutionStatus::Success => VMStatus::Executed,
-        ExecutionStatus::Abort {
+    let (stage, failure) = match status {
+        ExecutionStatus::Success => return VMStatus::Executed,
+        ExecutionStatus::Failure { stage, failure } => (stage, failure),
+    };
+    match failure {
+        // The fee payer failing to cover the fee is the one epilogue abort that
+        // survives as the transaction's own; any other means the framework
+        // misbehaved, which the legacy VM reports as an unexpected error.
+        MoveExecutionFailure::Abort {
             code,
             message,
             location,
-        } => VMStatus::MoveAbort {
-            location: location.clone(),
-            code: *code,
-            message: message.clone(),
+        } if matches!(stage, ExecutionStage::Payload) || is_cant_pay_fee_abort(*code) => {
+            VMStatus::MoveAbort {
+                location: location.clone(),
+                code: *code,
+                message: message.clone(),
+            }
         },
-        ExecutionStatus::Failure(err) => internal_error_to_status(err),
-        ExecutionStatus::RecoveredEpilogueFailure(failure) => {
-            epilogue_failure_status("after a successful payload", &format!("{failure:?}"))
+        MoveExecutionFailure::RuntimeError(err) if matches!(stage, ExecutionStage::Payload) => {
+            internal_error_to_status(err)
         },
+        failure => stage_failure_status(stage, &format!("{failure:?}")),
     }
 }
 
@@ -108,15 +121,15 @@ fn unsupported_status(msg: &str) -> VMStatus {
 // TODO(completeness): the legacy VM also recognizes aborts from
 // `transaction_limits` and the multisig account module. Neither is reachable
 // here yet, so they land in the unexpected-abort branch below.
-fn prologue_failure_to_status(failure: PrologueFailure) -> VMStatus {
+fn prologue_failure_to_status(failure: MoveExecutionFailure) -> VMStatus {
     let (code, message, location) = match failure {
-        PrologueFailure::Abort {
+        MoveExecutionFailure::Abort {
             code,
             message,
             location,
         } => (code, message, location),
-        PrologueFailure::Unexpected(detail) => {
-            return unexpected_validation_error("prologue", detail)
+        MoveExecutionFailure::RuntimeError(err) => {
+            return unexpected_validation_error("prologue", err.to_string())
         },
     };
     if location != validation_module() {
@@ -179,10 +192,17 @@ fn unexpected_validation_error(msg: &str, detail: String) -> VMStatus {
     )
 }
 
-/// The status of an epilogue failure the fee abort does not cover, whether it
-/// ends up kept or discarded. `run` says which epilogue run failed.
-fn epilogue_failure_status(run: &str, detail: &str) -> VMStatus {
-    unexpected_validation_error(&format!("epilogue {run}"), detail.to_string())
+/// The status of a failure the legacy mapping does not recognize: the framework
+/// misbehaved, which the legacy VM reports as an unexpected error.
+fn stage_failure_status(stage: &ExecutionStage, detail: &str) -> VMStatus {
+    let what = match stage {
+        ExecutionStage::Prologue => "prologue",
+        ExecutionStage::Payload => "payload",
+        ExecutionStage::Epilogue => "epilogue",
+        ExecutionStage::EpilogueAfterRollback => "epilogue after a rolled-back payload",
+        ExecutionStage::EpilogueRetry => "epilogue retry",
+    };
+    unexpected_validation_error(what, detail.to_string())
 }
 
 // TODO(correctness): the mapping is coarse; several kinds should be

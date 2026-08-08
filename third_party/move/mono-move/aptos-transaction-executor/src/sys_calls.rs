@@ -9,7 +9,7 @@
 
 use crate::{
     calls::{call_function, CallStatus},
-    errors::{EpilogueFailure, PrologueFailure},
+    errors::MoveExecutionFailure,
     metadata::TxnMetadata,
 };
 use aptos_types::{
@@ -85,7 +85,7 @@ pub(crate) fn run_prologue(
     guard: &ExecutionGuard<'_>,
     signers: &[[u8; AccountAddress::LENGTH]; 2],
     txn_data: &TxnMetadata,
-) -> Result<(), PrologueFailure> {
+) -> Result<(), MoveExecutionFailure> {
     let args = PrologueArgs::V1 {
         needs_fee_payer_auth_check: txn_data.fee_payer.is_some(),
         txn_sender_public_key: txn_data.sender_auth_key.clone(),
@@ -102,7 +102,7 @@ pub(crate) fn run_prologue(
         txn_limits_request: None,
     };
     let status = call_validation_function(guard, interp, VERSIONED_PROLOGUE, signers, &args)
-        .map_err(|err| PrologueFailure::Unexpected(err.to_string()))?;
+        .map_err(MoveExecutionFailure::RuntimeError)?;
 
     match status {
         CallStatus::Success => Ok(()),
@@ -110,7 +110,7 @@ pub(crate) fn run_prologue(
             code,
             message,
             location,
-        } => Err(PrologueFailure::Abort {
+        } => Err(MoveExecutionFailure::Abort {
             code,
             message,
             location,
@@ -125,7 +125,7 @@ pub(crate) fn run_epilogue(
     txn_data: &TxnMetadata,
     fee_statement: FeeStatement,
     gas_units_remaining: u64,
-) -> Result<(), EpilogueFailure> {
+) -> Result<(), MoveExecutionFailure> {
     let args = EpilogueArgs::V1 {
         fee_statement,
         txn_gas_price: txn_data.gas_unit_price,
@@ -135,7 +135,7 @@ pub(crate) fn run_epilogue(
         is_orderless_txn: txn_data.is_orderless(),
     };
     let status = call_validation_function(guard, interp, VERSIONED_EPILOGUE, signers, &args)
-        .map_err(EpilogueFailure::Internal)?;
+        .map_err(MoveExecutionFailure::RuntimeError)?;
 
     match status {
         CallStatus::Success => Ok(()),
@@ -143,7 +143,7 @@ pub(crate) fn run_epilogue(
             code,
             message,
             location,
-        } => Err(EpilogueFailure::Abort {
+        } => Err(MoveExecutionFailure::Abort {
             code,
             message,
             location,

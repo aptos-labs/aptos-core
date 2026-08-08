@@ -36,78 +36,52 @@ pub enum DiscardReason {
     Unsupported(&'static str),
     /// A type argument failed to resolve.
     InvalidTypeArgument(String),
-    Prologue(PrologueFailure),
-    /// The epilogue misbehaved. One versioned Move epilogue runs from up to
-    /// three places, and `run` says which one failed.
-    Epilogue {
-        run: &'static str,
-        failure: EpilogueFailure,
+    Failure {
+        stage: ExecutionStage,
+        failure: MoveExecutionFailure,
     },
     /// An executor-internal invariant violation.
     InvariantViolation(String),
 }
 
-/// How an executed transaction concluded. Any conclusion other than success
-/// still charges the fee and bumps the sequence number.
+/// Which Move call the transaction was in when it failed.
+#[derive(Clone, Copy, Debug)]
+pub enum ExecutionStage {
+    Prologue,
+    Payload,
+    /// The epilogue after a payload that succeeded.
+    Epilogue,
+    /// The epilogue after a payload that was rolled back.
+    EpilogueAfterRollback,
+    /// The epilogue rerun after the first one failed.
+    EpilogueRetry,
+}
+
+/// How an executed transaction concluded. Every variant commits on-chain and is
+/// charged the fee.
 #[derive(Debug)]
 pub enum ExecutionStatus {
     Success,
-    /// A Move abort, raised either by the payload or by the epilogue's balance
-    /// check; the payload's effects were dropped.
-    Abort {
-        code: u64,
-        message: Option<String>,
-        location: AbortLocation,
+    /// The payload or the epilogue failed; the payload's effects were dropped.
+    Failure {
+        stage: ExecutionStage,
+        failure: MoveExecutionFailure,
     },
-    /// The payload failed with a VM error; its effects were dropped.
-    Failure(VMInternalError),
-    /// The epilogue failed some way it must not after a successful payload, and
-    /// rerunning it against the state the prologue left succeeded. The payload's
-    /// effects were dropped and the fee still charged. The fee abort is
-    /// legitimate and becomes `Abort` instead.
-    RecoveredEpilogueFailure(EpilogueFailure),
 }
 
-/// A prologue failure; always discards the transaction.
+/// How Move execution failed, whether it was the prologue, the payload, the
+/// epilogue, or the transaction as a whole. What a failure means for the
+/// transaction is the driver's call.
 #[derive(Debug)]
-pub enum PrologueFailure {
-    /// The prologue aborted: the transaction failed validation.
+pub enum MoveExecutionFailure {
+    /// Execution reached a Move abort.
     Abort {
         code: u64,
         message: Option<String>,
         location: AbortLocation,
     },
-    /// The prologue must not fail any other way.
-    Unexpected(String),
-}
-
-/// A payload execution failure. An abort always commits (charging the fee);
-/// whether a VM error commits or discards follows the legacy keep/discard
-/// rules.
-#[derive(Debug)]
-pub(crate) enum PayloadFailure {
-    /// The payload executed a Move abort.
-    Abort {
-        code: u64,
-        message: Option<String>,
-        location: AbortLocation,
-    },
-    /// The payload failed with a VM error.
-    Internal(VMInternalError),
-}
-
-/// An epilogue failure. The fee payer failing to cover the fee is the only
-/// legitimate one, which the driver recognizes by the abort code.
-#[derive(Debug)]
-pub enum EpilogueFailure {
-    /// The epilogue executed a Move abort.
-    Abort {
-        code: u64,
-        message: Option<String>,
-        location: AbortLocation,
-    },
-    /// The epilogue failed with a VM error.
-    Internal(VMInternalError),
+    /// Execution failed with a VM error.
+    RuntimeError(VMInternalError),
 }
 
 /// Whether an epilogue abort is the fee payer failing to cover the fee.
