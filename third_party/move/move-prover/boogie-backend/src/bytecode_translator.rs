@@ -1396,8 +1396,8 @@ impl<'env> BoogieTranslator<'env> {
 
         // Build memory args (pre-state: both old and current slots use same variable)
         let fun_mem_args = self.build_spec_memory_args(
-            fun_env.get_spec_used_memory(),
-            fun_env.get_spec_old_memory(),
+            &fun_env.get_spec_used_memory(),
+            &fun_env.get_spec_old_memory(),
             &info.fun.inst,
             &None,
             None,
@@ -2594,6 +2594,55 @@ impl<'env> BoogieTranslator<'env> {
         }
     }
 
+    /// Doubles each `&mut` argument of two-state spec-fun calls into an
+    /// `(old(arg), arg)` pair, matching the dual `(old_p, p)` Boogie
+    /// parameters. Mirrors `wrap_mut_ref_spec_fun_inputs` in the model's
+    /// spec translator (which serves procedure instrumentation); idempotent
+    /// via the arity check.
+    fn double_mut_spec_fun_args(&self, exp: &Exp) -> Exp {
+        use move_model::exp_rewriter::ExpRewriterFunctions;
+        struct Doubler<'a> {
+            env: &'a GlobalEnv,
+        }
+        impl ExpRewriterFunctions for Doubler<'_> {
+            fn rewrite_call(
+                &mut self,
+                id: NodeId,
+                oper: &move_model::ast::Operation,
+                args: &[Exp],
+            ) -> Option<Exp> {
+                use move_model::ast::{ExpData, Operation};
+                let Operation::SpecFunction(mid, fid, _) = oper else {
+                    return None;
+                };
+                let module = self.env.get_module(*mid);
+                let decl = module.get_spec_fun(*fid);
+                let has_mut = decl
+                    .params
+                    .iter()
+                    .any(|Parameter(_, ty, _)| ty.is_mutable_reference());
+                if !decl.uses_old || !has_mut || args.len() != decl.params.len() {
+                    return None;
+                }
+                let mut new_args = Vec::with_capacity(args.len() + decl.params.len());
+                for (Parameter(_, ty, _), arg) in decl.params.iter().zip(args) {
+                    if ty.is_mutable_reference() {
+                        let old_id = self.env.new_node(
+                            self.env.get_node_loc(arg.node_id()),
+                            self.env.get_node_type(arg.node_id()),
+                        );
+                        new_args.push(
+                            ExpData::Call(old_id, Operation::Old, vec![arg.clone()]).into_exp(),
+                        );
+                    }
+                    new_args.push(arg.clone());
+                }
+                Some(ExpData::Call(id, oper.clone(), new_args).into_exp())
+            }
+        }
+        Doubler { env: self.env }.rewrite_exp(exp.clone())
+    }
+
     /// Translate a function's spec conditions of the given kind to a Boogie expression.
     /// Uses the SpecTranslator with old-aware memory context.
     fn translate_fun_spec_conditions(
@@ -2663,6 +2712,13 @@ impl<'env> BoogieTranslator<'env> {
                     is_two_state,
                     &cond.exp,
                 );
+                // Calls to two-state spec funs with `&mut` parameters take a
+                // doubled `(old(arg), arg)` pair per `&mut` slot in Boogie.
+                // Instrumentation doubles them for procedure contexts; here
+                // the raw spec is translated directly, so double them now —
+                // the `$Dereference` fixups below map the pair to the
+                // evaluator's input and post-state slots.
+                let exp = self.double_mut_spec_fun_args(&exp);
                 // Translate with old-aware memory context
                 let temp_writer = CodeWriter::new(self.env.internal_loc());
                 let mut temp_trans = SpecTranslator::new(&temp_writer, self.env, self.options);
@@ -2992,7 +3048,7 @@ impl<'env> BoogieTranslator<'env> {
         let mut old_memory_resources: BTreeSet<QualifiedInstId<StructId>> = BTreeSet::new();
         for info in closure_infos.iter() {
             let fun_env = env.get_function(info.fun.to_qualified_id());
-            for mem in fun_env.get_spec_old_memory() {
+            for mem in fun_env.get_spec_old_memory().iter() {
                 old_memory_resources.insert(mem.clone().instantiate(&info.fun.inst));
             }
         }
@@ -3019,10 +3075,10 @@ impl<'env> BoogieTranslator<'env> {
         let mut union_old_memory = BTreeSet::new();
         for info in closure_infos {
             let fun_env = env.get_function(info.fun.to_qualified_id());
-            for mem in fun_env.get_spec_used_memory() {
+            for mem in fun_env.get_spec_used_memory().iter() {
                 union_used_memory.insert(mem.clone().instantiate(&info.fun.inst));
             }
-            for mem in fun_env.get_spec_old_memory() {
+            for mem in fun_env.get_spec_old_memory().iter() {
                 union_old_memory.insert(mem.clone().instantiate(&info.fun.inst));
             }
         }
@@ -5477,13 +5533,13 @@ impl FunctionTranslator<'_> {
                         };
                     if let Some((inst, mid, fid)) = closure_info {
                         let closure_fun_env = env.get_function(mid.qualified(fid));
-                        for memory in closure_fun_env.get_spec_used_memory() {
+                        for memory in closure_fun_env.get_spec_used_memory().iter() {
                             let memory = memory.clone().instantiate(&inst);
                             for label in range.labels() {
                                 result.insert((label, memory.clone()));
                             }
                         }
-                        for memory in closure_fun_env.get_spec_old_memory() {
+                        for memory in closure_fun_env.get_spec_old_memory().iter() {
                             let memory = memory.clone().instantiate(&inst);
                             for label in range.labels() {
                                 result.insert((label, memory.clone()));
