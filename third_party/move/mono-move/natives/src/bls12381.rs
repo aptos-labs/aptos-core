@@ -4,13 +4,12 @@
 //! Natives for the `bls12381` module.
 
 use crate::{monomorphic_natives, NativeEntry};
-use aptos_crypto::{bls12381, traits::Signature};
-#[cfg(feature = "testing")]
 use aptos_crypto::{
-    bls12381::{PrivateKey, ProofOfPossession, PublicKey},
-    test_utils::KeyPair,
-    SigningKey, Uniform,
+    bls12381::{self, ProofOfPossession, PublicKey},
+    traits::Signature,
 };
+#[cfg(feature = "testing")]
+use aptos_crypto::{bls12381::PrivateKey, test_utils::KeyPair, SigningKey, Uniform};
 use mono_move_core::{
     native::{NativeContext, NativeContextFamily, NativeStatus, Vector},
     VMResult,
@@ -135,6 +134,164 @@ pub fn native_verify_proof_of_possession<C: NativeContext>(ctx: &C) -> VMResult<
     Ok(NativeStatus::Success)
 }
 
+/// Writes the "no aggregate" result -- `(empty vector<u8>, false)` -- shared by
+/// the two aggregate natives when there is nothing to aggregate or an input
+/// fails to deserialize.
+fn aggregate_none<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
+    let empty = ctx.new_byte_vector(&[])?;
+    // SAFETY: return slot 0 is `vector<u8>`, slot 1 is `bool`.
+    unsafe { ctx.set_return(0, empty)? };
+    unsafe { ctx.set_return(1, false)? };
+    Ok(NativeStatus::Success)
+}
+
+/// `0x1::bls12381::aggregate_pubkeys_internal(public_keys: vector<PublicKeyWithPoP>): (vector<u8>, bool)`
+///
+/// TODO(metering): charge gas.
+pub fn native_aggregate_pubkeys<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
+    // A `PublicKeyWithPoP` is a one-field struct wrapping `vector<u8>`, so a
+    // `vector<PublicKeyWithPoP>` has the same representation as
+    // `vector<vector<u8>>`: each element reads back as an inner byte vector.
+    // SAFETY: arg 0 is `vector<PublicKeyWithPoP>`.
+    let pks: Vector<Vector<u8>> = unsafe { ctx.arg(0)? };
+    let num_pks = pks.len();
+
+    // If zero PKs were given as input, there is no aggregate.
+    if num_pks == 0 {
+        return aggregate_none(ctx);
+    }
+
+    // Deserialize every public key, stopping at the first that fails.
+    let mut deserialized = Vec::with_capacity(num_pks as usize);
+    for i in 0..num_pks {
+        let pk = pks.get(i);
+        // SAFETY: byte slice consumed before any allocation.
+        let Ok(pk) = PublicKey::try_from(unsafe { pk.as_bytes() }) else {
+            break;
+        };
+        deserialized.push(pk);
+    }
+
+    // If not all PKs deserialized, or aggregation fails, there is no aggregate.
+    if deserialized.len() as u64 != num_pks {
+        return aggregate_none(ctx);
+    }
+    let Ok(aggpk) = PublicKey::aggregate(deserialized.iter().collect::<Vec<_>>()) else {
+        return aggregate_none(ctx);
+    };
+
+    let bytes = ctx.new_byte_vector(&aggpk.to_bytes())?;
+    // SAFETY: return slot 0 is `vector<u8>`, slot 1 is `bool`.
+    unsafe { ctx.set_return(0, bytes)? };
+    unsafe { ctx.set_return(1, true)? };
+    Ok(NativeStatus::Success)
+}
+
+/// `0x1::bls12381::aggregate_signatures_internal(signatures: vector<Signature>): (vector<u8>, bool)`
+///
+/// TODO(metering): charge gas.
+pub fn native_aggregate_signatures<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
+    // A `Signature` is a one-field struct wrapping `vector<u8>`, read the same
+    // way as a `vector<vector<u8>>`.
+    // SAFETY: arg 0 is `vector<Signature>`.
+    let sigs: Vector<Vector<u8>> = unsafe { ctx.arg(0)? };
+    let num_sigs = sigs.len();
+
+    // If zero signatures were given as input, there is no aggregate.
+    if num_sigs == 0 {
+        return aggregate_none(ctx);
+    }
+
+    // Deserialize every signature, stopping at the first that fails.
+    let mut deserialized = Vec::with_capacity(num_sigs as usize);
+    for i in 0..num_sigs {
+        let sig = sigs.get(i);
+        // SAFETY: byte slice consumed before any allocation.
+        let Ok(sig) = bls12381::Signature::try_from(unsafe { sig.as_bytes() }) else {
+            break;
+        };
+        deserialized.push(sig);
+    }
+
+    // If not all signatures deserialized, or aggregation fails, there is no
+    // aggregate.
+    if deserialized.len() as u64 != num_sigs {
+        return aggregate_none(ctx);
+    }
+    let Ok(aggsig) = bls12381::Signature::aggregate(deserialized) else {
+        return aggregate_none(ctx);
+    };
+
+    let bytes = ctx.new_byte_vector(&aggsig.to_bytes())?;
+    // SAFETY: return slot 0 is `vector<u8>`, slot 1 is `bool`.
+    unsafe { ctx.set_return(0, bytes)? };
+    unsafe { ctx.set_return(1, true)? };
+    Ok(NativeStatus::Success)
+}
+
+/// `0x1::bls12381::verify_aggregate_signature_internal(aggsig: vector<u8>, public_keys: vector<PublicKeyWithPoP>, messages: vector<vector<u8>>): bool`
+///
+/// TODO(metering): charge gas.
+pub fn native_verify_aggregate_signature<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
+    // SAFETY: arg 0 is `vector<u8>`, arg 1 is `vector<PublicKeyWithPoP>`, arg 2
+    // is `vector<vector<u8>>`.
+    let aggsig: Vector<u8> = unsafe { ctx.arg(0)? };
+    let pks: Vector<Vector<u8>> = unsafe { ctx.arg(1)? };
+    let messages: Vector<Vector<u8>> = unsafe { ctx.arg(2)? };
+
+    let num_pks = pks.len();
+
+    // The number of messages must match the number of public keys.
+    if num_pks != messages.len() {
+        // SAFETY: return slot 0 is `bool`.
+        unsafe { ctx.set_return(0, false)? };
+        return Ok(NativeStatus::Success);
+    }
+
+    // Deserialize every public key, stopping at the first that fails.
+    let mut pk_vals = Vec::with_capacity(num_pks as usize);
+    for i in 0..num_pks {
+        let pk = pks.get(i);
+        // SAFETY: byte slice consumed before any allocation.
+        let Ok(pk) = PublicKey::try_from(unsafe { pk.as_bytes() }) else {
+            break;
+        };
+        pk_vals.push(pk);
+    }
+    if pk_vals.len() as u64 != num_pks {
+        // SAFETY: return slot 0 is `bool`.
+        unsafe { ctx.set_return(0, false)? };
+        return Ok(NativeStatus::Success);
+    }
+
+    // SAFETY: byte slice consumed before any allocation.
+    let Ok(aggsig) = bls12381::Signature::try_from(unsafe { aggsig.as_bytes() }) else {
+        // SAFETY: return slot 0 is `bool`.
+        unsafe { ctx.set_return(0, false)? };
+        return Ok(NativeStatus::Success);
+    };
+
+    // Root every message vector, then borrow their bytes together for the
+    // verify call. No VM allocation happens in between, so the slices stay
+    // valid.
+    let msg_vecs = (0..messages.len())
+        .map(|i| messages.get(i))
+        .collect::<Vec<_>>();
+    // SAFETY: byte slices consumed before any allocation.
+    let msg_refs = msg_vecs
+        .iter()
+        .map(|m| unsafe { m.as_bytes() })
+        .collect::<Vec<_>>();
+    let pk_refs = pk_vals.iter().collect::<Vec<_>>();
+
+    let valid = aggsig
+        .verify_aggregate_arbitrary_msg(&msg_refs, &pk_refs)
+        .is_ok();
+    // SAFETY: return slot 0 is `bool`.
+    unsafe { ctx.set_return(0, valid)? };
+    Ok(NativeStatus::Success)
+}
+
 /// Production natives for the `bls12381` module.
 pub fn make_all_bls12381_natives<F: NativeContextFamily>() -> Vec<NativeEntry<F>> {
     monomorphic_natives![
@@ -161,6 +318,18 @@ pub fn make_all_bls12381_natives<F: NativeContextFamily>() -> Vec<NativeEntry<F>
         (
             "0x1::bls12381::verify_proof_of_possession_internal",
             native_verify_proof_of_possession
+        ),
+        (
+            "0x1::bls12381::aggregate_pubkeys_internal",
+            native_aggregate_pubkeys
+        ),
+        (
+            "0x1::bls12381::aggregate_signatures_internal",
+            native_aggregate_signatures
+        ),
+        (
+            "0x1::bls12381::verify_aggregate_signature_internal",
+            native_verify_aggregate_signature
         ),
     ]
 }
