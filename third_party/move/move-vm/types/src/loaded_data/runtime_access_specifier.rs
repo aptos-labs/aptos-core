@@ -44,7 +44,7 @@ use move_core_types::{
 use std::{fmt, fmt::Debug};
 
 /// Represents an access specifier.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub enum AccessSpecifier {
     /// Universal access granted
     Any,
@@ -56,7 +56,7 @@ pub enum AccessSpecifier {
 }
 
 /// Represents an access specifier clause
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub struct AccessSpecifierClause {
     pub kind: AccessKind,
     pub resource: ResourceSpecifier,
@@ -64,7 +64,7 @@ pub struct AccessSpecifierClause {
 }
 
 /// Represents a resource specifier.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub enum ResourceSpecifier {
     Any,
     DeclaredAtAddress(AccountAddress),
@@ -105,7 +105,7 @@ pub trait AccessSpecifierEnv {
 }
 
 /// A struct to represent an access instance (request).
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub struct AccessInstance {
     pub kind: AccessKind,
     pub resource: StructIdentifier,
