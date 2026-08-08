@@ -538,6 +538,25 @@ impl<'guard> InterpreterContext<'guard> {
         }
     }
 
+    /// Place a reference to `target` in the root frame at the given byte offset.
+    ///
+    /// # Safety
+    ///
+    /// `target` must stay valid and pinned until the call finishes. Pointing
+    /// outside the VM heap also keeps it away from the GC.
+    pub unsafe fn set_root_ref_arg(&mut self, offset: u32, target: *const u8) {
+        // SAFETY: the offset is a parameter slot of the root frame, so it is
+        // within the stack and wide enough for a reference.
+        unsafe {
+            write_fat_ptr(
+                self.stack.as_ptr(),
+                FRAME_METADATA_SIZE + offset as usize,
+                target,
+                0,
+            )
+        };
+    }
+
     /// Read a raw heap pointer from the root frame at the given byte offset.
     pub fn root_heap_ptr(&self, offset: u32) -> *const u8 {
         unsafe { read_ptr(self.stack.as_ptr(), FRAME_METADATA_SIZE + offset as usize) }

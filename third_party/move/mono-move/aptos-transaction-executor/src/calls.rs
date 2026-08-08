@@ -16,12 +16,14 @@ use mono_move_runtime::{
     error::{RuntimeError, RuntimeInvariantViolation},
     InterpreterContext, RuntimeStatus,
 };
-use move_core_types::{
-    account_address::AccountAddress, identifier::IdentStr, vm_status::AbortLocation,
-};
+use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 
 /// The parameter types of a loaded module's function, instantiated with
 /// `ty_args`.
+//
+// TODO(perf, cleanup): `Function` does not carry its signature, so this
+// re-derives the parameters from the module IR on every call -- which is also
+// the only reason callers need the `LoadedModule`.
 fn param_types(
     guard: &ExecutionGuard,
     loaded: &LoadedModule,
@@ -42,6 +44,9 @@ fn param_types(
 /// Fills the root frame of `func` from the signer and BCS-argument lists, in
 /// parameter order: `signer`/`&signer` parameters from the signer list,
 /// everything else deserialized from BCS.
+//
+// TODO(correctness): rework this part as a whole together with proper argument
+// validation.
 pub(crate) fn place_args(
     interp: &mut InterpreterContext<'_>,
     func: &Function,
@@ -59,9 +64,22 @@ pub(crate) fn place_args(
     let mut signers = signer_bufs.iter();
     let mut args = args.iter();
     let missing_signer = || anyhow!("not enough signers for the function");
+    // Signers must lead the parameter list, as the legacy VM requires.
+    let mut seen_argument = false;
     for (slot, ty) in func.param_slots.iter().zip(params) {
         let offset = slot.offset.0;
-        match view_type(*ty) {
+        let view = view_type(*ty);
+        let is_signer_param = matches!(view, Type::Signer)
+            || matches!(view, Type::ImmutRef { inner } | Type::MutRef { inner }
+                if matches!(view_type(*inner), Type::Signer));
+        if is_signer_param {
+            if seen_argument {
+                bail!("a signer parameter follows an argument");
+            }
+        } else {
+            seen_argument = true;
+        }
+        match view {
             Type::Signer => {
                 let signer = signers.next().ok_or_else(missing_signer)?;
                 interp.set_root_arg(offset, signer);
@@ -69,14 +87,21 @@ pub(crate) fn place_args(
             Type::ImmutRef { inner } | Type::MutRef { inner }
                 if matches!(view_type(*inner), Type::Signer) =>
             {
-                // A reference is a 16-byte (base, byte_offset) fat pointer at the
-                // signer buffer. The base is outside the VM heap, so the GC
-                // leaves it alone.
                 let signer = signers.next().ok_or_else(missing_signer)?;
-                let mut fat = [0u8; 16];
-                fat[..8].copy_from_slice(&(signer.as_ptr() as u64).to_le_bytes());
-                interp.set_root_arg(offset, &fat);
+                // SAFETY: the signer buffers outlive the call, and sit outside
+                // the VM heap so the GC leaves the reference alone.
+                unsafe { interp.set_root_ref_arg(offset, signer.as_ptr()) };
             },
+            // A reference to anything else cannot be built from a transaction
+            // argument, and a function value would let a payload pass something
+            // like `minter: || Coin`.
+            Type::ImmutRef { .. } | Type::MutRef { .. } => {
+                bail!("a reference to a non-signer is not a valid argument")
+            },
+            Type::Function { .. } => bail!("a function value is not a valid argument"),
+            // Substitution has already run, so a type parameter here means it
+            // failed.
+            Type::TypeParam { .. } => bail!("parameter type is still uninstantiated"),
             Type::Bool
             | Type::U8
             | Type::U16
@@ -91,12 +116,12 @@ pub(crate) fn place_args(
             | Type::I128
             | Type::I256
             | Type::Address
-            | Type::ImmutRef { .. }
-            | Type::MutRef { .. }
             | Type::Vector { .. }
-            | Type::Nominal { .. }
-            | Type::Function { .. }
-            | Type::TypeParam { .. } => {
+            // TODO(security, completeness): only the framework's constructible
+            // structs (`String`, `Object`, `Option`, ...) are valid arguments;
+            // everything else must be rejected. See the pre-coordinator gates in
+            // AGENTS.md.
+            | Type::Nominal { .. } => {
                 let arg = args
                     .next()
                     .ok_or_else(|| anyhow!("not enough arguments for the function"))?;
@@ -117,17 +142,6 @@ pub(crate) fn place_args(
     Ok(())
 }
 
-/// How a function call concluded. VM errors are reported through the `Err`
-/// channel instead.
-pub(crate) enum CallStatus {
-    Success,
-    Abort {
-        code: u64,
-        message: Option<String>,
-        location: AbortLocation,
-    },
-}
-
 /// Loads `module::function<ty_args>`, places arguments, and runs it in the
 /// transaction's interpreter context, metered against the context's gas
 /// budget.
@@ -140,7 +154,7 @@ pub(crate) fn call_function(
     ty_args: InternedTypeList,
     signer_bufs: &[[u8; AccountAddress::LENGTH]],
     args: &[Vec<u8>],
-) -> Result<CallStatus, VMInternalError> {
+) -> Result<RuntimeStatus, VMInternalError> {
     let module_id = guard.module_id_of(address, module_name);
     let function = guard.identifier_of(function_name);
     let func_ptr = interp.load_function(module_id, function, ty_args)?;
@@ -153,20 +167,12 @@ pub(crate) fn call_function(
     let params = param_types(guard, loaded, function, ty_args).map_err(invariant_violation)?;
 
     interp.prepare_call(func);
+    // TODO(correctness): rejecting an argument is a user error, not an invariant
+    // violation. It needs a real status once argument validation moves into the
+    // pre-execution checks.
     place_args(interp, func, &params, signer_bufs, args).map_err(invariant_violation)?;
 
-    Ok(match interp.run()? {
-        RuntimeStatus::Success => CallStatus::Success,
-        RuntimeStatus::Aborted {
-            code,
-            message,
-            location,
-        } => CallStatus::Abort {
-            code,
-            message,
-            location,
-        },
-    })
+    interp.run()
 }
 
 fn invariant_violation(err: anyhow::Error) -> VMInternalError {

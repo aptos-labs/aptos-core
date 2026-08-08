@@ -7,18 +7,14 @@
 //! here too. Only the versioned validation path is supported; the many legacy
 //! prologue/epilogue variants are intentionally not ported.
 
-use crate::{
-    calls::{call_function, CallStatus},
-    errors::MoveExecutionFailure,
-    metadata::TxnMetadata,
-};
+use crate::{calls::call_function, errors::MoveExecutionFailure, metadata::TxnMetadata};
 use aptos_types::{
     fee_statement::FeeStatement,
     transaction::{EpilogueArgs, PrologueArgs},
 };
 use mono_move_core::{types::InternedTypeList, Interner, VMInternalError};
 use mono_move_global_context::ExecutionGuard;
-use mono_move_runtime::InterpreterContext;
+use mono_move_runtime::{InterpreterContext, RuntimeStatus};
 use move_core_types::{account_address::AccountAddress, ident_str, identifier::IdentStr};
 use serde::Serialize;
 
@@ -43,7 +39,7 @@ fn call_system_function(
     ty_args: InternedTypeList,
     signer_bufs: &[[u8; AccountAddress::LENGTH]],
     args: &[Vec<u8>],
-) -> Result<CallStatus, VMInternalError> {
+) -> Result<RuntimeStatus, VMInternalError> {
     interp.unmetered(|interp| {
         call_function(
             guard,
@@ -66,7 +62,7 @@ fn call_validation_function(
     function: &IdentStr,
     signers: &[[u8; AccountAddress::LENGTH]; 2],
     args: &impl Serialize,
-) -> Result<CallStatus, VMInternalError> {
+) -> Result<RuntimeStatus, VMInternalError> {
     let args_blob = bcs::to_bytes(args).expect("validation args serialize");
     call_system_function(
         guard,
@@ -105,8 +101,8 @@ pub(crate) fn run_prologue(
         .map_err(MoveExecutionFailure::RuntimeError)?;
 
     match status {
-        CallStatus::Success => Ok(()),
-        CallStatus::Abort {
+        RuntimeStatus::Success => Ok(()),
+        RuntimeStatus::Aborted {
             code,
             message,
             location,
@@ -138,8 +134,8 @@ pub(crate) fn run_epilogue(
         .map_err(MoveExecutionFailure::RuntimeError)?;
 
     match status {
-        CallStatus::Success => Ok(()),
-        CallStatus::Abort {
+        RuntimeStatus::Success => Ok(()),
+        RuntimeStatus::Aborted {
             code,
             message,
             location,

@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    calls::{call_function, CallStatus},
+    calls::call_function,
     errors::{DiscardReason, ExecutionStage, ExecutionStatus, MoveExecutionFailure},
     metadata::TxnMetadata,
     natives::transaction_extensions,
@@ -21,7 +21,7 @@ use mono_move_core::{
 };
 use mono_move_global_context::ExecutionGuard;
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
-use mono_move_runtime::{InterpreterContext, ProductionNativeRegistry};
+use mono_move_runtime::{InterpreterContext, ProductionNativeRegistry, RuntimeStatus};
 
 /// The Aptos transaction executor on MonoMove (the legacy AptosVM's role).
 ///
@@ -257,8 +257,8 @@ impl<'a> AptosTransactionExecutor<'a> {
         .map_err(MoveExecutionFailure::RuntimeError)?;
 
         match status {
-            CallStatus::Success => Ok(()),
-            CallStatus::Abort {
+            RuntimeStatus::Success => Ok(()),
+            RuntimeStatus::Aborted {
                 code,
                 message,
                 location,
