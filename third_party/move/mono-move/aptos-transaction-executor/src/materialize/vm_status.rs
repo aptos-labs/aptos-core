@@ -26,6 +26,15 @@ use move_core_types::{
     language_storage::ModuleId,
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
+use std::sync::LazyLock;
+
+/// Where the transaction prologue and epilogue live.
+static ABORT_LOC_VALIDATION_MODULE: LazyLock<AbortLocation> = LazyLock::new(|| {
+    AbortLocation::Module(ModuleId::new(
+        AccountAddress::ONE,
+        ident_str!("transaction_validation").to_owned(),
+    ))
+});
 
 /// Converts a type-erased VM error into `VMStatus`: fine-grained for the
 /// error types with known legacy mappings, by public category otherwise.
@@ -132,7 +141,7 @@ fn prologue_failure_to_status(failure: MoveExecutionFailure) -> VMStatus {
             return unexpected_validation_error("prologue", err.to_string())
         },
     };
-    if location != validation_module() {
+    if location != *ABORT_LOC_VALIDATION_MODULE {
         return unexpected_prologue_abort(code, message, location);
     }
     let new_major_status = match split_canonical(code) {
@@ -160,13 +169,6 @@ fn prologue_failure_to_status(failure: MoveExecutionFailure) -> VMStatus {
         _ => return unexpected_prologue_abort(code, message, location),
     };
     VMStatus::error(new_major_status, None)
-}
-
-fn validation_module() -> AbortLocation {
-    AbortLocation::Module(ModuleId::new(
-        AccountAddress::ONE,
-        ident_str!("transaction_validation").to_owned(),
-    ))
 }
 
 fn unexpected_prologue_abort(

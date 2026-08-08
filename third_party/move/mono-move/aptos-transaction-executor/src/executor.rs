@@ -69,6 +69,8 @@ impl<'a> AptosTransactionExecutor<'a> {
     }
 
     /// Executes one user transaction, returning its side effects unmaterialized (see [`TxnOutcome`]).
+    //
+    // TODO(completeness): add logging. Should warn on unexpected errors/discards.
     pub fn execute_user_transaction(&self, txn: &SignedTransaction) -> TxnOutcome {
         match self.execute_user_transaction_impl(txn) {
             Ok(outcome) => outcome,

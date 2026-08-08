@@ -8,6 +8,11 @@
 //! Gas amounts intentionally differ between the two VMs, so writes that embed
 //! the fee (the fee payer's fungible store, the APT supply) and fee events are
 //! allowed to differ in *content*; everything else must match byte-for-byte.
+//
+// TODO(testing): revisit once the executor is more mature/wired up. See if we
+// want to switch to other payloads that are less gas-dependent, or get this
+// covered by other tests, such as the e2e move tests. Note that the sender's
+// store is masked, so a wrong debit there is not caught.
 
 use aptos_language_e2e_tests::executor::FakeExecutor;
 use aptos_types::{
