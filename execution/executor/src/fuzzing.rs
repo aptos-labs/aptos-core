@@ -19,7 +19,8 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        AuxiliaryInfo, BlockError, BlockOutput, Transaction, TransactionOutput, Version,
+        AuxiliaryInfo, BlockError, BlockOutput, CacheInvalidationInfo, Transaction,
+        TransactionOutput, Version,
     },
     vm_status::VMStatus,
 };
@@ -83,6 +84,10 @@ impl VMBlockExecutor for FakeVM {
         _transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, BlockError> {
         Ok(BlockOutput::new(vec![], None))
+    }
+
+    fn invalidate(&self, _info: &CacheInvalidationInfo) {
+        // No caches to invalidate.
     }
 }
 

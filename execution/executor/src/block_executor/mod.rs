@@ -155,6 +155,17 @@ where
             .commit_ledger(ledger_info_with_sigs)
     }
 
+    fn block_wait_for_commit(&self, block_id: HashValue) -> bool {
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "block_wait_for_commit"]);
+
+        self.maybe_initialize().expect("Failed to initialize.");
+        self.inner
+            .read()
+            .as_ref()
+            .expect("BlockExecutor is not reset")
+            .block_wait_for_commit(block_id)
+    }
+
     fn finish(&self) {
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "finish"]);
 
@@ -431,7 +442,7 @@ where
         }
 
         // Confirm the block to be committed is tracked in the tree.
-        self.block_tree.get_block(block_id)?;
+        let block = self.block_tree.get_block(block_id)?;
 
         fail_point!("executor::commit_blocks", |_| {
             Err(anyhow::anyhow!("Injected error in commit_blocks.").into())
@@ -444,7 +455,29 @@ where
 
         self.block_tree.prune(ledger_info_with_sigs.ledger_info())?;
 
+        // Invalidate executor-held caches only after the ledger is committed. A
+        // block that carries cache-invalidation info published code; its
+        // descendants are forced to wait for this commit (the consensus
+        // execute-stage barrier), so it always commits as the tip and can never
+        // be a batch-commit intermediate.
+        if let Some(info) = block
+            .output
+            .execution_output
+            .cache_invalidation_info
+            .as_ref()
+        {
+            self.block_executor.invalidate(info);
+        }
+
         Ok(())
+    }
+
+    fn block_wait_for_commit(&self, block_id: HashValue) -> bool {
+        // A block not tracked in the tree (genesis / already pruned) never
+        // needs to be waited on.
+        self.block_tree
+            .get_block(block_id)
+            .is_ok_and(|block| block.output.execution_output.needs_invalidation())
     }
 
     fn state_view(&self, block_id: HashValue) -> ExecutorResult<CachedStateView> {

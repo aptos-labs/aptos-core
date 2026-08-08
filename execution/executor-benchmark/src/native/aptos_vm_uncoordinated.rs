@@ -13,7 +13,8 @@ use aptos_types::{
     state_store::StateView,
     transaction::{
         block_epilogue::BlockEndInfo, signature_verified_transaction::SignatureVerifiedTransaction,
-        AuxiliaryInfo, BlockError, BlockOutput, Transaction, TransactionOutput,
+        AuxiliaryInfo, BlockError, BlockOutput, CacheInvalidationInfo, Transaction,
+        TransactionOutput,
     },
 };
 use aptos_vm::{AptosVM, VMBlockExecutor};
@@ -78,5 +79,9 @@ impl VMBlockExecutor for AptosVMParallelUncoordinatedBlockExecutor {
             transaction_outputs,
             Some(block_epilogue_txn.into()),
         ))
+    }
+
+    fn invalidate(&self, _info: &CacheInvalidationInfo) {
+        // No caches to invalidate.
     }
 }

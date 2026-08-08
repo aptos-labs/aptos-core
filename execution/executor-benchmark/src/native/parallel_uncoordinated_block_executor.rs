@@ -28,8 +28,8 @@ use aptos_types::{
     state_store::{state_key::StateKey, StateView},
     transaction::{
         block_epilogue::BlockEndInfo, signature_verified_transaction::SignatureVerifiedTransaction,
-        AuxiliaryInfo, BlockError, BlockOutput, ExecutionStatus, Transaction,
-        TransactionAuxiliaryData, TransactionOutput, TransactionStatus,
+        AuxiliaryInfo, BlockError, BlockOutput, CacheInvalidationInfo, ExecutionStatus,
+        Transaction, TransactionAuxiliaryData, TransactionOutput, TransactionStatus,
     },
     write_set::{WriteOp, WriteSetMut},
 };
@@ -114,6 +114,10 @@ impl<E: RawTransactionExecutor + Sync + Send> VMBlockExecutor
             transaction_outputs,
             Some(block_epilogue_txn.into()),
         ))
+    }
+
+    fn invalidate(&self, _info: &CacheInvalidationInfo) {
+        // No caches to invalidate.
     }
 }
 

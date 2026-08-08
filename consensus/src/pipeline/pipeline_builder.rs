@@ -591,6 +591,7 @@ impl PipelineBuilder {
             Self::execute(
                 prepare_fut.clone(),
                 parent.execute_fut.clone(),
+                parent.commit_ledger_fut.clone(),
                 rand_check_fut.clone(),
                 self.executor.clone(),
                 block.clone(),
@@ -931,6 +932,7 @@ impl PipelineBuilder {
     async fn execute(
         prepare_fut: TaskFuture<PrepareResult>,
         parent_block_execute_fut: TaskFuture<ExecuteResult>,
+        parent_block_commit_fut: TaskFuture<CommitLedgerResult>,
         rand_check: TaskFuture<RandResult>,
         executor: Arc<dyn BlockExecutorTrait>,
         block: Arc<Block>,
@@ -940,6 +942,13 @@ impl PipelineBuilder {
     ) -> TaskResult<ExecuteResult> {
         let mut tracker = Tracker::start_waiting("execute", &block);
         parent_block_execute_fut.await?;
+
+        if executor.block_wait_for_commit(block.parent_id()) {
+            // A module-publishing parent is a barrier: do not speculatively
+            // execute on top of it until it commits. A branch discard aborts
+            // this future instead.
+            parent_block_commit_fut.await?;
+        }
         let (user_txns, block_gas_limit, decryption_outcome) = prepare_fut.await?;
         let onchain_execution_config =
             onchain_execution_config.with_block_gas_limit_override(block_gas_limit);
