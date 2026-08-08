@@ -7,6 +7,7 @@ mod mock_vm_test;
 use anyhow::Result;
 use aptos_block_executor::txn_provider::{default::DefaultTxnProvider, TxnProvider};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
+use aptos_infallible::Mutex;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG,
@@ -22,8 +23,8 @@ use aptos_types::{
     state_store::{state_key::StateKey, StateView},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockEndInfo,
-        BlockError, BlockOutput, ChangeSet, ExecutionStatus, RawTransaction, Script,
-        SignedTransaction, Transaction, TransactionArgument, TransactionAuxiliaryData,
+        BlockError, BlockOutput, CacheInvalidationInfo, ChangeSet, ExecutionStatus, RawTransaction,
+        Script, SignedTransaction, Transaction, TransactionArgument, TransactionAuxiliaryData,
         TransactionExecutableRef, TransactionOutput, TransactionStatus, WriteSetPayload,
     },
     vm_status::{StatusCode, VMStatus},
@@ -33,7 +34,10 @@ use aptos_vm::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     VMBlockExecutor,
 };
-use move_core_types::language_storage::TypeTag;
+use move_core_types::{
+    ident_str,
+    language_storage::{ModuleId, TypeTag},
+};
 use once_cell::sync::Lazy;
 use std::{collections::HashMap, sync::Arc};
 
@@ -48,7 +52,20 @@ enum MockVMTransaction {
         recipient: AccountAddress,
         amount: u64,
     },
+    // A module-publishing transaction (marked by non-empty script code). Produces
+    // a write so the block has something to commit, and flags the block as
+    // requiring cache invalidation.
+    Publish {
+        sender: AccountAddress,
+    },
 }
+
+/// Records the cache-invalidation infos passed to [MockVM::invalidate], so tests
+/// can assert invalidation happens (and only at commit, not pre-commit). Global
+/// because the VM is constructed internally via [VMBlockExecutor::new]; tests run
+/// under nextest process isolation, and should `lock().clear()` at start.
+pub static INVALIDATE_CALLS: Lazy<Mutex<Vec<CacheInvalidationInfo>>> =
+    Lazy::new(|| Mutex::new(vec![]));
 
 pub static KEEP_STATUS: Lazy<TransactionStatus> =
     Lazy::new(|| TransactionStatus::Keep(ExecutionStatus::Success));
@@ -78,6 +95,7 @@ impl VMBlockExecutor for MockVM {
         let mut outputs = vec![];
 
         let mut skip_rest = false;
+        let mut published = vec![];
         for idx in 0..txn_provider.num_txns() {
             if skip_rest {
                 outputs.push(TransactionOutput::new(
@@ -194,6 +212,21 @@ impl VMBlockExecutor for MockVM {
                         TransactionAuxiliaryData::default(),
                     ));
                 },
+                MockVMTransaction::Publish { sender } => {
+                    // Bump the sender's seqnum so the block has a write to commit,
+                    // and mark the block as publishing modules.
+                    let balance = read_balance(&output_cache, state_view, sender);
+                    let new_seqnum = read_seqnum(&output_cache, state_view, sender) + 1;
+                    output_cache.insert(seqnum_ap(sender), new_seqnum);
+                    outputs.push(TransactionOutput::new(
+                        gen_mint_writeset(sender, balance, new_seqnum),
+                        vec![],
+                        0,
+                        KEEP_STATUS.clone(),
+                        TransactionAuxiliaryData::default(),
+                    ));
+                    published.push(ModuleId::new(sender, ident_str!("mock").to_owned()));
+                },
             }
         }
 
@@ -211,7 +244,12 @@ impl VMBlockExecutor for MockVM {
         Ok(BlockOutput::new(
             outputs,
             block_epilogue_txn.map(Into::into),
+            (!published.is_empty()).then_some(CacheInvalidationInfo::Legacy { published }),
         ))
+    }
+
+    fn invalidate(&self, info: &CacheInvalidationInfo) {
+        INVALIDATE_CALLS.lock().push(info.clone());
     }
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(
@@ -373,6 +411,12 @@ pub fn encode_mint_transaction(sender: AccountAddress, amount: u64) -> Transacti
     encode_transaction(sender, encode_mint_program(amount))
 }
 
+pub fn encode_publish_transaction(sender: AccountAddress) -> Transaction {
+    // Non-empty code marks this as a module-publishing transaction for MockVM.
+    let program = Script::new(vec![1, 2, 3], vec![], vec![]);
+    encode_transaction(sender, program)
+}
+
 pub fn encode_transfer_transaction(
     sender: AccountAddress,
     recipient: AccountAddress,
@@ -403,7 +447,10 @@ pub fn encode_reconfiguration_transaction() -> Transaction {
 fn decode_transaction(txn: &SignedTransaction) -> MockVMTransaction {
     let sender = txn.sender();
     let script_to_mock_vm_txn = |script: &Script| {
-        assert!(script.code().is_empty(), "Code should be empty.");
+        // Non-empty code marks a module-publishing transaction.
+        if !script.code().is_empty() {
+            return MockVMTransaction::Publish { sender };
+        }
         match script.args().len() {
             1 => match script.args()[0] {
                 TransactionArgument::U64(amount) => MockVMTransaction::Mint { sender, amount },

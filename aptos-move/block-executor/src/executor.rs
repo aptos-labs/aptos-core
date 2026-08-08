@@ -1585,7 +1585,7 @@ where
 
         let num_txns = signature_verified_block.num_txns();
         if num_txns == 0 {
-            return Ok(BlockOutput::new(vec![], None));
+            return Ok(BlockOutput::new(vec![], None, None));
         }
 
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2) as u32;
@@ -1727,6 +1727,7 @@ where
         Ok(BlockOutput::new(
             final_results.into_inner(),
             maybe_block_epilogue_txn,
+            None,
         ))
     }
 
@@ -1786,7 +1787,7 @@ where
 
         let num_txns = signature_verified_block.num_txns();
         if num_txns == 0 {
-            return Ok(BlockOutput::new(vec![], None));
+            return Ok(BlockOutput::new(vec![], None, None));
         }
 
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2);
@@ -1911,6 +1912,7 @@ where
         Ok(BlockOutput::new(
             final_results.into_inner(),
             maybe_block_epilogue_txn,
+            None,
         ))
     }
 
@@ -2100,7 +2102,7 @@ where
         let num_txns = signature_verified_block.num_txns();
 
         if num_txns == 0 {
-            return Ok(BlockOutput::new(vec![], None));
+            return Ok(BlockOutput::new(vec![], None, None));
         }
 
         let init_timer = VM_INIT_SECONDS.start_timer();
@@ -2342,7 +2344,7 @@ where
             .module_cache_mut()
             .insert_verified(unsync_map.into_modules_iter())?;
 
-        Ok(BlockOutput::new(ret, block_epilogue_txn))
+        Ok(BlockOutput::new(ret, block_epilogue_txn, None))
     }
 
     pub fn execute_block(
@@ -2455,7 +2457,7 @@ where
                     CommittedOutput::<E>::discard(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                 })
                 .collect();
-            return Ok(BlockOutput::new(ret, None));
+            return Ok(BlockOutput::new(ret, None, None));
         }
 
         Err(sequential_error)
