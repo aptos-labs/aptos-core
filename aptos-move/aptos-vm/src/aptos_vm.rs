@@ -78,11 +78,11 @@ use aptos_types::{
         },
         block_epilogue::{BlockEpiloguePayload, FeeDistribution},
         signature_verified_transaction::SignatureVerifiedTransaction,
-        AuxiliaryInfo, BlockExecutionResult, EntryFunction, ExecutionError, ExecutionStatus,
-        ModuleBundle, MultisigTransactionPayload, ReplayProtector, Script, SignedTransaction,
-        Transaction, TransactionArgument, TransactionExecutableRef, TransactionExtraConfig,
-        TransactionOutput, TransactionPayload, TransactionStatus, TxnLimitsRequest,
-        VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
+        AuxiliaryInfo, BlockExecutionResult, CacheInvalidationInfo, EntryFunction, ExecutionError,
+        ExecutionStatus, ModuleBundle, MultisigTransactionPayload, ReplayProtector, Script,
+        SignedTransaction, Transaction, TransactionArgument, TransactionExecutableRef,
+        TransactionExtraConfig, TransactionOutput, TransactionPayload, TransactionStatus,
+        TxnLimitsRequest, VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
     },
     vm::module_metadata::{get_metadata, get_randomness_annotation_for_entry_function},
     vm_status::{AbortLocation, StatusCode, VMStatus},
@@ -3341,6 +3341,14 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
             onchain: onchain_config,
         };
         self.execute_block_with_config(txn_provider, state_view, config, transaction_slice_metadata)
+    }
+
+    fn invalidate(&self, info: &CacheInvalidationInfo) {
+        // TODO: Wire this to `self.module_cache_manager` once the code-publish flow
+        // populates real invalidation payloads. Nothing sets non-None info yet.
+        match info {
+            CacheInvalidationInfo::Dummy => {},
+        }
     }
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>>(

@@ -441,7 +441,8 @@ impl<
         );
         match ret {
             Ok(block_output) => {
-                let (transaction_outputs, block_epilogue_txn) = block_output.into_inner();
+                let (transaction_outputs, block_epilogue_txn, cache_invalidation_info) =
+                    block_output.into_inner();
 
                 // Flush the speculative logs of the committed transactions.
                 let pos = transaction_outputs.partition_point(|o| !o.status().is_retry());
@@ -452,7 +453,11 @@ impl<
                     flush_speculative_logs(pos);
                 }
 
-                Ok(BlockOutput::new(transaction_outputs, block_epilogue_txn))
+                Ok(BlockOutput::new_with_cache_invalidation_info(
+                    transaction_outputs,
+                    block_epilogue_txn,
+                    cache_invalidation_info,
+                ))
             },
             Err(err) => Err(err),
         }
