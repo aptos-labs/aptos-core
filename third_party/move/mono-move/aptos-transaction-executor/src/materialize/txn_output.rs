@@ -125,7 +125,7 @@ fn drain_write_set(
     };
     // Note on determinism: the read-write set iterates in an unspecified order,
     // so nothing here may depend on it.
-    for (key, class) in effects.read_write_set.writes() {
+    for (key, class) in effects.read_write_set.writes_unordered() {
         if let Err(e) = convert(key, class) {
             failures.push(e);
         }

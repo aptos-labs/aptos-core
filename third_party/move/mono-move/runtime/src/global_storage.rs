@@ -407,9 +407,9 @@ impl ResourceReadWriteSet {
         self.journal.len()
     }
 
-    /// Yields each entry that is a write, with its [`WriteClass`]. Order is
-    /// unspecified (backing hash map); callers must sort before emitting.
-    pub fn writes(&self) -> impl Iterator<Item = (&InMemoryStorageKey, WriteClass)> {
+    /// Yields each entry that is a write, with its [`WriteClass`]. Callers must
+    /// sort before emitting.
+    pub fn writes_unordered(&self) -> impl Iterator<Item = (&InMemoryStorageKey, WriteClass)> {
         self.entries
             .iter()
             .filter_map(|(key, entry)| entry.write_class().map(|class| (key, class)))

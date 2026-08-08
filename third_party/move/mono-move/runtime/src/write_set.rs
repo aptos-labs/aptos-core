@@ -37,7 +37,7 @@ pub(crate) fn build_write_set<L: LayoutProvider + ?Sized>(
     layouts: &L,
 ) -> VMResult<WriteSet> {
     let mut writes = Vec::new();
-    for (key, class) in rws.writes() {
+    for (key, class) in rws.writes_unordered() {
         let state_key = state_key_of(key)?;
         // TODO(correctness): these are metadata-less legacy write ops; we need to set the
         // `StateValueMetadata` (slot deposit / refund) carried over from the pre-state.
