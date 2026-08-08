@@ -218,6 +218,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     pub fn translate(&mut self, loc: Loc, module_def: EA::ModuleDefinition) {
         self.decl_ana(&module_def);
         self.def_ana(&module_def);
+        self.synthesize_validity_slots();
         self.collect_spec_block_infos(&module_def);
         let attrs = self.translate_attributes(&module_def.attributes);
         self.populate_and_finalize_env(loc, attrs);
@@ -4062,6 +4063,103 @@ impl ModuleBuilder<'_, '_> {
             .clear();
     }
 
+    /// Backend-synthesized iterator-validity slots. Binding a validity
+    /// predicate role (`map_spec_iter_valid`, `map_spec_leaf_iter_valid`, or
+    /// `map_spec_iter_preserved`) gives the intrinsic map — and, for the
+    /// per-iterator predicates, the predicate's iterator enum — a hidden
+    /// ghost field named `$validity`. The name is not spellable in Move
+    /// source, so no user spec can read, write, initialize, or constrain the
+    /// slot; the ghost machinery (carrier representation, fresh-at-pack,
+    /// havoc on structural mutation, equality exclusion) carries it, and the
+    /// role templates define the predicates over it.
+    fn synthesize_validity_slots(&mut self) {
+        use crate::pragmas::{
+            INTRINSIC_FUN_MAP_SPEC_ITER_PRESERVED, INTRINSIC_FUN_MAP_SPEC_ITER_VALID,
+            INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID,
+        };
+        let hidden = self.symbol_pool().make("$validity");
+        let mut to_stamp: Vec<QualifiedSymbol> = vec![];
+        let mut bad_roles: Vec<&'static str> = vec![];
+        for decl in &self.parent.intrinsics {
+            if decl.get_move_type().module_id != self.module_id {
+                continue;
+            }
+            let mut any = false;
+            for role in [
+                INTRINSIC_FUN_MAP_SPEC_ITER_VALID,
+                INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID,
+            ] {
+                let Some(sf_qid) = decl.lookup_spec_fun(self.parent.env, role) else {
+                    continue;
+                };
+                any = true;
+                // The iterator enum is the predicate's first parameter; it
+                // must live in this module so its slot can be synthesized
+                // here. Full signature validation happens at mono analysis.
+                let iter_qsym = if sf_qid.module_id == self.module_id {
+                    match self.spec_funs[sf_qid.id.as_usize()].params.first() {
+                        Some(Parameter(_, Type::Struct(mid, sid, _), _))
+                            if *mid == self.module_id =>
+                        {
+                            Some(QualifiedSymbol {
+                                module_name: self.module_name.clone(),
+                                symbol: sid.symbol(),
+                            })
+                        },
+                        _ => None,
+                    }
+                } else {
+                    None
+                };
+                match iter_qsym {
+                    Some(qsym) => to_stamp.push(qsym),
+                    None => bad_roles.push(role),
+                }
+            }
+            if decl
+                .lookup_spec_fun(self.parent.env, INTRINSIC_FUN_MAP_SPEC_ITER_PRESERVED)
+                .is_some()
+            {
+                any = true;
+            }
+            if any {
+                to_stamp.push(QualifiedSymbol {
+                    module_name: self.module_name.clone(),
+                    symbol: decl.get_move_type().id.symbol(),
+                });
+            }
+        }
+        for role in bad_roles {
+            let loc = self.parent.env.unknown_loc();
+            self.parent.env.error(
+                &loc,
+                &format!(
+                    "the first parameter of a `{}` binding must be an iterator \
+                     type declared in the same module as the map",
+                    role
+                ),
+            );
+        }
+        for qsym in to_stamp {
+            let Some(entry) = self.parent.struct_table.get_mut(&qsym) else {
+                continue;
+            };
+            if entry.ghost_fields.contains_key(&hidden) {
+                continue;
+            }
+            let offset = entry.ghost_fields.len();
+            entry.ghost_fields.insert(hidden, FieldData {
+                name: hidden,
+                loc: entry.loc.clone(),
+                offset,
+                variant: None,
+                ty: Type::Primitive(PrimitiveType::Num),
+                is_ghost: true,
+                init: None,
+            });
+        }
+    }
+
     /// Post-definition-analysis check of all ghost field types in this
     /// module for recursion through runtime fields. Rejecting ghosts whose
     /// type reaches back to the enclosing struct keeps the generated Boogie
@@ -4310,6 +4408,9 @@ impl ModuleBuilder<'_, '_> {
                 );
                 return;
             }
+            // Read-only-ness of intrinsic-map ghosts is checked in spec
+            // instrumentation, where the intrinsics annotation is complete
+            // even for same-module declarations.
             // Bitwise operators on the RHS produce bitvector-typed Boogie
             // expressions, but ghost fields are declared as unbounded integer
             // in Boogie (they are model-only and don't participate in
@@ -5324,18 +5425,22 @@ impl ModuleBuilder<'_, '_> {
             // New struct in this module
             let spec = self.struct_specs.remove(&name.symbol).unwrap_or_default();
             // Intrinsic types have no generated Boogie datatype to carry
-            // ghost constructor arguments; reject ghosts on them. This is
-            // the earliest point where the intrinsic pragma is reliably
-            // known (spec blocks are fully analyzed).
-            if !entry.ghost_fields.is_empty()
-                && spec
-                    .properties
-                    .contains_key(&self.parent.env.symbol_pool().make(INTRINSIC_PRAGMA))
-            {
-                for f in entry.ghost_fields.values() {
-                    self.parent
-                        .env
-                        .error(&f.loc, "ghost fields are not supported on intrinsic types");
+            // ghost constructor arguments; reject ghosts on them — except
+            // intrinsic MAP types, which gain a carrier datatype. This is the
+            // earliest point where the intrinsic pragma is reliably known.
+            if !entry.ghost_fields.is_empty() {
+                let pool = self.parent.env.symbol_pool();
+                if spec.properties.contains_key(&pool.make(INTRINSIC_PRAGMA)) {
+                    for f in entry.ghost_fields.values() {
+                        // Backend-synthesized validity slots carry unspellable
+                        // `$`-names and exist precisely for intrinsic maps.
+                        if pool.string(f.name).starts_with('$') {
+                            continue;
+                        }
+                        self.parent
+                            .env
+                            .error(&f.loc, "ghost fields are not supported on intrinsic types");
+                    }
                 }
             }
             let mut field_data: BTreeMap<FieldId, FieldData> = BTreeMap::new();

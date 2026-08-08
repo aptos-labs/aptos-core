@@ -6,7 +6,9 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    boogie_helpers::{boogie_module_name, boogie_num_type_base, boogie_type, boogie_type_suffix},
+    boogie_helpers::{
+        boogie_field_sel, boogie_module_name, boogie_num_type_base, boogie_type, boogie_type_suffix,
+    },
     bytecode_translator::has_native_equality,
     options::{BoogieOptions, VectorTheory},
 };
@@ -17,7 +19,7 @@ use move_model::{
     ast::Address,
     code_writer::CodeWriter,
     emit, emitln,
-    model::{GlobalEnv, QualifiedId, StructId},
+    model::{GlobalEnv, Parameter, QualifiedId, StructId},
     pragmas::{
         INTRINSIC_FUN_MAP_ADD_ALL, INTRINSIC_FUN_MAP_ADD_NO_OVERRIDE,
         INTRINSIC_FUN_MAP_ADD_OVERRIDE_IF_EXISTS, INTRINSIC_FUN_MAP_APPEND,
@@ -35,10 +37,11 @@ use move_model::{
         INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW, INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL,
         INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY, INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_BORROW_MUT,
         INTRINSIC_FUN_MAP_SPEC_DEL, INTRINSIC_FUN_MAP_SPEC_GET, INTRINSIC_FUN_MAP_SPEC_HAS_KEY,
-        INTRINSIC_FUN_MAP_SPEC_IS_EMPTY, INTRINSIC_FUN_MAP_SPEC_LEN, INTRINSIC_FUN_MAP_SPEC_NEW,
-        INTRINSIC_FUN_MAP_SPEC_SET, INTRINSIC_FUN_MAP_TO_ORDERED_MAP,
-        INTRINSIC_FUN_MAP_TO_VEC_PAIR, INTRINSIC_FUN_MAP_TRIM, INTRINSIC_FUN_MAP_UPSERT,
-        INTRINSIC_FUN_MAP_UPSERT_ALL, INTRINSIC_FUN_MAP_VALUES,
+        INTRINSIC_FUN_MAP_SPEC_IS_EMPTY, INTRINSIC_FUN_MAP_SPEC_ITER_PRESERVED,
+        INTRINSIC_FUN_MAP_SPEC_ITER_VALID, INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID,
+        INTRINSIC_FUN_MAP_SPEC_LEN, INTRINSIC_FUN_MAP_SPEC_NEW, INTRINSIC_FUN_MAP_SPEC_SET,
+        INTRINSIC_FUN_MAP_TO_ORDERED_MAP, INTRINSIC_FUN_MAP_TO_VEC_PAIR, INTRINSIC_FUN_MAP_TRIM,
+        INTRINSIC_FUN_MAP_UPSERT, INTRINSIC_FUN_MAP_UPSERT_ALL, INTRINSIC_FUN_MAP_VALUES,
     },
     ty::{PrimitiveType, Type},
 };
@@ -107,6 +110,12 @@ struct BvInfo {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
+struct GhostArg {
+    sel: String,
+    ty: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
 struct MapImpl {
     struct_name: String,
     insts: Vec<(TypeInfo, TypeInfo)>,
@@ -133,6 +142,31 @@ struct MapImpl {
     iter_ptr_prefix: String,
     iter_variant: String,
     iter_key_sel: String,
+    // Iterator-validity predicates: equality of the hidden `$$validity` slot
+    // between an iterator and its map (or two map states for `preserved`).
+    // The iterator enum's Boogie name is `prefix`, plus the key suffix when
+    // the enum is keyed (`generic`).
+    fun_spec_iter_valid: String,
+    iter_valid_prefix: String,
+    iter_valid_generic: bool,
+    fun_spec_leaf_iter_valid: String,
+    leaf_iter_valid_prefix: String,
+    leaf_iter_valid_generic: bool,
+    fun_spec_iter_preserved: String,
+    // Ghost carrier: an intrinsic map that declares ghost fields is
+    // represented as a per-instance datatype wrapping the table, so the
+    // ghosts have constructor arguments to live in. `struct_base` plus the
+    // instance suffix is the carrier datatype name (agreeing with
+    // `boogie_struct_name`); `ghost_args` are the ghost selectors and their
+    // (type-parameter-free) Boogie types.
+    has_ghost_carrier: bool,
+    struct_base: String,
+    ghost_args: Vec<GhostArg>,
+    gb_args: String,
+    gb_decls: String,
+    gb_havoc: String,
+    ghost_preserve_args: String,
+    ghost_zero_args: String,
     fun_get: String,
     fun_borrow_front: String,
     fun_borrow_back: String,
@@ -563,7 +597,7 @@ impl MapImpl {
         ty_args: &BTreeSet<(Type, Type)>,
         bv_flag: bool,
     ) -> Self {
-        let insts = ty_args
+        let insts: Vec<(TypeInfo, TypeInfo)> = ty_args
             .iter()
             .map(|(kty, vty)| {
                 (
@@ -588,6 +622,41 @@ impl MapImpl {
             env,
             decl.get_fun_triple(env, INTRINSIC_FUN_MAP_ITER_BORROW_MUT),
         );
+        let iter_valid_parts = Self::validity_parts(env, decl, INTRINSIC_FUN_MAP_SPEC_ITER_VALID);
+        let leaf_iter_valid_parts =
+            Self::validity_parts(env, decl, INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID);
+        let ghost_args: Vec<GhostArg> = struct_env
+            .get_ghost_fields()
+            .map(|f| GhostArg {
+                sel: boogie_field_sel(&f),
+                ty: boogie_type(env, &f.get_type(), false),
+            })
+            .collect();
+        let has_ghost_carrier = !ghost_args.is_empty();
+        let struct_base = struct_name.clone();
+        // Rebuild plumbing for mutating templates: fresh (havoced) ghost
+        // values per rebuild site, shared between the rebuilt value and any
+        // post-state spec-function application describing it.
+        let (gb_args, gb_decls, gb_havoc) = if has_ghost_carrier {
+            let idxs = 0..ghost_args.len();
+            (
+                idxs.clone().map(|i| format!(", $gb{}", i)).join(""),
+                idxs.clone()
+                    .map(|i| format!("\n    var $gb{}: int;", i))
+                    .join(""),
+                idxs.map(|i| format!("havoc $gb{}; ", i)).join(""),
+            )
+        } else {
+            (String::new(), String::new(), String::new())
+        };
+        // Pure spec functions cannot havoc: map-returning spec funs preserve
+        // the input's ghost args (whole-map equalities are ghost-excluding,
+        // so the choice is immaterial) or use zeros when there is no input.
+        let ghost_preserve_args = ghost_args
+            .iter()
+            .map(|g| format!(", t->{}", g.sel))
+            .join("");
+        let ghost_zero_args = ghost_args.iter().map(|_| ", 0".to_string()).join("");
 
         MapImpl {
             struct_name,
@@ -651,9 +720,27 @@ impl MapImpl {
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_BORROW_WITH_DEFAULT),
             ),
             fun_iter_borrow_mut,
+            fun_spec_iter_valid: iter_valid_parts.0,
+            iter_valid_prefix: iter_valid_parts.1,
+            iter_valid_generic: iter_valid_parts.2,
+            fun_spec_leaf_iter_valid: leaf_iter_valid_parts.0,
+            leaf_iter_valid_prefix: leaf_iter_valid_parts.1,
+            leaf_iter_valid_generic: leaf_iter_valid_parts.2,
+            fun_spec_iter_preserved: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_ITER_PRESERVED),
+            ),
             iter_ptr_prefix: iter_parts.0,
             iter_variant: iter_parts.1,
             iter_key_sel: iter_parts.2,
+            has_ghost_carrier,
+            struct_base,
+            ghost_args,
+            gb_args,
+            gb_decls,
+            gb_havoc,
+            ghost_preserve_args,
+            ghost_zero_args,
             fun_get: Self::triple_opt_to_name(env, decl.get_fun_triple(env, INTRINSIC_FUN_MAP_GET)),
             fun_borrow_front: Self::triple_opt_to_name(
                 env,
@@ -776,8 +863,11 @@ impl MapImpl {
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW),
             ),
             fun_spec_aborts_iter_borrow_mut: {
-                // Only a NATIVE-bound predicate needs the template definition;
-                // and the template's fixed signature — two type parameters,
+                // Only a NATIVE-bound predicate needs the template definition:
+                // the condition mirrors the spec translator's skip exactly —
+                // bodied AND uninterpreted spec funs are emitted there, so a
+                // template definition would declare the symbol twice. Also,
+                // the template's fixed signature — two type parameters,
                 // `(Iter<K>, MapType<K, V>)` by value, `bool` — must match the
                 // binding, or spec translation would emit a call to a symbol
                 // the template never defines. The iterator type comes from the
@@ -785,11 +875,11 @@ impl MapImpl {
                 // co-bound.
                 match decl.lookup_spec_fun(env, INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_BORROW_MUT) {
                     Some(qid)
-                        if env
-                            .get_module(qid.module_id)
-                            .get_spec_fun(qid.id)
-                            .body
-                            .is_none() =>
+                        if {
+                            let module_env = env.get_module(qid.module_id);
+                            let sf = module_env.get_spec_fun(qid.id);
+                            sf.body.is_none() && !sf.uninterpreted
+                        } =>
                     {
                         let module_env = env.get_module(qid.module_id);
                         let fun_decl = module_env.get_spec_fun(qid.id);
@@ -845,6 +935,35 @@ impl MapImpl {
     /// variant (the variant with a field of the enum's first type parameter),
     /// and that field's Boogie selector. Returns empty strings when the role is
     /// not bound or the iterator enum does not have the expected shape.
+    /// Resolve a validity-predicate binding: the bound spec fun's Boogie
+    /// name, the iterator enum's uninstantiated Boogie name prefix, and
+    /// whether the enum is keyed (its Boogie name then carries the key
+    /// suffix per instance). Empty when unbound or malformed; signature
+    /// validation happens at mono analysis.
+    fn validity_parts(
+        env: &GlobalEnv,
+        decl: &move_model::intrinsics::IntrinsicDecl,
+        role: &str,
+    ) -> (String, String, bool) {
+        let empty = (String::new(), String::new(), false);
+        let Some(sf_qid) = decl.lookup_spec_fun(env, role) else {
+            return empty;
+        };
+        let name = Self::triple_opt_to_name(env, decl.get_fun_triple(env, role));
+        let module_env = env.get_module(sf_qid.module_id);
+        let sf = module_env.get_spec_fun(sf_qid.id);
+        let Some(Parameter(_, Type::Struct(mid, sid, inst), _)) = sf.params.first() else {
+            return empty;
+        };
+        let iter_env = env.get_struct(mid.qualified(*sid));
+        let prefix = format!(
+            "${}_{}",
+            boogie_module_name(&iter_env.module_env),
+            iter_env.get_name().display(iter_env.symbol_pool())
+        );
+        (name, prefix, !inst.is_empty())
+    }
+
     fn iter_ptr_parts(
         env: &GlobalEnv,
         decl: &move_model::intrinsics::IntrinsicDecl,
