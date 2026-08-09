@@ -1,0 +1,46 @@
+Move prover returns: exiting with verification errors
+error: induction case of the loop invariant does not hold
+   ┌─ tests/sources/functional/closures/inline/vector_hofs_for_each.move:26:13
+   │
+26 │             invariant forall j in 0..i: result[j] == result_of<f>(v[j]);
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:61: map_double_wrong
+   =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:68: map_double_wrong (spec)
+   =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:61: map_double_wrong
+   =         v = <redacted>
+   =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:15: map
+   =         v = <redacted>
+   =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:16: map
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:17: map
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:18: map
+   =         n = <redacted>
+   =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:22: map
+   =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:23: map
+   =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:24: map
+   =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:25: map
+   =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:26: map
+   =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:27: map
+   =     enter loop, variable(s) result, i havocked and reassigned
+   =         result = <redacted>
+   =         i = <redacted>
+   =     loop invariant holds at current state
+   =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:23: map
+   =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:24: map
+   =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:25: map
+   =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:26: map
+   =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:27: map
+   =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:19: map
+   =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:20: map
+   =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:62: map_double_wrong
+   =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:20: map
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:21: map
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:19: map
+   =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:23: map
+   =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:24: map
+   =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:25: map
+   =     at tests/sources/functional/closures/inline/vector_hofs_for_each.move:26: map

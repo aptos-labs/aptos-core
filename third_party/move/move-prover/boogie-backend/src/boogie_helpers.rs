@@ -224,6 +224,33 @@ pub fn boogie_native_spec_fun_name(fun_env: &FunctionEnv<'_>, inst: &[Type]) -> 
     )
 }
 
+/// Whether the prelude templates define a Boogie "$-spec" function
+/// (see [`boogie_native_spec_fun_name`]) for this native function. Only
+/// these natives can delegate their behavioral result function to the
+/// "$-spec" form; any other native has no Boogie-level function form and
+/// its result function must stay uninterpreted. The list mirrors the
+/// `$<module>_$<name>` function definitions in `src/prelude/*.bpl`.
+pub fn boogie_native_fun_has_spec_fun(fun_env: &FunctionEnv<'_>) -> bool {
+    let funs: &[(&str, &[&str])] = &[
+        ("0x1::vector", &[
+            "empty",
+            "push_back",
+            "length",
+            "borrow",
+            "borrow_mut",
+            "swap",
+        ]),
+        ("0x1::bcs", &["to_bytes"]),
+        ("0x1::from_bcs", &["from_bytes"]),
+        ("0x1::hash", &["sha2_256", "sha3_256"]),
+        ("0x1::signer", &["borrow_address"]),
+    ];
+    let module_name = fun_env.module_env.get_full_name_str();
+    let fun_name = fun_env.get_name_str();
+    funs.iter()
+        .any(|(m, fs)| *m == module_name && fs.contains(&fun_name.as_str()))
+}
+
 /// Reverse map mangled function name to source level function name.
 pub fn boogie_reverse_function_name(_env: &GlobalEnv, s: &str) -> Option<String> {
     // TODO: in order to make this actually reversible, we can't use ${}_{}{} above

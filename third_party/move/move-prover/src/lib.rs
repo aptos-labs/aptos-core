@@ -47,10 +47,14 @@ pub fn run_move_prover_v2<W: WriteColor>(
     mut experiments: Vec<String>,
 ) -> anyhow::Result<()> {
     let now = Instant::now();
-    if options.inference.inference || !options.prover.no_infer_lambda_specs {
-        // Lambda spec inference benefits from pure-spec-fun rewriting too: lambda
-        // bodies that call pure user functions then inference cleanly to
-        // `result == helper(args)` instead of `result == result_of<helper>(args)`.
+    if options.inference.inference {
+        // Spec inference benefits from pure-spec-fun rewriting: bodies that call
+        // pure user functions then infer cleanly to `result == helper(args)`
+        // instead of `result == result_of<helper>(args)`. In verify mode the
+        // experiment stays off: lambda spec inference for lifted lambdas works
+        // without it (pure callees are summarized via `result_of` instead), and
+        // deriving spec functions for all pure Move functions destabilizes the
+        // solver on spec-function specializations of accumulating HOFs.
         experiments.push(Experiment::SPEC_REWRITE_PURE_FUNS.to_string());
     }
     let mut env = create_move_prover_v2_model(error_writer, options.clone(), experiments)?;

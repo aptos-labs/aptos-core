@@ -77,6 +77,31 @@ impl IntrinsicDecl {
         let sym = symbol_pool.make(name);
         self.intrinsic_to_move_fun.get(&sym).cloned()
     }
+
+    /// Constructs a declaration directly from its parts, bypassing the
+    /// model builder; for unit tests of intrinsic-based machinery.
+    /// `move_funs` and `spec_funs` map role name symbols to bound
+    /// functions; `move_to_abort_spec` maps a Move role name to its
+    /// abort-condition spec role name.
+    #[cfg(test)]
+    pub(crate) fn new_for_test(
+        move_type: QualifiedId<StructId>,
+        intrinsic_type: Symbol,
+        move_funs: Vec<(Symbol, QualifiedId<FunId>)>,
+        spec_funs: Vec<(Symbol, QualifiedId<SpecFunId>)>,
+        move_to_abort_spec: Vec<(Symbol, Symbol)>,
+    ) -> Self {
+        IntrinsicDecl {
+            move_type,
+            intrinsic_type,
+            intrinsic_to_move_fun: move_funs.iter().cloned().collect(),
+            move_fun_to_intrinsic: move_funs.into_iter().map(|(sym, qid)| (qid, sym)).collect(),
+            intrinsic_to_spec_fun: spec_funs.iter().cloned().collect(),
+            spec_fun_to_intrinsic: spec_funs.into_iter().map(|(sym, qid)| (qid, sym)).collect(),
+            move_to_spec_intrinsic: BTreeMap::new(),
+            move_to_abort_spec_intrinsic: move_to_abort_spec.into_iter().collect(),
+        }
+    }
 }
 
 pub(crate) fn process_intrinsic_declaration(

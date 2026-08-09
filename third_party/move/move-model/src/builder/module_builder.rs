@@ -1263,15 +1263,15 @@ impl ModuleBuilder<'_, '_> {
             self.def_ana_fun(&name, fun_def);
         }
 
-        // TODO: we should re-visit this decision once we have high-order function ready on
-        // the compiled bytecode (i.e., file format) level. Before that, the rule is:
-        // - an inline function can have in-body spec blocks
-        // - an inline function cannot have function spec (i.e., pre/post-conditions)
-        //
-        // On the verification side:
-        // - we do not verify the correctness of in-body spec blocks in the inline function
-        // - instead, we inline these in-body spec blocks into the caller and verify these
-        //   specs in the context of caller.
+        // The rules for specs on inline functions are:
+        // - an inline function can have in-body spec blocks; they are expanded into the
+        //   caller and verified in the caller's context
+        // - an inline function without function-typed parameters can have a function spec;
+        //   in verify mode such a function is compiled to bytecode and checked against its
+        //   spec, and if it is opaque, calls are retained and use the spec at call sites
+        // - an inline function with function-typed parameters cannot have a function spec:
+        //   its spec would need to refer to the behavior of lambda arguments, which is not
+        //   supported (see move-prover/doc/dev/inline_fun_specs.md)
 
         // Analyze all module level spec blocks (except schemas)
         for spec in &module_def.specs {
@@ -1296,6 +1296,20 @@ impl ModuleBuilder<'_, '_> {
                                 &spec.value.target.value
                             {
                                 self.validate_target_signature(&fun_decl, &loc, signature);
+                            }
+
+                            if fun_decl.kind == FunctionKind::Inline
+                                && fun_decl
+                                    .params
+                                    .iter()
+                                    .any(|Parameter(_, ty, _)| ty.is_function())
+                            {
+                                self.parent.error(
+                                    &loc,
+                                    "function spec blocks are not supported for inline \
+                                     functions with function-typed parameters; those \
+                                     functions are verified at each application site",
+                                );
                             }
                         },
                         SpecBlockContext::Struct(..) | SpecBlockContext::Module => (),
@@ -1819,23 +1833,31 @@ impl ModuleBuilder<'_, '_> {
             if let Some(pre_name) = pre_label.and_then(&get_label_name) {
                 used_pre_labels.insert(pre_name);
             }
-            // Reject post-state labels on single-state predicates (requires_of, aborts_of).
+            // Reject post-state labels on predicates without an explicit
+            // post-state (requires_of, aborts_of, unchanged_of, folds_of).
             if post_label.is_some() {
-                if let Some(BehaviorKind::RequiresOf | BehaviorKind::AbortsOf) = behavior_kind {
-                    let kind_name = match behavior_kind.unwrap() {
-                        BehaviorKind::RequiresOf => "requires_of",
-                        BehaviorKind::AbortsOf => "aborts_of",
+                if let Some(
+                    kind @ (BehaviorKind::RequiresOf
+                    | BehaviorKind::AbortsOf
+                    | BehaviorKind::UnchangedOf
+                    | BehaviorKind::FoldsOf),
+                ) = behavior_kind
+                {
+                    let msg = match kind {
+                        BehaviorKind::RequiresOf | BehaviorKind::AbortsOf => format!(
+                            "`{}` describes a single state and cannot have a post-state label; \
+                             only `ensures_of` and `result_of` support state transitions",
+                            kind,
+                        ),
+                        BehaviorKind::UnchangedOf | BehaviorKind::FoldsOf => format!(
+                            "`{}` implicitly relates the pre-state to the current \
+                             state and cannot have a post-state label",
+                            kind,
+                        ),
                         _ => unreachable!(),
                     };
                     let exp_loc = self.parent.env.get_node_loc(*node_id);
-                    self.parent.env.error(
-                        &exp_loc,
-                        &format!(
-                            "`{}` describes a single state and cannot have a post-state label; \
-                             only `ensures_of` and `result_of` support state transitions",
-                            kind_name,
-                        ),
-                    );
+                    self.parent.env.error(&exp_loc, &msg);
                 }
             }
         }
@@ -3115,33 +3137,62 @@ impl ModuleBuilder<'_, '_> {
             cond.exp.visit_post_order(&mut visitor);
         } else if !context.allow_old() {
             let name = context.name().expect("should have name");
-            // Restrict accesses to function arguments only for `old(..)` in in-spec block
+            // For `old(..)` in an inline spec block, restrict the wrapped
+            // expression to function parameters and global state: local
+            // variables have no value at function entry. Everything built
+            // from parameters, `global`/`exists` reads, selections thereof,
+            // and pure operations is admissible.
             let entry = self.parent.fun_table.get(name).expect("function defined");
+            let param_count = entry.params.len();
+            // Variables bound within the condition itself (quantifiers, lets,
+            // lambdas) are rigid values, not state-dependent: `old(..)`
+            // reinterprets only state reads. Only occurrences free in the
+            // whole condition refer to locals of the enclosing function.
+            let mut free_occurrences = BTreeSet::new();
+            cond.exp.visit_free_local_vars(|id, _sym| {
+                free_occurrences.insert(id);
+            });
             let mut visitor = |e: &ExpData| {
                 if let ExpData::Call(_, Operation::Old, args) = e {
                     let arg = &args[0];
-                    match args[0].as_ref() {
-                        ExpData::Temporary(_, idx) if *idx < entry.params.len() => (),
-                        _ => {
-                            let label_cond = (
-                                cond.loc.clone(),
-                                "only a function parameter is allowed in old(..) expressions \
-                                in inline spec block"
-                                    .to_owned(),
-                            );
-                            let label_exp = (
-                                self.parent.env.get_node_loc(arg.node_id()),
-                                "this expression is not a function parameter".to_owned(),
-                            );
-                            self.parent.env.diag_with_labels(
-                                Severity::Error,
-                                loc,
-                                "invalid old(..) expression in inline spec block",
-                                vec![label_cond, label_exp],
-                            );
-                            ok = false;
-                        },
-                    };
+                    let mut offender = None;
+                    arg.visit_pre_order(&mut |sub| {
+                        if offender.is_some() {
+                            return false;
+                        }
+                        match sub {
+                            ExpData::LocalVar(id, _) if free_occurrences.contains(id) => {
+                                offender = Some(*id);
+                                false
+                            },
+                            ExpData::Temporary(id, idx) if *idx >= param_count => {
+                                offender = Some(*id);
+                                false
+                            },
+                            _ => true,
+                        }
+                    });
+                    if let Some(offender_id) = offender {
+                        let label_cond = (
+                            cond.loc.clone(),
+                            "only function parameters and global state can be used \
+                            in old(..) in inline spec blocks"
+                                .to_owned(),
+                        );
+                        let label_exp = (
+                            self.parent.env.get_node_loc(offender_id),
+                            "this refers to a local variable, which has no value \
+                            at function entry"
+                                .to_owned(),
+                        );
+                        self.parent.env.diag_with_labels(
+                            Severity::Error,
+                            loc,
+                            "invalid old(..) expression in inline spec block",
+                            vec![label_cond, label_exp],
+                        );
+                        ok = false;
+                    }
                 }
                 true // continue visit, note all problematic subexprs
             };

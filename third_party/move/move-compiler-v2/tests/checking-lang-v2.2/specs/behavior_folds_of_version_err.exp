@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: no function named `folds_of` found
+   ┌─ tests/checking-lang-v2.2/specs/behavior_folds_of_version_err.move:13:23
+   │
+13 │             invariant folds_of<f>(v, i);
+   │                       ^^^^^^^^^^^^^^^^^

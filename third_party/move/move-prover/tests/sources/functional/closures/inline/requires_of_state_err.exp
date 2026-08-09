@@ -1,0 +1,41 @@
+Move prover returns: exiting with compilation errors
+error: the lambda has global state effects, which require a unique application of the function parameter in the inline function body to anchor the predicate's states
+   ┌─ tests/sources/functional/closures/inline/requires_of_state_err.move:17:20
+   │
+17 │             assert requires_of<f>(x); // error: no unique application site to anchor the pre-state reads
+   │                    ^^^^^^^^^^^^^^^^^
+   ·
+23 │         apply_twice(|y| y spec { requires R[a].v > 0; ensures result == y; }, a, x)
+   │         ---------------------------------------------------------------------------
+   │         │           │
+   │         │           lambda argument
+   │         from a call inlined at this callsite
+
+error: the lambda has global state effects, which require a unique application of the function parameter in the inline function body to anchor the predicate's states
+   ┌─ tests/sources/functional/closures/inline/requires_of_state_err.move:42:20
+   │
+42 │               assert requires_of<f>(x); // error: a looped application is not a unique anchor
+   │                      ^^^^^^^^^^^^^^^^^
+   ·
+48 │ ╭         apply_in_loop(
+49 │ │             |y| y spec { requires R[a].v > 0; ensures result == y; },
+   │ │             -------------------------------------------------------- lambda argument
+50 │ │             x,
+51 │ │         )
+   │ ╰─────────' from a call inlined at this callsite
+
+error: the lambda has global state effects, which require a unique application of the function parameter in the inline function body to anchor the predicate's states
+   ┌─ tests/sources/functional/closures/inline/requires_of_state_err.move:68:20
+   │
+68 │                 assert ensures_of<f>(x, result); // error: a forwarded application may repeat dynamically
+   │                        ^^^^^^^^^^^^^^^^^^^^^^^^
+   ·
+74 │ ╭           apply_via_forwarder(
+75 │ │ ╭             |y| {
+76 │ │ │                 R[a].v = R[a].v + 1;
+77 │ │ │                 y
+78 │ │ │             },
+   │ │ ╰─────────────' lambda argument
+79 │ │               x,
+80 │ │           )
+   │ ╰───────────' from a call inlined at this callsite

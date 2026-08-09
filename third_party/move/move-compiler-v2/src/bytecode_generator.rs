@@ -1017,6 +1017,9 @@ impl Generator<'_> {
             | Operation::Global(_)
             | Operation::CanModify
             | Operation::Old
+            | Operation::SaveStateAnchor(..)
+            | Operation::WithStateAnchor(..)
+            | Operation::FoldsCaptureAnchor(..)
             | Operation::Trace(_)
             | Operation::Identical
             | Operation::EmptyVec

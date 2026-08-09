@@ -1,0 +1,70 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::verified_no_fun_param {
+    private inline fun add(x: u64,y: u64): u64 {
+        Add<u64>(x, y)
+    }
+    spec {
+      ensures Eq<u64>(result0(), Add($t0, $t1));
+    }
+
+    private fun caller(x: u64): u64 {
+        {
+          let (x: u64, y: u64): (u64, u64) = Tuple(x, 1);
+          Add<u64>(x, y)
+        }
+    }
+} // end 0x42::verified_no_fun_param
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::verified_no_fun_param {
+    inline fun add(x: u64, y: u64): u64 {
+        x + y
+    }
+
+    spec add(x: u64, y: u64): u64 {
+        ensures result == x + y;
+    }
+
+    fun caller(x: u64): u64 {
+        let (x,y) = (x, 1);
+        x + y
+    }
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::verified_no_fun_param {
+    private inline fun add(x: u64,y: u64): u64 {
+        Add<u64>(x, y)
+    }
+    spec {
+      ensures Eq<u64>(result0(), Add($t0, $t1));
+    }
+
+    private fun caller(x: u64): u64 {
+        {
+          let (x: u64, y: u64): (u64, u64) = Tuple(x, 1);
+          Add<u64>(x, 1)
+        }
+    }
+} // end 0x42::verified_no_fun_param
+
+
+============ disassembled file-format ==================
+// Bytecode version v10
+module 0x42::verified_no_fun_param
+// Function definition at index 0
+fun add(l0: u64, l1: u64): u64
+    move_loc l0
+    move_loc l1
+    add
+    ret
+
+// Function definition at index 1
+fun caller(l0: u64): u64
+    move_loc l0
+    ld_u64 1
+    add
+    ret
+
+
+============ bytecode verification succeeded ========
