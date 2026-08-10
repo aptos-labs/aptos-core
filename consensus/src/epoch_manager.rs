@@ -142,11 +142,11 @@ const PROPOSER_ELECTION_CACHING_WINDOW_ADDITION: usize = 3;
 /// Number of rounds we expect storage to be behind the proposer round,
 /// used for fetching data from DB.
 const PROPOSER_ROUND_BEHIND_STORAGE_BUFFER: usize = 30;
-/// How long we give the local pipeline to commit an epoch ending block after handing it a commit
-/// certificate received from the network, before giving up and falling back to state sync.
-const LOCAL_EPOCH_COMMIT_TIMEOUT: Duration = Duration::from_secs(5);
-/// How often we check storage while waiting for the local commit above.
-const LOCAL_EPOCH_COMMIT_POLL_INTERVAL: Duration = Duration::from_millis(50);
+/// How long we give the buffer manager to acknowledge an epoch change certificate handed to it by
+/// the epoch manager. The reply normally arrives within milliseconds (including when the certified
+/// block is not in the buffer at all); this is only a net against a wedged buffer manager, so that
+/// the epoch manager always makes it to the state sync fallback.
+const LOCAL_EPOCH_COMMIT_ACK_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[allow(clippy::large_enum_variant)]
 pub enum LivenessStorageData {
@@ -572,8 +572,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         }
     }
 
-    /// Hand a commit certificate for an epoch ending block to our own buffer manager and wait,
-    /// bounded, for the certified version to become durable locally.
+    /// Hand a commit certificate for an epoch ending block to our own buffer manager and wait for
+    /// the buffer manager to acknowledge it, so that the shutdown that follows is ordered after
+    /// any commit the certificate triggers.
     ///
     /// A locally generated `EpochChangeProof` is only produced after persisting (see
     /// `PersistingPhase`), so `initiate_new_epoch` could assume the certified state is durable
@@ -582,6 +583,14 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     /// while no validator has written the result to storage. Committing locally first restores that
     /// assumption whenever we already have the block, and leaves state sync for the case where we
     /// are genuinely behind.
+    ///
+    /// The buffer manager replies from within `process_commit_message`, on the same main loop
+    /// iteration that then drives the commit of a matching block all the way to persistence, and
+    /// its main loop is single threaded. Receiving the reply therefore guarantees that the `Stop`
+    /// reset sent by `shutdown_current_processor` below is served only after that commit
+    /// completes; we never have to watch storage ourselves. When the block is not in the buffer
+    /// (we are genuinely behind), the reply resolves just as promptly, so this never delays the
+    /// state sync fallback.
     async fn try_commit_epoch_ending_block_locally(&self, ledger_info: &LedgerInfoWithSignatures) {
         // Only a certificate for the epoch we are currently running can match a block held by our
         // pipeline, and only such a certificate is verifiable by the current epoch's validator set.
@@ -589,7 +598,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             return;
         }
 
-        let (response_sender, _response_receiver) = oneshot::channel();
+        let (response_sender, response_receiver) = oneshot::channel();
         let request = IncomingCommitRequest {
             req: CommitMessage::Decision(CommitDecision::new(ledger_info.clone())),
             protocol: ProtocolId::ConsensusDirectSendCompressed,
@@ -603,33 +612,21 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             return;
         }
 
-        let target_version = ledger_info.ledger_info().version();
-        let committed = tokio::time::timeout(LOCAL_EPOCH_COMMIT_TIMEOUT, async {
-            loop {
-                match self.storage.aptos_db().get_latest_ledger_info() {
-                    Ok(latest) if latest.ledger_info().version() >= target_version => return true,
-                    Ok(_) => {},
-                    Err(e) => {
-                        warn!(error = ?e, "[EpochManager] Failed to read the latest ledger info");
-                        return false;
-                    },
-                }
-                tokio::time::sleep(LOCAL_EPOCH_COMMIT_POLL_INTERVAL).await;
-            }
-        })
-        .await
-        .unwrap_or(false);
-
-        if committed {
-            info!(
-                version = target_version,
-                "[EpochManager] Committed the epoch ending block locally",
-            );
-        } else {
-            warn!(
-                version = target_version,
-                "[EpochManager] Epoch ending block did not commit locally, falling back to state sync",
-            );
+        // The sender side is dropped if the message is discarded anywhere along the way (e.g. the
+        // buffer manager is not running), which resolves the wait immediately.
+        match tokio::time::timeout(LOCAL_EPOCH_COMMIT_ACK_TIMEOUT, response_receiver).await {
+            Ok(Ok(_)) => info!(
+                version = ledger_info.ledger_info().version(),
+                "[EpochManager] The local pipeline acknowledged the epoch change certificate",
+            ),
+            Ok(Err(_)) => warn!(
+                version = ledger_info.ledger_info().version(),
+                "[EpochManager] The local pipeline dropped the epoch change certificate, falling back to state sync",
+            ),
+            Err(_) => warn!(
+                version = ledger_info.ledger_info().version(),
+                "[EpochManager] Timed out waiting for the local pipeline to acknowledge the epoch change certificate, falling back to state sync",
+            ),
         }
     }
 
