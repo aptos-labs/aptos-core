@@ -3092,7 +3092,7 @@ impl AptosVM {
                 arguments,
                 func_name.as_ident_str(),
                 &func,
-                metadata.as_ref().map(Arc::as_ref),
+                metadata.as_deref(),
                 vm.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
             )
             .map_err(|e| e.finish(Location::Module(module_id)))?;
