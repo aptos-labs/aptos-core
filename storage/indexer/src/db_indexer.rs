@@ -221,6 +221,10 @@ impl InternalIndexerDB {
     ///
     /// For callers whose `start_seq_num` is derived rather than client-supplied,
     /// where failing would withhold events the node can still serve.
+    ///
+    /// The pruner can advance between the two lookups, in which case the retry is
+    /// pruned as well and the caller still sees the error. Left alone: the window
+    /// is a single seek wide, and the fallback is the same error as before.
     pub fn lookup_events_by_key_clamped(
         &self,
         event_key: &EventKey,
