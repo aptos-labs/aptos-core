@@ -6,8 +6,9 @@ use crate::{
     metrics,
     response::{
         bcs_api_disabled, block_not_found_by_height, block_not_found_by_version,
-        block_pruned_by_height, json_api_disabled, version_not_found, version_pruned,
-        ForbiddenError, InternalError, NotFoundError, ServiceUnavailableError, StdApiError,
+        block_pruned_by_height, json_api_disabled, pruned_or_internal_error, version_not_found,
+        version_pruned, ForbiddenError, InternalError, NotFoundError, ServiceUnavailableError,
+        StdApiError,
     },
 };
 use anyhow::{anyhow, ensure, format_err, Context as AnyhowContext, Result};
@@ -680,13 +681,7 @@ impl Context {
             Some(
                 self.get_transactions(first_version, max_txns, ledger_version)
                     .context("Failed to read raw transactions from storage")
-                    .map_err(|err| {
-                        E::internal_with_code(
-                            err,
-                            AptosErrorCode::InternalError,
-                            latest_ledger_info,
-                        )
-                    })?,
+                    .map_err(|err| pruned_or_internal_error(err, latest_ledger_info))?,
             )
         } else {
             None
