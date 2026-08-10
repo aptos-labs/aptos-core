@@ -442,8 +442,8 @@ where
                     let (function, frame_cache) = if self.vm_config.enable_function_caches {
                         let current_frame_cache = &mut *current_frame.frame_cache.borrow_mut();
 
-                        if let PerInstructionCache::Call(ref function, ref frame_cache) =
-                            current_frame_cache.per_instruction_cache[current_frame.pc as usize]
+                        if let Some(PerInstructionCache::Call(function, frame_cache)) =
+                            current_frame_cache.instruction_cache_at(current_frame.pc)
                         {
                             let frame_cache = frame_cache.upgrade().ok_or_else(|| {
                                 PartialVMError::new_invariant_violation(
@@ -481,11 +481,13 @@ where
                                         (function.clone(), frame_cache)
                                     },
                                 };
-                            current_frame_cache.per_instruction_cache[current_frame.pc as usize] =
+                            current_frame_cache.memoize_instruction(
+                                current_frame.pc,
                                 PerInstructionCache::Call(
                                     Rc::clone(&function),
                                     Rc::downgrade(&frame_cache),
-                                );
+                                ),
+                            );
                             (function, frame_cache)
                         }
                     } else {
@@ -555,8 +557,8 @@ where
                     let (function, frame_cache) = if self.vm_config.enable_function_caches {
                         let current_frame_cache = &mut *current_frame.frame_cache.borrow_mut();
 
-                        if let PerInstructionCache::CallGeneric(ref function, ref frame_cache) =
-                            current_frame_cache.per_instruction_cache[current_frame.pc as usize]
+                        if let Some(PerInstructionCache::CallGeneric(function, frame_cache)) =
+                            current_frame_cache.instruction_cache_at(current_frame.pc)
                         {
                             let frame_cache = frame_cache.upgrade().ok_or_else(|| {
                                 PartialVMError::new_invariant_violation(
@@ -594,11 +596,13 @@ where
                                     (function.clone(), frame_cache)
                                 },
                             };
-                            current_frame_cache.per_instruction_cache[current_frame.pc as usize] =
+                            current_frame_cache.memoize_instruction(
+                                current_frame.pc,
                                 PerInstructionCache::CallGeneric(
                                     Rc::clone(&function),
                                     Rc::downgrade(&frame_cache),
-                                );
+                                ),
+                            );
                             (function, frame_cache)
                         }
                     } else {
