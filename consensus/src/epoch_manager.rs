@@ -591,6 +591,16 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     /// completes; we never have to watch storage ourselves. When the block is not in the buffer
     /// (we are genuinely behind), the reply resolves just as promptly, so this never delays the
     /// state sync fallback.
+    ///
+    /// Limitation: this is a best effort fast path, complete only for blocks the pipeline has
+    /// already executed. If the certificate arrives while the block is still queued for the
+    /// buffer manager or ordered-but-not-yet-executed, the buffer manager caches the certificate
+    /// (and still commits with it if execution finishes before the shutdown below is served), but
+    /// otherwise the block is aborted and we fall back to state sync as before this fast path
+    /// existed. Closing that gap requires the buffer manager to drain — finish committing a
+    /// certified epoch ending block — rather than abort on `Stop`, and, for blocks that never
+    /// reached the buffer, routing the certificate through the block store's commit certificate
+    /// machinery (`add_certs`), which can fetch, order, execute and commit without state sync.
     async fn try_commit_epoch_ending_block_locally(&self, ledger_info: &LedgerInfoWithSignatures) {
         // Only a certificate for the epoch we are currently running can match a block held by our
         // pipeline, and only such a certificate is verifiable by the current epoch's validator set.
