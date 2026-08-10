@@ -12897,7 +12897,6 @@ dependencies = [
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
- "specializer",
  "thiserror 1.0.69",
  "triomphe",
 ]
@@ -12908,11 +12907,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-cached-packages",
- "aptos-crypto",
  "aptos-language-e2e-tests",
  "aptos-transaction-simulation",
  "aptos-types",
- "aptos-vm-types",
  "bcs 0.1.4",
  "bytes",
  "mono-move-aptos-state-view-providers",
@@ -12922,7 +12919,6 @@ dependencies = [
  "mono-move-natives",
  "mono-move-output",
  "mono-move-runtime",
- "move-binary-format",
  "move-core-types",
  "serde",
  "thiserror 1.0.69",

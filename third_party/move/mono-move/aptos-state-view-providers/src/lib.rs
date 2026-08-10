@@ -11,7 +11,7 @@
 //!   materializing each value into a long-lived arena on first access, and
 //!   resolves resource-group placement.
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use aptos_framework::natives::code::PackageRegistry;
 use aptos_types::{
     state_store::{state_key::StateKey, StateView},
@@ -24,25 +24,25 @@ use mono_move_aptos_transaction_executor::{
 };
 use mono_move_core::{
     intern_struct_tag,
+    interner::{view_module_id, InternedModuleId},
     storage::{
         module_provider::ModuleProvider,
         resource_provider::{
             InMemoryStorageKey, ResourceProvider, ResourceProviderError, StorageRead,
         },
     },
-    struct_tag_of,
-    types::InternedType,
-    ExecutionErrorKind, FrameOffset, IntoExecutionError, LayoutProvider, VMInternalError, VMResult,
+    types::{view_name, view_type, InternedType, Type},
+    ExecutionErrorKind, IntoExecutionError, LayoutProvider, VMInternalError, VMResult,
     OBJECT_HEADER_SIZE,
 };
 use mono_move_global_context::ExecutionGuard;
 use mono_move_runtime::{deserialize_into, Heap};
 use move_binary_format::CompiledModule;
 use move_core_types::{
-    account_address::AccountAddress, identifier::Identifier, language_storage::StructTag,
+    account_address::AccountAddress,
+    identifier::{IdentStr, Identifier},
     move_resource::MoveStructType,
 };
-use specializer::lower::gc_layout::type_pointer_offsets;
 use std::cell::RefCell;
 use thiserror::Error;
 use triomphe::Arc;
@@ -157,12 +157,13 @@ struct ProviderState {
     /// Resource-group membership per resource type, resolved from the defining
     /// module's metadata. `None` = not a group member.
     group_membership: FxHashMap<InternedType, Option<InternedType>>,
-    /// Aptos metadata of each module consulted for group membership so far,
-    /// keyed by the module's state key. `None` = module absent or without
-    /// metadata.
-    module_metadata: FxHashMap<StateKey, Option<Arc<RuntimeModuleMetadataV1>>>,
-    /// Stored members of each resource group read so far, keyed by the
-    /// group's state key.
+    /// Aptos metadata of each module consulted for group membership so far.
+    /// `None` = module absent or without metadata.
+    module_metadata: FxHashMap<InternedModuleId, Option<Arc<RuntimeModuleMetadataV1>>>,
+    /// Members of each resource group read so far, keyed by the group's state key.
+    ///
+    /// Here it is safe to use a non-cryptographic hasher because `StateKey` already
+    /// gets hashed by its crypto digest.
     groups: FxHashMap<StateKey, Option<Arc<GroupMembers>>>,
 }
 
@@ -182,13 +183,18 @@ impl<'a, 'ctx, S: StateView> StateViewResourceProvider<'a, 'ctx, S> {
 
     /// Resolves group membership from the defining module's Aptos metadata.
     fn resolve_group_of(&self, ty: InternedType) -> Result<Option<InternedType>> {
-        let tag = struct_tag_of(ty).ok_or_else(|| anyhow!("resource type is not nominal"))?;
-        let Some(metadata) = self.module_metadata(&tag)? else {
+        let Type::Nominal {
+            module_id, name, ..
+        } = view_type(ty)
+        else {
+            bail!("resource type is not nominal");
+        };
+        let Some(metadata) = self.module_metadata(*module_id)? else {
             return Ok(None);
         };
         let Some(group_tag) = metadata
             .struct_attributes
-            .get(tag.name.as_str())
+            .get(view_name(*name))
             .into_iter()
             .flatten()
             .find_map(|attr| attr.get_resource_group_member())
@@ -198,17 +204,22 @@ impl<'a, 'ctx, S: StateView> StateViewResourceProvider<'a, 'ctx, S> {
         Ok(Some(intern_struct_tag(&group_tag, self.guard)?))
     }
 
-    /// The Aptos metadata of `tag`'s defining module, if any. Cached per
-    /// module.
+    /// The Aptos metadata of a module, if any. Cached per module.
     //
     // TODO(perf): cache the metadata in the global context instead — this
     // deserializes the whole defining module for its metadata, duplicating the
     // loader's own fetch and deserialization of the same bytes.
-    fn module_metadata(&self, tag: &StructTag) -> Result<Option<Arc<RuntimeModuleMetadataV1>>> {
-        let key = StateKey::module(&tag.address, &tag.module);
-        if let Some(metadata) = self.inner.borrow().module_metadata.get(&key) {
+    fn module_metadata(
+        &self,
+        module_id: InternedModuleId,
+    ) -> Result<Option<Arc<RuntimeModuleMetadataV1>>> {
+        if let Some(metadata) = self.inner.borrow().module_metadata.get(&module_id) {
             return Ok(metadata.clone());
         }
+        let view = view_module_id(module_id);
+        let name = IdentStr::new(view_name(view.name()))
+            .map_err(|e| anyhow!("invalid module name: {e}"))?;
+        let key = StateKey::module(view.address(), name);
         let metadata = match self
             .state_view
             .get_state_value(&key)
@@ -224,7 +235,7 @@ impl<'a, 'ctx, S: StateView> StateViewResourceProvider<'a, 'ctx, S> {
         self.inner
             .borrow_mut()
             .module_metadata
-            .insert(key, metadata.clone());
+            .insert(module_id, metadata.clone());
         Ok(metadata)
     }
 
@@ -259,17 +270,12 @@ impl<S: StateView> ResourceProvider for StateViewResourceProvider<'_, '_, S> {
             .guard
             .layout_by_ty(ty)
             .ok_or_else(|| internal(format!("no layout for the value at {:?}", key.address())))?;
-        // Ensure the type's GC descriptor exists (a no-op when lowering
-        // already published it), using the same pointer-offset computation
-        // lowering uses.
-        let offsets: Vec<FrameOffset> = type_pointer_offsets(self.guard, ty)
-            .map_err(|e| internal(format!("pointer offsets unavailable: {e}")))?
-            .into_iter()
-            .map(FrameOffset)
-            .collect();
+        // Lowering publishes a descriptor for every resource a global-storage
+        // instruction reaches, so the read that got here has one already.
         let descriptor = self
             .guard
-            .publish_struct_descriptor(ty, layout.size, &offsets);
+            .struct_descriptor(ty)
+            .ok_or_else(|| internal(format!("no GC descriptor for {:?}", key.address())))?;
 
         let mut inner = self.inner.borrow_mut();
         let obj = inner

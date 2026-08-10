@@ -125,6 +125,10 @@ fn drain_write_set(
     };
     // Note on determinism: the read-write set iterates in an unspecified order,
     // so nothing here may depend on it.
+    //
+    // TODO(correctness): consider sorting the keys first to ensure determinism. This
+    // cannot currently be done because keys contain `InternedType`, which is
+    // basically a pointer and does not implement `Ord`.
     for (key, class) in effects.read_write_set.writes_unordered() {
         // TODO(perf): currently we collect all errors and sort them to ensure determinism.
         // We should however revisit the design later and see if we want to switch to an alternative approach.

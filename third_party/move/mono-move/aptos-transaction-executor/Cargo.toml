@@ -14,22 +14,19 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-crypto = { workspace = true }
 aptos-types = { workspace = true }
-aptos-vm-types = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
-triomphe = { workspace = true }
 mono-move-core = { workspace = true }
 mono-move-global-context = { workspace = true }
 mono-move-loader = { workspace = true }
 mono-move-natives = { workspace = true }
 mono-move-output = { workspace = true }
 mono-move-runtime = { workspace = true }
-move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
+triomphe = { workspace = true }
 
 [dev-dependencies]
 aptos-cached-packages = { workspace = true }

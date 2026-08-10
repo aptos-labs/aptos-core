@@ -575,6 +575,15 @@ impl<'ctx> ExecutionGuard<'ctx> {
             })
     }
 
+    /// The struct-object descriptor already published for `struct_ty`, if any.
+    pub fn struct_descriptor(&self, struct_ty: InternedType) -> Option<DescriptorId> {
+        self.ctx
+            .descriptors
+            .struct_by_ty
+            .get(&struct_ty)
+            .map(|id| *id)
+    }
+
     /// Materializes a struct-object descriptor for `struct_ty` (the inline
     /// resource laid out as a heap object) into the shared arena and returns
     /// its assigned [`DescriptorId`]. Idempotent: subsequent calls with the
