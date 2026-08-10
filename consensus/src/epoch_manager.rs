@@ -583,6 +583,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     /// assumption whenever we already have the block, and leaves state sync for the case where we
     /// are genuinely behind.
     async fn try_commit_epoch_ending_block_locally(&self, ledger_info: &LedgerInfoWithSignatures) {
+        // Only a certificate for the epoch we are currently running can match a block held by our
+        // pipeline, and only such a certificate is verifiable by the current epoch's validator set.
+        if ledger_info.ledger_info().epoch() != self.epoch() {
+            return;
+        }
+
         let (response_sender, _response_receiver) = oneshot::channel();
         let request = IncomingCommitRequest {
             req: CommitMessage::Decision(CommitDecision::new(ledger_info.clone())),
@@ -639,8 +645,15 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         // Let the pipeline use the certificate before we tear it down: the block it certifies may
         // be one we already executed but deliberately did not pre-commit. This is a no-op if we
         // committed it already, and makes the state sync below a no-op if it succeeds.
-        self.try_commit_epoch_ending_block_locally(ledger_info)
-            .await;
+        //
+        // A proof can span several epochs, in which case `verify` above returns its last ledger
+        // info while `check_epoch` admitted it on the strength of its first. Only the first one
+        // certifies a block of the epoch we are running, so it is the only one our pipeline could
+        // be holding; we still sync to the last one below.
+        if let Some(current_epoch_ledger_info) = proof.ledger_info_with_sigs.first() {
+            self.try_commit_epoch_ending_block_locally(current_epoch_ledger_info)
+                .await;
+        }
 
         // shutdown existing processor first to avoid race condition with state sync.
         self.shutdown_current_processor().await;
