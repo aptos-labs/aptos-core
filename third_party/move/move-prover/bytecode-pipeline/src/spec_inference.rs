@@ -688,14 +688,8 @@ impl FunctionTargetProcessor for LambdaSpecInferenceProcessor {
     }
 }
 
-/// Identifies lambda-lifted functions by name. Mirrors `LIFTED_FUN_MARKER` from
-/// `move-compiler-v2/src/env_pipeline/lambda_lifter.rs` (we can't import that const
-/// because `bytecode-pipeline` does not depend on `move-compiler-v2`).
 fn is_lambda_lifted_name(fun_env: &FunctionEnv) -> bool {
-    fun_env
-        .symbol_pool()
-        .string(fun_env.get_name())
-        .contains("__lambda__")
+    crate::lifted_lambda::is_lifted_lambda(fun_env)
 }
 
 // =================================================================================================

@@ -662,6 +662,7 @@ procedure {:inline 2} {{impl.fun_next_key}}{{S}}(t: {{Self}}, key: {{K}}) return
 // is split into two implications so each direction gets a legal trigger
 // ($ContainsVec cannot be a pattern: its inline body is an `exists`).
 procedure {:inline 2} {{impl.fun_keys}}{{S}}(t: ({{Self}})) returns (result: Vec ({{K}})) {
+    assume $IsValid'vec'{{instance.0.suffix}}''(result);
     assume LenVec(result) == LenTable(t);
     assume (forall i: int :: {ReadVec(result, i)} InRangeVec(result, i) ==>
         {{impl.fun_spec_has_key}}{{S}}(t, ReadVec(result, i)));
@@ -670,6 +671,12 @@ procedure {:inline 2} {{impl.fun_keys}}{{S}}(t: ({{Self}})) returns (result: Vec
     assume (forall i: int, j: int :: {ReadVec(result, i), ReadVec(result, j)}
         InRangeVec(result, i) ==> InRangeVec(result, j) ==> i != j ==>
         !$IsEqual'{{instance.0.suffix}}'(ReadVec(result, i), ReadVec(result, j)));
+{%- if instance.0.cmp_available %}
+    // Keys are returned in ascending `cmp::compare` order.
+    assume (forall i: int, j: int :: {ReadVec(result, i), ReadVec(result, j)}
+        InRangeVec(result, i) ==> InRangeVec(result, j) ==> i < j ==>
+        $1_cmp_$compare'{{instance.0.suffix}}'(ReadVec(result, i), ReadVec(result, j)) == $1_cmp_Ordering_Less());
+{%- endif %}
 }
 {%- endif %}
 
@@ -695,6 +702,8 @@ procedure {:inline 2} {{impl.fun_values}}{{S}}(t: ({{Self}})) returns (result: V
 // Key-vector membership mirrors `fun_keys` (split biconditional, see there);
 // value-vector is length-only.
 procedure {:inline 2} {{impl.fun_to_vec_pair}}{{S}}(t: ({{Self}})) returns (result_keys: Vec ({{K}}), result_values: Vec ({{V}})) {
+    assume $IsValid'vec'{{instance.0.suffix}}''(result_keys);
+    assume $IsValid'vec'{{instance.1.suffix}}''(result_values);
     assume LenVec(result_keys) == LenTable(t);
     assume LenVec(result_values) == LenTable(t);
     assume (forall i: int :: {ReadVec(result_keys, i)} InRangeVec(result_keys, i) ==>
@@ -704,6 +713,12 @@ procedure {:inline 2} {{impl.fun_to_vec_pair}}{{S}}(t: ({{Self}})) returns (resu
     assume (forall i: int, j: int :: {ReadVec(result_keys, i), ReadVec(result_keys, j)}
         InRangeVec(result_keys, i) ==> InRangeVec(result_keys, j) ==> i != j ==>
         !$IsEqual'{{instance.0.suffix}}'(ReadVec(result_keys, i), ReadVec(result_keys, j)));
+{%- if instance.0.cmp_available %}
+    // Keys are returned in ascending `cmp::compare` order.
+    assume (forall i: int, j: int :: {ReadVec(result_keys, i), ReadVec(result_keys, j)}
+        InRangeVec(result_keys, i) ==> InRangeVec(result_keys, j) ==> i < j ==>
+        $1_cmp_$compare'{{instance.0.suffix}}'(ReadVec(result_keys, i), ReadVec(result_keys, j)) == $1_cmp_Ordering_Less());
+{%- endif %}
 }
 {%- endif %}
 
@@ -1068,6 +1083,32 @@ procedure {:inline 2} {{impl.fun_borrow_with_default}}{{S}}(t: {{Self}}, k: {{K}
 }
 {%- endif %}
 
+{%- if impl.fun_iter_borrow_mut != "" %}
+// Mutable borrow of the value at the iterator's key. The returned mutation's
+// path extends the map's path with the encoded key (a Table index edge), so
+// caller write-back goes through UpdateTable instead of concrete map internals.
+// Aborts when the iterator is the end iterator or its key is absent (stale
+// iterator); the constant-value-size requirement is presumed not to fire (see
+// the size presumption in the map's spec).
+procedure {:inline 2} {{impl.fun_iter_borrow_mut}}{{S}}(self: {{impl.iter_ptr_prefix}}'{{instance.0.suffix}}', m: $Mutation ({{Self}}))
+returns (dst: $Mutation ({{V}}), m': $Mutation ({{Self}})) {
+    var enc_k: int;
+    var t: {{Self}};
+    t := $Dereference(m);
+    if (!(self is {{impl.iter_ptr_prefix}}'{{instance.0.suffix}}'_{{impl.iter_variant}})) {
+        call $ExecFailureAbort();
+    } else {
+        enc_k := {{ENC}}(self->{{impl.iter_key_sel}});
+        if (!ContainsTable(t, enc_k)) {
+            call $ExecFailureAbort();
+        } else {
+            dst := $Mutation(m->l, ExtendVec(m->p, enc_k), GetTable(t, enc_k));
+            m' := m;
+        }
+    }
+}
+{%- endif %}
+
 {%- if impl.fun_spec_len != "" %}
 function {:inline} {{impl.fun_spec_len}}{{S}}(t: ({{Self}})): int {
     LenTable(t)
@@ -1135,6 +1176,17 @@ function {:inline} {{impl.fun_spec_aborts_del}}{{S}}(t: {{Self}}, k: {{K}}): boo
 {%- if impl.fun_spec_aborts_borrow != "" %}
 function {:inline} {{impl.fun_spec_aborts_borrow}}{{S}}(t: {{Self}}, k: {{K}}): bool {
     !ContainsTable(t, {{ENC}}(k))
+}
+{%- endif %}
+
+{#- Only emitted for a NATIVE-bound predicate (a defined spec fun is emitted
+    by regular spec-function translation). The body mirrors the
+    `iter_borrow_mut` procedure's abort behavior exactly: end iterator or
+    absent key. -#}
+{%- if impl.fun_spec_aborts_iter_borrow_mut != "" and impl.fun_iter_borrow_mut != "" %}
+function {:inline} {{impl.fun_spec_aborts_iter_borrow_mut}}{{S}}(self: {{impl.iter_ptr_prefix}}'{{instance.0.suffix}}', t: {{Self}}): bool {
+    !(self is {{impl.iter_ptr_prefix}}'{{instance.0.suffix}}'_{{impl.iter_variant}})
+        || !ContainsTable(t, {{ENC}}(self->{{impl.iter_key_sel}}))
 }
 {%- endif %}
 
