@@ -1,0 +1,14 @@
+Move prover returns: exiting with compilation errors
+error: spec function is already bound to another intrinsic type: intrinsic_map_shared_spec_fun::shared_len
+   ┌─ tests/sources/functional/intrinsic_map_shared_fun_err.move:11:9
+   │
+11 │ ╭         pragma intrinsic = map, map_new = new_b,
+12 │ │             map_spec_len = shared_len; // error: already bound to MapA
+   │ ╰──────────────────────────────────────^
+
+error: move function is already bound to another intrinsic type: intrinsic_map_shared_move_fun::shared_length
+   ┌─ tests/sources/functional/intrinsic_map_shared_fun_err.move:29:9
+   │
+29 │ ╭         pragma intrinsic = map,
+30 │ │             map_len = shared_length; // error: already bound to MapA
+   │ ╰────────────────────────────────────^

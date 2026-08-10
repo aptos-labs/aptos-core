@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{frame::Frame, LoadedFunction};
+use crate::{frame::Frame, interpreter_caches::InstructionCacheBudget, LoadedFunction};
 use move_binary_format::{
     errors::*,
     file_format::{
@@ -60,7 +60,20 @@ pub(crate) struct FrameTypeCache {
     /// the argument of the bytecode instructions, for which it is
     /// guaranteed that everything will be exactly the same as when we
     /// did the insertion.
-    pub(crate) per_instruction_cache: Vec<PerInstructionCache>,
+    ///
+    /// INVARIANT: `per_instruction_cache` is a pure memoization of [Self::function_cache] for
+    /// `Call` sites and [Self::generic_function_cache] for `CallGeneric` sites. Those two maps,
+    /// not this cache, decide whether a call site is resolved and gas is charged.
+    ///
+    /// A slot is filled only after that call site's entry in the matching map exists, and neither
+    /// the slot nor that map entry is ever removed. Both are owned by the enclosing
+    /// [FrameTypeCache], which lives for one interpreter invocation.
+    ///
+    /// A hit in `per_instruction_cache` therefore guarantees the matching map lookup would have
+    /// hit too, and neither path charges gas; a miss must fall through to that map rather than
+    /// resolving the call itself. This cache can consequently be shorter than the bytecode, or
+    /// empty, with no effect on gas or execution results.
+    per_instruction_cache: Vec<PerInstructionCache>,
 
     /// Caches function and its cache for non-generic handles. Uses weak reference for cache to
     /// prevent memory leaks for recursive functions.
@@ -223,17 +236,140 @@ impl FrameTypeCache {
         Ok((ty, *ty_count, *depth))
     }
 
+    /// Returns the memoized entry for the instruction at `pc`, if any.
+    ///
+    /// A `None` result means "not memoized" and must be handled by falling through to
+    /// [Self::function_cache] / [Self::generic_function_cache]. See the invariant on
+    /// [Self::per_instruction_cache].
+    pub(crate) fn instruction_cache_at(&self, pc: u16) -> Option<&PerInstructionCache> {
+        self.per_instruction_cache.get(pc as usize)
+    }
+
+    /// Best-effort memoization of the resolved call target at `pc`.
+    ///
+    /// Dropping the write is always safe: it only costs a map lookup next time, never a different
+    /// result or a different gas charge. See the invariant on [Self::per_instruction_cache].
+    pub(crate) fn memoize_instruction(&mut self, pc: u16, entry: PerInstructionCache) {
+        if let Some(slot) = self.per_instruction_cache.get_mut(pc as usize) {
+            *slot = entry;
+        }
+    }
+
     pub(crate) fn make_rc() -> Rc<RefCell<Self>> {
         Rc::new(RefCell::<Self>::new(Default::default()))
     }
 
-    pub(crate) fn make_rc_for_function(function: &LoadedFunction) -> Rc<RefCell<Self>> {
-        let frame_cache = Rc::new(RefCell::<Self>::new(Default::default()));
+    /// Creates a frame cache for a function with `code_size` instructions, giving it a
+    /// per-instruction cache only if `budget` can cover it. When the budget is exhausted the
+    /// cache still works, just without the per-instruction fast path.
+    pub(crate) fn make_rc_for_code_size(
+        code_size: usize,
+        budget: &mut InstructionCacheBudget,
+    ) -> Rc<RefCell<Self>> {
+        let mut frame_cache = Self::default();
+        if budget.try_reserve(code_size) {
+            frame_cache
+                .per_instruction_cache
+                .resize(code_size, PerInstructionCache::Nothing);
+        }
+        Rc::new(RefCell::new(frame_cache))
+    }
+}
 
-        frame_cache
-            .borrow_mut()
-            .per_instruction_cache
-            .resize(function.code_size(), PerInstructionCache::Nothing);
-        frame_cache
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::interpreter_caches::InstructionCacheBudgetOverride;
+
+    fn budget_with(max_entries: usize) -> InstructionCacheBudget {
+        let _override = InstructionCacheBudgetOverride::new(max_entries);
+        InstructionCacheBudget::new()
+    }
+
+    fn allocated_entries(frame_cache: &Rc<RefCell<FrameTypeCache>>) -> usize {
+        frame_cache.borrow().per_instruction_cache.len()
+    }
+
+    #[test]
+    fn allocated_instruction_cache_is_addressable_within_bounds() {
+        let mut budget = budget_with(1_000);
+        let frame_cache = FrameTypeCache::make_rc_for_code_size(500, &mut budget);
+        assert_eq!(allocated_entries(&frame_cache), 500);
+
+        let mut frame_cache = frame_cache.borrow_mut();
+        assert!(matches!(
+            frame_cache.instruction_cache_at(0),
+            Some(PerInstructionCache::Nothing)
+        ));
+        assert!(matches!(
+            frame_cache.instruction_cache_at(499),
+            Some(PerInstructionCache::Nothing)
+        ));
+        assert!(frame_cache.instruction_cache_at(500).is_none());
+
+        // Out of range writes are dropped rather than panicking.
+        frame_cache.memoize_instruction(500, PerInstructionCache::Nothing);
+    }
+
+    /// Absence of a per-instruction cache must read as a plain miss. Before the fix the access
+    /// sites indexed the vector directly, so an unallocated cache was not representable: reads
+    /// would have panicked instead of falling through to the function caches.
+    #[test]
+    fn absent_instruction_cache_reads_as_a_miss() {
+        let mut budget = budget_with(0);
+        let frame_cache = FrameTypeCache::make_rc_for_code_size(500, &mut budget);
+        assert_eq!(allocated_entries(&frame_cache), 0);
+
+        let mut frame_cache = frame_cache.borrow_mut();
+        assert!(frame_cache.instruction_cache_at(0).is_none());
+        assert!(frame_cache.instruction_cache_at(499).is_none());
+
+        // Writes are dropped rather than panicking, and the cache stays absent.
+        frame_cache.memoize_instruction(0, PerInstructionCache::Nothing);
+        assert!(frame_cache.instruction_cache_at(0).is_none());
+    }
+
+    /// The shape of APTOSNT-487: one long generic callee reached at many distinct type vectors,
+    /// each of which gets its own frame cache sized by the callee's bytecode length.
+    #[test]
+    fn aggregate_allocation_is_bounded_across_instantiations() {
+        const CODE_SIZE: usize = 10_000;
+        const INSTANTIATIONS: usize = 1_000;
+        const MAX_ENTRIES: usize = 100_000;
+
+        // Before the fix the resize was unconditional, so the total allocated was the product of
+        // two attacker-controlled quantities with no ceiling.
+        let unbounded_entries = CODE_SIZE * INSTANTIATIONS;
+
+        let mut budget = budget_with(MAX_ENTRIES);
+        let frame_caches = (0..INSTANTIATIONS)
+            .map(|_| FrameTypeCache::make_rc_for_code_size(CODE_SIZE, &mut budget))
+            .collect::<Vec<_>>();
+
+        let allocated = frame_caches.iter().map(allocated_entries).sum::<usize>();
+        assert_eq!(allocated, MAX_ENTRIES);
+        assert_eq!(unbounded_entries / allocated, 100);
+
+        // Exactly the first `MAX_ENTRIES / CODE_SIZE` instantiations get a per-instruction cache;
+        // the rest fall back to the function caches.
+        let with_cache = frame_caches
+            .iter()
+            .filter(|frame_cache| allocated_entries(frame_cache) > 0)
+            .count();
+        assert_eq!(with_cache, MAX_ENTRIES / CODE_SIZE);
+        assert_eq!(allocated_entries(frame_caches.last().unwrap()), 0);
+    }
+
+    /// A refused reservation must not consume budget, otherwise one oversized function would
+    /// starve every later one.
+    #[test]
+    fn refused_allocation_leaves_budget_for_smaller_functions() {
+        let mut budget = budget_with(1_000);
+
+        let too_big = FrameTypeCache::make_rc_for_code_size(1_001, &mut budget);
+        assert_eq!(allocated_entries(&too_big), 0);
+
+        let fits = FrameTypeCache::make_rc_for_code_size(1_000, &mut budget);
+        assert_eq!(allocated_entries(&fits), 1_000);
     }
 }

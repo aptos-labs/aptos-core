@@ -10,8 +10,8 @@ use crate::{
         LegacyLoaderConfig, Loader, ModuleMetadataLoader, NativeModuleLoader, ScriptLoader,
         StructDefinitionLoader,
     },
-    Function, LayoutCacheEntry, LayoutWithDelayedFields, LoadedFunction, Module, ModuleStorage,
-    RuntimeEnvironment, Script, StructKey, WithRuntimeEnvironment,
+    Function, LayoutCacheEntry, LayoutCacheKey, LayoutWithDelayedFields, LoadedFunction, Module,
+    ModuleStorage, RuntimeEnvironment, Script, WithRuntimeEnvironment,
 };
 use move_binary_format::{
     access::ScriptAccess,
@@ -216,7 +216,7 @@ where
         &self,
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,
-        key: &StructKey,
+        key: &LayoutCacheKey,
     ) -> Option<PartialVMResult<LayoutWithDelayedFields>> {
         let entry = self.module_storage.get_struct_layout(key)?;
         let (layout, modules) = entry.unpack();
@@ -269,7 +269,7 @@ where
 
     fn store_layout_to_cache(
         &self,
-        key: &StructKey,
+        key: &LayoutCacheKey,
         entry: LayoutCacheEntry,
     ) -> PartialVMResult<()> {
         self.module_storage.store_struct_layout(key, entry)

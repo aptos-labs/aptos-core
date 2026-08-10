@@ -1,0 +1,6 @@
+Move prover returns: exiting with bytecode transformation errors
+error: a `map_to_ordered_map` function whose result map type carries iterator-validity state is not supported
+   ┌─ tests/sources/functional/intrinsic_map_conv_ghost_err.move:23:5
+   │
+23 │     native fun to_dest<K: copy + drop, V>(m: Src<K, V>): Dest<K, V>;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -29,7 +29,7 @@ use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
 };
 use move_vm_runtime::{
-    LayoutCache, LayoutCacheEntry, Module, RuntimeEnvironment, Script, StructKey,
+    LayoutCache, LayoutCacheEntry, LayoutCacheKey, Module, RuntimeEnvironment, Script,
     WithRuntimeEnvironment,
 };
 use move_vm_types::code::{
@@ -262,17 +262,21 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> LatestView<'_, T, S> {
 }
 
 impl<T: Transaction, S: TStateView<Key = T::Key>> LayoutCache for LatestView<'_, T, S> {
-    fn get_struct_layout(&self, key: &StructKey) -> Option<LayoutCacheEntry> {
+    fn get_struct_layout(&self, key: &LayoutCacheKey) -> Option<LayoutCacheEntry> {
         self.global_module_cache.get_struct_layout_entry(key)
     }
 
-    fn store_struct_layout(&self, key: &StructKey, entry: LayoutCacheEntry) -> PartialVMResult<()> {
+    fn store_struct_layout(
+        &self,
+        key: &LayoutCacheKey,
+        entry: LayoutCacheEntry,
+    ) -> PartialVMResult<()> {
         self.global_module_cache
             .store_struct_layout_entry(key, entry)?;
         Ok(())
     }
 
-    fn remove_struct_layout(&self, key: &StructKey) {
+    fn remove_struct_layout(&self, key: &LayoutCacheKey) {
         self.global_module_cache.remove_struct_layout_entry(key);
     }
 }

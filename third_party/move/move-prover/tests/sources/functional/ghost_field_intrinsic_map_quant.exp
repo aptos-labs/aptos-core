@@ -1,0 +1,12 @@
+Move prover returns: exiting with compilation errors
+error: quantified variables must range over a vector, a type domain, a number range, or a state domain
+   ┌─ tests/sources/functional/ghost_field_intrinsic_map_quant.move:33:24
+   │
+33 │         ensures forall k in result: spec_get(result, k) == 7;
+   │                        ^
+
+error: quantified variables must range over a vector, a type domain, a number range, or a state domain
+   ┌─ tests/sources/functional/ghost_field_intrinsic_map_quant.move:34:24
+   │
+34 │         ensures exists k in result: k == 1;
+   │                        ^

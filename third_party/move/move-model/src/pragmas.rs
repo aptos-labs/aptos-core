@@ -105,6 +105,20 @@ pub const INTRINSIC_FUN_MAP_NEW_WITH_CONFIG: &str = "map_new_with_config";
 /// `[spec] fun map_new<K, V>(): Map<K, V>`
 pub const INTRINSIC_FUN_MAP_SPEC_NEW: &str = "map_spec_new";
 
+/// Iterator validity predicates: `(iterator_enum, map): bool`, true iff the
+/// iterator's hidden validity slot matches the map's — i.e. the iterator was
+/// created from the map's current version. Binding one of these gives the map
+/// a backend-synthesized validity slot (havoced by structural mutations) and
+/// the predicate's iterator enum a matching slot; neither is visible to or
+/// nameable from user specs. Two role names so a map can cover both a keyed
+/// iterator and a key-agnostic (leaf/node) walker.
+pub const INTRINSIC_FUN_MAP_SPEC_ITER_VALID: &str = "map_spec_iter_valid";
+pub const INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID: &str = "map_spec_leaf_iter_valid";
+/// Validity-preservation predicate: `(map_new, map_old): bool`, true iff the
+/// two map states share a validity version (no structural mutation between
+/// them) — the frame promise for operations that keep iterators valid.
+pub const INTRINSIC_FUN_MAP_SPEC_ITER_PRESERVED: &str = "map_spec_iter_preserved";
+
 /// Get the value associated with key `k`.
 /// The behavior is undefined if `k` does not exist in the map
 /// `[spec] fun map_get<K, V>(m: Map<K, V>, k: K): V`
@@ -282,6 +296,17 @@ pub const INTRINSIC_FUN_MAP_BORROW_MUT_WITH_DEFAULT: &str = "map_borrow_mut_with
 /// `[move] fun map_borrow_with_default<K, V>(m: &Map<K, V>, k: K, default: V): &V`
 pub const INTRINSIC_FUN_MAP_BORROW_WITH_DEFAULT: &str = "map_borrow_with_default";
 
+/// Mutable borrow of the value at an iterator's position. The first parameter must be
+/// an enum with exactly one variant carrying a field of the key type (the iterator's
+/// key); the map is the second parameter. Aborts if the iterator is the end iterator
+/// or its key is not in the map.
+/// `[move] fun map_iter_borrow_mut<K, V>(self: Iter<K>, m: &mut Map<K, V>): &mut V`
+pub const INTRINSIC_FUN_MAP_ITER_BORROW_MUT: &str = "map_iter_borrow_mut";
+
+/// Abort condition for map_iter_borrow_mut
+/// `[spec] fun map_spec_aborts_iter_borrow_mut<K, V>(self: Iter<K>, m: Map<K, V>): bool`
+pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_BORROW_MUT: &str = "map_spec_aborts_iter_borrow_mut";
+
 /// Abort condition for map_destroy_empty: true when the map is non-empty
 /// `[spec] fun map_spec_aborts_destroy_empty<K, V>(m: Map<K, V>): bool`
 pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY: &str = "map_spec_aborts_destroy_empty";
@@ -392,6 +417,18 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
                 ),
             ),
             (INTRINSIC_FUN_MAP_SPEC_NEW, IntrinsicFunDef::spec_fun()),
+            (
+                INTRINSIC_FUN_MAP_SPEC_ITER_VALID,
+                IntrinsicFunDef::spec_fun(),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID,
+                IntrinsicFunDef::spec_fun(),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_ITER_PRESERVED,
+                IntrinsicFunDef::spec_fun(),
+            ),
             (INTRINSIC_FUN_MAP_SPEC_GET, IntrinsicFunDef::spec_fun()),
             (INTRINSIC_FUN_MAP_SPEC_SET, IntrinsicFunDef::spec_fun()),
             (INTRINSIC_FUN_MAP_SPEC_DEL, IntrinsicFunDef::spec_fun()),
@@ -539,6 +576,17 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
             (
                 INTRINSIC_FUN_MAP_BORROW_WITH_DEFAULT,
                 IntrinsicFunDef::move_fun(Some(INTRINSIC_FUN_MAP_SPEC_GET), None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_ITER_BORROW_MUT,
+                IntrinsicFunDef::move_fun(
+                    None,
+                    Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_BORROW_MUT),
+                ),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_BORROW_MUT,
+                IntrinsicFunDef::spec_fun(),
             ),
             (
                 INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY,

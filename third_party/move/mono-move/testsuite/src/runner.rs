@@ -317,7 +317,16 @@ fn v1_native_table() -> NativeFunctionTable {
         TimedFeaturesBuilder::enable_all().build(),
         Features::default(),
     );
-    table.extend(crate::v1_test_natives::make_all_v1_test_natives());
+    // The mirrors take precedence over same-name production natives (cargo
+    // feature unification can put `unit_test` natives into the production
+    // table), so both VMs run the same implementation in the comparison.
+    let overrides = crate::v1_test_natives::make_all_v1_test_natives();
+    table.retain(|(addr, module, fun, _)| {
+        !overrides.iter().any(|(o_addr, o_module, o_fun, _)| {
+            addr == o_addr && module == o_module && fun == o_fun
+        })
+    });
+    table.extend(overrides);
     table
 }
 
