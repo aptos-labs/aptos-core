@@ -202,19 +202,8 @@ where
                         .consume_closure_call()
                         .map_err(|err| err.finish(Location::Undefined))
                         .map(|(f, mask)| (Rc::new(f.clone()), mask))?;
-                    // The other call paths take their cache from `function_caches`, which memoizes
-                    // per (function, type arguments) and so charges the budget once per
-                    // instantiation. Closure calls build a fresh cache each time, and its budget is
-                    // not reclaimed when that cache is freed, so a trace with enough closure calls
-                    // exhausts the budget and falls back to uncached lookups. Speed only: this
-                    // checker is unmetered, and the budget cannot change results.
-                    //
-                    // TODO(perf): take the cache from `function_caches` here too, which drops
-                    // both the per-call allocation and the unreclaimed budget.
-                    let callee_frame_cache = FrameTypeCache::make_rc_for_code_size(
-                        callee.code_size(),
-                        self.function_caches.budget_mut(),
-                    );
+                    let callee_frame_cache =
+                        self.function_caches.get_or_create_frame_cache(&callee);
                     self.execute_closure_call::<RTTCheck>(
                         cursor,
                         &mut current_frame,

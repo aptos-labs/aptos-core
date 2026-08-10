@@ -131,11 +131,6 @@ impl InterpreterFunctionCaches {
         }
     }
 
-    /// Budget shared by all frame caches created during this invocation.
-    pub(crate) fn budget_mut(&mut self) -> &mut InstructionCacheBudget {
-        &mut self.budget
-    }
-
     pub(crate) fn get_or_create_frame_cache(
         &mut self,
         function: &LoadedFunction,

@@ -801,7 +801,6 @@ where
                             callee,
                             fn_guard,
                             CallType::ClosureDynamicDispatch,
-                            // Make sure the frame cache is empty for the new call.
                             frame_cache,
                             mask,
                             captured_vec,
