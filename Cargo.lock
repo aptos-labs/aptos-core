@@ -5116,7 +5116,6 @@ dependencies = [
  "aptos-block-executor",
  "aptos-block-partitioner",
  "aptos-crypto",
- "aptos-crypto-derive",
  "aptos-experimental-runtimes",
  "aptos-framework-natives",
  "aptos-gas-algebra",
@@ -12879,6 +12878,51 @@ dependencies = [
  "bumpalo",
  "crossbeam-utils",
  "parking_lot 0.12.5",
+]
+
+[[package]]
+name = "mono-move-aptos-state-view-providers"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-framework",
+ "aptos-types",
+ "bcs 0.1.4",
+ "bytes",
+ "fxhash",
+ "mono-move-aptos-transaction-executor",
+ "mono-move-core",
+ "mono-move-global-context",
+ "mono-move-runtime",
+ "move-binary-format",
+ "move-bytecode-verifier",
+ "move-core-types",
+ "thiserror 1.0.69",
+ "triomphe",
+]
+
+[[package]]
+name = "mono-move-aptos-transaction-executor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-cached-packages",
+ "aptos-language-e2e-tests",
+ "aptos-transaction-simulation",
+ "aptos-types",
+ "bcs 0.1.4",
+ "bytes",
+ "mono-move-aptos-state-view-providers",
+ "mono-move-core",
+ "mono-move-global-context",
+ "mono-move-loader",
+ "mono-move-natives",
+ "mono-move-output",
+ "mono-move-runtime",
+ "move-core-types",
+ "serde",
+ "thiserror 1.0.69",
+ "triomphe",
 ]
 
 [[package]]

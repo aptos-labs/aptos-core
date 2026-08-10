@@ -18,6 +18,7 @@ use move_binary_format::{
     },
     CompiledModule,
 };
+use move_core_types::language_storage::{FunctionParamOrReturnTag, StructTag, TypeTag};
 use shared_dsa::UnorderedMap;
 use std::ops::Deref;
 use thiserror::Error;
@@ -488,6 +489,78 @@ pub fn intern_sig_token(
             interner.nominal_of(module_id, struct_name, interner.type_list_of(&ty_args))
         },
     }
+}
+
+/// Interns a runtime [`TypeTag`] (e.g. a transaction's type argument, or a
+/// resource's struct tag).
+//
+// TODO(metering): decide if this construction requires metering.
+pub fn intern_type_tag(tag: &TypeTag, interner: &impl Interner) -> anyhow::Result<InternedType> {
+    use crate::types as ty;
+    Ok(match tag {
+        TypeTag::Bool => ty::BOOL_TY,
+        TypeTag::U8 => ty::U8_TY,
+        TypeTag::U16 => ty::U16_TY,
+        TypeTag::U32 => ty::U32_TY,
+        TypeTag::U64 => ty::U64_TY,
+        TypeTag::U128 => ty::U128_TY,
+        TypeTag::U256 => ty::U256_TY,
+        TypeTag::I8 => ty::I8_TY,
+        TypeTag::I16 => ty::I16_TY,
+        TypeTag::I32 => ty::I32_TY,
+        TypeTag::I64 => ty::I64_TY,
+        TypeTag::I128 => ty::I128_TY,
+        TypeTag::I256 => ty::I256_TY,
+        TypeTag::Address => ty::ADDRESS_TY,
+        TypeTag::Signer => ty::SIGNER_TY,
+        TypeTag::Vector(elem) => interner.vector_of(intern_type_tag(elem, interner)?),
+        TypeTag::Struct(struct_tag) => intern_struct_tag(struct_tag, interner)?,
+        TypeTag::Function(function_tag) => {
+            let args = intern_function_param_tags(&function_tag.args, interner)?;
+            let results = intern_function_param_tags(&function_tag.results, interner)?;
+            interner.function_of(
+                interner.type_list_of(&args),
+                interner.type_list_of(&results),
+                function_tag.abilities,
+            )
+        },
+    })
+}
+
+/// Interns a function tag's parameter or return tags, applying each one's
+/// reference kind.
+fn intern_function_param_tags(
+    tags: &[FunctionParamOrReturnTag],
+    interner: &impl Interner,
+) -> anyhow::Result<Vec<InternedType>> {
+    tags.iter()
+        .map(|tag| {
+            Ok(match tag {
+                FunctionParamOrReturnTag::Value(tag) => intern_type_tag(tag, interner)?,
+                FunctionParamOrReturnTag::Reference(tag) => {
+                    interner.immut_ref_of(intern_type_tag(tag, interner)?)
+                },
+                FunctionParamOrReturnTag::MutableReference(tag) => {
+                    interner.mut_ref_of(intern_type_tag(tag, interner)?)
+                },
+            })
+        })
+        .collect()
+}
+
+/// Interns a struct tag into its nominal type.
+pub fn intern_struct_tag(
+    struct_tag: &StructTag,
+    interner: &impl Interner,
+) -> anyhow::Result<InternedType> {
+    let module_id = interner.module_id_of(&struct_tag.address, struct_tag.module.as_ident_str());
+    let name = interner.identifier_of(struct_tag.name.as_ident_str());
+    let args = struct_tag
+        .type_args
+        .iter()
+        .map(|arg| intern_type_tag(arg, interner))
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    Ok(interner.nominal_of(module_id, name, interner.type_list_of(&args)))
 }
 
 fn intern_struct_info(

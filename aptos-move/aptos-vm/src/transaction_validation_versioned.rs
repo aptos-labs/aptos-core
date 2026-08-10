@@ -14,7 +14,9 @@ use crate::{
 use aptos_gas_algebra::Gas;
 use aptos_types::{
     fee_statement::FeeStatement,
-    transaction::{ReplayProtector, TxnLimitsRequest, UserTxnLimitsRequest},
+    transaction::{
+        EpilogueArgs, PrologueArgs, ReplayProtector, TxnLimitsRequest, UserTxnLimitsRequest,
+    },
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use move_binary_format::errors::VMResult;
@@ -23,27 +25,6 @@ use move_vm_runtime::{
     logging::expect_no_verification_errors, module_traversal::TraversalContext, ModuleStorage,
 };
 use move_vm_types::gas::UnmeteredGasMeter;
-use serde::Serialize;
-
-/// Mirrors Move enum in `transaction_validation.move` and needs to have the
-/// same BCS serialization.
-#[derive(Serialize)]
-enum PrologueArgs {
-    V1 {
-        needs_fee_payer_auth_check: bool,
-        txn_sender_public_key: Option<Vec<u8>>,
-        fee_payer_public_key_hash: Option<Vec<u8>>,
-        replay_protector: ReplayProtector,
-        secondary_signer_addresses: Vec<AccountAddress>,
-        secondary_signer_public_key_hashes: Vec<Option<Vec<u8>>>,
-        txn_gas_price: u64,
-        txn_max_gas_units: u64,
-        txn_expiration_time: u64,
-        chain_id: u8,
-        is_simulation: bool,
-        txn_limits_request: Option<UserTxnLimitsRequest>,
-    },
-}
 
 /// Builder that collects prologue arguments and selects the appropriate enum
 /// variant to build.
@@ -143,20 +124,6 @@ pub(crate) fn run_prologue(
         .map(|_return_vals| ())
         .map_err(expect_no_verification_errors)
         .or_else(|err| convert_prologue_error(err, log_context))
-}
-
-/// Mirrors Move enum in `transaction_validation.move` and needs to have the
-/// same BCS serialization.
-#[derive(Serialize)]
-enum EpilogueArgs {
-    V1 {
-        fee_statement: FeeStatement,
-        txn_gas_price: u64,
-        txn_max_gas_units: u64,
-        gas_units_remaining: u64,
-        is_simulation: bool,
-        is_orderless_txn: bool,
-    },
 }
 
 /// Builder that collects epilogue arguments and selects the appropriate enum

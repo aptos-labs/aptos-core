@@ -48,8 +48,8 @@ pub use object_descriptor::{
     CLOSURE_DESCRIPTOR_ID, RESERVED_DESCRIPTOR_COUNT, TRIVIAL_DESCRIPTOR_ID,
 };
 pub use prepared_module::{
-    intern_sig_token, FieldTypes, FunctionInstantiationSignature, FunctionSignature,
-    PreparedModule, PreparedModuleError,
+    intern_sig_token, intern_struct_tag, intern_type_tag, FieldTypes,
+    FunctionInstantiationSignature, FunctionSignature, PreparedModule, PreparedModuleError,
 };
 pub use root_pool::{ObjectHandle, ReferenceHandle, RootPool};
 pub use storage::{
