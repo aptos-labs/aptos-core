@@ -158,8 +158,7 @@ fn test_error_if_version_pruned() {
     );
     assert!(db.error_if_ledger_pruned("Transaction", 10).is_ok());
 
-    // The API downcasts to this variant to return 410, so the shape matters here,
-    // not just the message.
+    // Callers match on the variant, so assert its shape and not just the message.
     assert!(matches!(
         db.error_if_ledger_pruned("Transaction", 9).unwrap_err(),
         AptosDbError::LedgerPruned {

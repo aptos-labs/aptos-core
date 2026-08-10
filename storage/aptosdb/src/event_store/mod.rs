@@ -129,9 +129,7 @@ impl EventStore {
             }
             if seq != cur_seq {
                 // Sequence numbers are contiguous per key, so a gap at the first
-                // requested entry means the range was pruned. Mirrors the same
-                // check in InternalIndexerDB::lookup_events_by_key; which of the
-                // two indexes gets pruned depends on node config.
+                // requested entry means the range was pruned.
                 if cur_seq == start_seq_num {
                     return Err(AptosDbError::EventPruned {
                         requested_seq_num: start_seq_num,
