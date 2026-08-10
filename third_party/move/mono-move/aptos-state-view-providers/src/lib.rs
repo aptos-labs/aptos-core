@@ -43,8 +43,9 @@ use move_core_types::{
     move_resource::MoveStructType,
 };
 use specializer::lower::gc_layout::type_pointer_offsets;
-use std::{cell::RefCell, sync::Arc};
+use std::cell::RefCell;
 use thiserror::Error;
+use triomphe::Arc;
 
 /// Size of the provider's value arena.
 pub const DEFAULT_RESOURCE_ARENA_BYTES: usize = 64 * 1024 * 1024;

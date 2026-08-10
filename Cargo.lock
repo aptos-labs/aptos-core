@@ -12899,6 +12899,7 @@ dependencies = [
  "move-core-types",
  "specializer",
  "thiserror 1.0.69",
+ "triomphe",
 ]
 
 [[package]]
@@ -12925,6 +12926,7 @@ dependencies = [
  "move-core-types",
  "serde",
  "thiserror 1.0.69",
+ "triomphe",
 ]
 
 [[package]]

@@ -12,10 +12,8 @@ use mono_move_core::{
     Interner,
 };
 use move_core_types::language_storage::StructTag;
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-};
+use std::collections::{BTreeMap, HashMap};
+use triomphe::Arc;
 
 /// Trait extending the runtime's [`ResourceProvider`] interface with additional capabilities to
 /// handle resource groups and table items.
@@ -50,6 +48,9 @@ pub trait AptosDataProvider: ResourceProvider {
 
 /// A resource group's members and their stored bytes. Unordered: the stored
 /// encoding is canonical in struct-tag order.
+//
+// TODO(cleanup): consider `shared-dsa`'s `UnorderedSet` and make it explicit that
+// the iteration order can be non-deterministic.
 pub type GroupMembers = HashMap<InternedType, Bytes>;
 
 /// Where a value lives in state storage.
@@ -73,6 +74,9 @@ pub fn decode_group_members(blob: &[u8], interner: &impl Interner) -> Result<Gro
 }
 
 /// The struct tag of a nominal type, for storage keys.
+//
+// TODO(perf): should be a cached method on the context, which would also let the
+// state-view providers stop open-coding it.
 pub(crate) fn nominal_tag(ty: InternedType) -> Result<StructTag> {
     struct_tag_of(ty).ok_or_else(|| anyhow!("resource type is not nominal"))
 }
