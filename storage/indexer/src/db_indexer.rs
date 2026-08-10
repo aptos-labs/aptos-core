@@ -216,13 +216,11 @@ impl InternalIndexerDB {
         ))
     }
 
-    /// Like [`Self::lookup_events_by_key`], but returns the events that are still
-    /// retained instead of failing when the requested range starts below the
-    /// pruner's window.
+    /// Like [`Self::lookup_events_by_key`], but returns whatever is still retained
+    /// instead of failing when the range starts below the pruner's window.
     ///
-    /// This is for callers whose `start_seq_num` is a derived lower bound rather
-    /// than a client-requested position: reporting such a range as pruned would
-    /// withhold events the caller asked for and that the node can still serve.
+    /// For callers whose `start_seq_num` is derived rather than client-supplied,
+    /// where failing would withhold events the node can still serve.
     pub fn lookup_events_by_key_clamped(
         &self,
         event_key: &EventKey,
@@ -235,9 +233,8 @@ impl InternalIndexerDB {
                 min_available_seq_num,
                 ..
             }) => {
-                // Shrink the limit by the pruned prefix so the window keeps its
-                // original end. Reusing `limit` from the clamped start would slide
-                // the window forward and return entries past what was requested.
+                // Shrink the limit by the pruned prefix so the window keeps its end.
+                // Reusing `limit` here would slide it forward past what was asked for.
                 let skipped = min_available_seq_num.saturating_sub(start_seq_num);
                 let remaining = limit.saturating_sub(skipped);
                 if remaining == 0 {
@@ -281,8 +278,8 @@ impl InternalIndexerDB {
                 break;
             }
             if seq != cur_seq {
-                // Sequence numbers are contiguous per event key, so a gap at the very
-                // first requested entry means the caller asked for a pruned range.
+                // Sequence numbers are contiguous per key, so a gap at the first
+                // requested entry means the range was pruned.
                 if cur_seq == start_seq_num {
                     return Err(AptosDbError::EventPruned {
                         requested_seq_num: start_seq_num,
@@ -742,11 +739,9 @@ impl DBIndexer {
         // Convert requested range and order to a range in ascending order.
         let (first_seq, real_limit) = get_first_seq_num_and_limit(order, cursor, limit)?;
 
-        // Query the index. Only when `get_latest` is `first_seq` derived from the
-        // latest sequence number rather than requested by the caller, so a pruned
-        // prefix there means fewer events are available rather than an unservable
-        // request. A caller-supplied start, in either order, is still reported as
-        // pruned.
+        // When `get_latest` is set, `first_seq` is derived rather than requested, so
+        // a pruned prefix just means fewer events are available. A caller-supplied
+        // start is still reported as pruned.
         let mut event_indices = if get_latest {
             self.indexer_db.lookup_events_by_key_clamped(
                 event_key,
@@ -822,8 +817,8 @@ mod tests {
 
     const EVENT_KEY_CREATION_NUM: u64 = 3;
 
-    /// Builds an indexer db holding only the given `(seq_num, version, index)`
-    /// event index entries, standing in for a db whose older entries were pruned.
+    /// Builds an indexer db holding only the given event index entries, standing in
+    /// for one whose older entries were pruned.
     fn indexer_db_with_events(
         tmp_dir: &TempPath,
         event_key: &EventKey,
@@ -849,8 +844,8 @@ mod tests {
         EventKey::new(EVENT_KEY_CREATION_NUM, AccountAddress::ONE)
     }
 
-    /// The API downcasts to this variant to return a 410 rather than a 500, so the
-    /// structure (not just the message) is load bearing.
+    /// The API downcasts to this variant to return 410, so the shape matters here,
+    /// not just the message.
     #[test]
     fn lookup_from_pruned_sequence_number_reports_pruned() {
         let tmp_dir = TempPath::new();
@@ -885,8 +880,8 @@ mod tests {
         assert_eq!(events, vec![(100, 5000, 0), (101, 5001, 7)]);
     }
 
-    /// A sequence number past the newest entry is not pruning, and must not be
-    /// reported as such -- the seek simply runs off the end of the key's range.
+    /// A start past the newest entry is not pruning: the seek just runs off the end
+    /// of the key's range.
     #[test]
     fn lookup_past_the_newest_sequence_number_is_not_pruned() {
         let tmp_dir = TempPath::new();
@@ -900,9 +895,8 @@ mod tests {
         assert!(events.is_empty());
     }
 
-    /// A descending query derives its start from the latest sequence number, so a
-    /// pruned prefix must yield the events that remain rather than a 410 naming a
-    /// sequence number the caller never asked for.
+    /// A descending query derives its start, so a pruned prefix must return the
+    /// events that remain rather than a 410 naming a sequence number nobody asked for.
     #[test]
     fn clamped_lookup_returns_retained_events_instead_of_reporting_pruned() {
         let tmp_dir = TempPath::new();
@@ -926,9 +920,8 @@ mod tests {
         assert_eq!(events, vec![(100, 5000, 0), (101, 5001, 0), (102, 5002, 0)]);
     }
 
-    /// Clamping moves the start forward, so the limit has to shrink by the same
-    /// amount. Reusing the original limit would return entries past the end of
-    /// the window the caller asked for.
+    /// Clamping moves the start forward, so the limit has to shrink to match, or the
+    /// result runs past the end of the requested window.
     #[test]
     fn clamped_lookup_does_not_extend_past_the_requested_window() {
         let tmp_dir = TempPath::new();
@@ -962,8 +955,8 @@ mod tests {
         );
     }
 
-    /// Corruption must not be clamped away: only a gap at the very first entry is
-    /// pruning, so the clamped variant still surfaces a mid-range gap as an error.
+    /// Only a gap at the first entry is pruning, so the clamped variant must still
+    /// surface a mid-range gap as an error.
     #[test]
     fn clamped_lookup_still_surfaces_corruption() {
         let tmp_dir = TempPath::new();
@@ -981,8 +974,8 @@ mod tests {
         assert!(err.to_string().contains("DB corruption"));
     }
 
-    /// A gap after the first entry is corruption, not pruning: it must stay a 500
-    /// rather than being laundered into a 410 telling the client to try archival.
+    /// A gap after the first entry is corruption, not pruning, and must stay a 500
+    /// rather than becoming a 410 that sends the client to an archival node.
     #[test]
     fn gap_after_the_first_entry_is_not_reported_as_pruned() {
         let tmp_dir = TempPath::new();

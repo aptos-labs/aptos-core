@@ -158,8 +158,8 @@ fn test_error_if_version_pruned() {
     );
     assert!(db.error_if_ledger_pruned("Transaction", 10).is_ok());
 
-    // The API downcasts to this variant to turn pruned reads into a 410 rather
-    // than a 500, so the structure (not just the message) is load bearing.
+    // The API downcasts to this variant to return 410, so the shape matters here,
+    // not just the message.
     assert!(matches!(
         db.error_if_ledger_pruned("Transaction", 9).unwrap_err(),
         AptosDbError::LedgerPruned {

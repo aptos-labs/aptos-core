@@ -24,9 +24,8 @@ pub enum AptosDbError {
         version: u64,
         min_available_version: u64,
     },
-    /// A requested event falls below the pruner's retained window. Events are
-    /// addressed by sequence number rather than version, so pruning is detected
-    /// as a gap at the start of the requested range rather than by version.
+    /// A requested event falls below the pruner's retained window. Events are keyed
+    /// by sequence number, so this is detected as a gap rather than by version.
     #[error("Event at sequence number {requested_seq_num} is pruned, min available sequence number is {min_available_seq_num}.")]
     EventPruned {
         requested_seq_num: u64,
@@ -84,9 +83,9 @@ impl From<AptosDbError> for StateViewError {
         match error {
             AptosDbError::NotFound(msg) => StateViewError::NotFound(msg),
             AptosDbError::Other(msg) => StateViewError::Other(msg),
-            // Listed explicitly rather than with a wildcard: everything below
-            // collapses into an opaque string, so a new variant whose structure
-            // callers depend on would otherwise be absorbed here silently.
+            // Listed explicitly rather than with a wildcard: these all collapse
+            // into an opaque string, so a new variant callers care about would
+            // otherwise be absorbed here silently.
             AptosDbError::TooManyRequested(..)
             | AptosDbError::MissingRootError(..)
             | AptosDbError::LedgerPruned { .. }
