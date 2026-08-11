@@ -1182,22 +1182,11 @@ module aptos_framework::account {
     /// than `(1/2)^(256)`.
     public fun create_resource_account(source: &signer, seed: vector<u8>): (signer, SignerCapability) acquires Account {
         let resource_addr = create_resource_address(&signer::address_of(source), seed);
-        let resource = if (exists_at(resource_addr)) {
-            if (resource_exists_at(resource_addr)) {
-            let account = &Account[resource_addr];
-            assert!(
-                account.signer_capability_offer.for.is_none(),
-                error::already_exists(ERESOURCE_ACCCOUNT_EXISTS),
-            );
-            };
-            assert!(
-                get_sequence_number(resource_addr) == 0,
-                error::invalid_state(EACCOUNT_ALREADY_USED),
-            );
-            create_signer(resource_addr)
-        } else {
-            create_account_unchecked(resource_addr)
-        };
+        assert!(
+            !resource_exists_at(resource_addr),
+            error::already_exists(ERESOURCE_ACCCOUNT_EXISTS)
+        );
+        let resource = create_signer(resource_addr);
 
         // By default, only the SignerCapability should have control over the resource account and not the auth key.
         // If the source account wants direct control via auth key, they would need to explicitly rotate the auth key
