@@ -1,0 +1,16 @@
+---
+remote_endpoint: ~
+name: "v1.48-enable-concurrent-fungible-balance"
+proposals:
+  - name: enable_concurrent_fungible_balance
+    metadata:
+      title: "Enable CONCURRENT_FUNGIBLE_BALANCE on testnet"
+      description: "Enable opt-in upgrades of fungible stores to concurrent balances on testnet without changing the default for new stores."
+      source_code_url: "https://github.com/aptos-labs/aptos-core/pull/11183"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-070-parallelize-fungible-assets.md"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - concurrent_fungible_balance
+          disabled: []
