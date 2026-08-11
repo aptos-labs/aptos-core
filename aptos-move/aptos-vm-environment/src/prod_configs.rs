@@ -115,6 +115,38 @@ pub fn get_layout_caches() -> bool {
     LAYOUT_CACHES.get().cloned().unwrap_or(false)
 }
 
+/// If enabled, a transaction's prologue and epilogue are not run.
+///
+/// The prologue checks a transaction's chain id, expiry, authentication key and replay protector,
+/// and reserves the gas deposit; the epilogue settles the fee, advances the sequence number and
+/// emits the fee statement. A chain needs every one of those. An embedder driving the VM over a
+/// stream that some outer layer has already ordered, authenticated and de-duplicated, and that
+/// settles no fees, pays for work it cannot use.
+///
+/// Reachable only under the `skip-transaction-validation` feature, so a build that does not ask for
+/// it — a validator's — has no way to set it.
+#[cfg(feature = "skip-transaction-validation")]
+static SKIP_TRANSACTION_VALIDATION: OnceCell<bool> = OnceCell::new();
+
+/// Set the flag that skips the transaction prologue and epilogue.
+#[cfg(feature = "skip-transaction-validation")]
+pub fn set_skip_transaction_validation(skip: bool) {
+    SKIP_TRANSACTION_VALIDATION.set(skip).ok();
+}
+
+/// Returns whether the transaction prologue and epilogue are skipped, and false if not set.
+#[cfg(feature = "skip-transaction-validation")]
+pub fn get_skip_transaction_validation() -> bool {
+    SKIP_TRANSACTION_VALIDATION.get().cloned().unwrap_or(false)
+}
+
+/// Returns whether the transaction prologue and epilogue are skipped, which without the
+/// `skip-transaction-validation` feature nothing can ask for.
+#[cfg(not(feature = "skip-transaction-validation"))]
+pub fn get_skip_transaction_validation() -> bool {
+    false
+}
+
 /// Returns [TypeBuilder] used by the Aptos blockchain in production.
 pub fn aptos_prod_ty_builder(
     gas_feature_version: u64,

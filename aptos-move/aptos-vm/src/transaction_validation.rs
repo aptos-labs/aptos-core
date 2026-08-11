@@ -20,6 +20,7 @@ use aptos_types::{
     on_chain_config::Features,
     transaction::{MultisigTransactionPayload, ReplayProtector, TransactionExecutableRef},
 };
+use aptos_vm_environment::prod_configs::get_skip_transaction_validation;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
 use move_binary_format::errors::VMResult;
@@ -122,6 +123,10 @@ pub(crate) fn run_script_prologue(
     traversal_context: &mut TraversalContext,
     is_simulation: bool,
 ) -> Result<(), VMStatus> {
+    if get_skip_transaction_validation() {
+        return Ok(());
+    }
+
     if features.is_versioned_transaction_validation_enabled() {
         return crate::transaction_validation_versioned::run_prologue(
             session,
@@ -489,6 +494,10 @@ fn run_epilogue(
     traversal_context: &mut TraversalContext,
     is_simulation: bool,
 ) -> VMResult<()> {
+    if get_skip_transaction_validation() {
+        return Ok(());
+    }
+
     if features.is_versioned_transaction_validation_enabled() {
         return crate::transaction_validation_versioned::run_epilogue(
             session,

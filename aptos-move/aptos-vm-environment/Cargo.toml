@@ -16,6 +16,9 @@ rust-version = { workspace = true }
 default = []
 testing = ["aptos-move-stdlib/testing"]
 profiling = ["move-vm-runtime/profiling"]
+# Lets an embedder skip the transaction prologue and epilogue. Never enable it for a node that
+# participates in consensus. See `prod_configs::set_skip_transaction_validation`.
+skip-transaction-validation = []
 
 [dependencies]
 aptos-framework-natives = { workspace = true }

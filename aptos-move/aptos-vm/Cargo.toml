@@ -23,6 +23,9 @@ fuzzing = [
 ]
 failpoints = ["fail/failpoints", "move-vm-runtime/failpoints"]
 profiling = ["move-vm-runtime/profiling"]
+# Lets an embedder skip the transaction prologue and epilogue. Never enable it for a node that
+# participates in consensus. See `aptos_vm_environment::prod_configs::set_skip_transaction_validation`.
+skip-transaction-validation = ["aptos-vm-environment/skip-transaction-validation"]
 testing = [
     "move-unit-test",
     "aptos-framework-natives/testing",
