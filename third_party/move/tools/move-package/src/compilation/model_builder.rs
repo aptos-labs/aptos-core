@@ -10,7 +10,9 @@ use crate::{
 use anyhow::Result;
 use itertools::Itertools;
 use legacy_move_compiler::shared::PackagePaths;
-use move_compiler_v2::{run_checker_and_rewriters, run_move_compiler_to_model, Options};
+use move_compiler_v2::{
+    run_checker_and_rewriters, run_move_compiler_to_model, Experiment, Options,
+};
 use move_model::model::GlobalEnv;
 
 #[derive(Debug, Clone)]
@@ -41,7 +43,11 @@ impl ModelBuilder {
     ///
     /// See [`ModelConfig::with_bytecode`] for the effect of that flag.
     pub fn build_model(&self) -> Result<GlobalEnv> {
-        let options = self.build_compiler_options()?;
+        // Analysis models may include native declarations at non-special addresses;
+        // that check only applies when compiling for execution.
+        let options = self
+            .build_compiler_options()?
+            .set_experiment(Experiment::NATIVE_CHECK, false);
         if self.model_config.with_bytecode {
             run_move_compiler_to_model(options)
         } else {

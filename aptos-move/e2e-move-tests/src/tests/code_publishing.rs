@@ -107,13 +107,15 @@ fn code_publishing_disallow_user_native() {
     let mut h = MoveHarness::new();
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
-    assert_vm_status!(
-        h.publish_package(
-            &acc,
-            &common::test_dir_path("code_publishing.data/pack_native"),
-        ),
-        StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED
+    // Disable the compiler's native check so the package builds and the
+    // publish-time VM check is exercised.
+    let txn = h.create_publish_package(
+        &acc,
+        &common::test_dir_path("code_publishing.data/pack_native"),
+        Some(aptos_framework::BuildOptions::default().with_experiment("native-check=off")),
+        |_| {},
     );
+    assert_vm_status!(h.run(txn), StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED);
 }
 
 #[test]
@@ -121,13 +123,15 @@ fn code_publishing_disallow_user_native_entry() {
     let mut h = MoveHarness::new();
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
-    assert_vm_status!(
-        h.publish_package(
-            &acc,
-            &common::test_dir_path("code_publishing.data/pack_native_entry"),
-        ),
-        StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED
+    // Disable the compiler's native check so the package builds and the
+    // publish-time VM check is exercised.
+    let txn = h.create_publish_package(
+        &acc,
+        &common::test_dir_path("code_publishing.data/pack_native_entry"),
+        Some(aptos_framework::BuildOptions::default().with_experiment("native-check=off")),
+        |_| {},
     );
+    assert_vm_status!(h.run(txn), StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED);
 }
 
 #[test]
@@ -146,13 +150,15 @@ fn code_publishing_disallow_system_native_entry() {
     let mut h = MoveHarness::new();
     let acc = h.aptos_framework_account();
 
-    assert_vm_status!(
-        h.publish_package(
-            &acc,
-            &common::test_dir_path("code_publishing.data/pack_native_system_entry"),
-        ),
-        StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED
+    // Disable the compiler's native check so the package builds and the
+    // publish-time VM check is exercised.
+    let txn = h.create_publish_package(
+        &acc,
+        &common::test_dir_path("code_publishing.data/pack_native_system_entry"),
+        Some(aptos_framework::BuildOptions::default().with_experiment("native-check=off")),
+        |_| {},
     );
+    assert_vm_status!(h.run(txn), StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED);
 }
 
 #[test]

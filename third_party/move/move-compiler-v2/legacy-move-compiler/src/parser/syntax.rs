@@ -3376,6 +3376,14 @@ fn parse_struct_decl(
             .env
             .add_diag(diag!(Syntax::InvalidModifier, (loc, msg)));
     }
+    if is_enum {
+        if let Some(loc) = native {
+            let msg = "native enums are not supported";
+            context
+                .env
+                .add_diag(diag!(Syntax::InvalidModifier, (loc, msg)));
+        }
+    }
 
     if is_enum {
         context.tokens.advance()?;
