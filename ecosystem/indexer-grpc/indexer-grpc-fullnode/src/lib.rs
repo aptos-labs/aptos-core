@@ -4,7 +4,8 @@
 use aptos_api::context::Context;
 use std::sync::Arc;
 
-pub mod convert;
+pub use aptos_indexer_grpc_convert as convert;
+
 pub mod counters;
 pub mod fullnode_data_service;
 pub mod localnet_data_service;

@@ -132,6 +132,7 @@ members = [
     "devtools/aptos-cargo-cli",
     "dkg",
     "ecosystem/indexer-grpc/indexer-grpc-cache-worker",
+    "ecosystem/indexer-grpc/indexer-grpc-convert",
     "ecosystem/indexer-grpc/indexer-grpc-data-service",
     "ecosystem/indexer-grpc/indexer-grpc-data-service-v2",
     "ecosystem/indexer-grpc/indexer-grpc-file-checker",
@@ -381,6 +382,7 @@ aptos-global-constants = { path = "config/global-constants" }
 aptos-id-generator = { path = "crates/aptos-id-generator" }
 aptos-in-memory-cache = { path = "crates/aptos-in-memory-cache" }
 aptos-indexer-grpc-cache-worker = { path = "ecosystem/indexer-grpc/indexer-grpc-cache-worker" }
+aptos-indexer-grpc-convert = { path = "ecosystem/indexer-grpc/indexer-grpc-convert" }
 aptos-indexer-grpc-data-service = { path = "ecosystem/indexer-grpc/indexer-grpc-data-service" }
 aptos-indexer-grpc-data-service-v2 = { path = "ecosystem/indexer-grpc/indexer-grpc-data-service-v2" }
 aptos-indexer-grpc-file-checker = { path = "ecosystem/indexer-grpc/indexer-grpc-file-checker" }
