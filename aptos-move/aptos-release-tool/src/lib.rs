@@ -118,6 +118,11 @@ enum Commands {
         )]
         metadata_url: String,
 
+        /// Mint gas funds to the validator first (root-signed). For throwaway
+        /// networks (local swarms, forge); refused on testnet.
+        #[clap(long)]
+        mint_to_validator: bool,
+
         /// Do not require the bundle's sign-off checkboxes to be ticked.
         #[clap(long)]
         skip_signoff: bool,
@@ -189,6 +194,7 @@ pub async fn run(args: Argument) -> Result<()> {
             validator_key,
             node_api_key,
             metadata_url,
+            mint_to_validator,
             skip_signoff,
             skip_simulation,
             dry_run,
@@ -204,6 +210,7 @@ pub async fn run(args: Argument) -> Result<()> {
                 node_api_key,
                 &metadata_url,
                 &core_path,
+                mint_to_validator,
                 skip_signoff,
                 skip_simulation,
                 dry_run,

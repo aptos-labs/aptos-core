@@ -32,6 +32,7 @@ clap = { workspace = true }
 git2 = { workspace = true }
 hex = { workspace = true }
 move-core-types = { workspace = true }
+move-model = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }

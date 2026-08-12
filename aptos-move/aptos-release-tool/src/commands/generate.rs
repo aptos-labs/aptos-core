@@ -165,7 +165,7 @@ async fn generate_scripts(config: &BundleConfig, bundle_path: &Path) -> Result<(
 fn prepend_script_hash(script_name: &str, script: &str) -> String {
     let single = [(script_name.to_string(), script.to_string())];
     match get_execution_hash(&single) {
-        Some(hash) => format!("// Script hash: {}\n{}", hash, script),
+        Some(hash) => format!("// Script hash: {}\n{}", hash.to_hex(), script),
         None => script.to_string(),
     }
 }

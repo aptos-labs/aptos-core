@@ -37,6 +37,7 @@ use aptos_types::{
 };
 use clap::Parser;
 use move_core_types::diag_writer::DiagWriter;
+use move_model::metadata::{CompilerVersion, LanguageVersion};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -53,6 +54,9 @@ const DEFAULT_RESOLUTION_SECS: u64 = 43200;
 /// fixed generous cap like the previous tooling did.
 const MAX_GAS: u64 = 2_000_000;
 const GAS_UNIT_PRICE: u64 = 100;
+
+/// Octas minted to the validator with --mint-to-validator (1000 APT).
+const MINT_AMOUNT: u64 = 100_000_000_000;
 
 /// How long to wait for voting to close after the fast-resolve window.
 const VOTING_CLOSE_TIMEOUT: Duration = Duration::from_secs(180);
@@ -83,6 +87,7 @@ pub async fn run(
     node_api_key: Option<String>,
     metadata_url: &str,
     core_path: &Path,
+    mint_to_validator: bool,
     skip_signoff: bool,
     skip_simulation: bool,
     dry_run: bool,
@@ -138,6 +143,23 @@ pub async fn run(
     let factory = TransactionFactory::new(ChainId::new(chain_id))
         .with_max_gas_amount(MAX_GAS)
         .with_gas_unit_price(GAS_UNIT_PRICE);
+
+    // Fund the validator's gas on throwaway networks (local swarms, forge).
+    // Refused on testnet: its validator is expected to already be funded.
+    if mint_to_validator {
+        if chain_id == ChainId::testnet().id() {
+            bail!("--mint-to-validator is not allowed on testnet");
+        }
+        submit(
+            &client,
+            &factory,
+            &root,
+            aptos_stdlib::aptos_coin_mint(validator.address(), MINT_AMOUNT),
+        )
+        .await
+        .context("failed to mint gas funds to the validator")?;
+        println!("Minted {} octas to the validator.", MINT_AMOUNT);
+    }
 
     set_resolution_time(&client, &factory, &root, core_path, FAST_RESOLUTION_SECS).await?;
     let outcome = run_governance(
@@ -222,6 +244,24 @@ async fn run_governance(
 
     wait_for_voting_closed(client, proposal_id).await?;
 
+    // Seed the approved-hash entry once, so an oversized first script clears
+    // the mempool size limit. Each resolve_multi_step_proposal call rolls the
+    // entry forward to the next script's hash on-chain, and the final step
+    // removes it -- no per-step approval is needed.
+    submit(
+        client,
+        factory,
+        validator,
+        aptos_stdlib::aptos_governance_add_approved_script_hash_script(proposal_id),
+    )
+    .await
+    .with_context(|| {
+        format!(
+            "failed to approve the script hash for proposal {}",
+            proposal_id
+        )
+    })?;
+
     for (executed, script) in scripts.iter().enumerate() {
         let state = || {
             format!(
@@ -232,14 +272,6 @@ async fn run_governance(
                 script.name
             )
         };
-        submit(
-            client,
-            factory,
-            validator,
-            aptos_stdlib::aptos_governance_add_approved_script_hash_script(proposal_id),
-        )
-        .await
-        .with_context(|| format!("failed to approve the script hash -- {}", state()))?;
         submit(
             client,
             factory,
@@ -460,9 +492,14 @@ fn compile_script(path: &Path, core_path: &Path) -> Result<(Vec<u8>, HashValue)>
         path,
         &framework_package_args,
         PromptOptions::yes(),
-        None, // bytecode_version
-        None, // language_version
-        None, // compiler_version
+        // The three compile options below must mirror CompileScriptFunction's
+        // fallbacks (the path generation stamps hashes through): the stamped
+        // hashes and the embedded next-execution-hash chain are computed from
+        // bytecode compiled with these exact settings, and on-chain execution
+        // compares the submitted blob's hash against that chain.
+        None,
+        Some(LanguageVersion::latest_stable()),
+        Some(CompilerVersion::latest_stable()),
     )
     .map_err(|e| anyhow!("{:#}", e))?;
     Ok((blob, hash))
