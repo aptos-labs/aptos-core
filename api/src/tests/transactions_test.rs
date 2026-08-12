@@ -1173,6 +1173,7 @@ async fn test_submit_transaction_records_api_trace_stages() {
         TransactionStage::ApiHandlerEnter,
         TransactionStage::ApiTransactionDecoded,
         TransactionStage::ApiMempoolSubmit,
+        TransactionStage::MempoolProcessStart,
         TransactionStage::MempoolInsert,
         TransactionStage::ApiMempoolAccepted,
     ] {
@@ -1199,7 +1200,12 @@ async fn test_submit_transaction_records_api_trace_stages() {
             <= timestamp(TransactionStage::ApiMempoolSubmit)
     );
     assert!(
-        timestamp(TransactionStage::ApiMempoolSubmit) <= timestamp(TransactionStage::MempoolInsert)
+        timestamp(TransactionStage::ApiMempoolSubmit)
+            <= timestamp(TransactionStage::MempoolProcessStart)
+    );
+    assert!(
+        timestamp(TransactionStage::MempoolProcessStart)
+            <= timestamp(TransactionStage::MempoolInsert)
     );
     assert!(
         timestamp(TransactionStage::MempoolInsert)

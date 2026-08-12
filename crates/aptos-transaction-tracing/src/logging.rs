@@ -67,6 +67,12 @@ pub struct LogSchema {
     api_mempool_submit_ms: Option<i64>,
     api_mempool_accepted_ms: Option<i64>,
     api_to_mempool_ms: Option<i64>,
+    /// Splits `api_to_mempool_ms`'s opaque tail in two. Also negative, so:
+    /// mempool queue+schedule wait = `mempool_process_start_ms -
+    /// api_mempool_submit_ms`, and mempool work (storage fetch, filter, VM
+    /// validation, insert) = `-mempool_process_start_ms`. Client-submission
+    /// path only.
+    mempool_process_start_ms: Option<i64>,
     mempool_insert_ms: Option<i64>,
     qs_batch_pull_ms: Option<i64>,
     qs_batch_created_ms: Option<i64>,
@@ -131,6 +137,7 @@ impl LogSchema {
             api_mempool_submit_ms: None,
             api_mempool_accepted_ms: None,
             api_to_mempool_ms: None,
+            mempool_process_start_ms: None,
             mempool_insert_ms: None,
             qs_batch_pull_ms: None,
             qs_batch_created_ms: None,

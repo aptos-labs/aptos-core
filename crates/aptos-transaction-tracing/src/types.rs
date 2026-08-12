@@ -12,6 +12,14 @@ pub enum TransactionStage {
     ApiTransactionDecoded,
     ApiMempoolSubmit,
     ApiMempoolAccepted,
+    /// Wall-clock time at which the mempool task for this submission actually
+    /// began running. Splits the otherwise-opaque `ApiMempoolSubmit ->
+    /// MempoolInsert` span into its two halves: the wait (bounded-channel
+    /// send, the single-threaded coordinator loop, and the `BoundedExecutor`
+    /// semaphore) before this stamp, and the work (storage fetch, filter, VM
+    /// validation, insert) after it. Recorded on the client-submission path
+    /// only.
+    MempoolProcessStart,
     MempoolInsert,
     QsBatchPull,
     QsBatchCreated,
