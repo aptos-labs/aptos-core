@@ -910,13 +910,11 @@ impl StorageReader {
         use_size_and_time_aware_chunking: bool,
         kind: StateKind,
     ) -> Result<StateValueChunkWithProof, Error> {
-        // Calculate the number of state values to fetch
-        let expected_num_state_values = inclusive_range_len(start_index, end_index)?;
-        let max_num_state_values = self.config.max_state_chunk_size;
-        let num_state_values_to_fetch = min(expected_num_state_values, max_num_state_values);
-
         // If size and time-aware chunking are disabled, use the legacy implementation
         if !use_size_and_time_aware_chunking {
+            let expected_num_state_values = inclusive_range_len(start_index, end_index)?;
+            let num_state_values_to_fetch =
+                min(expected_num_state_values, self.config.max_state_chunk_size);
             return self.get_state_value_chunk_with_proof_by_size_legacy(
                 version,
                 start_index,
@@ -927,71 +925,85 @@ impl StorageReader {
             );
         }
 
-        // Get the state value chunk iterator
-        let mut state_value_iterator = self.storage.get_state_value_chunk_iter(
+        self.get_value_chunk_with_proof_by_size(
             version,
-            start_index as usize,
-            num_state_values_to_fetch as usize,
-            kind,
-        )?;
+            start_index,
+            end_index,
+            max_response_size,
+            "state value",
+            DataResponse::get_state_value_chunk_with_proof_label(),
+            |first_index, chunk_size| {
+                self.storage
+                    .get_state_value_chunk_iter(version, first_index, chunk_size, kind)
+            },
+            |first_index, state_values| {
+                self.storage
+                    .get_state_value_chunk_proof(version, first_index, state_values, kind)
+            },
+        )
+    }
 
-        // Initialize the fetched state values
-        let mut state_values = vec![];
-
-        // Create a response progress tracker
+    /// Fetches a proof-carrying value chunk, bounded by the configured item, byte, and time limits.
+    fn get_value_chunk_with_proof_by_size<T, C, I, GetValues, GetProof>(
+        &self,
+        version: u64,
+        start_index: u64,
+        end_index: u64,
+        max_response_size: u64,
+        value_label: &'static str,
+        data_response_label: &'static str,
+        get_values: GetValues,
+        get_proof: GetProof,
+    ) -> Result<C, Error>
+    where
+        T: Serialize,
+        I: Iterator<Item = StorageResult<T>>,
+        GetValues: FnOnce(usize, usize) -> StorageResult<I>,
+        GetProof: FnOnce(usize, Vec<T>) -> StorageResult<C>,
+    {
+        let expected_num_values = inclusive_range_len(start_index, end_index)?;
+        let num_values_to_fetch = min(expected_num_values, self.config.max_state_chunk_size);
+        let mut value_iterator = get_values(start_index as usize, num_values_to_fetch as usize)?;
+        let mut values = vec![];
         let mut response_progress_tracker = ResponseDataProgressTracker::new(
-            num_state_values_to_fetch,
+            num_values_to_fetch,
             max_response_size,
             self.config.max_storage_read_wait_time_ms,
             self.time_service.clone(),
         );
 
-        // Fetch as many state values as possible
         while !response_progress_tracker.is_response_complete() {
-            match state_value_iterator.next() {
-                Some(Ok(state_value)) => {
-                    // Calculate the number of serialized bytes for the state value
-                    let num_serialized_bytes = get_num_serialized_bytes(&state_value)
+            match value_iterator.next() {
+                Some(Ok(value)) => {
+                    let num_serialized_bytes = get_num_serialized_bytes(&value)
                         .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
-
-                    // Add the state value to the list
                     if response_progress_tracker
                         .data_items_fits_in_response(true, num_serialized_bytes)
                     {
-                        state_values.push(state_value);
+                        values.push(value);
                         response_progress_tracker.add_data_item(num_serialized_bytes);
                     } else {
-                        break; // Cannot add any more data items
+                        break;
                     }
                 },
                 Some(Err(error)) => {
                     return Err(Error::StorageErrorEncountered(error.to_string()));
                 },
                 None => {
-                    // Log a warning that the iterator did not contain all the expected data
                     warn!(
-                        "The state value iterator is missing data! Version: {:?}, \
-                        start index: {:?}, end index: {:?}, num state values to fetch: {:?}",
-                        version, start_index, end_index, num_state_values_to_fetch
+                        "The {} iterator is missing data! Version: {:?}, start index: {:?}, \
+                        end index: {:?}, num values to fetch: {:?}",
+                        value_label, version, start_index, end_index, num_values_to_fetch
                     );
                     break;
                 },
             }
         }
 
-        // Create the state value chunk with proof
-        let state_value_chunk_with_proof = self.storage.get_state_value_chunk_proof(
-            version,
-            start_index as usize,
-            state_values,
-            kind,
-        )?;
+        let chunk_with_proof = get_proof(start_index as usize, values)?;
+        response_progress_tracker.update_data_truncation_metrics(data_response_label);
 
-        // Update the data truncation metrics
-        response_progress_tracker
-            .update_data_truncation_metrics(DataResponse::get_state_value_chunk_with_proof_label());
-
-        Ok(state_value_chunk_with_proof)
+        Ok(chunk_with_proof)
     }
 
     /// Returns a state value chunk with proof response (bound by the max response size in bytes).
