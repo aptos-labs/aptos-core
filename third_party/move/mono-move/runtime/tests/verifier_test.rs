@@ -8,8 +8,8 @@ mod common;
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     types::InternedType, Code, CodeOffset as CO, DescriptorId, DescriptorProvider, FrameLayoutInfo,
-    FrameOffset as FO, Function, LayoutId, LayoutProvider, MicroOp, SortedSafePointEntries,
-    ValueLayout,
+    FrameOffset as FO, Function, FunctionDefinitionIndex, LayoutId, LayoutProvider, MicroOp,
+    SortedSafePointEntries, ValueLayout,
 };
 use mono_move_runtime::{verify_function, ObjectDescriptor, ObjectDescriptorTable};
 
@@ -45,6 +45,7 @@ fn minimal_func() -> Function {
     Function {
         name: GlobalArenaPtr::from_static("test"),
         module_id: crate::program_module_id!("test"),
+        def_idx: FunctionDefinitionIndex(0),
         code: Code::from_vec(vec![MicroOp::Return]),
         entry_gas: 0,
         param_slots: vec![],
@@ -81,17 +82,10 @@ fn valid_with_arithmetic_and_jumps() {
         Return,
     ];
     let func = Function {
-        name: GlobalArenaPtr::from_static("test"),
-        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
-        entry_gas: 0,
-        param_slots: vec![],
-        param_region_size: 0,
         param_and_local_sizes_sum: 16,
         extended_frame_size: 40,
-        zero_frame: false,
-        frame_layout: FrameLayoutInfo::empty(),
-        safe_point_layouts: SortedSafePointEntries::empty(),
+        ..minimal_func()
     };
     let errors = verify_function(&func, &trivial_descriptors());
     assert!(errors.is_empty(), "errors: {:?}", errors);
@@ -110,17 +104,12 @@ fn valid_with_vec_and_pointer_slots() {
         Return,
     ];
     let func = Function {
-        name: GlobalArenaPtr::from_static("test"),
-        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(code),
-        entry_gas: 0,
-        param_slots: vec![],
-        param_region_size: 0,
         param_and_local_sizes_sum: 32,
         extended_frame_size: 56,
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(vec![FO(0)]),
-        safe_point_layouts: SortedSafePointEntries::empty(),
+        ..minimal_func()
     };
     let errors = verify_function(&func, &trivial_descriptors());
     assert!(errors.is_empty(), "errors: {:?}", errors);
@@ -134,8 +123,6 @@ fn valid_with_vec_and_pointer_slots() {
 fn frame_bounds_store_u64() {
     use MicroOp::*;
     let func = Function {
-        name: GlobalArenaPtr::from_static("test"),
-        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(vec![
             StoreImm8 {
                 dst: FO(8),
@@ -143,14 +130,8 @@ fn frame_bounds_store_u64() {
             },
             Return,
         ]),
-        entry_gas: 0,
-        param_slots: vec![],
-        param_and_local_sizes_sum: 8,
         extended_frame_size: 32, // offset 8 lands in metadata [8, 32)
-        param_region_size: 0,
-        zero_frame: false,
-        frame_layout: FrameLayoutInfo::empty(),
-        safe_point_layouts: SortedSafePointEntries::empty(),
+        ..minimal_func()
     };
     let errors = verify_function(&func, &trivial_descriptors());
     assert_eq!(errors.len(), 1);
@@ -165,8 +146,6 @@ fn frame_bounds_store_u64() {
 fn frame_bounds_mov() {
     use MicroOp::*;
     let func = Function {
-        name: GlobalArenaPtr::from_static("test"),
-        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(vec![
             Move {
                 dst: FO(8),
@@ -175,14 +154,9 @@ fn frame_bounds_mov() {
             },
             Return,
         ]),
-        entry_gas: 0,
-        param_slots: vec![],
-        param_region_size: 0,
         param_and_local_sizes_sum: 16,
         extended_frame_size: 40, // dst [8, 24) overlaps metadata [16, 40)
-        zero_frame: false,
-        frame_layout: FrameLayoutInfo::empty(),
-        safe_point_layouts: SortedSafePointEntries::empty(),
+        ..minimal_func()
     };
     let errors = verify_function(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -195,8 +169,6 @@ fn frame_bounds_mov() {
 fn frame_bounds_fat_ptr_write() {
     use MicroOp::*;
     let func = Function {
-        name: GlobalArenaPtr::from_static("test"),
-        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(vec![
             StoreImm8 {
                 dst: FO(0),
@@ -208,14 +180,9 @@ fn frame_bounds_fat_ptr_write() {
             },
             Return,
         ]),
-        entry_gas: 0,
-        param_slots: vec![],
-        param_region_size: 0,
         param_and_local_sizes_sum: 16,
         extended_frame_size: 40, // dst [8, 24) overlaps metadata [16, 40)
-        zero_frame: false,
-        frame_layout: FrameLayoutInfo::empty(),
-        safe_point_layouts: SortedSafePointEntries::empty(),
+        ..minimal_func()
     };
     let errors = verify_function(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -226,25 +193,31 @@ fn frame_bounds_fat_ptr_write() {
 
 #[test]
 fn frame_bounds_extended_frame_too_small() {
-    use MicroOp::*;
     let func = Function {
-        name: GlobalArenaPtr::from_static("test"),
-        module_id: crate::program_module_id!("test"),
-        code: Code::from_vec(vec![Return]),
-        entry_gas: 0,
-        param_slots: vec![],
-        param_and_local_sizes_sum: 8,
         extended_frame_size: 16, // param_and_local_sizes_sum 8 + 24 = 32 > 16
-        param_region_size: 0,
-        zero_frame: false,
-        frame_layout: FrameLayoutInfo::empty(),
-        safe_point_layouts: SortedSafePointEntries::empty(),
+        ..minimal_func()
     };
     let errors = verify_function(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
     assert!(errors
         .iter()
         .any(|e| e.message.contains("extended_frame_size") && e.message.contains("frame_size()")));
+}
+
+#[test]
+fn origins_table_must_be_empty_or_parallel_to_code() {
+    // Two-entry origins table against one-op code.
+    let mut func = minimal_func();
+    func.code = Code::with_origins(vec![MicroOp::Return], vec![0, 0]);
+    let errors = verify_function(&func, &trivial_descriptors());
+    assert!(errors
+        .iter()
+        .any(|error| error.message.contains("origins table")));
+
+    // Parallel table passes.
+    func.code = Code::with_origins(vec![MicroOp::Return], vec![0]);
+    let errors = verify_function(&func, &trivial_descriptors());
+    assert!(errors.is_empty(), "errors: {:?}", errors);
 }
 
 // ---------------------------------------------------------------------------
@@ -254,17 +227,9 @@ fn frame_bounds_extended_frame_too_small() {
 #[test]
 fn pointer_slots_offset_out_of_bounds() {
     let func = Function {
-        name: GlobalArenaPtr::from_static("test"),
-        module_id: crate::program_module_id!("test"),
-        code: Code::from_vec(vec![MicroOp::Return]),
-        entry_gas: 0,
-        param_slots: vec![],
-        param_region_size: 0,
-        param_and_local_sizes_sum: 8,
-        extended_frame_size: 32,
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(vec![FO(100)]), // offset 100 + 8 > extended_frame_size 32
-        safe_point_layouts: SortedSafePointEntries::empty(),
+        ..minimal_func()
     };
     let errors = verify_function(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -276,17 +241,10 @@ fn pointer_slots_offset_out_of_bounds() {
 #[test]
 fn pointer_slots_overlaps_metadata() {
     let func = Function {
-        name: GlobalArenaPtr::from_static("test"),
-        module_id: crate::program_module_id!("test"),
-        code: Code::from_vec(vec![MicroOp::Return]),
-        entry_gas: 0,
-        param_slots: vec![],
-        param_region_size: 0,
-        param_and_local_sizes_sum: 8,
         extended_frame_size: 40,
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(vec![FO(8)]), // offset 8 overlaps metadata [8, 32) since param_and_local_sizes_sum = 8
-        safe_point_layouts: SortedSafePointEntries::empty(),
+        ..minimal_func()
     };
     let errors = verify_function(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -299,17 +257,8 @@ fn pointer_slots_overlaps_metadata() {
 fn param_and_local_sizes_sum_misaligned() {
     // SAFETY: Arena is alive for the duration of the test.
     let func = Function {
-        name: GlobalArenaPtr::from_static("test"),
-        module_id: crate::program_module_id!("test"),
-        code: Code::from_vec(vec![MicroOp::Return]),
-        entry_gas: 0,
-        param_slots: vec![],
-        param_region_size: 0,
         param_and_local_sizes_sum: 1, // not a multiple of 8
-        extended_frame_size: 32,
-        zero_frame: false,
-        frame_layout: FrameLayoutInfo::empty(),
-        safe_point_layouts: SortedSafePointEntries::empty(),
+        ..minimal_func()
     };
     let errors = verify_function(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -319,17 +268,8 @@ fn param_and_local_sizes_sum_misaligned() {
 #[test]
 fn args_size_exceeds_data_size() {
     let func = Function {
-        name: GlobalArenaPtr::from_static("test"),
-        module_id: crate::program_module_id!("test"),
-        code: Code::from_vec(vec![MicroOp::Return]),
-        entry_gas: 0,
-        param_slots: vec![],
-        param_and_local_sizes_sum: 8,
-        extended_frame_size: 32,
         param_region_size: 16, // > param_and_local_sizes_sum 8
-        zero_frame: false,
-        frame_layout: FrameLayoutInfo::empty(),
-        safe_point_layouts: SortedSafePointEntries::empty(),
+        ..minimal_func()
     };
     let errors = verify_function(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -346,8 +286,6 @@ fn args_size_exceeds_data_size() {
 fn invalid_jump_target() {
     use MicroOp::*;
     let func = Function {
-        name: GlobalArenaPtr::from_static("test"),
-        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(vec![
             Jump {
                 target: CO(5),
@@ -355,14 +293,7 @@ fn invalid_jump_target() {
             }, // only 2 instructions -> 5 >= 2
             Return,
         ]),
-        entry_gas: 0,
-        param_slots: vec![],
-        param_region_size: 0,
-        param_and_local_sizes_sum: 8,
-        extended_frame_size: 32,
-        zero_frame: false,
-        frame_layout: FrameLayoutInfo::empty(),
-        safe_point_layouts: SortedSafePointEntries::empty(),
+        ..minimal_func()
     };
     let errors = verify_function(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -373,8 +304,6 @@ fn invalid_jump_target() {
 fn invalid_conditional_jump_target() {
     use MicroOp::*;
     let func = Function {
-        name: GlobalArenaPtr::from_static("test"),
-        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(vec![
             StoreImm8 {
                 dst: FO(0),
@@ -388,14 +317,7 @@ fn invalid_conditional_jump_target() {
             },
             Return,
         ]),
-        entry_gas: 0,
-        param_slots: vec![],
-        param_region_size: 0,
-        param_and_local_sizes_sum: 8,
-        extended_frame_size: 32,
-        zero_frame: false,
-        frame_layout: FrameLayoutInfo::empty(),
-        safe_point_layouts: SortedSafePointEntries::empty(),
+        ..minimal_func()
     };
     let errors = verify_function(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -411,8 +333,6 @@ fn invalid_descriptor_id() {
     use MicroOp::*;
 
     let func = Function {
-        name: GlobalArenaPtr::from_static("test"),
-        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(vec![
             VecNew { dst: FO(0) },
             SlotBorrow {
@@ -431,14 +351,11 @@ fn invalid_descriptor_id() {
             },
             Return,
         ]),
-        entry_gas: 0,
-        param_slots: vec![],
-        param_region_size: 0,
         param_and_local_sizes_sum: 32,
         extended_frame_size: 56,
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(vec![FO(0)]),
-        safe_point_layouts: SortedSafePointEntries::empty(),
+        ..minimal_func()
     };
     let errors = verify_function(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -453,8 +370,6 @@ fn invalid_descriptor_id() {
 fn zero_size_mov() {
     use MicroOp::*;
     let func = Function {
-        name: GlobalArenaPtr::from_static("test"),
-        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(vec![
             Move {
                 dst: FO(0),
@@ -463,14 +378,7 @@ fn zero_size_mov() {
             },
             Return,
         ]),
-        entry_gas: 0,
-        param_slots: vec![],
-        param_region_size: 0,
-        param_and_local_sizes_sum: 8,
-        extended_frame_size: 32,
-        zero_frame: false,
-        frame_layout: FrameLayoutInfo::empty(),
-        safe_point_layouts: SortedSafePointEntries::empty(),
+        ..minimal_func()
     };
     let errors = verify_function(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -482,8 +390,6 @@ fn zero_elem_size_vec_push() {
     use MicroOp::*;
 
     let func = Function {
-        name: GlobalArenaPtr::from_static("test"),
-        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(vec![
             VecNew { dst: FO(0) },
             SlotBorrow {
@@ -502,14 +408,11 @@ fn zero_elem_size_vec_push() {
             },
             Return,
         ]),
-        entry_gas: 0,
-        param_slots: vec![],
-        param_region_size: 0,
         param_and_local_sizes_sum: 32,
         extended_frame_size: 56,
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(vec![FO(0)]),
-        safe_point_layouts: SortedSafePointEntries::empty(),
+        ..minimal_func()
     };
     let errors = verify_function(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -523,17 +426,8 @@ fn zero_elem_size_vec_push() {
 #[test]
 fn empty_code() {
     let func = Function {
-        name: GlobalArenaPtr::from_static("test"),
-        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(vec![]),
-        entry_gas: 0,
-        param_slots: vec![],
-        param_region_size: 0,
-        param_and_local_sizes_sum: 8,
-        extended_frame_size: 32,
-        zero_frame: false,
-        frame_layout: FrameLayoutInfo::empty(),
-        safe_point_layouts: SortedSafePointEntries::empty(),
+        ..minimal_func()
     };
     let errors = verify_function(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -543,17 +437,9 @@ fn empty_code() {
 #[test]
 fn zero_frame_size() {
     let func = Function {
-        name: GlobalArenaPtr::from_static("test"),
-        module_id: crate::program_module_id!("test"),
-        code: Code::from_vec(vec![MicroOp::Return]),
-        entry_gas: 0,
-        param_slots: vec![],
-        param_region_size: 0,
         param_and_local_sizes_sum: 0,
         extended_frame_size: 0,
-        zero_frame: false,
-        frame_layout: FrameLayoutInfo::empty(),
-        safe_point_layouts: SortedSafePointEntries::empty(),
+        ..minimal_func()
     };
     let errors = verify_function(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
@@ -570,17 +456,10 @@ fn zero_frame_size() {
 
 fn func_with_single_op(op: MicroOp) -> Function {
     Function {
-        name: GlobalArenaPtr::from_static("test"),
-        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(vec![op, MicroOp::Return]),
-        entry_gas: 0,
-        param_slots: vec![],
-        param_region_size: 0,
         param_and_local_sizes_sum: 24,
         extended_frame_size: 48,
-        zero_frame: false,
-        frame_layout: FrameLayoutInfo::empty(),
-        safe_point_layouts: SortedSafePointEntries::empty(),
+        ..minimal_func()
     }
 }
 
@@ -678,8 +557,6 @@ fn shl_u64_imm_in_range_ok() {
 fn multiple_errors_collected() {
     use MicroOp::*;
     let func = Function {
-        name: GlobalArenaPtr::from_static("test"),
-        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(vec![
             StoreImm8 {
                 dst: FO(100),
@@ -691,14 +568,7 @@ fn multiple_errors_collected() {
             }, // invalid target
             Return,
         ]),
-        entry_gas: 0,
-        param_slots: vec![],
-        param_region_size: 0,
-        param_and_local_sizes_sum: 8,
-        extended_frame_size: 32,
-        zero_frame: false,
-        frame_layout: FrameLayoutInfo::empty(),
-        safe_point_layouts: SortedSafePointEntries::empty(),
+        ..minimal_func()
     };
     let errors = verify_function(&func, &trivial_descriptors());
     assert!(
@@ -719,8 +589,6 @@ fn multiple_errors_collected() {
 fn vec_pushback_func(descriptor_id: DescriptorId) -> Function {
     use MicroOp::*;
     Function {
-        name: GlobalArenaPtr::from_static("test"),
-        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(vec![
             VecNew { dst: FO(0) },
             SlotBorrow {
@@ -739,14 +607,11 @@ fn vec_pushback_func(descriptor_id: DescriptorId) -> Function {
             },
             Return,
         ]),
-        entry_gas: 0,
-        param_slots: vec![],
-        param_region_size: 0,
         param_and_local_sizes_sum: 32,
         extended_frame_size: 56,
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(vec![FO(0)]),
-        safe_point_layouts: SortedSafePointEntries::empty(),
+        ..minimal_func()
     }
 }
 
@@ -774,8 +639,6 @@ fn heap_new_rejects_vector_descriptor() {
     use MicroOp::*;
     // trivial_descriptors() has Vector at index 2.
     let func = Function {
-        name: GlobalArenaPtr::from_static("test"),
-        module_id: crate::program_module_id!("test"),
         code: Code::from_vec(vec![
             HeapNew {
                 dst: FO(0),
@@ -783,14 +646,9 @@ fn heap_new_rejects_vector_descriptor() {
             },
             Return,
         ]),
-        entry_gas: 0,
-        param_slots: vec![],
-        param_region_size: 0,
-        param_and_local_sizes_sum: 8,
-        extended_frame_size: 32,
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(vec![FO(0)]),
-        safe_point_layouts: SortedSafePointEntries::empty(),
+        ..minimal_func()
     };
     let errors = verify_function(&func, &trivial_descriptors());
     assert!(errors

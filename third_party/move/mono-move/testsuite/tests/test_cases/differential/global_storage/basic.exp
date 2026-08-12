@@ -178,9 +178,9 @@ fun borrow_missing(r0): u64 {
     r2: u64
   code:
   L0:
-    0: r1 := imm_borrow_global 0x42::globals::R, r0
-    1: r2 := read_field R::x, r1
-    2: ret [r2]
+    0: r1 := imm_borrow_global 0x42::globals::R, r0 @1
+    1: r2 := read_field R::x, r1 @2
+    2: ret [r2] @4
 }
 
 fun double_publish(r0) {
@@ -195,23 +195,23 @@ fun double_publish(r0) {
     r7: 0x42::globals::R
   code:
   L0:
-    0: r1 := imm_borrow_loc r0
-    1: r2 := ld_u64 1
-    2: r3 := ld_u64 1
-    3: r4 := ld_u64 1
-    4: r5 := ld_u64 1
-    5: r6 := pack 0x42::globals::Inner, [r4, r5]
-    6: r7 := pack 0x42::globals::R, [r2, r3, r6]
-    7: move_to 0x42::globals::R, r1, r7
-    8: r1 := imm_borrow_loc r0
-    9: r3 := ld_u64 2
-    10: r2 := ld_u64 2
-    11: r5 := ld_u64 2
-    12: r4 := ld_u64 2
-    13: r6 := pack 0x42::globals::Inner, [r5, r4]
-    14: r7 := pack 0x42::globals::R, [r3, r2, r6]
-    15: move_to 0x42::globals::R, r1, r7
-    16: ret []
+    0: r1 := imm_borrow_loc r0 @0
+    1: r2 := ld_u64 1 @1
+    2: r3 := ld_u64 1 @2
+    3: r4 := ld_u64 1 @3
+    4: r5 := ld_u64 1 @4
+    5: r6 := pack 0x42::globals::Inner, [r4, r5] @5
+    6: r7 := pack 0x42::globals::R, [r2, r3, r6] @6
+    7: move_to 0x42::globals::R, r1, r7 @7
+    8: r1 := imm_borrow_loc r0 @8
+    9: r3 := ld_u64 2 @9
+    10: r2 := ld_u64 2 @10
+    11: r5 := ld_u64 2 @11
+    12: r4 := ld_u64 2 @12
+    13: r6 := pack 0x42::globals::Inner, [r5, r4] @13
+    14: r7 := pack 0x42::globals::R, [r3, r2, r6] @14
+    15: move_to 0x42::globals::R, r1, r7 @15
+    16: ret [] @16
 }
 
 fun publish_and_read(r0, r1, r2): u64 {
@@ -228,22 +228,22 @@ fun publish_and_read(r0, r1, r2): u64 {
     r9: 0x42::globals::R
   code:
   L0:
-    0: r4 := imm_borrow_loc r0
-    1: r5 := add r2, #1
-    2: r6 := add r2, #2
-    3: r7 := add r2, #3
-    4: r8 := pack 0x42::globals::Inner, [r6, r7]
-    5: r9 := pack 0x42::globals::R, [r2, r5, r8]
-    6: move_to 0x42::globals::R, r4, r9
-    7: r3 := imm_borrow_global 0x42::globals::R, r1
-    8: r5 := read_field R::x, r3
-    9: r7 := read_field R::y, r3
-    10: r7 := add r5, r7
-    11: r5 := read_field_chain R::inner.Inner::a, r3
-    12: r5 := add r7, r5
-    13: r7 := read_field_chain R::inner.Inner::b, r3
-    14: r7 := add r5, r7
-    15: ret [r7]
+    0: r4 := imm_borrow_loc r0 @0
+    1: r5 := add r2, #1 @4
+    2: r6 := add r2, #2 @7
+    3: r7 := add r2, #3 @10
+    4: r8 := pack 0x42::globals::Inner, [r6, r7] @11
+    5: r9 := pack 0x42::globals::R, [r2, r5, r8] @12
+    6: move_to 0x42::globals::R, r4, r9 @13
+    7: r3 := imm_borrow_global 0x42::globals::R, r1 @15
+    8: r5 := read_field R::x, r3 @18
+    9: r7 := read_field R::y, r3 @21
+    10: r7 := add r5, r7 @23
+    11: r5 := read_field_chain R::inner.Inner::a, r3 @27
+    12: r5 := add r7, r5 @28
+    13: r7 := read_field_chain R::inner.Inner::b, r3 @32
+    14: r7 := add r5, r7 @33
+    15: ret [r7] @34
 }
 
 fun publish_and_take(r0, r1, r2): u64 {
@@ -261,20 +261,20 @@ fun publish_and_take(r0, r1, r2): u64 {
     r10: 0x42::globals::R
   code:
   L0:
-    0: r5 := imm_borrow_loc r0
-    1: r6 := add r2, #1
-    2: r7 := add r2, #2
-    3: r8 := add r2, #3
-    4: r9 := pack 0x42::globals::Inner, [r7, r8]
-    5: r10 := pack 0x42::globals::R, [r2, r6, r9]
-    6: move_to 0x42::globals::R, r5, r10
-    7: r10 := move_from 0x42::globals::R, r1
-    8: [r6, r8, r9] := unpack 0x42::globals::R, r10
-    9: [r4, r3] := unpack 0x42::globals::Inner, r9
-    10: r8 := add r6, r8
-    11: r8 := add r8, r4
-    12: r8 := add r8, r3
-    13: ret [r8]
+    0: r5 := imm_borrow_loc r0 @0
+    1: r6 := add r2, #1 @4
+    2: r7 := add r2, #2 @7
+    3: r8 := add r2, #3 @10
+    4: r9 := pack 0x42::globals::Inner, [r7, r8] @11
+    5: r10 := pack 0x42::globals::R, [r2, r6, r9] @12
+    6: move_to 0x42::globals::R, r5, r10 @13
+    7: r10 := move_from 0x42::globals::R, r1 @15
+    8: [r6, r8, r9] := unpack 0x42::globals::R, r10 @16
+    9: [r4, r3] := unpack 0x42::globals::Inner, r9 @17
+    10: r8 := add r6, r8 @20
+    11: r8 := add r8, r4 @22
+    12: r8 := add r8, r3 @24
+    13: ret [r8] @25
 }
 
 fun publish_mutate_read(r0, r1, r2): u64 {
@@ -292,20 +292,20 @@ fun publish_mutate_read(r0, r1, r2): u64 {
     r10: &0x42::globals::R
   code:
   L0:
-    0: r4 := imm_borrow_loc r0
-    1: r5 := ld_u64 0
-    2: r6 := ld_u64 0
-    3: r7 := ld_u64 0
-    4: r8 := pack 0x42::globals::Inner, [r6, r7]
-    5: r9 := pack 0x42::globals::R, [r2, r5, r8]
-    6: move_to 0x42::globals::R, r4, r9
-    7: r3 := mut_borrow_global 0x42::globals::R, r1
-    8: r5 := read_field R::x, r3
-    9: r5 := add r5, #1
-    10: write_field_chain R::inner.Inner::b, r3, r5
-    11: r10 := imm_borrow_global 0x42::globals::R, r1
-    12: r5 := read_field_chain R::inner.Inner::b, r10
-    13: ret [r5]
+    0: r4 := imm_borrow_loc r0 @0
+    1: r5 := ld_u64 0 @2
+    2: r6 := ld_u64 0 @3
+    3: r7 := ld_u64 0 @4
+    4: r8 := pack 0x42::globals::Inner, [r6, r7] @5
+    5: r9 := pack 0x42::globals::R, [r2, r5, r8] @6
+    6: move_to 0x42::globals::R, r4, r9 @7
+    7: r3 := mut_borrow_global 0x42::globals::R, r1 @9
+    8: r5 := read_field R::x, r3 @12
+    9: r5 := add r5, #1 @15
+    10: write_field_chain R::inner.Inner::b, r3, r5 @19
+    11: r10 := imm_borrow_global 0x42::globals::R, r1 @21
+    12: r5 := read_field_chain R::inner.Inner::b, r10 @24
+    13: ret [r5] @25
 }
 
 fun take_missing(r0): u64 {
@@ -317,9 +317,9 @@ fun take_missing(r0): u64 {
     r4: 0x42::globals::Inner
   code:
   L0:
-    0: r1 := move_from 0x42::globals::R, r0
-    1: [r2, r3, r4] := unpack 0x42::globals::R, r1
-    2: ret [r2]
+    0: r1 := move_from 0x42::globals::R, r0 @1
+    1: [r2, r3, r4] := unpack 0x42::globals::R, r1 @2
+    2: ret [r2] @5
 }
 === micro-ops ===
 // module 0x42::globals
@@ -328,43 +328,43 @@ fun borrow_missing() {
   frame_data_size: 56
   entry_gas: 95
   code:
-    0: BorrowGlobal<0x42::globals::R> [32] <- addr=[0], ty=
-    1: ReadRefOffset [48] <- *([32]+0) (size=8)
-    2: Move8 [0] <- [48]
-    3: Return
+    0: BorrowGlobal<0x42::globals::R> [32] <- addr=[0], ty= @1
+    1: ReadRefOffset [48] <- *([32]+0) (size=8) @2
+    2: Move8 [0] <- [48] @4
+    3: Return @4
 }
 
 fun double_publish() {
   frame_data_size: 136
   entry_gas: 348
   code:
-    0: SlotBorrow [32] <- &[0]
-    1: StoreImm8 [48] <- #1
-    2: StoreImm8 [56] <- #1
-    3: StoreImm8 [64] <- #1
-    4: StoreImm8 [72] <- #1
-    5: Move8 [88] <- [72]
-    6: Move8 [80] <- [64]
-    7: Move(16) [112] <- [80]
-    8: Move8 [104] <- [56]
-    9: Move8 [96] <- [48]
-    10: HeapNew [128] desc=2
-    11: HeapMoveTo [128]+0 <- [96] (size=32)
-    12: MoveTo<0x42::globals::R> signer=[32], src=[128]
-    13: SlotBorrow [32] <- &[0]
-    14: StoreImm8 [56] <- #2
-    15: StoreImm8 [48] <- #2
-    16: StoreImm8 [72] <- #2
-    17: StoreImm8 [64] <- #2
-    18: Move8 [88] <- [64]
-    19: Move8 [80] <- [72]
-    20: Move(16) [112] <- [80]
-    21: Move8 [104] <- [48]
-    22: Move8 [96] <- [56]
-    23: HeapNew [128] desc=2
-    24: HeapMoveTo [128]+0 <- [96] (size=32)
-    25: MoveTo<0x42::globals::R> signer=[32], src=[128]
-    26: Return
+    0: SlotBorrow [32] <- &[0] @0
+    1: StoreImm8 [48] <- #1 @1
+    2: StoreImm8 [56] <- #1 @2
+    3: StoreImm8 [64] <- #1 @3
+    4: StoreImm8 [72] <- #1 @4
+    5: Move8 [88] <- [72] @5
+    6: Move8 [80] <- [64] @5
+    7: Move(16) [112] <- [80] @6
+    8: Move8 [104] <- [56] @6
+    9: Move8 [96] <- [48] @6
+    10: HeapNew [128] desc=2 @7
+    11: HeapMoveTo [128]+0 <- [96] (size=32) @7
+    12: MoveTo<0x42::globals::R> signer=[32], src=[128] @7
+    13: SlotBorrow [32] <- &[0] @8
+    14: StoreImm8 [56] <- #2 @9
+    15: StoreImm8 [48] <- #2 @10
+    16: StoreImm8 [72] <- #2 @11
+    17: StoreImm8 [64] <- #2 @12
+    18: Move8 [88] <- [64] @13
+    19: Move8 [80] <- [72] @13
+    20: Move(16) [112] <- [80] @14
+    21: Move8 [104] <- [48] @14
+    22: Move8 [96] <- [56] @14
+    23: HeapNew [128] desc=2 @15
+    24: HeapMoveTo [128]+0 <- [96] (size=32) @15
+    25: MoveTo<0x42::globals::R> signer=[32], src=[128] @15
+    26: Return @16
   safe_point_layouts:
     10: []
     23: []
@@ -374,28 +374,28 @@ fun publish_and_read() {
   frame_data_size: 184
   entry_gas: 372
   code:
-    0: SlotBorrow [88] <- &[0]
-    1: AddU64Imm [104] <- [64] + #1
-    2: AddU64Imm [112] <- [64] + #2
-    3: AddU64Imm [120] <- [64] + #3
-    4: Move8 [136] <- [120]
-    5: Move8 [128] <- [112]
-    6: Move(16) [160] <- [128]
-    7: Move8 [152] <- [104]
-    8: Move8 [144] <- [64]
-    9: HeapNew [176] desc=2
-    10: HeapMoveTo [176]+0 <- [144] (size=32)
-    11: MoveTo<0x42::globals::R> signer=[88], src=[176]
-    12: BorrowGlobal<0x42::globals::R> [72] <- addr=[32], ty=
-    13: ReadRefOffset [104] <- *([72]+0) (size=8)
-    14: ReadRefOffset [120] <- *([72]+8) (size=8)
-    15: AddU64 [120] <- [104] + [120]
-    16: ReadRefOffset [104] <- *([72]+16) (size=8)
-    17: AddU64 [104] <- [120] + [104]
-    18: ReadRefOffset [120] <- *([72]+24) (size=8)
-    19: AddU64 [120] <- [104] + [120]
-    20: Move8 [0] <- [120]
-    21: Return
+    0: SlotBorrow [88] <- &[0] @0
+    1: AddU64Imm [104] <- [64] + #1 @4
+    2: AddU64Imm [112] <- [64] + #2 @7
+    3: AddU64Imm [120] <- [64] + #3 @10
+    4: Move8 [136] <- [120] @11
+    5: Move8 [128] <- [112] @11
+    6: Move(16) [160] <- [128] @12
+    7: Move8 [152] <- [104] @12
+    8: Move8 [144] <- [64] @12
+    9: HeapNew [176] desc=2 @13
+    10: HeapMoveTo [176]+0 <- [144] (size=32) @13
+    11: MoveTo<0x42::globals::R> signer=[88], src=[176] @13
+    12: BorrowGlobal<0x42::globals::R> [72] <- addr=[32], ty= @15
+    13: ReadRefOffset [104] <- *([72]+0) (size=8) @18
+    14: ReadRefOffset [120] <- *([72]+8) (size=8) @21
+    15: AddU64 [120] <- [104] + [120] @23
+    16: ReadRefOffset [104] <- *([72]+16) (size=8) @27
+    17: AddU64 [104] <- [120] + [104] @28
+    18: ReadRefOffset [120] <- *([72]+24) (size=8) @32
+    19: AddU64 [120] <- [104] + [120] @33
+    20: Move8 [0] <- [120] @34
+    21: Return @34
   safe_point_layouts:
     9: []
 }
@@ -404,30 +404,30 @@ fun publish_and_take() {
   frame_data_size: 184
   entry_gas: 412
   code:
-    0: SlotBorrow [88] <- &[0]
-    1: AddU64Imm [104] <- [64] + #1
-    2: AddU64Imm [112] <- [64] + #2
-    3: AddU64Imm [120] <- [64] + #3
-    4: Move8 [136] <- [120]
-    5: Move8 [128] <- [112]
-    6: Move(16) [160] <- [128]
-    7: Move8 [152] <- [104]
-    8: Move8 [144] <- [64]
-    9: HeapNew [176] desc=2
-    10: HeapMoveTo [176]+0 <- [144] (size=32)
-    11: MoveTo<0x42::globals::R> signer=[88], src=[176]
-    12: MoveFrom<0x42::globals::R> [176] <- addr=[32], ty=
-    13: HeapMoveFrom [144] <- [176]+0 (size=32)
-    14: Move(16) [128] <- [160]
-    15: Move8 [120] <- [152]
-    16: Move8 [104] <- [144]
-    17: Move8 [72] <- [136]
-    18: Move8 [80] <- [128]
-    19: AddU64 [120] <- [104] + [120]
-    20: AddU64 [120] <- [120] + [80]
-    21: AddU64 [120] <- [120] + [72]
-    22: Move8 [0] <- [120]
-    23: Return
+    0: SlotBorrow [88] <- &[0] @0
+    1: AddU64Imm [104] <- [64] + #1 @4
+    2: AddU64Imm [112] <- [64] + #2 @7
+    3: AddU64Imm [120] <- [64] + #3 @10
+    4: Move8 [136] <- [120] @11
+    5: Move8 [128] <- [112] @11
+    6: Move(16) [160] <- [128] @12
+    7: Move8 [152] <- [104] @12
+    8: Move8 [144] <- [64] @12
+    9: HeapNew [176] desc=2 @13
+    10: HeapMoveTo [176]+0 <- [144] (size=32) @13
+    11: MoveTo<0x42::globals::R> signer=[88], src=[176] @13
+    12: MoveFrom<0x42::globals::R> [176] <- addr=[32], ty= @15
+    13: HeapMoveFrom [144] <- [176]+0 (size=32) @15
+    14: Move(16) [128] <- [160] @16
+    15: Move8 [120] <- [152] @16
+    16: Move8 [104] <- [144] @16
+    17: Move8 [72] <- [136] @17
+    18: Move8 [80] <- [128] @17
+    19: AddU64 [120] <- [104] + [120] @20
+    20: AddU64 [120] <- [120] + [80] @22
+    21: AddU64 [120] <- [120] + [72] @24
+    22: Move8 [0] <- [120] @25
+    23: Return @25
   safe_point_layouts:
     9: []
     12: []
@@ -437,26 +437,26 @@ fun publish_mutate_read() {
   frame_data_size: 200
   entry_gas: 342
   code:
-    0: SlotBorrow [88] <- &[0]
-    1: StoreImm8 [104] <- #0
-    2: StoreImm8 [112] <- #0
-    3: StoreImm8 [120] <- #0
-    4: Move8 [136] <- [120]
-    5: Move8 [128] <- [112]
-    6: Move(16) [160] <- [128]
-    7: Move8 [152] <- [104]
-    8: Move8 [144] <- [64]
-    9: HeapNew [192] desc=2
-    10: HeapMoveTo [192]+0 <- [144] (size=32)
-    11: MoveTo<0x42::globals::R> signer=[88], src=[192]
-    12: BorrowGlobalMut<0x42::globals::R> [72] <- addr=[32], ty=
-    13: ReadRefOffset [104] <- *([72]+0) (size=8)
-    14: AddU64Imm [104] <- [104] + #1
-    15: WriteRefOffset *([72]+24) <- [104] (size=8)
-    16: BorrowGlobal<0x42::globals::R> [176] <- addr=[32], ty=
-    17: ReadRefOffset [104] <- *([176]+24) (size=8)
-    18: Move8 [0] <- [104]
-    19: Return
+    0: SlotBorrow [88] <- &[0] @0
+    1: StoreImm8 [104] <- #0 @2
+    2: StoreImm8 [112] <- #0 @3
+    3: StoreImm8 [120] <- #0 @4
+    4: Move8 [136] <- [120] @5
+    5: Move8 [128] <- [112] @5
+    6: Move(16) [160] <- [128] @6
+    7: Move8 [152] <- [104] @6
+    8: Move8 [144] <- [64] @6
+    9: HeapNew [192] desc=2 @7
+    10: HeapMoveTo [192]+0 <- [144] (size=32) @7
+    11: MoveTo<0x42::globals::R> signer=[88], src=[192] @7
+    12: BorrowGlobalMut<0x42::globals::R> [72] <- addr=[32], ty= @9
+    13: ReadRefOffset [104] <- *([72]+0) (size=8) @12
+    14: AddU64Imm [104] <- [104] + #1 @15
+    15: WriteRefOffset *([72]+24) <- [104] (size=8) @19
+    16: BorrowGlobal<0x42::globals::R> [176] <- addr=[32], ty= @21
+    17: ReadRefOffset [104] <- *([176]+24) (size=8) @24
+    18: Move8 [0] <- [104] @25
+    19: Return @25
   safe_point_layouts:
     9: []
     12: []
@@ -466,13 +466,13 @@ fun take_missing() {
   frame_data_size: 104
   entry_gas: 167
   code:
-    0: MoveFrom<0x42::globals::R> [96] <- addr=[0], ty=
-    1: HeapMoveFrom [32] <- [96]+0 (size=32)
-    2: Move(16) [80] <- [48]
-    3: Move8 [72] <- [40]
-    4: Move8 [64] <- [32]
-    5: Move8 [0] <- [64]
-    6: Return
+    0: MoveFrom<0x42::globals::R> [96] <- addr=[0], ty= @1
+    1: HeapMoveFrom [32] <- [96]+0 (size=32) @1
+    2: Move(16) [80] <- [48] @2
+    3: Move8 [72] <- [40] @2
+    4: Move8 [64] <- [32] @2
+    5: Move8 [0] <- [64] @5
+    6: Return @5
   safe_point_layouts:
     0: []
 }

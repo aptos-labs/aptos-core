@@ -251,73 +251,66 @@ fn allocate_block(
 ) -> VMResult<BasicBlock<NamedSlot>> {
     table.start_block();
 
-    let instrs = block
-        .instrs
-        .into_iter()
-        .enumerate()
-        .map(|(i, instr)| {
-            let (defs, uses) = collect_defs_and_uses(&instr);
+    let instrs = block.instrs.try_map(|index, instr| -> VMResult<_> {
+        let (defs, uses) = collect_defs_and_uses(&instr);
 
-            // Phase 1: Free use-slots whose last use is this instruction.
-            // Done BEFORE def allocation so the freed slot can be immediately
-            // reused. Safe because sources are read before destinations are
-            // written.
-            for use_slot in &uses {
-                if let SsaSlot::ValueId(id) = use_slot
-                    && analysis.live_end.get(use_slot) == Some(&i)
-                    && !defs.contains(use_slot)
-                    && let Some((named_slot, ty)) = table.lookup(*id)
-                    && table.is_poolable(named_slot)
-                {
-                    free_pool.entry(ty).or_default().push(named_slot);
-                }
+        // Phase 1: Free use-slots whose last use is this instruction.
+        // Done BEFORE def allocation so the freed slot can be immediately
+        // reused. Safe because sources are read before destinations are
+        // written.
+        for use_slot in &uses {
+            if let SsaSlot::ValueId(id) = use_slot
+                && analysis.live_end.get(use_slot) == Some(&index)
+                && !defs.contains(use_slot)
+                && let Some((named_slot, ty)) = table.lookup(*id)
+                && table.is_poolable(named_slot)
+            {
+                free_pool.entry(ty).or_default().push(named_slot);
             }
+        }
 
-            // Phase 2: Allocate named slots for destination `ValueId`s.
-            for def_slot in &defs {
-                if let SsaSlot::ValueId(id) = def_slot
-                    && !table.contains(*id)
-                {
-                    if let Some(&position) = analysis.transfer_precolor.get(def_slot) {
-                        table.bind(*id, NamedSlot::Transfer(position));
-                    } else if let Some(&home_idx) = analysis.stloc_targets.get(def_slot) {
-                        table.bind(*id, NamedSlot::Home(home_idx));
-                    } else if let Some(&home_idx) = analysis.coalesce_to_local.get(def_slot) {
-                        table.bind(*id, NamedSlot::Home(home_idx));
+        // Phase 2: Allocate named slots for destination `ValueId`s.
+        for def_slot in &defs {
+            if let SsaSlot::ValueId(id) = def_slot
+                && !table.contains(*id)
+            {
+                if let Some(&position) = analysis.transfer_precolor.get(def_slot) {
+                    table.bind(*id, NamedSlot::Transfer(position));
+                } else if let Some(&home_idx) = analysis.stloc_targets.get(def_slot) {
+                    table.bind(*id, NamedSlot::Home(home_idx));
+                } else if let Some(&home_idx) = analysis.coalesce_to_local.get(def_slot) {
+                    table.bind(*id, NamedSlot::Home(home_idx));
+                } else {
+                    // General case: reuse a same-typed slot from the pool,
+                    // or mint a fresh one.
+                    let ty = value_id_type(*id, value_id_types)?;
+                    if let Some(named_slot) = free_pool.get_mut(&ty).and_then(|slots| slots.pop()) {
+                        table.bind(*id, named_slot);
                     } else {
-                        // General case: reuse a same-typed slot from the pool,
-                        // or mint a fresh one.
-                        let ty = value_id_type(*id, value_id_types)?;
-                        if let Some(named_slot) =
-                            free_pool.get_mut(&ty).and_then(|slots| slots.pop())
-                        {
-                            table.bind(*id, named_slot);
-                        } else {
-                            table.mint_fresh(*id, ty);
-                        }
+                        table.mint_fresh(*id, ty);
                     }
                 }
             }
+        }
 
-            // Phase 3: Convert the instruction into the named-slot form.
-            let converted = try_map_slots(instr, |slot| table.resolve(slot))?;
+        // Phase 3: Convert the instruction into the named-slot form.
+        let converted = try_map_slots(instr, |slot| table.resolve(slot))?;
 
-            // Phase 4: Free slots for defs that are never used
-            // (live_end == def site).
-            for def_slot in &defs {
-                if let SsaSlot::ValueId(id) = def_slot
-                    && analysis.live_end.get(def_slot) == Some(&i)
-                    && !uses.contains(def_slot)
-                    && let Some((named_slot, ty)) = table.lookup(*id)
-                    && table.is_poolable(named_slot)
-                {
-                    free_pool.entry(ty).or_default().push(named_slot);
-                }
+        // Phase 4: Free slots for defs that are never used
+        // (live_end == def site).
+        for def_slot in &defs {
+            if let SsaSlot::ValueId(id) = def_slot
+                && analysis.live_end.get(def_slot) == Some(&index)
+                && !uses.contains(def_slot)
+                && let Some((named_slot, ty)) = table.lookup(*id)
+                && table.is_poolable(named_slot)
+            {
+                free_pool.entry(ty).or_default().push(named_slot);
             }
+        }
 
-            Ok(converted)
-        })
-        .collect::<VMResult<Vec<_>>>()?;
+        Ok(converted)
+    })?;
 
     Ok(BasicBlock {
         label: block.label,

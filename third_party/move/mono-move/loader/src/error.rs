@@ -22,9 +22,13 @@ pub enum LoaderError {
         name: String,
     },
 
-    /// TODO(completeness): temporary until natives are supported.
-    #[error("Function IR missing")]
-    FunctionIrMissing,
+    /// TODO(completeness): temporary until natives are loadable as functions.
+    #[error("Function {address}::{module}::{name} is a native and cannot be loaded as code")]
+    NativeFunctionNotLoadable {
+        address: AccountAddress,
+        module: String,
+        name: String,
+    },
 
     /// TODO(completeness): temporary until nominal types are supported.
     #[error("Failed to lower function: {reason}")]
@@ -42,7 +46,7 @@ impl IntoExecutionError for LoaderError {
     fn kind(&self) -> ExecutionErrorKind {
         use LoaderError::*;
         match self {
-            ModuleNotFound { .. } | FunctionNotFound { .. } | FunctionIrMissing => {
+            ModuleNotFound { .. } | FunctionNotFound { .. } | NativeFunctionNotLoadable { .. } => {
                 ExecutionErrorKind::LinkingError
             },
 

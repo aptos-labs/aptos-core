@@ -73,7 +73,7 @@ fn copy_propagation(func: &mut FunctionIR) {
         // reverse index (value → keys) for O(1) value-based kills.
         let mut subst: UnorderedMap<NamedSlot, NamedSlot> = UnorderedMap::new();
 
-        for instr in &mut block.instrs {
+        for instr in block.instrs.iter_mut() {
             remap_source_slots_with(instr, |s| *subst.get(&s).unwrap_or(&s));
 
             // Kill subst for locals whose storage may be mutated without a
@@ -175,14 +175,9 @@ fn dead_instruction_elimination(func: &mut FunctionIR) {
         }
 
         if !dead_indices.is_empty() {
-            // `retain` visits elements in order, so `idx` tracks the original
-            // pre-retain index of each instruction.
-            let mut idx = 0;
-            block.instrs.retain(|_| {
-                let keep = !dead_indices.contains(&idx);
-                idx += 1;
-                keep
-            });
+            block
+                .instrs
+                .retain_indexed(|index, _| !dead_indices.contains(&index));
         }
     }
 }

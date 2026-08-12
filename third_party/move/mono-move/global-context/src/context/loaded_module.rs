@@ -9,8 +9,9 @@ use mono_move_alloc::{LeakedBoxPtr, VersionedLeakedBoxPtr};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     types::InternedTypeList,
-    Function, FunctionPtr,
+    Function, FunctionDefinitionIndex, FunctionPtr,
 };
+use move_binary_format::access::ModuleAccess;
 use parking_lot::Mutex;
 use shared_dsa::{Entry, UnorderedMap};
 use specializer::{FunctionIR, ModuleIR};
@@ -133,6 +134,17 @@ impl FunctionSlot {
     }
 }
 
+/// Result of looking up a function's polymorphic IR by name. See
+/// [`LoadedModule::get_function_ir`].
+pub enum FunctionIrLookup<'a> {
+    /// The function is not defined in this module.
+    NotDefined,
+    /// The function is a native: defined, but has no IR.
+    Native,
+    /// The function's IR.
+    Ir(&'a FunctionIR),
+}
+
 /// A loaded module: polymorphic IR and lazily lowered monomorphic functions.
 pub struct LoadedModule {
     /// Polymorphic stackless IR.
@@ -176,16 +188,26 @@ impl LoadedModule {
         let mut functions = UnorderedMap::with_capacity(ir.functions.len());
         let mut function_indices = UnorderedMap::with_capacity(ir.functions.len());
 
-        for (idx, func_ir) in ir.functions.iter().enumerate() {
-            match func_ir {
-                Some(func_ir) => {
-                    let name = ir.module.interned_identifier_at(func_ir.name_idx);
-                    functions.insert(name, OnceLock::new());
-                    function_indices.insert(name, idx);
-                },
-                None => {
-                    // TODO(completeness): For natives we also need to add a function?
-                },
+        debug_assert_eq!(
+            ir.functions.len(),
+            ir.module.function_defs.len(),
+            "ModuleIR must carry one entry per function definition"
+        );
+        // `zip`, not indexing: a length mismatch drops entries, degrading to a
+        // failed name lookup.
+        for (idx, (func_ir, fdef)) in ir
+            .functions
+            .iter()
+            .zip(&ir.module.function_defs)
+            .enumerate()
+        {
+            let name_idx = ir.module.function_handle_at(fdef.function).name;
+            let name = ir.module.interned_identifier_at(name_idx);
+            // Every definition, natives included, resolves by name; only
+            // those with IR get a lowered-code slot.
+            function_indices.insert(name, idx);
+            if func_ir.is_some() {
+                functions.insert(name, OnceLock::new());
             }
         }
         Box::new(Self {
@@ -224,15 +246,23 @@ impl LoadedModule {
         self.functions.get(&name)
     }
 
-    /// Returns the polymorphic IR for the function with the given name.
-    ///
-    /// The two-level [`Option`] distinguishes three cases:
-    /// - [`None`]: the function is not defined in this module.
-    /// - [`Some(None)`]: the function is a native (no IR).
-    /// - [`Some(Some(ir))`]: the IR is available.
-    pub fn get_function_ir(&self, name: InternedIdentifier) -> Option<Option<&FunctionIR>> {
-        let idx = *self.function_indices.get(&name)?;
-        Some(self.ir.functions.get(idx).and_then(|slot| slot.as_ref()))
+    /// Looks up the polymorphic IR for the function with the given name.
+    pub fn get_function_ir(&self, name: InternedIdentifier) -> FunctionIrLookup<'_> {
+        let Some(&idx) = self.function_indices.get(&name) else {
+            return FunctionIrLookup::NotDefined;
+        };
+        match self.ir.functions.get(idx).and_then(|slot| slot.as_ref()) {
+            Some(ir) => FunctionIrLookup::Ir(ir),
+            None => FunctionIrLookup::Native,
+        }
+    }
+
+    /// Definition index of the named function in this module. Covers natives
+    /// as well as Move-body functions.
+    pub fn function_def_idx(&self, name: InternedIdentifier) -> Option<FunctionDefinitionIndex> {
+        self.function_indices
+            .get(&name)
+            .map(|&idx| FunctionDefinitionIndex(idx as u16))
     }
 
     /// Returns the function and its mandatory dependencies for the given

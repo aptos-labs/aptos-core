@@ -9,7 +9,8 @@ mod common;
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     native::{NativeExtension, NativeExtensions},
-    Code, FrameLayoutInfo, Function, MicroOp, SortedSafePointEntries, VMResult,
+    Code, FrameLayoutInfo, Function, FunctionDefinitionIndex, MicroOp, SortedSafePointEntries,
+    VMResult,
 };
 
 /// Test extension that records the checkpoint hooks the interpreter fires, so
@@ -40,6 +41,7 @@ fn trivial_program() -> Function {
     Function {
         name: GlobalArenaPtr::from_static("test"),
         module_id: crate::program_module_id!("test"),
+        def_idx: FunctionDefinitionIndex(0),
         code: Code::from_vec(vec![MicroOp::Return]),
         entry_gas: 0,
         param_slots: vec![],

@@ -5,12 +5,12 @@ fun read_value() {
   frame_data_size: 48
   entry_gas: 95
   code:
-    0: EnumNew [8] desc=2 tag #0
-    1: HeapMoveTo8 [8]+8 <- [0]
-    2: SlotBorrow [16] <- &[8]
-    3: HeapReadOffset(8) [32] <- (*[16]).8
-    4: Move8 [0] <- [32]
-    5: Return
+    0: EnumNew [8] desc=2 tag #0 @1
+    1: HeapMoveTo8 [8]+8 <- [0] @1
+    2: SlotBorrow [16] <- &[8] @3
+    3: HeapReadOffset(8) [32] <- (*[16]).8 @4
+    4: Move8 [0] <- [32] @6
+    5: Return @6
   safe_point_layouts:
     0: []
 }
@@ -19,17 +19,17 @@ fun run_computed() {
   frame_data_size: 56
   entry_gas: 211
   code:
-    0: StoreImm8 [24] <- #0
-    1: EnumNew [16] desc=2 tag #1
-    2: HeapMoveTo8 [16]+8 <- [0]
-    3: HeapMoveTo8 [16]+16 <- [24]
-    4: SlotBorrow [80] <- &[16]
-    5: Move8 [96] <- [8]
-    6: CallIndirect 0x42::enum_variant_field_uniform::write_computed
-    7: SlotBorrow [32] <- &[16]
-    8: HeapReadOffset(8) [24] <- (*[32]).8
-    9: Move8 [0] <- [24]
-    10: Return
+    0: StoreImm8 [24] <- #0 @1
+    1: EnumNew [16] desc=2 tag #1 @2
+    2: HeapMoveTo8 [16]+8 <- [0] @2
+    3: HeapMoveTo8 [16]+16 <- [24] @2
+    4: SlotBorrow [80] <- &[16] @4
+    5: Move8 [96] <- [8] @6
+    6: CallIndirect 0x42::enum_variant_field_uniform::write_computed @6
+    7: SlotBorrow [32] <- &[16] @7
+    8: HeapReadOffset(8) [24] <- (*[32]).8 @8
+    9: Move8 [0] <- [24] @10
+    10: Return @10
   safe_point_layouts:
     1: []
 }
@@ -38,15 +38,15 @@ fun run_simple() {
   frame_data_size: 56
   entry_gas: 183
   code:
-    0: EnumNew [16] desc=2 tag #0
-    1: HeapMoveTo8 [16]+8 <- [0]
-    2: SlotBorrow [80] <- &[16]
-    3: Move8 [96] <- [8]
-    4: CallIndirect 0x42::enum_variant_field_uniform::write_simple
-    5: SlotBorrow [24] <- &[16]
-    6: HeapReadOffset(8) [40] <- (*[24]).8
-    7: Move8 [0] <- [40]
-    8: Return
+    0: EnumNew [16] desc=2 tag #0 @1
+    1: HeapMoveTo8 [16]+8 <- [0] @1
+    2: SlotBorrow [80] <- &[16] @3
+    3: Move8 [96] <- [8] @5
+    4: CallIndirect 0x42::enum_variant_field_uniform::write_simple @5
+    5: SlotBorrow [24] <- &[16] @6
+    6: HeapReadOffset(8) [40] <- (*[24]).8 @7
+    7: Move8 [0] <- [40] @9
+    8: Return @9
   safe_point_layouts:
     0: []
 }
@@ -55,16 +55,16 @@ fun write_computed() {
   frame_data_size: 32
   entry_gas: 33
   code:
-    0: AddU64Imm [24] <- [16] + #1
-    1: HeapWriteOffset(8) (*[0]).8 <- [24]
-    2: Return
+    0: AddU64Imm [24] <- [16] + #1 @2
+    1: HeapWriteOffset(8) (*[0]).8 <- [24] @4
+    2: Return @6
 }
 
 fun write_simple() {
   frame_data_size: 40
   entry_gas: 30
   code:
-    0: HeapBorrow [24] <- &[0]+8
-    1: WriteRef *[24] <- [16] (size=8)
-    2: Return
+    0: HeapBorrow [24] <- &[0]+8 @1
+    1: WriteRef *[24] <- [16] (size=8) @5
+    2: Return @6
 }

@@ -33,8 +33,8 @@ fun add_u64(r0, r1): u64 {
     r2: u64
   code:
   L0:
-    0: r2 := add r0, r1
-    1: ret [r2]
+    0: r2 := add r0, r1 @2
+    1: ret [r2] @3
 }
 
 fun apply(r0, r1): u64 {
@@ -44,8 +44,8 @@ fun apply(r0, r1): u64 {
     r2: u64
   code:
   L0:
-    0: [r2] := call_closure [|u64|u64], [r1, r0]
-    1: ret [r2]
+    0: [r2] := call_closure [|u64|u64], [r1, r0] @2
+    1: ret [r2] @3
 }
 
 fun run(r0, r1): u64 {
@@ -54,9 +54,9 @@ fun run(r0, r1): u64 {
     r1: u64
   code:
   L0:
-    0: x0 := pack_closure add_u64, 1, [r0]
-    1: [x0] := call apply, [x0, r1]
-    2: ret [x0]
+    0: x0 := pack_closure add_u64, 1, [r0] @1
+    1: [x0] := call apply, [x0, r1] @3
+    2: ret [x0] @4
 }
 === micro-ops ===
 // module 0x99::closure_as_arg
@@ -65,30 +65,30 @@ fun add_u64() {
   frame_data_size: 24
   entry_gas: 59
   code:
-    0: AddU64 [16] <- [0] + [8]
-    1: Move8 [0] <- [16]
-    2: Return
+    0: AddU64 [16] <- [0] + [8] @2
+    1: Move8 [0] <- [16] @3
+    2: Return @3
 }
 
 fun apply() {
   frame_data_size: 24
   entry_gas: 142
   code:
-    0: CallClosure closure=[0], provided_args=[[8](8)]
-    1: Move8 [16] <- [48]
-    2: Move8 [0] <- [16]
-    3: Return
+    0: CallClosure closure=[0], provided_args=[[8](8)] @2
+    1: Move8 [16] <- [48] @2
+    2: Move8 [0] <- [16] @3
+    3: Return @3
 }
 
 fun run() {
   frame_data_size: 16
   entry_gas: 151
   code:
-    0: PackClosure [40] <- func_ref=Unresolved(add_u64), mask=1, captured_desc=0, captured=[[0](8)]
-    1: Move8 [48] <- [8]
-    2: CallIndirect 0x99::closure_as_arg::apply
-    3: Move8 [0] <- [40]
-    4: Return
+    0: PackClosure [40] <- func_ref=Unresolved(add_u64), mask=1, captured_desc=0, captured=[[0](8)] @1
+    1: Move8 [48] <- [8] @3
+    2: CallIndirect 0x99::closure_as_arg::apply @3
+    3: Move8 [0] <- [40] @4
+    4: Return @4
   safe_point_layouts:
     0: []
 }

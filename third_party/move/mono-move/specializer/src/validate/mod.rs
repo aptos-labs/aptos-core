@@ -12,6 +12,7 @@
 //! No user error should show up as translation validation failure.
 
 pub(crate) mod cfg_equivalence;
+pub(crate) mod origins;
 pub(crate) mod transfer;
 
 use crate::stackless_exec_ir::{FunctionIR, ModuleIR};
@@ -22,6 +23,7 @@ use move_binary_format::{
     control_flow_graph::VMControlFlowGraph,
     file_format::{Bytecode, CodeOffset},
 };
+use origins::OriginsError;
 use thiserror::Error;
 use transfer::TransferVerifierError;
 
@@ -64,6 +66,12 @@ impl<'a> FuncCtx<'a> {
                 def_handle: fdef.function.0,
             });
         }
+        if func_ir.def_idx.0 as usize != def_idx {
+            return Err(PassError::FunctionDefIdxMismatch {
+                ir_def_idx: func_ir.def_idx.0,
+                position: def_idx,
+            });
+        }
         let code = fdef.code.as_ref().ok_or(PassError::MissingBytecode)?;
         Ok(FuncCtx {
             func_ir,
@@ -104,8 +112,14 @@ enum PassError {
     #[error("IR carries function handle {ir_handle}, definition expects {def_handle}")]
     FunctionHandleMismatch { ir_handle: u16, def_handle: u16 },
 
+    #[error("IR carries def index {ir_def_idx}, but sits at position {position}")]
+    FunctionDefIdxMismatch { ir_def_idx: u16, position: usize },
+
     #[error("CFG equivalence: {0}")]
     CfgEquivalence(#[from] CfgEquivalenceError),
+
+    #[error("origin provenance: {0}")]
+    Origins(#[from] OriginsError),
 
     #[error("transfer invariants: {0}")]
     Transfer(#[from] TransferVerifierError),
@@ -118,8 +132,10 @@ impl IntoExecutionError for ValidationError {
             | PassError::FunctionCountMismatch { .. }
             | PassError::MissingFunctionIR
             | PassError::UnexpectedFunctionIR
-            | PassError::FunctionHandleMismatch { .. } => ExecutionErrorKind::InvariantViolation,
+            | PassError::FunctionHandleMismatch { .. }
+            | PassError::FunctionDefIdxMismatch { .. } => ExecutionErrorKind::InvariantViolation,
             PassError::CfgEquivalence(err) => err.kind(),
+            PassError::Origins(err) => err.kind(),
             PassError::Transfer(err) => err.kind(),
         }
     }
@@ -189,9 +205,8 @@ fn validate_function(
     func_ir: &FunctionIR,
 ) -> Result<(), PassError> {
     let ctx = FuncCtx::new(module_ir, def_idx, func_ir)?;
-    let _blocks = cfg_equivalence::verify(&ctx)?;
+    let blocks = cfg_equivalence::verify(&ctx)?;
+    origins::verify(&ctx, &blocks)?;
     transfer::verify(&ctx)?;
-    // Future passes can consume `_blocks` (the certified block correspondence)
-    // instead of re-deriving or re-trusting the raw witness.
     Ok(())
 }

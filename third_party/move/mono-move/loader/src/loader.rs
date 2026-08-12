@@ -30,7 +30,7 @@ use mono_move_core::{
     LayoutProvider, ModuleId, ModuleProvider, VMInternalError, VMResult, ValueLayout,
 };
 use mono_move_global_context::{
-    ArenaRef, ExecutionGuard, FunctionSlot, LoadedModule, LoadedModuleSlot,
+    ArenaRef, ExecutionGuard, FunctionIrLookup, FunctionSlot, LoadedModule, LoadedModuleSlot,
     ModuleMandatoryDependencies, ModuleSlot,
 };
 use shared_dsa::UnorderedSet;
@@ -181,11 +181,22 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
 
         // Non-generic call.
         if ty_args.is_empty() {
+            // No lowered-code slot: either a native (present by name, no IR)
+            // or genuinely absent: report which.
             let slot = module.get_function_slot(func_name).ok_or_else(|| {
-                LoaderError::FunctionNotFound {
-                    address: *id.address(),
-                    module: id.name().to_string(),
-                    name: view_name(func_name).to_string(),
+                match module.get_function_ir(func_name) {
+                    FunctionIrLookup::Native => LoaderError::NativeFunctionNotLoadable {
+                        address: *id.address(),
+                        module: id.name().to_string(),
+                        name: view_name(func_name).to_string(),
+                    },
+                    FunctionIrLookup::Ir(_) | FunctionIrLookup::NotDefined => {
+                        LoaderError::FunctionNotFound {
+                            address: *id.address(),
+                            module: id.name().to_string(),
+                            name: view_name(func_name).to_string(),
+                        }
+                    },
                 }
             })?;
             if let Some(loaded) = slot.get() {
@@ -254,9 +265,18 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         ty_args: InternedTypeList,
     ) -> VMResult<(Function, Arc<[LoadedModuleSlot]>)> {
         let func_ir = match module.get_function_ir(func_name) {
-            Some(Some(ir)) => ir,
-            Some(None) => return Err(VMInternalError::new(LoaderError::FunctionIrMissing)),
-            None => {
+            FunctionIrLookup::Ir(ir) => ir,
+            FunctionIrLookup::Native => {
+                let id = self.guard.arena_ref_for_module_id(module.id());
+                return Err(VMInternalError::new(
+                    LoaderError::NativeFunctionNotLoadable {
+                        address: *id.address(),
+                        module: id.name().to_string(),
+                        name: view_name(func_name).to_string(),
+                    },
+                ));
+            },
+            FunctionIrLookup::NotDefined => {
                 let id = self.guard.arena_ref_for_module_id(module.id());
                 return Err(VMInternalError::new(LoaderError::FunctionNotFound {
                     address: *id.address(),

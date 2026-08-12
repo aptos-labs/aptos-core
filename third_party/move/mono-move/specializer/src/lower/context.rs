@@ -972,6 +972,7 @@ pub fn try_lower_function(
     let name = module_ir.module.interned_identifier_at(func_ir.name_idx);
     let LoweredFunction {
         code,
+        origins,
         entry_gas,
         mut safe_points,
     } = lower_function(func_ir, &ctx)?;
@@ -1003,7 +1004,8 @@ pub fn try_lower_function(
     Ok(LoweringOutcome::Built(Function {
         name,
         module_id: module_ir.module.id(),
-        code: Code::from_vec(code),
+        def_idx: func_ir.def_idx,
+        code: Code::with_origins(code, origins),
         entry_gas,
         param_slots,
         param_region_size: derived.param_region_size as usize,

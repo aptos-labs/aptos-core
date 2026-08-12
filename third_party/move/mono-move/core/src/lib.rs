@@ -23,7 +23,8 @@ pub use align::{
 };
 pub use error::{ExecutionError, ExecutionErrorKind, ExecutionResult, IntoExecutionError};
 pub use function::{
-    Code, FrameLayoutInfo, Function, FunctionPtr, SafePointEntry, SortedSafePointEntries,
+    BytecodeOffset, Code, FrameLayoutInfo, Function, FunctionPtr, SafePointEntry,
+    SortedSafePointEntries,
 };
 pub use gas::{GasExhaustedError, GasMeter};
 pub use instruction::{
@@ -42,7 +43,7 @@ pub use interner::{
     module_id_of, struct_tag_of, type_tag_of, view_function_ref, view_module_id, FunctionRef,
     InternedFunctionRef, Interner, ModuleId, TypeSubstitutionError,
 };
-pub use move_binary_format::file_format::ConstantPoolIndex;
+pub use move_binary_format::file_format::{ConstantPoolIndex, FunctionDefinitionIndex};
 pub use object_descriptor::{
     DescriptorProvider, ObjectDescriptor, ObjectDescriptorInner, ObjectDescriptorTable,
     CLOSURE_DESCRIPTOR_ID, RESERVED_DESCRIPTOR_COUNT, TRIVIAL_DESCRIPTOR_ID,

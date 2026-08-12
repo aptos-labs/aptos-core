@@ -374,7 +374,7 @@ fn classify_loader_error(err: &LoaderError) -> FailureKind {
     match err {
         LoaderError::ModuleNotFound { .. }
         | LoaderError::FunctionNotFound { .. }
-        | LoaderError::FunctionIrMissing => FailureKind::Linker,
+        | LoaderError::NativeFunctionNotLoadable { .. } => FailureKind::Linker,
         LoaderError::LoweringSkipped { .. } | LoaderError::GlobalContext(_) => FailureKind::Other,
         LoaderError::InvariantViolation(_) => FailureKind::InvariantViolation,
     }
