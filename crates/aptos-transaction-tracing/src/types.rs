@@ -8,6 +8,18 @@ use std::sync::Arc;
 /// Lifecycle stages a transaction passes through.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, strum_macros::AsRefStr)]
 pub enum TransactionStage {
+    ApiHandlerEnter,
+    ApiTransactionDecoded,
+    ApiMempoolSubmit,
+    ApiMempoolAccepted,
+    /// Wall-clock time at which the mempool task for this submission actually
+    /// began running. Splits the otherwise-opaque `ApiMempoolSubmit ->
+    /// MempoolInsert` span into its two halves: the wait (bounded-channel
+    /// send, the single-threaded coordinator loop, and the `BoundedExecutor`
+    /// semaphore) before this stamp, and the work (storage fetch, filter, VM
+    /// validation, insert) after it. Recorded on the client-submission path
+    /// only.
+    MempoolProcessStart,
     MempoolInsert,
     QsBatchPull,
     QsBatchCreated,
@@ -30,6 +42,18 @@ pub enum TransactionStage {
     Committed,
     MempoolCommit,
     MempoolReject,
+}
+
+impl TransactionStage {
+    pub fn is_api_stage(self) -> bool {
+        matches!(
+            self,
+            Self::ApiHandlerEnter
+                | Self::ApiTransactionDecoded
+                | Self::ApiMempoolSubmit
+                | Self::ApiMempoolAccepted
+        )
+    }
 }
 
 /// Batch inclusion type in a block proposal.
@@ -144,7 +168,16 @@ pub struct TransactionTrace {
     /// Pre-computed sender hex string to avoid repeated allocations in
     /// `observe_stage_latency` (called ~10 times per trace lifecycle).
     pub sender_str: String,
-    pub insertion_time_usecs: u64,
+    /// Time when this trace first became active. For API-submitted transactions,
+    /// this precedes mempool insertion and is used for orphan cleanup.
+    pub trace_start_time_usecs: u64,
+    /// Mempool insertion remains the base for existing pipeline latency fields.
+    /// API-started traces leave this unset until core mempool accepts the txn.
+    pub insertion_time_usecs: Option<u64>,
+    /// Identifies the API request that created a pending trace. This remains set
+    /// after mempool promotion so that only the owning request can append its
+    /// terminal API stage.
+    pub(crate) api_generation: Option<u64>,
     pub current_attempt: u32,
     /// Gas unit price of this transaction, recorded at first QsBatchPull.
     /// Used to diagnose prioritization: mempool sorts by gas price descending.
@@ -159,11 +192,49 @@ impl TransactionTrace {
             hash,
             sender,
             sender_str,
-            insertion_time_usecs: now_usecs,
+            trace_start_time_usecs: now_usecs,
+            insertion_time_usecs: Some(now_usecs),
+            api_generation: None,
             current_attempt: 1,
             gas_unit_price: None,
             stages: Vec::new(),
         }
+    }
+
+    pub fn new_at_api(
+        hash: HashValue,
+        sender: AccountAddress,
+        now_usecs: u64,
+        api_generation: u64,
+    ) -> Self {
+        let sender_str = sender.to_string();
+        let mut trace = Self {
+            hash,
+            sender,
+            sender_str,
+            trace_start_time_usecs: now_usecs,
+            insertion_time_usecs: None,
+            api_generation: Some(api_generation),
+            current_attempt: 1,
+            gas_unit_price: None,
+            stages: Vec::new(),
+        };
+        trace.record(TransactionStage::ApiHandlerEnter, now_usecs);
+        trace
+    }
+
+    /// Initializes the existing mempool-relative timeline exactly once.
+    pub fn start_at_mempool(&mut self, now_usecs: u64) -> bool {
+        if self.insertion_time_usecs.is_some() {
+            return false;
+        }
+        self.insertion_time_usecs = Some(now_usecs);
+        self.record(TransactionStage::MempoolInsert, now_usecs);
+        true
+    }
+
+    pub fn has_stage(&self, stage: TransactionStage) -> bool {
+        self.stages.iter().any(|record| record.stage == stage)
     }
 
     pub fn record(&mut self, stage: TransactionStage, timestamp_usecs: u64) {

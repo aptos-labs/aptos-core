@@ -137,6 +137,15 @@ pub(crate) async fn process_client_transaction_submission<NetworkClient, Transac
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
     TransactionValidator: TransactionValidation + 'static,
 {
+    // Captured before any work so it marks the instant this task began running
+    // — the boundary between the submit-side wait (bounded-channel send, the
+    // coordinator loop, the `BoundedExecutor` semaphore) and the mempool work
+    // that follows. It can only be *recorded* after `process_incoming_transactions`
+    // below, because API-started traces have no `insertion_time_usecs` base
+    // until `add_txn` runs, and stage records before that are dropped.
+    let task_start_usecs = aptos_transaction_tracing::store::TransactionTraceStore::global()
+        .is_enabled()
+        .then(|| aptos_infallible::duration_since_epoch().as_micros() as u64);
     timer.stop_and_record();
     let _timer = counters::process_txn_submit_latency_timer_client();
     let ineligible_for_broadcast =
@@ -155,6 +164,16 @@ pub(crate) async fn process_client_transaction_submission<NetworkClient, Transac
         )
         .await;
     log_txn_process_results(&statuses, None);
+
+    // No-op unless the txn was accepted and sampled for tracing: the store
+    // drops stage records for unknown hashes and for traces with no base.
+    if let Some((task_start_usecs, (txn, _))) = task_start_usecs.zip(statuses.first()) {
+        aptos_transaction_tracing::store::TransactionTraceStore::global().record_stage_at(
+            &txn.committed_hash(),
+            aptos_transaction_tracing::types::TransactionStage::MempoolProcessStart,
+            task_start_usecs,
+        );
+    }
 
     if let Some(status) = statuses.first() {
         if callback.send(Ok(status.1.clone())).is_err() {
