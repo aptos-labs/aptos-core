@@ -190,7 +190,6 @@ fn test_bcs_to_bytes_value_size_metering() {
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     publish_deep_wrapper(&mut h, &acc, 120, 100, 30);
 
-    h.set_timed_feature(TimedFeatureFlag::MeterBcsByValueSize, false);
     let gas_off = h.evaluate_entry_function_gas(&acc, run_id(), vec![], vec![]);
     h.set_timed_feature(TimedFeatureFlag::MeterBcsByValueSize, true);
     let gas_on = h.evaluate_entry_function_gas(&acc, run_id(), vec![], vec![]);
@@ -208,7 +207,6 @@ fn test_bcs_to_bytes_execution_limit() {
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     publish_deep_wrapper(&mut h, &acc, 120, 200, 100);
 
-    h.set_timed_feature(TimedFeatureFlag::MeterBcsByValueSize, false);
     assert_success!(h.run_entry_function(&acc, run_id(), vec![], vec![]));
 
     // Enable timed feature flag.
