@@ -59,6 +59,13 @@ pub fn boogie_module_name(env: &ModuleEnv<'_>) -> String {
 /// Return boogie name of given structure.
 pub fn boogie_struct_name(struct_env: &StructEnv<'_>, inst: &[Type], bv_flag: bool) -> String {
     if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
+        if bv_flag {
+            crate::rendering::record_table_twin_ref(
+                struct_env.module_env.env,
+                struct_env.get_qualified_id(),
+                inst,
+            );
+        }
         if struct_env.get_ghost_fields().next().is_some() {
             // Ghost-declaring intrinsic maps use a per-instance carrier
             // datatype wrapping the table. The name must follow the suffix
@@ -77,14 +84,21 @@ pub fn boogie_struct_name(struct_env: &StructEnv<'_>, inst: &[Type], bv_flag: bo
         let env = struct_env.module_env.env;
         format!("Table int ({})", boogie_type(env, &inst[1], bv_flag))
     } else {
+        // Non-Table structs ignore the `bv_flag` argument: bv classification
+        // is tracked per-field, not per-value, so twin-ness is a global
+        // property of the (struct, instantiation) — a dragged instantiation
+        // (one whose declaration renders some field as a bitvector) carries
+        // its rendering in the name suffix, for its declaration and every
+        // reference uniformly.
+        let env = struct_env.module_env.env;
+        let arg_flags =
+            crate::rendering::struct_twin_flags(env, struct_env.get_qualified_id(), inst)
+                .unwrap_or_default();
         format!(
             "${}_{}{}",
             boogie_module_name(&struct_env.module_env),
             struct_env.get_name().display(struct_env.symbol_pool()),
-            // Non-Table structs use bv_flag=false for all type parameters: bv classification
-            // is tracked per-field, not at the struct name level, so the `bv_flag` argument
-            // is irrelevant here and only affects the intrinsic-map (Table) branch above.
-            boogie_inst_suffix(struct_env.module_env.env, inst, &[])
+            boogie_inst_suffix(env, inst, &arg_flags)
         )
     }
 }
@@ -161,6 +175,15 @@ pub fn field_bv_flag_global_state(
     // Ghost fields are model-only and never participate in number-operation
     // (bitvector) analysis; on enums they also carry no variant.
     if field_env.is_ghost() {
+        return false;
+    }
+    // Generic fields (declared type mentions a type parameter) are int
+    // sinks, like widthless `num`: their single datatype declaration is
+    // shared by every instantiation and every cone, so an inferred Bitwise
+    // classification (spilled from one bitwise user) must not force the
+    // bitvector rendering onto all of them. Bitwise values convert at the
+    // pack/unpack boundary instead.
+    if field_env.get_type().is_open() {
         return false;
     }
     let operation_map = &global_state.struct_operation_map;
@@ -480,7 +503,12 @@ pub fn boogie_type(env: &GlobalEnv, ty: &Type, bv_flag: bool) -> String {
             Bool => "bool".to_string(),
             Range | EventStore => panic!("unexpected type"),
         },
-        Vector(et) => format!("Vec ({})", boogie_type(env, et, bv_flag)),
+        Vector(et) => {
+            if bv_flag {
+                crate::rendering::record_vec_twin_ref(env, et);
+            }
+            format!("Vec ({})", boogie_type(env, et, bv_flag))
+        },
         Struct(mid, sid, inst) => {
             boogie_struct_name(&env.get_module(*mid).into_struct(*sid), inst, bv_flag)
         },
@@ -689,10 +717,15 @@ pub fn boogie_type_suffix(env: &GlobalEnv, ty: &Type, bv_flag: bool) -> String {
             Range => "range".to_string(),
             EventStore => format!("<<unsupported {:?}>>", ty),
         },
-        Vector(et) => format!(
-            "vec{}",
-            boogie_inst_suffix(env, &[et.as_ref().to_owned()], &[bv_flag])
-        ),
+        Vector(et) => {
+            if bv_flag {
+                crate::rendering::record_vec_twin_ref(env, et);
+            }
+            format!(
+                "vec{}",
+                boogie_inst_suffix(env, &[et.as_ref().to_owned()], &[bv_flag])
+            )
+        },
         Struct(mid, sid, inst) => {
             boogie_type_suffix_for_struct(&env.get_module(*mid).into_struct(*sid), inst, bv_flag)
         },
@@ -728,6 +761,13 @@ pub fn boogie_type_suffix_for_struct(
     bv_flag: bool,
 ) -> String {
     if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
+        if bv_flag {
+            crate::rendering::record_table_twin_ref(
+                struct_env.module_env.env,
+                struct_env.get_qualified_id(),
+                inst,
+            );
+        }
         format!(
             "${}_{}{}",
             boogie_module_name(&struct_env.module_env),

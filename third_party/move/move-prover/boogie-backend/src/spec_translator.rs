@@ -324,6 +324,27 @@ impl SpecTranslator<'_> {
     pub fn translate_axioms(&self, env: &GlobalEnv, mono_info: &MonoInfo) {
         let type_display_ctx = env.get_type_display_ctx();
         for (axiom, type_insts) in &mono_info.axioms {
+            // An axiom belongs to one rendering world, like a spec function
+            // (see `translate_spec_funs`): with no Bitwise node in its
+            // condition, its types — equality suffixes over dragged struct
+            // instantiations included — render plainly, matching the
+            // plain-world spec functions it quantifies over.
+            let plain_world = env
+                .get_extension::<GlobalNumberOperationState>()
+                .is_none_or(|state| {
+                    let mut plain = true;
+                    axiom.exp.visit_pre_order(&mut |e| {
+                        if state
+                            .get_node_num_oper_opt(e.node_id())
+                            .is_some_and(|oper| oper == Bitwise)
+                        {
+                            plain = false;
+                        }
+                        true
+                    });
+                    plain
+                });
+            let _plain_guard = plain_world.then(crate::rendering::PlainRenderingGuard::new);
             for type_inst in type_insts {
                 self.writer.set_location(&axiom.loc);
                 emit!(self.writer, "// axiom {}", axiom.loc.display(env));
@@ -414,6 +435,17 @@ impl SpecTranslator<'_> {
                 .iter()
                 .cloned()
             {
+                // A spec function belongs to one rendering world, decided by
+                // its own classification: with no Bitwise slot anywhere in
+                // its signature, its types — struct references included —
+                // and its body render plainly. (Without this, a numeric
+                // parameter follows its Arithmetic slot while a dragged
+                // struct return type follows the twin lookup, making the
+                // declaration internally inconsistent.) Call sites apply
+                // the same rule when rendering the name and arguments.
+                let _plain_guard =
+                    crate::rendering::spec_fun_plain_world(self.env, module_env.get_id(), *id)
+                        .then(crate::rendering::PlainRenderingGuard::new);
                 let name = boogie_spec_fun_name(module_env, *id, &type_inst, false);
                 if !translated.insert(name) {
                     continue;
@@ -2491,9 +2523,9 @@ impl SpecTranslator<'_> {
             boogie_struct_name(struct_env, inst, false)
         );
         let mut sep = "";
-        for arg in args {
+        for (ref field_env, arg) in struct_env.get_fields().zip(args.iter()) {
             emit!(self.writer, sep);
-            self.translate_exp(arg);
+            self.translate_plain_field_pack_arg(field_env, inst, arg);
             sep = ", ";
         }
         // Ghost fields are additional constructor arguments. If a ghost has an
@@ -2501,6 +2533,29 @@ impl SpecTranslator<'_> {
         // a fresh unconstrained value.
         self.emit_ghost_pack_args(struct_env, inst, &mut sep, node_id, Some(args));
         emit!(self.writer, ")");
+    }
+
+    /// See `plain_field_conv` in the bytecode translator: generic
+    /// (type-parameter typed) fields render plainly, so a
+    /// bitvector-rendered pack argument converts at the boundary.
+    fn translate_plain_field_pack_arg(&self, field_env: &move_model::model::FieldEnv, inst: &[Type], arg: &Exp) {
+        let field_ty = field_env.get_type().instantiate(inst);
+        if field_env.get_type().is_open()
+            && field_ty.skip_reference().is_number()
+            && self.operand_bv_flag(arg)
+        {
+            let base = boogie_num_type_base(
+                self.env,
+                Some(self.env.get_node_loc(arg.node_id())),
+                field_ty.skip_reference(),
+                false,
+            );
+            emit!(self.writer, "$bv2int.{}(", base);
+            self.translate_exp(arg);
+            emit!(self.writer, ")");
+        } else {
+            self.translate_exp(arg);
+        }
     }
 
     fn translate_pack_variant(
@@ -2522,9 +2577,12 @@ impl SpecTranslator<'_> {
             boogie_struct_variant_name(struct_env, inst, *variant)
         );
         let mut sep = "";
-        for arg in args {
+        for (ref field_env, arg) in struct_env
+            .get_fields_of_variant(*variant)
+            .zip(args.iter())
+        {
             emit!(self.writer, sep);
-            self.translate_exp(arg);
+            self.translate_plain_field_pack_arg(field_env, inst, arg);
             sep = ", ";
         }
         // Enum ghost initializers may not reference variant fields (ghosts are
@@ -2631,7 +2689,14 @@ impl SpecTranslator<'_> {
             node_id
         };
         let bv_flag = self.node_bv_flag(flag_node);
-        let name = boogie_spec_fun_name(module_env, fun_id, inst, bv_flag);
+        let name = {
+            // Render the callee's name in the callee's own world (see
+            // `translate_spec_funs`), so plain-world functions are named
+            // identically at declaration and call.
+            let _plain_guard = crate::rendering::spec_fun_plain_world(self.env, module_id, fun_id)
+                .then(crate::rendering::PlainRenderingGuard::new);
+            boogie_spec_fun_name(module_env, fun_id, inst, bv_flag)
+        };
         emit!(self.writer, "{}(", name);
         let mut first = true;
         let mut maybe_comma = || {

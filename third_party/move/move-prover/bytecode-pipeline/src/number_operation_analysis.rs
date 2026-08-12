@@ -794,6 +794,11 @@ impl NumberOperationAnalysis<'_> {
                                 .get_module(*mid)
                                 .into_struct(*sid);
                             for (i, field) in struct_env.get_fields().enumerate() {
+                                // Generic fields are int sinks; see
+                                // `handle_pack_unpack`.
+                                if field.get_type().is_open() {
+                                    continue;
+                                }
                                 let field_oper =
                                     global_state.get_num_operation_field(mid, sid, &field.get_id());
                                 let arg_oper = global_state.get_node_num_oper(args[i].node_id());
@@ -974,10 +979,19 @@ impl NumberOperationAnalysis<'_> {
         msid: ModuleId,
         sid: StructId,
         field_id: FieldId,
+        field_declared_ty: &Type,
         temp_idx: TempIndex,
         state: &mut NumberOperationState,
         global_state: &mut GlobalNumberOperationState,
     ) {
+        // Generic fields (declared type mentions a type parameter) are int
+        // sinks, like widthless `num`: Bitwise neither settles in the
+        // shared field slot nor crosses through it into the other side;
+        // values convert at the boundary instead (see
+        // `field_bv_flag_global_state` for the rendering side).
+        if field_declared_ty.is_open() {
+            return;
+        }
         let field_oper = *global_state.get_num_operation_field(&msid, &sid, &field_id);
         let temp_oper = self.get_temp_oper(temp_idx, global_state);
         let merged = field_oper.merge(&temp_oper);
@@ -1096,6 +1110,7 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                                 *msid,
                                 *sid,
                                 field.get_id(),
+                                &field.get_type(),
                                 srcs[i],
                                 state,
                                 &mut global_state,
@@ -1121,6 +1136,7 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                                     *msid,
                                     *sid,
                                     new_field_id,
+                                    &field.get_type(),
                                     srcs[i],
                                     state,
                                     &mut global_state,
@@ -1140,6 +1156,7 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                                 *msid,
                                 *sid,
                                 field.get_id(),
+                                &field.get_type(),
                                 dests[i],
                                 state,
                                 &mut global_state,
@@ -1165,6 +1182,7 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                                     *msid,
                                     *sid,
                                     new_field_id,
+                                    &field.get_type(),
                                     dests[i],
                                     state,
                                     &mut global_state,
@@ -1173,18 +1191,18 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                         }
                     },
                     GetField(msid, sid, _, offset) | BorrowField(msid, sid, _, offset) => {
-                        let field_id = self
+                        let struct_env = self
                             .func_target
                             .global_env()
                             .get_module(*msid)
-                            .into_struct(*sid)
-                            .get_field_by_offset(*offset)
-                            .get_id();
+                            .into_struct(*sid);
+                        let field = struct_env.get_field_by_offset(*offset);
 
                         self.handle_pack_unpack(
                             *msid,
                             *sid,
-                            field_id,
+                            field.get_id(),
+                            &field.get_type(),
                             dests[0],
                             state,
                             &mut global_state,
@@ -1198,49 +1216,50 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                             .get_module(*msid)
                             .into_struct(*sid);
                         let pool = struct_env.symbol_pool();
-                        let field_name = &self
-                            .func_target
-                            .func_env
-                            .module_env
-                            .get_struct(*sid)
-                            .get_field_by_offset_optional_variant(Some(variants[0]), *offset)
-                            .get_name();
-                        let new_field_id =
-                            FieldId::new(pool.make(&FieldId::make_variant_field_id_str(
-                                pool.string(variants[0]).as_str(),
-                                pool.string(*field_name).as_str(),
-                            )));
-                        let dests_oper = global_state
-                            .get_temp_index_oper(cur_mid, cur_fid, dests[0], baseline_flag)
-                            .unwrap();
-                        let field_oper =
-                            global_state.get_num_operation_field(msid, sid, &new_field_id);
-
-                        let merged_oper = dests_oper.merge(field_oper);
-                        if merged_oper != *field_oper || merged_oper != *dests_oper {
-                            state.changed = true;
-                        }
-                        *global_state
-                            .get_mut_temp_index_oper(cur_mid, cur_fid, dests[0], baseline_flag)
-                            .unwrap() = merged_oper;
-                        for variant in variants {
-                            let field_name = &self
-                                .func_target
-                                .func_env
-                                .module_env
-                                .get_struct(*sid)
-                                .get_field_by_offset_optional_variant(Some(*variant), *offset)
-                                .get_name();
+                        let variant_struct = self.func_target.func_env.module_env.get_struct(*sid);
+                        let variant_field = variant_struct
+                            .get_field_by_offset_optional_variant(Some(variants[0]), *offset);
+                        // Generic fields are int sinks; see
+                        // `handle_pack_unpack`.
+                        if !variant_field.get_type().is_open() {
+                            let field_name = &variant_field.get_name();
                             let new_field_id =
                                 FieldId::new(pool.make(&FieldId::make_variant_field_id_str(
-                                    pool.string(*variant).as_str(),
+                                    pool.string(variants[0]).as_str(),
                                     pool.string(*field_name).as_str(),
                                 )));
-                            global_state
-                                .struct_operation_map
-                                .get_mut(&(*msid, *sid))
-                                .unwrap()
-                                .insert(new_field_id, merged_oper);
+                            let dests_oper = global_state
+                                .get_temp_index_oper(cur_mid, cur_fid, dests[0], baseline_flag)
+                                .unwrap();
+                            let field_oper =
+                                global_state.get_num_operation_field(msid, sid, &new_field_id);
+
+                            let merged_oper = dests_oper.merge(field_oper);
+                            if merged_oper != *field_oper || merged_oper != *dests_oper {
+                                state.changed = true;
+                            }
+                            *global_state
+                                .get_mut_temp_index_oper(cur_mid, cur_fid, dests[0], baseline_flag)
+                                .unwrap() = merged_oper;
+                            for variant in variants {
+                                let field_name = &self
+                                    .func_target
+                                    .func_env
+                                    .module_env
+                                    .get_struct(*sid)
+                                    .get_field_by_offset_optional_variant(Some(*variant), *offset)
+                                    .get_name();
+                                let new_field_id =
+                                    FieldId::new(pool.make(&FieldId::make_variant_field_id_str(
+                                        pool.string(*variant).as_str(),
+                                        pool.string(*field_name).as_str(),
+                                    )));
+                                global_state
+                                    .struct_operation_map
+                                    .get_mut(&(*msid, *sid))
+                                    .unwrap()
+                                    .insert(new_field_id, merged_oper);
+                            }
                         }
                     },
                     Function(msid, fsid, _) => {

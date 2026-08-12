@@ -76,6 +76,7 @@ pub mod boogie_wrapper;
 pub mod bytecode_translator;
 pub mod options;
 mod prover_task_runner;
+pub mod rendering;
 mod spec_translator;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
@@ -354,50 +355,40 @@ pub fn add_prelude(
         .iter()
         .map(|(qid, ty_args)| MapImpl::new(env, options, *qid, ty_args, false))
         .collect_vec();
-    // If not using cvc5, generate vector functions for bv types
+    // If not using cvc5, generate vector functions for bv types. The twin
+    // supply sets are computed by the rendering analysis (see
+    // `rendering.rs`); this block only converts them into template inputs.
     if !options.use_cvc5 {
-        // Exclude element/value types with no bv rendering from bv twins
-        // (same guard as `bv_all_types` above).
-        let mut bv_vec_instances = mono_info
-            .vec_inst
+        let mut bv_vec_instances = rendering::vec_twin_supply(env, &mono_info)
             .iter()
-            .filter(|ty| !never_renders_bv(ty))
             .map(|ty| TypeInfo::new(env, options, ty, true))
             .filter(|ty_info| !vec_instances.contains(ty_info))
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect_vec();
-        // Twins are per-instance: each instantiation whose value type has a
-        // bv rendering gets a bv twin (same predicate as the rendering
-        // guard and the vec twins — nested unsigned values like
-        // `vector<u8>` included), independently of sibling instantiations
-        // of the same map type. Instances whose bv rendering coincides
-        // with the plain one are dropped by the dedup filter below.
-        let mut bv_table_instances = mono_info
-            .table_inst
+        let mut bv_table_instances = rendering::table_twin_supply(env, &mono_info)
             .iter()
-            .filter_map(|(qid, ty_args)| {
-                let bv_ty_args = ty_args
-                    .iter()
-                    .filter(|(_, vty)| {
-                        let vty = vty.skip_reference();
-                        // A twin exists only where the value's bv rendering
-                        // is legal and actually differs from the plain one
-                        // (struct/bool values render identically and would
-                        // duplicate the base instance).
-                        !never_renders_bv(vty)
-                            && boogie_type_suffix(env, vty, true)
-                                != boogie_type_suffix(env, vty, false)
-                    })
-                    .cloned()
-                    .collect::<BTreeSet<_>>();
-                (!bv_ty_args.is_empty())
-                    .then(|| MapImpl::new(env, options, *qid, &bv_ty_args, true))
-            })
+            .map(|(qid, bv_ty_args)| MapImpl::new(env, options, *qid, bv_ty_args, true))
             .filter(|map_impl| !table_instances.contains(map_impl))
             .collect_vec();
         vec_instances.append(&mut bv_vec_instances);
         table_instances.append(&mut bv_table_instances);
+    }
+    // Vector instances whose element type contains a dragged struct
+    // instantiation render differently in the plain world; plain-world
+    // contexts (plain twin datatypes, plain-world spec functions) need
+    // those instances declared too.
+    {
+        let _plain_guard = rendering::PlainRenderingGuard::new();
+        let mut plain_vec_instances = mono_info
+            .vec_inst
+            .iter()
+            .map(|ty| TypeInfo::new(env, options, ty, false))
+            .filter(|ty_info| !vec_instances.contains(ty_info))
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect_vec();
+        vec_instances.append(&mut plain_vec_instances);
     }
     context.insert("vec_instances", &vec_instances);
     let tuple_instances = mono_info

@@ -233,9 +233,27 @@ pub fn generate_boogie(
     targets: &FunctionTargetsHolder,
 ) -> anyhow::Result<CodeWriter> {
     let writer = CodeWriter::new(env.internal_loc());
+    // No twins exist on the cvc5 path; without the extension the twin
+    // lookup is inert and rendering behaves as before stage 3.
+    if !options.backend.use_cvc5 {
+        move_prover_boogie_backend::rendering::install_rendering_info(env, targets);
+    }
+    let twin_check = move_prover_boogie_backend::rendering::TwinUniverseCheck::start(
+        env,
+        &options.backend,
+        targets,
+    );
     add_prelude(env, &options.backend, &writer)?;
+    // Arm the twin-reference recorder only after the prelude: the prelude's
+    // speculative twin supply emission must not count as demand.
+    if let Some(check) = &twin_check {
+        check.arm(env);
+    }
     let mut translator = BoogieTranslator::new(env, &options.backend, shard, targets, &writer);
     translator.translate();
+    if let Some(check) = twin_check {
+        check.finish(env);
+    }
     Ok(writer)
 }
 

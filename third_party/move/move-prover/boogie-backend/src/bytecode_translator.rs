@@ -570,6 +570,29 @@ impl<'env> BoogieTranslator<'env> {
                         type_inst: type_inst.as_slice(),
                     }
                     .translate();
+                    // A dragged instantiation also gets its plain twin: the
+                    // declaration templates and undragged worlds construct
+                    // (int payloads into plainly rendered fields). Emitted
+                    // under the scoped plain mode, so its name, fields, and
+                    // nested references all belong to the plain world.
+                    // Dragged resources would need a second memory variable
+                    // and are not supported (none demanded in practice).
+                    if crate::rendering::struct_twin_flags(
+                        env,
+                        struct_env.get_qualified_id(),
+                        type_inst,
+                    )
+                    .is_some()
+                        && !struct_env.has_memory()
+                    {
+                        let _guard = crate::rendering::PlainRenderingGuard::new();
+                        StructTranslator {
+                            parent: self,
+                            struct_env,
+                            type_inst: type_inst.as_slice(),
+                        }
+                        .translate();
+                    }
                 }
             }
 
@@ -4825,8 +4848,13 @@ impl StructTranslator<'_> {
         );
     }
 
-    /// Return whether a field renders as a bitvector.
+    /// Return whether a field renders as a bitvector. In plain rendering
+    /// mode (emission of a dragged instantiation's plain twin) every field
+    /// renders plainly.
     pub fn field_bv_flag(&self, field_env: &FieldEnv) -> bool {
+        if crate::rendering::plain_rendering_active() {
+            return false;
+        }
         let global_state = &self
             .parent
             .env
@@ -5134,6 +5162,29 @@ impl FunctionTranslator<'_> {
     /// slots shared across generic instantiations.
     pub fn bv_flag(&self, num_oper: &NumOperation, ty: &Type) -> bool {
         bv_flag_for_type(self.parent.env, num_oper, ty)
+    }
+
+    /// Conversion at the generic-field boundary: generic (type-parameter
+    /// typed) fields render plainly (see `field_bv_flag_global_state`), so
+    /// a bitvector-classified temp converts when crossing — `$bv2int` into
+    /// the field, `$int2bv` out of it.
+    fn plain_field_conv(
+        &self,
+        conv: &str,
+        field_env: &FieldEnv,
+        inst: &[Type],
+        temp: TempIndex,
+        expr: String,
+    ) -> String {
+        if field_env.get_type().is_open() && self.temp_bv_flag(temp) {
+            let field_ty = field_env.get_type().instantiate(inst);
+            if field_ty.skip_reference().is_number() {
+                let base =
+                    boogie_num_type_base(self.parent.env, None, field_ty.skip_reference(), false);
+                return format!("${}.{}({})", conv, base, expr);
+            }
+        }
+        expr
     }
 
     /// Return whether the value of the given temp renders as a bitvector,
@@ -6414,7 +6465,19 @@ impl FunctionTranslator<'_> {
                                  code; use the map's creation functions",
                             );
                         } else {
-                            let mut args = srcs.iter().cloned().map(str_local).collect_vec();
+                            let mut args = struct_env
+                                .get_fields()
+                                .zip(srcs.iter())
+                                .map(|(ref field_env, src)| {
+                                    self.plain_field_conv(
+                                        "bv2int",
+                                        field_env,
+                                        inst,
+                                        *src,
+                                        str_local(*src),
+                                    )
+                                })
+                                .collect_vec();
                             args.extend(self.ghost_field_pack_args(
                                 &struct_env,
                                 inst,
@@ -6443,7 +6506,19 @@ impl FunctionTranslator<'_> {
                                  code; use the map's creation functions",
                             );
                         } else {
-                            let mut args = srcs.iter().cloned().map(str_local).collect_vec();
+                            let mut args = struct_env
+                                .get_fields_of_variant(*variant)
+                                .zip(srcs.iter())
+                                .map(|(ref field_env, src)| {
+                                    self.plain_field_conv(
+                                        "bv2int",
+                                        field_env,
+                                        inst,
+                                        *src,
+                                        str_local(*src),
+                                    )
+                                })
+                                .collect_vec();
                             args.extend(self.ghost_field_pack_args(&struct_env, inst, None, &loc));
                             let dest_str = str_local(dests[0]);
                             emitln!(
@@ -6455,7 +6530,8 @@ impl FunctionTranslator<'_> {
                             );
                         }
                     },
-                    Unpack(mid, sid, _) => {
+                    Unpack(mid, sid, inst) => {
+                        let inst = &self.inst_slice(inst);
                         let struct_env = env.get_module(*mid).into_struct(*sid);
                         // See `Pack`: intrinsic map fields are erased, so the
                         // emitted selectors would be ill-typed.
@@ -6471,6 +6547,9 @@ impl FunctionTranslator<'_> {
                                     "{}->{}",
                                     str_local(srcs[0]),
                                     boogie_field_sel(field_env),
+                                );
+                                let field_sel = self.plain_field_conv(
+                                    "int2bv", field_env, inst, dests[i], field_sel,
                                 );
                                 emitln!(writer, "{} := {};", str_local(dests[i]), field_sel);
                             }
@@ -6499,6 +6578,9 @@ impl FunctionTranslator<'_> {
                                     "{}->{}",
                                     str_local(srcs[0]),
                                     boogie_field_sel(field_env),
+                                );
+                                let field_sel = self.plain_field_conv(
+                                    "int2bv", field_env, inst, dests[i], field_sel,
                                 );
                                 emitln!(writer, "{} := {};", str_local(dests[i]), field_sel);
                             }
@@ -6557,7 +6639,8 @@ impl FunctionTranslator<'_> {
                         }
                         emitln!(writer, "else { call $ExecFailureAbort(); }");
                     },
-                    GetField(mid, sid, _, field_offset) => {
+                    GetField(mid, sid, inst, field_offset) => {
+                        let inst = &self.inst_slice(inst);
                         let src = srcs[0];
                         let mut src_str = str_local(src);
                         let dest_str = str_local(dests[0]);
@@ -6568,7 +6651,14 @@ impl FunctionTranslator<'_> {
                         if self.get_local_type(src).is_reference() {
                             src_str = format!("$Dereference({})", src_str);
                         };
-                        emitln!(writer, "{} := {}->{};", dest_str, src_str, field_sel);
+                        let rhs = self.plain_field_conv(
+                            "int2bv",
+                            field_env,
+                            inst,
+                            dests[0],
+                            format!("{}->{}", src_str, field_sel),
+                        );
+                        emitln!(writer, "{} := {};", dest_str, rhs);
                     },
                     GetVariantField(mid, sid, variants, inst, field_offset) => {
                         let inst = &self.inst_slice(inst);
@@ -6594,7 +6684,14 @@ impl FunctionTranslator<'_> {
                             );
                             let field_sel = boogie_field_sel(&field_env);
                             emit!(writer, "{} is {}) {{", value_str, struct_variant_name);
-                            emitln!(writer, "{} := {}->{};", dest_str, value_str, field_sel);
+                            let rhs = self.plain_field_conv(
+                                "int2bv",
+                                &field_env,
+                                inst,
+                                dests[0],
+                                format!("{}->{}", value_str, field_sel),
+                            );
+                            emitln!(writer, "{} := {};", dest_str, rhs);
                             emitln!(writer, "}");
                             if else_symbol.is_empty() {
                                 else_symbol = " else ";
