@@ -102,6 +102,24 @@ pub fn native_generate_unique_address<C: NativeContext>(ctx: &C) -> VMResult<Nat
     Ok(NativeStatus::Success)
 }
 
+/// `0x1::transaction_context::get_txn_hash(): vector<u8>`
+///
+/// The 32-byte hash identifying this transaction.
+//
+// TODO(metering): charge gas.
+pub fn native_get_txn_hash<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
+    // Copied off the extension before allocating: `new_byte_vector` may collect, and the extension
+    // is borrowed for as long as the hash is.
+    let txn_hash = ctx
+        .get_extension::<TransactionContextExtension>()?
+        .txn_hash
+        .clone();
+    let out = ctx.new_byte_vector(&txn_hash)?;
+    // SAFETY: return 0 is `vector<u8>`.
+    unsafe { ctx.set_return(0, out)? };
+    Ok(NativeStatus::Success)
+}
+
 /// `0x1::transaction_context::monotonically_increasing_counter_internal(timestamp_us: u64): u128`
 ///
 /// Packs `reserved_byte || timestamp_us || transaction_index || session_counter
@@ -139,6 +157,10 @@ pub fn make_all_transaction_context_natives<F: NativeContextFamily>() -> Vec<Nat
         (
             "0x1::transaction_context::generate_unique_address",
             native_generate_unique_address
+        ),
+        (
+            "0x1::transaction_context::get_txn_hash",
+            native_get_txn_hash
         ),
         (
             "0x1::transaction_context::monotonically_increasing_counter_internal",

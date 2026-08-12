@@ -2,18 +2,39 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use anyhow::{anyhow, Result};
-use aptos_types::state_store::{state_key::StateKey, table::TableHandle};
+use aptos_types::{
+    state_store::{state_key::StateKey, table::TableHandle},
+    vm::module_metadata::RuntimeModuleMetadataV1,
+};
 use bytes::Bytes;
 use mono_move_core::{
     intern_struct_tag,
-    storage::resource_provider::{InMemoryStorageKey, ResourceProvider},
+    storage::{
+        module_provider::ModuleProvider,
+        resource_provider::{InMemoryStorageKey, ResourceProvider},
+    },
     struct_tag_of,
     types::InternedType,
-    Interner,
+    Interner, VMResult,
 };
-use move_core_types::language_storage::StructTag;
+use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
 use std::collections::{BTreeMap, HashMap};
 use triomphe::Arc;
+
+/// Trait extending the runtime's [`ModuleProvider`] interface with the Aptos module metadata
+/// execution consults.
+pub trait AptosModuleProvider: ModuleProvider {
+    /// A module's Aptos metadata, or `None` if the module is absent or carries none.
+    ///
+    /// Every transaction asks for the metadata of the module its entry function is in, so an
+    /// implementation that deserializes the module to answer costs several times what executing the
+    /// transaction does. Cache it.
+    fn module_metadata(
+        &self,
+        address: &AccountAddress,
+        name: &str,
+    ) -> VMResult<Option<Arc<RuntimeModuleMetadataV1>>>;
+}
 
 /// Trait extending the runtime's [`ResourceProvider`] interface with additional capabilities to
 /// handle resource groups and table items.

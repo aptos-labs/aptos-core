@@ -7,6 +7,7 @@ use crate::{
     metadata::TxnMetadata,
     natives::transaction_extensions,
     outcome::TxnOutcome,
+    providers::AptosModuleProvider,
     sys_calls::{run_epilogue, run_prologue, TxnSigners},
 };
 use aptos_types::{
@@ -16,8 +17,7 @@ use aptos_types::{
     transaction::{EntryFunction, SignedTransaction, TransactionExecutableRef},
 };
 use mono_move_core::{
-    intern_type_tag, storage::module_provider::ModuleProvider, types::InternedTypeList, GasMeter,
-    Interner, ResourceProvider,
+    intern_type_tag, types::InternedTypeList, GasMeter, Interner, ResourceProvider,
 };
 use mono_move_global_context::ExecutionGuard;
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
@@ -32,7 +32,7 @@ pub struct AptosTransactionExecutor<'a> {
     // TODO(cleanup): We are considering moving the native registry into the GlobalContext.
     // This parameter may disappear once it moves there.
     natives: &'a ProductionNativeRegistry,
-    module_provider: &'a dyn ModuleProvider,
+    module_provider: &'a dyn AptosModuleProvider,
     data_provider: &'a dyn ResourceProvider,
     // TODO(completeness): Consider growing these into the full `AptosEnvironment` supplied by
     // the coordinator.
@@ -53,7 +53,7 @@ impl<'a> AptosTransactionExecutor<'a> {
     pub fn new(
         guard: &'a ExecutionGuard<'a>,
         natives: &'a ProductionNativeRegistry,
-        module_provider: &'a dyn ModuleProvider,
+        module_provider: &'a dyn AptosModuleProvider,
         data_provider: &'a dyn ResourceProvider,
         features: &'a Features,
         usage: StateStorageUsage,
@@ -127,7 +127,7 @@ impl<'a> AptosTransactionExecutor<'a> {
             self.natives,
         );
 
-        let extensions = transaction_extensions(&txn_data, self.usage);
+        let extensions = transaction_extensions(&txn_data, self.usage, self.is_unbiasable(entry)?);
 
         let max_gas = txn_data.max_gas_amount;
         let mut interp = InterpreterContext::new_idle(
@@ -225,6 +225,27 @@ impl<'a> AptosTransactionExecutor<'a> {
             fee_statement,
             effects: interp.finish(),
         })
+    }
+
+    /// Whether `entry` is annotated `#[randomness]`, and so may draw randomness.
+    fn is_unbiasable(&self, entry: &EntryFunction) -> Result<bool, DiscardReason> {
+        let module = entry.module();
+        let metadata = self
+            .module_provider
+            .module_metadata(&module.address, module.name().as_str())
+            .map_err(|e| {
+                DiscardReason::InvariantViolation(format!("reading {module}'s metadata: {e:?}"))
+            })?;
+        Ok(metadata.is_some_and(|metadata| {
+            metadata
+                .fun_attributes
+                .get(entry.function().as_str())
+                .is_some_and(|attributes| {
+                    attributes
+                        .iter()
+                        .any(|attribute| attribute.try_as_randomness_annotation().is_some())
+                })
+        }))
     }
 
     fn execute_entry_function(

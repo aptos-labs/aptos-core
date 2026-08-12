@@ -20,7 +20,7 @@ use aptos_types::{
 use bytes::Bytes;
 use fxhash::FxHashMap;
 use mono_move_aptos_transaction_executor::{
-    decode_group_members, AptosDataProvider, GroupMembers, StorageLocation,
+    decode_group_members, AptosDataProvider, AptosModuleProvider, GroupMembers, StorageLocation,
 };
 use mono_move_core::{
     intern_struct_tag,
@@ -43,7 +43,7 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     move_resource::MoveStructType,
 };
-use std::cell::RefCell;
+use std::{cell::RefCell, collections::HashMap};
 use thiserror::Error;
 use triomphe::Arc;
 
@@ -68,11 +68,45 @@ fn provider_error(detail: String) -> VMInternalError {
 /// Serves module bytes to the loader from a `StateView`.
 pub struct StateViewModuleProvider<'s, S> {
     state_view: &'s S,
+    /// Aptos metadata of each module asked for so far. `None` = module absent or without metadata.
+    ///
+    /// Reading it means deserializing the module, and execution asks once per transaction, so a
+    /// provider shared across transactions is the difference between amortizing that and paying it
+    /// every time. Sound only until a module is republished, which no transaction executed through
+    /// this provider does.
+    module_metadata:
+        RefCell<HashMap<(AccountAddress, Identifier), Option<Arc<RuntimeModuleMetadataV1>>>>,
 }
 
 impl<'s, S: StateView> StateViewModuleProvider<'s, S> {
     pub fn new(state_view: &'s S) -> Self {
-        Self { state_view }
+        Self {
+            state_view,
+            module_metadata: RefCell::new(HashMap::new()),
+        }
+    }
+}
+
+impl<S: StateView> AptosModuleProvider for StateViewModuleProvider<'_, S> {
+    fn module_metadata(
+        &self,
+        address: &AccountAddress,
+        name: &str,
+    ) -> VMResult<Option<Arc<RuntimeModuleMetadataV1>>> {
+        let name = Identifier::new(name)
+            .map_err(|e| provider_error(format!("invalid module name {name:?}: {e}")))?;
+        let key = (*address, name);
+        if let Some(metadata) = self.module_metadata.borrow().get(&key) {
+            return Ok(metadata.clone());
+        }
+        let metadata = match self.get_module_bytes(address, key.1.as_str())? {
+            Some(bytes) => get_metadata(&self.deserialize_module(&bytes)?.metadata),
+            None => None,
+        };
+        self.module_metadata
+            .borrow_mut()
+            .insert(key, metadata.clone());
+        Ok(metadata)
     }
 }
 
@@ -151,8 +185,8 @@ pub struct StateViewResourceProvider<'a, 'ctx, S> {
 /// The provider's interior-mutable state: caches and the value arena.
 struct ProviderState {
     /// Bump arena holding the flat values that reads hand out pointers into.
-    /// Never collected or reset; must stay alive as long as those pointers
-    /// (through materialization).
+    /// Never collected; must stay alive as long as those pointers (through
+    /// materialization), and only [`StateViewResourceProvider::reset`] rewinds it.
     arena: Heap,
     /// Resource-group membership per resource type, resolved from the defining
     /// module's metadata. `None` = not a group member.
@@ -179,6 +213,24 @@ impl<'a, 'ctx, S: StateView> StateViewResourceProvider<'a, 'ctx, S> {
                 groups: FxHashMap::default(),
             }),
         }
+    }
+
+    /// Returns the provider to the state it was constructed in, keeping the arena's buffer.
+    ///
+    /// A caller that runs a sequence of transactions needs a provider per transaction, because the
+    /// caches answer for state as it was read and the next transaction may have written over it.
+    /// Constructing one per transaction means allocating and zeroing the whole arena each time,
+    /// which dwarfs what executing a transaction costs; this rewinds it instead.
+    ///
+    /// Every pointer handed out since construction or the last reset dangles afterwards, so the
+    /// caller must be done with the previous transaction's values — its output materialized —
+    /// before calling this.
+    pub fn reset(&self) {
+        let mut inner = self.inner.borrow_mut();
+        inner.arena.reset();
+        inner.group_membership.clear();
+        inner.module_metadata.clear();
+        inner.groups.clear();
     }
 
     /// Resolves group membership from the defining module's Aptos metadata.
