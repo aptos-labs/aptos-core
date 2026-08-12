@@ -1,7 +1,5 @@
 /// Example of a managed stablecoin with mint, burn, freeze and pause functionalities.
 module stablecoin::usdk {
-    use aptos_framework::account;
-    use aptos_framework::chain_id;
     use aptos_framework::dispatchable_fungible_asset;
     use aptos_framework::event;
     use aptos_framework::function_info;
@@ -18,12 +16,12 @@ module stablecoin::usdk {
     const EPAUSED: u64 = 2;
     /// The account is already a minter
     const EALREADY_MINTER: u64 = 3;
-    /// The account is not a minter
-    const ENOT_MINTER: u64 = 4;
     /// The account is denylisted
     const EDENYLISTED: u64 = 5;
     /// Stablecoin is already initialized
     const EALREADY_INITIALIZED: u64 = 6;
+    /// The account has no primary store for the stablecoin
+    const ESTORE_NOT_FOUND: u64 = 7;
 
     const ASSET_SYMBOL: vector<u8> = b"USDK";
 
@@ -37,6 +35,8 @@ module stablecoin::usdk {
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct Management has key {
+        /// Unused today. Retained so a future upgrade can obtain the metadata object's signer
+        /// (e.g. to add resources to the object) without needing to recreate the asset.
         extend_ref: ExtendRef,
         mint_ref: MintRef,
         burn_ref: BurnRef,
@@ -82,6 +82,7 @@ module stablecoin::usdk {
     struct Denylist has drop, store {
         denylister: address,
         account: address,
+        is_denylisted: bool,
     }
 
     #[view]
@@ -94,13 +95,53 @@ module stablecoin::usdk {
         object::address_to_object(usdk_address())
     }
 
+    #[view]
+    /// Return whether the stablecoin is currently paused.
+    public fun is_paused(): bool {
+        State[usdk_address()].paused
+    }
+
+    #[view]
+    /// Return whether the account may mint. The master minter is implicitly a minter.
+    public fun is_minter(account: address): bool {
+        let roles = &Roles[usdk_address()];
+        account == roles.master_minter || roles.minters.contains(&account)
+    }
+
+    #[view]
+    /// Return the accounts explicitly granted the minter role. Excludes the master minter.
+    public fun minters(): vector<address> {
+        Roles[usdk_address()].minters
+    }
+
+    #[view]
+    /// Return whether the account is denylisted. Accounts without a primary store are never denylisted.
+    public fun is_denylisted(account: address): bool {
+        primary_fungible_store::is_frozen(account, metadata())
+    }
+
+    #[view]
+    public fun master_minter(): address {
+        Roles[usdk_address()].master_minter
+    }
+
+    #[view]
+    public fun pauser(): address {
+        Roles[usdk_address()].pauser
+    }
+
+    #[view]
+    public fun denylister(): address {
+        Roles[usdk_address()].denylister
+    }
+
     /// Called as part of deployment to initialize the stablecoin.
     /// Note: The signer has to be the account where the module is published.
     /// Create a stablecoin token (a new Fungible Asset)
     /// Ensure any stores for the stablecoin are untransferable.
     /// Store Roles, Management and State resources in the Metadata object.
     /// Override deposit and withdraw functions of the newly created asset/token to add custom denylist logic.
-    public fun initialize(stablecoin_signer: &signer) {
+    entry fun initialize(stablecoin_signer: &signer) {
         // Check that it hasn't been called already
         assert!(!object::object_exists<ObjectCore>(usdk_address()), EALREADY_INITIALIZED);
         authorize(signer::address_of(stablecoin_signer), @stablecoin);
@@ -112,7 +153,7 @@ module stablecoin::usdk {
             option::none(),
             utf8(ASSET_SYMBOL), /* name */
             utf8(ASSET_SYMBOL), /* symbol */
-            8, /* decimals */
+            6, /* decimals, matching the convention used by USDC/USDT */
             utf8(b"http://example.com/favicon.ico"), /* icon */
             utf8(b"http://example.com"), /* project */
         );
@@ -166,7 +207,8 @@ module stablecoin::usdk {
 
     /// Allow a spender to transfer tokens from the owner's account given their signed approval.
     /// Caller needs to provide the from account's scheme and public key which can be gotten via the Aptos SDK.
-    public fun transfer_from(
+    /// TODO: This has to be reworked before being re-enabled
+    /*public fun transfer_from(
         spender: &signer,
         proof: vector<u8>,
         from: address,
@@ -192,7 +234,7 @@ module stablecoin::usdk {
         let transfer_ref = &Management[usdk_address()].transfer_ref;
         // Only use with_ref API for primary_fungible_store (PFS) transfers in this module.
         primary_fungible_store::transfer_with_ref(transfer_ref, from, to, amount);
-    }
+    }*/
 
     /// Deposit function override to ensure that the account is not denylisted and the stablecoin is not paused.
     public fun deposit<T: key>(
@@ -202,6 +244,7 @@ module stablecoin::usdk {
     ) {
         assert_not_paused();
         assert_not_denylisted(store.owner());
+        assert_not_denylisted(store.root_owner());
         transfer_ref.deposit_with_ref(store, fa);
     }
 
@@ -213,6 +256,7 @@ module stablecoin::usdk {
     ): FungibleAsset {
         assert_not_paused();
         assert_not_denylisted(store.owner());
+        assert_not_denylisted(store.root_owner());
         transfer_ref.withdraw_with_ref(store, amount)
     }
 
@@ -239,8 +283,11 @@ module stablecoin::usdk {
     }
 
     /// Burn tokens from the specified account. This checks that the caller is a minter and the stablecoin is not paused.
+    /// Aborts if the account has no primary store rather than creating an empty one as a side effect.
     public entry fun burn(minter: &signer, from: address, amount: u64) {
-        burn_from(minter, primary_fungible_store::ensure_primary_store_exists(from, metadata()), amount);
+        let metadata = metadata();
+        assert!(primary_fungible_store::primary_store_exists(from, metadata), ESTORE_NOT_FOUND);
+        burn_from(minter, primary_fungible_store::primary_store(from, metadata), amount);
     }
 
     /// Burn tokens from the specified account's store. This checks that the caller is a minter and the stablecoin is
@@ -294,30 +341,43 @@ module stablecoin::usdk {
         set_denylist(denylister, account, false);
     }
 
-    inline fun set_denylist(denylister: &signer, account: address, frozen: bool) {
-        assert_not_paused();
+    inline fun set_denylist(denylister: &signer, account: address, denied: bool) {
         let usdk_address = usdk_address();
         let denylister_address = signer::address_of(denylister);
         let roles = &Roles[usdk_address];
         authorize(denylister_address, roles.denylister);
 
         let transfer_ref = &Management[usdk_address].transfer_ref;
-        primary_fungible_store::set_frozen_flag(transfer_ref, account, frozen);
+        primary_fungible_store::set_frozen_flag(transfer_ref, account, denied);
 
         event::emit(Denylist {
             denylister: denylister_address,
             account,
+            is_denylisted: denied
         });
     }
 
     /// Add a new minter. This checks that the caller is the master minter and the account is not already a minter.
+    /// Deliberately callable while paused: revoking and granting roles is part of incident response.
     public entry fun add_minter(admin: &signer, minter: address) {
-        assert_not_paused();
         let admin_address = signer::address_of(admin);
         let roles = &mut Roles[usdk_address()];
         authorize(admin_address, roles.master_minter);
         assert!(!roles.minters.contains(&minter), EALREADY_MINTER);
         roles.minters.push_back(minter);
+    }
+
+    /// Revoke the minter role. This checks that the caller is the master minter. No-op if the account is not a minter.
+    /// Deliberately callable while paused: revoking a compromised minter is part of incident response.
+    public entry fun remove_minter(admin: &signer, minter: address) {
+        let admin_address = signer::address_of(admin);
+        let roles = &mut Roles[usdk_address()];
+        authorize(admin_address, roles.master_minter);
+        let (found, index) = roles.minters.index_of(&minter);
+        if (found) {
+            // Order doesn't matter, so let's do the performant remove
+            roles.minters.swap_remove(index);
+        };
     }
 
     inline fun assert_is_minter(minter: &signer): address {
