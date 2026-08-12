@@ -53,13 +53,13 @@
 //! never relocated.
 
 use crate::{
-    error::{GlobalStorageOp, RuntimeError, RuntimeResult},
+    error::{GlobalStorageOp, RuntimeError},
     heap::RootScanner,
     invariant_violation,
 };
 use hashbrown::{hash_map::EntryRef, HashMap};
 use mono_move_core::{
-    storage::resource_provider::InMemoryStorageKey, ResourceProvider, StorageRead,
+    storage::resource_provider::InMemoryStorageKey, ResourceProvider, StorageRead, VMResult,
 };
 use std::ptr::NonNull;
 
@@ -104,6 +104,18 @@ pub struct Entry {
     pub write: StorageWrite,
 }
 
+/// The write an [`Entry`] contributes to the write set, by its `(read, write)`
+/// pair.
+pub enum WriteClass {
+    /// Did not exist before, now does. Carries the value pointer to serialize.
+    Creation(NonNull<u8>),
+    /// Existed before, now (possibly) modified — any mutable borrow counts,
+    /// even if the value is unchanged. Carries the value pointer to serialize.
+    Modification(NonNull<u8>),
+    /// Existed before, now moved out.
+    Deletion,
+}
+
 /// Represents the state of data pointer in the map: owned by local allocation
 /// with up-to-date epoch - writable and can be directly used for mutation or
 /// needing a copy (if it is read-only or has an outdated epoch).
@@ -128,6 +140,27 @@ impl Entry {
             },
             StorageWrite::Deleted { .. } => false,
             StorageWrite::LocalHeap { .. } => true,
+        }
+    }
+
+    /// Classifies this entry's `(read, write)` into a [`WriteClass`], or
+    /// [`None`] if it is not a write.
+    pub fn write_class(&self) -> Option<WriteClass> {
+        match self.write {
+            StorageWrite::NotModified => None,
+            StorageWrite::LocalHeap { ptr, .. } => Some(match self.read {
+                StorageRead::DoesNotExist => WriteClass::Creation(ptr),
+                // TODO(correctness, perf): over-approximation — a `borrow_global_mut` copies to the
+                // local heap even if nothing changed. Compare against the read value to drop no-op
+                // modifications here rather than downstream.
+                StorageRead::ExternalHeap { .. } => WriteClass::Modification(ptr),
+            }),
+            StorageWrite::Deleted { .. } => match self.read {
+                // Published and then removed in the same transaction: the
+                // on-chain slot never existed, so this is not a write.
+                StorageRead::DoesNotExist => None,
+                StorageRead::ExternalHeap { .. } => Some(WriteClass::Deletion),
+            },
         }
     }
 
@@ -220,7 +253,7 @@ impl ResourceReadWriteSet {
         &mut self,
         provider: &dyn ResourceProvider,
         key: &InMemoryStorageKey,
-    ) -> RuntimeResult<bool> {
+    ) -> Result<bool, RuntimeError> {
         Ok(get_or_create_resource_entry(&mut self.entries, provider, key)?.exists())
     }
 
@@ -230,7 +263,7 @@ impl ResourceReadWriteSet {
         &mut self,
         provider: &dyn ResourceProvider,
         key: &InMemoryStorageKey,
-    ) -> RuntimeResult<NonNull<u8>> {
+    ) -> Result<NonNull<u8>, RuntimeError> {
         get_or_create_resource_entry(&mut self.entries, provider, key)?
             .as_ptr()
             .ok_or_else(|| RuntimeError::ResourceDoesNotExist {
@@ -250,7 +283,7 @@ impl ResourceReadWriteSet {
         &mut self,
         provider: &dyn ResourceProvider,
         key: &InMemoryStorageKey,
-    ) -> RuntimeResult<EntryPtr> {
+    ) -> Result<EntryPtr, RuntimeError> {
         get_or_create_resource_entry(&mut self.entries, provider, key)?
             .as_ptr_mut(self.current_epoch)
             .ok_or_else(|| RuntimeError::ResourceDoesNotExist {
@@ -293,7 +326,7 @@ impl ResourceReadWriteSet {
         provider: &dyn ResourceProvider,
         key: &InMemoryStorageKey,
         ptr: NonNull<u8>,
-    ) -> RuntimeResult<()> {
+    ) -> Result<(), RuntimeError> {
         let entry = get_or_create_resource_entry(&mut self.entries, provider, key)?;
         if entry.exists() {
             return Err(RuntimeError::ResourceAlreadyExists {
@@ -319,7 +352,7 @@ impl ResourceReadWriteSet {
         &mut self,
         provider: &dyn ResourceProvider,
         key: &InMemoryStorageKey,
-    ) -> RuntimeResult<EntryPtr> {
+    ) -> Result<EntryPtr, RuntimeError> {
         let entry = get_or_create_resource_entry(&mut self.entries, provider, key)?;
         let ptr = entry.as_ptr_mut(self.current_epoch).ok_or_else(|| {
             RuntimeError::ResourceDoesNotExist {
@@ -374,6 +407,14 @@ impl ResourceReadWriteSet {
         self.journal.len()
     }
 
+    /// Yields each entry that is a write, with its [`WriteClass`]. Callers must
+    /// sort before emitting.
+    pub fn writes_unordered(&self) -> impl Iterator<Item = (&InMemoryStorageKey, WriteClass)> {
+        self.entries
+            .iter()
+            .filter_map(|(key, entry)| entry.write_class().map(|class| (key, class)))
+    }
+
     /// Save the current state and advance the epoch. A subsequent roll back
     /// can return here.
     pub fn checkpoint(&mut self) {
@@ -391,7 +432,7 @@ impl ResourceReadWriteSet {
     ///
     /// Note: allocations that became unreachable are eventually reclaimed by
     /// the next GC.
-    pub fn rollback(&mut self, n: usize) -> RuntimeResult<()> {
+    pub fn rollback(&mut self, n: usize) -> VMResult<()> {
         if n == 0 {
             return Ok(());
         }
@@ -463,7 +504,7 @@ fn get_or_create_resource_entry<'a>(
     entries: &'a mut HashMap<InMemoryStorageKey, Entry>,
     provider: &dyn ResourceProvider,
     key: &InMemoryStorageKey,
-) -> RuntimeResult<&'a mut Entry> {
+) -> Result<&'a mut Entry, RuntimeError> {
     match entries.entry_ref(key) {
         EntryRef::Occupied(entry) => Ok(entry.into_mut()),
         EntryRef::Vacant(entry) => {
@@ -965,6 +1006,46 @@ mod tests {
         let _ = rws.try_borrow_global_mut(&provider, &k).unwrap();
         rws.commit_borrow_global_mut(&k, fake_ptr(0xD2));
         assert_eq!(rws.journal_len(), 1);
+    }
+
+    // -- Write classification -------------------------------------------------
+
+    fn class_of(read: StorageRead, write: StorageWrite) -> Option<WriteClass> {
+        entry(read, write).write_class()
+    }
+
+    #[test]
+    fn write_class_covers_the_read_write_matrix() {
+        let ext = || StorageRead::ExternalHeap {
+            ptr: fake_ptr(0x10),
+            version: 0,
+        };
+        let local = || StorageWrite::LocalHeap {
+            ptr: fake_ptr(0x11),
+            epoch: 0,
+        };
+        let deleted = || StorageWrite::Deleted { epoch: 0 };
+
+        // Untouched / read-only: no write.
+        assert!(class_of(StorageRead::DoesNotExist, StorageWrite::NotModified).is_none());
+        assert!(class_of(ext(), StorageWrite::NotModified).is_none());
+        // Published this txn -> Creation.
+        assert!(matches!(
+            class_of(StorageRead::DoesNotExist, local()),
+            Some(WriteClass::Creation(_))
+        ));
+        // Pre-existing + local write -> Modification.
+        assert!(matches!(
+            class_of(ext(), local()),
+            Some(WriteClass::Modification(_))
+        ));
+        // Pre-existing + deleted -> Deletion.
+        assert!(matches!(
+            class_of(ext(), deleted()),
+            Some(WriteClass::Deletion)
+        ));
+        // Published then removed within the txn: net no-op, not a write.
+        assert!(class_of(StorageRead::DoesNotExist, deleted()).is_none());
     }
 
     // -- GC scan --------------------------------------------------------------

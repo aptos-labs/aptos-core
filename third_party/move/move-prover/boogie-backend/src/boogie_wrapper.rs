@@ -1429,7 +1429,38 @@ impl ModelValue {
             Type::Struct(module_id, struct_id, params) => {
                 let struct_env = wrapper.env.get_struct_qid(module_id.qualified(*struct_id));
                 if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
-                    self.pretty_table(wrapper, model, &params[0], &params[1])
+                    // Ghost-bearing intrinsic maps are carrier datatypes:
+                    // unwrap the raw table and render the ghosts after the
+                    // entries.
+                    let ghost_fields = struct_env.get_ghost_fields().collect_vec();
+                    if ghost_fields.is_empty() {
+                        self.pretty_table(wrapper, model, &params[0], &params[1])
+                    } else {
+                        // The value's own constructor name disambiguates the
+                        // bv twin, so try both carrier names.
+                        let carrier_name = boogie_struct_name(&struct_env, params, false);
+                        let carrier_name_bv = boogie_struct_name(&struct_env, params, true);
+                        let args = self
+                            .extract_list(&carrier_name)
+                            .or_else(|| self.extract_list(&format!("|{}|", carrier_name)))
+                            .or_else(|| self.extract_list(&carrier_name_bv))
+                            .or_else(|| self.extract_list(&format!("|{}|", carrier_name_bv)))?;
+                        let mut doc = args
+                            .first()?
+                            .pretty_table(wrapper, model, &params[0], &params[1])?;
+                        for (i, f) in ghost_fields.iter().enumerate() {
+                            let ty = f.get_type().instantiate(params);
+                            let default = ModelValue::error();
+                            let v = args.get(1 + i).unwrap_or(&default);
+                            doc = doc
+                                .append(PrettyDoc::text(format!(
+                                    " ghost {} = ",
+                                    f.get_name().display(struct_env.symbol_pool())
+                                )))
+                                .append(v.pretty_or_raw(wrapper, model, &ty));
+                        }
+                        Some(doc)
+                    }
                 } else {
                     self.pretty_struct(wrapper, model, &struct_env, params)
                 }

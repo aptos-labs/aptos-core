@@ -59,6 +59,18 @@ pub fn boogie_module_name(env: &ModuleEnv<'_>) -> String {
 /// Return boogie name of given structure.
 pub fn boogie_struct_name(struct_env: &StructEnv<'_>, inst: &[Type], bv_flag: bool) -> String {
     if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
+        if struct_env.get_ghost_fields().next().is_some() {
+            // Ghost-declaring intrinsic maps use a per-instance carrier
+            // datatype wrapping the table. The name must follow the suffix
+            // convention including the value's bv twin, so twin instances
+            // reference their own carrier.
+            return format!(
+                "${}_{}{}",
+                boogie_module_name(&struct_env.module_env),
+                struct_env.get_name().display(struct_env.symbol_pool()),
+                boogie_inst_suffix(struct_env.module_env.env, inst, &[false, bv_flag])
+            );
+        }
         // Map to the theory type representation, which is `Table int V`. The key
         // is encoded as an integer to avoid extensionality problems, and to support
         // $Mutation paths, which are sequences of ints.
@@ -143,6 +155,11 @@ pub fn field_bv_flag_global_state(
     global_state: &GlobalNumberOperationState,
     field_env: &FieldEnv,
 ) -> bool {
+    // Ghost fields are model-only and never participate in number-operation
+    // (bitvector) analysis; on enums they also carry no variant.
+    if field_env.is_ghost() {
+        return false;
+    }
     let operation_map = &global_state.struct_operation_map;
     let mid = field_env.struct_env.module_env.get_id();
     let sid = field_env.struct_env.get_id();
@@ -360,10 +377,10 @@ pub fn boogie_type(env: &GlobalEnv, ty: &Type, bv_flag: bool) -> String {
             U256 => uint_bv_type(256, bv_flag),
             I8 | I16 | I32 | I64 | I128 | I256 => {
                 if bv_flag {
-                    unimplemented!("{}", BV_TYPE_NOT_ENABLED_ERROR)
-                } else {
-                    "int".to_string()
+                    // Signed integers have no bv rendering.
+                    env.error(&env.unknown_loc(), BV_TYPE_NOT_ENABLED_ERROR);
                 }
+                "int".to_string()
             },
             Num => {
                 if bv_flag {

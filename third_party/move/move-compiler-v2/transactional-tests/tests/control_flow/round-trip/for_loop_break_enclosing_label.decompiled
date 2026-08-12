@@ -1,0 +1,19 @@
+//**** Cross-compiled for `move` syntax from `tests/control_flow/for_loop_break_enclosing_label.move`
+
+//# run
+script {
+    fun main() {
+        let _v0 = 0;
+        'l0: loop {
+            let _v1 = 0;
+            while (_v1 < 10) {
+                _v0 = _v0 + 1;
+                if (_v0 >= 3) break 'l0;
+                _v1 = _v1 + 1
+            };
+            _v0 = _v0 + 1000;
+            continue
+        };
+        assert!(_v0 == 3, 42);
+    }
+}

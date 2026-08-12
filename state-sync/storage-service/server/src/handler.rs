@@ -19,14 +19,17 @@ use crate::{
 use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
 use aptos_logger::{debug, sample, sample::SampleRate, trace, warn};
 use aptos_network::protocols::wire::handshake::v1::ProtocolId;
+use aptos_storage_interface::StateKind;
 use aptos_storage_service_types::{
     requests::{
         DataRequest, EpochEndingLedgerInfoRequest, GetTransactionDataWithProofRequest,
-        StateValuesWithProofRequest, StorageServiceRequest, TransactionOutputsWithProofRequest,
+        HotStateValuesWithProofRequest, NumberOfStatesRequestV2, StateValuesWithProofRequest,
+        StateValuesWithProofRequestV2, StorageServiceRequest, TransactionOutputsWithProofRequest,
         TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
     },
     responses::{
-        DataResponse, ServerProtocolVersion, StorageServerSummary, StorageServiceResponse,
+        DataResponse, NumberOfHotStatesResponse, NumberOfStatesResponseV2, ServerProtocolVersion,
+        StateValueChunkWithProofResponseV2, StorageServerSummary, StorageServiceResponse,
     },
     StorageServiceError,
 };
@@ -409,11 +412,23 @@ impl<T: StorageReaderInterface> Handler<T> {
             DataRequest::GetStateValuesWithProof(request) => {
                 self.get_state_value_chunk_with_proof(request)
             },
+            DataRequest::GetStateValuesWithProofV2(request) => {
+                self.get_state_value_chunk_with_proof_v2(request)
+            },
+            DataRequest::GetHotStateValuesWithProof(request) => {
+                self.get_hot_state_value_chunk_with_proof(request)
+            },
+            DataRequest::GetNumberOfHotStatesAtVersion(version) => {
+                self.get_number_of_hot_states_at_version(*version)
+            },
             DataRequest::GetEpochEndingLedgerInfos(request) => {
                 self.get_epoch_ending_ledger_infos(request)
             },
             DataRequest::GetNumberOfStatesAtVersion(version) => {
                 self.get_number_of_states_at_version(*version)
+            },
+            DataRequest::GetNumberOfStatesAtVersionV2(request) => {
+                self.get_number_of_states_at_version_v2(request)
             },
             DataRequest::GetTransactionOutputsWithProof(request) => {
                 self.get_transaction_outputs_with_proof(request)
@@ -469,10 +484,58 @@ impl<T: StorageReaderInterface> Handler<T> {
             request.version,
             request.start_index,
             request.end_index,
+            StateKind::MainState,
         )?;
 
         Ok(DataResponse::StateValueChunkWithProof(
             state_value_chunk_with_proof,
+        ))
+    }
+
+    fn get_state_value_chunk_with_proof_v2(
+        &self,
+        request: &StateValuesWithProofRequestV2,
+    ) -> aptos_storage_service_types::Result<DataResponse, Error> {
+        let state_value_chunk_with_proof = self.storage.get_state_value_chunk_with_proof(
+            request.version,
+            request.start_index,
+            request.end_index,
+            request.state_kind,
+        )?;
+
+        Ok(DataResponse::StateValueChunkWithProofV2(
+            StateValueChunkWithProofResponseV2 {
+                state_value_chunk_with_proof,
+                state_kind: request.state_kind,
+            },
+        ))
+    }
+
+    fn get_hot_state_value_chunk_with_proof(
+        &self,
+        request: &HotStateValuesWithProofRequest,
+    ) -> aptos_storage_service_types::Result<DataResponse, Error> {
+        let hot_state_value_chunk_with_proof = self.storage.get_hot_state_value_chunk_with_proof(
+            request.version,
+            request.start_index,
+            request.end_index,
+        )?;
+
+        Ok(DataResponse::HotStateValueChunkWithProof(
+            hot_state_value_chunk_with_proof,
+        ))
+    }
+
+    fn get_number_of_hot_states_at_version(
+        &self,
+        version: Version,
+    ) -> aptos_storage_service_types::Result<DataResponse, Error> {
+        let number_of_hot_states = self.storage.get_number_of_hot_states(version)?;
+
+        Ok(DataResponse::NumberOfHotStatesAtVersion(
+            NumberOfHotStatesResponse {
+                number_of_hot_states,
+            },
         ))
     }
 
@@ -491,9 +554,27 @@ impl<T: StorageReaderInterface> Handler<T> {
         &self,
         version: Version,
     ) -> aptos_storage_service_types::Result<DataResponse, Error> {
-        let number_of_states = self.storage.get_number_of_states(version)?;
+        let number_of_states = self
+            .storage
+            .get_number_of_states(version, StateKind::MainState)?;
 
         Ok(DataResponse::NumberOfStatesAtVersion(number_of_states))
+    }
+
+    fn get_number_of_states_at_version_v2(
+        &self,
+        request: &NumberOfStatesRequestV2,
+    ) -> aptos_storage_service_types::Result<DataResponse, Error> {
+        let number_of_states = self
+            .storage
+            .get_number_of_states(request.version, request.state_kind)?;
+
+        Ok(DataResponse::NumberOfStatesAtVersionV2(
+            NumberOfStatesResponseV2 {
+                number_of_states,
+                state_kind: request.state_kind,
+            },
+        ))
     }
 
     fn get_server_protocol_version(&self) -> DataResponse {

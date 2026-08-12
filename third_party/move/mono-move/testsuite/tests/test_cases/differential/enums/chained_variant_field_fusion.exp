@@ -1,0 +1,334 @@
+=== stackless ===
+// module 0x99::chained_variant_field_fusion
+
+fun mk_e(r0, r1): E {
+  slots: params(2), locals(0), temps(5)
+    r0: u64
+    r1: u8
+    r2: u8
+    r3: u8
+    r4: 0x99::chained_variant_field_fusion::Inner
+    r5: 0x99::chained_variant_field_fusion::E
+    r6: u16
+  code:
+  L2:
+    0: br_neq L0, r0, #0
+  L1:
+    1: r2 := ld_u8 1
+    2: r3 := ld_u8 7
+    3: r4 := pack 0x99::chained_variant_field_fusion::Inner, [r3, r1]
+    4: r5 := pack_variant 0x99::chained_variant_field_fusion::E@0, [r2, r4]
+    5: ret [r5]
+  L0:
+    6: r6 := ld_u16 2
+    7: r2 := ld_u8 7
+    8: r4 := pack 0x99::chained_variant_field_fusion::Inner, [r2, r1]
+    9: r5 := pack_variant 0x99::chained_variant_field_fusion::E@1, [r6, r4]
+    10: ret [r5]
+}
+
+fun mk_u(r0, r1): U {
+  slots: params(2), locals(0), temps(3)
+    r0: u64
+    r1: u8
+    r2: u8
+    r3: 0x99::chained_variant_field_fusion::Inner
+    r4: 0x99::chained_variant_field_fusion::U
+  code:
+  L2:
+    0: br_neq L0, r0, #0
+  L1:
+    1: r2 := ld_u8 7
+    2: r3 := pack 0x99::chained_variant_field_fusion::Inner, [r2, r1]
+    3: r4 := pack_variant 0x99::chained_variant_field_fusion::U@0, [r3]
+    4: ret [r4]
+  L0:
+    5: r2 := ld_u8 7
+    6: r3 := pack 0x99::chained_variant_field_fusion::Inner, [r2, r1]
+    7: r4 := pack_variant 0x99::chained_variant_field_fusion::U@1, [r3]
+    8: ret [r4]
+}
+
+fun read_e(r0): u8 {
+  slots: params(1), locals(0), temps(2)
+    r0: &0x99::chained_variant_field_fusion::E
+    r1: &0x99::chained_variant_field_fusion::Inner
+    r2: u8
+  code:
+  L0:
+    0: r1 := imm_borrow_variant_field E::P0::p, r0
+    1: r2 := read_field Inner::b, r1
+    2: ret [r2]
+}
+
+fun read_f(r0): u8 {
+  slots: params(1), locals(0), temps(2)
+    r0: &0x99::chained_variant_field_fusion::F
+    r1: &0x99::chained_variant_field_fusion::Inner
+    r2: u8
+  code:
+  L0:
+    0: r1 := imm_borrow_variant_field F::Fb::y, r0
+    1: r2 := read_field Inner::b, r1
+    2: ret [r2]
+}
+
+fun read_u(r0): u8 {
+  slots: params(1), locals(0), temps(2)
+    r0: &0x99::chained_variant_field_fusion::U
+    r1: &0x99::chained_variant_field_fusion::Inner
+    r2: u8
+  code:
+  L0:
+    0: r1 := imm_borrow_variant_field U::Ua::p, r0
+    1: r2 := read_field Inner::b, r1
+    2: ret [r2]
+}
+
+fun run_read_e(r0, r1): u8 {
+  slots: params(2), locals(1), temps(0), transfer(2)
+    r0: u64
+    r1: u8
+    r2: 0x99::chained_variant_field_fusion::E
+  code:
+  L0:
+    0: [r2] := call mk_e, [r0, r1]
+    1: x0 := imm_borrow_loc r2
+    2: [x0] := call read_e, [x0]
+    3: ret [x0]
+}
+
+fun run_read_f(r0): u8 {
+  slots: params(1), locals(1), temps(4), transfer(1)
+    r0: u64
+    r1: 0x99::chained_variant_field_fusion::F
+    r2: u8
+    r3: u8
+    r4: u8
+    r5: 0x99::chained_variant_field_fusion::Inner
+  code:
+  L3:
+    0: br_neq L0, r0, #0
+  L1:
+    1: r2 := ld_u8 1
+    2: r1 := pack_variant 0x99::chained_variant_field_fusion::F@0, [r2]
+  L2:
+    3: x0 := imm_borrow_loc r1
+    4: [x0] := call read_f, [x0]
+    5: ret [x0]
+  L0:
+    6: r2 := ld_u8 1
+    7: r3 := ld_u8 7
+    8: r4 := ld_u8 9
+    9: r5 := pack 0x99::chained_variant_field_fusion::Inner, [r3, r4]
+    10: r1 := pack_variant 0x99::chained_variant_field_fusion::F@1, [r2, r5]
+    11: branch L2
+}
+
+fun run_read_u(r0, r1): u8 {
+  slots: params(2), locals(1), temps(0), transfer(2)
+    r0: u64
+    r1: u8
+    r2: 0x99::chained_variant_field_fusion::U
+  code:
+  L0:
+    0: [r2] := call mk_u, [r0, r1]
+    1: x0 := imm_borrow_loc r2
+    2: [x0] := call read_u, [x0]
+    3: ret [x0]
+}
+
+fun run_write_e(r0, r1): u8 {
+  slots: params(2), locals(1), temps(0), transfer(2)
+    r0: u64
+    r1: u8
+    r2: 0x99::chained_variant_field_fusion::E
+  code:
+  L0:
+    0: x1 := ld_u8 0
+    1: [r2] := call mk_e, [r0, x1]
+    2: x0 := mut_borrow_loc r2
+    3: [] := call write_e, [x0, r1]
+    4: x0 := imm_borrow_loc r2
+    5: [x0] := call read_e, [x0]
+    6: ret [x0]
+}
+
+fun write_e(r0, r1) {
+  slots: params(2), locals(0), temps(2)
+    r0: &mut 0x99::chained_variant_field_fusion::E
+    r1: u8
+    r2: u8
+    r3: &mut 0x99::chained_variant_field_fusion::Inner
+  code:
+  L0:
+    0: r2 := add r1, #1u8
+    1: r3 := mut_borrow_variant_field E::P0::p, r0
+    2: write_field Inner::b, r3, r2
+    3: ret []
+}
+=== micro-ops ===
+// module 0x99::chained_variant_field_fusion
+
+fun mk_e() {
+  frame_data_size: 40
+  entry_gas: 3
+  code:
+    0: JumpIntCmp @10 [0] != u64 #0 gas_taken=90 gas_fallthrough=87
+    1: StoreImm1 [9] <- #1
+    2: StoreImm1 [10] <- #7
+    3: Move(1) [12] <- [8]
+    4: Move(1) [11] <- [10]
+    5: EnumNew [16] desc=2 tag #0
+    6: HeapMoveTo [16]+8 <- [9] (size=1)
+    7: HeapMoveTo [16]+9 <- [11] (size=2)
+    8: Move8 [0] <- [16]
+    9: Return
+    10: StoreImm2 [24] <- #2
+    11: StoreImm1 [9] <- #7
+    12: Move(1) [12] <- [8]
+    13: Move(1) [11] <- [9]
+    14: EnumNew [16] desc=2 tag #1
+    15: HeapMoveTo [16]+8 <- [24] (size=2)
+    16: HeapMoveTo [16]+10 <- [11] (size=2)
+    17: Move8 [0] <- [16]
+    18: Return
+  safe_point_layouts:
+    5: []
+    14: []
+}
+
+fun mk_u() {
+  frame_data_size: 32
+  entry_gas: 3
+  code:
+    0: JumpIntCmp @8 [0] != u64 #0 gas_taken=80 gas_fallthrough=80
+    1: StoreImm1 [9] <- #7
+    2: Move(1) [11] <- [8]
+    3: Move(1) [10] <- [9]
+    4: EnumNew [16] desc=3 tag #0
+    5: HeapMoveTo [16]+8 <- [10] (size=2)
+    6: Move8 [0] <- [16]
+    7: Return
+    8: StoreImm1 [9] <- #7
+    9: Move(1) [11] <- [8]
+    10: Move(1) [10] <- [9]
+    11: EnumNew [16] desc=3 tag #1
+    12: HeapMoveTo [16]+8 <- [10] (size=2)
+    13: Move8 [0] <- [16]
+    14: Return
+  safe_point_layouts:
+    4: []
+    11: []
+}
+
+fun read_e() {
+  frame_data_size: 40
+  entry_gas: 19
+  code:
+    0: EnumBorrowVariantFieldByTag [16] <- &(*[0]) by tag [Some(9), Some(10)]
+    1: ReadRefOffset [32] <- *([16]+1) (size=1)
+    2: Move(1) [0] <- [32]
+    3: Return
+}
+
+fun read_f() {
+  frame_data_size: 40
+  entry_gas: 19
+  code:
+    0: EnumBorrowVariantFieldByTag [16] <- &(*[0]) by tag [None, Some(9)]
+    1: ReadRefOffset [32] <- *([16]+1) (size=1)
+    2: Move(1) [0] <- [32]
+    3: Return
+}
+
+fun read_u() {
+  frame_data_size: 40
+  entry_gas: 19
+  code:
+    0: HeapBorrow [16] <- &[0]+8
+    1: ReadRefOffset [32] <- *([16]+1) (size=1)
+    2: Move(1) [0] <- [32]
+    3: Return
+}
+
+fun run_read_e() {
+  frame_data_size: 24
+  entry_gas: 141
+  code:
+    0: Move(1) [56] <- [8]
+    1: Move8 [48] <- [0]
+    2: CallIndirect 0x99::chained_variant_field_fusion::mk_e
+    3: Move8 [16] <- [48]
+    4: SlotBorrow [48] <- &[16]
+    5: CallIndirect 0x99::chained_variant_field_fusion::read_e
+    6: Move(1) [0] <- [48]
+    7: Return
+}
+
+fun run_read_f() {
+  frame_data_size: 32
+  entry_gas: 3
+  code:
+    0: JumpIntCmp @8 [0] != u64 #0 gas_taken=37 gas_fallthrough=15
+    1: StoreImm1 [16] <- #1
+    2: EnumNew [8] desc=4 tag #0
+    3: HeapMoveTo [8]+8 <- [16] (size=1)
+    4: SlotBorrow [56] <- &[8]
+    5: CallIndirect 0x99::chained_variant_field_fusion::read_f
+    6: Move(1) [0] <- [56]
+    7: Return
+    8: StoreImm1 [16] <- #1
+    9: StoreImm1 [17] <- #7
+    10: StoreImm1 [18] <- #9
+    11: Move(1) [20] <- [18]
+    12: Move(1) [19] <- [17]
+    13: EnumNew [8] desc=4 tag #1
+    14: HeapMoveTo [8]+8 <- [16] (size=1)
+    15: HeapMoveTo [8]+9 <- [19] (size=2)
+    16: Jump @4 gas=74
+  safe_point_layouts:
+    2: []
+    13: []
+}
+
+fun run_read_u() {
+  frame_data_size: 24
+  entry_gas: 141
+  code:
+    0: Move(1) [56] <- [8]
+    1: Move8 [48] <- [0]
+    2: CallIndirect 0x99::chained_variant_field_fusion::mk_u
+    3: Move8 [16] <- [48]
+    4: SlotBorrow [48] <- &[16]
+    5: CallIndirect 0x99::chained_variant_field_fusion::read_u
+    6: Move(1) [0] <- [48]
+    7: Return
+}
+
+fun run_write_e() {
+  frame_data_size: 24
+  entry_gas: 210
+  code:
+    0: StoreImm1 [56] <- #0
+    1: Move8 [48] <- [0]
+    2: CallIndirect 0x99::chained_variant_field_fusion::mk_e
+    3: Move8 [16] <- [48]
+    4: SlotBorrow [48] <- &[16]
+    5: Move(1) [64] <- [8]
+    6: CallIndirect 0x99::chained_variant_field_fusion::write_e
+    7: SlotBorrow [48] <- &[16]
+    8: CallIndirect 0x99::chained_variant_field_fusion::read_e
+    9: Move(1) [0] <- [48]
+    10: Return
+}
+
+fun write_e() {
+  frame_data_size: 40
+  entry_gas: 14
+  code:
+    0: IntAdd [17] <- [16] + u8 #1
+    1: EnumBorrowVariantFieldByTag [24] <- &(*[0]) by tag [Some(9), Some(10)]
+    2: WriteRefOffset *([24]+1) <- [17] (size=1)
+    3: Return
+}

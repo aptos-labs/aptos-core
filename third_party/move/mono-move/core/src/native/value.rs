@@ -317,6 +317,17 @@ impl<'a, V> Vector<'a, V> {
         self.len() == 0
     }
 
+    /// Reinterprets the element type of a vector.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure the object's actual element layout matches
+    /// the target layout.
+    #[inline]
+    pub(crate) unsafe fn transmute_unchecked<U>(self) -> Vector<'a, U> {
+        Vector::from_handle(self.handle)
+    }
+
     // TODO(completeness): Other vector APIs, added on-demand.
 }
 

@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{DescriptorId, FrameOffset};
+use crate::{DescriptorId, ExecutionErrorKind, FrameOffset, IntoExecutionError};
 use thiserror::Error;
 
 /// Location and size of an argument or return value in the calling frame.
@@ -42,6 +42,15 @@ pub enum NativeABIError {
     Unsorted { kind: &'static str, idx: usize },
     #[error("{kind} slot {idx} overlaps with previous slot")]
     Overlap { kind: &'static str, idx: usize },
+}
+
+impl IntoExecutionError for NativeABIError {
+    fn kind(&self) -> ExecutionErrorKind {
+        use NativeABIError::*;
+        match self {
+            Unsorted { .. } | Overlap { .. } => ExecutionErrorKind::InvariantViolation,
+        }
+    }
 }
 
 impl NativeABI {

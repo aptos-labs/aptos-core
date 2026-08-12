@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: invalid spec block member
+  ┌─ tests/checking/control_flow/for_spec_header_and_trailing.move:8:11
+  │
+6 │         for (i in 0..n spec { invariant s <= i; }) {
+  │                        -------------------------- already specified in the loop header here
+7 │             s = s + i;
+8 │         } spec { invariant s == i * (i - 1) / 2; };
+  │           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ a loop invariant may be given in the loop header or in a trailing spec block, but not both

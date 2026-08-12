@@ -397,7 +397,6 @@ impl<K, E> MockIncarnation<K, E> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum DeltaTestKind {
     DelayedFields,
-    AggregatorV1,
     None,
 }
 
@@ -459,16 +458,6 @@ impl<K, E> MockTransaction<K, E> {
         self
     }
 
-    pub(crate) fn with_aggregator_v1_testing(mut self) -> Self {
-        if let Self::Write {
-            delta_test_kind, ..
-        } = &mut self
-        {
-            *delta_test_kind = DeltaTestKind::AggregatorV1;
-        }
-        self
-    }
-
     pub(crate) fn with_pre_writes(mut self, new_pre_writes: Vec<(K, ValueType)>) -> Self {
         if let Self::Write { pre_writes, .. } = &mut self {
             *pre_writes = new_pre_writes;
@@ -510,13 +499,6 @@ impl<
 
     fn state_checkpoint(_block_id: HashValue) -> Self {
         Self::StateCheckpoint
-    }
-
-    fn pre_write_values(&self) -> Vec<(Self::Key, Self::Value)> {
-        match self {
-            MockTransaction::Write { pre_writes, .. } => pre_writes.clone(),
-            _ => vec![],
-        }
     }
 }
 
@@ -949,27 +931,13 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             MockTransaction::from_behaviors(behaviors)
         }
     }
-
-    pub(crate) fn materialize_with_deltas<
-        K: Clone + Hash + Debug + Eq + Ord,
-        E: Send + Sync + Debug + Clone + TransactionEvent,
-    >(
-        self,
-        universe: &[K],
-        delta_threshold: usize,
-        allow_deletes: bool,
-    ) -> MockTransaction<KeyType<K>, E> {
-        // Enable delta generation for this specific method
-        self.new_mock_write_txn(universe, allow_deletes, Some(delta_threshold))
-            .with_aggregator_v1_testing()
-    }
 }
 
 pub(crate) fn raw_metadata(v: u64) -> StateValueMetadata {
     StateValueMetadata::legacy(v, &CurrentTimeMicroseconds { microseconds: v })
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) enum GroupSizeOrMetadata {
     Size(u64),
     Metadata(Option<StateValueMetadata>),

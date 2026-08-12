@@ -774,6 +774,28 @@ pub fn run_single_with_default_params(
     use_blockstm_v2: bool,
     mode: SingleRunMode,
 ) -> SingleRunResults {
+    run_mix_with_default_params(
+        vec![(transaction_type, 1)],
+        test_folder,
+        concurrency_level,
+        use_blockstm_v2,
+        mode,
+    )
+}
+
+/// Like [`run_single_with_default_params`], but runs a weighted *mix* of
+/// transaction types. Each generated transaction is sampled across
+/// `transaction_mix` by the given integer weights (e.g. `[(perp, 80), (spot,
+/// 20)]`), and the mix is interleaved within every block. Each entry is set up
+/// independently (for `Workflow` entries, each runs its own `construct_workflow`),
+/// so the entries do not share on-chain state unless they are constructed to.
+pub fn run_mix_with_default_params(
+    transaction_mix: Vec<(TransactionType, usize)>,
+    test_folder: impl AsRef<Path>,
+    concurrency_level: usize,
+    use_blockstm_v2: bool,
+    mode: SingleRunMode,
+) -> SingleRunResults {
     aptos_logger::Logger::new().init();
 
     match mode {
@@ -937,7 +959,7 @@ pub fn run_single_with_default_params(
     run_benchmark::<AptosVMBlockExecutor>(
         benchmark_block_size, /* block_size */
         num_blocks,           /* num_blocks */
-        BenchmarkWorkload::TransactionMix(vec![(transaction_type, 1)]),
+        BenchmarkWorkload::TransactionMix(transaction_mix),
         1, /* transactions per sender */
         num_main_signer_accounts,
         num_dst_pool_accounts,

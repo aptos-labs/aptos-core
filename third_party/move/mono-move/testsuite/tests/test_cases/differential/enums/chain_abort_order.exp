@@ -1,0 +1,76 @@
+=== stackless ===
+// module 0x55::chain_abort_order
+
+fun boom() {
+  slots: params(0), locals(0), temps(1)
+    r0: u64
+  code:
+  L0:
+    0: r0 := ld_u64 777
+    1: abort r0
+}
+
+fun read_after_call(r0): u64 {
+  slots: params(1), locals(0), temps(3)
+    r0: &0x55::chain_abort_order::E
+    r1: &0x55::chain_abort_order::Inner
+    r2: &u64
+    r3: u64
+  code:
+  L0:
+    0: r1 := imm_borrow_variant_field E::Fb::y, r0
+    1: r2 := imm_borrow_field Inner::b, r1
+    2: [] := call boom, []
+    3: r3 := read_ref r2
+    4: ret [r3]
+}
+
+fun run(): u64 {
+  slots: params(0), locals(1), temps(1), transfer(1)
+    r0: 0x55::chain_abort_order::E
+    r1: u64
+  code:
+  L0:
+    0: r1 := ld_u64 7
+    1: r0 := pack_variant 0x55::chain_abort_order::E@0, [r1]
+    2: x0 := imm_borrow_loc r0
+    3: [x0] := call read_after_call, [x0]
+    4: ret [x0]
+}
+=== micro-ops ===
+// module 0x55::chain_abort_order
+
+fun boom() {
+  frame_data_size: 8
+  entry_gas: 4
+  code:
+    0: StoreImm8 [0] <- #777
+    1: Abort [0]
+}
+
+fun read_after_call() {
+  frame_data_size: 56
+  entry_gas: 94
+  code:
+    0: EnumBorrowVariantFieldByTag [16] <- &(*[0]) by tag [None, Some(16)]
+    1: DeriveRefOffsetImm [32] <- [16]+8
+    2: CallIndirect 0x55::chain_abort_order::boom
+    3: ReadRef [48] <- *[32] (size=8)
+    4: Move8 [0] <- [48]
+    5: Return
+}
+
+fun run() {
+  frame_data_size: 24
+  entry_gas: 152
+  code:
+    0: StoreImm8 [8] <- #7
+    1: EnumNew [0] desc=2 tag #0
+    2: HeapMoveTo8 [0]+8 <- [8]
+    3: SlotBorrow [48] <- &[0]
+    4: CallIndirect 0x55::chain_abort_order::read_after_call
+    5: Move8 [0] <- [48]
+    6: Return
+  safe_point_layouts:
+    1: []
+}

@@ -18,7 +18,12 @@ use crate::{
         module_builder::{ModuleBuilder, SpecBlockContext},
     },
     exp_rewriter::ExpRewriterFunctions,
-    metadata::{lang_feature_versions::LANGUAGE_VERSION_FOR_SINT, LanguageVersion},
+    metadata::{
+        lang_feature_versions::{
+            LANGUAGE_VERSION_FOR_ITER_UNSCOPED_BOUNDS, LANGUAGE_VERSION_FOR_SINT,
+        },
+        LanguageVersion, LATEST_STABLE_LANGUAGE_VERSION_VALUE,
+    },
     model::{
         FieldData, FieldId, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, NodeId, Parameter,
         QualifiedId, QualifiedInstId, SpecFunId, StructId, SurfaceSyntax, TypeParameter,
@@ -267,6 +272,23 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
     pub fn is_spec_mode(&self) -> bool {
         matches!(self.mode, ExpTranslationMode::Spec)
+    }
+
+    /// In specification expressions, ghost fields (`ghost f: T;` from the
+    /// struct's spec block) are selectable like ordinary fields; in code
+    /// contexts they do not exist. Returns the instantiated field type.
+    pub fn lookup_ghost_field_decl(
+        &self,
+        id: &QualifiedInstId<StructId>,
+        field_name: Symbol,
+    ) -> Option<Type> {
+        if self.is_spec_mode() {
+            self.parent
+                .parent
+                .lookup_struct_ghost_field_decl(id, field_name)
+        } else {
+            None
+        }
     }
 
     pub fn type_variance(&self) -> Variance {
@@ -868,7 +890,13 @@ impl UnificationContext for ExpTranslator<'_, '_, '_> {
         id: &QualifiedInstId<StructId>,
         field_name: Symbol,
     ) -> (Vec<(Option<Symbol>, Type)>, bool) {
-        self.parent.parent.lookup_struct_field_decl(id, field_name)
+        let result = self.parent.parent.lookup_struct_field_decl(id, field_name);
+        if result.0.is_empty() {
+            if let Some(ty) = self.lookup_ghost_field_decl(id, field_name) {
+                return (vec![(None, ty)], false);
+            }
+        }
+        result
     }
 
     fn get_function_wrapper_type(&self, id: &QualifiedInstId<StructId>) -> Option<Type> {
@@ -1714,6 +1742,16 @@ impl ExpTranslator<'_, '_, '_> {
                     .into_exp(),
                 )
             },
+            EA::Exp_::For(iter, lb, ub, body, spec_opt) => self.translate_for_loop(
+                &loc,
+                iter,
+                lb,
+                ub,
+                body,
+                spec_opt.as_deref(),
+                expected_type,
+                context,
+            ),
             EA::Exp_::Loop(label, body) => {
                 self.push_loop_label(label);
                 let body = self.translate_exp(body, &Type::unit());
@@ -2074,6 +2112,380 @@ impl ExpTranslator<'_, '_, '_> {
                 self.new_error_exp()
             },
         }
+    }
+
+    /// Returns whether `body` contains a `continue` targeting the enclosing
+    /// for-loop (rather than a loop nested within the body). `loop_depth` counts
+    /// the loops between a position and the for-loop, so a for-targeting
+    /// continuation is one whose nesting equals the current depth.
+    fn for_body_has_continue(body: &Exp) -> bool {
+        // Read-only scan: track the loop nesting between the current position and
+        // the for-loop (incremented on entering a nested loop, decremented on
+        // leaving it). A `continue` targets the for-loop when its nesting equals
+        // that depth. Stop at the first match.
+        let mut depth: usize = 0;
+        let mut found = false;
+        body.as_ref().visit_pre_post(&mut |post, e| match e {
+            ExpData::Loop(..) => {
+                if post {
+                    depth -= 1;
+                } else {
+                    depth += 1;
+                }
+                true
+            },
+            ExpData::LoopCont(_, nest, true) if !post && *nest == depth => {
+                found = true;
+                false // for-targeting `continue` found; stop early
+            },
+            _ => true,
+        });
+        found
+    }
+
+    /// Rewrites a for-loop body so it can be wrapped in an inner single-pass loop.
+    /// For continuations targeting the for-loop, a `continue` becomes a `break` of
+    /// the inner loop and a `break` becomes a `break` of the outer loop; those
+    /// targeting loops enclosing the for-loop are shifted out by one for the extra
+    /// loop level, and those targeting loops nested in the body are left unchanged.
+    fn rewrite_for_loop_continuations(body: Exp) -> Exp {
+        struct Rewriter {
+            loop_depth: usize,
+        }
+        impl ExpRewriterFunctions for Rewriter {
+            fn rewrite_exp(&mut self, exp: Exp) -> Exp {
+                match exp.as_ref() {
+                    ExpData::LoopCont(id, nest, is_continue) => {
+                        match (*nest).cmp(&self.loop_depth) {
+                            std::cmp::Ordering::Less => exp,
+                            std::cmp::Ordering::Equal => {
+                                let nest = if *is_continue {
+                                    self.loop_depth
+                                } else {
+                                    self.loop_depth + 1
+                                };
+                                ExpData::LoopCont(*id, nest, false).into_exp()
+                            },
+                            std::cmp::Ordering::Greater => {
+                                ExpData::LoopCont(*id, nest + 1, *is_continue).into_exp()
+                            },
+                        }
+                    },
+                    ExpData::Loop(..) => {
+                        self.loop_depth += 1;
+                        let result = self.rewrite_exp_descent(exp);
+                        self.loop_depth -= 1;
+                        result
+                    },
+                    _ => self.rewrite_exp_descent(exp),
+                }
+            }
+        }
+        Rewriter { loop_depth: 0 }.rewrite_exp(body)
+    }
+
+    /// Translates a `for` loop. The loop
+    /// ```move
+    /// for (i in lb..ub spec { invariant I; }) body
+    /// ```
+    /// is lowered into the following primitive loop, with `$lb` and `$ub`
+    /// compiler-generated locals which cannot be referenced from source:
+    /// ```move
+    /// let $lb = lb;
+    /// let $ub = ub;
+    /// let i = $lb;
+    /// loop {
+    ///     if ({spec { invariant I; }; i < $ub}) {
+    ///         body;
+    ///         i = i + 1;
+    ///     } else break
+    /// }
+    /// ```
+    /// The iterator is bound once before the loop, so the invariants (in the
+    /// condition) are the first thing in the loop header, as the prover requires,
+    /// and they are checked in the classical form: at the loop head `i` is the
+    /// next value to be processed. The bounds are evaluated once, in source order,
+    /// and outside the scope of the iterator.
+    ///
+    /// A `continue` would jump to the loop head, skipping the trailing increment.
+    /// If (and only if) the body has a `continue` targeting this loop, the body is
+    /// wrapped in an inner single-pass loop so a `continue` becomes a `break` of
+    /// the inner loop, falling through to `i = i + 1`:
+    /// ```move
+    ///     if ({spec { invariant I; }; i < $ub}) {
+    ///         loop { body; break };   // `continue` -> break inner; `break` -> break outer
+    ///         i = i + 1;
+    ///     } else break
+    /// ```
+    /// Placing the increment after the inner loop (outside the body) keeps it
+    /// correct even when a `continue` sits inside a scope that shadows `i`.
+    fn translate_for_loop(
+        &mut self,
+        loc: &Loc,
+        iter: &PA::Var,
+        lb: &EA::Exp,
+        ub: &EA::Exp,
+        body: &EA::Exp,
+        spec_opt: Option<&EA::Exp>,
+        expected_type: &Type,
+        context: &ErrorMessageContext,
+    ) -> ExpData {
+        // A `for` expression has unit type.
+        let for_type = self.check_type(loc, &Type::unit(), expected_type, context);
+        let unit_ty = Type::unit();
+        let bool_ty = Type::new_prim(PrimitiveType::Bool);
+
+        // The iterator has an integer type, unified from both bounds.
+        let iter_ty = self.fresh_type_var_constr(
+            loc.clone(),
+            WideningOrder::RightToLeft,
+            Constraint::SomeNumber(PrimitiveType::all_int_types().into_iter().collect()),
+        );
+        // The lower bound is always evaluated before the iterator is in scope,
+        // so it never refers to the iterator. From
+        // `LANGUAGE_VERSION_FOR_ITER_UNSCOPED_BOUNDS` on, the upper bound is also
+        // evaluated outside the iterator's scope; before that it is evaluated
+        // *inside* the iterator's scope (matching the older `for` desugaring,
+        // where e.g. `for (i in 0..i)` read the iterator and ran zero times).
+        let lb_exp = self.translate_exp(lb, &iter_ty);
+        let unscoped_bounds = self
+            .env()
+            .language_version()
+            .is_at_least(LANGUAGE_VERSION_FOR_ITER_UNSCOPED_BOUNDS);
+        let ub_exp_outer = unscoped_bounds.then(|| self.translate_exp(ub, &iter_ty));
+
+        let iter_loc = self.to_loc(&iter.0.loc);
+        // A `_` iterator discards the index; give it a fresh, unreferenceable
+        // name so the generated counter reads/writes still resolve.
+        let iter_sym = if iter.0.value.as_str() == "_" {
+            let uniq = self.fresh_type_var_idx();
+            self.symbol_pool().make(&format!("$for_iter_{}", uniq))
+        } else {
+            self.symbol_pool().make(iter.0.value.as_str())
+        };
+
+        // Record whether the iterator name shadows an enclosing binding, *before*
+        // the iterator is defined below (read-only, so no spurious access is
+        // recorded). `Some(idx)` is a parameter, `Some(None)` a `let`-local,
+        // `None` means the name is not shadowed. Used by the warning below.
+        let shadowed_enclosing = self
+            .local_table
+            .iter()
+            .find_map(|scope| scope.get(&iter_sym))
+            .map(|entry| entry.temp_index);
+
+        let lb_sym = self.symbol_pool().make("$lb");
+        let ub_sym = self.symbol_pool().make("$ub");
+
+        // Scope for the compiler-generated bound variables.
+        self.enter_scope();
+        self.define_local(loc, lb_sym, iter_ty.clone(), None, None);
+        self.define_local(loc, ub_sym, iter_ty.clone(), None, None);
+        // Scope for the iterator, shadowing any user variable of the same name.
+        self.enter_scope();
+        self.define_local(&iter_loc, iter_sym, iter_ty.clone(), None, None);
+
+        // Older language versions evaluate the upper bound inside the iterator's
+        // scope, so translate it now (with the iterator visible).
+        let ub_exp = match ub_exp_outer {
+            Some(exp) => exp,
+            None => self.translate_exp(ub, &iter_ty),
+        };
+
+        // Translate the loop invariants, if any, and the body within the scope
+        // of the iterator.
+        let spec_exp = spec_opt.map(|spec| self.translate_exp(spec, &unit_ty).into_exp());
+        self.push_loop_label(&None);
+        let body_exp = self.translate_exp(body, &unit_ty).into_exp();
+        self.pop_loop_label();
+
+        self.exit_scope();
+        self.exit_scope();
+
+        // Warn if the upper bound refers to a variable that the iterator shadows:
+        // its meaning changed with `LANGUAGE_VERSION_FOR_ITER_UNSCOPED_BOUNDS`
+        // (it reads the iterator before, the enclosing binding after), so
+        // recompiling such a loop across that boundary changes its behavior.
+        self.warn_if_upper_bound_shadows_iterator(iter, iter_sym, shadowed_enclosing, &ub_exp, ub);
+
+        // The iterator is advanced at the bottom of the loop, so a `continue`
+        // (which jumps to the head) would skip it. A body with a `continue`
+        // targeting this loop therefore needs the inner-loop scaffolding built
+        // below.
+        let has_continue = Self::for_body_has_continue(&body_exp);
+
+        // Construct the loop condition `{ [spec;] i < $ub }`, checking the loop
+        // invariants at the loop head.
+        let iter_use_id = self.new_node_id_with_type_loc(&iter_ty, &iter_loc);
+        let ub_use_id = self.new_node_id_with_type_loc(&iter_ty, loc);
+        let lt_id = self.new_node_id_with_type_loc(&bool_ty, loc);
+        let cmp_exp = ExpData::Call(lt_id, Operation::Lt, vec![
+            ExpData::LocalVar(iter_use_id, iter_sym).into_exp(),
+            ExpData::LocalVar(ub_use_id, ub_sym).into_exp(),
+        ])
+        .into_exp();
+        let cond_exp = if let Some(spec) = spec_exp {
+            let seq_id = self.new_node_id_with_type_loc(&bool_ty, loc);
+            ExpData::Sequence(seq_id, vec![spec, cmp_exp]).into_exp()
+        } else {
+            cmp_exp
+        };
+
+        // Build the then-branch `{ <body>; i = i + 1 }`. When the body has a
+        // `continue`, wrap it in an inner single-pass loop so the `continue` falls
+        // through to the increment rather than skipping it. Placing the increment
+        // structurally outside the body keeps it correct even when a `continue`
+        // sits inside a scope that shadows `i`: the increment always advances the
+        // loop iterator, not the shadow. Loops without a `continue` avoid the extra
+        // loop entirely.
+        let incr_exp = self.make_for_iter_increment(&iter_loc, iter_sym, &iter_ty);
+        let then_exp = if has_continue {
+            // Wrap the body in an inner single-pass loop so a `continue` becomes a
+            // `break` of the inner loop, falling through to the increment rather
+            // than skipping it.
+            let body_exp = Self::rewrite_for_loop_continuations(body_exp);
+            let inner_break =
+                ExpData::LoopCont(self.new_node_id_with_type_loc(&unit_ty, loc), 0, false)
+                    .into_exp();
+            let inner_seq_id = self.new_node_id_with_type_loc(&unit_ty, &iter_loc);
+            let inner_body =
+                ExpData::Sequence(inner_seq_id, vec![body_exp, inner_break]).into_exp();
+            let inner_loop_id = self.new_node_id_with_type_loc(&unit_ty, &iter_loc);
+            let inner_loop = ExpData::Loop(inner_loop_id, inner_body).into_exp();
+            let then_id = self.new_node_id_with_type_loc(&unit_ty, loc);
+            ExpData::Sequence(then_id, vec![inner_loop, incr_exp]).into_exp()
+        } else {
+            let then_id = self.new_node_id_with_type_loc(&unit_ty, loc);
+            ExpData::Sequence(then_id, vec![body_exp, incr_exp]).into_exp()
+        };
+
+        // Construct the loop `loop { if (cond) { .. } else break }`.
+        let else_break =
+            ExpData::LoopCont(self.new_node_id_with_type_loc(&unit_ty, loc), 0, false).into_exp();
+        let ite_id = self.new_node_id_with_type_loc(&unit_ty, loc);
+        let ite_exp = ExpData::IfElse(ite_id, cond_exp, then_exp, else_break).into_exp();
+        let id = self.new_node_id_with_type_loc(&for_type, loc);
+        let loop_exp = ExpData::Loop(id, ite_exp);
+
+        // Wrap so the bounds are evaluated once, in source order. When the bounds
+        // are unscoped (>= LANGUAGE_VERSION_FOR_ITER_UNSCOPED_BOUNDS) both are
+        // bound before the iterator (`let $lb; let $ub; let i = $lb`), so the
+        // upper bound cannot see the iterator. Otherwise the iterator is bound
+        // before the upper bound (`let $lb; let i = $lb; let $ub`), so the upper
+        // bound sees the iterator (the older semantics).
+        let iter_pat_id = self.new_node_id_with_type_loc(&iter_ty, &iter_loc);
+        let lb_use_id = self.new_node_id_with_type_loc(&iter_ty, loc);
+        let ub_pat_id = self.new_node_id_with_type_loc(&iter_ty, loc);
+        let lb_pat_id = self.new_node_id_with_type_loc(&iter_ty, loc);
+        let iter_init = ExpData::LocalVar(lb_use_id, lb_sym).into_exp();
+        let inner = if unscoped_bounds {
+            let iter_bind = self.new_bind_exp(
+                loc,
+                Pattern::Var(iter_pat_id, iter_sym),
+                Some(iter_init),
+                loop_exp.into_exp(),
+            );
+            self.new_bind_exp(
+                loc,
+                Pattern::Var(ub_pat_id, ub_sym),
+                Some(ub_exp.into_exp()),
+                iter_bind.into_exp(),
+            )
+        } else {
+            let ub_bind = self.new_bind_exp(
+                loc,
+                Pattern::Var(ub_pat_id, ub_sym),
+                Some(ub_exp.into_exp()),
+                loop_exp.into_exp(),
+            );
+            self.new_bind_exp(
+                loc,
+                Pattern::Var(iter_pat_id, iter_sym),
+                Some(iter_init),
+                ub_bind.into_exp(),
+            )
+        };
+        self.new_bind_exp(
+            loc,
+            Pattern::Var(lb_pat_id, lb_sym),
+            Some(lb_exp.into_exp()),
+            inner.into_exp(),
+        )
+    }
+
+    /// Creates the expression `iter = iter + 1` for advancing a `for` loop iterator.
+    fn make_for_iter_increment(&self, loc: &Loc, iter_sym: Symbol, iter_ty: &Type) -> Exp {
+        let local_id = self.new_node_id_with_type_loc(iter_ty, loc);
+        let one_id = self.new_node_id_with_type_loc(iter_ty, loc);
+        let add_id = self.new_node_id_with_type_loc(iter_ty, loc);
+        let pat_id = self.new_node_id_with_type_loc(iter_ty, loc);
+        let assign_id = self.new_node_id_with_type_loc(&Type::unit(), loc);
+        let add_exp = ExpData::Call(add_id, Operation::Add, vec![
+            ExpData::LocalVar(local_id, iter_sym).into_exp(),
+            ExpData::Value(one_id, Value::Number(BigInt::from(1))).into_exp(),
+        ]);
+        ExpData::Assign(
+            assign_id,
+            Pattern::Var(pat_id, iter_sym),
+            add_exp.into_exp(),
+        )
+        .into_exp()
+    }
+
+    /// Warns if the `for`-loop upper bound `ub_exp` (translated; `ub_src` is its
+    /// source) refers to a variable that the loop iterator shadows. Only the
+    /// upper bound is affected: the lower bound is evaluated before the iterator
+    /// is bound in every version, whereas the upper bound reads the iterator
+    /// before `LANGUAGE_VERSION_FOR_ITER_UNSCOPED_BOUNDS` and the enclosing
+    /// binding after, so recompiling such a loop across that boundary changes its
+    /// behavior. `shadowed_enclosing` is the enclosing binding of the iterator
+    /// name captured before the iterator was defined: `None` if the name is not
+    /// shadowed, `Some(Some(idx))` a parameter, `Some(None)` a `let`-local. The
+    /// warning retires automatically once the unscoped-bounds semantics are the
+    /// stable default.
+    fn warn_if_upper_bound_shadows_iterator(
+        &self,
+        iter: &PA::Var,
+        iter_sym: Symbol,
+        shadowed_enclosing: Option<Option<usize>>,
+        ub_exp: &ExpData,
+        ub_src: &EA::Exp,
+    ) {
+        if LATEST_STABLE_LANGUAGE_VERSION_VALUE
+            .is_at_least(LANGUAGE_VERSION_FOR_ITER_UNSCOPED_BOUNDS)
+        {
+            return;
+        }
+        let Some(enclosing_temp) = shadowed_enclosing else {
+            return;
+        };
+        // The upper bound refers to the iterator's name if it reads the iterator
+        // directly (a `LocalVar`, under the older in-scope semantics) or the
+        // shadowed enclosing binding (a `LocalVar` for a `let`, a `Temporary` for
+        // a parameter, under the newer out-of-scope semantics).
+        let refers = ub_exp.free_vars().contains(&iter_sym)
+            || matches!(enclosing_temp, Some(idx) if ub_exp.used_temporaries().contains(&idx));
+        if !refers {
+            return;
+        }
+        let iter_name = iter.0.value.as_str();
+        self.env().diag_with_notes(
+            Severity::Warning,
+            &self.to_loc(&ub_src.loc),
+            &format!(
+                "loop upper bound refers to `{0}`, which is shadowed by the loop iterator `{0}`",
+                iter_name
+            ),
+            vec![format!(
+                "the meaning of `{iter}` here depends on the language version: before {ver} the \
+                 upper bound is evaluated with the iterator `{iter}` in scope, \
+                 while from {ver} on it is evaluated outside the iterator's scope. \
+                 Recompiling this loop across {ver} changes its \
+                 behavior; consider renaming the iterator to avoid ambiguity.",
+                iter = iter_name,
+                ver = LANGUAGE_VERSION_FOR_ITER_UNSCOPED_BOUNDS.to_str(),
+            )],
+        );
     }
 
     fn find_loop_nest(&self, label: &Option<PA::Label>) -> usize {
@@ -3365,7 +3777,15 @@ impl ExpTranslator<'_, '_, '_> {
                 _ => unreachable!("not primitive"),
             }
         } else if self.is_spec_mode() {
-            // In specification mode, use I256 or U256.
+            // In specification mode, use I256 or U256. Record the location so
+            // the prover can distinguish this default from an explicit suffix.
+            let mut defaulted = self
+                .env()
+                .get_extension::<crate::model::SpecDefaultedNumLocs>()
+                .map(|x| (*x).clone())
+                .unwrap_or_default();
+            defaulted.0.insert(loc.clone());
+            self.env().set_extension(defaulted);
             if value < BigInt::zero() {
                 vec![PrimitiveType::I256]
             } else {
@@ -4613,7 +5033,12 @@ impl ExpTranslator<'_, '_, '_> {
         field_name: Symbol,
     ) -> Operation {
         let struct_name = self.parent.parent.get_struct_name(id.to_qualified_id());
-        if self.is_empty_struct(struct_name) {
+        // Ghost fields on an otherwise-empty struct are still selectable in
+        // spec expressions; only reject empty-struct access when the target
+        // is not a declared ghost field.
+        if self.is_empty_struct(struct_name)
+            && self.lookup_ghost_field_decl(id, field_name).is_none()
+        {
             self.error(
                 loc,
                 &format!(
@@ -4624,6 +5049,10 @@ impl ExpTranslator<'_, '_, '_> {
             );
         }
         let (decls, is_variant) = self.parent.parent.lookup_struct_field_decl(id, field_name);
+        if decls.is_empty() && self.lookup_ghost_field_decl(id, field_name).is_some() {
+            // Selection of a ghost field in a specification expression.
+            return Operation::Select(id.module_id, id.id, FieldId::new(field_name));
+        }
         let field_ids = decls
             .into_iter()
             .map(|(variant, _)| {
@@ -4676,15 +5105,20 @@ impl ExpTranslator<'_, '_, '_> {
             let expected_type = &self.subs.specialize(expected_type);
             if let Type::Struct(mid, sid, inst) = self.subs.specialize(expected_type) {
                 let field_name = self.symbol_pool().make(name.value.as_str());
+                let qid = mid.qualified_inst(sid, inst);
                 let (field_decls, _) = self
                     .parent
                     .parent
-                    .lookup_struct_field_decl(&mid.qualified_inst(sid, inst), field_name);
-                let (variant, expected_field_type) =
+                    .lookup_struct_field_decl(&qid, field_name);
+                let (variant, expected_field_type, is_ghost_field) =
                     if let Some((variant, ty)) = field_decls.into_iter().next() {
-                        (variant, ty)
+                        (variant, ty, false)
+                    } else if let Some(ty) = self.lookup_ghost_field_decl(&qid, field_name) {
+                        // Ghost fields participate in `update_field(s, f, v)` in
+                        // spec expressions — variant-agnostic.
+                        (None, ty, true)
                     } else {
-                        (None, Type::Error) // this error is reported via type unification
+                        (None, Type::Error, false) // this error is reported via type unification
                     };
                 let constraint = Constraint::SomeStruct(
                     [(field_name, expected_field_type.clone())]
@@ -4705,6 +5139,22 @@ impl ExpTranslator<'_, '_, '_> {
 
                 // Translate the new value with the field type as the expected type.
                 let value_exp = self.translate_exp(args[2], &expected_field_type);
+                // Mirror the rejection applied to direct `update s.g = rhs`:
+                // bitwise operators lower to bitvector-typed Boogie while
+                // ghost integer fields are modeled as unbounded int, so the
+                // emitted `$Update` application would be ill-typed.
+                if is_ghost_field {
+                    let value_check = value_exp.clone().into_exp();
+                    if super::module_builder::exp_contains_bitwise_op(&value_check) {
+                        self.error(
+                            loc,
+                            "bitvector expressions (|, &, ^, int2bv) cannot appear in a \
+                             ghost field update expression (ghost integer fields are \
+                             modeled as mathematical integers)",
+                        );
+                        return self.new_error_exp();
+                    }
+                }
                 let id = self.new_node_id_with_type_loc(expected_type, loc);
                 self.set_node_instantiation(id, vec![expected_type.clone()]);
                 // For enum types, use variant-qualified FieldId (like Select does)

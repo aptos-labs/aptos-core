@@ -7,8 +7,9 @@ use crate::{
     address_derivation::{auid_address, table_handle},
     monomorphic_natives, NativeEntry,
 };
-use mono_move_core::native::{
-    NativeContext, NativeContextFamily, NativeExtension, NativeStatus, TableHandle, VMInternalError,
+use mono_move_core::{
+    native::{NativeContext, NativeContextFamily, NativeExtension, NativeStatus, TableHandle},
+    VMResult,
 };
 
 /// Per-transaction context backing the `transaction_context` natives.
@@ -77,7 +78,7 @@ impl NativeExtension for TransactionContextExtension {
     // using the new VM?
     fn on_checkpoint(&mut self) {}
 
-    fn on_rollback(&mut self, _n: usize) -> Result<(), VMInternalError> {
+    fn on_rollback(&mut self, _n: usize) -> VMResult<()> {
         Ok(())
     }
 }
@@ -92,9 +93,7 @@ const COUNTER_OVERFLOW_ABORT_CODE: u64 = (3 << 16) | 2;
 /// the transaction.
 //
 // TODO(metering): charge gas.
-pub fn native_generate_unique_address<C: NativeContext>(
-    ctx: &C,
-) -> Result<NativeStatus, VMInternalError> {
+pub fn native_generate_unique_address<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     let mut ext = ctx.get_extension::<TransactionContextExtension>()?;
     ext.auid_counter += 1;
     let address = auid_address(&ext.txn_hash, ext.auid_counter);
@@ -111,7 +110,7 @@ pub fn native_generate_unique_address<C: NativeContext>(
 // TODO(metering): charge gas.
 pub fn native_monotonically_increasing_counter_internal<C: NativeContext>(
     ctx: &C,
-) -> Result<NativeStatus, VMInternalError> {
+) -> VMResult<NativeStatus> {
     // SAFETY: arg 0 is `timestamp_us: u64`.
     let timestamp_us = unsafe { ctx.arg::<u64>(0)? };
 

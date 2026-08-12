@@ -8,7 +8,10 @@ module 0x42::TestGlobalVars {
 
     spec module {
         global sum_table: Table<address, u64>;
-        global sum_of_T2: u64 = 0;
+        // `num`: spec-level sum tracker. Updates of typed spec variables are
+        // range-checked; `sum_of_T2 - 1` in `opaque_sub` (with invariants
+        // disabled in the body) could leave a bounded type's domain.
+        global sum_of_T2: num = 0;
         invariant [suspendable] forall addr: address: table::spec_contains(sum_table, addr) ==>
         (table::spec_get(sum_table, addr) == global<T>(addr).i);
     }

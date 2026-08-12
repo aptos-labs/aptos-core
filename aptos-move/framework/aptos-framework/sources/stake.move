@@ -605,8 +605,12 @@ module aptos_framework::stake {
                 invariant spec_validator_indices_are_valid(active_validators);
                 invariant spec_validators_are_initialized(pending_inactive);
                 invariant spec_validator_indices_are_valid(pending_inactive);
+                invariant ghost_active_num == len(active_validators);
+                invariant ghost_pending_inactive_num == len(pending_inactive);
                 invariant ghost_active_num + ghost_pending_inactive_num
                     == len(active_validators) + len(pending_inactive);
+                invariant len(active_validators) + len(pending_inactive)
+                    == spec_validator_index_upper_bound();
             };
             i < len_validators
         }) {

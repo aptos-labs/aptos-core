@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use aptos_types::error::PanicError;
+use aptos_types::{error::PanicError, transaction::BlockError};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum ParallelBlockExecutionError {
@@ -20,35 +20,15 @@ pub(crate) struct ResourceGroupSerializationError;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 /// Logging is bottlenecked in constructors.
-pub(crate) enum SequentialBlockExecutionError<E> {
+pub(crate) enum SequentialBlockExecutionError {
     // This is separate error because we need to match the error variant to provide a specialized
     // fallback logic if a resource group serialization error occurs.
     ResourceGroupSerializationError,
-    ErrorToReturn(BlockExecutionError<E>),
+    ErrorToReturn(BlockError),
 }
 
-/// If the unrecoverable error occurs during sequential execution (e.g. fallback),
-/// the error is propagated back to the caller (block execution is aborted).
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum BlockExecutionError<E> {
-    /// unrecoverable BlockSTM error
-    FatalBlockExecutorError(PanicError),
-    /// unrecoverable VM error
-    FatalVMError(E),
-}
-
-pub type BlockExecutionResult<T, E> = Result<T, BlockExecutionError<E>>;
-
-impl<E> From<PanicError> for BlockExecutionError<E> {
+impl From<PanicError> for SequentialBlockExecutionError {
     fn from(err: PanicError) -> Self {
-        BlockExecutionError::FatalBlockExecutorError(err)
-    }
-}
-
-impl<E> From<PanicError> for SequentialBlockExecutionError<E> {
-    fn from(err: PanicError) -> Self {
-        SequentialBlockExecutionError::ErrorToReturn(BlockExecutionError::FatalBlockExecutorError(
-            err,
-        ))
+        SequentialBlockExecutionError::ErrorToReturn(BlockError::from(err))
     }
 }

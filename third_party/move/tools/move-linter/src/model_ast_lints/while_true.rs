@@ -4,7 +4,6 @@
 //! This module implements an expression linter that checks code of the form:
 //! `while (true) { ... }` and suggests to use `loop { ... }` instead.
 
-use crate::utils::detect_for_loop;
 use move_compiler_v2::external_checks::ExpChecker;
 use move_model::{
     ast::{ExpData, Value},
@@ -22,6 +21,8 @@ impl ExpChecker for WhileTrue {
     fn visit_expr_pre(&mut self, function: &FunctionEnv, expr: &ExpData) {
         use ExpData::{IfElse, Loop};
         // Check if `expr` is of the form: Loop(IfElse(true, then, _)).
+        // Note that `for` loops cannot match this shape: they are lowered with a
+        // bound comparison as the loop condition.
         let Loop(id, body) = expr else { return };
         let IfElse(_, cond, _, _) = body.as_ref() else {
             return;
@@ -30,10 +31,6 @@ impl ExpChecker for WhileTrue {
             return;
         };
         if !*b {
-            return;
-        }
-        // Check if it is the `for` loop.
-        if detect_for_loop(expr, function) {
             return;
         }
         let env = function.env();

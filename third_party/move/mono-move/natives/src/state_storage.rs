@@ -4,9 +4,11 @@
 //! Natives for the `state_storage` module, plus the extension backing them.
 
 use crate::{monomorphic_natives, NativeEntry};
-use mono_move_core::native::{
-    NativeContext, NativeContextFamily, NativeExtension, NativeStatus, RootPool, VMInternalError,
-    VMValue,
+use mono_move_core::{
+    native::{
+        NativeContext, NativeContextFamily, NativeExtension, NativeStatus, RootPool, VMValue,
+    },
+    VMResult,
 };
 
 /// State-storage usage captured at the epoch boundary, served read-only to the
@@ -30,7 +32,7 @@ impl NativeExtension for StorageUsageAtEpochBoundary {
 
     fn on_checkpoint(&mut self) {}
 
-    fn on_rollback(&mut self, _n: usize) -> Result<(), VMInternalError> {
+    fn on_rollback(&mut self, _n: usize) -> VMResult<()> {
         Ok(())
     }
 }
@@ -69,7 +71,7 @@ impl<'a> VMValue<'a> for Usage {
 // TODO(metering): charge gas (constant cost) once the gas API lands.
 pub fn native_get_state_storage_usage_only_at_epoch_beginning<C: NativeContext>(
     ctx: &C,
-) -> Result<NativeStatus, VMInternalError> {
+) -> VMResult<NativeStatus> {
     let ext = ctx.get_extension::<StorageUsageAtEpochBoundary>()?;
     let usage = Usage {
         items: ext.items,

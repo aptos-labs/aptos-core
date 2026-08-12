@@ -164,6 +164,15 @@ pub(crate) struct StructEntry {
     pub type_params: Vec<TypeParameter>,
     pub abilities: AbilitySet,
     pub layout: StructLayout,
+    /// Ghost fields declared in the struct's spec block (`ghost f: T;`):
+    /// model-only fields with no runtime counterpart, variant-agnostic for
+    /// enums, only accessible in specification expressions.
+    pub ghost_fields: BTreeMap<Symbol, FieldData>,
+    /// Pending ghost field initializer expressions (`ghost f: T = expr;`),
+    /// held in expansion-AST form until the struct's runtime field layout is
+    /// known. Translated to `Exp` during `def_ana_struct` and moved onto the
+    /// corresponding `FieldData::init` in `ghost_fields`.
+    pub pending_ghost_inits: BTreeMap<Symbol, EA::Exp>,
     pub attributes: Vec<Attribute>,
     /// Maps simple function names to the qualified symbols of receiver functions. The
     /// symbol can be used to index the global function table.
@@ -450,6 +459,8 @@ impl<'env> ModelBuilder<'env> {
             abilities,
             type_params,
             layout,
+            ghost_fields: BTreeMap::new(),
+            pending_ghost_inits: BTreeMap::new(),
             receiver_functions: BTreeMap::new(),
             is_empty_struct: false,
             is_native,
@@ -769,6 +780,20 @@ impl<'env> ModelBuilder<'env> {
             ),
             _ => (vec![], false),
         }
+    }
+
+    /// Looks up the type of a ghost field (`ghost f: T;`) declared in the
+    /// struct's spec block, if any. Ghost fields are variant-agnostic and
+    /// only accessible in specification expressions.
+    pub fn lookup_struct_ghost_field_decl(
+        &self,
+        id: &QualifiedInstId<StructId>,
+        field_name: Symbol,
+    ) -> Option<Type> {
+        self.lookup_struct_entry(id.to_qualified_id())
+            .ghost_fields
+            .get(&field_name)
+            .map(|data| data.ty.instantiate(&id.inst))
     }
 
     pub fn get_function_wrapper_type(&self, id: &QualifiedInstId<StructId>) -> Option<Type> {

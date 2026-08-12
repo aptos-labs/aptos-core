@@ -56,9 +56,10 @@ bitflags! {
         const NO_POINTERS_NO_PADDING = 0b0000_0001;
         /// Every byte pattern of this value's in-memory image is a valid value,
         /// so deserialization needs no per-byte validation and can copy the BCS
-        /// bytes in one `memcpy`. Holds for integers and addresses but not for
-        /// `bool` (only `0`/`1` are canonical). An aggregate has this flag only
-        /// when it has no padding, no pointers, and no `bool` reachable.
+        /// bytes in one `memcpy`. Holds for integers and addresses. It does not
+        /// hold for `bool` (only `0`/`1` are canonical) or `signer` (never
+        /// deserializable). An aggregate has this flag only when it has no
+        /// padding, no pointers, and no `bool` or `signer` reachable.
         const ALL_BYTE_PATTERNS_VALID = 0b0000_0010;
     }
 }
@@ -93,8 +94,11 @@ pub enum LayoutKind {
     UnsignedInt,
     /// A signed integer (`i8`, ..., `i256`).
     SignedInt,
-    /// An `address` or `signer` (32 bytes).
+    /// An `address` (32 bytes).
     Address,
+    /// A `signer` (32 bytes). Distinct from `Address` so it can be rejected on
+    /// deserialization.
+    Signer,
     /// An inline struct: fields laid out flat in the parent's payload.
     /// TODO(completeness): for non-inline structs (resources), we need a descriptor ID.
     Struct {
@@ -158,8 +162,9 @@ impl ValueLayout {
     }
 
     /// Returns true if every byte pattern of this value's in-memory size is a
-    /// valid value, so deserialization can blit the BCS bytes without per-byte
-    /// validation. False for anything that reaches a `bool`.
+    /// valid value, so deserialization can copy the BCS bytes in one `memcpy`
+    /// without per-byte validation. False for anything that reaches a `bool`
+    /// or `signer`.
     pub fn all_byte_patterns_valid(&self) -> bool {
         self.flags.contains(LayoutFlags::ALL_BYTE_PATTERNS_VALID)
     }
@@ -241,7 +246,7 @@ impl ValueLayout {
         Self::signed_int(32, MAX_ALIGN as u32)
     }
 
-    /// Layout of `address` or a signer.
+    /// Layout of `address`.
     pub fn address() -> Self {
         Self {
             size: 32,
@@ -249,6 +254,19 @@ impl ValueLayout {
             fixed_bcs_size: Some(32),
             flags: LayoutFlags::NO_POINTERS_NO_PADDING | LayoutFlags::ALL_BYTE_PATTERNS_VALID,
             kind: LayoutKind::Address,
+        }
+    }
+
+    /// Layout of `signer`: the address shape, but never deserializable.
+    pub fn signer() -> Self {
+        Self {
+            size: 32,
+            align: MAX_ALIGN as u32,
+            fixed_bcs_size: Some(32),
+            // No `ALL_BYTE_PATTERNS_VALID`: without it deserialization takes the
+            // per-byte path, which rejects `signer` instead of copying the bytes.
+            flags: LayoutFlags::NO_POINTERS_NO_PADDING,
+            kind: LayoutKind::Signer,
         }
     }
 
@@ -403,8 +421,7 @@ pub const I128_LAYOUT_ID: LayoutId = LayoutId(11);
 /// Reserved layout ID for [`Type::I256`].
 pub const I256_LAYOUT_ID: LayoutId = LayoutId(12);
 
-/// Reserved layout ID for [`Type::Address`]. Note that  [`Type::Signer`]
-/// has the same layout.
+/// Reserved layout ID for [`Type::Address`].
 pub const ADDRESS_LAYOUT_ID: LayoutId = LayoutId(13);
 
 /// Reserved layout ID shared by all reference types.
@@ -412,6 +429,9 @@ pub const REF_LAYOUT_ID: LayoutId = LayoutId(14);
 
 /// Reserved layout ID shared by all function values.
 pub const FUNCTION_LAYOUT_ID: LayoutId = LayoutId(15);
+
+/// Reserved layout ID for [`Type::Signer`].
+pub const SIGNER_LAYOUT_ID: LayoutId = LayoutId(16);
 
 /// Returns the reserved [`LayoutId`] for a type whose layout is arg-independent
 /// (primitives, references, functions), or [`None`] for types that must be
@@ -432,8 +452,8 @@ pub fn reserved_layout_id(ty: &Type) -> Option<LayoutId> {
         Type::I64 => I64_LAYOUT_ID,
         Type::I128 => I128_LAYOUT_ID,
         Type::I256 => I256_LAYOUT_ID,
-        // Signer shares the address layout.
-        Type::Address | Type::Signer => ADDRESS_LAYOUT_ID,
+        Type::Address => ADDRESS_LAYOUT_ID,
+        Type::Signer => SIGNER_LAYOUT_ID,
         Type::ImmutRef { .. } | Type::MutRef { .. } => REF_LAYOUT_ID,
         Type::Function { .. } => FUNCTION_LAYOUT_ID,
         Type::Vector { .. } | Type::Nominal { .. } | Type::TypeParam { .. } => return None,
@@ -460,6 +480,7 @@ pub fn reserved_layouts() -> Vec<ValueLayout> {
         ValueLayout::address(),
         ValueLayout::reference(),
         ValueLayout::function(),
+        ValueLayout::signer(),
     ]
 }
 
@@ -537,7 +558,7 @@ mod tests {
     #[test]
     fn reserved_layouts_match_ids() {
         let layouts = reserved_layouts();
-        assert_eq!(layouts.len(), 16);
+        assert_eq!(layouts.len(), 17);
 
         let cases = [
             (BOOL_LAYOUT_ID, 1),
@@ -579,13 +600,20 @@ mod tests {
         let f = &layouts[FUNCTION_LAYOUT_ID.as_usize()];
         assert_eq!(f.size, 8);
         assert!(matches!(f.kind, LayoutKind::Function));
+
+        let s = &layouts[SIGNER_LAYOUT_ID.as_usize()];
+        assert_eq!(s.size, 32);
+        assert_eq!(s.fixed_bcs_size, Some(32));
+        assert!(s.has_no_pointers_no_padding());
+        assert!(!s.all_byte_patterns_valid());
+        assert!(matches!(s.kind, LayoutKind::Signer));
     }
 
     #[test]
     fn reserved_layout_id_maps_primitives_and_pointers() {
         assert_eq!(reserved_layout_id(&Type::U64), Some(U64_LAYOUT_ID));
         assert_eq!(reserved_layout_id(&Type::Address), Some(ADDRESS_LAYOUT_ID));
-        assert_eq!(reserved_layout_id(&Type::Signer), Some(ADDRESS_LAYOUT_ID));
+        assert_eq!(reserved_layout_id(&Type::Signer), Some(SIGNER_LAYOUT_ID));
         assert_eq!(
             reserved_layout_id(&Type::ImmutRef {
                 inner: crate::types::U64_TY

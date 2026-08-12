@@ -14,10 +14,15 @@ on:
         type: string
         required: false
         description: 'Name of the release, e.g. "Aptos Node Release v1.2.3":'
+permissions:
+  contents: read
 
 jobs:
   release-aptos-node:
     runs-on: 2cpu-gh-ubuntu24-x64
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
         with:

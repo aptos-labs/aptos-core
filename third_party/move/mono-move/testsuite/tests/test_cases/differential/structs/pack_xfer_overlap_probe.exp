@@ -27,7 +27,7 @@ fun consume_two(r0, r1): u64 {
 }
 
 fun trigger(r0): u64 {
-  slots: params(1), locals(0), temps(0), xfer(2)
+  slots: params(1), locals(0), temps(0), transfer(2)
     r0: u64
   code:
   L0:

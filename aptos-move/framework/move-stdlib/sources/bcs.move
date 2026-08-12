@@ -43,7 +43,11 @@ module std::bcs {
     }
 
     spec constant_serialized_size {
-        // TODO: temporary mockup.
         pragma opaque;
+        // Safely assumed to never abort: the native only aborts on type-layout
+        // construction limits, unreachable for realistic types (same rationale
+        // as `serialized_size` above). The result is left unconstrained; a
+        // precise per-type model would need prover-backend support.
+        aborts_if [abstract] false;
     }
 }

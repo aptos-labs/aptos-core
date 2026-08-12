@@ -157,6 +157,7 @@ fn collect_pointer_offsets(
         LayoutKind::Bool
         | LayoutKind::UnsignedInt
         | LayoutKind::SignedInt
-        | LayoutKind::Address => {},
+        | LayoutKind::Address
+        | LayoutKind::Signer => {},
     }
 }

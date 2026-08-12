@@ -20,7 +20,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     ambassador_impl_LayoutCache, ambassador_impl_WithRuntimeEnvironment, LayoutCache,
-    LayoutCacheEntry, Module, ModuleStorage, RuntimeEnvironment, Script, StructKey,
+    LayoutCacheEntry, LayoutCacheKey, Module, ModuleStorage, RuntimeEnvironment, Script,
     WithRuntimeEnvironment,
 };
 use move_vm_types::code::{ambassador_impl_ScriptCache, Code, ScriptCache};

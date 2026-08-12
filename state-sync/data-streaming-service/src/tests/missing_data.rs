@@ -23,6 +23,7 @@ use aptos_config::config::DataStreamingServiceConfig;
 use aptos_crypto::HashValue;
 use aptos_data_client::{global_summary::GlobalDataSummary, interface::ResponsePayload};
 use aptos_id_generator::U64IdGenerator;
+use aptos_storage_interface::StateKind;
 use aptos_storage_service_types::responses::CompleteDataRange;
 use aptos_types::{
     proof::{SparseMerkleRangeProof, TransactionInfoListWithProof},
@@ -79,7 +80,10 @@ fn create_missing_data_request_trivial_request_types() {
                 include_events: false,
             },
         ),
-        DataClientRequest::NumberOfStates(NumberOfStatesRequest { version: 0 }),
+        DataClientRequest::NumberOfStates(NumberOfStatesRequest {
+            version: 0,
+            state_kind: StateKind::MainState,
+        }),
         DataClientRequest::SubscribeTransactionOutputsWithProof(
             SubscribeTransactionOutputsWithProofRequest {
                 known_version: 0,
@@ -167,6 +171,7 @@ fn create_missing_data_request_state_values() {
             version,
             start_index,
             end_index,
+            state_kind: StateKind::MainState,
         });
 
     // Create the partial response payload
@@ -192,6 +197,7 @@ fn create_missing_data_request_state_values() {
             version,
             start_index: last_response_index + 1,
             end_index,
+            state_kind: StateKind::MainState,
         });
     assert_eq!(missing_data_request.unwrap(), expected_missing_data_request);
 
@@ -511,6 +517,7 @@ fn transform_state_values_stream_notifications() {
     let stream_request = StreamRequest::GetAllStates(GetAllStatesRequest {
         version,
         start_index,
+        state_kind: StateKind::MainState,
     });
 
     // Create a global data summary with a single state range
@@ -588,7 +595,7 @@ fn transform_state_values_stream_notifications() {
         .unwrap();
     assert_eq!(
         data_notification.unwrap().data_payload,
-        DataPayload::StateValuesWithProof(state_value_chunk_with_proof)
+        DataPayload::StateValuesWithProof(StateKind::MainState, state_value_chunk_with_proof)
     );
 
     // Verify the tracked stream indices
@@ -608,6 +615,7 @@ fn transform_state_values_stream_notifications() {
             version,
             start_index: start_index + 1,
             end_index: number_of_states - 1,
+            state_kind: StateKind::MainState,
         });
     let _ = stream_engine
         .transform_client_response_into_notification(

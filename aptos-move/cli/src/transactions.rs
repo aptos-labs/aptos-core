@@ -31,7 +31,6 @@ use aptos_types::{
     },
     write_set::WriteSet,
 };
-use aptos_vm::data_cache::AsMoveResolver;
 use aptos_vm_types::output::VMOutput;
 use clap::Parser;
 #[cfg(test)]
@@ -196,13 +195,9 @@ fn local_write_set_to_json(
     serialize_as_json(&changes)
 }
 
-fn local_materialize_output(
-    state_view: &impl aptos_types::state_store::StateView,
-    vm_output: VMOutput,
-) -> CliTypedResult<TransactionOutput> {
-    let resolver = state_view.as_move_resolver();
+fn local_materialize_output(vm_output: VMOutput) -> CliTypedResult<TransactionOutput> {
     vm_output
-        .try_materialize_into_transaction_output(&resolver)
+        .into_transaction_output()
         .map_err(|err| CliError::UnexpectedError(err.to_string()))
 }
 
@@ -452,7 +447,7 @@ impl TxnOptions {
         };
         if show_details {
             let state_view = debugger.state_view_at_version(version);
-            let transaction_output = local_materialize_output(&state_view, vm_output)?;
+            let transaction_output = local_materialize_output(vm_output)?;
             summary.events = Some(local_contract_events_to_json(
                 &state_view,
                 transaction_output.events(),

@@ -1,0 +1,28 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/ghost_field_map_equality.move:60:9
+   │
+60 │         ensures result_1 != result_2; // FAILS: they are Move-equal
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/ghost_field_map_equality.move:47: mk_diverged_neq
+   =         v1 = <redacted>
+   =     at tests/sources/functional/ghost_field_map_equality.move:48: mk_diverged_neq
+   =         v2 = <redacted>
+   =     at tests/sources/functional/ghost_field_map_equality.move:50: mk_diverged_neq
+   =         v1 = <redacted>
+   =     at tests/sources/functional/ghost_field_map_equality.move:51: mk_diverged_neq
+   =         v2 = <redacted>
+   =     at tests/sources/functional/ghost_field_map_equality.move:53: mk_diverged_neq
+   =         m1 = <redacted>
+   =     at tests/sources/functional/ghost_field_map_equality.move:54: mk_diverged_neq
+   =         m2 = <redacted>
+   =     at tests/sources/functional/ghost_field_map_equality.move:55: mk_diverged_neq
+   =         m1 = <redacted>
+   =     at tests/sources/functional/ghost_field_map_equality.move:56: mk_diverged_neq
+   =         m2 = <redacted>
+   =     at tests/sources/functional/ghost_field_map_equality.move:57: mk_diverged_neq
+   =     at tests/sources/functional/ghost_field_map_equality.move:46: mk_diverged_neq
+   =         result_1 = <redacted>
+   =         result_2 = <redacted>
+   =     at tests/sources/functional/ghost_field_map_equality.move:60: mk_diverged_neq (spec)

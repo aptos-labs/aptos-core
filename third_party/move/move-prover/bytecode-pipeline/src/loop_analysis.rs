@@ -6,7 +6,7 @@
 use crate::{memory_instrumentation::Instrumenter, options::ProverOptions};
 use move_binary_format::file_format::CodeOffset;
 use move_model::{
-    ast::{self},
+    ast::{self, QuantKind},
     exp_generator::ExpGenerator,
     model::FunctionEnv,
     ty::{PrimitiveType, Type},
@@ -34,7 +34,7 @@ impl LoopAnalysisProcessor {
 impl FunctionTargetProcessor for LoopAnalysisProcessor {
     fn process(
         &self,
-        _targets: &mut FunctionTargetsHolder,
+        targets: &mut FunctionTargetsHolder,
         func_env: &FunctionEnv,
         data: FunctionData,
         _scc_opt: Option<&[FunctionEnv]>,
@@ -42,7 +42,7 @@ impl FunctionTargetProcessor for LoopAnalysisProcessor {
         if !func_env.is_compiled() {
             return data;
         }
-        match fat_loop::build_loop_info_for_spec(&FunctionTarget::new(func_env, &data)) {
+        match fat_loop::build_loop_info_for_spec(&FunctionTarget::new(func_env, &data), targets) {
             Ok((loops_with_invariants, loops_for_unrolling)) => {
                 let mut data = Self::transform(func_env, data, &loops_with_invariants);
                 for (header_label, unrolling_instruction) in loops_for_unrolling.fat_loops {
@@ -173,6 +173,44 @@ impl LoopAnalysisProcessor {
                                 vec![builder.mk_temporary(*idx)],
                             );
                             builder.emit_with(move |id| Bytecode::Prop(id, PropKind::Assume, exp));
+                        }
+
+                        // havoc all memory the loop body may modify, so the
+                        // loop-exit path does not retain pre-loop memory; the
+                        // frame is re-established by user loop invariants
+                        if !options.for_interpretation {
+                            for mem in &loop_info.spec_info().mem_targets {
+                                let mem = mem.clone();
+                                builder.emit_with(|attr_id| {
+                                    Bytecode::Call(
+                                        attr_id,
+                                        vec![],
+                                        Operation::HavocGlobal(
+                                            mem.module_id,
+                                            mem.id,
+                                            mem.inst.clone(),
+                                        ),
+                                        vec![],
+                                        None,
+                                    )
+                                });
+                                // re-assume well-formedness of the memory contents
+                                if let Some(exp) = builder.mk_inst_mem_quant_opt(
+                                    QuantKind::Forall,
+                                    &mem,
+                                    &mut |val| {
+                                        Some(builder.mk_call(
+                                            &Type::Primitive(PrimitiveType::Bool),
+                                            ast::Operation::WellFormed,
+                                            vec![val],
+                                        ))
+                                    },
+                                ) {
+                                    builder.emit_with(move |id| {
+                                        Bytecode::Prop(id, PropKind::Assume, exp)
+                                    });
+                                }
+                            }
                         }
 
                         // trace implicitly reassigned variables after havocking

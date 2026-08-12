@@ -985,10 +985,26 @@ module aptos_framework::coin {
         coin_store.frozen = false;
     }
 
-    /// Upgrade total supply to use a parallelizable implementation if it is
-    /// available.
-    public entry fun upgrade_supply<CoinType>(_account: &signer) {
-        abort error::invalid_state(ECOIN_SUPPLY_UPGRADE_NOT_SUPPORTED)
+    /// Upgrade total supply to use a non-parallelizable implementation.
+    public entry fun upgrade_supply<CoinType>(account: &signer) {
+        system_addresses::assert_aptos_framework(account);
+        let account_addr = signer::address_of(account);
+
+        // Only coin creators can upgrade total supply.
+        assert!(
+            coin_address<CoinType>() == account_addr,
+            error::invalid_argument(ECOIN_INFO_ADDRESS_MISMATCH),
+        );
+
+        let maybe_supply = &mut borrow_global_mut<CoinInfo<CoinType>>(account_addr).supply;
+        if (maybe_supply.is_some()) {
+            let supply = maybe_supply.borrow_mut();
+            if (optional_aggregator::is_parallelizable(supply)) {
+                optional_aggregator::switch(supply);
+            }
+        }
+
+        // abort error::invalid_state(ECOIN_SUPPLY_UPGRADE_NOT_SUPPORTED)
     }
 
     /// Creates a new Coin with given `CoinType` and returns minting/freezing/burning capabilities.

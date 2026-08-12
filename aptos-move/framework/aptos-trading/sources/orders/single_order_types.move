@@ -213,6 +213,12 @@ module aptos_trading::single_order_types {
         self.order.order_request.remaining_size += size;
     }
 
+    spec increase_remaining_size_from_state {
+        aborts_if self.order.order_request.remaining_size + size > MAX_U64;
+        ensures self.order.order_request.remaining_size
+            == old(self.order.order_request.remaining_size) + size;
+    }
+
     public fun decrease_remaining_size_from_state<M: store + copy + drop>(
         self: &mut OrderWithState<M>, size: u64
     ) {

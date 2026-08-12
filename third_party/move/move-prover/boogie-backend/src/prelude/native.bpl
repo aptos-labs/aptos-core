@@ -9,8 +9,10 @@
 {% macro vector_module(instance) %}
 {%- set S = "'" ~ instance.suffix ~ "'" -%}
 {%- set T = instance.name -%}
-{%- if options.native_equality -%}
-{# Whole vector has native equality #}
+{%- if options.native_equality and instance.has_native_equality -%}
+{# Whole vector has native equality: extensional theory AND canonically
+   represented elements (ghost-bearing element types must compare
+   element-wise so ghosts are excluded). #}
 function {:inline} $IsEqual'vec{{S}}'(v1: Vec ({{T}}), v2: Vec ({{T}})): bool {
     v1 == v2
 }
@@ -386,40 +388,117 @@ axiom (
 {%- set K = instance.0.name -%}
 {%- set V = instance.1.name -%}
 {%- set Type = impl.struct_name -%}
-{%- set Self = "Table int (" ~ V ~ ")" -%}
+{%- set Table = "Table int (" ~ V ~ ")" -%}
 {%- set S = "'" ~ instance.0.suffix ~ "_" ~ instance.1.suffix ~ "'" -%}
 {%- set SK = "'" ~ instance.0.suffix ~ "'" -%}
 {%- set SV = "'" ~ instance.1.suffix ~ "'" -%}
 {%- set ENC = "$EncodeKey'" ~ instance.0.suffix ~ "'" -%}
 
-{%- if options.native_equality -%}
+{%- if impl.has_ghost_carrier %}
+{# Ghost carrier: the map value wraps the table so declared ghost fields have
+   constructor arguments to live in; `Self` is the carrier (named per
+   `boogie_struct_name`). Template plumbing (all expand to nothing / identity
+   for ghost-less maps, keeping their output byte-identical):
+   - `U`: content unwrap suffix applied to map-typed values at raw table ops;
+   - `W1`/`W2`: wrap a table expression into a carrier with the `$gbN` ghost
+     values of the enclosing rebuild site;
+   - `GH`/`GBD`: havoc statements / local declarations for the `$gbN`s
+     (mutation gives the map fresh, unconstrained ghost state; validity of
+     outstanding iterators becomes UNDETERMINED — never provable, but not
+     provably false either — so uses gated on validity fail closed until a
+     new iterator re-establishes it);
+   - `TND`: local declarations for blocks using a fresh raw table `t_new`
+     (`t_new` stays a raw table — it is wrapped at each use site). #}
+{%- set Self = impl.struct_base ~ S -%}
+{%- set U = "->$$t" -%}
+{%- set W1 = Self ~ "(" -%}
+{%- set W2 = impl.gb_args ~ ")" -%}
+{%- set SW1 = Self ~ "(" -%}
+{%- set SW2 = impl.ghost_preserve_args ~ ")" -%}
+{%- set SZ2 = impl.ghost_zero_args ~ ")" -%}
+{%- set GH = impl.gb_havoc -%}
+{%- set GBD = impl.gb_decls -%}
+{%- set TND = "var t: " ~ Self ~ "; var t_new: " ~ Table ~ ";" ~ GBD -%}
+{#- The raw-table selector is `$$t`: Move field selectors render as `$<name>`,
+    so a `$$`-prefixed name cannot collide with any declared ghost field. -#}
+datatype {{Self}} {
+    {{Self}}($$t: {{Table}}{%- for g in impl.ghost_args %}, {{g.sel}}: {{g.ty}}{%- endfor %})
+}
+{%- else %}
+{%- set Self = Table -%}
+{%- set U = "" -%}
+{%- set W1 = "" -%}
+{%- set W2 = "" -%}
+{%- set SW1 = "" -%}
+{%- set SW2 = "" -%}
+{%- set SZ2 = "" -%}
+{%- set GH = "" -%}
+{%- set GBD = "" -%}
+{%- set TND = "var t, t_new: " ~ Self ~ ";" -%}
+{%- endif %}
+
+{#- Content accessors: value-level functions compare/validate the table
+    content; carrier ghosts are excluded from equality (Move equality is the
+    quotient over runtime state) and `num` ghosts add no validity constraint. -#}
+{%- if impl.has_ghost_carrier -%}
+{%- set c1 = "t1->$$t" -%}{%- set c2 = "t2->$$t" -%}{%- set c = "t->$$t" -%}
+{%- else -%}
+{%- set c1 = "t1" -%}{%- set c2 = "t2" -%}{%- set c = "t" -%}
+{%- endif -%}
+{#- A ghost-bearing VALUE type must compare with `$IsEqual` rather than raw
+    `==`, which would include its ghost constructor arguments. (Carrier
+    ghosts on the map itself are excluded via the `c1`/`c2` unwrap above.) -#}
+{%- if instance.1.has_ghost -%}
+{%- set VEQ = "$IsEqual'" ~ instance.1.suffix ~ "'(GetTable(" ~ c1 ~ ", k), GetTable(" ~ c2 ~ ", k))" -%}
+{%- else -%}
+{%- set VEQ = "GetTable(" ~ c1 ~ ", k) == GetTable(" ~ c2 ~ ", k)" -%}
+{%- endif -%}
+{%- if options.native_equality and not impl.has_ghost_carrier and not instance.1.has_ghost -%}
 function $IsEqual'{{Type}}{{S}}'(t1: {{Self}}, t2: {{Self}}): bool {
     t1 == t2
 }
 {%- else -%}
 function $IsEqual'{{Type}}{{S}}'(t1: {{Self}}, t2: {{Self}}): bool {
-    LenTable(t1) == LenTable(t2) &&
-    (forall k: int :: ContainsTable(t1, k) <==> ContainsTable(t2, k)) &&
-    (forall k: int :: ContainsTable(t1, k) ==> GetTable(t1, k) == GetTable(t2, k)) &&
-    (forall k: int :: ContainsTable(t2, k) ==> GetTable(t1, k) == GetTable(t2, k))
+    LenTable({{c1}}) == LenTable({{c2}}) &&
+    (forall k: int :: ContainsTable({{c1}}, k) <==> ContainsTable({{c2}}, k)) &&
+    (forall k: int :: ContainsTable({{c1}}, k) ==> {{VEQ}}) &&
+    (forall k: int :: ContainsTable({{c2}}, k) ==> {{VEQ}})
 }
 {%- endif %}
 
 // Not inlined.
 function $IsValid'{{Type}}{{S}}'(t: {{Self}}): bool {
-    $IsValid'u64'(LenTable(t)) &&
-    (forall i: int:: ContainsTable(t, i) ==> $IsValid{{SV}}(GetTable(t, i)))
+    $IsValid'u64'(LenTable({{c}})) &&
+    (forall i: int:: ContainsTable({{c}}, i) ==> $IsValid{{SV}}(GetTable({{c}}, i)))
 }
 
 {%- if impl.fun_new != "" %}
-procedure {:inline 2} {{impl.fun_new}}{{S}}() returns (v: {{Self}}) {
-    v := EmptyTable();
+procedure {:inline 2} {{impl.fun_new}}{{S}}() returns (v: {{Self}}) {{"{"}}{{GBD}}
+    {{GH}}v := {{W1}}EmptyTable(){{W2}};
+}
+{%- endif %}
+
+{%- if impl.fun_new_with_config != "" and not instance.1.is_bv %}
+// Empty map with degree configuration. Aborts when a nonzero degree is outside its
+// valid range (INNER_MIN_DEGREE=4 / LEAF_MIN_DEGREE=3 / MAX_DEGREE=4096, mirroring
+// big_ordered_map constants). ASSUMPTION: the implementation's size-validation abort
+// (key/entry serialized size exceeding node limits) is presumed not to fire.
+procedure {:inline 2} {{impl.fun_new_with_config}}{{S}}(inner_max_degree: int, leaf_max_degree: int, reuse_slots: bool) returns (v: {{Self}}) {{"{"}}{{GBD}}
+    if (inner_max_degree != 0 && (inner_max_degree < 4 || inner_max_degree > 4096)) {
+        call $ExecFailureAbort();
+        return;
+    }
+    if (leaf_max_degree != 0 && (leaf_max_degree < 3 || leaf_max_degree > 4096)) {
+        call $ExecFailureAbort();
+        return;
+    }
+    {{GH}}v := {{W1}}EmptyTable(){{W2}};
 }
 {%- endif %}
 
 {%- if impl.fun_destroy_empty != "" %}
 procedure {:inline 2} {{impl.fun_destroy_empty}}{{S}}(t: {{Self}}) {
-    if (LenTable(t) != 0) {
+    if (LenTable(t{{U}}) != 0) {
         call $Abort($StdError(1/*INVALID_STATE*/, 102/*ENOT_EMPTY*/));
     }
 }
@@ -427,19 +506,19 @@ procedure {:inline 2} {{impl.fun_destroy_empty}}{{S}}(t: {{Self}}) {
 
 {%- if impl.fun_len != "" %}
 procedure {:inline 2} {{impl.fun_len}}{{S}}(t: ({{Self}})) returns (l: int) {
-    l := LenTable(t);
+    l := LenTable(t{{U}});
 }
 {%- endif %}
 
 {%- if impl.fun_is_empty != "" %}
 procedure {:inline 2} {{impl.fun_is_empty}}{{S}}(t: ({{Self}})) returns (r: bool) {
-    r := LenTable(t) == 0;
+    r := LenTable(t{{U}}) == 0;
 }
 {%- endif %}
 
 {%- if impl.fun_has_key != "" %}
 procedure {:inline 2} {{impl.fun_has_key}}{{S}}(t: ({{Self}}), k: {{K}}) returns (r: bool) {
-    r := ContainsTable(t, {{ENC}}(k));
+    r := ContainsTable(t{{U}}, {{ENC}}(k));
 }
 {%- endif %}
 
@@ -459,8 +538,8 @@ procedure {:inline 2} {{impl.fun_has_key}}{{S}}(t: ({{Self}}), k: {{K}}) returns
 procedure {:inline 2} {{impl.fun_get}}{{S}}(t: ({{Self}}), k: {{K}}) returns (result: $1_option_Option{{SV}}) {
     var enc_k: int;
     enc_k := {{ENC}}(k);
-    if (ContainsTable(t, enc_k)) {
-        result := $1_option_Option{{SV}}_Some(GetTable(t, enc_k));
+    if (ContainsTable(t{{U}}, enc_k)) {
+        result := $1_option_Option{{SV}}_Some(GetTable(t{{U}}, enc_k));
     } else {
         result := $1_option_Option{{SV}}_None();
     }
@@ -470,7 +549,7 @@ procedure {:inline 2} {{impl.fun_get}}{{S}}(t: ({{Self}}), k: {{K}}) returns (re
 {%- if impl.fun_borrow_front != "" and impl.fun_spec_has_key != "" and impl.fun_spec_get != "" and instance.0.cmp_available and not instance.1.is_bv %}
 // Smallest key under `cmp::compare` ordering. Aborts when the map is empty.
 procedure {:inline 2} {{impl.fun_borrow_front}}{{S}}(t: {{Self}}) returns (k: {{K}}, v: {{V}}) {
-    if (LenTable(t) == 0) {
+    if (LenTable(t{{U}}) == 0) {
         call $ExecFailureAbort();
         return;
     }
@@ -488,7 +567,7 @@ procedure {:inline 2} {{impl.fun_borrow_front}}{{S}}(t: {{Self}}) returns (k: {{
 {%- if impl.fun_borrow_back != "" and impl.fun_spec_has_key != "" and impl.fun_spec_get != "" and instance.0.cmp_available and not instance.1.is_bv %}
 // Largest key under `cmp::compare` ordering. Aborts when the map is empty.
 procedure {:inline 2} {{impl.fun_borrow_back}}{{S}}(t: {{Self}}) returns (k: {{K}}, v: {{V}}) {
-    if (LenTable(t) == 0) {
+    if (LenTable(t{{U}}) == 0) {
         call $ExecFailureAbort();
         return;
     }
@@ -496,6 +575,38 @@ procedure {:inline 2} {{impl.fun_borrow_back}}{{S}}(t: {{Self}}) returns (k: {{K
     assume $IsValid'{{instance.1.suffix}}'(v);
     assume {{impl.fun_spec_has_key}}{{S}}(t, k);
     assume v == {{impl.fun_spec_get}}{{S}}(t, k);
+    assume (forall other: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, other)} $IsValid'{{instance.0.suffix}}'(other) ==>
+        !$IsEqual'{{instance.0.suffix}}'(other, k) ==>
+        {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
+            $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Greater());
+}
+{%- endif %}
+
+{%- if impl.fun_front_key != "" and impl.fun_spec_has_key != "" and instance.0.cmp_available and not instance.1.is_bv %}
+// Smallest key under `cmp::compare` ordering. Aborts when the map is empty.
+procedure {:inline 2} {{impl.fun_front_key}}{{S}}(t: {{Self}}) returns (k: {{K}}) {
+    if (LenTable(t{{U}}) == 0) {
+        call $ExecFailureAbort();
+        return;
+    }
+    assume $IsValid'{{instance.0.suffix}}'(k);
+    assume {{impl.fun_spec_has_key}}{{S}}(t, k);
+    assume (forall other: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, other)} $IsValid'{{instance.0.suffix}}'(other) ==>
+        !$IsEqual'{{instance.0.suffix}}'(other, k) ==>
+        {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
+            $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Less());
+}
+{%- endif %}
+
+{%- if impl.fun_back_key != "" and impl.fun_spec_has_key != "" and instance.0.cmp_available and not instance.1.is_bv %}
+// Largest key under `cmp::compare` ordering. Aborts when the map is empty.
+procedure {:inline 2} {{impl.fun_back_key}}{{S}}(t: {{Self}}) returns (k: {{K}}) {
+    if (LenTable(t{{U}}) == 0) {
+        call $ExecFailureAbort();
+        return;
+    }
+    assume $IsValid'{{instance.0.suffix}}'(k);
+    assume {{impl.fun_spec_has_key}}{{S}}(t, k);
     assume (forall other: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, other)} $IsValid'{{instance.0.suffix}}'(other) ==>
         !$IsEqual'{{instance.0.suffix}}'(other, k) ==>
         {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
@@ -507,9 +618,9 @@ procedure {:inline 2} {{impl.fun_borrow_back}}{{S}}(t: {{Self}}) returns (k: {{K
 // Remove and return the smallest entry under `cmp::compare` ordering. Aborts when the map is empty.
 procedure {:inline 2} {{impl.fun_pop_front}}{{S}}(m: $Mutation ({{Self}}))
 returns (k: {{K}}, v: {{V}}, m': $Mutation ({{Self}})) {
-    var t: {{Self}};
+    var t: {{Self}};{{GBD}}
     t := $Dereference(m);
-    if (LenTable(t) == 0) {
+    if (LenTable(t{{U}}) == 0) {
         call $ExecFailureAbort();
         return;
     }
@@ -521,7 +632,7 @@ returns (k: {{K}}, v: {{V}}, m': $Mutation ({{Self}})) {
         !$IsEqual'{{instance.0.suffix}}'(other, k) ==>
         {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
             $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Less());
-    m' := $UpdateMutation(m, RemoveTable(t, {{ENC}}(k)));
+    {{GH}}m' := $UpdateMutation(m, {{W1}}RemoveTable(t{{U}}, {{ENC}}(k)){{W2}});
 }
 {%- endif %}
 
@@ -529,9 +640,9 @@ returns (k: {{K}}, v: {{V}}, m': $Mutation ({{Self}})) {
 // Remove and return the largest entry under `cmp::compare` ordering. Aborts when the map is empty.
 procedure {:inline 2} {{impl.fun_pop_back}}{{S}}(m: $Mutation ({{Self}}))
 returns (k: {{K}}, v: {{V}}, m': $Mutation ({{Self}})) {
-    var t: {{Self}};
+    var t: {{Self}};{{GBD}}
     t := $Dereference(m);
-    if (LenTable(t) == 0) {
+    if (LenTable(t{{U}}) == 0) {
         call $ExecFailureAbort();
         return;
     }
@@ -543,7 +654,7 @@ returns (k: {{K}}, v: {{V}}, m': $Mutation ({{Self}})) {
         !$IsEqual'{{instance.0.suffix}}'(other, k) ==>
         {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
             $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Greater());
-    m' := $UpdateMutation(m, RemoveTable(t, {{ENC}}(k)));
+    {{GH}}m' := $UpdateMutation(m, {{W1}}RemoveTable(t{{U}}, {{ENC}}(k)){{W2}});
 }
 {%- endif %}
 
@@ -602,7 +713,8 @@ procedure {:inline 2} {{impl.fun_next_key}}{{S}}(t: {{Self}}, key: {{K}}) return
 // is split into two implications so each direction gets a legal trigger
 // ($ContainsVec cannot be a pattern: its inline body is an `exists`).
 procedure {:inline 2} {{impl.fun_keys}}{{S}}(t: ({{Self}})) returns (result: Vec ({{K}})) {
-    assume LenVec(result) == LenTable(t);
+    assume $IsValid'vec'{{instance.0.suffix}}''(result);
+    assume LenVec(result) == LenTable(t{{U}});
     assume (forall i: int :: {ReadVec(result, i)} InRangeVec(result, i) ==>
         {{impl.fun_spec_has_key}}{{S}}(t, ReadVec(result, i)));
     assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
@@ -610,6 +722,21 @@ procedure {:inline 2} {{impl.fun_keys}}{{S}}(t: ({{Self}})) returns (result: Vec
     assume (forall i: int, j: int :: {ReadVec(result, i), ReadVec(result, j)}
         InRangeVec(result, i) ==> InRangeVec(result, j) ==> i != j ==>
         !$IsEqual'{{instance.0.suffix}}'(ReadVec(result, i), ReadVec(result, j)));
+{%- if instance.0.cmp_available %}
+    // Keys are returned in ascending `cmp::compare` order.
+    assume (forall i: int, j: int :: {ReadVec(result, i), ReadVec(result, j)}
+        InRangeVec(result, i) ==> InRangeVec(result, j) ==> i < j ==>
+        $1_cmp_$compare'{{instance.0.suffix}}'(ReadVec(result, i), ReadVec(result, j)) == $1_cmp_Ordering_Less());
+{%- endif %}
+}
+{%- endif %}
+
+{%- if impl.fun_to_ordered_map != "" and not instance.1.is_bv %}
+// Convert to another intrinsic-map type with identical contents. Never aborts.
+// Both map types share the `Table int V` representation and the per-K `$EncodeKey`,
+// so the conversion is the identity at this level.
+procedure {:inline 2} {{impl.fun_to_ordered_map}}{{S}}(t: ({{Self}})) returns (result: ({{Table}})) {
+    result := t{{U}};
 }
 {%- endif %}
 
@@ -617,7 +744,7 @@ procedure {:inline 2} {{impl.fun_keys}}{{S}}(t: ({{Self}})) returns (result: Vec
 // All values in the map as a `vector<V>`. Never aborts. Only length is promised;
 // callers needing value/key correspondence should use `to_vec_pair`.
 procedure {:inline 2} {{impl.fun_values}}{{S}}(t: ({{Self}})) returns (result: Vec ({{V}})) {
-    assume LenVec(result) == LenTable(t);
+    assume LenVec(result) == LenTable(t{{U}});
 }
 {%- endif %}
 
@@ -626,8 +753,10 @@ procedure {:inline 2} {{impl.fun_values}}{{S}}(t: ({{Self}})) returns (result: V
 // Key-vector membership mirrors `fun_keys` (split biconditional, see there);
 // value-vector is length-only.
 procedure {:inline 2} {{impl.fun_to_vec_pair}}{{S}}(t: ({{Self}})) returns (result_keys: Vec ({{K}}), result_values: Vec ({{V}})) {
-    assume LenVec(result_keys) == LenTable(t);
-    assume LenVec(result_values) == LenTable(t);
+    assume $IsValid'vec'{{instance.0.suffix}}''(result_keys);
+    assume $IsValid'vec'{{instance.1.suffix}}''(result_values);
+    assume LenVec(result_keys) == LenTable(t{{U}});
+    assume LenVec(result_values) == LenTable(t{{U}});
     assume (forall i: int :: {ReadVec(result_keys, i)} InRangeVec(result_keys, i) ==>
         {{impl.fun_spec_has_key}}{{S}}(t, ReadVec(result_keys, i)));
     assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
@@ -635,6 +764,12 @@ procedure {:inline 2} {{impl.fun_to_vec_pair}}{{S}}(t: ({{Self}})) returns (resu
     assume (forall i: int, j: int :: {ReadVec(result_keys, i), ReadVec(result_keys, j)}
         InRangeVec(result_keys, i) ==> InRangeVec(result_keys, j) ==> i != j ==>
         !$IsEqual'{{instance.0.suffix}}'(ReadVec(result_keys, i), ReadVec(result_keys, j)));
+{%- if instance.0.cmp_available %}
+    // Keys are returned in ascending `cmp::compare` order.
+    assume (forall i: int, j: int :: {ReadVec(result_keys, i), ReadVec(result_keys, j)}
+        InRangeVec(result_keys, i) ==> InRangeVec(result_keys, j) ==> i < j ==>
+        $1_cmp_$compare'{{instance.0.suffix}}'(ReadVec(result_keys, i), ReadVec(result_keys, j)) == $1_cmp_Ordering_Less());
+{%- endif %}
 }
 {%- endif %}
 
@@ -651,7 +786,7 @@ procedure {:inline 2} {{impl.fun_new_from}}{{S}}(keys_arg: Vec ({{K}}), values_a
         call $ExecFailureAbort();
         return;
     }
-    assume LenTable(result) == LenVec(keys_arg);
+    assume LenTable(result{{U}}) == LenVec(keys_arg);
     assume (forall i: int :: {ReadVec(keys_arg, i)} InRangeVec(keys_arg, i) ==>
         {{impl.fun_spec_has_key}}{{S}}(result, ReadVec(keys_arg, i)));
     assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(result, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
@@ -668,7 +803,7 @@ procedure {:inline 2} {{impl.fun_new_from}}{{S}}(keys_arg: Vec ({{K}}), values_a
 // spec_get(t, k) == spec_get(t_new, k)` shape would violate trigger discipline).
 procedure {:inline 2} {{impl.fun_add_all}}{{S}}(m: $Mutation ({{Self}}), keys_arg: Vec ({{K}}), values_arg: Vec ({{V}}))
 returns (m': $Mutation ({{Self}})) {
-    var t, t_new: {{Self}};
+    {{TND}}
     t := $Dereference(m);
     if (LenVec(keys_arg) != LenVec(values_arg)) {
         call $ExecFailureAbort();
@@ -683,19 +818,19 @@ returns (m': $Mutation ({{Self}})) {
         call $ExecFailureAbort();
         return;
     }
-    assume LenTable(t_new) == LenTable(t) + LenVec(keys_arg);
-    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k)} {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t_new, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
-        ({{impl.fun_spec_has_key}}{{S}}(t, k) ==> {{impl.fun_spec_has_key}}{{S}}(t_new, k)));
+    assume LenTable(t_new) == LenTable(t{{U}}) + LenVec(keys_arg);
+    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k)} {{"{"}}{{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
+        ({{impl.fun_spec_has_key}}{{S}}(t, k) ==> {{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k)));
     assume (forall i: int :: {ReadVec(keys_arg, i)} i >= 0 && i < LenVec(keys_arg) ==>
-        {{impl.fun_spec_has_key}}{{S}}(t_new, ReadVec(keys_arg, i)));
-    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t_new, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
-        {{impl.fun_spec_has_key}}{{S}}(t_new, k) ==>
+        {{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, ReadVec(keys_arg, i)));
+    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
+        {{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k) ==>
         ({{impl.fun_spec_has_key}}{{S}}(t, k)
          || (exists i: int :: i >= 0 && i < LenVec(keys_arg)
              && $IsEqual'{{instance.0.suffix}}'(k, ReadVec(keys_arg, i)))));
     assume (forall i: int :: {ReadVec(keys_arg, i)} i >= 0 && i < LenVec(keys_arg) ==>
-        {{impl.fun_spec_get}}{{S}}(t_new, ReadVec(keys_arg, i)) == ReadVec(values_arg, i));
-    m' := $UpdateMutation(m, t_new);
+        {{impl.fun_spec_get}}{{S}}({{W1}}t_new{{W2}}, ReadVec(keys_arg, i)) == ReadVec(values_arg, i));
+    {{GH}}m' := $UpdateMutation(m, {{W1}}t_new{{W2}});
 }
 {%- endif %}
 
@@ -708,7 +843,7 @@ returns (m': $Mutation ({{Self}})) {
 // trigger-unsafe `forall k :: spec_get` shape).
 procedure {:inline 2} {{impl.fun_upsert_all}}{{S}}(m: $Mutation ({{Self}}), keys_arg: Vec ({{K}}), values_arg: Vec ({{V}}))
 returns (m': $Mutation ({{Self}})) {
-    var t, t_new: {{Self}};
+    {{TND}}
     t := $Dereference(m);
     if (LenVec(keys_arg) != LenVec(values_arg)) {
         call $ExecFailureAbort();
@@ -716,22 +851,22 @@ returns (m': $Mutation ({{Self}})) {
     }
     // Exact length needs a distinct-count over `keys_arg`; `>= LenVec(keys_arg)`
     // would be unsound under duplicate input keys, so only these bounds hold.
-    assume LenTable(t_new) >= LenTable(t);
-    assume LenTable(t_new) <= LenTable(t) + LenVec(keys_arg);
-    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k)} {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t_new, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
-        ({{impl.fun_spec_has_key}}{{S}}(t, k) ==> {{impl.fun_spec_has_key}}{{S}}(t_new, k)));
+    assume LenTable(t_new) >= LenTable(t{{U}});
+    assume LenTable(t_new) <= LenTable(t{{U}}) + LenVec(keys_arg);
+    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k)} {{"{"}}{{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
+        ({{impl.fun_spec_has_key}}{{S}}(t, k) ==> {{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k)));
     assume (forall i: int :: {ReadVec(keys_arg, i)} i >= 0 && i < LenVec(keys_arg) ==>
-        {{impl.fun_spec_has_key}}{{S}}(t_new, ReadVec(keys_arg, i)));
-    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t_new, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
-        {{impl.fun_spec_has_key}}{{S}}(t_new, k) ==>
+        {{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, ReadVec(keys_arg, i)));
+    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
+        {{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k) ==>
         ({{impl.fun_spec_has_key}}{{S}}(t, k)
          || (exists i: int :: i >= 0 && i < LenVec(keys_arg)
              && $IsEqual'{{instance.0.suffix}}'(k, ReadVec(keys_arg, i)))));
     assume (forall i: int :: {ReadVec(keys_arg, i)} i >= 0 && i < LenVec(keys_arg) ==>
         (forall j: int :: {ReadVec(keys_arg, j)} j > i && j < LenVec(keys_arg) ==>
             !$IsEqual'{{instance.0.suffix}}'(ReadVec(keys_arg, j), ReadVec(keys_arg, i))) ==>
-        {{impl.fun_spec_get}}{{S}}(t_new, ReadVec(keys_arg, i)) == ReadVec(values_arg, i));
-    m' := $UpdateMutation(m, t_new);
+        {{impl.fun_spec_get}}{{S}}({{W1}}t_new{{W2}}, ReadVec(keys_arg, i)) == ReadVec(values_arg, i));
+    {{GH}}m' := $UpdateMutation(m, {{W1}}t_new{{W2}});
 }
 {%- endif %}
 
@@ -742,15 +877,15 @@ returns (m': $Mutation ({{Self}})) {
 // modeled — would require `forall k :: spec_get(t_new, k) == ...` shape.
 procedure {:inline 2} {{impl.fun_append}}{{S}}(m: $Mutation ({{Self}}), other: ({{Self}}))
 returns (m': $Mutation ({{Self}})) {
-    var t, t_new: {{Self}};
+    {{TND}}
     t := $Dereference(m);
-    assume LenTable(t_new) >= LenTable(t);
-    assume LenTable(t_new) >= LenTable(other);
-    assume LenTable(t_new) <= LenTable(t) + LenTable(other);
-    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t_new, k)} {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k)} {{"{"}}{{impl.fun_spec_has_key}}{{S}}(other, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
-        ({{impl.fun_spec_has_key}}{{S}}(t_new, k) <==>
+    assume LenTable(t_new) >= LenTable(t{{U}});
+    assume LenTable(t_new) >= LenTable(other{{U}});
+    assume LenTable(t_new) <= LenTable(t{{U}}) + LenTable(other{{U}});
+    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k)} {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k)} {{"{"}}{{impl.fun_spec_has_key}}{{S}}(other, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
+        ({{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k) <==>
             ({{impl.fun_spec_has_key}}{{S}}(t, k) || {{impl.fun_spec_has_key}}{{S}}(other, k))));
-    m' := $UpdateMutation(m, t_new);
+    {{GH}}m' := $UpdateMutation(m, {{W1}}t_new{{W2}});
 }
 {%- endif %}
 
@@ -760,18 +895,18 @@ returns (m': $Mutation ({{Self}})) {
 // per-key `spec_get(t_new, k) == spec_get(t\|other, k)` mapping is not modeled.
 procedure {:inline 2} {{impl.fun_append_disjoint}}{{S}}(m: $Mutation ({{Self}}), other: ({{Self}}))
 returns (m': $Mutation ({{Self}})) {
-    var t, t_new: {{Self}};
+    {{TND}}
     t := $Dereference(m);
     if ((exists k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k), {{impl.fun_spec_has_key}}{{S}}(other, k)} $IsValid'{{instance.0.suffix}}'(k)
             && {{impl.fun_spec_has_key}}{{S}}(t, k) && {{impl.fun_spec_has_key}}{{S}}(other, k))) {
         call $ExecFailureAbort();
         return;
     }
-    assume LenTable(t_new) == LenTable(t) + LenTable(other);
-    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t_new, k)} {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k)} {{"{"}}{{impl.fun_spec_has_key}}{{S}}(other, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
-        ({{impl.fun_spec_has_key}}{{S}}(t_new, k) <==>
+    assume LenTable(t_new) == LenTable(t{{U}}) + LenTable(other{{U}});
+    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k)} {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k)} {{"{"}}{{impl.fun_spec_has_key}}{{S}}(other, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
+        ({{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k) <==>
             ({{impl.fun_spec_has_key}}{{S}}(t, k) || {{impl.fun_spec_has_key}}{{S}}(other, k))));
-    m' := $UpdateMutation(m, t_new);
+    {{GH}}m' := $UpdateMutation(m, {{W1}}t_new{{W2}});
 }
 {%- endif %}
 
@@ -782,26 +917,26 @@ returns (m': $Mutation ({{Self}})) {
 // and not modeled.
 procedure {:inline 2} {{impl.fun_trim}}{{S}}(m: $Mutation ({{Self}}), at: int)
 returns (result: ({{Self}}), m': $Mutation ({{Self}})) {
-    var t, t_new: {{Self}};
+    {{TND}}
     t := $Dereference(m);
-    if (at > LenTable(t)) {
+    if (at > LenTable(t{{U}})) {
         call $ExecFailureAbort();
         return;
     }
     assume LenTable(t_new) == at;
-    assume LenTable(result) == LenTable(t) - at;
+    assume LenTable(result{{U}}) == LenTable(t{{U}}) - at;
 {%- if impl.fun_spec_has_key != "" %}
-    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t_new, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
-        ({{impl.fun_spec_has_key}}{{S}}(t_new, k) ==> {{impl.fun_spec_has_key}}{{S}}(t, k)));
+    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
+        ({{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k) ==> {{impl.fun_spec_has_key}}{{S}}(t, k)));
     assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(result, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
         ({{impl.fun_spec_has_key}}{{S}}(result, k) ==> {{impl.fun_spec_has_key}}{{S}}(t, k)));
     assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
         ({{impl.fun_spec_has_key}}{{S}}(t, k) ==>
-            ({{impl.fun_spec_has_key}}{{S}}(t_new, k) || {{impl.fun_spec_has_key}}{{S}}(result, k))));
-    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t_new, k), {{impl.fun_spec_has_key}}{{S}}(result, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
-        !({{impl.fun_spec_has_key}}{{S}}(t_new, k) && {{impl.fun_spec_has_key}}{{S}}(result, k)));
+            ({{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k) || {{impl.fun_spec_has_key}}{{S}}(result, k))));
+    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k), {{impl.fun_spec_has_key}}{{S}}(result, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
+        !({{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k) && {{impl.fun_spec_has_key}}{{S}}(result, k)));
 {%- endif %}
-    m' := $UpdateMutation(m, t_new);
+    {{GH}}m' := $UpdateMutation(m, {{W1}}t_new{{W2}});
 }
 {%- endif %}
 
@@ -815,7 +950,7 @@ returns (result: ({{Self}}), m': $Mutation ({{Self}})) {
 // trigger-unsafe `forall k :: spec_get` shape).
 procedure {:inline 2} {{impl.fun_replace_key_inplace}}{{S}}(m: $Mutation ({{Self}}), old_key: {{K}}, new_key: {{K}})
 returns (m': $Mutation ({{Self}})) {
-    var t, t_new: {{Self}};
+    {{TND}}
     var may_abort_on_order: bool;
     t := $Dereference(m);
     if (!{{impl.fun_spec_has_key}}{{S}}(t, old_key)) {
@@ -830,27 +965,27 @@ returns (m': $Mutation ({{Self}})) {
         call $ExecFailureAbort();
         return;
     }
-    assume LenTable(t_new) == LenTable(t);
-    assume !{{impl.fun_spec_has_key}}{{S}}(t_new, old_key);
-    assume {{impl.fun_spec_has_key}}{{S}}(t_new, new_key);
-    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k)} {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t_new, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
+    assume LenTable(t_new) == LenTable(t{{U}});
+    assume !{{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, old_key);
+    assume {{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, new_key);
+    assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k)} {{"{"}}{{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
         !$IsEqual'{{instance.0.suffix}}'(k, old_key) ==>
         !$IsEqual'{{instance.0.suffix}}'(k, new_key) ==>
-        ({{impl.fun_spec_has_key}}{{S}}(t, k) == {{impl.fun_spec_has_key}}{{S}}(t_new, k)));
-    m' := $UpdateMutation(m, t_new);
+        ({{impl.fun_spec_has_key}}{{S}}(t, k) == {{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k)));
+    {{GH}}m' := $UpdateMutation(m, {{W1}}t_new{{W2}});
 }
 {%- endif %}
 
 {%- if impl.fun_add_no_override != "" %}
 procedure {:inline 2} {{impl.fun_add_no_override}}{{S}}(m: $Mutation ({{Self}}), k: {{K}}, v: {{V}}) returns (m': $Mutation({{Self}})) {
     var enc_k: int;
-    var t: {{Self}};
+    var t: {{Self}};{{GBD}}
     enc_k := {{ENC}}(k);
     t := $Dereference(m);
-    if (ContainsTable(t, enc_k)) {
+    if (ContainsTable(t{{U}}, enc_k)) {
         call $Abort($StdError(7/*INVALID_ARGUMENTS*/, 100/*EALREADY_EXISTS*/));
     } else {
-        m' := $UpdateMutation(m, AddTable(t, enc_k, v));
+        {{GH}}m' := $UpdateMutation(m, {{W1}}AddTable(t{{U}}, enc_k, v){{W2}});
     }
 }
 {%- endif %}
@@ -858,13 +993,13 @@ procedure {:inline 2} {{impl.fun_add_no_override}}{{S}}(m: $Mutation ({{Self}}),
 {%- if impl.fun_add_override_if_exists != "" %}
 procedure {:inline 2} {{impl.fun_add_override_if_exists}}{{S}}(m: $Mutation ({{Self}}), k: {{K}}, v: {{V}}) returns (m': $Mutation({{Self}})) {
     var enc_k: int;
-    var t: {{Self}};
+    var t: {{Self}};{{GBD}}
     enc_k := {{ENC}}(k);
     t := $Dereference(m);
-    if (ContainsTable(t, enc_k)) {
-        m' := $UpdateMutation(m, UpdateTable(t, enc_k, v));
+    if (ContainsTable(t{{U}}, enc_k)) {
+        {{GH}}m' := $UpdateMutation(m, {{W1}}UpdateTable(t{{U}}, enc_k, v){{W2}});
     } else {
-        m' := $UpdateMutation(m, AddTable(t, enc_k, v));
+        {{GH}}m' := $UpdateMutation(m, {{W1}}AddTable(t{{U}}, enc_k, v){{W2}});
     }
 }
 {%- endif %}
@@ -875,15 +1010,15 @@ procedure {:inline 2} {{impl.fun_add_override_if_exists}}{{S}}(m: $Mutation ({{S
 procedure {:inline 2} {{impl.fun_upsert}}{{S}}(m: $Mutation ({{Self}}), k: {{K}}, v: {{V}})
 returns (prev_v: $1_option_Option{{SV}}, m': $Mutation ({{Self}})) {
     var enc_k: int;
-    var t: {{Self}};
+    var t: {{Self}};{{GBD}}
     enc_k := {{ENC}}(k);
     t := $Dereference(m);
-    if (ContainsTable(t, enc_k)) {
-        prev_v := $1_option_Option{{SV}}_Some(GetTable(t, enc_k));
-        m' := $UpdateMutation(m, UpdateTable(t, enc_k, v));
+    if (ContainsTable(t{{U}}, enc_k)) {
+        prev_v := $1_option_Option{{SV}}_Some(GetTable(t{{U}}, enc_k));
+        {{GH}}m' := $UpdateMutation(m, {{W1}}UpdateTable(t{{U}}, enc_k, v){{W2}});
     } else {
         prev_v := $1_option_Option{{SV}}_None();
-        m' := $UpdateMutation(m, AddTable(t, enc_k, v));
+        {{GH}}m' := $UpdateMutation(m, {{W1}}AddTable(t{{U}}, enc_k, v){{W2}});
     }
 }
 {%- endif %}
@@ -892,14 +1027,14 @@ returns (prev_v: $1_option_Option{{SV}}, m': $Mutation ({{Self}})) {
 procedure {:inline 2} {{impl.fun_del_must_exist}}{{S}}(m: $Mutation ({{Self}}), k: {{K}})
 returns (v: {{V}}, m': $Mutation({{Self}})) {
     var enc_k: int;
-    var t: {{Self}};
+    var t: {{Self}};{{GBD}}
     enc_k := {{ENC}}(k);
     t := $Dereference(m);
-    if (!ContainsTable(t, enc_k)) {
+    if (!ContainsTable(t{{U}}, enc_k)) {
         call $Abort($StdError(7/*INVALID_ARGUMENTS*/, 101/*ENOT_FOUND*/));
     } else {
-        v := GetTable(t, enc_k);
-        m' := $UpdateMutation(m, RemoveTable(t, enc_k));
+        v := GetTable(t{{U}}, enc_k);
+        {{GH}}m' := $UpdateMutation(m, {{W1}}RemoveTable(t{{U}}, enc_k){{W2}});
     }
 }
 {%- endif %}
@@ -910,12 +1045,12 @@ returns (v: {{V}}, m': $Mutation({{Self}})) {
 procedure {:inline 2} {{impl.fun_remove_or_none}}{{S}}(m: $Mutation ({{Self}}), k: {{K}})
 returns (result: $1_option_Option{{SV}}, m': $Mutation ({{Self}})) {
     var enc_k: int;
-    var t: {{Self}};
+    var t: {{Self}};{{GBD}}
     enc_k := {{ENC}}(k);
     t := $Dereference(m);
-    if (ContainsTable(t, enc_k)) {
-        result := $1_option_Option{{SV}}_Some(GetTable(t, enc_k));
-        m' := $UpdateMutation(m, RemoveTable(t, enc_k));
+    if (ContainsTable(t{{U}}, enc_k)) {
+        result := $1_option_Option{{SV}}_Some(GetTable(t{{U}}, enc_k));
+        {{GH}}m' := $UpdateMutation(m, {{W1}}RemoveTable(t{{U}}, enc_k){{W2}});
     } else {
         result := $1_option_Option{{SV}}_None();
         m' := m;
@@ -927,15 +1062,15 @@ returns (result: $1_option_Option{{SV}}, m': $Mutation ({{Self}})) {
 procedure {:inline 2} {{impl.fun_del_return_key}}{{S}}(m: $Mutation ({{Self}}), k: {{K}})
 returns (k': {{K}}, v: {{V}}, m': $Mutation({{Self}})) {
     var enc_k: int;
-    var t: {{Self}};
+    var t: {{Self}};{{GBD}}
     enc_k := {{ENC}}(k);
     t := $Dereference(m);
-    if (!ContainsTable(t, enc_k)) {
+    if (!ContainsTable(t{{U}}, enc_k)) {
         call $Abort($StdError(7/*INVALID_ARGUMENTS*/, 101/*ENOT_FOUND*/));
     } else {
         k' := k;
-        v := GetTable(t, enc_k);
-        m' := $UpdateMutation(m, RemoveTable(t, enc_k));
+        v := GetTable(t{{U}}, enc_k);
+        {{GH}}m' := $UpdateMutation(m, {{W1}}RemoveTable(t{{U}}, enc_k){{W2}});
     }
 }
 {%- endif %}
@@ -944,10 +1079,10 @@ returns (k': {{K}}, v: {{V}}, m': $Mutation({{Self}})) {
 procedure {:inline 2} {{impl.fun_borrow}}{{S}}(t: {{Self}}, k: {{K}}) returns (v: {{V}}) {
     var enc_k: int;
     enc_k := {{ENC}}(k);
-    if (!ContainsTable(t, enc_k)) {
+    if (!ContainsTable(t{{U}}, enc_k)) {
         call $Abort($StdError(7/*INVALID_ARGUMENTS*/, 101/*ENOT_FOUND*/));
     } else {
-        v := GetTable(t, {{ENC}}(k));
+        v := GetTable(t{{U}}, {{ENC}}(k));
     }
 }
 {%- endif %}
@@ -956,13 +1091,13 @@ procedure {:inline 2} {{impl.fun_borrow}}{{S}}(t: {{Self}}, k: {{K}}) returns (v
 procedure {:inline 2} {{impl.fun_borrow_mut}}{{S}}(m: $Mutation ({{Self}}), k: {{K}})
 returns (dst: $Mutation ({{V}}), m': $Mutation ({{Self}})) {
     var enc_k: int;
-    var t: {{Self}};
+    var t: {{Self}};{{GBD}}
     enc_k := {{ENC}}(k);
     t := $Dereference(m);
-    if (!ContainsTable(t, enc_k)) {
+    if (!ContainsTable(t{{U}}, enc_k)) {
         call $Abort($StdError(7/*INVALID_ARGUMENTS*/, 101/*ENOT_FOUND*/));
     } else {
-        dst := $Mutation(m->l, ExtendVec(m->p, enc_k), GetTable(t, enc_k));
+        dst := $Mutation(m->l, ExtendVec(m->p, enc_k), GetTable(t{{U}}, enc_k));
         m' := m;
     }
 }
@@ -972,16 +1107,16 @@ returns (dst: $Mutation ({{V}}), m': $Mutation ({{Self}})) {
 procedure {:inline 2} {{impl.fun_borrow_mut_with_default}}{{S}}(m: $Mutation ({{Self}}), k: {{K}}, default: {{V}})
 returns (dst: $Mutation ({{V}}), m': $Mutation ({{Self}})) {
     var enc_k: int;
-    var t: {{Self}};
+    var t: {{Self}};{{GBD}}
     var t': {{Self}};
     enc_k := {{ENC}}(k);
     t := $Dereference(m);
-    if (!ContainsTable(t, enc_k)) {
-        m' := $UpdateMutation(m, AddTable(t, enc_k, default));
+    if (!ContainsTable(t{{U}}, enc_k)) {
+        {{GH}}m' := $UpdateMutation(m, {{W1}}AddTable(t{{U}}, enc_k, default){{W2}});
         t' := $Dereference(m');
-        dst := $Mutation(m'->l, ExtendVec(m'->p, enc_k), GetTable(t', enc_k));
+        dst := $Mutation(m'->l, ExtendVec(m'->p, enc_k), GetTable(t'{{U}}, enc_k));
     } else {
-        dst := $Mutation(m->l, ExtendVec(m->p, enc_k), GetTable(t, enc_k));
+        dst := $Mutation(m->l, ExtendVec(m->p, enc_k), GetTable(t{{U}}, enc_k));
         m' := m;
     }
 }
@@ -991,81 +1126,140 @@ returns (dst: $Mutation ({{V}}), m': $Mutation ({{Self}})) {
 procedure {:inline 2} {{impl.fun_borrow_with_default}}{{S}}(t: {{Self}}, k: {{K}}, default: {{V}}) returns (v: {{V}}) {
     var enc_k: int;
     enc_k := {{ENC}}(k);
-    if (!ContainsTable(t, enc_k)) {
+    if (!ContainsTable(t{{U}}, enc_k)) {
         v := default;
     } else {
-        v := GetTable(t, {{ENC}}(k));
+        v := GetTable(t{{U}}, {{ENC}}(k));
+    }
+}
+{%- endif %}
+
+{%- if impl.fun_iter_borrow_mut != "" %}
+// Mutable borrow of the value at the iterator's key. The returned mutation's
+// path extends the map's path with the encoded key (a Table index edge), so
+// caller write-back goes through UpdateTable instead of concrete map internals.
+// Aborts when the iterator is the end iterator or its key is absent (stale
+// iterator); the constant-value-size requirement is presumed not to fire (see
+// the size presumption in the map's spec).
+procedure {:inline 2} {{impl.fun_iter_borrow_mut}}{{S}}(self: {{impl.iter_ptr_prefix}}'{{instance.0.suffix}}', m: $Mutation ({{Self}}))
+returns (dst: $Mutation ({{V}}), m': $Mutation ({{Self}})) {
+    var enc_k: int;
+    var t: {{Self}};{{GBD}}
+    t := $Dereference(m);
+    if (!(self is {{impl.iter_ptr_prefix}}'{{instance.0.suffix}}'_{{impl.iter_variant}})) {
+        call $ExecFailureAbort();
+    } else {
+        enc_k := {{ENC}}(self->{{impl.iter_key_sel}});
+        if (!ContainsTable(t{{U}}, enc_k)) {
+            call $ExecFailureAbort();
+        } else {
+            dst := $Mutation(m->l, ExtendVec(m->p, enc_k), GetTable(t{{U}}, enc_k));
+            m' := m;
+        }
     }
 }
 {%- endif %}
 
 {%- if impl.fun_spec_len != "" %}
 function {:inline} {{impl.fun_spec_len}}{{S}}(t: ({{Self}})): int {
-    LenTable(t)
+    LenTable(t{{U}})
 }
 {%- endif %}
 
 {%- if impl.fun_spec_is_empty != "" %}
 function {:inline} {{impl.fun_spec_is_empty}}{{S}}(t: ({{Self}})): bool {
-    LenTable(t) == 0
+    LenTable(t{{U}}) == 0
 }
 {%- endif %}
 
 {%- if impl.fun_spec_has_key != "" %}
 function {:inline} {{impl.fun_spec_has_key}}{{S}}(t: ({{Self}}), k: {{K}}): bool {
-    ContainsTable(t, {{ENC}}(k))
+    ContainsTable(t{{U}}, {{ENC}}(k))
 }
 {%- endif %}
 
 {%- if impl.fun_spec_set != "" %}
 function {:inline} {{impl.fun_spec_set}}{{S}}(t: {{Self}}, k: {{K}}, v: {{V}}): {{Self}} {
     (var enc_k := {{ENC}}(k);
-    if (ContainsTable(t, enc_k)) then
-        UpdateTable(t, enc_k, v)
+    if (ContainsTable(t{{U}}, enc_k)) then
+        {{SW1}}UpdateTable(t{{U}}, enc_k, v){{SW2}}
     else
-        AddTable(t, enc_k, v))
+        {{SW1}}AddTable(t{{U}}, enc_k, v){{SW2}})
 }
 {%- endif %}
 
 {%- if impl.fun_spec_del != "" %}
 function {:inline} {{impl.fun_spec_del}}{{S}}(t: {{Self}}, k: {{K}}): {{Self}} {
-    RemoveTable(t, {{ENC}}(k))
+    {{SW1}}RemoveTable(t{{U}}, {{ENC}}(k)){{SW2}}
 }
 {%- endif %}
 
 {%- if impl.fun_spec_get != "" %}
 function {:inline} {{impl.fun_spec_get}}{{S}}(t: {{Self}}, k: {{K}}): {{V}} {
-    GetTable(t, {{ENC}}(k))
+    GetTable(t{{U}}, {{ENC}}(k))
 }
 {%- endif %}
 
 {%- if impl.fun_spec_new != "" %}
 function {:inline} {{impl.fun_spec_new}}{{S}}(): {{Self}} {
-    EmptyTable()
+    {{SW1}}EmptyTable(){{SZ2}}
 }
 {%- endif %}
 
 {%- if impl.fun_spec_aborts_destroy_empty != "" %}
 function {:inline} {{impl.fun_spec_aborts_destroy_empty}}{{S}}(t: {{Self}}): bool {
-    LenTable(t) != 0
+    LenTable(t{{U}}) != 0
 }
 {%- endif %}
 
 {%- if impl.fun_spec_aborts_add != "" %}
 function {:inline} {{impl.fun_spec_aborts_add}}{{S}}(t: {{Self}}, k: {{K}}, v: {{V}}): bool {
-    ContainsTable(t, {{ENC}}(k))
+    ContainsTable(t{{U}}, {{ENC}}(k))
 }
 {%- endif %}
 
 {%- if impl.fun_spec_aborts_del != "" %}
 function {:inline} {{impl.fun_spec_aborts_del}}{{S}}(t: {{Self}}, k: {{K}}): bool {
-    !ContainsTable(t, {{ENC}}(k))
+    !ContainsTable(t{{U}}, {{ENC}}(k))
 }
 {%- endif %}
 
 {%- if impl.fun_spec_aborts_borrow != "" %}
 function {:inline} {{impl.fun_spec_aborts_borrow}}{{S}}(t: {{Self}}, k: {{K}}): bool {
-    !ContainsTable(t, {{ENC}}(k))
+    !ContainsTable(t{{U}}, {{ENC}}(k))
+}
+{%- endif %}
+
+{#- Only emitted for a NATIVE-bound predicate (a defined spec fun is emitted
+    by regular spec-function translation). The body mirrors the
+    `iter_borrow_mut` procedure's abort behavior exactly: end iterator or
+    absent key. -#}
+{%- if impl.fun_spec_aborts_iter_borrow_mut != "" and impl.fun_iter_borrow_mut != "" %}
+function {:inline} {{impl.fun_spec_aborts_iter_borrow_mut}}{{S}}(self: {{impl.iter_ptr_prefix}}'{{instance.0.suffix}}', t: {{Self}}): bool {
+    !(self is {{impl.iter_ptr_prefix}}'{{instance.0.suffix}}'_{{impl.iter_variant}})
+        || !ContainsTable(t{{U}}, {{ENC}}(self->{{impl.iter_key_sel}}))
+}
+{%- endif %}
+
+{#- Iterator-validity predicates over the hidden `$$validity` slots: an
+    iterator is valid iff its slot matches the map's current one (structural
+    mutations havoc the map's slot; see the carrier plumbing above), and two
+    map states preserve iterators iff their slots agree. -#}
+{%- if impl.fun_spec_iter_valid != "" and impl.has_ghost_carrier %}
+function {:inline} {{impl.fun_spec_iter_valid}}{{S}}(it: {{impl.iter_valid_prefix}}{% if impl.iter_valid_generic %}'{{instance.0.suffix}}'{% endif %}, t: {{Self}}): bool {
+    it->$$validity == t->$$validity
+}
+{%- endif %}
+
+{%- if impl.fun_spec_leaf_iter_valid != "" and impl.has_ghost_carrier %}
+function {:inline} {{impl.fun_spec_leaf_iter_valid}}{{S}}(it: {{impl.leaf_iter_valid_prefix}}{% if impl.leaf_iter_valid_generic %}'{{instance.0.suffix}}'{% endif %}, t: {{Self}}): bool {
+    it->$$validity == t->$$validity
+}
+{%- endif %}
+
+{%- if impl.fun_spec_iter_preserved != "" and impl.has_ghost_carrier %}
+function {:inline} {{impl.fun_spec_iter_preserved}}{{S}}(t1: {{Self}}, t2: {{Self}}): bool {
+    t1->$$validity == t2->$$validity
 }
 {%- endif %}
 

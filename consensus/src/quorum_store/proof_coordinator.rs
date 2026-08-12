@@ -62,6 +62,13 @@ impl BatchSignatureAggregator {
         }
     }
 
+    pub fn contains_voter(&self, validator: &PeerId) -> bool {
+        match self {
+            Self::BatchInfo(aggregator) => aggregator.contains_voter(validator),
+            Self::BatchInfoExt(aggregator) => aggregator.contains_voter(validator),
+        }
+    }
+
     pub fn check_voting_power(
         &self,
         verifier: &ValidatorVerifier,
@@ -156,12 +163,16 @@ impl IncrementalProofState {
 
         match validator_verifier.get_voting_power(&signed_batch_info.signer()) {
             Some(voting_power) => {
-                self.signature_aggregator.add_signature(
-                    signed_batch_info.signer(),
-                    signed_batch_info.signature_with_status(),
-                );
-                self.aggregated_voting_power += voting_power as u128;
-                if signed_batch_info.signer() == self.signature_aggregator.data().author() {
+                let signer = signed_batch_info.signer();
+                // Only count voting power the first time a signer votes, so replayed votes
+                // can't inflate `aggregated_voting_power` past `total_voting_power`.
+                let newly_added = !self.signature_aggregator.contains_voter(&signer);
+                self.signature_aggregator
+                    .add_signature(signer, signed_batch_info.signature_with_status());
+                if newly_added {
+                    self.aggregated_voting_power += voting_power as u128;
+                }
+                if signer == self.signature_aggregator.data().author() {
                     self.self_voted = true;
                 }
             },
@@ -196,7 +207,7 @@ impl IncrementalProofState {
             .saturating_div(validator_verifier.total_voting_power()) as u8;
         let batch_info = self.signature_aggregator.data();
         let author = batch_info.author();
-        if pct >= self.last_increment_pct + 10 {
+        if pct >= self.last_increment_pct.saturating_add(10) {
             observe_batch_vote_pct(timestamp, author, pct, &batch_info);
             self.last_increment_pct = pct;
         }
@@ -520,5 +531,62 @@ impl ProofCoordinator {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{quorum_store::types::Batch, test_utils::create_vec_signed_transactions};
+    use aptos_types::{quorum_store::BatchId, validator_verifier::random_validator_verifier};
+
+    /// Regression test for a DoS where a single validator could crash any batch author by
+    /// replaying its Quorum Store vote. Each replay used to bump `aggregated_voting_power`
+    /// unconditionally (only the `signature_aggregator` BTreeMap deduped by signer), so
+    /// `observe_voting_pct` walked `last_increment_pct` past 246 and overflowed the `u8` in
+    /// `last_increment_pct + 10`. Under `overflow-checks = true` that panicked the
+    /// proof_coordinator task, which the global crash handler turns into a full node exit.
+    #[test]
+    fn replayed_votes_do_not_inflate_power_or_overflow() {
+        let (signers, verifier) = random_validator_verifier(4, None, true);
+        let batch_author = signers[0].author();
+        let batch = Batch::new(
+            BatchId::new_for_test(1),
+            create_vec_signed_transactions(1),
+            1,
+            20,
+            batch_author,
+            0,
+        );
+        let batch_info = batch.batch_info().clone();
+        let mut state = IncrementalProofState::new_batch_info(batch_info.clone());
+
+        // A single malicious signer (not the batch author, and far below supermajority)
+        // replays its vote many more times than the ~11 that previously triggered the
+        // overflow for 4 equal-stake validators.
+        let malicious = &signers[1];
+        let signed: SignedBatchInfo<BatchInfoExt> = SignedBatchInfo::new(batch_info, malicious)
+            .expect("failed to sign batch info")
+            .into();
+        let voting_power = verifier
+            .get_voting_power(&malicious.author())
+            .expect("malicious signer must be in the validator set")
+            as u128;
+
+        for _ in 0..1_000 {
+            state
+                .add_signature(&signed, &verifier)
+                .expect("adding a valid signature should succeed");
+            // Must never panic on `u8` overflow, no matter how many times the vote is replayed.
+            state.observe_voting_pct(0, &verifier);
+        }
+
+        // The counter reflects a single signer regardless of how often the vote was replayed.
+        assert_eq!(state.aggregated_voting_power, voting_power);
+        // A lone (sub-supermajority) voter never completes the proof, so the entry lingers and
+        // keeps receiving replays for the whole proof-timeout window.
+        assert!(!state.check_voting_power(&verifier, true));
+        // Percentage tracking stays clamped within [0, 100].
+        assert!(state.last_increment_pct <= 100);
     }
 }

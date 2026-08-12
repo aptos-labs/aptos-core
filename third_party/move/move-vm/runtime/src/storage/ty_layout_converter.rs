@@ -8,7 +8,7 @@ use crate::{
         layout_cache::DefiningModules, loader::traits::StructDefinitionLoader,
         ty_tag_converter::TypeTagConverter,
     },
-    LayoutCacheEntry, RuntimeEnvironment, StructKey,
+    LayoutCacheEntry, LayoutCacheKey, RuntimeEnvironment,
 };
 use fxhash::FxHashMap;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
@@ -17,7 +17,7 @@ use move_core_types::{
     ident_str,
     identifier::Identifier,
     int256,
-    language_storage::LEGACY_OPTION_VEC,
+    language_storage::{ModuleId, LEGACY_OPTION_VEC},
     value::{IdentifierMappingKind, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
@@ -154,6 +154,44 @@ where
         self.struct_definition_loader.is_lazy_loading_enabled()
     }
 
+    /// Returns the cache key for the given root type, or [None] if its layout is not cached.
+    ///
+    /// Only struct- and vector-headed types are cached, keyed by the interned id of the whole
+    /// type. Keying on the whole type means an entry is only ever served for the exact type it was
+    /// built from, so a hit stays equivalent to a miss in gas and in node/depth accounting.
+    fn layout_cache_key(&self, ty: &Type) -> Option<LayoutCacheKey> {
+        match ty {
+            Type::Struct { .. } | Type::StructInstantiation { .. } | Type::Vector(_) => {},
+            Type::Bool
+            | Type::U8
+            | Type::U16
+            | Type::U32
+            | Type::U64
+            | Type::U128
+            | Type::U256
+            | Type::I8
+            | Type::I16
+            | Type::I32
+            | Type::I64
+            | Type::I128
+            | Type::I256
+            | Type::Address
+            | Type::Signer
+            | Type::Function { .. }
+            | Type::Reference(_)
+            | Type::MutableReference(_)
+            | Type::TyParam(_) => return None,
+        }
+
+        // Types here are fully instantiated, so there is nothing to substitute. Interning panics
+        // if that ever does not hold, as it already did when keys were built from `intern_ty_args`.
+        let id = self
+            .runtime_environment()
+            .ty_pool()
+            .instantiate_and_intern(ty, &[]);
+        Some(LayoutCacheKey { id })
+    }
+
     /// Returns the layout of a type, as well as a flag if it contains delayed fields or not.
     pub(crate) fn type_to_type_layout_with_delayed_fields(
         &self,
@@ -161,27 +199,8 @@ where
         traversal_context: &mut TraversalContext,
         ty: &Type,
     ) -> PartialVMResult<LayoutWithDelayedFields> {
-        let ty_pool = self.runtime_environment().ty_pool();
         if self.vm_config().enable_layout_caches {
-            let key = match ty {
-                Type::Struct { idx, .. } => {
-                    let ty_args_id = ty_pool.intern_ty_args(&[]);
-                    Some(StructKey {
-                        idx: *idx,
-                        ty_args_id,
-                    })
-                },
-                Type::StructInstantiation { idx, ty_args, .. } => {
-                    let ty_args_id = ty_pool.intern_ty_args(ty_args);
-                    Some(StructKey {
-                        idx: *idx,
-                        ty_args_id,
-                    })
-                },
-                _ => None,
-            };
-
-            if let Some(key) = key {
+            if let Some(key) = self.layout_cache_key(ty) {
                 if let Some(result) = self.struct_definition_loader.load_layout_from_cache(
                     gas_meter,
                     traversal_context,
@@ -238,6 +257,16 @@ where
     /// Returns the runtime environment used in the system.
     pub(crate) fn runtime_environment(&self) -> &RuntimeEnvironment {
         self.struct_definition_loader.runtime_environment()
+    }
+
+    /// Returns the hash and size of the specified module, without charging gas.
+    pub(crate) fn unmetered_get_module_hash_and_size(
+        &self,
+        module_id: &ModuleId,
+    ) -> PartialVMResult<([u8; 32], usize)> {
+        self.struct_definition_loader
+            .unmetered_get_module_hash_and_size(module_id.address(), module_id.name())
+            .map_err(|err| err.to_partial())
     }
 
     /// Returns the struct name for the specified index.
@@ -835,7 +864,7 @@ mod tests {
         module_traversal::{TraversalContext, TraversalStorage},
         storage::loader::test_utils::{generic_struct_ty, struct_ty, MockStructDefinitionLoader},
     };
-    use claims::{assert_err, assert_ok, assert_some};
+    use claims::{assert_err, assert_none, assert_ok, assert_some};
     use move_core_types::{
         ability::AbilitySet, account_address::AccountAddress, language_storage::StructTag,
     };
@@ -866,6 +895,99 @@ mod tests {
                 ty,
             )
         }
+    }
+
+    /// Wraps `ty` in `n` nested vectors.
+    fn vec_ty(ty: Type, n: usize) -> Type {
+        (0..n).fold(ty, |ty, _| Type::Vector(triomphe::Arc::new(ty)))
+    }
+
+    /// Asserts that every key in `keys` is distinct from every other.
+    fn assert_all_distinct(keys: &[LayoutCacheKey]) {
+        for (i, key) in keys.iter().enumerate() {
+            for other in &keys[i + 1..] {
+                assert_ne!(key, other);
+            }
+        }
+    }
+
+    #[test]
+    fn test_layout_cache_key_for_vector_wrapped_structs() {
+        let loader = MockStructDefinitionLoader::default();
+        let layout_converter = LayoutConverter::new(&loader);
+        let idx = StructNameIndex::new(0);
+
+        // Each nesting level keys to its own entry, else `vector<S>` gets the layout of `S`.
+        let by_nesting = (0..4)
+            .map(|n| assert_some!(layout_converter.layout_cache_key(&vec_ty(struct_ty(idx), n))))
+            .collect::<Vec<_>>();
+        assert_all_distinct(&by_nesting);
+
+        // The same type always keys to the same entry.
+        for (n, key) in by_nesting.iter().enumerate() {
+            assert_eq!(
+                assert_some!(layout_converter.layout_cache_key(&vec_ty(struct_ty(idx), n))),
+                *key
+            );
+        }
+
+        // Generic structs behind vectors stay keyed by their type arguments.
+        let by_ty_args = [Type::U8, Type::Bool, Type::U64]
+            .map(|ty_arg| vec_ty(generic_struct_ty(idx, vec![ty_arg]), 1))
+            .map(|ty| assert_some!(layout_converter.layout_cache_key(&ty)));
+        assert_all_distinct(&by_ty_args);
+
+        // Different structs never collide, at any nesting level.
+        let other_idx = StructNameIndex::new(1);
+        for n in 0..4 {
+            assert_ne!(
+                assert_some!(layout_converter.layout_cache_key(&vec_ty(struct_ty(idx), n))),
+                assert_some!(layout_converter.layout_cache_key(&vec_ty(struct_ty(other_idx), n)))
+            );
+        }
+    }
+
+    #[test]
+    fn test_layout_cache_key_for_uncacheable_tys() {
+        let loader = MockStructDefinitionLoader::default();
+        let layout_converter = LayoutConverter::new(&loader);
+
+        // Primitives and functions have constant-size layouts; references and type parameters have
+        // no layout at all. Neither is worth an entry.
+        let uncacheable = [
+            Type::Bool,
+            Type::U8,
+            Type::U16,
+            Type::U32,
+            Type::U64,
+            Type::U128,
+            Type::U256,
+            Type::I8,
+            Type::I16,
+            Type::I32,
+            Type::I64,
+            Type::I128,
+            Type::I256,
+            Type::Address,
+            Type::Signer,
+            Type::Function {
+                args: vec![Type::U8],
+                results: vec![Type::U256],
+                abilities: AbilitySet::EMPTY,
+            },
+            Type::Reference(Box::new(Type::U8)),
+            Type::MutableReference(Box::new(Type::U8)),
+            Type::TyParam(0),
+        ];
+        for ty in &uncacheable {
+            assert_none!(layout_converter.layout_cache_key(ty));
+        }
+
+        // Selection is on the head only, so wrapping any of them in a vector does make it
+        // cacheable. Those layouts are tiny, but carving out an exception would not pay for itself.
+        let vector_wrapped = [Type::U8, Type::Bool, Type::Address]
+            .map(|ty| assert_some!(layout_converter.layout_cache_key(&vec_ty(ty, 1))));
+        assert_all_distinct(&vector_wrapped);
     }
 
     #[test_case(true)]

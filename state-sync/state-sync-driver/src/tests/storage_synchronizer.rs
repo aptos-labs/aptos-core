@@ -26,12 +26,13 @@ use crate::{
 };
 use anyhow::format_err;
 use aptos_config::config::StateSyncDriverConfig;
+use aptos_crypto::HashValue;
 use aptos_data_streaming_service::data_notification::NotificationId;
 use aptos_event_notifications::EventSubscriptionService;
 use aptos_executor_types::ChunkCommitNotification;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_mempool_notifications::MempoolNotificationListener;
-use aptos_storage_interface::{AptosDbError, DbReaderWriter};
+use aptos_storage_interface::{AptosDbError, DbReaderWriter, StateKind};
 use aptos_storage_service_notifications::StorageServiceNotificationListener;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -623,64 +624,42 @@ async fn test_execute_transactions_commit_send_error() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[should_panic]
-async fn test_initialize_state_synchronizer_missing_info() {
-    // Create test data that is missing transaction infos
-    let mut output_list_with_proof =
-        create_output_list_with_proof().consume_output_list_with_proof();
-    output_list_with_proof.proof.transaction_infos = vec![]; // This is invalid!
-    let output_list_with_proof =
-        TransactionOutputListWithProofV2::new_from_v1(output_list_with_proof);
-
-    // Create the storage synchronizer
-    let (_, _, _, _, _, mut storage_synchronizer, _) = create_storage_synchronizer(
-        create_mock_executor(),
-        create_mock_reader_writer(None, None),
-    );
-
-    // Initialize the state synchronizer
-    let state_synchronizer_handle = storage_synchronizer
-        .initialize_state_synchronizer(
-            vec![create_epoch_ending_ledger_info()],
-            create_epoch_ending_ledger_info(),
-            output_list_with_proof,
-        )
-        .unwrap();
-
-    // The handler should panic as it was given invalid data
-    state_synchronizer_handle.await.unwrap();
-}
-
-#[tokio::test(flavor = "multi_thread")]
-#[should_panic]
-async fn test_initialize_state_synchronizer_receiver_error() {
-    // Setup the mock db writer. The db writer should always fail.
+async fn test_save_states_receiver_error() {
+    // Setup the mock db writer. Creating the snapshot receiver should always fail.
     let mut db_writer = create_mock_db_writer();
     db_writer
         .expect_get_state_snapshot_receiver()
-        .returning(|_, _| {
+        .returning(|_, _, _| {
             Err(AptosDbError::Other(
                 "Failed to get snapshot receiver!".to_string(),
             ))
         });
 
     // Create the storage synchronizer
-    let (_, _, _, _, _, mut storage_synchronizer, _) = create_storage_synchronizer(
+    let (_, mut error_listener, _, _, _, mut storage_synchronizer, _) = create_storage_synchronizer(
         create_mock_executor(),
         create_mock_reader_writer(None, Some(db_writer)),
     );
 
-    // Initialize the state synchronizer
-    let state_synchronizer_handle = storage_synchronizer
-        .initialize_state_synchronizer(
-            vec![create_epoch_ending_ledger_info()],
+    // Initialize the snapshot synchronizer. The receiver is created lazily on
+    // the first chunk, so initialization succeeds even though it will fail.
+    let _join_handle = storage_synchronizer
+        .initialize_snapshot_synchronizer(
             create_epoch_ending_ledger_info(),
-            create_output_list_with_proof(),
+            HashValue::random(),
+            StateKind::MainState,
         )
         .unwrap();
 
-    // The handler should panic as storage failed to return a snapshot receiver
-    state_synchronizer_handle.await.unwrap();
+    // Save a state chunk and verify the receiver failure surfaces as an error
+    // notification and that there's no pending data.
+    let notification_id = 0;
+    storage_synchronizer
+        .save_state_values(notification_id, create_state_value_chunk_with_proof(false))
+        .await
+        .unwrap();
+    verify_error_notification(&mut error_listener, notification_id).await;
+    verify_no_pending_data(&storage_synchronizer);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -710,8 +689,8 @@ async fn test_save_states_completion() {
     let mut db_writer = create_mock_db_writer();
     db_writer
         .expect_get_state_snapshot_receiver()
-        .with(always(), always())
-        .return_once(move |_, _| Ok(Box::new(snapshot_receiver)));
+        .with(always(), always(), always())
+        .return_once(move |_, _, _| Ok(Box::new(snapshot_receiver)));
     let target_ledger_info_clone = target_ledger_info.clone();
     let output_list_with_proof_clone = output_list_with_proof.clone();
     let epoch_change_proofs_clone = epoch_change_proofs.clone();
@@ -743,12 +722,12 @@ async fn test_save_states_completion() {
         .events()[0]
         .clone();
 
-    // Initialize the state synchronizer
+    // Initialize the snapshot synchronizer
     let state_synchronizer_handle = storage_synchronizer
-        .initialize_state_synchronizer(
-            epoch_change_proofs.to_vec(),
-            target_ledger_info,
-            output_list_with_proof.clone(),
+        .initialize_snapshot_synchronizer(
+            target_ledger_info.clone(),
+            HashValue::random(),
+            StateKind::MainState,
         )
         .unwrap();
 
@@ -759,6 +738,19 @@ async fn test_save_states_completion() {
         .unwrap();
     storage_synchronizer
         .save_state_values(1, create_state_value_chunk_with_proof(true))
+        .await
+        .unwrap();
+
+    // The receiver should return once it has written the entire snapshot
+    state_synchronizer_handle.await.unwrap();
+
+    // Finalize the whole fast sync (this is what sends the commit notification)
+    storage_synchronizer
+        .finalize_fast_sync(
+            epoch_change_proofs.to_vec(),
+            target_ledger_info,
+            output_list_with_proof.clone(),
+        )
         .await
         .unwrap();
 
@@ -778,52 +770,67 @@ async fn test_save_states_completion() {
     )
     .await;
 
-    // The handler should return as we've finished writing all states
-    state_synchronizer_handle.await.unwrap();
     verify_no_pending_data(&storage_synchronizer);
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[should_panic]
-async fn test_save_states_dropped_error_listener() {
-    // Setup the mock snapshot receiver
+async fn test_finalize_fast_sync_dropped_commit_listener() {
+    // `finalize_fast_sync` sends the commit notification (it used to be sent by
+    // the snapshot receiver). With the commit listener dropped, it should surface
+    // a recoverable error rather than panic.
+    let target_ledger_info = create_epoch_ending_ledger_info();
+    let output_list_with_proof = create_output_list_with_proof();
+
+    // Setup the mock snapshot receiver (writes the snapshot)
     let mut snapshot_receiver = create_mock_receiver();
     snapshot_receiver
         .expect_add_chunk()
         .with(always(), always())
         .returning(|_, _| Ok(()));
+    snapshot_receiver.expect_finish_box().returning(|| Ok(()));
 
-    // Setup the mock db writer
+    // Setup the mock executor and db writer
+    let mut chunk_executor = create_mock_executor();
+    chunk_executor.expect_reset().returning(|| Ok(()));
     let mut db_writer = create_mock_db_writer();
     db_writer
         .expect_get_state_snapshot_receiver()
-        .with(always(), always())
-        .return_once(move |_, _| Ok(Box::new(snapshot_receiver)));
+        .with(always(), always(), always())
+        .return_once(move |_, _, _| Ok(Box::new(snapshot_receiver)));
+    db_writer
+        .expect_finalize_state_snapshot()
+        .returning(|_, _, _| Ok(()));
 
-    // Create the storage synchronizer (drop all listeners)
-    let (_, _, _, _, _, mut storage_synchronizer, _) = create_storage_synchronizer(
-        create_mock_executor(),
+    // Create the storage synchronizer and drop the commit listener
+    let (commit_listener, _, _, _, _, mut storage_synchronizer, _) = create_storage_synchronizer(
+        chunk_executor,
         create_mock_reader_writer(None, Some(db_writer)),
     );
+    drop(commit_listener);
 
-    // Initialize the state synchronizer
+    // Write the snapshot to completion
     let state_synchronizer_handle = storage_synchronizer
-        .initialize_state_synchronizer(
-            vec![create_epoch_ending_ledger_info()],
-            create_epoch_ending_ledger_info(),
-            create_output_list_with_proof(),
+        .initialize_snapshot_synchronizer(
+            target_ledger_info.clone(),
+            HashValue::random(),
+            StateKind::MainState,
         )
         .unwrap();
-
-    // Save the last state chunk
-    let notification_id = 0;
     storage_synchronizer
-        .save_state_values(notification_id, create_state_value_chunk_with_proof(true))
+        .save_state_values(0, create_state_value_chunk_with_proof(true))
         .await
         .unwrap();
-
-    // The handler should panic as the commit listener was dropped
     state_synchronizer_handle.await.unwrap();
+
+    // Finalizing should error (not panic) as the commit listener was dropped
+    let result = storage_synchronizer
+        .finalize_fast_sync(
+            vec![create_epoch_ending_ledger_info()],
+            target_ledger_info,
+            output_list_with_proof,
+        )
+        .await;
+    assert_matches!(result, Err(Error::UnexpectedError(_)));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -839,8 +846,8 @@ async fn test_save_states_invalid_chunk() {
     let mut db_writer = create_mock_db_writer();
     db_writer
         .expect_get_state_snapshot_receiver()
-        .with(always(), always())
-        .return_once(move |_, _| Ok(Box::new(snapshot_receiver)));
+        .with(always(), always(), always())
+        .return_once(move |_, _, _| Ok(Box::new(snapshot_receiver)));
 
     // Create the storage synchronizer
     let (_, mut error_listener, _, _, _, mut storage_synchronizer, _) = create_storage_synchronizer(
@@ -848,12 +855,12 @@ async fn test_save_states_invalid_chunk() {
         create_mock_reader_writer(None, Some(db_writer)),
     );
 
-    // Initialize the state synchronizer
+    // Initialize the snapshot synchronizer
     let _join_handle = storage_synchronizer
-        .initialize_state_synchronizer(
-            vec![create_epoch_ending_ledger_info()],
+        .initialize_snapshot_synchronizer(
             create_epoch_ending_ledger_info(),
-            create_output_list_with_proof(),
+            HashValue::random(),
+            StateKind::MainState,
         )
         .unwrap();
 

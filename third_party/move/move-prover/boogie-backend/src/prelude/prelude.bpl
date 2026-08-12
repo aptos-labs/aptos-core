@@ -537,6 +537,14 @@ function {:inline} $IsValid'$tup{{tuple.arity}}'{{tuple.suffix}}''(t: $Tuple{{tu
     {% for e in tuple.elements %}$IsValid'{{e.suffix}}'(t->${{loop.index0}}){% if not loop.last %} && {% endif %}{% endfor %}
 
 }
+
+{%- if tuple.has_ghost %}
+
+function {:inline} $IsEqual'$tup{{tuple.arity}}'{{tuple.suffix}}''(t1: $Tuple{{tuple.arity}}{% for e in tuple.elements %} ({{e.name}}){% endfor %}, t2: $Tuple{{tuple.arity}}{% for e in tuple.elements %} ({{e.name}}){% endfor %}): bool {
+    {% for e in tuple.elements %}$IsEqual'{{e.suffix}}'(t1->${{loop.index0}}, t2->${{loop.index0}}){% if not loop.last %} && {% endif %}{% endfor %}
+
+}
+{%- endif %}
 {%- endfor %}
 
 function {:builtin "MapConst"} $ConstMemoryDomain(v: bool): [int]bool;

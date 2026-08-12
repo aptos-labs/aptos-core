@@ -5,9 +5,7 @@ use crate::{
     types::TxnIndex, versioned_data::VersionedData,
     versioned_delayed_fields::VersionedDelayedFields, versioned_group_data::VersionedGroupData,
 };
-use aptos_types::{
-    executable::ModulePath, vm::modules::AptosModuleExtension, write_set::TransactionWrite,
-};
+use aptos_types::{block_executor::value::SpeculativeValue, vm::modules::AptosModuleExtension};
 use move_binary_format::{file_format::CompiledScript, CompiledModule};
 use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::{Module, Script};
@@ -38,7 +36,7 @@ mod unit_tests;
 /// different multi-version data-structures (MVData and MVGroupData). It would also
 /// allow performing a check on the path once during initialization (to determine
 /// if the path is for a resource or a group), and then checking invariants.
-pub struct MVHashMap<K, T, V: TransactionWrite, I: Clone> {
+pub struct MVHashMap<K, T, V, I> {
     data: VersionedData<K, V>,
     group_data: VersionedGroupData<K, T, V>,
     delayed_fields: VersionedDelayedFields<I>,
@@ -50,14 +48,13 @@ pub struct MVHashMap<K, T, V: TransactionWrite, I: Clone> {
 
 impl<K, T, V, I> MVHashMap<K, T, V, I>
 where
-    K: ModulePath + Hash + Clone + Eq + Debug,
+    K: Hash + Clone + Eq + Debug,
     T: Hash + Clone + Eq + Debug + Serialize,
-    V: TransactionWrite + PartialEq,
+    V: SpeculativeValue,
     I: Copy + Clone + Eq + Hash + Debug,
 {
     #[allow(clippy::new_without_default)]
     pub fn new() -> MVHashMap<K, T, V, I> {
-        #[allow(deprecated)]
         MVHashMap {
             data: VersionedData::empty(),
             group_data: VersionedGroupData::empty(),

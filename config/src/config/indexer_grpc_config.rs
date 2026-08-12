@@ -37,6 +37,9 @@ pub struct IndexerGrpcConfig {
     /// instead of the standard fullnode GRPC stream interface. In other words, with
     /// this enabled, you can use an indexer fullnode like it is an instance of the
     /// indexer-grpc data service (aka the Transaction Stream Service API).
+    ///
+    /// TODO(#20246): the dual interface exists because the v1 (cache-worker) and v2
+    /// (manager) stream pipelines coexist; remove once v1 is retired.
     pub use_data_service_interface: bool,
 
     /// The address that the grpc server will listen on.

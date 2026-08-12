@@ -1,0 +1,6 @@
+Move prover returns: exiting with bytecode transformation errors
+error: integer type mismatch between two operands, one has type `u8` while the other one has type `u256`, consider using explicit type cast
+   ┌─ tests/sources/functional/bv_spec_literal_default.move:27:42
+   │
+27 │         ensures result == ((x as u256) & (x | 3u256) as u8);
+   │                                          ^^^^^^^^^^^

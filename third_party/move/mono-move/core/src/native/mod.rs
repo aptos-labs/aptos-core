@@ -18,5 +18,5 @@ pub use registry::{
     NativeContextFamily, NativeFunction, NativeIdx, NativeName, NativeRegistry,
     NativeRegistryError, NativeResolver, NoNatives,
 };
-pub use result::{NativeStatus, VMInternalError};
+pub use result::{native_invariant_violation, NativeStatus};
 pub use value::{Boxed, Opaque, Ref, TableHandle, VMValue, Vector};

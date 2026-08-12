@@ -238,6 +238,7 @@ fn parse_user_transaction(
         None,
         transaction_index_kind,
         false,
+        matches!(signed.replay_protector(), ReplayProtector::Nonce(_)),
     );
     // Session id from the replay protector (entry functions have no script hash).
     let session_id = match signed.replay_protector() {

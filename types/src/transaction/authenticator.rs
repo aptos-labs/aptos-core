@@ -330,6 +330,41 @@ impl TransactionAuthenticator {
         }
     }
 
+    /// Return the total number of public keys carried across every `AccountAuthenticator` in
+    /// this transaction authenticator (sender, secondary signers and fee payer).
+    pub fn number_of_public_keys(&self) -> usize {
+        match self {
+            Self::Ed25519 { .. } => 1,
+            Self::MultiEd25519 { public_key, .. } => public_key.public_keys().len(),
+            Self::SingleSender { sender } => sender.number_of_public_keys(),
+            Self::MultiAgent {
+                sender,
+                secondary_signer_addresses: _,
+                secondary_signers,
+            } => {
+                sender.number_of_public_keys()
+                    + secondary_signers
+                        .iter()
+                        .map(|signer| signer.number_of_public_keys())
+                        .sum::<usize>()
+            },
+            Self::FeePayer {
+                sender,
+                secondary_signer_addresses: _,
+                secondary_signers,
+                fee_payer_address: _,
+                fee_payer_signer,
+            } => {
+                sender.number_of_public_keys()
+                    + secondary_signers
+                        .iter()
+                        .map(|signer| signer.number_of_public_keys())
+                        .sum::<usize>()
+                    + fee_payer_signer.number_of_public_keys()
+            },
+        }
+    }
+
     /// Collect `(address, auth_key)` pairs for every signer in the transaction,
     /// in deterministic order: sender, then secondary signers, then fee payer.
     /// Returns `None` if any signer uses an authenticator incompatible with
@@ -928,6 +963,18 @@ impl AccountAuthenticator {
             Self::MultiEd25519 { signature, .. } => signature.signatures().len(),
             Self::SingleKey { .. } => 1,
             Self::MultiKey { authenticator } => authenticator.signatures.len(),
+            Self::NoAccountAuthenticator => 0,
+            Self::Abstract { .. } => 0,
+        }
+    }
+
+    /// Return the number of public keys carried by this account authenticator
+    pub fn number_of_public_keys(&self) -> usize {
+        match self {
+            Self::Ed25519 { .. } => 1,
+            Self::MultiEd25519 { public_key, .. } => public_key.public_keys().len(),
+            Self::SingleKey { .. } => 1,
+            Self::MultiKey { authenticator } => authenticator.public_keys().len(),
             Self::NoAccountAuthenticator => 0,
             Self::Abstract { .. } => 0,
         }

@@ -7,11 +7,9 @@ module 0xc0ffee::m {
     }
     fun lambda__1__apply_repeatedly(p0: u64, p1: |u64|(u64) has copy + drop, p2: u64): u64 {
         let _v0 = 0;
-        let _v1 = false;
-        loop {
-            if (_v1) _v0 = _v0 + 1 else _v1 = true;
-            if (!(_v0 < p0)) break;
-            p2 = p1(p2)
+        while (_v0 < p0) {
+            p2 = p1(p2);
+            _v0 = _v0 + 1
         };
         p2
     }

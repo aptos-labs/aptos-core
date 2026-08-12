@@ -30,19 +30,22 @@ use aptos_network::{
     application::{interface::NetworkClient, storage::PeersAndMetadata},
     protocols::network::RpcError,
 };
-use aptos_storage_interface::DbReader;
+use aptos_storage_interface::{DbReader, StateKind};
 use aptos_storage_service_client::StorageServiceClient;
 use aptos_storage_service_types::{
     requests::{
         DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
         NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
-        StateValuesWithProofRequest, StorageServiceRequest,
-        SubscribeTransactionOutputsWithProofRequest,
+        NumberOfStatesRequestV2, StateValuesWithProofRequest, StateValuesWithProofRequestV2,
+        StorageServiceRequest, SubscribeTransactionOutputsWithProofRequest,
         SubscribeTransactionsOrOutputsWithProofRequest, SubscribeTransactionsWithProofRequest,
         SubscriptionStreamMetadata, TransactionOutputsWithProofRequest,
         TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
     },
-    responses::{StorageServerSummary, StorageServiceResponse, TransactionOrOutputListWithProofV2},
+    responses::{
+        NumberOfStatesResponseV2, StateValueChunkWithProofResponseV2, StorageServerSummary,
+        StorageServiceResponse, TransactionOrOutputListWithProofV2,
+    },
     Epoch, StorageServiceMessage,
 };
 use aptos_time_service::TimeService;
@@ -1034,10 +1037,29 @@ impl AptosDataClientInterface for AptosDataClient {
         &self,
         version: Version,
         request_timeout_ms: u64,
+        kind: StateKind,
     ) -> crate::error::Result<Response<u64>> {
-        let data_request = DataRequest::GetNumberOfStatesAtVersion(version);
-        self.create_and_send_storage_request(request_timeout_ms, data_request)
-            .await
+        // TODO(grao): once the V2 state requests are supported fleet-wide, route
+        // main state through them too (behind a config flag, like
+        // `enable_transaction_data_v2`) and drop the V1 branch / variant.
+        match kind {
+            StateKind::MainState => {
+                let data_request = DataRequest::GetNumberOfStatesAtVersion(version);
+                self.create_and_send_storage_request(request_timeout_ms, data_request)
+                    .await
+            },
+            StateKind::Position => {
+                let data_request =
+                    DataRequest::GetNumberOfStatesAtVersionV2(NumberOfStatesRequestV2 {
+                        version,
+                        state_kind: kind,
+                    });
+                let response: Response<NumberOfStatesResponseV2> = self
+                    .create_and_send_storage_request(request_timeout_ms, data_request)
+                    .await?;
+                Ok(response.map(|response| response.number_of_states))
+            },
+        }
     }
 
     async fn get_state_values_with_proof(
@@ -1046,14 +1068,33 @@ impl AptosDataClientInterface for AptosDataClient {
         start_index: u64,
         end_index: u64,
         request_timeout_ms: u64,
+        kind: StateKind,
     ) -> crate::error::Result<Response<StateValueChunkWithProof>> {
-        let data_request = DataRequest::GetStateValuesWithProof(StateValuesWithProofRequest {
-            version,
-            start_index,
-            end_index,
-        });
-        self.create_and_send_storage_request(request_timeout_ms, data_request)
-            .await
+        match kind {
+            StateKind::MainState => {
+                let data_request =
+                    DataRequest::GetStateValuesWithProof(StateValuesWithProofRequest {
+                        version,
+                        start_index,
+                        end_index,
+                    });
+                self.create_and_send_storage_request(request_timeout_ms, data_request)
+                    .await
+            },
+            StateKind::Position => {
+                let data_request =
+                    DataRequest::GetStateValuesWithProofV2(StateValuesWithProofRequestV2 {
+                        version,
+                        start_index,
+                        end_index,
+                        state_kind: kind,
+                    });
+                let response: Response<StateValueChunkWithProofResponseV2> = self
+                    .create_and_send_storage_request(request_timeout_ms, data_request)
+                    .await?;
+                Ok(response.map(|response| response.state_value_chunk_with_proof))
+            },
+        }
     }
 
     async fn get_transaction_outputs_with_proof(

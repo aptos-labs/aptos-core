@@ -3,6 +3,8 @@
 
 use crate::{metrics, stream_engine::StreamEngine};
 use aptos_config::config::{DataStreamingServiceConfig, DynamicPrefetchingConfig};
+#[cfg(test)]
+use aptos_storage_interface::StateKind;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use std::{
     cmp::{max, min},
@@ -693,6 +695,7 @@ mod test {
         let stream_request = StreamRequest::GetAllStates(GetAllStatesRequest {
             version: 0,
             start_index: 0,
+            state_kind: StateKind::MainState,
         });
 
         // Create and return the stream engine

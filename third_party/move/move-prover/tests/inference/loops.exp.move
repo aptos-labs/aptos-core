@@ -235,10 +235,9 @@ module 0x42::loops {
         };
     }
     spec inc_global_with_invariant(addr: address, n: u64) {
-        pragma opaque = true;
+        pragma opaque = true, aborts_if_is_partial = true;
         modifies Counter[addr];
         ensures [inferred] Counter[addr].value == old(Counter[addr]).value ==> (forall x: u64, y: Counter: Counter[addr].value == old(Counter[addr]).value + x && x < n ==> update<Counter>(addr, update_field(y, value, y.value + 1)));
-        aborts_if [inferred] 0 < n;
         aborts_if [inferred] !exists<Counter>(addr);
     }
 

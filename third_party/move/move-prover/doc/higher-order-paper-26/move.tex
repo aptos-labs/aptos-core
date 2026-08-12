@@ -13,13 +13,15 @@ For the purposes of this paper, the relevant properties are:
     \item \emph{Strong static typing with generics.}  Every expression has a statically known explicit type; generic functions and structs are monomorphized for verification~\cite{DillGPQXZ22}.
 
 
-    \item \emph{Type-indexed global storage.}  Global state is a map keyed by (resource type, address) pairs: a struct can be moved to, borrowed, and moved from the location !T[address]!, with linear ownership enforced statically.  Specifications quantify over this memory directly, and !modifies! clauses name the footprint a function may touch, providing a frame condition.
+    \item \emph{Type-indexed global storage.}  A struct type with the !key! ability is called a \emph{resource} and can be stored in global state, which is a map keyed by (resource type, address) pairs: a resource can be moved to, borrowed, and moved from the location !T[addr]!, with linear ownership enforced statically, and !exists<T>(addr)! tests its presence.  Specifications quantify over this memory directly, and !modifies! clauses name the footprint a function may touch, providing a frame condition.
+
+    \item \emph{Deterministic execution.}  A Move function's results and effects are fully determined by its arguments and the pre-state of global storage; there is no in-language concurrency or other source of non-determinism.
 
     \item \emph{Reference semantics.}  References are borrowed from local variables or from global storage; this yields an alias-free memory model that makes verification tractable~\cite{DillGPQXZ22}.
 
     \item \emph{Strongly-typed bytecode.}  Move source is compiled to bytecode whose type- and memory-safety are checked before execution.  \MVP verifies this bytecode against specifications in the source.
 
-    \item \emph{Integrated specification language.}  Move lets developers write pre-/post-conditions, abort conditions, data invariants, and global memory invariants in the same source file as the code they describe, or optionally,
+    \item \emph{Integrated specification language.}  Move lets developers write pre-/postconditions, abort conditions, data invariants, and global memory invariants in the same source file as the code they describe, or optionally,
     into separate files.
 \end{Itemize}
 
@@ -34,13 +36,14 @@ Abort conditions deserve special note: multiple !aborts_if! clauses form a \emph
 
 \Paragraph{Function values in Move}
 A new version of Move extends the type system with \emph{function types} $T_1 \times \dots \times T_n \to T$ (written !|T1,...,Tn|T! in the concrete syntax) and allows values of such types to be constructed from concrete function symbols or from lambda expressions, possibly with captured arguments.
-In Move's type ability system, function values may be marked !copy!, !drop!, and !store!; a function value with !store! can be persisted to global storage.
+In Move's type ability system, function values may be marked !copy! (may be duplicated), !drop! (may be discarded), and !store! (may be placed in struct fields and thereby persisted to global storage).
 References may not be captured; only plain values may appear in a closure's payload, ensuring that captured data is independent of any borrow scope.
 
 \SubSection{Automated Market Maker Example}
 \label{sec:amm}
 
-The running example throughout this paper is a simplified AMM module (Automated Market Maker, also called Uniswap in the Ethereum context~\cite{UniswapV2}) in which the \emph{pricing curve} is a function value stored in the AMM pool.
+The running example throughout this paper is a simplified AMM (Automated Market Maker) module in which the \emph{pricing curve} is a function value stored in the AMM pool.
+An AMM holds reserves of two assets in a pool and lets traders exchange one for the other, the price determined by a curve over the current reserves rather than by an order book; prominent protocols include Uniswap~\cite{UniswapV2}, Curve, and Balancer.
 The pricing function has to satisfy a number of invariants: (i)~the function never aborts, (ii)~the output never exceeds the output reserve, (iii)~the output is monotone in the input amount, and (iv)~the product of the two reserves does not decrease after a swap (constant-product preservation).
 The spec expresses these invariants using \emph{behavioral predicates} and \emph{state labels}, two constructs introduced by this paper:
 
@@ -93,6 +96,10 @@ The behavioral predicates !aborts_of!, !result_of!, and (elsewhere) !ensures_of!
 Without behavioral predicates, specifying a higher-order function would require inlining the callee's conditions at every call site, leading to a combinatorial explosion in specification size; behavioral predicates make reasoning about function values modular and abstract.
 Using them in invariants as in the example creates (i)~a requirement for any code creating a pool to pass only compliant function values, and (ii)~a guarantee for any code calling a pool function that the requirements are met. Both conditions are verified by \MVP.
 
+Notice that the monotonicity invariant relates two invocations of the same function value --- a \emph{relational} property (hyperproperty).
+This is no special case: per state pair, !result_of! is a mathematical function of the function value and its arguments, so any first-order formula relating multiple !result_of! terms is a legal specification.
+For example, !S.. |~ result_of<f>(x) > result_of<g>(x)! compares two function values pointwise; relations across different states are expressed via distinct state labels.
+
 \Paragraph{Swapping}
 The major functionality of the pool is to facilitate !swap! (exchange) of one asset with another.
 
@@ -117,7 +124,8 @@ The major functionality of the pool is to facilitate !swap! (exchange) of one as
 \end{MoveBox}
 % @formatter:on
 
-\noindent The specification of !swap! can be verified by \MVP because of the invariants guaranteed for the (dynamic) !pricing! function. In this case, we only illustrate the aborts condition and product preservation. For aborts, !pricing! itself is non-aborting, and (more subtly), |pool.reserve_y - out| cannot underflow because of the 'output never exceeds the output reserve' invariant, so only the overflow condition remains. (Notice \MVP would flag any aborts conditions not covered). For product preservation, the constraint can be derived as well.
+\noindent In a postcondition, !result! is the predefined name of the function's return value, and !old(e)! evaluates !e! in the function's pre-state.
+The specification of !swap! can be verified by \MVP because of the invariants guaranteed for the (dynamic) !pricing! function. In this case, we only illustrate the aborts condition and product preservation. For aborts, !pricing! itself is non-aborting, and (more subtly), |pool.reserve_y - out| cannot underflow because of the 'output never exceeds the output reserve' invariant, so only the overflow condition remains. (Notice \MVP would flag any aborts conditions not covered). For product preservation, the constraint can be derived as well.
 
 \Paragraph{Pricing variants}
 At the time a pool value is constructed, the invariants for the pricing function need to be verified.
@@ -142,14 +150,15 @@ The next example uses a pricing function which charges a configurable fee:
 % @formatter:off
 \begin{MoveBox}
   struct Fee has key {bps: u64}
-  fun with_fee(addr: address,
+  fun with_fee(owner: address,
                ri: u64, ro: u64, a: u64): u64 {
     let b = (a as u128)
-       * (10000 - Fee[addr].bps as u128) / 10000;
-    product(ri, ro, b)
-  } spec with_fee {
+       * (10000 - Fee[owner].bps as u128) / 10000;
+    product(ri, ro, b as u64)
+  }
+  spec with_fee {
     aborts_if !exists<Fee>(owner);
-    aborts_if Fee[addr].bps > 10000;
+    aborts_if Fee[owner].bps > 10000;
     ..
   }
 \end{MoveBox}
@@ -159,10 +168,11 @@ The next example uses a pricing function which charges a configurable fee:
 
 % @formatter:off
 \begin{MoveBox}
-    let addr: address;
+    let owner: address;
     Pool{
       ..,
-      pricing: |ri, ro, a| with_fee(addr, ri, ro, a)
+      pricing: |ri, ro, a|
+        with_fee(owner, ri, ro, a)
     }
 \end{MoveBox}
 % @formatter:on
@@ -172,17 +182,19 @@ Guarding the definitions with checks and using a default fee fixes this and make
 
 % @formatter:off
 \begin{MoveBox}
-  fun with_fee_compliant(addr: address,
+  fun with_fee_compliant(owner: address,
                ri: u64, ro: u64, a: u64): u64 {
     let bps =
-      if (!exists<Fee>(addr) || Fee[addr].bps > 10000)
+      if (!exists<Fee>(owner)
+          || Fee[owner].bps > 10000)
         500
       else
-        Fee[addr].bps;
+        Fee[owner].bps;
     let b =
         (a as u128) * (10000 - bps as u128) / 10000;
     product(ri, ro, b as u64)
-  } spec with_fee_compliant {
+  }
+  spec with_fee_compliant {
     aborts_if false;
     ..
   }
@@ -196,7 +208,10 @@ We are looking at connecting specification inference in \MVP to the use case of 
 The AMM example shows that non-trivial invariants can be specified for function values, and that the prover is capable of verifying them on the construction and caller sides, even though the invariants presented constitute non-linear arithmetic problems. While determining that the aborts contract is violated by |with_fee| appears easy (after all, one can directly see in the spec that the function aborts), there are more subtle things happening in the background -- for example, that |product| does not have any underflow on subtraction because of the |pricing| invariant that the return value does not exceed the reserve.
 
 However, we have no illusions about the scalability of compliance-side verification.
-In general, passing a function $f$ as an actual parameter $p$ requires proving $\forall x: \requiresof{p}{x} \implies \requiresof{f}{x}$, $\forall x: \abortsof{f}{x} \iff \abortsof{p}{x}$, and $\forall x,y: \ensuresof{f}{x, y} \implies \ensuresof{p}{x, y}$. For the examples provided here, this proof was possible. In general cases, we do not expect those proofs to be automated easily; rather, they will require proof hints and/or trusted assumptions. Nevertheless, on the application side of function values, such as inside the |swap| function, verification is not more complex than for first-order functions.
+In general, passing a function $f$ as an actual parameter $p$ requires proving $\forall x: \requiresof{p}{x} \implies \requiresof{f}{x}$, $\forall x: \abortsof{f}{x} \iff \abortsof{p}{x}$, and $\forall x,y: \ensuresof{f}{x, y} \implies \ensuresof{p}{x, y}$; Sec.~\ref{sec:enc-bp} describes how these obligations materialize in the encoding.
+For the examples in this paper, !product! and the application side (!swap!, the callers of !find!) verify from the shown specifications alone; the nonlinear fee variants need in addition a one- or two-line proof hint (a case split, and a stepping-stone assertion bounding the fee-adjusted input).
+For harder universal properties of functions, we do not expect compliance proofs to be automated easily; rather, they will require more substantial proof hints and/or trusted assumptions.
+Nevertheless, on the application side of function values, such as inside the |swap| function, verification is not more complex than for first-order functions.
 
 \SubSection{Filter-style Loops} \label{sec:find}
 

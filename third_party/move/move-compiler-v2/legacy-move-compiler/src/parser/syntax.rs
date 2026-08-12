@@ -29,10 +29,6 @@ impl<'env, 'lexer, 'input> Context<'env, 'lexer, 'input> {
     }
 }
 
-// Internal complier variables used to represent `for` loops.
-pub const FOR_LOOP_UPDATE_ITER_FLAG: &str = "__update_iter_flag";
-const FOR_LOOP_UPPER_BOUND_VALUE: &str = "__upper_bound_value";
-
 // Tokens that can follow `friend` as a visibility modifier on a module member,
 // distinguishing `friend <visibility>` from a `friend <module_path>` declaration.
 const FRIEND_MODIFIER_FOLLOW_TOKENS: &[Tok] =
@@ -1217,8 +1213,15 @@ fn exp_ends_with_rbrace(exp: &Exp) -> bool {
                 exp_ends_with_rbrace(then_exp)
             }
         },
-        // For While and Loop, check the body
+        // For While and Loop, the expression ends with the body.
         Exp_::While(_, _, body) | Exp_::Loop(_, body) => exp_ends_with_rbrace(body),
+        // For `for`, a trailing spec block (declared after the body) ends with
+        // `}`; a header spec (inside the loop header, before the body) does not,
+        // so the expression ends wherever the body ends.
+        Exp_::For(_, _, _, body, spec_opt) => match spec_opt {
+            Some(spec) if spec.loc.start() >= body.loc.end() => true,
+            _ => exp_ends_with_rbrace(body),
+        },
         // All other expression types don't end with a `}`.
         // We keep this list exhaustive to catch future additions.
         Exp_::Value(_)
@@ -1550,13 +1553,17 @@ fn parse_exp_or_control_sequence(context: &mut Context) -> Result<(Exp, bool), B
     }
 }
 
+// TODO: folds a trailing `while` invariant into the condition as
+// `{ invariant ...; cond }`. Prefer a dedicated spec field on `Exp_::While`
+// (like `Exp_::For`) and drop this fold.
 fn parse_spec_while_loop(
     context: &mut Context,
     condition: Exp,
     ends_in_block: bool,
 ) -> Result<(Exp, bool), Box<Diagnostic>> {
     if context.tokens.peek() == Tok::Spec {
-        let spec_seq = parse_spec_loop_invariant(context)?;
+        let spec_exp = parse_spec_loop_invariant(context)?;
+        let spec_seq = sp(spec_exp.loc, SequenceItem_::Seq(Box::new(spec_exp)));
         let loc = condition.loc;
         let spec_block = Exp_::Block((vec![], vec![spec_seq], None, Box::new(Some(condition))));
         Ok((sp(loc, spec_block), true))
@@ -1565,10 +1572,9 @@ fn parse_spec_while_loop(
     }
 }
 
-fn parse_spec_loop_invariant(context: &mut Context) -> Result<SequenceItem, Box<Diagnostic>> {
+fn parse_spec_loop_invariant(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
     // Parse a loop invariant. Also validate that only `invariant`
-    // properties are contained in the spec block. This is
-    // transformed into `while ({spec { .. }; cond) body`.
+    // properties are contained in the spec block.
     let spec = parse_spec_block(vec![], context)?;
     for member in &spec.value.members {
         match member.value {
@@ -1585,10 +1591,7 @@ fn parse_spec_loop_invariant(context: &mut Context) -> Result<SequenceItem, Box<
             },
         }
     }
-    Ok(sp(
-        spec.loc,
-        SequenceItem_::Seq(Box::new(sp(spec.loc, Exp_::Spec(spec)))),
-    ))
+    Ok(sp(spec.loc, Exp_::Spec(spec)))
 }
 
 // if there is a block, only parse the block, not any subsequent tokens
@@ -1683,21 +1686,12 @@ fn parse_optional_label(context: &mut Context) -> Result<Option<Label>, Box<Diag
     }
 }
 
-// "for (iter in lower_bound..upper_bound) loop_body" transforms into
-// let iter = lower_bound;
-// let flag = false;
-// while (true) {
-//     if flag {
-//         iter = iter + 1;
-//     } else {
-//         flag = true;
-//     }
-//     if (i < upper_bound) {
-//         loop_body;
-//     } else {
-//         break
-//     }
-// }
+// Parse a for loop:
+//      ForLoop = "for" "(" <Identifier> "in" <UnaryExp> ".." <UnaryExp> (<SpecBlock>)? ")" <Exp> (<SpecBlock>)?
+// The loop invariants may be given either in the loop header (before `)`) or as a trailing
+// spec block after the body (mirroring the `while` loop), but not both. The spec block may
+// only contain loop invariants. The `for` loop is represented as a first-class expression
+// and lowered to a primitive loop during model building.
 fn parse_for_loop(context: &mut Context) -> Result<(Exp, bool), Box<Diagnostic>> {
     const FOR_IDENT: &str = "for";
     let start_loc = context.tokens.start_loc();
@@ -1718,167 +1712,47 @@ fn parse_for_loop(context: &mut Context) -> Result<(Exp, bool), Box<Diagnostic>>
     consume_token(context.tokens, Tok::PeriodPeriod)?;
     let ub = parse_unary_exp(context)?;
 
-    let spec_seq = if context.tokens.peek() == Tok::Spec {
-        Some(parse_spec_loop_invariant(context)?)
+    let header_spec_opt = if context.tokens.peek() == Tok::Spec {
+        Some(Box::new(parse_spec_loop_invariant(context)?))
     } else {
         None
     };
 
     consume_token(context.tokens, Tok::RParen)?;
-    let (for_body, ends_in_block) = parse_exp_or_control_sequence(context)?;
+    let (for_body, mut ends_in_block) = parse_exp_or_control_sequence(context)?;
+
+    // Loop invariants may alternatively be given in a trailing spec block after the body,
+    // like a `while` loop. A trailing spec block ends in `}`.
+    let spec_opt = if context.tokens.peek() == Tok::Spec {
+        let trailing_spec = Box::new(parse_spec_loop_invariant(context)?);
+        ends_in_block = true;
+        if let Some(header_spec) = &header_spec_opt {
+            return Err(Box::new(diag!(
+                Syntax::InvalidSpecBlockMember,
+                (
+                    trailing_spec.loc,
+                    "a loop invariant may be given in the loop header or in a trailing spec block, but not both"
+                ),
+                (header_spec.loc, "already specified in the loop header here")
+            )));
+        }
+        Some(trailing_spec)
+    } else {
+        header_spec_opt
+    };
 
     let end_loc = context.tokens.previous_end_loc();
-
-    // Build corresponding expression:
-    // let iter = lower_bound;
-    // let ub_value = upper_bound_value;
-    // flag = false;
-    // loop {
-    //     if (flag) {
-    //         iter = iter + 1;
-    //     } else {
-    //         flag = true;
-    //     };
-    //     if (i < ub_value) {
-    //         loop_body;
-    //     } else break;
-    // }
-    let for_loc = make_loc(context.tokens.file_hash(), start_loc, end_loc);
-
-    // Create assignment "let iter = lower_bound"
-    let iter_bind = sp(for_loc, Bind_::Var(Var(iter)));
-    let iter_bindlist = sp(for_loc, vec![iter_bind]);
-    let iter_init = sp(
-        iter.loc,
-        SequenceItem_::Bind(iter_bindlist, None, Box::new(lb)),
-    );
-
-    // To create the declaration "let flag = false", first create the variable flag, and then assign it to false
-    let flag_symb = Symbol::from(FOR_LOOP_UPDATE_ITER_FLAG);
-    let flag = sp(for_loc, vec![sp(
-        for_loc,
-        Bind_::Var(Var(sp(for_loc, flag_symb))),
-    )]);
-    let false_exp = sp(for_loc, Exp_::Value(sp(for_loc, Value_::Bool(false))));
-    let decl_flag = sp(
-        for_loc,
-        SequenceItem_::Bind(flag, None, Box::new(false_exp)),
-    );
-
-    // To create the declaration "let ub_value = upper_bound", first create the variable flag, and
-    // then assign it to upper_bound
-    let ub_value_symbol = Symbol::from(FOR_LOOP_UPPER_BOUND_VALUE);
-    let ub_value_bindlist = sp(for_loc, vec![sp(
-        for_loc,
-        Bind_::Var(Var(sp(for_loc, ub_value_symbol))),
-    )]);
-    let ub_value_assignment = sp(
-        for_loc,
-        SequenceItem_::Bind(ub_value_bindlist, None, Box::new(ub)),
-    );
-
-    // Construct the increment "iter = iter + 1"
-    let one_exp = sp(
-        for_loc,
-        Exp_::Value(sp(for_loc, Value_::Num(Symbol::from("1")))),
-    );
-    let op_add = sp(for_loc, BinOp_::Add);
-    let iter_exp = sp(
-        for_loc,
-        Exp_::Name(sp(for_loc, NameAccessChain_::One(iter)), None),
-    );
-    let updated_exp = sp(
-        for_loc,
-        Exp_::BinopExp(Box::new(iter_exp.clone()), op_add, Box::new(one_exp)),
-    );
-    let update = sp(
-        for_loc,
-        Exp_::Assign(Box::new(iter_exp.clone()), None, Box::new(updated_exp)),
-    );
-
-    // Create the assignment "flag = true;"
-    let flag_exp = sp(
-        for_loc,
-        Exp_::Name(
-            sp(for_loc, NameAccessChain_::One(sp(for_loc, flag_symb))),
-            None,
+    let parsed_for_loop = spanned(
+        context.tokens.file_hash(),
+        start_loc,
+        end_loc,
+        Exp_::For(
+            Var(iter),
+            Box::new(lb),
+            Box::new(ub),
+            Box::new(for_body),
+            spec_opt,
         ),
-    );
-    let true_exp = sp(for_loc, Exp_::Value(sp(for_loc, Value_::Bool(true))));
-    let assign_iter = sp(
-        for_loc,
-        Exp_::Assign(Box::new(flag_exp.clone()), None, Box::new(true_exp.clone())),
-    );
-
-    // construct flag conditional "if (flag) { update; } else { flag = true; }"
-    // let update = sp(
-    //     for_loc,
-    //     Exp_::Block((vec![], vec![update], None, Box::new(None))),
-    // );
-    let flag_conditional = sp(
-        for_loc,
-        Exp_::IfElse(
-            Box::new(flag_exp.clone()),
-            Box::new(update),
-            Some(Box::new(assign_iter)),
-        ),
-    );
-    let flag_conditional = sp(for_loc, SequenceItem_::Seq(Box::new(flag_conditional)));
-
-    // Create the condition "iter < upper_bound"
-    let op_le = sp(iter.loc, BinOp_::Lt);
-    let ub_value_exp = sp(
-        for_loc,
-        Exp_::Name(
-            sp(for_loc, NameAccessChain_::One(sp(for_loc, ub_value_symbol))),
-            None,
-        ),
-    );
-    let e = Exp_::BinopExp(Box::new(iter_exp), op_le, Box::new(ub_value_exp));
-    let loop_condition = sp(iter.loc, e);
-
-    // Create the "if (loop_condition) { loop_body; } else break"
-    let loop_conditional = Exp_::IfElse(
-        Box::new(loop_condition),
-        Box::new(for_body),
-        Some(Box::new(sp(for_loc, Exp_::Break(None)))),
-    );
-    let loop_conditional = sp(
-        for_loc,
-        SequenceItem_::Seq(Box::new(sp(for_loc, loop_conditional))),
-    );
-
-    let while_condition = match spec_seq {
-        None => true_exp.clone(),
-        Some(spec) => sp(
-            for_loc,
-            Exp_::Block((vec![], vec![spec], None, Box::new(Some(true_exp.clone())))),
-        ),
-    };
-    let body = sp(
-        for_loc,
-        Exp_::Block((
-            vec![],
-            vec![flag_conditional, loop_conditional],
-            None,
-            Box::new(None),
-        )),
-    );
-    let loop_body = sp(
-        for_loc,
-        Exp_::While(None, Box::new(while_condition), Box::new(body)),
-    );
-    let loop_body = sp(for_loc, SequenceItem_::Seq(Box::new(loop_body)));
-
-    // construct the parsed for loop
-    let parsed_for_loop = sp(
-        for_loc,
-        Exp_::Block((
-            vec![],
-            vec![iter_init, decl_flag, ub_value_assignment, loop_body],
-            Some(for_loc),
-            Box::new(None),
-        )),
     );
     Ok((parsed_for_loop, ends_in_block))
 }
@@ -4335,7 +4209,7 @@ fn parse_spec_block_member(context: &mut Context) -> Result<SpecBlockMember, Box
             "apply" => parse_spec_apply(context),
             "pragma" => parse_spec_pragma(context),
             "lemma" => parse_lemma(context),
-            "global" | "local" => parse_spec_variable(context),
+            "global" | "local" | "ghost" => parse_spec_variable(context),
             "update" => parse_spec_update(context),
             "modifies_of" if context.env.flags().language_version() >= LanguageVersion::V2_4 => {
                 parse_modifies_of(context)
@@ -4808,29 +4682,35 @@ fn parse_reads_of(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnost
 }
 
 // Parse a specification variable.
-//     SpecVariable = ( "global" | "local" )?
+//     SpecVariable = ( "global" | "local" | "ghost" )?
 //                    <Identifier> <OptionalTypeParameters>
 //                    ":" <Type>
 //                    [ "=" Exp ]  // global only
 //                    ";"
+// A "ghost" variable declares a model-only field on the struct enclosing the
+// spec block, rather than a spec variable.
 fn parse_spec_variable(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
-    let is_global = match context.tokens.content() {
+    let (is_global, is_ghost) = match context.tokens.content() {
         "global" => {
             consume_token(context.tokens, Tok::Identifier)?;
-            true
+            (true, false)
         },
         "local" => {
             consume_token(context.tokens, Tok::Identifier)?;
-            false
+            (false, false)
         },
-        _ => false,
+        "ghost" => {
+            consume_token(context.tokens, Tok::Identifier)?;
+            (false, true)
+        },
+        _ => (false, false),
     };
     let name = parse_identifier(context)?;
     let type_parameters = parse_optional_type_parameters(context)?;
     consume_token(context.tokens, Tok::Colon)?;
     let type_ = parse_type(context)?;
-    let init = if is_global && context.tokens.peek() == Tok::Equal {
+    let init = if (is_global || is_ghost) && context.tokens.peek() == Tok::Equal {
         context.tokens.advance()?;
         Some(parse_exp(context)?)
     } else {
@@ -4844,6 +4724,7 @@ fn parse_spec_variable(context: &mut Context) -> Result<SpecBlockMember, Box<Dia
         context.tokens.previous_end_loc(),
         SpecBlockMember_::Variable {
             is_global,
+            is_ghost,
             name,
             type_parameters,
             type_,

@@ -47,6 +47,21 @@ pub struct UsageState {
     pub accessed: MemoryUsage,
     /// The memory modified by this function.
     pub modified: MemoryUsage,
+    /// The memory declared as invocable-through by `modifies_of` frame
+    /// specifications reachable in this function's body — the enclosing
+    /// function's own `modifies_of` parameter frames, the struct-field
+    /// `modifies_of` declarations that any Invoke may reach, and (via
+    /// `subsume_callee`) the same for all callees. Distinct from
+    /// `modified` so downstream checks over declared modifies (e.g.
+    /// opacity coverage) are not perturbed; consumed by loop-header havoc
+    /// collection.
+    pub invoke_frame: MemoryUsage,
+    /// True if any `modifies_of<f> *` wildcard is reachable in this
+    /// function's body or its callees. Deliberately unresolved at
+    /// summary time: a pure forwarder's own accessed footprint is empty,
+    /// so callers must resolve the wildcard against *their* accessed
+    /// footprint at each use site (loop-header havoc, Invoke, etc.).
+    pub invoke_frame_wildcard: bool,
     /// The memory mentioned by the assume expressions in this function.
     pub assumed: MemoryUsage,
     /// The memory mentioned by the assert expressions in this function.
@@ -160,6 +175,26 @@ impl UsageState {
     generate_inserter!(asserted, add_transitive);
 }
 
+/// Direct-only inserters for `invoke_frame`: it does not participate in the
+/// `accessed` union (unlike `modified`, an invocable-through frame is a
+/// distinct concept from an actually-accessed memory).
+impl UsageState {
+    fn add_direct_invoke_frame(&mut self, mem: QualifiedInstId<StructId>) {
+        self.invoke_frame.direct.insert(mem.clone());
+        self.invoke_frame.all.insert(mem);
+    }
+
+    fn add_transitive_invoke_frame_iter(
+        &mut self,
+        mems: impl Iterator<Item = QualifiedInstId<StructId>>,
+    ) {
+        for mem in mems {
+            self.invoke_frame.transitive.insert(mem.clone());
+            self.invoke_frame.all.insert(mem);
+        }
+    }
+}
+
 /// Helpers for the abstract interpretation process
 impl UsageState {
     fn subsume_callee(&mut self, callee: &Self, inst: &[Type]) {
@@ -167,6 +202,8 @@ impl UsageState {
         self.add_transitive_modified_iter(callee.modified.get_all_inst(inst).into_iter());
         self.add_transitive_assumed_iter(callee.assumed.get_all_inst(inst).into_iter());
         self.add_transitive_asserted_iter(callee.asserted.get_all_inst(inst).into_iter());
+        self.add_transitive_invoke_frame_iter(callee.invoke_frame.get_all_inst(inst).into_iter());
+        self.invoke_frame_wildcard |= callee.invoke_frame_wildcard;
     }
 }
 
@@ -284,6 +321,92 @@ impl MemoryUsageAnalysis<'_> {
             }
         }
     }
+
+    /// Add memory declared as invocable-through by `modifies_of` frame
+    /// specifications to the modified summary of any function that invokes a
+    /// function value. Without this, a helper whose only effect is invoking
+    /// its declared parameter has an empty `modified` summary, and callers
+    /// that inherit that summary (e.g. loop-header havoc collection) miss
+    /// the frame — the effect propagates through arbitrary call depth via
+    /// the existing `subsume_callee` transitive closure.
+    ///
+    /// Sources of Invoke frame memory (all unioned; provenance of the
+    /// invoked value is not tracked at this stage):
+    /// - The enclosing function's `modifies_of` parameter frames — a
+    ///   `modifies_of<f> *` wildcard falls back to the current summary's
+    ///   accessed footprint.
+    /// - Struct fields with `modifies_of` declarations, whose field type
+    ///   may match the invoked value's type — same wildcard treatment.
+    ///
+    /// Foreign type-parameter contexts (a struct spec's or the enclosing
+    /// function's `*` fallback) set the wildcard flag instead of being
+    /// inserted with a mis-scoped instantiation.
+    fn compute_invoke_usage(&self, target: &FunctionTarget, state: &mut UsageState) {
+        use Bytecode::*;
+        use Operation::*;
+        let env = self.cache.global_env();
+        let has_invoke = target
+            .get_bytecode()
+            .iter()
+            .any(|bc| matches!(bc, Call(_, _, Invoke, _, _)));
+        if !has_invoke {
+            return;
+        }
+        let mem_is_closed =
+            |mem: &QualifiedInstId<StructId>| mem.inst.iter().all(|ty| !ty.is_open());
+        let mut wildcard = false;
+        // Parameter-declared frames of the enclosing function.
+        for access in target.func_env.get_fun_param_access_of() {
+            if access.frame_spec.modifies_all {
+                wildcard = true;
+            }
+            for mem in &access.old_memory {
+                if mem_is_closed(mem) {
+                    state.add_direct_invoke_frame(mem.clone());
+                } else {
+                    wildcard = true;
+                }
+            }
+        }
+        // Struct-field-declared frames from anywhere in the program.
+        //
+        // The type-match gate would need per-invocation-operand-type
+        // filtering (fat_loop.rs applies that at loop granularity); at the
+        // function-summary layer we don't know which Invoke reaches which
+        // caller, so we union the frames of every field whose type is a
+        // function type at all. Safe over-approximation for `invoke_frame`.
+        for module_env in env.get_modules() {
+            for struct_env in module_env.get_structs() {
+                for access in struct_env.get_field_access_of() {
+                    if !struct_env
+                        .find_field(access.fun_param)
+                        .is_some_and(|f| matches!(f.get_type().skip_reference(), Type::Fun(..)))
+                    {
+                        continue;
+                    }
+                    if access.frame_spec.modifies_all {
+                        wildcard = true;
+                    }
+                    for mem in &access.old_memory {
+                        if mem_is_closed(mem) {
+                            state.add_direct_invoke_frame(mem.clone());
+                        } else {
+                            wildcard = true;
+                        }
+                    }
+                }
+            }
+        }
+        // The wildcard is intentionally NOT resolved here against the
+        // summarized function's accessed footprint: for a pure forwarder
+        // (`fun apply(f, s) { f(s) }` with `modifies_of<f> *`) that
+        // footprint is empty, and a caller inheriting the summary via
+        // `subsume_callee` would then havoc nothing. Propagate the flag
+        // and let each use site resolve it against its own footprint.
+        if wildcard {
+            state.invoke_frame_wildcard = true;
+        }
+    }
 }
 
 pub struct UsageProcessor();
@@ -303,6 +426,7 @@ impl UsageProcessor {
         let analysis = MemoryUsageAnalysis { cache };
         let mut summary = analysis.summarize(&func_target, UsageState::default());
         analysis.compute_spec_usage(&func_env.get_spec(), &mut summary);
+        analysis.compute_invoke_usage(&func_target, &mut summary);
         summary
     }
 }

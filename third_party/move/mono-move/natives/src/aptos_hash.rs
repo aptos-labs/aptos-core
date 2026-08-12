@@ -8,8 +8,9 @@
 //! wrappers in the framework.
 
 use crate::{monomorphic_natives, NativeEntry};
-use mono_move_core::native::{
-    NativeContext, NativeContextFamily, NativeStatus, VMInternalError, Vector,
+use mono_move_core::{
+    native::{NativeContext, NativeContextFamily, NativeStatus, Vector},
+    VMResult,
 };
 use ripemd::Digest as OtherDigest;
 use sha2::Digest;
@@ -24,7 +25,7 @@ use tiny_keccak::{Hasher as KeccakHasher, Keccak};
 fn native_hash<C: NativeContext>(
     ctx: &C,
     hash: impl FnOnce(&[u8]) -> Vec<u8>,
-) -> Result<NativeStatus, VMInternalError> {
+) -> VMResult<NativeStatus> {
     // SAFETY: arg 0 is `vector<u8>`.
     let data: Vector<u8> = unsafe { ctx.arg(0)? };
     let digest = {
@@ -40,7 +41,7 @@ fn native_hash<C: NativeContext>(
 }
 
 /// `0x1::aptos_hash::keccak256(bytes: vector<u8>): vector<u8>`
-pub fn native_keccak256<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
+pub fn native_keccak256<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     native_hash(ctx, |bytes| {
         let mut output = [0u8; 32];
         let mut hasher = Keccak::v256();
@@ -53,7 +54,7 @@ pub fn native_keccak256<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInt
 /// `0x1::aptos_hash::sip_hash(bytes: vector<u8>): u64`
 //
 // TODO(metering): charge gas.
-pub fn native_sip_hash<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
+pub fn native_sip_hash<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     // SAFETY: arg 0 is `vector<u8>`.
     let data: Vector<u8> = unsafe { ctx.arg(0)? };
     let hash = {
@@ -70,7 +71,7 @@ pub fn native_sip_hash<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInte
 }
 
 /// `0x1::aptos_hash::sha2_512_internal(bytes: vector<u8>): vector<u8>`
-pub fn native_sha2_512<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
+pub fn native_sha2_512<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     native_hash(ctx, |bytes| {
         let mut hasher = sha2::Sha512::new();
         hasher.update(bytes);
@@ -79,7 +80,7 @@ pub fn native_sha2_512<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInte
 }
 
 /// `0x1::aptos_hash::sha3_512_internal(bytes: vector<u8>): vector<u8>`
-pub fn native_sha3_512<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
+pub fn native_sha3_512<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     native_hash(ctx, |bytes| {
         let mut hasher = sha3::Sha3_512::new();
         hasher.update(bytes);
@@ -88,7 +89,7 @@ pub fn native_sha3_512<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInte
 }
 
 /// `0x1::aptos_hash::ripemd160_internal(bytes: vector<u8>): vector<u8>`
-pub fn native_ripemd160<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
+pub fn native_ripemd160<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     native_hash(ctx, |bytes| {
         let mut hasher = ripemd::Ripemd160::new();
         hasher.update(bytes);
@@ -97,7 +98,7 @@ pub fn native_ripemd160<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInt
 }
 
 /// `0x1::aptos_hash::blake2b_256_internal(bytes: vector<u8>): vector<u8>`
-pub fn native_blake2b_256<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
+pub fn native_blake2b_256<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     native_hash(ctx, |bytes| {
         blake2_rfc::blake2b::blake2b(32, &[], bytes)
             .as_bytes()

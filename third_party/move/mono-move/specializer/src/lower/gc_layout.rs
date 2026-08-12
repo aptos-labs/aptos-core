@@ -3,12 +3,11 @@
 
 //! Type-driven derivation of GC frame layout from monomorphic slot types.
 
-use super::context::LoweringContext;
+use super::{context::LoweringContext, LoweringError};
 use crate::stackless_exec_ir::FunctionIR;
-use anyhow::{bail, Result};
 use mono_move_core::{
     types::{view_type, InternedType, Type},
-    FrameOffset, LayoutId, LayoutKind, LayoutProvider,
+    FrameOffset, LayoutId, LayoutKind, LayoutProvider, VMInternalError, VMResult,
 };
 
 /// GC-relevant frame metadata derived for a single function.
@@ -27,7 +26,7 @@ pub fn derive_frame_layout(
     ctx: &LoweringContext<'_>,
     func_ir: &FunctionIR,
     home_slot_types: &[InternedType],
-) -> Result<DerivedFrameLayout> {
+) -> VMResult<DerivedFrameLayout> {
     let mut heap_ptr_offsets = vec![];
     // TODO(cleanup): consider whether `LoweringContext::home_slots` should carry
     // each slot's type directly, so we wouldn't need to zip with a
@@ -64,7 +63,7 @@ pub fn derive_frame_layout(
 
 /// Returns `true` iff `type_pointer_offsets` would accept `ty` without
 /// erroring. Keep in sync with `type_pointer_offsets`: every case that
-/// `bail!`s there must return `false` here.
+/// errors there must return `false` here.
 pub fn gc_layout_supports(layouts: &dyn LayoutProvider, ty: InternedType) -> bool {
     match view_type(ty) {
         Type::Bool
@@ -99,7 +98,7 @@ pub fn gc_layout_supports(layouts: &dyn LayoutProvider, ty: InternedType) -> boo
 /// contains non-instantiated type parameters. Callers that want to
 /// decide *whether* to lower a function should use `gc_layout_supports`
 /// for a graceful `Skipped` outcome rather than reaching this `Err`.
-pub fn type_pointer_offsets(layouts: &dyn LayoutProvider, ty: InternedType) -> Result<Vec<u32>> {
+pub fn type_pointer_offsets(layouts: &dyn LayoutProvider, ty: InternedType) -> VMResult<Vec<u32>> {
     let offsets = match view_type(ty) {
         // Scalars: no pointer offsets.
         Type::Bool
@@ -132,12 +131,14 @@ pub fn type_pointer_offsets(layouts: &dyn LayoutProvider, ty: InternedType) -> R
         Type::Nominal { .. } => {
             let id = layouts
                 .layout_id(ty)
-                .ok_or_else(|| anyhow::anyhow!("nominal type has no layout populated"))?;
+                .ok_or(LoweringError::LayoutNotPopulated)?;
             layout_pointer_offsets(layouts, id)?
         },
 
         Type::TypeParam { .. } => {
-            bail!("type parameter reached gc_layout — try_build_context should have skipped");
+            return Err(VMInternalError::new(
+                LoweringError::TypeParamReachedGcLayout,
+            ));
         },
     };
     Ok(offsets)
@@ -150,15 +151,16 @@ pub fn type_pointer_offsets(layouts: &dyn LayoutProvider, ty: InternedType) -> R
 /// scalars hold none.
 ///
 /// TODO(metering): rewrite without recursion or add a depth/visited bound.
-fn layout_pointer_offsets(layouts: &dyn LayoutProvider, id: LayoutId) -> Result<Vec<u32>> {
+fn layout_pointer_offsets(layouts: &dyn LayoutProvider, id: LayoutId) -> VMResult<Vec<u32>> {
     let layout = layouts
         .layout(id)
-        .ok_or_else(|| anyhow::anyhow!("layout id does not resolve to a layout"))?;
+        .ok_or(LoweringError::LayoutIdUnresolved)?;
     let offsets = match &layout.kind {
         LayoutKind::Bool
         | LayoutKind::UnsignedInt
         | LayoutKind::SignedInt
-        | LayoutKind::Address => vec![],
+        | LayoutKind::Address
+        | LayoutKind::Signer => vec![],
         LayoutKind::Ref
         | LayoutKind::Vector { .. }
         | LayoutKind::FrozenEnum { .. }
@@ -167,13 +169,12 @@ fn layout_pointer_offsets(layouts: &dyn LayoutProvider, id: LayoutId) -> Result<
             let mut out = vec![];
             for field in fields.iter() {
                 for rel in layout_pointer_offsets(layouts, field.id)? {
-                    let abs = field.offset.checked_add(rel).ok_or_else(|| {
-                        anyhow::anyhow!(
-                            "gc_layout: field offset {} + inner offset {} overflows u32",
-                            field.offset,
-                            rel,
-                        )
-                    })?;
+                    let abs = field.offset.checked_add(rel).ok_or(
+                        LoweringError::GcFieldOffsetOverflow {
+                            field_offset: field.offset,
+                            inner_offset: rel,
+                        },
+                    )?;
                     out.push(abs);
                 }
             }
@@ -190,17 +191,17 @@ fn layout_pointer_offsets(layouts: &dyn LayoutProvider, id: LayoutId) -> Result<
 pub fn shifted_field_pointer_offsets(
     layouts: &dyn LayoutProvider,
     fields: impl IntoIterator<Item = (u32, InternedType)>,
-) -> Result<Vec<u32>> {
+) -> VMResult<Vec<u32>> {
     let mut out = vec![];
     for (field_offset, field_ty) in fields {
         for rel in type_pointer_offsets(layouts, field_ty)? {
-            let abs = field_offset.checked_add(rel).ok_or_else(|| {
-                anyhow::anyhow!(
-                    "gc_layout: field offset {} + inner offset {} overflows u32",
-                    field_offset,
-                    rel,
-                )
-            })?;
+            let abs =
+                field_offset
+                    .checked_add(rel)
+                    .ok_or(LoweringError::GcFieldOffsetOverflow {
+                        field_offset,
+                        inner_offset: rel,
+                    })?;
             out.push(abs);
         }
     }

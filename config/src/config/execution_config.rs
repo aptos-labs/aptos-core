@@ -106,7 +106,7 @@ impl Default for ExecutionConfig {
             genesis_waypoint: None,
             blockstm_v2_enabled: true,
             layout_caches_enabled: true,
-            async_runtime_checks: true,
+            async_runtime_checks: false,
             enable_pre_write: true,
         }
     }

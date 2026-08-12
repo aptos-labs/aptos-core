@@ -12,6 +12,8 @@ pub mod data_cache;
 pub mod execution_tracing;
 mod interpreter;
 mod interpreter_caches;
+#[cfg(any(test, feature = "testing"))]
+pub use interpreter_caches::InstructionCacheBudgetOverride;
 mod loader;
 pub mod logging;
 pub mod move_vm;
@@ -47,7 +49,7 @@ pub use storage::{
         unsync_module_storage::{AsUnsyncModuleStorage, BorrowedOrOwned, UnsyncModuleStorage},
     },
     layout_cache::{
-        ambassador_impl_LayoutCache, LayoutCache, LayoutCacheEntry, NoOpLayoutCache, StructKey,
+        ambassador_impl_LayoutCache, LayoutCache, LayoutCacheEntry, LayoutCacheKey, NoOpLayoutCache,
     },
     loader::{
         eager::EagerLoader,

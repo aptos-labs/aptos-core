@@ -8,7 +8,7 @@ use aptos_crypto::HashValue;
 use aptos_db_indexer::db_indexer::InternalIndexerDB;
 use aptos_infallible::RwLock;
 use aptos_storage_interface::{
-    chunk_to_commit::ChunkToCommit, DbReader, DbWriter, Result, StateSnapshotReceiver,
+    chunk_to_commit::ChunkToCommit, DbReader, DbWriter, Result, StateKind, StateSnapshotReceiver,
 };
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -143,10 +143,15 @@ impl DbWriter for FastSyncStorageWrapper {
         &self,
         version: Version,
         expected_root_hash: HashValue,
+        kind: StateKind,
     ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, StateValue>>> {
-        *self.fast_sync_status.write() = FastSyncStatus::STARTED;
+        // The main-state receiver marks the start of a fast sync; any later
+        // snapshot stage must not reset that status.
+        if kind == StateKind::MainState {
+            *self.fast_sync_status.write() = FastSyncStatus::STARTED;
+        }
         self.get_aptos_db_write_ref()
-            .get_state_snapshot_receiver(version, expected_root_hash)
+            .get_state_snapshot_receiver(version, expected_root_hash, kind)
     }
 
     fn finalize_state_snapshot(

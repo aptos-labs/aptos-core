@@ -29,7 +29,7 @@ fun take(l0: vector<u8>)
 // module 0x66::vec_pushback_safe_point
 
 fun caller(r0): u64 {
-  slots: params(1), locals(1), temps(2), xfer(1)
+  slots: params(1), locals(1), temps(2), transfer(1)
     r0: u64
     r1: vector<u64>
     r2: &mut vector<u64>

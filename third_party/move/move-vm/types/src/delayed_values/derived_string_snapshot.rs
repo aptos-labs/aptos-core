@@ -17,7 +17,7 @@ use std::str::FromStr;
 fn is_string_layout(layout: &MoveTypeLayout) -> bool {
     use MoveTypeLayout as L;
     if let L::Struct(move_struct) = layout {
-        if let [L::Vector(elem)] = move_struct.fields(None).iter().as_slice() {
+        if let Some([L::Vector(elem)]) = move_struct.fields(None) {
             if let L::U8 = elem.as_ref() {
                 return true;
             }
@@ -29,7 +29,7 @@ fn is_string_layout(layout: &MoveTypeLayout) -> bool {
 pub fn is_derived_string_struct_layout(layout: &MoveTypeLayout) -> bool {
     use MoveTypeLayout as L;
     if let L::Struct(move_struct) = layout {
-        if let [value_field, L::Vector(padding_elem)] = move_struct.fields(None).iter().as_slice() {
+        if let Some([value_field, L::Vector(padding_elem)]) = move_struct.fields(None) {
             if is_string_layout(value_field) {
                 if let L::U8 = padding_elem.as_ref() {
                     return true;

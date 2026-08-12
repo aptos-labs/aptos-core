@@ -215,6 +215,16 @@ pub enum FeatureFlag {
     /// account abstraction) runs via function values from `std::reflect` instead of the
     /// legacy native dispatch machinery. Requires `ENABLE_FUNCTION_REFLECTION`.
     FUNCTION_VALUE_DISPATCH = 125,
+    /// When enabled, BCS serialization of values containing function values fails:
+    /// `bcs::to_bytes` and `bcs::serialized_size` abort, and table operations with keys
+    /// containing function values fail. Storage writes and events are unaffected.
+    /// Transient: active while the function value storage format migration is in
+    /// progress, so no on-chain state can depend on the old bytes.
+    DISABLE_CLOSURE_BCS_SERIALIZATION = 126,
+    /// Enables lazy module initialization via `aptos_framework::init::internal_maybe_initialize`
+    /// (a module self-initializes on first use rather than via a genesis-time `init_module`).
+    /// While disabled, that entry point aborts.
+    LAZY_MODULE_INITIALIZATION = 127,
 }
 
 impl FeatureFlag {
@@ -574,6 +584,10 @@ impl Features {
 
     pub fn is_gas_refund_fa_mint_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::GAS_REFUND_FA_MINT)
+    }
+
+    pub fn is_closure_bcs_serialization_disabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::DISABLE_CLOSURE_BCS_SERIALIZATION)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

@@ -38,14 +38,18 @@ pub use instruction::{
     FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, OBJECT_HEADER_SIZE, VEC_DATA_OFFSET,
     VEC_LENGTH_OFFSET,
 };
-pub use interner::{view_function_ref, FunctionRef, InternedFunctionRef, Interner, ModuleId};
+pub use interner::{
+    module_id_of, struct_tag_of, type_tag_of, view_function_ref, view_module_id, FunctionRef,
+    InternedFunctionRef, Interner, ModuleId, TypeSubstitutionError,
+};
 pub use move_binary_format::file_format::ConstantPoolIndex;
 pub use object_descriptor::{
     DescriptorProvider, ObjectDescriptor, ObjectDescriptorInner, ObjectDescriptorTable,
     CLOSURE_DESCRIPTOR_ID, RESERVED_DESCRIPTOR_COUNT, TRIVIAL_DESCRIPTOR_ID,
 };
 pub use prepared_module::{
-    intern_sig_token, FieldTypes, FunctionInstantiationSignature, FunctionSignature, PreparedModule,
+    intern_sig_token, intern_struct_tag, intern_type_tag, FieldTypes,
+    FunctionInstantiationSignature, FunctionSignature, PreparedModule, PreparedModuleError,
 };
 pub use root_pool::{ObjectHandle, ReferenceHandle, RootPool};
 pub use storage::{
@@ -57,7 +61,4 @@ pub use value_layout::{
     reserved_layout_id, reserved_layouts, FieldValueLayout, LayoutFlags, LayoutId, LayoutKind,
     LayoutProvider, ValueLayout, ValueLayoutTable,
 };
-pub use vm_error::{
-    ArithOp, GlobalStorageOp, LoaderError, LoaderInvariantViolation, LoaderResult, RuntimeError,
-    RuntimeInvariantViolation, RuntimeResult, Signedness, VecOp,
-};
+pub use vm_error::{VMInternalError, VMResult};

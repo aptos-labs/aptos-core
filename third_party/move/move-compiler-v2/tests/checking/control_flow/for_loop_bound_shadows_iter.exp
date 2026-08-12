@@ -1,0 +1,173 @@
+
+Diagnostics:
+warning: loop upper bound refers to `i`, which is shadowed by the loop iterator `i`
+  ┌─ tests/checking/control_flow/for_loop_bound_shadows_iter.move:7:22
+  │
+7 │         for (i in 0..i) {
+  │                      ^
+  │
+  = the meaning of `i` here depends on the language version: before 2.5 the upper bound is evaluated with the iterator `i` in scope, while from 2.5 on it is evaluated outside the iterator's scope. Recompiling this loop across 2.5 changes its behavior; consider renaming the iterator to avoid ambiguity.
+
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    private fun lb_self_ref(i: u64,n: u64): u64 {
+        {
+          let s: u64 = 0;
+          {
+            let $lb: u64 = i;
+            {
+              let i: u64 = $lb;
+              {
+                let $ub: u64 = n;
+                loop {
+                  if Lt(i, $ub) {
+                    s: u64 = Add<u64>(s, i);
+                    Tuple();
+                    i: u64 = Add(i, 1)
+                  } else {
+                    break
+                  }
+                }
+              }
+            }
+          };
+          s
+        }
+    }
+    private fun no_shadow_ok(n: u64): u64 {
+        {
+          let s: u64 = 0;
+          {
+            let $lb: u64 = 0;
+            {
+              let i: u64 = $lb;
+              {
+                let $ub: u64 = n;
+                loop {
+                  if Lt(i, $ub) {
+                    s: u64 = Add<u64>(s, i);
+                    Tuple();
+                    i: u64 = Add(i, 1)
+                  } else {
+                    break
+                  }
+                }
+              }
+            }
+          };
+          s
+        }
+    }
+    private fun ub_self_ref(i: u64): u64 {
+        {
+          let s: u64 = 0;
+          {
+            let $lb: u64 = 0;
+            {
+              let i: u64 = $lb;
+              {
+                let $ub: u64 = i;
+                loop {
+                  if Lt(i, $ub) {
+                    s: u64 = Add<u64>(s, i);
+                    Tuple();
+                    i: u64 = Add(i, 1)
+                  } else {
+                    break
+                  }
+                }
+              }
+            }
+          };
+          s
+        }
+    }
+    private fun underscore_ok(n: u64): u64 {
+        {
+          let s: u64 = 0;
+          {
+            let $lb: u64 = 0;
+            {
+              let $for_iter_5: u64 = $lb;
+              {
+                let $ub: u64 = n;
+                loop {
+                  if Lt($for_iter_5, $ub) {
+                    s: u64 = Add<u64>(s, 1);
+                    Tuple();
+                    $for_iter_5: u64 = Add($for_iter_5, 1)
+                  } else {
+                    break
+                  }
+                }
+              }
+            }
+          };
+          s
+        }
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    fun lb_self_ref(i: u64, n: u64): u64 {
+        let s = 0;
+        {
+            let _lb = i;
+            let i = _lb;
+            let _ub = n;
+            while (i < _ub) {
+                {
+                    s = s + i;
+                };
+                i = i + 1
+            }
+        };
+        s
+    }
+    fun no_shadow_ok(n: u64): u64 {
+        let s = 0;
+        {
+            let _lb = 0;
+            let i = _lb;
+            let _ub = n;
+            while (i < _ub) {
+                {
+                    s = s + i;
+                };
+                i = i + 1
+            }
+        };
+        s
+    }
+    fun ub_self_ref(i: u64): u64 {
+        let s = 0;
+        {
+            let _lb = 0;
+            let i = _lb;
+            let _ub = i;
+            while (i < _ub) {
+                {
+                    s = s + i;
+                };
+                i = i + 1
+            }
+        };
+        s
+    }
+    fun underscore_ok(n: u64): u64 {
+        let s = 0;
+        {
+            let _lb = 0;
+            let _for_iter_5 = _lb;
+            let _ub = n;
+            while (_for_iter_5 < _ub) {
+                {
+                    s = s + 1;
+                };
+                _for_iter_5 = _for_iter_5 + 1
+            }
+        };
+        s
+    }
+}

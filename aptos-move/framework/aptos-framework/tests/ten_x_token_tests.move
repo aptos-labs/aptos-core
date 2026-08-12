@@ -1,5 +1,6 @@
 #[test_only]
 module aptos_framework::ten_x_token_tests {
+    use aptos_framework::aggregator_v2;
     use aptos_framework::fungible_asset::{Self, Metadata, TestToken};
     use aptos_framework::dispatchable_fungible_asset;
     use aptos_framework::primary_fungible_store;
@@ -31,6 +32,45 @@ module aptos_framework::ten_x_token_tests {
 
         // The derived supply is 10x
         assert!(dispatchable_fungible_asset::derived_supply(metadata) == option::some(1000), 5);
+
+        // The derived balance snapshot is also 10x, computed via the dispatch hook.
+        assert!(
+            aggregator_v2::read_snapshot(
+                &dispatchable_fungible_asset::derived_balance_snapshot(creator_store)
+            ) == 1000,
+            6
+        );
+    }
+
+    #[test(creator = @aptos_framework)]
+    fun test_derived_balance_snapshot_without_hook(
+        creator: &signer,
+    ) {
+        // Without a derived_balance dispatch hook, derived_balance_snapshot falls
+        // back to fungible_asset::balance_snapshot and reflects the raw balance.
+        let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
+        let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
+        let metadata = token_object.convert<TestToken, Metadata>();
+
+        let creator_store = fungible_asset::create_test_store(creator, metadata);
+
+        // Empty store yields a snapshot of 0.
+        assert!(
+            aggregator_v2::read_snapshot(
+                &dispatchable_fungible_asset::derived_balance_snapshot(creator_store)
+            ) == 0,
+            1
+        );
+
+        let fa = mint.mint(100);
+        dispatchable_fungible_asset::deposit(creator_store, fa);
+
+        assert!(
+            aggregator_v2::read_snapshot(
+                &dispatchable_fungible_asset::derived_balance_snapshot(creator_store)
+            ) == 100,
+            2
+        );
     }
 
     #[test(creator = @aptos_framework)]

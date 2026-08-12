@@ -4,8 +4,8 @@
 // All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    module_traversal::TraversalContext, Function, LayoutCacheEntry, LayoutWithDelayedFields,
-    LoadedFunction, LoadedFunctionOwner, Module, ModuleStorage, Script, StructKey,
+    module_traversal::TraversalContext, Function, LayoutCacheEntry, LayoutCacheKey,
+    LayoutWithDelayedFields, LoadedFunction, LoadedFunctionOwner, Module, ModuleStorage, Script,
     WithRuntimeEnvironment,
 };
 use move_binary_format::{
@@ -59,7 +59,7 @@ pub trait StructDefinitionLoader: WithRuntimeEnvironment {
         &self,
         _gas_meter: &mut impl DependencyGasMeter,
         _traversal_context: &mut TraversalContext,
-        _key: &StructKey,
+        _key: &LayoutCacheKey,
     ) -> Option<PartialVMResult<LayoutWithDelayedFields>> {
         None
     }
@@ -67,7 +67,7 @@ pub trait StructDefinitionLoader: WithRuntimeEnvironment {
     /// Stores computed layout to the layout cache.
     fn store_layout_to_cache(
         &self,
-        _key: &StructKey,
+        _key: &LayoutCacheKey,
         _entry: LayoutCacheEntry,
     ) -> PartialVMResult<()> {
         // Default as no-op.

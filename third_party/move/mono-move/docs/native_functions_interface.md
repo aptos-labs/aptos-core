@@ -232,12 +232,12 @@ All errors are transaction-aborting — execution state is discarded on failure,
 
 Errors split into two channels:
 
-- **VM-internal** (`VMInternalError`): not meant to be inspected by the native — bubbles back to the VM via `?` and folds into `RuntimeError`.
+- **VM-internal** (`VMInternalError`): not meant to be inspected by the native — bubbles back to the VM via `?`. It is the VM's type-erased boundary error, so any component error erases into it.
 - **Native-visible**: the native handles them explicitly via its own error type.
 
-More practically, the native context methods should follow these patterns: 
-- A method that produces only the former returns `Result<NativeStatus, VMInternalError>`
-- A method that produces both returns `Result<Result<NativeStatus, CustomError>, VMInternalError>`
+More practically, the native context methods should follow these patterns:
+- A method that produces only the former returns `VMResult<NativeStatus>` (i.e. `Result<NativeStatus, VMInternalError>`)
+- A method that produces both returns `VMResult<Result<NativeStatus, CustomError>>`
   - One with only native-visible errors can return simplified form `Result<NativeStatus, CustomError>`.
 
 See [`error_design.md`](error_design.md) for the broader VM error story.

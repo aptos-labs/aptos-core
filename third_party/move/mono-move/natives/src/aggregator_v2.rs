@@ -13,10 +13,11 @@
 use crate::{monomorphic_natives, NativeEntry};
 use mono_move_core::{
     native::{
-        NativeContext, NativeContextFamily, NativeStatus, Opaque, Ref, RootPool, VMInternalError,
-        VMValue,
+        native_invariant_violation, NativeContext, NativeContextFamily, NativeStatus, Opaque, Ref,
+        RootPool, VMValue,
     },
     types::{U128_TY, U64_TY},
+    VMResult,
 };
 use std::{fmt::Display, marker::PhantomData};
 
@@ -186,9 +187,7 @@ impl UnsignedInt for u128 {
 /// `0x1::agregator_v2::create_aggregator<T>(max_value: T): Aggregator<T>`
 ///
 /// Creates an aggregator with the given `max_value` and zero `value`.
-fn native_create_aggregator<C: NativeContext, T: UnsignedInt>(
-    ctx: &C,
-) -> Result<NativeStatus, VMInternalError> {
+fn native_create_aggregator<C: NativeContext, T: UnsignedInt>(ctx: &C) -> VMResult<NativeStatus> {
     // SAFETY: arg 0 is `max_value` of type `T`.
     let max_value = unsafe { ctx.arg::<T>(0) }?;
     // SAFETY: return 0 is an aggregator with layout matching VM value layout.
@@ -207,7 +206,7 @@ fn native_create_aggregator<C: NativeContext, T: UnsignedInt>(
 /// (its maximum) and zero `value`.
 fn native_create_unbounded_aggregator<C: NativeContext, T: UnsignedInt>(
     ctx: &C,
-) -> Result<NativeStatus, VMInternalError> {
+) -> VMResult<NativeStatus> {
     // SAFETY: return 0 is an aggregator with layout matching VM value layout.
     unsafe {
         ctx.set_return(0, Aggregator::<T> {
@@ -222,9 +221,7 @@ fn native_create_unbounded_aggregator<C: NativeContext, T: UnsignedInt>(
 ///
 /// Adds `value` to aggregators's `value` and returns true if the result is
 /// at most aggregator's `max_value`. Otherwise, no-op and returns false.
-fn native_try_add<C: NativeContext, T: UnsignedInt>(
-    ctx: &C,
-) -> Result<NativeStatus, VMInternalError> {
+fn native_try_add<C: NativeContext, T: UnsignedInt>(ctx: &C) -> VMResult<NativeStatus> {
     // SAFETY: arg 0 is aggregator reference (fat pointer); arg 1 is `T`.
     let aggregator = unsafe { ctx.arg::<AggregatorOrSnapshotRef<T>>(0) }?;
     let value = unsafe { ctx.arg::<T>(1) }?;
@@ -247,9 +244,7 @@ fn native_try_add<C: NativeContext, T: UnsignedInt>(
 ///
 /// Subtracts `value` from aggregators's `value` and returns true if the result
 /// is non-negative. Otherwise, no-op and returns false indicating underflow.
-fn native_try_sub<C: NativeContext, T: UnsignedInt>(
-    ctx: &C,
-) -> Result<NativeStatus, VMInternalError> {
+fn native_try_sub<C: NativeContext, T: UnsignedInt>(ctx: &C) -> VMResult<NativeStatus> {
     // SAFETY: arg 0 is aggregator reference (fat pointer); arg 1 is `T`.
     let aggregator = unsafe { ctx.arg::<AggregatorOrSnapshotRef<T>>(0) }?;
     let rhs = unsafe { ctx.arg::<T>(1) }?;
@@ -271,9 +266,7 @@ fn native_try_sub<C: NativeContext, T: UnsignedInt>(
 ///
 /// Returns true when the `value` of aggregator is at least this specified
 /// minimum amount.
-fn native_is_at_least_impl<C: NativeContext, T: UnsignedInt>(
-    ctx: &C,
-) -> Result<NativeStatus, VMInternalError> {
+fn native_is_at_least_impl<C: NativeContext, T: UnsignedInt>(ctx: &C) -> VMResult<NativeStatus> {
     // SAFETY: arg 0 is aggregator reference (fat pointer), and arg 1 is the
     // amount to compare against.
     let aggregator = unsafe { ctx.arg::<AggregatorOrSnapshotRef<T>>(0) }?;
@@ -289,14 +282,14 @@ fn native_is_at_least_impl<C: NativeContext, T: UnsignedInt>(
 /// `0x1::agregator_v2::read<T>(self: &Aggregator<T>): T`
 ///
 /// Returns `value` of the aggregator.
-fn native_read<C: NativeContext, T: UnsignedInt>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
+fn native_read<C: NativeContext, T: UnsignedInt>(ctx: &C) -> VMResult<NativeStatus> {
     // SAFETY: arg 0 is aggregator reference (fat pointer).
     let aggregator = unsafe { ctx.arg::<AggregatorOrSnapshotRef<T>>(0) }?;
 
     let value = aggregator.read_value();
     let max_value = aggregator.read_max_value();
     if value > max_value {
-        return Err(VMInternalError::invariant_violation(format!(
+        return Err(native_invariant_violation(format!(
             "Aggregator read returned value greater than max: {value} > {max_value}"
         )));
     }
@@ -309,9 +302,7 @@ fn native_read<C: NativeContext, T: UnsignedInt>(ctx: &C) -> Result<NativeStatus
 /// `0x1::agregator_v2::snapshot<T>(self: &Aggregator<T>): AggregatorSnapshot<T>`
 ///
 /// Captures the aggregator's current `value` into a snapshot.
-fn native_snapshot<C: NativeContext, T: UnsignedInt>(
-    ctx: &C,
-) -> Result<NativeStatus, VMInternalError> {
+fn native_snapshot<C: NativeContext, T: UnsignedInt>(ctx: &C) -> VMResult<NativeStatus> {
     // SAFETY: arg 0 is aggregator reference (fat pointer).
     let aggregator = unsafe { ctx.arg::<AggregatorOrSnapshotRef<T>>(0) }?;
     let value = aggregator.read_value();
@@ -324,9 +315,7 @@ fn native_snapshot<C: NativeContext, T: UnsignedInt>(
 /// `0x1::agregator_v2::create_snapshot<T>(value: T): AggregatorSnapshot<T>`
 ///
 /// Wraps `value` into a snapshot.
-fn native_create_snapshot<C: NativeContext, T: UnsignedInt>(
-    ctx: &C,
-) -> Result<NativeStatus, VMInternalError> {
+fn native_create_snapshot<C: NativeContext, T: UnsignedInt>(ctx: &C) -> VMResult<NativeStatus> {
     // SAFETY: arg 0 is `value` of type `T`.
     let value = unsafe { ctx.arg::<T>(0) }?;
 
@@ -338,9 +327,7 @@ fn native_create_snapshot<C: NativeContext, T: UnsignedInt>(
 /// `0x1::agregator_v2::read_snapshot<T>(self: &AggregatorSnapshot<T>): T`
 ///
 /// Returns the value held by the snapshot.
-fn native_read_snapshot<C: NativeContext, T: UnsignedInt>(
-    ctx: &C,
-) -> Result<NativeStatus, VMInternalError> {
+fn native_read_snapshot<C: NativeContext, T: UnsignedInt>(ctx: &C) -> VMResult<NativeStatus> {
     // SAFETY: arg 0 is a snapshot reference (fat pointer).
     let snapshot = unsafe { ctx.arg::<AggregatorOrSnapshotRef<T>>(0) }?;
     let value = snapshot.read_value();

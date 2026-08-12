@@ -21,7 +21,7 @@ fun add_two(r0, r1): u64 {
 }
 
 fun copy_to_call(r0): u64 {
-  slots: params(1), locals(0), temps(0), xfer(1)
+  slots: params(1), locals(0), temps(0), transfer(1)
     r0: u64
   code:
   L0:
@@ -30,7 +30,7 @@ fun copy_to_call(r0): u64 {
 }
 
 fun move_to_call(r0): u64 {
-  slots: params(1), locals(0), temps(0), xfer(1)
+  slots: params(1), locals(0), temps(0), transfer(1)
     r0: u64
   code:
   L0:
@@ -50,7 +50,7 @@ fun multi_use_local_alias(r0): u64 {
 }
 
 fun copy_call_then_use(r0): u64 {
-  slots: params(1), locals(0), temps(1), xfer(1)
+  slots: params(1), locals(0), temps(1), transfer(1)
     r0: u64
     r1: u64
   code:
@@ -61,7 +61,7 @@ fun copy_call_then_use(r0): u64 {
 }
 
 fun two_copies_to_call(r0, r1): u64 {
-  slots: params(2), locals(0), temps(0), xfer(2)
+  slots: params(2), locals(0), temps(0), transfer(2)
     r0: u64
     r1: u64
   code:

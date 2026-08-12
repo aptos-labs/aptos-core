@@ -115,8 +115,8 @@ use move_model::{
         StructId,
     },
     pragmas::{
-        CONDITION_INFERRED_PROP, CONDITION_INFERRED_SATHARD, CONDITION_INFERRED_VACUOUS,
-        INFERENCE_PRAGMA, OPAQUE_PRAGMA,
+        ABORTS_IF_IS_PARTIAL_PRAGMA, CONDITION_INFERRED_PROP, CONDITION_INFERRED_SATHARD,
+        CONDITION_INFERRED_VACUOUS, INFERENCE_PRAGMA, OPAQUE_PRAGMA,
     },
     pureness_checker::{FunctionPurenessChecker, FunctionPurenessCheckerMode},
     sourcifier::Sourcifier,
@@ -186,6 +186,11 @@ pub struct WPState {
     /// Tracks globals directly modified by MoveFrom/MoveTo (which bypass the borrow+writeback path).
     /// Each entry is a `global<R>(addr)` expression (no label) used to emit `modifies` clauses.
     pub direct_modifies: Vec<Exp>,
+    /// Whether abort conditions were dropped because they crossed a memory
+    /// havoc (loop-modified global memory): cumulative abort effects cannot be
+    /// inferred exactly there. The resulting aborts specification is emitted
+    /// as partial.
+    pub aborts_partial: bool,
 }
 
 impl WPState {
@@ -201,6 +206,7 @@ impl WPState {
             captured_globals: BTreeSet::new(),
             update_globals: BTreeSet::new(),
             direct_modifies: vec![],
+            aborts_partial: false,
         }
     }
 
@@ -216,6 +222,7 @@ impl WPState {
             captured_globals: BTreeSet::new(),
             update_globals: BTreeSet::new(),
             direct_modifies: vec![],
+            aborts_partial: false,
         }
     }
 
@@ -231,6 +238,7 @@ impl WPState {
             captured_globals: self.captured_globals.clone(),
             update_globals: self.update_globals.clone(),
             direct_modifies: self.direct_modifies.iter().map(&mut f).collect(),
+            aborts_partial: self.aborts_partial,
         }
     }
 
@@ -306,6 +314,8 @@ impl AbstractDomain for WPState {
         // analysis and never reach this point.
         let self_is_abort_only = !self.is_normal_return;
         let other_is_abort_only = !other.is_normal_return;
+
+        self.aborts_partial = self.aborts_partial || other.aborts_partial;
 
         if self_is_abort_only && !other_is_abort_only {
             // Current is abort-only; adopt incoming state wholesale
@@ -678,14 +688,8 @@ impl FunctionTargetProcessor for LambdaSpecInferenceProcessor {
     }
 }
 
-/// Identifies lambda-lifted functions by name. Mirrors `LIFTED_FUN_MARKER` from
-/// `move-compiler-v2/src/env_pipeline/lambda_lifter.rs` (we can't import that const
-/// because `bytecode-pipeline` does not depend on `move-compiler-v2`).
 fn is_lambda_lifted_name(fun_env: &FunctionEnv) -> bool {
-    fun_env
-        .symbol_pool()
-        .string(fun_env.get_name())
-        .contains("__lambda__")
+    crate::lifted_lambda::is_lifted_lambda(fun_env)
 }
 
 // =================================================================================================
@@ -1063,7 +1067,19 @@ fn update_spec<'env>(
             })
             .filter(|e| !is_trivial_true(e) && !is_trivial_false(e))
             .collect();
-        if aborts_conds.is_empty() {
+        if state.aborts_partial {
+            // Abort conditions crossing a memory-havocking loop were dropped;
+            // the remaining ones are a lower bound, not exact.
+            spec.properties.insert(
+                pool.make(ABORTS_IF_IS_PARTIAL_PRAGMA),
+                PropertyValue::Value(Value::Bool(true)),
+            );
+            spec.conditions.extend(
+                aborts_conds
+                    .iter()
+                    .map(|e| mk_cond(ConditionKind::AbortsIf, e)),
+            );
+        } else if aborts_conds.is_empty() {
             // No abort conditions: emit `aborts_if false` to indicate the function
             // never aborts. Without this, an opaque function with no aborts_if would
             // have unspecified abort behavior when called.
@@ -1589,10 +1605,22 @@ fn extract_result_of_clause(exp: &Exp) -> Option<(Exp, usize, Exp, Vec<Exp>, Mem
     None
 }
 
-/// Match `ensures_of<f>(args, …)` at the clause top; return `(fun_exp, args_after_fun, range)`.
-fn extract_top_ensures_of_clause(exp: &Exp) -> Option<(Exp, Vec<Exp>, MemoryRange)> {
+/// Match `ensures_of<f>(args, …)` at the clause top, possibly under nested
+/// `c ==> …` guards (from nested branches); return
+/// `(fun_exp, args_after_fun, range, guards)` with guards outermost-first.
+fn extract_top_ensures_of_clause(exp: &Exp) -> Option<(Exp, Vec<Exp>, MemoryRange, Vec<Exp>)> {
     use move_model::ast::BehaviorKind;
-    let ExpData::Call(_, AstOp::Behavior(BehaviorKind::EnsuresOf, range), bp_args) = exp.as_ref()
+    let mut guards: Vec<Exp> = Vec::new();
+    let mut target = exp;
+    while let ExpData::Call(_, AstOp::Implies, impl_args) = target.as_ref() {
+        if impl_args.len() != 2 {
+            break;
+        }
+        guards.push(impl_args[0].clone());
+        target = &impl_args[1];
+    }
+    let ExpData::Call(_, AstOp::Behavior(BehaviorKind::EnsuresOf, range), bp_args) =
+        target.as_ref()
     else {
         return None;
     };
@@ -1601,7 +1629,7 @@ fn extract_top_ensures_of_clause(exp: &Exp) -> Option<(Exp, Vec<Exp>, MemoryRang
     }
     let fun_exp = bp_args[0].clone();
     let args = bp_args[1..].to_vec();
-    Some((fun_exp, args, range.clone()))
+    Some((fun_exp, args, range.clone(), guards))
 }
 
 /// Structural equality of the (function, args) pair identifying a call site.
@@ -2055,6 +2083,7 @@ fn simplify_state<'env>(generator: &mut impl ExpGenerator<'env>, state: &WPState
         captured_globals: state.captured_globals.clone(),
         update_globals: state.update_globals.clone(),
         direct_modifies,
+        aborts_partial: state.aborts_partial,
     }
 }
 
@@ -2324,6 +2353,7 @@ impl StateBoundaryAnalysis<'_, '_> {
             Bytecode::Call(_, dests, op, srcs, _) => match op {
                 Operation::WriteBack(BorrowNode::GlobalRoot(_), _) => true,
                 Operation::MoveTo(_, _, _) | Operation::MoveFrom(_, _, _) => true,
+                Operation::HavocGlobal(_, _, _) => true,
                 Operation::Function(module_id, fun_id, type_inst) => {
                     // Mirror the backward WP's cascade: a function call is only
                     // non-state-changing if it qualifies for one of the direct-
@@ -3352,6 +3382,17 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
                     Operation::Stop => {
                         *state = WPState::new(state.post);
                     },
+                    // Memory havoc at loop headers: nothing is known about the
+                    // post-havoc memory. Abort conditions crossing the havoc
+                    // are dropped (cumulative loop aborts are inexact, so the
+                    // aborts spec becomes partial); `state.post` is advanced
+                    // so ensures accumulated backward for pre-loop code bind
+                    // strictly before the loop, never to the end-state.
+                    Operation::HavocGlobal(_, _, _) => {
+                        state.aborts.clear();
+                        state.aborts_partial = true;
+                        state.post = self.forward_label_at(offset);
+                    },
                 }
             },
 
@@ -4330,9 +4371,13 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             let fun_exp = bp_args[0].clone();
             let args = &bp_args[1..];
             let args_natural: Vec<Exp> = args.iter().map(strip_all_olds).collect();
+            // Sites are identified by (function, args, RANGE): the same call
+            // with identical arguments in different branches can carry
+            // different memory snapshots, and merging them would assign one
+            // branch's pre/post state to the other.
             if !sites
                 .iter()
-                .any(|(f, a, _)| calls_match(f, a, &fun_exp, &args_natural))
+                .any(|(f, a, r)| calls_match(f, a, &fun_exp, &args_natural) && r == range)
             {
                 sites.push((fun_exp, args_natural, range.clone()));
             }
@@ -4366,12 +4411,15 @@ impl<'env> SpecInferenceAnalyzer<'env> {
                     .count();
                 let lhs = bindings.iter().find_map(|(wo_call, lhs)| {
                     use move_model::ast::BehaviorKind;
-                    let ExpData::Call(_, AstOp::Behavior(BehaviorKind::WriteOf(j), _), bp_args) =
-                        wo_call.as_ref()
+                    let ExpData::Call(
+                        _,
+                        AstOp::Behavior(BehaviorKind::WriteOf(j), wo_range),
+                        bp_args,
+                    ) = wo_call.as_ref()
                     else {
                         return None;
                     };
-                    if *j != mut_ref_idx {
+                    if *j != mut_ref_idx || wo_range != range {
                         return None;
                     }
                     if bp_args.is_empty() {
@@ -4399,19 +4447,25 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             // *after* we have decided to build a replacement canonical —
             // never leave an anchor removed without a replacement.
             let mut dests_by_idx: BTreeMap<usize, Exp> = BTreeMap::new();
-            let mut anchors_for_site: Vec<usize> = Vec::new();
+            let mut anchors_for_site: Vec<(usize, Vec<Exp>)> = Vec::new();
             for (idx, clause) in state.ensures.iter().enumerate() {
-                if let Some((dest, output_idx, fun2, args2, _)) = extract_result_of_clause(clause) {
+                if let Some((dest, output_idx, fun2, args2, range2)) =
+                    extract_result_of_clause(clause)
+                {
                     let args2_natural: Vec<Exp> = args2.iter().map(strip_all_olds).collect();
-                    if calls_match(fun_exp, args_natural, &fun2, &args2_natural) {
+                    if calls_match(fun_exp, args_natural, &fun2, &args2_natural) && range2 == *range
+                    {
                         dests_by_idx.insert(output_idx, dest);
                     }
-                } else if let Some((fun2, args2, _)) = extract_top_ensures_of_clause(clause) {
+                } else if let Some((fun2, args2, range2, guard2)) =
+                    extract_top_ensures_of_clause(clause)
+                {
                     let args2_natural: Vec<Exp> = args2.iter().map(strip_all_olds).collect();
                     if calls_match(fun_exp, args_natural, &fun2, &args2_natural)
+                        && range2 == *range
                         && args2.len() == num_inputs
                     {
-                        anchors_for_site.push(idx);
+                        anchors_for_site.push((idx, guard2));
                     }
                 }
             }
@@ -4450,15 +4504,36 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             canonical_args.extend(dests);
             canonical_args.extend(post_state_slots);
             let bool_ty = Type::Primitive(PrimitiveType::Bool);
-            let new_id = self.new_node(bool_ty, None);
+            let new_id = self.new_node(bool_ty.clone(), None);
             let canonical = ExpData::Call(
                 new_id,
                 AstOp::Behavior(move_model::ast::BehaviorKind::EnsuresOf, range.clone()),
                 canonical_args,
             )
             .into_exp();
-            to_add.push(canonical);
-            to_remove.extend(anchors_for_site);
+            // Keep guarded anchors guarded: an unguarded canonical would claim
+            // the callee's ensures on paths that never make the call.
+            let mut emitted_unguarded = false;
+            for (idx, guards) in &anchors_for_site {
+                if guards.is_empty() {
+                    if !emitted_unguarded {
+                        to_add.push(canonical.clone());
+                        emitted_unguarded = true;
+                    }
+                } else {
+                    let mut wrapped = canonical.clone();
+                    for g in guards.iter().rev() {
+                        let imp_id = self.new_node(bool_ty.clone(), None);
+                        wrapped = ExpData::Call(imp_id, AstOp::Implies, vec![g.clone(), wrapped])
+                            .into_exp();
+                    }
+                    to_add.push(wrapped);
+                }
+                to_remove.insert(*idx);
+            }
+            if anchors_for_site.is_empty() {
+                to_add.push(canonical);
+            }
         }
 
         let mut new_ensures: Vec<Exp> = Vec::new();
@@ -4598,6 +4673,7 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             captured_globals: state.captured_globals.clone(),
             update_globals: state.update_globals.clone(),
             direct_modifies,
+            aborts_partial: state.aborts_partial,
         }
     }
 
@@ -4737,6 +4813,7 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             captured_globals: BTreeSet::new(),
             update_globals: BTreeSet::new(),
             direct_modifies: vec![],
+            aborts_partial: false,
         }
     }
 

@@ -31,6 +31,8 @@ pub mod table;
 pub mod test_natives;
 pub mod transaction_context;
 pub mod type_info;
+pub mod unit_test;
+pub mod vector;
 
 pub use aggregator_v2::make_all_aggregator_v2_natives;
 pub use aptos_hash::make_all_aptos_hash_natives;
@@ -50,6 +52,8 @@ pub use table::make_all_table_natives;
 pub use test_natives::{make_all_test_natives, native_u64_add, native_u64_identity};
 pub use transaction_context::{make_all_transaction_context_natives, TransactionContextExtension};
 pub use type_info::make_all_type_info_natives;
+pub use unit_test::make_all_unit_test_natives;
+pub use vector::make_all_vector_natives;
 
 /// How a native is dispatched against a call's type arguments. A native that
 /// works for any instantiation registers as [`Dispatch::Polymorphic`]; a native
@@ -96,6 +100,7 @@ pub fn make_all_production_natives<F: NativeContextFamily>() -> Vec<NativeEntry<
     natives.extend(make_all_from_bytes_natives::<F>());
     natives.extend(make_all_table_natives::<F>());
     natives.extend(make_all_secp256k1_natives::<F>());
+    natives.extend(make_all_vector_natives::<F>());
     natives
 }
 

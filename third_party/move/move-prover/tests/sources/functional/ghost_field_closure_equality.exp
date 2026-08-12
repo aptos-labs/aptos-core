@@ -1,0 +1,62 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/ghost_field_closure_equality.move:35:9
+   │
+35 │         ensures result; // FAILS: the closures are Move-equal
+   │         ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/ghost_field_closure_equality.move:32: cmp_neq
+   =     at tests/sources/functional/ghost_field_closure_equality.move:12: mk
+   =         gv = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality.move:13: mk
+   =         s = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality.move:15: mk
+   =         s = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality.move:17: mk
+   =     at tests/sources/functional/ghost_field_closure_equality.move:12: mk
+   =         result = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality.move:12: mk
+   =         gv = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality.move:13: mk
+   =         s = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality.move:15: mk
+   =         s = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality.move:17: mk
+   =     at tests/sources/functional/ghost_field_closure_equality.move:12: mk
+   =         result = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality.move:35: cmp_neq (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/ghost_field_closure_equality.move:60:9
+   │
+60 │         ensures result; // FAILS: the closures are Move-equal
+   │         ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/ghost_field_closure_equality.move:57: cmp_wrap_neq
+   =     at tests/sources/functional/ghost_field_closure_equality.move:12: mk
+   =         gv = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality.move:13: mk
+   =         s = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality.move:15: mk
+   =         s = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality.move:17: mk
+   =     at tests/sources/functional/ghost_field_closure_equality.move:12: mk
+   =         result = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality.move:42: wrap
+   =         f = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality.move:43: wrap
+   =         result = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality.move:12: mk
+   =         gv = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality.move:13: mk
+   =         s = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality.move:15: mk
+   =         s = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality.move:17: mk
+   =     at tests/sources/functional/ghost_field_closure_equality.move:12: mk
+   =         result = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality.move:42: wrap
+   =         f = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality.move:43: wrap
+   =         result = <redacted>
+   =     at tests/sources/functional/ghost_field_closure_equality.move:60: cmp_wrap_neq (spec)

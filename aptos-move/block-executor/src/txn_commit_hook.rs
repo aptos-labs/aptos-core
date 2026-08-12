@@ -1,17 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//use crate::task::TransactionOutput;
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_types::transaction::TransactionOutput;
-use once_cell::sync::OnceCell;
 
 /// An interface for listening to transaction commit events. The listener is called only once
 /// for each transaction commit.
-pub trait TransactionCommitHook: Send + Sync {
-    fn on_transaction_committed(&self, txn_idx: TxnIndex, output: &OnceCell<TransactionOutput>);
-
-    fn on_execution_aborted(&self, txn_idx: TxnIndex);
+pub trait TransactionCommitHook<O>: Send + Sync {
+    fn on_transaction_committed(&self, txn_idx: TxnIndex, output: &O);
 }
 
 pub struct NoOpTransactionCommitHook<E> {
@@ -32,12 +27,8 @@ impl<E: Sync + Send> NoOpTransactionCommitHook<E> {
     }
 }
 
-impl<E: Sync + Send> TransactionCommitHook for NoOpTransactionCommitHook<E> {
-    fn on_transaction_committed(&self, _txn_idx: TxnIndex, _output: &OnceCell<TransactionOutput>) {
-        // no-op
-    }
-
-    fn on_execution_aborted(&self, _txn_idx: TxnIndex) {
+impl<O, E: Sync + Send> TransactionCommitHook<O> for NoOpTransactionCommitHook<E> {
+    fn on_transaction_committed(&self, _txn_idx: TxnIndex, _output: &O) {
         // no-op
     }
 }
