@@ -4015,6 +4015,7 @@ dependencies = [
  "hex",
  "move-command-line-common",
  "move-core-types",
+ "move-model",
  "serde",
  "serde_json",
  "serde_yaml 0.8.26",
