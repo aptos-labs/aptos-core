@@ -1,11 +1,11 @@
 #[test_only]
 module stablecoin::usdk_tests {
-    use std::signer;
     use aptos_framework::primary_fungible_store;
     use aptos_framework::dispatchable_fungible_asset;
     use aptos_framework::fungible_asset::{Self, FungibleStore};
-    use stablecoin::usdk;
     use aptos_framework::object;
+    use stablecoin::usdk;
+    use std::signer;
 
     #[test(creator = @0xcafe, minter = @0xface, master_minter = @0xbab, denylister = @0xcade)]
     fun test_basic_flow(creator: &signer, minter: &signer, master_minter: &signer, denylister: &signer) {
@@ -17,7 +17,7 @@ module stablecoin::usdk_tests {
         usdk::add_minter(master_minter, minter_address);
         usdk::mint(minter, minter_address, 100);
         let asset = usdk::metadata();
-        assert!(primary_fungible_store::balance(minter_address, asset) == 100, 0);
+        assert!(primary_fungible_store::balance(minter_address, asset) == 100);
 
         // transfer from minter to receiver, check balance
         let minter_store = primary_fungible_store::ensure_primary_store_exists(minter_address, asset);
@@ -26,13 +26,13 @@ module stablecoin::usdk_tests {
 
         // denylist account, check if account is denylisted
         usdk::denylist(denylister, receiver_address);
-        assert!(primary_fungible_store::is_frozen(receiver_address, asset), 0);
+        assert!(primary_fungible_store::is_frozen(receiver_address, asset));
         usdk::undenylist(denylister, receiver_address);
-        assert!(!primary_fungible_store::is_frozen(receiver_address, asset), 0);
+        assert!(!primary_fungible_store::is_frozen(receiver_address, asset));
 
         // burn tokens, check balance
         usdk::burn(minter, minter_address, 90);
-        assert!(primary_fungible_store::balance(minter_address, asset) == 0, 0);
+        assert!(primary_fungible_store::balance(minter_address, asset) == 0);
     }
 
 
@@ -54,12 +54,12 @@ module stablecoin::usdk_tests {
         let asset = usdk::metadata();
 
         usdk::denylist(denylister, receiver_address);
-        assert!(primary_fungible_store::is_frozen(receiver_address, asset), 0);
+        assert!(primary_fungible_store::is_frozen(receiver_address, asset));
 
         let constructor_ref = object::create_object(receiver_address);
         fungible_asset::create_store(&constructor_ref, asset);
-        let store = object::object_from_constructor_ref<FungibleStore>(&constructor_ref);
+        let store = constructor_ref.object_from_constructor_ref();
 
-        object::transfer(receiver, store, @0xdeadbeef);
+        object::transfer<FungibleStore>(receiver, store, @0xdeadbeef);
     }
 }
