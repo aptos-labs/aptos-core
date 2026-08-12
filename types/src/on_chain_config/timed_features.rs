@@ -270,7 +270,15 @@ impl TimedFeatureFlag {
                 .unwrap()
                 .with_timezone(&Utc),
 
-            (MeterBcsByValueSize, TESTING) => Utc.with_ymd_and_hms(1970, 1, 1, 1, 0, 0).unwrap(),
+            // Note: Forge's framework upgrade and compatibility suites run half the validators on
+            //       the last released node image, which does not charge for value traversals. A
+            //       validator set split across this activation charges different gas for the same
+            //       transaction, which forks execution and stalls consensus, so the TESTING
+            //       activation has to stay in the future until a released image carries it.
+            (MeterBcsByValueSize, TESTING) => Los_Angeles
+                .with_ymd_and_hms(2026, 10, 1, 10, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
             (MeterBcsByValueSize, TESTNET) => Los_Angeles
                 .with_ymd_and_hms(2026, 8, 4, 14, 0, 0)
                 .unwrap()
