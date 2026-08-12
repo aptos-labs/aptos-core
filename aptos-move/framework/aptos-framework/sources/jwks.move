@@ -192,9 +192,14 @@ module aptos_framework::jwks {
         };
 
         let fed_jwks = borrow_global_mut<FederatedJWKs>(jwk_addr);
+        // Pass `&mut` to the JWK set instead of using `fed_jwks` in the lambda:
+        // the Move Prover cannot verify lambdas that modify values without the
+        // copy ability from the enclosing scope, and the resource lacks `copy`
+        // while the JWK set has it.
+        let jwks = &mut fed_jwks.jwks;
         patches.for_each_ref(|obj|{
             let patch: &Patch = obj;
-            apply_patch(&mut fed_jwks.jwks, *patch);
+            apply_patch(jwks, *patch);
         });
 
         // TODO: Can we check the size more efficiently instead of serializing it via BCS?

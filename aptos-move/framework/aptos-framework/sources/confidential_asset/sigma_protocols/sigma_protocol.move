@@ -191,17 +191,25 @@ module aptos_framework::sigma_protocol {
 
         // Extend MSM to: be \sum_{i \in [m]} A[i]^\beta[i] + \beta[i] ( e f(stmt)[i] )
         //                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^
-        efx.for_each_ref(|repr| {
+        // `for_each_ref` is not supported in verification since
+        // its captures lack `copy`/`drop` (TODO(#20372)).
+        let efx_reprs = efx.get_representations();
+        for (i in 0..efx_reprs.length()) {
+            let repr = efx_reprs.borrow(i);
             bases.append(repr.to_points(stmt));
             scalars.append(*repr.get_scalars());
-        });
+        };
 
         // Extend MSM to: be \sum_{i \in [m]} A[i]^\beta[i] + \beta[i] ( e f(stmt)[i] ) - \beta[i] (\psi(\sigma)[i])
         //                                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^
-        psi_sigma.for_each_ref(|repr| {
+        // `for_each_ref` is not supported in verification since
+        // its captures lack `copy`/`drop` (TODO(#20372)).
+        let psi_sigma_reprs = psi_sigma.get_representations();
+        for (i in 0..psi_sigma_reprs.length()) {
+            let repr = psi_sigma_reprs.borrow(i);
             bases.append(repr.to_points(stmt));
             scalars.append(*repr.get_scalars());
-        });
+        };
 
         // TODO(Perf): Could combine exponents for shared bases more aggresively? Or does the MSM code do it implicitly?
 

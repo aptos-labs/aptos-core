@@ -96,7 +96,15 @@ spec aptos_framework::jwks {
 
     spec apply_patch(jwks: &mut AllProvidersJWKs, patch: Patch) {
         pragma verify_duration_estimate = 80;
+        pragma opaque;
+        aborts_if [abstract] false;
+        ensures [abstract] jwks == spec_apply_patch(old(jwks), patch);
     }
+
+    /// The effect of `apply_patch` as a function over values. It is left
+    /// uninterpreted; it exists so that specifications can describe loops
+    /// that apply a sequence of patches.
+    spec fun spec_apply_patch(jwks: AllProvidersJWKs, patch: Patch): AllProvidersJWKs;
 
     spec try_get_patched_jwk(issuer: vector<u8>, jwk_id: vector<u8>): Option<JWK> {
         pragma verify_duration_estimate = 80;

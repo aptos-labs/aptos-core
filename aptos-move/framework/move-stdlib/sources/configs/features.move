@@ -1035,12 +1035,14 @@ module std::features {
             move_to<Features>(framework, Features { features: vector[] })
         };
         let features = &mut Features[@std].features;
-        enable.for_each_ref(|feature| {
-            set(features, *feature, true);
-        });
-        disable.for_each_ref(|feature| {
-            set(features, *feature, false);
-        });
+        // `for_each_ref` is not supported in verification since
+        // bit-vector integer mutation is unsupported (TODO(#20375)).
+        for (i in 0..enable.length()) {
+            set(features, enable[i], true);
+        };
+        for (i in 0..disable.length()) {
+            set(features, disable[i], false);
+        };
     }
 
     /// Enable and disable features for the next epoch.
