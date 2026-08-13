@@ -8,10 +8,10 @@ fun len(): u64 {
     r2: u64
   code:
   L0:
-    0: r0 := ld_const #0
-    1: r1 := imm_borrow_loc r0
-    2: r2 := vec_len address, r1
-    3: ret [r2]
+    0: r0 := ld_const #0 @0
+    1: r1 := imm_borrow_loc r0 @2
+    2: r2 := vec_len address, r1 @3
+    3: ret [r2] @4
 }
 
 fun addr(r0): address {
@@ -23,11 +23,11 @@ fun addr(r0): address {
     r4: address
   code:
   L0:
-    0: r1 := ld_const #0
-    1: r2 := imm_borrow_loc r1
-    2: r3 := vec_imm_borrow address, r2, r0
-    3: r4 := read_ref r3
-    4: ret [r4]
+    0: r1 := ld_const #0 @0
+    1: r2 := imm_borrow_loc r1 @2
+    2: r3 := vec_imm_borrow address, r2, r0 @4
+    3: r4 := read_ref r3 @5
+    4: ret [r4] @6
 }
 === micro-ops ===
 // module 0x1::test
@@ -36,11 +36,11 @@ fun len() {
   frame_data_size: 32
   entry_gas: 60
   code:
-    0: StoreImmVec [0] <- const[0]
-    1: SlotBorrow [8] <- &[0]
-    2: VecLen [24] <- vec_len([8])
-    3: Move8 [0] <- [24]
-    4: Return
+    0: StoreImmVec [0] <- const[0] @0
+    1: SlotBorrow [8] <- &[0] @2
+    2: VecLen [24] <- vec_len([8]) @3
+    3: Move8 [0] <- [24] @4
+    4: Return @4
   safe_point_layouts:
     0: []
 }
@@ -49,12 +49,12 @@ fun addr() {
   frame_data_size: 80
   entry_gas: 303
   code:
-    0: StoreImmVec [8] <- const[0]
-    1: SlotBorrow [16] <- &[8]
-    2: VecBorrow [32] <- &[16][[0]] (elem_size=32)
-    3: ReadRef [48] <- *[32] (size=32)
-    4: Move(32) [0] <- [48]
-    5: Return
+    0: StoreImmVec [8] <- const[0] @0
+    1: SlotBorrow [16] <- &[8] @2
+    2: VecBorrow [32] <- &[16][[0]] (elem_size=32) @4
+    3: ReadRef [48] <- *[32] (size=32) @5
+    4: Move(32) [0] <- [48] @6
+    5: Return @6
   safe_point_layouts:
     0: []
 }

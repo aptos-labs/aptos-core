@@ -11,7 +11,7 @@ use mono_move_core::{
     types::{view_type, view_type_list, InternedType, InternedTypeList, Type},
     Function, Interner, VMInternalError,
 };
-use mono_move_global_context::{ExecutionGuard, LoadedModule};
+use mono_move_global_context::{ExecutionGuard, FunctionIrLookup, LoadedModule};
 use mono_move_runtime::{
     error::{RuntimeError, RuntimeInvariantViolation},
     InterpreterContext, RuntimeStatus,
@@ -30,7 +30,7 @@ fn param_types(
     function: InternedIdentifier,
     ty_args: InternedTypeList,
 ) -> Result<Vec<InternedType>> {
-    let Some(Some(ir)) = loaded.get_function_ir(function) else {
+    let FunctionIrLookup::Ir(ir) = loaded.get_function_ir(function) else {
         bail!("function has no IR in its loaded module");
     };
     let params = loaded

@@ -37,8 +37,8 @@ fun aeq(r0, r1): bool {
     r2: bool
   code:
   L0:
-    0: r2 := eq r0, r1
-    1: ret [r2]
+    0: r2 := eq r0, r1 @2
+    1: ret [r2] @3
 }
 
 fun aneq(r0, r1): bool {
@@ -48,8 +48,8 @@ fun aneq(r0, r1): bool {
     r2: bool
   code:
   L0:
-    0: r2 := neq r0, r1
-    1: ret [r2]
+    0: r2 := neq r0, r1 @2
+    1: ret [r2] @3
 }
 
 fun asel(r0, r1): u64 {
@@ -59,13 +59,13 @@ fun asel(r0, r1): u64 {
     r2: u64
   code:
   L2:
-    0: br_neq L0, r0, r1
+    0: br_neq L0, r0, r1 @2
   L1:
-    1: r2 := ld_u64 10
-    2: ret [r2]
+    1: r2 := ld_u64 10 @4
+    2: ret [r2] @5
   L0:
-    3: r2 := ld_u64 20
-    4: ret [r2]
+    3: r2 := ld_u64 20 @6
+    4: ret [r2] @7
 }
 === micro-ops ===
 // module 0x1::test
@@ -74,29 +74,29 @@ fun aeq() {
   frame_data_size: 72
   entry_gas: 17
   code:
-    0: IntCmp [64] <- [0] == u256 [32]
-    1: Move(1) [0] <- [64]
-    2: Return
+    0: IntCmp [64] <- [0] == u256 [32] @2
+    1: Move(1) [0] <- [64] @3
+    2: Return @3
 }
 
 fun aneq() {
   frame_data_size: 72
   entry_gas: 17
   code:
-    0: IntCmp [64] <- [0] != u256 [32]
-    1: Move(1) [0] <- [64]
-    2: Return
+    0: IntCmp [64] <- [0] != u256 [32] @2
+    1: Move(1) [0] <- [64] @3
+    2: Return @3
 }
 
 fun asel() {
   frame_data_size: 72
   entry_gas: 3
   code:
-    0: JumpIntCmp @4 [0] != u256 [32] gas_taken=56 gas_fallthrough=56
-    1: StoreImm8 [64] <- #10
-    2: Move8 [0] <- [64]
-    3: Return
-    4: StoreImm8 [64] <- #20
-    5: Move8 [0] <- [64]
-    6: Return
+    0: JumpIntCmp @4 [0] != u256 [32] gas_taken=56 gas_fallthrough=56 @2
+    1: StoreImm8 [64] <- #10 @4
+    2: Move8 [0] <- [64] @5
+    3: Return @5
+    4: StoreImm8 [64] <- #20 @6
+    5: Move8 [0] <- [64] @7
+    6: Return @7
 }

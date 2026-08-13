@@ -323,9 +323,8 @@ fn classify_error(err: &VMInternalError) -> TestResult {
 fn classify_loader_error(err: &LoaderError) -> TestResult {
     match err {
         // mono-move can't build or resolve this yet: a native it doesn't
-        // implement (which surfaces as a missing function, since natives have
-        // no body to lower), or a feature the specializer/verifier can't lower.
-        LoaderError::FunctionIrMissing
+        // implement, or a feature the specializer/verifier can't lower.
+        LoaderError::NativeFunctionNotLoadable { .. }
         | LoaderError::LoweringSkipped { .. }
         | LoaderError::ModuleNotFound { .. }
         | LoaderError::FunctionNotFound { .. } => TestResult::Unsupported(err.to_string()),

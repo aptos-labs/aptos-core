@@ -172,9 +172,12 @@ impl<F: NativeContextFamily> NativeRegistry<F> {
 
     /// The module of the native registered at [`NativeIdx`].
     pub fn module_by_idx(&self, idx: NativeIdx) -> Option<InternedModuleId> {
-        self.entries
-            .get(idx.0 as usize)
-            .map(|entry| entry.name.module())
+        self.name_by_idx(idx).map(|name| name.module())
+    }
+
+    /// The fully-qualified name of the native registered at [`NativeIdx`].
+    pub fn name_by_idx(&self, idx: NativeIdx) -> Option<NativeName> {
+        self.entries.get(idx.0 as usize).map(|entry| entry.name)
     }
 
     /// Look up the [`NativeIdx`] of a fully-qualified name.

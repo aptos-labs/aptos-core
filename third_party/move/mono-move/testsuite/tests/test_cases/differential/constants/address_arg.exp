@@ -6,7 +6,7 @@ fun identity(r0): address {
     r0: address
   code:
   L0:
-    0: ret [r0]
+    0: ret [r0] @1
 }
 === micro-ops ===
 // module 0x1::test
@@ -15,5 +15,5 @@ fun identity() {
   frame_data_size: 32
   entry_gas: 198
   code:
-    0: Return
+    0: Return @1
 }

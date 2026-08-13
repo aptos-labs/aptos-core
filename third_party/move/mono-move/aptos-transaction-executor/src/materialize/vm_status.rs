@@ -255,7 +255,7 @@ fn loader_error_to_status(err: &LoaderError) -> VMStatus {
         // Kept (and charged) under the function-values feature, since a stale
         // function value makes this reachable at runtime.
         L::FunctionNotFound { .. } => StatusCode::FUNCTION_RESOLUTION_FAILURE,
-        L::ModuleNotFound { .. } | L::FunctionIrMissing => StatusCode::LINKER_ERROR,
+        L::ModuleNotFound { .. } | L::NativeFunctionNotLoadable { .. } => StatusCode::LINKER_ERROR,
         L::LoweringSkipped { .. } => StatusCode::UNKNOWN_STATUS,
         L::GlobalContext(_) | L::InvariantViolation(_) => {
             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR

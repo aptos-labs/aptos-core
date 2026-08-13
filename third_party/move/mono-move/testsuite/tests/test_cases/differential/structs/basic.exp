@@ -60,8 +60,8 @@ fun add(r0, r1): u64 {
     r2: u64
   code:
   L0:
-    0: r2 := add r0, r1
-    1: ret [r2]
+    0: r2 := add r0, r1 @2
+    1: ret [r2] @3
 }
 
 fun get_x(r0): u64 {
@@ -70,8 +70,8 @@ fun get_x(r0): u64 {
     r1: u64
   code:
   L0:
-    0: r1 := read_field Point::x, r0
-    1: ret [r1]
+    0: r1 := read_field Point::x, r0 @1
+    1: ret [r1] @3
 }
 
 fun get_x_of(r0, r1): u64 {
@@ -81,10 +81,10 @@ fun get_x_of(r0, r1): u64 {
     r2: 0x42::basic::Point
   code:
   L0:
-    0: [r2] := call make_point, [r0, r1]
-    1: x0 := imm_borrow_loc r2
-    2: [x0] := call get_x, [x0]
-    3: ret [x0]
+    0: [r2] := call make_point, [r0, r1] @2
+    1: x0 := imm_borrow_loc r2 @4
+    2: [x0] := call get_x, [x0] @5
+    3: ret [x0] @6
 }
 
 fun make_point(r0, r1): Point {
@@ -94,8 +94,8 @@ fun make_point(r0, r1): Point {
     r2: 0x42::basic::Point
   code:
   L0:
-    0: r2 := pack 0x42::basic::Point, [r0, r1]
-    1: ret [r2]
+    0: r2 := pack 0x42::basic::Point, [r0, r1] @2
+    1: ret [r2] @3
 }
 
 fun max(r0, r1): u64 {
@@ -104,11 +104,11 @@ fun max(r0, r1): u64 {
     r1: u64
   code:
   L2:
-    0: br_le L0, r0, r1
+    0: br_le L0, r0, r1 @2
   L1:
-    1: ret [r0]
+    1: ret [r0] @5
   L0:
-    2: ret [r1]
+    2: ret [r1] @7
 }
 === micro-ops ===
 // module 0x42::basic
@@ -117,50 +117,50 @@ fun add() {
   frame_data_size: 24
   entry_gas: 59
   code:
-    0: AddU64 [16] <- [0] + [8]
-    1: Move8 [0] <- [16]
-    2: Return
+    0: AddU64 [16] <- [0] + [8] @2
+    1: Move8 [0] <- [16] @3
+    2: Return @3
 }
 
 fun get_x() {
   frame_data_size: 24
   entry_gas: 80
   code:
-    0: ReadRefOffset [16] <- *([0]+0) (size=8)
-    1: Move8 [0] <- [16]
-    2: Return
+    0: ReadRefOffset [16] <- *([0]+0) (size=8) @1
+    1: Move8 [0] <- [16] @3
+    2: Return @3
 }
 
 fun get_x_of() {
   frame_data_size: 32
   entry_gas: 228
   code:
-    0: Move8 [64] <- [8]
-    1: Move8 [56] <- [0]
-    2: CallIndirect 0x42::basic::make_point
-    3: Move(16) [16] <- [56]
-    4: SlotBorrow [56] <- &[16]
-    5: CallIndirect 0x42::basic::get_x
-    6: Move8 [0] <- [56]
-    7: Return
+    0: Move8 [64] <- [8] @2
+    1: Move8 [56] <- [0] @2
+    2: CallIndirect 0x42::basic::make_point @2
+    3: Move(16) [16] <- [56] @2
+    4: SlotBorrow [56] <- &[16] @4
+    5: CallIndirect 0x42::basic::get_x @5
+    6: Move8 [0] <- [56] @6
+    7: Return @6
 }
 
 fun make_point() {
   frame_data_size: 32
   entry_gas: 152
   code:
-    0: Move8 [24] <- [8]
-    1: Move8 [16] <- [0]
-    2: Move(16) [0] <- [16]
-    3: Return
+    0: Move8 [24] <- [8] @2
+    1: Move8 [16] <- [0] @2
+    2: Move(16) [0] <- [16] @3
+    3: Return @3
 }
 
 fun max() {
   frame_data_size: 16
   entry_gas: 3
   code:
-    0: JumpGreaterEqualU64 @2 [8] >= [0] gas_taken=54 gas_fallthrough=54
-    1: Return
-    2: Move8 [0] <- [8]
-    3: Return
+    0: JumpGreaterEqualU64 @2 [8] >= [0] gas_taken=54 gas_fallthrough=54 @2
+    1: Return @5
+    2: Move8 [0] <- [8] @7
+    3: Return @7
 }

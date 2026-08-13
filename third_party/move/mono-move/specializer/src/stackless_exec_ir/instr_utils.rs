@@ -35,6 +35,7 @@
 
 use super::{
     BasicBlock, BinaryOp, CallClosureData, CallData, FieldPath, Instr, Label, PackClosureData,
+    UnaryOp,
 };
 use mono_move_core::types::InternedType;
 use smallvec::SmallVec;
@@ -685,6 +686,106 @@ pub(crate) fn is_commutative(op: &BinaryOp) -> bool {
             | BinaryOp::Or
             | BinaryOp::And
     )
+}
+
+impl BinaryOp {
+    /// Whether this binary op can abort.
+    fn can_abort(&self) -> bool {
+        match self {
+            BinaryOp::Add
+            | BinaryOp::Sub
+            | BinaryOp::Mul
+            | BinaryOp::Div
+            | BinaryOp::Mod
+            | BinaryOp::Shl
+            | BinaryOp::Shr => true,
+            BinaryOp::BitOr
+            | BinaryOp::BitAnd
+            | BinaryOp::BitXor
+            | BinaryOp::Cmp(_)
+            | BinaryOp::Or
+            | BinaryOp::And => false,
+        }
+    }
+}
+
+impl<SlotForm> Instr<SlotForm> {
+    /// Whether this instruction can abort: raise an explicit abort, or a check
+    /// driven by operand values or chain state. These aborts, when rendered,
+    /// attribute to a bytecode offset. Invariant violations and gas exhaustion
+    /// are not considered aborts.
+    pub(crate) fn can_abort(&self) -> bool {
+        match self {
+            // Cast aborts when the value does not fit; Negate aborts on signed
+            // minimum overflow.
+            Instr::UnaryOp { op, .. } => matches!(op, UnaryOp::Cast(_) | UnaryOp::Negate),
+            Instr::BinaryOp { op, .. } | Instr::BinaryOpImm { op, .. } => op.can_abort(),
+            // Runtime variant-tag checks.
+            Instr::UnpackVariant { .. }
+            | Instr::ImmBorrowVariantField { .. }
+            | Instr::MutBorrowVariantField { .. }
+            | Instr::ReadVariantField { .. }
+            | Instr::WriteVariantField { .. } => true,
+            // Vector bounds / length checks.
+            Instr::VecImmBorrow { .. }
+            | Instr::VecMutBorrow { .. }
+            | Instr::VecPopBack { .. }
+            | Instr::VecUnpack { .. }
+            | Instr::VecSwap { .. } => true,
+            // Global storage: missing resource / resource already exists.
+            Instr::MoveFrom { .. }
+            | Instr::MoveTo { .. }
+            | Instr::ImmBorrowGlobal { .. }
+            | Instr::MutBorrowGlobal { .. } => true,
+            // Calls can stack overflow, closure-dispatch has checks, abort
+            // instructions can abort.
+            Instr::Call { .. }
+            | Instr::CallClosure { .. }
+            | Instr::Abort { .. }
+            | Instr::AbortMsg { .. } => true,
+            // Every other instruction: cannot abort.
+            Instr::LdConst { .. }
+            | Instr::LdImm { .. }
+            | Instr::Copy { .. }
+            | Instr::Move { .. }
+            | Instr::Pack { .. }
+            | Instr::Unpack { .. }
+            | Instr::PackVariant { .. }
+            | Instr::TestVariant { .. }
+            | Instr::ImmBorrowLoc { .. }
+            | Instr::MutBorrowLoc { .. }
+            | Instr::ImmBorrowField { .. }
+            | Instr::MutBorrowField { .. }
+            | Instr::ReadRef { .. }
+            | Instr::WriteRef { .. }
+            | Instr::ReadField { .. }
+            | Instr::WriteField { .. }
+            | Instr::ImmBorrowLocField { .. }
+            | Instr::MutBorrowLocField { .. }
+            | Instr::ReadLocField { .. }
+            | Instr::WriteLocField { .. }
+            | Instr::ReadFieldChain { .. }
+            | Instr::WriteFieldChain { .. }
+            | Instr::ImmBorrowFieldChain { .. }
+            | Instr::MutBorrowFieldChain { .. }
+            | Instr::ReadLocFieldChain { .. }
+            | Instr::WriteLocFieldChain { .. }
+            | Instr::ImmBorrowLocFieldChain { .. }
+            | Instr::MutBorrowLocFieldChain { .. }
+            | Instr::Exists { .. }
+            | Instr::PackClosure { .. }
+            | Instr::VecPack { .. }
+            | Instr::VecLen { .. }
+            | Instr::VecPushBack { .. }
+            | Instr::Branch { .. }
+            | Instr::BrTrue { .. }
+            | Instr::BrFalse { .. }
+            | Instr::BrCmp { .. }
+            | Instr::BrCmpImm { .. }
+            | Instr::Ret { .. }
+            | Instr::ForceGC => false,
+        }
+    }
 }
 
 // =============================================================================

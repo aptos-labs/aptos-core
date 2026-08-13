@@ -1207,7 +1207,7 @@ impl InterpreterContext<'_> {
             // executing a call instruction, which stores a valid pointer.
             let func = unsafe { regs.func.as_ref() };
 
-            let code = func.code.get();
+            let code = func.code.ops();
 
             if regs.pc >= code.len() {
                 invariant_violation!(PcOutOfBounds {
