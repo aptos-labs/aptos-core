@@ -5,18 +5,23 @@
 //! implementation that deserializes a value from its BCS encoding.
 
 use crate::{polymorphic_natives, NativeEntry};
-use mono_move_core::native::{
-    NativeContext, NativeContextFamily, NativeStatus, VMInternalError, Vector,
+use mono_move_core::{
+    native::{NativeContext, NativeContextFamily, NativeStatus, Vector},
+    VMResult,
 };
+
+/// Abort code on a malformed encoding, matching the legacy `from_bcs`/`util`
+/// natives: `error::invalid_argument(EFROM_BYTES)`.
+const EFROM_BYTES: u64 = 0x01_0001;
 
 /// `0x1::from_bcs::from_bytes<T>(bytes: vector<u8>): T`, and the identical
 /// `0x1::util::from_bytes<T>`.
 ///
-/// Deserializes `bytes` as a value of type `T`; a malformed encoding propagates
-/// as a VM error.
+/// Deserializes `bytes` as a value of type `T`, aborting with `EFROM_BYTES` if
+/// `bytes` is not a valid encoding.
 //
 // TODO(metering): charge gas.
-pub fn native_from_bytes<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
+pub fn native_from_bytes<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     let ty = ctx.ty_arg(0)?;
     // SAFETY: arg 0 is `vector<u8>`, passed by value.
     let v: Vector<u8> = unsafe { ctx.arg(0)? };
@@ -24,7 +29,15 @@ pub fn native_from_bytes<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMIn
     // TODO(perf): avoid the copy to the Rust heap
     // SAFETY: the bytes are copied immediately, before any allocation.
     let bytes = unsafe { v.as_bytes() }.to_vec();
-    let value = ctx.bcs_deserialize_value(ty, &bytes)?;
+    let value = match ctx.bcs_deserialize_value(ty, &bytes)? {
+        Some(value) => value,
+        None => {
+            return Ok(NativeStatus::Abort {
+                code: EFROM_BYTES,
+                message: None,
+            })
+        },
+    };
     // SAFETY: `value` is the in-frame representation of type `ty`, which is the
     // return type `T`; it is written before any further heap allocation.
     unsafe { ctx.set_return_raw(0, &value)? };

@@ -22,7 +22,7 @@ use aptos_network::{
         },
     },
 };
-use aptos_storage_interface::{DbReader, LedgerSummary};
+use aptos_storage_interface::{DbReader, LedgerSummary, StateKind};
 use aptos_storage_service_notifications::StorageServiceNotifier;
 use aptos_storage_service_types::{
     requests::StorageServiceRequest, responses::StorageServiceResponse, StorageServiceError,
@@ -320,13 +320,14 @@ mock! {
             ledger_version: Version,
         ) -> aptos_storage_interface::Result<TransactionAccumulatorSummary>;
 
-        fn get_state_item_count(&self, version: Version) -> aptos_storage_interface::Result<usize>;
+        fn get_state_item_count(&self, version: Version, kind: StateKind) -> aptos_storage_interface::Result<usize>;
 
         fn get_state_value_chunk_with_proof(
             &self,
             version: Version,
             start_idx: usize,
             chunk_size: usize,
+            kind: StateKind,
         ) -> aptos_storage_interface::Result<StateValueChunkWithProof>;
 
         fn get_epoch_snapshot_prune_window(&self) -> aptos_storage_interface::Result<usize>;
@@ -381,6 +382,7 @@ mock! {
             version: Version,
             first_index: usize,
             chunk_size: usize,
+            kind: StateKind,
         ) -> aptos_storage_interface::Result<Box<dyn Iterator<Item = aptos_storage_interface::Result<(StateKey, StateValue)>>>>;
 
         fn get_state_value_chunk_proof(
@@ -388,6 +390,7 @@ mock! {
             version: Version,
             first_index: usize,
             state_key_values: Vec<(StateKey, StateValue)>,
+            kind: StateKind,
         ) -> aptos_storage_interface::Result<StateValueChunkWithProof>;
     }
 }

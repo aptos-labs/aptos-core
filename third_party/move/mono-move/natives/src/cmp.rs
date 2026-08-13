@@ -5,15 +5,15 @@
 
 use crate::{polymorphic_natives, NativeEntry};
 use mono_move_core::{
-    native::{NativeContext, NativeContextFamily, NativeStatus, Opaque, Ref, VMInternalError},
-    TRIVIAL_DESCRIPTOR_ID,
+    native::{NativeContext, NativeContextFamily, NativeStatus, Opaque, Ref},
+    VMResult, TRIVIAL_DESCRIPTOR_ID,
 };
 use std::cmp::Ordering;
 
 /// `0x1::cmp::compare<T>(first: &T, second: &T): Ordering`
 //
 // TODO(metering): charge gas.
-pub fn native_compare<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
+pub fn native_compare<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     let ty = ctx.ty_arg(0)?;
     // SAFETY: args 0 and 1 are `&T`, whose pointee type is `ty`.
     let first: Ref<Opaque> = unsafe { ctx.arg(0)? };

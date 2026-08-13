@@ -7,6 +7,7 @@ module aptos_framework::deflation_token_tests {
     use aptos_framework::object;
     use aptos_framework::primary_fungible_store;
     use aptos_framework::deflation_token;
+    use std::features;
     use std::option;
     use std::string;
     use std::signer;
@@ -16,6 +17,7 @@ module aptos_framework::deflation_token_tests {
         creator: &signer,
         aaron: &signer,
     ) {
+        features::change_feature_flags_for_testing(creator, vector[features::get_function_value_dispatch_feature()], vector[]);
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
         let metadata = token_object.convert<TestToken, Metadata>();
@@ -63,6 +65,7 @@ module aptos_framework::deflation_token_tests {
         creator: &signer,
         aaron: &signer,
     ) {
+        features::change_feature_flags_for_testing(creator, vector[features::get_function_value_dispatch_feature()], vector[]);
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
         let metadata = token_object.convert<TestToken, Metadata>();
@@ -86,6 +89,7 @@ module aptos_framework::deflation_token_tests {
     fun test_deflation_fa_deposit(
         creator: &signer,
     ) {
+        features::change_feature_flags_for_testing(creator, vector[features::get_function_value_dispatch_feature()], vector[]);
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
         let metadata = token_object.convert<TestToken, Metadata>();
@@ -111,6 +115,7 @@ module aptos_framework::deflation_token_tests {
         creator: &signer,
         aaron: &signer,
     ) {
+        features::change_feature_flags_for_testing(creator, vector[features::get_function_value_dispatch_feature()], vector[]);
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, _, _, _) = fungible_asset::init_test_metadata(&creator_ref);
         let metadata = token_object.convert<TestToken, Metadata>();
@@ -312,6 +317,7 @@ module aptos_framework::deflation_token_tests {
         creator: &signer,
         aaron: &signer,
     ) {
+        features::change_feature_flags_for_testing(creator, vector[features::get_function_value_dispatch_feature()], vector[]);
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint_ref, transfer_ref, burn_ref) = primary_fungible_store::init_test_metadata_with_primary_store_enabled(&creator_ref);
         let metadata = token_object.convert<TestToken, Metadata>();
@@ -359,6 +365,7 @@ module aptos_framework::deflation_token_tests {
         creator: &signer,
         aaron: &signer,
     ) {
+        features::change_feature_flags_for_testing(creator, vector[features::get_function_value_dispatch_feature()], vector[]);
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         let (mint, transfer_ref, _, _) = fungible_asset::init_test_metadata(&creator_ref);
         let metadata = token_object.convert<TestToken, Metadata>();
@@ -394,6 +401,7 @@ module aptos_framework::deflation_token_tests {
         creator: &signer,
         aaron: &signer,
     ) {
+        features::change_feature_flags_for_testing(creator, vector[features::get_function_value_dispatch_feature()], vector[]);
         let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
         fungible_asset::init_test_metadata(&creator_ref);
         let metadata = token_object.convert<TestToken, Metadata>();

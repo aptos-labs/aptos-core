@@ -102,6 +102,13 @@ pub const GHOST_MEMORY_PREFIX: &str = "Ghost$";
 // =================================================================================================
 /// # Locations
 
+/// Environment extension recording source locations of integer literals that
+/// received the spec-mode default type (u256/i256) because no context type was
+/// available. Lets the prover distinguish defaulted literals from explicitly
+/// suffixed ones (locations survive expression cloning, node ids do not).
+#[derive(Debug, Default, Clone)]
+pub struct SpecDefaultedNumLocs(pub std::collections::BTreeSet<Loc>);
+
 /// A location, consisting of a FileId and a span in this file.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub struct Loc {
@@ -2167,6 +2174,10 @@ impl GlobalEnv {
             offset: 0,
             variant: None,
             ty,
+            // The ghost-variable backing struct is synthetic, but its `v`
+            // field is an ordinary field of that struct, not a ghost field.
+            is_ghost: false,
+            init: None,
         });
         StructData {
             name: self.ghost_memory_name(var_name),
@@ -2177,6 +2188,7 @@ impl GlobalEnv {
             abilities: AbilitySet::ALL,
             spec_var_opt: Some(var_id),
             field_data,
+            ghost_field_data: BTreeMap::new(),
             variants: None,
             spec: RefCell::new(Spec::default()),
             field_access_of: vec![],
@@ -3206,12 +3218,7 @@ impl GlobalEnv {
             emitln!(writer);
             writer.indent();
             for spec in specs {
-                if spec.negated {
-                    emit!(writer, "!")
-                }
                 match &spec.kind {
-                    AccessSpecifierKind::Reads => emit!(writer, "reads "),
-                    AccessSpecifierKind::Writes => emit!(writer, "writes "),
                     AccessSpecifierKind::LegacyAcquires => emit!(writer, "acquires "),
                 }
                 match &spec.resource.1 {
@@ -4138,6 +4145,14 @@ pub struct StructData {
     /// Field definitions.
     pub(crate) field_data: BTreeMap<FieldId, FieldData>,
 
+    /// Ghost field definitions (`ghost f: T;` in the struct's spec block):
+    /// model-only fields carried by each value in the prover's encoding, with
+    /// no runtime counterpart. Kept separate from `field_data` so that
+    /// runtime-oriented consumers (layout, file format generation) never see
+    /// them. For enums, a ghost field is variant-agnostic (`variant: None`);
+    /// the backend duplicates it into every variant constructor.
+    pub(crate) ghost_field_data: BTreeMap<FieldId, FieldData>,
+
     /// If this structure has variants (i.e. is an `enum`), information about the
     /// names of the variants and the location of their declaration. The fields
     /// of variants can be identified via the variant name in `FieldData`.
@@ -4178,6 +4193,7 @@ impl StructData {
             abilities: AbilitySet::ALL,
             spec_var_opt: None,
             field_data: Default::default(),
+            ghost_field_data: Default::default(),
             variants: None,
             spec: RefCell::new(Default::default()),
             field_access_of: vec![],
@@ -4441,6 +4457,29 @@ impl<'env> StructEnv<'env> {
             })
     }
 
+    /// Get the ghost fields of this struct (`ghost f: T;` declarations from
+    /// its spec block). Ghost fields are model-only: they never appear in
+    /// `get_fields` and have no runtime layout. For enums they are
+    /// variant-agnostic.
+    pub fn get_ghost_fields(&'env self) -> impl Iterator<Item = FieldEnv<'env>> {
+        self.data
+            .ghost_field_data
+            .values()
+            .sorted_by_key(|data| data.offset)
+            .map(move |data| FieldEnv {
+                struct_env: self.clone(),
+                data,
+            })
+    }
+
+    /// Gets a ghost field by its id, if it exists.
+    pub fn get_ghost_field(&'env self, id: FieldId) -> Option<FieldEnv<'env>> {
+        self.data.ghost_field_data.get(&id).map(|data| FieldEnv {
+            struct_env: self.clone(),
+            data,
+        })
+    }
+
     /// Return true if it is a native struct
     pub fn is_native(&self) -> bool {
         self.data.is_native
@@ -4454,7 +4493,14 @@ impl<'env> StructEnv<'env> {
 
     /// Gets a field by its id.
     pub fn get_field(&'env self, id: FieldId) -> FieldEnv<'env> {
-        let data = self.data.field_data.get(&id).expect("FieldId undefined");
+        // Fall back to ghost fields: `Operation::Select` in specification
+        // expressions may reference a ghost field by the same id namespace.
+        let data = self
+            .data
+            .field_data
+            .get(&id)
+            .or_else(|| self.data.ghost_field_data.get(&id))
+            .expect("FieldId undefined");
         FieldEnv {
             struct_env: self.clone(),
             data,
@@ -4597,6 +4643,16 @@ pub struct FieldData {
 
     /// The type of this field.
     pub ty: Type,
+
+    /// Whether this is a ghost field (`ghost f: T;` in the struct's spec
+    /// block): a model-only field with no runtime counterpart, stored in
+    /// `StructData::ghost_field_data` rather than `field_data`.
+    pub is_ghost: bool,
+
+    /// Initializer expression for a ghost field (`ghost f: T = expr;`).
+    /// Evaluated over the packed runtime fields at every `Pack`; absent
+    /// means the ghost is unconstrained at pack.
+    pub init: Option<Exp>,
 }
 
 #[derive(Debug)]
@@ -4684,6 +4740,17 @@ impl FieldEnv<'_> {
     /// Gets the variant this field is associated with
     pub fn get_variant(&self) -> Option<Symbol> {
         self.data.variant
+    }
+
+    /// Whether this is a ghost field (model-only, no runtime counterpart).
+    pub fn is_ghost(&self) -> bool {
+        self.data.is_ghost
+    }
+
+    /// Returns the initializer expression for a ghost field (`ghost f: T = expr;`),
+    /// or `None` for a non-ghost field or a ghost field without an initializer.
+    pub fn get_init_exp(&self) -> Option<&Exp> {
+        self.data.init.as_ref()
     }
 }
 
@@ -5737,12 +5804,8 @@ impl<'env> FunctionEnv<'env> {
         }
     }
 
-    /// Returns the access specifiers of this function.
-    /// If this is `None`, all accesses are allowed. If the list is empty,
-    /// no accesses are allowed. Otherwise the list is divided into _inclusions_ and _exclusions_,
-    /// the later being negated specifiers. Access is allowed if (a) any of the inclusion
-    /// specifiers allows it (union of inclusion specifiers) (b) none of the exclusions
-    /// specifiers disallows it (intersection of exclusion specifiers).
+    /// Returns the access specifiers of this function. If this is `None`, the function
+    /// has no `acquires` annotations. Otherwise the list holds the acquired resources.
     pub fn get_access_specifiers(&self) -> Option<&[AccessSpecifier]> {
         self.data.access_specifiers.as_deref()
     }

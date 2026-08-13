@@ -1,0 +1,15 @@
+Move prover returns: exiting with bytecode transformation errors
+error: an intrinsic map binding a value-mutating role (`map_borrow_mut`, `map_borrow_mut_with_default`, `map_iter_borrow_mut`) must also bind `map_spec_get` so data invariants over stored values can be stated
+   ┌─ tests/sources/functional/intrinsic_map_mut_no_get_err.move:21:5
+   │
+21 │     fun poke(m: &mut Map<u64, W>) {
+   │     ^
+
+error: an intrinsic map binding a value-mutating role (`map_borrow_mut`, `map_borrow_mut_with_default`, `map_iter_borrow_mut`) must also bind `map_spec_get` so data invariants over stored values can be stated
+   ┌─ tests/sources/functional/intrinsic_map_mut_no_get_err.move:21:5
+   │
+21 │ ╭     fun poke(m: &mut Map<u64, W>) {
+22 │ │         let w = bmut(m, 1);
+23 │ │         w.v = 0;
+24 │ │     }
+   │ ╰─────^

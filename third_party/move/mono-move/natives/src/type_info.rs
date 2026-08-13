@@ -5,11 +5,9 @@
 
 use crate::{polymorphic_natives, NativeEntry};
 use mono_move_core::{
-    native::{
-        NativeContext, NativeContextFamily, NativeStatus, RootPool, VMInternalError, VMValue,
-        Vector,
-    },
+    native::{NativeContext, NativeContextFamily, NativeStatus, RootPool, VMValue, Vector},
     types::{type_to_string, view_name, view_type, view_type_list, Type},
+    VMResult,
 };
 use move_core_types::account_address::AccountAddress;
 
@@ -24,7 +22,7 @@ use move_core_types::account_address::AccountAddress;
 //
 // TODO(completeness): with monomorphization the name is known at specialization time, so the
 // specializer could write it directly rather than going through a native.
-pub fn native_type_name<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
+pub fn native_type_name<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     let name = type_to_string(ctx.ty_arg(0)?);
     let bytes = ctx.new_byte_vector(name.as_bytes())?;
     // SAFETY: structs are flattened inline rather than heap-boxed, so the
@@ -87,7 +85,7 @@ impl<'a> VMValue<'a> for TypeInfo<'a> {
 // specializer could synthesize this `TypeInfo` directly rather than via a native.
 //
 // TODO(correctness): double check that the result matches the legacy VM's completely.
-pub fn native_type_of<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
+pub fn native_type_of<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     let (address, module_name, struct_name) = match view_type(ctx.ty_arg(0)?) {
         Type::Nominal {
             module_id,

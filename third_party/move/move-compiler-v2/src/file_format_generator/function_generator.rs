@@ -1211,6 +1211,7 @@ impl<'a> FunctionGenerator<'a> {
             | Operation::GetGlobal(_, _, _)
             | Operation::Uninit
             | Operation::Havoc(_)
+            | Operation::HavocGlobal(_, _, _)
             | Operation::Stop
             | Operation::IsParent(_, _)
             | Operation::WriteBack(_, _)

@@ -67,8 +67,7 @@ async fn main() -> Result<()> {
     gas_log.exec_io.check_consistency()?;
     gas_log.storage.check_consistency()?;
 
-    let txn_output =
-        output.try_materialize_into_transaction_output(&debugger.state_view_at_version(version))?;
+    let txn_output = output.try_materialize_into_transaction_output()?;
 
     // Show results to the user
     println!("{:#?}", txn_output);

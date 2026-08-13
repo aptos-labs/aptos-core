@@ -7,7 +7,7 @@ use crate::{
             respawned_session::RespawnedSession,
             user_transaction_sessions::session_change_sets::SystemSessionChangeSet,
         },
-        AptosMoveResolver, SessionId,
+        AptosMoveResolver,
     },
     transaction_metadata::TransactionMetadata,
     AptosVM,
@@ -33,7 +33,7 @@ impl<'r> AbortHookSession<'r> {
         resolver: &'r impl AptosMoveResolver,
         prologue_session_change_set: SystemSessionChangeSet,
     ) -> Self {
-        let session_id = SessionId::run_on_abort(txn_meta);
+        let session_id = txn_meta.run_on_abort_session_id();
 
         let session = RespawnedSession::spawn(
             vm,

@@ -49,7 +49,7 @@ fun apply(r0, r1): u64 {
 }
 
 fun run(r0, r1): u64 {
-  slots: params(2), locals(0), temps(0), xfer(2)
+  slots: params(2), locals(0), temps(0), transfer(2)
     r0: u64
     r1: u64
   code:

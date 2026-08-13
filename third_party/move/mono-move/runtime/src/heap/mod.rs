@@ -12,12 +12,13 @@
 mod deep_copy;
 
 use crate::{
-    error::{RuntimeError, RuntimeInvariantViolation, RuntimeResult},
+    error::{RuntimeError, RuntimeInvariantViolation},
     global_storage::ResourceReadWriteSet,
     invariant_violation,
     memory::{
-        read_descriptor, read_forwarding, read_obj_size, read_ptr, read_u64, write_descriptor,
-        write_forwarding, write_object_header, write_ptr, write_u64, MemoryRegion,
+        read_descriptor, read_forwarding, read_obj_size, read_ptr, read_u64, read_vec_len,
+        write_descriptor, write_forwarding, write_object_header, write_ptr, write_u64,
+        MemoryRegion,
     },
     types::{
         DEFAULT_HEAP_SIZE, FORWARDED_MARKER, META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET,
@@ -29,8 +30,9 @@ use mono_move_core::{
     native::{NativeABI, NativeExtensions},
     types::InternedType,
     DescriptorId, DescriptorProvider, FrameOffset, Function, LayoutProvider, ObjectDescriptorInner,
-    RootPool, CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DATA_SIZE,
-    ENUM_DATA_OFFSET, ENUM_TAG_OFFSET, FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE,
+    RootPool, VMInternalError, VMResult, CAPTURED_DATA_VALUES_OFFSET,
+    CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DATA_SIZE, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
+    FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE,
 };
 use std::ptr::NonNull;
 
@@ -306,14 +308,14 @@ pub(crate) fn alloc_or_gc<P: DescriptorProvider + ?Sized>(
     fp: *mut u8,
     top_frame: TopFrame<'_>,
     try_alloc: impl Fn(&mut Heap) -> AllocationResult<*mut u8>,
-) -> RuntimeResult<*mut u8> {
+) -> VMResult<*mut u8> {
     match try_alloc(heap) {
         Ok(ptr) => Ok(ptr),
         Err(AllocationError::OutOfHeapMemory { .. }) => {
             gc_collect(heap, provider, rws, extra_roots, extensions, fp, top_frame)?;
-            try_alloc(heap).map_err(AllocationError::into_runtime_error)
+            try_alloc(heap).map_err(|e| VMInternalError::new(e.into_runtime_error()))
         },
-        Err(e) => Err(e.into_runtime_error()),
+        Err(e) => Err(VMInternalError::new(e.into_runtime_error())),
     }
 }
 
@@ -333,21 +335,21 @@ pub(crate) unsafe fn deep_copy_or_gc<P: DescriptorProvider + ?Sized>(
     fp: *mut u8,
     top_frame: TopFrame<'_>,
     root: NonNull<u8>,
-) -> RuntimeResult<NonNull<u8>> {
+) -> VMResult<NonNull<u8>> {
     // SAFETY: `root` is a live object (this function's contract).
     let root_guard = unsafe { extra_roots.root_object(root.as_ptr()) };
     // SAFETY: the rooted object is live, so its (possibly relocated) pointer is
     // non-null.
     match unsafe { heap.try_deep_copy(provider, NonNull::new_unchecked(root_guard.ptr())) } {
         Ok(ptr) => Ok(ptr),
-        Err(AllocationError::RuntimeError(err)) => Err(err),
+        Err(AllocationError::RuntimeError(err)) => Err(VMInternalError::new(err)),
         Err(AllocationError::OutOfHeapMemory { .. }) => {
             gc_collect(heap, provider, rws, extra_roots, extensions, fp, top_frame)?;
             // SAFETY: the handle kept the source live across GC; re-read its
             // relocated, still-non-null pointer.
             unsafe {
                 heap.try_deep_copy(provider, NonNull::new_unchecked(root_guard.ptr()))
-                    .map_err(AllocationError::into_runtime_error)
+                    .map_err(|e| VMInternalError::new(e.into_runtime_error()))
             }
         },
     }
@@ -377,11 +379,11 @@ pub(crate) unsafe fn deserialize_or_gc<
     extensions: &NativeExtensions,
     frame_ptr: *mut u8,
     top_frame: TopFrame<'_>,
-) -> RuntimeResult<()> {
+) -> VMResult<()> {
     // SAFETY: forwarded from this function's contract.
     match unsafe { crate::value_utils::deserialize(layouts, heap, ty, bytes, dst) } {
         Ok(()) => Ok(()),
-        Err(AllocationError::RuntimeError(err)) => Err(err),
+        Err(AllocationError::RuntimeError(err)) => Err(VMInternalError::new(err)),
         Err(AllocationError::OutOfHeapMemory { .. }) => {
             gc_collect(
                 heap,
@@ -394,7 +396,7 @@ pub(crate) unsafe fn deserialize_or_gc<
             )?;
             // SAFETY: as above.
             unsafe { crate::value_utils::deserialize(layouts, heap, ty, bytes, dst) }
-                .map_err(AllocationError::into_runtime_error)
+                .map_err(|e| VMInternalError::new(e.into_runtime_error()))
         },
     }
 }
@@ -517,7 +519,7 @@ fn alloc_sized<P: DescriptorProvider + ?Sized>(
     top_frame: TopFrame<'_>,
     total_size: usize,
     descriptor_id: DescriptorId,
-) -> RuntimeResult<*mut u8> {
+) -> VMResult<*mut u8> {
     alloc_or_gc(
         heap,
         provider,
@@ -547,7 +549,7 @@ pub(crate) fn alloc_vec<P: DescriptorProvider + ?Sized>(
     descriptor_id: DescriptorId,
     elem_size: u32,
     capacity_in_elems: u64,
-) -> RuntimeResult<*mut u8> {
+) -> VMResult<*mut u8> {
     let total_size = (capacity_in_elems as usize)
         .checked_mul(elem_size as usize)
         .and_then(|v| v.checked_add(OBJECT_HEADER_SIZE + VEC_DATA_OFFSET))
@@ -577,7 +579,7 @@ pub(crate) fn alloc_obj<P: DescriptorProvider + ?Sized>(
     fp: *mut u8,
     top_frame: TopFrame<'_>,
     descriptor_id: DescriptorId,
-) -> RuntimeResult<*mut u8> {
+) -> VMResult<*mut u8> {
     let desc = match provider.descriptor(descriptor_id) {
         Some(desc) => desc,
         None => invariant_violation!(DescriptorNotFound {
@@ -626,7 +628,7 @@ pub(crate) fn alloc_captured_data<P: DescriptorProvider + ?Sized>(
     top_frame: TopFrame<'_>,
     values_size: u32,
     descriptor_id: DescriptorId,
-) -> RuntimeResult<*mut u8> {
+) -> VMResult<*mut u8> {
     let total_size = OBJECT_HEADER_SIZE + CAPTURED_DATA_VALUES_OFFSET + values_size as usize;
     alloc_sized(
         heap,
@@ -641,19 +643,82 @@ pub(crate) fn alloc_captured_data<P: DescriptorProvider + ?Sized>(
     )
 }
 
-/// Grow a vector to at least `required_cap_in_elems` elements, accessed
-/// through a fat pointer reference at `fp + vec_ref_offset`. The vector
-/// pointer is written back through the reference; returns the new object
-/// pointer.
+/// Allocate a fresh vector holding at least `required` elements, tagged with
+/// `descriptor`, and move the `old` vector's contents into it (length
+/// preserved), returning the new object pointer for the caller to write back.
 ///
 /// # Safety
 ///
-/// `fp` must point to a valid frame. `vec_ref_offset` must be the byte
-/// offset of a 16-byte fat pointer `(base, offset)` whose target holds
-/// the current vector heap pointer. `alloc_vec` may trigger GC which
-/// relocates objects; the fat pointer's base in `heap_ptr_offsets` and the
-/// vector pointer in the struct's `pointer_offsets` are updated by the GC.
-/// We re-read through the fat pointer after allocation.
+/// `old` is null or a live vector of `elem_size`-byte elements. Rooting keeps
+/// it live across the allocation's GC, so its contents survive the copy.
+#[allow(clippy::too_many_arguments)]
+pub(crate) unsafe fn realloc_vec<P: DescriptorProvider + ?Sized>(
+    heap: &mut Heap,
+    provider: &P,
+    rws: &mut ResourceReadWriteSet,
+    extra_roots: &RootPool,
+    extensions: &NativeExtensions,
+    fp: *mut u8,
+    top_frame: TopFrame<'_>,
+    old: *mut u8,
+    descriptor: DescriptorId,
+    elem_size: u32,
+    required: u64,
+) -> VMResult<*mut u8> {
+    // SAFETY: `old` is null or a live vector.
+    let old_len = unsafe { read_vec_len(old) };
+    let old_cap = if old.is_null() {
+        0
+    } else {
+        // SAFETY: `old` is a live vector object.
+        ((unsafe { read_obj_size(old) } as usize - OBJECT_HEADER_SIZE - VEC_DATA_OFFSET)
+            / elem_size as usize) as u64
+    };
+    // Amortized doubling keeps repeated growth linear; `required` wins for a
+    // large one-shot grow.
+    let doubled = if old_cap == 0 { 4 } else { old_cap * 2 };
+    let new_cap = doubled.max(required);
+    // Root the source so its (relocated) pointer is recoverable after the GC
+    // `alloc_vec` may trigger.
+    // SAFETY: `old` is null or a live heap object.
+    let old_handle = unsafe { extra_roots.root_object(old) };
+    let new_ptr = alloc_vec(
+        heap,
+        provider,
+        rws,
+        extra_roots,
+        extensions,
+        fp,
+        top_frame,
+        descriptor,
+        elem_size,
+        new_cap,
+    )?;
+    let byte_count = old_len as usize * elem_size as usize;
+    if byte_count > 0 {
+        // SAFETY: the source holds `old_len` elements and `new_ptr` has room for them.
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                old_handle.ptr().add(VEC_DATA_OFFSET),
+                new_ptr.add(VEC_DATA_OFFSET),
+                byte_count,
+            );
+        }
+    }
+    // SAFETY: `new_ptr` is a freshly allocated vector.
+    unsafe { write_u64(new_ptr, VEC_LENGTH_OFFSET, old_len) };
+    Ok(new_ptr)
+}
+
+/// Grow a vector to at least `required_cap_in_elems` elements, accessed through
+/// a fat pointer reference at `fp + vec_ref_offset`, writing the new pointer
+/// back through the reference and returning it.
+///
+/// # Safety
+///
+/// `fp` must point to a valid frame and `vec_ref_offset` to a 16-byte fat
+/// pointer whose target holds the current (non-null) vector pointer. The GC
+/// updates that fat pointer, so it is re-read for the write-back.
 pub(crate) fn grow_vec_ref<P: DescriptorProvider + ?Sized>(
     heap: &mut Heap,
     provider: &P,
@@ -665,29 +730,19 @@ pub(crate) fn grow_vec_ref<P: DescriptorProvider + ?Sized>(
     vec_ref_offset: usize,
     elem_size: u32,
     required_cap_in_elems: u64,
-) -> RuntimeResult<*mut u8> {
+) -> VMResult<*mut u8> {
     unsafe {
         let base = read_ptr(fp, vec_ref_offset);
         let off = read_u64(fp, vec_ref_offset + 8) as usize;
         let old_ptr = read_ptr(base, off);
-
-        let old_len = read_u64(old_ptr, VEC_LENGTH_OFFSET);
-        let old_total = read_obj_size(old_ptr) as usize;
-        let old_cap_in_elems =
-            ((old_total - OBJECT_HEADER_SIZE - VEC_DATA_OFFSET) / elem_size as usize) as u64;
+        // Guard the descriptor read below: an empty vector is allocated fresh,
+        // never grown, so a null here is a caller-side invariant violation.
+        if old_ptr.is_null() {
+            invariant_violation!(GrowNullVector);
+        }
         let descriptor_id = DescriptorId(read_descriptor(old_ptr));
 
-        let mut new_cap_in_elems = if old_cap_in_elems == 0 {
-            4
-        } else {
-            old_cap_in_elems * 2
-        };
-        if new_cap_in_elems < required_cap_in_elems {
-            new_cap_in_elems = required_cap_in_elems;
-        }
-
-        // alloc_vec may trigger GC. Re-read through the fat pointer afterward.
-        let new_ptr = alloc_vec(
+        let new_ptr = realloc_vec(
             heap,
             provider,
             rws,
@@ -695,25 +750,15 @@ pub(crate) fn grow_vec_ref<P: DescriptorProvider + ?Sized>(
             extensions,
             fp,
             top_frame,
+            old_ptr,
             descriptor_id,
             elem_size,
-            new_cap_in_elems,
+            required_cap_in_elems,
         )?;
+
+        // Write the new pointer back through the (GC-updated) reference.
         let base = read_ptr(fp, vec_ref_offset);
         let off = read_u64(fp, vec_ref_offset + 8) as usize;
-        let old_ptr = read_ptr(base, off);
-
-        let byte_count = old_len as usize * elem_size as usize;
-        if byte_count > 0 {
-            std::ptr::copy_nonoverlapping(
-                old_ptr.add(VEC_DATA_OFFSET),
-                new_ptr.add(VEC_DATA_OFFSET),
-                byte_count,
-            );
-        }
-        write_u64(new_ptr, VEC_LENGTH_OFFSET, old_len);
-
-        // Write new pointer back through the reference.
         write_ptr(base, off, new_ptr);
         Ok(new_ptr)
     }
@@ -764,7 +809,7 @@ pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
     extensions: &NativeExtensions,
     frame_ptr: *mut u8,
     top_frame: TopFrame<'_>,
-) -> Result<(), RuntimeInvariantViolation> {
+) -> VMResult<()> {
     heap.gc_count += 1;
 
     let to_space = MemoryRegion::new(heap.buffer.len());
@@ -848,7 +893,11 @@ pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
     unsafe {
         extensions
             .relocate_all_roots(&mut |base| scanner.relocate(base))
-            .map_err(|_| RuntimeInvariantViolation::ExtensionBorrowedDuringGC)?;
+            .map_err(|_| {
+                RuntimeError::InvariantViolation(
+                    RuntimeInvariantViolation::ExtensionBorrowedDuringGC,
+                )
+            })?;
     }
 
     // Phase 2: Cheney-style breadth-first scan of copied objects.
@@ -866,11 +915,11 @@ pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
             let obj_size = read_obj_size(obj_ptr) as usize;
 
             if obj_size == 0 || obj_size != align_max(obj_size) {
-                return Err(RuntimeInvariantViolation::GcInvalidObjectSize { size: obj_size });
+                invariant_violation!(GcInvalidObjectSize { size: obj_size });
             }
 
             if descriptor_id == FORWARDED_MARKER {
-                return Err(RuntimeInvariantViolation::GcForwardingMarkerInToSpace);
+                invariant_violation!(GcForwardingMarkerInToSpace);
             }
             gc_scan_object(provider, &mut scanner, obj_ptr, DescriptorId(descriptor_id))?;
 
@@ -997,14 +1046,12 @@ fn gc_scan_object<P: DescriptorProvider + ?Sized>(
     scanner: &mut RootScanner<'_>,
     obj_ptr: *mut u8,
     descriptor_id: DescriptorId,
-) -> Result<(), RuntimeInvariantViolation> {
+) -> VMResult<()> {
     let desc = match provider.descriptor(descriptor_id) {
         Some(d) => d,
-        None => {
-            return Err(RuntimeInvariantViolation::DescriptorNotFound {
-                descriptor_id: descriptor_id.as_u32(),
-            })
-        },
+        None => invariant_violation!(DescriptorNotFound {
+            descriptor_id: descriptor_id.as_u32(),
+        }),
     };
 
     // All offsets below are relative to `obj_ptr` (the data-region
@@ -1060,7 +1107,7 @@ fn gc_scan_object<P: DescriptorProvider + ?Sized>(
             if tag >= variant_pointer_offsets.len() {
                 // A tag past the variant count means a corrupt object; surface
                 // it as an invariant violation.
-                return Err(RuntimeInvariantViolation::EnumTagOutOfRange {
+                invariant_violation!(EnumTagOutOfRange {
                     tag: tag as u64,
                     variant_count: variant_pointer_offsets.len(),
                 });

@@ -50,18 +50,6 @@ MAINNET_SEED_PEERS = {
     ],
     "role": "Upstream",
   },
-  "C0171305FEF577904C874D44C0A3821F830E9419D3AA3A40C29CA7DEA24F466F": {
-    "addresses": [
-      "/dns4/pfn3.usce1.fullnode.mainnet.aptoslabs.com/tcp/6182/noise-ik/C0171305FEF577904C874D44C0A3821F830E9419D3AA3A40C29CA7DEA24F466F/handshake/0"
-    ],
-    "role": "Upstream",
-  },
-  "99A2C88D211A6FDF56B934BE039330B4E76EC5FEEE4989ACE4C7CD63B2F94C34": {
-    "addresses": [
-      "/dns4/pfn4.usce1.fullnode.mainnet.aptoslabs.com/tcp/6182/noise-ik/99A2C88D211A6FDF56B934BE039330B4E76EC5FEEE4989ACE4C7CD63B2F94C34/handshake/0"
-    ],
-    "role": "Upstream",
-  },
 }
 
 def print_error_and_exit(error):

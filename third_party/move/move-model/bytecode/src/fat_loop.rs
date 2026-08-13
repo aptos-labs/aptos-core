@@ -15,13 +15,21 @@
 
 use crate::{
     function_target::FunctionTarget,
+    function_target_pipeline::{FunctionTargetsHolder, FunctionVariant},
     graph::{Graph, NaturalLoop},
-    stackless_bytecode::{AttrId, Bytecode, Label, PropKind},
+    stackless_bytecode::{AttrId, BorrowNode, Bytecode, Label, Operation, PropKind},
     stackless_control_flow_graph::{BlockContent, BlockId, StacklessControlFlowGraph},
+    usage_analysis,
 };
 use anyhow::bail;
 use move_binary_format::file_format::CodeOffset;
-use move_model::{ast, ast::TempIndex, pragmas::UNROLL_PRAGMA};
+use move_model::{
+    ast,
+    ast::TempIndex,
+    model::{Parameter, QualifiedInstId, StructId},
+    pragmas::UNROLL_PRAGMA,
+    ty::Type,
+};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Representation of a fat loop.
@@ -49,6 +57,12 @@ pub struct FatLoopSpecInfo {
     /// references. The boolean indicates whether the reference itself is modified, and is
     /// false if only the value it points to is. See also function `Bytecode::modifies`.
     pub mut_targets: BTreeMap<TempIndex, bool>,
+
+    /// The global memories which may be modified in the loop, directly (resource
+    /// operations, write-backs to global roots) or transitively through calls.
+    /// Loop-to-DAG transformation havocs these at the loop header, so the
+    /// loop-exit path does not retain pre-loop memory.
+    pub mem_targets: BTreeSet<QualifiedInstId<StructId>>,
 }
 
 /// Information about fat loops in a function.
@@ -103,24 +117,35 @@ impl FatLoopFunctionInfo {
 
 /// Find all fat loops in the function.
 pub fn build_loop_info(func_target: &FunctionTarget) -> anyhow::Result<FatLoopFunctionInfo> {
-    FatLoopBuilder { for_spec: false }
-        .build_loop_info(func_target)
-        .map(|(info, _)| info)
+    FatLoopBuilder {
+        for_spec: false,
+        targets: None,
+    }
+    .build_loop_info(func_target)
+    .map(|(info, _)| info)
 }
 
 /// Find all fat loops in the function and collect information needed for invariant instrumentation
-/// (i.e., loop-to-DAG transformation) and loop unrolling (if requested by user).
+/// (i.e., loop-to-DAG transformation) and loop unrolling (if requested by user). The targets
+/// holder is used to look up the (transitively) modified memory of functions called in loop
+/// bodies.
 pub fn build_loop_info_for_spec(
     func_target: &FunctionTarget,
+    targets: &FunctionTargetsHolder,
 ) -> anyhow::Result<(FatLoopFunctionInfo, LoopUnrollingFunctionInfo)> {
-    FatLoopBuilder { for_spec: true }.build_loop_info(func_target)
+    FatLoopBuilder {
+        for_spec: true,
+        targets: Some(targets),
+    }
+    .build_loop_info(func_target)
 }
 
-struct FatLoopBuilder {
+struct FatLoopBuilder<'a> {
     for_spec: bool,
+    targets: Option<&'a FunctionTargetsHolder>,
 }
 
-impl FatLoopBuilder {
+impl FatLoopBuilder<'_> {
     fn build_loop_info(
         &self,
         func_target: &FunctionTarget,
@@ -186,10 +211,12 @@ impl FatLoopBuilder {
                     let spec_info = if self.for_spec {
                         let (val_targets, mut_targets) =
                             self.collect_loop_targets(&cfg, func_target, &sub_loops);
+                        let mem_targets = self.collect_loop_memory(&cfg, func_target, &sub_loops);
                         Some(FatLoopSpecInfo {
                             invariants,
                             val_targets,
                             mut_targets,
+                            mem_targets,
                         })
                     } else {
                         None
@@ -233,7 +260,35 @@ impl FatLoopBuilder {
                         .map(|(attr_id, _)| *attr_id)
                 })
                 .collect();
+            // Natural-loop detection only sees code reachable from the entry, so a
+            // declaration in unreachable code (e.g. a dead copy left behind by
+            // inline expansion) can never be claimed by a loop. Such code is not
+            // verified, so the declaration is irrelevant rather than misplaced.
+            // One pass computes the attr ids of all reachable Prop bytecodes
+            // (invariants are asserts, unrolling marks assumes).
+            let reachable_prop_attrs: BTreeSet<AttrId> = {
+                let mut seen = BTreeSet::new();
+                let mut work = vec![cfg.entry_block()];
+                let mut attrs = BTreeSet::new();
+                while let Some(block) = work.pop() {
+                    if !seen.insert(block) {
+                        continue;
+                    }
+                    if let BlockContent::Basic { lower, upper } = cfg.content(block) {
+                        for offset in *lower..=*upper {
+                            if let Bytecode::Prop(attr, _, _) = &code[offset as usize] {
+                                attrs.insert(*attr);
+                            }
+                        }
+                    }
+                    work.extend(cfg.successors(block).iter().copied());
+                }
+                attrs
+            };
             for attr_id in func_target.data.loop_invariants.difference(&all_invariants) {
+                if !reachable_prop_attrs.contains(attr_id) {
+                    continue;
+                }
                 env.error(
                     &func_target.get_bytecode_loc(*attr_id),
                     "Loop invariants must be declared at the beginning of the loop header in a \
@@ -249,6 +304,9 @@ impl FatLoopBuilder {
             let declared_unrolling_marks: BTreeSet<_> =
                 func_target.data.loop_unrolling.keys().copied().collect();
             for attr_id in declared_unrolling_marks.difference(&all_unrolling_marks) {
+                if !reachable_prop_attrs.contains(attr_id) {
+                    continue;
+                }
                 env.error(
                     &func_target.get_bytecode_loc(*attr_id),
                     "Loop unrolling mark must be declared at the beginning of the loop header",
@@ -405,6 +463,293 @@ impl FatLoopBuilder {
             }
         }
         (val_targets, mut_targets)
+    }
+
+    /// Collect global memories that may be modified during loop execution:
+    /// directly through resource operations and write-backs to global roots,
+    /// or transitively through called functions (per their usage analysis).
+    /// Intrinsic memory is skipped — it is not modeled as regular global
+    /// memory. Requires the targets holder; returns empty without one.
+    fn collect_loop_memory(
+        &self,
+        cfg: &StacklessControlFlowGraph,
+        func_target: &FunctionTarget<'_>,
+        sub_loops: &[NaturalLoop<BlockId>],
+    ) -> BTreeSet<QualifiedInstId<StructId>> {
+        let mut mems = BTreeSet::new();
+        let Some(targets) = self.targets else {
+            return mems;
+        };
+        let env = func_target.global_env();
+        let code = func_target.get_bytecode();
+        let mut add = |mem: QualifiedInstId<StructId>| {
+            if !env.get_struct_qid(mem.to_qualified_id()).is_intrinsic() {
+                mems.insert(mem);
+            }
+        };
+        let fat_loop_body: BTreeSet<_> = sub_loops
+            .iter()
+            .flat_map(|l| l.loop_body.iter())
+            .copied()
+            .collect();
+        for block_id in fat_loop_body {
+            for code_offset in cfg
+                .instr_indexes(block_id)
+                .expect("A loop body should never contain a dummy block")
+            {
+                // Inline spec blocks that update ghost memory are lowered to
+                // `Prop(Assume, exp)` with `exp.node_id()` recorded in
+                // `spec.update_map` (see `stackless_bytecode_generator.rs`
+                // for the emission, and `spec_instrumentation.rs`'s use of
+                // the same lookup). This is offset-space-correct at loop
+                // analysis time; `spec.on_impl` is keyed by file-format
+                // offsets and does not align with the stackless code offsets
+                // used here.
+                if let Bytecode::Prop(_, PropKind::Assume, exp) = &code[code_offset as usize] {
+                    if let Some(cond) = func_target.get_spec().update_map.get(&exp.node_id()) {
+                        if !cond.additional_exps.is_empty() {
+                            if let Some((mem, _, _)) =
+                                cond.additional_exps[0].extract_ghost_mem_access(env)
+                            {
+                                add(mem);
+                            }
+                        }
+                    }
+                }
+                let Bytecode::Call(_, _, oper, srcs, _) = &code[code_offset as usize] else {
+                    continue;
+                };
+                match oper {
+                    Operation::MoveTo(mid, sid, inst) | Operation::MoveFrom(mid, sid, inst) => {
+                        add(mid.qualified_inst(*sid, inst.clone()));
+                    },
+                    Operation::WriteBack(BorrowNode::GlobalRoot(mem), _) => {
+                        add(mem.clone());
+                    },
+                    Operation::Function(mid, fid, inst) => {
+                        let callee = env.get_function(mid.qualified(*fid));
+                        if callee.is_native() || callee.is_intrinsic() || callee.is_struct_api() {
+                            continue;
+                        }
+                        // The callee's `invoke_frame` carries `modifies_of`
+                        // frame memory transitively reachable through
+                        // function-value invocations in the call subtree —
+                        // effects that are not in the callee's direct or
+                        // through-call `modified` summary.
+                        let usage = if callee.get_qualified_id()
+                            == func_target.func_env.get_qualified_id()
+                        {
+                            // Recursive call: the function under processing is
+                            // held out of the targets holder; its own usage
+                            // summary is fixpointed and includes recursive
+                            // effects.
+                            usage_analysis::get_memory_usage(func_target)
+                        } else {
+                            if !targets.has_target(&callee, &FunctionVariant::Baseline) {
+                                continue;
+                            }
+                            let callee_target =
+                                targets.get_target(&callee, &FunctionVariant::Baseline);
+                            usage_analysis::get_memory_usage(&callee_target)
+                        };
+                        for mem in usage.modified.get_all_inst(inst) {
+                            add(mem);
+                        }
+                        for mem in usage.invoke_frame.get_all_inst(inst) {
+                            add(mem);
+                        }
+                        // A wildcard `modifies_of<f> *` propagated up from
+                        // the callee is not resolved in `invoke_frame` (the
+                        // callee's own accessed footprint is often empty
+                        // for pure forwarders — a caller inheriting the
+                        // summary would havoc nothing). Resolve here
+                        // against the enclosing function's own accessed
+                        // footprint, which includes anything mentioned by
+                        // its specs (`requires`/`ensures`/etc.).
+                        if usage.invoke_frame_wildcard {
+                            let self_usage = usage_analysis::get_memory_usage(func_target);
+                            for mem in self_usage.accessed.all.iter() {
+                                add(mem.clone());
+                            }
+                        }
+                    },
+                    Operation::Invoke => {
+                        // Direct invocation in the current function body:
+                        // the operand's function-value type is known here,
+                        // so declared frames can be filtered by it. Union
+                        // callee `invoke_frame`s inherited via
+                        // `subsume_callee` (from static calls in the body,
+                        // which have no per-Invoke type to filter against
+                        // — they've already been resolved in the callee's
+                        // analysis).
+                        let self_usage = usage_analysis::get_memory_usage(func_target);
+                        let invoked_ty = func_target
+                            .get_local_type(*srcs.last().expect("invoke has a function operand"))
+                            .skip_reference()
+                            .clone();
+                        let invoked_norm = matches!(invoked_ty, Type::Fun(..))
+                            .then(|| invoked_ty.clone().normalize_fun());
+                        let type_may_match = |ty: &Type| {
+                            let ty = ty.skip_reference();
+                            ty.is_open()
+                                || invoked_ty.is_open()
+                                || match (&invoked_norm, ty) {
+                                    (Some(inv), Type::Fun(..)) => {
+                                        &ty.clone().normalize_fun() == inv
+                                    },
+                                    _ => ty == &invoked_ty,
+                                }
+                        };
+                        let mem_is_closed = |mem: &QualifiedInstId<StructId>| {
+                            mem.inst.iter().all(|ty| !ty.is_open())
+                        };
+                        // Parameter-declared frames of the enclosing
+                        // function, filtered by the invoked operand type.
+                        let mut wildcard_here = false;
+                        for access in func_target.func_env.get_fun_param_access_of() {
+                            let param_ty = func_target
+                                .func_env
+                                .get_parameters()
+                                .into_iter()
+                                .find(|Parameter(sym, _, _)| *sym == access.fun_param)
+                                .map(|Parameter(_, ty, _)| ty);
+                            let matches = param_ty.as_ref().map(&type_may_match).unwrap_or(true);
+                            if !matches {
+                                continue;
+                            }
+                            if access.frame_spec.modifies_all {
+                                wildcard_here = true;
+                            }
+                            for mem in &access.old_memory {
+                                if mem_is_closed(mem) {
+                                    add(mem.clone());
+                                } else {
+                                    wildcard_here = true;
+                                }
+                            }
+                        }
+                        // Struct-field-declared frames from anywhere in the
+                        // program, filtered by field type.
+                        for module_env in env.get_modules() {
+                            for struct_env in module_env.get_structs() {
+                                for access in struct_env.get_field_access_of() {
+                                    let field_may_match = struct_env
+                                        .find_field(access.fun_param)
+                                        .map(|f| type_may_match(&f.get_type()))
+                                        .unwrap_or(true);
+                                    if !field_may_match {
+                                        continue;
+                                    }
+                                    if access.frame_spec.modifies_all {
+                                        wildcard_here = true;
+                                    }
+                                    for mem in &access.old_memory {
+                                        if mem_is_closed(mem) {
+                                            add(mem.clone());
+                                        } else {
+                                            wildcard_here = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if wildcard_here {
+                            for mem in self_usage.accessed.all.iter() {
+                                add(mem.clone());
+                            }
+                        }
+                        // The function under processing is held out of the
+                        // targets holder, so its own Closure ops must be
+                        // scanned explicitly.
+                        let current_id = func_target.func_env.get_qualified_id();
+                        let mut closure_mems = vec![];
+                        let mut closure_widen = false;
+                        let mut scan_closures =
+                            |creator_target: &FunctionTarget<'_>, creator_is_current: bool| {
+                                for bc in creator_target.get_bytecode() {
+                                    let Bytecode::Call(
+                                        _,
+                                        dests,
+                                        Operation::Closure(mid, fid, inst, _),
+                                        _,
+                                        _,
+                                    ) = bc
+                                    else {
+                                        continue;
+                                    };
+                                    if !type_may_match(creator_target.get_local_type(dests[0])) {
+                                        continue;
+                                    }
+                                    let callee = env.get_function(mid.qualified(*fid));
+                                    if callee.is_native()
+                                        || callee.is_intrinsic()
+                                        || callee.is_struct_api()
+                                    {
+                                        continue;
+                                    }
+                                    let callee_id = callee.get_qualified_id();
+                                    let callee_usage = if callee_id == current_id {
+                                        usage_analysis::get_memory_usage(func_target)
+                                    } else {
+                                        if !targets.has_target(&callee, &FunctionVariant::Baseline)
+                                        {
+                                            continue;
+                                        }
+                                        usage_analysis::get_memory_usage(
+                                            &targets
+                                                .get_target(&callee, &FunctionVariant::Baseline),
+                                        )
+                                    };
+                                    // The closed-over callee may itself
+                                    // invoke a function value transitively
+                                    // — its `invoke_frame` carries those
+                                    // effects and must be havocked here too.
+                                    let mems = callee_usage
+                                        .modified
+                                        .get_all_inst(inst)
+                                        .into_iter()
+                                        .chain(callee_usage.invoke_frame.get_all_inst(inst));
+                                    for mem in mems {
+                                        if creator_is_current || mem_is_closed(&mem) {
+                                            closure_mems.push(mem);
+                                        } else {
+                                            closure_widen = true;
+                                        }
+                                    }
+                                }
+                            };
+                        scan_closures(func_target, true);
+                        for fun_id in targets.get_funs() {
+                            if fun_id == current_id {
+                                continue;
+                            }
+                            let creator = env.get_function(fun_id);
+                            if !targets.has_target(&creator, &FunctionVariant::Baseline) {
+                                continue;
+                            }
+                            scan_closures(
+                                &targets.get_target(&creator, &FunctionVariant::Baseline),
+                                false,
+                            );
+                        }
+                        for mem in closure_mems {
+                            add(mem);
+                        }
+                        // Foreign-context closure memory (open types the
+                        // creator's context can't express here) widens to
+                        // the current function's accessed footprint —
+                        // same fallback the wildcard case above uses.
+                        if closure_widen {
+                            for mem in self_usage.accessed.all.iter() {
+                                add(mem.clone());
+                            }
+                        }
+                    },
+                    _ => {},
+                }
+            }
+        }
+        mems
     }
 
     /// Collect code offsets that are branch instructions forming loop back-edges

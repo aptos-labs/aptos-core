@@ -99,6 +99,8 @@ pub struct ValueSerDeContext<'a> {
     pub(crate) legacy_signer: bool,
     /// Maximum allowed depth of a VM value. Enforced by serializer.
     pub(crate) max_value_nested_depth: Option<u64>,
+    /// If true, serialization of any value containing a closure fails.
+    pub(crate) closure_serialization_disabled: bool,
 }
 
 impl<'a> ValueSerDeContext<'a> {
@@ -109,12 +111,19 @@ impl<'a> ValueSerDeContext<'a> {
             delayed_fields_extension: None,
             legacy_signer: false,
             max_value_nested_depth,
+            closure_serialization_disabled: false,
         }
     }
 
     /// Serialize signer with legacy format to maintain backwards compatibility.
     pub fn with_legacy_signer(mut self) -> Self {
         self.legacy_signer = true;
+        self
+    }
+
+    /// If `disabled` is true, serialization fails on values containing closures.
+    pub fn with_closure_serialization_disabled(mut self, disabled: bool) -> Self {
+        self.closure_serialization_disabled = disabled;
         self
     }
 
@@ -145,6 +154,7 @@ impl<'a> ValueSerDeContext<'a> {
             delayed_fields_extension: None,
             legacy_signer: self.legacy_signer,
             max_value_nested_depth: self.max_value_nested_depth,
+            closure_serialization_disabled: self.closure_serialization_disabled,
         }
     }
 

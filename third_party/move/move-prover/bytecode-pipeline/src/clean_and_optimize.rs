@@ -17,7 +17,7 @@ use move_stackless_bytecode::{
     dataflow_domains::{AbstractDomain, JoinResult},
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
-    stackless_bytecode::{BorrowNode, Bytecode, Operation},
+    stackless_bytecode::{BorrowNode, Bytecode, Operation, PropKind},
     stackless_control_flow_graph::StacklessControlFlowGraph,
 };
 use std::collections::BTreeSet;
@@ -99,6 +99,36 @@ impl TransferFunctions for Optimizer<'_> {
         use BorrowNode::*;
         use Bytecode::*;
         use Operation::*;
+        // A ghost-field update currently appears as `Prop(Assume, Eq(Select(base, g), rhs))`
+        // in the update_map. spec_instrumentation later lowers it into a real
+        // `WriteRef`, but that lowering runs AFTER this optimizer. Treat the
+        // marker as a write to `base` so the borrow's write-back chain
+        // survives clean_and_optimize.
+        if let Prop(_, PropKind::Assume, exp) = instr {
+            let spec = self.target.get_spec();
+            if spec.update_map.contains_key(&exp.node_id()) {
+                if let move_model::ast::ExpData::Call(_, move_model::ast::Operation::Eq, args) =
+                    exp.as_ref()
+                {
+                    if args.len() == 2 {
+                        if let move_model::ast::ExpData::Call(
+                            _,
+                            move_model::ast::Operation::Select(..),
+                            sel_args,
+                        ) = args[0].as_ref()
+                        {
+                            if let Some(base) = sel_args.first() {
+                                if let move_model::ast::ExpData::Temporary(_, idx) = base.as_ref() {
+                                    if self.target.get_local_type(*idx).is_mutable_reference() {
+                                        state.unwritten.insert(Reference(*idx));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
         if let Call(_, _, oper, srcs, _) = instr {
             match oper {
                 WriteRef => {

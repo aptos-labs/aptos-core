@@ -43,6 +43,7 @@ const COMMON_EXCLUSIONS: &[&str] = &[
     "/testing-constant/",
     "/structs_visibility/",
     "/public_const/",
+    "/for_loop_lang_2_4/",
 ];
 
 /// Note that any config which has different output for a test directory
@@ -60,7 +61,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
         exclude: COMMON_EXCLUSIONS,
         cross_compile: true,
     },
-    // Test optimize/no-optimize/etc., except for `/access_control/`
+    // Test optimize/no-optimize/etc.
     TestConfig {
         name: "optimize",
         runner: |p| run(p, get_config_by_name("optimize")),
@@ -167,6 +168,17 @@ const TEST_CONFIGS: &[TestConfig] = &[
         language_version: LanguageVersion::latest(),
         include: &["/testing-constant/"],
         exclude: &["/structs_visibility/"],
+        cross_compile: false,
+    },
+    // Exercises `for` loop semantics under language version 2.4, where the upper
+    // bound is evaluated inside the iterator's scope (the pre-2.5 behavior).
+    TestConfig {
+        name: "for-loop-lang-2.4",
+        runner: |p| run(p, get_config_by_name("for-loop-lang-2.4")),
+        experiments: &[],
+        language_version: LanguageVersion::V2_4,
+        include: &["/for_loop_lang_2_4/"],
+        exclude: &[],
         cross_compile: false,
     },
 ];

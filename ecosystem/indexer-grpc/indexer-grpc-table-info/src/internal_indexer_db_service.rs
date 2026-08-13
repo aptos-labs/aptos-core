@@ -51,6 +51,8 @@ impl InternalIndexerDBService {
                 .expect("Failed to open internal indexer db"),
         );
 
+        // TODO(#20246): the restore-path config is hardcoded instead of derived from
+        // the node config.
         let internal_indexer_db_config =
             InternalIndexerDBConfig::new(true, true, true, 0, true, 10_000);
         Some(InternalIndexerDB::new(arc_db, internal_indexer_db_config))

@@ -50,6 +50,19 @@ pub enum TimedFeatureFlag {
     /// of same struct nodes, counting cache hits as 1 node instead of re-expanding its full
     /// subtree.
     ConstantSerializedSizeLocalCache,
+
+    /// Reject publishing of v5 module bytecode. Publishing only; already-published modules keep
+    /// loading and executing at any version.
+    RejectV5ModulePublishing,
+
+    /// If enabled, re-resolve a memoized closure when its defining module is
+    /// republished within the same transaction, so it binds to the current
+    /// module version instead of executing stale pre-upgrade code.
+    RevalidateResolvedClosures,
+
+    /// Charge `bcs::to_bytes` and `bcs::serialized_size` per input value node
+    /// instead of only per output byte.
+    MeterBcsByValueSize,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -96,7 +109,10 @@ impl TimedFeatureOverride {
                 | UseFullTransactionSizeForGasCheck
                 | EnableStrictBoundsInProdConfig
                 | RevisedBoundsInProdConfig
-                | ConstantSerializedSizeLocalCache,
+                | ConstantSerializedSizeLocalCache
+                | RejectV5ModulePublishing
+                | RevalidateResolvedClosures
+                | MeterBcsByValueSize,
             ) => None,
         }
     }
@@ -232,6 +248,35 @@ impl TimedFeatureFlag {
                 .with_timezone(&Utc),
             (ConstantSerializedSizeLocalCache, MAINNET) => Los_Angeles
                 .with_ymd_and_hms(2026, 3, 13, 10, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            // Security hardening: ban publishing of v5 module bytecode.
+            (RejectV5ModulePublishing, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 7, 24, 17, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (RejectV5ModulePublishing, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 7, 29, 12, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            (RevalidateResolvedClosures, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 7, 22, 10, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (RevalidateResolvedClosures, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 7, 24, 10, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            (MeterBcsByValueSize, TESTING) => Utc.with_ymd_and_hms(1970, 1, 1, 1, 0, 0).unwrap(),
+            (MeterBcsByValueSize, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 8, 4, 14, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (MeterBcsByValueSize, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 8, 6, 14, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
 

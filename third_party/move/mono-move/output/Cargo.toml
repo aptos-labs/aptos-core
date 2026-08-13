@@ -1,0 +1,21 @@
+[package]
+name = "mono-move-output"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+aptos-types = { workspace = true }
+bcs = { workspace = true }
+mono-move-core = { workspace = true }
+mono-move-natives = { workspace = true }
+mono-move-runtime = { workspace = true }
+move-core-types = { workspace = true }
+thiserror = { workspace = true }

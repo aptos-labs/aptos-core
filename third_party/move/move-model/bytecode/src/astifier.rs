@@ -1223,6 +1223,7 @@ impl Generator {
             | GetGlobal(_, _, _)
             | Uninit
             | Havoc(_)
+            | HavocGlobal(_, _, _)
             | Stop
             | TraceLocal(_)
             | TraceReturn(_)

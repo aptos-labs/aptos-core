@@ -7,7 +7,7 @@ use crate::{
     gas_schedule::NativeGasParameters,
     ver::gas_feature_versions::{
         RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_14, RELEASE_V1_23, RELEASE_V1_26, RELEASE_V1_28,
-        RELEASE_V1_36, RELEASE_V1_39, RELEASE_V1_45, RELEASE_V1_46, RELEASE_V1_8,
+        RELEASE_V1_36, RELEASE_V1_39, RELEASE_V1_45, RELEASE_V1_46, RELEASE_V1_50, RELEASE_V1_8,
         RELEASE_V1_9_SKIPPED,
     },
 };
@@ -317,6 +317,8 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [transaction_context_multisig_payload_base: InternalGas, {RELEASE_V1_12.. => "transaction_context.multisig_payload.base"}, 7350],
         [transaction_context_multisig_payload_per_byte_in_str: InternalGasPerByte, {RELEASE_V1_12.. => "transaction_context.multisig_payload.per_abstract_memory_unit"}, 180],
         [transaction_context_is_encrypted_txn_base: InternalGas, {RELEASE_V1_45.. => "transaction_context.is_encrypted_txn.base"}, 7350],
+        [transaction_context_is_orderless_txn_base: InternalGas, {RELEASE_V1_50.. => "transaction_context.is_orderless_txn.base"}, 7350],
+        [transaction_context_is_multisig_payload_txn_base: InternalGas, {RELEASE_V1_50.. => "transaction_context.is_multisig_payload_txn.base"}, 7350],
 
         [code_request_publish_base: InternalGas, "code.request_publish.base", 18380],
         [code_request_publish_per_byte: InternalGasPerByte, "code.request_publish.per_byte", 70],
@@ -362,6 +364,9 @@ crate::gas_schedule::macros::define_gas_parameters!(
 
         // Reflection
         [reflect_resolve_base: InternalGas, { RELEASE_V1_39.. => "reflect.resolve_base" }, 40960],
+
+        // Init module
+        [init_get_caller_address_and_module_id_base: InternalGas, { RELEASE_V1_50.. => "init.get_caller_address_and_module_id.base" }, 7350],
 
         // Storage slot
         [storage_slot_borrow_base: InternalGas, { RELEASE_V1_46.. => "storage_slot.borrow.base" }, 9190],

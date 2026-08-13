@@ -1,0 +1,32 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/ghost_field_bp.move:40:23
+   │
+40 │     spec bp_exploit { ensures result; }    // FAILS
+   │                       ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/ghost_field_bp.move:33: bp_exploit
+   =     at tests/sources/functional/ghost_field_bp.move:29
+   =     at tests/sources/functional/ghost_field_bp.move:33: bp_exploit
+   =         h = <redacted>
+   =     at tests/sources/functional/ghost_field_bp.move:34: bp_exploit
+   =     at tests/sources/functional/ghost_field_bp.move:14: bp_mk
+   =         v = <redacted>
+   =     at tests/sources/functional/ghost_field_bp.move:15: bp_mk
+   =         s = <redacted>
+   =     at tests/sources/functional/ghost_field_bp.move:16: bp_mk
+   =         s = <redacted>
+   =     at tests/sources/functional/ghost_field_bp.move:14: bp_mk
+   =         result = <redacted>
+   =     at tests/sources/functional/ghost_field_bp.move:35: bp_exploit
+   =     at tests/sources/functional/ghost_field_bp.move:14: bp_mk
+   =         v = <redacted>
+   =     at tests/sources/functional/ghost_field_bp.move:15: bp_mk
+   =         s = <redacted>
+   =     at tests/sources/functional/ghost_field_bp.move:16: bp_mk
+   =         s = <redacted>
+   =     at tests/sources/functional/ghost_field_bp.move:14: bp_mk
+   =         result = <redacted>
+   =     at tests/sources/functional/ghost_field_bp.move:38: bp_exploit
+   =         result = <redacted>
+   =     at tests/sources/functional/ghost_field_bp.move:40: bp_exploit (spec)

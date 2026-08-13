@@ -210,6 +210,11 @@ impl ProverOptions {
             true,  // with_bytecode: prover needs FileFormat bytecode
             false, // all_files_as_targets
         )?;
+        // Render stored diagnostics before bailing, otherwise model-building errors
+        // are counted but never shown to the user.
+        if model.has_errors() {
+            model.report_diag(writer, Severity::Error);
+        }
         model.check_errors("in compilation")?;
         let mut options = self.convert_options(package_path)?;
         options.language_version = language_version;

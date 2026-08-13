@@ -40,8 +40,11 @@ pub mod lang_feature_versions {
     /// This version guards match support for primitive types.
     pub const LANGUAGE_VERSION_FOR_PRIMITIVE_MATCH: LanguageVersion = LanguageVersion::V2_4;
     pub const LANGUAGE_VERSION_FOR_PUBLIC_CONST: LanguageVersion = LanguageVersion::V2_4;
-    pub const LANGUAGE_VERSION_FOR_RAC: LanguageVersion =
-        crate::metadata::LATEST_LANGUAGE_VERSION_VALUE;
+    /// This version guards evaluating `for` loop bounds outside the iterator's
+    /// scope. From this version on, the upper bound no longer sees the iterator,
+    /// so e.g. `for (i in 0..i)` reads the enclosing `i`; before it, the bound
+    /// saw the iterator (bound to the lower bound) and such a loop ran zero times.
+    pub const LANGUAGE_VERSION_FOR_ITER_UNSCOPED_BOUNDS: LanguageVersion = LanguageVersion::V2_5;
 }
 
 // ================================================================================'

@@ -30,7 +30,7 @@ l0: mut_borrow_loc l2
 // module 0x66::padded_param
 
 fun driver(r0, r1): u64 {
-  slots: params(2), locals(0), temps(0), xfer(2)
+  slots: params(2), locals(0), temps(0), transfer(2)
     r0: bool
     r1: u64
   code:

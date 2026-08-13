@@ -6,7 +6,7 @@ module 0x1::test {
 }
 
 // RUN: execute 0x1::test::do_abort --args 42
-// CHECK: aborted: code 42
+// CHECK: aborted: code 42 in 0x1::test
 
 // RUN: execute 0x1::test::do_abort --args 0
-// CHECK: aborted: code 0
+// CHECK: aborted: code 0 in 0x1::test

@@ -50,6 +50,18 @@ pub trait AbstractDomain {
     fn join(&mut self, other: &Self) -> JoinResult;
 }
 
+/// `bool` as a two-element lattice under disjunction (`false ⊑ true`).
+impl AbstractDomain for bool {
+    fn join(&mut self, other: &Self) -> JoinResult {
+        if *other && !*self {
+            *self = true;
+            JoinResult::Changed
+        } else {
+            JoinResult::Unchanged
+        }
+    }
+}
+
 // ================================================================================================
 // Predefined Domain Types
 

@@ -1,0 +1,188 @@
+=== stackless ===
+// module 0x88::field_chain_borrows
+
+fun build(r0): S {
+  slots: params(1), locals(0), temps(4)
+    r0: u64
+    r1: u64
+    r2: 0x88::field_chain_borrows::B
+    r3: 0x88::field_chain_borrows::A
+    r4: 0x88::field_chain_borrows::S
+  code:
+  L0:
+    0: r1 := ld_u64 0
+    1: r2 := pack 0x88::field_chain_borrows::B, [r1, r0]
+    2: r1 := ld_u64 0
+    3: r3 := pack 0x88::field_chain_borrows::A, [r2, r1]
+    4: r4 := pack 0x88::field_chain_borrows::S, [r3]
+    5: ret [r4]
+}
+
+fun bump_via_deep_mut(r0): u64 {
+  slots: params(1), locals(2), temps(1), transfer(1)
+    r0: u64
+    r1: 0x88::field_chain_borrows::S
+    r2: &mut u64
+    r3: u64
+  code:
+  L0:
+    0: [r1] := call build, [r0]
+    1: x0 := mut_borrow_loc r1
+    2: [r2] := call deep_mut, [x0]
+    3: r3 := read_ref r2
+    4: r3 := add r3, #1
+    5: write_ref r2, r3
+    6: r3 := read_loc_field_chain S::x.A::y.B::z, r1
+    7: ret [r3]
+}
+
+fun deep_mut(r0): &mut u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: &mut 0x88::field_chain_borrows::S
+    r1: &mut u64
+  code:
+  L0:
+    0: r1 := mut_borrow_field_chain S::x.A::y.B::z, r0
+    1: ret [r1]
+}
+
+fun read_ref(r0): u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: &u64
+    r1: u64
+  code:
+  L0:
+    0: r1 := read_ref r0
+    1: ret [r1]
+}
+
+fun read_via_call(r0): u64 {
+  slots: params(1), locals(1), temps(0), transfer(1)
+    r0: u64
+    r1: 0x88::field_chain_borrows::S
+  code:
+  L0:
+    0: [r1] := call build, [r0]
+    1: x0 := imm_borrow_loc_field_chain S::x.A::y.B::z, r1
+    2: [x0] := call read_ref, [x0]
+    3: ret [x0]
+}
+
+fun read_via_local_ref(r0): u64 {
+  slots: params(1), locals(1), temps(1), transfer(1)
+    r0: u64
+    r1: 0x88::field_chain_borrows::S
+    r2: u64
+  code:
+  L0:
+    0: [r1] := call build, [r0]
+    1: r2 := read_loc_field_chain S::x.A::y.B::z, r1
+    2: ret [r2]
+}
+
+fun write_via_local(r0): u64 {
+  slots: params(1), locals(1), temps(1), transfer(1)
+    r0: u64
+    r1: 0x88::field_chain_borrows::S
+    r2: u64
+  code:
+  L0:
+    0: x0 := ld_u64 0
+    1: [r1] := call build, [x0]
+    2: r2 := add r0, #1
+    3: write_loc_field_chain S::x.A::y.B::z, r1, r2
+    4: r2 := read_loc_field_chain S::x.A::y.B::z, r1
+    5: ret [r2]
+}
+=== micro-ops ===
+// module 0x88::field_chain_borrows
+
+fun build() {
+  frame_data_size: 80
+  entry_gas: 352
+  code:
+    0: StoreImm8 [8] <- #0
+    1: Move8 [24] <- [0]
+    2: Move8 [16] <- [8]
+    3: StoreImm8 [8] <- #0
+    4: Move8 [48] <- [8]
+    5: Move(16) [32] <- [16]
+    6: Move(24) [56] <- [32]
+    7: Move(24) [0] <- [56]
+    8: Return
+}
+
+fun bump_via_deep_mut() {
+  frame_data_size: 56
+  entry_gas: 363
+  code:
+    0: Move8 [80] <- [0]
+    1: CallIndirect 0x88::field_chain_borrows::build
+    2: Move(24) [8] <- [80]
+    3: SlotBorrow [80] <- &[8]
+    4: CallIndirect 0x88::field_chain_borrows::deep_mut
+    5: Move(16) [32] <- [80]
+    6: ReadRef [48] <- *[32] (size=8)
+    7: AddU64Imm [48] <- [48] + #1
+    8: WriteRef *[32] <- [48] (size=8)
+    9: Move8 [48] <- [16]
+    10: Move8 [0] <- [48]
+    11: Return
+}
+
+fun deep_mut() {
+  frame_data_size: 32
+  entry_gas: 108
+  code:
+    0: DeriveRefOffsetImm [16] <- [0]+8
+    1: Move(16) [0] <- [16]
+    2: Return
+}
+
+fun read_ref() {
+  frame_data_size: 24
+  entry_gas: 80
+  code:
+    0: ReadRef [16] <- *[0] (size=8)
+    1: Move8 [0] <- [16]
+    2: Return
+}
+
+fun read_via_call() {
+  frame_data_size: 32
+  entry_gas: 230
+  code:
+    0: Move8 [56] <- [0]
+    1: CallIndirect 0x88::field_chain_borrows::build
+    2: Move(24) [8] <- [56]
+    3: SlotBorrow [56] <- &[16]
+    4: CallIndirect 0x88::field_chain_borrows::read_ref
+    5: Move8 [0] <- [56]
+    6: Return
+}
+
+fun read_via_local_ref() {
+  frame_data_size: 40
+  entry_gas: 194
+  code:
+    0: Move8 [64] <- [0]
+    1: CallIndirect 0x88::field_chain_borrows::build
+    2: Move(24) [8] <- [64]
+    3: Move8 [32] <- [16]
+    4: Move8 [0] <- [32]
+    5: Return
+}
+
+fun write_via_local() {
+  frame_data_size: 40
+  entry_gas: 231
+  code:
+    0: StoreImm8 [64] <- #0
+    1: CallIndirect 0x88::field_chain_borrows::build
+    2: Move(24) [8] <- [64]
+    3: AddU64Imm [32] <- [0] + #1
+    4: Move8 [16] <- [32]
+    5: Move8 [32] <- [16]
+    6: Move8 [0] <- [32]
+    7: Return
+}

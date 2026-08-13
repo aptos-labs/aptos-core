@@ -51,9 +51,11 @@ pub mod encrypted_payload;
 mod module;
 mod multisig;
 mod script;
+pub mod session_id;
 pub mod signature_verified_transaction;
 pub mod use_case;
 pub mod user_transaction_context;
+pub mod validation;
 pub mod webauthn;
 
 pub use self::block_epilogue::{
@@ -72,7 +74,7 @@ use crate::{
     validator_txn::ValidatorTransaction,
     write_set::TransactionWrite,
 };
-pub use block_output::BlockOutput;
+pub use block_output::{BlockError, BlockExecutionResult, BlockOutput};
 pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
 pub use move_core_types::transaction_argument::TransactionArgument;
@@ -87,12 +89,14 @@ pub use script::{
     TypeArgumentABI,
 };
 use serde::de::DeserializeOwned;
+pub use session_id::SessionId;
 use std::{
     collections::BTreeSet,
     hash::Hash,
     ops::Deref,
     sync::{atomic::AtomicU64, Arc},
 };
+pub use validation::{EpilogueArgs, PrologueArgs};
 
 pub type Version = u64; // Height - also used for MVCC in StateDB
 pub type AtomicVersion = AtomicU64;
@@ -979,6 +983,20 @@ pub enum TransactionExtraConfig {
 }
 
 impl TransactionPayload {
+    /// The SHA3-256 hash of a script payload's code; empty for every other
+    /// payload kind.
+    pub fn script_hash(&self) -> Vec<u8> {
+        match self.executable_ref() {
+            Ok(TransactionExecutableRef::Script(script)) => {
+                HashValue::sha3_256_of(script.code()).to_vec()
+            },
+            Ok(TransactionExecutableRef::EntryFunction(_))
+            | Ok(TransactionExecutableRef::Empty)
+            | Ok(TransactionExecutableRef::Encrypted)
+            | Err(_) => vec![],
+        }
+    }
+
     pub fn is_multisig(&self) -> bool {
         match self {
             TransactionPayload::EntryFunction(_) => false,
@@ -3568,10 +3586,6 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         _to_make_hot: BTreeSet<Self::Key>,
     ) -> Self {
         unimplemented!()
-    }
-
-    fn pre_write_values(&self) -> Vec<(Self::Key, Self::Value)> {
-        vec![]
     }
 }
 

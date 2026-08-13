@@ -1,41 +1,40 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Cross-session delayed-field squash regression matrix (harness originally from
-//! aptos-core-private #292). Each scenario runs two VM sessions over a test-only `0x1::session`
-//! package — session_1 transforms a delayed-field container, session_2 touches the aggregator —
-//! then squashes their change sets, exactly mirroring the prologue/user/epilogue interaction but
-//! with full control over both sessions. Asserted under the STRICT resource-group squash
-//! (`gas_feature_version >= RELEASE_V1_46`): benign delta+delta flows and disjoint controls
-//! succeed with correct materialized values, while cross-session structural cases fail closed with
-//! the exact expected error (see `session.move` for the scenarios).
+//! Cross-session delayed-field squash regression matrix. Each scenario runs two VM sessions over a
+//! test-only `0x1::session` package (session_1 transforms a delayed-field container, session_2
+//! touches the aggregator), then squashes their change sets, mirroring the prologue/user/epilogue
+//! interaction. Under the strict squash, benign delta+delta and disjoint flows succeed with correct
+//! materialized values, while cross-session structural cases fail closed (see `session.move`).
 
 use crate::{assert_success, tests::common, MoveHarness};
 use aptos_aggregator::{
-    delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::TDelayedFieldView,
-    types::DelayedFieldValue,
+    delayed_change::DelayedChange, resolver::TDelayedFieldView, types::DelayedFieldValue,
 };
 use aptos_block_executor::{
     code_cache_global_manager::AptosModuleCacheManagerGuard,
     executor::BlockExecutor,
-    task::{
-        AfterMaterializationOutput, BeforeMaterializationOutput, ExecutionStatus, ExecutorTask,
-        TransactionOutput,
-    },
+    task::{ExecutionStatus, ExecutorTask, LegacyTxnOutput, TransactionOutput},
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::default::DefaultTxnProvider,
     types::InputOutputKey,
+    Materializer,
 };
 use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
+        value::ValueWithLayout,
     },
     contract_event::ContractEvent,
     error::PanicError,
     fee_statement::FeeStatement,
-    state_store::{state_key::StateKey, state_value::StateValueMetadata, TStateView},
+    state_store::{
+        state_key::StateKey,
+        state_value::{StateValue, StateValueMetadata},
+        TStateView,
+    },
     transaction::{AuxiliaryInfo, BlockExecutableTransaction},
     write_set::WriteOp,
 };
@@ -50,7 +49,6 @@ use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::{
     change_set::VMChangeSet,
     module_and_script_storage::code_storage::AptosCodeStorage,
-    module_write_set::ModuleWrite,
     resolver::{
         BlockSynchronizationKillSwitch, ExecutorView, ResourceGroupSize, ResourceGroupView,
     },
@@ -62,7 +60,6 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
     value::{MoveTypeLayout, MoveValue},
-    vm_status::{StatusCode, VMStatus},
 };
 use move_vm_runtime::{
     execution_tracing::Trace,
@@ -70,7 +67,6 @@ use move_vm_runtime::{
     ModuleStorage,
 };
 use move_vm_types::{delayed_values::delayed_field_id::DelayedFieldID, gas::UnmeteredGasMeter};
-use once_cell::sync::OnceCell;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     str::FromStr,
@@ -161,101 +157,36 @@ impl BlockExecutableTransaction for TestTransaction {
 }
 
 #[derive(Debug)]
-struct TestOutput {
-    committed: OnceCell<aptos_types::transaction::TransactionOutput>,
-}
+struct TestOutput;
 
 impl TransactionOutput for TestOutput {
-    type AfterMaterializationGuard<'a> = &'a Self;
-    type BeforeMaterializationGuard<'a> = &'a Self;
+    type CommittedOutput = aptos_types::transaction::TransactionOutput;
+    type Key = StateKey;
+    type Tag = StructTag;
     type Txn = TestTransaction;
-
-    fn committed_output(&self) -> &OnceCell<aptos_types::transaction::TransactionOutput> {
-        &self.committed
-    }
+    type Value = ValueWithLayout<WriteOp>;
 
     fn skip_output() -> Self {
-        Self {
-            committed: OnceCell::new(),
-        }
+        Self
     }
 
-    fn discard_output(_discard_code: StatusCode) -> Self {
-        Self {
-            committed: OnceCell::new(),
-        }
-    }
-
-    fn before_materialization(&self) -> Result<Self::BeforeMaterializationGuard<'_>, PanicError> {
-        Ok(self)
-    }
-
-    fn after_materialization(&self) -> Result<Self::AfterMaterializationGuard<'_>, PanicError> {
-        Ok(self)
-    }
-
-    fn is_materialized_and_success(&self) -> bool {
+    fn check_materialization(&self, _materializer: &impl Materializer<Self::Txn>) -> bool {
         true
     }
 
-    fn check_materialization(&self) -> Result<bool, PanicError> {
-        Ok(true)
-    }
-
-    fn incorporate_materialized_txn_output(
-        &mut self,
-        _aggregator_v1_writes: Vec<(StateKey, WriteOp)>,
-        _patched_resource_write_set: Vec<(StateKey, WriteOp)>,
-        _patched_events: Vec<ContractEvent>,
-    ) -> Result<Trace, PanicError> {
-        Ok(Trace::empty())
-    }
-
-    fn set_txn_output_for_non_dynamic_change_set(&mut self) {}
-
-    fn legacy_sequential_materialize_agg_v1(
-        &mut self,
-        _view: &impl aptos_aggregator::resolver::TAggregatorV1View<Identifier = StateKey>,
-    ) {
-    }
-}
-
-impl BeforeMaterializationOutput<TestTransaction> for &TestOutput {
-    fn resource_write_set(
-        &self,
-    ) -> HashMap<StateKey, (TriompheArc<WriteOp>, Option<TriompheArc<MoveTypeLayout>>)> {
+    fn resource_write_set(&self) -> HashMap<StateKey, ValueWithLayout<WriteOp>> {
         HashMap::new()
     }
 
-    fn module_write_set(&self) -> &BTreeMap<StateKey, ModuleWrite<WriteOp>> {
-        static EMPTY: OnceCell<BTreeMap<StateKey, ModuleWrite<WriteOp>>> = OnceCell::new();
-        EMPTY.get_or_init(BTreeMap::new)
-    }
-
-    fn aggregator_v1_write_set(&self) -> BTreeMap<StateKey, WriteOp> {
-        BTreeMap::new()
-    }
-
-    fn aggregator_v1_delta_set(&self) -> BTreeMap<StateKey, DeltaOp> {
-        BTreeMap::new()
+    fn for_each_module_write(
+        &self,
+        _callback: &mut dyn FnMut(&ModuleId, StateValue) -> Result<(), PanicError>,
+    ) -> Result<(), PanicError> {
+        Ok(())
     }
 
     fn delayed_field_change_set(&self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
         BTreeMap::new()
-    }
-
-    fn reads_needing_delayed_field_exchange(
-        &self,
-    ) -> Vec<(StateKey, StateValueMetadata, TriompheArc<MoveTypeLayout>)> {
-        vec![]
-    }
-
-    fn group_reads_needing_delayed_field_exchange(&self) -> Vec<(StateKey, StateValueMetadata)> {
-        vec![]
-    }
-
-    fn get_events(&self) -> Vec<(ContractEvent, Option<MoveTypeLayout>)> {
-        vec![]
     }
 
     fn resource_group_write_set(
@@ -263,15 +194,15 @@ impl BeforeMaterializationOutput<TestTransaction> for &TestOutput {
     ) -> HashMap<
         StateKey,
         (
-            WriteOp,
+            ValueWithLayout<WriteOp>,
             ResourceGroupSize,
-            BTreeMap<StructTag, (WriteOp, Option<TriompheArc<MoveTypeLayout>>)>,
+            BTreeMap<StructTag, ValueWithLayout<WriteOp>>,
         ),
     > {
         HashMap::new()
     }
 
-    fn for_each_resource_key_no_aggregator_v1(
+    fn for_each_resource_key(
         &self,
         _callback: &mut dyn FnMut(&StateKey) -> Result<(), PanicError>,
     ) -> Result<(), PanicError> {
@@ -310,19 +241,39 @@ impl BeforeMaterializationOutput<TestTransaction> for &TestOutput {
     }
 }
 
-impl AfterMaterializationOutput<TestTransaction> for &TestOutput {
-    fn fee_statement(&self) -> FeeStatement {
-        FeeStatement::zero()
+impl LegacyTxnOutput for TestOutput {
+    fn reads_needing_delayed_field_exchange(
+        &self,
+    ) -> Vec<(StateKey, StateValueMetadata, TriompheArc<MoveTypeLayout>)> {
+        vec![]
     }
 
-    fn has_new_epoch_event(&self) -> bool {
-        false
+    fn group_reads_needing_delayed_field_exchange(&self) -> Vec<(StateKey, StateValueMetadata)> {
+        vec![]
+    }
+
+    fn get_events(&self) -> Vec<(ContractEvent, Option<MoveTypeLayout>)> {
+        vec![]
+    }
+
+    fn resource_group_metadata_ops(&self) -> Vec<(StateKey, WriteOp)> {
+        vec![]
+    }
+
+    fn incorporate_materialized_txn_output(
+        self,
+        _patched_resource_write_set: Vec<(StateKey, WriteOp)>,
+        _patched_events: Vec<ContractEvent>,
+    ) -> Result<(Self::CommittedOutput, Trace), PanicError> {
+        Ok((
+            aptos_types::transaction::TransactionOutput::new_empty_success(),
+            Trace::empty(),
+        ))
     }
 }
 
 impl ExecutorTask for TestTask {
     type AuxiliaryInfo = AuxiliaryInfo;
-    type Error = VMStatus;
     type Output = TestOutput;
     type Txn = TestTransaction;
 
@@ -345,7 +296,7 @@ impl ExecutorTask for TestTask {
         txn: &Self::Txn,
         _auxiliary_info: &Self::AuxiliaryInfo,
         _txn_idx: TxnIndex,
-    ) -> ExecutionStatus<Self::Output, Self::Error> {
+    ) -> Result<ExecutionStatus<Self::Output>, PanicError> {
         let resolver = self.vm.as_move_resolver_with_group_view(view);
         let mut change_set_1 = self.run(&resolver, view, &txn.session_1);
         println!("  [session_1] change set: {:?}", change_set_1);
@@ -356,8 +307,9 @@ impl ExecutorTask for TestTask {
         let change_set_2 = self.run(&new_resolver, view, &txn.session_2);
         println!("  [session_2] change set: {:?}", change_set_2);
 
-        // Use the strict (gas_feature_version >= RELEASE_V1_46) resource-group squash, matching
-        // production behavior at the latest gas feature version.
+        // Exercise the strict resource-group squash (the fail-closed window
+        // [RELEASE_V1_46, RELEASE_V1_48)) by passing `true` explicitly, independent of the harness's
+        // gas feature version.
         let outcome = match change_set_1.squash_additional_change_set(change_set_2, true) {
             Ok(()) => {
                 // Resolve every aggregator in the SQUASHED change set to its final, materialized
@@ -393,13 +345,10 @@ impl ExecutorTask for TestTask {
         };
         *outcome_cell().lock().unwrap() = Some(outcome);
 
-        ExecutionStatus::Success(TestOutput {
-            committed: OnceCell::new(),
+        Ok(ExecutionStatus::Executed {
+            output: TestOutput,
+            skips_rest: false,
         })
-    }
-
-    fn is_transaction_dynamic_change_set_capable(_txn: &Self::Txn) -> bool {
-        unreachable!("Never used for tests")
     }
 }
 
@@ -483,8 +432,9 @@ fn test_session_with_delayed_fields() {
 
 fn run_all_scenarios() {
     // (label, session_1, session_2, expected), asserted under the STRICT resource-group squash
-    // (gas_feature_version >= RELEASE_V1_46). Cross-session structural cases fail closed with the
-    // exact error; benign delta+delta flows and disjoint controls succeed with correct values.
+    // (fail-closed window [RELEASE_V1_46, RELEASE_V1_48)). Cross-session structural cases fail
+    // closed with the exact error; benign delta+delta flows and disjoint controls succeed with
+    // correct values.
     let scenarios = [
         // NORMAL concurrent-FA flow: same aggregator delta'd in BOTH sessions, NO structural
         // change (user-session transfer delta + epilogue gas delta). Must stay allowed + correct.

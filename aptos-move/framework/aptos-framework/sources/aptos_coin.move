@@ -55,6 +55,12 @@ module aptos_framework::aptos_coin {
         (burn_cap, mint_cap)
     }
 
+    /// Used to upgrade supply to use an integer, deprecating Aggregator V1.
+    entry fun upgrade_supply(aptos_framework: &signer) {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        coin::upgrade_supply<AptosCoin>(aptos_framework);
+    }
+
     public fun has_mint_capability(account: &signer): bool {
         exists<MintCapStore>(signer::address_of(account))
     }

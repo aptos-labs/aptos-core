@@ -1,0 +1,108 @@
+Move prover returns: exiting with compilation errors
+error: duplicate declaration of field `x` in struct `ghost_field_err::S`
+  ┌─ tests/sources/functional/ghost_field_err.move:5:9
+  │
+5 │         ghost x: u64; // error: clashes with a runtime field
+  │         ^^^^^^^^^^^^^
+
+error: duplicate declaration of field `g` in struct `ghost_field_err::S`
+  ┌─ tests/sources/functional/ghost_field_err.move:7:9
+  │
+7 │         ghost g: u64; // error: duplicate ghost field
+  │         ^^^^^^^^^^^^^
+
+error: ghost fields can only be declared in a struct spec block
+   ┌─ tests/sources/functional/ghost_field_err.move:12:9
+   │
+12 │         ghost bad: u64; // error: not a struct spec block
+   │         ^^^^^^^^^^^^^^^
+
+error: target of `update` restricted to specification variables and ghost fields
+   ┌─ tests/sources/functional/ghost_field_err.move:17:20
+   │
+17 │             update s.x = 1; // error: not a ghost field
+   │                    ^^^
+
+error: ghost field update target must be a local variable or parameter
+   ┌─ tests/sources/functional/ghost_field_err.move:23:20
+   │
+23 │             update pass(s).g = 1; // error: target not a local
+   │                    ^^^^^^^^^
+
+error: ghost field update target cannot be behind an immutable reference; use an owned value or a mutable reference
+   ┌─ tests/sources/functional/ghost_field_err.move:32:20
+   │
+32 │             update s.g = 1; // error: behind an immutable reference
+   │                    ^^^
+
+error: ghost field type cannot be a reference
+   ┌─ tests/sources/functional/ghost_field_err.move:38:9
+   │
+38 │         ghost r: &mut u64; // error: reference-typed ghost field
+   │         ^^^^^^^^^^^^^^^^^^
+
+error: ghost field type cannot reference its enclosing struct `ghost_field_err::RecGhost`, directly or transitively
+   ┌─ tests/sources/functional/ghost_field_err.move:43:9
+   │
+43 │         ghost cyc: RecGhost; // error: transitively self-referential
+   │         ^^^^^^^^^^^^^^^^^^^^
+
+error: ghost field type cannot reference its enclosing struct `ghost_field_err::MraB`, directly or transitively
+   ┌─ tests/sources/functional/ghost_field_err.move:53:17
+   │
+53 │     spec MraB { ghost h: MraA; } // error: transitively self-referential
+   │                 ^^^^^^^^^^^^^^
+
+error: ghost field type cannot reference its enclosing struct `ghost_field_err::GenS`, directly or transitively
+   ┌─ tests/sources/functional/ghost_field_err.move:62:17
+   │
+62 │     spec GenS { ghost g: GenTwo; } // error: transitively self-referential
+   │                 ^^^^^^^^^^^^^^^^
+
+error: bitvector expressions (|, &, ^, int2bv) cannot appear in a ghost field initializer (ghost integer fields are modeled as mathematical integers)
+   ┌─ tests/sources/functional/ghost_field_err.move:69:24
+   │
+69 │         ghost g: u64 = x | 1; // error: bitwise operator in ghost initializer
+   │                        ^^^^^
+
+error: bitvector expressions (|, &, ^, int2bv) cannot appear in a ghost field update expression (ghost integer fields are modeled as mathematical integers)
+   ┌─ tests/sources/functional/ghost_field_err.move:74:26
+   │
+74 │             update s.g = s.g | 1; // error: bitwise operator in ghost update
+   │                          ^^^^^^^
+
+error: ghost fields are not supported on intrinsic types
+   ┌─ tests/sources/functional/ghost_field_err.move:85:9
+   │
+85 │         ghost g: u64; // error: ghost on (non-map) intrinsic type
+   │         ^^^^^^^^^^^^^
+
+error: ghost fields are not supported on intrinsic types
+   ┌─ tests/sources/functional/ghost_field_err.move:96:9
+   │
+96 │         ghost brand: num; // error: ghost on intrinsic type
+   │         ^^^^^^^^^^^^^^^^^
+
+error: ghost fields are not supported on intrinsic types
+   ┌─ tests/sources/functional/ghost_field_err.move:97:9
+   │
+97 │         ghost bad: K; // error: ghost on intrinsic type
+   │         ^^^^^^^^^^^^^
+
+error: bitvector expressions (|, &, ^, int2bv) cannot appear in a ghost field initializer (ghost integer fields are modeled as mathematical integers)
+    ┌─ tests/sources/functional/ghost_field_err.move:104:24
+    │
+104 │         ghost g: u64 = int2bv(x); // error: int2bv in ghost initializer
+    │                        ^^^^^^^^^
+
+error: bitvector expressions (|, &, ^, int2bv) cannot appear in a ghost field update expression (ghost integer fields are modeled as mathematical integers)
+    ┌─ tests/sources/functional/ghost_field_err.move:109:26
+    │
+109 │             update s.g = int2bv(s.g); // error: int2bv in ghost update
+    │                          ^^^^^^^^^^^
+
+error: bitvector expressions (|, &, ^, int2bv) cannot appear in a ghost field update expression (ghost integer fields are modeled as mathematical integers)
+    ┌─ tests/sources/functional/ghost_field_err.move:118:27
+    │
+118 │         ensures result == update_field(s, g, s.g | 1);
+    │                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^

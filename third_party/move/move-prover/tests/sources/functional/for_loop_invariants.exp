@@ -1,0 +1,44 @@
+Move prover returns: exiting with verification errors
+error: induction case of the loop invariant does not hold
+    ┌─ tests/sources/functional/for_loop_invariants.move:239:13
+    │
+239 │             invariant sum == i;
+    │             ^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/for_loop_invariants.move:234: sum_range_incorrect
+    =     at tests/sources/functional/for_loop_invariants.move:244: sum_range_incorrect (spec)
+    =     at tests/sources/functional/for_loop_invariants.move:234: sum_range_incorrect
+    =         n = <redacted>
+    =     at tests/sources/functional/for_loop_invariants.move:235: sum_range_incorrect
+    =         sum = <redacted>
+    =     at tests/sources/functional/for_loop_invariants.move:236: sum_range_incorrect
+    =         i = <redacted>
+    =     at tests/sources/functional/for_loop_invariants.move:238: sum_range_incorrect
+    =     at tests/sources/functional/for_loop_invariants.move:239: sum_range_incorrect
+    =     enter loop, variable(s) sum, i havocked and reassigned
+    =         sum = <redacted>
+    =         i = <redacted>
+    =     loop invariant holds at current state
+    =     at tests/sources/functional/for_loop_invariants.move:236: sum_range_incorrect
+    =     at tests/sources/functional/for_loop_invariants.move:237: sum_range_incorrect
+    =         sum = <redacted>
+    =     at tests/sources/functional/for_loop_invariants.move:236: sum_range_incorrect
+    =         i = <redacted>
+    =     at tests/sources/functional/for_loop_invariants.move:239: sum_range_incorrect
+
+error: base case of the loop invariant does not hold
+    ┌─ tests/sources/functional/for_loop_invariants.move:254:13
+    │
+254 │             invariant sum == i + 1;
+    │             ^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/for_loop_invariants.move:249: base_case_incorrect
+    =     at tests/sources/functional/for_loop_invariants.move:259: base_case_incorrect (spec)
+    =     at tests/sources/functional/for_loop_invariants.move:249: base_case_incorrect
+    =         n = <redacted>
+    =     at tests/sources/functional/for_loop_invariants.move:250: base_case_incorrect
+    =         sum = <redacted>
+    =     at tests/sources/functional/for_loop_invariants.move:251: base_case_incorrect
+    =         i = <redacted>
+    =     at tests/sources/functional/for_loop_invariants.move:253: base_case_incorrect
+    =     at tests/sources/functional/for_loop_invariants.move:254: base_case_incorrect

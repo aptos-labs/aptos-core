@@ -6,9 +6,11 @@
 use crate::{polymorphic_natives, NativeEntry};
 use mono_move_core::{
     native::{
-        NativeContext, NativeContextFamily, NativeExtension, NativeStatus, VMInternalError, Vector,
+        native_invariant_violation, NativeContext, NativeContextFamily, NativeExtension,
+        NativeStatus, Vector,
     },
     types::{view_type, InternedType, Type},
+    VMResult,
 };
 
 /// Number of bytes a heap pointer occupies in the flat value representation.
@@ -88,9 +90,9 @@ impl NativeExtension for EventStore {
         self.checkpoints.push(self.entries.len());
     }
 
-    fn on_rollback(&mut self, n: usize) -> Result<(), VMInternalError> {
+    fn on_rollback(&mut self, n: usize) -> VMResult<()> {
         if n > self.checkpoints.len() {
-            return Err(VMInternalError::invariant_violation(format!(
+            return Err(native_invariant_violation(format!(
                 "event rollback({n}): only {} checkpoint(s)",
                 self.checkpoints.len(),
             )));
@@ -105,26 +107,24 @@ impl NativeExtension for EventStore {
 /// `0x1::event::write_module_event_to_store<T>(msg: T)`
 //
 // TODO(metering): charge gas.
-pub fn native_write_module_event_to_store<C: NativeContext>(
-    ctx: &C,
-) -> Result<NativeStatus, VMInternalError> {
+pub fn native_write_module_event_to_store<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     let msg_ty = ctx.ty_arg(0)?;
 
     // The event type must be nominal, and the module emitting it must be the
     // one that defines it. Enums are admitted here; an unsupported enum layout
     // is rejected later, when its pointer offsets are computed.
     let Type::Nominal { module_id, .. } = view_type(msg_ty) else {
-        return Err(VMInternalError::invariant_violation(
+        return Err(native_invariant_violation(
             "write_module_event_to_store: event type must be a struct or enum".into(),
         ));
     };
     let caller = ctx.caller_module().ok_or_else(|| {
-        VMInternalError::invariant_violation(
+        native_invariant_violation(
             "write_module_event_to_store: scripts cannot emit module events".into(),
         )
     })?;
     if caller != *module_id {
-        return Err(VMInternalError::invariant_violation(
+        return Err(native_invariant_violation(
             "write_module_event_to_store: caller module does not define the event type".into(),
         ));
     }
@@ -139,9 +139,7 @@ pub fn native_write_module_event_to_store<C: NativeContext>(
 /// `0x1::event::write_to_event_store<T>(guid: vector<u8>, count: u64, msg: T)`
 //
 // TODO(metering): charge gas.
-pub fn native_write_to_event_store<C: NativeContext>(
-    ctx: &C,
-) -> Result<NativeStatus, VMInternalError> {
+pub fn native_write_to_event_store<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     // SAFETY: arg 0 is `guid: vector<u8>`.
     let guid_vec = unsafe { ctx.arg::<Vector<u8>>(0)? };
     let guid = unsafe { guid_vec.as_bytes() }.to_vec();

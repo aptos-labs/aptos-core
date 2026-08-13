@@ -123,37 +123,27 @@ module 0x42::test {
         {
           let x: u64 = 3;
           {
-            let i: u64 = 0;
+            let $lb: u64 = 0;
             {
-              let __update_iter_flag: bool = false;
+              let i: u64 = $lb;
               {
-                let __upper_bound_value: u64 = 15;
+                let $ub: u64 = 15;
                 loop {
-                  if true {
-                    if __update_iter_flag {
-                      i: u64 = Add<u64>(i, 1)
-                    } else {
-                      __update_iter_flag: bool = true
-                    };
-                    if Lt<u64>(i, __upper_bound_value) {
-                      {
-                        let y: u64 = test::choose_function1(i, 3);
-                        if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), x)) {
-                          Tuple()
-                        } else {
-                          Abort(i)
-                        };
+                  if Lt(i, $ub) {
+                    {
+                      let y: u64 = test::choose_function1(i, 3);
+                      if Eq<u64>(y, Mul<u64>(Add<u64>(i, 2), x)) {
                         Tuple()
-                      }
-                    } else {
-                      break
+                      } else {
+                        Abort(i)
+                      };
+                      Tuple()
                     };
-                    Tuple()
+                    i: u64 = Add(i, 1)
                   } else {
                     break
                   }
-                };
-                Tuple()
+                }
               }
             }
           }
@@ -247,16 +237,16 @@ module 0x42::test {
     }
     public fun test_functions() {
         let x = 3;
-        let i = 0;
-        let __update_iter_flag = false;
-        let __upper_bound_value = 15;
-        while (true) {
-            if (__update_iter_flag) i = i + 1 else __update_iter_flag = true;
-            if (i < __upper_bound_value) {
+        let _lb = 0;
+        let i = _lb;
+        let _ub = 15;
+        while (i < _ub) {
+            {
                 let y = choose_function1(i, 3);
                 if (y == (i + 2) * x) () else abort i;
-            } else break;
-        };
+            };
+            i = i + 1
+        }
     }
     fun lambda__1__choose_function1(x: u64, y: u64, z: u64): u64 {
         multiply3(x + 1, y, z)

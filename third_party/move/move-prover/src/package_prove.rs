@@ -158,6 +158,13 @@ pub fn run_move_prover(
         language_version,
         with_bytecode: true, // prover needs FileFormat bytecode
     })?;
+    // Report diagnostics before bailing, or model-build errors are never shown.
+    if model.has_errors() {
+        model.report_diag(
+            &mut error_writer,
+            codespan_reporting::diagnostic::Severity::Error,
+        );
+    }
     model.check_errors("in compilation")?;
     let _temp_dir_holder = if for_test {
         // Need to ensure a distinct output.bpl file for concurrent execution. In non-test

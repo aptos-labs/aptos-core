@@ -4,8 +4,9 @@
 //! Natives for the `function_info` module.
 
 use crate::{monomorphic_natives, NativeEntry};
-use mono_move_core::native::{
-    NativeContext, NativeContextFamily, NativeStatus, Ref, VMInternalError, Vector,
+use mono_move_core::{
+    native::{NativeContext, NativeContextFamily, NativeStatus, Ref, Vector},
+    VMResult,
 };
 use move_core_types::identifier::Identifier;
 
@@ -14,7 +15,7 @@ use move_core_types::identifier::Identifier;
 /// Returns true if `s` is valid UTF-8 spelling a Move identifier.
 //
 // TODO(metering): charge gas.
-pub fn native_is_identifier<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
+pub fn native_is_identifier<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     // SAFETY: arg 0 is `&vector<u8>`.
     let s: Ref<Vector<u8>> = unsafe { ctx.arg(0)? };
     let v = s.borrow();

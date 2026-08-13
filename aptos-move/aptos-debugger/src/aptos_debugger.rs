@@ -15,9 +15,9 @@ use aptos_types::{
     contract_event::ContractEvent,
     state_store::TStateView,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockOutput,
-        PersistedAuxiliaryInfo, SignedTransaction, Transaction, TransactionExecutableRef,
-        TransactionInfo, TransactionOutput, TransactionPayload, Version,
+        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockError,
+        BlockOutput, PersistedAuxiliaryInfo, SignedTransaction, Transaction,
+        TransactionExecutableRef, TransactionInfo, TransactionOutput, TransactionPayload, Version,
     },
     vm_status::VMStatus,
 };
@@ -545,7 +545,7 @@ fn execute_block_no_limit(
     txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo>,
     state_view: &DebuggerStateView,
     concurrency_level: usize,
-) -> Result<Vec<TransactionOutput>, VMStatus> {
+) -> Result<Vec<TransactionOutput>, BlockError> {
     let executor = AptosVMBlockExecutor::new();
     executor
         .execute_block_with_config(

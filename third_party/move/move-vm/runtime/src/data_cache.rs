@@ -30,7 +30,7 @@ use move_vm_types::{
     value_serde::{FunctionValueExtension, ValueSerDeContext},
     values::{GlobalValue, Value},
 };
-use std::collections::btree_map::{BTreeMap, Entry};
+use std::collections::{hash_map::Entry, BTreeMap, HashMap};
 use triomphe::Arc as TriompheArc;
 
 /// A hack to be able to use [MoveVmDataCache] in native context where there is no access to
@@ -223,7 +223,9 @@ struct DataCacheEntry {
 /// for a data store related to a transaction. Clients should create an instance of this type
 /// and pass it to the Move VM.
 pub struct TransactionDataCache {
-    account_map: BTreeMap<AccountAddress, BTreeMap<Type, DataCacheEntry>>,
+    // CAUTION: Iterating the inner map is not deterministic, one should
+    // enforce the ordering deterministically.
+    account_map: BTreeMap<AccountAddress, HashMap<Type, DataCacheEntry>>,
 }
 
 impl TransactionDataCache {
@@ -271,7 +273,18 @@ impl TransactionDataCache {
         let mut change_set = Changes::<Resource>::new();
         for (addr, account_data_cache) in self.account_map.into_iter() {
             let mut resources = BTreeMap::new();
-            for entry in account_data_cache.into_values() {
+
+            // Serialize resources in struct tag order so that the ordering is
+            // deterministic. This protects against
+            //   1) Non-deterministic hashmap iteration,
+            //   2) Non-deterministic type ordering (struct names are interned
+            //      in non-deterministic way and cannot be compared).
+            // This matters for cases when serialization of a resource fails,
+            // and the reported error may depend on the iteration order.
+            let mut account_data_cache = account_data_cache.into_values().collect::<Vec<_>>();
+            account_data_cache.sort_by(|a, b| a.struct_tag.cmp(&b.struct_tag));
+
+            for entry in account_data_cache {
                 let DataCacheEntry {
                     struct_tag,
                     layout,

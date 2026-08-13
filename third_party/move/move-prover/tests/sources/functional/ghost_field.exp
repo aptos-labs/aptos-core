@@ -1,0 +1,21 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/ghost_field.move:35:9
+   │
+35 │         ensures result.g == 0;
+   │         ^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/ghost_field.move:33: fresh_unconstrained
+   =         result = <redacted>
+   =     at tests/sources/functional/ghost_field.move:35: fresh_unconstrained (spec)
+
+error: ghost field update value is out of the field type's value domain
+    ┌─ tests/sources/functional/ghost_field.move:183:16
+    │
+183 │         spec { update b.n = a.w; };
+    │                ^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/ghost_field.move:182: copy_num_to_u8_unbounded
+    =         a = <redacted>
+    =         b = <redacted>
+    =     at tests/sources/functional/ghost_field.move:183: copy_num_to_u8_unbounded

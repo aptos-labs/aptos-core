@@ -347,9 +347,8 @@ fn force_end_epoch(state_view: &impl SimulationStateStore) -> Result<()> {
         &mut TraversalContext::new(&traversal_storage),
         &module_storage,
     )?;
-    let mut change_set = sess.finish(&change_set_configs, &module_storage)?;
+    let change_set = sess.finish(&change_set_configs, &module_storage)?;
 
-    change_set.try_materialize_aggregator_v1_delta_set(&resolver)?;
     let (write_set, _events) = change_set
         .try_combine_into_storage_change_set(ModuleWriteSet::empty())
         .expect("Failed to convert to storage ChangeSet")
@@ -530,7 +529,7 @@ pub async fn simulate_multistep_proposal(
         );
 
         let txn_output = vm_output
-            .try_materialize_into_transaction_output(&resolver)
+            .try_materialize_into_transaction_output()
             .context("failed to materialize transaction output")?;
 
         let txn_status = txn_output.status();

@@ -79,7 +79,7 @@ impl TableInfoService {
     ///        If backup service is enabled, it will also snapshot the rocksdb at the end of each epoch.
     /// 2. Optional backup service loop: it monitors if new snapshots are available to backup and uploads them to GCS.
     pub async fn run(&self) {
-        // TODO: fix the restore logic.
+        // TODO(#20246): fix the restore logic (TableInfoServiceMode::Restore is never wired up).
         let backup_is_enabled = match self.backup_restore_operator.clone() {
             Some(backup_restore_operator) => {
                 let context = self.context.clone();
@@ -295,15 +295,9 @@ impl TableInfoService {
                     .await;
                 }
 
-                assert!(
-                    self.indexer_async_v2.is_indexer_async_v2_pending_on_empty(),
-                    "Missing data in table info parsing after sequential retry"
-                );
-
-                // Update rocksdb's to be processed next version after verifying all txns are successfully parsed
-                self.indexer_async_v2
-                    .update_next_version(end_version + 1)
-                    .unwrap();
+                // Drop any handles still unresolved after the retry and advance, so parsing
+                // keeps making progress instead of stalling on them.
+                self.indexer_async_v2.finalize_batch(end_version).unwrap();
 
                 res
             },
@@ -441,7 +435,7 @@ impl TableInfoService {
     /// 1. If current epoch is backuped, it will skip the backup.
     /// 2. If the chain id in the backup metadata does not match with the current network, it will panic.
     /// Not thread safe.
-    /// TODO(larry): improve the error handling.
+    /// TODO(#20246): improve the error handling.
     async fn backup_snapshot_if_present(
         context: Arc<ApiContext>,
         backup_restore_operator: Arc<GcsBackupRestoreOperator>,
@@ -490,7 +484,7 @@ impl TableInfoService {
         }
     }
 
-    /// TODO(jill): consolidate it with `ensure_highest_known_version`
+    /// TODO(#20246): consolidate it with `ensure_highest_known_version`
     /// Will keep looping and checking the latest ledger info to see if there are new transactions
     /// If there are, it will update the ledger version version
     async fn get_highest_known_version(&self) -> Result<u64, Error> {

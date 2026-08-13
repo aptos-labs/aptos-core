@@ -604,7 +604,9 @@ impl NumberOperationAnalysis<'_> {
                             // signed types and `Num` are always represented as Boogie `int`,
                             // so a `Bitwise` source must not propagate past the cast. The
                             // boundary itself is then materialized as `$bv2int.N(...)` by
-                            // `translate_cast` in the spec backend.
+                            // `translate_cast` in the spec backend. Unsigned-target casts
+                            // keep the source classification: a bit-operation consumer
+                            // legitimately re-demands `Bitwise` on them.
                             let target_ty = self.func_target.global_env().get_node_type(*id);
                             let cast_oper = if target_ty.skip_reference().is_signed_int()
                                 || matches!(
@@ -648,6 +650,12 @@ impl NumberOperationAnalysis<'_> {
                                 // Analysis for general spec functions.
                                 let module = &self.func_target.global_env().get_module(*mid);
                                 let callee_spec_fun = module.get_spec_fun(*sid);
+                                // `num` guards below must evaluate on the
+                                // instantiated parameter types: a generic
+                                // parameter instantiated at `num` is a sink
+                                // just like a declared `num` parameter.
+                                let callee_inst =
+                                    self.func_target.global_env().get_node_instantiation(*id);
                                 // Try to get num_oper for signatures
                                 // If not exists, compute num_oper for this spec fun and update the exp_operation_map and spec_fun_map
                                 if let std::collections::btree_map::Entry::Vacant(_) =
@@ -658,6 +666,26 @@ impl NumberOperationAnalysis<'_> {
                                     // Default num oper is determined by the actual arguments
                                     para_vec.append(&mut arg_oper);
                                     ret_vec.push(Bottom);
+                                    // Widthless `num` parameters are Arithmetic sinks: they
+                                    // always render as int, so a bitwise-classified argument
+                                    // crosses a representational boundary at the call (the
+                                    // argument renders as a bitvector, materialized by
+                                    // `$bv2int.N` at the argument position) and `Bitwise`
+                                    // must not seed the parameter slot and infect the
+                                    // callee's spec expressions.
+                                    for (i, Parameter(_, ty, _)) in
+                                        callee_spec_fun.params.iter().enumerate()
+                                    {
+                                        if i < para_vec.len()
+                                            && para_vec[i] == Bitwise
+                                            && matches!(
+                                                ty.instantiate(&callee_inst).skip_reference(),
+                                                Type::Primitive(PrimitiveType::Num)
+                                            )
+                                        {
+                                            para_vec[i] = Arithmetic;
+                                        }
+                                    }
                                     if let Some(body_exp) = &callee_spec_fun.body {
                                         let local_map = body_exp.bound_local_vars_with_node_id();
                                         for (i, Parameter(sym, _, loc)) in
@@ -714,11 +742,26 @@ impl NumberOperationAnalysis<'_> {
                                         .unwrap()
                                         .0;
                                     assert_eq!(para_oper_vec.len(), arg_oper.len());
-                                    for (formal_oper, actual_oper) in
-                                        para_oper_vec.iter().zip(arg_oper.iter())
+                                    for (i, (formal_oper, actual_oper)) in
+                                        para_oper_vec.iter().zip(arg_oper.iter()).enumerate()
                                     {
+                                        // A widthless `num` parameter is an Arithmetic sink
+                                        // (see the seeding clamp above); a bitwise-classified
+                                        // argument is reconciled by `$bv2int.N` at the
+                                        // argument position, not a conflict.
+                                        let num_param = matches!(
+                                            callee_spec_fun.params.get(i),
+                                            Some(Parameter(_, ty, _))
+                                                if matches!(
+                                                    ty.instantiate(&callee_inst).skip_reference(),
+                                                    Type::Primitive(PrimitiveType::Num)
+                                                )
+                                        );
                                         // For simplicity, only check compatibility
-                                        if !allow_merge && formal_oper.conflict(actual_oper) {
+                                        if !allow_merge
+                                            && !num_param
+                                            && formal_oper.conflict(actual_oper)
+                                        {
                                             self.func_target.global_env().error(
                                                 &self.func_target.get_bytecode_loc(attr_id),
                                                 CONFLICT_ERROR_MSG,
@@ -769,6 +812,24 @@ impl NumberOperationAnalysis<'_> {
                                     .insert(field.get_id(), merged);
                             }
                         },
+                        move_model::ast::Operation::Vector | move_model::ast::Operation::Tuple => {
+                            // Aggregate constructors: the node's
+                            // classification is the join of its elements',
+                            // so a bitwise element makes the recorded
+                            // signature render the aggregate's elements as
+                            // bitvectors.
+                            let mut merged = Bottom;
+                            for num_oper in &arg_oper {
+                                if !allow_merge && num_oper.conflict(&merged) {
+                                    self.func_target.global_env().error(
+                                        &self.func_target.get_bytecode_loc(attr_id),
+                                        CONFLICT_ERROR_MSG,
+                                    );
+                                }
+                                merged = num_oper.merge(&merged);
+                            }
+                            global_state.update_node_oper(*id, merged, true);
+                        },
                         _ => {
                             // All args must have compatible number operations
                             // TODO(tengzhang): support converting int to bv
@@ -806,12 +867,24 @@ impl NumberOperationAnalysis<'_> {
                                                 | move_model::ast::Operation::Shr
                                         );
                                         // For shift operation, we don't need to check compatibility between the two operands
-                                        let concrete_num_ty = if if_shift {
+                                        let mut concrete_num_ty = if if_shift {
                                             Some(concrete_num_ty_oper_0.clone())
                                         } else {
                                             concrete_num_ty_oper_0
                                                 .is_compatible_num_type(&concrete_num_ty_oper_1)
                                         };
+                                        if concrete_num_ty.is_none() {
+                                            // Unsuffixed spec-mode literals default to
+                                            // u256/i256; treat them as `num` wildcards
+                                            // before erroring.
+                                            concrete_num_ty = adopt_spec_defaulted_literal_type(
+                                                self.func_target.global_env(),
+                                                &args[0],
+                                                &concrete_num_ty_oper_0,
+                                                &args[1],
+                                                &concrete_num_ty_oper_1,
+                                            );
+                                        }
                                         if concrete_num_ty.is_none() {
                                             self.func_target.global_env().error(
                                                     &self.func_target.global_env().get_node_loc(exp.node_id()),
@@ -1258,4 +1331,78 @@ impl AbstractDomain for NumberOperationState {
         }
         result
     }
+}
+
+/// Retype an integer literal carrying the spec-mode default type (u256/i256)
+/// to its sibling operand's concrete integer type when the value fits;
+/// returns the adopted type. Sibling types are always covered by mono
+/// analysis.
+fn adopt_spec_defaulted_literal_type(
+    env: &GlobalEnv,
+    arg0: &Exp,
+    ty0: &Type,
+    arg1: &Exp,
+    ty1: &Type,
+) -> Option<Type> {
+    use move_model::ast::Value as AstValue;
+    let is_defaulted_literal = |e: &Exp, ty: &Type| {
+        matches!(
+            ty.skip_reference(),
+            Type::Primitive(PrimitiveType::U256) | Type::Primitive(PrimitiveType::I256)
+        ) && matches!(e.as_ref(), ExpData::Value(_, AstValue::Number(_)))
+            // Explicitly suffixed literals (e.g. `1u256`) must keep the
+            // mismatch diagnostic; only builder-defaulted ones adapt.
+            && env
+                .get_extension::<move_model::model::SpecDefaultedNumLocs>()
+                .is_some_and(|s| s.0.contains(&env.get_node_loc(e.node_id())))
+    };
+    let fits = |v: &num::BigInt, ty: &Type| -> bool {
+        use num::bigint::Sign;
+        let Type::Primitive(p) = ty.skip_reference() else {
+            return false;
+        };
+        let (bits, signed) = match p {
+            PrimitiveType::U8 => (8u64, false),
+            PrimitiveType::U16 => (16, false),
+            PrimitiveType::U32 => (32, false),
+            PrimitiveType::U64 => (64, false),
+            PrimitiveType::U128 => (128, false),
+            PrimitiveType::U256 => (256, false),
+            PrimitiveType::I8 => (8, true),
+            PrimitiveType::I16 => (16, true),
+            PrimitiveType::I32 => (32, true),
+            PrimitiveType::I64 => (64, true),
+            PrimitiveType::I128 => (128, true),
+            PrimitiveType::I256 => (256, true),
+            _ => return false,
+        };
+        if signed {
+            let bound = num::BigInt::from(1u8) << (bits - 1);
+            v >= &(-bound.clone()) && v < &bound
+        } else {
+            v.sign() != Sign::Minus && v.bits() <= bits
+        }
+    };
+    let try_adopt = |lit: &Exp, lit_ty: &Type, other_ty: &Type| -> Option<Type> {
+        let other = other_ty.skip_reference();
+        // Concrete integer siblings only (`num` has no fixed width). Signed
+        // siblings are safe: the backend renders Bitwise-classified signed
+        // values as `int`, so the adopted literal renders as a plain int
+        // literal alongside them.
+        if !is_defaulted_literal(lit, lit_ty)
+            || !(other.is_unsigned_int() || other.is_signed_int())
+            || lit_ty.skip_reference() == other
+        {
+            return None;
+        }
+        let ExpData::Value(id, AstValue::Number(v)) = lit.as_ref() else {
+            return None;
+        };
+        if !fits(v, other) {
+            return None;
+        }
+        env.update_node_type(*id, other.clone());
+        Some(other.clone())
+    };
+    try_adopt(arg0, ty0, ty1).or_else(|| try_adopt(arg1, ty1, ty0))
 }

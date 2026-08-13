@@ -104,7 +104,7 @@ fun neq_ref(l0: u64, l1: u64, l2: u64, l3: u64): bool
 // module 0x1::test
 
 fun cmp(r0, r1, r2, r3): u64 {
-  slots: params(4), locals(0), temps(2), xfer(2)
+  slots: params(4), locals(0), temps(2), transfer(2)
     r0: u64
     r1: u64
     r2: u64
@@ -141,7 +141,7 @@ fun build(r0, r1): vector<u64> {
 }
 
 fun eq(r0, r1, r2, r3): bool {
-  slots: params(4), locals(0), temps(2), xfer(2)
+  slots: params(4), locals(0), temps(2), transfer(2)
     r0: u64
     r1: u64
     r2: u64
@@ -157,7 +157,7 @@ fun eq(r0, r1, r2, r3): bool {
 }
 
 fun eq_len(r0, r1, r2): bool {
-  slots: params(3), locals(1), temps(2), xfer(2)
+  slots: params(3), locals(1), temps(2), transfer(2)
     r0: u64
     r1: u64
     r2: u64
@@ -175,7 +175,7 @@ fun eq_len(r0, r1, r2): bool {
 }
 
 fun eq_ref(r0, r1, r2, r3): bool {
-  slots: params(4), locals(2), temps(3), xfer(2)
+  slots: params(4), locals(2), temps(3), transfer(2)
     r0: u64
     r1: u64
     r2: u64
@@ -196,7 +196,7 @@ fun eq_ref(r0, r1, r2, r3): bool {
 }
 
 fun neq_ref(r0, r1, r2, r3): bool {
-  slots: params(4), locals(2), temps(3), xfer(2)
+  slots: params(4), locals(2), temps(3), transfer(2)
     r0: u64
     r1: u64
     r2: u64

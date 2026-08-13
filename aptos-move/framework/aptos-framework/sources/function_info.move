@@ -1,5 +1,6 @@
 /// The `function_info` module defines the `FunctionInfo` type which simulates a function pointer.
 module aptos_framework::function_info {
+    use std::reflect;
     use std::signer;
     use std::string::{Self, String};
 
@@ -81,6 +82,19 @@ module aptos_framework::function_info {
     /// if such module isn't accessed previously in the transaction.
     public(friend) fun load_module_from_function(f: &FunctionInfo) {
         load_function_impl(f)
+    }
+
+    /// Resolves the function referenced by `self` into a function value of type `FuncType`.
+    /// Aborts with `EINVALID_FUNCTION` on failure; unreachable for targets validated via
+    /// `check_dispatch_type_compatibility`, whose signatures are frozen by upgrade rules.
+    public(friend) fun load_function_value<FuncType>(self: &FunctionInfo): FuncType {
+        let result = reflect::resolve<FuncType>(
+            self.module_address,
+            &self.module_name,
+            &self.function_name,
+        );
+        assert!(result.is_ok(), EINVALID_FUNCTION);
+        result.unwrap()
     }
 
     native fun check_dispatch_type_compatibility_impl(lhs: &FunctionInfo, r: &FunctionInfo): bool;

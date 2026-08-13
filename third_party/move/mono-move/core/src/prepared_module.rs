@@ -4,10 +4,10 @@
 //! Defines a wrapper for [`CompiledModule`] with all its types pre-interned.
 
 use crate::{
-    interner::{InternedIdentifier, InternedModuleId, Interner},
+    interner::{InternedIdentifier, InternedModuleId, Interner, TypeSubstitutionError},
     types::{InternedType, InternedTypeList, EMPTY_TYPE_LIST},
+    ExecutionErrorKind, IntoExecutionError,
 };
-use anyhow::{bail, Result};
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
@@ -18,8 +18,29 @@ use move_binary_format::{
     },
     CompiledModule,
 };
+use move_core_types::language_storage::{FunctionParamOrReturnTag, StructTag, TypeTag};
 use shared_dsa::UnorderedMap;
 use std::ops::Deref;
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum PreparedModuleError {
+    #[error("native struct fields are deprecated")]
+    NativeFieldsDeprecated,
+
+    #[error(transparent)]
+    TypeSubstitution(#[from] TypeSubstitutionError),
+}
+
+impl IntoExecutionError for PreparedModuleError {
+    fn kind(&self) -> ExecutionErrorKind {
+        use PreparedModuleError::*;
+        match self {
+            NativeFieldsDeprecated => ExecutionErrorKind::InvariantViolation,
+            TypeSubstitution(err) => err.kind(),
+        }
+    }
+}
 
 /// Wraps deserialized and verified [`CompiledModule`] with pre-interned type
 /// pools. Users can use interned type representation directly using same table
@@ -251,7 +272,10 @@ impl PreparedModule {
 
     /// Builds resolved module from compiled one, interning all signatures,
     /// field and constant types.
-    pub fn build(module: CompiledModule, interner: &impl Interner) -> Result<Self> {
+    pub fn build(
+        module: CompiledModule,
+        interner: &impl Interner,
+    ) -> Result<Self, PreparedModuleError> {
         let id = interner.module_id_of(module.self_addr(), module.self_name());
 
         let interned_identifiers = module
@@ -277,9 +301,9 @@ impl PreparedModule {
                 sig.0
                     .iter()
                     .map(|tok| intern_sig_token(tok, &module, interner))
-                    .collect::<Result<Vec<_>>>()
+                    .collect::<Vec<_>>()
             })
-            .collect::<Result<Vec<_>>>()?;
+            .collect::<Vec<_>>();
 
         // TODO(perf): intern the nominals first and pass a &[InternedType], indexed by struct handle
         // index, to intern_sig_token. That way, we could avoid re-interning the nominal in the
@@ -310,13 +334,13 @@ impl PreparedModule {
             .map(|(idx, def)| {
                 let field_types = match &def.field_information {
                     StructFieldInformation::Native => {
-                        bail!("Native fields are deprecated");
+                        return Err(PreparedModuleError::NativeFieldsDeprecated);
                     },
                     StructFieldInformation::Declared(fields) => {
                         let fields = fields
                             .iter()
                             .map(|f| intern_sig_token(&f.signature.0, &module, interner))
-                            .collect::<Result<Vec<_>>>()?;
+                            .collect::<Vec<_>>();
                         FieldTypes::Struct(fields)
                     },
                     StructFieldInformation::DeclaredVariants(variants) => {
@@ -326,9 +350,9 @@ impl PreparedModule {
                                 v.fields
                                     .iter()
                                     .map(|f| intern_sig_token(&f.signature.0, &module, interner))
-                                    .collect::<Result<Vec<_>>>()
+                                    .collect::<Vec<_>>()
                             })
-                            .collect::<Result<Vec<_>>>()?;
+                            .collect::<Vec<_>>();
                         FieldTypes::Enum(variants)
                     },
                 };
@@ -339,13 +363,13 @@ impl PreparedModule {
 
                 Ok(field_types)
             })
-            .collect::<Result<Vec<_>>>()?;
+            .collect::<Result<Vec<_>, _>>()?;
 
         let constant_types = module
             .constant_pool()
             .iter()
             .map(|c| intern_sig_token(&c.type_, &module, interner))
-            .collect::<Result<Vec<_>>>()?;
+            .collect::<Vec<_>>();
 
         let function_signatures = module
             .function_handles()
@@ -370,7 +394,7 @@ impl PreparedModule {
                     ty_args,
                 })
             })
-            .collect::<Result<Vec<_>>>()?;
+            .collect::<Result<Vec<_>, PreparedModuleError>>()?;
 
         Ok(Self {
             module,
@@ -408,9 +432,9 @@ pub fn intern_sig_token(
     token: &SignatureToken,
     module: &CompiledModule,
     interner: &impl Interner,
-) -> Result<InternedType> {
+) -> InternedType {
     use crate::types as ty;
-    Ok(match token {
+    match token {
         SignatureToken::Bool => ty::BOOL_TY,
         SignatureToken::U8 => ty::U8_TY,
         SignatureToken::U16 => ty::U16_TY,
@@ -428,26 +452,26 @@ pub fn intern_sig_token(
         SignatureToken::Signer => ty::SIGNER_TY,
         SignatureToken::TypeParameter(idx) => interner.type_param_of(*idx),
         SignatureToken::Vector(inner) => {
-            let elem = intern_sig_token(inner, module, interner)?;
+            let elem = intern_sig_token(inner, module, interner);
             interner.vector_of(elem)
         },
         SignatureToken::Reference(inner) => {
-            let inner = intern_sig_token(inner, module, interner)?;
+            let inner = intern_sig_token(inner, module, interner);
             interner.immut_ref_of(inner)
         },
         SignatureToken::MutableReference(inner) => {
-            let inner = intern_sig_token(inner, module, interner)?;
+            let inner = intern_sig_token(inner, module, interner);
             interner.mut_ref_of(inner)
         },
         SignatureToken::Function(args, results, abilities) => {
             let arg_ptrs = args
                 .iter()
                 .map(|t| intern_sig_token(t, module, interner))
-                .collect::<anyhow::Result<Vec<_>>>()?;
+                .collect::<Vec<_>>();
             let result_ptrs = results
                 .iter()
                 .map(|t| intern_sig_token(t, module, interner))
-                .collect::<anyhow::Result<Vec<_>>>()?;
+                .collect::<Vec<_>>();
             let args = interner.type_list_of(&arg_ptrs);
             let results = interner.type_list_of(&result_ptrs);
             interner.function_of(args, results, *abilities)
@@ -461,10 +485,82 @@ pub fn intern_sig_token(
             let ty_args = ty_args
                 .iter()
                 .map(|t| intern_sig_token(t, module, interner))
-                .collect::<anyhow::Result<Vec<_>>>()?;
+                .collect::<Vec<_>>();
             interner.nominal_of(module_id, struct_name, interner.type_list_of(&ty_args))
         },
+    }
+}
+
+/// Interns a runtime [`TypeTag`] (e.g. a transaction's type argument, or a
+/// resource's struct tag).
+//
+// TODO(metering): decide if this construction requires metering.
+pub fn intern_type_tag(tag: &TypeTag, interner: &impl Interner) -> anyhow::Result<InternedType> {
+    use crate::types as ty;
+    Ok(match tag {
+        TypeTag::Bool => ty::BOOL_TY,
+        TypeTag::U8 => ty::U8_TY,
+        TypeTag::U16 => ty::U16_TY,
+        TypeTag::U32 => ty::U32_TY,
+        TypeTag::U64 => ty::U64_TY,
+        TypeTag::U128 => ty::U128_TY,
+        TypeTag::U256 => ty::U256_TY,
+        TypeTag::I8 => ty::I8_TY,
+        TypeTag::I16 => ty::I16_TY,
+        TypeTag::I32 => ty::I32_TY,
+        TypeTag::I64 => ty::I64_TY,
+        TypeTag::I128 => ty::I128_TY,
+        TypeTag::I256 => ty::I256_TY,
+        TypeTag::Address => ty::ADDRESS_TY,
+        TypeTag::Signer => ty::SIGNER_TY,
+        TypeTag::Vector(elem) => interner.vector_of(intern_type_tag(elem, interner)?),
+        TypeTag::Struct(struct_tag) => intern_struct_tag(struct_tag, interner)?,
+        TypeTag::Function(function_tag) => {
+            let args = intern_function_param_tags(&function_tag.args, interner)?;
+            let results = intern_function_param_tags(&function_tag.results, interner)?;
+            interner.function_of(
+                interner.type_list_of(&args),
+                interner.type_list_of(&results),
+                function_tag.abilities,
+            )
+        },
     })
+}
+
+/// Interns a function tag's parameter or return tags, applying each one's
+/// reference kind.
+fn intern_function_param_tags(
+    tags: &[FunctionParamOrReturnTag],
+    interner: &impl Interner,
+) -> anyhow::Result<Vec<InternedType>> {
+    tags.iter()
+        .map(|tag| {
+            Ok(match tag {
+                FunctionParamOrReturnTag::Value(tag) => intern_type_tag(tag, interner)?,
+                FunctionParamOrReturnTag::Reference(tag) => {
+                    interner.immut_ref_of(intern_type_tag(tag, interner)?)
+                },
+                FunctionParamOrReturnTag::MutableReference(tag) => {
+                    interner.mut_ref_of(intern_type_tag(tag, interner)?)
+                },
+            })
+        })
+        .collect()
+}
+
+/// Interns a struct tag into its nominal type.
+pub fn intern_struct_tag(
+    struct_tag: &StructTag,
+    interner: &impl Interner,
+) -> anyhow::Result<InternedType> {
+    let module_id = interner.module_id_of(&struct_tag.address, struct_tag.module.as_ident_str());
+    let name = interner.identifier_of(struct_tag.name.as_ident_str());
+    let args = struct_tag
+        .type_args
+        .iter()
+        .map(|arg| intern_type_tag(arg, interner))
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    Ok(interner.nominal_of(module_id, name, interner.type_list_of(&args)))
 }
 
 fn intern_struct_info(

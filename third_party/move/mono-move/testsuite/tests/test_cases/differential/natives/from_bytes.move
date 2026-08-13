@@ -9,6 +9,9 @@ module 0x1::from_bcs {
 module 0x1::util {
     public native fun from_bytes<T>(bytes: vector<u8>): T;
 }
+module 0x1::create_signer {
+    public native fun create_signer(addr: address): signer;
+}
 module 0x1::main {
     use std::bcs;
 
@@ -55,6 +58,19 @@ module 0x1::main {
     public fun trailing(): u64 {
         0x1::from_bcs::from_bytes<u64>(x"2a0000000000000000")
     }
+
+    // A signer serializes to its address but must never deserialize.
+    public fun signer_roundtrip() {
+        let s = 0x1::create_signer::create_signer(@0x123);
+        0x1::from_bcs::from_bytes<signer>(bcs::to_bytes(&s));
+    }
+
+    // A signer nested in a vector is rejected too.
+    public fun signer_in_vector() {
+        0x1::from_bcs::from_bytes<vector<signer>>(
+            x"010000000000000000000000000000000000000000000000000000000000000000"
+        );
+    }
 }
 
 // RUN: execute 0x1::main::from_bcs_u64
@@ -75,13 +91,16 @@ module 0x1::main {
 // RUN: execute 0x1::main::roundtrip_bytes
 // CHECK: results: 0x68656c6c6f
 
-// Malformed input: the legacy VM aborts with EFROM_BYTES, while mono-move
-// surfaces the deserializer's error directly (V1/V2 diverge by design).
+// Malformed input aborts with EFROM_BYTES on both VMs.
 
 // RUN: execute 0x1::main::truncated
-// CHECK-V1: aborted: code 65537
-// CHECK-V2: error: BCS deserialize: unexpected end of input
+// CHECK: aborted: code 65537 in 0x1::from_bcs
 
 // RUN: execute 0x1::main::trailing
-// CHECK-V1: aborted: code 65537
-// CHECK-V2: error: BCS deserialize: 1 trailing byte(s) after value
+// CHECK: aborted: code 65537 in 0x1::from_bcs
+
+// RUN: execute 0x1::main::signer_roundtrip
+// CHECK: aborted: code 65537 in 0x1::from_bcs
+
+// RUN: execute 0x1::main::signer_in_vector
+// CHECK: aborted: code 65537 in 0x1::from_bcs

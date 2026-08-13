@@ -18,7 +18,7 @@ fun void_no_arg() {
 }
 
 fun trigger(): u64 {
-  slots: params(0), locals(1), temps(0), xfer(1)
+  slots: params(0), locals(1), temps(0), transfer(1)
     r0: u64
   code:
   L0:

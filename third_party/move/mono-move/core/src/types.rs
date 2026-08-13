@@ -148,29 +148,29 @@ pub fn view_name(ptr: InternedIdentifier) -> &'static str {
     unsafe { ptr.as_ref_unchecked() }
 }
 
-/// Converts `&mut T` to `&T` by interning the immutable counterpart. Errors
-/// if `mut_ref` is not a [`Type::MutRef`].
+/// Converts `&mut T` to `&T` by interning the immutable counterpart.
+/// Returns [`None`] if `mut_ref` is not a [`Type::MutRef`].
 ///
 /// Inherits safety contract of [`view_type`].
 pub fn convert_mut_to_immut_ref(
     interner: &impl Interner,
     mut_ref: InternedType,
-) -> anyhow::Result<InternedType> {
+) -> Option<InternedType> {
     let Type::MutRef { inner } = view_type(mut_ref) else {
-        anyhow::bail!("convert_mut_to_immut_ref: expected MutRef");
+        return None;
     };
-    Ok(interner.immut_ref_of(*inner))
+    Some(interner.immut_ref_of(*inner))
 }
 
-/// Strips the reference from `&T` or `&mut T`, returning `T`. Errors if
-/// `ref_ty` is not a reference type.
+/// Strips the reference from `&T` or `&mut T`, returning `T`.
+/// Returns [`None`] if `ref_ty` is not a reference type.
 ///
 /// Inherits safety contract of [`view_type`].
-pub fn strip_ref(ref_ty: InternedType) -> anyhow::Result<InternedType> {
+pub fn strip_ref(ref_ty: InternedType) -> Option<InternedType> {
     let (Type::ImmutRef { inner } | Type::MutRef { inner }) = view_type(ref_ty) else {
-        anyhow::bail!("strip_ref: expected reference type");
+        return None;
     };
-    Ok(*inner)
+    Some(*inner)
 }
 
 /// Whether `ty` contains no [`Type::TypeParam`] node.

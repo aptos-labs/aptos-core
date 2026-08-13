@@ -147,10 +147,10 @@ module 0x42::main {
 // CHECK-V2: results: 0x6364
 
 // RUN: execute 0x42::main::add_duplicate_aborts
-// CHECK-V2: aborted: code 25607
+// CHECK-V2: aborted: code 25607 in 0x1::table
 
 // RUN: execute 0x42::main::get_missing_aborts
-// CHECK-V2: aborted: code 25863
+// CHECK-V2: aborted: code 25863 in 0x1::table
 
 // RUN: execute 0x42::main::remove_present
 // CHECK-V2: results: 0x6869
@@ -162,4 +162,4 @@ module 0x42::main {
 // CHECK-V2: results: true
 
 // RUN: execute 0x42::main::remove_missing_aborts
-// CHECK-V2: aborted: code 25863
+// CHECK-V2: aborted: code 25863 in 0x1::table

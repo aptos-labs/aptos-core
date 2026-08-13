@@ -12,7 +12,7 @@ use crate::{
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     storage::{
-        layout_cache::StructKey,
+        layout_cache::LayoutCacheKey,
         loader::traits::NativeModuleLoader,
         module_storage::FunctionValueExtensionAdapter,
         ty_layout_converter::{LayoutConverter, LayoutWithDelayedFields},
@@ -472,6 +472,20 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
         // Construct result.
         let env = self.module_storage.runtime_environment();
         let ty_args_id = env.ty_pool().intern_ty_args(&ty_args);
+
+        // Record the version (hash) of the defining module so that the resolved function does not
+        // need to be re-resolved on its first call just to learn its version. The module was just
+        // loaded here, so this lookup is a cache hit.
+        let module_hash = if env.vm_config().revalidate_resolved_closures {
+            let module_id = module.self_id();
+            self.module_storage
+                .unmetered_get_module_hash_and_size(module_id.address(), module_id.name())
+                .map_err(|err| err.to_partial())?
+                .map(|(hash, _)| hash)
+        } else {
+            None
+        };
+
         let loaded_fun = Rc::new(LoadedFunction {
             owner: LoadedFunctionOwner::Module(module),
             ty_args,
@@ -479,7 +493,7 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
             function: func,
         });
         Ok(Ok(Box::new(
-            LazyLoadedFunction::new_resolved_not_capturing(env, loaded_fun)?,
+            LazyLoadedFunction::new_resolved_not_capturing(env, loaded_fun, module_hash)?,
         )))
     }
 }
@@ -521,15 +535,19 @@ struct ModuleStorageWrapper<'a> {
 }
 
 impl<'a> LayoutCache for ModuleStorageWrapper<'a> {
-    fn get_struct_layout(&self, key: &StructKey) -> Option<LayoutCacheEntry> {
+    fn get_struct_layout(&self, key: &LayoutCacheKey) -> Option<LayoutCacheEntry> {
         self.module_storage.get_struct_layout(key)
     }
 
-    fn store_struct_layout(&self, key: &StructKey, entry: LayoutCacheEntry) -> PartialVMResult<()> {
+    fn store_struct_layout(
+        &self,
+        key: &LayoutCacheKey,
+        entry: LayoutCacheEntry,
+    ) -> PartialVMResult<()> {
         self.module_storage.store_struct_layout(key, entry)
     }
 
-    fn remove_struct_layout(&self, key: &StructKey) {
+    fn remove_struct_layout(&self, key: &LayoutCacheKey) {
         self.module_storage.remove_struct_layout(key)
     }
 }

@@ -8,12 +8,41 @@
 //! [`crate::compile_move_modules`], serialize the resulting
 //! [`CompiledModule`]s, and populate the provider.
 
-use anyhow::{anyhow, Result};
 use bytes::Bytes;
+use mono_move_core::{ExecutionErrorKind, IntoExecutionError, VMInternalError, VMResult};
 use mono_move_loader::ModuleProvider;
 use move_binary_format::CompiledModule;
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use std::collections::HashMap;
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+#[error("deserialization failed: {0}")]
+pub struct DeserializationError(move_binary_format::errors::PartialVMError);
+
+impl IntoExecutionError for DeserializationError {
+    fn kind(&self) -> ExecutionErrorKind {
+        ExecutionErrorKind::Placeholder
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum ModuleProviderError {
+    #[error("invalid module name {module_name:?}")]
+    InvalidModuleName { module_name: String },
+
+    #[error("no package declared for {address}::{module_name}")]
+    PackageNotFound {
+        address: AccountAddress,
+        module_name: String,
+    },
+}
+
+impl IntoExecutionError for ModuleProviderError {
+    fn kind(&self) -> ExecutionErrorKind {
+        ExecutionErrorKind::Placeholder
+    }
+}
 
 pub struct InMemoryModuleProvider {
     module_bytes: HashMap<(AccountAddress, Identifier), Bytes>,
@@ -78,18 +107,19 @@ impl Default for InMemoryModuleProvider {
 }
 
 impl ModuleProvider for InMemoryModuleProvider {
-    fn get_module_bytes(&self, address: &AccountAddress, name: &str) -> Result<Option<Bytes>> {
+    fn get_module_bytes(&self, address: &AccountAddress, name: &str) -> VMResult<Option<Bytes>> {
         let Ok(ident) = Identifier::new(name) else {
             return Ok(None);
         };
         Ok(self.module_bytes.get(&(*address, ident)).cloned())
     }
 
-    fn deserialize_module(&self, bytes: &[u8]) -> Result<CompiledModule> {
-        CompiledModule::deserialize(bytes).map_err(|e| anyhow!("deserialize failed: {e:?}"))
+    fn deserialize_module(&self, bytes: &[u8]) -> VMResult<CompiledModule> {
+        CompiledModule::deserialize(bytes)
+            .map_err(|e| VMInternalError::new(DeserializationError(e)))
     }
 
-    fn verify_module(&self, _module: &CompiledModule) -> Result<()> {
+    fn verify_module(&self, _module: &CompiledModule) -> VMResult<()> {
         // Tests assume the compiled modules are already valid.
         Ok(())
     }
@@ -98,12 +128,20 @@ impl ModuleProvider for InMemoryModuleProvider {
         &self,
         address: &AccountAddress,
         module_name: &str,
-    ) -> Result<Vec<Identifier>> {
-        let ident = Identifier::new(module_name)
-            .map_err(|e| anyhow!("invalid module name {module_name:?}: {e}"))?;
+    ) -> VMResult<Vec<Identifier>> {
+        let ident = Identifier::new(module_name).map_err(|_| {
+            VMInternalError::new(ModuleProviderError::InvalidModuleName {
+                module_name: module_name.to_string(),
+            })
+        })?;
         self.packages
             .get(&(*address, ident))
             .cloned()
-            .ok_or_else(|| anyhow!("no package declared for {address}::{module_name}"))
+            .ok_or_else(|| {
+                VMInternalError::new(ModuleProviderError::PackageNotFound {
+                    address: *address,
+                    module_name: module_name.to_string(),
+                })
+            })
     }
 }

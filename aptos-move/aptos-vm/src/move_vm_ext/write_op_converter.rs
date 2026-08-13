@@ -33,30 +33,7 @@ pub(crate) struct WriteOpConverter<'r> {
     new_slot_metadata: Option<StateValueMetadata>,
 }
 
-macro_rules! convert_impl {
-    ($convert_func_name:ident, $get_metadata_callback:ident) => {
-        pub(crate) fn $convert_func_name(
-            &self,
-            state_key: &StateKey,
-            move_storage_op: MoveStorageOp<Bytes>,
-            legacy_creation_as_modification: bool,
-        ) -> PartialVMResult<WriteOp> {
-            let state_value_metadata = self
-                .remote
-                .as_executor_view()
-                .$get_metadata_callback(state_key)?;
-            self.convert(
-                state_value_metadata,
-                move_storage_op,
-                legacy_creation_as_modification,
-            )
-        }
-    };
-}
-
 impl<'r> WriteOpConverter<'r> {
-    convert_impl!(convert_aggregator, get_aggregator_v1_state_value_metadata);
-
     pub(crate) fn new(
         remote: &'r dyn AptosMoveResolver,
         is_storage_slot_metadata_enabled: bool,
@@ -288,6 +265,17 @@ impl<'r> WriteOpConverter<'r> {
         };
 
         Ok(op)
+    }
+
+    pub(crate) fn convert_aggregator_deletion(
+        &self,
+        state_key: &StateKey,
+    ) -> PartialVMResult<WriteOp> {
+        let state_value_metadata = self
+            .remote
+            .as_executor_view()
+            .get_aggregator_v1_state_value_metadata(state_key)?;
+        self.convert(state_value_metadata, MoveStorageOp::Delete, false)
     }
 }
 

@@ -109,13 +109,17 @@ impl ExpChecker for CyclomaticComplexity {
         match expr {
             // loop, while, for
             Loop(_, _) => {
-                let delta = if detect_for_loop(expr, function) {
-                    // For loop expansion generates: Loop(+1) + IfElse(+1) + IfElse(+1) + IfElse(+1) + LoopCont(+1) + LoopCont(+1) = +6 extra
-                    // But we want for to count as +1 total, so we subtract 4 here
-                    -4
+                let delta = if detect_for_loop(expr) {
+                    // A `for` loop with a `continue` adds an inner single-pass loop:
+                    // this loop + condition `if` + inner loop + inner `break` + else
+                    // `break`. The four non-outer nodes each add +1; to make the loop
+                    // count as +1 total, this node contributes -3.
+                    -3
                 } else if detect_while_loop(expr) {
-                    // While loop expansion generates: Loop(+1) + IfElse(+1) + LoopCont(+1) = +3 extra
-                    // But we want while to count as +1 total, so we subtract 1 here
+                    // A `while` loop (or a `for` loop without a `continue`) is this
+                    // loop + condition `if` + else `break`. The two non-outer nodes
+                    // each add +1; to make the loop count as +1 total, this node
+                    // contributes -1.
                     -1
                 } else {
                     1

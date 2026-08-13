@@ -7,6 +7,24 @@ spec aptos_framework::dispatchable_fungible_asset {
         pragma opaque;
     }
 
+    // Opaque, mirroring the natives they replace.
+
+    spec dispatch_withdraw_hook {
+        pragma opaque;
+    }
+
+    spec dispatch_deposit_hook {
+        pragma opaque;
+    }
+
+    spec dispatch_derived_balance_hook {
+        pragma opaque;
+    }
+
+    spec dispatch_derived_supply_hook {
+        pragma opaque;
+    }
+
     spec dispatchable_deposit {
         pragma opaque;
     }

@@ -251,6 +251,20 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         bounded_executor: BoundedExecutor,
     ) {
         while let Some(rand_gen_msg) = incoming_rpc_request.next().await {
+            // Drop messages from peers that are not part of the validator set
+            if !epoch_state
+                .verifier
+                .address_to_validator_index()
+                .contains_key(&rand_gen_msg.sender)
+            {
+                warn!(
+                    "Dropping rand gen message from {} that is not in the epoch {} validator set",
+                    rand_gen_msg.sender, epoch_state.epoch,
+                );
+                continue;
+            }
+
+            // Process the message
             let tx = verified_msg_tx.clone();
             let epoch_state_clone = epoch_state.clone();
             let config_clone = rand_config.clone();

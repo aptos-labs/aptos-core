@@ -549,7 +549,7 @@ impl Session {
             );
         }
 
-        let txn_output = vm_output.try_materialize_into_transaction_output(&resolver)?;
+        let txn_output = vm_output.try_materialize_into_transaction_output()?;
         self.state_store.apply_write_set(txn_output.write_set())?;
 
         // Re-patch the randomness seed. The block prologue clears it because our
@@ -612,7 +612,7 @@ impl Session {
                     &AuxiliaryInfo::new_timestamp_not_yet_assigned(0),
                 )
                 .map_err(|e| anyhow::anyhow!("transaction execution failed: {:?}", e))?;
-            let txn_output = vm_output.try_materialize_into_transaction_output(&resolver)?;
+            let txn_output = vm_output.try_materialize_into_transaction_output()?;
             // `finish` panics on a consistency failure with the library's generic
             // bug-report message; `finish_without_consistency_check` skips the
             // check entirely. User-facing tools that want a custom error (or to
@@ -632,7 +632,7 @@ impl Session {
                 &log_context,
                 &AuxiliaryInfo::new_timestamp_not_yet_assigned(0),
             );
-            let txn_output = vm_output.try_materialize_into_transaction_output(&resolver)?;
+            let txn_output = vm_output.try_materialize_into_transaction_output()?;
             (vm_status, txn_output, None)
         };
 

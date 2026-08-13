@@ -4,7 +4,7 @@ module std::option {
     use std::mem;
 
     /// Abstraction of a value that may or may not be present.
-    enum Option<Element> has copy, drop, store {
+    public enum Option<Element> has copy, drop, store {
         None,
         Some {
             e: Element,

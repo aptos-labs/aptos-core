@@ -210,11 +210,14 @@ members = [
     "third_party/move/documentation/framework-book/builder",
     "third_party/move/extensions/move-table-extension",
     "third_party/move/mono-move/alloc",
+    "third_party/move/mono-move/aptos-state-view-providers",
+    "third_party/move/mono-move/aptos-transaction-executor",
     "third_party/move/mono-move/core",
     "third_party/move/mono-move/global-context",
     "third_party/move/mono-move/loader",
     "third_party/move/mono-move/natives",
     "third_party/move/mono-move/orchestrator",
+    "third_party/move/mono-move/output",
     "third_party/move/mono-move/replay-benchmark",
     "third_party/move/mono-move/runtime",
     "third_party/move/mono-move/specializer",
@@ -901,11 +904,14 @@ aptos-position-natives = { path = "aptos-move/framework/position-natives" }
 aptos-table-natives = { path = "aptos-move/framework/table-natives" }
 legacy-move-compiler = { path = "third_party/move/move-compiler-v2/legacy-move-compiler" }
 mono-move-alloc = { path = "third_party/move/mono-move/alloc" }
+mono-move-aptos-state-view-providers = { path = "third_party/move/mono-move/aptos-state-view-providers" }
+mono-move-aptos-transaction-executor = { path = "third_party/move/mono-move/aptos-transaction-executor" }
 mono-move-core = { path = "third_party/move/mono-move/core" }
 mono-move-global-context = { path = "third_party/move/mono-move/global-context" }
 mono-move-loader = { path = "third_party/move/mono-move/loader" }
 mono-move-natives = { path = "third_party/move/mono-move/natives" }
 mono-move-orchestrator = { path = "third_party/move/mono-move/orchestrator" }
+mono-move-output = { path = "third_party/move/mono-move/output" }
 mono-move-runtime = { path = "third_party/move/mono-move/runtime" }
 mono-move-testsuite = { path = "third_party/move/mono-move/testsuite" }
 move-abigen = { path = "third_party/move/tools/move-abigen" }

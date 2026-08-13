@@ -13,7 +13,9 @@ pub mod timing;
 pub mod v1;
 pub mod v2;
 
-pub use compare::{compare_outcomes, Correctness, ExecOutcome};
+pub use compare::{
+    compare_outcomes, prune_unchanged_modifications, Correctness, ExecOutcome, WriteSet,
+};
 pub use data::{BenchmarkInput, ReadSet};
 pub use report::TransactionReport;
 pub use timing::{Samples, TimingConfig};

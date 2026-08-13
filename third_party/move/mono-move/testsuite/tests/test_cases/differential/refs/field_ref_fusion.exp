@@ -7,7 +7,7 @@ fun read_field_val(r0): u8 {
     r1: u8
   code:
   L0:
-    0: r1 := read_local_field S::_2, r0
+    0: r1 := read_loc_field S::_2, r0
     1: ret [r1]
 }
 
@@ -38,7 +38,7 @@ fun read_field_ref_twice(r0): u64 {
 }
 
 fun test_read_and_add(r0): u64 {
-  slots: params(1), locals(1), temps(0), xfer(1)
+  slots: params(1), locals(1), temps(0), transfer(1)
     r0: u64
     r1: u64
   code:

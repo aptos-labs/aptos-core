@@ -14,7 +14,7 @@ use crate::{
         boogie_reflection_type_info, boogie_reflection_type_is_struct, boogie_reflection_type_name,
         boogie_resource_memory_name, boogie_spec_fun_name, boogie_spec_var_name,
         boogie_struct_name, boogie_struct_variant_name, boogie_type, boogie_type_suffix,
-        boogie_value_blob, boogie_variant_field_update, boogie_well_formed_expr,
+        boogie_value_blob, boogie_variant_field_update, boogie_well_formed_expr, bv_flag_for_type,
         compute_evaluator_memory_union, MAX_TUPLE_SIZE,
     },
     options::BoogieOptions,
@@ -33,7 +33,7 @@ use move_model::{
     exp_rewriter::strip_all_olds,
     model::{
         FieldId, FunId, GlobalEnv, Loc, ModuleEnv, ModuleId, NodeId, Parameter, QualifiedInstId,
-        SpecFunId, SpecVarId, StructId,
+        SpecFunId, SpecVarId, StructEnv, StructId,
     },
     pragmas::INTRINSIC_TYPE_MAP,
     symbol::Symbol,
@@ -87,13 +87,26 @@ pub struct SpecTranslator<'env> {
     /// instantiation, it will have a different node id, but again the same instantiations
     /// map to the same node id, which is the desired semantics.
     lifted_choice_infos: Rc<RefCell<HashMap<(ExpData, Vec<Type>), LiftedChoiceInfo>>>,
-    /// Set of (node_id, type, bool) pairs for arbitrary value expressions that need uninterpreted
-    /// function declarations. Each arbitrary value at a unique source location gets its own
-    /// uninterpreted function to ensure soundness. The bool indicates whether the arbitrary value is of bv type.
-    arbitrary_values: Rc<RefCell<BTreeSet<(NodeId, Type, bool)>>>,
+    /// Set of (node_id, type, bv, ghost) tuples for arbitrary value expressions that need
+    /// uninterpreted function declarations. Each arbitrary value at a unique source location gets
+    /// its own uninterpreted function to ensure soundness. `bv` indicates a bitvector-typed value.
+    /// `ghost` marks values backing uninitialized ghost fields at a spec-level pack: only those
+    /// get a type-domain (`$IsValid`) axiom, mirroring the havoc+assume at bytecode-level packs.
+    /// Abort-origin values stay unconstrained — a blanket axiom would inject quantified facts
+    /// into the global context of every VC in the file and regress solver performance for
+    /// unrelated functions.
+    arbitrary_values: Rc<RefCell<BTreeSet<(NodeId, Type, bool, bool)>>>,
     /// The qualified instantiated ID of the function currently being verified, if any.
     /// Used to resolve behavioral predicates on function-typed parameters.
     current_fun_qid: RefCell<Option<QualifiedInstId<FunId>>>,
+    /// Whether the current function translation is the baseline variant;
+    /// selects the per-variant temporary classification map. `None` outside
+    /// per-function translation (e.g. evaluator/axiom contexts).
+    current_fun_baseline: RefCell<Option<bool>>,
+    /// Local (temporary) types of the current function target; the
+    /// authoritative type source for temporary renderings (exp nodes can
+    /// carry generalized `num` where the local is concrete, and vice versa).
+    current_fun_local_types: RefCell<Option<Vec<Type>>>,
     /// Map from state labels to their defining operation info.
     /// Used to resolve memory references at labeled states.
     label_info: RefCell<BTreeMap<MemoryLabel, LabelInfo>>,
@@ -168,6 +181,8 @@ impl<'env> SpecTranslator<'env> {
             lifted_choice_infos: Default::default(),
             arbitrary_values: Default::default(),
             current_fun_qid: RefCell::new(None),
+            current_fun_baseline: RefCell::new(None),
+            current_fun_local_types: RefCell::new(None),
             label_info: RefCell::new(BTreeMap::new()),
             declared_mem_names: RefCell::new(BTreeSet::new()),
             value_state_vars: RefCell::new(BTreeMap::new()),
@@ -176,6 +191,22 @@ impl<'env> SpecTranslator<'env> {
     }
 
     /// Sets the current function being verified, for resolving behavioral predicate memory.
+    pub fn set_current_fun_baseline(&self, baseline: bool) {
+        *self.current_fun_baseline.borrow_mut() = Some(baseline);
+    }
+
+    pub fn clear_current_fun_baseline(&self) {
+        *self.current_fun_baseline.borrow_mut() = None;
+    }
+
+    pub fn set_current_fun_local_types(&self, local_types: Vec<Type>) {
+        *self.current_fun_local_types.borrow_mut() = Some(local_types);
+    }
+
+    pub fn clear_current_fun_local_types(&self) {
+        *self.current_fun_local_types.borrow_mut() = None;
+    }
+
     pub fn set_current_fun_qid(&self, fun_qid: QualifiedInstId<FunId>) {
         *self.current_fun_qid.borrow_mut() = Some(fun_qid);
     }
@@ -549,7 +580,7 @@ impl SpecTranslator<'_> {
                 .get(&(module_env.get_id(), id))
                 .unwrap()
                 .1;
-            ret_oper_map[0] == Bitwise
+            bv_flag_for_type(self.env, &ret_oper_map[0], &self.inst(&fun.result_type))
         } else {
             false
         };
@@ -624,12 +655,15 @@ impl SpecTranslator<'_> {
                     .spec_fun_operation_map
                     .contains_key(&(module_env.get_id(), id))
                 {
-                    global_state
-                        .spec_fun_operation_map
-                        .get(&(module_env.get_id(), id))
-                        .unwrap()
-                        .0[i]
-                        == Bitwise
+                    bv_flag_for_type(
+                        self.env,
+                        &global_state
+                            .spec_fun_operation_map
+                            .get(&(module_env.get_id(), id))
+                            .unwrap()
+                            .0[i],
+                        &self.inst(ty),
+                    )
                 } else {
                     false
                 };
@@ -884,6 +918,14 @@ impl SpecTranslator<'_> {
         self.translate_arbitrary_value_functions();
     }
 
+    /// Shares `parent`'s lifted-choice and arbitrary-value collections, so
+    /// declarations for artifacts collected while rendering to a temporary
+    /// writer are still emitted by the parent's `finalize`.
+    pub(crate) fn share_collected_declarations(&mut self, parent: &Self) {
+        self.lifted_choice_infos = parent.lifted_choice_infos.clone();
+        self.arbitrary_values = parent.arbitrary_values.clone();
+    }
+
     /// Translate lifted functions for choice expressions.
     #[allow(clippy::literal_string_with_formatting_args)]
     fn translate_choice_functions(&self) {
@@ -1122,7 +1164,7 @@ impl SpecTranslator<'_> {
         emitln!(self.writer, "// ** arbitrary value functions");
         emitln!(self.writer);
 
-        for (node_id, ty, bv_flag) in arbitrary_values.iter() {
+        for (node_id, ty, bv_flag, is_ghost) in arbitrary_values.iter() {
             let loc = env.get_node_loc(*node_id);
             let (type_suffix, boogie_ty) = (
                 boogie_type_suffix(env, ty, *bv_flag),
@@ -1131,13 +1173,22 @@ impl SpecTranslator<'_> {
 
             self.writer.set_location(&loc);
             emitln!(self.writer, "// arbitrary value at {}", loc.display(env));
-            emitln!(
-                self.writer,
-                "function $Arbitrary_value_of'{}'_{}(): {};",
+            let fname = format!(
+                "$Arbitrary_value_of'{}'_{}",
                 type_suffix,
-                node_id.as_usize(),
-                boogie_ty
+                node_id.as_usize()
             );
+            emitln!(self.writer, "function {}(): {};", fname, boogie_ty);
+            // Ghost-origin values are constrained to the declared type's
+            // value domain, mirroring the havoc+assume at bytecode-level
+            // packs. Other origins (e.g. abort values) stay unconstrained.
+            if *is_ghost {
+                let call = format!("{}()", fname);
+                let well_formed = boogie_well_formed_expr(env, &call, ty, *bv_flag);
+                if !well_formed.is_empty() && well_formed != "true" {
+                    emitln!(self.writer, "axiom {};", well_formed);
+                }
+            }
             emitln!(self.writer);
         }
     }
@@ -1169,6 +1220,20 @@ impl SpecTranslator<'_> {
 
     fn get_node_type(&self, id: NodeId) -> Type {
         self.inst(&self.env.get_node_type(id))
+    }
+
+    /// Return whether the value of the given expression node renders as a
+    /// bitvector, pairing the node's number-operation classification with its
+    /// instantiated type. The classification is checked before the type
+    /// fetch: `Bitwise` nodes are rare, and the instantiation is only needed
+    /// for them.
+    fn node_bv_flag(&self, id: NodeId) -> bool {
+        let global_state = &self
+            .env
+            .get_extension::<GlobalNumberOperationState>()
+            .expect("global number operation state");
+        let num_oper = global_state.get_node_num_oper(id);
+        num_oper == Bitwise && bv_flag_for_type(self.env, &num_oper, &self.get_node_type(id))
     }
 
     fn get_node_instantiation(&self, id: NodeId) -> Vec<Type> {
@@ -1261,19 +1326,10 @@ impl SpecTranslator<'_> {
     }
 
     fn translate_value(&self, node_id: NodeId, val: &Value) {
-        let global_state = &self
-            .env
-            .get_extension::<GlobalNumberOperationState>()
-            .expect("global number operation state");
-        let num_oper = global_state.get_node_num_oper(node_id);
         let mut suffix = "".to_string();
-        let bv_flag = num_oper == Bitwise;
+        let bv_flag = self.node_bv_flag(node_id);
         if bv_flag {
-            suffix = boogie_type(
-                self.env,
-                self.env.get_node_type(node_id).skip_reference(),
-                true,
-            );
+            suffix = boogie_type(self.env, self.get_node_type(node_id).skip_reference(), true);
         }
         match val {
             Value::Address(addr) => emit!(self.writer, "{}", boogie_address(self.env, addr)),
@@ -1534,9 +1590,14 @@ impl SpecTranslator<'_> {
             Operation::Not => self.translate_logical_unary_op("!", args),
             Operation::Cast => self.translate_cast(node_id, args),
             Operation::Int2Bv => {
-                let exp_arith_flag = global_state.get_node_num_oper(args[0].node_id()) != Bitwise;
-                if exp_arith_flag {
-                    let arg_node_type = self.env.get_node_type(args[0].node_id());
+                // Convert only when the argument renders as int AND this node
+                // renders as a bitvector; under the signed clamp both render
+                // as int and the conversion is the identity. The base comes
+                // from the instantiated type (a raw node type can still be a
+                // type parameter, which has no numeric base).
+                let wrap = self.node_bv_flag(node_id) && !self.node_bv_flag(args[0].node_id());
+                if wrap {
+                    let arg_node_type = self.get_node_type(args[0].node_id());
                     let literal = boogie_num_type_base(
                         self.env,
                         Some(self.env.get_node_loc(args[0].node_id())),
@@ -1546,14 +1607,17 @@ impl SpecTranslator<'_> {
                     emit!(self.writer, "$int2bv.{}(", literal);
                 }
                 self.translate_exp(&args[0]);
-                if exp_arith_flag {
+                if wrap {
                     emit!(self.writer, ")");
                 }
             },
             Operation::Bv2Int => {
-                let exp_bv_flag = global_state.get_node_num_oper(args[0].node_id()) == Bitwise;
-                if exp_bv_flag {
-                    let arg_node_type = self.env.get_node_type(args[0].node_id());
+                // See `Int2Bv`: convert only when the argument renders as a
+                // bitvector; under the signed clamp it renders as int and the
+                // conversion is the identity.
+                let wrap = self.node_bv_flag(args[0].node_id());
+                if wrap {
+                    let arg_node_type = self.get_node_type(args[0].node_id());
                     let literal = boogie_num_type_base(
                         self.env,
                         Some(self.env.get_node_loc(args[0].node_id())),
@@ -1563,7 +1627,7 @@ impl SpecTranslator<'_> {
                     emit!(self.writer, "$bv2int.{}(", literal);
                 }
                 self.translate_exp(&args[0]);
-                if exp_bv_flag {
+                if wrap {
                     emit!(self.writer, ")");
                 }
             },
@@ -1636,12 +1700,16 @@ impl SpecTranslator<'_> {
                 emit!(self.writer, &")".repeat(count));
             },
             Operation::Abort(_) => {
-                let exp_bv_flag = global_state.get_node_num_oper(node_id) == Bitwise;
                 let ty = self.get_node_type(node_id);
+                let exp_bv_flag =
+                    bv_flag_for_type(self.env, &global_state.get_node_num_oper(node_id), &ty);
                 // Track this arbitrary value for later function declaration
-                self.arbitrary_values
-                    .borrow_mut()
-                    .insert((node_id, ty.clone(), exp_bv_flag));
+                self.arbitrary_values.borrow_mut().insert((
+                    node_id,
+                    ty.clone(),
+                    exp_bv_flag,
+                    false,
+                ));
                 // Emit call to unique uninterpreted function for this abort location
                 emit!(
                     self.writer,
@@ -2395,9 +2463,28 @@ impl SpecTranslator<'_> {
         emit!(self.writer, ")");
     }
 
+    /// Reject `Pack`/`PackVariant` of an intrinsic map in a specification:
+    /// its declared fields are erased (the representation is the raw table or
+    /// the ghost carrier, which declares no variant constructors either), so
+    /// the emitted constructor would be ill-typed. Returns true if rejected.
+    fn reject_intrinsic_map_pack(&self, node_id: NodeId, struct_env: &StructEnv) -> bool {
+        let intrinsic = struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP);
+        if intrinsic {
+            self.error(
+                &self.env.get_node_loc(node_id),
+                "cannot pack a value of an intrinsic map type in a specification; \
+                 use the map's `map_spec_new` binding",
+            );
+        }
+        intrinsic
+    }
+
     fn translate_pack(&self, node_id: NodeId, mid: ModuleId, sid: StructId, args: &[Exp]) {
         let struct_env = &self.env.get_module(mid).into_struct(sid);
         let inst = &self.get_node_instantiation(node_id);
+        if self.reject_intrinsic_map_pack(node_id, struct_env) {
+            return;
+        }
         emit!(
             self.writer,
             "{}(",
@@ -2409,6 +2496,10 @@ impl SpecTranslator<'_> {
             self.translate_exp(arg);
             sep = ", ";
         }
+        // Ghost fields are additional constructor arguments. If a ghost has an
+        // initializer, translate it over the runtime pack args; otherwise emit
+        // a fresh unconstrained value.
+        self.emit_ghost_pack_args(struct_env, inst, &mut sep, node_id, Some(args));
         emit!(self.writer, ")");
     }
 
@@ -2422,6 +2513,9 @@ impl SpecTranslator<'_> {
     ) {
         let struct_env = &self.env.get_module(mid).into_struct(sid);
         let inst = &self.get_node_instantiation(node_id);
+        if self.reject_intrinsic_map_pack(node_id, struct_env) {
+            return;
+        }
         emit!(
             self.writer,
             "{}(",
@@ -2433,7 +2527,84 @@ impl SpecTranslator<'_> {
             self.translate_exp(arg);
             sep = ", ";
         }
+        // Enum ghost initializers may not reference variant fields (ghosts are
+        // variant-agnostic), so no argument substitution is applied here.
+        self.emit_ghost_pack_args(struct_env, inst, &mut sep, node_id, None);
         emit!(self.writer, ")");
+    }
+
+    /// Emit one Boogie expression per ghost field of the struct/enum. If the
+    /// ghost has an initializer expression, translate it (with each runtime
+    /// field bare-referenced as `LocalVar(f)` substituted by the corresponding
+    /// pack argument, when `pack_args` is provided). Otherwise emit a fresh
+    /// `$Arbitrary_value_of'T'_<node>()` uninterpreted function so the ghost
+    /// is unconstrained.
+    fn emit_ghost_pack_args(
+        &self,
+        struct_env: &StructEnv<'_>,
+        inst: &[Type],
+        sep: &mut &str,
+        pack_id: NodeId,
+        pack_args: Option<&[Exp]>,
+    ) {
+        for field in struct_env.get_ghost_fields() {
+            emit!(self.writer, sep);
+            if let Some(init) = field.get_init_exp() {
+                let prepared = self.prepare_ghost_init(struct_env, inst, pack_args, init.clone());
+                self.translate_exp(&prepared);
+            } else {
+                let ty = field.get_type().instantiate(inst);
+                let loc = self.env.get_node_loc(pack_id);
+                let node = self.env.new_node(loc, ty.clone());
+                self.arbitrary_values
+                    .borrow_mut()
+                    .insert((node, ty.clone(), false, true));
+                emit!(
+                    self.writer,
+                    &format!(
+                        "$Arbitrary_value_of'{}'_{}()",
+                        boogie_type_suffix(self.env, &ty, false),
+                        node.as_usize()
+                    )
+                );
+            }
+            *sep = ", ";
+        }
+    }
+
+    /// Instantiate the initializer expression's node types with `inst` and, if
+    /// pack args are provided (struct pack, not enum variant pack), substitute
+    /// each free `LocalVar(field_name)` with the pack argument at that runtime
+    /// field's declaration offset. Uses the scope-aware `ExpRewriter` so bound
+    /// occurrences of a field name in an inner `Quant`/`Lambda`/`Block` are
+    /// not captured.
+    fn prepare_ghost_init(
+        &self,
+        struct_env: &StructEnv<'_>,
+        inst: &[Type],
+        pack_args: Option<&[Exp]>,
+        init: Exp,
+    ) -> Exp {
+        use move_model::exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget};
+        let mut map: BTreeMap<Symbol, Exp> = BTreeMap::new();
+        if let Some(args) = pack_args {
+            for field in struct_env.get_fields() {
+                let offset = field.get_offset();
+                if let Some(arg) = args.get(offset) {
+                    map.insert(field.get_name(), arg.clone());
+                }
+            }
+        }
+        let mut cb = |_id: NodeId, target: RewriteTarget| -> Option<Exp> {
+            if let RewriteTarget::LocalVar(sym) = target {
+                map.get(&sym).cloned()
+            } else {
+                None
+            }
+        };
+        ExpRewriter::new(self.env, &mut cb)
+            .set_type_args(inst)
+            .rewrite_exp(init)
     }
 
     fn translate_spec_fun_call(
@@ -2452,17 +2623,14 @@ impl SpecTranslator<'_> {
         }
 
         // regular path
-        let global_state = &self
-            .env
-            .get_extension::<GlobalNumberOperationState>()
-            .expect("global number operation state");
         let is_vector_table_cmp_module =
             module_env.is_std_vector() || module_env.is_table() || module_env.is_cmp();
-        let bv_flag = if is_vector_table_cmp_module && !args.is_empty() {
-            global_state.get_node_num_oper(args[0].node_id()) == Bitwise
+        let flag_node = if is_vector_table_cmp_module && !args.is_empty() {
+            args[0].node_id()
         } else {
-            global_state.get_node_num_oper(node_id) == Bitwise
+            node_id
         };
+        let bv_flag = self.node_bv_flag(flag_node);
         let name = boogie_spec_fun_name(module_env, fun_id, inst, bv_flag);
         emit!(self.writer, "{}(", name);
         let mut first = true;
@@ -2604,7 +2772,8 @@ impl SpecTranslator<'_> {
                 } else {
                     let arg = arg_iter.next().expect("missing arg for non-mut param");
                     maybe_comma();
-                    self.translate_exp(arg);
+                    // Instantiated type, as in the non-doubled branch below.
+                    self.translate_spec_fun_arg(arg, &ty.instantiate(inst));
                 }
             }
         } else {
@@ -2641,11 +2810,47 @@ impl SpecTranslator<'_> {
                     }
                     mut_idx += 1;
                 } else {
-                    self.translate_exp(arg);
+                    // The `num`-boundary check must see the instantiated
+                    // parameter type: a generic parameter instantiated at
+                    // `num` converts like a declared `num` parameter.
+                    self.translate_spec_fun_arg(arg, &ty.instantiate(inst));
                 }
             }
         }
         emit!(self.writer, ")");
+    }
+
+    /// Emit a spec fun argument for a by-value parameter, converting at the
+    /// representational boundary of widthless `num` parameters: a `num`
+    /// parameter always renders as int, while a bitwise-classified argument
+    /// renders as a bitvector (the number-operation analysis clamps `num`
+    /// parameter slots to `Arithmetic`, so the two sides legitimately
+    /// disagree exactly here). Other parameter types keep the propagated
+    /// classification and need no conversion (see the comment at the
+    /// argument-emission site).
+    fn translate_spec_fun_arg(&self, arg: &Exp, param_ty: &Type) {
+        // The operand's own rendering is authoritative (a schema binding
+        // can substitute a bitvector-rendered temporary under a node
+        // rewritten to `num`), and the conversion width comes from the
+        // same type that decided that rendering.
+        let (arg_is_bv, arg_ty) = self.operand_rendering(arg);
+        if matches!(
+            param_ty.skip_reference(),
+            Type::Primitive(PrimitiveType::Num)
+        ) && arg_is_bv
+        {
+            let base = boogie_num_type_base(
+                self.env,
+                Some(self.env.get_node_loc(arg.node_id())),
+                &arg_ty,
+                false,
+            );
+            emit!(self.writer, "$bv2int.{}(", base);
+            self.translate_exp(arg);
+            emit!(self.writer, ")");
+        } else {
+            self.translate_exp(arg);
+        }
     }
 
     fn try_translate_spec_fun_reflection_call(
@@ -2719,7 +2924,12 @@ impl SpecTranslator<'_> {
         args: &[Exp],
     ) {
         let struct_env = self.env.get_module(module_id).into_struct(struct_id);
-        if struct_env.is_intrinsic() {
+        // Ghost fields of intrinsic maps live in the carrier datatype and are
+        // selectable; runtime fields of intrinsic structs are erased.
+        let is_ghost_sel = struct_env
+            .get_ghost_fields()
+            .any(|f| f.get_id() == field_id);
+        if struct_env.is_intrinsic() && !is_ghost_sel {
             self.env.error(
                 &self.env.get_node_loc(node_id),
                 "cannot select field of intrinsic struct",
@@ -2774,12 +2984,12 @@ impl SpecTranslator<'_> {
             .env
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number operation state");
-        let exp_bv_flag = global_state.get_node_num_oper(node_id) == Bitwise;
         let ty = self.get_node_type(node_id);
+        let exp_bv_flag = bv_flag_for_type(self.env, &global_state.get_node_num_oper(node_id), &ty);
         // Track this arbitrary value for later function declaration
         self.arbitrary_values
             .borrow_mut()
-            .insert((node_id, ty.clone(), exp_bv_flag));
+            .insert((node_id, ty.clone(), exp_bv_flag, false));
         // Emit call to unique uninterpreted function for this test_variant location
         emit!(
             self.writer,
@@ -2817,7 +3027,7 @@ impl SpecTranslator<'_> {
 
     fn translate_update_field(
         &self,
-        _node_id: NodeId,
+        node_id: NodeId,
         module_id: ModuleId,
         struct_id: StructId,
         field_id: FieldId,
@@ -2825,6 +3035,15 @@ impl SpecTranslator<'_> {
     ) {
         let struct_env = &self.env.get_module(module_id).into_struct(struct_id);
         let field_env = struct_env.get_field(field_id);
+        // Fields of an intrinsic map cannot be updated in specifications:
+        // they are erased by the intrinsic representation.
+        if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
+            self.env.error(
+                &self.env.get_node_loc(node_id),
+                "cannot update a field of an intrinsic map type in a specification",
+            );
+            return;
+        }
         let receiver_type = self.get_node_type(args[0].node_id());
         let struct_inst = receiver_type.skip_reference().require_struct().2;
         let update_fun = if struct_env.has_variants() {
@@ -3406,8 +3625,8 @@ impl SpecTranslator<'_> {
             let var_name_str = self.env.symbol_pool().string(var_name);
             let quant_ty = self.get_node_type(range.node_id());
             let num_oper = global_state.get_node_num_oper(range.node_id());
-            let bv_flag = num_oper == Bitwise;
-            let ty_str = |ty: _| boogie_type(self.env, ty, bv_flag);
+            let ty_str =
+                |ty: &Type| boogie_type(self.env, ty, bv_flag_for_type(self.env, &num_oper, ty));
             match quant_ty.skip_reference() {
                 Type::TypeDomain(ty) => {
                     emit!(self.writer, "{}{}: {}", comma, var_name_str, ty_str(ty));
@@ -3415,12 +3634,19 @@ impl SpecTranslator<'_> {
                 Type::Struct(mid, sid, targs) => {
                     let struct_env = self.env.get_struct(mid.qualified(*sid));
                     if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
+                        // Clamp by the map type, matching the `$EncodeKey`
+                        // suffix in the range constraint below: both sides of
+                        // the pair must agree on the key rendering.
                         emit!(
                             self.writer,
                             "{}{}: {}",
                             comma,
                             var_name_str,
-                            ty_str(&targs[0])
+                            boogie_type(
+                                self.env,
+                                &targs[0],
+                                bv_flag_for_type(self.env, &num_oper, &quant_ty)
+                            )
                         );
                     } else {
                         panic!("unexpected type");
@@ -3557,12 +3783,27 @@ impl SpecTranslator<'_> {
                 Type::Struct(mid, sid, targs) => {
                     let struct_env = self.env.get_struct(mid.qualified(*sid));
                     if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
+                        // A ghost-carrier map wraps its table; membership
+                        // reads through the raw-table selector.
+                        let unwrap = if struct_env.get_ghost_fields().next().is_some() {
+                            "->$$t"
+                        } else {
+                            ""
+                        };
                         emit!(
                             self.writer,
-                            "{}ContainsTable({}, $EncodeKey'{}'({}))",
+                            "{}ContainsTable({}{}, $EncodeKey'{}'({}))",
                             separator,
                             range_tmps.get(&var_name).unwrap(),
-                            boogie_type_suffix(self.env, &targs[0], num_oper == Bitwise),
+                            unwrap,
+                            // Clamp by the map type: its containment (including
+                            // the value type) decides whether bv key encodings
+                            // exist for it.
+                            boogie_type_suffix(
+                                self.env,
+                                &targs[0],
+                                bv_flag_for_type(self.env, &num_oper, &quant_ty)
+                            ),
                             var_name_str,
                         );
                     } else {
@@ -3697,18 +3938,46 @@ impl SpecTranslator<'_> {
         let ty_binding = self.get_node_type(args[0].node_id());
         let ty = ty_binding.skip_reference();
 
-        // For tuple types, use native Boogie equality since datatypes support structural equality
+        // For tuple types, use native Boogie equality since datatypes support
+        // structural equality — unless a component transitively carries a
+        // ghost field: raw datatype equality would compare the ghost
+        // constructor arguments, while Move equality ignores ghosts. In that
+        // case compare componentwise with `$IsEqual`, which is fieldwise over
+        // runtime state for ghost-bearing types.
         if let Type::Tuple(elems) = ty {
             if elems.len() >= 2 {
-                emit!(self.writer, "(");
-                self.translate_exp(&args[0]);
-                if boogie_val_fun.starts_with('!') {
-                    emit!(self.writer, " != ");
+                let has_ghost = elems
+                    .iter()
+                    .any(|e| crate::bytecode_translator::type_has_ghost_transitively(self.env, e));
+                let negated = boogie_val_fun.starts_with('!');
+                if !has_ghost {
+                    emit!(self.writer, "(");
+                    self.translate_exp(&args[0]);
+                    if negated {
+                        emit!(self.writer, " != ");
+                    } else {
+                        emit!(self.writer, " == ");
+                    }
+                    self.translate_exp(&args[1]);
+                    emit!(self.writer, ")");
                 } else {
-                    emit!(self.writer, " == ");
+                    if negated {
+                        emit!(self.writer, "!");
+                    }
+                    emit!(self.writer, "(");
+                    let mut sep = "";
+                    for (i, ety) in elems.iter().enumerate() {
+                        emit!(self.writer, sep);
+                        let suffix = boogie_type_suffix(self.env, ety, false);
+                        emit!(self.writer, "$IsEqual'{}'((", suffix);
+                        self.translate_exp(&args[0]);
+                        emit!(self.writer, ")->${}, (", i);
+                        self.translate_exp(&args[1]);
+                        emit!(self.writer, ")->${})", i);
+                        sep = " && ";
+                    }
+                    emit!(self.writer, ")");
                 }
-                self.translate_exp(&args[1]);
-                emit!(self.writer, ")");
                 return;
             }
         }
@@ -3718,10 +3987,27 @@ impl SpecTranslator<'_> {
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number operation state");
         let num_oper = global_state.get_node_num_oper(args[0].node_id());
-        // `Num` is a polymorphic spec-only integer type (e.g. quantifier range variables);
-        // it cannot be a bitvector regardless of the number operation classification.
-        let bv_flag = num_oper == Bitwise && !matches!(ty, Type::Primitive(PrimitiveType::Num));
+        // (`Num` never carries a bv rendering; `bv_flag_for_type` clamps it.)
+        let bv_flag = bv_flag_for_type(self.env, &num_oper, ty);
         let suffix = boogie_type_suffix(self.env, ty, bv_flag);
+        if ty.skip_reference().is_number() {
+            let op_base = if bv_flag {
+                boogie_num_type_base(
+                    self.env,
+                    Some(self.env.get_node_loc(args[0].node_id())),
+                    ty,
+                    false,
+                )
+            } else {
+                String::new()
+            };
+            emit!(self.writer, "{}'{}'(", boogie_val_fun, suffix);
+            self.translate_op_operand(&args[0], bv_flag, &op_base);
+            emit!(self.writer, ", ");
+            self.translate_op_operand(&args[1], bv_flag, &op_base);
+            emit!(self.writer, ")");
+            return;
+        }
         emit!(self.writer, "{}'{}'(", boogie_val_fun, suffix);
         self.translate_exp(&args[0]);
         emit!(self.writer, ", ");
@@ -3763,30 +4049,110 @@ impl SpecTranslator<'_> {
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number operation state");
         let num_oper = global_state.get_node_num_oper(args[0].node_id());
-        if num_oper == Bitwise {
+        let ty0 = self.get_node_type(args[0].node_id());
+        if bv_flag_for_type(self.env, &num_oper, &ty0) {
             let oper_base = boogie_num_type_base(
                 self.env,
                 Some(self.env.get_node_loc(args[0].node_id())),
-                &self.env.get_node_type(args[0].node_id()),
+                &ty0,
                 true,
             );
+            let conv_base = boogie_num_type_base(
+                self.env,
+                Some(self.env.get_node_loc(args[0].node_id())),
+                &ty0,
+                false,
+            );
             emit!(self.writer, "${}'{}'(", bv_op, oper_base);
-            self.translate_seq(args.iter(), ", ", |e| self.translate_exp(e));
+            self.translate_seq(args.iter(), ", ", |e| {
+                self.translate_op_operand(e, true, &conv_base)
+            });
             emit!(self.writer, ")");
-        } else if let Some(helper) = signed_helper.filter(|_| {
-            self.env
-                .get_node_type(args[0].node_id())
-                .skip_reference()
-                .is_signed_int()
-        }) {
+        } else if let Some(helper) = signed_helper.filter(|_| ty0.skip_reference().is_signed_int())
+        {
             emit!(self.writer, "{}(", helper);
-            self.translate_seq(args.iter(), ", ", |e| self.translate_exp(e));
+            self.translate_seq(args.iter(), ", ", |e| {
+                self.translate_op_operand(e, false, "")
+            });
             emit!(self.writer, ")");
         } else {
             emit!(self.writer, "(");
-            self.translate_exp(&args[0]);
+            self.translate_op_operand(&args[0], false, "");
             emit!(self.writer, " {} ", boogie_op);
-            self.translate_exp(&args[1]);
+            self.translate_op_operand(&args[1], false, "");
+            emit!(self.writer, ")");
+        }
+    }
+
+    /// Rendering flag for an operand expression, and the type that decided
+    /// it. For temporaries the per-function local declaration is
+    /// authoritative: shared spec-node classification (schema conditions
+    /// instantiated at many call sites) can disagree with the
+    /// procedure-local rendering, and the exp node type can be generalized
+    /// `num` where the local is concrete (and vice versa). Falls back to the
+    /// node classification and node type outside per-function translation.
+    fn operand_rendering(&self, e: &Exp) -> (bool, Type) {
+        if let ExpData::Temporary(_, idx) = e.as_ref() {
+            if let (Some(fun_qid), Some(baseline), Some(local_types)) = (
+                self.current_fun_qid.borrow().as_ref(),
+                *self.current_fun_baseline.borrow(),
+                self.current_fun_local_types.borrow().as_ref(),
+            ) {
+                if let Some(local_ty) = local_types.get(*idx) {
+                    let global_state = &self
+                        .env
+                        .get_extension::<GlobalNumberOperationState>()
+                        .expect("global number operation state");
+                    if let Some(num_oper) = global_state.get_temp_index_oper(
+                        fun_qid.module_id,
+                        fun_qid.id,
+                        *idx,
+                        baseline,
+                    ) {
+                        // Mirrors the procedure-local declaration:
+                        // `boogie_type(local_ty, bv_flag_for_type(..))`.
+                        let ty = local_ty.instantiate(&fun_qid.inst);
+                        let flag = bv_flag_for_type(self.env, num_oper, ty.skip_reference());
+                        return (flag, ty.skip_reference().clone());
+                    }
+                }
+            }
+        }
+        (
+            self.node_bv_flag(e.node_id()),
+            self.get_node_type(e.node_id()),
+        )
+    }
+
+    fn operand_bv_flag(&self, e: &Exp) -> bool {
+        self.operand_rendering(e).0
+    }
+
+    /// Translate one operand of a binary op, converting at the rendering
+    /// boundary when the operand's own rendering disagrees with the op's: a
+    /// widthless `num` operand renders as int while its (inlined) defining
+    /// expression can render as a bitvector of concrete width, and vice
+    /// versa. `op_base` is the op's numeric base, used for int-to-bv; the
+    /// bv-to-int width comes from the same type that decided the operand's
+    /// rendering (the node type can be generalized `num` where that type is
+    /// concrete).
+    fn translate_op_operand(&self, e: &Exp, op_is_bv: bool, op_base: &str) {
+        let (operand_is_bv, operand_ty) = self.operand_rendering(e);
+        if operand_is_bv == op_is_bv {
+            self.translate_exp(e);
+        } else if op_is_bv {
+            emit!(self.writer, "$int2bv.{}(", op_base);
+            self.translate_exp(e);
+            emit!(self.writer, ")");
+        } else {
+            let base = boogie_num_type_base(
+                self.env,
+                Some(self.env.get_node_loc(e.node_id())),
+                &operand_ty,
+                false,
+            );
+            emit!(self.writer, "$bv2int.{}(", base);
+            self.translate_exp(e);
             emit!(self.writer, ")");
         }
     }
@@ -3836,10 +4202,17 @@ impl SpecTranslator<'_> {
     }
 
     fn translate_rel_op(&self, boogie_op: &str, args: &[Exp]) {
+        // Infix operators need both sides in the same rendering; when they
+        // disagree the bv side converts to int (never the reverse: only the
+        // bv side has a concrete width by construction). Deriving `want_bv`
+        // from the operands' own renderings — not the node flags, which can
+        // disagree with procedure-local declarations — guarantees the
+        // int-to-bv branch (which would need a width) is unreachable here.
+        let want_bv = self.operand_bv_flag(&args[0]) && self.operand_bv_flag(&args[1]);
         emit!(self.writer, "(");
-        self.translate_exp(&args[0]);
+        self.translate_op_operand(&args[0], want_bv, "");
         emit!(self.writer, " {} ", boogie_op);
-        self.translate_exp(&args[1]);
+        self.translate_op_operand(&args[1], want_bv, "");
         emit!(self.writer, ")");
     }
 
@@ -3852,13 +4225,11 @@ impl SpecTranslator<'_> {
     }
 
     fn translate_arithmetic_unary_op(&self, boogie_op: &str, args: &[Exp]) {
-        let global_state = &self
-            .env
-            .get_extension::<GlobalNumberOperationState>()
-            .expect("global number operation state");
-        let num_oper_e = global_state.get_node_num_oper(args[0].node_id());
+        // Unary minus only applies to signed operands, whose bv rendering is
+        // clamped; a raw `Bitwise` classification here is an artifact of
+        // instantiation-shared number-operation slots.
         assert!(
-            num_oper_e != Bitwise,
+            !self.node_bv_flag(args[0].node_id()),
             "no bitwise unary arithmetic ops supported"
         );
         emit!(self.writer, "{}", boogie_op);
@@ -3882,19 +4253,18 @@ impl SpecTranslator<'_> {
                 global_state.get_node_num_oper(arg.node_id()),
             )
         };
-        let target_type = self.env.get_node_type(node_id).skip_reference().clone();
-        let source_type = self
-            .env
-            .get_node_type(arg.node_id())
-            .skip_reference()
-            .clone();
+        let target_type = self.get_node_type(node_id).skip_reference().clone();
+        let source_type = self.get_node_type(arg.node_id()).skip_reference().clone();
         let check_cast = |ty: &Type| ty.is_unsigned_int();
         // bv → int boundary: source produces a bitvector (bv-classified unsigned
-        // int) but target is non-bv (signed or `Num`). Wrap with
+        // int) but the cast renders as int (spec casts sever `Bitwise`
+        // propagation, so this includes unsigned targets). Wrap with
         // `$bv2int.N(...)`. We must NOT propagate `cast_oper` (Arithmetic) onto
         // the source first — a bv-classified literal arg would otherwise lose
         // its bv suffix in `translate_value` and feed an `int` into `$bv2int.N`.
-        if source_oper == Bitwise && source_type.is_unsigned_int() && !target_type.is_unsigned_int()
+        if source_oper == Bitwise
+            && source_type.is_unsigned_int()
+            && !bv_flag_for_type(self.env, &cast_oper, &target_type)
         {
             let source_base = boogie_num_type_base(
                 self.env,
@@ -3950,13 +4320,16 @@ impl SpecTranslator<'_> {
                 };
 
                 emit!(self.writer, "(if ($Gt'Bv{}'(", source_base);
-                self.translate_exp(&arg);
+                self.translate_op_operand(&arg, true, &source_base);
                 emit!(self.writer, ", {}bv{})) then ", max_val_target, source_base);
 
                 // Track and emit unique arbitrary function for this cast overflow
-                self.arbitrary_values
-                    .borrow_mut()
-                    .insert((node_id, target_type.clone(), true));
+                self.arbitrary_values.borrow_mut().insert((
+                    node_id,
+                    target_type.clone(),
+                    true,
+                    false,
+                ));
                 emit!(
                     self.writer,
                     "$Arbitrary_value_of'bv{}'_{}() else ",
@@ -3965,17 +4338,35 @@ impl SpecTranslator<'_> {
                 );
 
                 // Extract lower bits
-                self.translate_exp(&arg);
+                self.translate_op_operand(&arg, true, &source_base);
                 emit!(self.writer, "[{}:0])", target_bits);
             } else if source_bits == target_bits {
                 // Same size: just pass through
-                self.translate_exp(&arg);
+                self.translate_op_operand(&arg, true, &source_base);
             } else {
-                // Upcast: zero-extend
+                // Upcast: zero-extend. The source can render as int under the
+                // per-procedure temp rendering even when the shared spec node
+                // is bv-classified; coerce at the boundary.
                 let extend_bits = target_bits - source_bits;
                 emit!(self.writer, "0bv{} ++ ", extend_bits);
-                self.translate_exp(&arg);
+                self.translate_op_operand(&arg, true, &source_base);
             }
+        } else if bv_flag_for_type(self.env, &cast_oper, &target_type)
+            && !bv_flag_for_type(self.env, &source_oper, &source_type)
+        {
+            // Int-rendered source (e.g. a signed value whose bv classification
+            // is clamped) into a bv-classified target: mirror the int-domain
+            // pass-through and convert the result. The operand's own
+            // rendering decides (a schema binding can substitute a
+            // bitvector-rendered temporary under a `num` node, which needs
+            // no conversion).
+            let target_base = boogie_num_type_base(
+                self.env,
+                Some(self.env.get_node_loc(node_id)),
+                &target_type,
+                false,
+            );
+            self.translate_op_operand(&arg, true, &target_base);
         } else {
             self.translate_exp(&arg);
         }
@@ -3993,17 +4384,18 @@ impl SpecTranslator<'_> {
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number operation state");
         let num_oper = global_state.get_node_num_oper(args[0].node_id());
-        if num_oper == Bitwise {
+        let ty0 = self.get_node_type(args[0].node_id());
+        if bv_flag_for_type(self.env, &num_oper, &ty0) {
             let oper_left_base = boogie_num_type_base(
                 self.env,
                 Some(self.env.get_node_loc(args[0].node_id())),
-                &self.env.get_node_type(args[0].node_id()),
+                &ty0,
                 true,
             );
             let oper_right_base = boogie_num_type_base(
                 self.env,
                 Some(self.env.get_node_loc(args[1].node_id())),
-                &self.env.get_node_type(args[1].node_id()),
+                &self.get_node_type(args[1].node_id()),
                 false,
             );
             emit!(
@@ -4013,25 +4405,41 @@ impl SpecTranslator<'_> {
                 oper_left_base,
                 oper_right_base
             );
-        } else {
-            let ty = self.get_node_type(args[0].node_id());
-            if matches!(
-                ty,
-                Type::Primitive(PrimitiveType::I8)
-                    | Type::Primitive(PrimitiveType::I16)
-                    | Type::Primitive(PrimitiveType::I32)
-                    | Type::Primitive(PrimitiveType::I64)
-                    | Type::Primitive(PrimitiveType::I128)
-                    | Type::Primitive(PrimitiveType::I256)
-            ) {
-                self.error(
-                    &self.env.get_node_loc(args[0].node_id()),
-                    &format!("signed integer types not supported in operation {}", fun),
-                );
-            }
-            emit!(self.writer, "{}(", fun);
+            // Both parameters are bitvectors; marshal operands whose own
+            // rendering is int (mirrors `translate_primitive_call_shl`).
+            let left_conv_base = boogie_num_type_base(
+                self.env,
+                Some(self.env.get_node_loc(args[0].node_id())),
+                &ty0,
+                false,
+            );
+            self.translate_op_operand(&args[0], true, &left_conv_base);
+            emit!(self.writer, ", ");
+            self.translate_op_operand(&args[1], true, &oper_right_base);
+            emit!(self.writer, ")");
+            return;
         }
-        self.translate_seq(args.iter(), ", ", |e| self.translate_exp(e));
+        let ty = self.get_node_type(args[0].node_id());
+        if matches!(
+            ty,
+            Type::Primitive(PrimitiveType::I8)
+                | Type::Primitive(PrimitiveType::I16)
+                | Type::Primitive(PrimitiveType::I32)
+                | Type::Primitive(PrimitiveType::I64)
+                | Type::Primitive(PrimitiveType::I128)
+                | Type::Primitive(PrimitiveType::I256)
+        ) {
+            self.error(
+                &self.env.get_node_loc(args[0].node_id()),
+                &format!("signed integer types not supported in operation {}", fun),
+            );
+        }
+        emit!(self.writer, "{}(", fun);
+        // Marshal operands whose own rendering is bv (mirrors the int path
+        // of `translate_primitive_call_shl`).
+        self.translate_seq(args.iter(), ", ", |e| {
+            self.translate_op_operand(e, false, "")
+        });
         emit!(self.writer, ")");
     }
 
@@ -4041,17 +4449,18 @@ impl SpecTranslator<'_> {
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number operation state");
         let num_oper = global_state.get_node_num_oper(args[0].node_id());
-        if num_oper == Bitwise {
+        let ty0 = self.get_node_type(args[0].node_id());
+        if bv_flag_for_type(self.env, &num_oper, &ty0) {
             let oper_left_base = boogie_num_type_base(
                 self.env,
                 Some(self.env.get_node_loc(args[0].node_id())),
-                &self.env.get_node_type(args[0].node_id()),
+                &ty0,
                 true,
             );
             let oper_right_base = boogie_num_type_base(
                 self.env,
                 Some(self.env.get_node_loc(args[1].node_id())),
-                &self.env.get_node_type(args[1].node_id()),
+                &self.get_node_type(args[1].node_id()),
                 false,
             );
             emit!(
@@ -4061,7 +4470,19 @@ impl SpecTranslator<'_> {
                 oper_left_base,
                 oper_right_base
             );
-        } else {
+            let left_conv_base = boogie_num_type_base(
+                self.env,
+                Some(self.env.get_node_loc(args[0].node_id())),
+                &ty0,
+                false,
+            );
+            self.translate_op_operand(&args[0], true, &left_conv_base);
+            emit!(self.writer, ", ");
+            self.translate_op_operand(&args[1], true, &oper_right_base);
+            emit!(self.writer, ")");
+            return;
+        }
+        {
             let ty = self.get_node_type(args[0].node_id());
             let fun_num = match ty {
                 Type::Primitive(PrimitiveType::U8) => "U8",
@@ -4087,7 +4508,9 @@ impl SpecTranslator<'_> {
             };
             emit!(self.writer, "{}(", format!("{}{}", fun, fun_num).as_str());
         }
-        self.translate_seq(args.iter(), ", ", |e| self.translate_exp(e));
+        self.translate_seq(args.iter(), ", ", |e| {
+            self.translate_op_operand(e, false, "")
+        });
         emit!(self.writer, ")");
     }
 
@@ -4104,7 +4527,11 @@ impl SpecTranslator<'_> {
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number state");
         let ty = self.get_node_type(exp.node_id());
-        let bv_flag = global_state.get_node_num_oper(exp.node_id()) == Bitwise;
+        let bv_flag = bv_flag_for_type(
+            self.env,
+            &global_state.get_node_num_oper(exp.node_id()),
+            &ty,
+        );
         match exp.as_ref() {
             ExpData::Temporary(_, idx) => {
                 // For the special case of a temporary which can represent a

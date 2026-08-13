@@ -4,8 +4,9 @@
 //! Natives for the `secp256k1` module (`aptos_std::secp256k1`).
 
 use crate::{monomorphic_natives, NativeEntry};
-use mono_move_core::native::{
-    NativeContext, NativeContextFamily, NativeStatus, VMInternalError, Vector,
+use mono_move_core::{
+    native::{NativeContext, NativeContextFamily, NativeStatus, Vector},
+    VMResult,
 };
 
 /// Abort code on deserialization failure (0x01 == INVALID_ARGUMENT). Must match
@@ -20,7 +21,7 @@ const NFE_DESERIALIZE: u64 = 0x01_0001;
 /// Aborts with `NFE_DESERIALIZE` when an input cannot be deserialized.
 //
 // TODO(metering): charge gas.
-pub fn native_ecdsa_recover<C: NativeContext>(ctx: &C) -> Result<NativeStatus, VMInternalError> {
+pub fn native_ecdsa_recover<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     // SAFETY: arg 0 is `vector<u8>`.
     let message_vec: Vector<u8> = unsafe { ctx.arg(0)? };
     // SAFETY: arg 1 is `u8`.

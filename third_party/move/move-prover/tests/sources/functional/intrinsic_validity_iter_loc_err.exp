@@ -1,0 +1,18 @@
+Move prover returns: exiting with compilation errors
+error: the first parameter of a `map_spec_iter_valid` binding must be an iterator type declared in the same module as the map
+   ┌─ tests/sources/functional/intrinsic_validity_iter_loc_err.move:19:10
+   │
+19 │     spec native fun spec_iter_valid<K, V>(it: u64, t: Table<K, V>): bool;
+   │          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: undeclared `0x42::validity_iter_loc_other::ForeignPtr`
+   ┌─ tests/sources/functional/intrinsic_validity_iter_loc_err.move:37:47
+   │
+37 │     spec native fun spec_node_valid<K, V>(it: ForeignPtr, t: Table<K, V>): bool;
+   │                                               ^^^^^^^^^^
+
+error: the first parameter of a `map_spec_leaf_iter_valid` binding must be an iterator type declared in the same module as the map
+   ┌─ tests/sources/functional/intrinsic_validity_iter_loc_err.move:37:10
+   │
+37 │     spec native fun spec_node_valid<K, V>(it: ForeignPtr, t: Table<K, V>): bool;
+   │          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -10,23 +10,27 @@ use crate::{
     error::RuntimeError,
     global_storage::{EntryPtr, ResourceReadWriteSet},
     heap::{
-        alloc_or_gc, alloc_vec, deep_copy_or_gc, deserialize_or_gc, heap_alloc, is_heap_ptr, Heap,
-        TopFrame,
+        alloc_or_gc, alloc_vec, deep_copy_or_gc, deserialize_or_gc, heap_alloc, is_heap_ptr,
+        realloc_vec, Heap, TopFrame,
     },
-    memory::{read_ptr, write_enum_tag, write_u64},
+    memory::{
+        read_descriptor, read_obj_size, read_ptr, read_vec_len, write_enum_tag, write_ptr,
+        write_u64,
+    },
     types::{META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET},
 };
 use mono_move_core::{
     interner::InternedModuleId,
     native::{
-        Boxed, NativeABI, NativeContext, NativeContextFamily, NativeExtension, NativeExtensions,
-        NativeFunction, NativeRegistry, Opaque, Ref, RootPool, TableHandle, VMInternalError,
-        VMValue, Vector,
+        native_invariant_violation, Boxed, NativeABI, NativeContext, NativeContextFamily,
+        NativeExtension, NativeExtensions, NativeFunction, NativeRegistry, Opaque, Ref, RootPool,
+        TableHandle, VMValue, Vector,
     },
     storage::resource_provider::InMemoryStorageKey,
     types::InternedType,
-    DescriptorId, DescriptorProvider, Function, GasMeter, LayoutProvider, ResourceProvider,
-    ENUM_DATA_OFFSET, FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE, TRIVIAL_DESCRIPTOR_ID,
+    DescriptorId, DescriptorProvider, ExecutionErrorKind, Function, GasMeter, LayoutProvider,
+    ResourceProvider, VMResult, ENUM_DATA_OFFSET, FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE,
+    TRIVIAL_DESCRIPTOR_ID,
 };
 use move_core_types::account_address::AccountAddress;
 use std::{
@@ -126,22 +130,22 @@ impl NativeContext for ProductionNativeContext<'_> {
         self.abi.args().len()
     }
 
-    unsafe fn arg<'a, T: VMValue<'a>>(&'a self, i: usize) -> Result<T, VMInternalError> {
+    unsafe fn arg<'a, T: VMValue<'a>>(&'a self, i: usize) -> VMResult<T> {
         if self.returns_started.get() {
-            return Err(VMInternalError::invariant_violation(format!(
+            return Err(native_invariant_violation(format!(
                 "arg({}) called after a return value was written",
                 i,
             )));
         }
         let slot = self.abi.args().get(i).copied().ok_or_else(|| {
-            VMInternalError::invariant_violation(format!(
+            native_invariant_violation(format!(
                 "arg index {} out of bounds (num_args={})",
                 i,
                 self.abi.args().len(),
             ))
         })?;
         if T::FRAME_SLOT_SIZE as u32 != slot.size {
-            return Err(VMInternalError::invariant_violation(format!(
+            return Err(native_invariant_violation(format!(
                 "VMValue size mismatch: ABI says {} bytes for arg {}, T::FRAME_SLOT_SIZE is {}",
                 slot.size,
                 i,
@@ -160,13 +164,13 @@ impl NativeContext for ProductionNativeContext<'_> {
         self.abi.returns().len()
     }
 
-    fn return_size(&self, i: usize) -> Result<usize, VMInternalError> {
+    fn return_size(&self, i: usize) -> VMResult<usize> {
         self.abi
             .returns()
             .get(i)
             .map(|slot| slot.size as usize)
             .ok_or_else(|| {
-                VMInternalError::invariant_violation(format!(
+                native_invariant_violation(format!(
                     "return index {} out of bounds (num_returns={})",
                     i,
                     self.abi.returns().len(),
@@ -174,20 +178,16 @@ impl NativeContext for ProductionNativeContext<'_> {
             })
     }
 
-    unsafe fn set_return<'a, T: VMValue<'a>>(
-        &'a self,
-        i: usize,
-        value: T,
-    ) -> Result<(), VMInternalError> {
+    unsafe fn set_return<'a, T: VMValue<'a>>(&'a self, i: usize, value: T) -> VMResult<()> {
         let slot = self.abi.returns().get(i).copied().ok_or_else(|| {
-            VMInternalError::invariant_violation(format!(
+            native_invariant_violation(format!(
                 "return index {} out of bounds (num_returns={})",
                 i,
                 self.abi.returns().len(),
             ))
         })?;
         if T::FRAME_SLOT_SIZE as u32 != slot.size {
-            return Err(VMInternalError::invariant_violation(format!(
+            return Err(native_invariant_violation(format!(
                 "VMValue size mismatch: ABI says {} bytes for return {}, T::FRAME_SLOT_SIZE is {}",
                 slot.size,
                 i,
@@ -201,16 +201,16 @@ impl NativeContext for ProductionNativeContext<'_> {
         Ok(())
     }
 
-    unsafe fn set_return_raw(&self, i: usize, bytes: &[u8]) -> Result<(), VMInternalError> {
+    unsafe fn set_return_raw(&self, i: usize, bytes: &[u8]) -> VMResult<()> {
         let slot = self.abi.returns().get(i).copied().ok_or_else(|| {
-            VMInternalError::invariant_violation(format!(
+            native_invariant_violation(format!(
                 "return index {} out of bounds (num_returns={})",
                 i,
                 self.abi.returns().len(),
             ))
         })?;
         if bytes.len() != slot.size as usize {
-            return Err(VMInternalError::invariant_violation(format!(
+            return Err(native_invariant_violation(format!(
                 "set_return_raw: return slot {} is {} bytes but got {}",
                 i,
                 slot.size,
@@ -240,9 +240,9 @@ impl NativeContext for ProductionNativeContext<'_> {
         self.ty_args.len()
     }
 
-    fn ty_arg(&self, i: usize) -> Result<InternedType, VMInternalError> {
+    fn ty_arg(&self, i: usize) -> VMResult<InternedType> {
         self.ty_args.get(i).copied().ok_or_else(|| {
-            VMInternalError::invariant_violation(format!(
+            native_invariant_violation(format!(
                 "ty_arg index {} out of bounds (num_ty_args={})",
                 i,
                 self.ty_args.len(),
@@ -250,23 +250,23 @@ impl NativeContext for ProductionNativeContext<'_> {
         })
     }
 
-    fn value_size(&self, ty: InternedType) -> Result<u32, VMInternalError> {
+    fn value_size(&self, ty: InternedType) -> VMResult<u32> {
         self.layouts
             .size_and_align(ty)
             .map(|(size, _)| size)
             .ok_or_else(|| {
-                VMInternalError::invariant_violation("value_size: type has no known layout".into())
+                native_invariant_violation("value_size: type has no known layout".into())
             })
     }
 
-    fn arg_raw(&self, i: usize) -> Result<Vec<u8>, VMInternalError> {
+    fn arg_raw(&self, i: usize) -> VMResult<Vec<u8>> {
         if self.returns_started.get() {
-            return Err(VMInternalError::invariant_violation(format!(
+            return Err(native_invariant_violation(format!(
                 "arg_raw({i}) called after a return value was written",
             )));
         }
         let slot = self.abi.args().get(i).copied().ok_or_else(|| {
-            VMInternalError::invariant_violation(format!(
+            native_invariant_violation(format!(
                 "arg index {} out of bounds (num_args={})",
                 i,
                 self.abi.args().len(),
@@ -280,9 +280,9 @@ impl NativeContext for ProductionNativeContext<'_> {
         Ok(bytes.to_vec())
     }
 
-    fn arg_ptr_offsets(&self, i: usize) -> Result<Vec<u32>, VMInternalError> {
+    fn arg_ptr_offsets(&self, i: usize) -> VMResult<Vec<u32>> {
         let slot = self.abi.args().get(i).copied().ok_or_else(|| {
-            VMInternalError::invariant_violation(format!(
+            native_invariant_violation(format!(
                 "arg index {} out of bounds (num_args={})",
                 i,
                 self.abi.args().len(),
@@ -318,14 +318,23 @@ impl NativeContext for ProductionNativeContext<'_> {
         }
     }
 
-    fn new_byte_vector<'a>(&'a self, bytes: &[u8]) -> Result<Vector<'a, u8>, VMInternalError> {
+    fn new_vector_no_pointers<'a>(
+        &'a self,
+        elem_size: u32,
+        count: u64,
+        data: &[u8],
+    ) -> VMResult<Vector<'a, Opaque>> {
         if self.returns_started.get() {
-            return Err(VMInternalError::invariant_violation(
-                "new_byte_vector called after a return value was written".into(),
+            return Err(native_invariant_violation(
+                "new_vector_no_pointers called after a return value was written".into(),
             ));
         }
-        let len = bytes.len() as u64;
-        if len == 0 {
+        if (count as usize).checked_mul(elem_size as usize) != Some(data.len()) {
+            return Err(native_invariant_violation(
+                "new_vector_no_pointers: data length must equal count * elem_size".into(),
+            ));
+        }
+        if count == 0 {
             // TODO(correctness): audit empty <=> null vector invariant
             // SAFETY: passing `null` is always safe.
             let handle = unsafe { self.pool.root_object(std::ptr::null_mut()) };
@@ -337,14 +346,14 @@ impl NativeContext for ProductionNativeContext<'_> {
         // live (see the type-level aliasing rule).
         let heap = unsafe { &mut **self.heap.get() };
         let rws = unsafe { &mut **self.rws.get() };
-        // A heap-aliasing `bytes` would be invalidated by the GC `alloc_vec` may
+        // A heap-aliasing `data` would be invalidated by the GC `alloc_vec` may
         // trigger, before the copy below.
-        if is_heap_ptr(heap, bytes.as_ptr()) {
-            return Err(VMInternalError::invariant_violation(
-                "new_byte_vector: bytes must not alias the VM heap".into(),
+        if is_heap_ptr(heap, data.as_ptr()) {
+            return Err(native_invariant_violation(
+                "new_vector_no_pointers: data must not alias the VM heap".into(),
             ));
         }
-        // A `vector<u8>` has no inner pointers, so it uses the trivial descriptor.
+        // Pointer-free elements, so the vector uses the trivial descriptor.
         let ptr = alloc_vec(
             heap,
             self.desc_provider,
@@ -354,47 +363,150 @@ impl NativeContext for ProductionNativeContext<'_> {
             self.frame_ptr,
             TopFrame::Native(self.abi),
             TRIVIAL_DESCRIPTOR_ID,
-            1,
-            len,
-        )
-        .map_err(VMInternalError::from)?;
-        // SAFETY: `ptr` is a fresh vector with room for `len` bytes; no GC runs
-        // between here and these writes, so the raw pointer is valid.
+            elem_size,
+            count,
+        )?;
+        // SAFETY: `ptr` is a fresh vector with room for `count` elements; no GC
+        // runs between here and these writes, so the raw pointer is valid.
         unsafe {
-            write_u64(ptr, VEC_LENGTH_OFFSET, len);
-            std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr.add(VEC_DATA_OFFSET), bytes.len());
+            write_u64(ptr, VEC_LENGTH_OFFSET, count);
+            std::ptr::copy_nonoverlapping(data.as_ptr(), ptr.add(VEC_DATA_OFFSET), data.len());
         }
         // Root it so it survives later allocations and is GC-relocated.
         // SAFETY: `ptr` is the data pointer of the freshly allocated vector.
         Ok(Vector::from_handle(unsafe { self.pool.root_object(ptr) }))
     }
 
-    unsafe fn bcs_serialize_value(
+    unsafe fn vector_move_range(
         &self,
-        base: *const u8,
-        ty: InternedType,
-    ) -> Result<Vec<u8>, VMInternalError> {
+        from: &Ref<'_, Opaque>,
+        removal_position: u64,
+        length: u64,
+        to: &Ref<'_, Opaque>,
+        insert_position: u64,
+        elem_ty: InternedType,
+    ) -> VMResult<bool> {
+        let elem_size = self.value_size(elem_ty)? as usize;
+
+        // Vector pointers behind the rooted references (null when empty); re-read
+        // after the grow, the only point a GC can relocate them.
+        // SAFETY: the references hold `vector<elem_ty>` pointers.
+        let mut from_ptr = unsafe { read_ptr(from.ptr(), 0usize) };
+        let mut to_ptr = unsafe { read_ptr(to.ptr(), 0usize) };
+
+        // Reject aliasing before any other work -- a defensive measure against
+        // bytecode verifier bugs. The null guard is required to avoid a false positive
+        // on two empty (null) vectors.
+        if !from_ptr.is_null() && from_ptr == to_ptr {
+            return Err(native_invariant_violation(
+                "vector_move_range: `from` and `to` alias the same vector".into(),
+            ));
+        }
+
+        // Check the removal range and insert position are in bounds. Phrased with
+        // subtraction rather than `removal_position + length` to avoid overflow on
+        // the user-supplied u64s; short-circuiting keeps `from_len - removal_position`
+        // from underflowing.
+        let from_len = unsafe { read_vec_len(from_ptr) };
+        let to_len = unsafe { read_vec_len(to_ptr) };
+
+        if removal_position > from_len
+            || length > from_len - removal_position
+            || insert_position > to_len
+        {
+            return Ok(false);
+        }
+        if length == 0 {
+            return Ok(true);
+        }
+
+        // Grow the `to` vector when it can't hold the inserted elements.
+        let required = to_len + length;
+        let to_cap = if to_ptr.is_null() {
+            0
+        } else {
+            // SAFETY: `to_ptr` is a live vector object.
+            let total = unsafe { read_obj_size(to_ptr) } as usize;
+            ((total - OBJECT_HEADER_SIZE - VEC_DATA_OFFSET) / elem_size) as u64
+        };
+        if required > to_cap {
+            // SAFETY: distinct fields, reborrowed exclusively (the aliasing rule).
+            let heap = unsafe { &mut **self.heap.get() };
+            let rws = unsafe { &mut **self.rws.get() };
+
+            // `to` may be null (an unallocated empty vector), so take the shared
+            // `vector<T>` descriptor from `from`, which is non-null here: length > 0
+            // and the bounds check force `from_len >= length >= 1`.
+            // SAFETY: `from_ptr` is a live `vector<elem_ty>`; `to_ptr` is null or live.
+            let new_ptr = unsafe {
+                realloc_vec(
+                    heap,
+                    self.desc_provider,
+                    rws,
+                    &self.pool,
+                    self.extensions,
+                    self.frame_ptr,
+                    TopFrame::Native(self.abi),
+                    to_ptr,
+                    DescriptorId(read_descriptor(from_ptr)),
+                    elem_size as u32,
+                    required,
+                )
+            }?;
+            // Write the grown `to` back and re-read `from`, both current after the GC.
+            // SAFETY: the rooted references yield live pointers.
+            unsafe {
+                write_ptr(to.ptr(), 0usize, new_ptr);
+                from_ptr = read_ptr(from.ptr(), 0usize);
+            }
+            to_ptr = new_ptr;
+        }
+
+        let rp = removal_position as usize;
+        let ip = insert_position as usize;
+        let len = length as usize;
+        // Open a gap in `to`, copy the range in (distinct vectors, non-overlapping),
+        // then close the gap in `from`.
+        // SAFETY: bounds check and grow keep every range in-allocation; no
+        // allocation runs past this point.
+        unsafe {
+            let from_data = from_ptr.add(VEC_DATA_OFFSET);
+            let to_data = to_ptr.add(VEC_DATA_OFFSET);
+            std::ptr::copy(
+                to_data.add(ip * elem_size),
+                to_data.add((ip + len) * elem_size),
+                (to_len as usize - ip) * elem_size,
+            );
+            std::ptr::copy_nonoverlapping(
+                from_data.add(rp * elem_size),
+                to_data.add(ip * elem_size),
+                len * elem_size,
+            );
+            std::ptr::copy(
+                from_data.add((rp + len) * elem_size),
+                from_data.add(rp * elem_size),
+                (from_len as usize - rp - len) * elem_size,
+            );
+            write_u64(from_ptr, VEC_LENGTH_OFFSET, from_len - length);
+            write_u64(to_ptr, VEC_LENGTH_OFFSET, to_len + length);
+        }
+        Ok(true)
+    }
+
+    unsafe fn bcs_serialize_value(&self, base: *const u8, ty: InternedType) -> VMResult<Vec<u8>> {
         // SAFETY: forwarded from this method's contract; serialization performs
         // no VM-heap allocation, so `base` stays valid throughout.
-        unsafe { crate::value_utils::serialize(self.layouts, base, ty) }.map_err(Into::into)
+        unsafe { crate::value_utils::serialize(self.layouts, base, ty) }
     }
 
-    unsafe fn bcs_serialized_size(
-        &self,
-        base: *const u8,
-        ty: InternedType,
-    ) -> Result<usize, VMInternalError> {
+    unsafe fn bcs_serialized_size(&self, base: *const u8, ty: InternedType) -> VMResult<usize> {
         // SAFETY: forwarded from this method's contract.
-        unsafe { crate::value_utils::serialized_size(self.layouts, base, ty) }.map_err(Into::into)
+        unsafe { crate::value_utils::serialized_size(self.layouts, base, ty) }
     }
 
-    fn bcs_deserialize_value(
-        &self,
-        ty: InternedType,
-        bytes: &[u8],
-    ) -> Result<Vec<u8>, VMInternalError> {
+    fn bcs_deserialize_value(&self, ty: InternedType, bytes: &[u8]) -> VMResult<Option<Vec<u8>>> {
         let layout = self.layouts.layout_by_ty(ty).ok_or_else(|| {
-            VMInternalError::invariant_violation("bcs deserialize: no layout for type".into())
+            native_invariant_violation("bcs deserialize: no layout for type".into())
         })?;
         let mut out = vec![0u8; layout.size as usize];
         // SAFETY: heap and rws are distinct fields (see the type-level aliasing
@@ -404,7 +516,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         // `bytes` is off-heap (the native copied it), so it survives the GC the
         // retry may run.
         // SAFETY: `out` is `layout.size` writable bytes.
-        unsafe {
+        let result = unsafe {
             deserialize_or_gc(
                 self.layouts,
                 heap,
@@ -418,26 +530,28 @@ impl NativeContext for ProductionNativeContext<'_> {
                 self.frame_ptr,
                 TopFrame::Native(self.abi),
             )
+        };
+        match result {
+            Ok(()) => Ok(Some(out)),
+            // Malformed input: the bytes are not a valid encoding of `ty`. Heap
+            // exhaustion and missing layouts carry other kinds and still propagate.
+            Err(e) if e.kind() == ExecutionErrorKind::InvalidOperation => Ok(None),
+            Err(e) => Err(e),
         }
-        .map_err(Into::into)
-        .map(|()| out)
     }
 
-    fn resource_exists(
-        &self,
-        address: AccountAddress,
-        ty: InternedType,
-    ) -> Result<bool, VMInternalError> {
+    fn resource_exists(&self, address: AccountAddress, ty: InternedType) -> VMResult<bool> {
         // SAFETY: `rws` is reborrowed exclusively here; no other borrow is live.
         let rws = unsafe { &mut **self.rws.get() };
         let key = InMemoryStorageKey::resource(address, ty);
         Ok(rws.exists(self.resource_provider, &key)?)
     }
 
-    fn bcs_serialize_arg(&self, i: usize, ty: InternedType) -> Result<Vec<u8>, VMInternalError> {
-        let slot = self.abi.args().get(i).copied().ok_or_else(|| {
-            VMInternalError::invariant_violation(format!("arg index {i} out of bounds"))
-        })?;
+    fn bcs_serialize_arg(&self, i: usize, ty: InternedType) -> VMResult<Vec<u8>> {
+        let slot =
+            self.abi.args().get(i).copied().ok_or_else(|| {
+                native_invariant_violation(format!("arg index {i} out of bounds"))
+            })?;
         // SAFETY: the ABI keeps arg `i` within the frame, holding a value of type
         // `ty` that stays live for the call.
         let base = unsafe { self.frame_ptr.add(slot.offset as usize) };
@@ -448,20 +562,14 @@ impl NativeContext for ProductionNativeContext<'_> {
         self.abi.required_descriptor(i)
     }
 
-    fn constant_serialized_size(&self, ty: InternedType) -> Result<Option<u64>, VMInternalError> {
-        let size = crate::value_utils::fixed_serialized_size(self.layouts, ty)
-            .map_err(VMInternalError::from)?;
+    fn constant_serialized_size(&self, ty: InternedType) -> VMResult<Option<u64>> {
+        let size = crate::value_utils::fixed_serialized_size(self.layouts, ty)?;
         Ok(size.map(|n| n as u64))
     }
 
-    unsafe fn compare(
-        &self,
-        a: *const u8,
-        b: *const u8,
-        ty: InternedType,
-    ) -> Result<Ordering, VMInternalError> {
+    unsafe fn compare(&self, a: *const u8, b: *const u8, ty: InternedType) -> VMResult<Ordering> {
         // SAFETY: forwarded from this method's contract.
-        unsafe { crate::value_utils::compare(self.layouts, a, b, ty) }.map_err(Into::into)
+        unsafe { crate::value_utils::compare(self.layouts, a, b, ty) }
     }
 
     unsafe fn new_enum<'a, V: VMValue<'a>>(
@@ -469,7 +577,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         descriptor: DescriptorId,
         tag: u64,
         value: V,
-    ) -> Result<Boxed<'a, Opaque>, VMInternalError> {
+    ) -> VMResult<Boxed<'a, Opaque>> {
         let payload = ENUM_DATA_OFFSET + V::FRAME_SLOT_SIZE;
         // SAFETY: heap and rws are distinct fields (see the aliasing rule).
         let heap = unsafe { &mut **self.heap.get() };
@@ -483,8 +591,7 @@ impl NativeContext for ProductionNativeContext<'_> {
             self.frame_ptr,
             TopFrame::Native(self.abi),
             |h| heap_alloc(h, OBJECT_HEADER_SIZE + payload, descriptor),
-        )
-        .map_err(VMInternalError::from)?;
+        )?;
         // SAFETY: `obj` has `payload` bytes; no GC runs before these writes.
         unsafe {
             write_enum_tag(obj, tag);
@@ -499,7 +606,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         handle: &TableHandle,
         key: &[u8],
         value_ty: InternedType,
-    ) -> Result<bool, VMInternalError> {
+    ) -> VMResult<bool> {
         // SAFETY: `rws` is reborrowed exclusively here.
         let rws = unsafe { &mut **self.rws.get() };
         let storage_key = InMemoryStorageKey::table_item(*handle, key.into(), value_ty);
@@ -512,7 +619,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         key: &[u8],
         mutable: bool,
         value_ty: InternedType,
-    ) -> Result<Option<Ref<'_, Opaque>>, VMInternalError> {
+    ) -> VMResult<Option<Ref<'_, Opaque>>> {
         let storage_key = InMemoryStorageKey::table_item(*handle, key.into(), value_ty);
         // SAFETY: heap and rws are distinct fields (see the aliasing rule).
         let rws = unsafe { &mut **self.rws.get() };
@@ -535,8 +642,7 @@ impl NativeContext for ProductionNativeContext<'_> {
                             TopFrame::Native(self.abi),
                             ptr,
                         )
-                    }
-                    .map_err(VMInternalError::from)?;
+                    }?;
                     rws.commit_borrow_global_mut(&storage_key, copied);
                     copied
                 },
@@ -562,16 +668,14 @@ impl NativeContext for ProductionNativeContext<'_> {
         &'a self,
         value_arg: usize,
         descriptor: DescriptorId,
-    ) -> Result<Boxed<'a, Opaque>, VMInternalError> {
+    ) -> VMResult<Boxed<'a, Opaque>> {
         if self.returns_started.get() {
-            return Err(VMInternalError::invariant_violation(format!(
+            return Err(native_invariant_violation(format!(
                 "box_arg({value_arg}) called after a return value was written"
             )));
         }
         let slot = self.abi.args().get(value_arg).copied().ok_or_else(|| {
-            VMInternalError::invariant_violation(format!(
-                "box_arg: arg index {value_arg} out of bounds"
-            ))
+            native_invariant_violation(format!("box_arg: arg index {value_arg} out of bounds"))
         })?;
         let size = slot.size as usize;
         // SAFETY: heap and rws are distinct fields (see the aliasing rule).
@@ -589,8 +693,7 @@ impl NativeContext for ProductionNativeContext<'_> {
             self.frame_ptr,
             TopFrame::Native(self.abi),
             |h| heap_alloc(h, OBJECT_HEADER_SIZE + size, descriptor),
-        )
-        .map_err(VMInternalError::from)?;
+        )?;
         // SAFETY: the arg slot lies within the frame and `obj` has `size` payload
         // bytes; no GC runs between the allocation and this copy.
         unsafe {
@@ -608,11 +711,10 @@ impl NativeContext for ProductionNativeContext<'_> {
         key: &[u8],
         value: Boxed<'_, Opaque>,
         value_ty: InternedType,
-    ) -> Result<bool, VMInternalError> {
+    ) -> VMResult<bool> {
         let storage_key = InMemoryStorageKey::table_item(*handle, key.into(), value_ty);
-        let obj = NonNull::new(value.ptr()).ok_or_else(|| {
-            VMInternalError::invariant_violation("table_add: null boxed value".into())
-        })?;
+        let obj = NonNull::new(value.ptr())
+            .ok_or_else(|| native_invariant_violation("table_add: null boxed value".into()))?;
         // SAFETY: `rws` is reborrowed exclusively here.
         let rws = unsafe { &mut **self.rws.get() };
         match rws.move_to(self.resource_provider, &storage_key, obj) {
@@ -627,7 +729,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         handle: &TableHandle,
         key: &[u8],
         value_ty: InternedType,
-    ) -> Result<Option<Boxed<'_, Opaque>>, VMInternalError> {
+    ) -> VMResult<Option<Boxed<'_, Opaque>>> {
         let storage_key = InMemoryStorageKey::table_item(*handle, key.into(), value_ty);
         // SAFETY: heap and rws are distinct fields (see the aliasing rule).
         let rws = unsafe { &mut **self.rws.get() };
@@ -649,8 +751,7 @@ impl NativeContext for ProductionNativeContext<'_> {
                         TopFrame::Native(self.abi),
                         ptr,
                     )
-                }
-                .map_err(VMInternalError::from)?;
+                }?;
                 rws.commit_move_from(&storage_key);
                 copied
             },
@@ -664,7 +765,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         })))
     }
 
-    fn get_extension<T: NativeExtension>(&self) -> Result<RefMut<'_, T>, VMInternalError> {
+    fn get_extension<T: NativeExtension>(&self) -> VMResult<RefMut<'_, T>> {
         self.extensions.get_mut::<T>()
     }
 }

@@ -304,7 +304,9 @@ impl StructIdentifier {
     }
 }
 
-#[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
+// CAUTION: Do not derive/implement `Ord`/`PartialOrd` because `StructNameIndex`
+// is not guaranteed to be deterministic.
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub enum Type {
     Bool,
     U8,

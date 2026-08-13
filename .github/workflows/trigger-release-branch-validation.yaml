@@ -2,6 +2,8 @@ name: Trigger Validation Tests on Release Branch Cut
 
 on:
   create:
+permissions:
+  contents: read
 
 jobs:
   check-branch-prefix:
@@ -11,8 +13,10 @@ jobs:
     steps:
       - name: Check if the branch starts with 'aptos-release'
         id: check-prefix
+        env:
+          GIT_REF: ${{ github.ref }}
         run: |
-          if [[ "${{ github.ref }}" == refs/heads/aptos-release-* ]]; then
+          if [[ "$GIT_REF" == refs/heads/aptos-release-* ]]; then
             echo "branch_matches=true" >> $GITHUB_OUTPUT
           else
             echo "branch_matches=false" >> $GITHUB_OUTPUT
@@ -22,6 +26,8 @@ jobs:
     needs: check-branch-prefix
     if: needs.check-branch-prefix.outputs.branch_matches == 'true'
     runs-on: 2cpu-gh-ubuntu24-x64
+    permissions:
+      actions: write
     steps:
       - name: Trigger Forge Stable Workflow'
         uses: actions/github-script@v7

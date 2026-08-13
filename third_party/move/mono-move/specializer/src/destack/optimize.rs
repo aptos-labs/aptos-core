@@ -10,14 +10,15 @@
 
 use crate::stackless_exec_ir::{
     instr_utils::{
-        for_each_def, for_each_slot, for_each_use, remap_all_slots_with, remap_source_slots_with,
+        for_each_def, for_each_slot, for_each_use, mut_local_borrow_target, remap_all_slots_with,
+        remap_source_slots_with,
     },
-    FunctionIR, Instr, ModuleIR, Slot,
+    FunctionIR, HomeIndex, Instr, ModuleIR, NamedSlot,
 };
 use shared_dsa::{UnorderedMap, UnorderedSet};
 
 /// Optimize all functions in a module IR.
-/// Pre: slot allocation complete — no `Vid`s remain.
+/// Operates on the slot-allocated (named-slot) IR.
 pub fn optimize_module(module_ir: &mut ModuleIR) {
     for func in module_ir.functions.iter_mut().flatten() {
         eliminate_identity_moves(func);
@@ -30,7 +31,7 @@ pub fn optimize_module(module_ir: &mut ModuleIR) {
 
 /// Pass: Forward copy propagation within each basic block.
 ///
-/// Pre: allocated instruction stream (real slots).
+/// Pre: allocated instruction stream (named slots).
 /// Post: Copy/Move sources propagated to downstream uses; no instructions removed.
 ///
 /// # Correctness
@@ -54,11 +55,11 @@ pub fn optimize_module(module_ir: &mut ModuleIR) {
 /// reference (via `WriteRef`, function calls, etc.) without appearing as a
 /// def in `get_defs_uses`. So we kill subst entries for the borrowed slot
 /// at `MutBorrowLoc` — conservatively assuming hidden writes may follow.
-/// `MutBorrowLocField` and `WriteLocalField` have the same hazard.
+/// `MutBorrowLocField` and `WriteLocField` have the same hazard.
 ///
 /// `ImmBorrowLoc` does NOT need this kill — the verifier guarantees the
 /// borrowed slot cannot be modified while immutably borrowed. The same
-/// holds for `ImmBorrowLocField` and `ReadLocalField`.
+/// holds for `ImmBorrowLocField` and `ReadLocField`.
 ///
 /// ## Why cross-block mutable borrows are safe
 ///
@@ -70,20 +71,25 @@ fn copy_propagation(func: &mut FunctionIR) {
         // TODO(perf): `retain` scans all entries to kill by value, making each kill O(|subst|).
         // For typical small blocks this is fine, but if subst grows large, consider a
         // reverse index (value → keys) for O(1) value-based kills.
-        let mut subst: UnorderedMap<Slot, Slot> = UnorderedMap::new();
+        let mut subst: UnorderedMap<NamedSlot, NamedSlot> = UnorderedMap::new();
 
         for instr in &mut block.instrs {
             remap_source_slots_with(instr, |s| *subst.get(&s).unwrap_or(&s));
 
-            // Kill subst for locals whose storage may be mutated without
-            // a full def: mut borrows (writes go through the ref) and
-            // `WriteLocalField` (partial write).
-            if let Instr::MutBorrowLoc(_, src)
-            | Instr::MutBorrowLocField(_, _, _, src)
-            | Instr::WriteLocalField(_, _, src, _) = instr
-            {
-                subst.remove(src);
-                subst.retain(|_, v| v != src);
+            // Kill subst for locals whose storage may be mutated without a
+            // full def: mut borrows (writes go through the ref) and
+            // `WriteLocField` (partial write). `WriteLocFieldChain`
+            // reports its root local as a def, so it is covered by the
+            // `for_each_def` kill below; the ref-rooted `WriteFieldChain`
+            // writes through a reference whose originating mut borrow was
+            // already killed here.
+            let mut hidden_write = mut_local_borrow_target(instr);
+            if let Instr::WriteLocField { local, .. } = instr {
+                hidden_write = Some(*local);
+            }
+            if let Some(src) = hidden_write {
+                subst.remove(&src);
+                subst.retain(|_, v| *v != src);
             }
 
             for_each_def(instr, |d| {
@@ -92,10 +98,10 @@ fn copy_propagation(func: &mut FunctionIR) {
             });
 
             match instr {
-                Instr::Copy(dst, src) | Instr::Move(dst, src) => {
-                    // Xfer slot values don't survive a call boundary,
+                Instr::Copy { dst, src } | Instr::Move { dst, src } => {
+                    // Transfer slot values don't survive a call boundary,
                     // so don't copy propagate from them.
-                    if !matches!(src, Slot::Xfer(_)) {
+                    if !matches!(src, NamedSlot::Transfer(_)) {
                         subst.insert(*dst, *src);
                     }
                 },
@@ -105,12 +111,14 @@ fn copy_propagation(func: &mut FunctionIR) {
     }
 }
 
-/// Pass: Remove `Move(r, r)` and `Copy(r, r)` instructions.
+/// Pass: Remove `Move` and `Copy` instructions whose `dst == src`.
 fn eliminate_identity_moves(func: &mut FunctionIR) {
     for block in &mut func.blocks {
         block
             .instrs
-            .retain(|instr| !matches!(instr, Instr::Move(d, s) | Instr::Copy(d, s) if d == s));
+            .retain(|instr| {
+                !matches!(instr, Instr::Move { dst, src } | Instr::Copy { dst, src } if dst == src)
+            });
     }
 }
 
@@ -123,9 +131,9 @@ fn eliminate_identity_moves(func: &mut FunctionIR) {
 /// removal — their liveness cannot be determined by block-local analysis.
 fn dead_instruction_elimination(func: &mut FunctionIR) {
     // Pre-scan: identify Home slots that appear in more than one block.
-    // (Vid and Xfer slots are intra-block and never cross block boundaries.)
-    let mut slot_block: UnorderedMap<Slot, usize> = UnorderedMap::new();
-    let mut cross_block_slots: UnorderedSet<Slot> = UnorderedSet::new();
+    // (Transfer slots are intra-block and never cross block boundaries.)
+    let mut slot_block: UnorderedMap<NamedSlot, usize> = UnorderedMap::new();
+    let mut cross_block_slots: UnorderedSet<NamedSlot> = UnorderedSet::new();
     for (block_id, block) in func.blocks.iter().enumerate() {
         for instr in &block.instrs {
             for_each_slot(instr, |r| match slot_block.get(&r) {
@@ -141,12 +149,14 @@ fn dead_instruction_elimination(func: &mut FunctionIR) {
     }
 
     for block in &mut func.blocks {
-        let mut live: UnorderedSet<Slot> = UnorderedSet::new();
+        let mut live: UnorderedSet<NamedSlot> = UnorderedSet::new();
         let mut dead_indices: UnorderedSet<usize> = UnorderedSet::new();
 
         for (i, instr) in block.instrs.iter().enumerate().rev() {
             let is_removable = match instr {
-                Instr::Copy(dst, _) | Instr::Move(dst, _) if !cross_block_slots.contains(dst) => {
+                Instr::Copy { dst, .. } | Instr::Move { dst, .. }
+                    if !cross_block_slots.contains(dst) =>
+                {
                     !live.contains(dst)
                 },
                 _ => false,
@@ -192,8 +202,8 @@ fn renumber_slots(func: &mut FunctionIR) {
     let mut used = vec![false; old_num_home as usize];
     for instr in func.instrs() {
         for_each_slot(instr, |r| {
-            if let Slot::Home(i) = r {
-                used[i as usize] = true;
+            if let NamedSlot::Home(i) = r {
+                used[i.0 as usize] = true;
             }
         });
     }
@@ -220,7 +230,9 @@ fn renumber_slots(func: &mut FunctionIR) {
     for instr in func.instrs_mut() {
         let remap_ref = &remap;
         remap_all_slots_with(instr, |slot| match slot {
-            Slot::Home(i) => remap_ref[i as usize].map(Slot::Home).unwrap_or(slot),
+            NamedSlot::Home(i) => remap_ref[i.0 as usize]
+                .map(|new_idx| NamedSlot::Home(HomeIndex(new_idx)))
+                .unwrap_or(slot),
             other => other,
         });
     }

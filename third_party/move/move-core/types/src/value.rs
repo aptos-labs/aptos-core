@@ -762,51 +762,19 @@ impl MoveStructLayout {
         Self::WithVariants { type_, variants }
     }
 
-    pub fn fields(&self, variant: Option<usize>) -> &[MoveTypeLayout] {
+    /// Returns the field layouts for `variant`, or `None` when the tag is out of
+    /// range so callers can reject invalid enum values.
+    pub fn fields(&self, variant: Option<usize>) -> Option<&[MoveTypeLayout]> {
         match self {
-            Self::Runtime(vals) => vals,
-            Self::RuntimeVariants(variants) => match variant {
-                Some(idx) if idx < variants.len() => &variants[idx],
-                _ => {
-                    // API does not allow to return error, return empty fields instead of crashing
-                    &[]
-                },
+            Self::Runtime(vals) => Some(vals),
+            Self::RuntimeVariants(variants) => {
+                variant.and_then(|idx| variants.get(idx).map(Vec::as_slice))
             },
             Self::WithFields(_) | Self::WithTypes { .. } | Self::WithVariants { .. } => {
                 // It's not possible to implement this without changing the return type, and some
                 // performance-critical VM serialization code uses the Runtime case of this.
                 // panicking is the best move
                 panic!("Getting fields for decorated representation")
-            },
-        }
-    }
-
-    pub fn into_fields(self, variant: Option<usize>) -> Vec<MoveTypeLayout> {
-        match self {
-            Self::Runtime(vals) => vals,
-            Self::RuntimeVariants(mut variants) => {
-                match variant {
-                    Some(idx) if idx < variants.len() => variants.remove(idx),
-                    _ => {
-                        // be on the robust side and remove empty vec instead of crash
-                        vec![]
-                    },
-                }
-            },
-            Self::WithFields(fields) | Self::WithTypes { fields, .. } => {
-                fields.into_iter().map(|f| f.layout).collect()
-            },
-            Self::WithVariants { mut variants, .. } => match variant {
-                Some(idx) if idx < variants.len() => variants
-                    .remove(idx)
-                    .fields
-                    .into_iter()
-                    .map(|f| f.layout)
-                    .collect(),
-                _ => {
-                    // be on the robust side and return empty vec instead of crash
-                    vec![]
-                },
             },
         }
     }

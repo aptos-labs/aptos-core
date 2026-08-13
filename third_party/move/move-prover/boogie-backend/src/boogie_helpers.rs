@@ -24,7 +24,7 @@ use move_model::{
     ty::{PrimitiveType, ReferenceKind, Type},
 };
 use move_prover_bytecode_pipeline::number_operation::{
-    GlobalNumberOperationState, NumOperation::Bitwise,
+    GlobalNumberOperationState, NumOperation, NumOperation::Bitwise,
 };
 use move_stackless_bytecode::{function_target::FunctionTarget, stackless_bytecode::Constant};
 use num::BigUint;
@@ -59,6 +59,18 @@ pub fn boogie_module_name(env: &ModuleEnv<'_>) -> String {
 /// Return boogie name of given structure.
 pub fn boogie_struct_name(struct_env: &StructEnv<'_>, inst: &[Type], bv_flag: bool) -> String {
     if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
+        if struct_env.get_ghost_fields().next().is_some() {
+            // Ghost-declaring intrinsic maps use a per-instance carrier
+            // datatype wrapping the table. The name must follow the suffix
+            // convention including the value's bv twin, so twin instances
+            // reference their own carrier.
+            return format!(
+                "${}_{}{}",
+                boogie_module_name(&struct_env.module_env),
+                struct_env.get_name().display(struct_env.symbol_pool()),
+                boogie_inst_suffix(struct_env.module_env.env, inst, &[false, bv_flag])
+            );
+        }
         // Map to the theory type representation, which is `Table int V`. The key
         // is encoded as an integer to avoid extensionality problems, and to support
         // $Mutation paths, which are sequences of ints.
@@ -138,11 +150,19 @@ pub fn boogie_variant_field_update(
     )
 }
 
-/// Return true if the field is a bitwise field
+/// Return whether the field renders as a bitvector. `ty` is the field's
+/// (instantiated) type; signed-containing types never render as bitvectors.
 pub fn field_bv_flag_global_state(
     global_state: &GlobalNumberOperationState,
     field_env: &FieldEnv,
+    env: &GlobalEnv,
+    ty: &Type,
 ) -> bool {
+    // Ghost fields are model-only and never participate in number-operation
+    // (bitvector) analysis; on enums they also carry no variant.
+    if field_env.is_ghost() {
+        return false;
+    }
     let operation_map = &global_state.struct_operation_map;
     let mid = field_env.struct_env.module_env.get_id();
     let sid = field_env.struct_env.get_id();
@@ -158,21 +178,21 @@ pub fn field_bv_flag_global_state(
     } else {
         field_env.get_id()
     };
-    if let Some(struct_info) = operation_map.get(&(mid, sid)) {
-        matches!(struct_info.get(&field_id), Some(&Bitwise))
-    } else {
-        false
-    }
+    operation_map
+        .get(&(mid, sid))
+        .and_then(|struct_info| struct_info.get(&field_id))
+        .is_some_and(|oper| bv_flag_for_type(env, oper, ty))
 }
 
-/// Return boogie type for given field
+/// Return boogie type for given field. `ty` is the field's (instantiated)
+/// type.
 pub fn boogie_type_for_struct_field(
     global_state: &GlobalNumberOperationState,
     field: &FieldEnv,
     env: &GlobalEnv,
     ty: &Type,
 ) -> String {
-    let bv_flag = field_bv_flag_global_state(global_state, field);
+    let bv_flag = field_bv_flag_global_state(global_state, field, env, ty);
     boogie_type(env, ty, bv_flag)
 }
 
@@ -336,6 +356,88 @@ pub fn boogie_make_vec_from_strings(args: &[String]) -> String {
     }
 }
 
+/// Return whether `ty`'s containment closure (vector elements, type arguments,
+/// struct fields) includes a signed integer. Signed integers are always Boogie
+/// `int` — they have no bitvector rendering — so such types must not select bv
+/// encodings; the prelude generates no bv twins for them. This mirrors the
+/// traversal of `Type::get_all_contained_types_with_skip_reference`, but
+/// short-circuits on the first signed integer instead of materializing the
+/// closure, and additionally checks the intrinsic-map value type argument: it
+/// is declared phantom, yet the Boogie representation (`Table int (V)`)
+/// embeds it. Keys are not checked — they encode to int regardless of the
+/// map's bv rendering.
+pub fn type_contains_signed_int(env: &GlobalEnv, ty: &Type) -> bool {
+    type_contains_prim(env, ty, &|p| p.is_signed())
+}
+
+/// Like `type_contains_signed_int`, for widthless `num`: it has no
+/// bitvector rendering either, and can appear nested (e.g. `vector<num>`
+/// in a spec-function instantiation whose slot acquired `Bitwise` from an
+/// unrelated caller).
+pub fn type_contains_widthless_num(env: &GlobalEnv, ty: &Type) -> bool {
+    type_contains_prim(env, ty, &|p| matches!(p, PrimitiveType::Num))
+}
+
+fn type_contains_prim(env: &GlobalEnv, ty: &Type, pred: &impl Fn(&PrimitiveType) -> bool) -> bool {
+    use Type::*;
+    match ty {
+        Primitive(p) => pred(p),
+        Tuple(ts) => ts.iter().any(|t| type_contains_prim(env, t, pred)),
+        Vector(et) => type_contains_prim(env, et, pred),
+        Struct(mid, sid, ts) => {
+            let struct_env = env.get_module(*mid).into_struct(*sid);
+            let args_contain = if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
+                // Only the value type is rendered: the representation is
+                // `Table int (V)` with keys encoded to int by `$EncodeKey`,
+                // and bv twin supply likewise keys on the value type alone.
+                // A signed key must not clamp an unsigned bitwise value to
+                // the int twin while value operands render bv.
+                ts.get(1).is_some_and(|t| type_contains_prim(env, t, pred))
+            } else {
+                // Phantom arguments cannot reach a field type of an ordinary
+                // struct, matching the containment closure.
+                ts.iter().enumerate().any(|(i, t)| {
+                    !struct_env.is_phantom_parameter(i) && type_contains_prim(env, t, pred)
+                })
+            };
+            if args_contain {
+                return true;
+            }
+            if struct_env.has_variants() {
+                struct_env.get_variants().any(|variant| {
+                    struct_env
+                        .get_fields_of_variant(variant)
+                        .any(|f| type_contains_prim(env, &f.get_type().instantiate(ts), pred))
+                })
+            } else {
+                struct_env
+                    .get_fields()
+                    .any(|f| type_contains_prim(env, &f.get_type().instantiate(ts), pred))
+            }
+        },
+        Fun(arg, result, _) => {
+            type_contains_prim(env, arg, pred) || type_contains_prim(env, result, pred)
+        },
+        Reference(_, bt) | TypeDomain(bt) => type_contains_prim(env, bt, pred),
+        ResourceDomain(_, _, Some(ts)) => ts.iter().any(|t| type_contains_prim(env, t, pred)),
+        ResourceDomain(_, _, None) | TypeParameter(_) | StateDomain | Error | Var(_) => false,
+    }
+}
+
+/// Effective bitvector flag for a value of type `ty`: a `Bitwise`
+/// classification selects bv rendering only for types that have one.
+/// Number-operation slots shared across generic instantiations (parameters,
+/// fields) can carry `Bitwise` acquired from an unsigned instantiation; values
+/// of signed instantiations must still render as `int`. Widthless `num`
+/// values (spec lets, spec fun results) have no bitvector rendering either:
+/// a caller's bitwise argument can mark a callee's parameter slot `Bitwise`
+/// and reach `num`-typed expressions in the callee's spec through it.
+pub fn bv_flag_for_type(env: &GlobalEnv, num_oper: &NumOperation, ty: &Type) -> bool {
+    *num_oper == Bitwise
+        && !type_contains_widthless_num(env, ty)
+        && !type_contains_signed_int(env, ty)
+}
+
 /// Returns `"bvN"` when `bv_flag` is true, `"int"` otherwise.
 fn uint_bv_type(bits: usize, bv_flag: bool) -> String {
     if bv_flag {
@@ -360,10 +462,10 @@ pub fn boogie_type(env: &GlobalEnv, ty: &Type, bv_flag: bool) -> String {
             U256 => uint_bv_type(256, bv_flag),
             I8 | I16 | I32 | I64 | I128 | I256 => {
                 if bv_flag {
-                    unimplemented!("{}", BV_TYPE_NOT_ENABLED_ERROR)
-                } else {
-                    "int".to_string()
+                    // Signed integers have no bv rendering.
+                    env.error(&env.unknown_loc(), BV_TYPE_NOT_ENABLED_ERROR);
                 }
+                "int".to_string()
             },
             Num => {
                 if bv_flag {
@@ -474,12 +576,14 @@ pub fn boogie_int_suffix(ty: &Type, bv_flag: bool) -> String {
         Type::Primitive(U64) => boogie_num_type_string_capital("U", "64", bv_flag),
         Type::Primitive(U128) => boogie_num_type_string_capital("U", "128", bv_flag),
         Type::Primitive(U256) => boogie_num_type_string_capital("U", "256", bv_flag),
-        Type::Primitive(I8) => boogie_num_type_string_capital("I", "8", bv_flag),
-        Type::Primitive(I16) => boogie_num_type_string_capital("I", "16", bv_flag),
-        Type::Primitive(I32) => boogie_num_type_string_capital("I", "32", bv_flag),
-        Type::Primitive(I64) => boogie_num_type_string_capital("I", "64", bv_flag),
-        Type::Primitive(I128) => boogie_num_type_string_capital("I", "128", bv_flag),
-        Type::Primitive(I256) => boogie_num_type_string_capital("I", "256", bv_flag),
+        // Signed integers have no bv rendering; ignore `bv_flag` rather than
+        // alias to the unsigned bv procedure names.
+        Type::Primitive(I8) => "I8".to_string(),
+        Type::Primitive(I16) => "I16".to_string(),
+        Type::Primitive(I32) => "I32".to_string(),
+        Type::Primitive(I64) => "I64".to_string(),
+        Type::Primitive(I128) => "I128".to_string(),
+        Type::Primitive(I256) => "I256".to_string(),
         _ => unreachable!("non-integer dest for arithmetic op"),
     }
 }
@@ -563,12 +667,14 @@ pub fn boogie_type_suffix(env: &GlobalEnv, ty: &Type, bv_flag: bool) -> String {
             U64 => boogie_num_type_string("u", "64", bv_flag),
             U128 => boogie_num_type_string("u", "128", bv_flag),
             U256 => boogie_num_type_string("u", "256", bv_flag),
-            I8 => boogie_num_type_string("i", "8", bv_flag),
-            I16 => boogie_num_type_string("i", "16", bv_flag),
-            I32 => boogie_num_type_string("i", "32", bv_flag),
-            I64 => boogie_num_type_string("i", "64", bv_flag),
-            I128 => boogie_num_type_string("i", "128", bv_flag),
-            I256 => boogie_num_type_string("i", "256", bv_flag),
+            // Signed integers have no bv rendering; ignore `bv_flag` rather
+            // than alias to the unsigned bv suffixes.
+            I8 => "i8".to_string(),
+            I16 => "i16".to_string(),
+            I32 => "i32".to_string(),
+            I64 => "i64".to_string(),
+            I128 => "i128".to_string(),
+            I256 => "i256".to_string(),
             Num => {
                 if bv_flag {
                     //TODO(#19036): add error message with accurate location info

@@ -3,19 +3,19 @@
 
 fun left_u64() {
   frame_data_size: 56
-  entry_gas: 17
+  entry_gas: 43
   code:
     0: EnumNew [8] desc=2 tag #0
     1: HeapMoveTo8 [8]+8 <- [0]
     2: SlotBorrow [16] <- &[8]
     3: EnumTestTag [32] <- (*[16]).tag == #0
-    4: JumpZeroByte @9 [32] gas_taken=7 gas_fallthrough=62
+    4: JumpZeroByte @9 [32] gas_taken=7 gas_fallthrough=88
     5: EnumCheckVariant assert [8].tag == #0
     6: HeapMoveFrom8 [40] <- [8]+8
     7: Move8 [0] <- [40]
     8: Return
     9: EnumTestTag [32] <- (*[16]).tag == #1
-    10: JumpZeroByte @16 [32] gas_taken=4 gas_fallthrough=64
+    10: JumpZeroByte @16 [32] gas_taken=4 gas_fallthrough=69
     11: EnumCheckVariant assert [8].tag == #1
     12: HeapMoveFrom [32] <- [8]+8 (size=1)
     13: StoreImm8 [40] <- #0
@@ -31,19 +31,19 @@ fun pick_variant() {
   frame_data_size: 56
   entry_gas: 3
   code:
-    0: JumpIntCmp @24 [0] != u64 #0 gas_taken=10 gas_fallthrough=10
+    0: JumpIntCmp @24 [0] != u64 #0 gas_taken=36 gas_fallthrough=15
     1: StoreImm1 [32] <- #1
     2: EnumNew [8] desc=2 tag #1
     3: HeapMoveTo [8]+8 <- [32] (size=1)
     4: SlotBorrow [16] <- &[8]
     5: EnumTestTag [32] <- (*[16]).tag == #0
-    6: JumpZeroByte @11 [32] gas_taken=7 gas_fallthrough=62
+    6: JumpZeroByte @11 [32] gas_taken=7 gas_fallthrough=88
     7: EnumCheckVariant assert [8].tag == #0
     8: HeapMoveFrom8 [40] <- [8]+8
     9: Move8 [0] <- [40]
     10: Return
     11: EnumTestTag [32] <- (*[16]).tag == #1
-    12: JumpZeroByte @22 [32] gas_taken=4 gas_fallthrough=11
+    12: JumpZeroByte @22 [32] gas_taken=4 gas_fallthrough=16
     13: EnumCheckVariant assert [8].tag == #1
     14: HeapMoveFrom [32] <- [8]+8 (size=1)
     15: JumpZeroByte @19 [32] gas_taken=56 gas_fallthrough=56
@@ -65,13 +65,13 @@ fun pick_variant() {
 
 fun swapped_right_u64() {
   frame_data_size: 56
-  entry_gas: 17
+  entry_gas: 43
   code:
     0: EnumNew [8] desc=3 tag #1
     1: HeapMoveTo8 [8]+8 <- [0]
     2: SlotBorrow [16] <- &[8]
     3: EnumTestTag [32] <- (*[16]).tag == #0
-    4: JumpZeroByte @14 [32] gas_taken=7 gas_fallthrough=11
+    4: JumpZeroByte @14 [32] gas_taken=7 gas_fallthrough=16
     5: EnumCheckVariant assert [8].tag == #0
     6: HeapMoveFrom [32] <- [8]+8 (size=1)
     7: JumpZeroByte @11 [32] gas_taken=56 gas_fallthrough=56
@@ -82,7 +82,7 @@ fun swapped_right_u64() {
     12: Move8 [0] <- [40]
     13: Return
     14: EnumTestTag [32] <- (*[16]).tag == #1
-    15: JumpZeroByte @20 [32] gas_taken=4 gas_fallthrough=62
+    15: JumpZeroByte @20 [32] gas_taken=4 gas_fallthrough=88
     16: EnumCheckVariant assert [8].tag == #1
     17: HeapMoveFrom8 [40] <- [8]+8
     18: Move8 [0] <- [40]
@@ -97,7 +97,7 @@ fun test_is_left() {
   frame_data_size: 56
   entry_gas: 3
   code:
-    0: JumpIntCmp @13 [0] != u64 #0 gas_taken=12 gas_fallthrough=10
+    0: JumpIntCmp @13 [0] != u64 #0 gas_taken=17 gas_fallthrough=36
     1: StoreImm8 [16] <- #5
     2: EnumNew [8] desc=2 tag #0
     3: HeapMoveTo8 [8]+8 <- [16]

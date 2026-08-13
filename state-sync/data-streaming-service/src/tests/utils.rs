@@ -13,6 +13,7 @@ use aptos_data_client::{
 };
 use aptos_infallible::Mutex;
 use aptos_logger::Level;
+use aptos_storage_interface::StateKind;
 use aptos_storage_service_types::{
     requests::{
         DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
@@ -287,6 +288,7 @@ impl AptosDataClientInterface for MockAptosDataClient {
         start_index: u64,
         end_index: u64,
         request_timeout_ms: u64,
+        _kind: StateKind,
     ) -> Result<Response<StateValueChunkWithProof>, aptos_data_client::error::Error> {
         // Verify the request timeout
         let data_request = DataRequest::GetStateValuesWithProof(StateValuesWithProofRequest {
@@ -529,6 +531,7 @@ impl AptosDataClientInterface for MockAptosDataClient {
         &self,
         version: Version,
         request_timeout_ms: u64,
+        _kind: StateKind,
     ) -> Result<Response<u64>, aptos_data_client::error::Error> {
         // Verify the request timeout
         let data_request = DataRequest::GetNumberOfStatesAtVersion(version);

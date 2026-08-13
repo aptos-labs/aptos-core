@@ -5,5 +5,5 @@ Error: Script execution failed with VMError: {
     sub_status: None,
     location: script,
     indices: [],
-    offsets: [(FunctionDefinitionIndex(0), 31)],
+    offsets: [(FunctionDefinitionIndex(0), 14)],
 }

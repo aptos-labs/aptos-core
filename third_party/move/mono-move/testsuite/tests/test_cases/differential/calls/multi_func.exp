@@ -29,7 +29,7 @@ fun double(r0): u64 {
 }
 
 fun quad(r0): u64 {
-  slots: params(1), locals(0), temps(0), xfer(1)
+  slots: params(1), locals(0), temps(0), transfer(1)
     r0: u64
   code:
   L0:

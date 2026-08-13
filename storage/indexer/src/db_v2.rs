@@ -1,15 +1,13 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-/// This file is a copy of the file storage/indexer/src/lib.rs.
-/// At the end of the migration to migrate table info mapping
-/// from storage critical path to indexer, the other file will be removed
-/// and this file will be moved to /ecosystem/indexer-grpc/indexer-grpc-table-info.
+/// TODO(#20246): this file was planned to move to `indexer-grpc-table-info` as part
+/// of a migration that stalled; consolidate code placement of the indexer stack.
 use aptos_db_indexer_schemas::{
     metadata::{MetadataKey, MetadataValue},
     schema::{indexer_metadata::IndexerMetadataSchema, table_info::TableInfoSchema},
 };
-use aptos_logger::{info, sample, sample::SampleRate};
+use aptos_logger::{info, sample, sample::SampleRate, warn};
 use aptos_resource_viewer::{AptosValueAnnotator, MoveTableInfo};
 use aptos_schemadb::{batch::SchemaBatch, DB};
 use aptos_storage_interface::{
@@ -121,6 +119,20 @@ impl IndexerAsyncV2 {
         )?;
         self.next_version.store(end_version, Ordering::Relaxed);
         Ok(())
+    }
+
+    /// Advances past a processed batch. Any table handles that couldn't be resolved are
+    /// dropped (their items left undecoded) instead of blocking progress, so parsing never
+    /// gets stuck on a transaction it can't fully handle.
+    pub fn finalize_batch(&self, end_version: Version) -> Result<()> {
+        if !self.is_indexer_async_v2_pending_on_empty() {
+            warn!(
+                end_version = end_version,
+                "[DB] Dropping unresolved table handles and advancing past this batch."
+            );
+            self.clear_pending_on();
+        }
+        self.update_next_version(end_version + 1)
     }
 
     /// Finishes the parsing process and writes the parsed table information to a SchemaBatch.
@@ -338,5 +350,55 @@ impl<'a, R: StateView> TableInfoParser<'a, R> {
             Some(table_info) => Ok(Some(table_info.clone())),
             None => self.indexer_async_v2.get_table_info(handle),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db_ops::open_db;
+    use aptos_config::config::RocksdbConfig;
+    use aptos_temppath::TempPath;
+    use move_core_types::account_address::AccountAddress;
+
+    fn new_test_indexer(tmp: &TempPath) -> IndexerAsyncV2 {
+        tmp.create_as_dir().unwrap();
+        let db = open_db(
+            tmp.path(),
+            &RocksdbConfig::default(),
+            /*readonly=*/ false,
+        )
+        .unwrap();
+        IndexerAsyncV2::new(db).unwrap()
+    }
+
+    /// An unresolved handle is dropped and the processed version advances, rather than
+    /// blocking progress.
+    #[test]
+    fn finalize_batch_advances_past_unresolvable_handle() {
+        let tmp = TempPath::new();
+        let indexer = new_test_indexer(&tmp);
+
+        let handle = TableHandle(AccountAddress::ONE);
+        indexer
+            .pending_on
+            .entry(handle)
+            .or_default()
+            .insert(Bytes::from_static(b"orphan-table-item"));
+        assert!(
+            !indexer.is_indexer_async_v2_pending_on_empty(),
+            "precondition: the orphan handle should be parked"
+        );
+
+        let end_version: Version = 41;
+        indexer
+            .finalize_batch(end_version)
+            .expect("finalize_batch must not fail on an unresolvable handle");
+
+        assert!(
+            indexer.is_indexer_async_v2_pending_on_empty(),
+            "the unresolvable handle should have been dropped"
+        );
+        assert_eq!(indexer.next_version(), end_version);
     }
 }

@@ -5453,6 +5453,11 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveStructLayout, 
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut values = self.value.as_slice();
         if let Some((tag, variant_layouts)) = try_get_variant_field_layouts(self.layout, values) {
+            // Reject a tag that is out of range for the layout instead of
+            // serializing bytes that strict deserialization would later reject.
+            let variant_layouts = variant_layouts.ok_or_else(|| {
+                invariant_violation::<S>("cannot serialize value: invalid variant tag".to_string())
+            })?;
             let tag_idx = tag as usize;
             let variant_tag = tag_idx as u32;
             let variant_names = value::variant_name_placeholder((tag + 1) as usize)
@@ -5501,7 +5506,11 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveStructLayout, 
                 },
             }
         } else {
-            let field_layouts = self.layout.fields(None);
+            let field_layouts = self.layout.fields(None).ok_or_else(|| {
+                invariant_violation::<S>(
+                    "cannot serialize value: missing field layouts".to_string(),
+                )
+            })?;
             let mut t = serializer.serialize_tuple(values.len())?;
             if field_layouts.len() != values.len() {
                 return Err(invariant_violation::<S>(format!(
@@ -6371,6 +6380,7 @@ pub mod prop {
                 },
                 _ => struct_layout
                     .fields(None)
+                    .expect("Runtime struct layout always has fields")
                     .iter()
                     .map(value_strategy_with_layout)
                     .collect::<Vec<_>>()
@@ -6501,6 +6511,8 @@ impl Value {
                 if let Some((tag, variant_layouts)) =
                     try_get_variant_field_layouts(struct_layout.as_ref(), values)
                 {
+                    let variant_layouts =
+                        variant_layouts.expect("variant tag must be in range for the layout");
                     MoveValue::Struct(MoveStruct::new_variant(
                         tag,
                         values
@@ -6515,7 +6527,11 @@ impl Value {
                     MoveValue::Struct(MoveStruct::new(
                         values
                             .iter()
-                            .zip(struct_layout.fields(None))
+                            .zip(
+                                struct_layout
+                                    .fields(None)
+                                    .expect("Runtime struct layout always has fields"),
+                            )
                             .map(|(v, field_layout)| v.as_move_value(field_layout))
                             .collect(),
                     ))
@@ -6590,10 +6606,12 @@ impl Value {
     }
 }
 
+// Outer `None`: not a variant layout (serialize as a plain struct). Inner
+// `None`: the tag is out of range for the layout, which callers must reject.
 fn try_get_variant_field_layouts<'a>(
     layout: &'a MoveStructLayout,
     values: &[Value],
-) -> Option<(u16, &'a [MoveTypeLayout])> {
+) -> Option<(u16, Option<&'a [MoveTypeLayout]>)> {
     if matches!(layout, MoveStructLayout::RuntimeVariants(..)) {
         if let Some(Value::U16(tag)) = values.first() {
             return Some((*tag, layout.fields(Some(*tag as usize))));

@@ -29,7 +29,7 @@ use aptos_config::config::{
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_storage_interface::{DbReader, Order};
+use aptos_storage_interface::{AptosDbError, DbReader, Order, StateKind};
 use aptos_temppath::TempPath;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -154,9 +154,19 @@ fn test_error_if_version_pruned() {
         db.error_if_ledger_pruned("Transaction", 9)
             .unwrap_err()
             .to_string(),
-        "AptosDB Other Error: Transaction at version 9 is pruned, min available version is 10."
+        "Transaction at version 9 is pruned, min available version is 10."
     );
     assert!(db.error_if_ledger_pruned("Transaction", 10).is_ok());
+
+    // Callers match on the variant, so assert its shape and not just the message.
+    assert!(matches!(
+        db.error_if_ledger_pruned("Transaction", 9).unwrap_err(),
+        AptosDbError::LedgerPruned {
+            version: 9,
+            min_available_version: 10,
+            ..
+        }
+    ));
 
     // Hot state guards consult the hot pruners, independent of the cold ones set above.
     db.state_store
@@ -461,10 +471,13 @@ proptest! {
         let state_checkpoint_version =
             db.get_latest_state_checkpoint_version().unwrap().unwrap();
         let state_leaf_count =
-            db.get_state_item_count(state_checkpoint_version).unwrap();
+            db.get_state_item_count(state_checkpoint_version, StateKind::MainState).unwrap();
         let state_value_chunk_with_proof = db
             .get_state_value_chunk_with_proof(
-                state_checkpoint_version, 0, state_leaf_count,
+                state_checkpoint_version,
+                0,
+                state_leaf_count,
+                StateKind::MainState,
             )
             .unwrap();
         prop_assert_eq!(state_value_chunk_with_proof.first_index, 0);

@@ -75,7 +75,7 @@ fun get_x(r0): u64 {
 }
 
 fun get_x_of(r0, r1): u64 {
-  slots: params(2), locals(1), temps(0), xfer(2)
+  slots: params(2), locals(1), temps(0), transfer(2)
     r0: u64
     r1: u64
     r2: 0x42::basic::Point

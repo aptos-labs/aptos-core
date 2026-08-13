@@ -1,0 +1,35 @@
+[package]
+name = "mono-move-aptos-transaction-executor"
+description = "The Aptos transaction-execution layer on the MonoMove VM."
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-types = { workspace = true }
+bcs = { workspace = true }
+bytes = { workspace = true }
+mono-move-core = { workspace = true }
+mono-move-global-context = { workspace = true }
+mono-move-loader = { workspace = true }
+mono-move-natives = { workspace = true }
+mono-move-output = { workspace = true }
+mono-move-runtime = { workspace = true }
+move-core-types = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+triomphe = { workspace = true }
+
+[dev-dependencies]
+aptos-cached-packages = { workspace = true }
+aptos-language-e2e-tests = { workspace = true }
+aptos-transaction-simulation = { workspace = true }
+mono-move-aptos-state-view-providers = { workspace = true }

@@ -11,6 +11,7 @@ module aptos_framework::account {
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::guid;
     use aptos_framework::system_addresses;
+    use aptos_framework::transaction_context;
     use aptos_std::ed25519;
     use aptos_std::from_bcs;
     use aptos_std::multi_ed25519;
@@ -234,6 +235,9 @@ module aptos_framework::account {
     const EENCRYPTED_DK_NOT_FOUND: u64 = 29;
     /// The permissioned signer feature has been removed.
     const EPERMISSIONED_SIGNER_REMOVED: u64 = 30;
+    /// Sequence-number-based proof challenges cannot be used when the proof-bearing account's
+    /// sequence number will not advance, since the signed proof would remain replayable.
+    const ESEQ_NUM_PROOF_REPLAYABLE_CONTEXT: u64 = 31;
 
     /// Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
     const MAX_GUID_CREATION_NUM: u64 = 0x4000000000000;
@@ -257,6 +261,19 @@ module aptos_framework::account {
     #[deprecated]
     public fun grant_key_rotation_permission(_master: &signer, _permissioned_signer: &signer) {
         abort error::unavailable(EPERMISSIONED_SIGNER_REMOVED)
+    }
+
+    /// Proof challenges that embed an account's sequence number rely on the sequence number
+    /// advancing with the submitting transaction to prevent the signed proof from being accepted
+    /// twice. Orderless transactions do not increment the sender's sequence number, and multisig
+    /// payload execution increments only the outer submitter's sequence number. Functions verifying
+    /// a sequence-number-based proof must call this first.
+    inline fun assert_seq_num_proof_replay_protected() {
+        assert!(
+            !transaction_context::is_orderless_txn()
+                && !transaction_context::is_multisig_payload_txn(),
+            error::invalid_state(ESEQ_NUM_PROOF_REPLAYABLE_CONTEXT),
+        );
     }
 
     #[deprecated]
@@ -516,6 +533,8 @@ module aptos_framework::account {
     /// # Events
     /// * Emits a `KeyRotationToMultiPublicKey` event with the new multi-key configuration
     entry fun upsert_ed25519_backup_key_on_keyless_account(account: &signer, keyless_public_key: vector<u8>, backup_public_key: vector<u8>, backup_key_proof: vector<u8>) acquires Account {
+        // The backup key proof is replay-protected by the account's sequence number.
+        assert_seq_num_proof_replay_protected();
         // Check that the provided public key is a keyless public key
         let keyless_single_key = single_key::new_public_key_from_bytes(keyless_public_key);
         assert!(single_key::is_keyless_or_federated_keyless_public_key(&keyless_single_key), error::invalid_argument(ENOT_A_KEYLESS_PUBLIC_KEY));
@@ -660,6 +679,8 @@ module aptos_framework::account {
         cap_rotate_key: vector<u8>,
         cap_update_table: vector<u8>,
     ) acquires Account, OriginatingAddress {
+        // The rotation proofs are replay-protected by the account's sequence number.
+        assert_seq_num_proof_replay_protected();
         let addr = signer::address_of(account);
         ensure_resource_exists(addr);
         let account_resource = &mut Account[addr];
@@ -736,6 +757,8 @@ module aptos_framework::account {
         new_public_key_bytes: vector<u8>,
         cap_update_table: vector<u8>
     ) acquires Account, OriginatingAddress {
+        // The rotation proof is replay-protected by the delegate's sequence number.
+        assert_seq_num_proof_replay_protected();
         assert!(resource_exists_at(rotation_cap_offerer_address), error::not_found(EOFFERER_ADDRESS_DOES_NOT_EXIST));
 
         // Check that there exists a rotation capability offer at the offerer's account resource for the delegate.
@@ -815,6 +838,8 @@ module aptos_framework::account {
         account_public_key_bytes: vector<u8>,
         recipient_address: address,
     ) acquires Account {
+        // The capability offer proof is replay-protected by the account's sequence number.
+        assert_seq_num_proof_replay_protected();
         let addr = signer::address_of(account);
         ensure_resource_exists(addr);
         assert!(exists_at(recipient_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
@@ -958,6 +983,8 @@ module aptos_framework::account {
         account_public_key_bytes: vector<u8>,
         recipient_address: address
     ) acquires Account {
+        // The capability offer proof is replay-protected by the account's sequence number.
+        assert_seq_num_proof_replay_protected();
         let source_address = signer::address_of(account);
         ensure_resource_exists(source_address);
         assert!(exists_at(recipient_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));

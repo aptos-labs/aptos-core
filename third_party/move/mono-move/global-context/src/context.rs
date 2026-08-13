@@ -55,8 +55,8 @@ use dashmap::DashMap;
 use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
 use mono_move_core::{
     reserved_layout_id, reserved_layouts, DescriptorId, DescriptorProvider, FrameOffset,
-    FunctionRef, Interner, LayoutId, LayoutProvider, ModuleId, ObjectDescriptor, ValueLayout,
-    TRIVIAL_DESCRIPTOR_ID,
+    FunctionRef, Interner, LayoutId, LayoutProvider, ModuleId, ObjectDescriptor,
+    TypeSubstitutionError, ValueLayout, TRIVIAL_DESCRIPTOR_ID,
 };
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use std::{
@@ -575,6 +575,15 @@ impl<'ctx> ExecutionGuard<'ctx> {
             })
     }
 
+    /// The struct-object descriptor already published for `struct_ty`, if any.
+    pub fn struct_descriptor(&self, struct_ty: InternedType) -> Option<DescriptorId> {
+        self.ctx
+            .descriptors
+            .struct_by_ty
+            .get(&struct_ty)
+            .map(|id| *id)
+    }
+
     /// Materializes a struct-object descriptor for `struct_ty` (the inline
     /// resource laid out as a heap object) into the shared arena and returns
     /// its assigned [`DescriptorId`]. Idempotent: subsequent calls with the
@@ -851,7 +860,7 @@ impl<'ctx> Interner for ExecutionGuard<'ctx> {
         &self,
         ty: InternedType,
         ty_args: InternedTypeList,
-    ) -> anyhow::Result<InternedType> {
+    ) -> Result<InternedType, TypeSubstitutionError> {
         if ty_args.is_empty() {
             return Ok(ty);
         }
@@ -924,12 +933,12 @@ impl<'ctx> Interner for ExecutionGuard<'ctx> {
             },
             Type::TypeParam { idx } => {
                 let table = view_type_list(ty_args);
-                *table.get(*idx as usize).ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "type parameter index {idx} out of bounds: substitution table has {} entries",
-                        table.len(),
-                    )
-                })?
+                *table
+                    .get(*idx as usize)
+                    .ok_or(TypeSubstitutionError::IndexOutOfBounds {
+                        idx: *idx,
+                        table_len: table.len(),
+                    })?
             },
         })
     }
@@ -938,7 +947,7 @@ impl<'ctx> Interner for ExecutionGuard<'ctx> {
         &self,
         tys: InternedTypeList,
         ty_args: InternedTypeList,
-    ) -> anyhow::Result<InternedTypeList> {
+    ) -> Result<InternedTypeList, TypeSubstitutionError> {
         if ty_args.is_empty() || tys.is_empty() {
             return Ok(tys);
         }

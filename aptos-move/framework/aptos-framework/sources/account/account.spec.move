@@ -381,6 +381,7 @@ spec aptos_framework::account {
         new_public_key_bytes: vector<u8>,
         cap_update_table: vector<u8>
     ) {
+        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
         aborts_if !exists<Account>(rotation_cap_offerer_address);
         let delegate_address = signer::address_of(delegate_signer);
         let offerer_account_resource = global<Account>(rotation_cap_offerer_address);
@@ -473,6 +474,7 @@ spec aptos_framework::account {
         account_public_key_bytes: vector<u8>,
         recipient_address: address
     ) {
+        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
         pragma aborts_if_is_partial;
         let source_address = signer::address_of(account);
         include EnsureResourceExistsAbortsIf { addr: source_address };

@@ -2,7 +2,7 @@
 // module 0x1::test
 
 fun frozen_read(r0): u64 {
-  slots: params(1), locals(1), temps(1), xfer(1)
+  slots: params(1), locals(1), temps(1), transfer(1)
     r0: u64
     r1: u64
     r2: &mut u64

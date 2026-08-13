@@ -32,12 +32,13 @@ use aptos_types::{
         transaction_slice_metadata::TransactionSliceMetadata,
     },
     contract_event::ContractEvent,
+    error::PanicError,
     fee_statement::FeeStatement,
     move_utils::move_event_v2::MoveEventV2Type,
     state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView},
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockOutput,
-        Transaction, TransactionOutput, TransactionStatus, WriteSetPayload,
+        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockError,
+        BlockOutput, TransactionOutput, TransactionStatus,
     },
     write_set::WriteOp,
 };
@@ -85,7 +86,7 @@ impl VMBlockExecutor for NativeVMBlockExecutor {
         state_view: &(impl StateView + Sync),
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
-    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, BlockError> {
         AptosBlockExecutorWrapper::<NativeVMExecutorTask>::execute_block::<
             _,
             NoOpTransactionCommitHook<VMStatus>,
@@ -116,7 +117,6 @@ pub(crate) struct NativeVMExecutorTask {
 
 impl ExecutorTask for NativeVMExecutorTask {
     type AuxiliaryInfo = AuxiliaryInfo;
-    type Error = VMStatus;
     type Output = AptosTransactionOutput;
     type Txn = SignatureVerifiedTransaction;
 
@@ -139,36 +139,27 @@ impl ExecutorTask for NativeVMExecutorTask {
         txn: &SignatureVerifiedTransaction,
         _auxiliary_info: &AuxiliaryInfo,
         _txn_idx: TxnIndex,
-    ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
-        match self.execute_transaction_impl(executor_with_group_view, txn) {
-            Ok((change_set, gas_units)) => {
-                ExecutionStatus::Success(AptosTransactionOutput::new(VMOutput::new(
-                    change_set,
-                    ModuleWriteSet::empty(),
-                    FeeStatement::builder()
-                        .total_charge_gas_units(gas_units)
-                        .execution_gas_units(gas_units)
-                        .io_gas_units(0)
-                        .storage_fee_octas(0)
-                        .storage_fee_refund_octas(0)
-                        .build(),
-                    TransactionStatus::Keep(aptos_types::transaction::ExecutionStatus::Success),
-                )))
+    ) -> Result<ExecutionStatus<AptosTransactionOutput>, PanicError> {
+        Ok(
+            match self.execute_transaction_impl(executor_with_group_view, txn) {
+                Ok((change_set, gas_units)) => ExecutionStatus::Executed {
+                    output: AptosTransactionOutput::new(VMOutput::new(
+                        change_set,
+                        ModuleWriteSet::empty(),
+                        FeeStatement::builder()
+                            .total_charge_gas_units(gas_units)
+                            .execution_gas_units(gas_units)
+                            .io_gas_units(0)
+                            .storage_fee_octas(0)
+                            .storage_fee_refund_octas(0)
+                            .build(),
+                        TransactionStatus::Keep(aptos_types::transaction::ExecutionStatus::Success),
+                    )),
+                    skips_rest: false,
+                },
+                Err(_) => ExecutionStatus::SpeculativeFailure,
             },
-            Err(_) => ExecutionStatus::SpeculativeExecutionAbortError("something".to_string()),
-        }
-    }
-
-    fn is_transaction_dynamic_change_set_capable(txn: &Self::Txn) -> bool {
-        if txn.is_valid() {
-            if let Transaction::GenesisTransaction(WriteSetPayload::Direct(_)) = txn.expect_valid()
-            {
-                // WriteSetPayload::Direct cannot be handled in mode where delayed_field_optimization or
-                // resource_groups_split_in_change_set is enabled.
-                return false;
-            }
-        }
-        true
+        )
     }
 }
 
@@ -345,13 +336,7 @@ impl NativeVMExecutorTask {
         ));
 
         Ok((
-            VMChangeSet::new(
-                resource_write_set,
-                events,
-                delayed_field_change_set,
-                BTreeMap::new(),
-                BTreeMap::new(),
-            ),
+            VMChangeSet::new(resource_write_set, events, delayed_field_change_set),
             gas_units,
         ))
     }
@@ -407,10 +392,13 @@ impl NativeVMExecutorTask {
                     account.sequence_number += 1;
                     resource_write_set.insert(
                         sender_account_key,
-                        AbstractResourceWriteOp::Write(WriteOp::modification(
-                            Bytes::from(bcs::to_bytes(&account).map_err(hide_error)?),
-                            metadata,
-                        )),
+                        AbstractResourceWriteOp::Write(
+                            WriteOp::modification(
+                                Bytes::from(bcs::to_bytes(&account).map_err(hide_error)?),
+                                metadata,
+                            ),
+                            false,
+                        ),
                     );
                     Ok(())
                 } else {
@@ -427,9 +415,12 @@ impl NativeVMExecutorTask {
                     account.sequence_number = 1;
                     resource_write_set.insert(
                         sender_account_key,
-                        AbstractResourceWriteOp::Write(WriteOp::legacy_creation(Bytes::from(
-                            bcs::to_bytes(&account).map_err(hide_error)?,
-                        ))),
+                        AbstractResourceWriteOp::Write(
+                            WriteOp::legacy_creation(Bytes::from(
+                                bcs::to_bytes(&account).map_err(hide_error)?,
+                            )),
+                            false,
+                        ),
                     );
                     Ok(())
                 } else {
@@ -469,9 +460,12 @@ impl NativeVMExecutorTask {
 
                     resource_write_set.insert(
                         account_key,
-                        AbstractResourceWriteOp::Write(WriteOp::legacy_creation(Bytes::from(
-                            bcs::to_bytes(&account).map_err(hide_error)?,
-                        ))),
+                        AbstractResourceWriteOp::Write(
+                            WriteOp::legacy_creation(Bytes::from(
+                                bcs::to_bytes(&account).map_err(hide_error)?,
+                            )),
+                            false,
+                        ),
                     );
                 }
             },
