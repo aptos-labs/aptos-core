@@ -136,9 +136,9 @@ pub(crate) fn place_args(
     if args.next().is_some() {
         bail!("too many arguments for the function");
     }
-    if signers.next().is_some() {
-        bail!("too many signers for the function");
-    }
+    // Unused signers are fine: like the legacy VM, a function taking fewer
+    // signer parameters than the transaction has signers ignores the rest
+    // (e.g. an entry function without a `&signer`).
     Ok(())
 }
 

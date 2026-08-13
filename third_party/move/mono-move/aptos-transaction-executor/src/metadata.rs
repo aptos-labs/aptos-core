@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use aptos_types::transaction::{ReplayProtector, SessionId, SignedTransaction};
+use aptos_types::transaction::{
+    PersistedAuxiliaryInfo, ReplayProtector, SessionId, SignedTransaction,
+};
 use move_core_types::account_address::AccountAddress;
 
 /// The slice of transaction metadata need by the executor.
@@ -20,10 +22,32 @@ pub(crate) struct TxnMetadata {
     /// Seeds unique-address generation. Derived like the legacy VM's, from the
     /// payload session's id, so generated addresses match.
     pub txn_hash: Vec<u8>,
+    /// The payload session's counter, one term of
+    /// `monotonically_increasing_number`; matches the legacy VM's.
+    pub session_counter: u8,
+    /// The transaction's index in its block, another term of
+    /// `monotonically_increasing_number`.
+    pub transaction_index: u32,
+    /// Distinguishes block execution (0) from validation/simulation (1) in
+    /// `monotonically_increasing_number`.
+    pub reserved_byte: u8,
 }
 
 impl TxnMetadata {
-    pub fn new(txn: &SignedTransaction) -> Self {
+    pub fn new(txn: &SignedTransaction, aux_info: PersistedAuxiliaryInfo) -> Self {
+        let (transaction_index, reserved_byte) = match aux_info {
+            PersistedAuxiliaryInfo::V1 { transaction_index } => (transaction_index, 0),
+            PersistedAuxiliaryInfo::TimestampNotYetAssignedV1 { transaction_index } => {
+                (transaction_index, 1)
+            },
+            PersistedAuxiliaryInfo::None => (0, 0),
+        };
+        let session_id = SessionId::txn(
+            txn.sender(),
+            txn.replay_protector(),
+            txn.payload().script_hash(),
+            txn.expiration_timestamp_secs(),
+        );
         Self {
             sender: txn.sender(),
             fee_payer: txn.authenticator_ref().fee_payer_address(),
@@ -48,14 +72,10 @@ impl TxnMetadata {
             expiration_timestamp_secs: txn.expiration_timestamp_secs(),
             chain_id: txn.chain_id().id(),
             replay_protector: txn.replay_protector(),
-            txn_hash: SessionId::txn(
-                txn.sender(),
-                txn.replay_protector(),
-                txn.payload().script_hash(),
-                txn.expiration_timestamp_secs(),
-            )
-            .txn_hash()
-            .to_vec(),
+            txn_hash: session_id.txn_hash().to_vec(),
+            session_counter: session_id.session_counter(),
+            transaction_index,
+            reserved_byte,
         }
     }
 

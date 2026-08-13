@@ -13,7 +13,9 @@ use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::Features,
     state_store::state_storage_usage::StateStorageUsage,
-    transaction::{EntryFunction, SignedTransaction, TransactionExecutableRef},
+    transaction::{
+        EntryFunction, PersistedAuxiliaryInfo, SignedTransaction, TransactionExecutableRef,
+    },
 };
 use mono_move_core::{
     intern_type_tag, storage::module_provider::ModuleProvider, types::InternedTypeList, GasMeter,
@@ -69,10 +71,16 @@ impl<'a> AptosTransactionExecutor<'a> {
     }
 
     /// Executes one user transaction, returning its side effects unmaterialized (see [`TxnOutcome`]).
+    /// `aux_info` carries the transaction's index in its block, which seeds
+    /// `monotonically_increasing_number`.
     //
     // TODO(completeness): add logging. Should warn on unexpected errors/discards.
-    pub fn execute_user_transaction(&self, txn: &SignedTransaction) -> TxnOutcome {
-        match self.execute_user_transaction_impl(txn) {
+    pub fn execute_user_transaction(
+        &self,
+        txn: &SignedTransaction,
+        aux_info: PersistedAuxiliaryInfo,
+    ) -> TxnOutcome {
+        match self.execute_user_transaction_impl(txn, aux_info) {
             Ok(outcome) => outcome,
             Err(reason) => TxnOutcome::Discarded(reason),
         }
@@ -82,6 +90,7 @@ impl<'a> AptosTransactionExecutor<'a> {
     fn execute_user_transaction_impl(
         &self,
         txn: &SignedTransaction,
+        aux_info: PersistedAuxiliaryInfo,
     ) -> Result<TxnOutcome, DiscardReason> {
         let guard = self.guard;
 
@@ -92,7 +101,7 @@ impl<'a> AptosTransactionExecutor<'a> {
         // gas price bounds, intrinsic gas coverage. Without them a transaction
         // outside the configured bounds -- including a zero gas price -- buys a
         // full `max_gas_amount` budget for free.
-        let txn_data = TxnMetadata::new(txn);
+        let txn_data = TxnMetadata::new(txn, aux_info);
 
         let entry = match txn.payload().executable_ref() {
             Ok(TransactionExecutableRef::EntryFunction(entry)) => entry,

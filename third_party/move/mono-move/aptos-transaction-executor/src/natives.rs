@@ -45,14 +45,11 @@ pub(crate) fn transaction_extensions(
     usage: StateStorageUsage,
 ) -> NativeExtensions {
     let mut extensions = NativeExtensions::new();
-    // TODO(completeness): the transaction index and the reserved byte
-    // (block execution vs. validation/simulation) come from the auxiliary
-    // info the block coordinator has to pass in; both are hardcoded here.
     extensions.add(TransactionContextExtension::new(
         txn_data.txn_hash.clone(),
-        0,
-        0,
-        0,
+        txn_data.session_counter,
+        txn_data.transaction_index,
+        txn_data.reserved_byte,
     ));
     extensions.add(ObjectContextExtension::new());
     extensions.add(StorageUsageAtEpochBoundary::new(

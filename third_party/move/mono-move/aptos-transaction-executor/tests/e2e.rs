@@ -19,8 +19,8 @@ use aptos_types::{
     on_chain_config::{Features, OnChainConfig},
     state_store::StateView,
     transaction::{
-        ExecutionStatus, SignedTransaction, TransactionAuxiliaryData, TransactionOutput,
-        TransactionStatus,
+        ExecutionStatus, PersistedAuxiliaryInfo, SignedTransaction, TransactionAuxiliaryData,
+        TransactionOutput, TransactionStatus,
     },
 };
 use mono_move_aptos_state_view_providers::{
@@ -61,7 +61,7 @@ fn execute_v2<S: StateView>(state: &S, txn: &SignedTransaction) -> TransactionOu
         usage,
     );
     executor
-        .execute_user_transaction(txn)
+        .execute_user_transaction(txn, PersistedAuxiliaryInfo::None)
         .materialize(
             &guard,
             &data_provider,
