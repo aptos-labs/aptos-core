@@ -7,7 +7,8 @@
 
 use crate::{
     boogie_helpers::{
-        boogie_field_sel, boogie_module_name, boogie_num_type_base, boogie_type, boogie_type_suffix,
+        boogie_field_sel, boogie_module_name, boogie_num_type_base, boogie_type,
+        boogie_type_suffix, type_contains_signed_int, type_contains_widthless_num,
     },
     bytecode_translator::has_native_equality,
     options::{BoogieOptions, VectorTheory},
@@ -293,15 +294,12 @@ pub fn add_prelude(
         bv_instances = vec![];
     }
 
-    // Signed integers are always Boogie `int`; they have no bv rendering. A bv
-    // rendering recurses into contained types (vector elements, type arguments),
-    // so a type is bv-renderable only when its whole containment closure is free
-    // of signed ints.
-    let contains_signed_int = |ty: &Type| {
-        ty.get_all_contained_types_with_skip_reference(env)
-            .iter()
-            .any(|t| t.is_signed_int())
-    };
+    // Signed integers and widthless `num` are always Boogie `int`; they have
+    // no bv rendering. A bv rendering recurses into contained types (vector
+    // elements, type arguments), so a type is bv-renderable only when its
+    // whole containment closure is free of both.
+    let never_renders_bv =
+        |ty: &Type| type_contains_signed_int(env, ty) || type_contains_widthless_num(env, ty);
 
     let mut all_types = mono_info
         .all_types
@@ -314,7 +312,7 @@ pub fn add_prelude(
     let mut bv_all_types = mono_info
         .all_types
         .iter()
-        .filter(|ty| ty.can_be_type_argument() && !contains_signed_int(ty))
+        .filter(|ty| ty.can_be_type_argument() && !never_renders_bv(ty))
         .map(|ty| TypeInfo::new(env, options, ty, true))
         .filter(|ty_info| !all_types.contains(ty_info))
         .collect::<BTreeSet<_>>()
@@ -358,26 +356,43 @@ pub fn add_prelude(
         .collect_vec();
     // If not using cvc5, generate vector functions for bv types
     if !options.use_cvc5 {
-        // Exclude signed-containing element/value types from bv twins (same
-        // guard as `bv_all_types` above).
+        // Exclude element/value types with no bv rendering from bv twins
+        // (same guard as `bv_all_types` above).
         let mut bv_vec_instances = mono_info
             .vec_inst
             .iter()
-            .filter(|ty| !contains_signed_int(ty))
+            .filter(|ty| !never_renders_bv(ty))
             .map(|ty| TypeInfo::new(env, options, ty, true))
             .filter(|ty_info| !vec_instances.contains(ty_info))
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect_vec();
+        // Twins are per-instance: each instantiation whose value type has a
+        // bv rendering gets a bv twin (same predicate as the rendering
+        // guard and the vec twins — nested unsigned values like
+        // `vector<u8>` included), independently of sibling instantiations
+        // of the same map type. Instances whose bv rendering coincides
+        // with the plain one are dropped by the dedup filter below.
         let mut bv_table_instances = mono_info
             .table_inst
             .iter()
-            .map(|(qid, ty_args)| {
-                let v_ty = ty_args.iter().map(|(_, vty)| vty).collect_vec();
-                let bv_flag = v_ty.iter().all(|ty| {
-                    ty.skip_reference().is_number() && !ty.skip_reference().is_signed_int()
-                });
-                MapImpl::new(env, options, *qid, ty_args, bv_flag)
+            .filter_map(|(qid, ty_args)| {
+                let bv_ty_args = ty_args
+                    .iter()
+                    .filter(|(_, vty)| {
+                        let vty = vty.skip_reference();
+                        // A twin exists only where the value's bv rendering
+                        // is legal and actually differs from the plain one
+                        // (struct/bool values render identically and would
+                        // duplicate the base instance).
+                        !never_renders_bv(vty)
+                            && boogie_type_suffix(env, vty, true)
+                                != boogie_type_suffix(env, vty, false)
+                    })
+                    .cloned()
+                    .collect::<BTreeSet<_>>();
+                (!bv_ty_args.is_empty())
+                    .then(|| MapImpl::new(env, options, *qid, &bv_ty_args, true))
             })
             .filter(|map_impl| !table_instances.contains(map_impl))
             .collect_vec();
@@ -455,7 +470,7 @@ pub fn add_prelude(
                 insts.iter().map(|inst| {
                     inst.iter()
                         .flat_map(|i| i.get_all_contained_types_with_skip_reference(env))
-                        .filter(|i| !bv_flag || !contains_signed_int(i))
+                        .filter(|i| !bv_flag || !never_renders_bv(i))
                         .map(|i| (i.clone(), TypeInfo::new(env, options, &i, bv_flag)))
                         .collect::<Vec<_>>()
                 })

@@ -1694,8 +1694,22 @@ impl Analyzer<'_> {
         if let Type::Fun(_, _, abilities) = field_ty {
             if abilities.has_store() {
                 let normalized = self.normalize_fun_ty(field_ty.clone());
+                // Normalize fun-type elements of the containing struct's
+                // instantiation too: the constructor name is derived from
+                // the boogie struct name, which drops fun abilities at every
+                // nesting depth. Without normalizing here, two
+                // ability-variant instantiations of the same wrapper (e.g.
+                // `Option<|u64| has drop>` and
+                // `Option<|u64| has drop + copy + store>`, directly or
+                // nested as in `Option<Option<|u64| has drop>>`) would
+                // produce two `StructFieldInfo` set entries mangling to one
+                // datatype constructor.
+                let normalized_targs: Vec<Type> = targs
+                    .iter()
+                    .map(|t| t.clone().normalize_nested_funs())
+                    .collect();
                 let info = StructFieldInfo {
-                    struct_id: struct_env.get_qualified_id().instantiate(targs.to_vec()),
+                    struct_id: struct_env.get_qualified_id().instantiate(normalized_targs),
                     field_sym: field.get_name(),
                 };
                 self.info

@@ -22,7 +22,8 @@ use crate::{
         boogie_type_for_struct_field, boogie_type_param, boogie_type_suffix,
         boogie_type_suffix_for_struct, boogie_type_suffix_for_struct_variant,
         boogie_variant_field_update, boogie_well_formed_check, boogie_well_formed_expr,
-        compute_evaluator_memory_union, field_bv_flag_global_state, TypeIdentToken,
+        bv_flag_for_type, compute_evaluator_memory_union, field_bv_flag_global_state,
+        TypeIdentToken,
     },
     options::BoogieOptions,
     spec_translator::{LabelInfo, SpecTranslator},
@@ -33,7 +34,7 @@ use itertools::Itertools;
 use legacy_move_compiler::interface_generator::NATIVE_INTERFACE;
 #[allow(unused_imports)]
 use log::{debug, info, log, warn, Level};
-use move_core_types::{ability::AbilitySet, function::ClosureMask};
+use move_core_types::function::ClosureMask;
 use move_model::{
     ast::{
         Attribute, BehaviorKind, ConditionKind, Exp, ExpData, FrameAccessKind, FunParamAccessOf,
@@ -161,9 +162,21 @@ impl BpAxiomCtx<'_> {
                 field_sym,
             } => {
                 if kind == BehaviorKind::ResultOf {
-                    boogie_struct_field_result_fun_name(env, struct_id, *field_sym, &[], false)
+                    boogie_struct_field_result_fun_name(
+                        env,
+                        struct_id,
+                        *field_sym,
+                        &struct_id.inst,
+                        false,
+                    )
                 } else {
-                    boogie_struct_field_spec_fun_name(env, struct_id, *field_sym, kind, &[])
+                    boogie_struct_field_spec_fun_name(
+                        env,
+                        struct_id,
+                        *field_sym,
+                        kind,
+                        &struct_id.inst,
+                    )
                 }
             },
             BpAxiomCtx::FunParam { fun, param_sym, .. } => {
@@ -1262,27 +1275,27 @@ impl<'env> BoogieTranslator<'env> {
                 &info.struct_id,
                 info.field_sym,
                 BehaviorKind::AbortsOf,
-                &[],
+                &info.struct_id.inst,
             );
             let ensures_name = boogie_struct_field_spec_fun_name(
                 self.env,
                 &info.struct_id,
                 info.field_sym,
                 BehaviorKind::EnsuresOf,
-                &[],
+                &info.struct_id.inst,
             );
             let result_fun_name = boogie_struct_field_result_fun_name(
                 self.env,
                 &info.struct_id,
                 info.field_sym,
-                &[],
+                &info.struct_id.inst,
                 false,
             );
             let multi_result_fun_name = boogie_struct_field_result_fun_name(
                 self.env,
                 &info.struct_id,
                 info.field_sym,
-                &[],
+                &info.struct_id.inst,
                 true,
             );
             let explicit_results = results.clone().flatten();
@@ -2096,14 +2109,21 @@ impl<'env> BoogieTranslator<'env> {
             .collect();
         let eval_call = format!("{}({})", eval_fun_name, eval_call_args.join(", "));
 
-        emitln!(
-            self.writer,
-            "axiom (forall {} :: {{{}}} {} <==> {});",
-            quantifier.join(", "),
-            eval_call,
-            eval_call,
-            rhs
-        );
+        if quantifier.is_empty() {
+            // Zero-argument function value with no memory dependency: emit a
+            // plain axiom (Boogie requires at least one bound variable in a
+            // quantifier).
+            emitln!(self.writer, "axiom {} <==> {};", eval_call, rhs);
+        } else {
+            emitln!(
+                self.writer,
+                "axiom (forall {} :: {{{}}} {} <==> {});",
+                quantifier.join(", "),
+                eval_call,
+                eval_call,
+                rhs
+            );
+        }
     }
 
     /// Emit a guarded evaluator axiom for a struct-field variant. Struct
@@ -2128,8 +2148,13 @@ impl<'env> BoogieTranslator<'env> {
     ) {
         let env = self.env;
         let ctor_name = boogie_struct_field_name(env, &info.struct_id, info.field_sym);
-        let bp_name =
-            boogie_struct_field_spec_fun_name(env, &info.struct_id, info.field_sym, kind, &[]);
+        let bp_name = boogie_struct_field_spec_fun_name(
+            env,
+            &info.struct_id,
+            info.field_sym,
+            kind,
+            &info.struct_id.inst,
+        );
         let struct_env_for_field = env.get_struct_qid(info.struct_id.to_qualified_id());
         let field_access = struct_env_for_field.get_field_access_of();
         let access_decl = field_access.iter().find(|a| a.fun_param == info.field_sym);
@@ -3568,7 +3593,7 @@ impl<'env> BoogieTranslator<'env> {
                     &info.struct_id,
                     info.field_sym,
                     kind,
-                    &[],
+                    &info.struct_id.inst,
                 );
                 emitln!(
                     self.writer,
@@ -3592,7 +3617,7 @@ impl<'env> BoogieTranslator<'env> {
                 &info.struct_id,
                 info.field_sym,
                 BehaviorKind::EnsuresOf,
-                &[],
+                &info.struct_id.inst,
             );
 
             let mut full_param_decls = input_param_decls.clone();
@@ -3605,7 +3630,7 @@ impl<'env> BoogieTranslator<'env> {
                     self.env,
                     &info.struct_id,
                     info.field_sym,
-                    &[],
+                    &info.struct_id.inst,
                     false,
                 );
                 emitln!(
@@ -3692,7 +3717,7 @@ impl<'env> BoogieTranslator<'env> {
                     self.env,
                     &info.struct_id,
                     info.field_sym,
-                    &[],
+                    &info.struct_id.inst,
                     true,
                 );
                 let tuple_element_types = Self::deref_output_types(&all_result_type_refs);
@@ -4402,18 +4427,21 @@ impl StructTranslator<'_> {
     ) -> Option<String> {
         let env = self.parent.env;
         let field_ty = field.get_type().instantiate(self.type_inst);
-        if let Type::Fun(params, results, abilities) = &field_ty {
+        if let Type::Fun(_, _, abilities) = &field_ty {
             if abilities.has_store() {
                 let mono_info = mono_analysis::get_info(env);
-                let normalized = Type::Fun(
-                    Box::new(Type::tuple(params.clone().flatten())),
-                    Box::new(Type::tuple(results.clone().flatten())),
-                    AbilitySet::EMPTY,
+                // Keys must derive from the same canonical forms the
+                // registration uses (`check_struct_fun_field`): the deep
+                // `normalize_fun` for the function type, and
+                // ability-normalized instantiation arguments for the
+                // containing struct.
+                let normalized = field_ty.clone().normalize_fun();
+                let struct_qid = self.struct_env.get_qualified_id().instantiate(
+                    self.type_inst
+                        .iter()
+                        .map(|t| t.clone().normalize_nested_funs())
+                        .collect(),
                 );
-                let struct_qid = self
-                    .struct_env
-                    .get_qualified_id()
-                    .instantiate(self.type_inst.to_vec());
                 if let Some(field_infos) = mono_info.fun_struct_field_infos.get(&normalized) {
                     let has_entry = field_infos.iter().any(|info| {
                         info.struct_id == struct_qid && info.field_sym == field.get_name()
@@ -4797,14 +4825,19 @@ impl StructTranslator<'_> {
         );
     }
 
-    /// Return whether a field involves bitwise operations
+    /// Return whether a field renders as a bitvector.
     pub fn field_bv_flag(&self, field_env: &FieldEnv) -> bool {
         let global_state = &self
             .parent
             .env
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number operation state");
-        field_bv_flag_global_state(global_state, field_env)
+        field_bv_flag_global_state(
+            global_state,
+            field_env,
+            self.parent.env,
+            &self.inst(&field_env.get_type()),
+        )
     }
 
     /// Return boogie type for a struct
@@ -5082,17 +5115,44 @@ impl StructTranslator<'_> {
 // Function Translation
 
 impl FunctionTranslator<'_> {
-    /// Return whether a specific TempIndex involves in bitwise operations
-    pub fn bv_flag_from_map(&self, i: &usize, operation_map: &FuncOperationMap) -> bool {
+    /// Return whether a value at position i in the given operation map renders
+    /// as a bitvector. `ty` is the value's (instantiated) type; signed-containing
+    /// types never render as bitvectors even when classified `Bitwise`.
+    pub fn bv_flag_from_map(&self, i: &usize, operation_map: &FuncOperationMap, ty: &Type) -> bool {
         let mid = self.fun_target.module_env().get_id();
         let sid = self.fun_target.func_env.get_id();
-        let param_oper = operation_map.get(&(mid, sid)).unwrap().get(i);
-        matches!(param_oper, Some(&Bitwise))
+        operation_map
+            .get(&(mid, sid))
+            .unwrap()
+            .get(i)
+            .is_some_and(|oper| bv_flag_for_type(self.parent.env, oper, ty))
     }
 
-    /// Return whether a specific TempIndex involves in bitwise operations
-    pub fn bv_flag(&self, num_oper: &NumOperation) -> bool {
-        *num_oper == Bitwise
+    /// Return whether a value of type `ty` with the given number-operation
+    /// classification renders as a bitvector. Signed-containing types never
+    /// do; a `Bitwise` classification can reach them through number-operation
+    /// slots shared across generic instantiations.
+    pub fn bv_flag(&self, num_oper: &NumOperation, ty: &Type) -> bool {
+        bv_flag_for_type(self.parent.env, num_oper, ty)
+    }
+
+    /// Return whether the value of the given temp renders as a bitvector,
+    /// pairing the temp's number-operation slot with its instantiated type.
+    /// The classification is checked before the type fetch: `Bitwise` slots
+    /// are rare, and the type instantiation is only needed for them.
+    pub fn temp_bv_flag(&self, idx: TempIndex) -> bool {
+        let global_state = &self
+            .fun_target
+            .global_env()
+            .get_extension::<GlobalNumberOperationState>()
+            .expect("global number operation state");
+        let mid = self.fun_target.module_env().get_id();
+        let fid = self.fun_target.func_env.get_id();
+        let baseline_flag = self.fun_target.data.variant == FunctionVariant::Baseline;
+        let num_oper = global_state
+            .get_temp_index_oper(mid, fid, idx, baseline_flag)
+            .unwrap();
+        *num_oper == Bitwise && self.bv_flag(num_oper, &self.get_local_type(idx))
     }
 
     /// Return whether a return value at position i involves in bitwise operation
@@ -5103,7 +5163,8 @@ impl FunctionTranslator<'_> {
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number operation state");
         let operation_map = &global_state.get_ret_map();
-        self.bv_flag_from_map(i, operation_map)
+        let ty = self.inst(&self.fun_target.get_return_type(*i));
+        self.bv_flag_from_map(i, operation_map, &ty)
     }
 
     /// Return boogie type for a local with given signature token.
@@ -5113,7 +5174,7 @@ impl FunctionTranslator<'_> {
         ty: &Type,
         num_oper: &NumOperation,
     ) -> String {
-        let bv_flag = self.bv_flag(num_oper);
+        let bv_flag = self.bv_flag(num_oper, ty);
         boogie_type(env, ty, bv_flag)
     }
 
@@ -5141,8 +5202,17 @@ impl FunctionTranslator<'_> {
             .get_qualified_id()
             .instantiate(self.type_inst.to_owned());
         // Set current function on spec_translator so behavioral predicates can
-        // resolve parameter access specifiers for memory args.
+        // resolve parameter access specifiers for memory args, and the
+        // variant so temporary renderings resolve through the right map.
         self.parent.spec_translator.set_current_fun_qid(qid.clone());
+        self.parent
+            .spec_translator
+            .set_current_fun_baseline(fun_target.data.variant == FunctionVariant::Baseline);
+        self.parent.spec_translator.set_current_fun_local_types(
+            (0..fun_target.get_local_count())
+                .map(|i| fun_target.get_local_type(i).clone())
+                .collect(),
+        );
         emitln!(
             writer,
             "// fun {} [{}] {}",
@@ -5154,6 +5224,8 @@ impl FunctionTranslator<'_> {
         self.generate_function_sig();
         self.generate_function_body();
         self.parent.spec_translator.clear_current_fun_qid();
+        self.parent.spec_translator.clear_current_fun_baseline();
+        self.parent.spec_translator.clear_current_fun_local_types();
         emitln!(self.parent.writer);
     }
 
@@ -5900,7 +5972,8 @@ impl FunctionTranslator<'_> {
                 PropKind::Modifies => {
                     let ty = self.inst(&env.get_node_type(exp.node_id()));
                     let ty = ty.skip_reference();
-                    let bv_flag = global_state.get_node_num_oper(exp.node_id()) == Bitwise;
+                    let bv_flag =
+                        bv_flag_for_type(env, &global_state.get_node_num_oper(exp.node_id()), ty);
                     let (mid, sid, inst) = ty.require_struct();
                     let memory = boogie_resource_memory_name(
                         env,
@@ -5957,10 +6030,7 @@ impl FunctionTranslator<'_> {
                 emitln!(writer, "return;");
             },
             Load(_, dest, c) => {
-                let num_oper = global_state
-                    .get_temp_index_oper(mid, fid, *dest, baseline_flag)
-                    .unwrap();
-                let bv_flag = self.bv_flag(num_oper);
+                let bv_flag = self.temp_bv_flag(*dest);
                 let value = match c {
                     Constant::Bool(true) => "true".to_string(),
                     Constant::Bool(false) => "false".to_string(),
@@ -6160,27 +6230,14 @@ impl FunctionTranslator<'_> {
                                     }
                                 }
                             }
-                            let caller_mid = self.fun_target.module_env().get_id();
-                            let caller_fid = self.fun_target.get_id();
                             let fun_verified =
                                 !self.fun_target.func_env.is_explicitly_not_verified(
                                     &ProverOptions::get(self.fun_target.global_env()).verify_scope,
                                 );
                             let mut fun_name = boogie_function_name(&callee_env, inst, &[]);
                             // Helper function to check whether the idx corresponds to a bitwise operation
-                            let compute_flag = |idx: TempIndex| {
-                                targeted
-                                    && fun_verified
-                                    && *global_state
-                                        .get_temp_index_oper(
-                                            caller_mid,
-                                            caller_fid,
-                                            idx,
-                                            baseline_flag,
-                                        )
-                                        .unwrap()
-                                        == Bitwise
-                            };
+                            let compute_flag =
+                                |idx: TempIndex| targeted && fun_verified && self.temp_bv_flag(idx);
                             let instrument_bv2int =
                                 |idx: TempIndex, args_str_vec: &mut Vec<String>| {
                                     let local_ty_srcs_1 = self.get_local_type(idx);
@@ -6687,7 +6744,7 @@ impl FunctionTranslator<'_> {
                         let num_oper = global_state
                             .get_temp_index_oper(mid, fid, dests[0], baseline_flag)
                             .unwrap();
-                        let bv_flag = self.bv_flag(num_oper);
+                        let bv_flag = self.bv_flag(num_oper, ty);
                         let var_str = str_local(dests[0]);
                         let temp_str = boogie_temp(env, ty.skip_reference(), 0, bv_flag);
                         emitln!(writer, "havoc {};", temp_str);
@@ -6717,11 +6774,7 @@ impl FunctionTranslator<'_> {
                             _ => unreachable!(),
                         };
 
-                        let num_oper = global_state
-                            .get_temp_index_oper(mid, fid, src, baseline_flag)
-                            .unwrap();
-
-                        if self.bv_flag(num_oper) {
+                        if self.temp_bv_flag(src) {
                             let src_type = self.get_local_type(src);
                             let src_base = boogie_num_type_base(
                                 self.parent.env,
@@ -6736,6 +6789,27 @@ impl FunctionTranslator<'_> {
                                 src_base,
                                 target_base,
                                 str_local(src)
+                            );
+                        } else if self.temp_bv_flag(dest) {
+                            // Source renders as int (e.g. a signed value whose bv
+                            // classification is clamped) while the destination stays a
+                            // bitvector: cast in the int domain, then convert the
+                            // in-range result.
+                            let int_temp = boogie_temp(env, &self.get_local_type(dest), 0, false);
+                            emitln!(
+                                writer,
+                                "call {} := $Cast{}{}({});",
+                                int_temp,
+                                target_kind,
+                                target_base,
+                                str_local(src)
+                            );
+                            emitln!(
+                                writer,
+                                "{} := $int2bv.{}({});",
+                                str_local(dest),
+                                target_base,
+                                int_temp
                             );
                         } else {
                             emitln!(
@@ -6760,10 +6834,7 @@ impl FunctionTranslator<'_> {
                             CastI256 => ("I", "256"),
                             _ => unreachable!(),
                         };
-                        let num_oper = global_state
-                            .get_temp_index_oper(mid, fid, src, baseline_flag)
-                            .unwrap();
-                        if self.bv_flag(num_oper) {
+                        if self.temp_bv_flag(src) {
                             // src is a bitvector: convert it to int and then do cast
                             let src_type = self.get_local_type(src);
                             let src_base = boogie_num_type_base(
@@ -6813,14 +6884,11 @@ impl FunctionTranslator<'_> {
                         } else {
                             ""
                         };
-                        let num_oper = global_state
-                            .get_temp_index_oper(mid, fid, dest, baseline_flag)
-                            .unwrap();
-                        let bv_flag = self.bv_flag(num_oper);
-
-                        let suffix = boogie_int_suffix(&self.get_local_type(dest), bv_flag);
+                        let dest_ty = self.get_local_type(dest);
+                        let bv_flag = self.temp_bv_flag(dest);
+                        let suffix = boogie_int_suffix(&dest_ty, bv_flag);
                         // Quirk: U8 omits the _unchecked suffix even when set.
-                        let add_type = match &self.get_local_type(dest) {
+                        let add_type = match &dest_ty {
                             Type::Primitive(PrimitiveType::U8) => suffix,
                             _ => format!("{}{}", suffix, unchecked),
                         };
@@ -6837,10 +6905,7 @@ impl FunctionTranslator<'_> {
                         let dest = dests[0];
                         let op1 = srcs[0];
                         let op2 = srcs[1];
-                        let num_oper = global_state
-                            .get_temp_index_oper(mid, fid, dest, baseline_flag)
-                            .unwrap();
-                        let bv_flag = self.bv_flag(num_oper);
+                        let bv_flag = self.temp_bv_flag(dest);
                         let sub_type = boogie_int_suffix(&self.get_local_type(dest), bv_flag);
                         emitln!(
                             writer,
@@ -6855,10 +6920,7 @@ impl FunctionTranslator<'_> {
                         let dest = dests[0];
                         let op1 = srcs[0];
                         let op2 = srcs[1];
-                        let num_oper = global_state
-                            .get_temp_index_oper(mid, fid, dest, baseline_flag)
-                            .unwrap();
-                        let bv_flag = self.bv_flag(num_oper);
+                        let bv_flag = self.temp_bv_flag(dest);
                         let mul_type = boogie_int_suffix(&self.get_local_type(dest), bv_flag);
                         emitln!(
                             writer,
@@ -6873,10 +6935,7 @@ impl FunctionTranslator<'_> {
                         let dest = dests[0];
                         let op1 = srcs[0];
                         let op2 = srcs[1];
-                        let num_oper = global_state
-                            .get_temp_index_oper(mid, fid, dest, baseline_flag)
-                            .unwrap();
-                        let bv_flag = self.bv_flag(num_oper);
+                        let bv_flag = self.temp_bv_flag(dest);
                         let div_type = boogie_int_suffix(&self.get_local_type(dest), bv_flag);
                         emitln!(
                             writer,
@@ -6891,10 +6950,7 @@ impl FunctionTranslator<'_> {
                         let dest = dests[0];
                         let op1 = srcs[0];
                         let op2 = srcs[1];
-                        let num_oper = global_state
-                            .get_temp_index_oper(mid, fid, dest, baseline_flag)
-                            .unwrap();
-                        let bv_flag = self.bv_flag(num_oper);
+                        let bv_flag = self.temp_bv_flag(dest);
                         let mod_type = boogie_int_suffix(&self.get_local_type(dest), bv_flag);
                         emitln!(
                             writer,
@@ -6908,10 +6964,7 @@ impl FunctionTranslator<'_> {
                     Negate => {
                         let dest = dests[0];
                         let op = srcs[0];
-                        let num_oper = global_state
-                            .get_temp_index_oper(mid, fid, dest, baseline_flag)
-                            .unwrap();
-                        if self.bv_flag(num_oper) {
+                        if self.temp_bv_flag(dest) {
                             bv_op_not_enabled_error!(bytecode, fun_target, env, loc);
                         }
                         let neg_type = match &self.get_local_type(dest) {
@@ -6947,10 +7000,7 @@ impl FunctionTranslator<'_> {
                         let op1 = srcs[0];
                         let op2 = srcs[1];
                         let sh_oper_str = if oper == &Shl { "Shl" } else { "Shr" };
-                        let num_oper = global_state
-                            .get_temp_index_oper(mid, fid, dest, baseline_flag)
-                            .unwrap();
-                        let bv_flag = self.bv_flag(num_oper);
+                        let bv_flag = self.temp_bv_flag(dest);
                         if bv_flag {
                             let target_type = match &self.get_local_type(dest) {
                                 Type::Primitive(PrimitiveType::U8) => "Bv8",
@@ -7025,10 +7075,7 @@ impl FunctionTranslator<'_> {
                         let op1 = srcs[0];
                         let op2 = srcs[1];
                         let make_comparison = |comp_oper: &str, op1, op2, dest| {
-                            let num_oper = global_state
-                                .get_temp_index_oper(mid, fid, op1, baseline_flag)
-                                .unwrap();
-                            let bv_flag = self.bv_flag(num_oper);
+                            let bv_flag = self.temp_bv_flag(op1);
                             let lt_type = if bv_flag {
                                 match &self.get_local_type(op1) {
                                     Type::Primitive(PrimitiveType::U8) => "Bv8".to_string(),
@@ -7037,8 +7084,17 @@ impl FunctionTranslator<'_> {
                                     Type::Primitive(PrimitiveType::U64) => "Bv64".to_string(),
                                     Type::Primitive(PrimitiveType::U128) => "Bv128".to_string(),
                                     Type::Primitive(PrimitiveType::U256) => "Bv256".to_string(),
-                                    Type::Primitive(_)
-                                    | Type::Tuple(_)
+                                    // `bv_flag` is clamped for signed operands, so this arm is
+                                    // unreachable unless a new path marks them Bitwise again;
+                                    // degrade to a diagnostic instead of crashing.
+                                    Type::Primitive(_) => {
+                                        env.error(
+                                            &self.fun_target.get_bytecode_loc(attr_id),
+                                            "comparison operand cannot be turned into bit vector",
+                                        );
+                                        "".to_string()
+                                    },
+                                    Type::Tuple(_)
                                     | Type::Vector(_)
                                     | Type::Struct(_, _, _)
                                     | Type::TypeParameter(_)
@@ -7100,10 +7156,7 @@ impl FunctionTranslator<'_> {
                         let dest = dests[0];
                         let op1 = srcs[0];
                         let op2 = srcs[1];
-                        let num_oper = global_state
-                            .get_temp_index_oper(mid, fid, op1, baseline_flag)
-                            .unwrap();
-                        let bv_flag = self.bv_flag(num_oper);
+                        let bv_flag = self.temp_bv_flag(op1);
                         let oper = boogie_equality_for_type(
                             env,
                             oper == &Eq,
@@ -7150,11 +7203,11 @@ impl FunctionTranslator<'_> {
                                 let num_oper_1 = global_state
                                     .get_temp_index_oper(mid, fid, op1, baseline_flag)
                                     .unwrap();
-                                let op1_bv_flag = self.bv_flag(num_oper_1);
+                                let op1_bv_flag = self.bv_flag(num_oper_1, op1_ty);
                                 let num_oper_2 = global_state
                                     .get_temp_index_oper(mid, fid, op2, baseline_flag)
                                     .unwrap();
-                                let op2_bv_flag = self.bv_flag(num_oper_2);
+                                let op2_bv_flag = self.bv_flag(num_oper_2, op2_ty);
                                 let op1_str = if !op1_bv_flag {
                                     format!(
                                         "$int2bv.{}({})",
@@ -7206,23 +7259,19 @@ impl FunctionTranslator<'_> {
                     },
                     Drop | Release => {},
                     TraceLocal(idx) => {
-                        let num_oper = global_state
-                            .get_temp_index_oper(mid, fid, srcs[0], baseline_flag)
-                            .unwrap();
-                        let bv_flag = self.bv_flag(num_oper);
+                        let bv_flag = self.temp_bv_flag(srcs[0]);
                         self.track_local(*idx, srcs[0], bv_flag);
                     },
                     TraceReturn(i) => {
-                        let oper_map = global_state.get_ret_map();
-                        let bv_flag = self.bv_flag_from_map(&srcs[0], oper_map);
+                        // The traced value is the TEMP: its rendering (not the
+                        // return slot's classification) decides the debug
+                        // temp's name, matching `compute_needed_temps`.
+                        let bv_flag = self.temp_bv_flag(srcs[0]);
                         self.track_return(*i, srcs[0], bv_flag);
                     },
                     TraceAbort => self.track_abort(&str_local(srcs[0])),
                     TraceExp(kind, node_id) => {
-                        let bv_flag = *global_state
-                            .get_temp_index_oper(mid, fid, srcs[0], baseline_flag)
-                            .unwrap()
-                            == Bitwise;
+                        let bv_flag = self.temp_bv_flag(srcs[0]);
                         self.track_exp(*kind, *node_id, srcs[0], bv_flag)
                     },
                     EmitEvent => {
@@ -7256,10 +7305,7 @@ impl FunctionTranslator<'_> {
                     writer.indent();
                     *last_tracked_loc = None;
                     self.track_loc(last_tracked_loc, &loc);
-                    let num_oper_code = global_state
-                        .get_temp_index_oper(mid, fid, *code, baseline_flag)
-                        .unwrap();
-                    let bv2int_str = if *num_oper_code == Bitwise {
+                    let bv2int_str = if self.temp_bv_flag(*code) {
                         format!(
                             "$int2bv.{}($abort_code)",
                             boogie_num_type_base(
@@ -7281,10 +7327,7 @@ impl FunctionTranslator<'_> {
                 }
             },
             Abort(_, src, _) => {
-                let num_oper_code = global_state
-                    .get_temp_index_oper(mid, fid, *src, baseline_flag)
-                    .unwrap();
-                let int2bv_str = if *num_oper_code == Bitwise {
+                let int2bv_str = if self.temp_bv_flag(*src) {
                     format!(
                         "$bv2int.{}({})",
                         boogie_num_type_base(
@@ -7571,6 +7614,8 @@ impl FunctionTranslator<'_> {
                                 .get_extension::<GlobalNumberOperationState>()
                                 .expect("global number operation state"),
                             &field_env,
+                            self.parent.env,
+                            &field_ty,
                         ),
                     );
                     let update_fun = if variant.is_none() {
@@ -7935,21 +7980,33 @@ impl FunctionTranslator<'_> {
             .global_env()
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number operation state");
-        let ret_oper_map = &global_state.get_ret_map();
         let mid = fun_target.func_env.module_env.get_id();
         let fid = fun_target.func_env.get_id();
 
         for bc in &fun_target.data.code {
             match bc {
                 Call(_, dests, oper, srcs, ..) => match oper {
-                    TraceExp(_, id) => {
-                        let ty = &self.inst(&env.get_node_type(*id));
-                        let bv_flag = global_state.get_node_num_oper(*id) == Bitwise;
+                    TraceExp(..) => {
+                        // Mirror the emission site (`track_exp`): both the
+                        // type and the flag derive from the traced LOCAL,
+                        // not the exp node — node types can be generalized
+                        // `num` where the local is concrete, and the node
+                        // classification can disagree with the local's.
+                        let ty = &self.get_local_type(srcs[0]);
+                        let num_oper = &global_state
+                            .get_temp_index_oper(mid, fid, srcs[0], baseline_flag)
+                            .unwrap();
+                        let bv_flag = self.bv_flag(num_oper, ty);
                         need(ty, bv_flag, 1)
                     },
-                    TraceReturn(idx) => {
-                        let ty = &self.inst(&fun_target.get_return_type(*idx));
-                        let bv_flag = self.bv_flag_from_map(idx, ret_oper_map);
+                    TraceReturn(_) => {
+                        // Mirror the emission site (`track_return`): type and
+                        // flag derive from the traced temp.
+                        let ty = &self.get_local_type(srcs[0]);
+                        let num_oper = &global_state
+                            .get_temp_index_oper(mid, fid, srcs[0], baseline_flag)
+                            .unwrap();
+                        let bv_flag = self.bv_flag(num_oper, ty);
                         need(ty, bv_flag, 1)
                     },
                     TraceLocal(_) => {
@@ -7957,15 +8014,22 @@ impl FunctionTranslator<'_> {
                         let num_oper = &global_state
                             .get_temp_index_oper(mid, fid, srcs[0], baseline_flag)
                             .unwrap();
-                        let bv_flag = self.bv_flag(num_oper);
+                        let bv_flag = self.bv_flag(num_oper, ty);
                         need(ty, bv_flag, 1)
+                    },
+                    CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256 => {
+                        // An int-rendered source (clamped signed) cast into a
+                        // bv-classified dest goes through an int scratch temp.
+                        if self.temp_bv_flag(dests[0]) && !self.temp_bv_flag(srcs[0]) {
+                            need(&self.get_local_type(dests[0]), false, 1)
+                        }
                     },
                     Havoc(HavocKind::MutationValue) => {
                         let ty = &self.get_local_type(dests[0]);
                         let num_oper = &global_state
                             .get_temp_index_oper(mid, fid, dests[0], baseline_flag)
                             .unwrap();
-                        let bv_flag = self.bv_flag(num_oper);
+                        let bv_flag = self.bv_flag(num_oper, ty);
                         need(ty, bv_flag, 1)
                     },
                     Pack(pack_mid, pack_sid, pack_inst)
@@ -7987,9 +8051,11 @@ impl FunctionTranslator<'_> {
                     _ => {},
                 },
                 Prop(_, PropKind::Modifies, exp) => {
-                    let bv_flag = global_state.get_node_num_oper(exp.node_id()) == Bitwise;
+                    let ty = self.inst(&env.get_node_type(exp.node_id()));
+                    let bv_flag =
+                        bv_flag_for_type(env, &global_state.get_node_num_oper(exp.node_id()), &ty);
                     need(&BOOL_TYPE, false, 1);
-                    need(&self.inst(&env.get_node_type(exp.node_id())), bv_flag, 1)
+                    need(&ty, bv_flag, 1)
                 },
                 _ => {},
             }
@@ -8057,15 +8123,16 @@ impl FunctionTranslator<'_> {
         };
         for field in &fields {
             let field_ty = field.get_type().instantiate(inst);
-            if let Type::Fun(params, results, abilities) = &field_ty {
+            if let Type::Fun(_, _, abilities) = &field_ty {
                 if abilities.has_store() {
-                    // Normalize to check against MonoInfo (same as mono_analysis::normalize_fun_ty)
-                    let normalized = Type::Fun(
-                        Box::new(Type::tuple(params.clone().flatten())),
-                        Box::new(Type::tuple(results.clone().flatten())),
-                        AbilitySet::EMPTY,
+                    // Same canonical keys as the registration; see
+                    // `boogie_field_identity_constraint`.
+                    let normalized = field_ty.clone().normalize_fun();
+                    let struct_qid = struct_env.get_qualified_id().instantiate(
+                        inst.iter()
+                            .map(|t| t.clone().normalize_nested_funs())
+                            .collect(),
                     );
-                    let struct_qid = struct_env.get_qualified_id().instantiate(inst.clone());
                     // Check if this field has a StructFieldInfo entry
                     if let Some(field_infos) = mono_info.fun_struct_field_infos.get(&normalized) {
                         let has_entry = field_infos.iter().any(|info| {
