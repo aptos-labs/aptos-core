@@ -2505,6 +2505,7 @@ impl ExpData {
                         | SaveStateAnchor(..)
                         | WithStateAnchor(..)
                         | FoldsCaptureAnchor(..)
+                        | InlineCallSummary
                         | Trace(..)
                         | SpecPublish(..)
                         | SpecRemove(..)
@@ -3175,16 +3176,12 @@ pub enum Operation {
     /// `old(..)` and pre-state references resolve to the state saved at the
     /// matching `SaveStateAnchor` marker instead of function entry.
     WithStateAnchor(MemoryLabel),
-    /// Inliner-internal marker (no surface syntax), emitted as an `assume`
-    /// condition in an inline spec block at the entry of an inline-function
-    /// expansion whose `folds_of` occurrences were deferred through a
-    /// forwarding lambda (see the inliner's anchored `folds_of` deferral):
-    /// marks the program point at which the captured variables of the
-    /// eventually supplied lambda are snapshotted. Consumed by the inliner
-    /// itself — replaced by the snapshot bindings when a deferred
-    /// occurrence anchored at the label resolves, erased when none
-    /// remains — and never reaches code generation or the prover backend.
+    /// Marks where spec instrumentation snapshots values read through a
+    /// matching `WithStateAnchor`.
     FoldsCaptureAnchor(MemoryLabel),
+    /// Exact result and abort summary for source derivation of an inline call.
+    /// Args: (result, aborts).
+    InlineCallSummary,
     Trace(TraceKind),
 
     // Spec-level mutation builtins. Two-state predicates carrying MemoryRange.
@@ -4167,6 +4164,7 @@ impl Operation {
             SaveStateAnchor(..) => false,    // Spec
             WithStateAnchor(..) => false,    // Spec
             FoldsCaptureAnchor(..) => false, // Spec
+            InlineCallSummary => false,      // Spec
             Trace(..) => false,              // Spec
             SpecPublish(..) => false,        // Spec
             SpecRemove(..) => false,         // Spec

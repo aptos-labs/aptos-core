@@ -66,11 +66,10 @@ module aptos_framework::aptos_account {
             error::invalid_argument(EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH)
         );
 
-        // `enumerate_ref` is not supported in verification since
-        // its lambda accesses global state (TODO(#20371)).
-        for (i in 0..recipients_len) {
-            transfer(source, recipients[i], amounts[i]);
-        };
+        recipients.enumerate_ref(|i, to| {
+                let amount = amounts[i];
+                transfer(source, *to, amount);
+            });
     }
 
     /// Convenient function to transfer APT to a recipient account that might not exist.
@@ -93,11 +92,10 @@ module aptos_framework::aptos_account {
             error::invalid_argument(EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH)
         );
 
-        // `enumerate_ref` is not supported in verification since
-        // its lambda accesses global state (TODO(#20371)).
-        for (i in 0..recipients_len) {
-            transfer_coins<CoinType>(from, recipients[i], amounts[i]);
-        };
+        recipients.enumerate_ref(|i, to| {
+                let amount = amounts[i];
+                transfer_coins<CoinType>(from, *to, amount);
+            });
     }
 
     /// Convenient function to transfer a custom CoinType to a recipient account that might not exist.
@@ -145,11 +143,10 @@ module aptos_framework::aptos_account {
             error::invalid_argument(EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH)
         );
 
-        // `enumerate_ref` is not supported in verification since
-        // its lambda accesses global state (TODO(#20371)).
-        for (i in 0..recipients_len) {
-            transfer_fungible_assets(from, metadata, recipients[i], amounts[i]);
-        };
+        recipients.enumerate_ref(|i, to| {
+                let amount = amounts[i];
+                transfer_fungible_assets(from, metadata, *to, amount);
+            });
     }
 
     /// Convenient function to deposit fungible asset into a recipient account that might not exist.

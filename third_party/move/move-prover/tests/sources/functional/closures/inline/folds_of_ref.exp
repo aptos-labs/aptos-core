@@ -13,8 +13,7 @@ error: post-condition does not hold
     =         r = <redacted>
     =     at tests/sources/functional/closures/inline/folds_of_ref.move:10: each_ref
     =         v = <redacted>
-    =     at tests/sources/functional/closures/inline/folds_of_ref.move:19: each_ref
-    =         <redacted> = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_ref.move:89: weighted_via_ref_wrong
     =     at tests/sources/functional/closures/inline/folds_of_ref.move:11: each_ref
     =         i = <redacted>
     =     at tests/sources/functional/closures/inline/folds_of_ref.move:12: each_ref

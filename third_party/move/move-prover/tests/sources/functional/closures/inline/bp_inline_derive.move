@@ -80,4 +80,33 @@ module 0x42::bp_inline_derive {
         requires x <= 1000;
         ensures result == (if (x * 2 > 100) x * 2 - 100 else x * 2);
     }
+
+    // A capture write is irrelevant when the returned expression does not
+    // read the capture's evolving value.
+    fun compute_capture_independent(x: u64): u64 {
+        let count = 0;
+        let r = compute(|y| {
+            count = count + 1;
+            y + 1
+        }, x);
+        assert!(count == 1, 0);
+        r
+    }
+    spec compute_capture_independent {
+        requires x < MAX_U64;
+        ensures result == x + 1;
+    }
+
+    // ===== result_of through a zero-argument inline helper =====
+
+    inline fun seven(): u64 { 7 }
+
+    fun compute_with_inline_helper(x: u64): u64 {
+        compute(|y| y + seven(), x)
+    }
+    spec compute_with_inline_helper {
+        requires x <= MAX_U64 - 7;
+        aborts_if false;
+        ensures result == x + 7;
+    }
 }

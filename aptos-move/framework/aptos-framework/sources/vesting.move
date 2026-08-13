@@ -499,27 +499,17 @@ module aptos_framework::vesting {
             return shareholder_or_beneficiary
         };
         let vesting_contract = borrow_global<VestingContract>(vesting_contract_address);
-        let found_shareholder = @0x0;
+        let result = @0x0;
         shareholders.any(|shareholder| {
             if (shareholder_or_beneficiary == get_beneficiary(vesting_contract, *shareholder)) {
-                found_shareholder = *shareholder;
+                result = *shareholder;
                 true
             } else {
                 false
             }
-        } spec {
-            // The Move Prover cannot infer the result of a lambda that
-            // modifies a value from the enclosing scope (`found_shareholder`),
-            // so state the result explicitly: this is the `get_beneficiary`
-            // logic, phrased with the `simple_map` spec functions.
-            ensures result == (shareholder_or_beneficiary ==
-                (if (simple_map::spec_contains_key(vesting_contract.beneficiaries, shareholder))
-                    simple_map::spec_get(vesting_contract.beneficiaries, shareholder)
-                else
-                    shareholder));
         });
 
-        found_shareholder
+        result
     }
 
     /// Create a vesting schedule with the given schedule of distributions, a vesting start time and period duration.
@@ -571,10 +561,10 @@ module aptos_framework::vesting {
         let grant = coin::zero<AptosCoin>();
         let grant_amount = 0;
         let grant_pool = pool_u64::create(MAXIMUM_SHAREHOLDERS);
-        // `for_each_ref` is not supported in verification since
-        // `pool_u64` lacks functional specs (TODO(#20373)).
-        for (i in 0..shareholders.length()) {
-            let shareholder = shareholders[i];
+        // TODO(#20373): add exact functional specs for pool mutations so
+        // verification need not weaken this HOF's fold.
+        shareholders.for_each_ref(|shareholder| {
+            let shareholder: address = *shareholder;
             let (_, buy_in) = simple_map::remove(&mut buy_ins, &shareholder);
             let buy_in_amount = coin::value(&buy_in);
             coin::merge(&mut grant, buy_in);
@@ -584,7 +574,7 @@ module aptos_framework::vesting {
                 buy_in_amount,
             );
             grant_amount += buy_in_amount;
-        };
+        });
         assert!(grant_amount > 0, error::invalid_argument(EZERO_GRANT));
 
         // If this is the first time this admin account has created a vesting contract, initialize the admin store.
@@ -657,11 +647,10 @@ module aptos_framework::vesting {
 
         assert!(len != 0, error::invalid_argument(EVEC_EMPTY_FOR_MANY_FUNCTION));
 
-        // `for_each_ref` is not supported in verification since
-        // its lambda accesses global state (TODO(#20371)).
-        for (i in 0..len) {
-            unlock_rewards(contract_addresses[i]);
-        };
+        contract_addresses.for_each_ref(|contract_address| {
+            let contract_address: address = *contract_address;
+            unlock_rewards(contract_address);
+        });
     }
 
     /// Unlock any vested portion of the grant.
@@ -722,11 +711,10 @@ module aptos_framework::vesting {
 
         assert!(len != 0, error::invalid_argument(EVEC_EMPTY_FOR_MANY_FUNCTION));
 
-        // `for_each_ref` is not supported in verification since
-        // its lambda accesses global state (TODO(#20371)).
-        for (i in 0..len) {
-            vest(contract_addresses[i]);
-        };
+        contract_addresses.for_each_ref(|contract_address| {
+            let contract_address = *contract_address;
+            vest(contract_address);
+        });
     }
 
     /// Distribute any withdrawable stake from the stake pool.
@@ -742,18 +730,16 @@ module aptos_framework::vesting {
         };
 
         // Distribute coins to all shareholders in the vesting contract.
-        // `for_each_ref` is not supported in verification since
-        // its lambda accesses global state (TODO(#20371)).
         let grant_pool = &vesting_contract.grant_pool;
         let shareholders = &grant_pool.shareholders();
-        for (i in 0..shareholders.length()) {
-            let shareholder = shareholders[i];
+        shareholders.for_each_ref(|shareholder| {
+            let shareholder = *shareholder;
             let shares = pool_u64::shares(grant_pool, shareholder);
             let amount = pool_u64::shares_to_amount_with_total_coins(grant_pool, shares, total_distribution_amount);
             let share_of_coins = coin::extract(&mut coins, amount);
             let recipient_address = get_beneficiary(vesting_contract, shareholder);
             aptos_account::deposit_coins(recipient_address, share_of_coins);
-        };
+        });
 
         // Send any remaining "dust" (leftover due to rounding error) to the withdrawal address.
         if (coin::value(&coins) > 0) {
@@ -777,11 +763,10 @@ module aptos_framework::vesting {
 
         assert!(len != 0, error::invalid_argument(EVEC_EMPTY_FOR_MANY_FUNCTION));
 
-        // `for_each_ref` is not supported in verification since
-        // its lambda accesses global state (TODO(#20371)).
-        for (i in 0..len) {
-            distribute(contract_addresses[i]);
-        };
+        contract_addresses.for_each_ref(|contract_address| {
+            let contract_address = *contract_address;
+            distribute(contract_address);
+        });
     }
 
     /// Terminate the vesting contract and send all funds back to the withdrawal address.

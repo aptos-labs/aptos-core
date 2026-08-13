@@ -7,14 +7,14 @@
 
 use crate::{
     boogie_helpers::{
-        boogie_address, boogie_address_blob, boogie_behavioral_eval_fun_name,
-        boogie_behavioral_fun_result_name, boogie_byte_blob, boogie_choice_fun_name,
-        boogie_closure_pack_name, boogie_declare_global, boogie_equality_for_type,
-        boogie_field_sel, boogie_field_update, boogie_inst_suffix, boogie_modifies_memory_name,
-        boogie_num_type_base, boogie_reflection_type_info, boogie_reflection_type_is_struct,
-        boogie_reflection_type_name, boogie_resource_memory_name, boogie_spec_fun_name,
-        boogie_spec_var_name, boogie_struct_name, boogie_struct_variant_name, boogie_type,
-        boogie_type_suffix, boogie_value_blob, boogie_variant_field_update,
+        behavioral_old_memory, boogie_address, boogie_address_blob,
+        boogie_behavioral_eval_fun_name, boogie_behavioral_fun_result_name, boogie_byte_blob,
+        boogie_choice_fun_name, boogie_closure_pack_name, boogie_declare_global,
+        boogie_equality_for_type, boogie_field_sel, boogie_field_update, boogie_inst_suffix,
+        boogie_modifies_memory_name, boogie_num_type_base, boogie_reflection_type_info,
+        boogie_reflection_type_is_struct, boogie_reflection_type_name, boogie_resource_memory_name,
+        boogie_spec_fun_name, boogie_spec_var_name, boogie_struct_name, boogie_struct_variant_name,
+        boogie_type, boogie_type_suffix, boogie_value_blob, boogie_variant_field_update,
         boogie_well_formed_expr, bv_flag_for_type, compute_evaluator_memory_union, MAX_TUPLE_SIZE,
     },
     bytecode_translator::has_native_equality,
@@ -420,13 +420,13 @@ impl SpecTranslator<'_> {
                     continue;
                 }
                 if type_inst.is_empty() {
-                    self.translate_spec_fun(module_env, *id, fun);
+                    self.translate_spec_fun(module_env, *id, fun, mono_info);
                 } else {
                     let new_spec_trans = SpecTranslator {
                         type_inst,
                         ..self.clone()
                     };
-                    new_spec_trans.translate_spec_fun(module_env, *id, fun);
+                    new_spec_trans.translate_spec_fun(module_env, *id, fun, mono_info);
                 }
             }
         }
@@ -543,11 +543,10 @@ impl SpecTranslator<'_> {
         id: SpecFunId,
         boogie_name: &str,
         bv_flag_result: bool,
+        needed: bool,
     ) {
         let qid = module_env.get_id().qualified(id);
-        if !self
-            .env
-            .spec_fun_needs_move_equality_congruence(qid.instantiate(self.type_inst.clone()))
+        if !needed
             || fun.uses_old
             || !fun.used_memory.is_empty()
             || matches!(fun.result_type, Type::Tuple(_) | Type::Fun(..))
@@ -628,7 +627,13 @@ impl SpecTranslator<'_> {
     }
 
     #[allow(clippy::literal_string_with_formatting_args)]
-    fn translate_spec_fun(&self, module_env: &ModuleEnv, id: SpecFunId, fun: &SpecFunDecl) {
+    fn translate_spec_fun(
+        &self,
+        module_env: &ModuleEnv,
+        id: SpecFunId,
+        fun: &SpecFunDecl,
+        mono_info: &MonoInfo,
+    ) {
         if fun.body.is_none() && !fun.uninterpreted {
             // This function is native and expected to be found in the prelude.
             return;
@@ -962,6 +967,11 @@ impl SpecTranslator<'_> {
                 id,
                 &boogie_name,
                 bv_flag_result,
+                mono_info.move_equality_congruence_spec_funs.contains(
+                    &module_env
+                        .get_id()
+                        .qualified_inst(id, self.type_inst.clone()),
+                ),
             );
             // Generate axioms from the spec block attached to the spec function
             // TODO(#16256): support general condition kinds, exploration use of `spec_translator` in `move_model`
@@ -1633,9 +1643,10 @@ impl SpecTranslator<'_> {
             // the backend.
             Operation::SaveStateAnchor(..)
             | Operation::WithStateAnchor(..)
-            | Operation::FoldsCaptureAnchor(..) => self.error(
+            | Operation::FoldsCaptureAnchor(..)
+            | Operation::InlineCallSummary => self.error(
                 &loc,
-                "unexpected state anchor operation in specification translation",
+                "unexpected prover-internal operation in specification translation",
             ),
 
             // Internal operators for event stores.
@@ -2560,10 +2571,9 @@ impl SpecTranslator<'_> {
         let post = range.post;
         let fun_env = self.env.get_function(fun_qid.to_qualified_id());
         let used_memory = fun_env.get_spec_used_memory();
-        let old_memory: BTreeSet<_> = fun_env
-            .get_spec_old_memory()
-            .iter()
-            .map(|m| m.clone().instantiate(&fun_qid.inst))
+        let old_memory: BTreeSet<_> = behavioral_old_memory(&fun_env)
+            .into_iter()
+            .map(|m| m.instantiate(&fun_qid.inst))
             .collect();
         let uses_old = !old_memory.is_empty();
         let current = match kind {

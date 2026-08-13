@@ -9,7 +9,7 @@ error: post-condition does not hold
     =         entries = <redacted>
     =     at tests/sources/functional/closures/inline/bp_forwarding.move:36: each_mut
     =         v = <redacted>
-    =         <redacted> = <redacted>
+    =     at tests/sources/functional/closures/inline/bp_forwarding.move:172: set_values_wrong
     =     at tests/sources/functional/closures/inline/bp_forwarding.move:37: each_mut
     =         i = <redacted>
     =     at tests/sources/functional/closures/inline/bp_forwarding.move:38: each_mut

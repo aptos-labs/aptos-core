@@ -52,13 +52,11 @@ module aptos_framework::sigma_protocol_statement_builder {
     /// Add a vector of compressed points; decompresses all internally. Returns the starting index.
     public(friend) fun add_points<P>(self: &mut StatementBuilder<P>, v: &vector<CompressedRistretto>): u64 {
         let start = self.points.length();
-        // `for_each_ref` is not supported in verification since
-        // its captures lack `copy`/`drop` (TODO(#20372)).
-        for (i in 0..v.length()) {
-            let p_val = v[i];
+        v.for_each_ref(|p| {
+            let p_val = *p;
             self.points.push_back(p_val.point_decompress());
             self.compressed_points.push_back(p_val);
-        };
+        });
         start
     }
 
@@ -68,7 +66,7 @@ module aptos_framework::sigma_protocol_statement_builder {
         let start = self.points.length();
         let cloned = vector[];
         // `for_each_ref` is not supported in verification since
-        // its captures lack `copy`/`drop` (TODO(#20372)).
+        // `point_clone` lacks a functional result spec (TODO(#20376)).
         for (i in 0..v.length()) {
             let p_val = v[i];
             let decompressed = p_val.point_decompress();

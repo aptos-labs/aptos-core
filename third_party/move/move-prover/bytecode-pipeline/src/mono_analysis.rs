@@ -63,6 +63,7 @@ pub struct MonoInfo {
     pub structs: BTreeMap<QualifiedId<StructId>, BTreeSet<Vec<Type>>>,
     pub funs: BTreeMap<(QualifiedId<FunId>, FunctionVariant), BTreeSet<Vec<Type>>>,
     pub spec_funs: BTreeMap<QualifiedId<SpecFunId>, BTreeSet<Vec<Type>>>,
+    pub move_equality_congruence_spec_funs: BTreeSet<QualifiedInstId<SpecFunId>>,
     pub spec_vars: BTreeMap<QualifiedId<SpecVarId>, BTreeSet<Vec<Type>>>,
     pub type_params: BTreeSet<u16>,
     pub vec_inst: BTreeSet<Type>,
@@ -78,6 +79,10 @@ pub struct MonoInfo {
     /// A map from function types used in the program to the closures appearing in
     /// code constructing values of this function type.
     pub fun_infos: BTreeMap<Type, BTreeSet<ClosureInfo>>,
+    /// Function types used by a behavioral predicate in the analyzed program.
+    pub behavioral_fun_types: BTreeSet<Type>,
+    /// Function types invoked dynamically in the analyzed program.
+    pub applied_fun_types: BTreeSet<Type>,
     /// A map from function types to function-typed parameters of verification target functions.
     /// This enables the Boogie backend to generate parameter variants in the function type datatype.
     pub fun_param_infos: BTreeMap<Type, BTreeSet<FunParamInfo>>,
@@ -1537,6 +1542,13 @@ impl Analyzer<'_> {
         // instructions because the types those are using are reflected in locals which are analyzed
         // elsewhere.
         match bc {
+            Call(_, _, Invoke, srcs, _) => {
+                if let Some(fun) = srcs.last() {
+                    let fun_type =
+                        self.normalize_fun_ty(self.instantiate(target.get_local_type(*fun)));
+                    self.info.applied_fun_types.insert(fun_type);
+                }
+            },
             Call(_, _, Function(mid, fid, targs), ..)
             | Call(_, _, Closure(mid, fid, targs, ..), ..) => {
                 let module_env = &self.env.get_module(*mid);
@@ -1718,6 +1730,26 @@ impl Analyzer<'_> {
         }
     }
 
+    fn add_move_equality_congruence_spec_fun(&mut self, root: QualifiedInstId<SpecFunId>) {
+        let mut todo = vec![root];
+        while let Some(id) = todo.pop() {
+            if !self
+                .info
+                .move_equality_congruence_spec_funs
+                .insert(id.clone())
+            {
+                continue;
+            }
+            if let Some(body) = self.env.get_spec_fun(id.to_qualified_id()).body.clone() {
+                todo.extend(
+                    body.called_spec_funs(self.env)
+                        .into_iter()
+                        .map(|callee| callee.instantiate(&id.inst)),
+                );
+            }
+        }
+    }
+
     fn analyze_exp(&mut self, exp: &ExpData) {
         exp.visit_post_order(&mut |e| {
             let node_id = e.node_id();
@@ -1763,10 +1795,31 @@ impl Analyzer<'_> {
                     }
                 }
             }
+            if let ExpData::Call(_, ast::Operation::Behavior(..), args) = e {
+                if let Some(target) = args.first() {
+                    let fun_type = self.normalize_fun_ty(
+                        self.instantiate(&self.env.get_node_type(target.node_id())),
+                    );
+                    self.info.behavioral_fun_types.insert(fun_type);
+                }
+            }
+            if let ExpData::Invoke(_, target, _) = e {
+                let fun_type = self
+                    .normalize_fun_ty(self.instantiate(&self.env.get_node_type(target.node_id())));
+                self.info.applied_fun_types.insert(fun_type);
+            }
             if let ExpData::Call(node_id, ast::Operation::SpecFunction(mid, fid, _), _) = e {
                 let actuals = self.instantiate_vec(&self.env.get_node_instantiation(*node_id));
                 let module = self.env.get_module(*mid);
                 let spec_fun = module.get_spec_fun(*fid);
+                if self
+                    .env
+                    .spec_fun_call_needs_move_equality_congruence(*node_id)
+                {
+                    self.add_move_equality_congruence_spec_fun(
+                        mid.qualified_inst(*fid, actuals.clone()),
+                    );
+                }
 
                 // the type reflection functions are specially handled here
                 if self.env.get_extlib_address() == *module.get_name().addr() {

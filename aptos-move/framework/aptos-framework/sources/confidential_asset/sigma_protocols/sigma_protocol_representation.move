@@ -12,7 +12,7 @@ module aptos_framework::sigma_protocol_representation {
     friend aptos_framework::sigma_protocol_schnorr_example;
 
     use std::error;
-    use aptos_std::ristretto255::{Self, Scalar, RistrettoPoint, scalar_one};
+    use aptos_std::ristretto255::{Scalar, RistrettoPoint, scalar_one};
     use aptos_framework::sigma_protocol_statement::Statement;
 
     /// The number of points and scalars in a Representation needs to be the same.
@@ -63,13 +63,6 @@ module aptos_framework::sigma_protocol_representation {
     public(friend) fun scale(self: &mut Representation, e: &Scalar) {
         self.scalars.for_each_mut(|scalar| {
             scalar.scalar_mul_assign(e);
-        } spec {
-            // The Move Prover cannot verify lambdas that call functions
-            // returning `&mut` references (`scalar_mul_assign` returns
-            // `&mut Scalar` for chaining); state the lambda's effect on
-            // `scalar` explicitly.
-            aborts_if false;
-            ensures scalar.data == ristretto255::spec_scalar_mul_internal(old(scalar).data, e.data);
         });
     }
 }

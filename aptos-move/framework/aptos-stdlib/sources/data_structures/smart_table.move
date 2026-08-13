@@ -160,13 +160,11 @@ module aptos_std::smart_table {
     inline fun unzip_entries<K: copy, V: copy>(entries: &vector<Entry<K, V>>): (vector<K>, vector<V>) {
         let keys = vector[];
         let values = vector[];
-        // `for_each_ref` is not supported in verification since
-        // its captures lack `copy`/`drop` (TODO(#20372)).
-        for (i in 0..entries.length()) {
-            let entry = entries.borrow(i);
+        entries.for_each_ref(|e|{
+            let entry: &Entry<K, V> = e;
             keys.push_back(entry.key);
             values.push_back(entry.value);
-        };
+        });
         (keys, values)
     }
 
@@ -436,8 +434,8 @@ module aptos_std::smart_table {
         f: |&V1|V2
     ): SmartTable<K, V2> {
         let new_table = new<K, V2>();
-        // `for_each_ref` is not supported in verification since
-        // its captures lack `copy`/`drop` (TODO(#20372)).
+        // `for_each_ref` is not supported in verification since capture
+        // updates cannot depend on a forwarded HOF (TODO(#20383)).
         for (i in 0..self.num_buckets()) {
             let bucket = self.borrow_buckets().borrow(i);
             for (j in 0..bucket.length()) {

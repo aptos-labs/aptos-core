@@ -191,9 +191,9 @@ module 0x42::bp_inline_errors {
     }
 
     /// `unchanged_of` builds its frame from the write footprint derived from
-    /// the lambda's own body; a callee's summary does not provide one.
+    /// the lambda body; a callee summary does not provide one, so it weakens.
     fun unchanged_of_callee_footprint(v: &vector<address>) {
-        each_unchanged(v, |a| bump(a)); // error: the memory footprint of the lambda's body cannot be determined exactly
+        each_unchanged(v, |a| bump(a)); // warning: unchanged_of weakened
     }
 
     inline fun each_ensures(v: &vector<address>, f: |address|) {
@@ -208,6 +208,18 @@ module 0x42::bp_inline_errors {
         };
     }
 
+    /// A body containing a nested loop has no source-derived summary. The
+    /// generic HOF invariant is weakened instead of rejecting the call.
+    fun ensures_of_underivable_loop(v: &vector<address>) {
+        each_ensures(v, |a| {
+            let i = 0;
+            while (i < 1) {
+                i = i + 1;
+            };
+            let _ = a;
+        }); // warning: underivable ensures_of loop invariant weakened
+    }
+
     /// Two sequential global state effects: the intermediate memory state
     /// between them cannot be named in a loop invariant.
     fun two_effects_in_loop(v: &vector<address>) {
@@ -216,7 +228,7 @@ module 0x42::bp_inline_errors {
             r.v = r.v + 1;
             let t = &mut T[a];
             t.w = t.w + 1;
-        }); // error: intermediate memory states are not expressible in a loop invariant
+        }); // warning: intermediate-state ensures_of invariant weakened
     }
 
     /// Spec function bodies are single-state contexts: a behavioral

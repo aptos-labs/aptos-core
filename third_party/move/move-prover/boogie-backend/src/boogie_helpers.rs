@@ -14,7 +14,7 @@ use move_core_types::{
     ability::AbilitySet, account_address::AccountAddress, function::ClosureMask,
 };
 use move_model::{
-    ast::{Address, BehaviorKind, MemoryLabel, TempIndex, Value},
+    ast::{Address, BehaviorKind, ConditionKind, MemoryLabel, TempIndex, Value},
     model::{
         FieldEnv, FieldId, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, QualifiedInstId,
         SpecFunId, StructEnv, StructId, SCRIPT_MODULE_NAME,
@@ -38,6 +38,18 @@ pub const TABLE_NATIVE_SPEC_ERROR: &str =
     "Native functions defined in Table cannot be used as specification functions";
 const NUM_TYPE_BASE_ERROR: &str = "cannot infer concrete integer type from `num`, consider using a concrete integer type or explicit type cast";
 const BV_TYPE_NOT_ENABLED_ERROR: &str = "signed integer cannot be turned into bit vector";
+
+/// Memory whose pre-state is needed by a function behavioral predicate.
+pub fn behavioral_old_memory(fun_env: &FunctionEnv<'_>) -> BTreeSet<QualifiedInstId<StructId>> {
+    let mut result = fun_env.get_spec_old_memory().clone();
+    let spec = fun_env.get_spec();
+    for cond in &spec.conditions {
+        if matches!(cond.kind, ConditionKind::LetPre(..)) {
+            result.extend(cond.exp.directly_used_memory(fun_env.env()));
+        }
+    }
+    result
+}
 
 /// Return boogie name of given module.
 pub fn boogie_module_name(env: &ModuleEnv<'_>) -> String {
@@ -1607,7 +1619,7 @@ pub fn compute_evaluator_memory_union(
             for mem in fun_env.get_spec_used_memory().iter() {
                 union_used_memory.insert(mem.clone().instantiate(&info.fun.inst));
             }
-            for mem in fun_env.get_spec_old_memory().iter() {
+            for mem in behavioral_old_memory(&fun_env) {
                 union_old_memory.insert(mem.clone().instantiate(&info.fun.inst));
             }
         }

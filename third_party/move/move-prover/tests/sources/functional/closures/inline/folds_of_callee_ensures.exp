@@ -12,8 +12,7 @@ error: post-condition does not hold
     =         sum = <redacted>
     =     at tests/sources/functional/closures/inline/folds_of_callee_ensures.move:11: each_ref
     =         v = <redacted>
-    =     at tests/sources/functional/closures/inline/folds_of_callee_ensures.move:20: each_ref
-    =         <redacted> = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_callee_ensures.move:191: sum_via_callee_wrong (spec)
     =     at tests/sources/functional/closures/inline/folds_of_callee_ensures.move:12: each_ref
     =         i = <redacted>
     =     at tests/sources/functional/closures/inline/folds_of_callee_ensures.move:13: each_ref

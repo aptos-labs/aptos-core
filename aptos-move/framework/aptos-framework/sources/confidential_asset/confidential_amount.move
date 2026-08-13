@@ -125,23 +125,17 @@ module aptos_framework::confidential_amount {
 
     // === Compress ===
 
+    fun compress_points(points: &vector<RistrettoPoint>): vector<CompressedRistretto> {
+        points.map_ref(|point| point.point_compress())
+    }
+
     public(friend) fun compress(self: &Amount): CompressedAmount {
         CompressedAmount {
             compressed_P: self.P.map_ref(|p| p.point_compress()),
             compressed_R_sender: self.R_sender.map_ref(|r| r.point_compress()),
             compressed_R_recip: self.R_recip.map_ref(|r| r.point_compress()),
             compressed_R_eff_aud: self.R_eff_aud.map_ref(|r| r.point_compress()),
-            compressed_R_volun_auds: {
-                // `map_ref` is not supported in verification since
-                // nested HOF results are underivable (TODO(#20374)).
-                let compressed_volun_auds = vector[];
-                for (i in 0..self.R_volun_auds.length()) {
-                    compressed_volun_auds.push_back(
-                        self.R_volun_auds.borrow(i).map_ref(|r: &RistrettoPoint| r.point_compress())
-                    );
-                };
-                compressed_volun_auds
-            },
+            compressed_R_volun_auds: self.R_volun_auds.map_ref(|rs| compress_points(rs)),
         }
     }
 

@@ -1348,29 +1348,26 @@ module aptos_framework::stake {
         let validator_perf = borrow_global_mut<ValidatorPerformance>(@aptos_framework);
 
         // Process pending stake and distribute transaction fees and rewards for each currently active validator.
-        // `for_each_ref` is not supported in verification since
-        // its lambda accesses global state (TODO(#20371)).
-        for (i in 0..validator_set.active_validators.length()) {
-            update_stake_pool(validator_perf, validator_set.active_validators[i].addr, &config);
-        };
+        validator_set.active_validators.for_each_ref(|validator| {
+            let validator: &ValidatorInfo = validator;
+            update_stake_pool(validator_perf, validator.addr, &config);
+        });
 
         // Process pending stake and distribute transaction fees and rewards for each currently pending_inactive validator
         // (requested to leave but not removed yet).
-        // `for_each_ref` is not supported in verification since
-        // its lambda accesses global state (TODO(#20371)).
-        for (i in 0..validator_set.pending_inactive.length()) {
-            update_stake_pool(validator_perf, validator_set.pending_inactive[i].addr, &config);
-        };
+        validator_set.pending_inactive.for_each_ref(|validator| {
+            let validator: &ValidatorInfo = validator;
+            update_stake_pool(validator_perf, validator.addr, &config);
+        });
 
         // Settle expired pending_inactive for pending_active validators before activating them.
         // update_stake_pool is not called for pending_active validators, so without this step
         // their expired pending_inactive would be incorrectly counted as voting power, causing
         // a mismatch with the DKG validator set (which excludes expired pending_inactive) and
         // an out-of-bounds panic in the epoch manager.
-        // `for_each_ref` is not supported in verification since
-        // its lambda accesses global state (TODO(#20371)).
-        for (i in 0..validator_set.pending_active.length()) {
-            let stake_pool = borrow_global_mut<StakePool>(validator_set.pending_active[i].addr);
+        validator_set.pending_active.for_each_ref(|validator| {
+            let validator: &ValidatorInfo = validator;
+            let stake_pool = borrow_global_mut<StakePool>(validator.addr);
             if (stake_pool.locked_until_secs > 0
                 && get_reconfig_start_time_secs() >= stake_pool.locked_until_secs) {
                 coin::merge(
@@ -1378,7 +1375,7 @@ module aptos_framework::stake {
                     coin::extract_all(&mut stake_pool.pending_inactive)
                 );
             };
-        };
+        });
 
         // Activate currently pending_active validators.
         append(&mut validator_set.active_validators, &mut validator_set.pending_active);
@@ -1478,15 +1475,9 @@ module aptos_framework::stake {
                 pending_fee_by_validator.is_empty(),
                 error::internal(ETRANSACTION_FEE_NOT_FULLY_DISTRIBUTED)
             );
-            // `for_each_ref` is not supported in verification since
-            // its lambda accesses global state (TODO(#20371)).
-            let active_validators = &validator_set.active_validators;
-            for (i in 0..active_validators.length()) {
-                pending_fee_by_validator.add(
-                    active_validators[i].config.validator_index,
-                    aggregator_v2::create_unbounded_aggregator<u64>()
-                );
-            };
+            validator_set.active_validators.for_each_ref(|v| pending_fee_by_validator.add(
+                v.config.validator_index, aggregator_v2::create_unbounded_aggregator<u64>()
+            ));
         };
 
         if (features::periodical_reward_rate_decrease_enabled()) {

@@ -49,12 +49,12 @@ use crate::{
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use log::trace;
-use move_core_types::ability::{Ability, AbilitySet};
+use move_core_types::ability::AbilitySet;
 use move_model::{
     ast::{
         BehaviorKind, Condition, ConditionKind, Exp, ExpData, LambdaCaptureKind, MemoryLabel,
-        MemoryRange, Operation, Pattern, QuantKind, Spec, SpecBlockTarget, SpecFunDecl, TempIndex,
-        Value, VisitorPosition,
+        MemoryRange, Operation, Pattern, PropertyValue, QuantKind, Spec, SpecBlockTarget,
+        SpecFunDecl, TempIndex, Value, VisitorPosition,
     },
     exp_generator::FunExpGenerator,
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget as ExpRewriteTarget},
@@ -62,6 +62,7 @@ use move_model::{
         FunId, GlobalEnv, Loc, NodeId, Parameter, QualifiedId, SpecFunId, TypeParameter,
         TypeParameterKind,
     },
+    pragmas::{ABORTS_IF_IS_PARTIAL_PRAGMA, CONDITION_INFERRED_PROP},
     pureness_checker::{FunctionPurenessChecker, FunctionPurenessCheckerMode},
     spec_derivation::{self, DerivedSpec},
     symbol::Symbol,
@@ -70,13 +71,20 @@ use move_model::{
 };
 use num::BigInt;
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     collections::{BTreeMap, BTreeSet},
     fmt::Debug,
     iter,
     iter::{zip, IntoIterator, Iterator},
+    rc::Rc,
     vec::Vec,
 };
+
+// TODO(#20371): derive exact global-state HOF effects instead of weakening.
+const INLINE_HOF_WEAKENING_ISSUE: &str = "https://github.com/aptos-labs/aptos-core/issues/20371";
+const FORWARDED_FOLD_WEAKENING_ISSUE: &str =
+    "https://github.com/aptos-labs/aptos-core/issues/20383";
+const BEHAVIORAL_INVARIANT_MARKER: &str = "$inliner_behavioral_invariant";
 
 type QualifiedFunId = QualifiedId<FunId>;
 type CallSiteLocations = BTreeMap<(RewriteTarget, QualifiedFunId), BTreeSet<NodeId>>;
@@ -589,6 +597,12 @@ struct OuterInlinerRewriter<'env, 'inliner> {
     current_fun_target_opt: Option<QualifiedFunId>,
 }
 
+#[derive(Clone, Copy)]
+struct InlineCallSummarySpec {
+    result: QualifiedId<SpecFunId>,
+    aborts: QualifiedId<SpecFunId>,
+}
+
 impl<'env, 'inliner> OuterInlinerRewriter<'env, 'inliner> {
     fn new(inliner: &'inliner mut Inliner<'env>, current_target: Option<QualifiedFunId>) -> Self {
         Self {
@@ -668,6 +682,34 @@ impl ExpRewriterFunctions for OuterInlinerRewriter<'_, '_> {
                         );
                     }
                     let lift_inline_funs = self.inliner.lift_inline_funs;
+                    let inline_call_summary = if self.inliner.env.is_verify_mode()
+                        && func_env.module_env.is_std_vector()
+                        && self
+                            .inliner
+                            .env
+                            .symbol_pool()
+                            .string(func_env.get_name())
+                            .as_ref()
+                            == "map_ref"
+                    {
+                        let result = well_known::find_spec_fun_in_module(
+                            &func_env.module_env,
+                            well_known::VECTOR_SPEC_MAP_REF,
+                        );
+                        let aborts = well_known::find_spec_fun_in_module(
+                            &func_env.module_env,
+                            well_known::VECTOR_SPEC_MAP_REF_ABORTS,
+                        );
+                        result.zip(aborts).and_then(|(result, aborts)| {
+                            let callees = expr.called_spec_funs(self.inliner.env);
+                            let calls =
+                                |qid| callees.iter().any(|callee| callee.to_qualified_id() == qid);
+                            (calls(result) && calls(aborts))
+                                .then_some(InlineCallSummarySpec { result, aborts })
+                        })
+                    } else {
+                        None
+                    };
                     let inliner = &mut *self.inliner;
                     let rewritten = InlinedRewriter::inline_call(
                         inliner.env,
@@ -681,6 +723,7 @@ impl ExpRewriterFunctions for OuterInlinerRewriter<'_, '_> {
                         self.current_fun_target_opt,
                         &mut inliner.spec_fun_unifier,
                         &mut inliner.folds_of_unifier,
+                        inline_call_summary,
                     );
 
                     if DEBUG {
@@ -892,16 +935,13 @@ struct InlinedRewriter<'env, 'rewriter> {
     application_anchors: BTreeMap<Symbol, MemoryLabel>,
     /// The kind of the spec condition currently being rewritten, if any.
     current_condition_kind: Option<ConditionKind>,
-    /// Whether the condition currently being rewritten contains a behavioral
-    /// predicate that could not be resolved. The condition is then replaced
-    /// by `true`: in regular compilation (where no error is reported) it is
-    /// dropped by code generation anyway, and in verify mode (where an
-    /// error has been reported and compilation fails) this suppresses
-    /// cascade diagnostics; either way the intact predicate would carry the
-    /// literal lambda into contexts which cannot handle it (e.g. the lambda
-    /// lifter rejects mutated captures, and specification material rejects
-    /// function-value applications).
+    /// Whether the current condition originally depended on lambda behavior.
+    current_condition_is_behavioral: bool,
+    /// Whether an unresolved behavioral predicate requires weakening the
+    /// current condition to `true`.
     unresolved_bp_in_condition: bool,
+    /// Whether the current spec block contains an unresolved predicate.
+    unresolved_bp_in_spec: bool,
     /// The resolutions of `folds_of` predicates over lambda-bound
     /// parameters, keyed by the predicate's node id (verify mode; see
     /// `resolve_folds_of_occurrences`).
@@ -995,7 +1035,9 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             target_fun,
             application_anchors,
             current_condition_kind: None,
+            current_condition_is_behavioral: false,
             unresolved_bp_in_condition: false,
+            unresolved_bp_in_spec: false,
             folds_of_resolutions,
         }
     }
@@ -1013,28 +1055,20 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         target_qualified_fun_id_opt: Option<QualifiedFunId>,
         spec_fun_unifier: &mut Vec<SpecFunUnifierEntry>,
         folds_of_unifier: &mut Vec<FoldsOfRecursionEntry>,
+        inline_call_summary: Option<InlineCallSummarySpec>,
     ) -> Exp {
         let body = body.clone();
-        // Freshen the anchor labels of previously deferred `folds_of`
-        // occurrences and their markers: each expansion of this body must
-        // anchor at its own marker instances.
         let body = if env.is_verify_mode() {
             freshen_folds_anchor_labels(env, body)
         } else {
             body
         };
-        // Anchor `old(..)` over the function's parameters at this
-        // expansion's entry: record the parameters' entry values in
-        // snapshot bindings and redirect the `old(..)` references to them
-        // (see `anchor_param_old_at_expansion_entry`). Verify mode only; in
-        // regular compilation specs are not enforced.
+        // Preserve inline-entry `old(parameter)` semantics.
         let body = if env.is_verify_mode() {
             anchor_param_old_at_expansion_entry(
                 env,
                 body,
                 &parameters,
-                &type_args,
-                target_qualified_fun_id_opt,
                 &env.get_node_loc(call_node_id),
             )
         } else {
@@ -1078,6 +1112,27 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             target_qualified_fun_id_opt,
             spec_fun_unifier,
         );
+        for ((target, _, _), spec) in &spec_fun_specs {
+            let is_summary = inline_call_summary
+                .as_ref()
+                .is_some_and(|summary| *target == summary.result || *target == summary.aborts);
+            if !is_summary {
+                spec.underivable_behavior.set(None);
+            }
+        }
+        let inline_call_summary = inline_call_summary.and_then(|summary| {
+            let lambda_sym = parameters.get(1)?.0;
+            let find = |qid| {
+                spec_fun_specs
+                    .iter()
+                    .find_map(|((target, _, bindings), spec)| {
+                        (*target == qid && bindings.as_slice() == [(0, lambda_sym)])
+                            .then(|| spec.clone())
+                            .filter(|spec| spec.underivable_behavior(env).is_none())
+                    })
+            };
+            Some((find(summary.result)?, find(summary.aborts)?))
+        });
 
         // Lift lambda expressions and generate corresponding spec functions
         let (function_value_map, sym_param_map, function_value_spec_map) =
@@ -1207,8 +1262,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         // the fold recursion over it (see `resolve_folds_of_occurrences`).
         // Verify mode only; in regular compilation the unresolved predicates
         // reduce their conditions to `true`.
-        let (folds_of_resolutions, folds_of_snapshots, folds_of_deferral) = if env.is_verify_mode()
-        {
+        let (folds_of_resolutions, folds_of_deferral) = if env.is_verify_mode() {
             resolve_folds_of_occurrences(
                 env,
                 &body,
@@ -1223,9 +1277,8 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
                 folds_of_unifier,
             )
         } else {
-            (BTreeMap::new(), vec![], FoldsOfDeferralState::default())
+            (BTreeMap::new(), FoldsOfDeferralState::default())
         };
-
         // rewrite body with type_args, lambda params, and var renames to keep lambda free vars
         // free.
         let mut rewriter = InlinedRewriter::new(
@@ -1260,30 +1313,65 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         // Rewrite body types, shadowed vars, replace invoked lambda params, etc.
         let rewritten_body = rewriter.rewrite_exp(body.clone());
 
-        // Bind the capture snapshots of the `folds_of` resolutions inside
-        // the parameter-binding block, after argument evaluation.
-        let rewritten_body =
-            wrap_folds_of_snapshots(env, &call_site_loc, rewritten_body, folds_of_snapshots);
-
-        // Anchored `folds_of` material: insert the snapshot bindings of
-        // resolved previously-deferred occurrences at their markers, erase
-        // markers no occurrence references anymore, and place the marker of
-        // occurrences deferred by this expansion.
+        // Retain only anchors referenced after this expansion.
         let has_markers = rewritten_body
             .any(&mut |e| matches!(e, ExpData::Call(_, Operation::FoldsCaptureAnchor(..), _)));
         let rewritten_body = if has_markers {
-            apply_anchored_snapshots_and_prune_markers(
-                env,
-                &call_site_loc,
-                rewritten_body,
-                folds_of_deferral.anchored_snapshots,
-            )
+            prune_folds_anchor_markers(rewritten_body)
         } else {
-            debug_assert!(folds_of_deferral.anchored_snapshots.is_empty());
             rewritten_body
         };
-        let rewritten_body = if let Some(label) = folds_of_deferral.new_label {
+        let rewritten_body = if let Some(label) = folds_of_deferral.entry_label {
             prepend_folds_anchor_marker(env, &call_site_loc, rewritten_body, label)
+        } else {
+            rewritten_body
+        };
+
+        let bound: BTreeSet<_> = params_pattern
+            .vars()
+            .into_iter()
+            .map(|(_, sym)| sym)
+            .collect();
+        let (mutated_free_vars, mutated_temps) =
+            spec_derivation::collect_mutated_free_vars_and_temps(env, &rewritten_body, &bound);
+        // Summaries omit memory and capture effects.
+        let inline_call_summary = inline_call_summary.filter(|_| {
+            spec_derivation::exp_has_no_memory_effects(env, &rewritten_body)
+                && mutated_free_vars.is_empty()
+                && mutated_temps.is_empty()
+        });
+        let rewritten_body = if let Some((result_spec, aborts_spec)) = inline_call_summary {
+            let self_sym = params_pattern.vars().first().map(|(_, sym)| *sym);
+            if let (Some(self_sym), Some(Parameter(_, self_ty, _))) = (self_sym, parameters.first())
+            {
+                let self_ty = self_ty.skip_reference().instantiate(&type_args);
+                let self_value =
+                    ExpData::LocalVar(env.new_node(call_site_loc.clone(), self_ty), self_sym)
+                        .into_exp();
+                let len = ExpData::Call(
+                    env.new_node(call_site_loc.clone(), Type::Primitive(PrimitiveType::U64)),
+                    Operation::Len,
+                    vec![self_value.clone()],
+                )
+                .into_exp();
+                let result = result_spec.make_call(
+                    env,
+                    call_site_loc.clone(),
+                    &MemoryRange::default(),
+                    vec![self_value.clone(), len.clone()],
+                    &BTreeMap::new(),
+                );
+                let aborts = aborts_spec.make_call(
+                    env,
+                    call_site_loc.clone(),
+                    &MemoryRange::default(),
+                    vec![self_value, len],
+                    &BTreeMap::new(),
+                );
+                prepend_inline_call_summary(env, &call_site_loc, rewritten_body, result, aborts)
+            } else {
+                rewritten_body
+            }
         } else {
             rewritten_body
         };
@@ -1556,6 +1644,17 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             return None;
         };
         let lambda = self.resolve_lambda_target(args.first()?)?.clone();
+        // Loop invariants are verifier-only. Skip lambda-spec derivation in
+        // regular builds.
+        if !self.env.is_verify_mode()
+            && matches!(
+                self.current_condition_kind,
+                Some(ConditionKind::LoopInvariant)
+            )
+        {
+            self.unresolved_bp_in_condition = true;
+            return Some(exp.clone());
+        }
         // Rewrite the predicate arguments in the regular way; the lambda's spec
         // material spliced below is caller scope and left untouched.
         let bp_args: Vec<Exp> = args[1..]
@@ -1578,6 +1677,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             self.target_fun,
             anchor,
             context,
+            context == BpContext::LoopInvariant,
             new_id,
             *kind,
             range,
@@ -1585,20 +1685,19 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             bp_args,
             self.folds_of_resolutions.get(id),
         );
+        if context == BpContext::LoopInvariant {
+            if let Some(kind) = underivable_concrete_behavior(self.env, &result) {
+                warn_underivable_concrete_behavior(self.env, &self.env.get_node_loc(new_id), kind);
+                self.unresolved_bp_in_condition = true;
+            }
+        }
         // Values in an inlined behavioral predicate can be related to their
         // snapshots only by Move equality. Record the spec functions used by
         // the substituted material so the backend emits congruence only for
         // those functions, instead of globally for every uninterpreted spec
         // function in the program.
         self.env.mark_move_equality_congruence_spec_funs_in(&result);
-        // A predicate left intact — recognizable by the literal lambda
-        // spliced as its target (resolved and deferred predicates target a
-        // function parameter) — signals a resolution failure: mark the
-        // enclosing condition for replacement by `true` (see
-        // `unresolved_bp_in_condition`). In verify mode an error has been
-        // reported and compilation fails; dropping the condition avoids
-        // cascade diagnostics from the lambda body (e.g. its function-value
-        // applications) inside specification material.
+        // An intact predicate over a literal lambda signals failed resolution.
         if matches!(
             result.as_ref(),
             ExpData::Call(_, Operation::Behavior(..), args)
@@ -1659,6 +1758,15 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
                 .into_exp(),
             );
         };
+        if matches!(
+            self.current_condition_kind,
+            Some(ConditionKind::LoopInvariant)
+        ) {
+            if let Some(kind) = spec.underivable_behavior(self.env) {
+                warn_underivable_concrete_behavior(self.env, &loc, kind);
+                self.unresolved_bp_in_condition = true;
+            }
+        }
         let retained_args: Vec<Exp> = spec
             .retained
             .iter()
@@ -1750,6 +1858,10 @@ enum BpContext {
     /// without an application site or an `old(..)` scope; two-state
     /// conditions are rejected.
     SpecFunBody,
+    /// A spec-function specialization used only to construct a fold
+    /// transformer. Failure is propagated to `folds_of`, which warns and
+    /// weakens its enclosing invariant instead of emitting a nested error.
+    FoldTransformer,
 }
 
 /// Substitutes a behavioral predicate applied to the given lambda:
@@ -1794,6 +1906,7 @@ fn substitute_bp_by_lambda_spec(
     target_fun: Option<QualifiedFunId>,
     anchor: Option<MemoryLabel>,
     context: BpContext,
+    weakenable_condition: bool,
     id: NodeId,
     kind: BehaviorKind,
     range: &MemoryRange,
@@ -1964,8 +2077,8 @@ fn substitute_bp_by_lambda_spec(
     // The lambda's mutated captures: free variables of the enclosing scope
     // its body writes, treated as implicit `&mut` parameters by the body
     // derivation. See the capture-aware policies in the function comment.
-    let mutated_captures =
-        mutated_captures_with_types(env, target_fun, lambda, lambda_body, &param_syms);
+    let (mutated_captures, derivation_body) =
+        prepare_mutated_captures(env, target_fun, lambda, lambda_body, &param_syms);
     // Derives a specification from the lambda's body via the source-level
     // weakest-precondition analysis, regardless of an attached spec. Only
     // invoked by the arms which actually consume the derivation.
@@ -1986,13 +2099,20 @@ fn substitute_bp_by_lambda_spec(
             for (sym, ty) in lambda.free_vars_with_types(env) {
                 var_types.entry(sym).or_insert(ty);
             }
+            for capture in &mutated_captures {
+                var_types.entry(capture.sym).or_insert(capture.ty.clone());
+            }
+            let captures: Vec<(Symbol, Type)> = mutated_captures
+                .iter()
+                .map(|capture| (capture.sym, capture.ty.clone()))
+                .collect();
             spec_derivation::derive_spec_with_captures(
                 &mut generator,
                 &params,
-                &mutated_captures,
+                &captures,
                 &var_types,
                 &lambda_result_ty,
-                lambda_body,
+                &derivation_body,
                 &deferred_fun_param_temps(env, target_fun),
             )
         })
@@ -2040,10 +2160,18 @@ fn substitute_bp_by_lambda_spec(
             BpContext::LoopInvariant => {
                 let projected = project_effects_to_point_facts(env, cond);
                 if let Some(msg) = loop_invariant_residual(&projected) {
-                    spec_error_with_labels(env, &loc, msg, vec![(
-                        lambda_loc.clone(),
-                        "lambda argument".to_string(),
-                    )]);
+                    env.diag_with_labels(
+                        Severity::Warning,
+                        &loc,
+                        &format!(
+                            "cannot derive `{}` exactly for this lambda \
+                             argument: {}; weakening the enclosing loop \
+                             invariant; see {}",
+                            kind, msg, INLINE_HOF_WEAKENING_ISSUE
+                        ),
+                        vec![(lambda_loc.clone(), "lambda argument".to_string())],
+                    );
+                    return intact();
                 }
                 projected
             },
@@ -2057,6 +2185,7 @@ fn substitute_bp_by_lambda_spec(
                 );
                 cond
             },
+            BpContext::FoldTransformer => cond,
             BpContext::Plain => {
                 if let Some(label) = anchor {
                     ExpData::Call(
@@ -2094,7 +2223,8 @@ fn substitute_bp_by_lambda_spec(
             && ((anchor.is_some() && context == BpContext::Plain)
                 || context == BpContext::LoopInvariant)
             && reads_state;
-        let needs_anchor = (reads_state && context != BpContext::SpecFunBody)
+        let needs_anchor = (reads_state
+            && !matches!(context, BpContext::SpecFunBody | BpContext::FoldTransformer))
             || source
                 .iter()
                 .any(|c| condition_needs_anchor(env, c, &param_set));
@@ -2204,11 +2334,28 @@ fn substitute_bp_by_lambda_spec(
                 }
                 pre_state_conditions(source, Operation::Or, false)
             } else {
-                report_underivable_bp(env, &loc, &lambda_loc, kind);
+                report_underivable_bp(env, &loc, &lambda_loc, kind, context);
                 intact()
             }
         },
         BehaviorKind::EnsuresOf => {
+            let inferred = env.symbol_pool().make(CONDITION_INFERRED_PROP);
+            let has_explicit_ensures = lambda_spec.is_some_and(|spec| {
+                spec.filter_kind(ConditionKind::Ensures)
+                    .any(|cond| !cond.properties.contains_key(&inferred))
+            });
+            let has_reference_capture = lambda
+                .free_vars_with_types(env)
+                .into_iter()
+                .any(|(_, ty)| ty.is_reference())
+                || lambda_body
+                    .used_temporaries_with_types(env)
+                    .into_iter()
+                    .any(|(_, ty)| ty.is_reference());
+            if !has_explicit_ensures && mut_param_count > 0 && has_reference_capture {
+                report_underivable_bp(env, &loc, &lambda_loc, kind, context);
+                return intact();
+            }
             let derived = derive();
             let mut source = spec_or_derived(
                 lambda_spec,
@@ -2221,7 +2368,7 @@ fn substitute_bp_by_lambda_spec(
             // `folds_of` material. Dropping is a sound weakening.
             if lambda_spec.is_none() && !mutated_captures.is_empty() {
                 let capture_syms: BTreeSet<Symbol> =
-                    mutated_captures.iter().map(|(sym, _)| *sym).collect();
+                    mutated_captures.iter().map(|capture| capture.sym).collect();
                 source = source.map(|conds| {
                     conds
                         .into_iter()
@@ -2245,37 +2392,49 @@ fn substitute_bp_by_lambda_spec(
                 let joined = env.new_bool_join(&loc, Operation::And, conds, true);
                 finalize(env, needs_anchor, joined)
             } else {
-                report_underivable_bp(env, &loc, &lambda_loc, kind);
+                report_underivable_bp(env, &loc, &lambda_loc, kind, context);
                 intact()
             }
         },
         BehaviorKind::ResultOf => {
-            // The value source: the functional `ensures result == E` of an
-            // attached spec if it has that shape, otherwise the single
-            // derived result value from the body (the body stays
-            // authoritative for the value; a non-functional attached spec
-            // describes conditions, not the value). Both sources are
-            // spliced into a value position and thus subject to the same
-            // state resolution policy.
+            // Prefer a functional `ensures`; otherwise derive the body value.
             let from_spec = lambda_spec.and_then(functional_result_ensures);
-            if from_spec.is_none() && !mutated_captures.is_empty() {
-                report_capture_writing_bp(env, &loc, &lambda_loc, kind, &mutated_captures);
-                return intact();
-            }
-            let derived = if from_spec.is_none() {
+            let body_has_exact_value = spec_derivation::exp_has_exact_value_model(env, lambda_body);
+            let derived = if from_spec.is_none() && body_has_exact_value {
                 derive_from_body()
             } else {
                 None
             };
-            let source = from_spec.or_else(|| {
-                derived
-                    .as_ref()
-                    .and_then(|d| d.results.as_ref())
-                    .and_then(|vals| match vals.as_slice() {
-                        [val] => Some(val),
-                        _ => None,
-                    })
-            });
+            let from_body = derived
+                .as_ref()
+                .and_then(|d| d.results.as_ref())
+                .and_then(|vals| match vals.as_slice() {
+                    [val] => Some(val),
+                    _ => None,
+                });
+            let source = from_spec.or(from_body);
+            // Capture-independent results remain pointwise values.
+            if !mutated_captures.is_empty() {
+                let capture_syms: BTreeSet<Symbol> =
+                    mutated_captures.iter().map(|capture| capture.sym).collect();
+                if source.is_none_or(|val| !val.free_vars().is_disjoint(&capture_syms)) {
+                    if weakenable_condition {
+                        env.diag_with_labels(
+                            Severity::Warning,
+                            &loc,
+                            &format!(
+                                "cannot derive `result_of` exactly for this lambda argument: \
+                                 the lambda mutates captured state; weakening condition; \
+                                 see {INLINE_HOF_WEAKENING_ISSUE}"
+                            ),
+                            vec![(lambda_loc.clone(), "lambda argument".to_string())],
+                        );
+                    } else {
+                        report_capture_writing_bp(env, &loc, &lambda_loc, kind, &mutated_captures);
+                    }
+                    return intact();
+                }
+            }
             if let Some(val) = source {
                 let substituted = substitute(val);
                 if env.is_verify_mode() {
@@ -2314,15 +2473,17 @@ fn substitute_bp_by_lambda_spec(
                     }
                 }
                 substituted
-            } else if let Some(reduced) = beta_reduce_pure_lambda(
-                env,
-                &loc,
-                &tuple_pat,
-                &param_tys,
-                inputs,
-                lambda_body,
-                &lambda_result_ty,
-            ) {
+            } else if body_has_exact_value
+                && let Some(reduced) = beta_reduce_pure_lambda(
+                    env,
+                    &loc,
+                    &tuple_pat,
+                    &param_tys,
+                    inputs,
+                    lambda_body,
+                    &lambda_result_ty,
+                )
+            {
                 // Beta-reduction fallback: a pure, state-free body is a
                 // value expression of the inputs alone; splice it under a
                 // binding of the parameter pattern to the inputs. This
@@ -2332,7 +2493,12 @@ fn substitute_bp_by_lambda_spec(
                 // state-free, no anchoring policy applies.
                 reduced
             } else {
-                if lambda_spec.is_some() {
+                if context == BpContext::SpecFunBody && !body_has_exact_value {
+                    // The specialization records the residual predicate and
+                    // lets its loop-invariant caller choose the fallback.
+                } else if context == BpContext::LoopInvariant && !body_has_exact_value {
+                    warn_underivable_concrete_behavior(env, &loc, BehaviorKind::ResultOf);
+                } else if lambda_spec.is_some() {
                     // A spec is attached but has no functional value shape,
                     // and no value could be derived from the body either.
                     spec_error_with_labels(
@@ -2346,7 +2512,7 @@ fn substitute_bp_by_lambda_spec(
                         vec![(lambda_loc.clone(), "lambda argument".to_string())],
                     );
                 } else {
-                    report_underivable_bp(env, &loc, &lambda_loc, kind);
+                    report_underivable_bp(env, &loc, &lambda_loc, kind, context);
                 }
                 intact()
             }
@@ -2366,6 +2532,9 @@ fn substitute_bp_by_lambda_spec(
                      the body of a spec function",
                     vec![(lambda_loc.clone(), "lambda argument".to_string())],
                 );
+                return intact();
+            }
+            if context == BpContext::FoldTransformer && env.is_verify_mode() {
                 return intact();
             }
             let derived = derive_from_body();
@@ -2397,7 +2566,7 @@ fn substitute_bp_by_lambda_spec(
                     env,
                     deferred.iter().flat_map(|(_, inputs, _)| inputs),
                 ) {
-                    report_underivable_bp(env, &loc, &lambda_loc, kind);
+                    report_underivable_bp(env, &loc, &lambda_loc, kind, context);
                     return intact();
                 }
                 let mut conds: Vec<Exp> = targets
@@ -2422,7 +2591,7 @@ fn substitute_bp_by_lambda_spec(
                 }
                 env.new_bool_join(&loc, Operation::And, conds, true)
             } else {
-                report_underivable_bp(env, &loc, &lambda_loc, kind);
+                report_underivable_bp(env, &loc, &lambda_loc, kind, context);
                 intact()
             }
         },
@@ -2614,6 +2783,117 @@ fn functional_result_ensures(spec: &Spec) -> Option<&Exp> {
     }
 }
 
+fn underivable_concrete_behavior(env: &GlobalEnv, exp: &Exp) -> Option<BehaviorKind> {
+    let mut result = None;
+    let mut pending = vec![exp.clone()];
+    let mut visited = BTreeSet::new();
+    while let Some(exp) = pending.pop() {
+        exp.visit_pre_order(&mut |sub| {
+            let ExpData::Call(_, Operation::Behavior(kind, _), args) = sub else {
+                return true;
+            };
+            if let Some(ExpData::Lambda(_, _, body, _, _)) = args.first().map(|arg| arg.as_ref()) {
+                if *kind == BehaviorKind::ResultOf
+                    && !spec_derivation::exp_has_exact_value_model(env, body)
+                {
+                    result = Some(*kind);
+                    return false;
+                }
+                return true;
+            }
+            let Some(ExpData::Call(_, Operation::Closure(mid, fid, _), _)) =
+                args.first().map(|arg| arg.as_ref())
+            else {
+                return true;
+            };
+            let fun_env = env.get_function(mid.qualified(*fid));
+            let spec = fun_env.get_spec();
+            let has_mutable_parameter = fun_env
+                .get_parameter_types()
+                .iter()
+                .any(Type::is_mutable_reference);
+            let body_is_unavailable = fun_env.is_opaque() || fun_env.is_native_or_intrinsic();
+            let underivable = match kind {
+                BehaviorKind::ResultOf => {
+                    (body_is_unavailable
+                        || !spec_derivation::move_fun_has_exact_value_model(
+                            env,
+                            fun_env.get_qualified_id(),
+                        ))
+                        && (functional_result_ensures(&spec).is_none() || has_mutable_parameter)
+                },
+                BehaviorKind::AbortsOf => {
+                    fun_env.is_pragma_true(ABORTS_IF_IS_PARTIAL_PRAGMA, || false)
+                        || (body_is_unavailable
+                            && spec.filter_kind(ConditionKind::AbortsIf).next().is_none()
+                            && env
+                                .get_intrinsics()
+                                .get_abort_spec_fun_for_move_fun(&fun_env.get_qualified_id())
+                                .is_none())
+                },
+                _ => false,
+            };
+            if underivable {
+                result = Some(*kind);
+                false
+            } else {
+                true
+            }
+        });
+        if result.is_some() {
+            break;
+        }
+        for callee in exp.called_spec_funs(env) {
+            let id = callee.to_qualified_id();
+            if visited.insert(id)
+                && let Some(body) = env.get_spec_fun(id).body.clone()
+            {
+                pending.push(body);
+            }
+        }
+    }
+    result
+}
+
+fn depends_on_behavior(env: &GlobalEnv, exp: &Exp) -> bool {
+    let mut pending = vec![exp.clone()];
+    let mut visited = BTreeSet::new();
+    while let Some(exp) = pending.pop() {
+        if exp.any(&mut |sub| matches!(sub, ExpData::Call(_, Operation::Behavior(..), _))) {
+            return true;
+        }
+        for callee in exp.called_spec_funs(env) {
+            let id = callee.to_qualified_id();
+            if visited.insert(id)
+                && let Some(body) = env.get_spec_fun(id).body.clone()
+            {
+                pending.push(body);
+            }
+        }
+    }
+    false
+}
+
+fn warn_underivable_concrete_behavior(env: &GlobalEnv, loc: &Loc, kind: BehaviorKind) {
+    if !env.is_verify_mode() {
+        return;
+    }
+    let missing = if kind == BehaviorKind::ResultOf {
+        "a nested result cannot be modeled from its specification"
+    } else {
+        "a nested call has no complete abort specification"
+    };
+    env.diag(
+        Severity::Warning,
+        loc,
+        &format!(
+            "cannot derive `{kind}` exactly for this lambda argument: {missing}; \
+             weakening the enclosing loop invariant; see \
+             {INLINE_HOF_WEAKENING_ISSUE}"
+        ),
+    );
+}
+
 /// The beta reduction of applying a lambda with a pure, state-free body to
 /// the given inputs: the body spliced under a binding of the parameter
 /// pattern to the input arguments. Such a body is a value expression of
@@ -2726,24 +3006,47 @@ fn spliceable_as_spec_value(env: &GlobalEnv, body: &Exp) -> bool {
 /// plug in. (For lambdas passed to non-inline functions — which are still
 /// lambda-lifted — the bytecode-level `LambdaSpecInferenceProcessor` in
 /// `spec_inference.rs` performs this role.)
-fn report_underivable_bp(env: &GlobalEnv, loc: &Loc, lambda_loc: &Loc, kind: BehaviorKind) {
-    let msg = if kind == BehaviorKind::UnchangedOf {
-        // The footprint always comes from the body derivation; an attached
-        // spec block does not help.
-        format!(
-            "cannot resolve `{}` for this lambda argument: \
-                 the memory footprint of the lambda's body cannot be \
-                 determined exactly",
-            kind
-        )
-    } else {
-        format!(
-            "cannot resolve `{}` for this lambda argument: \
-                 add a spec block to the lambda \
-                 (e.g. `|x| .. spec {{ aborts_if ..; ensures ..; }}`)",
-            kind
-        )
-    };
+fn report_underivable_bp(
+    env: &GlobalEnv,
+    loc: &Loc,
+    lambda_loc: &Loc,
+    kind: BehaviorKind,
+    context: BpContext,
+) {
+    if context == BpContext::FoldTransformer {
+        return;
+    }
+    if context == BpContext::LoopInvariant
+        && matches!(kind, BehaviorKind::UnchangedOf | BehaviorKind::EnsuresOf)
+    {
+        // Only generic loop invariants may soundly drop these predicates.
+        if env.is_verify_mode() {
+            let message = if kind == BehaviorKind::UnchangedOf {
+                format!(
+                    "the memory footprint of this lambda argument cannot be \
+                     determined exactly; weakening `unchanged_of` condition; \
+                     see {INLINE_HOF_WEAKENING_ISSUE}"
+                )
+            } else {
+                format!(
+                    "the behavior of this lambda argument cannot be determined \
+                     exactly; weakening loop invariant containing `ensures_of`; \
+                     see {INLINE_HOF_WEAKENING_ISSUE}"
+                )
+            };
+            env.diag_with_labels(Severity::Warning, loc, &message, vec![(
+                lambda_loc.clone(),
+                "lambda argument".to_string(),
+            )]);
+        }
+        return;
+    }
+    let msg = format!(
+        "cannot resolve `{}` for this lambda argument: \
+         add a spec block to the lambda \
+         (e.g. `|x| .. spec {{ aborts_if ..; ensures ..; }}`)",
+        kind
+    );
     spec_error_with_labels(env, loc, &msg, vec![(
         lambda_loc.clone(),
         "lambda argument".to_string(),
@@ -3176,6 +3479,8 @@ struct FoldsOfDirect {
     /// The specialization of the fold recursion over the lambda's derived
     /// accumulator transformer; `None` iff there are no captures.
     spec: Option<SpecFunSpecialization>,
+    /// Anchored reads lifted into recursion context parameters.
+    anchored_ctx_values: BTreeMap<Symbol, Exp>,
     /// The lambda's abort disjuncts, phrased in lambda scope over the
     /// iteration's pre-state: lambda parameters and captures appear as
     /// plain variables.
@@ -3185,36 +3490,18 @@ struct FoldsOfDirect {
     param_syms: Vec<Symbol>,
 }
 
-/// The material of a `folds_of` occurrence deferred through a pure
-/// forwarding lambda (see `derive_forwarded_application`): the occurrence
-/// is rewritten to `folds_of<f>(|j| (A1(..), ..), i)` over the enclosing
-/// inline function's parameter `f`, with the iteration arguments composed
-/// through the forwarder, plus the prefix no-abort condition of the
-/// forwarder's own (prelude) abort disjuncts. The anchor label — carried
-/// in the rewritten occurrence's `MemoryRange` and marked by a
-/// `FoldsCaptureAnchor` at this expansion's entry — records the program
-/// point at which the eventually supplied lambda's captures are
-/// snapshotted (per entry into this expansion, e.g. per outer-loop
-/// iteration for a bucketed table), preserving the fold equation's base
-/// values across the deferral.
-///
-/// The composed material is phrased in the expansion result's scope with
-/// references to the enclosing function's parameters as *temporaries*
-/// (like a normalized index lambda), so the next level's normalization
-/// splices its actual arguments through them — which is what makes the
-/// eventually derived transformer unify with caller restatements.
+/// A `folds_of` occurrence deferred through a pure forwarding lambda. Its
+/// arguments are composed in the expansion scope and its capture base is
+/// retained by `label` until the concrete lambda is known.
 struct FoldsOfDeferred {
     /// The forwarded parameter, in the enclosing function's scope (spliced
     /// untouched, like other deferred predicate targets).
     target: Exp,
     /// The iteration index binder of the composed components.
     j_sym: Symbol,
-    /// The composed iteration arguments at index `j_sym`: the forwarded
-    /// application's argument values with the forwarder's parameters
-    /// substituted by iteration `j`'s arguments.
+    /// Forwarded arguments at iteration `j_sym`.
     components: Vec<Exp>,
-    /// The forwarder's own abort disjuncts (outside the application),
-    /// composed at index `j_sym` likewise.
+    /// Abort disjuncts outside the forwarded application.
     prelude_aborts: Vec<Exp>,
     /// The anchor label.
     label: MemoryLabel,
@@ -3246,18 +3533,17 @@ struct FoldsOfCapture {
     /// the dereferenced target, and the snapshot records the referenced
     /// value at expansion entry.
     ref_ty: Option<Type>,
-    /// The fresh symbol holding the capture's value at expansion entry,
-    /// bound by a snapshot `let` wrapped around the expanded body (see
-    /// `wrap_folds_of_snapshots`).
-    snapshot: Symbol,
+    /// The capture in the enclosing function.
+    current: Exp,
+    /// Anchor for the capture's initial value.
+    snapshot_label: MemoryLabel,
 }
 
 impl FoldsOfCapture {
     /// The expression denoting the capture's current value: the variable
     /// itself, or the dereferenced target for a `&mut` capture.
     fn current_value(&self, env: &GlobalEnv, loc: &Loc) -> Exp {
-        let var_ty = self.ref_ty.clone().unwrap_or_else(|| self.ty.clone());
-        let var = ExpData::LocalVar(env.new_node(loc.clone(), var_ty), self.sym).into_exp();
+        let var = self.current.clone();
         if self.ref_ty.is_some() {
             ExpData::Call(
                 env.new_node(loc.clone(), self.ty.clone()),
@@ -3269,6 +3555,31 @@ impl FoldsOfCapture {
             var
         }
     }
+
+    /// The capture's value at the fold anchor.
+    fn snapshot_value(&self, env: &GlobalEnv, loc: &Loc) -> Exp {
+        let value = self.current_value(env, loc);
+        let old = ExpData::Call(
+            env.new_node(loc.clone(), self.ty.clone()),
+            Operation::Old,
+            vec![value],
+        )
+        .into_exp();
+        ExpData::Call(
+            env.new_node(loc.clone(), self.ty.clone()),
+            Operation::WithStateAnchor(self.snapshot_label),
+            vec![old],
+        )
+        .into_exp()
+    }
+}
+
+/// A mutated capture normalized for source-level derivation.
+struct MutatedCapture {
+    sym: Symbol,
+    name: Symbol,
+    ty: Type,
+    current: Exp,
 }
 
 /// A bespoke multi-capture fold recursion generated for a `folds_of`
@@ -3299,39 +3610,19 @@ struct FoldsOfRecursionEntry {
     spec: SpecFunSpecialization,
 }
 
-/// A snapshot binding `let sym: ty = value;` recording a capture's value at
-/// expansion entry, wrapped around the rewritten body of the expansion.
-struct FoldsOfSnapshot {
-    sym: Symbol,
-    ty: Type,
-    value: Exp,
-}
-
-/// The mutated free variables of a lambda body with their types, in stable
-/// symbol order: the capture set treated as implicit `&mut` parameters by
-/// capture-aware body derivation. A capture's type is resolved from the
-/// lambda's free-variable occurrences; a mutated variable without a
-/// resolvable type is omitted, which makes the derivation bail at the write
-/// site rather than dropping the effect.
-///
-/// Variables named like a parameter of the expansion target's function are
-/// omitted as well: the body reads a parameter as a temporary but assigns
-/// it by symbol, so the derivation cannot connect the reads to the
-/// capture's evolving value (and a write-only assignment cannot even be
-/// attributed between the parameter and a shadowing local). The derivation
-/// then bails at the write site.
-fn mutated_captures_with_types(
+/// Gives mutated parameter temporaries stable symbols for derivation while
+/// retaining their original expressions for generated invariants. Ambiguous
+/// direct assignments to parameter-named symbols are omitted.
+fn prepare_mutated_captures(
     env: &GlobalEnv,
     target_fun: Option<QualifiedFunId>,
     lambda: &Exp,
     body: &Exp,
     param_syms: &[Symbol],
-) -> Vec<(Symbol, Type)> {
+) -> (Vec<MutatedCapture>, Exp) {
     let bound: BTreeSet<Symbol> = param_syms.iter().copied().collect();
-    let mutated = spec_derivation::collect_mutated_free_vars(env, body, &bound);
-    if mutated.is_empty() {
-        return vec![];
-    }
+    let (mutated, mutated_temps) =
+        spec_derivation::collect_mutated_free_vars_and_temps(env, body, &bound);
     let target_params: BTreeSet<Symbol> = target_fun
         .map(|qid| {
             env.get_function(qid)
@@ -3342,11 +3633,53 @@ fn mutated_captures_with_types(
         })
         .unwrap_or_default();
     let types: BTreeMap<Symbol, Type> = lambda.free_vars_with_types(env).into_iter().collect();
-    mutated
+    let loc = env.get_node_loc(lambda.node_id());
+    let mut captures: Vec<MutatedCapture> = mutated
         .into_iter()
         .filter(|sym| !target_params.contains(sym))
-        .filter_map(|sym| types.get(&sym).map(|ty| (sym, ty.clone())))
-        .collect()
+        .filter_map(|sym| {
+            types.get(&sym).map(|ty| MutatedCapture {
+                sym,
+                name: sym,
+                ty: ty.clone(),
+                current: ExpData::LocalVar(env.new_node(loc.clone(), ty.clone()), sym).into_exp(),
+            })
+        })
+        .collect();
+    let mut temp_map = BTreeMap::new();
+    if let Some(qid) = target_fun {
+        let params = env.get_function(qid).get_parameters();
+        for idx in mutated_temps {
+            let Some(Parameter(name, ty, _)) = params.get(idx) else {
+                continue;
+            };
+            let sym = env.symbol_pool().make(&format!(
+                "$lambda_capture_{}_{}",
+                lambda.node_id().as_usize(),
+                idx
+            ));
+            temp_map.insert(idx, sym);
+            captures.push(MutatedCapture {
+                sym,
+                name: *name,
+                ty: ty.clone(),
+                current: ExpData::Temporary(env.new_node(loc.clone(), ty.clone()), idx).into_exp(),
+            });
+        }
+    }
+    captures.sort_by_key(|capture| capture.sym);
+    let normalized = if temp_map.is_empty() {
+        body.clone()
+    } else {
+        let mut replacer = |id: NodeId, target: ExpRewriteTarget| match target {
+            ExpRewriteTarget::Temporary(idx) => temp_map
+                .get(&idx)
+                .map(|sym| ExpData::LocalVar(id, *sym).into_exp()),
+            _ => None,
+        };
+        ExpRewriter::new(env, &mut replacer).rewrite_exp(body.clone())
+    };
+    (captures, normalized)
 }
 
 /// The temporary indices of the target function's function-typed
@@ -3496,20 +3829,17 @@ fn mentions_behavior_over_fun_param(exp: &Exp, params: &BTreeMap<TempIndex, Symb
     })
 }
 
-/// Reports `aborts_of`/`result_of` applied to a capture-writing lambda: the
-/// values of the captures at a given application are inductive quantities
-/// these pointwise predicates cannot name; the cumulative effect and its
-/// abort-freeness are `folds_of` material.
+/// Reports pointwise predicates that require a capture's inductive value.
 fn report_capture_writing_bp(
     env: &GlobalEnv,
     loc: &Loc,
     lambda_loc: &Loc,
     kind: BehaviorKind,
-    captures: &[(Symbol, Type)],
+    captures: &[MutatedCapture],
 ) {
     let names = captures
         .iter()
-        .map(|(sym, _)| format!("`{}`", sym.display(env.symbol_pool())))
+        .map(|capture| format!("`{}`", capture.name.display(env.symbol_pool())))
         .join(", ");
     spec_error_with_labels(
         env,
@@ -3525,25 +3855,8 @@ fn report_capture_writing_bp(
     );
 }
 
-/// Scans the body of an inline function being expanded for `folds_of`
-/// predicates over lambda-bound function parameters and resolves each
-/// occurrence: discovers the target lambda's mutated captures, derives its
-/// per-iteration effect (`derive_spec_with_captures`), builds the
-/// accumulator transformer `|acc, e| E` from the derived capture value
-/// (with the capture's pre-state reference replaced by `acc`), and
-/// specializes the fold recursion over that transformer through the regular
-/// literal-lambda specialization path — so caller restatements with
-/// spec-equivalent lambdas unify onto the same specialized function. The
-/// recursion is `std::vector::spec_fold`, or a like-named declaration in
-/// the expansion target's module when the vector module does not provide
-/// one.
-///
-/// Returns the resolutions keyed by the predicate's node id, plus the
-/// snapshot bindings recording the captures' entry values (one per distinct
-/// capture) and the deferral state (see `FoldsOfDeferralState`). On
-/// classification failure an error is reported and no resolution is
-/// recorded; the substitution then leaves the predicate intact. Verify
-/// mode only.
+/// Resolves `folds_of` predicates over lambda-bound parameters by deriving
+/// their capture transformers and specializing the fold recursion.
 fn resolve_folds_of_occurrences(
     env: &mut GlobalEnv,
     body: &Exp,
@@ -3556,21 +3869,13 @@ fn resolve_folds_of_occurrences(
     call_site_loc: &Loc,
     unifier: &mut Vec<SpecFunUnifierEntry>,
     folds_of_unifier: &mut Vec<FoldsOfRecursionEntry>,
-) -> (
-    BTreeMap<NodeId, FoldsOfResolution>,
-    Vec<FoldsOfSnapshot>,
-    FoldsOfDeferralState,
-) {
+) -> (BTreeMap<NodeId, FoldsOfResolution>, FoldsOfDeferralState) {
     let mut resolutions = BTreeMap::new();
-    let mut snapshots = vec![];
     let mut deferral = FoldsOfDeferralState::default();
     if lambda_param_map.is_empty() {
-        return (resolutions, snapshots, deferral);
+        return (resolutions, deferral);
     }
-    // Collect the occurrences whose target is a lambda-bound parameter,
-    // with the raw second argument (the vector of the element form, the
-    // index lambda of the general form) and the anchor label of previously
-    // deferred occurrences.
+    // Collect occurrences before rewriting their enclosing body.
     let mut occurrences: Vec<(NodeId, Exp, Exp, Option<MemoryLabel>)> = vec![];
     body.visit_pre_order(&mut |e| {
         if let ExpData::Call(id, Operation::Behavior(BehaviorKind::FoldsOf, range), args) = e {
@@ -3584,13 +3889,9 @@ fn resolve_folds_of_occurrences(
         }
         true
     });
-    let mut snapshot_syms: BTreeMap<(Option<MemoryLabel>, Symbol), Symbol> = BTreeMap::new();
     for (id, lambda, second_arg, anchor) in occurrences {
         let loc = env.get_node_loc(id).inlined_from(call_site_loc);
-        // Normalize the second argument to the expansion result's scope:
-        // the index lambda of a general-form occurrence, or the vector of
-        // an element-form one (used when the occurrence defers, whose
-        // composed components live in that scope).
+        // Normalize the vector or index lambda into the expansion scope.
         let normalized = match normalize_index_lambda(
             env,
             &second_arg,
@@ -3617,25 +3918,20 @@ fn resolve_folds_of_occurrences(
             &loc,
             unifier,
             folds_of_unifier,
-            &mut snapshot_syms,
-            &mut snapshots,
             &mut deferral,
         ) {
             resolutions.insert(id, resolution);
         }
     }
-    (resolutions, snapshots, deferral)
+    (resolutions, deferral)
 }
 
-/// Per-expansion state of the anchored `folds_of` deferral: the label
-/// allocated for the occurrences deferred *by this expansion* (whose
-/// snapshot point is marked by one `FoldsCaptureAnchor` at the expansion's
-/// entry), and the snapshot bindings to insert at the markers of previous
-/// expansions whose anchored occurrences resolve here.
+/// Per-expansion state of anchored `folds_of` material: the label allocated
+/// for occurrences resolved or deferred by this expansion. One
+/// `FoldsCaptureAnchor` at expansion entry serves all of them.
 #[derive(Default)]
 struct FoldsOfDeferralState {
-    new_label: Option<MemoryLabel>,
-    anchored_snapshots: Vec<(MemoryLabel, FoldsOfSnapshot)>,
+    entry_label: Option<MemoryLabel>,
 }
 
 /// Normalizes the index lambda `g` of a general-form `folds_of` occurrence
@@ -3755,9 +4051,7 @@ fn normalize_index_lambda(
 }
 
 /// Resolves a single `folds_of` occurrence over the given lambda; see
-/// `resolve_folds_of_occurrences`. `snapshot_syms` deduplicates the
-/// snapshot symbols per captured variable across the occurrences of one
-/// expansion.
+/// `resolve_folds_of_occurrences`.
 fn resolve_folds_of_occurrence(
     env: &mut GlobalEnv,
     lambda: &Exp,
@@ -3768,8 +4062,6 @@ fn resolve_folds_of_occurrence(
     loc: &Loc,
     unifier: &mut Vec<SpecFunUnifierEntry>,
     folds_of_unifier: &mut Vec<FoldsOfRecursionEntry>,
-    snapshot_syms: &mut BTreeMap<(Option<MemoryLabel>, Symbol), Symbol>,
-    snapshots: &mut Vec<FoldsOfSnapshot>,
     deferral: &mut FoldsOfDeferralState,
 ) -> Option<FoldsOfResolution> {
     let lambda_loc = env.get_node_loc(lambda.node_id());
@@ -3785,6 +4077,22 @@ fn resolve_folds_of_occurrence(
             lambda_label(),
         );
     };
+    let weaken_with_issue = |env: &GlobalEnv, reason: &str, issue: &str| {
+        if env.is_verify_mode() {
+            env.diag_with_labels(
+                Severity::Warning,
+                loc,
+                &format!(
+                    "cannot derive `folds_of` exactly for this lambda argument: \
+                     {}; weakening the enclosing loop invariant; see {}",
+                    reason, issue
+                ),
+                lambda_label(),
+            );
+        }
+    };
+    let weaken =
+        |env: &GlobalEnv, reason: &str| weaken_with_issue(env, reason, INLINE_HOF_WEAKENING_ISSUE);
     let ExpData::Lambda(_, pat, lambda_body, _, _) = lambda.as_ref() else {
         env.diag(
             Severity::Bug,
@@ -3859,7 +4167,7 @@ fn resolve_folds_of_occurrence(
                 return None;
             }
             if !spec_derivation::exps_are_pure_single_state_for_folds(env, &args) {
-                cannot_resolve(
+                weaken(
                     env,
                     "the index function of `folds_of` accesses global state, \
                      whose per-iteration evaluation state is not expressible \
@@ -3901,10 +4209,11 @@ fn resolve_folds_of_occurrence(
     // Discover the mutated captures and derive the per-iteration effect,
     // with the captures as implicit `&mut` parameters. Writes to variables
     // naming a parameter of the enclosing function cannot be tracked (see
-    // `mutated_captures_with_types`); report them precisely instead of
+    // `prepare_mutated_captures`); report them precisely instead of
     // through the generic derivation failure below.
     let bound: BTreeSet<Symbol> = param_syms.iter().copied().collect();
-    let all_mutated = spec_derivation::collect_mutated_free_vars(env, lambda_body, &bound);
+    let all_mutated =
+        spec_derivation::collect_mutated_free_vars_and_temps(env, lambda_body, &bound).0;
     let target_params: BTreeSet<Symbol> = target_fun
         .map(|qid| {
             env.get_function(qid)
@@ -3926,14 +4235,15 @@ fn resolve_folds_of_occurrence(
         );
         return None;
     }
-    let mutated_captures =
-        mutated_captures_with_types(env, target_fun, lambda, lambda_body, &param_syms);
+    let (mutated_captures, derivation_body) =
+        prepare_mutated_captures(env, target_fun, lambda, lambda_body, &param_syms);
     if let FoldsOfForm::General { args, .. } = &form {
         // The index function's arguments are re-evaluated per iteration by
         // the substitution; a dependency on a variable the lambda writes
         // (directly, or through an actual argument spliced by the
         // normalization) would make that evaluation state-dependent.
-        let capture_syms: BTreeSet<Symbol> = mutated_captures.iter().map(|(sym, _)| *sym).collect();
+        let capture_syms: BTreeSet<Symbol> =
+            mutated_captures.iter().map(|capture| capture.sym).collect();
         if args
             .iter()
             .any(|comp| !comp.free_vars().is_disjoint(&capture_syms))
@@ -3972,24 +4282,45 @@ fn resolve_folds_of_occurrence(
         for (sym, ty) in lambda.free_vars_with_types(env) {
             var_types.entry(sym).or_insert(ty);
         }
+        for capture in &mutated_captures {
+            var_types.entry(capture.sym).or_insert(capture.ty.clone());
+        }
+        let captures: Vec<(Symbol, Type)> = mutated_captures
+            .iter()
+            .map(|capture| (capture.sym, capture.ty.clone()))
+            .collect();
         spec_derivation::derive_spec_with_captures(
             &mut generator,
             &params,
-            &mutated_captures,
+            &captures,
             &var_types,
             &lambda_result_ty,
-            lambda_body,
+            &derivation_body,
             &deferred_fun_param_temps(env, target_fun),
         )
     });
     let Some(derived) = derived else {
-        cannot_resolve(
+        weaken(
             env,
             "the per-iteration effect of the lambda's body cannot be derived \
              exactly",
         );
         return None;
     };
+    if mutated_captures.is_empty()
+        && !derived.aborts.is_empty()
+        && target_fun.is_some_and(|qid| {
+            env.get_function(qid)
+                .is_pragma_true(ABORTS_IF_IS_PARTIAL_PRAGMA, || false)
+        })
+    {
+        weaken(
+            env,
+            "the enclosing function has a partial abort specification, so \
+             the lambda's complete prefix-abort history is not required",
+        );
+        return None;
+    }
     // A pure forwarding lambda defers the occurrence: it is rewritten to
     // an anchored `folds_of` over the enclosing inline function's
     // parameter, with the iteration arguments composed through the
@@ -4000,9 +4331,9 @@ fn resolve_folds_of_occurrence(
         if !mutated_captures.is_empty() {
             let names = mutated_captures
                 .iter()
-                .map(|(sym, _)| format!("`{}`", sym.display(env.symbol_pool())))
+                .map(|capture| format!("`{}`", capture.name.display(env.symbol_pool())))
                 .join(", ");
-            cannot_resolve(
+            weaken_with_issue(
                 env,
                 &format!(
                     "the lambda both writes the captured variable(s) {} and \
@@ -4013,6 +4344,7 @@ fn resolve_folds_of_occurrence(
                      without the intermediate lambda",
                     names, target_name, target_name
                 ),
+                FORWARDED_FOLD_WEAKENING_ISSUE,
             );
             return None;
         }
@@ -4033,7 +4365,7 @@ fn resolve_folds_of_occurrence(
             env,
             forwarded.args.iter().chain(&forwarded.prelude_aborts),
         ) {
-            cannot_resolve(
+            weaken(
                 env,
                 "the forwarded application's arguments or the forwarder's \
                  own abort conditions access global state, whose \
@@ -4091,7 +4423,7 @@ fn resolve_folds_of_occurrence(
         // marker.
         let label = anchor.unwrap_or_else(|| {
             *deferral
-                .new_label
+                .entry_label
                 .get_or_insert_with(|| MemoryLabel::new(env.new_global_id().as_usize()))
         });
         return Some(FoldsOfResolution::Deferred(FoldsOfDeferred {
@@ -4112,11 +4444,11 @@ fn resolve_folds_of_occurrence(
                 && vals
                     .iter()
                     .zip(&mutated_captures)
-                    .all(|((s1, _), (s2, _))| s1 == s2))
+                    .all(|((sym, _), capture)| *sym == capture.sym))
             .then(|| vals.clone())
         });
         let Some(values) = values else {
-            cannot_resolve(
+            weaken(
                 env,
                 "the values written to the captured variables cannot be \
                  expressed over the iteration's pre-state",
@@ -4133,12 +4465,13 @@ fn resolve_folds_of_occurrence(
     // value is known only through the callee's `ensures_of` — not as a
     // value the fold transformer could restate.
     {
-        let capture_syms: BTreeSet<Symbol> = mutated_captures.iter().map(|(sym, _)| *sym).collect();
+        let capture_syms: BTreeSet<Symbol> =
+            mutated_captures.iter().map(|capture| capture.sym).collect();
         if capture_values
             .iter()
             .any(|(_, value)| spec_derivation::mentions_syms_outside_old(value, &capture_syms))
         {
-            cannot_resolve(
+            weaken(
                 env,
                 "the lambda accumulates into a captured variable through a \
                  function call whose effect on the capture cannot be \
@@ -4163,7 +4496,7 @@ fn resolve_folds_of_occurrence(
             .iter()
             .any(|(_, value)| mentions_behavior_over_fun_param(value, &fun_params))
         {
-            cannot_resolve(
+            weaken_with_issue(
                 env,
                 "the values written to the captured variables depend on an \
                  application of a function-typed parameter of the enclosing \
@@ -4171,6 +4504,7 @@ fn resolve_folds_of_occurrence(
                  the capture updates in the lambda eventually bound to that \
                  parameter, or restate this wrapper without the \
                  intermediate lambda",
+                FORWARDED_FOLD_WEAKENING_ISSUE,
             );
             return None;
         }
@@ -4182,12 +4516,65 @@ fn resolve_folds_of_occurrence(
         env,
         capture_values.iter().map(|(_, e)| e).chain(&derived.aborts),
     ) {
-        cannot_resolve(
+        weaken(
             env,
             "the lambda combines captured-variable writes or abort \
              conditions with global state access, whose per-iteration \
              evaluation state is not expressible in a loop invariant",
         );
+        return None;
+    }
+    let inferred = env.symbol_pool().make(CONDITION_INFERRED_PROP);
+    let capture_names: BTreeSet<_> = mutated_captures
+        .iter()
+        .map(|capture| capture.name)
+        .collect();
+    let capture_temps: BTreeSet<_> = mutated_captures
+        .iter()
+        .flat_map(|capture| capture.current.used_temporaries())
+        .collect();
+    let transformer_has_behavior = capture_values
+        .iter()
+        .any(|(_, value)| depends_on_behavior(env, value));
+    let summary_affects_success = transformer_has_behavior || !derived.aborts.is_empty();
+    let fold_summary_is_used = target_fun.is_some_and(|qid| {
+        env.get_function(qid)
+            .get_spec()
+            .conditions
+            .iter()
+            .filter(|cond| !cond.properties.contains_key(&inferred))
+            .any(|cond| match cond.kind {
+                ConditionKind::Ensures | ConditionKind::LetPost(..) => {
+                    summary_affects_success
+                        || !cond.exp.free_vars().is_disjoint(&capture_names)
+                        || !cond.exp.used_temporaries().is_disjoint(&capture_temps)
+                        || cond.exp.any(&mut |exp| {
+                            matches!(exp, ExpData::Call(_, Operation::Result(..), _))
+                        })
+                },
+                ConditionKind::Update | ConditionKind::Emits | ConditionKind::AbortsWith => true,
+                ConditionKind::AbortsIf => {
+                    !matches!(cond.exp.as_ref(), ExpData::Value(_, Value::Bool(false)))
+                },
+                _ => false,
+            })
+    });
+    let fun_params = deferred_fun_param_temps(env, target_fun);
+    let transformer_depends_on_fun_param = capture_values
+        .iter()
+        .any(|(_, value)| mentions_behavior_over_fun_param(value, &fun_params));
+    let transformer_has_underivable_behavior = capture_values
+        .iter()
+        .any(|(_, value)| underivable_concrete_behavior(env, value).is_some());
+    if !fold_summary_is_used && !transformer_depends_on_fun_param {
+        let reason = if transformer_has_underivable_behavior {
+            "the capture transformer contains behavior which cannot be \
+             summarized as a value"
+        } else {
+            "the enclosing function has no specification which requires the \
+             fold summary"
+        };
+        weaken(env, reason);
         return None;
     }
     // A lambda without captures degenerates to the prefix no-abort
@@ -4197,37 +4584,21 @@ fn resolve_folds_of_occurrence(
             form,
             captures: vec![],
             spec: None,
+            anchored_ctx_values: BTreeMap::new(),
             aborts: derived.aborts,
             param_syms,
         }));
-    }
-    // The snapshot bindings copy the captures' values (the referenced
-    // values for `&mut` captures) at expansion entry.
-    let ty_params = target_fun
-        .map(|qid| env.get_function(qid).get_type_parameters())
-        .unwrap_or_default();
-    for (sym, ty) in &mutated_captures {
-        let abilities = env.type_abilities(ty.skip_reference(), &ty_params);
-        if !abilities.has_ability(Ability::Copy) || !abilities.has_ability(Ability::Drop) {
-            cannot_resolve(
-                env,
-                &format!(
-                    "the captured variable `{}` must have the `copy` and \
-                     `drop` abilities, so its value at loop entry can be \
-                     recorded",
-                    sym.display(env.symbol_pool())
-                ),
-            );
-            return None;
-        }
     }
     // The accumulator slots: value type and, for `&mut` captures, the
     // reference type.
     let accumulators: Vec<(Symbol, Type, Option<Type>)> = mutated_captures
         .iter()
-        .map(|(sym, ty)| {
-            let ref_ty = ty.is_mutable_reference().then(|| ty.clone());
-            (*sym, ty.skip_reference().clone(), ref_ty)
+        .map(|capture| {
+            let ref_ty = capture
+                .ty
+                .is_mutable_reference()
+                .then(|| capture.ty.clone());
+            (capture.sym, capture.ty.skip_reference().clone(), ref_ty)
         })
         .collect();
     // The transformer material per form: for the element form the derived
@@ -4249,6 +4620,10 @@ fn resolve_folds_of_occurrence(
             (vec![*j_sym], composed)
         },
     };
+    // Recursive spec functions receive anchored reads as context parameters;
+    // `old(..)` itself is meaningful only at the loop invariant.
+    let (transformer_values, anchored_ctx_values) =
+        abstract_fold_anchored_values(env, loc, transformer_values);
 
     // Resolve the recursion: a single capture specializes the generic
     // `spec_fold` (element form) resp. `spec_fold_idx` (general form)
@@ -4305,7 +4680,17 @@ fn resolve_folds_of_occurrence(
                 (capture_sym, transformer_values[0].1.clone()),
             ])?;
         let mut specializer = SpecFunSpecializer::new(env, target_fun, unifier);
-        specializer.specialize(loc, fold_qid, inst, vec![(0, transformer)], None)?
+        specializer.bp_context = BpContext::FoldTransformer;
+        let Some(spec) = specializer.specialize(loc, fold_qid, inst, vec![(0, transformer)], None)
+        else {
+            weaken(
+                env,
+                "the capture transformer contains behavior which cannot be \
+                 summarized as a value",
+            );
+            return None;
+        };
+        spec
     } else {
         let elem_ty = match &form {
             FoldsOfForm::Element => Some(param_tys[0].skip_reference().clone()),
@@ -4322,81 +4707,84 @@ fn resolve_folds_of_occurrence(
             folds_of_unifier,
         )?
     };
+    // Deferred occurrences retain their original capture anchor.
+    let snapshot_label = anchor.unwrap_or_else(|| {
+        *deferral
+            .entry_label
+            .get_or_insert_with(|| MemoryLabel::new(env.new_global_id().as_usize()))
+    });
+    let capture_currents: BTreeMap<Symbol, Exp> = mutated_captures
+        .iter()
+        .map(|capture| (capture.sym, capture.current.clone()))
+        .collect();
     let captures = accumulators
         .into_iter()
-        .map(|(sym, ty, ref_ty)| {
-            let snapshot = folds_of_snapshot_sym(
-                env,
-                loc,
-                sym,
-                &ty,
-                ref_ty.as_ref(),
-                anchor,
-                snapshot_syms,
-                snapshots,
-                deferral,
-            );
-            FoldsOfCapture {
-                sym,
-                ty,
-                ref_ty,
-                snapshot,
-            }
+        .map(|(sym, ty, ref_ty)| FoldsOfCapture {
+            sym,
+            ty,
+            ref_ty,
+            current: capture_currents[&sym].clone(),
+            snapshot_label,
         })
         .collect();
     Some(FoldsOfResolution::Direct(FoldsOfDirect {
         form,
         captures,
         spec: Some(spec),
+        anchored_ctx_values,
         aborts: derived.aborts,
         param_syms,
     }))
 }
 
-/// Returns the snapshot symbol recording a capture's value at the
-/// occurrence's snapshot point, creating the binding on first use within
-/// one expansion: at expansion entry for a regular occurrence, or at the
-/// `FoldsCaptureAnchor` marker of the anchor label for a previously
-/// deferred occurrence (see `FoldsOfDeferred`). For a `&mut` capture the
-/// recorded value is the dereferenced target.
-fn folds_of_snapshot_sym(
+/// Lifts anchored fold-transformer reads into recursion context parameters.
+fn abstract_fold_anchored_values(
     env: &GlobalEnv,
     loc: &Loc,
-    sym: Symbol,
-    value_ty: &Type,
-    ref_ty: Option<&Type>,
-    anchor: Option<MemoryLabel>,
-    snapshot_syms: &mut BTreeMap<(Option<MemoryLabel>, Symbol), Symbol>,
-    snapshots: &mut Vec<FoldsOfSnapshot>,
-    deferral: &mut FoldsOfDeferralState,
-) -> Symbol {
-    *snapshot_syms.entry((anchor, sym)).or_insert_with(|| {
-        let snap = env.symbol_pool().make(&format!(
-            "{}$pre_{}",
-            sym.display(env.symbol_pool()),
-            env.new_global_id().as_usize()
-        ));
-        let var_ty = ref_ty.cloned().unwrap_or_else(|| value_ty.clone());
-        let mut value = ExpData::LocalVar(env.new_node(loc.clone(), var_ty), sym).into_exp();
-        if ref_ty.is_some() {
-            value = ExpData::Call(
-                env.new_node(loc.clone(), value_ty.clone()),
-                Operation::Deref,
-                vec![value],
-            )
-            .into_exp();
+    values: Vec<(Symbol, Exp)>,
+) -> (Vec<(Symbol, Exp)>, BTreeMap<Symbol, Exp>) {
+    struct Abstractor<'a> {
+        env: &'a GlobalEnv,
+        loc: &'a Loc,
+        values: Vec<(Symbol, Exp)>,
+    }
+    impl ExpRewriterFunctions for Abstractor<'_> {
+        fn rewrite_exp(&mut self, exp: Exp) -> Exp {
+            if matches!(
+                exp.as_ref(),
+                ExpData::Call(_, Operation::WithStateAnchor(..), _)
+            ) {
+                let pos = self
+                    .values
+                    .iter()
+                    .position(|(_, value)| {
+                        value.as_ref().is_spec_equivalent(self.env, exp.as_ref())
+                    })
+                    .unwrap_or_else(|| {
+                        let sym = self
+                            .env
+                            .symbol_pool()
+                            .make(&format!("$fold_anchor_ctx_{}", self.values.len()));
+                        self.values.push((sym, exp.clone()));
+                        self.values.len() - 1
+                    });
+                let sym = self.values[pos].0;
+                let ty = self.env.get_node_type(exp.node_id());
+                return ExpData::LocalVar(self.env.new_node(self.loc.clone(), ty), sym).into_exp();
+            }
+            self.rewrite_exp_descent(exp)
         }
-        let snapshot = FoldsOfSnapshot {
-            sym: snap,
-            ty: value_ty.clone(),
-            value,
-        };
-        match anchor {
-            None => snapshots.push(snapshot),
-            Some(label) => deferral.anchored_snapshots.push((label, snapshot)),
-        }
-        snap
-    })
+    }
+    let mut abstractor = Abstractor {
+        env,
+        loc,
+        values: vec![],
+    };
+    let values = values
+        .into_iter()
+        .map(|(sym, value)| (sym, abstractor.rewrite_exp(value)))
+        .collect();
+    (values, abstractor.values.into_iter().collect())
 }
 
 /// Resolves the fold recursion declaration of the given name:
@@ -4675,6 +5063,7 @@ fn generate_multi_capture_recursion(
                 param_sym: sym,
                 temp: None,
                 ty: ty.skip_reference().clone(),
+                caller_ty: ty,
             });
         }
     }
@@ -4686,6 +5075,7 @@ fn generate_multi_capture_recursion(
                     param_sym: *sym,
                     temp: Some(idx),
                     ty: ty.skip_reference().clone(),
+                    caller_ty: ty,
                 });
             }
         } else {
@@ -4695,6 +5085,25 @@ fn generate_multi_capture_recursion(
                 "unresolved parameter reference in lambda argument",
             );
         }
+    }
+    if ctx_args
+        .iter()
+        .any(|ctx| ctx.caller_ty.is_mutable_reference())
+    {
+        if env.is_verify_mode() {
+            env.diag(
+                Severity::Warning,
+                loc,
+                &format!(
+                    "cannot derive `folds_of` exactly for this lambda argument: \
+                     a multi-capture fold reads through a mutable reference, \
+                     which cannot yet be represented as a stable recursion \
+                     parameter; weakening the enclosing loop invariant; see {}",
+                    INLINE_HOF_WEAKENING_ISSUE
+                ),
+            );
+        }
+        return None;
     }
     let mut taken: BTreeSet<Symbol> = capture_values
         .iter()
@@ -4802,6 +5211,7 @@ fn generate_multi_capture_recursion(
         ctx_args: ctx_args.clone(),
         result_type: result_type.clone(),
         type_args: spec_type_args,
+        underivable_behavior: Rc::new(Cell::new(None)),
     };
     folds_of_unifier.push(FoldsOfRecursionEntry {
         elem_ty: elem_ty.cloned(),
@@ -4916,18 +5326,18 @@ fn generate_multi_capture_recursion(
     .into_exp();
     // Replace references to enclosing-function parameters by the context
     // parameters.
-    let temp_map: BTreeMap<TempIndex, Symbol> = ctx_args
+    let temp_map: BTreeMap<TempIndex, (Symbol, Type)> = ctx_args
         .iter()
-        .filter_map(|c| c.temp.map(|idx| (idx, c.param_sym)))
+        .filter_map(|c| c.temp.map(|idx| (idx, (c.param_sym, c.ty.clone()))))
         .collect();
     let body = if temp_map.is_empty() {
         body
     } else {
         let env_ref: &GlobalEnv = env;
-        let mut replacer = |id: NodeId, target: ExpRewriteTarget| match target {
-            ExpRewriteTarget::Temporary(idx) => temp_map
-                .get(&idx)
-                .map(|sym| ExpData::LocalVar(id, *sym).into_exp()),
+        let mut replacer = |_id: NodeId, target: ExpRewriteTarget| match target {
+            ExpRewriteTarget::Temporary(idx) => temp_map.get(&idx).map(|(sym, ty)| {
+                ExpData::LocalVar(env_ref.new_node(loc.clone(), ty.clone()), *sym).into_exp()
+            }),
             _ => None,
         };
         ExpRewriter::new(env_ref, &mut replacer).rewrite_exp(body)
@@ -4997,15 +5407,16 @@ fn build_folds_of_invariant(
             resolution
                 .captures
                 .iter()
-                .map(|c| mk_var(c.snapshot, &c.ty)),
+                .map(|c| c.snapshot_value(env, loc)),
         );
         args.push(end);
-        spec.make_call(
+        spec.make_call_with_context_values(
             env,
             loc.clone(),
             &MemoryRange::default(),
             args,
             &BTreeMap::new(),
+            &resolution.anchored_ctx_values,
         )
     };
     let mut conjuncts = vec![];
@@ -5294,37 +5705,13 @@ fn substitute_free_locals(exp: &Exp, subst: &BTreeMap<Symbol, Exp>) -> Exp {
     .rewrite_exp(exp.clone())
 }
 
-/// Anchors `old(..)` over parameters of an inline function at the
-/// expansion entry. In the specification conditions of an inline function
-/// body (loop invariants, asserts), `old(p)` of a parameter denotes the
-/// parameter's value at the *inline function's* entry — the analog of
-/// function-entry `old(..)` in a regular function's spec. The enclosing
-/// function's entry state does not in general contain that value (the
-/// argument may not exist at entry, e.g. a field borrow `&mut s.v`
-/// constructed at the call site), so the value is recorded in a snapshot
-/// binding `let p$pre = *p;` (the referenced value for a reference
-/// parameter) wrapped around the body — inside the parameter-binding block
-/// of the expansion, like the `folds_of` capture snapshots — and the
-/// `old(p)` references are redirected to the snapshot, dropping the
-/// `old(..)` wrapper. This requires the parameter's value type to have the
-/// `copy` and `drop` abilities; otherwise an error names the boundary —
-/// except when the expansion target is itself an inline function: its
-/// body is pre-expanded once with the function's generic type parameters
-/// (bottom-up inlining), so insufficient abilities there are not final —
-/// an eventual instantiation may well be copyable — and no caller exists
-/// to direct an error at. Such occurrences are skipped silently and keep
-/// their function-entry anchoring (a documented boundary; anchoring them
-/// would take deferred snapshot materialization at the outer expansion).
-/// `old(..)` over anything other than a plain parameter (state reads, body
-/// locals, and the parameters of an attached lambda spec, which are
-/// pattern-bound rather than parameter temporaries) is left untouched and
-/// keeps its function-entry anchoring.
+/// Anchors `old(parameter)` at inline-expansion entry. Verifier temporaries
+/// avoid Move `copy` and `drop` requirements; other `old(..)` forms retain
+/// function-entry semantics.
 fn anchor_param_old_at_expansion_entry(
     env: &GlobalEnv,
     body: Exp,
     parameters: &[Parameter],
-    type_args: &[Type],
-    target_fun: Option<QualifiedFunId>,
     call_site_loc: &Loc,
 ) -> Exp {
     // Fast path: no `old(<parameter>)` occurrence in the body.
@@ -5337,13 +5724,8 @@ fn anchor_param_old_at_expansion_entry(
     struct Anchorer<'a> {
         env: &'a GlobalEnv,
         parameters: &'a [Parameter],
-        type_args: &'a [Type],
-        target_fun: Option<QualifiedFunId>,
-        call_site_loc: &'a Loc,
-        /// Snapshot symbol and value type (callee side) per parameter.
-        snapshots: BTreeMap<TempIndex, (Symbol, Type)>,
-        /// Parameters whose value cannot be recorded (error reported).
-        errored: BTreeSet<TempIndex>,
+        label: MemoryLabel,
+        anchored: bool,
     }
     impl ExpRewriterFunctions for Anchorer<'_> {
         fn rewrite_call(&mut self, id: NodeId, oper: &Operation, args: &[Exp]) -> Option<Exp> {
@@ -5357,156 +5739,90 @@ fn anchor_param_old_at_expansion_entry(
                 return None;
             };
             let param = self.parameters.get(*idx)?;
-            if matches!(param.1, Type::Fun(..)) || self.errored.contains(idx) {
+            if matches!(param.1, Type::Fun(..)) {
                 return None;
             }
             let env = self.env;
             let loc = env.get_node_loc(id);
-            if !self.snapshots.contains_key(idx) {
-                let value_ty = param.1.skip_reference();
-                let ty_params = self
-                    .target_fun
-                    .map(|qid| env.get_function(qid).get_type_parameters())
-                    .unwrap_or_default();
-                let abilities =
-                    env.type_abilities(&value_ty.instantiate(self.type_args), &ty_params);
-                if !abilities.has_ability(Ability::Copy) || !abilities.has_ability(Ability::Drop) {
-                    // Only a non-inline target makes the instantiation
-                    // final; an inline target's body is pre-expanded with
-                    // its generic type parameters, where insufficient
-                    // abilities are not conclusive (see the function doc).
-                    let target_is_final = self
-                        .target_fun
-                        .is_some_and(|qid| !env.get_function(qid).is_inline());
-                    if target_is_final {
-                        spec_error_with_labels(
-                            env,
-                            &loc,
-                            &format!(
-                                "cannot anchor `old(..)` over the inline function \
-                                 parameter `{}` at the entry of this expansion: the \
-                                 parameter's value type must have the `copy` and \
-                                 `drop` abilities, so its value at entry can be \
-                                 recorded",
-                                param.0.display(env.symbol_pool())
-                            ),
-                            vec![(
-                                self.call_site_loc.clone(),
-                                "expanded from this call".to_string(),
-                            )],
-                        );
-                    }
-                    self.errored.insert(*idx);
-                    return None;
-                }
-                let sym = env.symbol_pool().make(&format!(
-                    "{}$pre_{}",
-                    param.0.display(env.symbol_pool()),
-                    env.new_global_id().as_usize()
-                ));
-                self.snapshots.insert(*idx, (sym, value_ty.clone()));
+            let value_ty = param.1.skip_reference().clone();
+            // Anchor the binding; a forwarded argument may change before entry.
+            let mut value =
+                ExpData::LocalVar(env.new_node(loc.clone(), param.1.clone()), param.0).into_exp();
+            if param.1.is_reference() {
+                value = ExpData::Call(
+                    env.new_node(loc.clone(), value_ty.clone()),
+                    Operation::Deref,
+                    vec![value],
+                )
+                .into_exp();
             }
-            let (sym, value_ty) = &self.snapshots[idx];
-            Some(ExpData::LocalVar(env.new_node(loc, value_ty.clone()), *sym).into_exp())
-        }
-    }
-    let mut anchorer = Anchorer {
-        env,
-        parameters,
-        type_args,
-        target_fun,
-        call_site_loc,
-        snapshots: BTreeMap::new(),
-        errored: BTreeSet::new(),
-    };
-    let mut result = anchorer.rewrite_exp(body);
-    // Wrap the body in the snapshot bindings, with callee-side types and
-    // parameter temporaries: the expansion's rewriting instantiates the
-    // types and resolves the temporaries to the bound parameters, and the
-    // parameter-binding block of `construct_inlined_call_expression`
-    // closes over the bindings.
-    for (idx, (sym, value_ty)) in anchorer.snapshots.into_iter().rev() {
-        let param = &parameters[idx];
-        let loc = param.2.clone();
-        let mut value =
-            ExpData::Temporary(env.new_node(loc.clone(), param.1.clone()), idx).into_exp();
-        if param.1.is_reference() {
-            value = ExpData::Call(
+            let old = ExpData::Call(
                 env.new_node(loc.clone(), value_ty.clone()),
-                Operation::Deref,
+                Operation::Old,
                 vec![value],
             )
             .into_exp();
+            self.anchored = true;
+            Some(
+                ExpData::Call(
+                    env.new_node(loc, value_ty),
+                    Operation::WithStateAnchor(self.label),
+                    vec![old],
+                )
+                .into_exp(),
+            )
         }
-        result = wrap_snapshot_binding(env, &loc, result, FoldsOfSnapshot {
-            sym,
-            ty: value_ty,
-            value,
-        });
     }
-    result
-}
-
-/// Wraps the rewritten body of an inline function expansion in the snapshot
-/// bindings of its `folds_of` resolutions: `let c$pre = c;` per distinct
-/// capture, inside the parameter-binding block built by
-/// `construct_inlined_call_expression` — after argument evaluation, before
-/// the body.
-fn wrap_folds_of_snapshots(
-    env: &GlobalEnv,
-    loc: &Loc,
-    body: Exp,
-    snapshots: Vec<FoldsOfSnapshot>,
-) -> Exp {
-    let mut result = body;
-    for snap in snapshots.into_iter().rev() {
-        result = wrap_snapshot_binding(env, loc, result, snap);
+    let label = MemoryLabel::new(env.new_global_id().as_usize());
+    let mut anchorer = Anchorer {
+        env,
+        parameters,
+        label,
+        anchored: false,
+    };
+    let result = anchorer.rewrite_exp(body);
+    if anchorer.anchored {
+        prepend_folds_anchor_marker(env, call_site_loc, result, label)
+    } else {
+        result
     }
-    result
 }
 
-/// Wraps an expression in the `let sym: ty = value;` binding of a capture
-/// snapshot.
-fn wrap_snapshot_binding(env: &GlobalEnv, loc: &Loc, body: Exp, snap: FoldsOfSnapshot) -> Exp {
-    let body_ty = env.get_node_type(body.node_id());
-    let block_id = env.new_node(loc.clone(), body_ty);
-    let pat = Pattern::Var(env.new_node(loc.clone(), snap.ty), snap.sym);
-    ExpData::Block(block_id, pat, Some(snap.value), body).into_exp()
-}
-
-/// Freshens the anchor labels of deferred `folds_of` occurrences and their
-/// `FoldsCaptureAnchor` markers in a body about to be expanded: each
-/// expansion must anchor at its own marker instances (the same wrapper
-/// expanded twice in one function would otherwise carry colliding labels).
-/// Marker and occurrences of one label freshen consistently. Returns the
-/// body unchanged when it carries no anchors.
+/// Freshens verifier-state labels consistently for each expansion.
 fn freshen_folds_anchor_labels(env: &GlobalEnv, body: Exp) -> Exp {
-    if !body.any(&mut |e| match e {
-        ExpData::Call(_, Operation::FoldsCaptureAnchor(..), _) => true,
-        ExpData::Call(_, Operation::Behavior(BehaviorKind::FoldsOf, range), _) => {
-            !range.is_default()
-        },
-        _ => false,
-    }) {
+    let mut labels = BTreeSet::new();
+    body.visit_pre_order(&mut |e| {
+        match e {
+            ExpData::Call(_, Operation::FoldsCaptureAnchor(label), _) => {
+                labels.insert(*label);
+            },
+            ExpData::Call(_, Operation::Behavior(BehaviorKind::FoldsOf, range), _) => {
+                labels.extend(range.pre);
+                labels.extend(range.post);
+            },
+            _ => {},
+        }
+        true
+    });
+    if labels.is_empty() {
         return body;
     }
-    struct Freshener<'a> {
-        env: &'a GlobalEnv,
+    struct Freshener {
         map: BTreeMap<MemoryLabel, MemoryLabel>,
     }
-    impl Freshener<'_> {
-        fn freshen(&mut self, label: MemoryLabel) -> MemoryLabel {
-            *self
-                .map
-                .entry(label)
-                .or_insert_with(|| MemoryLabel::new(self.env.new_global_id().as_usize()))
+    impl Freshener {
+        fn freshen(&self, label: MemoryLabel) -> MemoryLabel {
+            self.map.get(&label).copied().unwrap_or(label)
         }
     }
-    impl ExpRewriterFunctions for Freshener<'_> {
+    impl ExpRewriterFunctions for Freshener {
         fn rewrite_call(&mut self, id: NodeId, oper: &Operation, args: &[Exp]) -> Option<Exp> {
             let new_oper = match oper {
                 Operation::FoldsCaptureAnchor(label) => {
                     Some(Operation::FoldsCaptureAnchor(self.freshen(*label)))
+                },
+                Operation::WithStateAnchor(label) if self.map.contains_key(label) => {
+                    Some(Operation::WithStateAnchor(self.freshen(*label)))
                 },
                 Operation::Behavior(BehaviorKind::FoldsOf, range) if !range.is_default() => {
                     Some(Operation::Behavior(BehaviorKind::FoldsOf, MemoryRange {
@@ -5520,15 +5836,15 @@ fn freshen_folds_anchor_labels(env: &GlobalEnv, body: Exp) -> Exp {
         }
     }
     Freshener {
-        env,
-        map: BTreeMap::new(),
+        map: labels
+            .into_iter()
+            .map(|label| (label, MemoryLabel::new(env.new_global_id().as_usize())))
+            .collect(),
     }
     .rewrite_exp(body)
 }
 
-/// Builds the `FoldsCaptureAnchor` marker statement for the given label: an
-/// `assume` condition in an inline spec block, like the `SaveStateAnchor`
-/// marker.
+/// Builds the marker used for fold captures and inline-parameter snapshots.
 fn mk_folds_anchor_marker(env: &GlobalEnv, loc: &Loc, label: MemoryLabel) -> Exp {
     let marker_exp = ExpData::Call(
         env.new_bool_node(loc),
@@ -5549,10 +5865,7 @@ fn mk_folds_anchor_marker(env: &GlobalEnv, loc: &Loc, label: MemoryLabel) -> Exp
     .into_exp()
 }
 
-/// Prepends the `FoldsCaptureAnchor` marker of this expansion's deferred
-/// `folds_of` occurrences to the rewritten body: the marker names the
-/// program point at which the eventually supplied lambda's captures are
-/// snapshotted (see `FoldsOfDeferred`).
+/// Marks the snapshot point of captures and bound inline parameters.
 fn prepend_folds_anchor_marker(env: &GlobalEnv, loc: &Loc, body: Exp, label: MemoryLabel) -> Exp {
     let body_ty = env.get_node_type(body.node_id());
     ExpData::Sequence(env.new_node(loc.clone(), body_ty), vec![
@@ -5562,9 +5875,73 @@ fn prepend_folds_anchor_marker(env: &GlobalEnv, loc: &Loc, body: Exp, label: Mem
     .into_exp()
 }
 
-/// The label of a `FoldsCaptureAnchor` marker statement (an inline spec
-/// block whose single condition is the marker operation), if the
-/// expression is one.
+/// Adds a derivation summary while asserting it against the executable result.
+fn prepend_inline_call_summary(
+    env: &GlobalEnv,
+    loc: &Loc,
+    body: Exp,
+    result: Exp,
+    aborts: Exp,
+) -> Exp {
+    let body_ty = env.get_node_type(body.node_id());
+    let marker_exp = ExpData::Call(env.new_bool_node(loc), Operation::InlineCallSummary, vec![
+        result.clone(),
+        aborts,
+    ])
+    .into_exp();
+    let marker = ExpData::SpecBlock(env.new_node(loc.clone(), Type::unit()), Spec {
+        conditions: vec![Condition {
+            loc: loc.clone(),
+            kind: ConditionKind::Assume,
+            properties: Default::default(),
+            exp: marker_exp,
+            additional_exps: vec![],
+        }],
+        ..Spec::default()
+    })
+    .into_exp();
+
+    let result_sym = env.symbol_pool().make(&format!(
+        "$inline_summary_result_{}",
+        env.new_global_id().as_usize()
+    ));
+    let result_pattern = Pattern::Var(env.new_node(loc.clone(), body_ty.clone()), result_sym);
+    let actual =
+        ExpData::LocalVar(env.new_node(loc.clone(), body_ty.clone()), result_sym).into_exp();
+    let eq_id = env.new_bool_node(loc);
+    env.set_node_instantiation(eq_id, vec![body_ty.clone()]);
+    let equality = ExpData::Call(eq_id, Operation::Eq, vec![actual, result]).into_exp();
+    let check = ExpData::SpecBlock(env.new_node(loc.clone(), Type::unit()), Spec {
+        conditions: vec![Condition {
+            loc: loc.clone(),
+            kind: ConditionKind::Assert,
+            properties: Default::default(),
+            exp: equality,
+            additional_exps: vec![],
+        }],
+        ..Spec::default()
+    })
+    .into_exp();
+    let returned =
+        ExpData::LocalVar(env.new_node(loc.clone(), body_ty.clone()), result_sym).into_exp();
+    let checked_body = ExpData::Block(
+        env.new_node(loc.clone(), body_ty.clone()),
+        result_pattern,
+        Some(body),
+        ExpData::Sequence(env.new_node(loc.clone(), body_ty.clone()), vec![
+            check, returned,
+        ])
+        .into_exp(),
+    )
+    .into_exp();
+    ExpData::Sequence(env.new_node(loc.clone(), body_ty), vec![
+        marker,
+        checked_body,
+    ])
+    .into_exp()
+}
+
+/// Returns the label of a `FoldsCaptureAnchor` statement.
 fn folds_anchor_marker_label(exp: &Exp) -> Option<MemoryLabel> {
     let ExpData::SpecBlock(_, spec) = exp.as_ref() else {
         return None;
@@ -5578,40 +5955,26 @@ fn folds_anchor_marker_label(exp: &Exp) -> Option<MemoryLabel> {
     }
 }
 
-/// Post-pass over the rewritten body of an expansion containing
-/// `FoldsCaptureAnchor` markers: inserts the snapshot bindings of resolved
-/// anchored `folds_of` occurrences at their matching markers — the
-/// marker's continuation within its enclosing sequence is wrapped in the
-/// `let c$pre = <value>;` blocks, so each entry into the marked region
-/// (e.g. each outer-loop iteration over a bucketed table) re-records the
-/// captures — and erases markers whose label no deferred occurrence in the
-/// body references anymore (consumed by this resolution, or stale).
-fn apply_anchored_snapshots_and_prune_markers(
-    env: &GlobalEnv,
-    loc: &Loc,
-    body: Exp,
-    anchored_snapshots: Vec<(MemoryLabel, FoldsOfSnapshot)>,
-) -> Exp {
-    // Labels still referenced by (re-)deferred occurrences after the
-    // rewrite; their markers must stay for the next expansion level.
+/// Removes unreferenced `FoldsCaptureAnchor` markers.
+fn prune_folds_anchor_markers(body: Exp) -> Exp {
     let mut referenced: BTreeSet<MemoryLabel> = BTreeSet::new();
     body.visit_pre_order(&mut |e| {
-        if let ExpData::Call(_, Operation::Behavior(BehaviorKind::FoldsOf, range), _) = e {
-            referenced.extend(range.pre);
+        match e {
+            ExpData::Call(_, Operation::Behavior(BehaviorKind::FoldsOf, range), _) => {
+                referenced.extend(range.pre);
+                referenced.extend(range.post);
+            },
+            ExpData::Call(_, Operation::WithStateAnchor(label), _) => {
+                referenced.insert(*label);
+            },
+            _ => {},
         }
         true
     });
-    let mut pending: BTreeMap<MemoryLabel, Vec<FoldsOfSnapshot>> = BTreeMap::new();
-    for (label, snap) in anchored_snapshots {
-        pending.entry(label).or_default().push(snap);
-    }
-    struct MarkerPass<'a> {
-        env: &'a GlobalEnv,
-        loc: &'a Loc,
+    struct MarkerPass {
         referenced: BTreeSet<MemoryLabel>,
-        pending: BTreeMap<MemoryLabel, Vec<FoldsOfSnapshot>>,
     }
-    impl ExpRewriterFunctions for MarkerPass<'_> {
+    impl ExpRewriterFunctions for MarkerPass {
         fn rewrite_exp(&mut self, exp: Exp) -> Exp {
             let exp = self.rewrite_exp_descent(exp);
             let ExpData::Sequence(id, exps) = exp.as_ref() else {
@@ -5620,58 +5983,22 @@ fn apply_anchored_snapshots_and_prune_markers(
             if !exps.iter().any(|e| folds_anchor_marker_label(e).is_some()) {
                 return exp;
             }
-            let seq_ty = self.env.get_node_type(*id);
-            // Process right-to-left, wrapping each marker's continuation.
-            let mut result: Vec<Exp> = vec![];
-            for e in exps.iter().rev() {
-                let Some(label) = folds_anchor_marker_label(e) else {
-                    result.push(e.clone());
-                    continue;
-                };
-                if let Some(snaps) = self.pending.remove(&label) {
-                    result.reverse();
-                    let mut continuation = if let [single] = result.as_slice() {
-                        single.clone()
-                    } else {
-                        ExpData::Sequence(
-                            self.env.new_node(self.loc.clone(), seq_ty.clone()),
-                            std::mem::take(&mut result),
-                        )
-                        .into_exp()
-                    };
-                    for snap in snaps.into_iter().rev() {
-                        continuation =
-                            wrap_snapshot_binding(self.env, self.loc, continuation, snap);
-                    }
-                    result = vec![continuation];
-                    result.reverse();
-                }
-                if self.referenced.contains(&label) {
-                    result.push(e.clone());
-                }
-            }
-            result.reverse();
+            let result: Vec<Exp> = exps
+                .iter()
+                .filter(|e| {
+                    folds_anchor_marker_label(e)
+                        .is_none_or(|label| self.referenced.contains(&label))
+                })
+                .cloned()
+                .collect();
             match result.as_slice() {
                 [single] => single.clone(),
                 _ => ExpData::Sequence(*id, result).into_exp(),
             }
         }
     }
-    let mut pass = MarkerPass {
-        env,
-        loc,
-        referenced,
-        pending,
-    };
-    let result = pass.rewrite_exp(body);
-    if !pass.pending.is_empty() {
-        env.diag(
-            Severity::Bug,
-            loc,
-            "anchored folds_of snapshots without a matching capture-anchor marker",
-        );
-    }
-    result
+    let mut pass = MarkerPass { referenced };
+    pass.rewrite_exp(body)
 }
 
 // ======================================================================================
@@ -5858,6 +6185,9 @@ struct CtxArg {
     sym: Symbol,
     param_sym: Symbol,
     temp: Option<TempIndex>,
+    /// Type of the caller-side expression. This can be a reference even
+    /// though the generated spec parameter in `ty` is value-level.
+    caller_ty: Type,
     ty: Type,
 }
 
@@ -5878,9 +6208,19 @@ struct SpecFunSpecialization {
     /// type parameters (see `compact_type_param_mapping`). Empty for a
     /// specialization over fully concrete material.
     type_args: Vec<Type>,
+    underivable_behavior: Rc<Cell<Option<BehaviorKind>>>,
 }
 
 impl SpecFunSpecialization {
+    fn underivable_behavior(&self, env: &GlobalEnv) -> Option<BehaviorKind> {
+        self.underivable_behavior.get().or_else(|| {
+            env.get_spec_fun(self.qid)
+                .body
+                .as_ref()
+                .and_then(|body| underivable_concrete_behavior(env, body))
+        })
+    }
+
     /// Constructs the redirected call to the specialized function: the given
     /// retained arguments, followed by the materialized context arguments.
     /// Context arguments backed by parameters of the enclosing function are
@@ -5894,11 +6234,34 @@ impl SpecFunSpecialization {
         env: &GlobalEnv,
         loc: Loc,
         range: &MemoryRange,
-        mut retained_args: Vec<Exp>,
+        retained_args: Vec<Exp>,
         ctx_renames: &BTreeMap<Symbol, Symbol>,
     ) -> Exp {
+        self.make_call_with_context_values(
+            env,
+            loc,
+            range,
+            retained_args,
+            ctx_renames,
+            &BTreeMap::new(),
+        )
+    }
+
+    fn make_call_with_context_values(
+        &self,
+        env: &GlobalEnv,
+        loc: Loc,
+        range: &MemoryRange,
+        mut retained_args: Vec<Exp>,
+        ctx_renames: &BTreeMap<Symbol, Symbol>,
+        ctx_values: &BTreeMap<Symbol, Exp>,
+    ) -> Exp {
         for ctx in &self.ctx_args {
-            let node = env.new_node(loc.clone(), ctx.ty.clone());
+            if let Some(value) = ctx_values.get(&ctx.sym) {
+                retained_args.push(value.clone());
+                continue;
+            }
+            let node = env.new_node(loc.clone(), ctx.caller_ty.clone());
             retained_args.push(match ctx.temp {
                 Some(idx) => ExpData::Temporary(node, idx).into_exp(),
                 None => {
@@ -5936,6 +6299,9 @@ struct SpecFunSpecializer<'env, 'unifier> {
     env: &'env mut GlobalEnv,
     /// The function into which the expansion happens.
     target_fun: Option<QualifiedFunId>,
+    /// Context used when behavioral predicates in the specialized body are
+    /// resolved. Fold-transformer failures are reported by `folds_of`.
+    bp_context: BpContext,
     /// Parameters of the enclosing function, for resolving temporaries in
     /// lambda material.
     enclosing_params: Vec<Parameter>,
@@ -5957,6 +6323,7 @@ impl<'env, 'unifier> SpecFunSpecializer<'env, 'unifier> {
         Self {
             env,
             target_fun,
+            bp_context: BpContext::SpecFunBody,
             enclosing_params,
             cache: BTreeMap::new(),
             unifier,
@@ -6087,6 +6454,7 @@ impl<'env, 'unifier> SpecFunSpecializer<'env, 'unifier> {
                         param_sym: sym,
                         temp: None,
                         ty: ty.skip_reference().clone(),
+                        caller_ty: ty,
                     });
                 }
             }
@@ -6098,6 +6466,7 @@ impl<'env, 'unifier> SpecFunSpecializer<'env, 'unifier> {
                             param_sym: *sym,
                             temp: Some(idx),
                             ty: ty.skip_reference().clone(),
+                            caller_ty: ty,
                         });
                     }
                 } else {
@@ -6223,6 +6592,7 @@ impl<'env, 'unifier> SpecFunSpecializer<'env, 'unifier> {
             ctx_args: ctx_args.clone(),
             result_type,
             type_args: spec_type_args,
+            underivable_behavior: Rc::new(Cell::new(None)),
         };
         self.unifier.push(SpecFunUnifierEntry {
             target: qid,
@@ -6274,18 +6644,18 @@ impl<'env, 'unifier> SpecFunSpecializer<'env, 'unifier> {
         }
         // Replace references to enclosing-function parameters (temporaries in
         // the spliced lambda material) by the context parameters.
-        let temp_map: BTreeMap<TempIndex, Symbol> = ctx_args
+        let temp_map: BTreeMap<TempIndex, (Symbol, Type)> = ctx_args
             .iter()
-            .filter_map(|c| c.temp.map(|idx| (idx, c.param_sym)))
+            .filter_map(|c| c.temp.map(|idx| (idx, (c.param_sym, c.ty.clone()))))
             .collect();
         let new_body = if temp_map.is_empty() {
             new_body
         } else {
             let env: &GlobalEnv = self.env;
-            let mut replacer = |id: NodeId, target: ExpRewriteTarget| match target {
-                ExpRewriteTarget::Temporary(idx) => temp_map
-                    .get(&idx)
-                    .map(|sym| ExpData::LocalVar(id, *sym).into_exp()),
+            let mut replacer = |_id: NodeId, target: ExpRewriteTarget| match target {
+                ExpRewriteTarget::Temporary(idx) => temp_map.get(&idx).map(|(sym, ty)| {
+                    ExpData::LocalVar(env.new_node(loc.clone(), ty.clone()), *sym).into_exp()
+                }),
                 _ => None,
             };
             ExpRewriter::new(env, &mut replacer).rewrite_exp(new_body)
@@ -6295,6 +6665,9 @@ impl<'env, 'unifier> SpecFunSpecializer<'env, 'unifier> {
         // (nested or recursive) specializations inside the body carry their
         // type arguments in context space and are remapped alongside.
         let new_body = instantiate_exp_with_patterns(self.env, new_body, &type_param_remap);
+        specialization
+            .underivable_behavior
+            .set(underivable_concrete_behavior(self.env, &new_body));
         // Internal invariant: every free variable of the specialized body is
         // a parameter of the specialization; in particular, no reference to
         // an eliminated function parameter survives.
@@ -6380,11 +6753,12 @@ impl ExpRewriterFunctions for SpecFunBodyRewriter<'_, '_, '_, '_> {
                         .iter()
                         .map(|arg| self.rewrite_exp(arg.clone()))
                         .collect();
-                    return substitute_bp_by_lambda_spec(
+                    let result = substitute_bp_by_lambda_spec(
                         self.specializer.env,
                         self.specializer.target_fun,
                         None,
-                        BpContext::SpecFunBody,
+                        self.specializer.bp_context,
+                        false,
                         *id,
                         *kind,
                         range,
@@ -6392,6 +6766,16 @@ impl ExpRewriterFunctions for SpecFunBodyRewriter<'_, '_, '_, '_> {
                         bp_args,
                         None,
                     );
+                    if matches!(
+                        result.as_ref(),
+                        ExpData::Call(_, Operation::Behavior(..), args)
+                            if args.first().is_some_and(
+                                |target| matches!(target.as_ref(), ExpData::Lambda(..))
+                            )
+                    ) {
+                        self.failed = true;
+                    }
+                    return result;
                 }
             },
             ExpData::Call(id, Operation::SpecFunction(mid, sid, range), args) => {
@@ -6713,6 +7097,8 @@ impl ExpRewriterFunctions for InlinedRewriter<'_, '_> {
     /// `try_inline_behavior_predicate` to detect loop invariants.
     fn rewrite_enter_condition(&mut self, _target: &SpecBlockTarget, cond: &Condition) {
         self.current_condition_kind = Some(cond.kind.clone());
+        self.current_condition_is_behavioral =
+            cond.kind == ConditionKind::LoopInvariant && depends_on_behavior(self.env, &cond.exp);
         self.unresolved_bp_in_condition = false;
     }
 
@@ -6723,15 +7109,40 @@ impl ExpRewriterFunctions for InlinedRewriter<'_, '_> {
         _target: &SpecBlockTarget,
         cond: &Condition,
     ) -> Option<Condition> {
-        if !self.unresolved_bp_in_condition {
-            return None;
+        let mut result = cond.clone();
+        let mut changed = false;
+        if self.current_condition_is_behavioral {
+            result.properties.insert(
+                self.env.symbol_pool().make(BEHAVIORAL_INVARIANT_MARKER),
+                PropertyValue::Value(Value::Bool(true)),
+            );
+            changed = true;
         }
-        self.unresolved_bp_in_condition = false;
-        let loc = self.env.get_node_loc(cond.exp.node_id());
-        Some(Condition {
-            exp: self.env.new_bool_const(&loc, true),
-            ..cond.clone()
-        })
+        if self.unresolved_bp_in_condition {
+            self.unresolved_bp_in_condition = false;
+            self.unresolved_bp_in_spec = true;
+            let loc = self.env.get_node_loc(cond.exp.node_id());
+            result.exp = self.env.new_bool_const(&loc, true);
+            changed = true;
+        }
+        changed.then_some(result)
+    }
+
+    fn rewrite_spec(&mut self, _target: &SpecBlockTarget, spec: &Spec) -> Option<Spec> {
+        let marker = self.env.symbol_pool().make(BEHAVIORAL_INVARIANT_MARKER);
+        let weaken_behavioral_invariants = self.unresolved_bp_in_spec;
+        self.unresolved_bp_in_spec = false;
+        let mut result = spec.clone();
+        let mut changed = false;
+        for cond in &mut result.conditions {
+            let is_behavioral = cond.properties.remove(&marker).is_some();
+            changed |= is_behavioral;
+            if weaken_behavioral_invariants && is_behavioral {
+                let loc = self.env.get_node_loc(cond.exp.node_id());
+                cond.exp = self.env.new_bool_const(&loc, true);
+            }
+        }
+        changed.then_some(result)
     }
 
     /// Record that the provided symbols have local definitions, so renaming should be done.

@@ -181,11 +181,9 @@ module aptos_framework::code {
         // was published (see `init::internal_maybe_initialize`). Objects only; feature-gated.
         if (features::is_lazy_module_initialization_enabled() && object::is_object(addr)) {
             let owner = object::address_to_object<object::ObjectCore>(addr).root_owner();
-            // `for_each_ref` is not supported in verification since
-            // its lambda accesses global state (TODO(#20371)).
-            for (i in 0..module_names.length()) {
-                init::record_deploy_owner(addr, *module_names[i].bytes(), owner);
-            };
+            module_names.for_each_ref(|name| {
+                init::record_deploy_owner(addr, *name.bytes(), owner);
+            });
         };
         let package_immutable = &borrow_global<PackageRegistry>(addr).packages;
         let len = package_immutable.length();
@@ -209,11 +207,10 @@ module aptos_framework::code {
         // Update registry
         let policy = pack.upgrade_policy;
         if (index < len) {
-            // `for_each_ref` is not supported in verification since
-            // its lambda accesses global state (TODO(#20371)).
-            for (i in 0..pack.modules.length()) {
-                init::reset_initialized(addr, *pack.modules[i].name.bytes());
-            };
+            pack.modules.for_each_ref(|m| {
+                let m: &ModuleMetadata = m;
+                init::reset_initialized(addr, *m.name.bytes());
+            });
             *packages.borrow_mut(index) = pack
         } else {
             packages.push_back(pack)
@@ -299,10 +296,8 @@ module aptos_framework::code {
     acquires PackageRegistry {
         let allowed_module_deps = vector::empty();
         let deps = &pack.deps;
-        // `for_each_ref` is not supported in verification since
-        // its lambda accesses global state (TODO(#20371)).
-        for (i in 0..deps.length()) {
-            let dep = deps.borrow(i);
+        deps.for_each_ref(|dep| {
+            let dep: &PackageDep = dep;
             assert!(exists<PackageRegistry>(dep.account), error::not_found(EPACKAGE_DEP_MISSING));
             if (is_policy_exempted_address(dep.account)) {
                 // Allow all modules from this address, by using "" as a wildcard in the AllowedDep
@@ -339,14 +334,12 @@ module aptos_framework::code {
                         false
                     }
                 } spec {
-                    // The Move Prover cannot infer the result of a lambda that
-                    // modifies a value from the enclosing scope
-                    // (`allowed_module_deps`), so state the result explicitly.
+                    // State the result because the lambda mutates its capture.
                     ensures result == (dep_pack.name == dep.package_name);
                 });
                 assert!(found, error::not_found(EPACKAGE_DEP_MISSING));
             };
-        };
+        });
         allowed_module_deps
     }
 

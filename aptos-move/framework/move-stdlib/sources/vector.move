@@ -385,14 +385,6 @@ module std::vector {
         }
     }
 
-    // Note on verification: the consuming (by-value) functions below carry no
-    // loop invariants. They remove elements from the vector as they iterate,
-    // so the elements already processed are no longer available for a loop
-    // invariant to refer to (and without a `copy` bound they cannot be read
-    // by value from an intact vector). Callers needing exact facts about an
-    // accumulation should use the reference-taking functions (`for_each_ref`,
-    // `enumerate_ref`, `zip_ref`) instead.
-
     /// Apply the function to each element in the vector, consuming it.
     public inline fun for_each<Element>(self: vector<Element>, f: |Element|) {
         self.reverse(); // We need to reverse the vector to consume it efficiently
@@ -405,6 +397,16 @@ module std::vector {
         while (len > 0) {
             f(self.pop_back());
             len -= 1;
+        } spec {
+            invariant len <= length(old(self));
+            invariant len == length(self);
+            invariant forall j in 0..len: self[j] == old(self)[j];
+            invariant forall j in len..length(old(self)):
+                ensures_of<f>(old(self)[j]);
+            invariant folds_of<f>(
+                |j| old(self)[length(old(self)) - 1 - j],
+                length(old(self)) - len
+            );
         };
         self.destroy_empty()
     }
@@ -447,6 +449,22 @@ module std::vector {
         while (len > 0) {
             f(self.pop_back(), v2.pop_back());
             len -= 1;
+        } spec {
+            invariant len <= length(old(self));
+            invariant len == length(self);
+            invariant len == length(v2);
+            invariant length(old(self)) == length(old(v2));
+            invariant forall j in 0..len: self[j] == old(self)[j];
+            invariant forall j in 0..len: v2[j] == old(v2)[j];
+            invariant forall j in len..length(old(self)):
+                ensures_of<f>(old(self)[j], old(v2)[j]);
+            invariant folds_of<f>(
+                |j| (
+                    old(self)[length(old(self)) - 1 - j],
+                    old(v2)[length(old(v2)) - 1 - j]
+                ),
+                length(old(self)) - len
+            );
         };
         self.destroy_empty();
         v2.destroy_empty();
@@ -494,10 +512,7 @@ module std::vector {
         };
     }
 
-    // Note on verification: the `_mut` variants carry per-element loop
-    // invariants but no `folds_of` invariant (compare `for_each_ref` above):
-    // `folds_of` does not support lambdas with `&mut` parameters, since the
-    // values the lambda is applied to change as the loop runs.
+    // `_mut` HOFs use pointwise invariants because their inputs evolve.
 
     /// Apply the function to a mutable reference to each element in the vector.
     public inline fun for_each_mut<Element>(self: &mut vector<Element>, f: |&mut Element|) {
@@ -562,7 +577,6 @@ module std::vector {
 
     /// Fold the function over the elements. For example, `fold(vector[1,2,3], 0, f)` will execute
     /// `f(f(f(0, 1), 2), 3)`
-    // No loop invariants: consuming iteration, see the note above `for_each`.
     public inline fun fold<Accumulator, Element>(
         self: vector<Element>,
         init: Accumulator,
@@ -600,6 +614,8 @@ module std::vector {
         } spec {
             invariant i <= len;
             invariant length(result) == i;
+            invariant result == spec_map_ref(f, self, i);
+            invariant !spec_map_ref_aborts(f, self, i);
             invariant forall j in 0..i: result[j] == result_of<f>(self[j]);
             invariant forall j in 0..i: !aborts_of<f>(self[j]);
         };
@@ -658,7 +674,6 @@ module std::vector {
     }
 
     /// Filter the vector using the boolean function, removing all elements for which `p(e)` is not true.
-    // No loop invariants: consuming iteration, see the note above `for_each`.
     public inline fun filter<Element:drop>(
         self: vector<Element>,
         p: |&Element|bool
@@ -876,23 +891,37 @@ module std::vector {
             exists x in self: x == e
         }
 
-        /// `f` folded over the prefix `v[0..end]`, starting from `init`.
-        /// The `folds_of` loop invariants of the reference-taking functions
-        /// above are expressed in terms of this recursion; a caller condition
-        /// written as `vector::spec_fold(|acc, e| .., v, init, end)` with a
-        /// literal lambda matches them.
+        /// `f` folded over `v[0..end]`, starting from `init`.
         fun spec_fold<Element, Acc>(f: |Acc, &Element| Acc, v: vector<Element>, init: Acc, end: u64): Acc {
             if (end == 0) init
             else result_of<f>(spec_fold(f, v, init, end - 1), v[end - 1])
         }
 
-        /// `t` folded over the iteration indices `0..end`, starting from
-        /// `init`. Used like `spec_fold` for the `folds_of` invariants that
-        /// iterate over indices (enumerations, zips), and can likewise be
-        /// restated by callers.
+        /// `t` folded over indices `0..end`, starting from `init`.
         fun spec_fold_idx<Acc>(t: |Acc, u64| Acc, init: Acc, end: u64): Acc {
             if (end == 0) init
             else result_of<t>(spec_fold_idx(t, init, end - 1), end - 1)
+        }
+
+        /// The result of mapping `f` over the prefix `v[0..end]`.
+        fun spec_map_ref<Element, NewElement>(
+            f: |&Element| NewElement, v: vector<Element>, end: u64
+        ): vector<NewElement> {
+            if (end == 0) vec()
+            else concat(
+                spec_map_ref(f, v, end - 1),
+                vec(result_of<f>(v[end - 1]))
+            )
+        }
+
+        /// Whether mapping `f` over the prefix `v[0..end]` aborts.
+        fun spec_map_ref_aborts<Element, NewElement>(
+            f: |&Element| NewElement, v: vector<Element>, end: u64
+        ): bool {
+            end > 0 && (
+                spec_map_ref_aborts(f, v, end - 1)
+                    || aborts_of<f>(v[end - 1])
+            )
         }
     }
 

@@ -197,10 +197,8 @@ module aptos_framework::genesis {
 
     fun create_accounts(aptos_framework: &signer, accounts: vector<AccountMap>) {
         let unique_accounts = vector::empty();
-        // `for_each_ref` is not supported in verification since
-        // its lambda accesses global state (TODO(#20371)).
-        for (i in 0..accounts.length()) {
-            let account_map = accounts.borrow(i);
+        accounts.for_each_ref(|account_map| {
+            let account_map: &AccountMap = account_map;
             assert!(
                 !vector::contains(&unique_accounts, &account_map.account_address),
                 error::already_exists(EDUPLICATE_ACCOUNT),
@@ -212,7 +210,7 @@ module aptos_framework::genesis {
                 account_map.account_address,
                 account_map.balance,
             );
-        };
+        });
     }
 
     /// This creates an funds an account if it doesn't exist.
@@ -238,11 +236,9 @@ module aptos_framework::genesis {
     ) {
         let unique_accounts = vector::empty();
 
-        // `for_each_ref` is not supported in verification since
-        // its lambda accesses global state (TODO(#20371)).
-        for (i in 0..employees.length()) {
-            let employee_group = employees.borrow(i);
+        employees.for_each_ref(|employee_group| {
             let j = 0;
+            let employee_group: &EmployeeAccountMap = employee_group;
             let num_employees_in_group = vector::length(&employee_group.accounts);
 
             let buy_ins = simple_map::create();
@@ -318,7 +314,7 @@ module aptos_framework::genesis {
             if (employee_group.validator.join_during_genesis) {
                 initialize_validator(pool_address, validator);
             };
-        };
+        });
     }
 
     fun create_initialize_validators_with_commission(
@@ -326,11 +322,10 @@ module aptos_framework::genesis {
         use_staking_contract: bool,
         validators: vector<ValidatorConfigurationWithCommission>,
     ) {
-        // `for_each_ref` is not supported in verification since
-        // its lambda accesses global state (TODO(#20371)).
-        for (i in 0..validators.length()) {
-            create_initialize_validator(aptos_framework, validators.borrow(i), use_staking_contract);
-        };
+        validators.for_each_ref(|validator| {
+            let validator: &ValidatorConfigurationWithCommission = validator;
+            create_initialize_validator(aptos_framework, validator, use_staking_contract);
+        });
 
         // Destroy the aptos framework account's ability to mint coins now that we're done with setting up the initial
         // validators.

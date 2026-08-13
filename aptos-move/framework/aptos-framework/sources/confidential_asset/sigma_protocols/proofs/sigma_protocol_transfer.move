@@ -271,15 +271,13 @@ module aptos_framework::sigma_protocol_transfer {
             compressed_new_balance.get_compressed_R_aud().length() == if (has_eff) { get_num_available_chunks() } else { 0 },
             error::invalid_argument(E_AUDITOR_COUNT_MISMATCH)
         );
-        // `get_n()` must be called outside the lambda: the Move Prover does not
-        // support verification of lambdas that call inline functions.
-        let n = get_n();
         assert!(
-            compressed_amount.get_compressed_R_volun_auds().all(|r| r.length() == n),
+            compressed_amount.get_compressed_R_volun_auds().all(|r| r.length() == get_n()),
             error::invalid_argument(E_AUDITOR_COUNT_MISMATCH)
         );
 
         let ell = get_ell();
+        let n = get_n();
         let e = error::internal(E_STATEMENT_BUILDER_INCONSISTENCY);
 
         let b = new_builder();

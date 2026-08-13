@@ -26,16 +26,13 @@ spec aptos_std::ristretto255 {
     }
 
     spec point_decompress_internal {
+        // TODO: temporary mockup.
         pragma opaque;
-        aborts_if [abstract] false;
-        ensures result_1 == spec_point_decompress_internal(maybe_non_canonical_bytes);
-        ensures result_2 == spec_point_is_canonical_internal(maybe_non_canonical_bytes);
     }
 
     spec point_compress_internal {
+        // TODO: temporary mockup.
         pragma opaque;
-        aborts_if [abstract] false;
-        ensures result == spec_point_compress_internal(point);
     }
 
     spec point_mul_internal {
@@ -290,10 +287,6 @@ spec aptos_std::ristretto255 {
     }
 
     spec fun spec_point_is_canonical_internal(bytes: vector<u8>): bool;
-
-    spec fun spec_point_compress_internal(point: RistrettoPoint): vector<u8>;
-
-    spec fun spec_point_decompress_internal(maybe_non_canonical_bytes: vector<u8>): u64;
 
     spec fun spec_double_scalar_mul_internal(point1: u64, point2: u64, scalar1: vector<u8>, scalar2: vector<u8>): u64;
 

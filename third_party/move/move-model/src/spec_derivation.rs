@@ -242,9 +242,23 @@ pub fn collect_mutated_free_vars(
     body: &Exp,
     bound: &BTreeSet<Symbol>,
 ) -> BTreeSet<Symbol> {
+    collect_mutated_free_vars_and_temps(env, body, bound).0
+}
+
+/// Like [`collect_mutated_free_vars`], also returns mutated temporary roots.
+pub fn collect_mutated_free_vars_and_temps(
+    env: &GlobalEnv,
+    body: &Exp,
+    bound: &BTreeSet<Symbol>,
+) -> (BTreeSet<Symbol>, BTreeSet<usize>) {
     // Shadowing depth per symbol, seeded with the initially bound symbols.
     let mut shadow: BTreeMap<Symbol, usize> = bound.iter().map(|sym| (*sym, 1)).collect();
-    let mut result = BTreeSet::new();
+    let mut locals = BTreeSet::new();
+    let mut temps = BTreeSet::new();
+    enum Root {
+        Local(Symbol),
+        Temporary(usize),
+    }
     fn adjust_pat(pat: &Pattern, entering: bool, shadow: &mut BTreeMap<Symbol, usize>) {
         for (_, sym) in pat.vars() {
             let counter = shadow.entry(sym).or_insert(0);
@@ -259,9 +273,10 @@ pub fn collect_mutated_free_vars(
         shadow.get(&sym).copied().unwrap_or(0) == 0
     }
     // The root variable of a place-denoting expression, if free.
-    fn free_root(exp: &Exp, shadow: &BTreeMap<Symbol, usize>) -> Option<Symbol> {
+    fn free_root(exp: &Exp, shadow: &BTreeMap<Symbol, usize>) -> Option<Root> {
         match exp.as_ref() {
-            ExpData::LocalVar(_, sym) if is_free(*sym, shadow) => Some(*sym),
+            ExpData::LocalVar(_, sym) if is_free(*sym, shadow) => Some(Root::Local(*sym)),
+            ExpData::Temporary(_, idx) => Some(Root::Temporary(*idx)),
             ExpData::Call(
                 _,
                 Operation::Select(..)
@@ -302,18 +317,28 @@ pub fn collect_mutated_free_vars(
             (Assign(_, pat, _), Pre) => {
                 for (_, sym) in pat.vars() {
                     if is_free(sym, &shadow) {
-                        result.insert(sym);
+                        locals.insert(sym);
                     }
                 }
             },
-            (Mutate(_, lhs, _), Pre) => {
-                if let Some(sym) = free_root(lhs, &shadow) {
-                    result.insert(sym);
-                }
+            (Mutate(_, lhs, _), Pre) => match free_root(lhs, &shadow) {
+                Some(Root::Local(sym)) => {
+                    locals.insert(sym);
+                },
+                Some(Root::Temporary(idx)) => {
+                    temps.insert(idx);
+                },
+                None => {},
             },
             (Call(_, Operation::Borrow(ReferenceKind::Mutable), args), Pre) => {
-                if let Some(sym) = free_root(&args[0], &shadow) {
-                    result.insert(sym);
+                match free_root(&args[0], &shadow) {
+                    Some(Root::Local(sym)) => {
+                        locals.insert(sym);
+                    },
+                    Some(Root::Temporary(idx)) => {
+                        temps.insert(idx);
+                    },
+                    None => {},
                 }
             },
             (Call(_, Operation::MoveFunction(mid, fid), args), Pre) => {
@@ -322,8 +347,14 @@ pub fn collect_mutated_free_vars(
                 let callee = env.get_function(mid.qualified(*fid));
                 for (param, arg) in callee.get_parameters().iter().zip(args) {
                     if param.1.is_mutable_reference() {
-                        if let Some(sym) = free_root(arg, &shadow) {
-                            result.insert(sym);
+                        match free_root(arg, &shadow) {
+                            Some(Root::Local(sym)) => {
+                                locals.insert(sym);
+                            },
+                            Some(Root::Temporary(idx)) => {
+                                temps.insert(idx);
+                            },
+                            None => {},
                         }
                     }
                 }
@@ -333,8 +364,14 @@ pub fn collect_mutated_free_vars(
                 if let Type::Fun(param_ty, ..) = env.get_node_type(target.as_ref().node_id()) {
                     for (ty, arg) in param_ty.flatten().iter().zip(args) {
                         if ty.is_mutable_reference() {
-                            if let Some(sym) = free_root(arg, &shadow) {
-                                result.insert(sym);
+                            match free_root(arg, &shadow) {
+                                Some(Root::Local(sym)) => {
+                                    locals.insert(sym);
+                                },
+                                Some(Root::Temporary(idx)) => {
+                                    temps.insert(idx);
+                                },
+                                None => {},
                             }
                         }
                     }
@@ -345,7 +382,7 @@ pub fn collect_mutated_free_vars(
         true
     };
     body.visit_positions(&mut visitor);
-    result
+    (locals, temps)
 }
 
 /// Classifies whether the given expressions — e.g. a derived
@@ -514,6 +551,18 @@ pub fn fun_has_no_memory_effects(env: &GlobalEnv, fun_id: QualifiedId<FunId>) ->
     // An omitted opaque frame is conservatively implemented from the body's
     // memory effects, so opacity alone cannot establish memory freedom.
     fun_body_is_memory_free(env, fun_id, &mut BTreeSet::new(), &mut BTreeSet::new())
+}
+
+/// Whether an expression and its callees are free of global-memory effects.
+pub fn exp_has_no_memory_effects(env: &GlobalEnv, exp: &Exp) -> bool {
+    exp_is_memory_free(
+        env,
+        exp,
+        &[],
+        false,
+        &mut BTreeSet::new(),
+        &mut BTreeSet::new(),
+    )
 }
 
 /// The conjuncts of an `And` tree, in order; a non-conjunction is its own
@@ -797,6 +846,112 @@ fn exp_is_memory_free(
     ok
 }
 
+fn has_functional_result_spec(env: &GlobalEnv, id: QualifiedId<FunId>) -> bool {
+    use crate::ast::ConditionKind;
+
+    let fun = env.get_function(id);
+    let result_count = fun.get_result_type().flatten().len();
+    if result_count == 0 {
+        return true;
+    }
+    let mut_params = fun
+        .get_parameters()
+        .iter()
+        .enumerate()
+        .filter(|(_, param)| param.1.is_mutable_reference())
+        .map(|(idx, _)| idx)
+        .collect();
+    let concrete_prop = env
+        .symbol_pool()
+        .make(crate::pragmas::CONDITION_CONCRETE_PROP);
+    let inferred_prop = env
+        .symbol_pool()
+        .make(crate::pragmas::CONDITION_INFERRED_PROP);
+    let determined: BTreeSet<_> = fun
+        .get_spec()
+        .conditions
+        .iter()
+        .filter(|cond| cond.kind == ConditionKind::Ensures)
+        .filter(|cond| {
+            !cond.properties.contains_key(&concrete_prop)
+                && !cond.properties.contains_key(&inferred_prop)
+        })
+        .flat_map(|cond| exp_conjuncts(&cond.exp))
+        .filter_map(|conjunct| {
+            let ExpData::Call(_, Operation::Eq, args) = conjunct.as_ref() else {
+                return None;
+            };
+            (args.len() == 2)
+                .then_some([(&args[0], &args[1]), (&args[1], &args[0])])?
+                .into_iter()
+                .find_map(|(lhs, rhs)| {
+                    let ExpData::Call(_, Operation::Result(idx), _) = lhs.as_ref() else {
+                        return None;
+                    };
+                    spec_value_over_prestate(env, rhs, &mut_params).then_some(*idx)
+                })
+        })
+        .collect();
+    determined.len() == result_count && (0..result_count).all(|idx| determined.contains(&idx))
+}
+
+fn has_exact_move_value_model(
+    env: &GlobalEnv,
+    id: QualifiedId<FunId>,
+    visited: &mut BTreeSet<QualifiedId<FunId>>,
+) -> bool {
+    if env
+        .get_intrinsics()
+        .get_spec_fun_for_move_fun(&id)
+        .is_some()
+    {
+        return true;
+    }
+    let fun = env.get_function(id);
+    if has_functional_result_spec(env, id) {
+        return true;
+    }
+    if fun.is_inline() {
+        return true;
+    }
+    if fun.is_native_or_intrinsic() {
+        let name = env.symbol_pool().string(fun.get_name());
+        return (fun.module_env.is_std_vector()
+            && well_known::is_special_vector_bp_fun_name(name.as_str()))
+            || fun.is_well_known(well_known::TYPE_NAME_MOVE)
+            || fun.is_well_known(well_known::TYPE_INFO_MOVE)
+            || fun.is_well_known(well_known::TYPE_NAME_GET_MOVE);
+    }
+    if fun.is_opaque() {
+        return false;
+    }
+    let Some(body) = fun.get_def() else {
+        return false;
+    };
+    if !visited.insert(id) {
+        return false;
+    }
+    let exact = !body.any(&mut |exp| matches!(exp, ExpData::Loop(..) | ExpData::LoopCont(..)))
+        && body
+            .called_funs()
+            .into_iter()
+            .all(|callee| has_exact_move_value_model(env, callee, visited));
+    visited.remove(&id);
+    exact
+}
+
+/// Whether all named calls in `exp` have transitive value models.
+pub fn exp_has_exact_value_model(env: &GlobalEnv, exp: &Exp) -> bool {
+    exp.called_funs()
+        .into_iter()
+        .all(|callee| has_exact_move_value_model(env, callee, &mut BTreeSet::new()))
+}
+
+/// Whether a Move function has an exact functional result model.
+pub fn move_fun_has_exact_value_model(env: &GlobalEnv, id: QualifiedId<FunId>) -> bool {
+    has_exact_move_value_model(env, id, &mut BTreeSet::new())
+}
+
 /// Check if a callee has an associated pure spec function (created by the
 /// spec rewriter) that can be called directly in spec expressions, returning
 /// the spec function id and instantiated result type if so.
@@ -844,9 +999,7 @@ pub fn try_as_pure_spec_call(
     // a callee whose spec fun has side-effects or a while-loop body is rejected here.
     let (spec_fun_id, decl) = callee.find_spec_fun()?;
     // Non-native functions without a derived body cannot be expressed as a
-    // spec call — typical of effectful operations like `move_to`/`move_from`.
-    // Native body-less spec functions (e.g. `vector::length`) are pure and
-    // resolved natively by the backend, so we let them through.
+    // spec call. Native body-less spec functions are resolved by the backend.
     if !decl.is_native && decl.body.is_none() {
         return None;
     }
@@ -1481,6 +1634,45 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
         }
     }
 
+    /// Returns an expanded inline call's derivation summary, if present.
+    fn inline_call_summary(exp: &Exp) -> Option<(&Exp, &Exp)> {
+        let ExpData::Sequence(_, exps) = exp.as_ref() else {
+            return None;
+        };
+        exps.iter().find_map(|candidate| {
+            let ExpData::SpecBlock(_, spec) = candidate.as_ref() else {
+                return None;
+            };
+            let [condition] = spec.conditions.as_slice() else {
+                return None;
+            };
+            let ExpData::Call(_, Operation::InlineCallSummary, args) = condition.exp.as_ref()
+            else {
+                return None;
+            };
+            let [result, aborts] = args.as_slice() else {
+                return None;
+            };
+            Some((result, aborts))
+        })
+    }
+
+    /// Instantiates an inline-call summary in the current symbolic frame.
+    fn instantiate_inline_call_summary(&self, exp: &Exp) -> Res<Exp> {
+        let mut substitutions = BTreeMap::new();
+        for sym in exp.free_vars() {
+            if let Some(value) = self.frame.store.get(&sym).cloned() {
+                substitutions.insert(sym, self.as_value(value)?);
+            }
+        }
+        let env = self.builder.global_env();
+        let mut replacer = |_: NodeId, target: RewriteTarget| match target {
+            RewriteTarget::LocalVar(sym) => substitutions.get(&sym).cloned(),
+            RewriteTarget::Temporary(_) => None,
+        };
+        Ok(ExpRewriter::new(env, &mut replacer).rewrite_exp(exp.clone()))
+    }
+
     // =============================================================================================
     // Evaluation
 
@@ -1489,6 +1681,12 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
             return Ok(None);
         }
         self.builder.set_loc_from_node(exp.node_id());
+        if let Some((result, aborts)) = Self::inline_call_summary(exp) {
+            let result = self.instantiate_inline_call_summary(result)?;
+            let aborts = self.instantiate_inline_call_summary(aborts)?;
+            self.add_abort(aborts);
+            return Ok(Some(SymVal::Value(result)));
+        }
         use ExpData::*;
         match exp.as_ref() {
             Invalid(_) => Err(Unsupported),
@@ -1580,11 +1778,16 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
             Sequence(_, exps) => {
                 let mut last = Some(SymVal::Value(self.unit_value()));
                 for (i, e) in exps.iter().enumerate() {
-                    let v = self.eval(e)?;
+                    let is_last = i + 1 == exps.len();
+                    let v = if is_last {
+                        self.eval(e)?
+                    } else {
+                        self.eval_discarded(e)?
+                    };
                     if v.is_none() {
                         return Ok(None);
                     }
-                    if i + 1 == exps.len() {
+                    if is_last {
                         last = v;
                     }
                 }
@@ -1627,6 +1830,22 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
         let env = self.builder.global_env();
         let id = env.new_node(self.builder.get_current_loc(), Type::unit());
         ExpData::Call(id, Operation::Tuple, vec![]).into_exp()
+    }
+
+    /// Evaluates an expression without requiring a place for a returned `&mut`.
+    fn eval_discarded(&mut self, exp: &Exp) -> EvalResult {
+        let ExpData::Call(id, Operation::MoveFunction(mid, fid), args) = exp.as_ref() else {
+            return self.eval(exp);
+        };
+        self.builder.set_loc_from_node(*id);
+        let mut arg_vals = vec![];
+        for arg in args {
+            let Some(value) = self.eval(arg)? else {
+                return Ok(None);
+            };
+            arg_vals.push(value);
+        }
+        self.eval_move_function_call(*id, *mid, *fid, arg_vals, false)
     }
 
     /// Evaluates both sides of a branch in cloned frames and joins.
@@ -1834,6 +2053,10 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
             },
             Pattern::Wildcard(_) => Ok(()),
             Pattern::Tuple(_, sub_pats) => {
+                // Zero-argument inline calls bind an empty tuple to nothing.
+                if sub_pats.is_empty() && value.is_none() {
+                    return Ok(());
+                }
                 let Some(v) = value else {
                     return Err(Unsupported);
                 };
@@ -1843,6 +2066,10 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
                             self.bind_pattern_rec(p, Some(v), scoped, saved)?;
                         }
                         Ok(())
+                    },
+                    // Inline parameter blocks use singleton tuple patterns.
+                    v if sub_pats.len() == 1 => {
+                        self.bind_pattern_rec(&sub_pats[0], Some(v), scoped, saved)
                     },
                     // A unit value matching an empty tuple pattern.
                     SymVal::Value(_) if sub_pats.is_empty() => Ok(()),
@@ -1933,7 +2160,7 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
                 }));
             },
             Operation::MoveFunction(mid, fid) => {
-                return self.eval_move_function_call(id, *mid, *fid, arg_vals);
+                return self.eval_move_function_call(id, *mid, *fid, arg_vals, true);
             },
             Select(..) => {
                 // A field selection over a reference denotes a sub-place:
@@ -2312,6 +2539,7 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
         mid: ModuleId,
         fid: FunId,
         arg_vals: Vec<SymVal>,
+        result_is_used: bool,
     ) -> EvalResult {
         let env = self.builder.global_env();
         let callee = env.get_function(mid.qualified(fid));
@@ -2408,7 +2636,15 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
         }
 
         // 3. Generic behavioral summary.
-        self.generic_call_summary(mid, fid, &type_inst, inputs, mut_places, &result_type)
+        self.generic_call_summary(
+            mid,
+            fid,
+            &type_inst,
+            inputs,
+            mut_places,
+            &result_type,
+            result_is_used,
+        )
     }
 
     /// Computes the vector-intrinsic WP if the callee is a handled
@@ -2524,18 +2760,20 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
         inputs: Vec<Exp>,
         mut_places: Vec<(Place, Type)>,
         result_type: &Type,
+        result_is_used: bool,
     ) -> EvalResult {
-        if result_type
-            .clone()
-            .flatten()
-            .iter()
-            .any(|ty| ty.is_mutable_reference())
+        if result_is_used
+            && result_type
+                .clone()
+                .flatten()
+                .iter()
+                .any(|ty| ty.is_mutable_reference())
         {
             // Returning references from summarized callees is not supported.
             return Err(Unsupported);
         }
         let fun_exp = self.mk_callee_closure(mid, fid, type_inst);
-        self.behavioral_summary_over(fun_exp, inputs, mut_places, result_type)
+        self.behavioral_summary_over(fun_exp, inputs, mut_places, result_type, result_is_used)
     }
 
     /// Evaluates an invocation of a function value: recursive evaluation
@@ -2606,7 +2844,7 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
                         }
                     }
                 }
-                self.behavioral_summary_over(fun_exp, inputs, mut_places, &result_ty)
+                self.behavioral_summary_over(fun_exp, inputs, mut_places, &result_ty, true)
             },
             _ => Err(Unsupported),
         }
@@ -2619,6 +2857,7 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
         inputs: Vec<Exp>,
         mut_places: Vec<(Place, Type)>,
         result_type: &Type,
+        result_is_used: bool,
     ) -> EvalResult {
         // A deferred application of a function-typed parameter of the
         // enclosing function: the summary is emitted label-free and its
@@ -2732,6 +2971,9 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
             post,
             deferred,
         });
+        if !result_is_used {
+            return Ok(Some(SymVal::Value(self.unit_value())));
+        }
         match results.len() {
             0 => Ok(Some(SymVal::Value(self.unit_value()))),
             1 => Ok(Some(SymVal::Value(results.pop().unwrap()))),
@@ -3112,6 +3354,10 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
         callee_qid: QualifiedId<FunId>,
         type_inst: &[Type],
     ) -> Option<CalleeValueSummary> {
+        if !has_exact_move_value_model(self.builder.global_env(), callee_qid, &mut BTreeSet::new())
+        {
+            return None;
+        }
         let cache = summary_cache(self.builder.global_env());
         let key = (callee_qid, type_inst.to_vec());
         if let Some(entry) = cache.entries.borrow().get(&key) {
@@ -4367,6 +4613,22 @@ mod tests {
     }
 
     #[test]
+    fn empty_tuple_without_binding() {
+        let env = test_env();
+        // A zero-argument expansion has an empty, uninitialized binding.
+        let body = ExpData::Block(
+            node(&env, u64_ty()),
+            Pattern::Tuple(node(&env, Type::unit()), vec![]),
+            None,
+            num(&env, 7),
+        )
+        .into_exp();
+        let spec = derive(&env, &[], u64_ty(), body).unwrap();
+        assert_eq!(render(&env, spec.results.as_ref().unwrap()), vec!["7"]);
+        assert!(spec.aborts.is_empty());
+    }
+
+    #[test]
     fn mut_param_increment() {
         let env = test_env();
         // *p = *p + 1  where p: &mut u64
@@ -5244,6 +5506,65 @@ mod tests {
         ));
         // Memory-free callee: exact (empty) modifies footprint kept.
         assert!(spec.modifies.as_ref().is_some_and(|m| m.is_empty()));
+    }
+
+    /// Discarding `&mut` results retains callee aborts and argument effects.
+    #[test]
+    fn discarded_mut_ref_result_keeps_callee_effects() {
+        let mut env = test_env();
+        let p_ref_ty = Type::Reference(ReferenceKind::Mutable, Box::new(u64_ty()));
+        let old_t0 = call(&env, u64_ty(), Operation::Old, vec![temp(
+            &env,
+            0,
+            u64_ty(),
+        )]);
+        let add = call(&env, u64_ty(), Operation::Add, vec![
+            old_t0,
+            temp(&env, 1, u64_ty()),
+        ]);
+        let ens = call(&env, BOOL_TYPE.clone(), Operation::Eq, vec![
+            temp(&env, 0, u64_ty()),
+            add,
+        ]);
+        let def = loop_def(&env);
+        let fid = add_function_with_spec(
+            &mut env,
+            "bump_and_return",
+            &[("p", p_ref_ty.clone()), ("x", u64_ty())],
+            p_ref_ty.clone(),
+            Some(def),
+            false,
+            ensures_spec(vec![ens]),
+        );
+        let borrow = call(
+            &env,
+            p_ref_ty.clone(),
+            Operation::Borrow(ReferenceKind::Mutable),
+            vec![var(&env, "c", u64_ty())],
+        );
+        let discarded_call = call(
+            &env,
+            p_ref_ty,
+            Operation::MoveFunction(ModuleId::new(0), fid),
+            vec![borrow, var(&env, "e", u64_ty())],
+        );
+        let body = ExpData::Sequence(node(&env, Type::unit()), vec![
+            discarded_call,
+            call(&env, Type::unit(), Operation::Tuple, vec![]),
+        ])
+        .into_exp();
+        let spec = derive_with_captures(
+            &env,
+            &[("e", u64_ty())],
+            &[("c", u64_ty())],
+            Type::unit(),
+            body,
+        )
+        .expect("the unused reference result must not prevent derivation");
+        assert_eq!(
+            render_vals(&env, spec.mut_param_values.as_ref().unwrap()),
+            vec![("c".to_string(), "Add(Old(c), e)".to_string())]
+        );
     }
 
     /// Complete per-field functional ensures (the `coin::merge` shape,

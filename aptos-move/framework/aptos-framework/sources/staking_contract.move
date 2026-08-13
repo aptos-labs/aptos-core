@@ -1010,30 +1010,32 @@ module aptos_framework::staking_contract {
         // Charge all stakeholders (except for the operator themselves) commission on any rewards earnt relatively to the
         // previous value of the distribution pool.
         let shareholders = &distribution_pool.shareholders();
-        // `for_each_ref` is not supported in verification since
-        // `pool_u64` lacks functional specs (TODO(#20373)).
-        for (i in 0..shareholders.length()) {
-            let shareholder = shareholders[i];
-            if (shareholder != operator) {
-                let shares = pool_u64::shares(distribution_pool, shareholder);
-                let previous_worth = pool_u64::balance(distribution_pool, shareholder);
-                let current_worth =
-                    pool_u64::shares_to_amount_with_total_coins(
-                        distribution_pool, shares, updated_total_coins
+        // TODO(#20373): add exact functional specs for pool mutations so
+        // verification need not weaken this HOF's fold.
+        shareholders.for_each_ref(
+            |shareholder| {
+                let shareholder: address = *shareholder;
+                if (shareholder != operator) {
+                    let shares = pool_u64::shares(distribution_pool, shareholder);
+                    let previous_worth = pool_u64::balance(distribution_pool, shareholder);
+                    let current_worth =
+                        pool_u64::shares_to_amount_with_total_coins(
+                            distribution_pool, shares, updated_total_coins
+                        );
+                    let unpaid_commission =
+                        (current_worth - previous_worth) * commission_percentage / 100;
+                    // Transfer shares from current shareholder to the operator as payment.
+                    // The value of the shares should use the updated pool's total value.
+                    let shares_to_transfer =
+                        pool_u64::amount_to_shares_with_total_coins(
+                            distribution_pool, unpaid_commission, updated_total_coins
+                        );
+                    pool_u64::transfer_shares(
+                        distribution_pool, shareholder, operator, shares_to_transfer
                     );
-                let unpaid_commission =
-                    (current_worth - previous_worth) * commission_percentage / 100;
-                // Transfer shares from current shareholder to the operator as payment.
-                // The value of the shares should use the updated pool's total value.
-                let shares_to_transfer =
-                    pool_u64::amount_to_shares_with_total_coins(
-                        distribution_pool, unpaid_commission, updated_total_coins
-                    );
-                pool_u64::transfer_shares(
-                    distribution_pool, shareholder, operator, shares_to_transfer
-                );
-            };
-        };
+                };
+            }
+        );
 
         distribution_pool.update_total_coins(updated_total_coins);
     }
