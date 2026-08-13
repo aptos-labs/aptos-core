@@ -83,6 +83,10 @@ impl FromStr for GithubRepo {
     }
 }
 
+/// Shared options for locating the genesis configuration repository
+///
+/// Genesis inputs can be read either from a GitHub repository or from a local
+/// directory. Exactly one of the two sources must be provided.
 #[derive(Clone, Default, Parser)]
 pub struct GitOptions {
     /// Github repository e.g. 'aptos-labs/aptos-core'
