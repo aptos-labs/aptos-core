@@ -1,0 +1,14 @@
+Move prover returns: exiting with compilation errors
+error: cannot anchor `old(..)` over the inline function parameter `v` at the entry of this expansion: the parameter's value type must have the `copy` and `drop` abilities, so its value at entry can be recorded
+   ┌─ tests/sources/functional/closures/inline/vector_hofs_mut_receiver_err.move:19:37
+   │
+19 │               invariant len(v) == len(old(v));
+   │                                       ^^^^^^
+   ·
+26 │ ╭         for_each_mut(&mut h.v, |e| {
+27 │ │             e.x = 0
+28 │ │         } spec {
+29 │ │             aborts_if false;
+30 │ │             ensures e.x == 0;
+31 │ │         }); // error: element type without `copy` cannot be recorded at the expansion entry
+   │ ╰──────────' expanded from this call

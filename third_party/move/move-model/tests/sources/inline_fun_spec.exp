@@ -1,1 +1,5 @@
-All good, no errors!
+error: function spec blocks are not supported for inline functions with function-typed parameters; those functions are verified at each application site
+   ┌─ tests/sources/inline_fun_spec.move:15:10
+   │
+15 │     spec g {
+   │          ^

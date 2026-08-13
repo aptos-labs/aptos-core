@@ -254,8 +254,8 @@ module std::vector {
         while ({
             spec {
                 invariant i <= len;
-                invariant forall j: num where j >= 0 && j < i: !f(self[j]);
-                invariant find ==> i < len && f(self[i]);
+                invariant forall j: num where j >= 0 && j < i: !result_of<f>(self[j]);
+                invariant find ==> i < len && result_of<f>(self[i]);
             };
             i < len
             }) {
@@ -268,7 +268,7 @@ module std::vector {
             i += 1;
         };
         spec {
-            assert !find <==> (forall j: num where j >= 0 && j < len: !f(self[j]));
+            assert !find <==> (forall j: num where j >= 0 && j < len: !result_of<f>(self[j]));
         };
         (find, found_index)
     }

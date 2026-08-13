@@ -16,7 +16,7 @@ use move_model::{
     memory_labels::all_labels_in_exp,
     model::{
         FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, NodeId, QualifiedId, QualifiedInstId,
-        StructId,
+        SpecVarId, StructId,
     },
     pragmas::{ABORTS_IF_IS_PARTIAL_PRAGMA, EMITS_IS_PARTIAL_PRAGMA, EMITS_IS_STRICT_PRAGMA},
     spec_translator::{ProofAction, SpecTranslator, TranslatedSpec},
@@ -373,9 +373,6 @@ struct Instrumenter<'a> {
     /// AttrIds are stable across optimization passes, unlike bytecode offsets.
     /// The optional guard is a path condition from enclosing `if` in the proof block.
     split_points: Vec<(AttrId, Exp, Option<Exp>)>,
-    /// Counter for deterministic label freshening across opaque call sites.
-    /// Starts at 0 so that freshened labels are independent of the global counter.
-    freshen_counter: usize,
 }
 
 // =================================================================================================
@@ -454,6 +451,14 @@ impl<'a> Instrumenter<'a> {
         // ilined spec blocks
         let inlined_props: BTreeMap<_, _> = props
             .into_iter()
+            .filter(|(_, prop)| {
+                // `SaveStateAnchor` markers are not properties; they are
+                // consumed positionally in `instrument_bytecode`.
+                !matches!(
+                    prop.as_ref(),
+                    ExpData::Call(_, move_model::ast::Operation::SaveStateAnchor(..), _)
+                )
+            })
             .map(|(id, prop)| {
                 let loc = builder.get_loc(id);
                 (
@@ -488,7 +493,6 @@ impl<'a> Instrumenter<'a> {
             can_abort: false,
             mem_info: &mem_info,
             split_points: vec![],
-            freshen_counter: 0,
         };
         // Always inline spec lets in proof actions, independent of the
         // `inline_spec_lets` option. Proof-action exps are recorded in
@@ -577,22 +581,15 @@ impl<'a> Instrumenter<'a> {
             }
 
             // For the verification variant, we generate post-conditions. Inject any state
-            // save instructions needed for this.
+            // save instructions needed for this. For inline properties, only the
+            // function-entry scoped saves are emitted here; saves registered under an
+            // anchor label are emitted at the matching `SaveStateAnchor` marker.
+            let mut saved_mems = BTreeSet::new();
+            let mut saved_vars = BTreeSet::new();
             for translated_spec in
                 std::iter::once(spec).chain(inlined_props.values().map(|(s, _)| s))
             {
-                for (mem, label) in &translated_spec.saved_memory {
-                    let mem = mem.clone();
-                    self.builder
-                        .emit_with(|attr_id| SaveMem(attr_id, *label, mem));
-                }
-                for (spec_var, label) in &translated_spec.saved_spec_vars {
-                    let spec_var = spec_var.clone();
-                    self.builder
-                        .emit_with(|attr_id| SaveSpecVar(attr_id, *label, spec_var));
-                }
-                let saved_params = translated_spec.saved_params.clone();
-                self.emit_save_for_old(&saved_params);
+                self.emit_state_saves(translated_spec, None, &mut saved_mems, &mut saved_vars);
             }
         } else {
             // The inlined variant may have an inlined spec that used "old" values - these need to
@@ -604,9 +601,10 @@ impl<'a> Instrumenter<'a> {
                 ))
                 .inlined
             );
+            let mut saved_mems = BTreeSet::new();
+            let mut saved_vars = BTreeSet::new();
             for translated_spec in inlined_props.values().map(|(s, _)| s) {
-                let saved_params = translated_spec.saved_params.clone();
-                self.emit_save_for_old(&saved_params);
+                self.emit_state_saves(translated_spec, None, &mut saved_mems, &mut saved_vars);
             }
         }
 
@@ -724,6 +722,30 @@ impl<'a> Instrumenter<'a> {
                 self.can_abort = true;
             },
             Prop(id, kind @ PropKind::Assume, prop) | Prop(id, kind @ PropKind::Assert, prop) => {
+                if let ExpData::Call(_, move_model::ast::Operation::SaveStateAnchor(label), _) =
+                    prop.as_ref()
+                {
+                    // Emit the state saves registered under this anchor label
+                    // by any property anchored at this program point, and
+                    // drop the marker. A property's saves under other labels
+                    // are emitted elsewhere: at the matching marker for other
+                    // anchor labels, at function entry for the rest.
+                    let mut saved_mems = BTreeSet::new();
+                    let mut saved_vars = BTreeSet::new();
+                    for translated_spec in inlined_props
+                        .values()
+                        .map(|(s, _)| s)
+                        .filter(|s| s.anchors.contains(label))
+                    {
+                        self.emit_state_saves(
+                            translated_spec,
+                            Some(*label),
+                            &mut saved_mems,
+                            &mut saved_vars,
+                        );
+                    }
+                    return;
+                }
                 match inlined_props.get(&id) {
                     None => {
                         self.builder.emit(Prop(id, kind, prop));
@@ -773,9 +795,20 @@ impl<'a> Instrumenter<'a> {
             &dests,
         );
 
-        // Freshen state labels to avoid collisions between different inlining sites.
-        // Uses a function-scoped counter for deterministic label IDs.
-        callee_spec.freshen_labels(&mut self.freshen_counter);
+        // Function specs cannot contain `WithStateAnchor` wrappers (those only
+        // arise in inline spec-block properties), so all of the callee spec's
+        // saves are entry-scoped and can be emitted at the call site below.
+        debug_assert!(
+            callee_spec.anchors.is_empty() && callee_spec.anchored_saved_params.is_empty(),
+            "unexpected state anchors in callee function spec"
+        );
+
+        // Freshen state labels to avoid collisions between different inlining
+        // sites. Labels come from the environment's global id allocator, like
+        // all other memory labels (e.g. inline-expansion anchor labels): an
+        // independent counter could collide with those, letting one label's
+        // memory snapshot overwrite another's.
+        callee_spec.freshen_labels(env);
 
         self.builder.set_loc_from_attr(id);
 
@@ -1113,6 +1146,52 @@ impl<'a> Instrumenter<'a> {
 // # Spec Condition Emission
 
 impl<'a> Instrumenter<'a> {
+    /// Emits the state save instructions (`SaveMem`, `SaveSpecVar`, and
+    /// parameter saves) of the given translated spec at the current program
+    /// point. With `at_anchor == None` (function entry), only the entries
+    /// whose label is not one of the spec's anchor labels are emitted; with
+    /// `at_anchor == Some(label)` (a `SaveStateAnchor` marker), only the
+    /// entries registered under that anchor label. The sets dedup saves
+    /// across multiple specs emitted at the same program point.
+    fn emit_state_saves(
+        &mut self,
+        translated_spec: &TranslatedSpec,
+        at_anchor: Option<MemoryLabel>,
+        saved_mems: &mut BTreeSet<(QualifiedInstId<StructId>, MemoryLabel)>,
+        saved_vars: &mut BTreeSet<(QualifiedInstId<SpecVarId>, MemoryLabel)>,
+    ) {
+        use Bytecode::*;
+        let label_selected = |label: &MemoryLabel| match &at_anchor {
+            Some(anchor) => label == anchor,
+            None => !translated_spec.anchors.contains(label),
+        };
+        for (mem, label) in &translated_spec.saved_memory {
+            if label_selected(label) && saved_mems.insert((mem.clone(), *label)) {
+                let mem = mem.clone();
+                let label = *label;
+                self.builder
+                    .emit_with(|attr_id| SaveMem(attr_id, label, mem));
+            }
+        }
+        for (spec_var, label) in &translated_spec.saved_spec_vars {
+            if label_selected(label) && saved_vars.insert((spec_var.clone(), *label)) {
+                let spec_var = spec_var.clone();
+                let label = *label;
+                self.builder
+                    .emit_with(|attr_id| SaveSpecVar(attr_id, label, spec_var));
+            }
+        }
+        let saved_params = match at_anchor {
+            None => translated_spec.saved_params.clone(),
+            Some(anchor) => translated_spec
+                .anchored_saved_params
+                .get(&anchor)
+                .cloned()
+                .unwrap_or_default(),
+        };
+        self.emit_save_for_old(&saved_params);
+    }
+
     fn emit_save_for_old(&mut self, vars: &BTreeMap<TempIndex, TempIndex>) {
         use Bytecode::*;
         for (idx, saved_idx) in vars {
@@ -1492,6 +1571,7 @@ impl<'a> Instrumenter<'a> {
                     env,
                     pre_replacement.clone(),
                     &mut spec.saved_memory,
+                    &spec.anchors,
                 );
                 self.remap_params_to_saved(annotated, &mut spec.saved_params)
             } else {
@@ -1541,8 +1621,12 @@ impl<'a> Instrumenter<'a> {
             // 1. Annotate memory references with pre-state labels
             // 2. Remap param temporaries to saved (pre-state) versions
             let post_state_replacement = if !is_post {
-                let annotated =
-                    Self::annotate_pre_state_memory(env, exp.clone(), &mut spec.saved_memory);
+                let annotated = Self::annotate_pre_state_memory(
+                    env,
+                    exp.clone(),
+                    &mut spec.saved_memory,
+                    &spec.anchors,
+                );
                 self.remap_params_to_saved(annotated, &mut spec.saved_params)
             } else {
                 exp.clone()
@@ -1627,21 +1711,34 @@ impl<'a> Instrumenter<'a> {
     /// with a pre-state memory label. This is used when a LetPre expression (translated in
     /// pre-state context) is substituted into a post-state condition (ensures), so that
     /// memory accesses still evaluate against entry-state. For pure expressions without
-    /// memory references, this is a no-op.
+    /// memory references, this is a no-op. An existing save of the resource is only
+    /// reused if its label is saved at function entry, i.e. is not one of the spec's
+    /// anchor labels (those are saved at their `SaveStateAnchor` markers instead).
     fn annotate_pre_state_memory(
         env: &GlobalEnv,
         exp: Exp,
-        saved_memory: &mut BTreeMap<QualifiedInstId<StructId>, MemoryLabel>,
+        saved_memory: &mut BTreeSet<(QualifiedInstId<StructId>, MemoryLabel)>,
+        anchors: &BTreeSet<MemoryLabel>,
     ) -> Exp {
         use ast::Operation as AstOp;
+        let mut label_for = |mem: QualifiedInstId<StructId>| -> MemoryLabel {
+            if let Some((_, l)) = saved_memory
+                .iter()
+                .find(|(m, l)| *m == mem && !anchors.contains(l))
+            {
+                *l
+            } else {
+                let l = MemoryLabel::new(env.new_global_id().as_usize());
+                saved_memory.insert((mem, l));
+                l
+            }
+        };
         ExpData::rewrite(exp, &mut |e| match e.as_ref() {
             ExpData::Call(id, AstOp::Global(None), args) => {
                 let mem = env.get_node_instantiation(*id);
                 if let Some(rty) = mem.first() {
                     let (mid, sid, inst) = rty.require_struct();
-                    let l = *saved_memory
-                        .entry(mid.qualified_inst(sid, inst.to_owned()))
-                        .or_insert_with(|| MemoryLabel::new(env.new_global_id().as_usize()));
+                    let l = label_for(mid.qualified_inst(sid, inst.to_owned()));
                     RewriteResult::Rewritten(
                         ExpData::Call(*id, AstOp::Global(Some(l)), args.clone()).into_exp(),
                     )
@@ -1653,9 +1750,7 @@ impl<'a> Instrumenter<'a> {
                 let mem = env.get_node_instantiation(*id);
                 if let Some(rty) = mem.first() {
                     let (mid, sid, inst) = rty.require_struct();
-                    let l = *saved_memory
-                        .entry(mid.qualified_inst(sid, inst.to_owned()))
-                        .or_insert_with(|| MemoryLabel::new(env.new_global_id().as_usize()));
+                    let l = label_for(mid.qualified_inst(sid, inst.to_owned()));
                     RewriteResult::Rewritten(
                         ExpData::Call(*id, AstOp::Exists(Some(l)), args.clone()).into_exp(),
                     )
@@ -2078,7 +2173,8 @@ impl<'a> Instrumenter<'a> {
         use Bytecode::*;
         use PropKind::*;
 
-        let saved_labels: BTreeSet<MemoryLabel> = spec.saved_memory.values().copied().collect();
+        let saved_labels: BTreeSet<MemoryLabel> =
+            spec.saved_memory.iter().map(|(_, l)| *l).collect();
 
         // Build map: label -> defining condition (the condition with range.post == Some(label))
         let mut label_definers: BTreeMap<MemoryLabel, Vec<usize>> = BTreeMap::new();

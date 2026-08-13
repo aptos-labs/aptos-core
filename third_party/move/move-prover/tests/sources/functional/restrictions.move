@@ -9,9 +9,14 @@ module 0x42::M {
         fun f2(): | |num { | | 1 }
 
         // Invoke
-        fun f3(f: |u64|u64): u64 {
-            f(1u64)
-        }
+        // Applying a function value in a specification is now rejected in the
+        // model phase when the argument is a literal lambda (specialization),
+        // which would mask the boogie-translator restrictions below; see
+        // closures/inline/bp_inline_errors.move for that error. Commented out
+        // to see the other issues.
+        // fun f3(f: |u64|u64): u64 {
+        //     f(1u64)
+        // }
 
         // Lambda outside of all/any
         fun f4(): u64 {
@@ -43,7 +48,6 @@ module 0x42::M {
     fun use_them(): bool { true }
     spec use_them {
         ensures f2() == f2();
-        ensures f3(|x|x) == f3(|x|x);
         ensures f4() == f4();
         ensures f5() == f5();
     }

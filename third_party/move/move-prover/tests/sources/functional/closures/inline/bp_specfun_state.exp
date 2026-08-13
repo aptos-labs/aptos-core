@@ -1,0 +1,106 @@
+Move prover returns: exiting with verification errors
+error: unknown assertion failed
+   ┌─ tests/sources/functional/closures/inline/bp_specfun_state.move:37:13
+   │
+37 │             assert requires_of<f>(x); // error: false at the application for the `requires_false_*` callers
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:54: requires_false_at_application
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:58: requires_false_at_application (spec)
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:54: requires_false_at_application
+   =         a = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:31: apply_then_bump
+   =         a' = <redacted>
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:58: requires_false_at_application (spec)
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:33: apply_then_bump
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:37: apply_then_bump
+
+error: unknown assertion failed
+   ┌─ tests/sources/functional/closures/inline/bp_specfun_state.move:37:13
+   │
+37 │             assert requires_of<f>(x); // error: false at the application for the `requires_false_*` callers
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:161: requires_false_mutual_recursive
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:172: requires_false_mutual_recursive (spec)
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:161: requires_false_mutual_recursive
+   =         a = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:31: apply_then_bump
+   =         a' = <redacted>
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:172: requires_false_mutual_recursive (spec)
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:33: apply_then_bump
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:37: apply_then_bump
+
+error: unknown assertion failed
+   ┌─ tests/sources/functional/closures/inline/bp_specfun_state.move:37:13
+   │
+37 │             assert requires_of<f>(x); // error: false at the application for the `requires_false_*` callers
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:63: requires_false_transitive
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:68: requires_false_transitive (spec)
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:63: requires_false_transitive
+   =         a = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:31: apply_then_bump
+   =         a' = <redacted>
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:68: requires_false_transitive (spec)
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:33: apply_then_bump
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:37: apply_then_bump
+
+error: unknown assertion failed
+   ┌─ tests/sources/functional/closures/inline/bp_specfun_state.move:78:13
+   │
+78 │             assert !aborts_of<f>(x); // error: the abort condition holds at the application for the `aborts_at_application` caller
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:97: aborts_at_application
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:102: aborts_at_application (spec)
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:97: aborts_at_application
+   =         a = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:74: apply_then_bump_na
+   =         a' = <redacted>
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:102: aborts_at_application (spec)
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:76: apply_then_bump_na
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:78: apply_then_bump_na
+
+error: induction case of the loop invariant does not hold
+    ┌─ tests/sources/functional/closures/inline/bp_specfun_state.move:118:13
+    │
+118 │             invariant forall j in 0..i: requires_of<f>(v[j]); // error: false at entry for the `loop_false_at_entry` caller
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:136: loop_false_at_entry
+    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:140: loop_false_at_entry (spec)
+    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:141: loop_false_at_entry (spec)
+    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:136: loop_false_at_entry
+    =         v = <redacted>
+    =         a = <redacted>
+    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:108: for_each_bump
+    =         a' = <redacted>
+    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:109: for_each_bump
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:110: for_each_bump
+    =         n = <redacted>
+    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:115: for_each_bump
+    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:116: for_each_bump
+    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:117: for_each_bump
+    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:118: for_each_bump
+    =     enter loop, variable(s) i havocked and reassigned
+    =         i = <redacted>
+    =     loop invariant holds at current state
+    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:116: for_each_bump
+    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:117: for_each_bump
+    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:118: for_each_bump
+    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:111: for_each_bump
+    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:112: for_each_bump
+    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:113: for_each_bump
+    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:114: for_each_bump
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:111: for_each_bump
+    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:116: for_each_bump
+    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:117: for_each_bump
+    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:118: for_each_bump

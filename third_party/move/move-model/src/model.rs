@@ -636,6 +636,11 @@ pub struct GlobalEnv {
     /// can register new spec functions. Must not call `add_used_spec_fun` while a borrow
     /// from `is_spec_fun_used` or iteration is held.
     pub(crate) used_spec_funs: RefCell<BTreeSet<QualifiedId<SpecFunId>>>,
+    /// Specification functions occurring in behavioral-predicate material
+    /// inlined from a lambda. Their applications can receive values related
+    /// only by Move equality, so uninterpreted members need an explicit
+    /// congruence axiom in non-extensional backend theories.
+    pub(crate) move_equality_congruence_spec_funs: RefCell<BTreeSet<QualifiedInstId<SpecFunId>>>,
     /// An annotation of all intrinsic declarations
     pub(crate) intrinsics: IntrinsicsAnnotation,
     /// A type-indexed container for storing extension data in the environment.
@@ -721,6 +726,7 @@ impl GlobalEnv {
             global_invariants: Default::default(),
             global_invariants_for_memory: Default::default(),
             used_spec_funs: RefCell::new(BTreeSet::new()),
+            move_equality_congruence_spec_funs: RefCell::new(BTreeSet::new()),
             intrinsics: Default::default(),
             extensions: Default::default(),
             stdlib_address: None,
@@ -1590,6 +1596,64 @@ impl GlobalEnv {
     /// Marks a spec fun to be used
     pub fn add_used_spec_fun(&self, id: QualifiedId<SpecFunId>) {
         self.used_spec_funs.borrow_mut().insert(id);
+    }
+
+    /// Marks a spec fun to be used, transitively including the spec
+    /// functions called from its body. Needed when a generated expression
+    /// references a companion spec function derived before the spec
+    /// rewriter's own usage marking (see
+    /// `spec_rewriter::run_pure_fun_companion_derivation`): the backend
+    /// only emits used `is_move_fun` spec functions, so a used companion's
+    /// companion callees must be marked as well.
+    pub fn add_used_spec_fun_transitive(&self, id: QualifiedId<SpecFunId>) {
+        let mut todo = vec![id];
+        let mut visited = BTreeSet::new();
+        while let Some(id) = todo.pop() {
+            if !visited.insert(id) {
+                continue;
+            }
+            self.add_used_spec_fun(id);
+            if let Some(body) = self.get_spec_fun(id).body.clone() {
+                todo.extend(
+                    body.called_spec_funs(self)
+                        .into_iter()
+                        .map(|qid| qid.to_qualified_id()),
+                );
+            }
+        }
+    }
+
+    /// Marks spec functions occurring in an inlined behavioral predicate,
+    /// transitively including spec functions called from their bodies. The
+    /// backend uses this narrow set to emit Move-equality congruence axioms
+    /// without burdening unrelated verification conditions with quantified
+    /// axioms for every uninterpreted spec function in the program.
+    pub fn mark_move_equality_congruence_spec_funs_in(&self, exp: &Exp) {
+        let mut todo = exp.called_spec_funs(self).into_iter().collect_vec();
+        while let Some(id) = todo.pop() {
+            if !self
+                .move_equality_congruence_spec_funs
+                .borrow_mut()
+                .insert(id.clone())
+            {
+                continue;
+            }
+            if let Some(body) = self.get_spec_fun(id.to_qualified_id()).body.clone() {
+                todo.extend(
+                    body.called_spec_funs(self)
+                        .into_iter()
+                        .map(|callee| callee.instantiate(&id.inst)),
+                );
+            }
+        }
+    }
+
+    /// Whether this spec function needs Move-equality congruence because it
+    /// occurs in material inlined from a behavioral predicate.
+    pub fn spec_fun_needs_move_equality_congruence(&self, id: QualifiedInstId<SpecFunId>) -> bool {
+        self.move_equality_congruence_spec_funs
+            .borrow()
+            .contains(&id)
     }
 
     /// Determines whether the given spec fun is recursive.
@@ -2484,6 +2548,39 @@ impl GlobalEnv {
             .spec_funs
             .get_mut(&fun.id)
             .unwrap()
+    }
+
+    /// Gets a lemma declaration mutably.
+    pub fn get_lemma_mut(&mut self, lemma: QualifiedId<LemmaId>) -> &mut LemmaDecl {
+        self.module_data
+            .get_mut(lemma.module_id.to_usize())
+            .unwrap()
+            .lemmas
+            .get_mut(&lemma.id)
+            .unwrap()
+    }
+
+    /// If the given function is the synthetic function of a lemma, mirrors the
+    /// given spec into the `LemmaDecl`. Lemma conditions live in two places:
+    /// the synthetic lemma function's spec, which is used to verify the lemma,
+    /// and the `LemmaDecl`, which is used to instantiate `apply` sites; any
+    /// update of the function spec must maintain the mirror.
+    pub fn sync_lemma_from_spec(&mut self, fun: QualifiedId<FunId>, spec: &Spec) {
+        let lemma_id = {
+            let fun_env = self.get_function(fun);
+            if !fun_env.is_lemma() {
+                return;
+            }
+            fun_env
+                .module_env
+                .find_lemma_by_name(fun_env.get_name())
+                .map(|(id, _)| id)
+        };
+        if let Some(lemma_id) = lemma_id {
+            let decl = self.get_lemma_mut(fun.module_id.qualified(lemma_id));
+            decl.conditions = spec.conditions.clone();
+            decl.proof = spec.proof.clone();
+        }
     }
 
     /// Adds a new specification function and returns id of it.
@@ -4084,7 +4181,7 @@ impl<'env> ModuleEnv<'env> {
             == module_name
     }
 
-    fn is_module_in_std(&self, module_name: &str) -> bool {
+    pub fn is_module_in_std(&self, module_name: &str) -> bool {
         let addr = self.get_name().addr();
         *addr == self.env.get_stdlib_address() && self.match_module_name(module_name)
     }
@@ -5600,19 +5697,35 @@ impl<'env> FunctionEnv<'env> {
             })
     }
 
+    /// Returns true if this function has a parameter of function type.
+    pub fn has_function_parameters(&self) -> bool {
+        self.get_parameters_ref()
+            .iter()
+            .any(|Parameter(_, ty, _)| ty.is_function())
+    }
+
     /// Returns true if this is an inline function which is verified: in verify mode,
     /// inline functions with explicitly given specs are compiled to bytecode and their
-    /// bodies are checked against their specs, like regular functions.
+    /// bodies are checked against their specs, like regular functions. This is restricted
+    /// to inline functions without function-typed parameters; specs on other inline
+    /// functions are rejected by the model builder.
     pub fn is_inline_verified(&self) -> bool {
-        self.module_env.env.is_verify_mode() && self.is_inline() && self.has_explicit_spec()
+        self.module_env.env.is_verify_mode()
+            && self.is_inline()
+            && self.has_explicit_spec()
+            && !self.has_function_parameters()
     }
 
     /// Returns true if this is an inline function which is retained (not expanded at call
     /// sites) because the model is built for verification and the function is opaque.
     /// Such functions act like regular opaque functions in the prover: their spec is used
-    /// at call sites instead of their body.
+    /// at call sites instead of their body. As with `is_inline_verified`, this is
+    /// restricted to inline functions without function-typed parameters.
     pub fn is_inline_opaque_retained(&self) -> bool {
-        self.module_env.env.is_verify_mode() && self.is_inline() && self.is_opaque()
+        self.module_env.env.is_verify_mode()
+            && self.is_inline()
+            && self.is_opaque()
+            && !self.has_function_parameters()
     }
 
     /// Return true if this is a lemma function (synthesized from a lemma declaration).
