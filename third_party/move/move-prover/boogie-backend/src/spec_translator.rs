@@ -1733,7 +1733,7 @@ impl SpecTranslator<'_> {
                 // as int and the conversion is the identity. The base comes
                 // from the instantiated type (a raw node type can still be a
                 // type parameter, which has no numeric base).
-                let wrap = self.node_bv_flag(node_id) && !self.node_bv_flag(args[0].node_id());
+                let wrap = self.node_bv_flag(node_id) && !self.operand_bv_flag(&args[0]);
                 if wrap {
                     let arg_node_type = self.get_node_type(args[0].node_id());
                     let literal = boogie_num_type_base(
@@ -1751,15 +1751,14 @@ impl SpecTranslator<'_> {
             },
             Operation::Bv2Int => {
                 // See `Int2Bv`: convert only when the argument renders as a
-                // bitvector; under the signed clamp it renders as int and the
-                // conversion is the identity.
-                let wrap = self.node_bv_flag(args[0].node_id());
+                // bitvector; a severed contract leaves the node unclassified
+                // where the temporary itself still renders bv.
+                let (wrap, arg_ty) = self.operand_rendering(&args[0]);
                 if wrap {
-                    let arg_node_type = self.get_node_type(args[0].node_id());
                     let literal = boogie_num_type_base(
                         self.env,
                         Some(self.env.get_node_loc(args[0].node_id())),
-                        &arg_node_type,
+                        &arg_ty,
                         false,
                     );
                     emit!(self.writer, "$bv2int.{}(", literal);
@@ -2894,6 +2893,22 @@ impl SpecTranslator<'_> {
         // spec-function checks compare state S against entry/exit (or one labeled state
         // against another) rather than collapsing to entry-vs-exit via the `Old(arg)`-routed
         // function-entry snapshots.
+        // Mirrors the declaration in `translate_spec_fun`; `None` for native templates,
+        // whose parameters follow the call's flag-node suffix.
+        let boundary_global_state = self.env.get_extension::<GlobalNumberOperationState>();
+        let param_renders_bv = |i: usize, ty: &Type| -> Option<bool> {
+            if is_vector_table_cmp_module {
+                return None;
+            }
+            Some(
+                boundary_global_state
+                    .as_ref()
+                    .and_then(|gs| gs.spec_fun_operation_map.get(&(module_id, fun_id)))
+                    .and_then(|(params, _)| params.get(i))
+                    .map(|oper| bv_flag_for_type(self.env, oper, ty))
+                    .unwrap_or(false),
+            )
+        };
         let mut_count = fun_decl
             .params
             .iter()
@@ -2925,7 +2940,7 @@ impl SpecTranslator<'_> {
         if is_doubled {
             let mut arg_iter = args.iter();
             let mut mut_idx: usize = 0;
-            for move_model::model::Parameter(_, ty, _) in &fun_decl.params {
+            for (i, move_model::model::Parameter(_, ty, _)) in fun_decl.params.iter().enumerate() {
                 if ty.is_mutable_reference() {
                     let pre_arg = arg_iter.next().expect("doubled args missing pre slot");
                     let post_arg = arg_iter.next().expect("doubled args missing post slot");
@@ -2946,7 +2961,9 @@ impl SpecTranslator<'_> {
                     let arg = arg_iter.next().expect("missing arg for non-mut param");
                     maybe_comma();
                     // Instantiated type, as in the non-doubled branch below.
-                    self.translate_spec_fun_arg(arg, &ty.instantiate(inst));
+                    let ity = ty.instantiate(inst);
+                    let param_is_bv = param_renders_bv(i, &ity);
+                    self.translate_spec_fun_arg(arg, &ity, param_is_bv);
                 }
             }
         } else {
@@ -2972,7 +2989,7 @@ impl SpecTranslator<'_> {
             };
             let mut arg_iter = args.iter();
             let mut mut_idx: usize = 0;
-            for move_model::model::Parameter(_, ty, _) in &fun_decl.params {
+            for (i, move_model::model::Parameter(_, ty, _)) in fun_decl.params.iter().enumerate() {
                 let arg = arg_iter.next().expect("missing arg");
                 maybe_comma();
                 if ty.is_mutable_reference() {
@@ -2983,35 +3000,33 @@ impl SpecTranslator<'_> {
                     }
                     mut_idx += 1;
                 } else {
-                    // The `num`-boundary check must see the instantiated
-                    // parameter type: a generic parameter instantiated at
-                    // `num` converts like a declared `num` parameter.
-                    self.translate_spec_fun_arg(arg, &ty.instantiate(inst));
+                    // Instantiated type: a generic parameter at `num` converts like a
+                    // declared `num` one.
+                    let ity = ty.instantiate(inst);
+                    let param_is_bv = param_renders_bv(i, &ity);
+                    self.translate_spec_fun_arg(arg, &ity, param_is_bv);
                 }
             }
         }
         emit!(self.writer, ")");
     }
 
-    /// Emit a spec fun argument for a by-value parameter, converting at the
-    /// representational boundary of widthless `num` parameters: a `num`
-    /// parameter always renders as int, while a bitwise-classified argument
-    /// renders as a bitvector (the number-operation analysis clamps `num`
-    /// parameter slots to `Arithmetic`, so the two sides legitimately
-    /// disagree exactly here). Other parameter types keep the propagated
-    /// classification and need no conversion (see the comment at the
-    /// argument-emission site).
-    fn translate_spec_fun_arg(&self, arg: &Exp, param_ty: &Type) {
+    /// Emit a by-value spec fun argument, converting a bitvector argument that meets an
+    /// int-rendered parameter. `param_is_bv == None` keeps the argument's own rendering.
+    fn translate_spec_fun_arg(&self, arg: &Exp, param_ty: &Type, param_is_bv: Option<bool>) {
         // The operand's own rendering is authoritative (a schema binding
         // can substitute a bitvector-rendered temporary under a node
         // rewritten to `num`), and the conversion width comes from the
         // same type that decided that rendering.
         let (arg_is_bv, arg_ty) = self.operand_rendering(arg);
-        if matches!(
+        let is_num_param = matches!(
             param_ty.skip_reference(),
             Type::Primitive(PrimitiveType::Num)
-        ) && arg_is_bv
-        {
+        );
+        // `$bv2int.N` exists only for concrete unsigned widths; aggregates and type
+        // parameters have no scalar conversion.
+        let arg_is_convertible = arg_ty.skip_reference().is_unsigned_int();
+        if arg_is_bv && arg_is_convertible && (is_num_param || param_is_bv == Some(false)) {
             let base = boogie_num_type_base(
                 self.env,
                 Some(self.env.get_node_loc(arg.node_id())),
@@ -3022,6 +3037,19 @@ impl SpecTranslator<'_> {
             self.translate_exp(arg);
             emit!(self.writer, ")");
         } else {
+            // Renderings disagree with no conversion available; types rendering the same
+            // under both flags are not a disagreement.
+            if arg_is_bv
+                && param_is_bv == Some(false)
+                && boogie_type(self.env, arg_ty.skip_reference(), true)
+                    != boogie_type(self.env, arg_ty.skip_reference(), false)
+            {
+                self.env.error(
+                    &self.env.get_node_loc(arg.node_id()),
+                    "argument renders as a bitvector but the spec function parameter \
+                     renders as an integer, and no conversion exists for this type",
+                );
+            }
             self.translate_exp(arg);
         }
     }
@@ -4157,15 +4185,22 @@ impl SpecTranslator<'_> {
             }
         }
 
-        let global_state = &self
-            .env
-            .get_extension::<GlobalNumberOperationState>()
-            .expect("global number operation state");
-        let num_oper = global_state.get_node_num_oper(args[0].node_id());
-        // (`Num` never carries a bv rendering; `bv_flag_for_type` clamps it.)
-        let bv_flag = bv_flag_for_type(self.env, &num_oper, ty);
+        // A scalar comparison converts its operands below, so the node decides and a
+        // severed contract stays in integer world. An aggregate has no conversion, so
+        // there the operands' own rendering must pick the helper.
+        let is_scalar = ty.skip_reference().is_number();
+        let bv_flag = if is_scalar {
+            let global_state = &self
+                .env
+                .get_extension::<GlobalNumberOperationState>()
+                .expect("global number operation state");
+            let num_oper = global_state.get_node_num_oper(args[0].node_id());
+            bv_flag_for_type(self.env, &num_oper, ty)
+        } else {
+            self.operand_bv_flag(&args[0])
+        };
         let suffix = boogie_type_suffix(self.env, ty, bv_flag);
-        if ty.skip_reference().is_number() {
+        if is_scalar {
             let op_base = if bv_flag {
                 boogie_num_type_base(
                     self.env,
@@ -4437,14 +4472,17 @@ impl SpecTranslator<'_> {
         // `$bv2int.N(...)`. We must NOT propagate `cast_oper` (Arithmetic) onto
         // the source first — a bv-classified literal arg would otherwise lose
         // its bv suffix in `translate_value` and feed an `int` into `$bv2int.N`.
-        if source_oper == Bitwise
-            && source_type.is_unsigned_int()
+        // The operand's rendering decides, not the node's: in a boundary condition the
+        // node is integer-world while the temporary it reads renders as a bitvector.
+        let (source_renders_bv, source_render_ty) = self.operand_rendering(&arg);
+        if source_renders_bv
+            && source_render_ty.is_unsigned_int()
             && !bv_flag_for_type(self.env, &cast_oper, &target_type)
         {
             let source_base = boogie_num_type_base(
                 self.env,
                 Some(self.env.get_node_loc(arg.node_id())),
-                &source_type,
+                &source_render_ty,
                 false,
             );
             emit!(self.writer, "$bv2int.{}(", source_base);
@@ -4689,10 +4727,38 @@ impl SpecTranslator<'_> {
         emit!(self.writer, ")");
     }
 
+    /// Emit a native vector primitive specialized on the element type. The aggregate
+    /// operand picks the template (a vector has no conversion); elements convert to match.
     fn translate_primitive_inst_call(&self, node_id: NodeId, fun: &str, args: &[Exp]) {
-        let suffix = boogie_inst_suffix(self.env, &self.get_node_instantiation(node_id), &[]);
+        let inst = self.get_node_instantiation(node_id);
+        // Only concrete unsigned elements have both templates and a conversion.
+        let elem_convertible = inst
+            .first()
+            .is_some_and(|ty| ty.skip_reference().is_unsigned_int());
+        let elem_is_bv = elem_convertible
+            && match args.first() {
+                Some(aggregate) => self.operand_rendering(aggregate).0,
+                None => self.node_bv_flag(node_id),
+            };
+        let suffix = boogie_inst_suffix(self.env, &inst, &[elem_is_bv]);
         emit!(self.writer, "{}{}(", fun, suffix);
-        self.translate_seq(args.iter(), ", ", |e| self.translate_exp(e));
+        let elem_base = if elem_is_bv {
+            boogie_num_type_base(
+                self.env,
+                Some(self.env.get_node_loc(node_id)),
+                inst.first().expect("element type"),
+                false,
+            )
+        } else {
+            String::new()
+        };
+        self.translate_seq(args.iter().enumerate(), ", ", |(i, e)| {
+            if i == 0 || !elem_convertible {
+                self.translate_exp(e)
+            } else {
+                self.translate_op_operand(e, elem_is_bv, &elem_base)
+            }
+        });
         emit!(self.writer, ")");
     }
 

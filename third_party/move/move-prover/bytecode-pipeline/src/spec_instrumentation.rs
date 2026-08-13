@@ -5,7 +5,9 @@
 
 // Transformation which injects specifications (Move function spec blocks) into the bytecode.
 
-use crate::{options::ProverOptions, verification_analysis};
+use crate::{
+    number_operation::BvInternalBoundaryProps, options::ProverOptions, verification_analysis,
+};
 use itertools::Itertools;
 use move_core_types::function::ClosureMask;
 use move_model::{
@@ -18,7 +20,10 @@ use move_model::{
         FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, NodeId, QualifiedId, QualifiedInstId,
         SpecVarId, StructId,
     },
-    pragmas::{ABORTS_IF_IS_PARTIAL_PRAGMA, EMITS_IS_PARTIAL_PRAGMA, EMITS_IS_STRICT_PRAGMA},
+    pragmas::{
+        ABORTS_IF_IS_PARTIAL_PRAGMA, BV_INTERNAL_PRAGMA, CONDITION_ABSTRACT_PROP,
+        CONDITION_CONCRETE_PROP, EMITS_IS_PARTIAL_PRAGMA, EMITS_IS_STRICT_PRAGMA,
+    },
     spec_translator::{ProofAction, SpecTranslator, TranslatedSpec},
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type, TypeDisplayContext, BOOL_TYPE, NUM_TYPE},
@@ -442,6 +447,11 @@ struct Instrumenter<'a> {
     /// AttrIds are stable across optimization passes, unlike bytecode offsets.
     /// The optional guard is a path condition from enclosing `if` in the proof block.
     split_points: Vec<(AttrId, Exp, Option<Exp>)>,
+    /// Whether the function being instrumented declares `pragma bv_internal`.
+    self_is_bv_internal: bool,
+    /// Locations of this function's `[concrete]` conditions: verified against the body,
+    /// never assumed by a caller, so not boundary language.
+    concrete_cond_locs: BTreeSet<Loc>,
 }
 
 // =================================================================================================
@@ -626,6 +636,21 @@ impl<'a> Instrumenter<'a> {
             opaque_callee_framed_memory,
             opaque_closure_modifies,
             split_points: vec![],
+            self_is_bv_internal: fun_env.is_pragma_true(BV_INTERNAL_PRAGMA, || false),
+            concrete_cond_locs: fun_env
+                .get_spec()
+                .conditions
+                .iter()
+                .filter(|cond| {
+                    let env = &fun_env.module_env.env;
+                    env.is_property_true(&cond.properties, CONDITION_CONCRETE_PROP)
+                        .unwrap_or(false)
+                        && !env
+                            .is_property_true(&cond.properties, CONDITION_ABSTRACT_PROP)
+                            .unwrap_or(false)
+                })
+                .map(|cond| cond.loc.clone())
+                .collect(),
         };
         // Always inline spec lets in proof actions, independent of the
         // `inline_spec_lets` option. Proof-action exps are recorded in
@@ -678,15 +703,17 @@ impl<'a> Instrumenter<'a> {
         let old_code = std::mem::take(&mut self.builder.data.code);
 
         // Emit `let` bindings.
-        self.emit_lets(spec, false);
+        self.emit_lets(spec, false, self.self_is_bv_internal);
 
         // Inject preconditions as assumes. This is done for all self.variant values.
         self.builder
             .set_loc(self.builder.fun_env.get_loc().at_start()); // reset to function level
         for (loc, exp) in spec.pre_conditions(&self.builder) {
+            let is_concrete = self.is_concrete_cond(&loc);
             self.builder.set_loc(loc);
             self.builder
-                .emit_with(move |attr_id| Prop(attr_id, Assume, exp))
+                .emit_with(move |attr_id| Prop(attr_id, Assume, exp));
+            self.tag_contract_prop(self.self_is_bv_internal && !is_concrete);
         }
 
         // Emit well-formedness checks for choice expressions in let bindings.
@@ -931,6 +958,7 @@ impl<'a> Instrumenter<'a> {
 
         let callee_env = env.get_module(mid).into_function(fid);
         let callee_opaque = callee_env.is_opaque();
+        let callee_is_bv_internal = callee_env.is_pragma_true(BV_INTERNAL_PRAGMA, || false);
         let mut callee_spec = SpecTranslator::translate_fun_spec(
             self.options.auto_trace_level.functions(),
             true,
@@ -963,7 +991,7 @@ impl<'a> Instrumenter<'a> {
         }
 
         // Emit `let` assignments.
-        self.emit_lets(&callee_spec, false);
+        self.emit_lets(&callee_spec, false, callee_is_bv_internal);
         self.builder.set_loc_from_attr(id);
 
         // Emit pre conditions if this is the verification variant or if the callee
@@ -983,6 +1011,7 @@ impl<'a> Instrumenter<'a> {
                     FunctionVariant::Baseline => Assume,
                 };
                 self.builder.emit_with(|id| Prop(id, prop_kind, cond));
+                self.tag_contract_prop(callee_is_bv_internal);
             }
         }
 
@@ -1054,7 +1083,8 @@ impl<'a> Instrumenter<'a> {
             // aborts_if conditions. Uses abort_path=true to emit only the
             // defining fragment (label-defining conjuncts), not full postcondition
             // properties that reference post-havoc state.
-            let defining_indices = self.emit_state_label_assumes(&callee_spec, true);
+            let defining_indices =
+                self.emit_state_label_assumes(&callee_spec, true, callee_is_bv_internal);
             // Remove defining conditions from post so they aren't double-emitted
             // later when assumes for ensures are emitted on the non-abort path.
             if !defining_indices.is_empty() {
@@ -1076,8 +1106,11 @@ impl<'a> Instrumenter<'a> {
 
             // Translate the abort condition. If the abort_cond_temp_opt is None, it indicates
             // that the abort condition is known to be false, so we can skip the abort handling.
-            let (abort_cond_temp_opt, code_cond) =
-                self.generate_abort_opaque_cond(callee_aborts_if_is_partial, &callee_spec);
+            let (abort_cond_temp_opt, code_cond) = self.generate_abort_opaque_cond(
+                callee_aborts_if_is_partial,
+                &callee_spec,
+                callee_is_bv_internal,
+            );
             if let Some(abort_cond_temp) = abort_cond_temp_opt {
                 let abort_local = self.abort_local;
                 let abort_label = self.abort_label;
@@ -1089,6 +1122,7 @@ impl<'a> Instrumenter<'a> {
                 if let Some(cond) = code_cond {
                     self.emit_traces(&callee_spec, &cond);
                     self.builder.emit_with(move |id| Prop(id, Assume, cond));
+                    self.tag_contract_prop(callee_is_bv_internal);
                 }
                 // Aggregate `aborts_of<callee>` on the abort path so a
                 // caller's `aborts_of<callee>` assertion discharges directly.
@@ -1193,7 +1227,7 @@ impl<'a> Instrumenter<'a> {
             }
 
             // Emit `let post` assignments.
-            self.emit_lets(&callee_spec, true);
+            self.emit_lets(&callee_spec, true, callee_is_bv_internal);
 
             // Emit well-formedness checks for choice expressions in callee's post-state let bindings.
             self.emit_choice_wellformedness(&callee_spec, true);
@@ -1205,6 +1239,7 @@ impl<'a> Instrumenter<'a> {
             for (_, cond) in std::mem::take(&mut callee_spec.post) {
                 self.emit_traces(&callee_spec, &cond);
                 self.builder.emit_with(|id| Prop(id, Assume, cond));
+                self.tag_contract_prop(callee_is_bv_internal);
             }
 
             // Emit the events in the `emits` specs of the callee.
@@ -1304,6 +1339,36 @@ impl<'a> Instrumenter<'a> {
             // Generate OpaqueCallEnd instruction if invariant_v2.
             self.generate_opaque_call(dests, mid, fid, targs, srcs, aa, false);
         }
+    }
+
+    /// Mark the `Prop` just emitted as a `bv_internal` contract condition (`pre`, `post`,
+    /// `aborts`, `lets`) — the only ones proven in one context and assumed in another.
+    /// `owner_is_bv_internal` is the callee at a call site, not the enclosing function.
+    /// Whether `loc` is a `[concrete]` condition of this function.
+    fn is_concrete_cond(&self, loc: &Loc) -> bool {
+        self.concrete_cond_locs.contains(loc)
+    }
+
+    fn tag_contract_prop(&mut self, owner_is_bv_internal: bool) {
+        if !owner_is_bv_internal {
+            return;
+        }
+        let Some(Bytecode::Prop(attr_id, ..)) = self.builder.data.code.last() else {
+            return;
+        };
+        let attr_id = *attr_id;
+        let env = self.builder.global_env();
+        let mut boundary = env
+            .get_extension::<BvInternalBoundaryProps>()
+            .map(|rc| rc.as_ref().clone())
+            .unwrap_or_default();
+        boundary.insert(
+            self.builder.fun_env.module_env.get_id(),
+            self.builder.fun_env.get_id(),
+            self.builder.data.variant == FunctionVariant::Baseline,
+            attr_id,
+        );
+        env.set_extension(boundary);
     }
 }
 
@@ -1624,7 +1689,7 @@ impl<'a> Instrumenter<'a> {
         }
     }
 
-    fn emit_lets(&mut self, spec: &TranslatedSpec, post_state: bool) {
+    fn emit_lets(&mut self, spec: &TranslatedSpec, post_state: bool, owner_is_bv_internal: bool) {
         use Bytecode::*;
         let lets = spec
             .lets
@@ -1638,6 +1703,7 @@ impl<'a> Instrumenter<'a> {
                 .mk_identical(self.builder.mk_temporary(*temp), exp.clone());
             self.builder
                 .emit_with(|id| Prop(id, PropKind::Assume, assign));
+            self.tag_contract_prop(owner_is_bv_internal);
         }
     }
 
@@ -2137,6 +2203,13 @@ impl<'a> Instrumenter<'a> {
 
     /// Generates verification conditions for abort block.
     fn generate_abort_verify(&mut self, spec: &TranslatedSpec) {
+        // The aggregate is a disjunction over all `aborts_if`; it is boundary language
+        // only when some clause travels, i.e. is not `[concrete]`.
+        let aborts_travel = spec
+            .aborts
+            .iter()
+            .any(|(loc, ..)| !self.is_concrete_cond(loc));
+        let tag = self.self_is_bv_internal && aborts_travel;
         use Bytecode::*;
         use PropKind::*;
 
@@ -2147,7 +2220,7 @@ impl<'a> Instrumenter<'a> {
         // when address aliasing makes the abort condition depend on labeled state.
         // Use abort_path=true to assume only the defining fragment of each
         // condition, not extra properties that only hold on successful returns.
-        self.emit_state_label_assumes(spec, true);
+        self.emit_state_label_assumes(spec, true, self.self_is_bv_internal);
 
         let is_partial = self
             .builder
@@ -2161,6 +2234,7 @@ impl<'a> Instrumenter<'a> {
                 self.emit_traces(spec, &cond);
                 self.builder.set_loc_and_vc_info(loc, ABORT_NOT_COVERED);
                 self.builder.emit_with(move |id| Prop(id, Assert, cond));
+                self.tag_contract_prop(tag);
             }
         }
 
@@ -2174,6 +2248,7 @@ impl<'a> Instrumenter<'a> {
                     .set_loc_and_vc_info(loc, ABORTS_CODE_NOT_COVERED);
                 self.builder
                     .emit_with(move |id| Prop(id, Assert, code_cond));
+                self.tag_contract_prop(tag);
             }
         }
     }
@@ -2186,6 +2261,7 @@ impl<'a> Instrumenter<'a> {
         &mut self,
         is_partial: bool,
         spec: &TranslatedSpec,
+        owner_is_bv_internal: bool,
     ) -> (Option<TempIndex>, Option<Exp>) {
         let aborts_cond = if is_partial {
             None
@@ -2197,7 +2273,9 @@ impl<'a> Instrumenter<'a> {
                 return (None, None);
             }
             // Introduce a temporary to hold the value of the aborts condition.
-            self.builder.emit_let(cond).0
+            let t = self.builder.emit_let(cond).0;
+            self.tag_contract_prop(owner_is_bv_internal);
+            t
         } else {
             // Introduce a havoced temporary to hold an arbitrary value for the aborts
             // condition.
@@ -2227,7 +2305,7 @@ impl<'a> Instrumenter<'a> {
         // Emit specification variable updates. They are generated for both verified and inlined
         // function variants, as the evolution of state updates is always the same.
         let lets_emitted = if !spec.updates.is_empty() {
-            self.emit_lets(spec, true);
+            self.emit_lets(spec, true, self.self_is_bv_internal);
             self.emit_updates(spec, None);
             true
         } else {
@@ -2237,13 +2315,14 @@ impl<'a> Instrumenter<'a> {
         if self.is_verified() {
             // Emit `let` bindings if not already emitted.
             if !lets_emitted {
-                self.emit_lets(spec, true);
+                self.emit_lets(spec, true, self.self_is_bv_internal);
             }
 
             // Emit well-formedness checks for choice expressions in post-state let bindings.
             self.emit_choice_wellformedness(spec, true);
 
-            let defining_indices = self.emit_state_label_assumes(spec, false);
+            let defining_indices =
+                self.emit_state_label_assumes(spec, false, self.self_is_bv_internal);
 
             // Emit the negation of all aborts conditions.
             // For defining conditions (already assumed), assert the non-defining
@@ -2258,6 +2337,9 @@ impl<'a> Instrumenter<'a> {
                         self.builder
                             .set_loc_and_vc_info(loc.clone(), ABORTS_IF_FAILS_MESSAGE);
                         self.builder.emit_with(|id| Prop(id, Assert, exp));
+                        self.tag_contract_prop(
+                            self.self_is_bv_internal && !self.is_concrete_cond(loc),
+                        );
                     }
                     continue;
                 }
@@ -2265,7 +2347,8 @@ impl<'a> Instrumenter<'a> {
                 let exp = self.builder.mk_not(abort_cond.clone());
                 self.builder
                     .set_loc_and_vc_info(loc.clone(), ABORTS_IF_FAILS_MESSAGE);
-                self.builder.emit_with(|id| Prop(id, Assert, exp))
+                self.builder.emit_with(|id| Prop(id, Assert, exp));
+                self.tag_contract_prop(self.self_is_bv_internal && !self.is_concrete_cond(loc));
             }
 
             // Emit return-point proof actions (`post`-prefixed proof statements).
@@ -2285,6 +2368,9 @@ impl<'a> Instrumenter<'a> {
                         self.builder
                             .set_loc_and_vc_info(loc.clone(), ENSURES_FAILS_MESSAGE);
                         self.builder.emit_with(move |id| Prop(id, Assert, residual));
+                        self.tag_contract_prop(
+                            self.self_is_bv_internal && !self.is_concrete_cond(loc),
+                        );
                     }
                     continue;
                 }
@@ -2292,7 +2378,8 @@ impl<'a> Instrumenter<'a> {
                 self.builder
                     .set_loc_and_vc_info(loc.clone(), ENSURES_FAILS_MESSAGE);
                 self.builder
-                    .emit_with(move |id| Prop(id, Assert, cond.clone()))
+                    .emit_with(move |id| Prop(id, Assert, cond.clone()));
+                self.tag_contract_prop(self.self_is_bv_internal && !self.is_concrete_cond(loc));
             }
 
             // Emit all event `emits` checks.
@@ -2334,6 +2421,7 @@ impl<'a> Instrumenter<'a> {
         &mut self,
         spec: &TranslatedSpec,
         abort_path: bool,
+        owner_is_bv_internal: bool,
     ) -> BTreeSet<usize> {
         use Bytecode::*;
         use PropKind::*;
@@ -2351,6 +2439,14 @@ impl<'a> Instrumenter<'a> {
             .iter()
             .map(|(_, e)| e)
             .chain(spec.aborts.iter().map(|(_, e, _)| e))
+            .collect();
+        // Same index space as `all_conditions`: a `[concrete]` definer stays in
+        // body world, like its counterpart in the post and aborts loops.
+        let condition_locs: Vec<&Loc> = spec
+            .post
+            .iter()
+            .map(|(l, _)| l)
+            .chain(spec.aborts.iter().map(|(l, _, _)| l))
             .collect();
         for (idx, cond) in all_conditions.iter().enumerate() {
             for label in Self::defined_labels(cond) {
@@ -2405,6 +2501,9 @@ impl<'a> Instrumenter<'a> {
                             all_conditions[idx].clone()
                         };
                         self.builder.emit_with(move |id| Prop(id, Assume, cond));
+                        self.tag_contract_prop(
+                            owner_is_bv_internal && !self.is_concrete_cond(condition_locs[idx]),
+                        );
                         defining_indices.insert(idx);
                     }
                     emitted_labels.insert(label);

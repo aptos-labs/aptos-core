@@ -681,6 +681,7 @@ pub fn is_pragma_valid_for_block(
                 | DELEGATE_INVARIANTS_TO_CALLER_PRAGMA
                 | BV_PARAM_PROP
                 | BV_RET_PROP
+                | BV_INTERNAL_PRAGMA
                 | UNROLL_PRAGMA
                 | INFERENCE_PRAGMA
         ),
@@ -780,6 +781,11 @@ pub const BV_PARAM_PROP: &str = "bv";
 /// to explicitly specify which return value will be translated into a bv type in the boogie file
 /// example: bv_ret=b"0,1"
 pub const BV_RET_PROP: &str = "bv_ret";
+
+/// A pragma declaring a function's bitwise representation internal: the body verifies
+/// with bitvectors, while parameters, results and the contract are integers at the
+/// boundary. Requires `pragma opaque`.
+pub const BV_INTERNAL_PRAGMA: &str = "bv_internal";
 
 /// A function which determines whether a property is valid for a given condition kind.
 pub fn is_property_valid_for_condition(kind: &ConditionKind, prop: &str) -> bool {
