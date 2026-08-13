@@ -116,19 +116,22 @@ fn failing_test_writes_coverage_map() {
 
     assert_eq!(result, UnitTestResult::Failure);
     let coverage_map_path = package_dir.path().join(".coverage_map.mvcov");
-    let coverage_map =
-        CoverageMap::from_binary_file(&coverage_map_path).unwrap_or_else(|error| {
-            panic!(
-                "failed test did not produce a readable coverage map: {error:#}\n{}",
-                String::from_utf8_lossy(&output)
-            )
-        });
+    let coverage_map = CoverageMap::from_binary_file(&coverage_map_path).unwrap_or_else(|error| {
+        panic!(
+            "failed test did not produce a readable coverage map: {error:#}\n{}",
+            String::from_utf8_lossy(&output)
+        )
+    });
     let failing_function_was_traced = coverage_map.exec_maps.values().any(|execution_map| {
         execution_map.module_maps.values().any(|module_map| {
             module_map.module_name.as_str() == "failing_test"
-                && module_map.function_maps.iter().any(|(name, program_counters)| {
-                    name.as_str() == "fails" && program_counters.values().any(|count| *count > 0)
-                })
+                && module_map
+                    .function_maps
+                    .iter()
+                    .any(|(name, program_counters)| {
+                        name.as_str() == "fails"
+                            && program_counters.values().any(|count| *count > 0)
+                    })
         })
     });
     assert!(
