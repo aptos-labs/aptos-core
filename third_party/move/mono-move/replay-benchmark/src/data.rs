@@ -6,104 +6,51 @@
 //! shape has to match the producer.
 
 use anyhow::{bail, Context};
+use aptos_transaction_simulation::InMemoryStateStore;
 use aptos_types::{
-    access_path::Path,
-    chain_id::ChainId,
-    state_store::{
-        state_key::{inner::StateKeyInner, StateKey},
-        state_slot::{StateSlot, StateSlotKind},
-        state_storage_usage::StateStorageUsage,
-        state_value::StateValue,
-        StateViewResult, TStateView,
-    },
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
-        user_transaction_context::{TransactionIndexKind, UserTransactionContext},
-        EntryFunction, PersistedAuxiliaryInfo, ReplayProtector, Transaction, TransactionBlock,
+        PersistedAuxiliaryInfo, SignedTransaction, Transaction, TransactionBlock,
         TransactionExecutableRef, Version,
     },
 };
-use aptos_vm::move_vm_ext::SessionId;
-use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
-use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::Path as FsPath, sync::Arc};
-
-/// The complete read-set a block touched, matching `aptos_replay_benchmark::state_view::ReadSet`.
-/// Keyed by [`StateKey`] (modules, resources, and resource groups all live here).
-#[derive(Clone, Serialize, Deserialize)]
-pub struct ReadSet {
-    pub data: HashMap<StateKey, StateValue>,
-}
-
-impl TStateView for ReadSet {
-    type Key = StateKey;
-
-    fn next_version(&self) -> Version {
-        0
-    }
-
-    fn get_state_slot(&self, state_key: &Self::Key) -> StateViewResult<StateSlot> {
-        let slot = match self.data.get(state_key) {
-            Some(state_value) => StateSlot::new(state_key.clone(), StateSlotKind::ColdOccupied {
-                value_version: 0,
-                value: state_value.clone(),
-            }),
-            None => StateSlot::new(state_key.clone(), StateSlotKind::ColdVacant),
-        };
-        Ok(slot)
-    }
-
-    fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
-        // TODO(correctness): record the real usage at capture and return it here.
-        Ok(StateStorageUsage::new_untracked())
-    }
-}
-
-impl ReadSet {
-    /// Every module's `(id, bytecode)` present in the read-set.
-    pub fn modules(&self) -> Vec<(ModuleId, Vec<u8>)> {
-        let mut modules = vec![];
-        for (key, value) in &self.data {
-            if let StateKeyInner::AccessPath(ap) = key.inner()
-                && let Path::Code(module_id) = ap.get_path()
-            {
-                modules.push((module_id, value.bytes().to_vec()));
-            }
-        }
-        modules
-    }
-}
 
 /// Everything needed to benchmark a single entry-function transaction on both VMs.
 pub struct BenchmarkInput {
     /// On-chain version of the transaction (for reporting).
     pub version: Version,
-    /// The transaction sender; used to materialize the leading `&signer` argument(s).
-    pub sender: AccountAddress,
-    /// The entry function and its (BCS-encoded, non-signer) arguments.
-    pub entry: EntryFunction,
-    /// The transaction's user context (sender, gas, fee payer, secondary signers, entry payload,
-    /// index), reconstructed from the transaction itself. Fed to the `transaction_context` native
-    /// so the entry function sees the same context it did on chain (this matters: some functions
-    /// abort early without it).
-    pub user_context: UserTransactionContext,
-    /// The transaction's chain id.
-    pub chain_id: ChainId,
-    /// The transaction's session id.
-    pub session_id: SessionId,
-    /// The complete read-set the transaction's block touched. Shared across the block's
-    /// transactions; a superset of any single transaction's reads, which is fine for replay.
-    pub read_set: Arc<ReadSet>,
+    /// The transaction to replay.
+    pub txn: SignedTransaction,
+    /// The transaction's on-chain auxiliary info (its index in the block).
+    pub aux_info: PersistedAuxiliaryInfo,
+    /// The state the transaction executes against.
+    pub state: Arc<InMemoryStateStore>,
+}
+
+impl BenchmarkInput {
+    /// The entry function's `module::function`, for reporting.
+    pub fn function_label(&self) -> String {
+        match self.txn.executable_ref() {
+            Ok(TransactionExecutableRef::EntryFunction(entry)) => {
+                format!("{}::{}", entry.module(), entry.function())
+            },
+            _ => "<not an entry function>".to_string(),
+        }
+    }
 }
 
 /// Loads the transaction blocks written by `download`.
-pub fn load_transaction_blocks(path: impl AsRef<FsPath>) -> anyhow::Result<Vec<TransactionBlock>> {
+fn load_transaction_blocks(path: impl AsRef<FsPath>) -> anyhow::Result<Vec<TransactionBlock>> {
     let bytes = std::fs::read(path.as_ref())
         .with_context(|| format!("Failed to read transactions file {:?}", path.as_ref()))?;
     bcs::from_bytes(&bytes).context("Failed to decode transaction blocks")
 }
 
-/// Loads the read-sets written by `initialize`. Index-aligned with the transaction blocks.
-pub fn load_read_sets(path: impl AsRef<FsPath>) -> anyhow::Result<Vec<ReadSet>> {
+/// Loads the read-sets written by `capture`. Index-aligned with the transaction blocks.
+pub fn load_read_sets(
+    path: impl AsRef<FsPath>,
+) -> anyhow::Result<Vec<HashMap<StateKey, StateValue>>> {
     let bytes = std::fs::read(path.as_ref())
         .with_context(|| format!("Failed to read inputs file {:?}", path.as_ref()))?;
     bcs::from_bytes(&bytes).context("Failed to decode read-sets")
@@ -128,21 +75,22 @@ pub fn load_inputs(
 
     let mut inputs = vec![];
     for (block, read_set) in blocks.into_iter().zip(read_sets) {
-        let read_set = Arc::new(read_set);
+        let state = InMemoryStateStore::new_with_state_values(read_set);
+        crate::gas::make_gas_free(&state)?;
+        let state = Arc::new(state);
         let mut version = block.begin_version;
         for (i, txn) in block.transactions.iter().enumerate() {
-            let aux_info = block.persisted_auxiliary_infos.get(i);
-            if let Some((sender, entry, user_context, chain_id, session_id)) =
-                parse_user_transaction(txn, aux_info)
-            {
+            if let Some(txn) = as_entry_function_transaction(txn) {
+                let aux_info = block
+                    .persisted_auxiliary_infos
+                    .get(i)
+                    .copied()
+                    .unwrap_or(PersistedAuxiliaryInfo::None);
                 inputs.push(BenchmarkInput {
                     version,
-                    sender,
-                    entry,
-                    user_context,
-                    chain_id,
-                    session_id,
-                    read_set: Arc::clone(&read_set),
+                    txn,
+                    aux_info,
+                    state: Arc::clone(&state),
                 });
             }
             version += 1;
@@ -186,73 +134,17 @@ pub fn load_inputs_from_dir(dir: impl AsRef<FsPath>) -> anyhow::Result<Vec<Bench
     Ok(inputs)
 }
 
-/// If `txn` is an entry-function user transaction, returns its sender, entry function, the
-/// reconstructed [`UserTransactionContext`], and chain id. Everything is derived from the
-/// transaction itself — no chain access required.
-fn parse_user_transaction(
-    txn: &Transaction,
-    aux_info: Option<&PersistedAuxiliaryInfo>,
-) -> Option<(
-    AccountAddress,
-    EntryFunction,
-    UserTransactionContext,
-    ChainId,
-    SessionId,
-)> {
+/// If `txn` is an entry-function user transaction, returns it. Both executors
+/// derive everything else (signers, gas, session identity) from the
+/// transaction themselves.
+fn as_entry_function_transaction(txn: &Transaction) -> Option<SignedTransaction> {
     let signed = match txn {
         Transaction::UserTransaction(signed) => signed,
         _ => return None,
     };
-    let entry = match signed.executable_ref() {
-        Ok(TransactionExecutableRef::EntryFunction(entry)) => entry.clone(),
-        _ => return None,
-    };
-
-    let sender = signed.sender();
-    let chain_id = signed.chain_id();
-    let authenticator = signed.authenticator();
-    let secondary_signers = authenticator.secondary_signer_addresses();
-    let gas_payer = authenticator.fee_payer_address().unwrap_or(sender);
-    let transaction_index_kind = match aux_info {
-        Some(PersistedAuxiliaryInfo::V1 { transaction_index }) => {
-            TransactionIndexKind::BlockExecution {
-                transaction_index: *transaction_index,
-            }
-        },
-        Some(PersistedAuxiliaryInfo::TimestampNotYetAssignedV1 { transaction_index }) => {
-            TransactionIndexKind::ValidationOrSimulation {
-                transaction_index: *transaction_index,
-            }
-        },
-        Some(PersistedAuxiliaryInfo::None) | None => TransactionIndexKind::NotAvailable,
-    };
-
-    let user_context = UserTransactionContext::new(
-        sender,
-        secondary_signers,
-        gas_payer,
-        signed.max_gas_amount(),
-        signed.gas_unit_price(),
-        chain_id.id(),
-        Some(entry.as_entry_function_payload()),
-        None,
-        transaction_index_kind,
-        false,
-        matches!(signed.replay_protector(), ReplayProtector::Nonce(_)),
-    );
-    // Session id from the replay protector (entry functions have no script hash).
-    let session_id = match signed.replay_protector() {
-        ReplayProtector::SequenceNumber(sequence_number) => SessionId::Txn {
-            sender,
-            sequence_number,
-            script_hash: vec![],
-        },
-        ReplayProtector::Nonce(nonce) => SessionId::OrderlessTxn {
-            sender,
-            nonce,
-            expiration_time: signed.expiration_timestamp_secs(),
-            script_hash: vec![],
-        },
-    };
-    Some((sender, entry, user_context, chain_id, session_id))
+    matches!(
+        signed.executable_ref(),
+        Ok(TransactionExecutableRef::EntryFunction(_))
+    )
+    .then(|| signed.clone())
 }

@@ -1,12 +1,13 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! CLI for the MonoMove-vs-MoveVM replay benchmark.
+//! CLI for the MonoMove-vs-AptosVM replay benchmark.
 //!
 //! - `capture` fetches transactions from chain into a self-contained dump (the transaction plus a
 //!   read-set with the full module dependency closure).
-//! - `bench` replays each entry-function transaction in a dump on both the legacy Move VM (V1) and
-//!   MonoMove (V2), comparing execution time (primary) and correctness (secondary, coarse).
+//! - `bench` replays each entry-function transaction in a dump — the full transaction, gas-free —
+//!   on both the legacy AptosVM (V1) and the MonoMove-backed transaction executor (V2), comparing
+//!   execution time (primary) and outputs (strictly).
 
 use anyhow::Result;
 use aptos_rest_client::AptosBaseUrl;
@@ -73,7 +74,10 @@ impl VMSelection {
 }
 
 #[derive(Parser)]
-#[command(about = "Replay-benchmark MonoMove (V2) against the legacy Move VM (V1).")]
+#[command(
+    about = "Replay-benchmark the MonoMove transaction executor (V2) against the legacy \
+                   AptosVM (V1)."
+)]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -186,7 +190,6 @@ fn bench(args: BenchArgs) -> Result<()> {
     );
 
     for input in &inputs {
-        let function = format!("{}::{}", input.entry.module(), input.entry.function());
         // Isolate each VM run: a panic (e.g. a MonoMove feature not yet implemented) becomes that
         // VM's failure reason and never aborts the whole benchmark.
         let v1 = args
@@ -197,7 +200,7 @@ fn bench(args: BenchArgs) -> Result<()> {
             .vm
             .runs_v2()
             .then(|| run_vm(|| v2::run(input, &timing)));
-        TransactionReport::new(input.version, function, v1, v2).print();
+        TransactionReport::new(input, v1, v2).print();
     }
     Ok(())
 }
