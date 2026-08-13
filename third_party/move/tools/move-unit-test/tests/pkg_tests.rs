@@ -78,10 +78,12 @@ fn failing_test_writes_coverage_map() {
     .expect("failed to write package manifest");
     fs::write(
         sources_dir.join("failing_test.move"),
-        "module 0x42::failing_test {\n\
-         \x20   #[test]\n\
-         \x20   fun fails() { abort 1 }\n\
-         }\n",
+        concat!(
+            "module 0x42::failing_test {\n",
+            "    #[test]\n",
+            "    fun fails() { abort 1 }\n",
+            "}\n",
+        ),
     )
     .expect("failed to write package source");
 
@@ -100,7 +102,7 @@ fn failing_test_writes_coverage_map() {
         },
         UnitTestingConfig::default(),
         all_natives(
-            AccountAddress::from_hex_literal("0x1").unwrap(),
+            AccountAddress::from_hex_literal("0x1").expect("hardcoded address must be valid"),
             GasParameters::zeros(),
         ),
         ChangeSet::new(),
@@ -114,10 +116,24 @@ fn failing_test_writes_coverage_map() {
 
     assert_eq!(result, UnitTestResult::Failure);
     let coverage_map_path = package_dir.path().join(".coverage_map.mvcov");
-    CoverageMap::from_binary_file(&coverage_map_path).unwrap_or_else(|error| {
-        panic!(
-            "failed test did not produce a readable coverage map: {error:#}\n{}",
-            String::from_utf8_lossy(&output)
-        )
+    let coverage_map =
+        CoverageMap::from_binary_file(&coverage_map_path).unwrap_or_else(|error| {
+            panic!(
+                "failed test did not produce a readable coverage map: {error:#}\n{}",
+                String::from_utf8_lossy(&output)
+            )
+        });
+    let failing_function_was_traced = coverage_map.exec_maps.values().any(|execution_map| {
+        execution_map.module_maps.values().any(|module_map| {
+            module_map.module_name.as_str() == "failing_test"
+                && module_map.function_maps.iter().any(|(name, program_counters)| {
+                    name.as_str() == "fails" && program_counters.values().any(|count| *count > 0)
+                })
+        })
     });
+    assert!(
+        failing_function_was_traced,
+        "coverage map did not contain execution data for the failing test:\n{}",
+        String::from_utf8_lossy(&output)
+    );
 }
