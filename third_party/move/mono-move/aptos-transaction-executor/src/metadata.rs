@@ -25,22 +25,21 @@ pub(crate) struct TxnMetadata {
     /// The payload session's counter, one term of
     /// `monotonically_increasing_number`; matches the legacy VM's.
     pub session_counter: u8,
-    /// The transaction's index in its block, another term of
-    /// `monotonically_increasing_number`.
-    pub transaction_index: u32,
-    /// Distinguishes block execution (0) from validation/simulation (1) in
-    /// `monotonically_increasing_number`.
-    pub reserved_byte: u8,
+    /// The transaction's index within its block plus the counter's reserved
+    /// byte (0 for block execution, 1 for validation/simulation), or `None`
+    /// when the auxiliary info carries no index — the legacy VM aborts
+    /// `monotonically_increasing_number` in that case.
+    pub transaction_index: Option<(u32, u8)>,
 }
 
 impl TxnMetadata {
     pub fn new(txn: &SignedTransaction, aux_info: PersistedAuxiliaryInfo) -> Self {
-        let (transaction_index, reserved_byte) = match aux_info {
-            PersistedAuxiliaryInfo::V1 { transaction_index } => (transaction_index, 0),
+        let transaction_index = match aux_info {
+            PersistedAuxiliaryInfo::V1 { transaction_index } => Some((transaction_index, 0)),
             PersistedAuxiliaryInfo::TimestampNotYetAssignedV1 { transaction_index } => {
-                (transaction_index, 1)
+                Some((transaction_index, 1))
             },
-            PersistedAuxiliaryInfo::None => (0, 0),
+            PersistedAuxiliaryInfo::None => None,
         };
         let session_id = SessionId::txn(
             txn.sender(),
@@ -75,7 +74,6 @@ impl TxnMetadata {
             txn_hash: session_id.txn_hash().to_vec(),
             session_counter: session_id.session_counter(),
             transaction_index,
-            reserved_byte,
         }
     }
 

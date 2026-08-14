@@ -26,8 +26,7 @@ pub(crate) fn seed_extensions() -> NativeExtensions {
     extensions.add(TransactionContextExtension::new(
         TEST_TXN_HASH.to_vec(),
         TEST_SESSION_COUNTER,
-        TEST_TXN_INDEX,
-        TEST_RESERVED_BYTE,
+        Some((TEST_TXN_INDEX, TEST_RESERVED_BYTE)),
     ));
     extensions.add(ObjectContextExtension::new());
     extensions.add(StorageUsageAtEpochBoundary::new(

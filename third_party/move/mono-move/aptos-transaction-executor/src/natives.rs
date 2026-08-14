@@ -49,7 +49,6 @@ pub(crate) fn transaction_extensions(
         txn_data.txn_hash.clone(),
         txn_data.session_counter,
         txn_data.transaction_index,
-        txn_data.reserved_byte,
     ));
     extensions.add(ObjectContextExtension::new());
     extensions.add(StorageUsageAtEpochBoundary::new(
