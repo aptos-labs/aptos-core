@@ -1,0 +1,6 @@
+module 0x42::bad_sort
+
+fun f(x: u64): u64
+    requires x + 1
+    move_loc x
+    ret

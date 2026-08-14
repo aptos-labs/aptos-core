@@ -14,16 +14,16 @@ use crate::{
         boogie_debug_track_local, boogie_debug_track_return, boogie_equality_for_type,
         boogie_field_sel, boogie_field_update, boogie_fun_apply_name, boogie_fun_param_name,
         boogie_function_name, boogie_int_suffix, boogie_make_vec_from_strings,
-        boogie_modifies_memory_name, boogie_native_spec_fun_name, boogie_num_literal,
-        boogie_num_type_base, boogie_reflection_type_info, boogie_reflection_type_name,
-        boogie_resource_memory_name, boogie_spec_fun_name, boogie_struct_field_name,
-        boogie_struct_field_result_fun_name, boogie_struct_field_spec_fun_name, boogie_struct_name,
-        boogie_struct_variant_name, boogie_temp, boogie_temp_from_suffix, boogie_type,
-        boogie_type_for_struct_field, boogie_type_param, boogie_type_suffix,
-        boogie_type_suffix_for_struct, boogie_type_suffix_for_struct_variant,
-        boogie_variant_field_update, boogie_well_formed_check, boogie_well_formed_expr,
-        bv_flag_for_type, compute_evaluator_memory_union, field_bv_flag_global_state,
-        TypeIdentToken,
+        boogie_modifies_memory_name, boogie_native_fun_has_spec_fun, boogie_native_spec_fun_name,
+        boogie_num_literal, boogie_num_type_base, boogie_reflection_type_info,
+        boogie_reflection_type_name, boogie_resource_memory_name, boogie_spec_fun_name,
+        boogie_struct_field_name, boogie_struct_field_result_fun_name,
+        boogie_struct_field_spec_fun_name, boogie_struct_name, boogie_struct_variant_name,
+        boogie_temp, boogie_temp_from_suffix, boogie_type, boogie_type_for_struct_field,
+        boogie_type_param, boogie_type_suffix, boogie_type_suffix_for_struct,
+        boogie_type_suffix_for_struct_variant, boogie_variant_field_update,
+        boogie_well_formed_check, boogie_well_formed_expr, bv_flag_for_type,
+        compute_evaluator_memory_union, field_bv_flag_global_state, TypeIdentToken,
     },
     options::BoogieOptions,
     spec_translator::{LabelInfo, SpecTranslator},
@@ -743,14 +743,6 @@ impl<'env> BoogieTranslator<'env> {
                 if pos > 0 {
                     emit!(self.writer, ", ")
                 }
-                // Captured immutable references are plain values in the prover,
-                // consistent with the elimination of immutable references in the
-                // bytecode pipeline (both at pack sites and in function signatures).
-                let captured_ty = if captured_ty.is_immutable_reference() {
-                    captured_ty.skip_reference()
-                } else {
-                    captured_ty
-                };
                 emit!(
                     self.writer,
                     "p{}_v{}: {}",
@@ -2455,10 +2447,13 @@ impl<'env> BoogieTranslator<'env> {
                 // instead of leaving the result function uninterpreted.  This ensures that
                 // `result_of<native_fun>(args)` in inferred specs is fully constrained.
                 // Only applies when there are no memory parameters — $-spec functions in
-                // native.bpl are pure and do not take memory arguments.
+                // native.bpl are pure and do not take memory arguments — and only for the
+                // natives the prelude actually defines a "$-spec" function for; any other
+                // native's result function stays uninterpreted.
                 let is_native_no_spec = fun_env.is_native()
                     && closure_spec.conditions.is_empty()
-                    && mem_param_decls.is_empty();
+                    && mem_param_decls.is_empty()
+                    && boogie_native_fun_has_spec_fun(&fun_env);
                 let native_spec_call = if is_native_no_spec {
                     let spec_name = boogie_native_spec_fun_name(&fun_env, &info.fun.inst);
                     let call = format!("{}({})", spec_name, input_args.join(", "));
@@ -2638,7 +2633,13 @@ impl<'env> BoogieTranslator<'env> {
                 BehaviorKind::EnsuresOf => matches!(c.kind, ConditionKind::Ensures),
                 // ResultOf/WriteOf are uninterpreted Skolems; the axiom in
                 // `generate_result_of_function_and_axiom` ties them to `ensures_of`.
-                BehaviorKind::ResultOf | BehaviorKind::WriteOf(_) => false,
+                // UnchangedOf/FoldsOf are not supported on function values
+                // (rejected in the spec translator) and have no
+                // spec-condition counterpart.
+                BehaviorKind::ResultOf
+                | BehaviorKind::WriteOf(_)
+                | BehaviorKind::UnchangedOf
+                | BehaviorKind::FoldsOf => false,
             })
             .collect();
 
@@ -2662,7 +2663,10 @@ impl<'env> BoogieTranslator<'env> {
             return match kind {
                 BehaviorKind::RequiresOf | BehaviorKind::EnsuresOf => "true".to_string(),
                 BehaviorKind::AbortsOf => "false".to_string(),
-                BehaviorKind::ResultOf | BehaviorKind::WriteOf(_) => "true".to_string(),
+                BehaviorKind::ResultOf
+                | BehaviorKind::WriteOf(_)
+                | BehaviorKind::UnchangedOf
+                | BehaviorKind::FoldsOf => "true".to_string(),
             };
         }
 
@@ -2724,8 +2728,12 @@ impl<'env> BoogieTranslator<'env> {
                         BehaviorKind::RequiresOf | BehaviorKind::AbortsOf => {
                             format!("p{}", param_idx)
                         },
-                        // ResultOf/WriteOf are uninterpreted — no body translated.
-                        BehaviorKind::ResultOf | BehaviorKind::WriteOf(_) => unreachable!(),
+                        // ResultOf/WriteOf are uninterpreted, UnchangedOf and
+                        // FoldsOf have no spec conditions — no body translated.
+                        BehaviorKind::ResultOf
+                        | BehaviorKind::WriteOf(_)
+                        | BehaviorKind::UnchangedOf
+                        | BehaviorKind::FoldsOf => unreachable!(),
                     };
                     result =
                         result.replace(&format!("$Dereference($t{})", param_idx), &current_value);
@@ -2761,7 +2769,10 @@ impl<'env> BoogieTranslator<'env> {
                     format!("({})", translated.join(" || "))
                 }
             },
-            BehaviorKind::ResultOf | BehaviorKind::WriteOf(_) => return "true".to_string(),
+            BehaviorKind::ResultOf
+            | BehaviorKind::WriteOf(_)
+            | BehaviorKind::UnchangedOf
+            | BehaviorKind::FoldsOf => return "true".to_string(),
         };
 
         // Collect intermediate labels from conditions that need existential wrapping.
@@ -2796,7 +2807,10 @@ impl<'env> BoogieTranslator<'env> {
                         BehaviorKind::RequiresOf => matches!(c.kind, ConditionKind::Requires),
                         BehaviorKind::AbortsOf => matches!(c.kind, ConditionKind::AbortsIf),
                         BehaviorKind::EnsuresOf => matches!(c.kind, ConditionKind::Ensures),
-                        BehaviorKind::ResultOf | BehaviorKind::WriteOf(_) => false,
+                        BehaviorKind::ResultOf
+                        | BehaviorKind::WriteOf(_)
+                        | BehaviorKind::UnchangedOf
+                        | BehaviorKind::FoldsOf => false,
                     };
                     if dominated {
                         return false;

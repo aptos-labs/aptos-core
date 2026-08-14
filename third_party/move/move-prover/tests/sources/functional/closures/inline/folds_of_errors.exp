@@ -1,0 +1,179 @@
+Move prover returns: exiting with compilation errors
+error: cannot resolve `folds_of` for this lambda argument: the lambda combines captured-variable writes or abort conditions with global state access, whose per-iteration evaluation state is not expressible in a loop invariant
+   ┌─ tests/sources/functional/closures/inline/folds_of_errors.move:15:23
+   │
+15 │             invariant folds_of<f>(v, i);
+   │                       ^^^^^^^^^^^^^^^^^
+   ·
+33 │         each_ref(v, |e| sum = sum + *e + R[@0x1].v); // error: capture write combined with global state access
+   │         -------------------------------------------
+   │         │           │
+   │         │           lambda argument
+   │         from a call inlined at this callsite
+
+error: cannot resolve `folds_of` for this lambda argument: the per-iteration effect of the lambda's body cannot be derived exactly
+   ┌─ tests/sources/functional/closures/inline/folds_of_errors.move:15:23
+   │
+15 │                 invariant folds_of<f>(v, i);
+   │                           ^^^^^^^^^^^^^^^^^
+   ·
+41 │ ╭           each_ref(v, |e| {
+   │ │ ╭─────────────────────'
+42 │ │ │             let x = *e;
+43 │ │ │             while (x > 0) {
+44 │ │ │                 x = x - 1;
+45 │ │ │                 sum = sum + 1;
+46 │ │ │             }
+47 │ │ │         }); // error: the per-iteration effect cannot be derived exactly
+   │ ╰─│──────────' from a call inlined at this callsite
+   │   ╰─────────' lambda argument
+
+error: cannot resolve `folds_of` for this lambda argument: the captured variable `acc` must have the `copy` and `drop` abilities, so its value at loop entry can be recorded
+   ┌─ tests/sources/functional/closures/inline/folds_of_errors.move:15:23
+   │
+15 │             invariant folds_of<f>(v, i);
+   │                       ^^^^^^^^^^^^^^^^^
+   ·
+59 │         each_ref(v, |e| acc.v = acc.v + *e); // error: capture must have the copy and drop abilities
+   │         -----------------------------------
+   │         │           │
+   │         │           lambda argument
+   │         from a call inlined at this callsite
+
+error: cannot resolve `folds_of` for this lambda argument: the lambda accumulates into a captured variable through a function call whose effect on the capture cannot be summarized as a value; perform the update directly in the lambda body, use a helper function that returns the new value, or give the callee a functional `ensures` for the `&mut` parameter (e.g. `ensures p == f(old(p), ..)`, with `pragma opaque` and `[abstract]` if stated rather than proven), which the derivation can consume
+   ┌─ tests/sources/functional/closures/inline/folds_of_errors.move:15:23
+   │
+15 │             invariant folds_of<f>(v, i);
+   │                       ^^^^^^^^^^^^^^^^^
+   ·
+81 │         each_ref(v, |e| add_to_relational(&mut sum, *e)); // error: accumulates into a capture through a function call
+   │         ------------------------------------------------
+   │         │           │
+   │         │           lambda argument
+   │         from a call inlined at this callsite
+
+error: cannot resolve `folds_of` for this lambda argument: the lambda accumulates into a captured variable through a function call whose effect on the capture cannot be summarized as a value; perform the update directly in the lambda body, use a helper function that returns the new value, or give the callee a functional `ensures` for the `&mut` parameter (e.g. `ensures p == f(old(p), ..)`, with `pragma opaque` and `[abstract]` if stated rather than proven), which the derivation can consume
+   ┌─ tests/sources/functional/closures/inline/folds_of_errors.move:15:23
+   │
+15 │             invariant folds_of<f>(v, i);
+   │                       ^^^^^^^^^^^^^^^^^
+   ·
+96 │         each_ref(v, |e| add_to_looping(&mut sum, *e)); // error: accumulates into a capture through a function call
+   │         ---------------------------------------------
+   │         │           │
+   │         │           lambda argument
+   │         from a call inlined at this callsite
+
+error: cannot resolve `folds_of` for this lambda argument: the values written to the captured variables cannot be expressed over the iteration's pre-state
+    ┌─ tests/sources/functional/closures/inline/folds_of_errors.move:15:23
+    │
+ 15 │             invariant folds_of<f>(v, i);
+    │                       ^^^^^^^^^^^^^^^^^
+    ·
+115 │         each_ref(v, |_e| set_two(&mut p.x, &mut p.y)); // error: values written to the captures not expressible
+    │         ---------------------------------------------
+    │         │           │
+    │         │           lambda argument
+    │         from a call inlined at this callsite
+
+error: cannot resolve `folds_of` for this lambda argument: the lambda writes 9 captured variables, more than the supported maximum of 8 (the generated fold recursion returns the capture tuple)
+    ┌─ tests/sources/functional/closures/inline/folds_of_errors.move:15:23
+    │
+ 15 │                 invariant folds_of<f>(v, i);
+    │                           ^^^^^^^^^^^^^^^^^
+    ·
+144 │ ╭           each_ref(v, |e| {
+    │ │ ╭─────────────────────'
+145 │ │ │             // error: more captures than the supported maximum
+146 │ │ │             c1 = c1 + *e;
+147 │ │ │             c2 = c2 + *e;
+    · │ │
+154 │ │ │             c9 = c9 + *e;
+155 │ │ │         });
+    │ ╰─│──────────' from a call inlined at this callsite
+    │   ╰─────────' lambda argument
+
+error: cannot resolve `folds_of` for this lambda argument: the lambda writes `acc`, which names a parameter of the enclosing function; copy the parameter into a local variable and capture that instead
+    ┌─ tests/sources/functional/closures/inline/folds_of_errors.move:15:23
+    │
+ 15 │             invariant folds_of<f>(v, i);
+    │                       ^^^^^^^^^^^^^^^^^
+    ·
+163 │         each_ref(v, |e| acc = acc + *e); // error: writes a parameter of the enclosing function
+    │         -------------------------------
+    │         │           │
+    │         │           lambda argument
+    │         from a call inlined at this callsite
+
+error: cannot resolve `folds_of` for this lambda argument: the lambda both writes the captured variable(s) `out` and forwards to the function-typed parameter `f`; the cumulative capture effect cannot be split across the forwarding — perform the capture updates in the lambda eventually bound to `f`, or restate this wrapper without the intermediate lambda
+    ┌─ tests/sources/functional/closures/inline/folds_of_errors.move:15:23
+    │
+ 15 │             invariant folds_of<f>(v, i);
+    │                       ^^^^^^^^^^^^^^^^^
+    ·
+219 │         each_ref(v, |e| vector::push_back(&mut out, f(e))); // error: capture write mixed with forwarding
+    │         --------------------------------------------------
+    │         │           │
+    │         │           lambda argument
+    │         from a call inlined at this callsite
+
+error: cannot resolve `folds_of` for this lambda argument: the lambda forwards to the function-value parameter `f` of a non-inline function: `folds_of` requires the cumulative effect of a concrete lambda, which a function value provides only through inline expansion
+    ┌─ tests/sources/functional/closures/inline/folds_of_errors.move:15:23
+    │
+ 15 │             invariant folds_of<f>(v, i);
+    │                       ^^^^^^^^^^^^^^^^^
+    ·
+230 │         each_ref(v, |e| f(e)); // error: folds_of deferral needs an inline enclosing function
+    │         ---------------------
+    │         │           │
+    │         │           lambda argument
+    │         from a call inlined at this callsite
+
+error: `folds_of` can only be used in a loop invariant
+    ┌─ tests/sources/functional/closures/inline/folds_of_errors.move:122:20
+    │
+122 │                 assert folds_of<f>(v, 1); // error: folds_of can only be used in a loop invariant
+    │                        ^^^^^^^^^^^^^^^^^
+    ·
+128 │ ╭           apply_one(v, |e| {
+    │ │ ╭──────────────────────'
+129 │ │ │             let _ = 1 / *e;
+130 │ │ │         });
+    │ ╰─│──────────' from a call inlined at this callsite
+    │   ╰─────────' lambda argument
+
+error: cannot resolve `folds_of` for this lambda argument: the index function of `folds_of` must produce a literal tuple of the target's 2 argument(s)
+    ┌─ tests/sources/functional/closures/inline/folds_of_errors.move:177:23
+    │
+177 │             invariant folds_of<f>(|j| if (j > 0) (v[j], v[j]) else (v[0], v[0]), i);
+    │                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ·
+185 │         zip_with_self(v, |x, y| sum = sum + x + y);
+    │         ------------------------------------------
+    │         │                │
+    │         │                lambda argument
+    │         from a call inlined at this callsite
+
+error: cannot resolve `folds_of` for this lambda argument: the index function's arguments depend on a captured variable the lambda writes, whose per-iteration value is not expressible
+    ┌─ tests/sources/functional/closures/inline/folds_of_errors.move:198:23
+    │
+198 │             invariant folds_of<f>(|j| k + j, i);
+    │                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+    ·
+206 │         each_off(v, sum, |x| sum = sum + x); // error: index arguments depend on a written capture
+    │         -----------------------------------
+    │         │                │
+    │         │                lambda argument
+    │         from a call inlined at this callsite
+
+error: cannot resolve `folds_of` for this lambda argument: the index function of `folds_of` accesses global state, whose per-iteration evaluation state is not expressible in a loop invariant
+    ┌─ tests/sources/functional/closures/inline/folds_of_errors.move:251:23
+    │
+251 │             invariant folds_of<f>(|_j| wrapped_stateful_index(), i);
+    │                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ·
+258 │         each_stateful_index(n, |_x| {});
+    │         -------------------------------
+    │         │                      │
+    │         │                      lambda argument
+    │         from a call inlined at this callsite

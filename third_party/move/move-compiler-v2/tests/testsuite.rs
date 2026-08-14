@@ -274,8 +274,10 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 .exp_off(Experiment::KEEP_INLINE_FUNS)
                 .lang(LanguageVersion::V2_2)
         },
-        // Tests for inline functions with `pragma opaque` which are retained
-        // (not expanded) in verify mode, with lambda arguments lifted.
+        // Tests for specs on inline functions: functions without function-typed
+        // parameters may carry specs and are compiled in verify mode (with
+        // `pragma opaque` their calls are retained); functions with
+        // function-typed parameters reject specs.
         TestConfig {
             name: "inline-opaque",
             runner: |p| run_test(p, get_config_by_name("inline-opaque")),
@@ -784,20 +786,15 @@ fn run_flow_similar_to_compiler(config: &TestConfig, options: &Options) -> anyho
                 out.push_str("\n============ disassembled file-format ==================\n");
                 out.push_str(&disassemble_compiled_units(&units)?);
             }
-            if options.compile_verify_code {
-                // Mirror `run_move_compiler_to_model`: in verify mode, the bytecode
-                // verifier is skipped since generated code is only translated for
-                // the prover and may contain constructs the VM rejects.
-                out.push_str("\n============ bytecode verification skipped (verify mode) ====\n");
+            // Mirror `run_move_compiler_to_model` and `run_move_compiler`: the
+            // bytecode verifier runs in verify mode as well.
+            let annotated_units = annotate_units(units);
+            if run_bytecode_verifier(&annotated_units, &mut env) {
+                out.push_str("\n============ bytecode verification succeeded ========\n");
             } else {
-                let annotated_units = annotate_units(units);
-                if run_bytecode_verifier(&annotated_units, &mut env) {
-                    out.push_str("\n============ bytecode verification succeeded ========\n");
-                } else {
-                    out.push_str("\n============ bytecode verification failed ========\n");
-                }
-                check_diags(out, &env, options);
+                out.push_str("\n============ bytecode verification failed ========\n");
             }
+            check_diags(out, &env, options);
         }
     }
 

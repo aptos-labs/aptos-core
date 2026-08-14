@@ -34,7 +34,7 @@ NAMESPACE = "replay-verify"
 ZONE = "us-central1-a"
 
 DEFAULT_PVC_ACCESS_MODE = "ReadOnlyMany"  # Default access mode for PVCs
-TESTNET_SNAPSHOT_DISK_SIZE = "25Ti"  # Must be >= the testnet PFN disk size (25Ti as of 2026-07)
+TESTNET_SNAPSHOT_DISK_SIZE = "26Ti"  # Must be >= the testnet PFN disk size (26Ti as of 2026-08)
 MAINNET_SNAPSHOT_DISK_SIZE = "23Ti"  # Must be >= the mainnet PFN disk size (23Ti as of 2026-07)
 
 def get_disk_size_for_snapshot(snapshot_name: str) -> str:

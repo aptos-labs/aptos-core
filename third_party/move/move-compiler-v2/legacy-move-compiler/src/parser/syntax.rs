@@ -2485,6 +2485,8 @@ fn behavior_kind_from_str(s: &str) -> Option<BehaviorKind> {
         "aborts_of" => Some(BehaviorKind::AbortsOf),
         "ensures_of" => Some(BehaviorKind::EnsuresOf),
         "result_of" => Some(BehaviorKind::ResultOf),
+        "unchanged_of" => Some(BehaviorKind::UnchangedOf),
+        "folds_of" => Some(BehaviorKind::FoldsOf),
         _ => None,
     }
 }
@@ -2629,7 +2631,8 @@ fn parse_bare_behavior(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
                 current_token_loc(context.tokens),
                 format!(
                     "expected a behavior predicate keyword \
-                     (requires_of, aborts_of, ensures_of, result_of), found '{}'",
+                     (requires_of, aborts_of, ensures_of, result_of, unchanged_of, folds_of), \
+                     found '{}'",
                     kind_content
                 )
             )

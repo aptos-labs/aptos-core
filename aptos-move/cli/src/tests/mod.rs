@@ -16,6 +16,7 @@ mod compile_script;
 mod decompile;
 mod disassemble;
 mod document;
+mod exchange;
 mod fmt_cmd;
 mod init;
 mod lint;

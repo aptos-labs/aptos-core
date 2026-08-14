@@ -1,0 +1,12 @@
+module 0x42::wrl
+
+fun f(x: u64): u64
+l1: ld_u64 5
+    mut_borrow_loc x
+    write_ref
+    copy_loc x
+    ld_u64 0
+    gt
+    br_true l1
+    move_loc x
+    ret

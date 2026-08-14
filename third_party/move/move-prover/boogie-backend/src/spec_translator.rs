@@ -9,14 +9,15 @@ use crate::{
     boogie_helpers::{
         boogie_address, boogie_address_blob, boogie_behavioral_eval_fun_name,
         boogie_behavioral_fun_result_name, boogie_byte_blob, boogie_choice_fun_name,
-        boogie_closure_pack_name, boogie_declare_global, boogie_field_sel, boogie_field_update,
-        boogie_inst_suffix, boogie_modifies_memory_name, boogie_num_type_base,
-        boogie_reflection_type_info, boogie_reflection_type_is_struct, boogie_reflection_type_name,
-        boogie_resource_memory_name, boogie_spec_fun_name, boogie_spec_var_name,
-        boogie_struct_name, boogie_struct_variant_name, boogie_type, boogie_type_suffix,
-        boogie_value_blob, boogie_variant_field_update, boogie_well_formed_expr, bv_flag_for_type,
-        compute_evaluator_memory_union, MAX_TUPLE_SIZE,
+        boogie_closure_pack_name, boogie_declare_global, boogie_equality_for_type,
+        boogie_field_sel, boogie_field_update, boogie_inst_suffix, boogie_modifies_memory_name,
+        boogie_num_type_base, boogie_reflection_type_info, boogie_reflection_type_is_struct,
+        boogie_reflection_type_name, boogie_resource_memory_name, boogie_spec_fun_name,
+        boogie_spec_var_name, boogie_struct_name, boogie_struct_variant_name, boogie_type,
+        boogie_type_suffix, boogie_value_blob, boogie_variant_field_update,
+        boogie_well_formed_expr, bv_flag_for_type, compute_evaluator_memory_union, MAX_TUPLE_SIZE,
     },
+    bytecode_translator::has_native_equality,
     options::BoogieOptions,
 };
 use itertools::Itertools;
@@ -523,6 +524,109 @@ impl SpecTranslator<'_> {
         }
     }
 
+    /// Emits the Move-value-equality congruence axiom of an uninterpreted
+    /// spec function (see the call site in [`Self::translate_spec_fun`]):
+    ///
+    /// ```text
+    /// axiom (forall p1: T1, p1$eq: T1, p2: T2 :: {f(p1, p2), f(p1$eq, p2)}
+    ///     $IsEqual'T1'(p1, p1$eq) ==> $IsEqual'R'(f(p1, p2), f(p1$eq, p2)));
+    /// ```
+    ///
+    /// duplicating exactly the parameters whose types lack native equality.
+    /// Nothing is emitted when every parameter has native equality, or for
+    /// shapes an uninterpreted function cannot have anyway (memory usage,
+    /// `old(..)`, type reflection, tuple results), guarded defensively.
+    fn generate_uninterpreted_congruence_axiom(
+        &self,
+        fun: &SpecFunDecl,
+        module_env: &ModuleEnv,
+        id: SpecFunId,
+        boogie_name: &str,
+        bv_flag_result: bool,
+    ) {
+        let qid = module_env.get_id().qualified(id);
+        if !self
+            .env
+            .spec_fun_needs_move_equality_congruence(qid.instantiate(self.type_inst.clone()))
+            || fun.uses_old
+            || !fun.used_memory.is_empty()
+            || matches!(fun.result_type, Type::Tuple(_) | Type::Fun(..))
+            // Move equality deliberately ignores ghost fields, but an
+            // uninterpreted spec function can observe them through its
+            // parameter. Congruence over `$IsEqual` would therefore equate
+            // results for inputs whose proof-only state differs and can make
+            // user axioms about those fields inconsistent.
+            || fun.params.iter().any(|Parameter(_, ty, _)| {
+                crate::bytecode_translator::type_has_ghost_transitively(
+                    self.env,
+                    self.inst(ty).skip_reference(),
+                )
+            })
+            || self
+                .env
+                .spec_fun_uses_generic_type_reflection(&qid.instantiate(self.type_inst.clone()))
+        {
+            return;
+        }
+        let global_state = &self
+            .env
+            .get_extension::<GlobalNumberOperationState>()
+            .expect("global number operation state");
+        let param_bv_flag = |i: usize| {
+            global_state
+                .spec_fun_operation_map
+                .get(&(module_env.get_id(), id))
+                .map(|(args, _)| args[i] == Bitwise)
+                .unwrap_or(false)
+        };
+        let mut decls: Vec<String> = vec![];
+        let mut args_a: Vec<String> = vec![];
+        let mut args_b: Vec<String> = vec![];
+        let mut eqs: Vec<String> = vec![];
+        for (i, Parameter(name, ty, _)) in fun.params.iter().enumerate() {
+            let bv_flag = param_bv_flag(i);
+            let ty = self.inst(ty).skip_reference().clone();
+            let name = name.display(module_env.symbol_pool()).to_string();
+            let ty_str = boogie_type(self.env, &ty, bv_flag);
+            decls.push(format!("{}: {}", name, ty_str));
+            args_a.push(name.clone());
+            if has_native_equality(self.env, self.options, &ty) {
+                args_b.push(name);
+            } else {
+                let other = format!("{}$eq", name);
+                decls.push(format!("{}: {}", other, ty_str));
+                eqs.push(format!(
+                    "{}({}, {})",
+                    boogie_equality_for_type(self.env, true, &ty, bv_flag),
+                    name,
+                    other
+                ));
+                args_b.push(other);
+            }
+        }
+        if eqs.is_empty() {
+            return;
+        }
+        let call_a = format!("{}({})", boogie_name, args_a.join(", "));
+        let call_b = format!("{}({})", boogie_name, args_b.join(", "));
+        emitln!(
+            self.writer,
+            "axiom (forall {} :: {{{}, {}}}\n{} ==> {}({}, {}));",
+            decls.join(", "),
+            call_a,
+            call_b,
+            eqs.join(" && "),
+            boogie_equality_for_type(
+                self.env,
+                true,
+                self.inst(&fun.result_type).skip_reference(),
+                bv_flag_result
+            ),
+            call_a,
+            call_b
+        );
+    }
+
     #[allow(clippy::literal_string_with_formatting_args)]
     fn translate_spec_fun(&self, module_env: &ModuleEnv, id: SpecFunId, fun: &SpecFunDecl) {
         if fun.body.is_none() && !fun.uninterpreted {
@@ -838,6 +942,27 @@ impl SpecTranslator<'_> {
                     );
                 }
             }
+            // Congruence over Move value equality: an uninterpreted spec
+            // function denotes a function of Move *values*, but under a
+            // non-extensional vector theory the raw (SMT) equality of a
+            // representation is stronger than Move equality (`$IsEqual`),
+            // so the solver cannot derive `$IsEqual(f(a, ..), f(b, ..))`
+            // from `$IsEqual(a, b)` by congruence closure. Emit the
+            // congruence explicitly for functions recorded while inlining
+            // behavioral predicates and for parameters whose types lack
+            // native equality; parameters with native equality are shared
+            // between the two applications. Restricting this to behavioral
+            // material prevents unrelated verification conditions from
+            // inheriting hundreds of quantified axioms. (Bodied functions do
+            // not need this: their definitions are built from
+            // `$IsEqual`-respecting operations.)
+            self.generate_uninterpreted_congruence_axiom(
+                fun,
+                module_env,
+                id,
+                &boogie_name,
+                bv_flag_result,
+            );
             // Generate axioms from the spec block attached to the spec function
             // TODO(#16256): support general condition kinds, exploration use of `spec_translator` in `move_model`
             self.generate_spec_function_axioms(fun, module_env, boogie_name.clone(), param_list);
@@ -1299,7 +1424,10 @@ impl SpecTranslator<'_> {
                 &self.env.get_node_loc(*node_id),
                 "match not yet implemented",
             ),
-            ExpData::Invalid(_) => panic!("unexpected error expression"),
+            ExpData::Invalid(id) => panic!(
+                "unexpected error expression at {:?}",
+                self.env.get_node_loc(*id)
+            ),
             ExpData::Sequence(_, exp_vec) if exp_vec.len() == 1 => {
                 // Single-element sequence is just a wrapped value.
                 self.translate_exp(exp_vec.first().expect("list has an element"));
@@ -1499,6 +1627,16 @@ impl SpecTranslator<'_> {
             // Operators we introduced in the top level public entry `SpecTranslator::translate`,
             // mapping between Boogies single value domain and our typed world.
             Operation::BoxValue | Operation::UnboxValue => panic!("unexpected box/unbox"),
+
+            // State anchor operations are consumed by spec instrumentation
+            // (and folds-capture anchors by the inliner) and must not reach
+            // the backend.
+            Operation::SaveStateAnchor(..)
+            | Operation::WithStateAnchor(..)
+            | Operation::FoldsCaptureAnchor(..) => self.error(
+                &loc,
+                "unexpected state anchor operation in specification translation",
+            ),
 
             // Internal operators for event stores.
             Operation::EmptyEventStore => emit!(self.writer, "$EmptyEventStore"),
@@ -1727,6 +1865,31 @@ impl SpecTranslator<'_> {
                     self.env.error(
                         &self.env.get_node_loc(node_id),
                         "bug: Operation::Behavior has no arguments",
+                    );
+                    return;
+                }
+                if matches!(kind, BehaviorKind::UnchangedOf) {
+                    // `unchanged_of` over lambda arguments of inline functions
+                    // is substituted by the inliner and never reaches this
+                    // point; any remaining occurrence targets a runtime
+                    // function value, whose write footprint is unknown here.
+                    self.env.error(
+                        &self.env.get_node_loc(node_id),
+                        "`unchanged_of` is currently only supported over lambda \
+                         arguments of inline functions",
+                    );
+                    return;
+                }
+                if matches!(kind, BehaviorKind::FoldsOf) {
+                    // `folds_of` in loop invariants of inline functions over
+                    // lambda arguments is substituted by the inliner and never
+                    // reaches this point; any remaining occurrence targets a
+                    // runtime function value, whose capture-accumulator fold
+                    // cannot be derived here.
+                    self.env.error(
+                        &self.env.get_node_loc(node_id),
+                        "`folds_of` is only supported in loop invariants of \
+                         inline functions over lambda arguments",
                     );
                     return;
                 }
@@ -2093,7 +2256,11 @@ impl SpecTranslator<'_> {
         let uses_old = !union_old_memory.is_empty();
         let current = match kind {
             BehaviorKind::RequiresOf | BehaviorKind::AbortsOf => pre,
-            BehaviorKind::EnsuresOf | BehaviorKind::ResultOf | BehaviorKind::WriteOf(_) => post,
+            BehaviorKind::EnsuresOf
+            | BehaviorKind::ResultOf
+            | BehaviorKind::UnchangedOf
+            | BehaviorKind::FoldsOf
+            | BehaviorKind::WriteOf(_) => post,
         };
         let mut first = true;
         for memory in &union_used_memory {
@@ -2318,7 +2485,11 @@ impl SpecTranslator<'_> {
         let uses_old = !old_memory.is_empty();
         let current = match kind {
             BehaviorKind::RequiresOf | BehaviorKind::AbortsOf => pre,
-            BehaviorKind::EnsuresOf | BehaviorKind::ResultOf | BehaviorKind::WriteOf(_) => post,
+            BehaviorKind::EnsuresOf
+            | BehaviorKind::ResultOf
+            | BehaviorKind::UnchangedOf
+            | BehaviorKind::FoldsOf
+            | BehaviorKind::WriteOf(_) => post,
         };
         let mut first = true;
         for memory in used_memory {
@@ -2402,6 +2573,8 @@ impl SpecTranslator<'_> {
             BehaviorKind::AbortsOf => "aborts_of",
             BehaviorKind::EnsuresOf => "ensures_of",
             BehaviorKind::ResultOf => "result_of",
+            BehaviorKind::UnchangedOf => "unchanged_of",
+            BehaviorKind::FoldsOf => "folds_of",
             BehaviorKind::WriteOf(_) => "write_of",
         };
         let struct_env = self.env.get_struct_qid(memory.to_qualified_id());
@@ -3401,7 +3574,9 @@ impl SpecTranslator<'_> {
                             | BehaviorKind::ResultOf
                             | BehaviorKind::WriteOf(_)
                             | BehaviorKind::RequiresOf
-                            | BehaviorKind::AbortsOf,
+                            | BehaviorKind::AbortsOf
+                            | BehaviorKind::UnchangedOf
+                            | BehaviorKind::FoldsOf,
                             range,
                         ),
                         args,

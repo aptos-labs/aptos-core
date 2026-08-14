@@ -1,0 +1,71 @@
+Move prover returns: exiting with verification errors
+error: unknown assertion failed
+   ┌─ tests/sources/functional/closures/inline/requires_of_state.move:28:13
+   │
+28 │             assert requires_of<f>(x); // error: false at the application for the `false_at_application` caller
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:46: false_at_application
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:50: false_at_application (spec)
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:46: false_at_application
+   =         a = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:22: apply_then_bump
+   =         a' = <redacted>
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:50: false_at_application (spec)
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:24: apply_then_bump
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:28: apply_then_bump
+
+error: unknown assertion failed
+   ┌─ tests/sources/functional/closures/inline/requires_of_state.move:28:13
+   │
+28 │             assert requires_of<f>(x); // error: false at the application for the `false_at_application` caller
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:57: nested_false_at_application
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:68: nested_false_at_application (spec)
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:57: nested_false_at_application
+   =         a = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:22: apply_then_bump
+   =         a' = <redacted>
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:24: apply_then_bump
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:28: apply_then_bump
+
+error: induction case of the loop invariant does not hold
+   ┌─ tests/sources/functional/closures/inline/requires_of_state.move:86:13
+   │
+86 │             invariant forall j in 0..i: requires_of<f>(v[j]); // error: false at entry for the `false_at_entry` caller
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:105: false_at_entry
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:109: false_at_entry (spec)
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:110: false_at_entry (spec)
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:105: false_at_entry
+   =         v = <redacted>
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:74: for_each_bump
+   =         a' = <redacted>
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:75: for_each_bump
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:76: for_each_bump
+   =         n = <redacted>
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:81: for_each_bump
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:82: for_each_bump
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:83: for_each_bump
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:86: for_each_bump
+   =     enter loop, variable(s) i havocked and reassigned
+   =         i = <redacted>
+   =     loop invariant holds at current state
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:82: for_each_bump
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:83: for_each_bump
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:86: for_each_bump
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:77: for_each_bump
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:78: for_each_bump
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:79: for_each_bump
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:80: for_each_bump
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:77: for_each_bump
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:82: for_each_bump
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:83: for_each_bump
+   =     at tests/sources/functional/closures/inline/requires_of_state.move:86: for_each_bump
