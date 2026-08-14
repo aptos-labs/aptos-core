@@ -96,7 +96,7 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun
     };
     let mut extensions = NativeExtensions::new();
     extensions.add(TransactionContextExtension::new(
-        input.session_id.txn_hash().to_vec(),
+        input.session_id.txn_hash(),
         input.session_id.session_counter(),
         transaction_index,
     ));

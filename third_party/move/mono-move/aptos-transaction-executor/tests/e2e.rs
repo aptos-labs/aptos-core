@@ -14,7 +14,7 @@
 // covered by other tests, such as the e2e move tests. Note that the sender's
 // store is masked, so a wrong debit there is not caught.
 
-use aptos_language_e2e_tests::executor::FakeExecutor;
+use aptos_language_e2e_tests::{account::AccountData, executor::FakeExecutor};
 use aptos_types::{
     on_chain_config::{Features, OnChainConfig},
     state_store::StateView,
@@ -72,13 +72,19 @@ fn execute_v2<S: StateView>(state: &S, txn: &SignedTransaction) -> TransactionOu
         .expect("the transaction output materializes")
 }
 
-#[test]
-fn p2p_transfer_matches_v1() {
+/// Fresh genesis with a funded sender (sequence number 10) and recipient.
+fn setup() -> (FakeExecutor, AccountData, AccountData) {
     let mut fx = FakeExecutor::from_head_genesis();
     let alice = fx.create_raw_account_data(1_000_000_000, 10);
     fx.add_account_data(&alice);
     let bob = fx.create_raw_account_data(100_000_000, 0);
     fx.add_account_data(&bob);
+    (fx, alice, bob)
+}
+
+#[test]
+fn p2p_transfer_matches_v1() {
+    let (fx, alice, bob) = setup();
 
     let txn = alice
         .account()
@@ -193,11 +199,7 @@ fn compare_outputs(
 /// epilogue still charges the fee and bumps the sequence number.
 #[test]
 fn p2p_transfer_insufficient_balance_aborts_like_v1() {
-    let mut fx = FakeExecutor::from_head_genesis();
-    let alice = fx.create_raw_account_data(1_000_000_000, 10);
-    fx.add_account_data(&alice);
-    let bob = fx.create_raw_account_data(100_000_000, 0);
-    fx.add_account_data(&bob);
+    let (fx, alice, bob) = setup();
 
     let txn = alice
         .account()
@@ -245,11 +247,7 @@ fn p2p_transfer_insufficient_balance_aborts_like_v1() {
 /// failure cleanup — including the abort location.
 #[test]
 fn p2p_transfer_draining_fee_payer_aborts_like_v1() {
-    let mut fx = FakeExecutor::from_head_genesis();
-    let alice = fx.create_raw_account_data(1_000_000_000, 10);
-    fx.add_account_data(&alice);
-    let bob = fx.create_raw_account_data(100_000_000, 0);
-    fx.add_account_data(&bob);
+    let (fx, alice, bob) = setup();
 
     // Send the entire balance: nothing is left for the fee at epilogue time.
     let txn = alice
@@ -298,9 +296,7 @@ fn nonexistent_entry_function_kept_like_v1() {
     use aptos_types::transaction::{EntryFunction, TransactionPayload};
     use move_core_types::{ident_str, language_storage::ModuleId};
 
-    let mut fx = FakeExecutor::from_head_genesis();
-    let alice = fx.create_raw_account_data(1_000_000_000, 10);
-    fx.add_account_data(&alice);
+    let (fx, alice, _bob) = setup();
 
     let txn = alice
         .account()
@@ -342,11 +338,7 @@ fn nonexistent_entry_function_kept_like_v1() {
 // real status instead of an invariant violation.
 #[test]
 fn extra_signers_rejected_like_v1() {
-    let mut fx = FakeExecutor::from_head_genesis();
-    let alice = fx.create_raw_account_data(1_000_000_000, 10);
-    fx.add_account_data(&alice);
-    let bob = fx.create_raw_account_data(100_000_000, 0);
-    fx.add_account_data(&bob);
+    let (fx, alice, bob) = setup();
 
     // `aptos_account::transfer` takes one `&signer`; supply two senders.
     let txn = alice
@@ -395,11 +387,7 @@ fn extra_signers_rejected_like_v1() {
 fn sequential_execution_applies_outputs() {
     use aptos_transaction_simulation::{DeltaStateStore, SimulationStateStore};
 
-    let mut fx = FakeExecutor::from_head_genesis();
-    let alice = fx.create_raw_account_data(1_000_000_000, 10);
-    fx.add_account_data(&alice);
-    let bob = fx.create_raw_account_data(100_000_000, 0);
-    fx.add_account_data(&bob);
+    let (fx, alice, bob) = setup();
 
     let transfer = |seq| {
         alice

@@ -18,7 +18,7 @@ use mono_move_core::{
 // functions) is not modeled; the legacy VM aborts those natives with
 // ETRANSACTION_CONTEXT_NOT_AVAILABLE.
 pub struct TransactionContextExtension {
-    txn_hash: Vec<u8>,
+    txn_hash: [u8; 32],
     /// AUIDs issued so far in this transaction.
     auid_counter: u64,
     /// Per-session counter feeding the low bits of the monotonic counter.
@@ -35,7 +35,7 @@ pub struct TransactionContextExtension {
 
 impl TransactionContextExtension {
     pub fn new(
-        txn_hash: Vec<u8>,
+        txn_hash: [u8; 32],
         session_counter: u8,
         transaction_index: Option<(u32, u8)>,
     ) -> Self {

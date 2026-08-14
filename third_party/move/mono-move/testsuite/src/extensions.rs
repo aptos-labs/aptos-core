@@ -24,7 +24,7 @@ pub(crate) const TEST_RESERVED_BYTE: u8 = 0;
 pub(crate) fn seed_extensions() -> NativeExtensions {
     let mut extensions = NativeExtensions::new();
     extensions.add(TransactionContextExtension::new(
-        TEST_TXN_HASH.to_vec(),
+        TEST_TXN_HASH,
         TEST_SESSION_COUNTER,
         Some((TEST_TXN_INDEX, TEST_RESERVED_BYTE)),
     ));

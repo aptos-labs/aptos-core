@@ -21,7 +21,7 @@ pub(crate) struct TxnMetadata {
     pub replay_protector: ReplayProtector,
     /// Seeds unique-address generation. Derived like the legacy VM's, from the
     /// payload session's id, so generated addresses match.
-    pub txn_hash: Vec<u8>,
+    pub txn_hash: [u8; 32],
     /// The payload session's counter, one term of
     /// `monotonically_increasing_number`; matches the legacy VM's.
     pub session_counter: u8,
@@ -47,21 +47,19 @@ impl TxnMetadata {
             txn.payload().script_hash(),
             txn.expiration_timestamp_secs(),
         );
+        let authenticator = txn.authenticator_ref();
         Self {
             sender: txn.sender(),
-            fee_payer: txn.authenticator_ref().fee_payer_address(),
-            secondary_signers: txn.authenticator().secondary_signer_addresses(),
-            sender_auth_key: txn
-                .authenticator()
+            fee_payer: authenticator.fee_payer_address(),
+            secondary_signers: authenticator.secondary_signer_addresses(),
+            sender_auth_key: authenticator
                 .sender()
                 .authentication_proof()
                 .optional_auth_key(),
-            fee_payer_auth_key: txn
-                .authenticator()
+            fee_payer_auth_key: authenticator
                 .fee_payer_signer()
                 .and_then(|signer| signer.authentication_proof().optional_auth_key()),
-            secondary_auth_keys: txn
-                .authenticator()
+            secondary_auth_keys: authenticator
                 .secondary_signers()
                 .iter()
                 .map(|account_auth| account_auth.authentication_proof().optional_auth_key())
@@ -71,7 +69,7 @@ impl TxnMetadata {
             expiration_timestamp_secs: txn.expiration_timestamp_secs(),
             chain_id: txn.chain_id().id(),
             replay_protector: txn.replay_protector(),
-            txn_hash: session_id.txn_hash().to_vec(),
+            txn_hash: session_id.txn_hash(),
             session_counter: session_id.session_counter(),
             transaction_index,
         }
