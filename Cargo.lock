@@ -13015,7 +13015,6 @@ dependencies = [
  "mono-move-core",
  "mono-move-natives",
  "mono-move-runtime",
- "move-core-types",
  "thiserror 1.0.69",
 ]
 
