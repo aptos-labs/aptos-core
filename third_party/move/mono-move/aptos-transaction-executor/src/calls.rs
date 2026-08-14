@@ -66,6 +66,7 @@ pub(crate) fn place_args(
     let missing_signer = || anyhow!("not enough signers for the function");
     // Signers must lead the parameter list, as the legacy VM requires.
     let mut seen_argument = false;
+    let mut signer_params = 0;
     for (slot, ty) in func.param_slots.iter().zip(params) {
         let offset = slot.offset.0;
         let view = view_type(*ty);
@@ -76,6 +77,7 @@ pub(crate) fn place_args(
             if seen_argument {
                 bail!("a signer parameter follows an argument");
             }
+            signer_params += 1;
         } else {
             seen_argument = true;
         }
@@ -136,9 +138,11 @@ pub(crate) fn place_args(
     if args.next().is_some() {
         bail!("too many arguments for the function");
     }
-    // Unused signers are fine: like the legacy VM, a function taking fewer
-    // signer parameters than the transaction has signers ignores the rest
-    // (e.g. an entry function without a `&signer`).
+    // Like the legacy VM: a function with signer parameters requires exactly
+    // that many signers; one without ignores them.
+    if signer_params > 0 && signers.next().is_some() {
+        bail!("more signers than the function's signer parameters");
+    }
     Ok(())
 }
 

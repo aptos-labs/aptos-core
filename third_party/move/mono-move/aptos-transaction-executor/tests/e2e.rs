@@ -28,6 +28,7 @@ use mono_move_aptos_state_view_providers::{
 };
 use mono_move_aptos_transaction_executor::{production_natives, AptosTransactionExecutor};
 use mono_move_global_context::GlobalContext;
+use move_core_types::vm_status::StatusCode;
 use std::collections::BTreeMap;
 
 /// Event types whose payload embeds gas amounts.
@@ -332,6 +333,59 @@ fn nonexistent_entry_function_kept_like_v1() {
     assert_eq!(v1_output.status(), v2_output.status());
 
     compare_outputs(&v1_output, &v2_output, *alice.address());
+}
+
+/// A multi-agent transaction supplying two senders to a one-signer entry
+/// function is rejected, like on the legacy VM.
+//
+// TODO(correctness): compare exact statuses once argument rejection gets a
+// real status instead of an invariant violation.
+#[test]
+fn extra_signers_rejected_like_v1() {
+    let mut fx = FakeExecutor::from_head_genesis();
+    let alice = fx.create_raw_account_data(1_000_000_000, 10);
+    fx.add_account_data(&alice);
+    let bob = fx.create_raw_account_data(100_000_000, 0);
+    fx.add_account_data(&bob);
+
+    // `aptos_account::transfer` takes one `&signer`; supply two senders.
+    let txn = alice
+        .account()
+        .transaction()
+        .payload(aptos_cached_packages::aptos_stdlib::aptos_account_transfer(
+            *bob.address(),
+            1_000,
+        ))
+        .sequence_number(10)
+        .gas_unit_price(100)
+        .max_gas_amount(1_000_000)
+        .secondary_signers(vec![bob.account().clone()])
+        .sign_multi_agent();
+
+    let v1_output = fx.execute_transaction(txn.clone());
+    assert!(
+        matches!(
+            v1_output.status(),
+            TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+                StatusCode::NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH
+            )))
+        ),
+        "v1 did not reject the signer-count mismatch: {:?}",
+        v1_output.status()
+    );
+
+    let v2_output = execute_v2(fx.get_state_view(), &txn);
+    assert!(
+        matches!(
+            v2_output.status(),
+            TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(_))
+        ),
+        "v2 did not reject the signer-count mismatch: {:?}",
+        v2_output.status()
+    );
+
+    // Write sets are not compared: the gas divergence leaves v1 with fee
+    // writes v2 lacks.
 }
 
 /// Two dependent transfers executed sequentially, each transaction's outputs
