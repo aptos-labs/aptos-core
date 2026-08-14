@@ -242,6 +242,7 @@ members = [
     "third_party/move/move-model/bytecode",
     "third_party/move/move-model/bytecode-test-utils",
     "third_party/move/move-model/bytecode/ast-generator-tests",
+    "third_party/move/move-model/exchange",
     "third_party/move/move-prover",
     "third_party/move/move-prover/boogie-backend",
     "third_party/move/move-prover/bytecode-pipeline",
@@ -932,6 +933,7 @@ move-docgen = { path = "third_party/move/tools/move-docgen" }
 move-ir-types = { path = "third_party/move/move-ir/types" }
 move-linter = { path = "third_party/move/tools/move-linter" }
 move-model = { path = "third_party/move/move-model" }
+move-model-exchange = { path = "third_party/move/move-model/exchange" }
 move-package = { path = "third_party/move/tools/move-package" }
 move-package-cache = { path = "third_party/move/tools/move-package-cache" }
 move-package-manifest = { path = "third_party/move/tools/move-package-manifest" }
