@@ -42,11 +42,29 @@ pub struct ReachingDefState {
 #[derive(Default)]
 pub struct ReachingDefAnnotation(BTreeMap<CodeOffset, ReachingDefState>);
 
-pub struct ReachingDefProcessor {}
+pub struct ReachingDefProcessor {
+    /// Whether copies of mutable references may be alias-propagated. The
+    /// prophecy reference model turns every `&mut`-to-`&mut` assignment into a
+    /// reborrow whose handles carry independent current values, so propagating
+    /// a use of the copy to the source would read a diverged handle; the
+    /// write-back (path) model keeps the propagation, which its copy coherence
+    /// relies on.
+    propagate_mut_refs: bool,
+}
 
 impl ReachingDefProcessor {
     pub fn new() -> Box<Self> {
-        Box::new(ReachingDefProcessor {})
+        Box::new(ReachingDefProcessor {
+            propagate_mut_refs: true,
+        })
+    }
+
+    /// A variant for the prophecy reference model: `&mut` copies are reborrows
+    /// with their own state and are never alias-propagated.
+    pub fn new_no_mut_ref_propagation() -> Box<Self> {
+        Box::new(ReachingDefProcessor {
+            propagate_mut_refs: false,
+        })
     }
 
     /// Returns Some(temp, def) if temp has a unique reaching definition and None otherwise.
@@ -114,9 +132,19 @@ impl ReachingDefProcessor {
             .filter_map(|bc| match bc {
                 Call(_, _, Operation::BorrowLoc, srcs, _) => Some(srcs[0]),
                 Call(_, _, Operation::WriteBack(BorrowNode::LocalRoot(src), ..), ..)
-                | Call(_, _, Operation::IsParent(BorrowNode::LocalRoot(src), ..), ..) => Some(*src),
+                | Call(_, _, Operation::IsParent(BorrowNode::LocalRoot(src), ..), ..)
+                | Call(_, _, Operation::ProphecyBorrow(BorrowNode::LocalRoot(src), ..), ..)
+                | Call(_, _, Operation::ProphecySyncCurrent(BorrowNode::LocalRoot(src), ..), ..)
+                | Call(_, _, Operation::ProphecySyncFinal(BorrowNode::LocalRoot(src), ..), ..) => {
+                    Some(*src)
+                },
                 Call(_, _, Operation::WriteBack(BorrowNode::Reference(src), ..), ..)
-                | Call(_, _, Operation::IsParent(BorrowNode::Reference(src), ..), ..) => Some(*src),
+                | Call(_, _, Operation::IsParent(BorrowNode::Reference(src), ..), ..)
+                | Call(_, _, Operation::ProphecyBorrow(BorrowNode::Reference(src), ..), ..)
+                | Call(_, _, Operation::ProphecySyncCurrent(BorrowNode::Reference(src), ..), ..)
+                | Call(_, _, Operation::ProphecySyncFinal(BorrowNode::Reference(src), ..), ..) => {
+                    Some(*src)
+                },
                 _ => None,
             })
             .collect()
@@ -136,6 +164,7 @@ impl FunctionTargetProcessor for ReachingDefProcessor {
             let analyzer = ReachingDefAnalysis {
                 _target: FunctionTarget::new(func_env, &data),
                 borrowed_locals: self.borrowed_locals(&data.code),
+                propagate_mut_refs: self.propagate_mut_refs,
             };
             let block_state_map = analyzer.analyze_function(
                 ReachingDefState {
@@ -173,6 +202,7 @@ impl FunctionTargetProcessor for ReachingDefProcessor {
 struct ReachingDefAnalysis<'a> {
     _target: FunctionTarget<'a>,
     borrowed_locals: BTreeSet<TempIndex>,
+    propagate_mut_refs: bool,
 }
 
 impl ReachingDefAnalysis<'_> {}
@@ -189,7 +219,16 @@ impl TransferFunctions for ReachingDefAnalysis<'_> {
         match instr {
             Assign(_, dest, src, _) => {
                 state.kill(*dest);
-                if !self.borrowed_locals.contains(dest) && !self.borrowed_locals.contains(src) {
+                // Under the prophecy model `&mut` assignments are reborrows (renames
+                // arise only later, in `normalize_exits`' merged-exit moves), so
+                // redirecting a later use from the copy to the source would address
+                // a diverged handle.
+                let excluded_mut_ref = !self.propagate_mut_refs
+                    && self._target.get_local_type(*dest).is_mutable_reference();
+                if !excluded_mut_ref
+                    && !self.borrowed_locals.contains(dest)
+                    && !self.borrowed_locals.contains(src)
+                {
                     state.def_alias(*dest, *src);
                 }
             },
@@ -249,13 +288,6 @@ impl ReachingDefState {
         // ensure that the previous def is killed
         assert!(!self.map.contains_key(&dest));
 
-        // cascade the definition
-        for defs in self.map.values_mut() {
-            if defs.contains(&Def::Alias(dest)) {
-                defs.insert(Def::Alias(src));
-            }
-        }
-
         // update the new alias
         self.map.entry(dest).or_default().insert(Def::Alias(src));
     }
@@ -263,6 +295,23 @@ impl ReachingDefState {
     fn kill(&mut self, dest: TempIndex) {
         self.map.remove(&dest);
         self.havoced.remove(&dest);
+        // A redefinition of `dest` invalidates every alias to it recorded for other
+        // temps: their values were copied from the overwritten definition, and a
+        // later use would propagate to the redefined temp and read the wrong value.
+        // (Source-level reassignments arrive as `Assign`s from fresh temps;
+        // pass-emitted code redefines temps directly via `Load`/`Call` dests.) The
+        // whole entry is removed, not the one alias: a multi-element set stems from a
+        // join, so a surviving element holds only on some paths; and removal, unlike
+        // an emptied set, survives the join — union would resurrect an empty set.
+        let stale: Vec<TempIndex> = self
+            .map
+            .iter()
+            .filter(|(_, defs)| defs.contains(&Def::Alias(dest)))
+            .map(|(temp, _)| *temp)
+            .collect();
+        for temp in stale {
+            self.map.remove(&temp);
+        }
     }
 
     fn havoc(&mut self, dest: TempIndex) {
@@ -315,4 +364,58 @@ pub fn format_reaching_def_annotation(
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn propagated(state: &ReachingDefState, temp: TempIndex) -> TempIndex {
+        ReachingDefProcessor::get_propagated_local(temp, state)
+    }
+
+    #[test]
+    fn kill_invalidates_aliases_to_redefined_temp() {
+        // saved := a; a := <load/call>; use saved  — must NOT propagate to a.
+        let mut state = ReachingDefState::default();
+        state.def_alias(1, 0); // saved(1) := a(0)
+        assert_eq!(propagated(&state, 1), 0);
+        state.kill(0); // a redefined
+        assert_eq!(propagated(&state, 1), 1);
+    }
+
+    #[test]
+    fn kill_invalidates_alias_chains() {
+        // y := x; z := y; x := <load>; use z — must stop at y, not reach x.
+        let mut state = ReachingDefState::default();
+        state.def_alias(1, 0); // y(1) := x(0)
+        state.def_alias(2, 1); // z(2) := y(1)
+        assert_eq!(propagated(&state, 2), 0);
+        state.kill(0);
+        assert_eq!(propagated(&state, 2), 1);
+    }
+
+    #[test]
+    fn join_preserves_kill_of_stale_alias() {
+        // Path A: copy := x intact. Path B: x redefined after the copy.
+        // After the join the alias must not survive (it only holds on path A).
+        let mut a = ReachingDefState::default();
+        a.def_alias(1, 0);
+        let mut b = ReachingDefState::default();
+        b.def_alias(1, 0);
+        b.kill(0);
+        a.join(&b);
+        assert_eq!(propagated(&a, 1), 1);
+    }
+
+    #[test]
+    fn joined_alias_sets_do_not_propagate() {
+        // y aliases x on one path and w on the other; neither may propagate.
+        let mut a = ReachingDefState::default();
+        a.def_alias(1, 0);
+        let mut b = ReachingDefState::default();
+        b.def_alias(1, 2);
+        a.join(&b);
+        assert_eq!(propagated(&a, 1), 1);
+    }
 }

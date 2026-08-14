@@ -12,8 +12,10 @@ error: post-condition does not hold
    =         pool = <redacted>
    =         addr = <redacted>
    =     at tests/sources/regression/vector_theory_boogie_array.move:7: f1
+   =         pool = <redacted>
    =         idx = <redacted>
    =     at tests/sources/regression/vector_theory_boogie_array.move:8: f1
+   =         pool = <redacted>
    =     at tests/sources/regression/vector_theory_boogie_array.move:6: f1
    =         pool = <redacted>
    =     at tests/sources/regression/vector_theory_boogie_array.move:11: f1 (spec)

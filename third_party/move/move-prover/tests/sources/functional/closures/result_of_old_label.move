@@ -20,7 +20,7 @@ module 0x42::result_of_old_label {
     }
     spec Reader {
         modifies_of<f> *;
-        invariant forall a: address: !aborts_of<f>(a);
+        invariant forall S in *, a: address: S |~ !aborts_of<f>(a);
     }
 
     #[persistent]

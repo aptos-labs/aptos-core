@@ -1,0 +1,59 @@
+Move prover returns: exiting with verification errors
+error: unknown assertion failed
+   ┌─ tests/sources/functional/prophecy_observe_index.move:26:13
+   │
+26 │             assert x == 100; // error: intended failure guards against vacuity
+   │             ^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/prophecy_observe_index.move:14: observe_vec_elem
+   =         v = <redacted>
+   =     at tests/sources/functional/prophecy_observe_index.move:15: observe_vec_elem
+   =         e = <redacted>
+   =     at tests/sources/functional/prophecy_observe_index.move:16: observe_vec_elem
+   =         e = <redacted>
+   =     at tests/sources/functional/prophecy_observe_index.move:18: observe_vec_elem
+   =     at tests/sources/functional/prophecy_observe_index.move:19: observe_vec_elem
+   =     at tests/sources/functional/prophecy_observe_index.move:20: observe_vec_elem
+   =     at tests/sources/functional/prophecy_observe_index.move:22: observe_vec_elem
+   =         e = <redacted>
+   =     at tests/sources/functional/prophecy_observe_index.move:23: observe_vec_elem
+   =         x = <redacted>
+   =     at tests/sources/functional/prophecy_observe_index.move:25: observe_vec_elem
+   =     at tests/sources/functional/prophecy_observe_index.move:26: observe_vec_elem
+
+error: unknown assertion failed
+   ┌─ tests/sources/functional/prophecy_observe_index.move:42:13
+   │
+42 │             assert v[0].f == 100; // error: intended failure guards against vacuity
+   │             ^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/prophecy_observe_index.move:33: observe_elem_field
+   =         v = <redacted>
+   =     at tests/sources/functional/prophecy_observe_index.move:34: observe_elem_field
+   =     at tests/sources/functional/prophecy_observe_index.move:35: observe_elem_field
+   =         g = <redacted>
+   =     at tests/sources/functional/prophecy_observe_index.move:36: observe_elem_field
+   =         g = <redacted>
+   =     at tests/sources/functional/prophecy_observe_index.move:38: observe_elem_field
+   =     at tests/sources/functional/prophecy_observe_index.move:40: observe_elem_field
+   =         g = <redacted>
+   =     at tests/sources/functional/prophecy_observe_index.move:42: observe_elem_field
+
+error: unknown assertion failed
+   ┌─ tests/sources/functional/prophecy_observe_index.move:57:13
+   │
+57 │             assert table::spec_get(t, 1) == 100; // error: intended failure guards against vacuity
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/prophecy_observe_index.move:47: observe_table_elem
+   =         t = <redacted>
+   =     at tests/sources/functional/prophecy_observe_index.move:48: observe_table_elem
+   =     at tests/sources/functional/prophecy_observe_index.move:49: observe_table_elem
+   =         e = <redacted>
+   =     at tests/sources/functional/prophecy_observe_index.move:50: observe_table_elem
+   =         e = <redacted>
+   =     at tests/sources/functional/prophecy_observe_index.move:52: observe_table_elem
+   =     at tests/sources/functional/prophecy_observe_index.move:54: observe_table_elem
+   =         e = <redacted>
+   =     at tests/sources/functional/prophecy_observe_index.move:56: observe_table_elem
+   =     at tests/sources/functional/prophecy_observe_index.move:57: observe_table_elem

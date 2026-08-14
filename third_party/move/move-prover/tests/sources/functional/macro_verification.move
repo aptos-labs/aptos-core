@@ -1,3 +1,4 @@
+// separate_baseline: path
 // flag: --trace
 
 // CVC5 does currently not terminate on this:

@@ -1,0 +1,12 @@
+Move prover returns: exiting with compilation errors
+error: data invariant must not depend on a free state: a behavioral predicate must be bound to a state variable via `S |~ ...` where S is introduced by an enclosing state quantifier (`forall S in *:` or `exists S in *:`)
+   ┌─ tests/sources/functional/closures/data_inv_free_state.move:15:9
+   │
+15 │         invariant forall s: signer: !aborts_of<f>(s); // error: free state
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: data invariant must not depend on a free state: a behavioral predicate must be bound to a state variable via `S |~ ...` where S is introduced by an enclosing state quantifier (`forall S in *:` or `exists S in *:`)
+   ┌─ tests/sources/functional/closures/data_inv_free_state.move:23:9
+   │
+23 │         invariant forall s: signer: wraps(g, s); // error: free state behind a wrapper
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

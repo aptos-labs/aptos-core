@@ -13,13 +13,14 @@
 //! When the function already has a single trailing `Ret`, no transformation is
 //! applied — the existing exit is already unified.
 
+use crate::options::ProverOptions;
 use itertools::Itertools;
 use move_model::{ast::TempIndex, exp_generator::ExpGenerator, model::FunctionEnv};
 use move_stackless_bytecode::{
     function_data_builder::FunctionDataBuilder,
     function_target::FunctionData,
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
-    stackless_bytecode::{AssignKind, Bytecode},
+    stackless_bytecode::{AssignKind, Bytecode, Operation},
 };
 
 pub struct NormalizeExitsProcessor {}
@@ -52,6 +53,8 @@ impl FunctionTargetProcessor for NormalizeExitsProcessor {
             return data;
         }
 
+        let options = ProverOptions::get(func_env.module_env.env);
+        let prophecy_refs = !options.path_refs && !options.inference;
         let mut builder = FunctionDataBuilder::new(func_env, data);
         let ret_locals: Vec<TempIndex> = builder
             .data
@@ -69,8 +72,33 @@ impl FunctionTargetProcessor for NormalizeExitsProcessor {
                 Bytecode::Ret(id, results) => {
                     builder.set_loc_from_attr(id);
                     for (i, r) in ret_locals.iter().copied().enumerate() {
-                        builder
-                            .emit_with(|id| Bytecode::Assign(id, r, results[i], AssignKind::Move));
+                        let src = results[i];
+                        let assign_id = builder.new_attr();
+                        builder.emit(Bytecode::Assign(assign_id, r, src, AssignKind::Move));
+                        let is_mut_ref = builder
+                            .get_target()
+                            .get_local_type(src)
+                            .is_mutable_reference();
+                        if prophecy_refs && is_mut_ref {
+                            if results[i + 1..].contains(&src) {
+                                // Not the source's last use (a returned `&mut`
+                                // parameter also handed back as its own out-value):
+                                // the translator reborrows this assign, and the
+                                // resolve chains the source's obligation to the fresh
+                                // prophecy — sharing one prophecy between two resolved
+                                // handles would pin it to two values.
+                                builder.emit_with(|id| {
+                                    Bytecode::Call(id, vec![], Operation::Resolve, vec![src], None)
+                                });
+                            } else {
+                                // Last use: a *final reborrow*. The return temp
+                                // inherits the binding, prophecy included (the
+                                // translator emits a plain copy); no resolve — the
+                                // caller pins the prophecy where the returned
+                                // reference dies.
+                                builder.data.prophecy_rename_assigns.insert(assign_id);
+                            }
+                        }
                     }
                     builder.emit_with(|id| Bytecode::Jump(id, ret_label));
                 },

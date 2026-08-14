@@ -1,0 +1,36 @@
+Move prover returns: exiting with verification errors
+error: data invariant does not hold
+   ┌─ tests/sources/functional/data_inv_cond_field_global.move:13:9
+   │
+13 │         invariant x > 0;
+   │         ^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/data_inv_cond_field_global.move:20: violates
+   =         a = <redacted>
+   =         c = <redacted>
+   =     at tests/sources/functional/data_inv_cond_field_global.move:21: violates
+   =         r = <redacted>
+   =     at tests/sources/functional/data_inv_cond_field_global.move:22: violates
+   =         r = <redacted>
+   =     at tests/sources/functional/data_inv_cond_field_global.move:22: violates
+   =         r = <redacted>
+   =     at tests/sources/functional/data_inv_cond_field_global.move:13
+
+error: data invariant does not hold
+   ┌─ tests/sources/functional/data_inv_cond_field_global.move:32:9
+   │
+32 │         invariant a <= b;
+   │         ^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/data_inv_cond_field_global.move:35: seq_violates
+   =         x = <redacted>
+   =         y = <redacted>
+   =     at tests/sources/functional/data_inv_cond_field_global.move:36: seq_violates
+   =         c = <redacted>
+   =     at tests/sources/functional/data_inv_cond_field_global.move:37: seq_violates
+   =         c = <redacted>
+   =         <redacted> = <redacted>
+   =     at tests/sources/functional/data_inv_cond_field_global.move:38: seq_violates
+   =         c = <redacted>
+   =         <redacted> = <redacted>
+   =     at tests/sources/functional/data_inv_cond_field_global.move:32

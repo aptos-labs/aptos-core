@@ -1,3 +1,4 @@
+// separate_baseline: path
 module 0x42::TestInvariants {
     spec module {
         pragma verify = true;

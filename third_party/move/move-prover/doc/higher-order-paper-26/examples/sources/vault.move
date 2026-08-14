@@ -14,8 +14,8 @@ module defi::vault {
     struct Strategy(|FungibleAsset|FungibleAsset) has store, copy, drop;
     spec Strategy {
         modifies_of<self.0> *;
-        invariant forall input: FungibleAsset, result: FungibleAsset:
-            ensures_of<self.0>(input, result) ==> result.amount >= input.amount;
+        invariant forall S in *, input: FungibleAsset, result: FungibleAsset:
+            S.. |~ ensures_of<self.0>(input, result) ==> result.amount >= input.amount;
     }
 
     struct Vault has key {

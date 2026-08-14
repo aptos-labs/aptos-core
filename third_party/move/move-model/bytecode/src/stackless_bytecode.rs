@@ -294,6 +294,37 @@ pub enum Operation {
     UnpackRefDeep,
     PackRefDeep,
 
+    // Prophecy memory model (the default; WriteBack/IsParent serve `--path-refs`).
+    // ProphecyBorrow marks a borrow creation, carrying the lender node and edge;
+    // Resolve marks a dying reference whose prophecy is fulfilled (assume current ==
+    // final); ResolveReturn marks a returned reference, resolved only standalone.
+    // See move-prover/doc/dev/prophecies/prophecy_model.md, §3.2.
+    ProphecyBorrow(BorrowNode, BorrowEdge),
+    Resolve,
+    ResolveReturn,
+    /// Marks the global-state transition of a resolved global borrow (emitted where
+    /// the borrow dies, after its `Resolve`): here update invariants are asserted.
+    /// The single source — the reference written into the resource — anchors the
+    /// marker to its defining `BorrowGlobal` site(s), where the `old(mem)` snapshots
+    /// are placed. Generates no code.
+    ProphecyCommitGlobal(QualifiedInstId<StructId>),
+    /// Re-pins an exclusively borrowed global resource slot after an intervening
+    /// call under the prophecy model, with sources `[child, addr]`:
+    /// `mem := ResourceUpdate(mem, addr, child->f)`. Restores the eager update in
+    /// case the callee havoced the memory — no non-aborting callee can change the
+    /// borrowed slot itself. Not a state transition for invariant purposes.
+    ProphecyRepin(QualifiedInstId<StructId>),
+    /// Prophecy-model observation sync: conditionally installs the borrowing
+    /// reference's *current* value into its lender, so an observation naming the
+    /// lender (an in-code spec or a loop invariant) sees the borrow's current
+    /// state instead of the eagerly-installed prophecy. Sources are
+    /// `[child, flag]`, plus the saved borrow address for a `GlobalRoot` lender;
+    /// the flag is true exactly when this borrow site reached the observation.
+    ProphecySyncCurrent(BorrowNode, BorrowEdge),
+    /// Restores the eager update (the *final* value, `child->f`) into the lender
+    /// after the observation. Same operands as `ProphecySyncCurrent`.
+    ProphecySyncFinal(BorrowNode, BorrowEdge),
+
     // Get shortcut
     GetField(ModuleId, StructId, Vec<Type>, usize),
     GetVariantField(ModuleId, StructId, Vec<Symbol>, Vec<Type>, usize),
@@ -360,6 +391,13 @@ impl Operation {
             Operation::PackRef => false,
             Operation::UnpackRefDeep => false,
             Operation::PackRefDeep => false,
+            Operation::ProphecyBorrow(..) => false,
+            Operation::Resolve => false,
+            Operation::ResolveReturn => false,
+            Operation::ProphecyCommitGlobal(..) => false,
+            Operation::ProphecyRepin(..) => false,
+            Operation::ProphecySyncCurrent(..) => false,
+            Operation::ProphecySyncFinal(..) => false,
             Operation::CastU8 => true,
             Operation::CastU16 => true,
             Operation::CastU32 => true,
@@ -796,6 +834,27 @@ impl Bytecode {
                 map(true, f, srcs),
                 map_abort(f, aa),
             ),
+            Call(attr, _, ProphecyBorrow(node, edge), srcs, aa) => Call(
+                attr,
+                vec![],
+                ProphecyBorrow(map_node(f, node), edge),
+                map(true, f, srcs),
+                map_abort(f, aa),
+            ),
+            Call(attr, _, ProphecySyncCurrent(node, edge), srcs, aa) => Call(
+                attr,
+                vec![],
+                ProphecySyncCurrent(map_node(f, node), edge),
+                map(true, f, srcs),
+                map_abort(f, aa),
+            ),
+            Call(attr, _, ProphecySyncFinal(node, edge), srcs, aa) => Call(
+                attr,
+                vec![],
+                ProphecySyncFinal(map_node(f, node), edge),
+                map(true, f, srcs),
+                map_abort(f, aa),
+            ),
             Call(attr, dests, IsParent(node, edge), srcs, aa) => Call(
                 attr,
                 map(false, f, dests),
@@ -900,6 +959,17 @@ impl Bytecode {
                     WriteBack(node, edge) => {
                         WriteBack(node.instantiate(params), edge.instantiate(params))
                     },
+                    ProphecyBorrow(node, edge) => {
+                        ProphecyBorrow(node.instantiate(params), edge.instantiate(params))
+                    },
+                    ProphecyCommitGlobal(mem) => ProphecyCommitGlobal(mem.instantiate_ref(params)),
+                    ProphecyRepin(mem) => ProphecyRepin(mem.instantiate_ref(params)),
+                    ProphecySyncCurrent(node, edge) => {
+                        ProphecySyncCurrent(node.instantiate(params), edge.instantiate(params))
+                    },
+                    ProphecySyncFinal(node, edge) => {
+                        ProphecySyncFinal(node.instantiate(params), edge.instantiate(params))
+                    },
                     // others
                     _ => op.clone(),
                 };
@@ -951,10 +1021,19 @@ impl Bytecode {
         };
 
         match self {
-            Assign(_, dest, _, _) => {
+            Assign(_, dest, src, _) => {
                 if func_target.get_local_type(*dest).is_mutable_reference() {
-                    // reference assignment completely distorts the reference (value + pointer)
-                    (vec![], vec![(*dest, true)])
+                    // Reference assignment completely distorts the reference (value +
+                    // pointer). If the source is a mutable reference as well, its value is
+                    // distorted too: under the prophecy reference model the assignment is a
+                    // reborrow which relinks the source to a fresh final value. (Under the
+                    // path model such copies are eliminated by copy propagation before this
+                    // analysis is consulted, so the extra target is vacuous there.)
+                    let mut mut_targets = vec![(*dest, true)];
+                    if func_target.get_local_type(*src).is_mutable_reference() {
+                        mut_targets.push((*src, false));
+                    }
+                    (vec![], mut_targets)
                 } else {
                     // value assignment
                     (vec![*dest], vec![])
@@ -970,6 +1049,19 @@ impl Bytecode {
             },
             Call(_, _, Operation::WriteBack(Reference(dest), ..), _, aa) => {
                 // write-back to a reference only distorts the value, but not the pointer itself
+                (add_abort(vec![], aa), vec![(*dest, false)])
+            },
+            Call(_, _, Operation::ProphecyBorrow(LocalRoot(dest), ..), _, aa)
+            | Call(_, _, Operation::ProphecySyncCurrent(LocalRoot(dest), ..), _, aa)
+            | Call(_, _, Operation::ProphecySyncFinal(LocalRoot(dest), ..), _, aa) => {
+                // eager prophecy update / observation sync of a local lender distorts its value
+                (add_abort(vec![*dest], aa), vec![])
+            },
+            Call(_, _, Operation::ProphecyBorrow(Reference(dest), ..), _, aa)
+            | Call(_, _, Operation::ProphecySyncCurrent(Reference(dest), ..), _, aa)
+            | Call(_, _, Operation::ProphecySyncFinal(Reference(dest), ..), _, aa) => {
+                // eager prophecy update / observation sync of a reference lender distorts the
+                // value, not the pointer
                 (add_abort(vec![], aa), vec![(*dest, false)])
             },
             Call(_, _, Operation::WriteRef, srcs, aa) => {
@@ -1461,6 +1553,36 @@ impl fmt::Display for OperationDisplay<'_> {
                 node.display(self.func_target),
                 edge.display(self.func_target.global_env())
             )?,
+            ProphecyBorrow(node, edge) => write!(
+                f,
+                "prophecy_borrow[{}{}]",
+                node.display(self.func_target),
+                edge.display(self.func_target.global_env())
+            )?,
+            Resolve => write!(f, "resolve")?,
+            ResolveReturn => write!(f, "resolve_return")?,
+            ProphecySyncCurrent(node, edge) => write!(
+                f,
+                "prophecy_sync_current[{}{}]",
+                node.display(self.func_target),
+                edge.display(self.func_target.global_env())
+            )?,
+            ProphecySyncFinal(node, edge) => write!(
+                f,
+                "prophecy_sync_final[{}{}]",
+                node.display(self.func_target),
+                edge.display(self.func_target.global_env())
+            )?,
+            ProphecyCommitGlobal(mem) => {
+                let ty = Type::Struct(mem.module_id, mem.id, mem.inst.to_owned());
+                let tctx = TypeDisplayContext::new(self.func_target.global_env());
+                write!(f, "prophecy_commit_global[{}]", ty.display(&tctx))?
+            },
+            ProphecyRepin(mem) => {
+                let ty = Type::Struct(mem.module_id, mem.id, mem.inst.to_owned());
+                let tctx = TypeDisplayContext::new(self.func_target.global_env());
+                write!(f, "prophecy_repin[{}]", ty.display(&tctx))?
+            },
 
             Havoc(kind) => {
                 write!(f, "havoc[{}]", match kind {

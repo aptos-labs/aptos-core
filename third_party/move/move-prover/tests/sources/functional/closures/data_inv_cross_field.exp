@@ -1,0 +1,13 @@
+Move prover returns: exiting with verification errors
+error: data invariant does not hold
+   ┌─ tests/sources/functional/closures/data_inv_cross_field.move:14:9
+   │
+14 │ ╭         invariant forall Q in *, x: u64:
+15 │ │             Q |~ (!aborts_of<f>(x) && !aborts_of<g>(x) ==>
+16 │ │                 result_of<g>(x) >= result_of<f>(x));
+   │ ╰────────────────────────────────────────────────────^
+   │
+   =     at tests/sources/functional/closures/data_inv_cross_field.move:43: store_violates
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/data_inv_cross_field.move:44: store_violates
+   =     at tests/sources/functional/closures/data_inv_cross_field.move:14

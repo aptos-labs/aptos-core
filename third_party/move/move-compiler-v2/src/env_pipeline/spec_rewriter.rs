@@ -28,7 +28,7 @@ use log::debug;
 use move_model::{
     ast::{
         ConditionKind, Exp, ExpData, FrameSpec, FunParamAccessOf, GlobalInvariant, MemoryRange,
-        Operation, SpecBlockTarget, SpecFunDecl, VisitorPosition,
+        Operation, Spec, SpecBlockTarget, SpecFunDecl, VisitorPosition,
     },
     exp_rewriter::ExpRewriterFunctions,
     metadata::LanguageVersion,
@@ -213,158 +213,22 @@ pub fn run_spec_rewriter(env: &mut GlobalEnv) {
     targets.write_to_env(env);
 
     // Now that all functions are defined, compute transitive callee and used memory,
-    // as well as `uses_old` and `old_memory` for dual-state spec funs.
-    // Since specification functions can be recursive we compute the strongly-connected
-    // components first and then process each in bottom-up order.
-    let mut graph: DiGraphMap<QualifiedId<SpecFunId>, ()> = DiGraphMap::new();
-    let spec_funs = env
-        .get_modules()
-        .flat_map(|m| {
-            m.get_spec_funs()
-                .map(|(id, _)| m.get_id().qualified(*id))
-                .collect_vec()
-        })
-        .collect_vec();
-    for qid in spec_funs {
-        graph.add_node(qid);
-        let decl = env.get_spec_fun(qid);
-        let has_mut_params = decl
-            .params
-            .iter()
-            .any(|Parameter(_, ty, _)| ty.is_mutable_reference());
-        let (initial_callees, initial_usage, direct_uses_old, direct_old_memory) =
-            if let Some(def) = &decl.body {
-                let callees = def.called_spec_funs(env);
-                for callee in &callees {
-                    graph.add_edge(qid, callee.to_qualified_id(), ());
-                }
-                let usage = def.directly_used_memory(env);
-                // Detect direct old() usage and collect old_memory
-                let (direct_uses_old, direct_old_memory) = compute_direct_old_usage(def, env);
-                (callees, usage, direct_uses_old, direct_old_memory)
-            } else {
-                Default::default()
-            };
+    // as well as `uses_old` and `old_memory` for dual-state spec funs, together with
+    // the spec memory of Move functions used by behavioral predicates. The two are
+    // mutually recursive (a spec fun body may contain a behavioral predicate over a
+    // function whose spec conditions in turn call spec functions), so they are
+    // computed as one combined fixpoint.
+    compute_transitive_spec_memory(env);
 
-        // If user-declared modifies/reads exist, derive memory from them
-        let has_user_decl = decl
-            .frame_spec
-            .as_ref()
-            .is_some_and(|fs| !fs.modifies_targets.is_empty() || !fs.reads_targets.is_empty());
-        let (final_usage, final_uses_old, final_old_memory) = if has_user_decl {
-            let frame = decl.frame_spec.as_ref().unwrap();
-            let mut spec_usage = BTreeSet::new();
-            let mut spec_old_memory = BTreeSet::new();
-            // modifies targets → used_memory + old_memory
-            for target in &frame.modifies_targets {
-                if let ExpData::Call(id, Operation::Global(_), _) = target.as_ref() {
-                    let ty = env.get_node_type(*id);
-                    let ty = ty.skip_reference();
-                    if let Type::Struct(mid, sid, inst) = ty {
-                        let qid = mid.qualified_inst(*sid, inst.clone());
-                        spec_usage.insert(qid.clone());
-                        spec_old_memory.insert(qid);
-                    }
-                }
-            }
-            // reads targets → used_memory only (already resolved to struct IDs)
-            for qid in &frame.reads_targets {
-                spec_usage.insert(qid.clone());
-            }
-            // Also include old() usage detected from the body itself (e.g., a spec
-            // fun with `reads R` that uses `old(R[a])` in its body).
-            spec_old_memory.extend(direct_old_memory.iter().cloned());
-            let spec_uses_old = !spec_old_memory.is_empty() || direct_uses_old || has_mut_params;
-
-            // For funs with body, validate that body-derived memory is covered
-            if decl.body.is_some() {
-                for mem in &initial_usage {
-                    if !spec_usage.contains(mem) {
-                        env.error(
-                            &decl.loc,
-                            &format!(
-                                "spec fun body accesses `{}` which is not covered by \
-                                 its modifies/reads declaration",
-                                env.display(mem)
-                            ),
-                        );
-                    }
-                }
-            }
-            (spec_usage, spec_uses_old, spec_old_memory)
-        } else {
-            (
-                initial_usage,
-                direct_uses_old || has_mut_params,
-                direct_old_memory,
-            )
-        };
-
-        let decl_mut = env.get_spec_fun_mut(qid);
-        decl_mut.callees = initial_callees;
-        decl_mut.used_memory = final_usage;
-        decl_mut.uses_old = final_uses_old;
-        decl_mut.old_memory = final_old_memory;
-    }
-    for scc in petgraph::algo::kosaraju_scc(&graph) {
-        // Within each cycle, the transitive usage is the union of the transitive
-        // usage of each member.
-        let mut transitive_callees = BTreeSet::new();
-        let mut transitive_usage = BTreeSet::new();
-        let mut transitive_uses_old = false;
-        let mut transitive_old_memory = BTreeSet::new();
-        for qid in &scc {
-            let decl = env.get_spec_fun(*qid);
-            // Add direct usage.
-            transitive_callees.extend(decl.callees.iter().cloned());
-            transitive_usage.extend(decl.used_memory.iter().cloned());
-            if decl.uses_old {
-                transitive_uses_old = true;
-            }
-            transitive_old_memory.extend(decl.old_memory.iter().cloned());
-            // Add indirect usage
-            for callee in &decl.callees {
-                let callee_decl = env.get_spec_fun(callee.to_qualified_id());
-                transitive_callees.extend(
-                    callee_decl
-                        .callees
-                        .iter()
-                        .map(|id| id.clone().instantiate(&callee.inst)),
-                );
-                transitive_usage.extend(
-                    callee_decl
-                        .used_memory
-                        .iter()
-                        .map(|mem| mem.clone().instantiate(&callee.inst)),
-                );
-                if callee_decl.uses_old {
-                    transitive_uses_old = true;
-                }
-                transitive_old_memory.extend(
-                    callee_decl
-                        .old_memory
-                        .iter()
-                        .map(|mem| mem.clone().instantiate(&callee.inst)),
-                );
-            }
-        }
-        // Store result back
-        for qid in scc {
-            let decl_mut = env.get_spec_fun_mut(qid);
-            decl_mut.callees.clone_from(&transitive_callees);
-            decl_mut.used_memory.clone_from(&transitive_usage);
-            decl_mut.uses_old = decl_mut.uses_old || transitive_uses_old;
-            decl_mut.old_memory.clone_from(&transitive_old_memory);
-        }
-    }
-
-    // Compute spec memory for behavioral predicates.
-    // For each function, derive (used_memory, old_memory) from its spec conditions.
-    // Also populate access_of entries with derived memory.
-    compute_behavioral_predicate_memory(env);
+    // Derive memory for struct-field access_of entries.
+    compute_struct_field_access_of_memory(env);
 
     // Validate that closures passed to functions with access_of respect the limits.
     validate_closure_access_of_compliance(env);
+
+    // Reject state-labeled spec function calls whose callee transitively
+    // contains a behavioral predicate over a function-typed value (fail closed).
+    check_state_labeled_spec_fun_calls(env);
 
     // Last, process invariants
     for module in env.get_modules() {
@@ -375,6 +239,113 @@ pub fn run_spec_rewriter(env: &mut GlobalEnv) {
         }
     }
     collect_global_invariants_to_env(env)
+}
+
+/// Rejects state-labeled calls of spec functions whose body (transitively)
+/// contains a behavioral predicate over a function-typed value. A state label
+/// attaches only to the call operation and does not distribute into the
+/// callee's body (see `exp_builder::propagate_state_labels`); the labeled state
+/// reaches the body only through the callee's memory parameters. For a
+/// predicate over a concrete-function closure literal the target's spec memory
+/// is folded into the callee's `used_memory`/`old_memory` (see
+/// `compute_transitive_spec_memory`), so the label threads through. For a
+/// predicate over a function-typed value the memory footprint (the evaluator
+/// memory union) is only known per instantiation at monomorphization time, so
+/// the predicate would silently be evaluated at the free/ambient state instead
+/// of the labeled one.
+fn check_state_labeled_spec_fun_calls(env: &GlobalEnv) {
+    let check_node = |e: &ExpData| {
+        if let ExpData::Call(id, Operation::SpecFunction(mid, fid, range), _) = e {
+            if !range.is_default() {
+                let qid = mid.qualified(*fid);
+                let mut visited = BTreeSet::new();
+                if spec_fun_transitively_contains_fun_value_behavior(env, qid, &mut visited) {
+                    env.error(
+                        &env.get_node_loc(*id),
+                        &format!(
+                            "state label cannot be applied to a call of `{}`: its body \
+                             (transitively) contains a behavioral predicate over a \
+                             function-typed value, whose memory footprint is only known \
+                             per instantiation, and a state label does not distribute \
+                             into called spec functions — the predicate would be \
+                             evaluated at a free state. Apply the state label to the \
+                             behavioral predicate directly, or use a concrete function \
+                             as the predicate's target",
+                            env.get_spec_fun(qid).name.display(env.symbol_pool()),
+                        ),
+                    );
+                }
+            }
+        }
+    };
+    let check_exp = |exp: &ExpData| {
+        exp.visit_pre_order(&mut |e| {
+            check_node(e);
+            true
+        })
+    };
+    let check_spec = |spec: &Spec| {
+        spec.visit_positions(&mut |pos, e| {
+            if matches!(pos, VisitorPosition::Pre) {
+                check_node(e);
+            }
+            Some(())
+        })
+    };
+    for module in env.get_modules() {
+        if !module.is_target() {
+            continue;
+        }
+        check_spec(&module.get_spec());
+        for struct_env in module.get_structs() {
+            check_spec(&struct_env.get_spec());
+        }
+        for fun in module.get_functions() {
+            check_spec(&fun.get_spec());
+            if let Some(def) = fun.get_def() {
+                def.visit_inline_specs(&mut |spec| {
+                    check_spec(spec);
+                    true
+                });
+            }
+        }
+        for (_, decl) in module.get_spec_funs() {
+            if let Some(body) = &decl.body {
+                check_exp(body);
+            }
+            check_spec(&decl.spec.borrow());
+        }
+    }
+}
+
+/// Whether the spec function's body — or transitively any called spec
+/// function's body — contains a behavioral predicate over a function-typed
+/// value (anything but a concrete-function closure literal), of any memory
+/// range: an outer label on the call never distributes into the body, and such
+/// a predicate's memory is not part of the callee's memory parameters, so it
+/// would leave slots at the ambient state.
+fn spec_fun_transitively_contains_fun_value_behavior(
+    env: &GlobalEnv,
+    qid: QualifiedId<SpecFunId>,
+    visited: &mut BTreeSet<QualifiedId<SpecFunId>>,
+) -> bool {
+    visited.insert(qid)
+        && env.get_spec_fun(qid).body.as_ref().is_some_and(|body| {
+            body.any(&mut |e| match e {
+                ExpData::Call(_, Operation::Behavior(..), args) => !matches!(
+                    args.first().map(|a| a.as_ref()),
+                    Some(ExpData::Call(_, Operation::Closure(..), _))
+                ),
+                ExpData::Call(_, Operation::SpecFunction(mid, fid, _), _) => {
+                    spec_fun_transitively_contains_fun_value_behavior(
+                        env,
+                        mid.qualified(*fid),
+                        visited,
+                    )
+                },
+                _ => false,
+            })
+        })
 }
 
 /// Entry point to generate spec functions from lambda expressions to be expanded during inlining
@@ -808,11 +779,176 @@ pub fn derive_memory_from_access_of(
     (used_memory, old_memory)
 }
 
-/// Computes and stores memory footprints for behavioral predicates.
-/// - For each `access_of` entry on functions: derives `used_memory`/`old_memory` from specifiers
-/// - For each function with spec conditions: derives `spec_used_memory`/`spec_old_memory` from conditions
-fn compute_behavioral_predicate_memory(env: &mut GlobalEnv) {
-    // Collect all function IDs first to avoid borrow issues
+/// A node in the combined memory-dependency graph: either a spec function or the
+/// specification of a Move function. Their memory footprints are mutually
+/// recursive: a spec fun body may contain a behavioral predicate over a function
+/// whose spec conditions in turn call spec functions.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+enum MemNode {
+    SpecFun(QualifiedId<SpecFunId>),
+    Fun(QualifiedId<FunId>),
+}
+
+/// A memory dependency of a `MemNode`, carrying the call-site instantiation.
+enum MemDep {
+    /// A call of a spec function.
+    SpecFunCall(QualifiedInstId<SpecFunId>),
+    /// A behavioral predicate over a concrete-function closure literal. For
+    /// two-state kinds (`ensures_of`/`result_of`/`write_of`) the target's old
+    /// memory becomes dual-state for the container as well; one-state kinds
+    /// (`requires_of`/`aborts_of`) evaluate all slots at a single state.
+    Behavior {
+        fun: QualifiedId<FunId>,
+        inst: Vec<Type>,
+        two_state: bool,
+    },
+}
+
+impl MemDep {
+    fn target_node(&self) -> MemNode {
+        match self {
+            MemDep::SpecFunCall(callee) => MemNode::SpecFun(callee.to_qualified_id()),
+            MemDep::Behavior { fun, .. } => MemNode::Fun(*fun),
+        }
+    }
+}
+
+/// Collects behavioral predicates over concrete-function closure literals in
+/// `exp` as memory dependencies. Predicates over function-typed values are
+/// skipped: their memory footprint (the evaluator memory union) is only known
+/// per instantiation at monomorphization time; state-labeled calls of spec
+/// functions containing them are rejected by
+/// `check_state_labeled_spec_fun_calls`.
+fn collect_behavior_closure_deps(env: &GlobalEnv, exp: &ExpData, deps: &mut Vec<MemDep>) {
+    exp.visit_post_order(&mut |e: &ExpData| {
+        if let ExpData::Call(_, Operation::Behavior(kind, _), args) = e {
+            if let Some(ExpData::Call(closure_id, Operation::Closure(mid, fid, _), _)) =
+                args.first().map(|a| a.as_ref())
+            {
+                deps.push(MemDep::Behavior {
+                    fun: mid.qualified(*fid),
+                    inst: env.get_node_instantiation(*closure_id),
+                    two_state: kind.is_two_state(),
+                });
+            }
+        }
+        true
+    });
+}
+
+/// Computes transitive memory usage (`used_memory`, `old_memory`, `uses_old`) for
+/// all spec functions, together with the spec memory of all Move functions
+/// (`spec_used_memory`, `spec_old_memory`, `spec_uses_old`, used by behavioral
+/// predicates), and the derived memory of function-parameter `access_of` entries.
+///
+/// Both kinds of nodes are seeded with their direct usage and then closed over a
+/// combined dependency graph (spec fun calls and behavioral predicates over
+/// concrete functions) by processing strongly-connected components bottom-up.
+fn compute_transitive_spec_memory(env: &mut GlobalEnv) {
+    let mut graph: DiGraphMap<MemNode, ()> = DiGraphMap::new();
+    let mut deps: BTreeMap<MemNode, Vec<MemDep>> = BTreeMap::new();
+
+    // Seed spec functions with the direct usage of their bodies (or their
+    // user-declared modifies/reads frame).
+    let spec_funs = env
+        .get_modules()
+        .flat_map(|m| {
+            m.get_spec_funs()
+                .map(|(id, _)| m.get_id().qualified(*id))
+                .collect_vec()
+        })
+        .collect_vec();
+    for qid in spec_funs {
+        let node = MemNode::SpecFun(qid);
+        graph.add_node(node);
+        let decl = env.get_spec_fun(qid);
+        let has_mut_params = decl
+            .params
+            .iter()
+            .any(|Parameter(_, ty, _)| ty.is_mutable_reference());
+        let mut node_deps = vec![];
+        let (initial_callees, initial_usage, direct_uses_old, direct_old_memory) =
+            if let Some(def) = &decl.body {
+                let callees = def.called_spec_funs(env);
+                node_deps.extend(callees.iter().cloned().map(MemDep::SpecFunCall));
+                let usage = def.directly_used_memory(env);
+                // Detect direct old() usage and collect old_memory
+                let (direct_uses_old, direct_old_memory) = compute_direct_old_usage(def, env);
+                collect_behavior_closure_deps(env, def, &mut node_deps);
+                (callees, usage, direct_uses_old, direct_old_memory)
+            } else {
+                Default::default()
+            };
+
+        // If user-declared modifies/reads exist, derive memory from them
+        let has_user_decl = decl
+            .frame_spec
+            .as_ref()
+            .is_some_and(|fs| !fs.modifies_targets.is_empty() || !fs.reads_targets.is_empty());
+        let (final_usage, final_uses_old, final_old_memory) = if has_user_decl {
+            let frame = decl.frame_spec.as_ref().unwrap();
+            let mut spec_usage = BTreeSet::new();
+            let mut spec_old_memory = BTreeSet::new();
+            // modifies targets → used_memory + old_memory
+            for target in &frame.modifies_targets {
+                if let ExpData::Call(id, Operation::Global(_), _) = target.as_ref() {
+                    let ty = env.get_node_type(*id);
+                    let ty = ty.skip_reference();
+                    if let Type::Struct(mid, sid, inst) = ty {
+                        let qid = mid.qualified_inst(*sid, inst.clone());
+                        spec_usage.insert(qid.clone());
+                        spec_old_memory.insert(qid);
+                    }
+                }
+            }
+            // reads targets → used_memory only (already resolved to struct IDs)
+            for qid in &frame.reads_targets {
+                spec_usage.insert(qid.clone());
+            }
+            // Also include old() usage detected from the body itself (e.g., a spec
+            // fun with `reads R` that uses `old(R[a])` in its body).
+            spec_old_memory.extend(direct_old_memory.iter().cloned());
+            let spec_uses_old = !spec_old_memory.is_empty() || direct_uses_old || has_mut_params;
+
+            // For funs with body, validate that body-derived memory is covered
+            if decl.body.is_some() {
+                for mem in &initial_usage {
+                    if !spec_usage.contains(mem) {
+                        env.error(
+                            &decl.loc,
+                            &format!(
+                                "spec fun body accesses `{}` which is not covered by \
+                                 its modifies/reads declaration",
+                                env.display(mem)
+                            ),
+                        );
+                    }
+                }
+            }
+            (spec_usage, spec_uses_old, spec_old_memory)
+        } else {
+            (
+                initial_usage,
+                direct_uses_old || has_mut_params,
+                direct_old_memory,
+            )
+        };
+
+        for dep in &node_deps {
+            graph.add_edge(node, dep.target_node(), ());
+        }
+        deps.insert(node, node_deps);
+
+        let decl_mut = env.get_spec_fun_mut(qid);
+        decl_mut.callees = initial_callees;
+        decl_mut.used_memory = final_usage;
+        decl_mut.uses_old = final_uses_old;
+        decl_mut.old_memory = final_old_memory;
+    }
+
+    // Seed Move functions with the direct memory usage of their spec conditions
+    // and access_of declarations. Also derives and stores the memory of
+    // function-parameter access_of entries.
     let fun_ids: Vec<QualifiedId<FunId>> = env
         .get_modules()
         .flat_map(|m| {
@@ -821,10 +957,11 @@ fn compute_behavioral_predicate_memory(env: &mut GlobalEnv) {
                 .collect_vec()
         })
         .collect_vec();
-
     for fun_id in fun_ids {
+        let node = MemNode::Fun(fun_id);
+        graph.add_node(node);
         // Collect memory info while borrowing env immutably via fun_env
-        let (param_updates, spec_used, spec_old, spec_uses_old) = {
+        let (param_updates, spec_used, spec_old, spec_uses_old, node_deps) = {
             let fun_env = env.get_function(fun_id);
             let mut param_updates: Vec<(
                 usize,
@@ -836,42 +973,29 @@ fn compute_behavioral_predicate_memory(env: &mut GlobalEnv) {
                 param_updates.push((i, used, old));
             }
 
-            // Compute spec condition memory
+            // Compute spec condition memory. Called spec functions and behavioral
+            // predicates over concrete functions are recorded as dependencies;
+            // their memory is folded in by the SCC pass below.
             let spec = fun_env.get_spec();
             let mut spec_used = BTreeSet::new();
             let mut spec_old = BTreeSet::new();
+            let mut node_deps = vec![];
             for cond in &spec.conditions {
-                spec_used.extend(cond.exp.directly_used_memory(env));
-                for e in &cond.additional_exps {
-                    spec_used.extend(e.directly_used_memory(env));
-                }
-                let (uses_old, old_mem) = compute_direct_old_usage(&cond.exp, env);
-                if uses_old {
-                    spec_old.extend(old_mem);
-                }
-                for e in &cond.additional_exps {
-                    let (uses_old, old_mem) = compute_direct_old_usage(e, env);
+                for exp in std::iter::once(&cond.exp).chain(&cond.additional_exps) {
+                    spec_used.extend(exp.directly_used_memory(env));
+                    let (uses_old, old_mem) = compute_direct_old_usage(exp, env);
                     if uses_old {
                         spec_old.extend(old_mem);
                     }
-                }
-            }
-            // Include old_memory from spec functions called in conditions.
-            // If `ensures helper(a)` and `helper` uses `old()`, the function's
-            // spec_old must include helper's old_memory for correct pre-state snapshots.
-            for cond in &spec.conditions {
-                for exp in std::iter::once(&cond.exp).chain(&cond.additional_exps) {
                     exp.visit_post_order(&mut |e: &ExpData| {
                         if let ExpData::Call(id, Operation::SpecFunction(mid, fid, _), _) = e {
-                            let inst = &env.get_node_instantiation(*id);
-                            let module = env.get_module(*mid);
-                            let sfun = module.get_spec_fun(*fid);
-                            for mem in &sfun.old_memory {
-                                spec_old.insert(mem.clone().instantiate(inst));
-                            }
+                            node_deps.push(MemDep::SpecFunCall(
+                                mid.qualified_inst(*fid, env.get_node_instantiation(*id)),
+                            ));
                         }
                         true
                     });
+                    collect_behavior_closure_deps(env, exp, &mut node_deps);
                 }
             }
             // Include modifies_of/reads_of memory in spec_used/spec_old so that SaveMem
@@ -886,17 +1010,138 @@ fn compute_behavioral_predicate_memory(env: &mut GlobalEnv) {
                 .iter()
                 .any(|Parameter(_, ty, _)| ty.is_mutable_reference());
             let spec_uses_old = !spec_old.is_empty() || has_mut_params;
-            (param_updates, spec_used, spec_old, spec_uses_old)
+            (param_updates, spec_used, spec_old, spec_uses_old, node_deps)
         };
 
         // Store results (env is no longer borrowed by fun_env)
+        for dep in &node_deps {
+            graph.add_edge(node, dep.target_node(), ());
+        }
+        deps.insert(node, node_deps);
         for (i, used, old) in param_updates {
             env.set_fun_param_access_of_memory(fun_id, i, used, old);
         }
         env.set_function_spec_memory(fun_id, spec_used, spec_old, spec_uses_old);
     }
 
-    // Process struct field access declarations
+    // Close the seeded sets over the dependency graph. Since both spec functions
+    // and function specs can be (mutually) recursive we compute the
+    // strongly-connected components first and then process each in bottom-up
+    // order.
+    for scc in petgraph::algo::kosaraju_scc(&graph) {
+        // Within each cycle, the transitive usage is the union of the transitive
+        // usage of each member.
+        let mut transitive_callees = BTreeSet::new();
+        let mut transitive_usage = BTreeSet::new();
+        let mut transitive_uses_old = false;
+        let mut transitive_old_memory = BTreeSet::new();
+        for node in &scc {
+            // Add direct usage.
+            match node {
+                MemNode::SpecFun(qid) => {
+                    let decl = env.get_spec_fun(*qid);
+                    transitive_callees.extend(decl.callees.iter().cloned());
+                    transitive_usage.extend(decl.used_memory.iter().cloned());
+                    if decl.uses_old {
+                        transitive_uses_old = true;
+                    }
+                    transitive_old_memory.extend(decl.old_memory.iter().cloned());
+                },
+                MemNode::Fun(qid) => {
+                    let fun_env = env.get_function(*qid);
+                    transitive_usage.extend(fun_env.get_spec_used_memory().iter().cloned());
+                    transitive_old_memory.extend(fun_env.get_spec_old_memory().iter().cloned());
+                },
+            }
+            // Add indirect usage
+            for dep in deps.get(node).map(|d| d.as_slice()).unwrap_or_default() {
+                match dep {
+                    MemDep::SpecFunCall(callee) => {
+                        let callee_decl = env.get_spec_fun(callee.to_qualified_id());
+                        transitive_callees.extend(
+                            callee_decl
+                                .callees
+                                .iter()
+                                .map(|id| id.clone().instantiate(&callee.inst)),
+                        );
+                        transitive_usage.extend(
+                            callee_decl
+                                .used_memory
+                                .iter()
+                                .map(|mem| mem.clone().instantiate(&callee.inst)),
+                        );
+                        // The callee's `uses_old` flag makes a containing spec fun
+                        // dual-state, but not a function spec, whose dual-state
+                        // treatment is keyed on non-empty `spec_old_memory` (and
+                        // `&mut` params) only.
+                        if callee_decl.uses_old && matches!(node, MemNode::SpecFun(_)) {
+                            transitive_uses_old = true;
+                        }
+                        transitive_old_memory.extend(
+                            callee_decl
+                                .old_memory
+                                .iter()
+                                .map(|mem| mem.clone().instantiate(&callee.inst)),
+                        );
+                    },
+                    MemDep::Behavior {
+                        fun,
+                        inst,
+                        two_state,
+                    } => {
+                        let fun_env = env.get_function(*fun);
+                        transitive_usage.extend(
+                            fun_env
+                                .get_spec_used_memory()
+                                .iter()
+                                .chain(fun_env.get_spec_old_memory().iter())
+                                .map(|mem| mem.clone().instantiate(inst)),
+                        );
+                        if *two_state {
+                            transitive_old_memory.extend(
+                                fun_env
+                                    .get_spec_old_memory()
+                                    .iter()
+                                    .map(|mem| mem.clone().instantiate(inst)),
+                            );
+                        }
+                    },
+                }
+            }
+        }
+        // A two-state behavioral predicate can contribute old memory without a
+        // `uses_old` carrier; derive the flag from the final set.
+        transitive_uses_old = transitive_uses_old || !transitive_old_memory.is_empty();
+        // Store result back
+        for node in scc {
+            match node {
+                MemNode::SpecFun(qid) => {
+                    let decl_mut = env.get_spec_fun_mut(qid);
+                    decl_mut.callees.clone_from(&transitive_callees);
+                    decl_mut.used_memory.clone_from(&transitive_usage);
+                    decl_mut.uses_old = decl_mut.uses_old || transitive_uses_old;
+                    decl_mut.old_memory.clone_from(&transitive_old_memory);
+                },
+                MemNode::Fun(qid) => {
+                    let has_mut_params = env
+                        .get_function(qid)
+                        .get_parameters()
+                        .iter()
+                        .any(|Parameter(_, ty, _)| ty.is_mutable_reference());
+                    env.set_function_spec_memory(
+                        qid,
+                        transitive_usage.clone(),
+                        transitive_old_memory.clone(),
+                        !transitive_old_memory.is_empty() || has_mut_params,
+                    );
+                },
+            }
+        }
+    }
+}
+
+/// Derives and stores the memory of struct-field `access_of` entries.
+fn compute_struct_field_access_of_memory(env: &mut GlobalEnv) {
     let struct_ids: Vec<QualifiedId<StructId>> = env
         .get_modules()
         .flat_map(|m| m.get_structs().map(|s| s.get_qualified_id()).collect_vec())
@@ -1644,8 +1889,60 @@ fn check_data_invariants(struct_env: &StructEnv) {
                     ),
                 )
             }
+            // A behavioral predicate (`requires_of`/`aborts_of`/`ensures_of`/`result_of`) is
+            // evaluated against global memory, so in a data invariant it must be bound to a
+            // specific state variable via `S |~ ...` where S is introduced by an enclosing state
+            // quantifier (either `forall S in *:` or `exists S in *:`). Left at the free/ambient
+            // state (a default memory range) it makes the invariant state-dependent, which is not
+            // allowed: a data invariant must be a property of the value alone.
+            // `used_memory` above does not look inside `Operation::Behavior`, so this is checked
+            // separately, looking through called spec functions — a state binder does not
+            // distribute into their bodies, so a behavioral predicate inside one stays free even
+            // under an enclosing `S |~`.
+            let mut visited = BTreeSet::new();
+            if has_state_dependent_behavior(env, &cond.exp, &mut visited) {
+                env.error(
+                    &cond.loc,
+                    "data invariant must not depend on a free state: a behavioral predicate \
+                     must be bound to a state variable via `S |~ ...` where S is introduced \
+                     by an enclosing state quantifier (`forall S in *:` or `exists S in *:`)",
+                )
+            }
         }
     }
+}
+
+/// Whether the expression contains a behavioral predicate that evaluates at a free
+/// (unbound) state. Looks through called spec functions.
+///
+/// After `propagate_state_labels`, any `Behavior` inside a `S |~` context has its
+/// range set to `Some(S)`, where S is the state variable introduced by an enclosing
+/// state quantifier (`forall S in *:` or `exists S in *:`). Only a `Behavior` whose
+/// range is still `default()` — not rewritten to any specific state variable —
+/// evaluates at the truly free ambient state.
+///
+/// This means the check reduces to a single condition: `range.is_default()`. No
+/// separate check on quantifier kind is needed: any state quantifier (forall or
+/// exists) introduces a bound state variable, and `propagate_state_labels` records
+/// that binding in the range. Spec function bodies are checked independently.
+fn has_state_dependent_behavior(
+    env: &GlobalEnv,
+    exp: &ExpData,
+    visited: &mut BTreeSet<QualifiedId<SpecFunId>>,
+) -> bool {
+    exp.any(&mut |e| match e {
+        ExpData::Call(_, Operation::Behavior(_, range), _) => range.is_default(),
+        ExpData::Call(_, Operation::SpecFunction(mid, fid, _), _) => {
+            let qid = mid.qualified(*fid);
+            visited.insert(qid)
+                && env
+                    .get_spec_fun(qid)
+                    .body
+                    .as_ref()
+                    .is_some_and(|body| has_state_dependent_behavior(env, body, visited))
+        },
+        _ => false,
+    })
 }
 
 #[cfg(test)]
