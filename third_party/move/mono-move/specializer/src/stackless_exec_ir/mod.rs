@@ -262,6 +262,21 @@ pub enum Instr<SlotForm> {
     LdImm { dst: SlotForm, imm: ImmValue },
 
     // --- Slot ops ---
+    //
+    // For transformation passes: when may `dst` and `src` be treated as
+    // interchangeable names for one value?
+    //
+    // - `Move`: always — both name the same object, and `src` is unusable
+    //   until redefined (bytecode verifier).
+    // - `Copy`: only for bitwise-copy types
+    //   (`PreparedModule::is_bitwise_copy_type`). Otherwise the lowering
+    //   deep-copies, so `dst` is a different object: the `Copy` must not be
+    //   substituted through, coalesced, or elided unless its result is
+    //   provably unobserved.
+    //
+    // Either claim holds only until `dst` or `src` is redefined (frame slots
+    // are recycled); invalidate before rewriting the redefining instruction
+    // itself.
     /// `dst = copy(src)`, source remains valid.
     Copy { dst: SlotForm, src: SlotForm },
     /// `dst = move(src)`, source invalidated.

@@ -14,7 +14,8 @@ use crate::stackless_exec_ir::{
     BasicBlock, HomeIndex, NamedSlot, SsaSlot,
 };
 use mono_move_core::{
-    types::InternedType, ExecutionErrorKind, IntoExecutionError, VMInternalError, VMResult,
+    types::InternedType, ExecutionErrorKind, IntoExecutionError, PreparedModule, VMInternalError,
+    VMResult,
 };
 use shared_dsa::UnorderedMap;
 use thiserror::Error;
@@ -199,14 +200,23 @@ impl SlotTable {
 ///      `ValueId(i)` to its type at index `i`.
 /// Post: all `ValueId`s replaced with `Home`/`Transfer` slots
 ///       (guaranteed by the output type).
-pub(crate) fn allocate_slots(ssa: SSAFunction) -> VMResult<AllocatedFunction> {
+pub(crate) fn allocate_slots(
+    ssa: SSAFunction,
+    module: &PreparedModule,
+) -> VMResult<AllocatedFunction> {
     let mut table = SlotTable::new(&ssa.local_types, ssa.value_id_types.len());
     let mut result_blocks = Vec::with_capacity(ssa.blocks.len());
     let mut num_transfer_positions: u16 = 0;
     let mut free_pool: UnorderedMap<InternedType, Vec<NamedSlot>> = UnorderedMap::new();
 
+    let is_bitwise_copy_value = |id: u16| -> bool {
+        ssa.value_id_types
+            .get(id as usize)
+            .is_some_and(|ty| module.is_bitwise_copy_type(*ty))
+    };
+
     for block in ssa.blocks {
-        let analysis = BlockAnalysis::analyze(&block.instrs);
+        let analysis = BlockAnalysis::analyze(&block.instrs, is_bitwise_copy_value);
         num_transfer_positions = num_transfer_positions.max(analysis.max_transfer_positions);
         result_blocks.push(allocate_block(
             block,
