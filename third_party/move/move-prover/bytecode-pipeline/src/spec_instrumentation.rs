@@ -40,6 +40,7 @@ use move_stackless_bytecode::{
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
+    sync::Mutex,
 };
 
 const REQUIRES_FAILS_MESSAGE: &str = "precondition does not hold at this call";
@@ -55,16 +56,40 @@ const CHOICE_WITNESS_FAILS_MESSAGE: &str = "choice expression requires a witness
 // ================================================================================================
 // # Spec Instrumenter
 
-pub struct SpecInstrumentationProcessor {}
+pub struct SpecInstrumentationProcessor {
+    opaque_callee_modifies:
+        Mutex<BTreeMap<QualifiedId<FunId>, BTreeSet<QualifiedInstId<StructId>>>>,
+}
 
 impl SpecInstrumentationProcessor {
     pub fn new() -> Box<Self> {
-        Box::new(Self {})
+        Box::new(Self {
+            opaque_callee_modifies: Mutex::new(BTreeMap::new()),
+        })
     }
 }
 
 impl FunctionTargetProcessor for SpecInstrumentationProcessor {
     fn initialize(&self, env: &GlobalEnv, targets: &mut FunctionTargetsHolder) {
+        let effects = targets
+            .get_funs()
+            .filter_map(|qid| {
+                let fun = env.get_function(qid);
+                fun.is_opaque().then(|| {
+                    let target = targets.get_target(&fun, &FunctionVariant::Baseline);
+                    (
+                        qid,
+                        usage_analysis::get_memory_usage(&target)
+                            .modified
+                            .all
+                            .iter()
+                            .cloned()
+                            .collect(),
+                    )
+                })
+            })
+            .collect();
+        *self.opaque_callee_modifies.lock().unwrap() = effects;
         // Perform static analysis part of modifies check.
         check_modifies(env, targets);
     }
@@ -86,14 +111,21 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
             verification_analysis::get_info(&FunctionTarget::new(fun_env, &data));
         let is_verified = verification_info.verified;
         let is_inlined = verification_info.inlined;
+        let opaque_callee_modifies = self.opaque_callee_modifies.lock().unwrap().clone();
 
         if is_verified {
             // Create a clone of the function data, moving annotations
             // out of this data and into the clone.
             let mut verification_data =
                 data.fork(FunctionVariant::Verification(VerificationFlavor::Regular));
-            let (instrumented, split_points) =
-                Instrumenter::run(&options, targets, fun_env, verification_data, scc_opt);
+            let (instrumented, split_points) = Instrumenter::run(
+                &options,
+                targets,
+                fun_env,
+                verification_data,
+                scc_opt,
+                &opaque_callee_modifies,
+            );
             verification_data = instrumented;
 
             if split_points.is_empty() || options.inference {
@@ -123,7 +155,14 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
 
         // Instrument baseline variant only if it is inlined.
         if is_inlined {
-            let (data, _) = Instrumenter::run(&options, targets, fun_env, data, scc_opt);
+            let (data, _) = Instrumenter::run(
+                &options,
+                targets,
+                fun_env,
+                data,
+                scc_opt,
+                &opaque_callee_modifies,
+            );
             data
         } else {
             // Clear code but keep function data stub.
@@ -369,6 +408,11 @@ struct Instrumenter<'a> {
     abort_label: Label,
     can_abort: bool,
     mem_info: &'a BTreeSet<QualifiedInstId<StructId>>,
+    /// Transitive memory effects of opaque callees in the original bytecode.
+    opaque_callee_modifies: BTreeMap<QualifiedId<FunId>, BTreeSet<QualifiedInstId<StructId>>>,
+    /// Resource types explicitly framed by opaque callees before call-site type
+    /// substitution.
+    opaque_callee_framed_memory: BTreeMap<QualifiedId<FunId>, BTreeSet<QualifiedInstId<StructId>>>,
     /// Map from Nop AttrId to split expression and optional guard (for `split` proof items).
     /// AttrIds are stable across optimization passes, unlike bytecode offsets.
     /// The optional guard is a path condition from enclosing `if` in the proof block.
@@ -385,14 +429,74 @@ impl<'a> Instrumenter<'a> {
         fun_env: &FunctionEnv<'a>,
         data: FunctionData,
         scc_opt: Option<&[FunctionEnv]>,
+        all_opaque_callee_modifies: &BTreeMap<
+            QualifiedId<FunId>,
+            BTreeSet<QualifiedInstId<StructId>>,
+        >,
     ) -> (FunctionData, Vec<(AttrId, Exp, Option<Exp>)>) {
-        // Pre-collect properties in the original function data
+        // Pre-collect properties and opaque-callee effects from the original code.
         let props: Vec<_> = data
             .code
             .iter()
             .filter_map(|bc| match bc {
                 Bytecode::Prop(id, PropKind::Assume, exp)
                 | Bytecode::Prop(id, PropKind::Assert, exp) => Some((*id, exp.clone())),
+                _ => None,
+            })
+            .collect();
+        let opaque_callee_modifies = data
+            .code
+            .iter()
+            .filter_map(|bc| match bc {
+                Bytecode::Call(_, _, Operation::Function(mid, fid, _), _, _) => {
+                    let callee = fun_env.module_env.env.get_module(*mid).into_function(*fid);
+                    callee.is_opaque().then(|| {
+                        (
+                            mid.qualified(*fid),
+                            all_opaque_callee_modifies
+                                .get(&mid.qualified(*fid))
+                                .cloned()
+                                .unwrap_or_default(),
+                        )
+                    })
+                },
+                _ => None,
+            })
+            .collect();
+        let opaque_callee_framed_memory = data
+            .code
+            .iter()
+            .filter_map(|bc| match bc {
+                Bytecode::Call(_, _, Operation::Function(mid, fid, _), _, _) => {
+                    let callee = fun_env.module_env.env.get_module(*mid).into_function(*fid);
+                    callee.is_opaque().then(|| {
+                        (
+                            mid.qualified(*fid),
+                            callee
+                                .get_frame_spec()
+                                .map(|frame| {
+                                    frame
+                                        .modifies_targets
+                                        .iter()
+                                        .filter_map(|target| {
+                                            match fun_env
+                                                .module_env
+                                                .env
+                                                .get_node_type(target.node_id())
+                                                .skip_reference()
+                                            {
+                                                Type::Struct(mid, sid, inst) => {
+                                                    Some(mid.qualified_inst(*sid, inst.clone()))
+                                                },
+                                                _ => None,
+                                            }
+                                        })
+                                        .collect()
+                                })
+                                .unwrap_or_default(),
+                        )
+                    })
+                },
                 _ => None,
             })
             .collect();
@@ -492,6 +596,8 @@ impl<'a> Instrumenter<'a> {
             abort_label,
             can_abort: false,
             mem_info: &mem_info,
+            opaque_callee_modifies,
+            opaque_callee_framed_memory,
             split_points: vec![],
         };
         // Always inline spec lets in proof actions, independent of the
@@ -979,10 +1085,51 @@ impl<'a> Instrumenter<'a> {
             // Note: saved_memory and saved_spec_vars were already emitted above,
             // before the label defines and abort condition evaluation.
 
-            // Emit modifies properties which havoc memory at the modified location.
+            // Emit precise, address-level memory havocs from the callee frame.
             for (_, exp) in std::mem::take(&mut callee_spec.modifies) {
                 self.emit_traces(&callee_spec, &exp);
                 self.builder.emit_with(|id| Prop(id, Modifies, exp));
+            }
+
+            // An omitted address frame on an opaque callee is conservatively
+            // represented by havocing the complete memory for that resource.
+            // This preserves soundness while allowing coarse modular summaries.
+            let callee_qid = mid.qualified(fid);
+            let framed_memory = self
+                .opaque_callee_framed_memory
+                .get(&callee_qid)
+                .cloned()
+                .unwrap_or_default();
+            for mem in self
+                .opaque_callee_modifies
+                .get(&callee_qid)
+                .into_iter()
+                .flatten()
+                .filter(|mem| !framed_memory.contains(mem))
+                .map(|mem| mem.instantiate_ref(targs))
+                .filter(|mem| {
+                    !env.is_wellknown_event_handle_type(&Type::Struct(
+                        mem.module_id,
+                        mem.id,
+                        vec![],
+                    )) && !env.get_struct_qid(mem.to_qualified_id()).is_ghost_memory()
+                })
+            {
+                let op = Operation::HavocGlobal(mem.module_id, mem.id, mem.inst.clone());
+                self.builder
+                    .emit_with(|id| Call(id, vec![], op, vec![], None));
+                if let Some(exp) =
+                    self.builder
+                        .mk_inst_mem_quant_opt(QuantKind::Forall, &mem, &mut |val| {
+                            Some(self.builder.mk_call(
+                                &BOOL_TYPE,
+                                ast::Operation::WellFormed,
+                                vec![val],
+                            ))
+                        })
+                {
+                    self.builder.emit_with(|id| Prop(id, Assume, exp));
+                }
             }
 
             // Havoc all &mut parameters, their post-value are to be determined by the post
@@ -2625,12 +2772,13 @@ fn find_behavior_pre_label_for_callee(
 /// Check modifies annotations. This is depending on usage analysis and is therefore
 /// invoked here from the initialize trait function of this processor.
 fn check_modifies(env: &GlobalEnv, targets: &FunctionTargetsHolder) {
+    let mut warned_coarse_callees = BTreeSet::new();
     for module_env in env.get_modules() {
         if module_env.is_target() {
             for fun_env in module_env.get_functions() {
                 if !fun_env.is_not_prover_target() && fun_env.is_compiled() {
                     check_caller_callee_modifies_relation(env, targets, &fun_env);
-                    check_opaque_modifies_completeness(env, targets, &fun_env);
+                    warn_coarse_opaque_calls(env, targets, &fun_env, &mut warned_coarse_callees);
                     check_reads_completeness(env, targets, &fun_env);
                 }
             }
@@ -2685,38 +2833,53 @@ fn check_caller_callee_modifies_relation(
     }
 }
 
-fn check_opaque_modifies_completeness(
+fn warn_coarse_opaque_calls(
     env: &GlobalEnv,
     targets: &FunctionTargetsHolder,
     fun_env: &FunctionEnv,
+    warned: &mut BTreeSet<QualifiedId<FunId>>,
 ) {
     let target = targets.get_target(fun_env, &FunctionVariant::Baseline);
-    if !target.is_opaque() {
+    let info = verification_analysis::get_info(&target);
+    if !info.verified && !info.inlined {
         return;
     }
-    // All memory directly or indirectly modified by this opaque function must be captured by
-    // a modifies clause. Otherwise we could introduce unsoundness.
-    // TODO: we currently except Event::EventHandle from this, because this is treated as
-    //   an immutable reference. We should find a better way how to deal with event handles.
-    for mem in usage_analysis::get_memory_usage(&target)
-        .modified
-        .all
-        .iter()
+    for callee_qid in fun_env
+        .get_called_functions()
+        .expect(COMPILED_MODULE_AVAILABLE)
     {
-        if env.is_wellknown_event_handle_type(&Type::Struct(mem.module_id, mem.id, vec![])) {
+        let callee = env.get_function(*callee_qid);
+        if !callee.is_opaque() || !warned.insert(*callee_qid) {
             continue;
         }
-        if env.get_struct_qid(mem.to_qualified_id()).is_ghost_memory() {
-            continue;
-        }
-        let found = target.get_modify_ids().iter().any(|id| mem == id);
-        if !found {
-            let loc = fun_env.get_spec_loc();
-            env.error(&loc,
-            &format!("function `{}` is opaque but its specification does not have a modifies clause for `{}`",
-                fun_env.get_full_name_str(),
-                env.display(mem))
-            )
+        let callee_target = targets.get_target(&callee, &FunctionVariant::Baseline);
+        let framed = callee_target.get_modify_ids();
+        let unframed_count = usage_analysis::get_memory_usage(&callee_target)
+            .modified
+            .all
+            .iter()
+            .filter(|mem| {
+                !env.is_wellknown_event_handle_type(&Type::Struct(mem.module_id, mem.id, vec![]))
+                    && !env.get_struct_qid(mem.to_qualified_id()).is_ghost_memory()
+                    && !framed.iter().any(|id| *mem == id)
+            })
+            .count();
+        if unframed_count > 0 {
+            let resource_types = if unframed_count == 1 {
+                "resource type"
+            } else {
+                "resource types"
+            };
+            env.warning(
+                &callee.get_spec_loc(),
+                &format!(
+                    "opaque call to `{}` has an incomplete modifies frame; verification weakens \
+                     its summary by havocing every address of {} {}",
+                    callee.get_full_name_str(),
+                    unframed_count,
+                    resource_types
+                ),
+            );
         }
     }
 }

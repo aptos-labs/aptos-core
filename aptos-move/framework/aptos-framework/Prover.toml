@@ -1,5 +1,2 @@
-[backend]
-shards = 5
-
 [prover]
 borrow_natives = ["storage_slot::borrow_storage_slot_resource_mut"]

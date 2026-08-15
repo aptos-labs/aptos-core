@@ -35,4 +35,5 @@ error: post-condition does not hold
    =     at tests/sources/functional/closures/inline/folds_of_multi.move:54: weighted_pair_wrong
    =         result_1 = <redacted>
    =         result_2 = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_multi.move:69: weighted_pair_wrong (spec)
    =     at tests/sources/functional/closures/inline/folds_of_multi.move:65: weighted_pair_wrong (spec)
