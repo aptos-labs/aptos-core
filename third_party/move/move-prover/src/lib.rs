@@ -202,7 +202,7 @@ fn run_move_prover_with_model_v2_internal<W: WriteColor>(
     let mut gen_durations = vec![];
     let mut verify_durations = vec![];
     let mut timings = vec![];
-    let output_base_file = options.output_path.clone();
+    let (output_base_file, _temporary_boogie_dir) = verification_output_base(&options)?;
     let package_mono_info = mono_analysis::get_info(env);
     let roots = BoogieTranslator::verification_roots(env, &options.backend, &targets);
     info!("{} verification roots", roots.len());
@@ -515,6 +515,40 @@ fn verification_output_path(
             .to_string()
     } else {
         output_base_file.to_string()
+    }
+}
+
+fn verification_output_base(
+    options: &Options,
+) -> anyhow::Result<(String, Option<tempfile::TempDir>)> {
+    if options.backend.keep_artifacts {
+        return Ok((options.output_path.clone(), None));
+    }
+    let dir = tempfile::Builder::new().prefix("move-prover-").tempdir()?;
+    let output = dir.path().join("output.bpl").to_string_lossy().to_string();
+    Ok((output, Some(dir)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn verification_output_is_temporary_unless_kept() {
+        let options = Options::default();
+        let (output, temporary_dir) = verification_output_base(&options).unwrap();
+        let temporary_dir = temporary_dir.unwrap();
+        assert_eq!(Path::new(&output).parent(), Some(temporary_dir.path()));
+        let temporary_path = temporary_dir.path().to_path_buf();
+        drop(temporary_dir);
+        assert!(!temporary_path.exists());
+
+        let mut options = Options::default();
+        options.output_path = "kept.bpl".to_string();
+        options.backend.keep_artifacts = true;
+        let (output, temporary_dir) = verification_output_base(&options).unwrap();
+        assert_eq!(output, "kept.bpl");
+        assert!(temporary_dir.is_none());
     }
 }
 
