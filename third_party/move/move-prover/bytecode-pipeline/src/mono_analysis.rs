@@ -1814,7 +1814,7 @@ impl Analyzer<'_> {
                 let spec_fun = module.get_spec_fun(*fid);
                 if self
                     .env
-                    .spec_fun_call_needs_move_equality_congruence(*node_id)
+                    .spec_fun_call_needs_move_equality_congruence(*node_id, mid.qualified(*fid))
                 {
                     self.add_move_equality_congruence_spec_fun(
                         mid.qualified_inst(*fid, actuals.clone()),

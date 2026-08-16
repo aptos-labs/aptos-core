@@ -63,7 +63,8 @@ module 0x42::requires_of_state_err {
     }
 
     inline fun apply_via_forwarder(f: |u64| u64, x: u64): u64 {
-        let result = repeat_twice(|y| f(y), x);
+        let (g, _) = (|y| f(y), |y| y);
+        let result = repeat_twice(g, x);
         spec {
             assert ensures_of<f>(x, result); // error: a forwarded application may repeat dynamically
         };

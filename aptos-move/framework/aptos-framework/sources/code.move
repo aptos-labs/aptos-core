@@ -239,18 +239,28 @@ module aptos_framework::code {
         );
 
         let registry = borrow_global_mut<PackageRegistry>(code_object_addr);
-        registry.packages.for_each_mut(|pack| {
-            let package: &mut PackageMetadata = pack;
+        // `for_each_mut` is not used because effectful HOF verification
+        // does not scale yet (TODO(#20391)).
+        let i = 0;
+        let len = registry.packages.length();
+        while (i < len) {
+            let package: &mut PackageMetadata = registry.packages.borrow_mut(i);
             package.upgrade_policy = upgrade_policy_immutable();
-        });
+            i += 1;
+        };
 
         // We unfortunately have to make a copy of each package to avoid borrow checker issues as check_dependencies
         // needs to borrow PackageRegistry from the dependency packages.
         // This would increase the amount of gas used, but this is a rare operation and it's rare to have many packages
         // in a single code object.
-        registry.packages.for_each(|pack| {
-            check_dependencies(code_object_addr, &pack);
-        });
+        let packages = registry.packages;
+        // `for_each` is not used because effectful HOF verification
+        // does not scale yet (TODO(#20391)).
+        let i = 0;
+        while (i < len) {
+            check_dependencies(code_object_addr, packages.borrow(i));
+            i += 1;
+        };
     }
 
     /// Same as `publish_package` but as an entry function which can be called as a transaction. Because

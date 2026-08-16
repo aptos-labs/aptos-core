@@ -211,13 +211,6 @@ struct BpMemArgs {
 }
 
 impl BpMemArgs {
-    fn empty() -> Self {
-        Self {
-            slots: vec![],
-            instance_id: None,
-        }
-    }
-
     /// Render the Boogie-arg prefix for a BP call of the given kind.
     fn render(&self, kind: BehaviorKind) -> String {
         let mut parts: Vec<String> = Vec::with_capacity(self.slots.len() * 2 + 1);
@@ -1543,7 +1536,7 @@ impl<'env> BoogieTranslator<'env> {
 
         // Build memory args (pre-state: both old and current slots use same variable)
         let fun_mem_args = self.build_spec_memory_args(
-            fun_env.get_spec_used_memory(),
+            &fun_env.get_spec_used_memory(),
             &behavioral_old_memory(fun_env),
             &info.fun.inst,
             &None,
@@ -1962,7 +1955,8 @@ impl<'env> BoogieTranslator<'env> {
         struct_field_infos: &BTreeSet<StructFieldInfo>,
         kind: BehaviorKind,
     ) {
-        if fun_param_infos.is_empty() && struct_field_infos.is_empty() {
+        if !closure_infos.is_empty() && fun_param_infos.is_empty() && struct_field_infos.is_empty()
+        {
             self.generate_concrete_behavioral_predicate_evaluator(fun_type, closure_infos, kind);
             return;
         }
@@ -2406,13 +2400,15 @@ impl<'env> BoogieTranslator<'env> {
     /// `(declared_results..., &mut post-states...)`. `BehaviorKind::ResultOf`
     /// and `BehaviorKind::WriteOf(j)` share this symbol — callers project the
     /// declared-result slice or the j-th post-state slot, respectively. The
-    /// axiom ties it to `ensures_of` by splatting the Skolem's tuple
-    /// components into the corresponding `ensures_of` slots:
+    /// axiom ties it to `ensures_of` for inputs which satisfy the precondition
+    /// and do not abort by splatting the Skolem's tuple components into the
+    /// corresponding `ensures_of` slots:
     ///
     /// ```text
     /// axiom forall mem, f, p_* ::
-    ///     (var _r := result_of(mem, f, p_*);
-    ///      ensures_of(mem, f, p_*, _r->$0, ..., _r->$<N+K-1>))
+    ///     requires_of(pre_mem, f, p_*) && !aborts_of(pre_mem, f, p_*) ==>
+    ///       (var _r := result_of(mem, f, p_*);
+    ///        ensures_of(mem, f, p_*, _r->$0, ..., _r->$<N+K-1>))
     /// ```
     ///
     /// Earlier versions of this generator made the `&mut` post-state slots
@@ -2454,10 +2450,15 @@ impl<'env> BoogieTranslator<'env> {
             Self::collect_union_memory(env, closure_infos, fun_param_infos, struct_field_infos);
         let (eval_mem_decls, eval_mem_args) =
             Self::build_memory_params(env, &union_used_memory, &union_old_memory);
+        let abort_mem_args =
+            Self::build_pre_state_memory_args(env, &union_used_memory, &union_old_memory);
 
         let result_of_name = boogie_behavioral_eval_fun_name(env, fun_type, BehaviorKind::ResultOf);
         let ensures_of_name =
             boogie_behavioral_eval_fun_name(env, fun_type, BehaviorKind::EnsuresOf);
+        let requires_of_name =
+            boogie_behavioral_eval_fun_name(env, fun_type, BehaviorKind::RequiresOf);
+        let aborts_of_name = boogie_behavioral_eval_fun_name(env, fun_type, BehaviorKind::AbortsOf);
 
         // Inputs: memory, fun, p0..pN. No post-state inputs.
         let mut param_decls: Vec<String> = eval_mem_decls;
@@ -2472,6 +2473,9 @@ impl<'env> BoogieTranslator<'env> {
             ));
             input_args.push(format!("p{}", pos));
         }
+        let mut abort_args = abort_mem_args;
+        abort_args.push("f".to_string());
+        abort_args.extend((0..params_flat.len()).map(|pos| format!("p{}", pos)));
 
         // Output tuple: declared results followed by `&mut` post-states.
         // References are stripped — spec predicates work on values.
@@ -2510,12 +2514,36 @@ impl<'env> BoogieTranslator<'env> {
         );
 
         let result_of_call = format!("{}({})", result_of_name, input_args.join(", "));
+        let requires_of_call = format!("{}({})", requires_of_name, abort_args.join(", "));
+        let aborts_of_call = format!("{}({})", aborts_of_name, abort_args.join(", "));
+        let precond = Self::validity_precondition(env, &params_flat, "p");
+        if output_types.len() == 1 {
+            self.emit_result_validity_axiom(
+                &param_decls,
+                &result_of_call,
+                &output_types[0],
+                &precond,
+            );
+        } else {
+            self.emit_tuple_result_validity_axiom(
+                &param_decls,
+                &result_of_call,
+                &output_types,
+                &precond,
+            );
+        }
 
         // ensures_of takes: input_args, then output slots (declared + post-state).
         let mut ensures_args = input_args.clone();
         if output_types.len() == 1 {
             ensures_args.push(result_of_call.clone());
-            let body = format!("{}({})", ensures_of_name, ensures_args.join(", "));
+            let body = format!(
+                "({}) && !({}) ==> {}({})",
+                requires_of_call,
+                aborts_of_call,
+                ensures_of_name,
+                ensures_args.join(", ")
+            );
             emitln!(
                 self.writer,
                 "axiom (forall {} :: {{{}}} {});",
@@ -2529,7 +2557,9 @@ impl<'env> BoogieTranslator<'env> {
                 .collect();
             ensures_args.extend(tuple_projections);
             let body = format!(
-                "(var _r := {}; {}({}))",
+                "({}) && !({}) ==> (var _r := {}; {}({}))",
+                requires_of_call,
+                aborts_of_call,
                 result_of_call,
                 ensures_of_name,
                 ensures_args.join(", ")
@@ -2729,7 +2759,9 @@ impl<'env> BoogieTranslator<'env> {
                     && !fun_env.is_pragma_true(ABORTS_IF_IS_PARTIAL_PRAGMA, || false);
                 if kind == BehaviorKind::AbortsOf
                     && !has_complete_aborts
-                    && (fun_env.is_opaque() || fun_env.is_native_or_intrinsic())
+                    && (fun_env.is_pragma_true(ABORTS_IF_IS_PARTIAL_PRAGMA, || false)
+                        || fun_env.is_opaque()
+                        || fun_env.is_native_or_intrinsic())
                 {
                     emitln!(
                         self.writer,
@@ -2815,6 +2847,20 @@ impl<'env> BoogieTranslator<'env> {
                 let mut args = mem_args.clone();
                 args.extend(input_args.iter().cloned());
                 args
+            };
+            let aborts_fun_name =
+                boogie_behavioral_fun_spec_name(self.env, &info.fun, BehaviorKind::AbortsOf);
+            let aborts_of_call = {
+                let mut args = Self::build_pre_state_memory_args(self.env, &inst_used, &inst_old);
+                args.extend(input_args.iter().cloned());
+                format!("{}({})", aborts_fun_name, args.join(", "))
+            };
+            let requires_fun_name =
+                boogie_behavioral_fun_spec_name(self.env, &info.fun, BehaviorKind::RequiresOf);
+            let requires_of_call = {
+                let mut args = Self::build_pre_state_memory_args(self.env, &inst_used, &inst_old);
+                args.extend(input_args.iter().cloned());
+                format!("{}({})", requires_fun_name, args.join(", "))
             };
 
             if all_result_types.len() == 1 {
@@ -2907,7 +2953,13 @@ impl<'env> BoogieTranslator<'env> {
                 let ensures_of_with_result = {
                     let mut call_args = all_input_arg_names.clone();
                     call_args.push(format!("{}({})", result_fun_name, input_args_str));
-                    format!("{}({})", ensures_fun_name, call_args.join(", "))
+                    format!(
+                        "({}) && !({}) ==> {}({})",
+                        requires_of_call,
+                        aborts_of_call,
+                        ensures_fun_name,
+                        call_args.join(", ")
+                    )
                 };
                 if input_param_decls.is_empty() {
                     emitln!(self.writer, "axiom {};", ensures_of_with_result);
@@ -2973,7 +3025,9 @@ impl<'env> BoogieTranslator<'env> {
                     let mut call_args = all_input_arg_names.clone();
                     call_args.extend(tuple_projections);
                     format!(
-                        "(var _r := {}({}); {}({}))",
+                        "({}) && !({}) ==> (var _r := {}({}); {}({}))",
+                        requires_of_call,
+                        aborts_of_call,
                         result_fun_name,
                         input_args_str,
                         ensures_fun_name,
@@ -3358,7 +3412,8 @@ impl<'env> BoogieTranslator<'env> {
                 &fun_env.get_loc(),
                 &format!(
                     "generic type reflection in a function specification is not yet \
-                     supported through behavioral predicates; weakening `{}`; see \
+                     supported through behavioral predicates; leaving `{}` \
+                     uninterpreted; see \
                      https://github.com/aptos-labs/aptos-core/issues/20371",
                     kind
                 ),
@@ -3604,6 +3659,28 @@ impl<'env> BoogieTranslator<'env> {
             }
         }
         (decls, args)
+    }
+
+    /// Builds evaluator memory arguments at a call's pre-state. Two-state
+    /// resources pass the old slot in both positions.
+    fn build_pre_state_memory_args(
+        env: &GlobalEnv,
+        used_memory: &BTreeSet<QualifiedInstId<StructId>>,
+        old_memory: &BTreeSet<QualifiedInstId<StructId>>,
+    ) -> Vec<String> {
+        let uses_old = !old_memory.is_empty();
+        let mut args = vec![];
+        for memory in used_memory {
+            let name = boogie_resource_memory_name(env, memory, &None);
+            if uses_old && old_memory.contains(memory) {
+                let old_name = format!("old_{}", name);
+                args.push(old_name.clone());
+                args.push(old_name);
+            } else {
+                args.push(name);
+            }
+        }
+        args
     }
 
     /// Build memory argument strings for a struct field variant in the evaluator.
@@ -4116,7 +4193,6 @@ impl<'env> BoogieTranslator<'env> {
                         struct_id: &info.struct_id,
                         field_sym: info.field_sym,
                     };
-                    let fp_mem_args = BpMemArgs::empty();
                     for kind in [
                         BehaviorKind::EnsuresOf,
                         BehaviorKind::ResultOf,
@@ -4136,6 +4212,30 @@ impl<'env> BoogieTranslator<'env> {
                         // evaluator dispatch branches on discriminator tag, so
                         // both variants must be constrained).
                         for fp_info in fun_param_infos {
+                            let (fp_used_memory, fp_old_memory) =
+                                Self::get_param_memory(self.env, &fp_info.fun, fp_info.param_sym);
+                            let (mut fp_input_param_decls, _) = Self::build_memory_params(
+                                self.env,
+                                &fp_used_memory,
+                                &fp_old_memory,
+                            );
+                            fp_input_param_decls.extend(data_param_decls.iter().cloned());
+                            let fp_mem_args = BpMemArgs {
+                                slots: fp_used_memory
+                                    .iter()
+                                    .map(|memory| {
+                                        let name =
+                                            boogie_resource_memory_name(self.env, memory, &None);
+                                        MemArgSlot {
+                                            old: fp_old_memory
+                                                .contains(memory)
+                                                .then(|| format!("old_{}", name)),
+                                            cur: name,
+                                        }
+                                    })
+                                    .collect(),
+                                instance_id: None,
+                            };
                             let fp_ctx = BpAxiomCtx::FunParam {
                                 fun: &fp_info.fun,
                                 param_sym: fp_info.param_sym,
@@ -4144,7 +4244,7 @@ impl<'env> BoogieTranslator<'env> {
                             self.emit_data_invariant_axiom_for_behavior(
                                 info,
                                 kind,
-                                &data_param_decls,
+                                &fp_input_param_decls,
                                 &fp_ctx,
                                 &fp_mem_args,
                                 &params,
@@ -5998,7 +6098,7 @@ impl FunctionTranslator<'_> {
                                 result.insert((label, memory.clone()));
                             }
                         }
-                        for memory in closure_fun_env.get_spec_old_memory().iter() {
+                        for memory in behavioral_old_memory(&closure_fun_env) {
                             let memory = memory.clone().instantiate(&inst);
                             for label in range.labels() {
                                 result.insert((label, memory.clone()));

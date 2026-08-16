@@ -53,14 +53,14 @@ use move_core_types::ability::AbilitySet;
 use move_model::{
     ast::{
         BehaviorKind, Condition, ConditionKind, Exp, ExpData, LambdaCaptureKind, MemoryLabel,
-        MemoryRange, Operation, Pattern, PropertyValue, QuantKind, Spec, SpecBlockTarget,
-        SpecFunDecl, TempIndex, Value, VisitorPosition,
+        MemoryRange, Operation, Pattern, QuantKind, Spec, SpecBlockTarget, SpecFunDecl, TempIndex,
+        Value, VisitorPosition,
     },
     exp_generator::FunExpGenerator,
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget as ExpRewriteTarget},
     model::{
-        FunId, GlobalEnv, Loc, NodeId, Parameter, QualifiedId, SpecFunId, TypeParameter,
-        TypeParameterKind,
+        FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, QualifiedId, SpecFunId,
+        TypeParameter, TypeParameterKind,
     },
     pragmas::{ABORTS_IF_IS_PARTIAL_PRAGMA, CONDITION_INFERRED_PROP},
     pureness_checker::{FunctionPurenessChecker, FunctionPurenessCheckerMode},
@@ -84,10 +84,58 @@ use std::{
 const INLINE_HOF_WEAKENING_ISSUE: &str = "https://github.com/aptos-labs/aptos-core/issues/20371";
 const FORWARDED_FOLD_WEAKENING_ISSUE: &str =
     "https://github.com/aptos-labs/aptos-core/issues/20383";
-const BEHAVIORAL_INVARIANT_MARKER: &str = "$inliner_behavioral_invariant";
 
 type QualifiedFunId = QualifiedId<FunId>;
 type CallSiteLocations = BTreeMap<(RewriteTarget, QualifiedFunId), BTreeSet<NodeId>>;
+
+#[derive(Default)]
+struct UnresolvedBehaviorNodes {
+    nodes: RefCell<BTreeSet<NodeId>>,
+    spec_funs: RefCell<BTreeSet<QualifiedId<SpecFunId>>>,
+}
+
+fn unresolved_behavior_nodes(env: &GlobalEnv) -> Rc<UnresolvedBehaviorNodes> {
+    match env.get_extension::<UnresolvedBehaviorNodes>() {
+        Some(nodes) => nodes,
+        None => {
+            env.set_extension(UnresolvedBehaviorNodes::default());
+            env.get_extension::<UnresolvedBehaviorNodes>()
+                .expect("extension just set")
+        },
+    }
+}
+
+fn mark_unresolved_behavior(env: &GlobalEnv, id: NodeId) {
+    unresolved_behavior_nodes(env).nodes.borrow_mut().insert(id);
+}
+
+fn mark_unresolved_spec_fun(env: &GlobalEnv, id: QualifiedId<SpecFunId>) {
+    unresolved_behavior_nodes(env)
+        .spec_funs
+        .borrow_mut()
+        .insert(id);
+}
+
+fn is_unresolved_behavior(env: &GlobalEnv, exp: &ExpData) -> bool {
+    env.get_extension::<UnresolvedBehaviorNodes>()
+        .is_some_and(|unresolved| {
+            unresolved.nodes.borrow().contains(&exp.node_id())
+                || matches!(
+                    exp,
+                    ExpData::Call(_, Operation::SpecFunction(mid, sid, _), _)
+                        if unresolved.spec_funs.borrow().contains(&mid.qualified(*sid))
+                )
+        })
+}
+
+fn weaken_or_mark_unresolved(env: &GlobalEnv, exp: Exp) -> Exp {
+    let id = exp.node_id();
+    if let ExpData::Call(_, Operation::SpecFunction(mid, sid, _), _) = exp.as_ref() {
+        mark_unresolved_spec_fun(env, mid.qualified(*sid));
+    }
+    mark_unresolved_behavior(env, id);
+    exp
+}
 
 const DEBUG: bool = false;
 
@@ -935,13 +983,8 @@ struct InlinedRewriter<'env, 'rewriter> {
     application_anchors: BTreeMap<Symbol, MemoryLabel>,
     /// The kind of the spec condition currently being rewritten, if any.
     current_condition_kind: Option<ConditionKind>,
-    /// Whether the current condition originally depended on lambda behavior.
-    current_condition_is_behavioral: bool,
-    /// Whether an unresolved behavioral predicate requires weakening the
-    /// current condition to `true`.
-    unresolved_bp_in_condition: bool,
-    /// Whether the current spec block contains an unresolved predicate.
-    unresolved_bp_in_spec: bool,
+    /// Unresolved behavioral-predicate subexpressions in the current
+    /// condition. Only their enclosing conjunction arms are weakened.
     /// The resolutions of `folds_of` predicates over lambda-bound
     /// parameters, keyed by the predicate's node id (verify mode; see
     /// `resolve_folds_of_occurrences`).
@@ -1035,9 +1078,6 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             target_fun,
             application_anchors,
             current_condition_kind: None,
-            current_condition_is_behavioral: false,
-            unresolved_bp_in_condition: false,
-            unresolved_bp_in_spec: false,
             folds_of_resolutions,
         }
     }
@@ -1207,21 +1247,82 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         if env.is_verify_mode() {
             // Merely being lexically nested in a lambda is not enough to
             // make the count opaque: a forwarding lambda passed to another
-            // inline function is expanded and analyzed normally. Record
-            // only lambda literals passed directly to non-inline calls.
+            // inline function is expanded and analyzed normally. Track local
+            // aliases of lambdas too: a non-inline call can receive a
+            // forwarding lambda through `let g = |x| f(x); callee(g)`.
+            let mut lambda_aliases = BTreeMap::new();
+            body.visit_pre_order(&mut |e| {
+                if let ExpData::Block(_, pat, Some(binding), _) = e {
+                    for (sym, bound_exp) in pat.vars_and_exprs(binding) {
+                        let lambda_id = bound_exp.and_then(|bound_exp| match bound_exp.as_ref() {
+                            ExpData::Lambda(id, ..) => Some(*id),
+                            ExpData::LocalVar(_, sym) => lambda_aliases.get(sym).copied(),
+                            _ => None,
+                        });
+                        if let Some(lambda_id) = lambda_id {
+                            lambda_aliases.insert(sym, lambda_id);
+                        }
+                    }
+                }
+                true
+            });
+            // Record when one lambda forwards another lambda through a local
+            // alias. For example, in `let g = |x| f(x); let h = || g`, an
+            // opaque call of `h` may repeatedly invoke the distinct lambda
+            // `g` it returns.
+            let mut forwarded_lambdas: BTreeMap<NodeId, BTreeSet<NodeId>> = BTreeMap::new();
+            body.visit_pre_order(&mut |e| {
+                if let ExpData::Lambda(id, _, lambda_body, _, _) = e {
+                    let mut forwarded = BTreeSet::new();
+                    lambda_body.visit_pre_order(&mut |inner| {
+                        if let ExpData::LocalVar(_, sym) = inner {
+                            if let Some(lambda_id) = lambda_aliases.get(sym) {
+                                forwarded.insert(*lambda_id);
+                            }
+                        }
+                        true
+                    });
+                    if !forwarded.is_empty() {
+                        forwarded_lambdas.insert(*id, forwarded);
+                    }
+                }
+                true
+            });
             let mut opaque_forwarding_lambdas = BTreeSet::new();
             body.visit_pre_order(&mut |e| {
                 if let ExpData::Call(_, Operation::MoveFunction(mid, fid), args) = e {
                     if !env.get_function(mid.qualified(*fid)).is_inline() {
                         for arg in args {
-                            if let ExpData::Lambda(id, ..) = arg.as_ref() {
-                                opaque_forwarding_lambdas.insert(*id);
+                            match arg.as_ref() {
+                                ExpData::Lambda(id, ..) => {
+                                    opaque_forwarding_lambdas.insert(*id);
+                                },
+                                ExpData::LocalVar(_, sym) => {
+                                    if let Some(lambda_id) = lambda_aliases.get(sym) {
+                                        opaque_forwarding_lambdas.insert(*lambda_id);
+                                    }
+                                },
+                                _ => {},
                             }
                         }
                     }
                 }
                 true
             });
+            // Transitively mark forwarding lambdas reachable from a lambda
+            // supplied to an opaque call. Each may be invoked repeatedly by
+            // that call, even if its body is not syntactically nested in the
+            // lambda passed as the call argument.
+            let mut pending: Vec<_> = opaque_forwarding_lambdas.iter().copied().collect();
+            while let Some(lambda_id) = pending.pop() {
+                if let Some(forwarded) = forwarded_lambdas.get(&lambda_id) {
+                    for forwarded_id in forwarded {
+                        if opaque_forwarding_lambdas.insert(*forwarded_id) {
+                            pending.push(*forwarded_id);
+                        }
+                    }
+                }
+            }
             let mut application_counts: BTreeMap<Symbol, (usize, bool)> = BTreeMap::new();
             let mut loop_depth = 0;
             let mut opaque_lambda_depth = 0;
@@ -1652,7 +1753,6 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
                 Some(ConditionKind::LoopInvariant)
             )
         {
-            self.unresolved_bp_in_condition = true;
             return Some(exp.clone());
         }
         // Rewrite the predicate arguments in the regular way; the lambda's spec
@@ -1688,7 +1788,14 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         if context == BpContext::LoopInvariant {
             if let Some(kind) = underivable_concrete_behavior(self.env, &result) {
                 warn_underivable_concrete_behavior(self.env, &self.env.get_node_loc(new_id), kind);
-                self.unresolved_bp_in_condition = true;
+                return Some(weaken_or_mark_unresolved(self.env, result));
+            }
+            if uses_generic_type_reflection(self.env, &result)
+                || lambda_uses_generic_type_reflection(self.env, &lambda)
+                || behavior_uses_generic_type_reflection(self.env, &result)
+            {
+                warn_generic_type_reflection_behavior(self.env, &self.env.get_node_loc(new_id));
+                return Some(weaken_or_mark_unresolved(self.env, result));
             }
         }
         // Values in an inlined behavioral predicate can be related to their
@@ -1703,7 +1810,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             ExpData::Call(_, Operation::Behavior(..), args)
                 if args.first().is_some_and(|t| matches!(t.as_ref(), ExpData::Lambda(..)))
         ) {
-            self.unresolved_bp_in_condition = true;
+            return Some(weaken_or_mark_unresolved(self.env, result));
         }
         Some(result)
     }
@@ -1758,20 +1865,21 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
                 .into_exp(),
             );
         };
+        let retained_args: Vec<Exp> = spec
+            .retained
+            .iter()
+            .map(|pos| self.rewrite_exp(args[*pos].clone()))
+            .collect();
         if matches!(
             self.current_condition_kind,
             Some(ConditionKind::LoopInvariant)
         ) {
             if let Some(kind) = spec.underivable_behavior(self.env) {
                 warn_underivable_concrete_behavior(self.env, &loc, kind);
-                self.unresolved_bp_in_condition = true;
+                let result = spec.make_call(self.env, loc, range, retained_args, &BTreeMap::new());
+                return Some(weaken_or_mark_unresolved(self.env, result));
             }
         }
-        let retained_args: Vec<Exp> = spec
-            .retained
-            .iter()
-            .map(|pos| self.rewrite_exp(args[*pos].clone()))
-            .collect();
         Some(spec.make_call(self.env, loc, range, retained_args, &BTreeMap::new()))
     }
 
@@ -2806,34 +2914,7 @@ fn underivable_concrete_behavior(env: &GlobalEnv, exp: &Exp) -> Option<BehaviorK
             else {
                 return true;
             };
-            let fun_env = env.get_function(mid.qualified(*fid));
-            let spec = fun_env.get_spec();
-            let has_mutable_parameter = fun_env
-                .get_parameter_types()
-                .iter()
-                .any(Type::is_mutable_reference);
-            let body_is_unavailable = fun_env.is_opaque() || fun_env.is_native_or_intrinsic();
-            let underivable = match kind {
-                BehaviorKind::ResultOf => {
-                    (body_is_unavailable
-                        || !spec_derivation::move_fun_has_exact_value_model(
-                            env,
-                            fun_env.get_qualified_id(),
-                        ))
-                        && (functional_result_ensures(&spec).is_none() || has_mutable_parameter)
-                },
-                BehaviorKind::AbortsOf => {
-                    fun_env.is_pragma_true(ABORTS_IF_IS_PARTIAL_PRAGMA, || false)
-                        || (body_is_unavailable
-                            && spec.filter_kind(ConditionKind::AbortsIf).next().is_none()
-                            && env
-                                .get_intrinsics()
-                                .get_abort_spec_fun_for_move_fun(&fun_env.get_qualified_id())
-                                .is_none())
-                },
-                _ => false,
-            };
-            if underivable {
+            if move_fun_behavior_is_underivable(env, mid.qualified(*fid), *kind) {
                 result = Some(*kind);
                 false
             } else {
@@ -2853,6 +2934,184 @@ fn underivable_concrete_behavior(env: &GlobalEnv, exp: &Exp) -> Option<BehaviorK
         }
     }
     result
+}
+
+fn move_fun_behavior_is_underivable(
+    env: &GlobalEnv,
+    qid: QualifiedFunId,
+    kind: BehaviorKind,
+) -> bool {
+    let fun_env = env.get_function(qid);
+    let spec = fun_env.get_spec();
+    let has_mutable_parameter = fun_env
+        .get_parameter_types()
+        .iter()
+        .any(Type::is_mutable_reference);
+    let body_is_unavailable = fun_env.is_opaque() || fun_env.is_native_or_intrinsic();
+    match kind {
+        BehaviorKind::ResultOf => {
+            (body_is_unavailable || !spec_derivation::move_fun_has_exact_value_model(env, qid))
+                && (functional_result_ensures(&spec).is_none() || has_mutable_parameter)
+        },
+        BehaviorKind::AbortsOf => {
+            fun_env.is_pragma_true(ABORTS_IF_IS_PARTIAL_PRAGMA, || false)
+                || (body_is_unavailable
+                    && spec.filter_kind(ConditionKind::AbortsIf).next().is_none()
+                    && env
+                        .get_intrinsics()
+                        .get_abort_spec_fun_for_move_fun(&qid)
+                        .is_none())
+        },
+        _ => false,
+    }
+}
+
+fn spec_fun_call_has_underivable_behavior(
+    env: &GlobalEnv,
+    mid: move_model::model::ModuleId,
+    sid: SpecFunId,
+    args: &[Exp],
+) -> bool {
+    let decl = env.get_spec_fun(mid.qualified(sid));
+    let Some(body) = &decl.body else {
+        return false;
+    };
+    body.any(&mut |sub| {
+        let ExpData::Call(_, Operation::Behavior(kind, _), bp_args) = sub else {
+            return false;
+        };
+        let Some(sym) = bp_args.first().and_then(|target| match target.as_ref() {
+            ExpData::LocalVar(_, sym) => Some(*sym),
+            _ => None,
+        }) else {
+            return false;
+        };
+        let Some(pos) = decl.params.iter().position(|param| param.0 == sym) else {
+            return false;
+        };
+        let Some(actual) = args.get(pos) else {
+            return false;
+        };
+        match actual.as_ref() {
+            ExpData::Call(_, Operation::Closure(fun_mid, fid, _), _) => {
+                move_fun_behavior_is_underivable(env, fun_mid.qualified(*fid), *kind)
+            },
+            ExpData::Lambda(_, _, body, _, _) if *kind == BehaviorKind::ResultOf => {
+                !spec_derivation::exp_has_exact_value_model(env, body)
+            },
+            _ => false,
+        }
+    })
+}
+
+fn uses_generic_type_reflection(env: &GlobalEnv, exp: &Exp) -> bool {
+    exp.called_spec_funs(env)
+        .iter()
+        .any(|qid| env.spec_fun_uses_generic_type_reflection(qid))
+}
+
+fn is_type_reflection_fun(fun: &FunctionEnv<'_>) -> bool {
+    fun.is_well_known(well_known::TYPE_NAME_MOVE)
+        || fun.is_well_known(well_known::TYPE_INFO_MOVE)
+        || fun.is_well_known(well_known::TYPE_NAME_GET_MOVE)
+}
+
+fn move_fun_uses_type_reflection(env: &GlobalEnv, qid: QualifiedFunId) -> bool {
+    let fun = env.get_function(qid);
+    is_type_reflection_fun(&fun)
+        || fun.get_def().is_some_and(|def| {
+            def.any(&mut |sub| {
+                let ExpData::Call(_, Operation::MoveFunction(mid, fid), _) = sub else {
+                    return false;
+                };
+                is_type_reflection_fun(&env.get_function(mid.qualified(*fid)))
+            })
+        })
+}
+
+fn behavior_uses_generic_type_reflection(env: &GlobalEnv, exp: &Exp) -> bool {
+    exp.any(&mut |sub| {
+        let ExpData::Call(_, Operation::Behavior(_, _), args) = sub else {
+            return false;
+        };
+        let Some(ExpData::Call(target_id, Operation::Closure(mid, fid, _), _)) =
+            args.first().map(|arg| arg.as_ref())
+        else {
+            return false;
+        };
+        env.get_node_instantiation(*target_id)
+            .iter()
+            .any(Type::is_type_parameter)
+            && move_fun_uses_type_reflection(env, mid.qualified(*fid))
+    })
+}
+
+fn lambda_uses_generic_type_reflection(env: &GlobalEnv, lambda: &Exp) -> bool {
+    let ExpData::Lambda(_, _, body, _, _) = lambda.as_ref() else {
+        return false;
+    };
+    body.any(&mut |exp| {
+        let ExpData::Call(id, Operation::MoveFunction(mid, fid), _) = exp else {
+            return false;
+        };
+        let fun = env.get_function(mid.qualified(*fid));
+        let specs_use_reflection = fun
+            .get_spec()
+            .conditions
+            .iter()
+            .any(|cond| uses_generic_type_reflection(env, &cond.exp));
+        let is_generic_call = env
+            .get_node_instantiation(*id)
+            .iter()
+            .any(Type::is_type_parameter);
+        let body_uses_reflection = fun.get_def().is_some_and(|def| {
+            def.any(&mut |sub| {
+                let ExpData::Call(sub_id, Operation::MoveFunction(sub_mid, sub_fid), _) = sub
+                else {
+                    return false;
+                };
+                is_type_reflection_fun(&env.get_function(sub_mid.qualified(*sub_fid)))
+                    && env
+                        .get_node_instantiation(*sub_id)
+                        .iter()
+                        .any(Type::is_type_parameter)
+            })
+        });
+        specs_use_reflection
+            || (is_generic_call && (is_type_reflection_fun(&fun) || body_uses_reflection))
+    })
+}
+
+/// Weakens only conjunction arms containing unresolved behavioral material.
+fn weaken_unresolved_conjuncts(env: &GlobalEnv, exp: &Exp) -> (Exp, bool) {
+    if let ExpData::Call(id, Operation::And, args) = exp.as_ref() {
+        let mut changed = false;
+        let args = args
+            .iter()
+            .map(|arg| {
+                let (arg, arg_changed) = weaken_unresolved_conjuncts(env, arg);
+                changed |= arg_changed;
+                arg
+            })
+            .collect();
+        if changed {
+            return (ExpData::Call(*id, Operation::And, args).into_exp(), true);
+        }
+        return (exp.clone(), false);
+    }
+    if exp.any(&mut |sub| {
+        is_unresolved_behavior(env, sub)
+            || matches!(
+                sub,
+                ExpData::Call(_, Operation::SpecFunction(mid, sid, _), args)
+                    if spec_fun_call_has_underivable_behavior(env, *mid, *sid, args)
+            )
+    }) {
+        let loc = env.get_node_loc(exp.node_id());
+        (env.new_bool_const(&loc, true), true)
+    } else {
+        (exp.clone(), false)
+    }
 }
 
 fn depends_on_behavior(env: &GlobalEnv, exp: &Exp) -> bool {
@@ -2890,6 +3149,20 @@ fn warn_underivable_concrete_behavior(env: &GlobalEnv, loc: &Loc, kind: Behavior
             "cannot derive `{kind}` exactly for this lambda argument: {missing}; \
              weakening the enclosing loop invariant; see \
              {INLINE_HOF_WEAKENING_ISSUE}"
+        ),
+    );
+}
+
+fn warn_generic_type_reflection_behavior(env: &GlobalEnv, loc: &Loc) {
+    if !env.is_verify_mode() {
+        return;
+    }
+    env.diag(
+        Severity::Warning,
+        loc,
+        &format!(
+            "generic type reflection is not yet supported through behavioral predicates; \
+             weakening the enclosing loop invariant; see {INLINE_HOF_WEAKENING_ISSUE}"
         ),
     );
 }
@@ -4538,26 +4811,30 @@ fn resolve_folds_of_occurrence(
         .any(|(_, value)| depends_on_behavior(env, value));
     let summary_affects_success = transformer_has_behavior || !derived.aborts.is_empty();
     let fold_summary_is_used = target_fun.is_some_and(|qid| {
-        env.get_function(qid)
-            .get_spec()
-            .conditions
-            .iter()
-            .filter(|cond| !cond.properties.contains_key(&inferred))
-            .any(|cond| match cond.kind {
-                ConditionKind::Ensures | ConditionKind::LetPost(..) => {
-                    summary_affects_success
-                        || !cond.exp.free_vars().is_disjoint(&capture_names)
-                        || !cond.exp.used_temporaries().is_disjoint(&capture_temps)
-                        || cond.exp.any(&mut |exp| {
-                            matches!(exp, ExpData::Call(_, Operation::Result(..), _))
-                        })
-                },
-                ConditionKind::Update | ConditionKind::Emits | ConditionKind::AbortsWith => true,
-                ConditionKind::AbortsIf => {
-                    !matches!(cond.exp.as_ref(), ExpData::Value(_, Value::Bool(false)))
-                },
-                _ => false,
-            })
+        let fun = env.get_function(qid);
+        fun.is_inline()
+            || fun
+                .get_spec()
+                .conditions
+                .iter()
+                .filter(|cond| !cond.properties.contains_key(&inferred))
+                .any(|cond| match cond.kind {
+                    ConditionKind::Ensures | ConditionKind::LetPost(..) => {
+                        summary_affects_success
+                            || !cond.exp.free_vars().is_disjoint(&capture_names)
+                            || !cond.exp.used_temporaries().is_disjoint(&capture_temps)
+                            || cond.exp.any(&mut |exp| {
+                                matches!(exp, ExpData::Call(_, Operation::Result(..), _))
+                            })
+                    },
+                    ConditionKind::Update | ConditionKind::Emits | ConditionKind::AbortsWith => {
+                        true
+                    },
+                    ConditionKind::AbortsIf => {
+                        !matches!(cond.exp.as_ref(), ExpData::Value(_, Value::Bool(false)))
+                    },
+                    _ => false,
+                })
     });
     let fun_params = deferred_fun_param_temps(env, target_fun);
     let transformer_depends_on_fun_param = capture_values
@@ -7097,52 +7374,27 @@ impl ExpRewriterFunctions for InlinedRewriter<'_, '_> {
     /// `try_inline_behavior_predicate` to detect loop invariants.
     fn rewrite_enter_condition(&mut self, _target: &SpecBlockTarget, cond: &Condition) {
         self.current_condition_kind = Some(cond.kind.clone());
-        self.current_condition_is_behavioral =
-            cond.kind == ConditionKind::LoopInvariant && depends_on_behavior(self.env, &cond.exp);
-        self.unresolved_bp_in_condition = false;
     }
 
-    /// Replaces a condition containing an unresolved behavioral predicate
-    /// by `true` (see `unresolved_bp_in_condition`).
     fn rewrite_condition(
         &mut self,
         _target: &SpecBlockTarget,
         cond: &Condition,
     ) -> Option<Condition> {
-        let mut result = cond.clone();
-        let mut changed = false;
-        if self.current_condition_is_behavioral {
-            result.properties.insert(
-                self.env.symbol_pool().make(BEHAVIORAL_INVARIANT_MARKER),
-                PropertyValue::Value(Value::Bool(true)),
-            );
-            changed = true;
+        if !self.env.is_verify_mode() && matches!(cond.kind, ConditionKind::LoopInvariant) {
+            return Some(Condition {
+                exp: self.env.new_bool_const(&cond.loc, true),
+                ..cond.clone()
+            });
         }
-        if self.unresolved_bp_in_condition {
-            self.unresolved_bp_in_condition = false;
-            self.unresolved_bp_in_spec = true;
-            let loc = self.env.get_node_loc(cond.exp.node_id());
-            result.exp = self.env.new_bool_const(&loc, true);
-            changed = true;
+        if !matches!(cond.kind, ConditionKind::LoopInvariant) {
+            return None;
         }
-        changed.then_some(result)
-    }
-
-    fn rewrite_spec(&mut self, _target: &SpecBlockTarget, spec: &Spec) -> Option<Spec> {
-        let marker = self.env.symbol_pool().make(BEHAVIORAL_INVARIANT_MARKER);
-        let weaken_behavioral_invariants = self.unresolved_bp_in_spec;
-        self.unresolved_bp_in_spec = false;
-        let mut result = spec.clone();
-        let mut changed = false;
-        for cond in &mut result.conditions {
-            let is_behavioral = cond.properties.remove(&marker).is_some();
-            changed |= is_behavioral;
-            if weaken_behavioral_invariants && is_behavioral {
-                let loc = self.env.get_node_loc(cond.exp.node_id());
-                cond.exp = self.env.new_bool_const(&loc, true);
-            }
-        }
-        changed.then_some(result)
+        let (exp, changed) = weaken_unresolved_conjuncts(self.env, &cond.exp);
+        changed.then(|| Condition {
+            exp,
+            ..cond.clone()
+        })
     }
 
     /// Record that the provided symbols have local definitions, so renaming should be done.
@@ -7169,7 +7421,16 @@ impl ExpRewriterFunctions for InlinedRewriter<'_, '_> {
     fn rewrite_node_id(&mut self, id: NodeId) -> Option<NodeId> {
         let loc = self.env.get_node_loc(id);
         let new_loc = loc.inlined_from(self.call_site_loc);
-        ExpData::instantiate_node_new_loc(self.env, id, self.type_args, &new_loc)
+        let result = ExpData::instantiate_node_new_loc(self.env, id, self.type_args, &new_loc);
+        if let Some(new_id) = result
+            && self
+                .env
+                .get_extension::<UnresolvedBehaviorNodes>()
+                .is_some_and(|nodes| nodes.nodes.borrow().contains(&id))
+        {
+            mark_unresolved_behavior(self.env, new_id);
+        }
+        result
     }
 
     /// Replaces symbol uses that are shadowed with the shadow symbol.

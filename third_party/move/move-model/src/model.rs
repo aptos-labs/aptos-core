@@ -637,7 +637,9 @@ pub struct GlobalEnv {
     /// from `is_spec_fun_used` or iteration is held.
     pub(crate) used_spec_funs: RefCell<BTreeSet<QualifiedId<SpecFunId>>>,
     /// Spec-function calls originating in inlined behavioral predicates.
-    pub(crate) move_equality_congruence_spec_fun_calls: RefCell<BTreeSet<NodeId>>,
+    /// Locations survive AST cloning while node ids do not.
+    pub(crate) move_equality_congruence_spec_fun_calls:
+        RefCell<BTreeSet<(Loc, QualifiedId<SpecFunId>)>>,
     /// An annotation of all intrinsic declarations
     pub(crate) intrinsics: IntrinsicsAnnotation,
     /// A type-indexed container for storing extension data in the environment.
@@ -1644,19 +1646,23 @@ impl GlobalEnv {
     /// verification fallback.
     pub fn mark_move_equality_congruence_spec_funs_in(&self, exp: &Exp) {
         exp.visit_pre_order(&mut |sub| {
-            if let ExpData::Call(id, Operation::SpecFunction(..), _) = sub {
+            if let ExpData::Call(id, Operation::SpecFunction(mid, fid, _), _) = sub {
                 self.move_equality_congruence_spec_fun_calls
                     .borrow_mut()
-                    .insert(*id);
+                    .insert((self.get_node_loc(*id), mid.qualified(*fid)));
             }
             true
         });
     }
 
-    pub fn spec_fun_call_needs_move_equality_congruence(&self, id: NodeId) -> bool {
+    pub fn spec_fun_call_needs_move_equality_congruence(
+        &self,
+        id: NodeId,
+        fun: QualifiedId<SpecFunId>,
+    ) -> bool {
         self.move_equality_congruence_spec_fun_calls
             .borrow()
-            .contains(&id)
+            .contains(&(self.get_node_loc(id), fun))
     }
 
     /// Determines whether the given spec fun is recursive.
