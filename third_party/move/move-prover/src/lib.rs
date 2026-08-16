@@ -586,7 +586,7 @@ fn report_verification_timing(timing: &VerificationTiming) {
         "failed"
     };
     info!(
-        "{:>9.3}s {} {}",
+        "{:>6.3}s {} {}",
         timing.duration.as_secs_f64(),
         result,
         timing.verification_condition
