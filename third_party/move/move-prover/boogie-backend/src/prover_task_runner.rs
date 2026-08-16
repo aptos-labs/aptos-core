@@ -293,22 +293,23 @@ impl ProverTask for RunBoogieWithSeeds {
 
     async fn run(&mut self, task_id: Self::TaskId, sem: Arc<Semaphore>) -> Self::TaskResult {
         let _guard = sem.acquire().await;
+        if task_id == self.options.random_seed {
+            // Wake delayed fallback seeds even when the package deadline has
+            // already expired. They then observe the same deadline and finish
+            // instead of waiting forever for a primary process that will not run.
+            self.primary_started.notify_one();
+        } else if let Some(delay) = self.seed_handoff_after {
+            log::info!(
+                "primary Boogie seed used {:.1}s; starting fallback seed {}",
+                delay.as_secs_f64(),
+                task_id
+            );
+        }
         if self
             .process_deadline
             .is_some_and(|deadline| deadline <= Instant::now())
         {
             return Err(std::io::Error::from(std::io::ErrorKind::TimedOut));
-        }
-        if task_id == self.options.random_seed {
-            self.primary_started.notify_one();
-        } else {
-            if let Some(delay) = self.seed_handoff_after {
-                log::info!(
-                    "primary Boogie seed used {:.1}s; starting fallback seed {}",
-                    delay.as_secs_f64(),
-                    task_id
-                );
-            }
         }
         let args = self
             .get_boogie_command(task_id)
@@ -776,5 +777,40 @@ mod tests {
             .unwrap()
             .block_on(task.run(0, Arc::new(Semaphore::new(1))));
         assert_eq!(result.unwrap_err().kind(), std::io::ErrorKind::TimedOut);
+    }
+
+    #[test]
+    fn expired_primary_wakes_delayed_fallback() {
+        let task = RunBoogieWithSeeds {
+            options: BoogieOptions::default(),
+            boogie_file: "test.bpl".to_string(),
+            prefer_primary: false,
+            process_timeout_secs: 60,
+            process_deadline: Some(Instant::now() - Duration::from_secs(1)),
+            seed_handoff_after: Some(Duration::from_millis(1)),
+            primary_started: Arc::new(Notify::new()),
+        };
+        tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .unwrap()
+            .block_on(async move {
+                let mut primary = task.clone();
+                assert_eq!(
+                    primary
+                        .run(primary.options.random_seed, Arc::new(Semaphore::new(1)))
+                        .await
+                        .unwrap_err()
+                        .kind(),
+                    std::io::ErrorKind::TimedOut
+                );
+                let mut fallback = task;
+                assert!(tokio::time::timeout(
+                    Duration::from_millis(50),
+                    fallback.wait_for_retry(1)
+                )
+                .await
+                .is_ok());
+            });
     }
 }

@@ -219,6 +219,29 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
     }
 }
 
+fn opaque_framed_memory(
+    env: &GlobalEnv,
+    callee: &FunctionEnv,
+) -> BTreeSet<QualifiedInstId<StructId>> {
+    callee
+        .get_frame_spec()
+        .map(|frame| {
+            frame
+                .modifies_targets
+                .iter()
+                .filter_map(
+                    |target| match env.get_node_type(target.node_id()).skip_reference() {
+                        Type::Struct(mid, sid, inst) => {
+                            Some(mid.qualified_inst(*sid, inst.clone()))
+                        },
+                        _ => None,
+                    },
+                )
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 /// Maximum number of split combinations before we emit an error.
 const MAX_SPLIT_COMBINATIONS: usize = 1024;
 
@@ -413,6 +436,8 @@ struct Instrumenter<'a> {
     /// Resource types explicitly framed by opaque callees before call-site type
     /// substitution.
     opaque_callee_framed_memory: BTreeMap<QualifiedId<FunId>, BTreeSet<QualifiedInstId<StructId>>>,
+    /// Unframed memory possibly modified by opaque closures invoked in this function.
+    opaque_closure_modifies: BTreeSet<QualifiedInstId<StructId>>,
     /// Map from Nop AttrId to split expression and optional guard (for `split` proof items).
     /// AttrIds are stable across optimization passes, unlike bytecode offsets.
     /// The optional guard is a path condition from enclosing `if` in the proof block.
@@ -472,32 +497,33 @@ impl<'a> Instrumenter<'a> {
                     callee.is_opaque().then(|| {
                         (
                             mid.qualified(*fid),
-                            callee
-                                .get_frame_spec()
-                                .map(|frame| {
-                                    frame
-                                        .modifies_targets
-                                        .iter()
-                                        .filter_map(|target| {
-                                            match fun_env
-                                                .module_env
-                                                .env
-                                                .get_node_type(target.node_id())
-                                                .skip_reference()
-                                            {
-                                                Type::Struct(mid, sid, inst) => {
-                                                    Some(mid.qualified_inst(*sid, inst.clone()))
-                                                },
-                                                _ => None,
-                                            }
-                                        })
-                                        .collect()
-                                })
-                                .unwrap_or_default(),
+                            opaque_framed_memory(fun_env.module_env.env, &callee),
                         )
                     })
                 },
                 _ => None,
+            })
+            .collect();
+        let opaque_closure_modifies = data
+            .code
+            .iter()
+            .filter_map(|bc| match bc {
+                Bytecode::Call(_, _, Operation::Closure(mid, fid, targs, _), _, _) => {
+                    let callee = fun_env.module_env.env.get_module(*mid).into_function(*fid);
+                    callee.is_opaque().then(|| (mid.qualified(*fid), targs))
+                },
+                _ => None,
+            })
+            .flat_map(|(callee_qid, targs)| {
+                let callee = fun_env.module_env.env.get_function(callee_qid);
+                let framed_memory = opaque_framed_memory(fun_env.module_env.env, &callee);
+                all_opaque_callee_modifies
+                    .get(&callee_qid)
+                    .into_iter()
+                    .flatten()
+                    .filter(|mem| !framed_memory.contains(mem))
+                    .map(|mem| mem.instantiate_ref(targs))
+                    .collect_vec()
             })
             .collect();
 
@@ -598,6 +624,7 @@ impl<'a> Instrumenter<'a> {
             mem_info: &mem_info,
             opaque_callee_modifies,
             opaque_callee_framed_memory,
+            opaque_closure_modifies,
             split_points: vec![],
         };
         // Always inline spec lets in proof actions, independent of the
@@ -816,6 +843,17 @@ impl<'a> Instrumenter<'a> {
             },
             Call(id, dests, Function(mid, fid, targs), srcs, aa) => {
                 self.instrument_call(spec, id, dests, mid, fid, targs, srcs, aa);
+            },
+            Call(id, dests, Invoke, srcs, _) => {
+                self.builder.emit(Call(
+                    id,
+                    dests,
+                    Invoke,
+                    srcs,
+                    Some(AbortAction(self.abort_label, self.abort_local)),
+                ));
+                self.can_abort = true;
+                self.emit_global_havocs(self.opaque_closure_modifies.clone());
             },
             Call(id, dests, oper, srcs, _) if oper.can_abort() => {
                 self.builder.emit(Call(
@@ -1100,37 +1138,15 @@ impl<'a> Instrumenter<'a> {
                 .get(&callee_qid)
                 .cloned()
                 .unwrap_or_default();
-            for mem in self
+            let unframed_memory = self
                 .opaque_callee_modifies
                 .get(&callee_qid)
                 .into_iter()
                 .flatten()
                 .filter(|mem| !framed_memory.contains(mem))
                 .map(|mem| mem.instantiate_ref(targs))
-                .filter(|mem| {
-                    !env.is_wellknown_event_handle_type(&Type::Struct(
-                        mem.module_id,
-                        mem.id,
-                        vec![],
-                    )) && !env.get_struct_qid(mem.to_qualified_id()).is_ghost_memory()
-                })
-            {
-                let op = Operation::HavocGlobal(mem.module_id, mem.id, mem.inst.clone());
-                self.builder
-                    .emit_with(|id| Call(id, vec![], op, vec![], None));
-                if let Some(exp) =
-                    self.builder
-                        .mk_inst_mem_quant_opt(QuantKind::Forall, &mem, &mut |val| {
-                            Some(self.builder.mk_call(
-                                &BOOL_TYPE,
-                                ast::Operation::WellFormed,
-                                vec![val],
-                            ))
-                        })
-                {
-                    self.builder.emit_with(|id| Prop(id, Assume, exp));
-                }
-            }
+                .collect_vec();
+            self.emit_global_havocs(unframed_memory);
 
             // Havoc all &mut parameters, their post-value are to be determined by the post
             // conditions.
@@ -2559,6 +2575,33 @@ impl<'a> Instrumenter<'a> {
         self.builder
             .emit_with(|id| Bytecode::Call(id, dests, opaque_op, srcs, aa));
     }
+
+    fn emit_global_havocs(
+        &mut self,
+        memories: impl IntoIterator<Item = QualifiedInstId<StructId>>,
+    ) {
+        let env = self.builder.global_env();
+        for mem in memories.into_iter().filter(|mem| {
+            !env.is_wellknown_event_handle_type(&Type::Struct(mem.module_id, mem.id, vec![]))
+                && !env.get_struct_qid(mem.to_qualified_id()).is_ghost_memory()
+        }) {
+            let op = Operation::HavocGlobal(mem.module_id, mem.id, mem.inst.clone());
+            self.builder
+                .emit_with(|id| Bytecode::Call(id, vec![], op, vec![], None));
+            if let Some(exp) =
+                self.builder
+                    .mk_inst_mem_quant_opt(QuantKind::Forall, &mem, &mut |val| {
+                        Some(
+                            self.builder
+                                .mk_call(&BOOL_TYPE, ast::Operation::WellFormed, vec![val]),
+                        )
+                    })
+            {
+                self.builder
+                    .emit_with(|id| Bytecode::Prop(id, PropKind::Assume, exp));
+            }
+        }
+    }
 }
 
 // =================================================================================================
@@ -2844,12 +2887,27 @@ fn warn_coarse_opaque_calls(
     if !info.verified && !info.inlined {
         return;
     }
-    for callee_qid in fun_env
+    let mut opaque_callees: BTreeSet<_> = fun_env
         .get_called_functions()
         .expect(COMPILED_MODULE_AVAILABLE)
+        .iter()
+        .copied()
+        .collect();
+    if target
+        .get_bytecode()
+        .iter()
+        .any(|bc| matches!(bc, Bytecode::Call(_, _, Operation::Invoke, _, _)))
     {
-        let callee = env.get_function(*callee_qid);
-        if !callee.is_opaque() || !warned.insert(*callee_qid) {
+        opaque_callees.extend(target.get_bytecode().iter().filter_map(|bc| match bc {
+            Bytecode::Call(_, _, Operation::Closure(mid, fid, _, _), _, _) => {
+                Some(mid.qualified(*fid))
+            },
+            _ => None,
+        }));
+    }
+    for callee_qid in opaque_callees {
+        let callee = env.get_function(callee_qid);
+        if !callee.is_opaque() || !warned.insert(callee_qid) {
             continue;
         }
         let callee_target = targets.get_target(&callee, &FunctionVariant::Baseline);

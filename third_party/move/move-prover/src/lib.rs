@@ -529,29 +529,6 @@ fn verification_output_base(
     Ok((output, Some(dir)))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn verification_output_is_temporary_unless_kept() {
-        let options = Options::default();
-        let (output, temporary_dir) = verification_output_base(&options).unwrap();
-        let temporary_dir = temporary_dir.unwrap();
-        assert_eq!(Path::new(&output).parent(), Some(temporary_dir.path()));
-        let temporary_path = temporary_dir.path().to_path_buf();
-        drop(temporary_dir);
-        assert!(!temporary_path.exists());
-
-        let mut options = Options::default();
-        options.output_path = "kept.bpl".to_string();
-        options.backend.keep_artifacts = true;
-        let (output, temporary_dir) = verification_output_base(&options).unwrap();
-        assert_eq!(output, "kept.bpl");
-        assert!(temporary_dir.is_none());
-    }
-}
-
 fn make_verification_timing(
     env: &GlobalEnv,
     root: &VerificationRoot,
@@ -649,4 +626,32 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
     }
 
     targets
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn verification_output_is_temporary_unless_kept() {
+        let options = Options::default();
+        let (output, temporary_dir) = verification_output_base(&options).unwrap();
+        let temporary_dir = temporary_dir.unwrap();
+        assert_eq!(Path::new(&output).parent(), Some(temporary_dir.path()));
+        let temporary_path = temporary_dir.path().to_path_buf();
+        drop(temporary_dir);
+        assert!(!temporary_path.exists());
+
+        let options = Options {
+            output_path: "kept.bpl".to_string(),
+            backend: move_prover_boogie_backend::options::BoogieOptions {
+                keep_artifacts: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let (output, temporary_dir) = verification_output_base(&options).unwrap();
+        assert_eq!(output, "kept.bpl");
+        assert!(temporary_dir.is_none());
+    }
 }
