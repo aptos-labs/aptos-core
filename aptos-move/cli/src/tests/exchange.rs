@@ -28,7 +28,7 @@ l2: move_loc x
         .unwrap(),
     )
     .unwrap();
-    assert_eq!(json["version"], json!(5));
+    assert_eq!(json["version"], json!(7));
     let fun = &json["funs"][0];
     assert_eq!(fun["name"], json!("count_down"));
     assert_eq!(fun["params"], json!(1));
@@ -169,6 +169,7 @@ module 0x42::account {
         modifies global<Account>(addr);
     }
 }
+
 "#,
         )
         .unwrap(),
@@ -192,6 +193,47 @@ module 0x42::account {
         fun["spec"]["modifies"],
         json!([{"resource": 0, "addr": {"local": 0}}])
     );
+}
+
+#[test]
+fn move_source_generics() {
+    let json = serde_json::to_value(
+        exchange::move_source_to_module(
+            r#"
+module 0x42::generics {
+    struct Box<T: copy + drop + store> has copy, drop, store { value: T }
+
+    fun identity<T: copy + drop>(value: T): T { value }
+
+    fun round_trip(value: u64): u64 {
+        let boxed = Box<u64> { value: identity<u64>(value) };
+        let Box { value } = boxed;
+        value
+    }
+}
+"#,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        json["structs"][0]["type_parameters"],
+        json!([{"name": "T", "abilities": ["copy", "drop", "store"]}])
+    );
+    assert_eq!(
+        json["structs"][0]["fields"][0]["ty"],
+        json!({"type_parameter": 0})
+    );
+    assert_eq!(
+        json["funs"][0]["type_parameters"],
+        json!([{"name": "T", "abilities": ["copy", "drop"]}])
+    );
+    let round_trip = &json["funs"][1];
+    assert!(round_trip["blocks"][0]["instrs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|instr| instr.to_string().contains("function_inst")));
 }
 
 #[test]
@@ -219,6 +261,98 @@ module 0x42::declarations {
     .unwrap();
     assert_eq!(json["funs"].as_array().unwrap().len(), 1);
     assert_eq!(json["funs"][0]["name"], json!("call_inline"));
+}
+
+#[test]
+fn move_source_vectors() {
+    let json = serde_json::to_value(
+        exchange::move_source_to_module(
+            r#"
+module 0x42::vectors {
+    use std::vector;
+
+    fun exercise(first: u64): u64 {
+        let v = vector[first, 20];
+        vector::push_back(&mut v, 30);
+        let last = vector::pop_back(&mut v);
+        v[1] = 25;
+        last + vector::length(&v) + *vector::borrow(&v, 0) + v[1]
+    }
+}
+"#,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let fun = &json["funs"][0];
+    assert!(fun["locals"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|ty| ty == &json!({"vector": "u64"})));
+    let text = serde_json::to_string(fun).unwrap();
+    for operation in [
+        "vec_pack",
+        "vec_push",
+        "vec_pop",
+        "vec_len",
+        "borrow_vec_elem",
+        "write_ref",
+    ] {
+        assert!(text.contains(operation), "missing {operation} in {text}");
+    }
+}
+
+#[test]
+fn move_source_enums() {
+    let json = serde_json::to_value(
+        exchange::move_source_to_module(
+            r#"
+module 0x42::enums {
+    enum Choice has drop {
+        None,
+        One(u64),
+        Pair { left: u64, right: u64 },
+    }
+
+    fun inspect(choice: Choice): u64 {
+        match (choice) {
+            Choice::None => 0,
+            Choice::One(value) => value,
+            Choice::Pair { left, right } => left + right,
+        }
+    }
+
+    fun make(value: u64): Choice {
+        Choice::One(value)
+    }
+}
+"#,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        json["structs"][0],
+        json!({
+            "name": "Choice",
+            "fields": [],
+            "variants": [
+                {"name": "None", "fields": []},
+                {"name": "One", "fields": [{"name": "0", "ty": "u64"}]},
+                {"name": "Pair", "fields": [
+                    {"name": "left", "ty": "u64"},
+                    {"name": "right", "ty": "u64"}
+                ]}
+            ]
+        })
+    );
+    assert_eq!(json["funs"][0]["locals"][0], json!({"enum": 0}));
+    assert_eq!(json["funs"][1]["returns"][0], json!({"enum": 0}));
+    let text = serde_json::to_string(&json["funs"]).unwrap();
+    for operation in ["pack_variant", "unpack_variant", "test_variant"] {
+        assert!(text.contains(operation), "missing {operation} in {text}");
+    }
 }
 
 #[test]

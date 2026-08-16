@@ -1,9 +1,9 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
-import Move.Frontend.Elab
+import MoveModel.Frontend.Elab
 import Tests.Common
-import Move.IR.Interp
+import MoveModel.IR.Interp.Exec
 
 /-!
 # Interpreter Tests: Global Memory
@@ -17,8 +17,8 @@ boundary.
 
 namespace Tests.Interp.Globals
 
-open Move.IR
-open Move.Frontend
+open MoveModel.IR
+open MoveModel.Frontend.XIR
 
 def globalsM : MProgram := moveM% "
 module 0x42::globals {

@@ -321,11 +321,16 @@ impl<'a> BinaryModuleLoader<'a> {
             .entry(struct_id)
             .or_insert_with(|| {
                 new = true;
-                StructData {
-                    abilities: handle_view.abilities(),
-                    is_empty_struct: false, // Default to false when created from a compiled module
-                    ..StructData::new(struct_id.symbol(), loc.clone())
-                }
+                StructData::new_runtime(
+                    struct_id.symbol(),
+                    loc.clone(),
+                    handle_view.abilities(),
+                    type_params.clone(),
+                    field_data.clone(),
+                    variants.clone(),
+                    false,
+                    Visibility::Private,
+                )
             });
 
         // Verify consistency if the type is already loaded. Can't report it now because
@@ -524,15 +529,25 @@ impl<'a> BinaryModuleLoader<'a> {
             .entry(fun_id)
             .or_insert_with(|| {
                 new = true;
-                FunctionData {
+                FunctionData::new_runtime(
+                    fun_id.symbol(),
+                    loc.clone(),
                     visibility,
                     is_native,
-                    is_struct_api: is_struct_api_fn,
                     kind,
-                    attributes,
-                    ..FunctionData::new(fun_id.symbol(), loc)
-                }
+                    attributes.clone(),
+                    type_params.clone(),
+                    params.clone(),
+                    result_type.clone(),
+                    access_specifiers.clone(),
+                    None,
+                    None,
+                )
             });
+
+        if new {
+            fun_data.is_struct_api = is_struct_api_fn;
+        }
 
         // Verify consistency if the type is already loaded. Can't report it now because
         // the env is mut borrowed.

@@ -13297,6 +13297,7 @@ dependencies = [
  "move-core-types",
  "move-ir-types",
  "move-model",
+ "move-model-exchange",
  "move-prover-test-utils",
  "move-stackless-bytecode",
  "move-stdlib",

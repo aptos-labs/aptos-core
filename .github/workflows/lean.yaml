@@ -54,5 +54,5 @@ jobs:
           APTOS_CLI: ${{ github.workspace }}/target/debug/aptos
         run: |
           source "$HOME/.profile"
-          lake build Move
+          lake build MoveModel
           lake build Examples Tests

@@ -4320,9 +4320,37 @@ impl StructData {
             users: BTreeSet::new(),
         }
     }
+
+    /// Constructs the runtime-facing part of a struct declaration.
+    ///
+    /// Source and binary loaders share this constructor so declarations which
+    /// do not originate in the Move AST still initialize the model with the
+    /// same abilities, fields, variants, and visibility invariants.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn new_runtime(
+        name: Symbol,
+        loc: Loc,
+        abilities: AbilitySet,
+        type_params: Vec<TypeParameter>,
+        field_data: BTreeMap<FieldId, FieldData>,
+        variants: Option<BTreeMap<Symbol, StructVariant>>,
+        is_native: bool,
+        visibility: Visibility,
+    ) -> Self {
+        Self {
+            abilities,
+            type_params,
+            field_data,
+            variants,
+            is_native,
+            visibility,
+            is_empty_struct: false,
+            ..Self::new(name, loc)
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct StructVariant {
     pub(crate) loc: Loc,
     pub(crate) attributes: Vec<Attribute>,
@@ -5306,6 +5334,42 @@ impl FunctionData {
             def: None,
             called_funs: None,
             used_funs: None,
+        }
+    }
+
+    /// Constructs the runtime-facing part of a function declaration.
+    ///
+    /// `called_funs` is `None` when a later binary attachment will recover the
+    /// call graph. Source-independent IR loaders pass `Some`, including the
+    /// empty set, because no AST or compiled module exists to derive it from.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn new_runtime(
+        name: Symbol,
+        loc: Loc,
+        visibility: Visibility,
+        is_native: bool,
+        kind: FunctionKind,
+        attributes: Vec<Attribute>,
+        type_params: Vec<TypeParameter>,
+        params: Vec<Parameter>,
+        result_type: Type,
+        access_specifiers: Option<Vec<AccessSpecifier>>,
+        acquired_structs: Option<BTreeSet<StructId>>,
+        called_funs: Option<BTreeSet<QualifiedId<FunId>>>,
+    ) -> Self {
+        Self {
+            visibility,
+            is_native,
+            kind,
+            attributes,
+            type_params,
+            params,
+            result_type,
+            access_specifiers,
+            acquired_structs,
+            used_funs: called_funs.clone(),
+            called_funs,
+            ..Self::new(name, loc)
         }
     }
 }

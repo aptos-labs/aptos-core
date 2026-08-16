@@ -1,16 +1,16 @@
-name = "Move"
-defaultTargets = ["Move"]
+name = "MoveModel"
+defaultTargets = ["MoveModel"]
 testDriver = "Tests"
 
 [[lean_lib]]
-name = "Move"
+name = "MoveModel"
 
 # Frontend-embedding examples (`masm%`/`move%`): elaborating them runs the
 # Aptos CLI (`aptos move exchange`), hence not a default target.  Rooted
-# inside the library tree at `Move/Examples.lean`.
+# inside the library tree at `MoveModel/Examples.lean`.
 [[lean_lib]]
 name = "Examples"
-roots = ["Move.Examples"]
+roots = ["MoveModel.Examples"]
 
 # Interpreter unit tests (`#test`/`#guard`-based): elaborating them runs
 # the Aptos CLI (`aptos move exchange`), hence not a default target.

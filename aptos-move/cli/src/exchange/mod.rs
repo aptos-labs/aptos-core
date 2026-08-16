@@ -12,12 +12,12 @@
 //! layout order, and builds a [`move_model_exchange::Module`].  Callers
 //! serialize it to JSON with serde; the `move-model-exchange` crate's data
 //! structures are the normative schema of that JSON.  The Lean side
-//! (`Move/Frontend/` in the Lean project) invokes the command at elaboration
+//! (`MoveModel/Frontend/` in the Lean project) invokes the command at elaboration
 //! time, decoding the JSON into its `IR` representation.
 //!
 //! The export only contains what the Lean fragment can represent;
-//! everything else (generics, enums, vectors, non-u64 integer widths,
-//! casts, …) is rejected with an error.  Reference operations are passed
+//! everything else (unsupported vector instructions, non-u64
+//! integer widths, casts, …) is rejected with an error. Reference operations are passed
 //! through — the Lean model executes them; verifying borrow-based code goes
 //! through its reference elimination.
 
@@ -96,7 +96,19 @@ fn assemble_module(input: &str, ast: Unit) -> Result<CompiledModule> {
 /// format (declaration order).
 struct NameMaps {
     structs: BTreeMap<QualifiedId<StructId>, usize>,
+    variants: BTreeMap<QualifiedId<StructId>, BTreeMap<move_model::symbol::Symbol, usize>>,
     funs: BTreeMap<QualifiedId<FunId>, usize>,
+    vector_funs: BTreeMap<QualifiedId<FunId>, VectorFun>,
+}
+
+#[derive(Clone, Copy)]
+enum VectorFun {
+    Empty,
+    Length,
+    Borrow,
+    BorrowMut,
+    PushBack,
+    PopBack,
 }
 
 /// Where a function's loop invariants come from.
@@ -148,7 +160,7 @@ impl<'a> InvariantSource<'a> {
 }
 
 /// Scans the module declarations shared by both modes: dense struct and
-/// function ids in declaration order (enums and natives are rejected;
+/// function ids in declaration order (natives are rejected;
 /// declarations without executable bytecode are skipped), the translated
 /// structs, the function environments to dump, and their baseline
 /// stackless-bytecode targets. Structs take two passes, so that field types
@@ -164,33 +176,65 @@ fn scan_module<'env>(
     let pool = module_env.env.symbol_pool();
 
     let mut struct_map = BTreeMap::new();
+    let mut variant_map = BTreeMap::new();
     for struct_env in module_env.get_structs() {
         if struct_env.has_variants() {
-            bail!(
-                "enum `{}` not supported",
-                struct_env.get_name().display(pool)
+            variant_map.insert(
+                struct_env.get_qualified_id(),
+                struct_env
+                    .get_variants()
+                    .enumerate()
+                    .map(|(index, name)| (name, index))
+                    .collect(),
             );
         }
         struct_map.insert(struct_env.get_qualified_id(), struct_map.len());
     }
+    let mut maps = NameMaps {
+        structs: struct_map,
+        variants: variant_map,
+        funs: BTreeMap::new(),
+        vector_funs: BTreeMap::new(),
+    };
     let mut structs = vec![];
     for struct_env in module_env.get_structs() {
-        let fields = struct_env
-            .get_fields()
-            .map(|field| {
-                Ok(exchange::Field {
-                    name: field.get_name().display(pool).to_string(),
-                    ty: translate_type(&struct_map, &field.get_type())?,
-                })
+        let translate_field = |field: move_model::model::FieldEnv<'_>| {
+            Ok(exchange::Field {
+                name: field.get_name().display(pool).to_string(),
+                ty: translate_type(&maps, &field.get_type())?,
             })
-            .collect::<Result<Vec<_>>>()?;
+        };
+        let (fields, variants) = if struct_env.has_variants() {
+            let variants = struct_env
+                .get_variants()
+                .map(|variant| {
+                    Ok(exchange::Variant {
+                        name: variant.display(pool).to_string(),
+                        fields: struct_env
+                            .get_fields_of_variant(variant)
+                            .map(&translate_field)
+                            .collect::<Result<Vec<_>>>()?,
+                    })
+                })
+                .collect::<Result<Vec<_>>>()?;
+            (vec![], Some(variants))
+        } else {
+            (
+                struct_env
+                    .get_fields()
+                    .map(&translate_field)
+                    .collect::<Result<Vec<_>>>()?,
+                None,
+            )
+        };
         structs.push(exchange::Struct {
             name: struct_env.get_name().display(pool).to_string(),
+            type_parameters: translate_type_parameters(pool, struct_env.get_type_parameters()),
             fields,
+            variants,
         });
     }
 
-    let mut fun_map = BTreeMap::new();
     let mut fun_envs = vec![];
     for func_env in module_env.get_functions() {
         if func_env.is_struct_api() || func_env.is_excluded_from_bytecode_gen() {
@@ -202,23 +246,37 @@ fn scan_module<'env>(
                 func_env.get_name().display(pool)
             );
         }
-        fun_map.insert(func_env.get_qualified_id(), fun_envs.len());
+        maps.funs
+            .insert(func_env.get_qualified_id(), fun_envs.len());
         fun_envs.push(func_env);
+    }
+
+    for vector_module in module_env.env.get_modules().filter(|m| m.is_std_vector()) {
+        // The compiler installs `0x1::vector` as an implicit dependency
+        // containing the module identity but not necessarily FunctionEnv
+        // declarations. Stackless vector bytecodes still use these FunIds.
+        for (name, op) in [
+            ("empty", VectorFun::Empty),
+            ("length", VectorFun::Length),
+            ("borrow", VectorFun::Borrow),
+            ("borrow_mut", VectorFun::BorrowMut),
+            ("push_back", VectorFun::PushBack),
+            ("pop_back", VectorFun::PopBack),
+        ] {
+            maps.vector_funs.insert(
+                vector_module
+                    .get_id()
+                    .qualified(FunId::new(pool.make(name))),
+                op,
+            );
+        }
     }
 
     let mut targets = FunctionTargetsHolder::default();
     for func_env in &fun_envs {
         targets.add_target(func_env);
     }
-    Ok((
-        NameMaps {
-            structs: struct_map,
-            funs: fun_map,
-        },
-        structs,
-        fun_envs,
-        targets,
-    ))
+    Ok((maps, structs, fun_envs, targets))
 }
 
 fn dump_module(
@@ -247,7 +305,7 @@ fn dump_module(
             .find(|f| f.name == name)
             .ok_or_else(|| anyhow!("function `{}` not found in the masm AST", name))?;
         let locals = (0..target.get_local_count())
-            .map(|i| translate_type(&maps.structs, target.get_local_type(i)))
+            .map(|i| translate_type(&maps, target.get_local_type(i)))
             .collect::<Result<Vec<_>>>()
             .with_context(|| format!("in function `{}`", name))?;
         let returns = translate_return_types(&maps, func_env)
@@ -292,6 +350,7 @@ fn dump_module(
             .collect::<Result<Vec<_>>>()?;
         let fun = dump_function(
             &name,
+            translate_type_parameters(pool, &func_env.get_type_parameters()),
             func_env.get_parameter_count(),
             locals,
             returns,
@@ -309,28 +368,39 @@ fn dump_module(
 }
 
 /// Translates a move-model type into the exchange fragment.
-fn translate_type(
-    structs: &BTreeMap<QualifiedId<StructId>, usize>,
-    ty: &move_model::ty::Type,
-) -> Result<exchange::Type> {
+fn translate_type(maps: &NameMaps, ty: &move_model::ty::Type) -> Result<exchange::Type> {
     use move_model::ty::{PrimitiveType, ReferenceKind, Type};
     match ty {
         Type::Primitive(PrimitiveType::Bool) => Ok(exchange::Type::Bool),
         Type::Primitive(PrimitiveType::U64) => Ok(exchange::Type::U64),
         Type::Primitive(PrimitiveType::Address) => Ok(exchange::Type::Address),
         Type::Primitive(PrimitiveType::Signer) => Ok(exchange::Type::Signer),
+        Type::TypeParameter(index) => Ok(exchange::Type::TypeParameter(*index as usize)),
         Type::Struct(mid, sid, targs) => {
-            if !targs.is_empty() {
-                bail!("generic struct types not supported");
-            }
-            let idx = structs
-                .get(&mid.qualified(*sid))
+            let qualified = mid.qualified(*sid);
+            let idx = maps
+                .structs
+                .get(&qualified)
                 .copied()
                 .ok_or_else(|| anyhow!("struct of foreign module not supported"))?;
-            Ok(exchange::Type::Struct(idx))
+            let args = targs
+                .iter()
+                .map(|arg| translate_type(maps, arg))
+                .collect::<Result<Vec<_>>>()?;
+            Ok(
+                match (maps.variants.contains_key(&qualified), args.is_empty()) {
+                    (true, true) => exchange::Type::Enum(idx),
+                    (true, false) => exchange::Type::EnumInst(idx, args),
+                    (false, true) => exchange::Type::Struct(idx),
+                    (false, false) => exchange::Type::StructInst(idx, args),
+                },
+            )
         },
+        Type::Vector(inner) => Ok(exchange::Type::Vector(Box::new(translate_type(
+            maps, inner,
+        )?))),
         Type::Reference(kind, inner) => {
-            let inner = Box::new(translate_type(structs, inner)?);
+            let inner = Box::new(translate_type(maps, inner)?);
             Ok(match kind {
                 ReferenceKind::Immutable => exchange::Type::Ref(inner),
                 ReferenceKind::Mutable => exchange::Type::MutRef(inner),
@@ -340,6 +410,31 @@ fn translate_type(
     }
 }
 
+fn ability_names(abilities: move_core_types::ability::AbilitySet) -> Vec<String> {
+    use move_core_types::ability::Ability;
+    [Ability::Copy, Ability::Drop, Ability::Store, Ability::Key]
+        .into_iter()
+        .filter(|ability| abilities.has_ability(*ability))
+        .map(|ability| ability.to_string())
+        .collect()
+}
+
+fn translate_type_parameters(
+    pool: &move_model::symbol::SymbolPool,
+    params: &[move_model::model::TypeParameter],
+) -> Vec<exchange::TypeParameter> {
+    params
+        .iter()
+        .map(
+            |move_model::model::TypeParameter(name, kind, _)| exchange::TypeParameter {
+                name: name.display(pool).to_string(),
+                abilities: ability_names(kind.abilities),
+                phantom: kind.is_phantom,
+            },
+        )
+        .collect()
+}
+
 /// The translated return types of a function (a tuple result flattens to
 /// one entry per component).
 fn translate_return_types(
@@ -347,11 +442,8 @@ fn translate_return_types(
     func_env: &move_model::model::FunctionEnv,
 ) -> Result<Vec<exchange::Type>> {
     match func_env.get_result_type() {
-        move_model::ty::Type::Tuple(ts) => ts
-            .iter()
-            .map(|t| translate_type(&maps.structs, t))
-            .collect(),
-        ty => Ok(vec![translate_type(&maps.structs, &ty)?]),
+        move_model::ty::Type::Tuple(ts) => ts.iter().map(|t| translate_type(maps, t)).collect(),
+        ty => Ok(vec![translate_type(maps, &ty)?]),
     }
 }
 
@@ -441,13 +533,14 @@ pub fn dump_module_from_model(
         let locals = data
             .local_types
             .iter()
-            .map(|ty| translate_type(&maps.structs, ty))
+            .map(|ty| translate_type(&maps, ty))
             .collect::<Result<Vec<_>>>()
             .with_context(|| format!("in function `{}`", name))?;
         let returns = translate_return_types(&maps, func_env)
             .with_context(|| format!("in function `{}`", name))?;
         let fun = dump_function(
             &name,
+            translate_type_parameters(pool, &func_env.get_type_parameters()),
             func_env.get_parameter_count(),
             locals,
             returns,
@@ -489,6 +582,7 @@ fn reject_unsupported_source_specs(env: &GlobalEnv, module_env: &ModuleEnv<'_>) 
 
 fn dump_function(
     name: &str,
+    type_parameters: Vec<exchange::TypeParameter>,
     num_params: usize,
     mut locals: Vec<exchange::Type>,
     returns: Vec<exchange::Type>,
@@ -652,6 +746,7 @@ fn dump_function(
 
     let fun = exchange::Function {
         name: name.to_string(),
+        type_parameters,
         params: num_params,
         locals,
         returns,
@@ -680,6 +775,12 @@ fn constant_value(cons: &Constant) -> Result<exchange::Value> {
         Constant::Address(Address::Numerical(a)) => {
             Ok(exchange::Value::Address(a.to_hex_literal()))
         },
+        Constant::Vector(values) => Ok(exchange::Value::Vector(
+            values
+                .iter()
+                .map(constant_value)
+                .collect::<Result<Vec<_>>>()?,
+        )),
         cons => bail!("unsupported constant {:?}", cons),
     }
 }
@@ -705,12 +806,18 @@ fn translate_call(
             .copied()
             .ok_or_else(|| anyhow!("resource of foreign module not supported"))
     };
-    let no_generics = |tys: &[move_model::ty::Type]| -> Result<()> {
-        if tys.is_empty() {
-            Ok(())
-        } else {
-            bail!("generics not supported")
-        }
+    let type_args = |tys: &[move_model::ty::Type]| -> Result<Vec<exchange::Type>> {
+        tys.iter().map(|ty| translate_type(maps, ty)).collect()
+    };
+    let variant = |m: &move_model::model::ModuleId,
+                   s: &StructId,
+                   name: &move_model::symbol::Symbol|
+     -> Result<usize> {
+        maps.variants
+            .get(&m.qualified(*s))
+            .and_then(|variants| variants.get(name))
+            .copied()
+            .ok_or_else(|| anyhow!("variant of foreign or ordinary struct not supported"))
     };
     let instr = match op {
         Add => simple(exchange::Oper::Add),
@@ -746,50 +853,172 @@ fn translate_call(
             exchange::Instr::Call(dsts.to_vec(), exchange::Oper::Not, vec![tmp])
         },
         Pack(_, _, tys) => {
-            no_generics(tys)?;
-            simple(exchange::Oper::Pack)
+            let tys = type_args(tys)?;
+            simple(
+                if tys.is_empty() {
+                    exchange::Oper::Pack
+                } else {
+                    exchange::Oper::PackInst(tys)
+                },
+            )
         },
         Unpack(_, _, tys) => {
-            no_generics(tys)?;
-            simple(exchange::Oper::Unpack)
+            let tys = type_args(tys)?;
+            simple(
+                if tys.is_empty() {
+                    exchange::Oper::Unpack
+                } else {
+                    exchange::Oper::UnpackInst(tys)
+                },
+            )
+        },
+        PackVariant(m, s, name, tys) => {
+            let variant = variant(m, s, name)?;
+            let tys = type_args(tys)?;
+            simple(
+                if tys.is_empty() {
+                    exchange::Oper::PackVariant(variant)
+                } else {
+                    exchange::Oper::PackVariantInst(variant, tys)
+                },
+            )
+        },
+        UnpackVariant(m, s, name, tys) => {
+            let variant = variant(m, s, name)?;
+            let tys = type_args(tys)?;
+            simple(
+                if tys.is_empty() {
+                    exchange::Oper::UnpackVariant(variant)
+                } else {
+                    exchange::Oper::UnpackVariantInst(variant, tys)
+                },
+            )
+        },
+        TestVariant(m, s, name, tys) => {
+            let tys = type_args(tys)?;
+            let [src] = srcs else {
+                bail!("variant test expects one operand")
+            };
+            // The VM's TestVariant bytecode consumes an immutable reference,
+            // while the proof-facing IR operation tests an enum value.
+            let value_src = match locals.get(*src) {
+                Some(exchange::Type::Ref(inner)) | Some(exchange::Type::MutRef(inner)) => {
+                    let tmp = locals.len();
+                    locals.push((**inner).clone());
+                    instrs.push(exchange::Instr::Call(
+                        vec![tmp],
+                        exchange::Oper::ReadRef,
+                        vec![*src],
+                    ));
+                    tmp
+                },
+                Some(exchange::Type::Enum(_) | exchange::Type::EnumInst(_, _)) => *src,
+                _ => bail!("variant test operand is not an enum reference"),
+            };
+            exchange::Instr::Call(
+                dsts.to_vec(),
+                if tys.is_empty() {
+                    exchange::Oper::TestVariant(variant(m, s, name)?)
+                } else {
+                    exchange::Oper::TestVariantInst(variant(m, s, name)?, tys)
+                },
+                vec![value_src],
+            )
         },
         GetField(_, _, tys, offset) => {
-            no_generics(tys)?;
-            simple(exchange::Oper::GetField(*offset))
+            let tys = type_args(tys)?;
+            simple(
+                if tys.is_empty() {
+                    exchange::Oper::GetField(*offset)
+                } else {
+                    exchange::Oper::GetFieldInst(*offset, tys)
+                },
+            )
         },
         GetGlobal(m, s, tys) => {
-            no_generics(tys)?;
-            simple(exchange::Oper::GetGlobal(resource(m, s)?))
+            let resource = resource(m, s)?;
+            let tys = type_args(tys)?;
+            simple(
+                if tys.is_empty() {
+                    exchange::Oper::GetGlobal(resource)
+                } else {
+                    exchange::Oper::GetGlobalInst(resource, tys)
+                },
+            )
         },
         MoveTo(m, s, tys) => {
-            no_generics(tys)?;
-            simple(exchange::Oper::MoveTo(resource(m, s)?))
+            let resource = resource(m, s)?;
+            let tys = type_args(tys)?;
+            simple(
+                if tys.is_empty() {
+                    exchange::Oper::MoveTo(resource)
+                } else {
+                    exchange::Oper::MoveToInst(resource, tys)
+                },
+            )
         },
         MoveFrom(m, s, tys) => {
-            no_generics(tys)?;
-            simple(exchange::Oper::MoveFrom(resource(m, s)?))
+            let resource = resource(m, s)?;
+            let tys = type_args(tys)?;
+            simple(
+                if tys.is_empty() {
+                    exchange::Oper::MoveFrom(resource)
+                } else {
+                    exchange::Oper::MoveFromInst(resource, tys)
+                },
+            )
         },
         Exists(m, s, tys) => {
-            no_generics(tys)?;
-            simple(exchange::Oper::Exists(resource(m, s)?))
+            let resource = resource(m, s)?;
+            let tys = type_args(tys)?;
+            simple(
+                if tys.is_empty() {
+                    exchange::Oper::Exists(resource)
+                } else {
+                    exchange::Oper::ExistsInst(resource, tys)
+                },
+            )
         },
         Function(m, f, tys) => {
-            no_generics(tys)?;
+            if let Some(op) = maps.vector_funs.get(&m.qualified(*f)).copied() {
+                translate_vector_call(instrs, dsts, op, srcs, tys, maps, locals)?;
+                return Ok(());
+            }
             let idx = maps
                 .funs
                 .get(&m.qualified(*f))
                 .copied()
                 .ok_or_else(|| anyhow!("call to foreign or unsupported function"))?;
-            simple(exchange::Oper::Function(idx))
+            let tys = type_args(tys)?;
+            simple(
+                if tys.is_empty() {
+                    exchange::Oper::Function(idx)
+                } else {
+                    exchange::Oper::FunctionInst(idx, tys)
+                },
+            )
         },
         BorrowLoc => simple(exchange::Oper::BorrowLoc),
         BorrowField(_, _, tys, offset) => {
-            no_generics(tys)?;
-            simple(exchange::Oper::BorrowField(*offset))
+            let tys = type_args(tys)?;
+            simple(
+                if tys.is_empty() {
+                    exchange::Oper::BorrowField(*offset)
+                } else {
+                    exchange::Oper::BorrowFieldInst(*offset, tys)
+                },
+            )
         },
         BorrowGlobal(m, s, tys) => {
-            no_generics(tys)?;
-            simple(exchange::Oper::BorrowGlobal(resource(m, s)?))
+            let resource = resource(m, s)?;
+            let tys = type_args(tys)?;
+            simple(
+                if tys.is_empty() {
+                    exchange::Oper::BorrowGlobal(resource)
+                } else {
+                    exchange::Oper::BorrowGlobalInst(resource, tys)
+                },
+            )
         },
         ReadRef => simple(exchange::Oper::ReadRef),
         WriteRef => simple(exchange::Oper::WriteRef),
@@ -798,6 +1027,113 @@ fn translate_call(
         op => bail!("unsupported operation {:?}", op),
     };
     instrs.push(instr);
+    Ok(())
+}
+
+/// Lowers stackless calls which represent vector bytecodes into the
+/// proof-facing value operations. Mutating VM operations take `&mut vector<T>`;
+/// the exchange IR makes their read/functional-update/write-back explicit.
+fn translate_vector_call(
+    instrs: &mut Vec<exchange::Instr>,
+    dsts: &[usize],
+    op: VectorFun,
+    srcs: &[usize],
+    tys: &[move_model::ty::Type],
+    maps: &NameMaps,
+    locals: &mut Vec<exchange::Type>,
+) -> Result<()> {
+    let [elem_ty] = tys else {
+        bail!("vector operation expects exactly one type argument")
+    };
+    let elem_ty = translate_type(maps, elem_ty)?;
+    let vec_ty = exchange::Type::Vector(Box::new(elem_ty));
+    let mut fresh_vec = || {
+        let tmp = locals.len();
+        locals.push(vec_ty.clone());
+        tmp
+    };
+    match op {
+        VectorFun::Empty => {
+            if !srcs.is_empty() || dsts.len() != 1 {
+                bail!("vector::empty has an unexpected stackless signature")
+            }
+            instrs.push(exchange::Instr::Call(
+                dsts.to_vec(),
+                exchange::Oper::VecPack,
+                vec![],
+            ));
+        },
+        VectorFun::Length => {
+            let ([dst], [src]) = (dsts, srcs) else {
+                bail!("vector::length has an unexpected stackless signature")
+            };
+            let value = fresh_vec();
+            instrs.push(exchange::Instr::Call(
+                vec![value],
+                exchange::Oper::ReadRef,
+                vec![*src],
+            ));
+            instrs.push(exchange::Instr::Call(
+                vec![*dst],
+                exchange::Oper::VecLen,
+                vec![value],
+            ));
+        },
+        VectorFun::Borrow | VectorFun::BorrowMut => {
+            if dsts.len() != 1 || srcs.len() != 2 {
+                bail!("vector borrow has an unexpected stackless signature")
+            }
+            instrs.push(exchange::Instr::Call(
+                dsts.to_vec(),
+                exchange::Oper::BorrowVecElem,
+                srcs.to_vec(),
+            ));
+        },
+        VectorFun::PushBack => {
+            let ([], [reference, elem]) = (dsts, srcs) else {
+                bail!("vector::push_back has an unexpected stackless signature")
+            };
+            let value = fresh_vec();
+            let updated = fresh_vec();
+            instrs.push(exchange::Instr::Call(
+                vec![value],
+                exchange::Oper::ReadRef,
+                vec![*reference],
+            ));
+            instrs.push(exchange::Instr::Call(
+                vec![updated],
+                exchange::Oper::VecPush,
+                vec![value, *elem],
+            ));
+            instrs.push(exchange::Instr::Call(
+                vec![],
+                exchange::Oper::WriteRef,
+                vec![*reference, updated],
+            ));
+        },
+        VectorFun::PopBack => {
+            let ([elem], [reference]) = (dsts, srcs) else {
+                bail!("vector::pop_back has an unexpected stackless signature")
+            };
+            let value = fresh_vec();
+            let updated = fresh_vec();
+            instrs.push(exchange::Instr::Call(
+                vec![value],
+                exchange::Oper::ReadRef,
+                vec![*reference],
+            ));
+            instrs.push(exchange::Instr::Call(
+                vec![updated, *elem],
+                exchange::Oper::VecPop,
+                vec![value],
+            ));
+            instrs.push(exchange::Instr::Call(
+                vec![],
+                exchange::Oper::WriteRef,
+                vec![*reference, updated],
+            ));
+        },
+    }
     Ok(())
 }
 
@@ -857,12 +1193,16 @@ fn collect_loops(
                     exchange::Instr::Call(dsts, op, _) => {
                         val_targets.extend(dsts.iter().copied());
                         match op {
-                            Oper::MoveTo(r) | Oper::MoveFrom(r) | Oper::WriteGlobal(r) => {
+                            Oper::MoveTo(r)
+                            | Oper::MoveFrom(r)
+                            | Oper::WriteGlobal(r)
+                            | Oper::MoveToInst(r, _)
+                            | Oper::MoveFromInst(r, _) => {
                                 mem_targets.insert(*r);
                             },
                             // A call may modify anything; recognized when
                             // spec support lands. For now, reject.
-                            Oper::Function(_) => bail!(
+                            Oper::Function(_) | Oper::FunctionInst(_, _) => bail!(
                                 "calls inside loops not yet supported by loop-target collection"
                             ),
                             // A reference write may target any borrowed
@@ -884,8 +1224,17 @@ fn collect_loops(
                             | Oper::Or
                             | Oper::Not
                             | Oper::Pack
+                            | Oper::PackInst(_)
                             | Oper::Unpack
+                            | Oper::UnpackInst(_)
+                            | Oper::PackVariant(_)
+                            | Oper::PackVariantInst(_, _)
+                            | Oper::UnpackVariant(_)
+                            | Oper::UnpackVariantInst(_, _)
+                            | Oper::TestVariant(_)
+                            | Oper::TestVariantInst(_, _)
                             | Oper::GetField(_)
+                            | Oper::GetFieldInst(_, _)
                             | Oper::UpdateField(_)
                             | Oper::VecPack
                             | Oper::VecLen
@@ -894,10 +1243,14 @@ fn collect_loops(
                             | Oper::VecPush
                             | Oper::VecPop
                             | Oper::GetGlobal(_)
+                            | Oper::GetGlobalInst(_, _)
                             | Oper::Exists(_)
+                            | Oper::ExistsInst(_, _)
                             | Oper::BorrowLoc
                             | Oper::BorrowField(_)
+                            | Oper::BorrowFieldInst(_, _)
                             | Oper::BorrowGlobal(_)
+                            | Oper::BorrowGlobalInst(_, _)
                             | Oper::BorrowVecElem
                             | Oper::ReadRef
                             | Oper::FreezeRef => {},

@@ -2,7 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import Tests.Common
-import Move.IR.Interp
+import MoveModel.IR.Interp.Exec
 
 /-!
 # Interpreter Tests: The Mutation Algebra
@@ -18,7 +18,7 @@ generates.
 
 namespace Tests.Interp.Mutations
 
-open Move.IR
+open MoveModel.IR
 
 /-- A one-block function (parameters are the prefix of `locals`). -/
 private def fn (numParams : Nat) (locals : List Ty) (returns : List Ty)
