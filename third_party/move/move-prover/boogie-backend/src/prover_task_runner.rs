@@ -19,7 +19,7 @@ use std::{
 use tokio::{
     process::Command,
     sync::{Notify, Semaphore},
-    time::timeout,
+    time::{timeout, timeout_at},
 };
 
 const MAX_PERMITS: usize = usize::MAX >> 4;
@@ -293,14 +293,12 @@ impl ProverTask for RunBoogieWithSeeds {
 
     async fn run(&mut self, task_id: Self::TaskId, sem: Arc<Semaphore>) -> Self::TaskResult {
         let _guard = sem.acquire().await;
-        let remaining = self
+        if self
             .process_deadline
-            .map(|deadline| {
-                deadline
-                    .checked_duration_since(Instant::now())
-                    .ok_or_else(|| std::io::Error::from(std::io::ErrorKind::TimedOut))
-            })
-            .transpose()?;
+            .is_some_and(|deadline| deadline <= Instant::now())
+        {
+            return Err(std::io::Error::from(std::io::ErrorKind::TimedOut));
+        }
         if task_id == self.options.random_seed {
             self.primary_started.notify_one();
         } else {
@@ -320,23 +318,20 @@ impl ProverTask for RunBoogieWithSeeds {
             .args(&args[1..])
             .kill_on_drop(true)
             .output();
-        let process_timeout_secs = remaining.map_or(self.process_timeout_secs, |remaining| {
-            let remaining_secs = remaining
-                .as_secs()
-                .saturating_add(u64::from(remaining.subsec_nanos() > 0))
-                .max(1);
-            if self.process_timeout_secs == 0 {
-                remaining_secs
-            } else {
-                self.process_timeout_secs.min(remaining_secs)
-            }
-        });
-        if process_timeout_secs == 0 {
-            process.await
-        } else {
-            timeout(Duration::from_secs(process_timeout_secs), process)
+        let timeout_deadline = self
+            .process_deadline
+            .map(tokio::time::Instant::from_std)
+            .into_iter()
+            .chain((self.process_timeout_secs != 0).then(|| {
+                tokio::time::Instant::now() + Duration::from_secs(self.process_timeout_secs)
+            }))
+            .min();
+        if let Some(deadline) = timeout_deadline {
+            timeout_at(deadline, process)
                 .await
                 .unwrap_or_else(|_| Err(std::io::Error::from(std::io::ErrorKind::TimedOut)))
+        } else {
+            process.await
         }
     }
 
