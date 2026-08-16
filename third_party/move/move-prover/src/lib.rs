@@ -546,12 +546,12 @@ fn make_verification_timing(
 }
 
 fn report_verification_timing(timing: &VerificationTiming) {
-    info!(
-        "verification condition finished: {:>9.3}s {:<7} {}",
-        timing.duration.as_secs_f64(),
-        timing.status.as_str(),
-        timing.verification_condition
-    );
+    let result = if timing.status == BoogieRunStatus::Ok {
+        "ok"
+    } else {
+        "failed"
+    };
+    info!("{:>9.3}s {}", timing.duration.as_secs_f64(), result);
 }
 
 /// Create bytecode and process it.
