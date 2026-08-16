@@ -68,8 +68,11 @@ operations, with the borrow-based natives expressed through references):
 `vecPack` builds a vector from its operands (`vector::empty` + literals),
 `vecLen`/`vecGet`/`vecSet` read the length, an element, and functionally
 replace an element (aborting out of range, like `vector::borrow`),
-`vecPush`/`vecPop` append and remove at the back (`vecPop` aborts on the
-empty vector, `vecPush` when the length would exceed the `u64` range).
+`vecPush`/`vecPop` append and remove at the back, while
+`vecInsert`/`vecRemove` shift a suffix at a dynamic index. `vecPop` aborts on
+the empty vector, `vecInsert` when the index is beyond the end, and
+`vecRemove` when it is at or beyond the end. Growth also aborts when the
+length would exceed the `u64` range.
 `vecGet`/`vecSet` are also the reference-elimination residues of
 element borrows, alongside `updateField`/`writeGlobal`.
 
@@ -102,6 +105,8 @@ inductive Oper where
   | vecSet
   | vecPush
   | vecPop
+  | vecInsert
+  | vecRemove
   -- the mutation algebra (`Mvp::*` of TACAS'22 §3.1, `$Mutation` of the
   -- Boogie prelude): residues of the full reference elimination, never
   -- produced by frontends

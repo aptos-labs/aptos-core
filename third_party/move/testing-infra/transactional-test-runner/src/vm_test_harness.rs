@@ -14,8 +14,12 @@ use legacy_move_compiler::{
     shared::known_attributes::KnownAttribute,
 };
 use move_binary_format::{
-    access::ModuleAccess, compatibility::Compatibility, errors, errors::VMResult,
-    file_format::CompiledScript, CompiledModule,
+    access::ModuleAccess,
+    compatibility::Compatibility,
+    errors,
+    errors::{PartialVMResult, VMResult},
+    file_format::CompiledScript,
+    CompiledModule,
 };
 use move_bytecode_verifier::VerifierConfig;
 use move_command_line_common::{
@@ -41,6 +45,7 @@ use move_vm_runtime::{
     module_traversal::*,
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
+    native_functions::{make_table_from_iter, NativeContext, NativeFunction},
     AsFunctionValueExtension, AsUnsyncCodeStorage, AsUnsyncModuleStorage, CodeStorage,
     InstantiatedFunctionLoader, LegacyLoaderConfig, RuntimeEnvironment, ScriptLoader,
     StagingModuleStorage, TypeChecker,
@@ -50,18 +55,26 @@ use move_vm_test_utils::{
     InMemoryStorage,
 };
 use move_vm_types::{
+    loaded_data::runtime_types::Type,
+    natives::function::NativeResult,
     resolver::ResourceResolver,
     value_serde::{FunctionValueExtension, ValueSerDeContext},
-    values::Value,
+    values::{Struct, Value},
 };
 use once_cell::sync::Lazy;
+use smallvec::smallvec;
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     iter::Iterator,
     path::Path,
+    sync::Arc,
 };
 
 const STD_ADDR: AccountAddress = AccountAddress::ONE;
+
+const ORDERING_LESS_VARIANT: u16 = 0;
+const ORDERING_EQUAL_VARIANT: u16 = 1;
+const ORDERING_GREATER_VARIANT: u16 = 2;
 
 struct SimpleVMTestAdapter<'a> {
     compiled_state: CompiledState<'a>,
@@ -539,15 +552,35 @@ impl SimpleVMTestAdapter<'_> {
     }
 }
 
+fn native_compare(
+    _context: &mut NativeContext,
+    ty_args: &[Type],
+    arguments: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    debug_assert_eq!(ty_args.len(), 1);
+    debug_assert_eq!(arguments.len(), 2);
+
+    let variant = match arguments[0].compare(&arguments[1])? {
+        std::cmp::Ordering::Less => ORDERING_LESS_VARIANT,
+        std::cmp::Ordering::Equal => ORDERING_EQUAL_VARIANT,
+        std::cmp::Ordering::Greater => ORDERING_GREATER_VARIANT,
+    };
+    let result = Value::struct_(Struct::pack(vec![Value::u16(variant)]));
+    Ok(NativeResult::ok(0.into(), smallvec![result]))
+}
+
 fn create_runtime_environment(vm_config: VMConfig) -> RuntimeEnvironment {
-    RuntimeEnvironment::new_with_config(
-        move_stdlib::natives::all_natives(
-            STD_ADDR,
-            // TODO: come up with a suitable gas schedule
-            move_stdlib::natives::GasParameters::zeros(),
-        ),
-        vm_config,
-    )
+    let mut natives = move_stdlib::natives::all_natives(
+        STD_ADDR,
+        // TODO: come up with a suitable gas schedule
+        move_stdlib::natives::GasParameters::zeros(),
+    );
+    natives.extend(make_table_from_iter(STD_ADDR, [(
+        "cmp",
+        "compare",
+        Arc::new(native_compare) as NativeFunction,
+    )]));
+    RuntimeEnvironment::new_with_config(natives, vm_config)
 }
 
 fn get_gas_status(cost_table: &CostTable, gas_budget: Option<u64>) -> Result<GasStatus> {
@@ -595,8 +628,15 @@ impl PrecompiledFilesModules {
 }
 
 static PRECOMPILED_MOVE_STDLIB_V2: Lazy<PrecompiledFilesModules> = Lazy::new(|| {
+    let mut sources = move_stdlib::move_stdlib_files();
+    sources.push(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("src/cmp.move")
+            .to_string_lossy()
+            .into_owned(),
+    );
     let options = move_compiler_v2::Options {
-        sources: move_stdlib::move_stdlib_files(),
+        sources: sources.clone(),
         sources_deps: vec![],
         dependencies: vec![],
         named_address_mapping: move_stdlib::move_stdlib_named_addresses_strings(),
@@ -607,7 +647,7 @@ static PRECOMPILED_MOVE_STDLIB_V2: Lazy<PrecompiledFilesModules> = Lazy::new(|| 
 
     let (_global_env, modules) = move_compiler_v2::run_move_compiler_to_stderr(options)
         .expect("stdlib compilation succeeds");
-    PrecompiledFilesModules::new(move_stdlib::move_stdlib_files(), modules)
+    PrecompiledFilesModules::new(sources, modules)
 });
 
 #[derive(Debug, Clone, PartialEq, Eq)]

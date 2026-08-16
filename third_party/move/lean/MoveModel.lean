@@ -32,6 +32,8 @@ import MoveModel.Prover.Translate.Sim
 import MoveModel.Prover.Translate.Adequacy
 import MoveModel.Prover.Translate.Mono
 import MoveModel.Frontend.XIR
+import MoveModel.Frontend.XIR.FromIR
+import MoveModel.Frontend.XIR.Json
 import MoveModel.Frontend.Decode
 import MoveModel.Frontend.Elab
 import MoveModel.Examples.Account

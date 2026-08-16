@@ -1,0 +1,8 @@
+processed 1 task
+task 0 lines 1-11:  publish [import Move]
+Error: compilation errors:
+ 
+Leaner elaboration failed for `TEMPFILE`:
+TEMPFILE:7:57: error: `continue` in `LeanerRejectNonSelfContinue.invalid` calls `LeanerRejectNonSelfContinue.twice`; only a direct self-call can become a loop
+TEMPFILE:7:57: error: cannot evaluate code because 'sorryAx' uses 'sorry' and/or contains errors
+

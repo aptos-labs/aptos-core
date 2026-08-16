@@ -116,7 +116,7 @@ inductive InstrStop : Instr → MoveState → FrameOutcome → Prop where
       (hsrcs : srcs.mapM s.locals = some vs)
       (hop : op.sem s.current s.readTarget vs s.memory = some .abort) :
       InstrStop (.call dsts op srcs) s
-        (.abort s.memory runtimeAbortCode)
+        (.abort s.memory op.abortCode)
   | borrowGlobal {s : MoveState} {dst t : LocalIndex} {r : ResourceId}
       {a : Address}
       (ha : s.locals t = some (.address a))

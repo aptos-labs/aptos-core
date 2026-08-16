@@ -1,0 +1,23 @@
+-- Copyright © Aptos Foundation
+-- SPDX-License-Identifier: Apache-2.0
+
+import Move
+
+/-! A Lean-authored Move library imported by another Lean-authored module. -/
+
+namespace Tests.MovePrograms.Modules
+
+open Move
+open scoped Move Move.Compiler Move.Spec
+
+move_module Math where
+
+  @[move_public]
+  fun identity {T : Type} (value : T) : T := value
+
+  spec identity {T : Type} [Inhabited T] (value : T) where
+    ensures result = value
+
+  verify identity
+
+end Tests.MovePrograms.Modules

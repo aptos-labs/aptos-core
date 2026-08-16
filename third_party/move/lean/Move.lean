@@ -1,0 +1,34 @@
+-- Copyright © Aptos Foundation
+-- SPDX-License-Identifier: Apache-2.0
+
+import Move.Basic
+import Move.Action
+import Move.Attributes
+import Move.Syntax
+import Move.Semantics.Outcome
+import Move.Semantics.Spec
+import Move.Semantics.Checked
+import Move.Semantics.Reference
+import Move.Semantics.Vector
+import Move.Semantics.Global
+import Move.Verify.Contract
+import Move.Verify.Borrow
+import Move.Verify.Compare
+import Move.Verify.Syntax
+import Move.Compiler.LIR
+import Move.Compiler.LCNF
+import Move.Compiler.Normalize
+import Move.Compiler.Elab
+import Move.Compiler.Export
+
+/-!
+# Move source language
+
+`Move` is the source-language and compiler namespace for smart contracts
+authored in Lean and lowered to `MoveModel.IR`. The compiler tool remains
+named Leaner. Its implementation design is in `Move/README.md`.
+-/
+
+namespace Move
+
+end Move

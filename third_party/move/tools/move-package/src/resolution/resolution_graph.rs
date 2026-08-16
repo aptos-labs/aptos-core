@@ -21,7 +21,8 @@ use anyhow::{bail, Context, Result};
 use colored::Colorize;
 use legacy_move_compiler::command_line::DEFAULT_OUTPUT_DIR;
 use move_command_line_common::files::{
-    extension_equals, find_filenames, find_move_filenames, FileHash, MOVE_COMPILED_EXTENSION,
+    extension_equals, find_filenames, FileHash, LEAN_EXTENSION, MOVE_COMPILED_EXTENSION,
+    MOVE_EXTENSION,
 };
 use move_core_types::account_address::AccountAddress;
 use move_symbol_pool::Symbol;
@@ -791,10 +792,12 @@ impl ResolvedPackage {
                 .into_iter()
                 .map(|p| p.to_string_lossy().to_string())
                 .collect::<Vec<_>>();
-        Ok(find_move_filenames(&places_to_look, false)?
-            .into_iter()
-            .map(Symbol::from)
-            .collect())
+        Ok(find_filenames(&places_to_look, |path| {
+            extension_equals(path, MOVE_EXTENSION) || extension_equals(path, LEAN_EXTENSION)
+        })?
+        .into_iter()
+        .map(Symbol::from)
+        .collect())
     }
 
     pub fn get_bytecodes(&self) -> Result<Vec<FileName>> {

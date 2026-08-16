@@ -144,6 +144,8 @@ private def decodeOper (j : Json) : Dec Oper := do
   | "vec_set" => pure .vecSet
   | "vec_push" => pure .vecPush
   | "vec_pop" => pure .vecPop
+  | "vec_insert" => pure .vecInsert
+  | "vec_remove" => pure .vecRemove
   | "get_global" => pure (.getGlobal (← arg))
   | "get_global_inst" =>
     let a ← payloadArr tag 2 p

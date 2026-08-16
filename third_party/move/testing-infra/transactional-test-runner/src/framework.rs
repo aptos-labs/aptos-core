@@ -23,7 +23,10 @@ use move_binary_format::{
 };
 use move_command_line_common::{
     address::ParsedAddress,
-    files::{DECOMPILED_EXTENSION, DISASSEMBLED_EXTENSION, MOVE_ASM_EXTENSION, MOVE_EXTENSION},
+    files::{
+        DECOMPILED_EXTENSION, DISASSEMBLED_EXTENSION, LEAN_EXTENSION, MOVE_ASM_EXTENSION,
+        MOVE_EXTENSION,
+    },
     testing::{add_update_baseline_fix, format_diff, read_env_update_baseline, EXP_EXT},
     types::ParsedType,
     values::{ParsableValue, ParsedValue},
@@ -209,11 +212,16 @@ pub trait MoveTestAdapter<'a>: Sized {
                 start_line, command_lines_stop
             ),
         };
+        let data = match syntax {
+            SyntaxChoice::Source => temp_with_extension(data, MOVE_EXTENSION)?,
+            SyntaxChoice::Leaner => temp_with_extension(data, LEAN_EXTENSION)?,
+            SyntaxChoice::ASM => data,
+        };
         let data_path = data.path().to_str().unwrap();
         let run_config = self.run_config();
         let state = self.compiled_state();
         let (named_addr_opt, module, opt_model, warnings_opt) = match syntax {
-            SyntaxChoice::Source => {
+            SyntaxChoice::Source | SyntaxChoice::Leaner => {
                 // It is possible that a module gets republished. In this case, we need to filter
                 // existing pre-compiled dependencies to remove old module. Because we do not know
                 // in advance the module we are compiling, we need to see if the module matches the
@@ -330,6 +338,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                 let script = compile_asm_script(state.dep_modules(), data_path)?;
                 (script, None, None)
             },
+            SyntaxChoice::Leaner => bail!("Leaner XIR currently represents modules, not scripts"),
         };
         Ok((script, opt_model, warning_opt))
     }
@@ -545,7 +554,8 @@ pub trait MoveTestAdapter<'a>: Sized {
             };
             let cleaned_source = cleaned_source
                 .replace("--syntax=move", "")
-                .replace("--syntax=masm", "");
+                .replace("--syntax=masm", "")
+                .replace("--syntax=lean", "");
 
             let lines = self
                 .compiled_state()
@@ -580,6 +590,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     move_asm::disassembler::disassemble_module(&mut out, module)?;
                     out
                 },
+                SyntaxChoice::Leaner => unreachable!("Leaner is not a cross-compilation target"),
             };
             self.compiled_state()
                 .cross_compiled
@@ -611,6 +622,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     move_asm::disassembler::disassemble_script(&mut out, script)?;
                     out
                 },
+                SyntaxChoice::Leaner => unreachable!("Leaner is not a cross-compilation target"),
             };
             self.compiled_state()
                 .cross_compiled
@@ -838,6 +850,16 @@ impl<'a> CompiledState<'a> {
     }
 }
 
+fn temp_with_extension(data: NamedTempFile, extension: &str) -> Result<NamedTempFile> {
+    if data.path().extension().and_then(|ext| ext.to_str()) == Some(extension) {
+        return Ok(data);
+    }
+    let suffix = format!(".{extension}");
+    let mut result = tempfile::Builder::new().suffix(&suffix).tempfile()?;
+    std::io::copy(&mut data.reopen()?, result.as_file_mut())?;
+    Ok(result)
+}
+
 fn compile_source_unit_v2(
     pre_compiled_deps: &PrecompiledFilesModules,
     named_address_mapping: BTreeMap<String, NumericalAddress>,
@@ -887,8 +909,8 @@ fn compile_source_unit_v2(
         move_compiler_v2::run_move_compiler(emitter.as_mut(), options)
     };
     let error_str = String::from_utf8_lossy(&error_writer.into_inner()).to_string();
-    let (model, mut units) =
-        result.map_err(|_| anyhow::anyhow!("compilation errors:\n {}", error_str))?;
+    let (model, mut units) = result
+        .map_err(|error| anyhow::anyhow!("compilation errors:\n {}\n{error:#}", error_str))?;
     let unit = if units.len() != 1 {
         anyhow::bail!("expected either one script or one module")
     } else {
@@ -962,6 +984,7 @@ where
     let default_syntax = match extension {
         MOVE_EXTENSION | DECOMPILED_EXTENSION => SyntaxChoice::Source,
         MOVE_ASM_EXTENSION | DISASSEMBLED_EXTENSION => SyntaxChoice::ASM,
+        LEAN_EXTENSION => SyntaxChoice::Leaner,
         _ => {
             panic!("unexpected extensions `{}`", extension)
         },
@@ -1102,6 +1125,7 @@ fn handle_cross_compiled_output(
     let ending = match target.syntax {
         SyntaxChoice::Source => DECOMPILED_EXTENSION,
         SyntaxChoice::ASM => DISASSEMBLED_EXTENSION,
+        SyntaxChoice::Leaner => unreachable!("Leaner is not a cross-compilation target"),
     };
     let file_name = test_path
         .with_extension(ending)
@@ -1160,12 +1184,12 @@ fn handle_expected_output(
 }
 
 fn add_exp_suffix(path: &Path, suffix: &Option<String>) -> PathBuf {
-    // Only replace move or masm extension, otherwise add suffix.
+    // Only replace a source extension, otherwise add suffix.
     // So for paths resulting from cross-compilation, like `foo.decompiled`,
     // we won't generate `foo.exp` but `foo.decompiled.exp`.
     let suffix = suffix.as_ref().map(|s| s.as_str()).unwrap_or(EXP_EXT);
     let path_str = path.display().to_string();
-    if path_str.ends_with(".move") || path_str.ends_with(".masm") {
+    if path_str.ends_with(".move") || path_str.ends_with(".masm") || path_str.ends_with(".lean") {
         path.with_extension(suffix)
     } else {
         PathBuf::from(format!("{}.{}", path.display(), suffix))

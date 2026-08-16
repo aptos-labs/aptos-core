@@ -143,6 +143,10 @@ inductive WfOp (Δ : StructDecls) : Oper → List Ty → List Ty → Prop where
   | vecSet (t : Ty) : WfOp Δ .vecSet [.vector t, .u64, t] [.vector t]
   | vecPush (t : Ty) : WfOp Δ .vecPush [.vector t, t] [.vector t]
   | vecPop (t : Ty) : WfOp Δ .vecPop [.vector t] [.vector t, t]
+  | vecInsert (t : Ty) :
+      WfOp Δ .vecInsert [.vector t, .u64, t] [.vector t]
+  | vecRemove (t : Ty) :
+      WfOp Δ .vecRemove [.vector t, .u64] [.vector t, t]
   | mkMutLoc (x : LocalIndex) (t : Ty) :
       WfOp Δ (.mkMutLoc x) [t] [.mutRef t]
   | mkMutGlobal {r : ResourceId} {sd : StructDecl} :
@@ -188,6 +192,7 @@ def Oper.isRefOp : Oper → Bool
   | .testVariant _ | .testVariantInst _ _
   | .getField _ | .getFieldInst _ _ | .updateField _
   | .vecPack | .vecLen | .vecGet | .vecSet | .vecPush | .vecPop
+  | .vecInsert | .vecRemove
   | .mkMutLoc _ | .mkMutGlobal _ | .childMutField _ | .childMutIndex
   | .getMut | .setMut | .isParent _ | .mutPathIndex _
   | .isMutLoc _ | .isMutGlobal _ | .mutAddr
@@ -978,6 +983,58 @@ theorem WfOp.sem_preserves {Δ : StructDecls} {op : Oper}
       · intro w hw
         exact hes w (List.dropLast_subset _ hw)
       · exact List.mem_of_getElem? (List.getLast?_eq_getElem? ▸ hv)
+    next => cases hsem
+  | vecInsert =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl with | cons hv₃ htl =>
+    cases htl
+    rw [isValid_vector_iff] at hv₁
+    obtain ⟨es, rfl, hlen, hes⟩ := hv₁
+    rw [isValid_u64_iff] at hv₂
+    obtain ⟨i, rfl, hi⟩ := hv₂
+    simp only [Oper.sem] at hsem
+    split at hsem
+    next => cases hsem
+    next hgrowth =>
+      split at hsem
+      next hin =>
+        cases hsem
+        have hin' : i ≤ es.length ∧ es.length + 1 < U64_SIZE := by
+          simpa using hin
+        have hindex := hin'.1
+        have hsize := hin'.2
+        refine ⟨.cons (.vector ?_ ?_) .nil, hm⟩
+        · simp [List.length_append]
+          omega
+        · intro w hw
+          rcases List.mem_append.mp hw with hw | hw
+          · exact hes w (List.take_subset _ _ hw)
+          · simp only [List.mem_cons] at hw
+            rcases hw with rfl | hw
+            · exact hv₃
+            · exact hes w (List.drop_subset _ _ hw)
+      next => cases hsem
+  | vecRemove =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    rw [isValid_vector_iff] at hv₁
+    obtain ⟨es, rfl, hlen, hes⟩ := hv₁
+    rw [isValid_u64_iff] at hv₂
+    obtain ⟨i, rfl, hi⟩ := hv₂
+    simp only [Oper.sem] at hsem
+    split at hsem
+    next removed hremoved =>
+      cases hsem
+      refine ⟨.cons (.vector ?_ ?_) (.cons (hes removed ?_) .nil), hm⟩
+      · exact Nat.lt_of_le_of_lt
+          (by simp [List.length_append]; omega) hlen
+      · intro w hw
+        rcases List.mem_append.mp hw with hw | hw
+        · exact hes w (List.take_subset _ _ hw)
+        · exact hes w (List.drop_subset _ _ hw)
+      · exact List.mem_of_getElem? hremoved
     next => cases hsem
   | mkMutLoc x t =>
     cases hvs with | @cons _ v _ _ hv₁ htl =>

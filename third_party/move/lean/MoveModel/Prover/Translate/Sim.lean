@@ -414,6 +414,12 @@ theorem compileInstr_skips (P : Program) (i : Instr) :
     | vecPop => intro c hc
                 simp only [compileInstr, List.mem_singleton] at hc
                 subst hc; exact skipCmd_onOk _
+    | vecInsert => intro c hc
+                   simp only [compileInstr, List.mem_singleton] at hc
+                   subst hc; exact skipCmd_onOk _
+    | vecRemove => intro c hc
+                   simp only [compileInstr, List.mem_singleton] at hc
+                   subst hc; exact skipCmd_onOk _
     | mkMutLoc x => intro c hc
                     simp only [compileInstr, List.mem_singleton] at hc
                     subst hc; exact skipCmd_onOk _
@@ -812,7 +818,7 @@ theorem compile_sim_instrStop (P : Program)
       cases hop
     obtain ⟨o', hcont, hfact⟩ :=
       abortPath P d (rest := rest) (t := term)
-        (v := v.doAbort runtimeAbortCode) (code := runtimeAbortCode) rfl
+        (v := v.doAbort op.abortCode) (code := op.abortCode) rfl
     refine ⟨o', ContRun.prepend ?_ hcont
       (compileInstr_op P dsts srcs hfun hfunInst href), ?_⟩
     · have hstep := onOk_run (v := v) (f := applyOper dsts op srcs) hok

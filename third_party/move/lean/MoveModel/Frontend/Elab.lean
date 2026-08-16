@@ -20,8 +20,9 @@ Masm input goes through the real assembler.  Move input goes through compiler
 v2, including genuine `spec` blocks.  Compiler and frontend failures are
 reported at the source string.
 
-`APTOS_CLI` may name the CLI binary.  Otherwise the elaborators look up
-`aptos` on `PATH`.
+`APTOS_CLI` may name the CLI binary.  Otherwise the elaborators prefer a
+checkout-local `target/debug/aptos` found above the current directory, then
+fall back to `aptos` on `PATH`.
 
 This is the only module of the library that imports `Lean`; the theory
 itself stays independent of the metaprogramming framework.
@@ -54,6 +55,7 @@ deriving instance ToExpr for MoveModel.IR.Visibility
 deriving instance ToExpr for Dialect
 deriving instance ToExpr for StructMeta
 deriving instance ToExpr for FunMeta
+deriving instance ToExpr for ExternalFunRef
 deriving instance ToExpr for MLoop
 deriving instance ToExpr for MContract
 deriving instance ToExpr for MFun
@@ -63,10 +65,23 @@ deriving instance ToExpr for MModule
 
 /-! ## Running the frontend -/
 
-/-- Locates the Aptos CLI binary: `APTOS_CLI` if set, else `aptos` on
-`PATH`. -/
+private partial def findCheckoutFrontend (dir : System.FilePath) : IO (Option String) := do
+  let candidate := dir / "target" / "debug" / "aptos"
+  if ← candidate.pathExists then
+    return some candidate.toString
+  match dir.parent with
+  | some parent => findCheckoutFrontend parent
+  | none => return none
+
+/-- Locates the Aptos CLI binary: `APTOS_CLI` if set, a checkout-local debug
+binary if available, or finally `aptos` on `PATH`.
+
+Preferring the checkout binary keeps the exchange producer and Lean decoder on
+the same schema while developing inside the Aptos repository. -/
 def findFrontend : IO String := do
   if let some p ← IO.getEnv "APTOS_CLI" then
+    return p
+  if let some p ← findCheckoutFrontend (← IO.currentDir) then
     return p
   return "aptos"
 
@@ -102,8 +117,8 @@ def decodeFrontend (s : Syntax) (fileArg suffix : String) :
     try
       runFrontend fileArg suffix input
     catch e =>
-      throwErrorAt s "`aptos move exchange` failed (set APTOS_CLI to \
-        an `aptos` CLI binary, or put one on PATH):\n{e.toMessageData}"
+      throwErrorAt s "`aptos move exchange` failed (build the checkout-local \
+        `aptos`, set APTOS_CLI, or put a matching binary on PATH):\n{e.toMessageData}"
   match decodeMProgram (← run) with
   | .ok p => return p
   | .error e =>
