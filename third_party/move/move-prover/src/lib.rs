@@ -551,7 +551,12 @@ fn report_verification_timing(timing: &VerificationTiming) {
     } else {
         "failed"
     };
-    info!("{:>9.3}s {}", timing.duration.as_secs_f64(), result);
+    info!(
+        "{:>9.3}s {} {}",
+        timing.duration.as_secs_f64(),
+        result,
+        timing.verification_condition
+    );
 }
 
 /// Create bytecode and process it.
