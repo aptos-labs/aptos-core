@@ -254,7 +254,7 @@ be justified merely because materialization succeeded.
 Build the terminal proof modules with:
 
 ```bash
-lake -Kjobs=2 build \
+LEAN_NUM_THREADS=2 lake build \
   MoveModel.IR.Mono.Correctness.CFG \
   MoveModel.IR.Mono.Correctness.Instances \
   MoveModel.IR.Mono.Correctness.Coverage
@@ -263,8 +263,8 @@ lake -Kjobs=2 build \
 Build the whole Lean model and its tests with:
 
 ```bash
-lake -Kjobs=2 build
-APTOS_CLI=/path/to/aptos lake -Kjobs=2 build Tests
+LEAN_NUM_THREADS=2 lake build
+APTOS_CLI=/path/to/aptos LEAN_NUM_THREADS=2 lake build Tests
 ```
 
 The correctness directory contains no admitted theorems: `sorry`, `admit`,

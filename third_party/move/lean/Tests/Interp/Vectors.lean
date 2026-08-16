@@ -8,10 +8,10 @@ import MoveModel.IR.Interp.Exec
 # Interpreter Tests: Vectors
 
 The vector value operations (`vec_pack`/`vec_len`/`vec_get`/`vec_set`/
-`vec_push`/`vec_pop`) and element borrows (`borrow_vec_elem` + read/write
-through the reference), on normal and abort paths.  The programs are
-hand-written IR: the frontends do not translate the vector natives yet, so
-there is no `move%` authoring path for these operations.
+`vec_push`/`vec_pop`/`vec_insert`/`vec_remove`) and element borrows
+(`borrow_vec_elem` + read/write through the reference), on normal and abort
+paths. These programs exercise the hand-written IR layer directly; source
+coverage lives in `Tests.Move.VectorOperations`.
 -/
 
 namespace Tests.Interp.Vectors
@@ -66,6 +66,17 @@ private def len : FunDecl :=
 #test run1 len [vecU64 [10, 20, 30]] = okU64 3
 #test run1 len [.vector []] = okU64 0
 
+/-- Vector observations work directly through a reference; no owned vector is
+materialized merely to ask for its length. -/
+private def borrowedLen : FunDecl :=
+  fn 1 [.vector .u64, .mutRef (.vector .u64), .ref (.vector .u64), .u64]
+    [.u64]
+    [.call [1] .borrowLoc [0],
+     .call [2] .freezeRef [1],
+     .call [3] .vecLen [2]] [3]
+
+#test run1 borrowedLen [vecU64 [10, 20, 30]] = okU64 3
+
 /-! ## `vec_get` and `vec_set` (abort out of range) -/
 
 private def get : FunDecl :=
@@ -98,6 +109,31 @@ private def pop : FunDecl :=
 #test run1 pop [vecU64 [1, 2, 3]] = okVals [vecU64 [1, 2], .u64 3]
 #test run1 pop [.vector []] = aborted 0
 
+/-! ## Indexed insertion and stable removal -/
+
+private def insert : FunDecl :=
+  fn 3 [.vector .u64, .u64, .u64, .vector .u64] [.vector .u64]
+    [.call [3] .vecInsert [0, 1, 2]] [3]
+
+#test run1 insert [vecU64 [10, 30], .u64 1, .u64 20]
+  = okVals [vecU64 [10, 20, 30]]
+#test run1 insert [vecU64 [20], .u64 0, .u64 10]
+  = okVals [vecU64 [10, 20]]
+#test run1 insert [vecU64 [20], .u64 1, .u64 30]
+  = okVals [vecU64 [20, 30]]
+#test run1 insert [vecU64 [20], .u64 2, .u64 30] = aborted 0x20000
+
+private def remove : FunDecl :=
+  fn 2 [.vector .u64, .u64, .vector .u64, .u64]
+    [.vector .u64, .u64]
+    [.call [2, 3] .vecRemove [0, 1]] [2, 3]
+
+#test run1 remove [vecU64 [10, 20, 30], .u64 1]
+  = okVals [vecU64 [10, 30], .u64 20]
+#test run1 remove [vecU64 [10], .u64 0]
+  = okVals [vecU64 [], .u64 10]
+#test run1 remove [vecU64 [10], .u64 1] = aborted 0x20000
+
 /-! ## Structural equality (vectors are compared elementwise) -/
 
 private def eqv : FunDecl :=
@@ -107,6 +143,22 @@ private def eqv : FunDecl :=
 #test run1 eqv [vecU64 [1, 2], vecU64 [1, 2]] = okBool true
 #test run1 eqv [vecU64 [1, 2], vecU64 [1, 3]] = okBool false
 #test run1 eqv [vecU64 [1], vecU64 [1, 1]] = okBool false
+
+/- Move compares references by comparing their referents. This applies to
+both equality and the language's generic structural ordering. -/
+private def compareRefs : FunDecl :=
+  fn 2 [.u64, .u64, .mutRef .u64, .mutRef .u64, .ref .u64, .ref .u64,
+        .bool, .bool]
+    [.bool, .bool]
+    [.call [2] .borrowLoc [0],
+     .call [3] .borrowLoc [1],
+     .call [4] .freezeRef [2],
+     .call [5] .freezeRef [3],
+     .call [6] .eq [4, 5],
+     .call [7] .lt [4, 5]] [6, 7]
+
+#test run1 compareRefs [.u64 3, .u64 3] = okVals [.bool true, .bool false]
+#test run1 compareRefs [.u64 2, .u64 3] = okVals [.bool false, .bool true]
 
 /-! ## Element borrows: read and write through `borrow_vec_elem` -/
 

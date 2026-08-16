@@ -199,7 +199,18 @@ def interpOp (current : FrameId) (deref : RefTarget → Option Value) (op : Oper
       pure (if j = 0 then .abort else .ok [.u64 (i / j)] m)
   | .mod => arith2 fun i j =>
       pure (if j = 0 then .abort else .ok [.u64 (i % j)] m)
-  | .lt => arith2 fun i j => pure (.ok [.bool (decide (i < j))] m)
+  | .lt =>
+    match vs with
+    | [v₁, v₂] =>
+      match v₁.derefWith deref, v₂.derefWith deref with
+      | some (.u64 i), some (.u64 j) =>
+          pure (.ok [.bool (decide (i < j))] m)
+      | some a, some b =>
+          if a.refFree && b.refFree && a.sameTypeShape b then
+            pure (.ok [.bool (compare a b == .lt)] m)
+          else throw (.stuck "ill-typed comparison operands")
+      | _, _ => throw (.stuck "read through a dangling reference")
+    | _ => throw (.stuck "ill-typed operands")
   | .le => arith2 fun i j => pure (.ok [.bool (decide (i ≤ j))] m)
   | .eq =>
     match vs with
@@ -348,7 +359,11 @@ def interpOp (current : FrameId) (deref : RefTarget → Option Value) (op : Oper
     else throw (.stuck "reference stored into a vector")
   | .vecLen =>
     match vs with
-    | [.vector es] => pure (.ok [.u64 es.length] m)
+    | [value] =>
+      match value.derefWith deref with
+      | some (.vector es) => pure (.ok [.u64 es.length] m)
+      | some _ => throw (.stuck "vector length of a non-vector")
+      | none => throw (.stuck "read through a dangling reference")
     | _ => throw (.stuck "ill-typed operands")
   | .vecGet =>
     match vs with
@@ -376,6 +391,21 @@ def interpOp (current : FrameId) (deref : RefTarget → Option Value) (op : Oper
     | [.vector es] =>
       match es.getLast? with
       | some v => pure (.ok [.vector es.dropLast, v] m)
+      | none => pure .abort
+    | _ => throw (.stuck "ill-typed operands")
+  | .vecInsert =>
+    match vs with
+    | [.vector es, .u64 i, v] =>
+      if !v.refFree then throw (.stuck "reference stored into a vector")
+      else if i ≤ es.length && es.length + 1 < U64_SIZE then
+        pure (.ok [.vector (es.take i ++ v :: es.drop i)] m)
+      else pure .abort
+    | _ => throw (.stuck "ill-typed operands")
+  | .vecRemove =>
+    match vs with
+    | [.vector es, .u64 i] =>
+      match es[i]? with
+      | some v => pure (.ok [.vector (es.take i ++ es.drop (i + 1)), v] m)
       | none => pure .abort
     | _ => throw (.stuck "ill-typed operands")
   | .mkMutLoc x =>
@@ -682,7 +712,7 @@ def interpGeneric (P : Program) (fuel : Nat) (rest : List Instr)
   | none => throw (.stuck "uninitialized operand")
   | some vs =>
     match ← interpOp s.current (readTargetI s) op vs s.memory with
-    | .abort => pure (.abort s.memory runtimeAbortCode)
+    | .abort => pure (.abort s.memory op.abortCode)
     | .ok rets m' =>
       if dsts.length = rets.length then
         interpInstrs P fuel rest ((s.setMemory m').writeLocals dsts rets)

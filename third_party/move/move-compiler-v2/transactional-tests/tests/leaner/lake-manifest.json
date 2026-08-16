@@ -1,0 +1,13 @@
+{"version": "1.2.0",
+ "packagesDir": ".lake/packages",
+ "packages":
+ [{"type": "path",
+   "scope": "",
+   "name": "Move",
+   "manifestFile": "lake-manifest.json",
+   "inherited": false,
+   "dir": "../../../../lean",
+   "configFile": "lakefile.toml"}],
+ "name": "LeanerTransactionalTests",
+ "lakeDir": ".lake",
+ "fixedToolchain": false}

@@ -1,0 +1,36 @@
+--# publish
+
+import Move
+
+open scoped Move
+
+move_module LeanerVectors where
+
+  fun length : U64 :=
+    Move.Vector.length (vector![10, 20, 30] : Move.Vector U64)
+
+  fun middle : U64 := Move.Vector.get vector![10, 20, 30] 1
+
+  fun replaced : U64 :=
+    Move.Vector.get (Move.Vector.set vector![10, 20, 30] 1 42) 1
+
+  fun borrowed : Action U64 := do
+    let values : Move.Vector U64 := vector![10, 20, 30]
+    let value ← &values[1]
+    (*value)
+
+  fun borrowedMut : Action U64 := do
+    let values : Move.Vector U64 := vector![10, 20, 30]
+    let value ← &mut values[1]
+    value := 42
+    (*value)
+
+--# run 0x0::LeanerVectors::length
+
+--# run 0x0::LeanerVectors::middle
+
+--# run 0x0::LeanerVectors::replaced
+
+--# run 0x0::LeanerVectors::borrowed
+
+--# run 0x0::LeanerVectors::borrowedMut

@@ -70,8 +70,10 @@ resources, fields, results, and typed quantifiers.
 
 ## Setup
 
-Build the Aptos CLI and either place `aptos` on `PATH` or set `APTOS_CLI` to
-the executable:
+Build the Aptos CLI.  When this project is used in the Aptos checkout, the
+elaborator automatically prefers the nearest ancestor's `target/debug/aptos`.
+`APTOS_CLI` can select another executable explicitly; otherwise `aptos` on
+`PATH` is the final fallback:
 
 ```bash
 cargo build -p aptos

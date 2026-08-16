@@ -139,6 +139,19 @@ pub struct XirModule {
     pub module: XirModuleMetadata,
     pub structs: Vec<XirStruct>,
     pub functions: Vec<XirFunction>,
+    /// Public functions referenced in other modules. Function ids greater
+    /// than or equal to `functions.len()` index this table after subtracting
+    /// the local function count.
+    #[serde(default)]
+    pub external_functions: Vec<XirExternalFunction>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct XirExternalFunction {
+    pub address: String,
+    pub module: String,
+    pub function: String,
 }
 
 impl XirModule {
@@ -507,6 +520,11 @@ pub enum Oper {
     /// `"vec_pop"` — remove the last element, returning
     /// (vector, element); aborts on the empty vector.
     VecPop,
+    /// `"vec_insert"` — insert at an index, returning the updated vector.
+    VecInsert,
+    /// `"vec_remove"` — remove at an index, returning
+    /// (updated vector, removed element).
+    VecRemove,
     /// `{"get_global": resource}` — read a resource from global memory.
     GetGlobal(ResourceId),
     GetGlobalInst(ResourceId, Vec<Type>),
@@ -949,6 +967,14 @@ mod tests {
         assert_eq!(
             serde_json::to_value(Oper::VecPop).unwrap(),
             json!("vec_pop")
+        );
+        assert_eq!(
+            serde_json::to_value(Oper::VecInsert).unwrap(),
+            json!("vec_insert")
+        );
+        assert_eq!(
+            serde_json::to_value(Oper::VecRemove).unwrap(),
+            json!("vec_remove")
         );
         assert_eq!(
             serde_json::to_value(Oper::BorrowVecElem).unwrap(),

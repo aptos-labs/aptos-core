@@ -14,6 +14,16 @@ changing the proof-facing semantic core.
 
 namespace MoveModel.IR
 
+/-- A function declared by another Move module. Calls in `program` use ids
+`numFuns + i` to refer to `externalFuns[i]`; local function ids retain their
+existing positional meaning. Keeping this link metadata on the finite module
+leaves the proof-facing single-module `Program` representation unchanged. -/
+structure ExternalFunRef where
+  address : Address
+  moduleName : String
+  functionName : String
+  deriving BEq, Repr
+
 /-- File-format visibility.  Entry status is represented independently. -/
 inductive Visibility where
   | private_
@@ -53,6 +63,7 @@ structure Module where
   numFuns : Nat
   structMeta : ResourceId → Option StructMeta
   funMeta : FunId → Option FunMeta
+  externalFuns : List ExternalFunRef := []
   dialect : Dialect := .stackless
 
 /-- Apply a semantic program transformation while retaining module metadata. -/

@@ -48,17 +48,34 @@ use std::{
     rc::Rc,
 };
 
+const VECTOR_INDEX_OUT_OF_BOUNDS: u64 = 0x20000;
+
 pub struct XirSource {
     path: PathBuf,
     text: String,
     module: XirModule,
+    is_target: bool,
 }
 
 pub fn parse_source(path: PathBuf, text: String, json: &str) -> Result<XirSource> {
+    parse_source_with_target(path, text, json, true)
+}
+
+pub(crate) fn parse_source_with_target(
+    path: PathBuf,
+    text: String,
+    json: &str,
+    is_target: bool,
+) -> Result<XirSource> {
     let module: XirModule = serde_json::from_str(json)
         .with_context(|| format!("invalid XIR from `{}`", path.display()))?;
     validate(&module)?;
-    Ok(XirSource { path, text, module })
+    Ok(XirSource {
+        path,
+        text,
+        module,
+        is_target,
+    })
 }
 
 fn validate(module: &XirModule) -> Result<()> {
@@ -163,6 +180,12 @@ fn validate(module: &XirModule) -> Result<()> {
         );
         let _ = &decl.spec;
     }
+    for reference in &module.external_functions {
+        AccountAddress::from_hex_literal(&reference.address)
+            .with_context(|| format!("invalid external module address `{}`", reference.address))?;
+        valid_identifier("external module", &reference.module)?;
+        valid_identifier("external function", &reference.function)?;
+    }
     Ok(())
 }
 
@@ -223,12 +246,46 @@ pub fn import_sources(
     sources: &[XirSource],
     targets: &mut FunctionTargetsHolder,
 ) -> Result<()> {
-    for source in sources {
+    if sources.is_empty() {
+        return Ok(());
+    }
+    let mut imported = vec![false; sources.len()];
+    let mut imported_count = 0;
+    while imported_count < sources.len() {
+        let ready = sources.iter().enumerate().find_map(|(index, source)| {
+            (!imported[index] && external_modules_available(env, &source.module)).then_some(index)
+        });
+        let Some(index) = ready else {
+            let blocked = sources
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| !imported[*index])
+                .map(|(_, source)| source.module.module.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
+            bail!("unresolved or cyclic XIR module dependencies: {blocked}")
+        };
+        let source = &sources[index];
         import_source(env, source, targets)
             .with_context(|| format!("loading XIR from `{}`", source.path.display()))?;
+        imported[index] = true;
+        imported_count += 1;
     }
     env.set_function_size_estimates(targets.compute_function_size_estimates());
     Ok(())
+}
+
+fn external_modules_available(env: &GlobalEnv, xir: &XirModule) -> bool {
+    xir.external_functions.iter().all(|reference| {
+        let Ok(address) = AccountAddress::from_hex_literal(&reference.address) else {
+            return false;
+        };
+        let name = ModuleName::new(
+            Address::Numerical(address),
+            env.symbol_pool().make(&reference.module),
+        );
+        env.find_module(&name).is_some()
+    })
 }
 
 fn import_source(
@@ -251,8 +308,8 @@ fn import_source(
         Rc::new(BTreeMap::new()),
         &source.path.to_string_lossy(),
         &source.text,
-        true,
-        true,
+        source.is_target,
+        source.is_target,
     );
     let end = u32::try_from(source.text.len()).unwrap_or(u32::MAX);
     let loc = Loc::new(file_id, Span::new(0, end));
@@ -349,7 +406,7 @@ fn import_source(
             .iter()
             .map(|id| struct_at(&struct_ids, *id, &decl.name))
             .collect::<Result<BTreeSet<_>>>()?;
-        let called = called_functions(decl, module_id, &function_ids)?;
+        let called = called_functions(env, xir, decl, module_id, &function_ids)?;
         functions.push(ModelXirFunctionData {
             name: fun_id.symbol(),
             loc: loc.clone(),
@@ -382,7 +439,50 @@ fn import_source(
         let data = translate_function(env, xir, module_id, &struct_ids, &function_ids, decl, qid)?;
         targets.insert_target_data(&qid, FunctionVariant::Baseline, data);
     }
+    add_transitive_callee_targets(env, module_id, targets);
     Ok(())
+}
+
+/// XIR is imported after the ordinary Move stackless-bytecode generation pass.
+/// Add library callees discovered in XIR to the target holder so subsequent
+/// whole-program analyses see the same transitive call graph as for Move source.
+fn add_transitive_callee_targets(
+    env: &GlobalEnv,
+    module_id: ModuleId,
+    targets: &mut FunctionTargetsHolder,
+) {
+    let mut todo = env
+        .get_module(module_id)
+        .get_functions()
+        .flat_map(|function| {
+            function
+                .get_used_functions()
+                .expect("XIR call information is available")
+                .clone()
+                .into_iter()
+        })
+        .collect::<BTreeSet<_>>();
+    let mut done = targets.get_funs().collect::<BTreeSet<_>>();
+
+    while let Some(id) = todo.pop_first() {
+        if !done.insert(id) {
+            continue;
+        }
+        let function = env.get_function(id);
+        if function.is_excluded_from_bytecode_gen() {
+            continue;
+        }
+        let data = crate::bytecode_generator::generate_bytecode(env, id);
+        targets.insert_target_data(&id, FunctionVariant::Baseline, data);
+        todo.extend(
+            function
+                .get_used_functions()
+                .expect("called function information is available")
+                .iter()
+                .filter(|callee| !done.contains(callee))
+                .copied(),
+        );
+    }
 }
 
 fn ability_set(decl: &StructDecl) -> Result<AbilitySet> {
@@ -492,20 +592,77 @@ fn model_type(ty: &Ty, module_id: ModuleId, structs: &[StructId]) -> Result<Type
     })
 }
 
+fn function_at(
+    env: &GlobalEnv,
+    xir: &XirModule,
+    module_id: ModuleId,
+    functions: &[FunId],
+    id: usize,
+) -> Result<QualifiedId<FunId>> {
+    if let Some(fun_id) = functions.get(id) {
+        return Ok(module_id.qualified(*fun_id));
+    }
+    let external_id = id
+        .checked_sub(functions.len())
+        .context("external function id underflow")?;
+    let reference = xir.external_functions.get(external_id).with_context(|| {
+        format!("function id {id} is outside the local and external function tables")
+    })?;
+    let address = AccountAddress::from_hex_literal(&reference.address)?;
+    let module_name = ModuleName::new(
+        Address::Numerical(address),
+        env.symbol_pool().make(&reference.module),
+    );
+    let module = env.find_module(&module_name).with_context(|| {
+        format!(
+            "external module `{}::{}` is not loaded",
+            reference.address, reference.module
+        )
+    })?;
+    let function = module
+        .find_function(env.symbol_pool().make(&reference.function))
+        .with_context(|| {
+            format!(
+                "external module `{}::{}` has no function `{}`",
+                reference.address, reference.module, reference.function
+            )
+        })?;
+    Ok(module.get_id().qualified(function.get_id()))
+}
+
 fn called_functions(
+    env: &GlobalEnv,
+    xir: &XirModule,
     decl: &FunctionDecl,
     module_id: ModuleId,
     functions: &[FunId],
 ) -> Result<BTreeSet<QualifiedId<FunId>>> {
     let mut called = BTreeSet::new();
+    let mut uses_generic_comparison = false;
     for block in &decl.blocks {
         for instr in &block.instrs {
             if let Instr::Call(_, Oper::Function(id) | Oper::FunctionInst(id, _), _) = instr {
-                let fun_id = functions.get(*id).with_context(|| {
-                    format!("function id {id} is out of range in `{}`", decl.name)
-                })?;
-                called.insert(module_id.qualified(*fun_id));
+                called.insert(function_at(env, xir, module_id, functions, *id)?);
             }
+            if let Instr::Call(_, Oper::Lt, srcs) = instr {
+                let source_type = srcs
+                    .first()
+                    .and_then(|id| decl.locals.get(*id))
+                    .with_context(|| format!("malformed comparison in `{}`", decl.name))?;
+                uses_generic_comparison |= !matches!(source_type, Ty::U64);
+            }
+        }
+    }
+    if uses_generic_comparison {
+        let module = env
+            .get_modules()
+            .find(|module| module.is_cmp())
+            .context("generic comparison requires the standard `cmp` module")?;
+        for name in ["compare", "is_lt"] {
+            let function = module
+                .find_function(env.symbol_pool().make(name))
+                .with_context(|| format!("the standard `cmp` module has no `{name}` function"))?;
+            called.insert(module.get_id().qualified(function.get_id()));
         }
     }
     Ok(called)
@@ -544,11 +701,30 @@ fn translate_function(
             .map(|ty| model_type(ty, module_id, struct_ids))
             .collect::<Result<Vec<_>>>()?,
         next_attr: 0,
+        next_label: decl.blocks.len(),
     };
     translator.emit(|attr| Bytecode::Jump(attr, Label::new(decl.entry)))?;
     for (block_id, block) in decl.blocks.iter().enumerate() {
         translator.emit(|attr| Bytecode::Label(attr, Label::new(block_id)))?;
-        for (instruction_id, instruction) in block.instrs.iter().enumerate() {
+        let mut instruction_id = 0;
+        while instruction_id < block.instrs.len() {
+            if let Some(consumed) = translator
+                .translate_reference_vector_update(
+                    block_id,
+                    &block.instrs[instruction_id..],
+                    &block.term,
+                )
+                .with_context(|| {
+                    format!(
+                        "function `{}`, block {block_id}, instruction {instruction_id}",
+                        decl.name
+                    )
+                })?
+            {
+                instruction_id += consumed;
+                continue;
+            }
+            let instruction = &block.instrs[instruction_id];
             translator
                 .translate_instruction(instruction)
                 .with_context(|| {
@@ -557,6 +733,7 @@ fn translate_function(
                         decl.name
                     )
                 })?;
+            instruction_id += 1;
         }
         translator
             .translate_term(&block.term)
@@ -606,6 +783,7 @@ struct FunctionTranslator<'a> {
     locations: BTreeMap<AttrId, Loc>,
     local_types: Vec<Type>,
     next_attr: usize,
+    next_label: usize,
 }
 
 impl FunctionTranslator<'_> {
@@ -637,6 +815,18 @@ impl FunctionTranslator<'_> {
         id
     }
 
+    fn fresh_label(&mut self) -> Result<Label> {
+        ensure!(
+            self.next_label <= u16::MAX as usize,
+            "function `{}` requires more than {} labels",
+            self.decl.name,
+            u16::MAX
+        );
+        let label = Label::new(self.next_label);
+        self.next_label += 1;
+        Ok(label)
+    }
+
     fn translate_instruction(&mut self, instruction: &Instr) -> Result<()> {
         match instruction {
             Instr::Load(dst, constant) => {
@@ -654,6 +844,84 @@ impl FunctionTranslator<'_> {
         }
     }
 
+    /// Lean's small IR represents reference mutation using the already-proved
+    /// `read_ref; functional update; write_ref` vocabulary. Recognize that
+    /// sequence before stackless lowering and keep the vector borrowed. This
+    /// avoids copying a potentially large vector merely to call Move's native
+    /// reference-based vector operations.
+    fn translate_reference_vector_update(
+        &mut self,
+        block_id: usize,
+        instrs: &[Instr],
+        term: &Term,
+    ) -> Result<Option<usize>> {
+        let [Instr::Call(read_dsts, Oper::ReadRef, read_srcs), Instr::Call(update_dsts, oper @ (Oper::VecInsert | Oper::VecRemove), update_srcs), Instr::Call(write_dsts, Oper::WriteRef, write_srcs), ..] =
+            instrs
+        else {
+            return Ok(None);
+        };
+        let ([old], [reference]) = (read_dsts.as_slice(), read_srcs.as_slice()) else {
+            return Ok(None);
+        };
+        if !write_dsts.is_empty() {
+            return Ok(None);
+        }
+        let Some(updated) = update_dsts.first() else {
+            return Ok(None);
+        };
+        if update_srcs.first() != Some(old) || write_srcs.as_slice() != [*reference, *updated] {
+            return Ok(None);
+        }
+        let Type::Reference(ReferenceKind::Mutable, referent) = self.local(*reference)? else {
+            return Ok(None);
+        };
+        let Type::Vector(element) = referent.as_ref() else {
+            return Ok(None);
+        };
+        if self.local(*old)? != referent.as_ref() || self.local(*updated)? != referent.as_ref() {
+            return Ok(None);
+        }
+        let value_dst = match oper {
+            Oper::VecInsert if update_dsts.len() == 1 && update_srcs.len() == 3 => None,
+            Oper::VecRemove if update_dsts.len() == 2 && update_srcs.len() == 2 => {
+                Some(update_dsts[1])
+            },
+            _ => return Ok(None),
+        };
+        let u64_type = Type::Primitive(PrimitiveType::U64);
+        if self.local(update_srcs[1])? != &u64_type
+            || (oper == &Oper::VecInsert && self.local(update_srcs[2])? != element.as_ref())
+            || value_dst.is_some_and(|dst| self.local(dst).ok() != Some(element.as_ref()))
+            || old == updated
+            || value_dst.is_some_and(|dst| dst == *old || dst == *updated)
+            || self.local_is_read_outside_vector_update(*old, block_id, &instrs[3..], term)
+            || self.local_is_read_outside_vector_update(*updated, block_id, &instrs[3..], term)
+        {
+            return Ok(None);
+        }
+        self.translate_vector_update_on_reference(
+            value_dst,
+            oper,
+            update_srcs,
+            *reference,
+            element.as_ref().clone(),
+        )?;
+        Ok(Some(3))
+    }
+
+    fn local_is_read_outside_vector_update(
+        &self,
+        local: usize,
+        block_id: usize,
+        current_tail: &[Instr],
+        current_term: &Term,
+    ) -> bool {
+        local_is_read_after(local, current_tail, current_term)
+            || self.decl.blocks.iter().enumerate().any(|(index, block)| {
+                index != block_id && local_is_read_after(local, &block.instrs, &block.term)
+            })
+    }
+
     fn translate_call(&mut self, dsts: &[usize], oper: &Oper, srcs: &[usize]) -> Result<()> {
         for id in dsts.iter().chain(srcs) {
             self.local(*id)?;
@@ -661,20 +929,41 @@ impl FunctionTranslator<'_> {
         match oper {
             Oper::VecLen => {
                 arity(dsts, srcs, 1, 1, oper)?;
-                let element = self.vector_element_type(self.local(srcs[0])?)?;
-                let reference = self.fresh_local(Type::Reference(
-                    ReferenceKind::Immutable,
-                    Box::new(Type::Vector(Box::new(element.clone()))),
-                ));
-                self.emit(|attr| {
-                    Bytecode::Call(
-                        attr,
-                        vec![reference],
-                        StacklessOperation::BorrowLoc,
-                        vec![srcs[0]],
-                        None,
-                    )
-                })?;
+                let source_type = self.local(srcs[0])?.clone();
+                let element = self.vector_element_type(&source_type)?;
+                let reference = match source_type {
+                    Type::Reference(ReferenceKind::Immutable, _) => srcs[0],
+                    Type::Reference(ReferenceKind::Mutable, referent) => {
+                        let reference =
+                            self.fresh_local(Type::Reference(ReferenceKind::Immutable, referent));
+                        self.emit(|attr| {
+                            Bytecode::Call(
+                                attr,
+                                vec![reference],
+                                StacklessOperation::FreezeRef(true),
+                                vec![srcs[0]],
+                                None,
+                            )
+                        })?;
+                        reference
+                    },
+                    vector_type => {
+                        let reference = self.fresh_local(Type::Reference(
+                            ReferenceKind::Immutable,
+                            Box::new(vector_type),
+                        ));
+                        self.emit(|attr| {
+                            Bytecode::Call(
+                                attr,
+                                vec![reference],
+                                StacklessOperation::BorrowLoc,
+                                vec![srcs[0]],
+                                None,
+                            )
+                        })?;
+                        reference
+                    },
+                };
                 let operation = self.vector_function("length", element)?;
                 self.emit(|attr| {
                     Bytecode::Call(attr, dsts.to_vec(), operation, vec![reference], None)
@@ -720,7 +1009,7 @@ impl FunctionTranslator<'_> {
                     )
                 })
             },
-            Oper::VecSet | Oper::VecPush | Oper::VecPop => {
+            Oper::VecSet | Oper::VecPush | Oper::VecPop | Oper::VecInsert | Oper::VecRemove => {
                 self.translate_functional_vector_update(dsts, oper, srcs)
             },
             Oper::BorrowVecElem => {
@@ -903,6 +1192,9 @@ impl FunctionTranslator<'_> {
                     )
                 })
             },
+            Oper::Lt if !self.local(srcs[0])?.is_number() => {
+                self.translate_generic_less(dsts, srcs)
+            },
             _ => {
                 let operation = self.operation(dsts, oper, srcs)?;
                 self.emit(|attr| {
@@ -1067,22 +1359,16 @@ impl FunctionTranslator<'_> {
                     self.type_args(args)?,
                 )
             },
-            Oper::Function(id) => StacklessOperation::Function(
-                self.module_id,
-                *self
-                    .function_ids
-                    .get(*id)
-                    .with_context(|| format!("function id {id} is out of range"))?,
-                vec![],
-            ),
-            Oper::FunctionInst(id, args) => StacklessOperation::Function(
-                self.module_id,
-                *self
-                    .function_ids
-                    .get(*id)
-                    .with_context(|| format!("function id {id} is out of range"))?,
-                self.type_args(args)?,
-            ),
+            Oper::Function(id) => {
+                let target =
+                    function_at(self.env, self.xir, self.module_id, self.function_ids, *id)?;
+                StacklessOperation::Function(target.module_id, target.id, vec![])
+            },
+            Oper::FunctionInst(id, args) => {
+                let target =
+                    function_at(self.env, self.xir, self.module_id, self.function_ids, *id)?;
+                StacklessOperation::Function(target.module_id, target.id, self.type_args(args)?)
+            },
             Oper::BorrowLoc => {
                 arity(dsts, srcs, 1, 1, oper)?;
                 StacklessOperation::BorrowLoc
@@ -1161,6 +1447,120 @@ impl FunctionTranslator<'_> {
         ))
     }
 
+    /// XIR enters the model after compiler-v2's AST comparison rewriter has
+    /// run. Reproduce that rewrite here so generic `<` follows exactly the
+    /// production Move path: `std::cmp::compare<T>(&left, &right).is_lt()`.
+    fn translate_generic_less(&mut self, dsts: &[usize], srcs: &[usize]) -> Result<()> {
+        arity(dsts, srcs, 1, 2, &Oper::Lt)?;
+        let operand_type = self.local(srcs[0])?.clone();
+        ensure!(
+            self.local(srcs[1])? == &operand_type,
+            "generic comparison operands have different types"
+        );
+
+        let module = self
+            .env
+            .get_modules()
+            .find(|module| module.is_cmp())
+            .context("generic comparison requires the standard `cmp` module")?;
+        let compare = module
+            .find_function(self.env.symbol_pool().make("compare"))
+            .context("the standard `cmp` module has no `compare` function")?;
+        let is_lt = module
+            .find_function(self.env.symbol_pool().make("is_lt"))
+            .context("the standard `cmp` module has no `is_lt` function")?;
+        let module_id = module.get_id();
+
+        let (compare_type, left_ref, right_ref) = match operand_type {
+            Type::Reference(ReferenceKind::Immutable, referent) => {
+                (referent.as_ref().clone(), srcs[0], srcs[1])
+            },
+            Type::Reference(ReferenceKind::Mutable, referent) => {
+                let immutable_type = Type::Reference(ReferenceKind::Immutable, referent.clone());
+                let left_ref = self.fresh_local(immutable_type.clone());
+                let right_ref = self.fresh_local(immutable_type);
+                self.emit(|attr| {
+                    Bytecode::Call(
+                        attr,
+                        vec![left_ref],
+                        StacklessOperation::FreezeRef(true),
+                        vec![srcs[0]],
+                        None,
+                    )
+                })?;
+                self.emit(|attr| {
+                    Bytecode::Call(
+                        attr,
+                        vec![right_ref],
+                        StacklessOperation::FreezeRef(true),
+                        vec![srcs[1]],
+                        None,
+                    )
+                })?;
+                (referent.as_ref().clone(), left_ref, right_ref)
+            },
+            value_type => {
+                let reference_type =
+                    Type::Reference(ReferenceKind::Immutable, Box::new(value_type.clone()));
+                let left_ref = self.fresh_local(reference_type.clone());
+                let right_ref = self.fresh_local(reference_type);
+                self.emit(|attr| {
+                    Bytecode::Call(
+                        attr,
+                        vec![left_ref],
+                        StacklessOperation::BorrowLoc,
+                        vec![srcs[0]],
+                        None,
+                    )
+                })?;
+                self.emit(|attr| {
+                    Bytecode::Call(
+                        attr,
+                        vec![right_ref],
+                        StacklessOperation::BorrowLoc,
+                        vec![srcs[1]],
+                        None,
+                    )
+                })?;
+                (value_type, left_ref, right_ref)
+            },
+        };
+
+        let ordering_type = compare.get_result_type();
+        let ordering = self.fresh_local(ordering_type.clone());
+        self.emit(|attr| {
+            Bytecode::Call(
+                attr,
+                vec![ordering],
+                StacklessOperation::Function(module_id, compare.get_id(), vec![compare_type]),
+                vec![left_ref, right_ref],
+                None,
+            )
+        })?;
+        let ordering_ref = self.fresh_local(Type::Reference(
+            ReferenceKind::Immutable,
+            Box::new(ordering_type),
+        ));
+        self.emit(|attr| {
+            Bytecode::Call(
+                attr,
+                vec![ordering_ref],
+                StacklessOperation::BorrowLoc,
+                vec![ordering],
+                None,
+            )
+        })?;
+        self.emit(|attr| {
+            Bytecode::Call(
+                attr,
+                dsts.to_vec(),
+                StacklessOperation::Function(module_id, is_lt.get_id(), vec![]),
+                vec![ordering_ref],
+                None,
+            )
+        })
+    }
+
     fn translate_functional_vector_update(
         &mut self,
         dsts: &[usize],
@@ -1180,6 +1580,14 @@ impl FunctionTranslator<'_> {
                 arity(dsts, srcs, 2, 1, oper)?;
                 (dsts[0], Some(dsts[1]))
             },
+            Oper::VecInsert => {
+                arity(dsts, srcs, 1, 3, oper)?;
+                (dsts[0], None)
+            },
+            Oper::VecRemove => {
+                arity(dsts, srcs, 2, 2, oper)?;
+                (dsts[0], Some(dsts[1]))
+            },
             _ => unreachable!(),
         };
         let element = self.vector_element_type(self.local(srcs[0])?)?;
@@ -1197,6 +1605,17 @@ impl FunctionTranslator<'_> {
                 None,
             )
         })?;
+        self.translate_vector_update_on_reference(value_dst, oper, srcs, vector_ref, element)
+    }
+
+    fn translate_vector_update_on_reference(
+        &mut self,
+        value_dst: Option<usize>,
+        oper: &Oper,
+        srcs: &[usize],
+        vector_ref: usize,
+        element: Type,
+    ) -> Result<()> {
         match oper {
             Oper::VecSet => {
                 let element_ref = self.fresh_local(Type::Reference(
@@ -1235,6 +1654,170 @@ impl FunctionTranslator<'_> {
                     Bytecode::Call(
                         attr,
                         vec![value_dst.expect("checked vec_pop destination")],
+                        pop,
+                        vec![vector_ref],
+                        None,
+                    )
+                })
+            },
+            Oper::VecInsert => {
+                // This Aptos stdlib does not expose `vector::insert` in the
+                // bytecode model. Reconstruct its stable-shift algorithm
+                // from actual vector opcodes so the generated control flow
+                // still passes through compiler-v2's complete pipeline.
+                let u64_type = Type::Primitive(PrimitiveType::U64);
+                let bool_type = Type::Primitive(PrimitiveType::Bool);
+                let len = self.fresh_local(u64_type.clone());
+                let cursor = self.fresh_local(u64_type.clone());
+                let one = self.fresh_local(u64_type.clone());
+                let condition = self.fresh_local(bool_type);
+                let abort_code = self.fresh_local(u64_type);
+                let valid_label = self.fresh_label()?;
+                let abort_label = self.fresh_label()?;
+                let loop_label = self.fresh_label()?;
+                let body_label = self.fresh_label()?;
+                let done_label = self.fresh_label()?;
+                let length = self.vector_function("length", element.clone())?;
+                let push = self.vector_function("push_back", element.clone())?;
+                let swap = self.vector_function("swap", element)?;
+                self.emit(|attr| Bytecode::Call(attr, vec![len], length, vec![vector_ref], None))?;
+                self.emit(|attr| {
+                    Bytecode::Call(
+                        attr,
+                        vec![condition],
+                        StacklessOperation::Le,
+                        vec![srcs[1], len],
+                        None,
+                    )
+                })?;
+                self.emit(|attr| Bytecode::Branch(attr, valid_label, abort_label, condition))?;
+                self.emit(|attr| Bytecode::Label(attr, abort_label))?;
+                self.emit(|attr| {
+                    Bytecode::Load(
+                        attr,
+                        abort_code,
+                        StacklessConstant::U64(VECTOR_INDEX_OUT_OF_BOUNDS),
+                    )
+                })?;
+                self.emit(|attr| Bytecode::Abort(attr, abort_code, None))?;
+                self.emit(|attr| Bytecode::Label(attr, valid_label))?;
+                self.emit(|attr| {
+                    Bytecode::Call(attr, vec![], push, vec![vector_ref, srcs[2]], None)
+                })?;
+                self.emit(|attr| Bytecode::Assign(attr, cursor, srcs[1], AssignKind::Inferred))?;
+                self.emit(|attr| Bytecode::Load(attr, one, StacklessConstant::U64(1)))?;
+                self.emit(|attr| Bytecode::Jump(attr, loop_label))?;
+                self.emit(|attr| Bytecode::Label(attr, loop_label))?;
+                self.emit(|attr| {
+                    Bytecode::Call(
+                        attr,
+                        vec![condition],
+                        StacklessOperation::Lt,
+                        vec![cursor, len],
+                        None,
+                    )
+                })?;
+                self.emit(|attr| Bytecode::Branch(attr, body_label, done_label, condition))?;
+                self.emit(|attr| Bytecode::Label(attr, body_label))?;
+                self.emit(|attr| {
+                    Bytecode::Call(attr, vec![], swap, vec![vector_ref, cursor, len], None)
+                })?;
+                self.emit(|attr| {
+                    Bytecode::Call(
+                        attr,
+                        vec![cursor],
+                        StacklessOperation::Add,
+                        vec![cursor, one],
+                        None,
+                    )
+                })?;
+                self.emit(|attr| Bytecode::Jump(attr, loop_label))?;
+                self.emit(|attr| Bytecode::Label(attr, done_label))
+            },
+            Oper::VecRemove => {
+                // Stable removal is the dual shift: swap each successor one
+                // position left, then pop the last element.
+                let u64_type = Type::Primitive(PrimitiveType::U64);
+                let bool_type = Type::Primitive(PrimitiveType::Bool);
+                let len = self.fresh_local(u64_type.clone());
+                let last = self.fresh_local(u64_type.clone());
+                let cursor = self.fresh_local(u64_type.clone());
+                let next = self.fresh_local(u64_type.clone());
+                let one = self.fresh_local(u64_type.clone());
+                let condition = self.fresh_local(bool_type);
+                let abort_code = self.fresh_local(u64_type);
+                let valid_label = self.fresh_label()?;
+                let abort_label = self.fresh_label()?;
+                let loop_label = self.fresh_label()?;
+                let body_label = self.fresh_label()?;
+                let done_label = self.fresh_label()?;
+                let length = self.vector_function("length", element.clone())?;
+                let swap = self.vector_function("swap", element.clone())?;
+                let pop = self.vector_function("pop_back", element)?;
+                self.emit(|attr| Bytecode::Call(attr, vec![len], length, vec![vector_ref], None))?;
+                self.emit(|attr| {
+                    Bytecode::Call(
+                        attr,
+                        vec![condition],
+                        StacklessOperation::Lt,
+                        vec![srcs[1], len],
+                        None,
+                    )
+                })?;
+                self.emit(|attr| Bytecode::Branch(attr, valid_label, abort_label, condition))?;
+                self.emit(|attr| Bytecode::Label(attr, abort_label))?;
+                self.emit(|attr| {
+                    Bytecode::Load(
+                        attr,
+                        abort_code,
+                        StacklessConstant::U64(VECTOR_INDEX_OUT_OF_BOUNDS),
+                    )
+                })?;
+                self.emit(|attr| Bytecode::Abort(attr, abort_code, None))?;
+                self.emit(|attr| Bytecode::Label(attr, valid_label))?;
+                self.emit(|attr| Bytecode::Load(attr, one, StacklessConstant::U64(1)))?;
+                self.emit(|attr| {
+                    Bytecode::Call(
+                        attr,
+                        vec![last],
+                        StacklessOperation::Sub,
+                        vec![len, one],
+                        None,
+                    )
+                })?;
+                self.emit(|attr| Bytecode::Assign(attr, cursor, srcs[1], AssignKind::Inferred))?;
+                self.emit(|attr| Bytecode::Jump(attr, loop_label))?;
+                self.emit(|attr| Bytecode::Label(attr, loop_label))?;
+                self.emit(|attr| {
+                    Bytecode::Call(
+                        attr,
+                        vec![condition],
+                        StacklessOperation::Lt,
+                        vec![cursor, last],
+                        None,
+                    )
+                })?;
+                self.emit(|attr| Bytecode::Branch(attr, body_label, done_label, condition))?;
+                self.emit(|attr| Bytecode::Label(attr, body_label))?;
+                self.emit(|attr| {
+                    Bytecode::Call(
+                        attr,
+                        vec![next],
+                        StacklessOperation::Add,
+                        vec![cursor, one],
+                        None,
+                    )
+                })?;
+                self.emit(|attr| {
+                    Bytecode::Call(attr, vec![], swap, vec![vector_ref, cursor, next], None)
+                })?;
+                self.emit(|attr| Bytecode::Assign(attr, cursor, next, AssignKind::Inferred))?;
+                self.emit(|attr| Bytecode::Jump(attr, loop_label))?;
+                self.emit(|attr| Bytecode::Label(attr, done_label))?;
+                self.emit(|attr| {
+                    Bytecode::Call(
+                        attr,
+                        vec![value_dst.expect("checked vec_remove destination")],
                         pop,
                         vec![vector_ref],
                         None,
@@ -1316,6 +1899,39 @@ impl FunctionTranslator<'_> {
                 self.emit(|attr| Bytecode::Abort(attr, *code, None))
             },
         }
+    }
+}
+
+/// Whether a local whose defining instructions are omitted by a peephole is
+/// read before being redefined. Destinations are deliberately ignored: a
+/// later definition makes the skipped definition dead.
+fn local_is_read_after(local: usize, instrs: &[Instr], term: &Term) -> bool {
+    for instruction in instrs {
+        match instruction {
+            Instr::Load(destination, _) if *destination == local => return false,
+            Instr::Assign(destination, source) => {
+                if *source == local {
+                    return true;
+                }
+                if *destination == local {
+                    return false;
+                }
+            },
+            Instr::Call(destinations, _, sources) => {
+                if sources.contains(&local) {
+                    return true;
+                }
+                if destinations.contains(&local) {
+                    return false;
+                }
+            },
+            Instr::Load(_, _) | Instr::Nop => {},
+        }
+    }
+    match term {
+        Term::Jump(_) => false,
+        Term::Branch(condition, _, _) | Term::Abort(condition) => *condition == local,
+        Term::Ret(values) => values.contains(&local),
     }
 }
 
@@ -1517,5 +2133,20 @@ mod tests {
         assert!(error
             .to_string()
             .contains("type parameter index 0 is out of range"));
+    }
+
+    #[test]
+    fn vector_update_peephole_keeps_live_skipped_locals() {
+        assert!(local_is_read_after(
+            1,
+            &[Instr::Assign(2, 1)],
+            &Term::Ret(vec![]),
+        ));
+        assert!(local_is_read_after(1, &[], &Term::Ret(vec![1])));
+        assert!(!local_is_read_after(
+            1,
+            &[Instr::Load(1, Constant::U64(0))],
+            &Term::Ret(vec![]),
+        ));
     }
 }

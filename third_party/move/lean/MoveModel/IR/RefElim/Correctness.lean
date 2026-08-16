@@ -5133,34 +5133,43 @@ theorem ImmViews.eq_sem {s s' : MoveState} {vs vs' : List Value}
           | nil => simp only [Oper.sem, h₁.derefWith, h₂.derefWith]
           | cons => rfl
 
-/- Type correctness says equality is the only source operation allowed to
-consume a reference operand. -/
+def UsesDeref (op : Oper) : Prop :=
+  op = .eq ∨ op = .lt ∨ op = .vecLen
+
+/- Type correctness says only dereferencing observations may consume an
+immutable reference operand. -/
 def ImmOperandsSafe (op : Oper) (vs : List Value) : Prop :=
-  op = .eq ∨ ∀ v ∈ vs, ∀ rt, v ≠ .ref rt
+  UsesDeref op ∨ ∀ v ∈ vs, ∀ rt, v ≠ .ref rt
 
 set_option maxHeartbeats 1000000 in
 /-- A semantically defined ordinary operation has admissible immutable-copy
-operands.  Equality is the sole operation that can consume references; every
-other semantic clause either pattern-matches on non-reference values or
+operands. Equality, ordering, and vector length observe through references;
+every other semantic clause either pattern-matches on non-reference values or
 explicitly rejects reference-bearing aggregate operands. -/
 theorem Oper.sem_immOperandsSafe {op : Oper} {current : FrameId}
     {deref : RefTarget → Option Value} {vs : List Value} {m : Memory}
     {out : OpOutcome} (hsem : op.sem current deref vs m = some out) :
     ImmOperandsSafe op vs := by
   by_cases heq : op = .eq
-  · exact Or.inl heq
-  · right
-    generalize hs : op.sem current deref vs m = result at hsem
-    fun_cases op.sem current deref vs m <;>
-      simp_all [Oper.sem, Value.refFreeList_iff_forall]
-    all_goals
-      first
-        | exact fun v hv rt => Value.refFree_ne_ref (by simp_all) rt
-        | exact fun rt => Value.refFree_ne_ref (by simp_all) rt
+  · exact Or.inl (Or.inl heq)
+  · by_cases hlt : op = .lt
+    · exact Or.inl (Or.inr (Or.inl hlt))
+    · by_cases hlen : op = .vecLen
+      · exact Or.inl (Or.inr (Or.inr hlen))
+      · right
+        generalize hs : op.sem current deref vs m = result at hsem
+        fun_cases op.sem current deref vs m <;>
+          simp_all [Oper.sem, Value.refFreeList_iff_forall]
+        all_goals
+          first
+            | constructor <;>
+                exact fun rt => Value.refFree_ne_ref (by simp_all) rt
+            | exact fun v hv rt => Value.refFree_ne_ref (by simp_all) rt
+            | exact fun rt => Value.refFree_ne_ref (by simp_all) rt
 
 /- Immutable-copy views are observationally indistinguishable to an ordinary
-well-typed operation: equality observes dereferenced values, and every other
-operation receives no reference operands. -/
+well-typed operation: dereferencing observations see the same underlying
+values, and every other operation receives no reference operands. -/
 theorem ImmViews.op_sem {op : Oper} {s s' : MoveState}
     {vs vs' : List Value} {oo : OpOutcome}
     (h : ImmViews s s' vs vs') (hcurrent : s'.current = s.current)
@@ -5168,17 +5177,58 @@ theorem ImmViews.op_sem {op : Oper} {s s' : MoveState}
     (hsem : op.sem s.current s.readTarget vs s.memory = some oo)
     (hsafe : ImmOperandsSafe op vs) :
     op.sem s'.current s'.readTarget vs' s'.memory = some oo := by
-  rcases hsafe with heq | hnref
-  · subst op
-    rw [h.eq_sem hcurrent hmemory]
-    exact hsem
+  rcases hsafe with huses | hnref
+  · rcases huses with heq | hlt | hlen
+    · subst op
+      rw [h.eq_sem hcurrent hmemory]
+      exact hsem
+    · subst op
+      rw [hcurrent, hmemory]
+      cases h with
+      | nil => exact hsem
+      | cons h₁ hs =>
+          cases hs with
+          | nil => exact hsem
+          | cons h₂ hs =>
+              cases hs with
+              | nil => simpa only [Oper.sem, h₁.derefWith, h₂.derefWith] using hsem
+              | cons => exact hsem
+    · subst op
+      rw [hcurrent, hmemory]
+      cases h with
+      | nil => exact hsem
+      | cons h₁ hs =>
+          cases hs with
+          | nil => simpa only [Oper.sem, h₁.derefWith] using hsem
+          | cons => exact hsem
   · by_cases heq : op = .eq
     · subst op
       rw [h.eq_sem hcurrent hmemory]
       exact hsem
-    · rw [h.eq_of_not_ref hnref, hcurrent, hmemory]
-      rw [Oper.sem_deref_irrel heq]
-      exact hsem
+    · by_cases hlt : op = .lt
+      · subst op
+        rw [hcurrent, hmemory]
+        cases h with
+        | nil => exact hsem
+        | cons h₁ hs =>
+            cases hs with
+            | nil => exact hsem
+            | cons h₂ hs =>
+                cases hs with
+                | nil => simpa only [Oper.sem, h₁.derefWith, h₂.derefWith] using hsem
+                | cons => exact hsem
+      · by_cases hlen : op = .vecLen
+        · subst op
+          rw [hcurrent, hmemory]
+          cases h with
+          | nil => exact hsem
+          | cons h₁ hs =>
+              cases hs with
+              | nil => simpa only [Oper.sem, h₁.derefWith] using hsem
+              | cons => exact hsem
+        · rw [h.eq_of_not_ref hnref, hcurrent, hmemory]
+          rw [Oper.sem_deref_irrel heq hlt hlen]
+          exact hsem
 
 /-- Genuinely relational state at one immutable-pass program point.  Source
 typing and borrow validity live in generic `FrameSafe`; this relation only
@@ -6880,7 +6930,7 @@ theorem ImmStackRel.simulate_op_abort {P' : Program} {G : Cfg}
     (hop : op.sem s.current s.readTarget vs s.memory = some .abort)
     (hsafe : ImmOperandsSafe op vs) :
     RunFrom P' G (tgt ++ rest) term s'
-      (.abort s.memory runtimeAbortCode) := by
+      (.abort s.memory op.abortCode) := by
   obtain ⟨vs', hsrcs', hviews⟩ := h.lookup_views hframe
     (fun x hx => uses_mem_liveThroughInstr (by
       simpa [instrUses] using hx))
@@ -7029,7 +7079,7 @@ theorem ImmStackRel.simulate_borrowGlobal_abort {P' : Program} {G : Cfg}
     have hop : (Oper.getGlobal r).sem s'.current s'.readTarget
         [.address a] s'.memory = some .abort := by
       simp [Oper.sem, habsent']
-    simpa [h.memory_eq] using
+    simpa [h.memory_eq, Oper.abortCode] using
       (InstrStop.run (rest := rest) (term := term) (.op hsrcs hop))
   · simpa [h.memory_eq] using
       (InstrStop.run (rest := rest) (term := term)
@@ -7628,7 +7678,7 @@ theorem ImmStackRel.simulate_borrowVecElem_abort {P P' : Program} {G : Cfg}
       have hop : Oper.vecGet.sem s'.current s'.readTarget
           [.vector es, .u64 n] s'.memory = some .abort := by
         simp [Oper.sem, hnone]
-      simpa [h.memory_eq] using
+      simpa [h.memory_eq, Oper.abortCode] using
         (InstrStop.run (rest := rest) (term := term) (.op hsrcs hop))
   · obtain ⟨-, htmut, ty, hty, -, rfl⟩ := hcase
     have hvectorFree := hchecked.consistent.refTarget_free hty rfl ht hv
@@ -7660,7 +7710,7 @@ theorem ImmStackRel.simulate_borrowVecElem_abort {P P' : Program} {G : Cfg}
         [.vector es, .u64 n] (s'.writeLocal tmp (.vector es)).memory =
           some .abort := by simp [Oper.sem, hnone]
     exact hfirst.run (by
-      simpa [h.memory_eq] using
+      simpa [h.memory_eq, Oper.abortCode] using
         (InstrStop.run (rest := rest) (term := term) (.op hsrcs hop)))
   · obtain ⟨-, htimm, -, rfl⟩ := hcase
     rw [htimm] at htval
