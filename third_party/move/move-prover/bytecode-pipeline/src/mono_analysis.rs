@@ -30,10 +30,12 @@ use move_model::{
         INTRINSIC_FUN_MAP_SPEC_ABORTS_UPSERT_ALL, INTRINSIC_FUN_MAP_SPEC_DEL,
         INTRINSIC_FUN_MAP_SPEC_GET, INTRINSIC_FUN_MAP_SPEC_HAS_KEY,
         INTRINSIC_FUN_MAP_SPEC_IS_EMPTY, INTRINSIC_FUN_MAP_SPEC_ITER_PRESERVED,
-        INTRINSIC_FUN_MAP_SPEC_ITER_VALID, INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID,
-        INTRINSIC_FUN_MAP_SPEC_LEN, INTRINSIC_FUN_MAP_SPEC_NEW, INTRINSIC_FUN_MAP_SPEC_SET,
-        INTRINSIC_FUN_MAP_TO_ORDERED_MAP, INTRINSIC_FUN_MAP_TO_VEC_PAIR, INTRINSIC_FUN_MAP_UPSERT,
-        INTRINSIC_TYPE_MAP, INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS,
+        INTRINSIC_FUN_MAP_SPEC_ITER_VALID, INTRINSIC_FUN_MAP_SPEC_KEY_AT,
+        INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID, INTRINSIC_FUN_MAP_SPEC_LEAF_OFFSET,
+        INTRINSIC_FUN_MAP_SPEC_LEN, INTRINSIC_FUN_MAP_SPEC_NEW, INTRINSIC_FUN_MAP_SPEC_RANK,
+        INTRINSIC_FUN_MAP_SPEC_SET, INTRINSIC_FUN_MAP_TO_ORDERED_MAP,
+        INTRINSIC_FUN_MAP_TO_VEC_PAIR, INTRINSIC_FUN_MAP_UPSERT, INTRINSIC_TYPE_MAP,
+        INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS,
     },
     symbol::Symbol,
     ty::{NoUnificationContext, PrimitiveType, ReferenceKind, Type, TypeDisplayContext, Variance},
@@ -511,24 +513,23 @@ impl Analyzer<'_> {
                 } else if let Some(Type::Struct(mid, sid, inst)) =
                     param_tys.first().map(|ty| ty.skip_reference())
                 {
-                    // The fabricated `Iter<K>` instantiation assumes the
-                    // iterator enum has exactly one type parameter; visiting
-                    // a fabricated instance of a wider enum would index its
-                    // argument list out of bounds. Report a diagnostic for a
-                    // malformed binding instead of crashing.
-                    if self
+                    // The fabricated instantiation mirrors the enum's own arity:
+                    // a keyed iterator is `Iter<K>`, a position-based one is
+                    // unparameterized. Anything wider would index its argument
+                    // list out of bounds, so reject it with a diagnostic rather
+                    // than crashing.
+                    let iter_ty_params = self
                         .env
                         .get_struct(mid.qualified(*sid))
                         .get_type_parameters()
-                        .len()
-                        != 1
-                    {
+                        .len();
+                    if iter_ty_params > 1 {
                         self.env.error(
                             &fun_env.get_loc(),
                             "the iterator enum of a `map_iter_borrow_mut` function must \
-                             have exactly one type parameter (the key type)",
+                             have at most one type parameter (the key type)",
                         );
-                    } else if inst.first() != Some(&Type::TypeParameter(0)) {
+                    } else if iter_ty_params == 1 && inst.first() != Some(&Type::TypeParameter(0)) {
                         // The template hardcodes the map instance's key type
                         // for the iterator parameter; a binding instantiated
                         // with anything but the function's first (key) type
@@ -572,10 +573,14 @@ impl Analyzer<'_> {
                              function's type parameters) and return a mutable reference \
                              to the value type parameter",
                         );
-                    } else {
+                    } else if iter_ty_params == 1 {
                         for (k, _v) in ty_args.iter() {
                             iter_ptr_to_register.push(Type::Struct(*mid, *sid, vec![k.clone()]));
                         }
+                    } else {
+                        // Unparameterized iterator: one instance covers every
+                        // map instance.
+                        iter_ptr_to_register.push(Type::Struct(*mid, *sid, vec![]));
                     }
                 }
             }
@@ -645,7 +650,7 @@ impl Analyzer<'_> {
                 let v = || Type::TypeParameter(1);
                 let num = || Type::Primitive(PrimitiveType::Num);
                 let boolean = || Type::Primitive(PrimitiveType::Bool);
-                let fixed_sigs: [(&str, Vec<Type>, Type, &str); 11] = [
+                let fixed_sigs: [(&str, Vec<Type>, Type, &str); 13] = [
                     (
                         INTRINSIC_FUN_MAP_SPEC_NEW,
                         vec![],
@@ -657,6 +662,18 @@ impl Analyzer<'_> {
                         vec![map_ty()],
                         num(),
                         "(map<K, V>): num",
+                    ),
+                    (
+                        INTRINSIC_FUN_MAP_SPEC_KEY_AT,
+                        vec![map_ty(), num()],
+                        k(),
+                        "(map<K, V>, num): K",
+                    ),
+                    (
+                        INTRINSIC_FUN_MAP_SPEC_RANK,
+                        vec![map_ty(), k()],
+                        num(),
+                        "(map<K, V>, K): num",
                     ),
                     (
                         INTRINSIC_FUN_MAP_SPEC_IS_EMPTY,
@@ -830,9 +847,25 @@ impl Analyzer<'_> {
             // key type parameter; anything else would emit ill-typed Boogie.
             // Register the iterator enum's instances eagerly: the template
             // references them per map instance.
-            for role in [
-                INTRINSIC_FUN_MAP_SPEC_ITER_VALID,
-                INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID,
+            // The validity predicates answer a yes/no question about a walker;
+            // the leaf offset answers where it sits. Same parameter shape, so
+            // the expected result type travels with the role.
+            for (role, expected_result, result_name) in [
+                (
+                    INTRINSIC_FUN_MAP_SPEC_ITER_VALID,
+                    Type::Primitive(PrimitiveType::Bool),
+                    "bool",
+                ),
+                (
+                    INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID,
+                    Type::Primitive(PrimitiveType::Bool),
+                    "bool",
+                ),
+                (
+                    INTRINSIC_FUN_MAP_SPEC_LEAF_OFFSET,
+                    Type::Primitive(PrimitiveType::Num),
+                    "num",
+                ),
             ] {
                 let Some(sf_qid) = decl.lookup_spec_fun(self.env, role) else {
                     continue;
@@ -853,16 +886,16 @@ impl Analyzer<'_> {
                     || sf.params.len() != 2
                     || !iter_ok
                     || sf.params[1].1 != expected_map
-                    || sf.result_type != Type::Primitive(PrimitiveType::Bool)
+                    || sf.result_type != expected_result
                 {
                     self.env.error(
                         &sf.loc,
                         &format!(
                             "a `{}` function must have two type parameters and the \
-                             signature (iterator_enum, map<K, V>): bool, with the \
+                             signature (iterator_enum, map<K, V>): {}, with the \
                              iterator enum either unparameterized or instantiated \
                              with the key type parameter",
-                            role
+                            role, result_name
                         ),
                     );
                     continue;
@@ -916,12 +949,15 @@ impl Analyzer<'_> {
                 INTRINSIC_FUN_MAP_SPEC_GET,
                 INTRINSIC_FUN_MAP_SPEC_SET,
                 INTRINSIC_FUN_MAP_SPEC_DEL,
+                INTRINSIC_FUN_MAP_SPEC_KEY_AT,
+                INTRINSIC_FUN_MAP_SPEC_RANK,
                 INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY,
                 INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD,
                 INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL,
                 INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW,
                 INTRINSIC_FUN_MAP_SPEC_ITER_VALID,
                 INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID,
+                INTRINSIC_FUN_MAP_SPEC_LEAF_OFFSET,
                 INTRINSIC_FUN_MAP_SPEC_ITER_PRESERVED,
             ] {
                 let Some(sf_qid) = decl.lookup_spec_fun(self.env, role) else {
@@ -936,6 +972,41 @@ impl Analyzer<'_> {
                             "a `{}` binding must be a `spec native fun`; \
                              its definition is provided by the intrinsic model",
                             role
+                        ),
+                    );
+                }
+            }
+            // The enumeration roles define each other: the template emits both
+            // declarations or neither, since `key_at`'s axioms are stated
+            // through `rank` and vice versa. Binding only one would pass the
+            // per-role checks above and then reach Boogie as a call to a
+            // function that was never declared, so require the pair.
+            {
+                let key_at = decl.lookup_spec_fun(self.env, INTRINSIC_FUN_MAP_SPEC_KEY_AT);
+                let rank = decl.lookup_spec_fun(self.env, INTRINSIC_FUN_MAP_SPEC_RANK);
+                let missing = match (key_at, rank) {
+                    (Some(qid), None) => Some((
+                        qid,
+                        INTRINSIC_FUN_MAP_SPEC_KEY_AT,
+                        INTRINSIC_FUN_MAP_SPEC_RANK,
+                    )),
+                    (None, Some(qid)) => Some((
+                        qid,
+                        INTRINSIC_FUN_MAP_SPEC_RANK,
+                        INTRINSIC_FUN_MAP_SPEC_KEY_AT,
+                    )),
+                    _ => None,
+                };
+                if let Some((sf_qid, bound_role, absent_role)) = missing {
+                    let module_env = self.env.get_module(sf_qid.module_id);
+                    let sf = module_env.get_spec_fun(sf_qid.id);
+                    self.env.error(
+                        &sf.loc,
+                        &format!(
+                            "`{}` is bound but `{}` is not; the two must be bound \
+                             together, since the intrinsic model defines each \
+                             through the other",
+                            bound_role, absent_role
                         ),
                     );
                 }

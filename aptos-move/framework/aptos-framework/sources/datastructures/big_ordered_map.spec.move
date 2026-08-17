@@ -69,6 +69,8 @@ spec aptos_framework::big_ordered_map {
             map_spec_del = spec_remove,
             map_spec_len = spec_len,
             map_spec_has_key = spec_contains_key,
+            map_spec_key_at = spec_key_at,
+            map_spec_rank = spec_rank,
             map_spec_aborts_empty = spec_aborts_empty,
             map_spec_aborts_add_all = spec_aborts_add_all,
             map_spec_aborts_new_from = spec_aborts_new_from,
@@ -80,6 +82,7 @@ spec aptos_framework::big_ordered_map {
             map_is_empty = is_empty,
             map_spec_iter_valid = spec_iter_current,
             map_spec_leaf_iter_valid = spec_leaf_iter_valid,
+            map_spec_leaf_offset = spec_leaf_offset,
             map_spec_iter_preserved = spec_iter_preserved;
     }
 
@@ -101,6 +104,11 @@ spec aptos_framework::big_ordered_map {
 
     spec native fun spec_len<K, V>(t: BigOrderedMap<K, V>): num;
     spec native fun spec_contains_key<K, V>(t: BigOrderedMap<K, V>, k: K): bool;
+    // Enumeration view: `spec_key_at(t, i)` is the i-th smallest key under
+    // `cmp::compare` (0 <= i < spec_len(t)), `spec_rank(t, k)` its inverse on
+    // contained keys. Lets loop invariants index a traversal by position.
+    spec native fun spec_key_at<K, V>(t: BigOrderedMap<K, V>, i: num): K;
+    spec native fun spec_rank<K, V>(t: BigOrderedMap<K, V>, k: K): num;
     spec native fun spec_set<K, V>(t: BigOrderedMap<K, V>, k: K, v: V): BigOrderedMap<K, V>;
     spec native fun spec_remove<K, V>(t: BigOrderedMap<K, V>, k: K): BigOrderedMap<K, V>;
     spec native fun spec_get<K, V>(t: BigOrderedMap<K, V>, k: K): V;
@@ -266,6 +274,12 @@ spec aptos_framework::big_ordered_map {
         requires spec_iter_valid(self, map);
         aborts_if false;
         ensures result <==> spec_iter_is_begin(self, map);
+        // The smallest key occupies position 0, so a non-End begin iterator
+        // sits at rank 0. Stated here because the characterization above is by
+        // `cmp::compare` minimality, which does not by itself reach the
+        // enumeration; a backward traversal needs this to conclude at begin
+        // that it has walked the whole map.
+        ensures result && !(self is IteratorPtr::End<K>) ==> spec_rank(map, self.key) == 0;
     }
 
     // Returns the iterator pointing to the smallest key K in self with K >= input
@@ -396,6 +410,8 @@ spec aptos_framework::big_ordered_map {
         ensures !iter_is_end(result, self) ==>
             (forall k: K where spec_contains_key(self, k) && k != result.key:
                 std::cmp::compare(result.key, k) == std::cmp::Ordering::Less);
+        // The first key has rank 0.
+        ensures !iter_is_end(result, self) ==> spec_rank(self, result.key) == 0;
     }
 
     spec internal_new_end_iter {
@@ -423,6 +439,11 @@ spec aptos_framework::big_ordered_map {
             (forall k: K where spec_contains_key(map, k)
                 && std::cmp::compare(k, self.key) == std::cmp::Ordering::Greater:
                 std::cmp::compare(result.key, k) != std::cmp::Ordering::Greater);
+        // Rank increments per step; End means self.key had the last rank.
+        ensures !(result is IteratorPtr::End<K>) && spec_contains_key(map, self.key) ==>
+            spec_rank(map, result.key) == spec_rank(map, self.key) + 1;
+        ensures (result is IteratorPtr::End<K>) && spec_contains_key(map, self.key) ==>
+            spec_rank(map, self.key) == spec_len(map) - 1;
     }
 
     spec iter_prev {
@@ -446,6 +467,11 @@ spec aptos_framework::big_ordered_map {
             (forall k: K where spec_contains_key(map, k)
                 && std::cmp::compare(k, self.key) == std::cmp::Ordering::Less:
                 std::cmp::compare(k, result.key) != std::cmp::Ordering::Greater);
+        // From End: result has the last rank; otherwise the rank decrements.
+        ensures (self is IteratorPtr::End<K>) ==>
+            spec_rank(map, result.key) == spec_len(map) - 1;
+        ensures !(self is IteratorPtr::End<K>) && spec_contains_key(map, self.key) ==>
+            spec_rank(map, result.key) == spec_rank(map, self.key) - 1;
     }
 
     spec compute_length {
@@ -477,6 +503,15 @@ spec aptos_framework::big_ordered_map {
         ensures spec_len(map) == spec_len(old(map));
         ensures spec_unchanged_except_at(map, self.key);
         ensures ensures_of<f>(old(spec_get(map, self.key)), result, spec_get(map, self.key));
+        // A value write moves no keys, so every position survives. This has to
+        // be stated positionally: equality against `spec_set` would not do it,
+        // because equality on a map carrying ghosts is extensional (see
+        // `$IsEqual` in the prelude), so it never produces the write term the
+        // model's rank-preservation axiom triggers on. Same content as that
+        // axiom, so no new trust.
+        ensures forall i in 0..spec_len(map): spec_key_at(map, i) == spec_key_at(old(map), i);
+        ensures forall k: K where spec_contains_key(old(map), k):
+            spec_rank(map, k) == spec_rank(old(map), k);
     }
 
     spec internal_find_with_path {
@@ -505,7 +540,27 @@ spec aptos_framework::big_ordered_map {
         ensures !spec_contains_key(map, self.iterator.key);
         ensures spec_len(map) == spec_len(old(map)) - 1;
         ensures spec_unchanged_except_at(map, self.iterator.key);
+        // Removal closes the position up: keys before the removed one keep
+        // their place, keys after it move down by one. Positional for the same
+        // reason as in `iter_modify` — extensional equality against
+        // `spec_remove` cannot reach the enumeration.
+        ensures forall i in 0..spec_rank(old(map), self.iterator.key):
+            spec_key_at(map, i) == spec_key_at(old(map), i);
+        ensures forall i in spec_rank(old(map), self.iterator.key)..spec_len(map):
+            spec_key_at(map, i) == spec_key_at(old(map), i + 1);
     }
+
+    // Position of a leaf in the walk: the number of keys held by the leaves
+    // before it. Uninterpreted — its meaning comes entirely from the clauses on
+    // the two leaf functions below, which say it starts at zero, advances by
+    // each leaf's size, and reaches the map's length when the walk ends. That
+    // is what lets a leaf walk carry a rank-indexed invariant, and what makes
+    // the walk COMPLETE rather than merely sound: the entries seen are the
+    // map's keys at positions `offset .. offset + leaf size`, and the offsets
+    // tile `0 .. spec_len(map)`.
+    spec native fun spec_leaf_offset<K, V>(
+        leaf: LeafNodeIteratorPtr, map: BigOrderedMap<K, V>
+    ): num;
 
     spec internal_leaf_new_begin_iter {
         pragma opaque;
@@ -515,6 +570,8 @@ spec aptos_framework::big_ordered_map {
         // Points at `min_leaf_index`, which is never NULL_INDEX: an empty map's
         // leaf walk visits the (empty) root leaf once.
         ensures !internal_leaf_iter_is_end(result);
+        // Nothing precedes the first leaf.
+        ensures spec_leaf_offset(result, self) == 0;
     }
 
     spec internal_leaf_iter_is_end {
@@ -536,9 +593,8 @@ spec aptos_framework::big_ordered_map {
         requires spec_leaf_iter_valid(self, map);
         aborts_if internal_leaf_iter_is_end(self);
         ensures spec_leaf_iter_valid(result_2, map);
-        // Soundness direction only: every entry in the returned leaf is a real
-        // map entry (a Leaf child with contained key and matching value).
-        // Completeness — that the leaves together visit every key — is not modeled.
+        // Every entry in the returned leaf is a real map entry (a Leaf child
+        // with contained key and matching value).
         ensures forall k: K where ordered_map::spec_contains_key(result_1, k):
             spec_contains_key(map, k);
         ensures forall k: K where ordered_map::spec_contains_key(result_1, k):
@@ -546,5 +602,38 @@ spec aptos_framework::big_ordered_map {
                 && ordered_map::spec_get(result_1, k).value == spec_get(map, k);
         // Leaves of a nonempty map are nonempty.
         ensures spec_len(map) > 0 ==> ordered_map::spec_len(result_1) > 0;
+        // The other direction, which the soundness clauses above do not give:
+        // this leaf holds exactly the map's keys at positions
+        // `offset .. offset + leaf size`, in that order. Leaves are visited in
+        // ascending key order and each leaf's entries are ascending, so the
+        // leaf's own enumeration lines up with the map's at that offset.
+        ensures spec_leaf_offset(self, map) + ordered_map::spec_len(result_1)
+            <= spec_len(map);
+        ensures forall j in 0..ordered_map::spec_len(result_1):
+            spec_key_at(map, spec_leaf_offset(self, map) + j)
+                == ordered_map::spec_key_at(result_1, j);
+        // The same correspondence for values, stated positionally. The
+        // key-guarded clauses above cannot be used by a walk that has just read
+        // position `j`: that would first require the key at `j` to be known
+        // contained, which nothing about an opaque result gives. Leaf-ness is
+        // part of it — `.value` is a variant selector, so without it the value
+        // equality says nothing about the child a walk actually reads.
+        ensures forall j in 0..ordered_map::spec_len(result_1):
+            ordered_map::spec_get(result_1, ordered_map::spec_key_at(result_1, j))
+                is Child::Leaf<V>;
+        ensures forall j in 0..ordered_map::spec_len(result_1):
+            ordered_map::spec_get(result_1, ordered_map::spec_key_at(result_1, j))
+                .value
+                == spec_get(map, spec_key_at(map, spec_leaf_offset(self, map) + j));
+        // Advancing consumes exactly this leaf's keys, and the walk ends only
+        // once every key has been consumed.
+        ensures spec_leaf_offset(result_2, map)
+            == spec_leaf_offset(self, map) + ordered_map::spec_len(result_1);
+        // An offset counts keys, so it never goes backwards past the start.
+        // Without this a walk could sit at a negative position, where a
+        // position-indexed aggregate is trivially zero.
+        ensures spec_leaf_offset(result_2, map) >= 0;
+        ensures internal_leaf_iter_is_end(result_2) ==>
+            spec_leaf_offset(result_2, map) == spec_len(map);
     }
 }
