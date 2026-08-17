@@ -58,7 +58,6 @@ use move_model::{
     },
     exp_generator::FunExpGenerator,
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget as ExpRewriteTarget},
-    metadata::LanguageVersion,
     model::{
         FunId, GlobalEnv, Loc, NodeId, Parameter, QualifiedId, SpecFunId, TypeParameter,
         TypeParameterKind,
@@ -1358,9 +1357,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             .map(|param| {
                 let Parameter(sym, ty, loc) = *param;
                 let id = env.new_node(loc.clone(), ty.instantiate(self.type_args));
-                if env.language_version().is_at_least(LanguageVersion::V2_1)
-                    && env.symbol_pool().string(*sym).as_ref() == "_"
-                {
+                if env.symbol_pool().string(*sym).as_ref() == "_" {
                     Pattern::Wildcard(id)
                 } else if let Some(new_sym) = self.shadow_stack.get_shadow_symbol(*sym, true) {
                     Pattern::Var(id, new_sym)

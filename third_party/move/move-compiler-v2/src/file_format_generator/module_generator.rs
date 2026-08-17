@@ -30,7 +30,7 @@ use move_core_types::{
 use move_ir_types::ast as IR_AST;
 use move_model::{
     ast::Attribute,
-    metadata::{CompilationMetadata, CompilerVersion, LanguageVersion, COMPILATION_METADATA_KEY},
+    metadata::{CompilationMetadata, CompilerVersion, COMPILATION_METADATA_KEY},
     model::{
         FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, ModuleId, Parameter, QualifiedId,
         StructEnv, StructId, TypeParameter, TypeParameterKind,
@@ -77,8 +77,6 @@ struct StructAPIIndex {
 /// Internal state of the module code generator
 #[derive(Debug)]
 pub struct ModuleGenerator {
-    /// Whether to generate function attributes.
-    pub(crate) gen_function_attributes: bool,
     /// The module index for which we generate code.
     #[allow(unused)]
     module_idx: FF::ModuleHandleIndex,
@@ -165,7 +163,6 @@ impl ModuleGenerator {
         let compiler_version = options
             .compiler_version
             .unwrap_or(CompilerVersion::latest_stable());
-        let gen_function_attributes = language_version.is_at_least(LanguageVersion::V2_2);
         let compilation_metadata = CompilationMetadata::new(compiler_version, language_version);
         let metadata = Metadata {
             key: COMPILATION_METADATA_KEY.to_vec(),
@@ -193,7 +190,6 @@ impl ModuleGenerator {
             SourceMap::new(ctx.env.to_ir_loc(&module_env.get_loc()), module_name_opt)
         };
         let mut genr = Self {
-            gen_function_attributes,
             module_idx: FF::ModuleHandleIndex(0),
             module_to_idx: Default::default(),
             name_to_idx: Default::default(),
@@ -580,11 +576,7 @@ impl ModuleGenerator {
         // into the file format. Legacy `acquires` is carried by the function definition's
         // acquired-resources list, not the function handle.
         let access_specifiers = None;
-        let attributes = if self.gen_function_attributes {
-            ctx.function_attributes(fun_env)
-        } else {
-            vec![]
-        };
+        let attributes = ctx.function_attributes(fun_env);
         let handle = FF::FunctionHandle {
             module,
             name,

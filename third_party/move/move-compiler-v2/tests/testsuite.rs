@@ -212,7 +212,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             exclude: vec!["/inlining/", "/more-v1/"],
             stop_after: StopAfter::FirstBytecodeGen, // FileFormat,
             dump_ast: DumpLevel::EndStage,
-            ..config().lang(LanguageVersion::V2_1)
+            ..config().lang(LanguageVersion::V2_2)
         },
         TestConfig {
             name: "macros",
@@ -327,7 +327,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             runner: |p| run_test(p, get_config_by_name("more-v1")),
             include: vec!["/more-v1/"],
             ..config()
-                .lang(LanguageVersion::V2_1)
+                .lang(LanguageVersion::V2_2)
                 .exp(Experiment::AST_SIMPLIFY)
         },
         // Tests for inlining, simplifier, and folding
@@ -338,7 +338,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             exclude: vec!["/more-v1/"],
             dump_ast: DumpLevel::EndStage,
             ..config()
-                .lang(LanguageVersion::V2_1)
+                .lang(LanguageVersion::V2_2)
                 .exp(Experiment::AST_SIMPLIFY)
         },
         // Tests for targets in non-simplifier
@@ -453,9 +453,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             name: "acquires-checker",
             runner: |p| run_test(p, get_config_by_name("acquires-checker")),
             include: vec!["/acquires-checker/"],
-            ..config()
-                // after 2.2, acquires is no longer enforced
-                .lang(LanguageVersion::V2_1)
+            ..config().lang(LanguageVersion::V2_2)
         },
         // Bytecode verifier tests
         TestConfig {

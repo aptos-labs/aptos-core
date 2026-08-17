@@ -1,16 +1,5 @@
 
 Diagnostics:
-error: missing acquires annotation for `Test`
-   ┌─ tests/checking/inlining/acquires_error_msg_inline.move:6:16
-   │
- 6 │     public fun call_modify_without_acquire() {
-   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
- 7 │         modify(); // expect error message here
-   │         -------- from a call inlined at this callsite
-   ·
-11 │         borrow_global_mut<Test>(@0xcafe).value = 2;
-   │         -------------------------------- acquired here
-
 warning: storage operation on `test::Test` can only be done within module `0x42::test`, but `test::modify` could be called (and expanded) outside
    ┌─ tests/checking/inlining/acquires_error_msg_inline.move:10:23
    │
@@ -26,3 +15,57 @@ warning: field access on `test::Test` can only be done within module `0x42::test
    │                       ^^^^^^
 11 │         borrow_global_mut<Test>(@0xcafe).value = 2;
    │         -------------------------------------- field access here
+
+// -- Model dump before first bytecode pipeline
+module 0x42::test {
+    struct Test {
+        value: u64,
+    }
+    public fun call_modify_without_acquire() {
+        {
+          let (): ();
+          select test::Test.value<&mut Test>(BorrowGlobal(Mutable)<Test>(0xcafe)) = 2;
+          Tuple()
+        };
+        Tuple()
+    }
+    public inline fun modify() {
+        select test::Test.value<&mut Test>(BorrowGlobal(Mutable)<Test>(0xcafe)) = 2;
+        Tuple()
+    }
+} // end 0x42::test
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::test {
+    struct Test has key {
+        value: u64,
+    }
+    public fun call_modify_without_acquire() {
+        {
+            let ();
+            borrow_global_mut<Test>(@0xcafe).value = 2;
+        };
+    }
+    public inline fun modify() {
+        borrow_global_mut<Test>(@0xcafe).value = 2;
+    }
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::test {
+    struct Test {
+        value: u64,
+    }
+    public fun call_modify_without_acquire() {
+        select test::Test.value<&mut Test>(BorrowGlobal(Mutable)<Test>(0xcafe)) = 2;
+        Tuple();
+        Tuple()
+    }
+    public inline fun modify() {
+        select test::Test.value<&mut Test>(BorrowGlobal(Mutable)<Test>(0xcafe)) = 2;
+        Tuple()
+    }
+} // end 0x42::test
+
+
+============ bytecode verification succeeded ========

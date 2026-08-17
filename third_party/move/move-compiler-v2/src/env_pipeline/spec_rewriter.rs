@@ -31,7 +31,6 @@ use move_model::{
         Operation, SpecBlockTarget, SpecFunDecl, VisitorPosition,
     },
     exp_rewriter::ExpRewriterFunctions,
-    metadata::LanguageVersion,
     model::{
         FunId, FunctionData, FunctionEnv, GlobalEnv, Loc, ModuleId, NodeId, Parameter, QualifiedId,
         QualifiedInstId, SpecFunId, StructEnv, StructId,
@@ -1357,12 +1356,7 @@ impl ExpRewriterFunctions for SpecConverter<'_> {
                 result
             } else {
                 let exp = self.rewrite_exp_descent(exp);
-                if self
-                    .env
-                    .language_version()
-                    .is_at_least(LanguageVersion::V2_2)
-                    && !self.for_inline
-                {
+                if !self.for_inline {
                     if let ExpData::Invoke(id, call, args) = exp.as_ref() {
                         if let ExpData::Call(_, Closure(mid, fid, mask), captured) = call.as_ref() {
                             let mut new_args = vec![];
