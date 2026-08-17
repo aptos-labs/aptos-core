@@ -5,7 +5,8 @@
 
 use mono_move_core::native::NativeExtensions;
 use mono_move_natives::{
-    EventStore, ObjectContextExtension, StorageUsageAtEpochBoundary, TransactionContextExtension,
+    EventStore, ObjectContextExtension, RistrettoPointStore, StorageUsageAtEpochBoundary,
+    TransactionContextExtension,
 };
 
 // Fixed inputs seeded into both VMs' native extensions, so extension-backed
@@ -36,5 +37,6 @@ pub(crate) fn seed_extensions() -> NativeExtensions {
         TEST_STATE_BYTES,
     ));
     extensions.add(EventStore::new());
+    extensions.add(RistrettoPointStore::new());
     extensions
 }

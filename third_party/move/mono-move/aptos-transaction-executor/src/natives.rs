@@ -9,7 +9,7 @@ use mono_move_core::{
 };
 use mono_move_global_context::ExecutionGuard;
 use mono_move_natives::{
-    make_all_production_natives, Dispatch, EventStore, ObjectContextExtension,
+    make_all_production_natives, Dispatch, EventStore, ObjectContextExtension, RistrettoPointStore,
     StorageUsageAtEpochBoundary, TransactionContextExtension,
 };
 use mono_move_runtime::{ProductionContextFamily, ProductionNativeRegistry};
@@ -57,5 +57,6 @@ pub(crate) fn transaction_extensions(
         usage.bytes() as u64,
     ));
     extensions.add(EventStore::new());
+    extensions.add(RistrettoPointStore::new());
     extensions
 }
