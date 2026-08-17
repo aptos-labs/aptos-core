@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_types::transaction::{
-    PersistedAuxiliaryInfo, ReplayProtector, SessionId, SignedTransaction,
+    AuxiliaryInfo, PersistedAuxiliaryInfo, ReplayProtector, SessionId, SignedTransaction,
 };
 use move_core_types::account_address::AccountAddress;
 
@@ -33,8 +33,8 @@ pub(crate) struct TxnMetadata {
 }
 
 impl TxnMetadata {
-    pub fn new(txn: &SignedTransaction, aux_info: PersistedAuxiliaryInfo) -> Self {
-        let transaction_index = match aux_info {
+    pub fn new(txn: &SignedTransaction, aux_info: &AuxiliaryInfo) -> Self {
+        let transaction_index = match *aux_info.persisted_info() {
             PersistedAuxiliaryInfo::V1 { transaction_index } => Some((transaction_index, 0)),
             PersistedAuxiliaryInfo::TimestampNotYetAssignedV1 { transaction_index } => {
                 Some((transaction_index, 1))

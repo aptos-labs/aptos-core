@@ -13,9 +13,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::Features,
     state_store::state_storage_usage::StateStorageUsage,
-    transaction::{
-        EntryFunction, PersistedAuxiliaryInfo, SignedTransaction, TransactionExecutableRef,
-    },
+    transaction::{AuxiliaryInfo, EntryFunction, SignedTransaction, TransactionExecutableRef},
 };
 use mono_move_core::{
     intern_type_tag, storage::module_provider::ModuleProvider, types::InternedTypeList, GasMeter,
@@ -78,7 +76,7 @@ impl<'a> AptosTransactionExecutor<'a> {
     pub fn execute_user_transaction(
         &self,
         txn: &SignedTransaction,
-        aux_info: PersistedAuxiliaryInfo,
+        aux_info: &AuxiliaryInfo,
     ) -> TxnOutcome {
         match self.execute_user_transaction_impl(txn, aux_info) {
             Ok(outcome) => outcome,
@@ -90,7 +88,7 @@ impl<'a> AptosTransactionExecutor<'a> {
     fn execute_user_transaction_impl(
         &self,
         txn: &SignedTransaction,
-        aux_info: PersistedAuxiliaryInfo,
+        aux_info: &AuxiliaryInfo,
     ) -> Result<TxnOutcome, DiscardReason> {
         let guard = self.guard;
 
