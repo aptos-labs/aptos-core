@@ -87,19 +87,18 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun
         .max(MIN_ARENA_BYTES);
     let resource_provider = read_set_resource_provider(&guard, &input.read_set, arena_size)?;
 
-    let (transaction_index, reserved_byte) = match input.user_context.transaction_index_kind() {
-        TransactionIndexKind::BlockExecution { transaction_index } => (transaction_index, 0),
+    let transaction_index = match input.user_context.transaction_index_kind() {
+        TransactionIndexKind::BlockExecution { transaction_index } => Some((transaction_index, 0)),
         TransactionIndexKind::ValidationOrSimulation { transaction_index } => {
-            (transaction_index, 1)
+            Some((transaction_index, 1))
         },
-        TransactionIndexKind::NotAvailable => (0, 0),
+        TransactionIndexKind::NotAvailable => None,
     };
     let mut extensions = NativeExtensions::new();
     extensions.add(TransactionContextExtension::new(
-        input.session_id.txn_hash().to_vec(),
+        input.session_id.txn_hash(),
         input.session_id.session_counter(),
         transaction_index,
-        reserved_byte,
     ));
     extensions.add(ObjectContextExtension::new());
     let usage = input.read_set.get_usage()?;
