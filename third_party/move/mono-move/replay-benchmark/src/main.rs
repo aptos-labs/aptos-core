@@ -91,6 +91,8 @@ enum Command {
     Capture(CaptureArgs),
 }
 
+// TODO(completeness): per-stage benchmark (prologue, payload, epilogue, materialization).
+// Will likely require executor-side changes (e.g. hooks).
 #[derive(Parser)]
 struct BenchArgs {
     #[clap(long, help = "Path to the transactions file")]

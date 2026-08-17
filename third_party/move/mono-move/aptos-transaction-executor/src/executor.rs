@@ -44,9 +44,9 @@ pub struct AptosTransactionExecutor<'a> {
     features: &'a Features,
     /// State storage usage at the current epoch's beginning.
     usage: StateStorageUsage,
-    /// If set, gas is free: the payload runs on an effectively unbounded
-    /// budget and the epilogue charges a zero fee.
-    zero_gas: bool,
+    /// If set, the payload runs unmetered and the epilogue charges a zero
+    /// fee.
+    unmetered: bool,
 }
 
 impl<'a> AptosTransactionExecutor<'a> {
@@ -68,15 +68,15 @@ impl<'a> AptosTransactionExecutor<'a> {
             data_provider,
             features,
             usage,
-            zero_gas: false,
+            unmetered: false,
         }
     }
 
-    /// Makes gas free: the payload gets an effectively unbounded budget and
-    /// the epilogue charges a zero fee. For replay- and simulation-style
-    /// callers that need gas-independent outputs.
-    pub fn with_zero_gas(mut self) -> Self {
-        self.zero_gas = true;
+    /// Runs the payload unmetered, making the epilogue charge a zero fee.
+    /// For replay- and simulation-style callers that need gas-independent
+    /// outputs.
+    pub fn without_metering(mut self) -> Self {
+        self.unmetered = true;
         self
     }
 
@@ -173,9 +173,9 @@ impl<'a> AptosTransactionExecutor<'a> {
         checkpoint(&mut interp)?;
 
         // ========================== User payload ============================
-        // Under zero gas the payload runs unmetered, so the untouched balance
-        // makes the epilogue charge nothing.
-        let payload_result = if self.zero_gas {
+        // An unmetered payload leaves the balance untouched, making the
+        // epilogue charge nothing.
+        let payload_result = if self.unmetered {
             interp
                 .unmetered(|interp| self.execute_entry_function(interp, &txn_data, entry, ty_args))
         } else {

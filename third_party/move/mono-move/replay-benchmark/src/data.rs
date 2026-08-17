@@ -29,11 +29,25 @@ pub struct BenchmarkInput {
 }
 
 impl BenchmarkInput {
-    /// The entry function's `module::function`, for reporting.
+    /// The entry function's `module::function<type args>`, for reporting.
     pub fn function_label(&self) -> String {
         match self.txn.executable_ref() {
             Ok(TransactionExecutableRef::EntryFunction(entry)) => {
-                format!("{}::{}", entry.module(), entry.function())
+                let mut label = format!(
+                    "{}::{}",
+                    entry.module().short_str_lossless(),
+                    entry.function()
+                );
+                if !entry.ty_args().is_empty() {
+                    let ty_args = entry
+                        .ty_args()
+                        .iter()
+                        .map(|t| t.to_canonical_string())
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    label.push_str(&format!("<{}>", ty_args));
+                }
+                label
             },
             _ => "<not an entry function>".to_string(),
         }

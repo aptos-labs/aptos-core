@@ -30,18 +30,25 @@ pub struct BenchmarkRun {
 
 /// Runs the transaction once untimed — determining the reported output and
 /// warming the caches — then times `execute_once` for each sample, keeping
-/// the output's deallocation outside the measured region.
+/// the output's deallocation outside the measured region. A failure in any
+/// run fails the benchmark rather than biasing the samples.
 pub(crate) fn measure(
     timing: &TimingConfig,
     execute_once: impl Fn() -> anyhow::Result<TransactionOutput>,
 ) -> anyhow::Result<BenchmarkRun> {
     let outcome = execute_once()?;
+    let mut first_error = None;
     let samples = collect_samples(timing, || {
         let start = std::time::Instant::now();
         let result = execute_once();
         let elapsed = start.elapsed();
-        drop(result);
+        if let Err(error) = result {
+            first_error.get_or_insert(error);
+        }
         elapsed
     });
-    Ok(BenchmarkRun { outcome, samples })
+    match first_error {
+        Some(error) => Err(error.context("a timed run failed")),
+        None => Ok(BenchmarkRun { outcome, samples }),
+    }
 }
