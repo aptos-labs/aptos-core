@@ -56,7 +56,7 @@ use move_model::{
 };
 use move_prover_bytecode_pipeline::{
     mono_analysis,
-    mono_analysis::{ClosureInfo, FunParamInfo, StructFieldInfo},
+    mono_analysis::{ClosureInfo, FunParamInfo, MonoSlice, StructFieldInfo, VerificationRoot},
     number_operation::{
         FuncOperationMap, GlobalNumberOperationState, NumOperation,
         NumOperation::{Bitwise, Bottom},
@@ -71,10 +71,7 @@ use move_stackless_bytecode::{
         Operation, PropKind,
     },
 };
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    hash::{DefaultHasher, Hash, Hasher},
-};
+use std::collections::{BTreeMap, BTreeSet};
 
 macro_rules! bv_op_not_enabled_error {
     ($bytecode:expr, $fun_target:expr, $env:expr, $loc:expr) => {
@@ -104,13 +101,15 @@ enum ApplyFrameAccess {
 pub struct BoogieTranslator<'env> {
     env: &'env GlobalEnv,
     options: &'env BoogieOptions,
-    for_shard: Option<usize>,
     writer: &'env CodeWriter,
     spec_translator: SpecTranslator<'env>,
     targets: &'env FunctionTargetsHolder,
     /// Map from function type to the set of function parameter infos for that type.
     /// Used to emit behavioral predicate assumptions at closure construction sites.
     fun_param_infos: BTreeMap<Type, BTreeSet<FunParamInfo>>,
+    /// Semantic instances needed by verification roots in this Boogie file.
+    selected_theory: MonoSlice,
+    verification_root: Option<VerificationRoot>,
 }
 
 pub struct FunctionTranslator<'env> {
@@ -266,56 +265,55 @@ impl<'env> BoogieTranslator<'env> {
     pub fn new(
         env: &'env GlobalEnv,
         options: &'env BoogieOptions,
-        for_shard: Option<usize>,
+        verification_root: Option<VerificationRoot>,
         targets: &'env FunctionTargetsHolder,
         writer: &'env CodeWriter,
     ) -> Self {
         Self {
             env,
             options,
-            for_shard,
             targets,
             writer,
             spec_translator: SpecTranslator::new(writer, env, options),
             fun_param_infos: BTreeMap::new(),
+            selected_theory: MonoSlice::default(),
+            verification_root,
         }
     }
 
     fn get_timeout(&self, fun_target: &FunctionTarget) -> usize {
-        let options = self.options;
-        let estimate_timeout_opt = fun_target
-            .func_env
-            .get_num_pragma(VERIFY_DURATION_ESTIMATE_PRAGMA);
+        Self::function_timeout(self.options, fun_target.func_env)
+    }
+
+    fn function_timeout(options: &BoogieOptions, fun_env: &FunctionEnv<'_>) -> usize {
+        let estimate_timeout_opt = fun_env.get_num_pragma(VERIFY_DURATION_ESTIMATE_PRAGMA);
         let default_timeout = if options.global_timeout_overwrite {
             estimate_timeout_opt.unwrap_or(options.vc_timeout)
         } else {
             options.vc_timeout
         };
-        fun_target
-            .func_env
+        fun_env
             .get_num_pragma(TIMEOUT_PRAGMA)
             .unwrap_or(default_timeout)
     }
 
-    /// Checks whether the given function is a verification target.
-    fn is_verified(&self, fun_variant: &FunctionVariant, fun_target: &FunctionTarget) -> bool {
+    pub fn verification_timeout(
+        env: &GlobalEnv,
+        options: &BoogieOptions,
+        root: &VerificationRoot,
+    ) -> usize {
+        Self::function_timeout(options, &env.get_function(root.fun))
+    }
+
+    fn is_verified_target(
+        options: &BoogieOptions,
+        fun_variant: &FunctionVariant,
+        fun_target: &FunctionTarget,
+    ) -> bool {
         if !fun_variant.is_verified() {
             return false;
         }
-        if let Some(shard) = self.for_shard {
-            // Check whether the shard is included.
-            if self.options.only_shard.is_some() && self.options.only_shard != Some(shard + 1) {
-                return false;
-            }
-            // Check whether it is part of the shard.
-            let mut hasher = DefaultHasher::new();
-            fun_target.func_env.get_full_name_str().hash(&mut hasher);
-            if (hasher.finish() as usize) % self.options.shards != shard {
-                return false;
-            }
-        }
         // Check whether the estimated duration is too large for configured timeout
-        let options = self.options;
         let estimate_timeout_opt = fun_target
             .func_env
             .get_num_pragma(VERIFY_DURATION_ESTIMATE_PRAGMA);
@@ -328,6 +326,143 @@ impl<'env> BoogieTranslator<'env> {
         } else {
             true
         }
+    }
+
+    /// Checks whether the given function is a verification target.
+    fn is_verified(&self, fun_variant: &FunctionVariant, fun_target: &FunctionTarget) -> bool {
+        Self::is_verified_target(self.options, fun_variant, fun_target)
+    }
+
+    fn is_verified_root(
+        &self,
+        fun_variant: &FunctionVariant,
+        fun_target: &FunctionTarget,
+        type_inst: &[Type],
+    ) -> bool {
+        if !self.is_verified(fun_variant, fun_target) {
+            return false;
+        }
+        self.verification_root.as_ref().is_none_or(|root| {
+            root == &VerificationRoot {
+                fun: fun_target.func_env.get_qualified_id(),
+                variant: fun_variant.clone(),
+                inst: type_inst.to_vec(),
+            }
+        })
+    }
+
+    fn root_slice<'a>(
+        mono_info: &'a mono_analysis::MonoInfo,
+        root: &VerificationRoot,
+    ) -> &'a MonoSlice {
+        let mut semantic_root = root.clone();
+        loop {
+            if let Some(slice) = mono_info.root_slices.get(&semantic_root) {
+                return slice;
+            }
+            semantic_root.variant = match &semantic_root.variant {
+                FunctionVariant::Verification(VerificationFlavor::Inconsistency(inner))
+                | FunctionVariant::Verification(VerificationFlavor::Split(inner, _)) => {
+                    FunctionVariant::Verification((**inner).clone())
+                },
+                _ => panic!("missing monomorphization slice for root {:?}", root),
+            };
+        }
+    }
+
+    fn collect_verification_roots(
+        env: &GlobalEnv,
+        options: &BoogieOptions,
+        targets: &FunctionTargetsHolder,
+        mono_info: &mono_analysis::MonoInfo,
+    ) -> BTreeSet<VerificationRoot> {
+        let empty = BTreeSet::new();
+        let mut roots = BTreeSet::new();
+        for module_env in env.get_modules() {
+            for fun_env in module_env.get_functions() {
+                if fun_env.is_native_or_intrinsic()
+                    || fun_env.is_test_only()
+                    || fun_env.is_not_prover_target()
+                {
+                    continue;
+                }
+                for (variant, fun_target) in targets.get_targets(&fun_env) {
+                    if !Self::is_verified_target(options, &variant, &fun_target) {
+                        continue;
+                    }
+                    roots.insert(VerificationRoot {
+                        fun: fun_target.func_env.get_qualified_id(),
+                        variant: variant.clone(),
+                        inst: vec![],
+                    });
+                    if options.skip_instance_check {
+                        continue;
+                    }
+                    let semantic_variant = Self::semantic_variant(&variant);
+                    for type_inst in mono_info
+                        .funs
+                        .get(&(fun_target.func_env.get_qualified_id(), variant.clone()))
+                        .or_else(|| {
+                            mono_info.funs.get(&(
+                                fun_target.func_env.get_qualified_id(),
+                                semantic_variant.clone(),
+                            ))
+                        })
+                        .unwrap_or(&empty)
+                    {
+                        let type_params = type_inst
+                            .iter()
+                            .filter(|ty| matches!(ty, Type::TypeParameter(_)))
+                            .collect::<BTreeSet<_>>();
+                        if type_params.len() == type_inst.len() {
+                            continue;
+                        }
+                        roots.insert(VerificationRoot {
+                            fun: fun_target.func_env.get_qualified_id(),
+                            variant: variant.clone(),
+                            inst: type_inst.clone(),
+                        });
+                    }
+                }
+            }
+        }
+        roots
+    }
+
+    pub fn verification_roots(
+        env: &GlobalEnv,
+        options: &BoogieOptions,
+        targets: &FunctionTargetsHolder,
+    ) -> Vec<VerificationRoot> {
+        let mono_info = mono_analysis::get_info(env);
+        Self::collect_verification_roots(env, options, targets, mono_info.as_ref())
+            .into_iter()
+            .collect()
+    }
+
+    fn semantic_variant(variant: &FunctionVariant) -> FunctionVariant {
+        match variant {
+            FunctionVariant::Verification(VerificationFlavor::Inconsistency(inner))
+            | FunctionVariant::Verification(VerificationFlavor::Split(inner, _)) => {
+                Self::semantic_variant(&FunctionVariant::Verification((**inner).clone()))
+            },
+            _ => variant.clone(),
+        }
+    }
+
+    fn collect_selected_theory(&mut self, mono_info: &mono_analysis::MonoInfo) {
+        if let Some(root) = &self.verification_root {
+            self.selected_theory = Self::root_slice(mono_info, root).clone();
+        } else {
+            self.selected_theory.structs = mono_info.structs.clone();
+        }
+    }
+
+    fn emits_struct_theory(&self, struct_env: &StructEnv<'_>, type_inst: &[Type]) -> bool {
+        self.selected_theory
+            .structs
+            .get(&struct_env.get_qualified_id())
+            .is_some_and(|insts| insts.contains(type_inst))
     }
 
     #[allow(clippy::literal_string_with_formatting_args)]
@@ -379,10 +514,12 @@ impl<'env> BoogieTranslator<'env> {
     pub fn translate(&mut self) {
         let writer = self.writer;
         let env = self.env;
-        let spec_translator = &self.spec_translator;
 
         let mono_info = mono_analysis::get_info(self.env);
         let empty = &BTreeSet::new();
+
+        self.collect_selected_theory(mono_info.as_ref());
+        let spec_translator = &self.spec_translator;
 
         // Populate fun_param_infos for use during closure construction.
         // This enables emitting behavioral predicate assumptions at the call site.
@@ -539,7 +676,7 @@ impl<'env> BoogieTranslator<'env> {
         let mut translated_memory: Vec<(QualifiedInstId<StructId>, String)> = vec![];
         let mut translated_funs = BTreeSet::new();
         let mut verified_functions_count = 0;
-        info!("generating verification conditions");
+        debug!("generating verification conditions");
         for module_env in self.env.get_modules() {
             self.writer.set_location(&module_env.env.internal_loc());
 
@@ -583,26 +720,35 @@ impl<'env> BoogieTranslator<'env> {
                 }
                 for (variant, ref fun_target) in self.targets.get_targets(fun_env) {
                     if self.is_verified(&variant, fun_target) {
-                        verified_functions_count += 1;
-                        debug!(
-                            "will verify primary function `{}`",
-                            env.display(&module_env.get_id().qualified(fun_target.get_id()))
-                        );
-                        // Always produce a verified functions with an empty instantiation such that
-                        // there is at least one top-level entry points for a VC.
-                        FunctionTranslator {
-                            parent: self,
-                            fun_target,
-                            type_inst: &[],
+                        if self.is_verified_root(&variant, fun_target, &[]) {
+                            verified_functions_count += 1;
+                            debug!(
+                                "will verify primary function `{}`",
+                                env.display(&module_env.get_id().qualified(fun_target.get_id()))
+                            );
+                            // Always produce a verified function with an empty instantiation such
+                            // that there is at least one top-level entry point for a VC.
+                            FunctionTranslator {
+                                parent: self,
+                                fun_target,
+                                type_inst: &[],
+                            }
+                            .translate();
                         }
-                        .translate();
 
                         // There maybe more verification targets that needs to be produced as we
                         // defer the instantiation of verified functions to this stage
                         if !self.options.skip_instance_check {
+                            let semantic_variant = Self::semantic_variant(&variant);
                             for type_inst in mono_info
                                 .funs
-                                .get(&(fun_target.func_env.get_qualified_id(), variant))
+                                .get(&(fun_target.func_env.get_qualified_id(), variant.clone()))
+                                .or_else(|| {
+                                    mono_info.funs.get(&(
+                                        fun_target.func_env.get_qualified_id(),
+                                        semantic_variant.clone(),
+                                    ))
+                                })
                                 .unwrap_or(empty)
                             {
                                 // Skip redundant instantiations. Those are any permutation of
@@ -616,6 +762,9 @@ impl<'env> BoogieTranslator<'env> {
                                     .cloned()
                                     .collect::<BTreeSet<_>>();
                                 if type_params_in_inst.len() == type_inst.len() {
+                                    continue;
+                                }
+                                if !self.is_verified_root(&variant, fun_target, type_inst) {
                                     continue;
                                 }
 
@@ -689,15 +838,7 @@ impl<'env> BoogieTranslator<'env> {
 
         // Emit any finalization items required by spec translation.
         self.spec_translator.finalize();
-        let shard_info = if let Some(shard) = self.for_shard {
-            format!(" (for shard #{} of {})", shard + 1, self.options.shards)
-        } else {
-            "".to_string()
-        };
-        info!(
-            "{} verification conditions{}",
-            verified_functions_count, shard_info
-        );
+        debug!("{} verification conditions", verified_functions_count);
     }
 
     fn translate_fun_type(
@@ -4494,7 +4635,6 @@ impl StructTranslator<'_> {
             boogie_type_suffix_for_struct_variant(struct_env, self.type_inst, &variant);
         let struct_variant_name = boogie_struct_variant_name(struct_env, self.type_inst, variant);
         let struct_name = boogie_struct_name(struct_env, self.type_inst, false);
-        let fields = struct_env.get_fields_of_variant(variant).collect_vec();
         // Constructor arguments include the (variant-agnostic) ghost fields.
         // Emitting per-variant $Update functions for ghost fields too makes
         // the variant-dispatching update wrapper cover them across variants.
@@ -4560,67 +4700,40 @@ impl StructTranslator<'_> {
             );
         }
 
-        // Emit $IsValid function for `variant`.
-        self.parent.emit_function_with_attr(
-            writer,
-            "", // not inlined!
-            &format!("$IsValid'{}'(s: {}): bool", suffix_variant, struct_name),
-            || {
-                // Ghost fields are included: their declared type's value
-                // domain is enforced at every ghost write (pack initializers
-                // and updates are asserted in range), which justifies
-                // assuming it here at boundaries. Use `num` for an
-                // unbounded ghost integer.
-                let ghosts: Vec<_> = struct_env.get_ghost_fields().collect();
-                let empty = struct_env.is_intrinsic()
-                    || (struct_env
-                        .get_fields_of_variant(variant)
-                        .collect_vec()
-                        .is_empty()
-                        && ghosts.is_empty());
-                if empty {
-                    emitln!(writer, "true")
-                } else {
-                    let mut sep = "";
-                    emitln!(writer, "if s is {} then", suffix_variant);
-                    for field in fields.iter().chain(ghosts.iter()) {
-                        emitln!(writer, "{}", self.boogie_field_is_valid(field, sep));
-                        sep = "  && ";
-                    }
-                    // Add identity constraints for function-valued fields
-                    for field in &fields {
-                        if let Some(constraint) = self.boogie_field_identity_constraint(field, sep)
-                        {
-                            emitln!(writer, "{}", constraint);
-                            sep = "  && ";
-                        }
-                    }
-                    emitln!(writer, "else false");
-                }
-            },
-        );
+        if self.parent.emits_struct_theory(struct_env, self.type_inst) {
+            self.parent.emit_function_with_attr(
+                writer,
+                "",
+                &format!("$IsValid'{}'(s: {}): bool", suffix_variant, struct_name),
+                || self.emit_struct_variant_is_valid_body(struct_env, variant),
+            );
+        } else {
+            emitln!(
+                writer,
+                "function $IsValid'{}'(s: {}): bool;",
+                suffix_variant,
+                struct_name
+            );
+        }
     }
 
-    // Emit $IsValid function for struct.
-    fn emit_is_valid_struct(&self, struct_env: &StructEnv, struct_name: &str, emit_fn: impl Fn()) {
+    fn emit_is_valid_struct(&self, struct_env: &StructEnv<'_>, struct_name: &str) {
         let writer = self.parent.writer;
-        self.parent.emit_function_with_attr(
-            writer,
-            "", // not inlined!
-            &format!("$IsValid'{}'(s: {}): bool", struct_name, struct_name),
-            || {
-                // A struct with no runtime fields can still carry ghost
-                // fields whose value domain must be maintained; only emit
-                // the trivial `true` when there is genuinely nothing to
-                // check.
-                let no_ghosts = struct_env.get_ghost_fields().next().is_none();
-                if struct_env.is_intrinsic() || (struct_env.get_field_count() == 0 && no_ghosts) {
-                    emitln!(writer, "true")
-                } else {
-                    emit_fn()
-                }
-            },
-        );
+        if self.parent.emits_struct_theory(struct_env, self.type_inst) {
+            self.parent.emit_function_with_attr(
+                writer,
+                "",
+                &format!("$IsValid'{}'(s: {}): bool", struct_name, struct_name),
+                || self.emit_struct_is_valid_body(struct_env),
+            );
+        } else {
+            emitln!(
+                writer,
+                "function $IsValid'{}'(s: {}): bool;",
+                struct_name,
+                struct_name
+            );
+        }
     }
 
     /// Emit $Update and $IsValid for enum
@@ -4666,21 +4779,7 @@ impl StructTranslator<'_> {
             );
         }
 
-        self.emit_is_valid_struct(struct_env, struct_name, || {
-            let mut else_symbol = "";
-            for variant in struct_env.get_variants() {
-                let struct_variant_name =
-                    boogie_struct_variant_name(struct_env, self.type_inst, variant);
-                let match_condition = format!("s is {}", struct_variant_name);
-                let str = format!("$IsValid'{}'(s)", struct_variant_name,);
-                emitln!(writer, "{} if {} then", else_symbol, match_condition);
-                emitln!(writer, "{}", str);
-                if else_symbol.is_empty() {
-                    else_symbol = "else";
-                }
-            }
-            emitln!(writer, "else false");
-        });
+        self.emit_is_valid_struct(struct_env, struct_name);
     }
 
     /// Emit the function body of $IsEqual for enum
@@ -4712,6 +4811,80 @@ impl StructTranslator<'_> {
             sep = "";
         }
         emitln!(writer, "else false");
+    }
+
+    fn emit_struct_variant_is_valid_body(&self, struct_env: &StructEnv, variant: Symbol) {
+        let writer = self.parent.writer;
+        let suffix_variant =
+            boogie_type_suffix_for_struct_variant(struct_env, self.type_inst, &variant);
+        let fields = struct_env.get_fields_of_variant(variant).collect_vec();
+        let ghosts = struct_env.get_ghost_fields().collect_vec();
+        if fields.is_empty() && ghosts.is_empty() {
+            emitln!(writer, "true");
+            return;
+        }
+        let mut sep = "";
+        emitln!(writer, "if s is {} then", suffix_variant);
+        for field in fields.iter().chain(ghosts.iter()) {
+            emitln!(writer, "{}", self.boogie_field_is_valid(field, sep));
+            sep = "  && ";
+        }
+        for field in &fields {
+            if let Some(constraint) = self.boogie_field_identity_constraint(field, sep) {
+                emitln!(writer, "{}", constraint);
+                sep = "  && ";
+            }
+        }
+        emitln!(writer, "else false");
+    }
+
+    fn emit_struct_is_valid_body(&self, struct_env: &StructEnv) {
+        let writer = self.parent.writer;
+        let no_ghosts = struct_env.get_ghost_fields().next().is_none();
+        if struct_env.get_field_count() == 0 && no_ghosts {
+            emitln!(writer, "true");
+        } else if struct_env.has_variants() {
+            let mut else_symbol = "";
+            for variant in struct_env.get_variants() {
+                let variant_name = boogie_struct_variant_name(struct_env, self.type_inst, variant);
+                emitln!(writer, "{} if s is {} then", else_symbol, variant_name);
+                emitln!(writer, "$IsValid'{}'(s)", variant_name);
+                else_symbol = "else";
+            }
+            emitln!(writer, "else false");
+        } else {
+            let mut sep = "";
+            for field in struct_env.get_fields().chain(struct_env.get_ghost_fields()) {
+                emitln!(writer, "{}", self.boogie_field_is_valid(&field, sep));
+                sep = "  && ";
+            }
+            for field in struct_env.get_fields() {
+                if let Some(constraint) = self.boogie_field_identity_constraint(&field, sep) {
+                    emitln!(writer, "{}", constraint);
+                    sep = "  && ";
+                }
+            }
+        }
+    }
+
+    fn emit_struct_is_equal_body(&self, struct_env: &StructEnv) {
+        let writer = self.parent.writer;
+        if struct_has_native_equality(struct_env, self.type_inst, self.parent.options) {
+            emitln!(writer, "s1 == s2");
+        } else if struct_env.has_variants() {
+            self.emit_is_equal_fn_body_for_enum(struct_env);
+        } else {
+            let fields = struct_env.get_fields().collect_vec();
+            if fields.is_empty() {
+                emitln!(writer, "true");
+            } else {
+                let mut sep = "";
+                for field in &fields {
+                    emitln!(writer, "{}", self.boogie_field_is_equal(field, sep));
+                    sep = "&& ";
+                }
+            }
+        }
     }
 
     /// Emit the function cmp::compare for enum
@@ -4968,63 +5141,22 @@ impl StructTranslator<'_> {
                 );
             }
 
-            // Emit $IsValid function. Ghost fields are included: their
-            // declared type's value domain is enforced at every ghost write
-            // (pack initializers and updates are asserted in range), which
-            // justifies assuming it here at boundaries. Use `num` for an
-            // unbounded ghost integer.
-            self.emit_is_valid_struct(struct_env, &struct_name, || {
-                let mut sep = "";
-                for field in struct_env.get_fields().chain(struct_env.get_ghost_fields()) {
-                    emitln!(writer, "{}", self.boogie_field_is_valid(&field, sep));
-                    sep = "  && ";
-                }
-                // Add identity constraints for function-valued fields
-                for field in struct_env.get_fields() {
-                    if let Some(constraint) = self.boogie_field_identity_constraint(&field, sep) {
-                        emitln!(writer, "{}", constraint);
-                        sep = "  && ";
-                    }
-                }
-            });
+            self.emit_is_valid_struct(struct_env, &struct_name);
         }
 
-        // Emit equality
-        self.emit_function(
-            &format!(
-                "$IsEqual'{}'(s1: {}, s2: {}): bool",
-                boogie_type_suffix_for_struct(struct_env, self.type_inst, false),
-                struct_name,
-                struct_name
-            ),
-            || {
-                // Native (raw) equality is used only when it coincides with
-                // Move value equality; ghost-bearing types are excluded inside
-                // the predicate and fall to the field-wise form over runtime
-                // fields only.
-                if struct_has_native_equality(struct_env, self.type_inst, self.parent.options) {
-                    emitln!(writer, "s1 == s2")
-                } else if struct_env.has_variants() {
-                    self.emit_is_equal_fn_body_for_enum(struct_env);
-                } else {
-                    let fields: Vec<_> = struct_env.get_fields().collect();
-                    if fields.is_empty() {
-                        // Ghost-only or empty struct — the field-wise form
-                        // would produce an empty function body; emit `true`
-                        // (equality by construction, since all runtime state
-                        // is trivially equal).
-                        emit!(writer, "true");
-                    } else {
-                        let mut sep = "";
-                        for field in &fields {
-                            let field_equal_str = self.boogie_field_is_equal(field, sep);
-                            emit!(writer, "{}", field_equal_str,);
-                            sep = "\n&& ";
-                        }
-                    }
-                }
-            },
+        let equal_signature = format!(
+            "$IsEqual'{}'(s1: {}, s2: {}): bool",
+            boogie_type_suffix_for_struct(struct_env, self.type_inst, false),
+            struct_name,
+            struct_name
         );
+        if self.parent.emits_struct_theory(struct_env, self.type_inst) {
+            self.parent.emit_function(writer, &equal_signature, || {
+                self.emit_struct_is_equal_body(struct_env)
+            });
+        } else {
+            emitln!(writer, "function {};", equal_signature);
+        }
 
         if struct_env.has_memory() {
             // Emit memory variable.
@@ -5515,7 +5647,10 @@ impl FunctionTranslator<'_> {
         }
 
         // Initial assumptions
-        if self.parent.is_verified(variant, fun_target) {
+        if self
+            .parent
+            .is_verified_root(variant, fun_target, self.type_inst)
+        {
             self.translate_verify_entry_assumptions(fun_target);
         }
 
@@ -5864,7 +5999,10 @@ impl FunctionTranslator<'_> {
         // Assume function-typed parameters equal their parameter variant.
         // This enables behavioral predicate handling in the apply function.
         let params = fun_target.func_env.get_parameters();
-        let fun_id = fun_target.func_env.get_qualified_id().instantiate(vec![]);
+        let fun_id = fun_target
+            .func_env
+            .get_qualified_id()
+            .instantiate(self.type_inst.to_vec());
         for (i, param) in params.iter().enumerate() {
             let ty = fun_target.get_local_type(i);
             if matches!(ty, Type::Fun(..)) {

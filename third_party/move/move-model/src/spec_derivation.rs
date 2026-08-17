@@ -511,15 +511,8 @@ pub fn fun_has_no_memory_effects(env: &GlobalEnv, fun_id: QualifiedId<FunId>) ->
             }
         }
     }
-    if fun.is_opaque() {
-        // An opaque callee's contract is its specification alone: without
-        // modifies targets (checked above) callers treat it as modifying
-        // nothing, and with memory-free conditions its behavioral summary
-        // is state-independent — exactly how the backend parameterizes the
-        // callee's behavioral functions by the spec's used memory. The body
-        // is not consulted.
-        return true;
-    }
+    // An omitted opaque frame is conservatively implemented from the body's
+    // memory effects, so opacity alone cannot establish memory freedom.
     fun_body_is_memory_free(env, fun_id, &mut BTreeSet::new(), &mut BTreeSet::new())
 }
 

@@ -63,5 +63,11 @@ module 0x42::folds_of_multi {
     spec weighted_pair_wrong {
         pragma aborts_if_is_partial;
         ensures len(v) == 2 ==> result_1 == v[0] + v[1]; // error: the count weight adds one
+    } proof {
+        post {
+            if (len(v) == 2) {
+                assert result_1 == v[0] + v[1] + 1;
+            }
+        }
     }
 }
