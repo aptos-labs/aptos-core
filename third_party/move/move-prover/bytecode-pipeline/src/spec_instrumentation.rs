@@ -845,6 +845,9 @@ impl<'a> Instrumenter<'a> {
                 self.instrument_call(spec, id, dests, mid, fid, targs, srcs, aa);
             },
             Call(id, dests, Invoke, srcs, _) => {
+                // Havoc before `$apply` so the closure's postconditions remain
+                // available after the invocation.
+                self.emit_global_havocs(self.opaque_closure_modifies.clone());
                 self.builder.emit(Call(
                     id,
                     dests,
@@ -853,7 +856,6 @@ impl<'a> Instrumenter<'a> {
                     Some(AbortAction(self.abort_label, self.abort_local)),
                 ));
                 self.can_abort = true;
-                self.emit_global_havocs(self.opaque_closure_modifies.clone());
             },
             Call(id, dests, oper, srcs, _) if oper.can_abort() => {
                 self.builder.emit(Call(
