@@ -18,6 +18,7 @@ pub mod aptos_hash;
 pub mod bcs;
 pub mod bls12381;
 pub mod cmp;
+pub mod consensus_config;
 pub mod ed25519;
 pub mod event;
 pub mod from_bytes;
@@ -45,6 +46,7 @@ pub use bls12381::make_all_bls12381_natives;
 #[cfg(feature = "testing")]
 pub use bls12381::make_all_bls12381_test_natives;
 pub use cmp::make_all_cmp_natives;
+pub use consensus_config::make_all_consensus_config_natives;
 pub use ed25519::make_all_ed25519_natives;
 #[cfg(feature = "testing")]
 pub use ed25519::make_all_ed25519_test_natives;
@@ -113,6 +115,7 @@ pub fn make_all_production_natives<F: NativeContextFamily>() -> Vec<NativeEntry<
     natives.extend(make_all_string_natives::<F>());
     natives.extend(make_all_bcs_natives::<F>());
     natives.extend(make_all_cmp_natives::<F>());
+    natives.extend(make_all_consensus_config_natives::<F>());
     natives.extend(make_all_from_bytes_natives::<F>());
     natives.extend(make_all_table_natives::<F>());
     natives.extend(make_all_secp256k1_natives::<F>());

@@ -12985,6 +12985,8 @@ name = "mono-move-natives"
 version = "0.1.0"
 dependencies = [
  "aptos-crypto",
+ "aptos-types",
+ "bcs 0.1.4",
  "blake2-rfc",
  "curve25519-dalek-ng",
  "libsecp256k1",

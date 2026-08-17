@@ -13,6 +13,8 @@ rust-version = { workspace = true }
 
 [dependencies]
 aptos-crypto = { workspace = true }
+aptos-types = { workspace = true }
+bcs = { workspace = true }
 blake2-rfc = { workspace = true }
 curve25519-dalek = { package = "curve25519-dalek-ng", version = "4" }
 libsecp256k1 = { workspace = true }

@@ -8,8 +8,8 @@ use crate::{
     compile::{compile, compile_move_path, compile_move_stdlib, SourceKind},
     engine::RunResult,
     extensions::{
-        seed_extensions, TEST_SESSION_COUNTER, TEST_STATE_BYTES, TEST_STATE_ITEMS, TEST_TXN_HASH,
-        TEST_TXN_INDEX,
+        seed_extensions, TEST_CHAIN_ID, TEST_SESSION_COUNTER, TEST_STATE_BYTES, TEST_STATE_ITEMS,
+        TEST_TXN_HASH, TEST_TXN_INDEX,
     },
     matcher::check_output,
     module_provider::InMemoryModuleProvider,
@@ -470,7 +470,7 @@ fn execute_function_v1(
         AccountAddress::ZERO,
         0,
         0,
-        0,
+        TEST_CHAIN_ID, // chain_id, read by transaction_context::chain_id_internal
         None,
         None,
         TransactionIndexKind::BlockExecution {
@@ -482,7 +482,7 @@ fn execute_function_v1(
     extensions.add(NativeTransactionContext::new(
         TEST_TXN_HASH.to_vec(),
         vec![],
-        0,
+        TEST_CHAIN_ID,
         Some(user_transaction_context),
         TEST_SESSION_COUNTER,
     ));
