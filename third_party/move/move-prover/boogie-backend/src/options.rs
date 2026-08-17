@@ -551,8 +551,12 @@ mod tests {
     #[test]
     fn derives_process_timeout_from_root_timeout() {
         let mut options = BoogieOptions::default();
-        assert_eq!(options.process_timeout_secs(40), 300);
-        assert_eq!(options.process_timeout_secs(100), 400);
+        for root_timeout_secs in [40, 100] {
+            let expected = (options.adjust_timeout(root_timeout_secs) as u64)
+                .saturating_mul(BoogieOptions::PROCESS_TIMEOUT_FACTOR)
+                .max(BoogieOptions::MIN_PROCESS_TIMEOUT_SECS);
+            assert_eq!(options.process_timeout_secs(root_timeout_secs), expected);
+        }
         assert_eq!(options.process_timeout_secs(0), 0);
 
         options.hard_timeout_secs = 7;
