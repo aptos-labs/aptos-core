@@ -24,6 +24,7 @@ pub mod event;
 pub mod from_bytes;
 pub mod function_info;
 pub mod hash;
+pub mod init;
 pub mod mem;
 pub mod multi_ed25519;
 pub mod object;
@@ -54,6 +55,7 @@ pub use event::{make_all_event_natives, EventEntry, EventKind, EventStore};
 pub use from_bytes::make_all_from_bytes_natives;
 pub use function_info::make_all_function_info_natives;
 pub use hash::make_all_hash_natives;
+pub use init::make_all_init_natives;
 pub use mem::make_all_mem_natives;
 pub use multi_ed25519::make_all_multi_ed25519_natives;
 #[cfg(feature = "testing")]
@@ -112,6 +114,7 @@ pub fn make_all_production_natives<F: NativeContextFamily>() -> Vec<NativeEntry<
     natives.extend(make_all_event_natives::<F>());
     natives.extend(make_all_hash_natives::<F>());
     natives.extend(make_all_aptos_hash_natives::<F>());
+    natives.extend(make_all_init_natives::<F>());
     natives.extend(make_all_string_natives::<F>());
     natives.extend(make_all_bcs_natives::<F>());
     natives.extend(make_all_cmp_natives::<F>());
