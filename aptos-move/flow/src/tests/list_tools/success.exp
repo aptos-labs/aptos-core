@@ -200,7 +200,7 @@
           "nullable": true
         },
         "error_limit": {
-          "description": "Maximum number of counterexamples reported per verification\ncondition.",
+          "description": "Maximum number of counterexamples reported per verification condition.\nThe request also has a fixed aggregate diagnostic limit.",
           "type": "integer",
           "format": "uint",
           "minimum": 0,
