@@ -336,7 +336,8 @@ aptos-debugger aptos-db framework-usage \
   --target-db-dir /mnt/archive/db \
   --output /tmp/framework-usage-1000000-1999999.json \
   --html-output /tmp/framework-usage-1000000-1999999.html \
-  --replay-concurrency-level 1
+  --replay-concurrency-level 1 \
+  --enable-storage-sharding
 ```
 
 `--html-output` is optional. When present, the command writes a self-contained,
@@ -345,6 +346,11 @@ unobserved and rarely observed externally callable functions first, supports
 search and visibility filters, and exposes immediate caller and root payload
 paths. Its classifications are evidence for review rather than automated
 removal decisions.
+
+The framework usage path opens the archive database read-only and does not run
+replay-on-archive's legacy write-mode initialization. This permits analysis of
+read-only archive mounts and prevents the tool from creating newly introduced
+database directories as a side effect.
 
 The existing archive replay loop should be extracted into a shared internal
 runner with an optional transaction-result consumer. Both replay verify and

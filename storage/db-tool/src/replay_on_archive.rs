@@ -199,8 +199,11 @@ struct Verifier {
 
 impl Verifier {
     pub fn new(config: &Opt, function_usage: Option<Arc<FrameworkUsageCollector>>) -> Result<Self> {
-        // Open in write mode to create any new DBs necessary.
-        {
+        // Replay-on-archive historically opens in write mode once to create any DBs introduced by
+        // a newer binary. Framework usage is an analysis of an existing archive and must remain
+        // read-only: archive snapshots are commonly mounted without write permission, and this
+        // initialization otherwise emits caught shard-opening panics before the read-only open.
+        if function_usage.is_none() {
             if let Err(e) = panic::catch_unwind(|| {
                 AptosDB::open(
                     StorageDirPaths::from_path(config.db_dir.as_path()),
