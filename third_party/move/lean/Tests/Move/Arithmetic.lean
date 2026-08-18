@@ -24,6 +24,21 @@ move_module Arithmetic where
     aborts_if ¬left.toNat + right.toNat < U64.size
       with Semantics.Checked.arithmeticAbortCode
 
+  fun explicitAdd (left right : U64) : Action U64 :=
+    pure (Move.U64.add left right)
+
+  spec explicitAdd (left : U64) (right : U64) where
+    ensures True;
+    aborts_if ¬left.toNat + right.toNat < U64.size
+      with Semantics.Checked.arithmeticAbortCode
+
+  fun explicitDiv (left right : U64) : Action U64 :=
+    pure (Move.U64.div left right)
+
+  spec explicitDiv (left : U64) (right : U64) where
+    ensures True;
+    aborts_if right.toNat = 0 with Semantics.Checked.arithmeticAbortCode
+
   @[move_struct]
   structure Counter where
     value : U64
@@ -59,6 +74,10 @@ move_module Arithmetic where
 
   verify addValues
 
+  verify explicitAdd
+
+  verify explicitDiv
+
   verify multiply
 
   verify divide
@@ -74,6 +93,10 @@ move_module Arithmetic where
 
   #test run "addValues" [] [.u64 6, .u64 7] = Tests.okU64 13
   #test run "addValues" [] [.u64 18446744073709551615, .u64 1] = Tests.aborted 0
+  #test run "explicitAdd" [] [.u64 6, .u64 7] = Tests.okU64 13
+  #test run "explicitAdd" [] [.u64 18446744073709551615, .u64 1] = Tests.aborted 0
+  #test run "explicitDiv" [] [.u64 17, .u64 5] = Tests.okU64 3
+  #test run "explicitDiv" [] [.u64 17, .u64 0] = Tests.aborted 0
   #test run "multiply" (memory 2 6) [.address 2, .u64 7]
     = Tests.okRet (memory 2 42) []
   #test run "multiply" (memory 2 18446744073709551615) [.address 2, .u64 2]

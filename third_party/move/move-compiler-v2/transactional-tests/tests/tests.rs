@@ -14,6 +14,7 @@ use move_transactional_test_runner::{
 };
 use std::{
     path::{Path, PathBuf},
+    process::Command,
     string::ToString,
 };
 use walkdir::WalkDir;
@@ -271,7 +272,15 @@ fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
     vm_test_harness::run_test_with_config_and_exp_suffix(vm_test_config, path, &exp_suffix)
 }
 
+fn lake_available() -> bool {
+    Command::new("lake")
+        .arg("--version")
+        .output()
+        .is_ok_and(|output| output.status.success())
+}
+
 fn main() {
+    let has_lake = lake_available();
     let files = WalkDir::new("tests")
         .follow_links(false)
         .min_depth(1)
@@ -299,10 +308,14 @@ fn main() {
                 .map(|file| {
                     let prompt = format!("compiler-v2-txn[config={}]::{}", config.name, file);
                     let path = PathBuf::from(file);
+                    let requires_lean = path
+                        .extension()
+                        .is_some_and(|extension| extension == "lean");
                     let runner = config.runner;
                     Trial::test(prompt, move || {
                         runner(&path).map_err(|err| format!("{:?}", err).into())
                     })
+                    .with_ignored_flag(requires_lean && !has_lake)
                 })
         })
         .collect_vec();

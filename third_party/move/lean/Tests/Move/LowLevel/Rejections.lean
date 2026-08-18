@@ -124,6 +124,13 @@ def duplicateLabel (n : U64) : U64 := Id.run do
       break
   n
 
+/--
+error: Unknown identifier `Move.loopEnter`
+-/
+#guard_msgs in
+def forgedLoopMarker : Nat :=
+  Move.loopEnter 0 0 0 ()
+
 move_module SourceVerificationRejection where
 
   @[move_struct]
@@ -167,7 +174,64 @@ move_module SourceVerificationRejection where
     ensures True;
     aborts_if False
 
+  fun explicitArithmeticCondition (value : U64) : Action U64 := do
+    if Move.U64.add value 1 < 2 then pure value else pure 0
+
+  /--
+  error: automatic source specifications do not yet support arithmetic in this context; bind it to a local first
+  -/
+  #guard_msgs in
+  spec explicitArithmeticCondition (value : U64) where
+    ensures True;
+    aborts_if False
+
   fun plusOne (value : U64) : U64 := value + 1
+
+  fun purePredicate (value : U64) : Bool := value == 0
+
+  fun helperCondition (value : U64) : Action U64 := do
+    if purePredicate value then pure 1 else pure 2
+
+  /--
+  error: automatic source specifications do not yet model pure Move callee `Tests.MovePrograms.Calls.Rejection.SourceVerificationRejection.purePredicate`; inline it or omit `verify`
+  -/
+  #guard_msgs in
+  spec helperCondition (value : U64) where
+    ensures True;
+    aborts_if False
+
+  fun overwrite (slot : &mut U64) (replacement : U64) : Action Unit := do
+    slot := replacement
+
+  spec overwrite (slot : &mut U64) (replacement : U64) where
+    ensures slot = replacement;
+    aborts_if False
+
+  fun callsOverwrite (slot : &mut U64) : Action Unit := do
+    overwrite slot 9
+
+  /--
+  error: automatic source specifications do not yet model calls to effectful Move callee `Tests.MovePrograms.Calls.Rejection.SourceVerificationRejection.overwrite` with a mutable-reference parameter
+  -/
+  #guard_msgs in
+  spec callsOverwrite (slot : &mut U64) where
+    ensures slot = 9;
+    aborts_if False
+
+  fun shadowedLoopState (value : U64) : U64 := do
+    loop
+      let mut value : U64 := 2
+      value := 1
+      break
+    value
+
+  /--
+  error: automatic source specifications do not yet support shadowing loop state variable `value`
+  -/
+  #guard_msgs in
+  spec shadowedLoopState (value : U64) where
+    ensures result = value;
+    aborts_if False
 
   fun callsPureHelper (value : U64) : Action U64 :=
     pure (plusOne value)

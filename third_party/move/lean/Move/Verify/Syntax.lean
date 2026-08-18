@@ -391,12 +391,68 @@ private partial def containsArithmetic (term : Syntax) : Bool :=
       term[1].getAtomVal == "%")) ||
   term.getArgs.any containsArithmetic
 
+private def checkedArithmeticCall? (term : TSyntax `term) :
+    CommandElabM (Option (Name × TSyntax `term × TSyntax `term)) := do
+  let some (head, arguments) := application? term | return none
+  unless head.raw.isIdent && arguments.size == 2 do return none
+  let functionName ← try
+      pure (some (← resolveGlobalConstNoOverload head.raw))
+    catch _ => pure none
+  let operation? := functionName.bind fun functionName =>
+    if functionName == ``Move.U64.add then some ``Move.Semantics.Checked.addSpec
+    else if functionName == ``Move.U64.sub then some ``Move.Semantics.Checked.subSpec
+    else if functionName == ``Move.U64.mul then some ``Move.Semantics.Checked.mulSpec
+    else if functionName == ``Move.U64.div then some ``Move.Semantics.Checked.divSpec
+    else if functionName == ``Move.U64.mod then some ``Move.Semantics.Checked.modSpec
+    else none
+  return operation?.map (·, arguments[0]!, arguments[1]!)
+
+private partial def containsCheckedArithmeticCall (term : Syntax) :
+    CommandElabM Bool := do
+  if (← checkedArithmeticCall? ⟨term⟩).isSome then return true
+  for child in term.getArgs do
+    if ← containsCheckedArithmeticCall child then return true
+  return false
+
+private def resolvePureMoveFunction? (identifier : TSyntax `ident) :
+    CommandElabM (Option Name) := do
+  let env ← getEnv
+  let currentNamespace ← getCurrNamespace
+  let candidates := #[currentNamespace ++ identifier.getId, identifier.getId]
+  let some functionName := candidates.find? fun name =>
+      Move.moveFunAttr.hasTag env name || Move.movePublicAttr.hasTag env name ||
+        Move.moveEntryAttr.hasTag env name
+    | return none
+  let some declaration := declarations.getState env |>.find? functionName
+    | return none
+  if (findTypeApplication? ``Move.Action declaration.resultType).isSome then
+    return none
+  return some functionName
+
+private def pureMoveCallAtRoot? (term : TSyntax `term) :
+    CommandElabM (Option Name) := do
+  let some (head, _) := application? term | return none
+  unless head.raw.isIdent do return none
+  resolvePureMoveFunction? ⟨head.raw⟩
+
+private partial def nestedPureMoveCall? (term : Syntax) :
+    CommandElabM (Option Name) := do
+  if let some functionName ← pureMoveCallAtRoot? ⟨term⟩ then
+    return some functionName
+  for child in term.getArgs do
+    if let some functionName ← nestedPureMoveCall? child then
+      return some functionName
+  return none
+
 private partial def rewritePure (mutation? : Option (TSyntax `ident))
     (term : TSyntax `term) : CommandElabM (TSyntax `term) := do
   ensureSupportedSourceTerm term
-  if containsArithmetic term.raw then
+  if containsArithmetic term.raw || (← containsCheckedArithmeticCall term.raw) then
     throwErrorAt term
       "automatic source specifications do not yet support arithmetic in this context; bind it to a local first"
+  if let some functionName ← nestedPureMoveCall? term.raw then
+    throwErrorAt term
+      "automatic source specifications do not yet model pure Move callee `{functionName}`; inline it or omit `verify`"
   match term with
   | `($value:ident) =>
       let parts := fieldParts value.getId
@@ -503,6 +559,19 @@ private def resolveMoveFunction? (identifier : TSyntax `ident) :
     Move.moveFunAttr.hasTag env name || Move.movePublicAttr.hasTag env name ||
       Move.moveEntryAttr.hasTag env name
 
+private def hasExplicitMutableParameter (functionName : Name) :
+    CommandElabM Bool :=
+  liftTermElabM do
+    let function ← Lean.Meta.mkConstWithFreshMVarLevels functionName
+    let (parameters, binderInfos, _) ←
+      Lean.Meta.forallMetaTelescope (← Lean.Meta.inferType function)
+    for (parameter, binderInfo) in parameters.zip binderInfos do
+      if binderInfo.isExplicit then
+        let parameterType ← Lean.Meta.whnf (← Lean.Meta.inferType parameter)
+        if parameterType.isAppOfArity ``Move.MutRef 1 then
+          return true
+    return false
+
 private def effectfulCallSpec?
     (translateArgument : TSyntax `term → CommandElabM (TSyntax `term))
     (context : TranslationContext)
@@ -520,6 +589,9 @@ private def effectfulCallSpec?
     | return none
   unless (findTypeApplication? ``Move.Action declaration.resultType).isSome do
     return none
+  if ← hasExplicitMutableParameter functionName then
+    throwErrorAt term
+      "automatic source specifications do not yet model calls to effectful Move callee `{functionName}` with a mutable-reference parameter"
   let mut valueNames : Array (TSyntax `term) := #[]
   let mut argumentSpecs : Array (TSyntax `term × TSyntax `ident) := #[]
   for (argument, index) in arguments.zipIdx do
@@ -583,6 +655,8 @@ private partial def expressionSpec (context : TranslationContext)
       let lhs : TSyntax `term := ⟨multiplication[0]⟩
       let rhs : TSyntax `term := ⟨multiplication[2]⟩
       return ← binary ``Move.Semantics.Checked.mulSpec lhs rhs
+  if let some (operation, lhs, rhs) ← checkedArithmeticCall? term then
+    return ← binary operation lhs rhs
   match term with
   | `(($value:term)) => expressionSpec context value
   | `($lhs:term + $rhs:term) => binary ``Move.Semantics.Checked.addSpec lhs rhs
@@ -664,6 +738,33 @@ private partial def assignedLoopIdents (stx : Syntax)
     | none => found
   stx.getArgs.foldl (init := found) fun found child =>
     assignedLoopIdents child found
+
+private def boundDoIdentifier? (stx : Syntax) : Option (TSyntax `ident) :=
+  if stx.isOfKind ``Lean.Parser.Term.doLet && stx.getNumArgs > 3 then
+    let declaration := stx[3]
+    if declaration.getNumArgs > 0 then
+      let idNode := declaration[0]
+      if idNode.isIdent then some ⟨idNode⟩
+      else if idNode.getNumArgs > 0 && idNode[0].isIdent then some ⟨idNode[0]⟩
+      else none
+    else
+      none
+  else
+    none
+
+private partial def loopStateShadow? (assigned : List (TSyntax `ident))
+    (stx : Syntax) : Option (TSyntax `ident) :=
+  match boundDoIdentifier? stx with
+  | some bound =>
+      if assigned.any (·.getId == bound.getId) then some bound
+      else stx.getArgs.findSome? (loopStateShadow? assigned)
+  | none => stx.getArgs.findSome? (loopStateShadow? assigned)
+
+private def rejectLoopStateShadowing (assigned : List (TSyntax `ident))
+    (body : Syntax) : CommandElabM Unit := do
+  if let some shadow := loopStateShadow? assigned body then
+    throwErrorAt shadow
+      "automatic source specifications do not yet support shadowing loop state variable `{shadow.getId}`"
 
 private def freshLoopStateIdents (ref : Syntax)
     (assigned : List (TSyntax `ident)) : List (TSyntax `ident) :=
@@ -811,6 +912,7 @@ private partial def translateDo (context : TranslationContext)
       throwErrorAt first
         "`return` inside `loop` / `while` is not yet supported for `verify`"
     let assigned := (assignedLoopIdents body.raw).toList
+    rejectLoopStateShadowing assigned body.raw
     let state := freshLoopStateIdents first.raw assigned
     let pack ← packLoopState assigned
     let recName := mkIdentFrom first `_moveSpecLoop
@@ -1026,6 +1128,7 @@ private partial def translateDo (context : TranslationContext)
           "`return` inside `loop` / `while` is not yet supported for `verify`"
       let condition ← conditionTerm condition
       let assigned := (assignedLoopIdents body.raw).toList
+      rejectLoopStateShadowing assigned body.raw
       let state := freshLoopStateIdents first.raw assigned
       let condition : TSyntax `term := ⟨replaceLoopState assigned state condition.raw⟩
       let condition ← rewritePure context.mutation? condition

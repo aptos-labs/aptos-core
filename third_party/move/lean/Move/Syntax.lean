@@ -22,6 +22,40 @@ namespace Move
 
 open Lean Meta Elab Term
 
+/-! Compiler-only loop markers. They are private so authored Leaner cannot
+forge CFG control by calling the normalizer protocol directly. -/
+
+@[never_extract, noinline] private partial def loopEnter
+    {σ : Type} [Inhabited σ] (label arity token : Nat) (state : σ) : Nat :=
+  loopEnter label arity token state
+
+@[never_extract, noinline] private partial def loopContinue
+    {σ : Type} [Inhabited σ] (label arity token : Nat) (state : σ) : Nat :=
+  loopContinue label arity token state
+
+@[never_extract, noinline] private partial def loopContinueTail
+    {σ : Type} [Inhabited σ] (label arity token : Nat) (state : σ) : Nat :=
+  loopContinueTail label arity token state
+
+@[never_extract, noinline] private partial def loopBreak
+    {σ : Type} [Inhabited σ] (label arity token : Nat) (state : σ) : Nat :=
+  loopBreak label arity token state
+
+@[never_extract, noinline] private partial def loopTokenLive
+    (token : Nat) : Bool :=
+  loopTokenLive token
+
+@[never_extract, noinline] private partial def loopTokenJoin
+    (token outerToken : Nat) : Nat :=
+  loopTokenJoin token outerToken
+
+def isLoopEnterMarker (name : Name) : Bool := name == ``loopEnter
+def isLoopContinueMarker (name : Name) : Bool := name == ``loopContinue
+def isLoopContinueTailMarker (name : Name) : Bool := name == ``loopContinueTail
+def isLoopBreakMarker (name : Name) : Bool := name == ``loopBreak
+def isLoopTokenLiveMarker (name : Name) : Bool := name == ``loopTokenLive
+def isLoopTokenJoinMarker (name : Name) : Bool := name == ``loopTokenJoin
+
 scoped syntax:max (name := borrowTerm) "&" term:40 : term
 scoped syntax:max (name := borrowMutTerm) "&mut " term:40 : term
 scoped syntax:max (name := borrowIndexTerm) (priority := high)

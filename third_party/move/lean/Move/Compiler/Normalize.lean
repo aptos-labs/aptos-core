@@ -6,6 +6,7 @@ import Move.Basic
 import Move.Action
 import Move.Compiler.LIR
 import Move.Compiler.LCNF
+import Move.Syntax
 
 /-!
 # LCNF normalization
@@ -123,7 +124,7 @@ private def functionContext (env : Environment) (decl : Decl .pure) :
     if param.type.isSort then
       let ty ← match sourceNames.idxOf? param.binderName with
         | some index =>
-            while typeParams.size ≤ index do
+            for _ in [:index + 1 - typeParams.size] do
               let name := sourceNames[typeParams.size]!
               typeParams := typeParams.push {
                 name := name.toString
@@ -518,10 +519,8 @@ private inductive LoopMarker where
   | break_ (label : Nat) (state : Array FVarId)
 
 private def loopMarker? (fn : Name) (vars : Array FVarId) : BuildM (Option LoopMarker) := do
-  let isMarker := fn == ``Move.loopEnter || fn == ``loopEnter ||
-    fn == ``Move.loopContinue || fn == ``loopContinue ||
-    fn == ``Move.loopContinueTail || fn == ``loopContinueTail ||
-    fn == ``Move.loopBreak || fn == ``loopBreak
+  let isMarker := Move.isLoopEnterMarker fn || Move.isLoopContinueMarker fn ||
+    Move.isLoopContinueTailMarker fn || Move.isLoopBreakMarker fn
   unless isMarker do return none
   let literals ← loopMarkerNats vars
   let some label := literals[0]?
@@ -534,13 +533,13 @@ private def loopMarker? (fn : Name) (vars : Array FVarId) : BuildM (Option LoopM
       let some packed := vars.back?
         | throwError "loop marker is missing its state"
       flattenLoopState arity packed
-  if fn == ``Move.loopEnter || fn == ``loopEnter then
+  if Move.isLoopEnterMarker fn then
     return some (.enter label state)
-  if fn == ``Move.loopContinue || fn == ``loopContinue then
+  if Move.isLoopContinueMarker fn then
     return some (.continue_ label state false)
-  if fn == ``Move.loopContinueTail || fn == ``loopContinueTail then
+  if Move.isLoopContinueTailMarker fn then
     return some (.continue_ label state true)
-  if fn == ``Move.loopBreak || fn == ``loopBreak then
+  if Move.isLoopBreakMarker fn then
     return some (.break_ label state)
   return none
 
@@ -659,10 +658,10 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
       let types := typeArgs args
       if fn == ``continueMarker then
         throwError "`continue` must mark a direct self-call in tail position"
-      if fn == ``Move.loopTokenLive || fn == ``loopTokenLive then
+      if Move.isLoopTokenLiveMarker fn then
         modify fun s => { s with loopLiveResults := decl.fvarId :: s.loopLiveResults }
         return instrs
-      if fn == ``Move.loopTokenJoin || fn == ``loopTokenJoin then
+      if Move.isLoopTokenJoinMarker fn then
         return instrs
       if let some _ ← loopMarker? fn vars then
         return instrs
@@ -808,7 +807,7 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
             resultTy := none
           }) :: s.pending }
         return instrs
-      if fn == ``abort then
+      if fn == `Move.abort then
         let some code := beforeWorld? vars | throwError "abort is missing its code"
         modify fun s => { s with pending := (decl.fvarId, .abort code) :: s.pending }
         return instrs
@@ -1359,7 +1358,7 @@ private def addNames (names additions : Array Name) : Array Name :=
   additions.foldl (fun names name => if names.any (· == name) then names else names.push name) names
 
 private def propagateAcquires (functions : Array LIR.FunDecl) : Array LIR.FunDecl :=
-  let rec loop : Nat → Array LIR.FunDecl → Array LIR.FunDecl
+  let rec go : Nat → Array LIR.FunDecl → Array LIR.FunDecl
     | 0, current => current
     | fuel + 1, current =>
         let next := current.map fun decl =>
@@ -1368,8 +1367,8 @@ private def propagateAcquires (functions : Array LIR.FunDecl) : Array LIR.FunDec
             | some calleeDecl => addNames names calleeDecl.acquires
             | none => names) decl.acquires
           { decl with acquires := inherited }
-        loop fuel next
-  loop functions.size functions
+        go fuel next
+  go functions.size functions
 
 private partial def typeDependencies : LIR.Ty → Array Name
   | .struct name => #[name]
