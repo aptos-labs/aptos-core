@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::chain_id::{ChainId, NamedChain};
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, TimeZone, Timelike, Utc};
 use chrono_tz::America::Los_Angeles;
 use serde::Serialize;
 use strum::{EnumCount, IntoEnumIterator};
@@ -63,6 +63,10 @@ pub enum TimedFeatureFlag {
     /// Charge `bcs::to_bytes` and `bcs::serialized_size` per input value node
     /// instead of only per output byte.
     MeterBcsByValueSize,
+
+    /// Charge execution gas for value deserialization proportional to the
+    /// produced value size.
+    MeterValueNodesOnDeserialize,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -112,7 +116,8 @@ impl TimedFeatureOverride {
                 | ConstantSerializedSizeLocalCache
                 | RejectV5ModulePublishing
                 | RevalidateResolvedClosures
-                | MeterBcsByValueSize,
+                | MeterBcsByValueSize
+                | MeterValueNodesOnDeserialize,
             ) => None,
         }
     }
@@ -151,7 +156,7 @@ impl TimedFeatureFlag {
 
             // Note: Activation time set to 1 hour after the beginning of time
             //       so we can test the old and new behaviors in tests.
-            (FixMemoryUsageTracking, TESTING) => Utc.with_ymd_and_hms(1970, 1, 1, 1, 0, 0).unwrap(),
+            (FixMemoryUsageTracking, TESTING) => BEGINNING_OF_TIME.with_hour(1).unwrap(),
             (FixMemoryUsageTracking, TESTNET) => Los_Angeles
                 .with_ymd_and_hms(2025, 3, 7, 12, 0, 0)
                 .unwrap()
@@ -174,7 +179,7 @@ impl TimedFeatureFlag {
                 .unwrap()
                 .with_timezone(&Utc),
             // For testing, time set to 1 hour after the beginning of time to test the old and new behaviors in tests.
-            (_DisabledCaptureOption, TESTING) => Utc.with_ymd_and_hms(1970, 1, 1, 1, 0, 0).unwrap(),
+            (_DisabledCaptureOption, TESTING) => BEGINNING_OF_TIME.with_hour(1).unwrap(),
             // For mainnet, always enable this feature.
             (_DisabledCaptureOption, MAINNET) => BEGINNING_OF_TIME,
 
@@ -199,7 +204,7 @@ impl TimedFeatureFlag {
 
             // For testing, time set to 1 hour after the beginning of time to test the old and new behaviors in tests.
             (FixCryptoAlgebraNativesResultHandling, TESTING) => {
-                Utc.with_ymd_and_hms(1970, 1, 1, 1, 0, 0).unwrap()
+                BEGINNING_OF_TIME.with_hour(1).unwrap()
             },
             (FixCryptoAlgebraNativesResultHandling, TESTNET) => Los_Angeles
                 .with_ymd_and_hms(2026, 2, 2, 22, 0, 0)
@@ -270,13 +275,29 @@ impl TimedFeatureFlag {
                 .unwrap()
                 .with_timezone(&Utc),
 
-            (MeterBcsByValueSize, TESTING) => Utc.with_ymd_and_hms(1970, 1, 1, 1, 0, 0).unwrap(),
+            (MeterBcsByValueSize, TESTING) => BEGINNING_OF_TIME.with_hour(1).unwrap(),
             (MeterBcsByValueSize, TESTNET) => Los_Angeles
                 .with_ymd_and_hms(2026, 8, 4, 14, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
             (MeterBcsByValueSize, MAINNET) => Los_Angeles
                 .with_ymd_and_hms(2026, 8, 6, 14, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            // Note: Set to a future date so forge's framework-upgrade compat test runs
+            // with this feature off, matching the pre-feature old image and avoiding a
+            // fork (see UseFullTransactionSizeForGasCheck).
+            (MeterValueNodesOnDeserialize, TESTING) => Los_Angeles
+                .with_ymd_and_hms(2026, 8, 26, 14, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (MeterValueNodesOnDeserialize, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 8, 19, 14, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (MeterValueNodesOnDeserialize, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 8, 21, 14, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
 
