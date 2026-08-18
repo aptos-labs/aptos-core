@@ -44,6 +44,9 @@ pub struct AptosTransactionExecutor<'a> {
     features: &'a Features,
     /// State storage usage at the current epoch's beginning.
     usage: StateStorageUsage,
+    /// If set, the payload runs unmetered and the epilogue charges a zero
+    /// fee.
+    unmetered: bool,
 }
 
 impl<'a> AptosTransactionExecutor<'a> {
@@ -65,7 +68,16 @@ impl<'a> AptosTransactionExecutor<'a> {
             data_provider,
             features,
             usage,
+            unmetered: false,
         }
+    }
+
+    /// Runs the payload unmetered, making the epilogue charge a zero fee.
+    /// For replay- and simulation-style callers that need gas-independent
+    /// outputs.
+    pub fn without_metering(mut self) -> Self {
+        self.unmetered = true;
+        self
     }
 
     /// Executes one user transaction, returning its side effects unmaterialized (see [`TxnOutcome`]).
@@ -161,7 +173,14 @@ impl<'a> AptosTransactionExecutor<'a> {
         checkpoint(&mut interp)?;
 
         // ========================== User payload ============================
-        let payload_result = self.execute_entry_function(&mut interp, &txn_data, entry, ty_args);
+        // An unmetered payload leaves the balance untouched, making the
+        // epilogue charge nothing.
+        let payload_result = if self.unmetered {
+            interp
+                .unmetered(|interp| self.execute_entry_function(interp, &txn_data, entry, ty_args))
+        } else {
+            self.execute_entry_function(&mut interp, &txn_data, entry, ty_args)
+        };
         let gas_remaining = interp.gas_balance();
         let gas_used = max_gas.saturating_sub(gas_remaining);
 

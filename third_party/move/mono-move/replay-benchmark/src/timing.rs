@@ -29,6 +29,11 @@ pub struct Samples {
 }
 
 impl Samples {
+    fn from_nanos(mut nanos: Vec<u128>) -> Self {
+        nanos.sort_unstable();
+        Self { nanos }
+    }
+
     pub fn len(&self) -> usize {
         self.nanos.len()
     }
@@ -86,9 +91,7 @@ impl Samples {
 }
 
 /// Warms up `config.warmup` times (discarded), then records `config.samples` samples.
-///
-/// `run_once` must perform any per-run state reset *itself* (untimed) and return only the duration
-/// of the measured region, so setup is never charged to the measurement.
+/// `run_once` returns the duration of the measured region.
 pub fn collect_samples(config: &TimingConfig, mut run_once: impl FnMut() -> Duration) -> Samples {
     for _ in 0..config.warmup {
         let _ = run_once();
@@ -97,6 +100,5 @@ pub fn collect_samples(config: &TimingConfig, mut run_once: impl FnMut() -> Dura
     for _ in 0..config.samples {
         nanos.push(run_once().as_nanos());
     }
-    nanos.sort_unstable();
-    Samples { nanos }
+    Samples::from_nanos(nanos)
 }
