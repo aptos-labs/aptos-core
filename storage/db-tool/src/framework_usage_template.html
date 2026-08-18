@@ -192,8 +192,9 @@ function renderFunctions() {
     const candidates = module.functions.filter(f => evidence(f, threshold).rank <= 1).length;
     const invocations = module.functions.reduce((total, f) => total + f.invocations, 0);
     const collapsed = collapsedModules.has(moduleId);
-    const summary = `${nf.format(visibleFunctions.length)} shown of ${nf.format(module.functions.length)} · ${nf.format(observed)} observed · ${nf.format(candidates)} candidates · ${nf.format(invocations)} invocations`;
-    const header = `<tr class="module-row"><td colspan="8"><button class="module-toggle" data-module="${esc(moduleId)}" aria-expanded="${!collapsed}"><span class="module-chevron">${collapsed?"▸":"▾"}</span><code title="${esc(module.id)}">${esc(module.displayId)}</code><span class="module-summary">${esc(summary)}</span></button></td></tr>`;
+    const summary = `${nf.format(observed)} of ${nf.format(module.functions.length)} functions observed · ${nf.format(candidates)} candidates · ${nf.format(invocations)} invocations`;
+    const moduleStatus = observed === 0 ? `<span class="badge unused-external">Entire module unobserved</span>` : "";
+    const header = `<tr class="module-row"><td colspan="8"><button class="module-toggle" data-module="${esc(moduleId)}" aria-expanded="${!collapsed}"><span class="module-chevron">${collapsed?"▸":"▾"}</span><code title="${esc(module.id)}">${esc(module.displayId)}</code>${moduleStatus}<span class="module-summary">${esc(summary)}</span></button></td></tr>`;
     return header + (collapsed ? "" : visibleFunctions.map(functionRow).join(""));
   }).join("") : `<tr><td colspan="8" class="empty">No functions match these filters.</td></tr>`;
   for (const button of document.querySelectorAll("button[data-module]")) button.addEventListener("click", () => {
