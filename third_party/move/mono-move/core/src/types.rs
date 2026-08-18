@@ -173,6 +173,74 @@ pub fn strip_ref(ref_ty: InternedType) -> Option<InternedType> {
     Some(*inner)
 }
 
+/// Whether a value of type `actual` may be used where `expected` is required.
+///
+/// - Identical types are assignable.
+/// - Two [`Type::Function`]s are assignable when their argument and result
+///   lists are identical and `expected`'s abilities are a subset of `actual`'s.
+/// - Two [`Type::ImmutRef`]s are assignable when their pointees are.
+/// - Nothing else is assignable; in particular, `&mut T` and `&T` are not.
+///
+/// # Preconditions
+///
+/// Both types must come from the same interner, and from the same
+/// type-parameter scope: a [`Type::TypeParam`] is interned by index alone, so
+/// parameters sharing an index across scopes are the same pointer.
+///
+/// Inherits safety contract of [`view_type`].
+///
+/// TODO(metering): unbounded recursion on reference nesting; same family as the
+/// `TODO(metering)` on [`is_closed_type`]. Depth is 1 in practice because
+/// nested references are not expressible.
+pub fn is_assignable(expected: InternedType, actual: InternedType) -> bool {
+    // Interning makes pointer equality structural equality, which settles every
+    // invariant constructor: below, only the two variant positions do work.
+    if expected == actual {
+        return true;
+    }
+    match view_type(expected) {
+        Type::Function {
+            args,
+            results,
+            abilities,
+        } => matches!(
+            view_type(actual),
+            Type::Function {
+                args: actual_args,
+                results: actual_results,
+                abilities: actual_abilities,
+            } if args == actual_args
+                && results == actual_results
+                && abilities.is_subset(*actual_abilities)
+        ),
+        Type::ImmutRef { inner } => matches!(
+            view_type(actual),
+            Type::ImmutRef { inner: actual_inner } if is_assignable(*inner, *actual_inner)
+        ),
+        // Invariant: pointer inequality above already decided these. Listed
+        // explicitly so a new `Type` variant forces a variance decision.
+        Type::Bool
+        | Type::U8
+        | Type::U16
+        | Type::U32
+        | Type::U64
+        | Type::U128
+        | Type::U256
+        | Type::I8
+        | Type::I16
+        | Type::I32
+        | Type::I64
+        | Type::I128
+        | Type::I256
+        | Type::Address
+        | Type::Signer
+        | Type::MutRef { .. }
+        | Type::Vector { .. }
+        | Type::Nominal { .. }
+        | Type::TypeParam { .. } => false,
+    }
+}
+
 /// Whether `ty` contains no [`Type::TypeParam`] node.
 ///
 /// Inherits safety contract of [`view_type`].
@@ -442,12 +510,16 @@ pub fn display_type(f: &mut fmt::Formatter<'_>, ty: InternedType) -> fmt::Result
             }
             Ok(())
         },
-        Type::Function { args, results, .. } => {
+        Type::Function {
+            args,
+            results,
+            abilities,
+        } => {
             write!(f, "|")?;
             display_type_list(f, *args)?;
             write!(f, "|")?;
             display_type_list(f, *results)?;
-            Ok(())
+            write!(f, "{}", abilities.display_postfix())
         },
     }
 }
