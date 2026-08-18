@@ -123,9 +123,9 @@ pub trait ExecutorTask {
 /// The output of executing a single transaction. The associated `Key`, `Tag`, and
 /// `Value` are the multi-version map's types (the writes applied to and validated
 /// against the map); `Txn` provides the storage-side key/value/event types.
-pub trait TxnOutput: Send + Debug {
+pub trait TxnOutput: Send {
     type Txn: Transaction;
-    type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + Debug + 'static;
+    type Key: Send + Sync + Clone + Hash + Eq + Debug + 'static;
     type Tag: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + Debug + Serialize + 'static;
     type Value: SpeculativeValue + 'static;
     /// The materialized output produced from this (speculative) output.

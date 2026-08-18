@@ -82,6 +82,11 @@ pub struct ProductionNativeContext<'a> {
     rws: UnsafeCell<&'a mut ResourceReadWriteSet>,
     /// Resource provider backing global-storage reads on a read-set cache miss.
     resource_provider: &'a dyn ResourceProvider,
+    /// Resolves the resource group a type belongs to, from the transaction's
+    /// version-pinned read-set. Threaded in as a closure so the native context
+    /// needs neither the loader nor the read-set as fields. Returns [`None`] for
+    /// an own-slot resource or a non-nominal type.
+    resource_group_of: &'a dyn Fn(InternedType) -> VMResult<Option<InternedType>>,
     /// Per-transaction native extensions, shared across native calls. Accessed
     /// sharedly — each extension's own [`RefCell`](std::cell::RefCell) provides
     /// the interior mutability.
@@ -104,6 +109,7 @@ impl<'a> ProductionNativeContext<'a> {
         desc_provider: &'a dyn DescriptorProvider,
         layouts: &'a dyn LayoutProvider,
         resource_provider: &'a dyn ResourceProvider,
+        resource_group_of: &'a dyn Fn(InternedType) -> VMResult<Option<InternedType>>,
         heap: &'a mut Heap,
         rws: &'a mut ResourceReadWriteSet,
         extensions: &'a NativeExtensions,
@@ -114,6 +120,7 @@ impl<'a> ProductionNativeContext<'a> {
             desc_provider,
             layouts,
             resource_provider,
+            resource_group_of,
             frame_ptr,
             gas: UnsafeCell::new(gas_meter),
             heap: UnsafeCell::new(heap),
@@ -541,10 +548,11 @@ impl NativeContext for ProductionNativeContext<'_> {
     }
 
     fn resource_exists(&self, address: AccountAddress, ty: InternedType) -> VMResult<bool> {
+        let group = (self.resource_group_of)(ty)?;
         // SAFETY: `rws` is reborrowed exclusively here; no other borrow is live.
         let rws = unsafe { &mut **self.rws.get() };
         let key = InMemoryStorageKey::resource(address, ty);
-        Ok(rws.exists(self.resource_provider, &key)?)
+        Ok(rws.exists(self.resource_provider, &key, group)?)
     }
 
     fn bcs_serialize_arg(&self, i: usize, ty: InternedType) -> VMResult<Vec<u8>> {
@@ -610,7 +618,8 @@ impl NativeContext for ProductionNativeContext<'_> {
         // SAFETY: `rws` is reborrowed exclusively here.
         let rws = unsafe { &mut **self.rws.get() };
         let storage_key = InMemoryStorageKey::table_item(*handle, key.into(), value_ty);
-        Ok(rws.exists(self.resource_provider, &storage_key)?)
+        // A table item is never a resource-group member.
+        Ok(rws.exists(self.resource_provider, &storage_key, None)?)
     }
 
     fn table_borrow(
@@ -624,7 +633,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         // SAFETY: heap and rws are distinct fields (see the aliasing rule).
         let rws = unsafe { &mut **self.rws.get() };
         let ptr = if mutable {
-            match rws.try_borrow_global_mut(self.resource_provider, &storage_key) {
+            match rws.try_borrow_global_mut(self.resource_provider, &storage_key, None) {
                 Ok(EntryPtr::Writable(ptr)) => ptr,
                 Ok(EntryPtr::NonWritable(ptr)) => {
                     // Copy-on-write: an external or stale value must be copied
@@ -650,7 +659,7 @@ impl NativeContext for ProductionNativeContext<'_> {
                 Err(e) => return Err(e.into()),
             }
         } else {
-            match rws.borrow_global(self.resource_provider, &storage_key) {
+            match rws.borrow_global(self.resource_provider, &storage_key, None) {
                 Ok(ptr) => ptr,
                 Err(RuntimeError::ResourceDoesNotExist { .. }) => return Ok(None),
                 Err(e) => return Err(e.into()),
@@ -717,7 +726,7 @@ impl NativeContext for ProductionNativeContext<'_> {
             .ok_or_else(|| native_invariant_violation("table_add: null boxed value".into()))?;
         // SAFETY: `rws` is reborrowed exclusively here.
         let rws = unsafe { &mut **self.rws.get() };
-        match rws.move_to(self.resource_provider, &storage_key, obj) {
+        match rws.move_to(self.resource_provider, &storage_key, None, obj) {
             Ok(()) => Ok(true),
             Err(RuntimeError::ResourceAlreadyExists { .. }) => Ok(false),
             Err(e) => Err(e.into()),
@@ -733,7 +742,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         let storage_key = InMemoryStorageKey::table_item(*handle, key.into(), value_ty);
         // SAFETY: heap and rws are distinct fields (see the aliasing rule).
         let rws = unsafe { &mut **self.rws.get() };
-        let ptr = match rws.try_move_from(self.resource_provider, &storage_key) {
+        let ptr = match rws.try_move_from(self.resource_provider, &storage_key, None) {
             Ok(EntryPtr::Writable(ptr)) => ptr,
             Ok(EntryPtr::NonWritable(ptr)) => {
                 // Copy-on-write: an external or older-epoch value must be copied

@@ -40,7 +40,9 @@ impl TStateView for ReadSet {
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
-        unreachable!("Should not be called when benchmarking")
+        // Usage only feeds block-metadata and storage-gas accounting, which the benchmark ignores.
+        // Return an untracked value so VMs that read it (e.g. MonoMove) do not panic.
+        Ok(StateStorageUsage::new_untracked())
     }
 }
 
@@ -129,6 +131,8 @@ impl<S: StateView> TStateView for ReadSetCapturingStateView<'_, S> {
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
-        unreachable!("Should not be called when benchmarking")
+        // See the note on `ReadSet::get_usage`: usage is irrelevant to the benchmark, so return an
+        // untracked value rather than panicking.
+        Ok(StateStorageUsage::new_untracked())
     }
 }

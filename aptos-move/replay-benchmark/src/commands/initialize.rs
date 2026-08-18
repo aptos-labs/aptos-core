@@ -5,6 +5,7 @@ use crate::{
     commands::{build_debugger, init_logger_and_metrics, RestAPI},
     generator::InputOutputDiffGenerator,
     overrides::OverrideConfig,
+    workload::retain_user_transactions_only,
 };
 use anyhow::anyhow;
 use aptos_logger::Level;
@@ -56,11 +57,32 @@ pub struct InitializeCommand {
 
     #[clap(
         long,
+        default_value_t = false,
+        help = "If set, zero all gas-schedule cost entries so replay is gas-free. Applied as a \
+                state override during initialization, so the captured input state runs without \
+                charging gas for both the baseline and the compared VM (e.g. MonoMove). Mirrors \
+                the gas-free replay used by mono-move's benchmark"
+    )]
+    gas_free: bool,
+
+    #[clap(
+        long,
         num_args = 1..,
         value_delimiter = ' ',
         help = "List of space-separated paths to compiled / built packages with Move code"
     )]
     override_packages: Vec<String>,
+
+    #[clap(
+        long,
+        default_value_t = false,
+        help = "If set, keep only signed user transactions in each block, dropping block \
+                metadata, state checkpoint, block epilogue, validator, and genesis transactions \
+                (and dropping blocks left empty). Pass the same value to `initialize`, \
+                `benchmark`, and `diff` so the captured state and the replayed workload stay \
+                aligned. Useful for VMs that execute only user transactions, e.g. MonoMove"
+    )]
+    user_txns_only: bool,
 }
 
 impl InitializeCommand {
@@ -74,6 +96,11 @@ impl InitializeCommand {
                 err
             )
         })?;
+        let txn_blocks = if self.user_txns_only {
+            retain_user_transactions_only(txn_blocks)
+        } else {
+            txn_blocks
+        };
 
         // TODO:
         //   1. Override gas schedule, to track the costs of charging gas or tracking limits.
@@ -84,6 +111,7 @@ impl InitializeCommand {
             self.enable_features,
             self.disable_features,
             self.gas_feature_version,
+            self.gas_free,
             self.override_packages,
         )?;
 

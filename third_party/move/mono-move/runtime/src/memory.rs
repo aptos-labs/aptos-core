@@ -11,7 +11,7 @@ use mono_move_core::{DescriptorId, ENUM_TAG_OFFSET, MAX_ALIGN};
 use std::alloc::{self, Layout};
 
 // ---------------------------------------------------------------------------
-// Aligned buffer — owns a zeroed, [`MAX_ALIGN`]-aligned allocation
+// Aligned buffer — owns a [`MAX_ALIGN`]-aligned allocation, zeroed or not
 // ---------------------------------------------------------------------------
 
 pub struct MemoryRegion {
@@ -24,11 +24,37 @@ impl MemoryRegion {
     ///
     /// OOM is handled by aborting via `handle_alloc_error`.
     pub fn new(size: usize) -> Self {
+        Self::alloc(size, true)
+    }
+
+    /// Allocates an uninitialized, [`MAX_ALIGN`]-aligned memory region of the
+    /// given size.
+    ///
+    /// The bytes are indeterminate: every byte the caller reads must be written
+    /// first. Reading an unwritten byte is undefined behavior. Use this only
+    /// where the consumer initializes each byte before reading it -- e.g. the
+    /// bump [`Heap`](crate::heap::Heap), which zeroes every object in
+    /// `heap_alloc` before returning its pointer and never reads past the bump
+    /// cursor, so the buffer-wide zero would be redundant.
+    ///
+    /// OOM is handled by aborting via `handle_alloc_error`.
+    pub fn new_uninit(size: usize) -> Self {
+        Self::alloc(size, false)
+    }
+
+    fn alloc(size: usize, zeroed: bool) -> Self {
         debug_assert!(size > 0);
         let layout = Layout::from_size_align(size, MAX_ALIGN).expect("invalid memory layout");
-        // SAFETY: layout is valid (power-of-two alignment) and `alloc_zeroed` handles
-        // zero-size layouts per the GlobalAlloc contract. Null is checked below.
-        let ptr = unsafe { alloc::alloc_zeroed(layout) };
+        // SAFETY: the layout has power-of-two alignment and (per the debug
+        // assert) non-zero size, satisfying the GlobalAlloc contract for both
+        // `alloc` and `alloc_zeroed`. Null is checked below.
+        let ptr = unsafe {
+            if zeroed {
+                alloc::alloc_zeroed(layout)
+            } else {
+                alloc::alloc(layout)
+            }
+        };
         if ptr.is_null() {
             alloc::handle_alloc_error(layout);
         }

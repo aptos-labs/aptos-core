@@ -34,7 +34,7 @@ use mono_move_core::{
     native::{NativeABI, NativeExtensions, NativeIdx, NativeStatus, ObjectHandle, RootPool},
     next_captured_value_offset,
     storage::resource_provider::InMemoryStorageKey,
-    types::{view_type_list, InternedType, InternedTypeList},
+    types::{view_type, view_type_list, InternedType, InternedTypeList, Type},
     value_layout::LayoutProvider,
     CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex, DescriptorId,
     FrameOffset, Function, FunctionPtr, FunctionRef, GasMeter, IntBinaryOp, IntCastOp, IntNegateOp,
@@ -51,7 +51,10 @@ use move_core_types::{
     vm_status::AbortLocation,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use std::ptr::{null, NonNull};
+use std::{
+    ptr::{null, NonNull},
+    sync::Arc,
+};
 // ---------------------------------------------------------------------------
 // Runtime state
 // ---------------------------------------------------------------------------
@@ -125,11 +128,16 @@ fn root_frame_base(stack: &MemoryRegion) -> *mut u8 {
 /// parts are only valid together; external read pointers remain owned by the
 /// resource provider.
 ///
+/// The heap is `Arc`-shared so it can back both a deferred materialization off
+/// these effects and any written values published into an external map (e.g.
+/// Block-STM's multi-version map), which must outlive the effects. It is frozen
+/// at [`finish`](InterpreterContext::finish) and never mutated afterwards.
+///
 // TODO(correctness): the effects hold interned types but carry no lifetime, so
 // they can outlive the guard and dereference freed arenas after a maintenance
 // reset. Tie them to the guard lifetime (`SessionEffects<'guard>`).
 pub struct SessionEffects {
-    pub heap: Heap,
+    pub heap: Arc<Heap>,
     pub read_write_set: ResourceReadWriteSet,
     pub extensions: NativeExtensions,
 }
@@ -345,6 +353,24 @@ impl<'guard> InterpreterContext<'guard> {
         ))
     }
 
+    /// Resolves the resource group `ty` belongs to, if any, from the
+    /// version-pinned read-set. The type's defining module is loaded in the
+    /// read set (it was linked when the type was formed), so membership is read
+    /// from that pinned module -- not from whatever version the loader may hold
+    /// now, which could add or remove the group attribute under a concurrent
+    /// upgrade. A non-nominal type never belongs to a group.
+    fn resource_group_of(&self, ty: InternedType) -> VMResult<Option<InternedType>> {
+        let Type::Nominal {
+            module_id, name, ..
+        } = view_type(ty)
+        else {
+            return Ok(None);
+        };
+        let arena_ref = self.loader.guard().arena_ref_for_module_id(*module_id);
+        let loaded = self.read_set.get_loaded(arena_ref)?;
+        Ok(loaded.resource_group_of(*name))
+    }
+
     /// Returns the transaction's read-set.
     pub fn read_set(&self) -> &ModuleReadSet<'guard> {
         &self.read_set
@@ -408,7 +434,7 @@ impl<'guard> InterpreterContext<'guard> {
     /// as long as the returned effects live.
     pub fn finish(self) -> SessionEffects {
         SessionEffects {
-            heap: self.heap,
+            heap: Arc::new(self.heap),
             read_write_set: self.read_write_set,
             extensions: self.extensions,
         }
@@ -2100,18 +2126,22 @@ impl InterpreterContext<'_> {
 
                     MicroOp::Exists { addr, ty, dst } => {
                         let address = read_account_address(fp, addr);
+                        let group = self.resource_group_of(ty)?;
                         let exists = self.read_write_set.exists(
                             self.resource_provider,
                             &InMemoryStorageKey::resource(address, ty),
+                            group,
                         )?;
                         write_bool(fp, dst, exists);
                     },
 
                     MicroOp::BorrowGlobal { addr, ty, dst } => {
                         let address = read_account_address(fp, addr);
+                        let group = self.resource_group_of(ty)?;
                         let ptr = self.read_write_set.borrow_global(
                             self.resource_provider,
                             &InMemoryStorageKey::resource(address, ty),
+                            group,
                         )?;
                         // A reference is a 16-byte fat pointer; the borrow points
                         // at the start of the resource, so the offset half is 0.
@@ -2120,11 +2150,13 @@ impl InterpreterContext<'_> {
 
                     MicroOp::BorrowGlobalMut { addr, ty, dst } => {
                         let address = read_account_address(fp, addr);
+                        let group = self.resource_group_of(ty)?;
                         let key = InMemoryStorageKey::resource(address, ty);
-                        let ptr = match self
-                            .read_write_set
-                            .try_borrow_global_mut(self.resource_provider, &key)?
-                        {
+                        let ptr = match self.read_write_set.try_borrow_global_mut(
+                            self.resource_provider,
+                            &key,
+                            group,
+                        )? {
                             EntryPtr::Writable(ptr) => ptr,
                             EntryPtr::NonWritable(ptr) => {
                                 let ptr = self.deep_copy(regs, ptr)?;
@@ -2139,10 +2171,13 @@ impl InterpreterContext<'_> {
 
                     MicroOp::MoveFrom { addr, ty, dst } => {
                         let address = read_account_address(fp, addr);
+                        let group = self.resource_group_of(ty)?;
                         let key = InMemoryStorageKey::resource(address, ty);
-                        let entry_ptr = self
-                            .read_write_set
-                            .try_move_from(self.resource_provider, &key)?;
+                        let entry_ptr = self.read_write_set.try_move_from(
+                            self.resource_provider,
+                            &key,
+                            group,
+                        )?;
                         let ptr = match entry_ptr {
                             EntryPtr::Writable(ptr) => ptr,
                             EntryPtr::NonWritable(ptr) => {
@@ -2165,10 +2200,12 @@ impl InterpreterContext<'_> {
                         let Some(ptr) = NonNull::new(read_ptr(fp, src)) else {
                             invariant_violation!(MoveToNullSource);
                         };
+                        let group = self.resource_group_of(ty)?;
 
                         self.read_write_set.move_to(
                             self.resource_provider,
                             &InMemoryStorageKey::resource(address, ty),
+                            group,
                             ptr,
                         )?;
                     },
@@ -3105,6 +3142,22 @@ impl InterpreterContext<'_> {
             // — clearer once everything (rws → table natives, gas → all) is
             // wired up.
             let guard = self.loader.guard();
+            // Resolves a resource's group from the version-pinned read-set, for
+            // native ops that touch global storage (e.g. `object::exists_at`).
+            // Mirrors `Interpreter::resource_group_of`; captured by reference so
+            // it borrows only `read_set` and `guard`, disjoint from the `&mut`
+            // fields the context also holds.
+            let read_set = &self.read_set;
+            let resource_group_of = move |ty: InternedType| -> VMResult<Option<InternedType>> {
+                let Type::Nominal {
+                    module_id, name, ..
+                } = view_type(ty)
+                else {
+                    return Ok(None);
+                };
+                let arena_ref = guard.arena_ref_for_module_id(*module_id);
+                Ok(read_set.get_loaded(arena_ref)?.resource_group_of(*name))
+            };
             let ctx = ProductionNativeContext::new(
                 new_fp,
                 abi,
@@ -3113,6 +3166,7 @@ impl InterpreterContext<'_> {
                 guard,
                 guard,
                 self.resource_provider,
+                &resource_group_of,
                 &mut self.heap,
                 &mut self.read_write_set,
                 &self.extensions,

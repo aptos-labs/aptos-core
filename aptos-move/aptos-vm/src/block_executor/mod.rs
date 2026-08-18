@@ -430,6 +430,11 @@ impl<
             .features()
             .is_mono_move_enabled()
         {
+            // MonoMove does not yet validate read sets, so it must not run in
+            // parallel. Force sequential execution regardless of the configured
+            // concurrency level (see `mono_move`'s milestone-1 scope).
+            let mut config = config;
+            config.local.concurrency_level = 1;
             let executor = BlockExecutor::<
                 SignatureVerifiedTransaction,
                 MonoTransactionExecutor<'_>,

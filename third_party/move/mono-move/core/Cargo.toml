@@ -21,4 +21,5 @@ move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 shared-dsa = { workspace = true }
 smallvec = { workspace = true }
+static_assertions = { workspace = true }
 thiserror = { workspace = true }

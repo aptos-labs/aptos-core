@@ -53,6 +53,8 @@ pub struct OverrideConfig {
     additional_disabled_features: Vec<FeatureFlag>,
     /// Gas feature version to use. Invariant: must be at most the latest version.
     gas_feature_version: Option<u64>,
+    /// If true, all gas-schedule cost entries are zeroed so replay is gas-free.
+    gas_free: bool,
     /// Information about overridden packages.
     package_override: PackageOverride,
 }
@@ -62,6 +64,7 @@ impl OverrideConfig {
         additional_enabled_features: Vec<FeatureFlag>,
         additional_disabled_features: Vec<FeatureFlag>,
         gas_feature_version: Option<u64>,
+        gas_free: bool,
         override_packages: Vec<String>,
     ) -> anyhow::Result<Self> {
         let build_options = BuildOptions::move_2();
@@ -84,6 +87,7 @@ impl OverrideConfig {
             additional_enabled_features,
             additional_disabled_features,
             gas_feature_version,
+            gas_free,
             package_override,
         })
     }
@@ -113,14 +117,26 @@ impl OverrideConfig {
             state_override.insert(features_state_key, features_state_value);
         }
 
-        // Gas feature override.
-        if let Some(gas_feature_version) = self.gas_feature_version {
+        // Gas schedule override: feature version and/or zeroing all costs for gas-free replay.
+        // Both edits go through a single override so they do not clobber each other's state value.
+        if self.gas_feature_version.is_some() || self.gas_free {
             // Only support V2 gas schedule which has gas feature versions. Otherwise, V1 has 0
             // version at all times, and most likely it has been so long ago we will not replay
             // these transactions.
             let (gas_schedule_state_key, gas_schedule_state_value) =
                 config_override::<GasScheduleV2, _>(state_view, |gas_schedule| {
-                    gas_schedule.feature_version = gas_feature_version;
+                    if let Some(gas_feature_version) = self.gas_feature_version {
+                        gas_schedule.feature_version = gas_feature_version;
+                    }
+                    if self.gas_free {
+                        for (name, value) in &mut gas_schedule.entries {
+                            if is_cost(name) {
+                                *value = 0;
+                            } else if name.as_str() == GAS_UNIT_SCALING_FACTOR_ENTRY {
+                                *value = value.saturating_mul(GAS_FREE_SCALING_FACTOR_MULTIPLIER);
+                            }
+                        }
+                    }
                 });
             state_override.insert(gas_schedule_state_key, gas_schedule_state_value);
         }
@@ -244,6 +260,64 @@ impl OverrideConfig {
 
         state_override
     }
+}
+
+/// On-chain gas schedule entry name for the gas unit scaling factor, which converts internal gas
+/// into external gas units (`external = internal / scaling_factor`).
+const GAS_UNIT_SCALING_FACTOR_ENTRY: &str = "txn.gas_unit_scaling_factor";
+
+/// Multiplier applied to the gas unit scaling factor for gas-free replay. Zeroing every cost entry
+/// leaves execution and IO gas at zero, but a few internal gas units can still slip in through
+/// charges that do not read the gas schedule. Inflating the scaling factor divides the external gas
+/// used down to zero, so no fee is settled and no fee-related writes are produced.
+const GAS_FREE_SCALING_FACTOR_MULTIPLIER: u64 = 1000;
+
+/// The cost entries of the `txn.` namespace. Everything else under `txn.` is structure (bounds,
+/// limits, quotas, unit scaling) and must not be zeroed when making replay gas-free.
+const TXN_COST_ENTRIES: &[&str] = &[
+    "txn.min_transaction_gas_units",
+    "txn.intrinsic_gas_per_byte",
+    "txn.load_data.base",
+    "txn.load_data.failure",
+    "txn.load_data.per_byte",
+    "txn.write_data.new_item",
+    "txn.write_data.per_op",
+    "txn.write_data.per_byte_in_key",
+    "txn.write_data.per_byte_in_val",
+    "txn.legacy_storage_fee_per_event_byte",
+    "txn.legacy_storage_fee_per_excess_state_byte",
+    "txn.legacy_storage_fee_per_state_slot_create",
+    "txn.legacy_storage_fee_per_transaction_byte",
+    "txn.storage_fee_per_event_byte",
+    "txn.storage_fee_per_excess_state_byte",
+    "txn.storage_fee_per_state_byte",
+    "txn.storage_fee_per_state_slot",
+    "txn.storage_fee_per_state_slot_create",
+    "txn.storage_fee_per_transaction_byte",
+    "txn.storage_io_per_event_byte_write",
+    "txn.storage_io_per_state_byte_read",
+    "txn.storage_io_per_state_byte_write",
+    "txn.storage_io_per_state_slot_read",
+    "txn.storage_io_per_state_slot_write",
+    "txn.storage_io_per_transaction_byte_write",
+    "txn.dependency_per_byte",
+    "txn.dependency_per_module",
+    "txn.keyless.base",
+    "txn.slh_dsa_sha2_128s.base",
+    "txn.encrypted_txn_decryption.base",
+];
+
+/// Returns true if a gas schedule entry is a cost that should be zeroed for
+/// gas-free replay. Only `txn.` mixes costs with structural entries (bounds,
+/// limits, quotas, unit scaling), so there we zero only the entries in
+/// [TXN_COST_ENTRIES]. Every other namespace is a pure cost and is zeroed in
+/// full: `misc.` (abstract value sizes, which feed execution and memory-quota
+/// charges), `instr.`, `move_stdlib.`, `table.`, and `aptos_framework.`.
+fn is_cost(name: &str) -> bool {
+    if name.starts_with("txn.") {
+        return TXN_COST_ENTRIES.contains(&name);
+    }
+    true
 }
 
 /// Returns the state key for on-chain config type.

@@ -66,7 +66,7 @@ pub enum ViewMode<'a, I: TxnInput> {
 pub trait SingleTransactionExecutor<'ctx> {
     type Txn: Transaction;
     type AuxiliaryInfo: AuxiliaryInfoTrait;
-    type Key: Ord + Send + Sync + Clone + Hash + Debug + 'static;
+    type Key: Send + Sync + Clone + Hash + Eq + Debug + 'static;
     type Tag: Ord + Send + Sync + Clone + Hash + Debug + Serialize + 'static;
     type Value: SpeculativeValue + 'static;
 

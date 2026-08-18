@@ -5,7 +5,6 @@ use bumpalo::Bump;
 use crossbeam_utils::CachePadded;
 use parking_lot::{Mutex, MutexGuard};
 use std::{
-    cmp::Ordering,
     fmt,
     hash::{Hash, Hasher},
     ptr::NonNull,
@@ -101,25 +100,7 @@ impl<T: ?Sized> Hash for GlobalArenaPtr<T> {
     }
 }
 
-// Pointer-address ordering, so interned pointers can key ordered containers
-// (e.g. `BTreeMap`) that require `Ord`.
-//
-// TODO(correctness): this order is by arena address and is therefore NOT stable
-// across runs. It must never drive consensus-visible output ordering; callers
-// that need determinism must sort by a stable key (e.g. the resolved struct tag
-// / state key) instead.
-impl<T: ?Sized> PartialOrd for GlobalArenaPtr<T> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl<T: ?Sized> Ord for GlobalArenaPtr<T> {
-    fn cmp(&self, other: &Self) -> Ordering {
-        (self.as_raw_ptr() as *const ()).cmp(&(other.as_raw_ptr() as *const ()))
-    }
-}
-
+// TODO(security): remove this Debug impl: needed by block executor trait bound.
 impl<T: ?Sized> fmt::Debug for GlobalArenaPtr<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "GlobalArenaPtr({:p})", self.as_raw_ptr() as *const ())

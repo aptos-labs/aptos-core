@@ -42,6 +42,8 @@ dashmap = { workspace = true }
 derivative = { workspace = true }
 fail = { workspace = true }
 hashbrown = { workspace = true }
+mono-move-aptos-state-view-providers = { workspace = true }
+mono-move-aptos-transaction-executor = { workspace = true }
 mono-move-core = { workspace = true }
 mono-move-global-context = { workspace = true }
 mono-move-output = { workspace = true }

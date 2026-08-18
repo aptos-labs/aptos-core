@@ -1846,9 +1846,8 @@ where
         signature_verified_block: &TP,
         outputs: impl Iterator<Item = &'a CommittedOutput<'ctx, E>>,
         epilogue_txn_idx: TxnIndex,
-        block_end_info: TBlockEndInfoExt<E::Key>,
+        block_end_info: TBlockEndInfoExt<T::Key>,
         features: &Features,
-        executor: &E,
     ) -> Result<T, PanicError> {
         // TODO(grao): Remove this check once AIP-88 is fully enabled.
         if !self
@@ -1915,14 +1914,7 @@ where
             }
         }
         let fee_distribution = FeeDistribution::new(amount);
-        // Convert the in-memory hot keys to storage keys for the on-chain epilogue.
-        // Fallible for MonoMove (a deeply-nested type may not fit a StateKey);
-        // identity/infallible for the legacy VM.
         let (inner, to_make_hot) = block_end_info.into_parts();
-        let to_make_hot = to_make_hot
-            .into_iter()
-            .map(|k| executor.materialize_storage_key(k))
-            .collect::<Result<BTreeSet<_>, PanicError>>()?;
         if self.config.onchain.hotness_in_epilogue() {
             Ok(T::block_epilogue_v2(
                 block_id,
@@ -2269,9 +2261,10 @@ where
                             signature_verified_block,
                             ret.iter(),
                             idx as TxnIndex,
-                            block_limit_processor.get_block_end_info(),
+                            block_limit_processor.get_block_end_info(|k| {
+                                executor.materialize_storage_key(k.clone())
+                            })?,
                             module_cache_manager_guard.environment().features(),
-                            &executor,
                         )?);
                     } else {
                         info!("Reach epoch ending, do not append BlockEpilogue txn, block_id: {block_id:?}.");
@@ -2433,9 +2426,10 @@ where
                 block,
                 outputs,
                 epilogue_txn_idx,
-                block_limit_processor.acquire().get_block_end_info(),
+                block_limit_processor
+                    .acquire()
+                    .get_block_end_info(|k| executor.materialize_storage_key(k.clone()))?,
                 environment.features(),
-                executor,
             )?;
 
             Ok(Some(epilogue_txn))

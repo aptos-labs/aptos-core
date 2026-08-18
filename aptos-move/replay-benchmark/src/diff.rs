@@ -7,7 +7,7 @@ use aptos_types::{
     },
     contract_event::ContractEvent,
     fee_statement::FeeStatement,
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, state_value::StateValueMetadata},
     transaction::{ExecutionStatus, TransactionOutput},
     write_set::{TransactionWrite, WriteOp, WriteSet, TOTAL_SUPPLY_STATE_KEY},
     AptosCoinType,
@@ -146,7 +146,8 @@ pub struct TransactionDiffBuilder {
     ///   - total gas used is not compared,
     ///   - `EmitFeeStatement` event is not compared,
     ///   - total APT supply is not compared,
-    ///   - account balances are no compared.
+    ///   - account balances are no compared,
+    ///   - state-value metadata (storage deposits) is normalized away before comparing writes.
     allow_different_gas_usage: bool,
     /// If true, the gas used is still compared even if the `allow_different_gas_usage` is true.
     still_compare_gas_used: bool,
@@ -288,6 +289,12 @@ impl TransactionDiffBuilder {
         if self.allow_different_gas_usage {
             filter_gas_related_ops(&mut left);
             filter_gas_related_ops(&mut right);
+
+            // Storage-deposit metadata tracks gas-charged deposits, and MonoMove does not track it,
+            // so normalize it away on both sides before comparing the remaining writes by value.
+            for op in left.values_mut().chain(right.values_mut()) {
+                *op.metadata_mut() = StateValueMetadata::none();
+            }
         }
 
         let mut diffs = vec![];

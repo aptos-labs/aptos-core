@@ -744,6 +744,8 @@ dependencies = [
  "fail",
  "hashbrown 0.14.3",
  "itertools 0.13.0",
+ "mono-move-aptos-state-view-providers",
+ "mono-move-aptos-transaction-executor",
  "mono-move-core",
  "mono-move-global-context",
  "mono-move-output",
@@ -3429,6 +3431,7 @@ dependencies = [
  "dashmap 7.0.0-rc2",
  "equivalent",
  "fail",
+ "mono-move-runtime",
  "move-binary-format",
  "move-core-types",
  "move-vm-runtime",
@@ -12951,6 +12954,7 @@ dependencies = [
  "move-core-types",
  "shared-dsa",
  "smallvec",
+ "static_assertions",
  "thiserror 1.0.69",
 ]
 
@@ -12960,6 +12964,7 @@ version = "0.1.0"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
+ "aptos-types",
  "boxcar",
  "dashmap 7.0.0-rc2",
  "fxhash",

@@ -148,7 +148,7 @@ impl<'a> VMValue<'a> for AccountAddress {
 
 /// A table's storage handle.
 #[repr(transparent)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub struct TableHandle(AccountAddress);
 
 impl TableHandle {

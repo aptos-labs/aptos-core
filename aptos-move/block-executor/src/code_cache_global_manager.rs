@@ -106,10 +106,11 @@ where
         transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<(), VMStatus> {
         // If we execute non-consecutive sequence of transactions, we need to flush everything.
-        if !transaction_slice_metadata.is_immediately_after(&self.transaction_slice_metadata) {
-            self.module_cache.flush_all_caches();
-            self.environment = None;
-        }
+        // TODO: this is a temporary hack to preserve cache for benachmarks
+        // if !transaction_slice_metadata.is_immediately_after(&self.transaction_slice_metadata) {
+        //     self.module_cache.flush_all_caches();
+        //     self.environment = None;
+        // }
         // Record the new metadata for this slice of transactions.
         self.transaction_slice_metadata = transaction_slice_metadata;
 
@@ -268,7 +269,8 @@ impl AptosModuleCacheManager {
         // To avoid cold starts, fetch the framework code. This ensures the state with 0 modules
         // cached is not possible for block execution (as long as the config enables the framework
         // prefetch).
-        if guard.module_cache().num_modules() == 0
+        if !guard.environment().features().is_mono_move_enabled()
+            && guard.module_cache().num_modules() == 0
             && config.module_cache_config.prefetch_framework_code
         {
             prefetch_aptos_framework(state_view, &mut guard).map_err(|err| {

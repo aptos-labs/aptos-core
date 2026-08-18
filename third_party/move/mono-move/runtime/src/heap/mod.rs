@@ -233,7 +233,10 @@ pub struct Heap {
 
 impl Heap {
     pub fn new(size: usize) -> Self {
-        let buffer = MemoryRegion::new(size);
+        // Uninitialized is safe: `heap_alloc` zeroes every object before handing
+        // out its pointer, and reads only ever touch allocated objects, never
+        // the un-bumped tail.
+        let buffer = MemoryRegion::new_uninit(size);
         Self {
             bump_ptr: buffer.as_ptr(),
             buffer,
@@ -812,7 +815,10 @@ pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
 ) -> VMResult<()> {
     heap.gc_count += 1;
 
-    let to_space = MemoryRegion::new(heap.buffer.len());
+    // Uninitialized is safe: the Cheney scan below reads only
+    // `[to_space.start, free_ptr)`, every byte of which `gc_copy_object` fills
+    // with a full object image; the un-bumped tail is never read.
+    let to_space = MemoryRegion::new_uninit(heap.buffer.len());
     // `free_ptr` is a raw bump cursor — it points at the start of the
     // next *header* reservation, advancing by each object's total size.
     // Treating it as a raw cursor (rather than as an "object pointer"

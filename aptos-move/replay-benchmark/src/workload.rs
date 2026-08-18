@@ -8,7 +8,7 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        AuxiliaryInfo, TransactionBlock, Version,
+        AuxiliaryInfo, Transaction, TransactionBlock, Version,
     },
 };
 
@@ -47,4 +47,73 @@ impl From<TransactionBlock> for Workload {
             transaction_slice_metadata,
         }
     }
+}
+
+/// Returns whether `txn` is a signed user transaction, the only kind of
+/// transaction MonoMove executes. Written as an exhaustive match so that adding
+/// a new [`Transaction`] variant is a compile error here, forcing an explicit
+/// decision on whether to keep or drop it.
+fn is_user_transaction(txn: &Transaction) -> bool {
+    match txn {
+        Transaction::UserTransaction(_) => true,
+        Transaction::GenesisTransaction(_)
+        | Transaction::BlockMetadata(_)
+        | Transaction::BlockMetadataExt(_)
+        | Transaction::StateCheckpoint(_)
+        | Transaction::ValidatorTransaction(_)
+        | Transaction::BlockEpilogue(_) => false,
+    }
+}
+
+/// Drops every non-user transaction (block metadata, state checkpoint, block
+/// epilogue, validator, and genesis transactions) from each block, keeping only
+/// signed user transactions. The aligned `persisted_auxiliary_infos` are
+/// filtered in lockstep, and blocks left empty are removed.
+///
+/// The captured read-set and the replayed workload must be filtered the same
+/// way, so `--user-txns-only` has to be passed consistently to `initialize`,
+/// `benchmark`, and `diff`. `begin_version` is left unchanged: the user
+/// transactions replay on top of the pre-block state, so the block prologue's
+/// timestamp is not advanced. This is acceptable for throughput measurement, but
+/// means outputs for timestamp-dependent transactions can differ from on-chain.
+pub(crate) fn retain_user_transactions_only(
+    txn_blocks: Vec<TransactionBlock>,
+) -> Vec<TransactionBlock> {
+    txn_blocks
+        .into_iter()
+        .filter_map(|txn_block| {
+            let TransactionBlock {
+                begin_version,
+                transactions,
+                persisted_auxiliary_infos,
+            } = txn_block;
+
+            let keep = transactions
+                .iter()
+                .map(is_user_transaction)
+                .collect::<Vec<_>>();
+            let has_aux = !persisted_auxiliary_infos.is_empty();
+
+            let transactions = transactions
+                .into_iter()
+                .zip(&keep)
+                .filter_map(|(txn, &keep)| keep.then_some(txn))
+                .collect::<Vec<_>>();
+            let persisted_auxiliary_infos = if has_aux {
+                persisted_auxiliary_infos
+                    .into_iter()
+                    .zip(&keep)
+                    .filter_map(|(info, &keep)| keep.then_some(info))
+                    .collect::<Vec<_>>()
+            } else {
+                vec![]
+            };
+
+            (!transactions.is_empty()).then_some(TransactionBlock {
+                begin_version,
+                transactions,
+                persisted_auxiliary_infos,
+            })
+        })
+        .collect()
 }
