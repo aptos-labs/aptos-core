@@ -170,6 +170,13 @@ mod tests {
     use move_binary_format::access::ModuleAccess;
     use std::collections::BTreeSet;
 
+    fn lake_available() -> bool {
+        Command::new("lake")
+            .arg("--version")
+            .output()
+            .is_ok_and(|output| output.status.success())
+    }
+
     #[test]
     fn extracts_lean_file() {
         let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean");
@@ -207,6 +214,10 @@ mod tests {
 
     #[test]
     fn lean_source_runs_complete_compiler_v2_pipeline() {
+        if !lake_available() {
+            eprintln!("skipping Leaner integration test: `lake` is unavailable");
+            return;
+        }
         let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean");
         let options = Options {
             sources: vec![lean_root
@@ -230,6 +241,10 @@ mod tests {
 
     #[test]
     fn imported_lean_modules_compile_as_move_dependencies() {
+        if !lake_available() {
+            eprintln!("skipping Leaner integration test: `lake` is unavailable");
+            return;
+        }
         let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean");
         // Intentionally put the client first: XIR loading must use declared
         // Move dependencies, not filesystem or command-line order.
@@ -284,6 +299,10 @@ mod tests {
 
     #[test]
     fn lean_source_dependency_is_not_emitted_as_a_target() {
+        if !lake_available() {
+            eprintln!("skipping Leaner integration test: `lake` is unavailable");
+            return;
+        }
         let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean");
         let options = Options {
             sources: vec![lean_root

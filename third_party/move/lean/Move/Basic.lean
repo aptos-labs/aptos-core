@@ -15,42 +15,6 @@ normalizer consumes this call and requires the marked application to become a
 CFG back edge; it has no Move runtime representation. -/
 @[noinline] opaque continueMarker {α : Sort u} (value : α) : α := value
 
-/-- Marks the header of a source `while` / `loop`.  The state argument carries
-the mutable locals whose values are live at the back edge. -/
-@[never_extract, noinline] partial def loopEnter {σ : Type} [Inhabited σ]
-    (label arity token : Nat) (state : σ) : Nat :=
-  loopEnter label arity token state
-
-/-- Source `continue` of a `while` / `loop`.  The normalizer turns this into a
-back edge to `loopEnter label`.  The token keeps the call live; the
-polymorphic result is the current `do` branch value. -/
-@[never_extract, noinline] partial def loopContinue {σ : Type} [Inhabited σ]
-    (label arity token : Nat) (state : σ) : Nat :=
-  loopContinue label arity token state
-
-/-- The implicit continue inserted at the end of a loop body.  It also marks
-where Normalize can recover and compile the loop's exit continuation. -/
-@[never_extract, noinline] partial def loopContinueTail {σ : Type} [Inhabited σ]
-    (label arity token : Nat) (state : σ) : Nat :=
-  loopContinueTail label arity token state
-
-/-- Source `break` of a `while` / `loop`.  The normalizer follows the LCNF
-join after this call as the loop exit. -/
-@[never_extract, noinline] partial def loopBreak {σ : Type} [Inhabited σ]
-    (label arity token : Nat) (state : σ) : Nat :=
-  loopBreak label arity token state
-
-/-- Keeps the marker token live until the source loop's syntactic exit.
-Normalize removes this test and follows its `true` branch. -/
-@[never_extract, noinline] partial def loopTokenLive (token : Nat) : Bool :=
-  loopTokenLive token
-
-/-- Data-dependency marker used when an inner loop contains control flow to an
-outer loop. It keeps the outer token update before the inner tail marker. -/
-@[never_extract, noinline] partial def loopTokenJoin
-    (token outerToken : Nat) : Nat :=
-  loopTokenJoin token outerToken
-
 /-- A Move account address.  The private payload exists only so source
 declarations pass through Lean's compiler; the Move backend supplies the real
 256-bit representation. -/
