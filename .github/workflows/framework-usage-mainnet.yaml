@@ -1,0 +1,57 @@
+name: "Framework function usage: Mainnet"
+
+on:
+  workflow_dispatch:
+    inputs:
+      IMAGE_TAG:
+        required: false
+        type: string
+        description: Optional tools image commit; defaults to the current branch.
+      START_VERSION:
+        required: false
+        type: string
+        description: First ledger version. Mutually exclusive with START_TIME.
+      END_VERSION:
+        required: false
+        type: string
+        description: Last ledger version. Mutually exclusive with END_TIME.
+      START_TIME:
+        required: false
+        type: string
+        description: 'Start time, for example "7 days ago" or "2026-08-01" (UTC).'
+      END_TIME:
+        required: false
+        type: string
+        description: 'End time, for example "now" or "2026-08-08" (UTC).'
+      RESULTS_BUCKET:
+        required: true
+        type: string
+        description: GCS bucket for durable per-range report shards.
+      DRY_RUN:
+        required: false
+        type: boolean
+        description: Validate inputs without building or running workers.
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    uses: ./.github/workflows/workflow-run-replay-verify-on-archive.yaml
+    secrets: inherit
+    with:
+      NETWORK: mainnet
+      IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
+      START_VERSION: ${{ inputs.START_VERSION }}
+      END_VERSION: ${{ inputs.END_VERSION }}
+      START_TIME: ${{ inputs.START_TIME }}
+      END_TIME: ${{ inputs.END_TIME }}
+      FRAMEWORK_USAGE: true
+      RESULTS_BUCKET: ${{ inputs.RESULTS_BUCKET }}
+      DRY_RUN: ${{ inputs.DRY_RUN || false }}

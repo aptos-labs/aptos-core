@@ -33,6 +33,15 @@ on:
         type: boolean
         description: If true, the workflow will not run replay verify.
         default: false
+      FRAMEWORK_USAGE:
+        required: false
+        type: boolean
+        description: Collect framework function usage instead of only replay-verifying.
+        default: false
+      RESULTS_BUCKET:
+        required: false
+        type: string
+        description: GCS bucket used for framework usage shards.
 
   workflow_dispatch:
     inputs:
@@ -65,6 +74,15 @@ on:
         type: boolean
         description: If true, the workflow will not run replay verify.
         default: false
+      FRAMEWORK_USAGE:
+        required: false
+        type: boolean
+        description: Collect framework function usage instead of only replay-verifying.
+        default: false
+      RESULTS_BUCKET:
+        required: false
+        type: string
+        description: GCS bucket used for framework usage shards.
 permissions:
   contents: read
 
@@ -78,6 +96,8 @@ jobs:
           START_TIME: ${{ inputs.START_TIME }}
           END_VERSION: ${{ inputs.END_VERSION }}
           END_TIME: ${{ inputs.END_TIME }}
+          FRAMEWORK_USAGE: ${{ inputs.FRAMEWORK_USAGE }}
+          RESULTS_BUCKET: ${{ inputs.RESULTS_BUCKET }}
         run: |
           if [ -n "$START_VERSION" ] && [ -n "$START_TIME" ]; then
             echo "::error::START_VERSION and START_TIME are mutually exclusive. Please specify only one."
@@ -86,6 +106,20 @@ jobs:
           if [ -n "$END_VERSION" ] && [ -n "$END_TIME" ]; then
             echo "::error::END_VERSION and END_TIME are mutually exclusive. Please specify only one."
             exit 1
+          fi
+          if [ "$FRAMEWORK_USAGE" = "true" ]; then
+            if [ -z "$RESULTS_BUCKET" ]; then
+              echo "::error::RESULTS_BUCKET is required for framework usage collection."
+              exit 1
+            fi
+            if [ -z "$START_VERSION" ] && [ -z "$START_TIME" ]; then
+              echo "::error::A START_VERSION or START_TIME is required for framework usage collection."
+              exit 1
+            fi
+            if [ -z "$END_VERSION" ] && [ -z "$END_TIME" ]; then
+              echo "::error::An END_VERSION or END_TIME is required for framework usage collection."
+              exit 1
+            fi
           fi
 
   build-images:
@@ -167,6 +201,8 @@ jobs:
           START_TIME: ${{ inputs.START_TIME }}
           END_TIME: ${{ inputs.END_TIME }}
           IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
+          FRAMEWORK_USAGE: ${{ inputs.FRAMEWORK_USAGE }}
+          RESULTS_BUCKET: ${{ inputs.RESULTS_BUCKET }}
         run: |
           cd testsuite/replay-verify
           ARGS=(--network "$NETWORK")
@@ -185,9 +221,21 @@ jobs:
           if [ -n "$IMAGE_TAG" ]; then
             ARGS+=(--image_tag "$IMAGE_TAG")
           fi
+          if [ "$FRAMEWORK_USAGE" = "true" ]; then
+            ARGS+=(--framework-usage-bucket "$RESULTS_BUCKET")
+            ARGS+=(--framework-usage-output-dir ../../framework-usage-results)
+          fi
           ARGS+=(--image_profile performance)
           poetry run python main.py "${ARGS[@]}"
         timeout-minutes: 420 # 7 hours
+
+      - name: Upload framework usage report
+        if: ${{ inputs.DRY_RUN == false && inputs.FRAMEWORK_USAGE }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: framework-usage-${{ inputs.NETWORK }}-${{ github.run_id }}
+          path: framework-usage-results/
+          if-no-files-found: error
       # This is in case user manually cancel the step above, we still want to cleanup the resources
       - name: Post-run cleanup
         env:

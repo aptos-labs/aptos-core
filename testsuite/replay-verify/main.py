@@ -1,5 +1,6 @@
 import argparse
 from collections import Counter
+import csv
 from dataclasses import dataclass
 import datetime
 import dateparser
@@ -235,6 +236,7 @@ class WorkerPod:
         replay_config: ReplayConfig,
         network: Network = Network.TESTNET,
         namespace: str = "default",
+        framework_usage_bucket: Optional[str] = None,
     ) -> None:
         self.worker_id = worker_id
         self.client = client.CoreV1Api()
@@ -256,6 +258,7 @@ class WorkerPod:
         self.image = image
         self.pvc_name = pvc_name
         self.config = replay_config
+        self.framework_usage_bucket = framework_usage_bucket
 
     def update_status(self) -> None:
         """Refresh self.local_phase from the K8s API (with caching).
@@ -388,6 +391,24 @@ class WorkerPod:
             return container_statuses[0].state.terminated.exit_code == 2
         return False
 
+    def has_sidecar_failure(self) -> bool:
+        container_statuses = self.get_container_status()
+        if not container_statuses or len(container_statuses) < 2:
+            return False
+        main_state = container_statuses[0].state
+        if (
+            not main_state
+            or not main_state.terminated
+            or main_state.terminated.exit_code != 0
+        ):
+            return False
+        return any(
+            status.state
+            and status.state.terminated
+            and status.state.terminated.exit_code != 0
+            for status in container_statuses[1:]
+        )
+
     def get_target_db_dir(self) -> str:
         return "/mnt/archive/db"
 
@@ -410,10 +431,10 @@ class WorkerPod:
             "claimName"
         ] = self.get_claim_name()
         pod_manifest["spec"]["containers"][0]["name"] = self.get_claim_name()
-        pod_manifest["spec"]["containers"][0]["command"] = [
+        aptos_command = [
             "aptos-debugger",
             "aptos-db",
-            "replay-on-archive",
+            "framework-usage" if self.framework_usage_bucket else "replay-on-archive",
             "--start-version",
             str(self.start_version),
             "--end-version",
@@ -429,6 +450,50 @@ class WorkerPod:
             "--block-cache-size",
             f"{36 * 1024 * 1024 * 1024}",
         ]
+        if self.framework_usage_bucket:
+            output_path = f"/results/{self.start_version}-{self.end_version}.json"
+            aptos_command.extend(["--output", output_path])
+            pod_manifest["spec"]["volumes"].append(
+                {"name": "results", "emptyDir": {}}
+            )
+            pod_manifest["spec"]["containers"][0]["volumeMounts"].append(
+                {"mountPath": "/results", "name": "results"}
+            )
+            pod_manifest["spec"]["containers"][0]["command"] = [
+                "/bin/sh",
+                "-c",
+                '"$@"; status=$?; '
+                'if [ "$status" -eq 0 ]; then touch /results/ready; '
+                "else touch /results/failed; fi; exit \"$status\"",
+                "--",
+                *aptos_command,
+            ]
+            destination = (
+                f"gs://{self.framework_usage_bucket}/{self.label}/shards/"
+                f"{self.start_version}-{self.end_version}.json"
+            )
+            pod_manifest["spec"]["containers"].append(
+                {
+                    "name": "upload-framework-usage",
+                    "image": "gcr.io/google.com/cloudsdktool/google-cloud-cli:slim",
+                    "command": [
+                        "/bin/sh",
+                        "-c",
+                        "until [ -f /results/ready ] || [ -f /results/failed ]; do sleep 5; done; "
+                        "if [ -f /results/failed ]; then exit 1; fi; "
+                        "attempt=1; while [ \"$attempt\" -le 5 ]; do "
+                        'gcloud storage cp /results/*.json "$DESTINATION" && exit 0; '
+                        'attempt=$((attempt + 1)); sleep 10; done; exit 1',
+                    ],
+                    "env": [{"name": "DESTINATION", "value": destination}],
+                    "volumeMounts": [{"mountPath": "/results", "name": "results"}],
+                    "resources": {
+                        "requests": {"cpu": "100m", "memory": "256Mi"},
+                    },
+                }
+            )
+        else:
+            pod_manifest["spec"]["containers"][0]["command"] = aptos_command
         # TODO(ibalajiarun): bump memory limit to 180GiB for heavy ranges
         if (
             self.network == Network.TESTNET
@@ -584,6 +649,7 @@ class ReplayScheduler:
         replay_config: ReplayConfig,
         network: Network = Network.TESTNET,
         namespace: str = "default",
+        framework_usage_bucket: Optional[str] = None,
     ) -> None:
         KubernetesConfig.load_kube_config()
         self.client = client.CoreV1Api()
@@ -605,6 +671,7 @@ class ReplayScheduler:
         self.pvcs: list[PVCInfo] = []
         self._snapshot_name: Optional[str] = None
         self.config = replay_config
+        self.framework_usage_bucket = framework_usage_bucket
 
     def __str__(self):
         return f"""ReplayScheduler:
@@ -947,6 +1014,7 @@ class ReplayScheduler:
                         self.config,
                         self.network,
                         self.namespace,
+                        framework_usage_bucket=self.framework_usage_bucket,
                     )
                     self.current_workers[i] = worker_pod
                     worker_pod.start()
@@ -989,7 +1057,9 @@ class ReplayScheduler:
         if worker_pod.is_failed():
             reason = worker_pod.get_failure_reason()
             retries = self.task_stats[worker_pod.name].retry_count + 1
-            if worker_pod.should_reschedule() and retries < MAX_RETRIES:
+            if (
+                worker_pod.should_reschedule() or worker_pod.has_sidecar_failure()
+            ) and retries < MAX_RETRIES:
                 logger.info(
                     f"Worker {worker_idx} completed: {worker_pod.name}, "
                     f"status=Failed({reason}), duration={duration}s, "
@@ -1272,6 +1342,16 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--image_tag", required=False, type=str)
     parser.add_argument("--image_profile", required=False, type=str, default="performance")
+    parser.add_argument(
+        "--framework-usage-bucket",
+        required=False,
+        help="GCS bucket for framework usage shards; enables framework usage mode",
+    )
+    parser.add_argument(
+        "--framework-usage-output-dir",
+        required=False,
+        help="Local directory for merged framework usage artifacts",
+    )
     parser.add_argument("--cleanup", required=False, action="store_true", default=False)
     args = parser.parse_args()
 
@@ -1279,6 +1359,10 @@ def parse_args() -> argparse.Namespace:
         parser.error("--start and --start-time are mutually exclusive")
     if args.end is not None and args.end_time is not None:
         parser.error("--end and --end-time are mutually exclusive")
+    if bool(args.framework_usage_bucket) != bool(args.framework_usage_output_dir):
+        parser.error(
+            "--framework-usage-bucket and --framework-usage-output-dir must be used together"
+        )
 
     return args
 
@@ -1315,6 +1399,192 @@ def print_logs(failed_workpod_logs: list[str], txn_mismatch_logs: list[str]) -> 
             logger.info(log)
 
 
+def _merge_usage_rows(reports: list[dict], field: str) -> list[dict]:
+    count_fields = {
+        "invocation_count",
+        "transaction_count",
+        "first_version",
+        "last_version",
+    }
+    merged: dict[str, dict] = {}
+    for report in reports:
+        for row in report[field]:
+            key = {name: value for name, value in row.items() if name not in count_fields}
+            encoded_key = json.dumps(key, sort_keys=True, separators=(",", ":"))
+            if encoded_key not in merged:
+                merged[encoded_key] = {
+                    **key,
+                    "invocation_count": 0,
+                    "transaction_count": 0,
+                    "first_version": row["first_version"],
+                    "last_version": row["last_version"],
+                }
+            aggregate = merged[encoded_key]
+            aggregate["invocation_count"] += row["invocation_count"]
+            aggregate["transaction_count"] += row["transaction_count"]
+            aggregate["first_version"] = min(
+                aggregate["first_version"], row["first_version"]
+            )
+            aggregate["last_version"] = max(
+                aggregate["last_version"], row["last_version"]
+            )
+    return [merged[key] for key in sorted(merged)]
+
+
+def merge_framework_usage_reports(
+    bucket_name: str,
+    prefix: str,
+    output_dir: str,
+    expected_shards: int,
+    expected_start: int,
+    expected_end: int,
+    network: str,
+) -> None:
+    storage_client = storage.Client()
+    blobs = list(storage_client.list_blobs(bucket_name, prefix=f"{prefix}/shards/"))
+    if len(blobs) != expected_shards:
+        raise RuntimeError(
+            f"expected {expected_shards} framework usage shards, found {len(blobs)} "
+            f"under gs://{bucket_name}/{prefix}/shards/"
+        )
+    reports = [json.loads(blob.download_as_text()) for blob in blobs]
+    if not reports:
+        raise RuntimeError("no framework usage reports were produced")
+
+    reference = reports[0]
+    for report in reports[1:]:
+        for field in ("schema_version", "git_sha", "target_modules", "functions"):
+            if report[field] != reference[field]:
+                raise RuntimeError(f"framework usage shard metadata differs for {field}")
+
+    cursor = expected_start
+    for report in sorted(reports, key=lambda item: item["start_version"]):
+        if report["start_version"] != cursor:
+            raise RuntimeError(
+                f"framework usage range is incomplete or overlapping at version {cursor}"
+            )
+        if report["end_version"] < report["start_version"]:
+            raise RuntimeError("framework usage shard has an invalid version range")
+        cursor = report["end_version"] + 1
+    if cursor != expected_end + 1:
+        raise RuntimeError(
+            f"framework usage range ended at {cursor - 1}, expected {expected_end}"
+        )
+
+    merged = {
+        "schema_version": reference["schema_version"],
+        "network": network,
+        "start_version": min(report["start_version"] for report in reports),
+        "end_version": max(report["end_version"] for report in reports),
+        "git_sha": reference["git_sha"],
+        "target_modules": reference["target_modules"],
+        "processed_transaction_count": sum(
+            report["processed_transaction_count"] for report in reports
+        ),
+        "transaction_usage_records": sum(
+            report["transaction_usage_records"] for report in reports
+        ),
+        "shard_count": len(reports),
+        "gcs_prefix": f"gs://{bucket_name}/{prefix}/",
+        "functions": reference["functions"],
+        "function_usage": _merge_usage_rows(reports, "function_usage"),
+        "usage": _merge_usage_rows(reports, "usage"),
+    }
+
+    os.makedirs(output_dir, exist_ok=True)
+    report_path = os.path.join(output_dir, "framework-usage.json")
+    with open(report_path, "w") as output:
+        json.dump(merged, output, indent=2)
+        output.write("\n")
+
+    totals: dict[str, dict] = {}
+    for row in merged["function_usage"]:
+        encoded_callee = json.dumps(row["callee"], sort_keys=True)
+        if encoded_callee not in totals:
+            totals[encoded_callee] = {
+                "invocation_count": 0,
+                "transaction_count": 0,
+                "first_version": row["first_version"],
+                "last_version": row["last_version"],
+            }
+        total = totals[encoded_callee]
+        total["invocation_count"] += row["invocation_count"]
+        total["transaction_count"] += row["transaction_count"]
+        total["first_version"] = min(total["first_version"], row["first_version"])
+        total["last_version"] = max(total["last_version"], row["last_version"])
+
+    summary_path = os.path.join(output_dir, "framework-usage-summary.csv")
+    columns = [
+        "module_id",
+        "function_name",
+        "visibility",
+        "is_entry",
+        "is_native",
+        "type_parameter_count",
+        "invocation_count",
+        "transaction_count",
+        "first_version",
+        "last_version",
+    ]
+    with open(summary_path, "w", newline="") as output:
+        writer = csv.DictWriter(output, fieldnames=columns)
+        writer.writeheader()
+        for function in merged["functions"]:
+            function_id = {
+                "module_id": function["module_id"],
+                "function_name": function["function_name"],
+            }
+            total = totals.get(json.dumps(function_id, sort_keys=True), {})
+            writer.writerow(
+                {
+                    **function,
+                    "invocation_count": total.get("invocation_count", 0),
+                    "transaction_count": total.get("transaction_count", 0),
+                    "first_version": total.get("first_version", ""),
+                    "last_version": total.get("last_version", ""),
+                }
+            )
+
+    callers_path = os.path.join(output_dir, "framework-usage-callers.csv")
+    caller_columns = [
+        "callee_module_id",
+        "callee_function",
+        "caller_module_id",
+        "caller_function",
+        "root_module_id",
+        "root_function",
+        "call_kind",
+        "outcome",
+        "invocation_count",
+        "transaction_count",
+        "first_version",
+        "last_version",
+    ]
+    with open(callers_path, "w", newline="") as output:
+        writer = csv.DictWriter(output, fieldnames=caller_columns)
+        writer.writeheader()
+        for row in merged["usage"]:
+            caller = row.get("caller") or {}
+            root = row.get("root_function") or {}
+            writer.writerow(
+                {
+                    "callee_module_id": row["callee"].get("module_id", ""),
+                    "callee_function": row["callee"]["function_name"],
+                    "caller_module_id": caller.get("module_id", ""),
+                    "caller_function": caller.get("function_name", ""),
+                    "root_module_id": root.get("module_id", ""),
+                    "root_function": root.get("function_name", ""),
+                    "call_kind": row["call_kind"],
+                    "outcome": row["outcome"],
+                    "invocation_count": row["invocation_count"],
+                    "transaction_count": row["transaction_count"],
+                    "first_version": row["first_version"],
+                    "last_version": row["last_version"],
+                }
+            )
+    logger.info(f"Wrote merged framework usage artifacts to {output_dir}")
+
+
 if __name__ == "__main__":
     args = parse_args()
     get_kubectl_credentials("aptos-devinfra-0", "us-central1", "devinfra-usce1-0")
@@ -1323,6 +1593,9 @@ if __name__ == "__main__":
     run_id = f"{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}-{image[-5:]}"
     network = Network.from_string(args.network)
     config = ReplayConfig(network)
+    if args.framework_usage_bucket:
+        config.min_range_size = 1
+        skip_ranges = []
     worker_cnt = (
         args.worker_cnt
         if args.worker_cnt
@@ -1360,6 +1633,7 @@ if __name__ == "__main__":
         replay_config=config,
         network=network,
         namespace=args.namespace,
+        framework_usage_bucket=args.framework_usage_bucket,
     )
     logger.info(f"scheduler: {scheduler}")
     cleanup = args.cleanup
@@ -1382,5 +1656,15 @@ if __name__ == "__main__":
             if len(failed_logs) > 0:
                 logger.error("Failed tasks found.")
                 exit(1)
+            if args.framework_usage_bucket:
+                merge_framework_usage_reports(
+                    args.framework_usage_bucket,
+                    scheduler.get_label(),
+                    args.framework_usage_output_dir,
+                    scheduler.total_tasks,
+                    scheduler.start_version,
+                    scheduler.end_version,
+                    str(scheduler.network),
+                )
         finally:
             scheduler.cleanup()
