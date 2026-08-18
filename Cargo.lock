@@ -12988,8 +12988,10 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4",
  "blake2-rfc",
+ "bulletproofs",
  "curve25519-dalek-ng",
  "libsecp256k1",
+ "merlin",
  "mono-move-core",
  "move-core-types",
  "rand_core 0.5.1",
@@ -13076,7 +13078,6 @@ name = "mono-move-testsuite"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-crypto",
  "aptos-framework-natives",
  "aptos-gas-schedule",
  "aptos-move-stdlib",
@@ -13106,7 +13107,6 @@ dependencies = [
  "move-vm-runtime",
  "move-vm-test-utils",
  "move-vm-types",
- "rand_core 0.5.1",
  "smallvec",
  "specializer",
  "tempfile",

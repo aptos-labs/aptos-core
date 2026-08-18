@@ -126,6 +126,21 @@ pub trait NativeContext {
         data: &[u8],
     ) -> VMResult<Vector<'a, Opaque>>;
 
+    /// Allocates a `vector<vector<u8>>` on the VM heap whose `i`-th element is a
+    /// freshly allocated `vector<u8>` holding `elements[i]`, and returns a
+    /// handle to it. The whole structure stays live for the rest of the native
+    /// call.
+    ///
+    /// `descriptor` must be the GC descriptor for the outer `vector<vector<u8>>`
+    /// (element size 8, one heap pointer at offset 0); obtain it from
+    /// [`Self::required_descriptor`]. Each slice in `elements` must not alias
+    /// the VM heap.
+    fn new_byte_vector_vector<'a>(
+        &'a self,
+        descriptor: DescriptorId,
+        elements: &[&[u8]],
+    ) -> VMResult<Vector<'a, Vector<'a, u8>>>;
+
     /// Moves the elements of `from` at `[removal_position, removal_position + length)`
     /// into `to` at `insert_position`.
     ///

@@ -23,8 +23,8 @@ use mono_move_core::{
     interner::InternedModuleId,
     native::{
         native_invariant_violation, Boxed, NativeABI, NativeContext, NativeContextFamily,
-        NativeExtension, NativeExtensions, NativeFunction, NativeRegistry, Opaque, Ref, RootPool,
-        TableHandle, VMValue, Vector,
+        NativeExtension, NativeExtensions, NativeFunction, NativeRegistry, ObjectHandle, Opaque,
+        Ref, RootPool, TableHandle, VMValue, Vector,
     },
     storage::resource_provider::InMemoryStorageKey,
     types::InternedType,
@@ -122,6 +122,48 @@ impl<'a> ProductionNativeContext<'a> {
             pool: RootPool::new(),
             returns_started: Cell::new(false),
         }
+    }
+
+    /// Allocates a `vector<u8>` holding `bytes` on the heap, roots it, and
+    /// returns the handle. A helper for [`Self::new_byte_vector_vector`]'s inner
+    /// elements, where the caller needs each inner object's handle to fill the
+    /// outer vector's pointer slots.
+    fn alloc_byte_vector(&self, bytes: &[u8]) -> VMResult<ObjectHandle<'_>> {
+        let count = bytes.len() as u64;
+        if count == 0 {
+            // SAFETY: passing `null` is always safe (empty vectors are null-backed).
+            return Ok(unsafe { self.pool.root_object(std::ptr::null_mut()) });
+        }
+        // SAFETY: `heap` and `rws` are distinct fields (the aliasing rule).
+        let heap = unsafe { &mut **self.heap.get() };
+        let rws = unsafe { &mut **self.rws.get() };
+        // A heap-aliasing `bytes` would be invalidated by the GC `alloc_vec` may
+        // trigger, before the copy below.
+        if is_heap_ptr(heap, bytes.as_ptr()) {
+            return Err(native_invariant_violation(
+                "new_byte_vector_vector: element data must not alias the VM heap".into(),
+            ));
+        }
+        let ptr = alloc_vec(
+            heap,
+            self.desc_provider,
+            rws,
+            &self.pool,
+            self.extensions,
+            self.frame_ptr,
+            TopFrame::Native(self.abi),
+            TRIVIAL_DESCRIPTOR_ID,
+            1,
+            count,
+        )?;
+        // SAFETY: `ptr` is a fresh vector with room for `count` bytes; no GC runs
+        // between here and these writes.
+        unsafe {
+            write_u64(ptr, VEC_LENGTH_OFFSET, count);
+            std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr.add(VEC_DATA_OFFSET), bytes.len());
+        }
+        // SAFETY: `ptr` is the data pointer of the freshly allocated vector.
+        Ok(unsafe { self.pool.root_object(ptr) })
     }
 }
 
@@ -375,6 +417,63 @@ impl NativeContext for ProductionNativeContext<'_> {
         // Root it so it survives later allocations and is GC-relocated.
         // SAFETY: `ptr` is the data pointer of the freshly allocated vector.
         Ok(Vector::from_handle(unsafe { self.pool.root_object(ptr) }))
+    }
+
+    fn new_byte_vector_vector<'a>(
+        &'a self,
+        descriptor: DescriptorId,
+        elements: &[&[u8]],
+    ) -> VMResult<Vector<'a, Vector<'a, u8>>> {
+        if self.returns_started.get() {
+            return Err(native_invariant_violation(
+                "new_byte_vector_vector called after a return value was written".into(),
+            ));
+        }
+        let count = elements.len() as u64;
+        if count == 0 {
+            // TODO(correctness): audit empty <=> null vector invariant
+            // SAFETY: passing `null` is always safe.
+            let handle = unsafe { self.pool.root_object(std::ptr::null_mut()) };
+            return Ok(Vector::from_handle(handle));
+        }
+
+        // Allocate and root each inner `vector<u8>` first, so they survive the
+        // GC the outer allocation below may trigger.
+        let mut inners = Vec::with_capacity(elements.len());
+        for bytes in elements {
+            inners.push(self.alloc_byte_vector(bytes)?);
+        }
+
+        // Allocate the outer vector. Its elements are 8-byte heap pointers, so
+        // it uses `descriptor` (not the trivial one) for GC tracing. This is
+        // the last allocation, so the inner pointers read below stay valid.
+        // SAFETY: `heap` and `rws` are distinct fields (the aliasing rule).
+        let heap = unsafe { &mut **self.heap.get() };
+        let rws = unsafe { &mut **self.rws.get() };
+        let outer = alloc_vec(
+            heap,
+            self.desc_provider,
+            rws,
+            &self.pool,
+            self.extensions,
+            self.frame_ptr,
+            TopFrame::Native(self.abi),
+            descriptor,
+            8,
+            count,
+        )?;
+        // Write the length and each inner pointer into the outer vector. The
+        // inner handles give each object's current (post-GC) address; no
+        // allocation runs past this point, so the raw pointers stay valid.
+        // SAFETY: `outer` has room for `count` 8-byte element slots.
+        unsafe {
+            write_u64(outer, VEC_LENGTH_OFFSET, count);
+            for (i, inner) in inners.iter().enumerate() {
+                write_ptr(outer, VEC_DATA_OFFSET + i * 8, inner.ptr());
+            }
+        }
+        // SAFETY: `outer` is a freshly allocated, live vector object.
+        Ok(Vector::from_handle(unsafe { self.pool.root_object(outer) }))
     }
 
     unsafe fn vector_move_range(

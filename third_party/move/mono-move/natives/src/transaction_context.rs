@@ -3,14 +3,14 @@
 
 //! Natives for the `transaction_context` module, plus the extension backing them.
 
-use crate::{
-    address_derivation::{auid_address, table_handle},
-    monomorphic_natives, NativeEntry,
-};
+use crate::{monomorphic_natives, NativeEntry};
+use aptos_types::transaction::authenticator::AuthenticationKey;
 use mono_move_core::{
     native::{NativeContext, NativeContextFamily, NativeExtension, NativeStatus, TableHandle},
     VMResult,
 };
+use move_core_types::account_address::AccountAddress;
+use sha3::{Digest, Sha3_256};
 
 /// Per-transaction context backing the `transaction_context` natives.
 //
@@ -61,6 +61,14 @@ impl TransactionContextExtension {
     }
 }
 
+/// Table handle: `sha3_256(txn_hash || table_count_be_u32)`.
+fn table_handle(txn_hash: &[u8], table_count: u32) -> TableHandle {
+    let mut hasher = Sha3_256::new();
+    hasher.update(txn_hash);
+    hasher.update(table_count.to_be_bytes());
+    TableHandle::new(AccountAddress::new(hasher.finalize().into()))
+}
+
 impl NativeExtension for TransactionContextExtension {
     unsafe fn relocate_roots(&mut self, _relocate: &mut dyn FnMut(*mut u8) -> Option<*mut u8>) {}
 
@@ -101,7 +109,8 @@ const INDEX_NOT_AVAILABLE_ABORT_CODE: u64 = (3 << 16) | 5;
 pub fn native_generate_unique_address<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     let mut ext = ctx.get_extension::<TransactionContextExtension>()?;
     ext.auid_counter += 1;
-    let address = auid_address(&ext.txn_hash, ext.auid_counter);
+    let address =
+        AuthenticationKey::auid(ext.txn_hash.to_vec(), ext.auid_counter).account_address();
     // SAFETY: return 0 is `address`.
     unsafe { ctx.set_return(0, address)? };
     Ok(NativeStatus::Success)
