@@ -5,7 +5,10 @@
 
 use crate::{
     logging::{LogEntry, LogSchema},
-    metrics::{APPLY_CHUNK, CHUNK_OTHER_TIMERS, COMMIT_CHUNK, CONCURRENCY_GAUGE, EXECUTE_CHUNK},
+    metrics::{
+        APPLY_CHUNK, CHUNK_EXECUTOR_NOT_RESET, CHUNK_OTHER_TIMERS, COMMIT_CHUNK, CONCURRENCY_GAUGE,
+        EXECUTE_CHUNK,
+    },
     types::{
         executed_chunk::ExecutedChunk, partial_state_compute_result::PartialStateComputeResult,
     },
@@ -21,7 +24,7 @@ use aptos_executor_types::{
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
-use aptos_metrics_core::{IntGaugeVecHelper, TimerHelper};
+use aptos_metrics_core::{IntCounterVecHelper, IntGaugeVecHelper, TimerHelper};
 use aptos_storage_interface::{
     state_store::{
         state::State,
@@ -96,6 +99,9 @@ fn chunk_onchain_config(state_view: &CachedStateView) -> Result<BlockExecutorCon
 pub struct ChunkExecutor<V> {
     db: DbReaderWriter,
     inner: RwLock<Option<ChunkExecutorInner<V>>>,
+    /// Set by `finish()`, cleared by `reset()`. Tells apart "handed off, reject further
+    /// work" from "not initialized yet, initialize on demand" -- both leave `inner` empty.
+    finished: AtomicBool,
 }
 
 impl<V: VMBlockExecutor> ChunkExecutor<V> {
@@ -103,22 +109,40 @@ impl<V: VMBlockExecutor> ChunkExecutor<V> {
         Self {
             db,
             inner: RwLock::new(None),
+            finished: AtomicBool::new(false),
         }
     }
 
     fn maybe_initialize(&self) -> Result<()> {
+        // Don't resurrect an executor that was handed off; `with_inner()` rejects instead.
+        if self.finished.load(Ordering::Acquire) {
+            return Ok(());
+        }
         if self.inner.read().is_none() {
             self.reset()?;
         }
         Ok(())
     }
 
-    fn with_inner<F, T>(&self, f: F) -> Result<T>
+    /// Runs `f` against the initialized inner executor.
+    ///
+    /// Errors out if the executor has been finished. State sync calls `finish()` the
+    /// moment it hands off to the continuous syncer or consensus, while chunks it
+    /// already queued in the storage synchronizer pipeline can still land afterwards.
+    /// Whoever takes over calls `reset()` and re-fetches from the committed version,
+    /// so dropping those chunks is safe.
+    fn with_inner<F, T>(&self, entry_point: &'static str, f: F) -> Result<T>
     where
         F: FnOnce(&ChunkExecutorInner<V>) -> Result<T>,
     {
         let locked = self.inner.read();
-        let inner = locked.as_ref().expect("not reset");
+        let Some(inner) = locked.as_ref() else {
+            CHUNK_EXECUTOR_NOT_RESET.inc_with(&[entry_point]);
+            return Err(anyhow!(
+                "Chunk executor has been finished, dropping {} request",
+                entry_point
+            ));
+        };
 
         let has_pending_pre_commit = inner.has_pending_pre_commit.load(Ordering::Acquire);
         f(inner).map_err(|error| {
@@ -133,7 +157,9 @@ impl<V: VMBlockExecutor> ChunkExecutor<V> {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.with_inner(|inner| Ok(inner.is_empty())).unwrap()
+        // A finished executor holds no queued chunks.
+        self.with_inner("is_empty", |inner| Ok(inner.is_empty()))
+            .unwrap_or(true)
     }
 }
 
@@ -179,7 +205,9 @@ impl<V: VMBlockExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         });
 
         // Call the shared implementation.
-        self.with_inner(|inner| inner.enqueue_chunk(chunk, chunk_verifier, "execute"))
+        self.with_inner("enqueue_by_execution", |inner| {
+            inner.enqueue_chunk(chunk, chunk_verifier, "execute")
+        })
     }
 
     fn enqueue_chunk_by_transaction_outputs(
@@ -223,32 +251,38 @@ impl<V: VMBlockExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         });
 
         // Call the shared implementation.
-        self.with_inner(|inner| inner.enqueue_chunk(chunk, chunk_verifier, "apply"))
+        self.with_inner("enqueue_by_outputs", |inner| {
+            inner.enqueue_chunk(chunk, chunk_verifier, "apply")
+        })
     }
 
     fn update_ledger(&self) -> Result<()> {
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["chunk", "update_ledger"]);
 
-        self.with_inner(|inner| inner.update_ledger())
+        self.with_inner("update_ledger", |inner| inner.update_ledger())
     }
 
     fn commit_chunk(&self) -> Result<ChunkCommitNotification> {
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["chunk", "commit_chunk"]);
 
-        self.with_inner(|inner| inner.commit_chunk())
+        self.with_inner("commit_chunk", |inner| inner.commit_chunk())
     }
 
     fn reset(&self) -> Result<()> {
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["chunk", "reset"]);
 
-        *self.inner.write() = Some(ChunkExecutorInner::new(self.db.clone())?);
+        let mut inner = self.inner.write();
+        *inner = Some(ChunkExecutorInner::new(self.db.clone())?);
+        self.finished.store(false, Ordering::Release);
         Ok(())
     }
 
     fn finish(&self) {
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["chunk", "finish"]);
 
-        *self.inner.write() = None;
+        let mut inner = self.inner.write();
+        self.finished.store(true, Ordering::Release);
+        *inner = None;
     }
 }
 

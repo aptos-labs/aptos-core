@@ -152,7 +152,7 @@ pub const NOT_IMPLEMENTED: u64 = 0xC;
 pub const UNAVAILABLE: u64 = 0xD;
 
 /// Construct a canonical error code from a category and a reason.
-pub fn canonical(category: u64, reason: u64) -> u64 {
+pub const fn canonical(category: u64, reason: u64) -> u64 {
     (category << 16) + reason
 }
 
@@ -162,40 +162,40 @@ pub fn split_canonical(code: u64) -> (u64, u64) {
 }
 
 /// Functions to construct a canonical error code of the given category.
-pub fn invalid_argument(r: u64) -> u64 {
+pub const fn invalid_argument(r: u64) -> u64 {
     canonical(INVALID_ARGUMENT, r)
 }
-pub fn out_of_range(r: u64) -> u64 {
+pub const fn out_of_range(r: u64) -> u64 {
     canonical(OUT_OF_RANGE, r)
 }
-pub fn invalid_state(r: u64) -> u64 {
+pub const fn invalid_state(r: u64) -> u64 {
     canonical(INVALID_STATE, r)
 }
-pub fn unauthenticated(r: u64) -> u64 {
+pub const fn unauthenticated(r: u64) -> u64 {
     canonical(UNAUTHENTICATED, r)
 }
-pub fn permission_denied(r: u64) -> u64 {
+pub const fn permission_denied(r: u64) -> u64 {
     canonical(PERMISSION_DENIED, r)
 }
-pub fn not_found(r: u64) -> u64 {
+pub const fn not_found(r: u64) -> u64 {
     canonical(NOT_FOUND, r)
 }
-pub fn aborted(r: u64) -> u64 {
+pub const fn aborted(r: u64) -> u64 {
     canonical(ABORTED, r)
 }
-pub fn already_exists(r: u64) -> u64 {
+pub const fn already_exists(r: u64) -> u64 {
     canonical(ALREADY_EXISTS, r)
 }
-pub fn resource_exhausted(r: u64) -> u64 {
+pub const fn resource_exhausted(r: u64) -> u64 {
     canonical(RESOURCE_EXHAUSTED, r)
 }
-pub fn internal(r: u64) -> u64 {
+pub const fn internal(r: u64) -> u64 {
     canonical(INTERNAL, r)
 }
-pub fn not_implemented(r: u64) -> u64 {
+pub const fn not_implemented(r: u64) -> u64 {
     canonical(NOT_IMPLEMENTED, r)
 }
-pub fn unavailable(r: u64) -> u64 {
+pub const fn unavailable(r: u64) -> u64 {
     canonical(UNAVAILABLE, r)
 }
 

@@ -1185,13 +1185,6 @@ impl ModuleBuilder<'_, '_> {
                 if !self.parent.const_table.contains_key(&qsym) {
                     continue;
                 }
-                if !self.test_language_version(
-                    &loc,
-                    "constant definitions referring to other constants",
-                    LanguageVersion::V2_0,
-                ) {
-                    continue;
-                }
                 if visited.contains(&const_name) {
                     continue;
                 }
@@ -1686,10 +1679,9 @@ impl ModuleBuilder<'_, '_> {
                 et.define_type_param(loc, *name, Type::new_param(pos), kind.clone(), false);
             }
             et.enter_scope();
-            let is_lang_version_2_1 = et.env().language_version.is_at_least(LanguageVersion::V2_1);
             for (idx, Parameter(n, ty, loc)) in params.iter().enumerate() {
                 let symbol_pool = et.parent.parent.env.symbol_pool();
-                if !is_lang_version_2_1 || symbol_pool.string(*n).as_ref() != "_" {
+                if symbol_pool.string(*n).as_ref() != "_" {
                     et.define_local(loc, *n, ty.clone(), None, Some(idx));
                 }
             }
@@ -5621,9 +5613,9 @@ impl ModuleBuilder<'_, '_> {
                 result_type: entry.result_type.clone(),
                 access_specifiers,
                 fun_param_access_of,
-                spec_used_memory: BTreeSet::new(),
-                spec_old_memory: BTreeSet::new(),
-                spec_uses_old: false,
+                spec_used_memory: std::cell::RefCell::new(BTreeSet::new()),
+                spec_old_memory: std::cell::RefCell::new(BTreeSet::new()),
+                spec_uses_old: std::cell::Cell::new(false),
                 acquired_structs: None,
                 spec: spec.into(),
                 def,
@@ -5661,9 +5653,9 @@ impl ModuleBuilder<'_, '_> {
                 result_type: Type::unit(),
                 access_specifiers: None,
                 fun_param_access_of: vec![],
-                spec_used_memory: BTreeSet::new(),
-                spec_old_memory: BTreeSet::new(),
-                spec_uses_old: false,
+                spec_used_memory: std::cell::RefCell::new(BTreeSet::new()),
+                spec_old_memory: std::cell::RefCell::new(BTreeSet::new()),
+                spec_uses_old: std::cell::Cell::new(false),
                 acquired_structs: None,
                 spec: spec.into(),
                 def: None,

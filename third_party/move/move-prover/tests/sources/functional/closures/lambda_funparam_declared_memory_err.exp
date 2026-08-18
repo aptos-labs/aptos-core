@@ -1,0 +1,6 @@
+Move prover returns: exiting with condition generation errors
+error: the specification of this function (used as a function value) applies a behavioral predicate to a function-typed parameter whose possible targets or declared `modifies_of`/`reads_of` footprints access global memory; this is not yet supported — give the lambda an explicit specification or exclude it from verification
+   ┌─ tests/sources/functional/closures/lambda_funparam_declared_memory_err.move:23:15
+   │
+23 │         apply(|x| g(x), a)
+   │               ^^^^^^^^

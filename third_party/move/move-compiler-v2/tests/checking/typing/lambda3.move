@@ -74,7 +74,7 @@ module 0x8675309::M {
     // }
 
     public fun lambda_not_allowed() {
-        let _x = |i| i + 1; // expected lambda not allowed
+        let _x: |u64|u64 has drop = |i| i + 1;
     }
 
     // struct FieldFunNotAllowed {

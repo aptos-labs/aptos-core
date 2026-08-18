@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{Options, COMPILER_BUG_REPORT_MSG};
+use crate::COMPILER_BUG_REPORT_MSG;
 use codespan_reporting::diagnostic::Severity;
 use ethnum::{I256, U256};
 use itertools::Itertools;
@@ -12,7 +12,6 @@ use move_model::{
         AbortKind, Exp, ExpData, MatchArm, Operation, Pattern, SpecBlockTarget, TempIndex, Value,
     },
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
-    metadata::LanguageVersion,
     model::{
         FieldId, FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, NodeId, Parameter, QualifiedId,
         QualifiedInstId, StructId,
@@ -358,26 +357,6 @@ impl<'env> Generator<'env> {
         let loc = env.get_node_loc(id);
         env.diag(severity, &loc, msg.as_ref())
     }
-
-    fn check_if_lambdas_enabled(&self) -> bool {
-        let options = self
-            .env()
-            .get_extension::<Options>()
-            .expect("Options is available");
-        options
-            .language_version
-            .unwrap_or_default()
-            .is_at_least(LanguageVersion::V2_2)
-    }
-
-    fn expect_function_values_enabled(&self, id: NodeId) {
-        if !self.check_if_lambdas_enabled() {
-            self.error(
-                id,
-                "function values outside of inline functions not supported in this language version",
-            )
-        }
-    }
 }
 
 // ======================================================================================
@@ -391,20 +370,11 @@ impl Generator<'_> {
             ExpData::Value(id, val) => self.gen_value(targets, *id, val),
             ExpData::LocalVar(id, name) => self.gen_local(targets, *id, *name),
             ExpData::Call(id, op, args) => self.gen_call(targets, *id, op, args),
-            ExpData::Invoke(id, fun, args) => {
-                self.expect_function_values_enabled(*id);
-                self.gen_invoke(targets, *id, fun, args)
-            },
-            ExpData::Lambda(id, ..) => {
-                if self.check_if_lambdas_enabled() {
-                    self.internal_error(
-                        *id,
-                        "unexpected lambda, expected to be eliminated by lambda lifting",
-                    )
-                } else {
-                    self.expect_function_values_enabled(*id)
-                }
-            },
+            ExpData::Invoke(id, fun, args) => self.gen_invoke(targets, *id, fun, args),
+            ExpData::Lambda(id, ..) => self.internal_error(
+                *id,
+                "unexpected lambda, expected to be eliminated by lambda lifting",
+            ),
             ExpData::Sequence(_, exps) => {
                 for step in exps.iter().take(exps.len() - 1) {
                     // Result is thrown away, but for typing reasons, we need to introduce
@@ -920,7 +890,6 @@ impl Generator<'_> {
                 self.gen_function_call(targets, id, m.qualified(*f), args)
             },
             Operation::Closure(mid, fid, mask) => {
-                self.expect_function_values_enabled(id);
                 let inst = self.env().get_node_instantiation(id);
                 debug_assert_eq!(
                     inst.len(),

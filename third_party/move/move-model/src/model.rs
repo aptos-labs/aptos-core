@@ -20,8 +20,8 @@ use crate::{
     ast::{
         AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, Attribute, Exp, ExpData,
         FrameSpec, FriendDecl, FunParamAccessOf, GlobalInvariant, LemmaDecl, LemmaId, MemoryLabel,
-        ModuleName, PropertyBag, PropertyValue, ResourceSpecifier, Spec, SpecBlockInfo,
-        SpecBlockTarget, SpecFunDecl, SpecVarDecl, UseDecl, Value,
+        ModuleName, Operation, PropertyBag, PropertyValue, ResourceSpecifier, Spec, SpecBlockInfo,
+        SpecBlockTarget, SpecFunDecl, SpecVarDecl, UseDecl, Value, VisitorPosition,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -77,7 +77,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     any::{Any, TypeId},
     backtrace::{Backtrace, BacktraceStatus},
-    cell::{Ref, RefCell, RefMut},
+    cell::{Cell, Ref, RefCell, RefMut},
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet, VecDeque},
     ffi::OsStr,
@@ -2466,9 +2466,9 @@ impl GlobalEnv {
             result_type,
             access_specifiers: None,
             fun_param_access_of: vec![],
-            spec_used_memory: BTreeSet::new(),
-            spec_old_memory: BTreeSet::new(),
-            spec_uses_old: false,
+            spec_used_memory: RefCell::new(BTreeSet::new()),
+            spec_old_memory: RefCell::new(BTreeSet::new()),
+            spec_uses_old: Cell::new(false),
             acquired_structs: None,
             spec: RefCell::new(spec_opt.unwrap_or_default()),
             def: Some(def),
@@ -2538,9 +2538,9 @@ impl GlobalEnv {
             result_type,
             access_specifiers: None,
             fun_param_access_of: vec![],
-            spec_used_memory: BTreeSet::new(),
-            spec_old_memory: BTreeSet::new(),
-            spec_uses_old: false,
+            spec_used_memory: RefCell::new(BTreeSet::new()),
+            spec_old_memory: RefCell::new(BTreeSet::new()),
+            spec_uses_old: Cell::new(false),
             acquired_structs: None,
             spec: RefCell::new(spec_opt.unwrap_or_default()),
             def: Some(def),
@@ -2737,9 +2737,9 @@ impl GlobalEnv {
             .function_data
             .get_mut(&qid.id)
             .expect("function data exists");
-        data.spec_used_memory = spec_used_memory;
-        data.spec_old_memory = spec_old_memory;
-        data.spec_uses_old = spec_uses_old;
+        data.spec_used_memory = RefCell::new(spec_used_memory);
+        data.spec_old_memory = RefCell::new(spec_old_memory);
+        data.spec_uses_old = Cell::new(spec_uses_old);
     }
 
     /// Sets derived memory on a function parameter's access_of entry.
@@ -5179,12 +5179,14 @@ pub struct FunctionData {
     pub(crate) fun_param_access_of: Vec<FunParamAccessOf>,
 
     /// Memory used by this function's spec conditions (requires, ensures, aborts_if).
-    /// Computed during the spec_rewriter pass.
-    pub(crate) spec_used_memory: BTreeSet<QualifiedInstId<StructId>>,
+    /// Computed during the spec_rewriter pass; interior-mutable because a spec
+    /// attached later (lambda spec inference runs inside the prover pipeline,
+    /// with only shared access to the env) must refresh it.
+    pub(crate) spec_used_memory: RefCell<BTreeSet<QualifiedInstId<StructId>>>,
     /// Resources accessed in old() contexts within spec conditions.
-    pub(crate) spec_old_memory: BTreeSet<QualifiedInstId<StructId>>,
+    pub(crate) spec_old_memory: RefCell<BTreeSet<QualifiedInstId<StructId>>>,
     /// Whether any spec condition uses old() or the function has &mut params.
-    pub(crate) spec_uses_old: bool,
+    pub(crate) spec_uses_old: Cell<bool>,
 
     /// Acquires information, if available. This is either inferred or annotated by the
     /// user via a legacy acquires declaration.
@@ -5296,9 +5298,9 @@ impl FunctionData {
             result_type: Type::unit(),
             access_specifiers: None,
             fun_param_access_of: vec![],
-            spec_used_memory: BTreeSet::new(),
-            spec_old_memory: BTreeSet::new(),
-            spec_uses_old: false,
+            spec_used_memory: RefCell::new(BTreeSet::new()),
+            spec_old_memory: RefCell::new(BTreeSet::new()),
+            spec_uses_old: Cell::new(false),
             acquired_structs: None,
             spec: RefCell::new(Default::default()),
             def: None,
@@ -5948,18 +5950,130 @@ impl<'env> FunctionEnv<'env> {
     }
 
     /// Returns memory used by this function's spec conditions.
-    pub fn get_spec_used_memory(&self) -> &BTreeSet<QualifiedInstId<StructId>> {
-        &self.data.spec_used_memory
+    pub fn get_spec_used_memory(&self) -> Ref<'_, BTreeSet<QualifiedInstId<StructId>>> {
+        self.data.spec_used_memory.borrow()
     }
 
     /// Returns memory accessed in old() contexts within spec conditions.
-    pub fn get_spec_old_memory(&self) -> &BTreeSet<QualifiedInstId<StructId>> {
-        &self.data.spec_old_memory
+    pub fn get_spec_old_memory(&self) -> Ref<'_, BTreeSet<QualifiedInstId<StructId>>> {
+        self.data.spec_old_memory.borrow()
     }
 
     /// Returns whether any spec condition uses old() or function has &mut params.
     pub fn spec_uses_old(&self) -> bool {
-        self.data.spec_uses_old
+        self.data.spec_uses_old.get()
+    }
+
+    /// Sets this function's spec memory summaries through interior mutability.
+    /// Used when a spec is attached after the compiler's spec rewriter ran
+    /// (lambda spec inference), so the summaries stay consistent with the
+    /// spec's conditions.
+    pub fn set_spec_memory_usage(
+        &self,
+        used: BTreeSet<QualifiedInstId<StructId>>,
+        old: BTreeSet<QualifiedInstId<StructId>>,
+        uses_old: bool,
+    ) {
+        *self.data.spec_used_memory.borrow_mut() = used;
+        *self.data.spec_old_memory.borrow_mut() = old;
+        self.data.spec_uses_old.set(uses_old);
+    }
+
+    /// Computes this function's spec memory summaries from its CURRENT spec
+    /// conditions. Mirrors the condition-level collection of the compiler's
+    /// spec rewriter (`spec_rewriter.rs`, which persists the summaries once at
+    /// model-build time), and additionally resolves behavioral references to
+    /// concrete closure targets — those arise only in inferred lambda specs,
+    /// and evaluating `aborts_of`/`ensures_of` of a target includes the
+    /// target's spec memory. The targets' own summaries must already be
+    /// final: named functions get them from the rewriter, and callee lambdas
+    /// are processed before their callers (call-graph order).
+    pub fn compute_spec_memory_usage(
+        &self,
+    ) -> (
+        BTreeSet<QualifiedInstId<StructId>>,
+        BTreeSet<QualifiedInstId<StructId>>,
+        bool,
+    ) {
+        let env = self.module_env.env;
+        let spec = self.get_spec();
+        let mut used = BTreeSet::new();
+        let mut old = BTreeSet::new();
+        for cond in &spec.conditions {
+            for exp in std::iter::once(&cond.exp).chain(&cond.additional_exps) {
+                used.extend(exp.directly_used_memory(env));
+                // Direct old() usage (mirrors the rewriter's
+                // `compute_direct_old_usage`).
+                let mut in_old_depth: usize = 0;
+                exp.visit_positions(&mut |pos, e| {
+                    match e {
+                        ExpData::Call(_, Operation::Old, _) => match pos {
+                            VisitorPosition::Pre => in_old_depth += 1,
+                            VisitorPosition::Post => in_old_depth -= 1,
+                            _ => {},
+                        },
+                        ExpData::Call(id, Operation::Global(_), _)
+                        | ExpData::Call(id, Operation::Exists(_), _)
+                            if in_old_depth > 0 && matches!(pos, VisitorPosition::Pre) =>
+                        {
+                            let inst = &env.get_node_instantiation(*id);
+                            let (mid, sid, sinst) = inst[0].require_struct();
+                            old.insert(mid.qualified_inst(sid, sinst.to_owned()));
+                        },
+                        ExpData::Call(
+                            id,
+                            Operation::SpecPublish(_)
+                            | Operation::SpecRemove(_)
+                            | Operation::SpecUpdate(_),
+                            _,
+                        ) if matches!(pos, VisitorPosition::Pre) => {
+                            let inst = &env.get_node_instantiation(*id);
+                            let (mid, sid, sinst) = inst[0].require_struct();
+                            old.insert(mid.qualified_inst(sid, sinst.to_owned()));
+                        },
+                        _ => {},
+                    }
+                    true
+                });
+                exp.visit_post_order(&mut |e: &ExpData| {
+                    match e {
+                        // Spec fun callees using old() need pre-state snapshots.
+                        ExpData::Call(id, Operation::SpecFunction(mid, fid, _), _) => {
+                            let inst = &env.get_node_instantiation(*id);
+                            let module = env.get_module(*mid);
+                            let sfun = module.get_spec_fun(*fid);
+                            for mem in &sfun.old_memory {
+                                old.insert(mem.clone().instantiate(inst));
+                            }
+                        },
+                        // Behavioral predicate over a concrete closure target:
+                        // its evaluator is defined over the target's memory.
+                        ExpData::Call(_, Operation::Behavior(..), args) => {
+                            if let Some(ExpData::Call(cid, Operation::Closure(mid, fid, _), _)) =
+                                args.first().map(|a| a.as_ref())
+                            {
+                                let target = env.get_function(mid.qualified(*fid));
+                                let inst = env.get_node_instantiation(*cid);
+                                for mem in target.get_spec_used_memory().iter() {
+                                    used.insert(mem.clone().instantiate(&inst));
+                                }
+                                for mem in target.get_spec_old_memory().iter() {
+                                    old.insert(mem.clone().instantiate(&inst));
+                                }
+                            }
+                        },
+                        _ => {},
+                    }
+                    true
+                });
+            }
+        }
+        let has_mut_params = self
+            .get_parameters()
+            .iter()
+            .any(|Parameter(_, ty, _)| ty.is_mutable_reference());
+        let uses_old = !old.is_empty() || has_mut_params;
+        (used, old, uses_old)
     }
 
     /// Returns the inferred acquired structs of this function. This is checked

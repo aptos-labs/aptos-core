@@ -60,7 +60,6 @@ use move_binary_format::errors::VMError;
 use move_bytecode_source_map::source_map::SourceMap;
 use move_core_types::vm_status::StatusType;
 use move_model::{
-    metadata::LanguageVersion,
     model::{GlobalEnv, Loc, MoveIrLoc},
     PackageInfo,
 };
@@ -418,10 +417,6 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
             "unused checks",
             flow_insensitive_checkers::check_for_unused_vars_and_params,
         );
-        env_pipeline.add(
-            "type parameter check",
-            function_checker::check_for_function_typed_parameters,
-        );
     }
 
     if options.experiment_on(Experiment::NATIVE_CHECK) {
@@ -463,14 +458,7 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
         env_pipeline.add("model AST lints", model_ast_lints::checker);
     }
 
-    // The comparison rewriter is a new features in Aptos Move 2.2 and onwards
-    let rewrite_cmp = options
-        .language_version
-        .unwrap_or_default()
-        .is_at_least(LanguageVersion::V2_2)
-        && options.experiment_on(Experiment::CMP_REWRITE);
-
-    if rewrite_cmp {
+    if options.experiment_on(Experiment::CMP_REWRITE) {
         env_pipeline.add("rewrite comparison operations", |env| {
             // This rewrite is suggested to run before inlining to avoid repeated rewriting
             cmp_rewriter::rewrite(env);
@@ -531,31 +519,19 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
         });
     }
 
-    if options
-        .language_version
-        .unwrap_or_default()
-        .is_at_least(LanguageVersion::V2_2)
-    {
-        let include_inline_functions = options.experiment_on(Experiment::LAMBDA_LIFTING_INLINE);
-        env_pipeline.add("lambda-lifting", move |env: &mut GlobalEnv| {
-            lambda_lifter::lift_lambdas(
-                LambdaLiftingOptions {
-                    include_inline_functions,
-                },
-                env,
-            )
-        });
-    }
+    let include_inline_functions = options.experiment_on(Experiment::LAMBDA_LIFTING_INLINE);
+    env_pipeline.add("lambda-lifting", move |env: &mut GlobalEnv| {
+        lambda_lifter::lift_lambdas(
+            LambdaLiftingOptions {
+                include_inline_functions,
+            },
+            env,
+        )
+    });
 
-    if options
-        .language_version
-        .unwrap_or_default()
-        .is_at_least(LanguageVersion::V2_2)
-    {
-        env_pipeline.add("closure-checker", |env: &mut GlobalEnv| {
-            closure_checker::check_closures(env)
-        });
-    }
+    env_pipeline.add("closure-checker", |env: &mut GlobalEnv| {
+        closure_checker::check_closures(env)
+    });
 
     if options.experiment_on(Experiment::SPEC_CHECK) {
         env_pipeline.add("specification checker", |env| {
