@@ -341,66 +341,11 @@ move_module Loops where
     intro _ _ n initial _
     exact Move.Verify.wp_of_satisfies loopVerified trivial
 
-  verify labeledProof by
-    unfold labeledProof.contract labeledProof.sourceSpec
-    intro State
-    apply Move.Verify.satisfies_fix
-    intro outer outerVerified
-    apply Move.Verify.satisfies_fix
-    intro inner innerVerified
-    unfold Move.Verify.Satisfies at *
-    intro args initial _
-    cases args
-    constructor <;> intros <;>
-      simp_all [Move.Semantics.Spec.pure]
+  verify labeledProof
 
-  verify shadowedLoopState by
-    unfold shadowedLoopState.contract shadowedLoopState.sourceSpec
-    intro State n initial _
-    constructor
-    · intro result final execution
-      rcases execution with ⟨fuel, execution⟩
-      cases fuel with
-      | zero => simp [Move.Semantics.Spec.fixApprox,
-          Move.Semantics.Spec.bottom] at execution
-      | succ fuel =>
-          simp only [Move.Semantics.Spec.fixApprox,
-            Move.Semantics.Spec.pure_bind,
-            Move.Semantics.Spec.pure_ok] at execution
-          exact execution.1
-    · intro code execution
-      rcases execution with ⟨fuel, execution⟩
-      cases fuel with
-      | zero => simp [Move.Semantics.Spec.fixApprox,
-          Move.Semantics.Spec.bottom] at execution
-      | succ fuel =>
-          simp only [Move.Semantics.Spec.fixApprox,
-            Move.Semantics.Spec.pure_bind,
-            Move.Semantics.Spec.pure_aborts] at execution
+  verify shadowedLoopState
 
-  verify shadowedLoopArrow by
-    unfold shadowedLoopArrow.contract shadowedLoopArrow.sourceSpec
-    intro State n initial _
-    constructor
-    · intro result final execution
-      rcases execution with ⟨fuel, execution⟩
-      cases fuel with
-      | zero => simp [Move.Semantics.Spec.fixApprox,
-          Move.Semantics.Spec.bottom] at execution
-      | succ fuel =>
-          simp only [Move.Semantics.Spec.fixApprox,
-            Move.Semantics.Spec.pure_bind,
-            Move.Semantics.Spec.pure_ok] at execution
-          grind
-    · intro code execution
-      rcases execution with ⟨fuel, execution⟩
-      cases fuel with
-      | zero => simp [Move.Semantics.Spec.fixApprox,
-          Move.Semantics.Spec.bottom] at execution
-      | succ fuel =>
-          simp only [Move.Semantics.Spec.fixApprox,
-            Move.Semantics.Spec.pure_bind,
-            Move.Semantics.Spec.pure_aborts] at execution
+  verify shadowedLoopArrow
 
   verify drain by
     unfold drain.contract drain.sourceSpec
