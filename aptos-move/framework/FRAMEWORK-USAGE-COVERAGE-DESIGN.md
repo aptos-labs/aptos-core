@@ -352,6 +352,11 @@ replay-on-archive's legacy write-mode initialization. This permits analysis of
 read-only archive mounts and prevents the tool from creating newly introduced
 database directories as a side effect.
 
+In the example, `/mnt/archive/db` is the database mount inside the replay CI
+worker. A local invocation must replace it with the root of an existing,
+unpruned Aptos archive database; the repository does not include a mainnet
+archive fixture.
+
 The existing archive replay loop should be extracted into a shared internal
 runner with an optional transaction-result consumer. Both replay verify and
 framework usage then use the same transaction loading, epoch boundary handling,

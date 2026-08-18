@@ -20,6 +20,7 @@ use aptos_types::{
         transaction_slice_metadata::TransactionSliceMetadata,
     },
     contract_event::ContractEvent,
+    state_store::NUM_STATE_SHARDS,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockOutput,
         PersistedAuxiliaryInfo, Transaction, TransactionInfo, Version,
@@ -37,7 +38,7 @@ use clap::Parser;
 use rayon::{iter::ParallelIterator, prelude::IntoParallelIterator};
 use std::{
     panic,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process,
     sync::{atomic::AtomicU64, Arc},
     time::Instant,
@@ -199,6 +200,8 @@ struct Verifier {
 
 impl Verifier {
     pub fn new(config: &Opt, function_usage: Option<Arc<FrameworkUsageCollector>>) -> Result<Self> {
+        validate_archive_db_dir(&config.db_dir)?;
+
         // Replay-on-archive historically opens in write mode once to create any DBs introduced by
         // a newer binary. Framework usage is an analysis of an existing archive and must remain
         // read-only: archive snapshots are commonly mounted without write permission, and this
@@ -481,5 +484,53 @@ impl Verifier {
         expected_writesets.clear();
 
         Ok(None)
+    }
+}
+
+fn validate_archive_db_dir(db_dir: &Path) -> Result<()> {
+    anyhow::ensure!(
+        db_dir.is_dir(),
+        "archive database directory {:?} does not exist; --target-db-dir must point to an existing Aptos archive DB (`/mnt/archive/db` is the mount used inside replay CI pods)",
+        db_dir
+    );
+
+    let state_kv_dir = db_dir.join("state_kv_db");
+    let missing_shards = (0..NUM_STATE_SHARDS)
+        .filter(|shard| !state_kv_dir.join(format!("shard_{shard}")).is_dir())
+        .collect::<Vec<_>>();
+    anyhow::ensure!(
+        missing_shards.is_empty(),
+        "archive database {:?} is missing state KV shard directories {:?}; check that --target-db-dir points to the DB root and that the archive snapshot is complete",
+        db_dir,
+        missing_shards
+    );
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn archive_db_layout_validation_reports_missing_paths() {
+        let temp_dir = aptos_temppath::TempPath::new();
+        let missing_root = temp_dir.path().join("missing");
+        let error = validate_archive_db_dir(&missing_root).unwrap_err();
+        assert!(error.to_string().contains("does not exist"));
+
+        temp_dir.create_as_dir().unwrap();
+        let error = validate_archive_db_dir(temp_dir.path()).unwrap_err();
+        assert!(error.to_string().contains("missing state KV shard"));
+
+        for shard in 0..NUM_STATE_SHARDS {
+            std::fs::create_dir_all(
+                temp_dir
+                    .path()
+                    .join("state_kv_db")
+                    .join(format!("shard_{shard}")),
+            )
+            .unwrap();
+        }
+        validate_archive_db_dir(temp_dir.path()).unwrap();
     }
 }
