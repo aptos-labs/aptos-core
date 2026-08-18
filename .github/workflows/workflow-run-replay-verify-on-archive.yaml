@@ -42,6 +42,10 @@ on:
         required: false
         type: string
         description: GCS bucket used for framework usage shards.
+      REPORT_BUCKET:
+        required: false
+        type: string
+        description: Public GCS bucket used to publish the rendered HTML report.
 
   workflow_dispatch:
     inputs:
@@ -83,6 +87,10 @@ on:
         required: false
         type: string
         description: GCS bucket used for framework usage shards.
+      REPORT_BUCKET:
+        required: false
+        type: string
+        description: Public GCS bucket used to publish the rendered HTML report.
 permissions:
   contents: read
 
@@ -234,6 +242,45 @@ jobs:
           name: framework-usage-${{ inputs.NETWORK }}-${{ github.run_id }}
           path: framework-usage-results/
           if-no-files-found: error
+
+      - name: Publish framework usage HTML
+        if: ${{ inputs.DRY_RUN == false && inputs.FRAMEWORK_USAGE && inputs.REPORT_BUCKET != '' }}
+        env:
+          NETWORK: ${{ inputs.NETWORK }}
+          REPORT_BUCKET: ${{ inputs.REPORT_BUCKET }}
+        run: |
+          REPORT_JSON="framework-usage-results/framework-usage.json"
+          REPORT_HTML="framework-usage-results/framework-usage.html"
+          OBJECT_PATH="framework-usage/${NETWORK}/runs/${GITHUB_RUN_ID}/attempt-${GITHUB_RUN_ATTEMPT}/index.html"
+          REPORT_URL="https://storage.googleapis.com/${REPORT_BUCKET}/${OBJECT_PATH}"
+
+          gcloud storage cp "$REPORT_HTML" "gs://${REPORT_BUCKET}/${OBJECT_PATH}" \
+            --content-type="text/html; charset=utf-8" \
+            --content-disposition=inline \
+            --cache-control="public,max-age=31536000,immutable"
+
+          START_VERSION="$(jq -r '.start_version' "$REPORT_JSON")"
+          END_VERSION="$(jq -r '.end_version' "$REPORT_JSON")"
+          TRANSACTION_COUNT="$(jq -r '.processed_transaction_count' "$REPORT_JSON")"
+          START_TIMESTAMP_USECS="$(jq -r '.start_timestamp_usecs' "$REPORT_JSON")"
+          END_TIMESTAMP_USECS="$(jq -r '.end_timestamp_usecs' "$REPORT_JSON")"
+          START_TIMESTAMP="$(date --utc --date="@$((START_TIMESTAMP_USECS / 1000000))" '+%Y-%m-%d %H:%M:%S UTC')"
+          END_TIMESTAMP="$(date --utc --date="@$((END_TIMESTAMP_USECS / 1000000))" '+%Y-%m-%d %H:%M:%S UTC')"
+
+          {
+            echo "## Framework function usage report"
+            echo
+            echo "### [Open interactive HTML report](${REPORT_URL})"
+            echo
+            echo "| Property | Value |"
+            echo "| --- | --- |"
+            echo "| Network | ${NETWORK} |"
+            echo "| Ledger versions | ${START_VERSION}&ndash;${END_VERSION} |"
+            echo "| UTC range | ${START_TIMESTAMP}&ndash;${END_TIMESTAMP} |"
+            echo "| Transactions processed | ${TRANSACTION_COUNT} |"
+            echo "| Run attempt | ${GITHUB_RUN_ATTEMPT} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       # This is in case user manually cancel the step above, we still want to cleanup the resources
       - name: Post-run cleanup
         env:

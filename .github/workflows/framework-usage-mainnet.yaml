@@ -27,6 +27,11 @@ on:
         required: false
         type: string
         description: Optional GCS bucket; required for ranges over 10,000 transactions.
+      REPORT_BUCKET:
+        required: false
+        type: string
+        description: Public GCS bucket for the rendered HTML report.
+        default: aptos-framework-usage-reports
       DRY_RUN:
         required: false
         type: boolean
@@ -54,4 +59,5 @@ jobs:
       END_TIME: ${{ inputs.END_TIME }}
       FRAMEWORK_USAGE: true
       RESULTS_BUCKET: ${{ inputs.RESULTS_BUCKET }}
+      REPORT_BUCKET: ${{ inputs.REPORT_BUCKET }}
       DRY_RUN: ${{ inputs.DRY_RUN || false }}

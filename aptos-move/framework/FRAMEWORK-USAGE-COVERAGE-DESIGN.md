@@ -407,6 +407,7 @@ Inputs mirror replay verify:
 - `START_VERSION` and `END_VERSION`
 - `START_TIME` and `END_TIME`
 - `RESULTS_BUCKET`
+- `REPORT_BUCKET`
 - `DRY_RUN`
 
 Version and time inputs remain mutually exclusive. UTC times are resolved to
@@ -439,6 +440,13 @@ The final GitHub Actions artifact contains:
 - `framework-usage-callers.csv`: immediate and root contract caller breakdown
 - `framework-usage.json`: complete per-function and immediate/root caller
   aggregates plus run metadata
+
+When `REPORT_BUCKET` is set, the workflow also publishes the self-contained
+HTML under a path unique to the workflow run and retry attempt. The Actions job
+summary links directly to that rendered report and shows its resolved UTC time
+range, ledger-version range, and processed transaction count. The bucket grants
+CI object-creation access and public object-read access; raw JSON and CSV files
+remain available only through the Actions artifact.
 
 When a result bucket is used, it should have a lifecycle policy. CI cleanup
 always removes pods and temporary PVCs, while completed workflow artifacts
