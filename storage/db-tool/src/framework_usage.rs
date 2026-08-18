@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::replay_on_archive;
+use crate::{framework_usage_html, replay_on_archive};
 use anyhow::{Context, Result};
 use aptos_crypto::HashValue;
 use aptos_types::transaction::{ExecutionStatus, TransactionStatus, Version};
@@ -30,11 +30,26 @@ pub struct Opt {
 
     #[clap(long, value_parser, help = "Path to the framework usage JSON report")]
     output: PathBuf,
+
+    #[clap(
+        long,
+        value_parser,
+        help = "Optional path for a self-contained HTML deprecation analysis report"
+    )]
+    html_output: Option<PathBuf>,
 }
 
 impl Opt {
     pub async fn run(self) -> Result<()> {
-        self.replay.run_with_function_usage(self.output).await
+        if let Some(html_output) = &self.html_output {
+            anyhow::ensure!(
+                html_output != &self.output,
+                "--output and --html-output must be different paths"
+            );
+        }
+        self.replay
+            .run_with_function_usage(self.output, self.html_output)
+            .await
     }
 }
 
@@ -227,7 +242,7 @@ impl FrameworkUsageCollector {
         Ok(())
     }
 
-    pub(crate) fn write_report(&self, output: &Path) -> Result<()> {
+    pub(crate) fn write_report(&self, output: &Path, html_output: Option<&Path>) -> Result<()> {
         let state = self.lock_state();
         anyhow::ensure!(
             state.pending.is_empty(),
@@ -266,23 +281,32 @@ impl FrameworkUsageCollector {
                 .collect(),
         };
 
-        let parent = output.parent().unwrap_or_else(|| Path::new("."));
-        anyhow::ensure!(
-            parent.exists(),
-            "output directory {:?} does not exist",
-            parent
-        );
-        let tmp_output = output.with_extension("tmp");
-        let writer = BufWriter::new(
-            File::create(&tmp_output)
-                .with_context(|| format!("creating temporary report {:?}", tmp_output))?,
-        );
-        serde_json::to_writer_pretty(writer, &report)
-            .context("serializing framework usage report")?;
-        std::fs::rename(&tmp_output, output)
-            .with_context(|| format!("renaming report {:?} to {:?}", tmp_output, output))?;
+        write_json_report(output, &report)?;
+        if let Some(html_output) = html_output {
+            let report_json = serde_json::to_string(&report)
+                .context("serializing framework usage data for HTML report")?;
+            framework_usage_html::write(html_output, &report_json)?;
+        }
         Ok(())
     }
+}
+
+fn write_json_report(output: &Path, report: &FrameworkUsageReport) -> Result<()> {
+    let parent = output.parent().unwrap_or_else(|| Path::new("."));
+    anyhow::ensure!(
+        parent.exists(),
+        "output directory {:?} does not exist",
+        parent
+    );
+    let tmp_output = output.with_extension("tmp");
+    let writer = BufWriter::new(
+        File::create(&tmp_output)
+            .with_context(|| format!("creating temporary report {:?}", tmp_output))?,
+    );
+    serde_json::to_writer_pretty(writer, report).context("serializing framework usage report")?;
+    std::fs::rename(&tmp_output, output)
+        .with_context(|| format!("renaming report {:?} to {:?}", tmp_output, output))?;
+    Ok(())
 }
 
 fn merge_usage_counts<K: Ord>(
@@ -374,12 +398,17 @@ mod tests {
         let output_dir = aptos_temppath::TempPath::new();
         output_dir.create_as_dir().unwrap();
         let output = output_dir.path().join("usage.json");
-        collector.write_report(&output).unwrap();
+        let html_output = output_dir.path().join("usage.html");
+        collector.write_report(&output, Some(&html_output)).unwrap();
         let report: serde_json::Value =
             serde_json::from_reader(File::open(output).unwrap()).unwrap();
         assert_eq!(report["schema_version"], SCHEMA_VERSION);
         assert_eq!(report["processed_transaction_count"], 11);
         assert_eq!(report["function_usage"][0]["invocation_count"], 2);
         assert_eq!(report["usage"][0]["transaction_count"], 1);
+        let html = std::fs::read_to_string(html_output).unwrap();
+        assert!(html.contains("Framework deprecation evidence"));
+        assert!(html.contains("target"));
+        assert!(html.contains("report-data"));
     }
 }

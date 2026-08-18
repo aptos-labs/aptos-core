@@ -335,8 +335,16 @@ aptos-debugger aptos-db framework-usage \
   --end-version 1999999 \
   --target-db-dir /mnt/archive/db \
   --output /tmp/framework-usage-1000000-1999999.json \
+  --html-output /tmp/framework-usage-1000000-1999999.html \
   --replay-concurrency-level 1
 ```
+
+`--html-output` is optional. When present, the command writes a self-contained,
+interactive report alongside the machine-readable JSON. The view puts
+unobserved and rarely observed externally callable functions first, supports
+search and visibility filters, and exposes immediate caller and root payload
+paths. Its classifications are evidence for review rather than automated
+removal decisions.
 
 The existing archive replay loop should be extracted into a shared internal
 runner with an optional transaction-result consumer. Both replay verify and
@@ -410,6 +418,7 @@ The merge step rejects:
 
 The final GitHub Actions artifact contains:
 
+- `framework-usage.html`: self-contained interactive deprecation evidence view
 - `framework-usage-summary.csv`: one row per framework function, including zero
   counts
 - `framework-usage-callers.csv`: immediate and root contract caller breakdown

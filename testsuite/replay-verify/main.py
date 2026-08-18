@@ -1497,6 +1497,30 @@ def merge_framework_usage_reports(
         json.dump(merged, output, indent=2)
         output.write("\n")
 
+    template_path = os.path.abspath(
+        os.path.join(
+            os.path.dirname(__file__),
+            "../../storage/db-tool/src/framework_usage_template.html",
+        )
+    )
+    with open(template_path) as template_file:
+        html = template_file.read()
+    embedded_json = json.dumps(merged, separators=(",", ":"))
+    for character, escape in (
+        ("&", r"\u0026"),
+        ("<", r"\u003c"),
+        (">", r"\u003e"),
+        ("\u2028", r"\u2028"),
+        ("\u2029", r"\u2029"),
+    ):
+        embedded_json = embedded_json.replace(character, escape)
+    marker = "__FRAMEWORK_USAGE_REPORT__"
+    if html.count(marker) != 1:
+        raise RuntimeError("framework usage HTML template has an invalid report marker")
+    html_path = os.path.join(output_dir, "framework-usage.html")
+    with open(html_path, "w") as output:
+        output.write(html.replace(marker, embedded_json))
+
     totals: dict[str, dict] = {}
     for row in merged["function_usage"]:
         encoded_callee = json.dumps(row["callee"], sort_keys=True)

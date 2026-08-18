@@ -7,6 +7,7 @@ mod backup;
 mod backup_maintenance;
 mod bootstrap;
 mod framework_usage;
+mod framework_usage_html;
 mod gen_replay_verify_jobs;
 mod replay_on_archive;
 mod replay_verify;

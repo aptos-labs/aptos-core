@@ -96,7 +96,11 @@ impl Opt {
         self.run_impl(None).await
     }
 
-    pub(crate) async fn run_with_function_usage(self, output: PathBuf) -> Result<()> {
+    pub(crate) async fn run_with_function_usage(
+        self,
+        output: PathBuf,
+        html_output: Option<PathBuf>,
+    ) -> Result<()> {
         anyhow::ensure!(
             self.replay_concurrency_level.get() == 1,
             "framework usage replay requires --replay-concurrency-level 1"
@@ -106,14 +110,17 @@ impl Opt {
             self.end_version,
         ));
         let _sink_guard = install_function_usage_sink(collector.clone())?;
-        self.run_impl(Some((collector, output))).await
+        self.run_impl(Some((collector, output, html_output))).await
     }
 
     async fn run_impl(
         self,
-        function_usage: Option<(Arc<FrameworkUsageCollector>, PathBuf)>,
+        function_usage: Option<(Arc<FrameworkUsageCollector>, PathBuf, Option<PathBuf>)>,
     ) -> Result<()> {
-        let verifier = Verifier::new(&self, function_usage.as_ref().map(|(sink, _)| sink.clone()))?;
+        let verifier = Verifier::new(
+            &self,
+            function_usage.as_ref().map(|(sink, _, _)| sink.clone()),
+        )?;
         if function_usage.is_some() {
             let expected_limit = self
                 .end_version
@@ -133,9 +140,9 @@ impl Opt {
             }
             process::exit(2);
         }
-        if let Some((collector, output)) = function_usage {
-            collector.write_report(&output)?;
-            info!(output = ?output, "Wrote framework usage report.");
+        if let Some((collector, output, html_output)) = function_usage {
+            collector.write_report(&output, html_output.as_deref())?;
+            info!(output = ?output, html_output = ?html_output, "Wrote framework usage report.");
         }
         Ok(())
     }
