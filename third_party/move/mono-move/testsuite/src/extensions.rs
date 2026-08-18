@@ -12,6 +12,7 @@ use mono_move_natives::{
 // natives (AUID generation, state-storage usage, ...) produce matching output
 // across the two engines.
 pub(crate) const TEST_TXN_HASH: [u8; 32] = [7u8; 32];
+pub(crate) const TEST_CHAIN_ID: u8 = 4;
 pub(crate) const TEST_STATE_ITEMS: u64 = 100;
 pub(crate) const TEST_STATE_BYTES: u64 = 2000;
 // Inputs to the monotonically-increasing counter. The reserved byte is 0,
@@ -25,6 +26,7 @@ pub(crate) fn seed_extensions() -> NativeExtensions {
     let mut extensions = NativeExtensions::new();
     extensions.add(TransactionContextExtension::new(
         TEST_TXN_HASH,
+        TEST_CHAIN_ID,
         TEST_SESSION_COUNTER,
         Some((TEST_TXN_INDEX, TEST_RESERVED_BYTE)),
     ));
