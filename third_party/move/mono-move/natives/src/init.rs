@@ -4,6 +4,7 @@
 //! Natives for the `init` module, backing lazy module initialization.
 
 use crate::{monomorphic_natives, NativeEntry};
+use aptos_types::error;
 use mono_move_core::{
     native::{NativeContext, NativeContextFamily, NativeStatus},
     types::view_name,
@@ -11,15 +12,15 @@ use mono_move_core::{
 };
 use sha3::{Digest, Sha3_256};
 
-/// `error::invalid_argument(EINVALID_INITIALIZE_CALLER)`, where the Move-side
-/// constant is `0x1` (category 1, reason 1).
-const EINVALID_INITIALIZE_CALLER: u64 = (1 << 16) | 1;
+/// Matches the Move-side `EINVALID_INITIALIZE_CALLER` in `0x1::init.move`.
+const EINVALID_INITIALIZE_CALLER: u64 = error::invalid_argument(1);
 
 /// `0x1::init::get_caller_address_and_module_id(): (address, ModuleId)`
 ///
-/// Returns module ID of the module calling this function. Aborts if caller is
-/// not a module. The module id is the sha3-256 of the module name, trimmed to
-/// 16 bytes. INVARIANT: Must match implemention in `0x1::init.move`.
+/// Returns the address and module id of the module that directly called the
+/// function invoking this native. Aborts if there is no such module (e.g. a
+/// script). The module id is the sha3-256 of the module name, trimmed to 16
+/// bytes. INVARIANT: Must match implemention in `0x1::init.move`.
 //
 // TODO(metering): charge gas.
 pub fn native_get_caller_address_and_module_id<C: NativeContext>(
