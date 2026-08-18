@@ -38,7 +38,7 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockError,
-        BlockOutput, TransactionOutput, TransactionStatus,
+        BlockOutput, CacheInvalidationInfo, TransactionOutput, TransactionStatus,
     },
     write_set::WriteOp,
 };
@@ -108,6 +108,10 @@ impl VMBlockExecutor for NativeVMBlockExecutor {
             transaction_slice_metadata,
             None,
         )
+    }
+
+    fn invalidate(&self, _info: &CacheInvalidationInfo) {
+        // No caches to invalidate.
     }
 }
 

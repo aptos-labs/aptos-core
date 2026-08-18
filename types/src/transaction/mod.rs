@@ -74,7 +74,7 @@ use crate::{
     validator_txn::ValidatorTransaction,
     write_set::TransactionWrite,
 };
-pub use block_output::{BlockError, BlockExecutionResult, BlockOutput};
+pub use block_output::{BlockError, BlockExecutionResult, BlockOutput, CacheInvalidationInfo};
 pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
 pub use move_core_types::transaction_argument::TransactionArgument;

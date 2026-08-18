@@ -28,16 +28,18 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        AuxiliaryInfo, ExecutionStatus, PersistedAuxiliaryInfo, RawTransaction, Script,
-        SignedTransaction, Transaction, TransactionAuxiliaryData, TransactionListWithProofV2,
-        TransactionOutput, TransactionPayload, TransactionStatus, Version,
+        AuxiliaryInfo, CacheInvalidationInfo, ExecutionStatus, PersistedAuxiliaryInfo,
+        RawTransaction, Script, SignedTransaction, Transaction, TransactionAuxiliaryData,
+        TransactionListWithProofV2, TransactionOutput, TransactionPayload, TransactionStatus,
+        Version,
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use itertools::Itertools;
+use move_core_types::{ident_str, language_storage::ModuleId};
 use mock_vm::{
-    encode_mint_transaction, encode_reconfiguration_transaction, encode_transfer_transaction,
-    MockVM, DISCARD_STATUS, KEEP_STATUS,
+    encode_mint_transaction, encode_publish_transaction, encode_reconfiguration_transaction,
+    encode_transfer_transaction, MockVM, DISCARD_STATUS, INVALIDATE_CALLS, KEEP_STATUS,
 };
 use proptest::prelude::*;
 use std::iter::once;
@@ -297,6 +299,71 @@ fn test_executor_commit_twice() {
     executor.pre_commit_block(block1_id).unwrap();
     executor.commit_ledger(ledger_info.clone()).unwrap();
     executor.commit_ledger(ledger_info).unwrap();
+}
+
+#[test]
+fn test_executor_invalidates_cache_at_commit_for_publishing_block() {
+    INVALIDATE_CALLS.lock().clear();
+
+    let executor = TestExecutor::new();
+    let parent_block_id = executor.committed_block_id();
+    let block_id = gen_block_id(1);
+    let publish_txn = encode_publish_transaction(gen_address(0));
+
+    let output = executor
+        .execute_block(
+            (block_id, block(vec![publish_txn])).into(),
+            parent_block_id,
+            TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
+        )
+        .unwrap();
+
+    // A publishing block is a barrier: consensus must wait for its commit.
+    assert!(executor.block_wait_for_commit(block_id).unwrap());
+
+    // Invalidation must not happen at pre-commit; a pre-committed branch can
+    // still be discarded.
+    executor.pre_commit_block(block_id).unwrap();
+    assert!(INVALIDATE_CALLS.lock().is_empty());
+
+    let ledger_info = gen_ledger_info(2, output.root_hash(), block_id, 1);
+    executor.commit_ledger(ledger_info).unwrap();
+
+    // Now that the ledger is committed, the VM cache is invalidated exactly once
+    // with the module published by this block.
+    assert_eq!(
+        *INVALIDATE_CALLS.lock(),
+        vec![CacheInvalidationInfo::Legacy {
+            published: vec![ModuleId::new(gen_address(0), ident_str!("mock").to_owned())],
+        }]
+    );
+}
+
+#[test]
+fn test_executor_does_not_invalidate_cache_for_normal_block() {
+    INVALIDATE_CALLS.lock().clear();
+
+    let executor = TestExecutor::new();
+    let parent_block_id = executor.committed_block_id();
+    let block_id = gen_block_id(1);
+    let mint_txn = encode_mint_transaction(gen_address(0), 100);
+
+    let output = executor
+        .execute_block(
+            (block_id, block(vec![mint_txn])).into(),
+            parent_block_id,
+            TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
+        )
+        .unwrap();
+
+    // A non-publishing block is not a barrier.
+    assert!(!executor.block_wait_for_commit(block_id).unwrap());
+
+    let ledger_info = gen_ledger_info(2, output.root_hash(), block_id, 1);
+    executor.pre_commit_block(block_id).unwrap();
+    executor.commit_ledger(ledger_info).unwrap();
+
+    assert!(INVALIDATE_CALLS.lock().is_empty());
 }
 
 #[test]

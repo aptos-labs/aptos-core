@@ -44,8 +44,8 @@ use aptos_types::{
     },
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo,
-        AuxiliaryInfoTrait, BlockOutput, PersistedAuxiliaryInfo, Transaction, TransactionOutput,
-        TransactionStatus, Version,
+        AuxiliaryInfoTrait, BlockOutput, CacheInvalidationInfo, PersistedAuxiliaryInfo,
+        Transaction, TransactionOutput, TransactionStatus, Version,
     },
     write_set::{TransactionWrite, WriteSet},
 };
@@ -120,7 +120,8 @@ impl DoGetExecutionOutput {
             onchain_config,
             transaction_slice_metadata,
         )?;
-        let (mut transaction_outputs, block_epilogue_txn) = block_output.into_inner();
+        let (mut transaction_outputs, block_epilogue_txn, cache_invalidation_info) =
+            block_output.into_inner();
         let (transactions, mut auxiliary_infos) = txn_provider.into_inner();
         let mut transactions = transactions
             .into_iter()
@@ -179,6 +180,7 @@ impl DoGetExecutionOutput {
             .parent_state(parent_state)
             .base_state_view(state_view)
             .prime_state_cache(false)
+            .maybe_cache_invalidation_info(cache_invalidation_info)
             .is_block(
                 transaction_slice_metadata
                     .append_state_checkpoint_to_block()
@@ -356,6 +358,7 @@ impl DoGetExecutionOutput {
                     })
                     .collect::<Vec<_>>(),
                 None,
+                None,
             ),
         };
         Ok(transaction_outputs)
@@ -375,6 +378,7 @@ impl Parser {
         parent_state: &LedgerState,
         base_state_view: CachedStateView,
         prime_state_cache: bool,
+        cache_invalidation_info: Option<CacheInvalidationInfo>,
         is_block: bool,
         transaction_info_v1: bool,
         hot_state_root_in_txn_info: bool,
@@ -465,6 +469,7 @@ impl Parser {
             .hot_state_updates(hot_state_updates)
             .maybe_block_end_info(block_end_info)
             .maybe_next_epoch_state(next_epoch_state)
+            .maybe_cache_invalidation_info(cache_invalidation_info)
             .subscribable_events(Planned::place_holder())
             .transaction_info_v1(transaction_info_v1)
             .hot_state_root_in_txn_info(hot_state_root_in_txn_info)

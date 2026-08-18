@@ -74,7 +74,7 @@ fn execute_and_get_hot_state_promotions(
             TransactionSliceMetadata::block(HashValue::zero(), HashValue::new([1; 32])),
         )
         .expect("Block execution should succeed");
-    let (outputs, epilogue_txn) = block_output.into_inner();
+    let (outputs, epilogue_txn, _) = block_output.into_inner();
 
     let statuses = outputs
         .iter()
