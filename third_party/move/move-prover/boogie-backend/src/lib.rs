@@ -39,10 +39,12 @@ use move_model::{
         INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY, INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_BORROW_MUT,
         INTRINSIC_FUN_MAP_SPEC_DEL, INTRINSIC_FUN_MAP_SPEC_GET, INTRINSIC_FUN_MAP_SPEC_HAS_KEY,
         INTRINSIC_FUN_MAP_SPEC_IS_EMPTY, INTRINSIC_FUN_MAP_SPEC_ITER_PRESERVED,
-        INTRINSIC_FUN_MAP_SPEC_ITER_VALID, INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID,
-        INTRINSIC_FUN_MAP_SPEC_LEN, INTRINSIC_FUN_MAP_SPEC_NEW, INTRINSIC_FUN_MAP_SPEC_SET,
-        INTRINSIC_FUN_MAP_TO_ORDERED_MAP, INTRINSIC_FUN_MAP_TO_VEC_PAIR, INTRINSIC_FUN_MAP_TRIM,
-        INTRINSIC_FUN_MAP_UPSERT, INTRINSIC_FUN_MAP_UPSERT_ALL, INTRINSIC_FUN_MAP_VALUES,
+        INTRINSIC_FUN_MAP_SPEC_ITER_VALID, INTRINSIC_FUN_MAP_SPEC_KEY_AT,
+        INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID, INTRINSIC_FUN_MAP_SPEC_LEAF_OFFSET,
+        INTRINSIC_FUN_MAP_SPEC_LEN, INTRINSIC_FUN_MAP_SPEC_NEW, INTRINSIC_FUN_MAP_SPEC_RANK,
+        INTRINSIC_FUN_MAP_SPEC_SET, INTRINSIC_FUN_MAP_TO_ORDERED_MAP,
+        INTRINSIC_FUN_MAP_TO_VEC_PAIR, INTRINSIC_FUN_MAP_TRIM, INTRINSIC_FUN_MAP_UPSERT,
+        INTRINSIC_FUN_MAP_UPSERT_ALL, INTRINSIC_FUN_MAP_VALUES,
     },
     ty::{PrimitiveType, Type},
 };
@@ -139,10 +141,18 @@ struct MapImpl {
     fun_borrow_with_default: String,
     fun_iter_borrow_mut: String,
     // Iterator enum parts for the iter_borrow_mut template: uninstantiated Boogie
-    // name prefix, the key-carrying variant, and the key field selector.
+    // name prefix, the payload-carrying variant, and that payload's selector.
     iter_ptr_prefix: String,
     iter_variant: String,
     iter_key_sel: String,
+    // Whether the payload is a position rather than a key. A position-based
+    // iterator reaches its key through the enumeration (`spec_key_at`), so the
+    // template resolves the key at borrow time instead of reading it off the
+    // iterator.
+    iter_is_index: bool,
+    // Whether the iterator enum takes the key as a type parameter, which
+    // decides whether its Boogie name carries the per-instance key suffix.
+    iter_ptr_generic: bool,
     // Iterator-validity predicates: equality of the hidden `$$validity` slot
     // between an iterator and its map (or two map states for `preserved`).
     // The iterator enum's Boogie name is `prefix`, plus the key suffix when
@@ -153,6 +163,11 @@ struct MapImpl {
     fun_spec_leaf_iter_valid: String,
     leaf_iter_valid_prefix: String,
     leaf_iter_valid_generic: bool,
+    // Leaf-walk position; the same three parts, since its first parameter is
+    // likewise the walker enum.
+    fun_spec_leaf_offset: String,
+    leaf_offset_prefix: String,
+    leaf_offset_generic: bool,
     fun_spec_iter_preserved: String,
     // Ghost carrier: an intrinsic map that declares ghost fields is
     // represented as a per-instance datatype wrapping the table, so the
@@ -196,6 +211,9 @@ struct MapImpl {
     fun_spec_len: String,
     fun_spec_is_empty: String,
     fun_spec_has_key: String,
+    // enumeration view: i-th key / key rank
+    fun_spec_key_at: String,
+    fun_spec_rank: String,
     // abort-condition spec functions
     fun_spec_aborts_destroy_empty: String,
     fun_spec_aborts_add: String,
@@ -640,6 +658,7 @@ impl MapImpl {
         let iter_valid_parts = Self::validity_parts(env, decl, INTRINSIC_FUN_MAP_SPEC_ITER_VALID);
         let leaf_iter_valid_parts =
             Self::validity_parts(env, decl, INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID);
+        let leaf_offset_parts = Self::validity_parts(env, decl, INTRINSIC_FUN_MAP_SPEC_LEAF_OFFSET);
         let ghost_args: Vec<GhostArg> = struct_env
             .get_ghost_fields()
             .map(|f| GhostArg {
@@ -741,6 +760,9 @@ impl MapImpl {
             fun_spec_leaf_iter_valid: leaf_iter_valid_parts.0,
             leaf_iter_valid_prefix: leaf_iter_valid_parts.1,
             leaf_iter_valid_generic: leaf_iter_valid_parts.2,
+            fun_spec_leaf_offset: leaf_offset_parts.0,
+            leaf_offset_prefix: leaf_offset_parts.1,
+            leaf_offset_generic: leaf_offset_parts.2,
             fun_spec_iter_preserved: Self::triple_opt_to_name(
                 env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_ITER_PRESERVED),
@@ -748,6 +770,8 @@ impl MapImpl {
             iter_ptr_prefix: iter_parts.0,
             iter_variant: iter_parts.1,
             iter_key_sel: iter_parts.2,
+            iter_is_index: iter_parts.3,
+            iter_ptr_generic: iter_parts.4,
             has_ghost_carrier,
             struct_base,
             ghost_args,
@@ -860,6 +884,14 @@ impl MapImpl {
             fun_spec_has_key: Self::triple_opt_to_name(
                 env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_HAS_KEY),
+            ),
+            fun_spec_key_at: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_KEY_AT),
+            ),
+            fun_spec_rank: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_RANK),
             ),
             fun_spec_aborts_destroy_empty: Self::triple_opt_to_name(
                 env,
@@ -979,11 +1011,18 @@ impl MapImpl {
         (name, prefix, !inst.is_empty())
     }
 
+    /// Boogie name prefix, payload variant, payload selector, whether the
+    /// payload is a position rather than a key, and whether the enum is
+    /// parameterized by the key.
     fn iter_ptr_parts(
         env: &GlobalEnv,
         decl: &move_model::intrinsics::IntrinsicDecl,
-    ) -> (String, String, String) {
-        let empty = (String::new(), String::new(), String::new());
+    ) -> (String, String, String, bool, bool) {
+        let empty = (String::new(), String::new(), String::new(), false, false);
+        let shape_msg = "the first parameter of a `map_iter_borrow_mut` function must be an \
+                         enum whose payload variant carries either a field of the key type \
+                         (a key-based iterator) or a single integer field (a position-based \
+                         iterator)";
         let Some(fun_qid) = decl.lookup_move_fun(env, INTRINSIC_FUN_MAP_ITER_BORROW_MUT) else {
             return empty;
         };
@@ -991,29 +1030,25 @@ impl MapImpl {
         let param_tys = fun_env.get_parameter_types();
         let Some(Type::Struct(mid, sid, _)) = param_tys.first().map(|ty| ty.skip_reference())
         else {
-            env.error(
-                &fun_env.get_loc(),
-                "the first parameter of a `map_iter_borrow_mut` function must be an \
-                 enum carrying the key",
-            );
+            env.error(&fun_env.get_loc(), shape_msg);
             return empty;
         };
         let iter_env = env.get_struct(mid.qualified(*sid));
         // `get_variants` panics on a non-enum; report a proper diagnostic for
         // a malformed binding instead of crashing the prover.
         if !iter_env.has_variants() {
-            env.error(
-                &fun_env.get_loc(),
-                "the first parameter of a `map_iter_borrow_mut` function must be an \
-                 enum carrying the key",
-            );
+            env.error(&fun_env.get_loc(), shape_msg);
             return empty;
         }
-        let mut found = None;
+        // A key field wins over an integer one: a keyed iterator names its key
+        // directly, which needs no enumeration.
+        let mut by_key = None;
+        let mut by_index = None;
         for variant in iter_env.get_variants() {
             for field in iter_env.get_fields_of_variant(variant) {
+                let sel = boogie_helpers::boogie_field_sel(&field);
                 if field.get_type() == Type::TypeParameter(0) {
-                    if found.is_some() {
+                    if by_key.is_some() {
                         env.error(
                             &fun_env.get_loc(),
                             "the iterator enum of a `map_iter_borrow_mut` function must \
@@ -1021,25 +1056,55 @@ impl MapImpl {
                         );
                         return empty;
                     }
-                    found = Some((variant, boogie_helpers::boogie_field_sel(&field)));
+                    by_key = Some((variant, sel));
+                } else if matches!(
+                    field.get_type(),
+                    Type::Primitive(PrimitiveType::U64 | PrimitiveType::Num)
+                ) {
+                    if by_index.is_some() {
+                        env.error(
+                            &fun_env.get_loc(),
+                            "the iterator enum of a position-based `map_iter_borrow_mut` \
+                             function must have exactly one integer field",
+                        );
+                        return empty;
+                    }
+                    by_index = Some((variant, sel));
                 }
             }
         }
-        let Some((variant, key_sel)) = found else {
+        let (is_index, found) = match (by_key, by_index) {
+            (Some(k), _) => (false, k),
+            (None, Some(i)) => (true, i),
+            (None, None) => {
+                env.error(&fun_env.get_loc(), shape_msg);
+                return empty;
+            },
+        };
+        if is_index
+            && decl
+                .lookup_spec_fun(env, INTRINSIC_FUN_MAP_SPEC_KEY_AT)
+                .is_none()
+        {
             env.error(
                 &fun_env.get_loc(),
-                "the iterator enum of a `map_iter_borrow_mut` function must have a \
-                 variant carrying a field of the key type",
+                "a position-based `map_iter_borrow_mut` function requires \
+                 `map_spec_key_at` to be bound: the position is turned into a key \
+                 through the enumeration",
             );
             return empty;
-        };
+        }
+        let (variant, sel) = found;
         // With an empty instantiation this is exactly the uninstantiated name
-        // prefix; the templates append the per-instance suffix and variant.
+        // prefix; the templates append the per-instance suffix (only when the
+        // enum is keyed) and the variant.
         let prefix = boogie_helpers::boogie_struct_name(&iter_env, &[], false);
         (
             prefix,
             variant.display(iter_env.symbol_pool()).to_string(),
-            key_sel,
+            sel,
+            is_index,
+            !iter_env.get_type_parameters().is_empty(),
         )
     }
 

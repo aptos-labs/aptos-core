@@ -393,6 +393,12 @@ axiom (
 {%- set SK = "'" ~ instance.0.suffix ~ "'" -%}
 {%- set SV = "'" ~ instance.1.suffix ~ "'" -%}
 {%- set ENC = "$EncodeKey'" ~ instance.0.suffix ~ "'" -%}
+{#- Enumeration-view names and emission guard, hoisted so the front/back
+    templates can state rank facts about their witness key. -#}
+{%- set EKA = "$EnumKeyAt'" ~ Type ~ S ~ "'" -%}
+{%- set ERK = "$EnumRank'" ~ Type ~ S ~ "'" -%}
+{%- set EWF = "$TableWf'" ~ Type ~ S ~ "'" -%}
+{%- set HAS_ENUM = impl.fun_spec_key_at != "" and impl.fun_spec_rank != "" and not instance.0.is_bv and not instance.1.is_bv -%}
 
 {%- if impl.has_ghost_carrier %}
 {# Ghost carrier: the map value wraps the table so declared ghost fields have
@@ -469,6 +475,9 @@ function $IsEqual'{{Type}}{{S}}'(t1: {{Self}}, t2: {{Self}}): bool {
 // Not inlined.
 function $IsValid'{{Type}}{{S}}'(t: {{Self}}): bool {
     $IsValid'u64'(LenTable({{c}})) &&
+{%- if HAS_ENUM %}
+    {{EWF}}({{c}}) &&
+{%- endif %}
     (forall i: int:: ContainsTable({{c}}, i) ==> $IsValid{{SV}}(GetTable({{c}}, i)))
 }
 
@@ -561,6 +570,9 @@ procedure {:inline 2} {{impl.fun_borrow_front}}{{S}}(t: {{Self}}) returns (k: {{
         !$IsEqual'{{instance.0.suffix}}'(other, k) ==>
         {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
             $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Less());
+{%- if HAS_ENUM %}
+    assume {{EWF}}(t{{U}}) ==> {{ERK}}(t{{U}}, {{ENC}}(k)) == 0;
+{%- endif %}
 }
 {%- endif %}
 
@@ -579,6 +591,9 @@ procedure {:inline 2} {{impl.fun_borrow_back}}{{S}}(t: {{Self}}) returns (k: {{K
         !$IsEqual'{{instance.0.suffix}}'(other, k) ==>
         {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
             $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Greater());
+{%- if HAS_ENUM %}
+    assume {{EWF}}(t{{U}}) ==> {{ERK}}(t{{U}}, {{ENC}}(k)) == LenTable(t{{U}}) - 1;
+{%- endif %}
 }
 {%- endif %}
 
@@ -595,6 +610,9 @@ procedure {:inline 2} {{impl.fun_front_key}}{{S}}(t: {{Self}}) returns (k: {{K}}
         !$IsEqual'{{instance.0.suffix}}'(other, k) ==>
         {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
             $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Less());
+{%- if HAS_ENUM %}
+    assume {{EWF}}(t{{U}}) ==> {{ERK}}(t{{U}}, {{ENC}}(k)) == 0;
+{%- endif %}
 }
 {%- endif %}
 
@@ -611,6 +629,9 @@ procedure {:inline 2} {{impl.fun_back_key}}{{S}}(t: {{Self}}) returns (k: {{K}})
         !$IsEqual'{{instance.0.suffix}}'(other, k) ==>
         {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
             $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Greater());
+{%- if HAS_ENUM %}
+    assume {{EWF}}(t{{U}}) ==> {{ERK}}(t{{U}}, {{ENC}}(k)) == LenTable(t{{U}}) - 1;
+{%- endif %}
 }
 {%- endif %}
 
@@ -632,6 +653,9 @@ returns (k: {{K}}, v: {{V}}, m': $Mutation ({{Self}})) {
         !$IsEqual'{{instance.0.suffix}}'(other, k) ==>
         {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
             $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Less());
+{%- if HAS_ENUM %}
+    assume {{EWF}}(t{{U}}) ==> {{ERK}}(t{{U}}, {{ENC}}(k)) == 0;
+{%- endif %}
     {{GH}}m' := $UpdateMutation(m, {{W1}}RemoveTable(t{{U}}, {{ENC}}(k)){{W2}});
 }
 {%- endif %}
@@ -654,6 +678,9 @@ returns (k: {{K}}, v: {{V}}, m': $Mutation ({{Self}})) {
         !$IsEqual'{{instance.0.suffix}}'(other, k) ==>
         {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
             $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Greater());
+{%- if HAS_ENUM %}
+    assume {{EWF}}(t{{U}}) ==> {{ERK}}(t{{U}}, {{ENC}}(k)) == LenTable(t{{U}}) - 1;
+{%- endif %}
     {{GH}}m' := $UpdateMutation(m, {{W1}}RemoveTable(t{{U}}, {{ENC}}(k)){{W2}});
 }
 {%- endif %}
@@ -676,8 +703,18 @@ procedure {:inline 2} {{impl.fun_prev_key}}{{S}}(t: {{Self}}, key: {{K}}) return
             {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
             $1_cmp_$compare'{{instance.0.suffix}}'(other, key) == $1_cmp_Ordering_Less() ==>
                 $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Greater());
+{%- if HAS_ENUM %}
+        // The predecessor of a contained key sits one position earlier.
+        assume {{EWF}}(t{{U}}) && ContainsTable(t{{U}}, {{ENC}}(key)) ==>
+            {{ERK}}(t{{U}}, {{ENC}}(k)) == {{ERK}}(t{{U}}, {{ENC}}(key)) - 1;
+{%- endif %}
         result := $1_option_Option{{SK}}_Some(k);
     } else {
+{%- if HAS_ENUM %}
+        // No predecessor means `key` occupies the first position.
+        assume {{EWF}}(t{{U}}) && ContainsTable(t{{U}}, {{ENC}}(key)) ==>
+            {{ERK}}(t{{U}}, {{ENC}}(key)) == 0;
+{%- endif %}
         result := $1_option_Option{{SK}}_None();
     }
 }
@@ -701,8 +738,21 @@ procedure {:inline 2} {{impl.fun_next_key}}{{S}}(t: {{Self}}, key: {{K}}) return
             {{impl.fun_spec_has_key}}{{S}}(t, other) ==>
             $1_cmp_$compare'{{instance.0.suffix}}'(other, key) == $1_cmp_Ordering_Greater() ==>
                 $1_cmp_$compare'{{instance.0.suffix}}'(k, other) == $1_cmp_Ordering_Less());
+{%- if HAS_ENUM %}
+        // The successor of a contained key sits one position later. Minimality
+        // above is stated through `cmp::compare` and does not by itself reach
+        // the enumeration, so a scan that steps by `next_key` could not
+        // otherwise be indexed by position.
+        assume {{EWF}}(t{{U}}) && ContainsTable(t{{U}}, {{ENC}}(key)) ==>
+            {{ERK}}(t{{U}}, {{ENC}}(k)) == {{ERK}}(t{{U}}, {{ENC}}(key)) + 1;
+{%- endif %}
         result := $1_option_Option{{SK}}_Some(k);
     } else {
+{%- if HAS_ENUM %}
+        // No successor means `key` occupies the last position.
+        assume {{EWF}}(t{{U}}) && ContainsTable(t{{U}}, {{ENC}}(key)) ==>
+            {{ERK}}(t{{U}}, {{ENC}}(key)) == LenTable(t{{U}}) - 1;
+{%- endif %}
         result := $1_option_Option{{SK}}_None();
     }
 }
@@ -727,6 +777,16 @@ procedure {:inline 2} {{impl.fun_keys}}{{S}}(t: ({{Self}})) returns (result: Vec
     assume (forall i: int, j: int :: {ReadVec(result, i), ReadVec(result, j)}
         InRangeVec(result, i) ==> InRangeVec(result, j) ==> i < j ==>
         $1_cmp_$compare'{{instance.0.suffix}}'(ReadVec(result, i), ReadVec(result, j)) == $1_cmp_Ordering_Less());
+{%- endif %}
+{%- if HAS_ENUM %}
+    // The returned vector and the enumeration agree position by position:
+    // both list the same key set in ascending order. Stated because two
+    // independently described ascending listings are not connected
+    // otherwise — the solver would have to argue their uniqueness — which is
+    // what leaves `keys()`-based code unable to share facts with
+    // position-based code.
+    assume (forall i: int :: {ReadVec(result, i)} InRangeVec(result, i) ==>
+        $IsEqual'{{instance.0.suffix}}'(ReadVec(result, i), {{EKA}}(t{{U}}, i)));
 {%- endif %}
 }
 {%- endif %}
@@ -787,6 +847,9 @@ procedure {:inline 2} {{impl.fun_new_from}}{{S}}(keys_arg: Vec ({{K}}), values_a
         return;
     }
     assume LenTable(result{{U}}) == LenVec(keys_arg);
+{%- if HAS_ENUM %}
+    assume {{EWF}}(result{{U}});
+{%- endif %}
     assume (forall i: int :: {ReadVec(keys_arg, i)} InRangeVec(keys_arg, i) ==>
         {{impl.fun_spec_has_key}}{{S}}(result, ReadVec(keys_arg, i)));
     assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(result, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
@@ -819,6 +882,9 @@ returns (m': $Mutation ({{Self}})) {
         return;
     }
     assume LenTable(t_new) == LenTable(t{{U}}) + LenVec(keys_arg);
+{%- if HAS_ENUM %}
+    assume {{EWF}}(t_new);
+{%- endif %}
     assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k)} {{"{"}}{{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
         ({{impl.fun_spec_has_key}}{{S}}(t, k) ==> {{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k)));
     assume (forall i: int :: {ReadVec(keys_arg, i)} i >= 0 && i < LenVec(keys_arg) ==>
@@ -853,6 +919,9 @@ returns (m': $Mutation ({{Self}})) {
     // would be unsound under duplicate input keys, so only these bounds hold.
     assume LenTable(t_new) >= LenTable(t{{U}});
     assume LenTable(t_new) <= LenTable(t{{U}}) + LenVec(keys_arg);
+{%- if HAS_ENUM %}
+    assume {{EWF}}(t_new);
+{%- endif %}
     assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k)} {{"{"}}{{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
         ({{impl.fun_spec_has_key}}{{S}}(t, k) ==> {{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k)));
     assume (forall i: int :: {ReadVec(keys_arg, i)} i >= 0 && i < LenVec(keys_arg) ==>
@@ -882,6 +951,9 @@ returns (m': $Mutation ({{Self}})) {
     assume LenTable(t_new) >= LenTable(t{{U}});
     assume LenTable(t_new) >= LenTable(other{{U}});
     assume LenTable(t_new) <= LenTable(t{{U}}) + LenTable(other{{U}});
+{%- if HAS_ENUM %}
+    assume {{EWF}}(t_new);
+{%- endif %}
     assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k)} {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k)} {{"{"}}{{impl.fun_spec_has_key}}{{S}}(other, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
         ({{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k) <==>
             ({{impl.fun_spec_has_key}}{{S}}(t, k) || {{impl.fun_spec_has_key}}{{S}}(other, k))));
@@ -903,6 +975,9 @@ returns (m': $Mutation ({{Self}})) {
         return;
     }
     assume LenTable(t_new) == LenTable(t{{U}}) + LenTable(other{{U}});
+{%- if HAS_ENUM %}
+    assume {{EWF}}(t_new);
+{%- endif %}
     assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k)} {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k)} {{"{"}}{{impl.fun_spec_has_key}}{{S}}(other, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
         ({{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k) <==>
             ({{impl.fun_spec_has_key}}{{S}}(t, k) || {{impl.fun_spec_has_key}}{{S}}(other, k))));
@@ -925,6 +1000,10 @@ returns (result: ({{Self}}), m': $Mutation ({{Self}})) {
     }
     assume LenTable(t_new) == at;
     assume LenTable(result{{U}}) == LenTable(t{{U}}) - at;
+{%- if HAS_ENUM %}
+    assume {{EWF}}(t_new);
+    assume {{EWF}}(result{{U}});
+{%- endif %}
 {%- if impl.fun_spec_has_key != "" %}
     assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
         ({{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k) ==> {{impl.fun_spec_has_key}}{{S}}(t, k)));
@@ -966,6 +1045,9 @@ returns (m': $Mutation ({{Self}})) {
         return;
     }
     assume LenTable(t_new) == LenTable(t{{U}});
+{%- if HAS_ENUM %}
+    assume {{EWF}}(t_new);
+{%- endif %}
     assume !{{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, old_key);
     assume {{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, new_key);
     assume (forall k: {{K}} :: {{"{"}}{{impl.fun_spec_has_key}}{{S}}(t, k)} {{"{"}}{{impl.fun_spec_has_key}}{{S}}({{W1}}t_new{{W2}}, k)} $IsValid'{{instance.0.suffix}}'(k) ==>
@@ -985,6 +1067,13 @@ procedure {:inline 2} {{impl.fun_add_no_override}}{{S}}(m: $Mutation ({{Self}}),
     if (ContainsTable(t{{U}}, enc_k)) {
         call $Abort($StdError(7/*INVALID_ARGUMENTS*/, 100/*EALREADY_EXISTS*/));
     } else {
+{%- if HAS_ENUM %}
+        // Insertion keeps the table cardinality-consistent. Stated here rather
+        // than as a preservation axiom because an axiom triggered on
+        // `AddTable` cannot fire: the function is `{:inline}` and its
+        // expansion is a constructor term with two array stores.
+        assume {{EWF}}(t{{U}}) ==> {{EWF}}(AddTable(t{{U}}, enc_k, v));
+{%- endif %}
         {{GH}}m' := $UpdateMutation(m, {{W1}}AddTable(t{{U}}, enc_k, v){{W2}});
     }
 }
@@ -1001,6 +1090,13 @@ procedure {:inline 2} {{impl.fun_add_override_if_exists}}{{S}}(m: $Mutation ({{S
             mutation — ghosts (the validity slot) are preserved. -#}
         m' := $UpdateMutation(m, {{SW1}}UpdateTable(t{{U}}, enc_k, v){{SW2}});
     } else {
+{%- if HAS_ENUM %}
+        // Insertion keeps the table cardinality-consistent. Stated here rather
+        // than as a preservation axiom because an axiom triggered on
+        // `AddTable` cannot fire: the function is `{:inline}` and its
+        // expansion is a constructor term with two array stores.
+        assume {{EWF}}(t{{U}}) ==> {{EWF}}(AddTable(t{{U}}, enc_k, v));
+{%- endif %}
         {{GH}}m' := $UpdateMutation(m, {{W1}}AddTable(t{{U}}, enc_k, v){{W2}});
     }
 }
@@ -1022,6 +1118,13 @@ returns (prev_v: $1_option_Option{{SV}}, m': $Mutation ({{Self}})) {
         m' := $UpdateMutation(m, {{SW1}}UpdateTable(t{{U}}, enc_k, v){{SW2}});
     } else {
         prev_v := $1_option_Option{{SV}}_None();
+{%- if HAS_ENUM %}
+        // Insertion keeps the table cardinality-consistent. Stated here rather
+        // than as a preservation axiom because an axiom triggered on
+        // `AddTable` cannot fire: the function is `{:inline}` and its
+        // expansion is a constructor term with two array stores.
+        assume {{EWF}}(t{{U}}) ==> {{EWF}}(AddTable(t{{U}}, enc_k, v));
+{%- endif %}
         {{GH}}m' := $UpdateMutation(m, {{W1}}AddTable(t{{U}}, enc_k, v){{W2}});
     }
 }
@@ -1116,6 +1219,12 @@ returns (dst: $Mutation ({{V}}), m': $Mutation ({{Self}})) {
     enc_k := {{ENC}}(k);
     t := $Dereference(m);
     if (!ContainsTable(t{{U}}, enc_k)) {
+{%- if HAS_ENUM %}
+        // Same reason as the other insertion sites: an axiom triggered on
+        // `AddTable` cannot fire, so well-formedness has to be carried by an
+        // assume or the enumeration axioms stay gated off past this call.
+        assume {{EWF}}(t{{U}}) ==> {{EWF}}(AddTable(t{{U}}, enc_k, default));
+{%- endif %}
         {{GH}}m' := $UpdateMutation(m, {{W1}}AddTable(t{{U}}, enc_k, default){{W2}});
         t' := $Dereference(m');
         dst := $Mutation(m'->l, ExtendVec(m'->p, enc_k), GetTable(t'{{U}}, enc_k));
@@ -1138,22 +1247,54 @@ procedure {:inline 2} {{impl.fun_borrow_with_default}}{{S}}(t: {{Self}}, k: {{K}
 }
 {%- endif %}
 
+{#- The iterator enum is either parameterized by the key (a keyed iterator) or
+    unparameterized (a position-based one); its Boogie name follows suit. -#}
+{%- if impl.iter_ptr_generic -%}
+{%- set ITER = impl.iter_ptr_prefix ~ "'" ~ instance.0.suffix ~ "'" -%}
+{%- else -%}
+{%- set ITER = impl.iter_ptr_prefix -%}
+{%- endif -%}
+
 {%- if impl.fun_iter_borrow_mut != "" %}
-// Mutable borrow of the value at the iterator's key. The returned mutation's
-// path extends the map's path with the encoded key (a Table index edge), so
-// caller write-back goes through UpdateTable instead of concrete map internals.
-// Aborts when the iterator is the end iterator or its key is absent (stale
-// iterator); the constant-value-size requirement is presumed not to fire (see
+// Mutable borrow of the value at the iterator's position. The returned
+// mutation's path extends the map's path with the encoded key (a Table index
+// edge), so caller write-back goes through UpdateTable instead of concrete map
+// internals. The constant-value-size requirement is presumed not to fire (see
 // the size presumption in the map's spec).
-procedure {:inline 2} {{impl.fun_iter_borrow_mut}}{{S}}(self: {{impl.iter_ptr_prefix}}'{{instance.0.suffix}}', m: $Mutation ({{Self}}))
+procedure {:inline 2} {{impl.fun_iter_borrow_mut}}{{S}}(self: {{ITER}}, m: $Mutation ({{Self}}))
 returns (dst: $Mutation ({{V}}), m': $Mutation ({{Self}})) {
     var enc_k: int;
     var t: {{Self}};{{GBD}}
     t := $Dereference(m);
-    if (!(self is {{impl.iter_ptr_prefix}}'{{instance.0.suffix}}'_{{impl.iter_variant}})) {
+{%- if impl.iter_is_index %}
+{#- A position-based iterator names no key, so the key comes from the
+    enumeration: position i holds key_at(t, i). Aborts on the end iterator or
+    an out-of-range position, which is what a stale iterator degrades to. -#}
+    if (!(self is {{ITER}}_{{impl.iter_variant}})
+        || self->{{impl.iter_key_sel}} < 0
+        || self->{{impl.iter_key_sel}} >= LenTable(t{{U}})) {
+        call $ExecFailureAbort();
+    } else {
+{%- if HAS_ENUM %}
+        enc_k := {{ENC}}({{EKA}}(t{{U}}, self->{{impl.iter_key_sel}}));
+{%- else %}
+        // The enumeration is not rendered for this instance (bv-flagged key or
+        // value), so a position cannot be resolved to a key at all. Fail here
+        // rather than model the borrow: an unconstrained key would leave this
+        // procedure able to abort on the containment check below while the
+        // map's abort predicate says otherwise, and the two must agree.
+        // Unreachable calls still verify, so this only bites real uses.
+        assert false;
+        enc_k := 0;
+{%- endif %}
+{%- else %}
+{#- A keyed iterator carries its key; aborts on the end iterator or an absent
+    key (stale iterator). -#}
+    if (!(self is {{ITER}}_{{impl.iter_variant}})) {
         call $ExecFailureAbort();
     } else {
         enc_k := {{ENC}}(self->{{impl.iter_key_sel}});
+{%- endif %}
         if (!ContainsTable(t{{U}}, enc_k)) {
             call $ExecFailureAbort();
         } else {
@@ -1204,6 +1345,99 @@ function {:inline} {{impl.fun_spec_get}}{{S}}(t: {{Self}}, k: {{K}}): {{V}} {
 }
 {%- endif %}
 
+{%- if HAS_ENUM %}
+// Enumeration view: `key_at(t, i)` is the i-th smallest key under
+// `cmp::compare` (a representative of its `$IsEqual` class), `rank(t, k)` its
+// inverse on contained keys. `rank` is defined over the encoded key, so equal
+// keys get equal ranks. Names are impl-qualified to avoid collisions when two
+// map impls share a (K, V) instance.
+function {{EKA}}(t: {{Table}}, i: int): {{K}};
+function {{ERK}}(t: {{Table}}, ek: int): int;
+function {:inline} {{impl.fun_spec_key_at}}{{S}}(t: {{Self}}, i: int): {{K}} {
+    {{EKA}}(t{{U}}, i)
+}
+function {:inline} {{impl.fun_spec_rank}}{{S}}(t: {{Self}}, k: {{K}}): int {
+    {{ERK}}(t{{U}}, {{ENC}}(k))
+}
+// The axioms below quantify over ALL table values, but the `Table` datatype
+// also admits cardinality-inconsistent triples (more contained keys than
+// `l`), on which an in-range rank bijection cannot exist. So every statement
+// about the enumeration — these axioms and the border rank facts in the
+// front/back templates alike — guards on a well-formedness predicate, and no
+// rank claim is ever made about a table that may be inconsistent.
+//
+// Well-formedness holds for the empty table (a ground fact, since
+// `EmptyTable` is inline and so this carries no quantifier), is assumed for
+// program values through `$IsValid` and at the sites that havoc a fresh
+// table, and is carried across value writes and removals by the two axioms
+// below. Chained mutations rely on that: the second of two successive pops
+// needs the once-removed table to be well formed.
+//
+// Insertion is carried by an `assume` in each `AddTable` template instead of
+// a third axiom here, because an axiom triggered on `AddTable` cannot fire:
+// the function is `{:inline}` and its expansion is a constructor term with
+// two array stores, which never matches (measured).
+//
+// Only the RANK side of each mutation needs an axiom. The corresponding
+// `key_at` facts — that a removal splices its position out, and an insertion
+// splices one in — follow from the rank shift together with the bijection
+// below, confirmed by deleting hand-written splice axioms for both and
+// watching every position-asserting test still verify.
+// Impl-qualified like the enumeration functions, so non-enum programs emit
+// nothing.
+function {{EWF}}(t: {{Table}}): bool;
+axiom {{EWF}}(EmptyTable());
+axiom (forall t: {{Table}}, ek: int, v: {{V}} :: {UpdateTable(t, ek, v)}
+    {{EWF}}(t) ==> {{EWF}}(UpdateTable(t, ek, v)));
+axiom (forall t: {{Table}}, ek: int :: {RemoveTable(t, ek)}
+    {{EWF}}(t) && ContainsTable(t, ek) ==> {{EWF}}(RemoveTable(t, ek)));
+// Every enumerated position holds a contained key, and rank inverts key_at.
+// One axiom rather than two: both facts share the trigger and the guard, so
+// splitting them would double instantiations on the commonest pattern.
+axiom (forall t: {{Table}}, i: int :: {{"{"}}{{EKA}}(t, i)}
+    {{EWF}}(t) && 0 <= i && i < LenTable(t) ==>
+        ContainsTable(t, {{ENC}}({{EKA}}(t, i)))
+        && {{ERK}}(t, {{ENC}}({{EKA}}(t, i))) == i);
+{%- if instance.0.cmp_available %}
+// Strictly ascending under `cmp::compare`; emitted only when a cmp
+// instantiation for the key type exists in this run.
+axiom (forall t: {{Table}}, i: int, j: int :: {{"{"}}{{EKA}}(t, i), {{EKA}}(t, j)}
+    {{EWF}}(t) && 0 <= i && i < j && j < LenTable(t) ==>
+        $1_cmp_$compare'{{instance.0.suffix}}'({{EKA}}(t, i), {{EKA}}(t, j)) == $1_cmp_Ordering_Less());
+{%- endif %}
+// A contained key's rank is in range and key_at inverts it (up to $IsEqual).
+axiom (forall t: {{Table}}, k: {{K}} :: {{"{"}}{{ERK}}(t, {{ENC}}(k))}
+    {{EWF}}(t) && ContainsTable(t, {{ENC}}(k)) ==>
+        0 <= {{ERK}}(t, {{ENC}}(k)) && {{ERK}}(t, {{ENC}}(k)) < LenTable(t)
+        && $IsEqual'{{instance.0.suffix}}'({{EKA}}(t, {{ERK}}(t, {{ENC}}(k))), k));
+// Removal shift: a surviving key's rank drops by one exactly when it was
+// above the removed key.
+axiom (forall t: {{Table}}, ek: int, ek2: int :: {{"{"}}{{ERK}}(RemoveTable(t, ek), ek2)}
+    {{EWF}}(t) && ContainsTable(t, ek) && ContainsTable(t, ek2) && ek2 != ek ==>
+        {{ERK}}(RemoveTable(t, ek), ek2) ==
+            (if {{ERK}}(t, ek2) < {{ERK}}(t, ek) then {{ERK}}(t, ek2) else {{ERK}}(t, ek2) - 1));
+
+// A value write leaves the key set and the length alone, so it leaves ranks
+// alone. Without this, every position fact is lost across `iter_borrow_mut`,
+// `iter_modify` and an upsert of an existing key, since all of them write
+// back through `UpdateTable` — which is what a loop that mutates values
+// while traversing needs to carry its invariant. Preserving `key_at` needs
+// no separate rule: rank preservation plus the bijection above pins it.
+axiom (forall t: {{Table}}, ek: int, v: {{V}}, ek2: int :: {{"{"}}{{ERK}}(UpdateTable(t, ek, v), ek2)}
+    {{EWF}}(t) ==> {{ERK}}(UpdateTable(t, ek, v), ek2) == {{ERK}}(t, ek2));
+// Insertion shift, the mirror of removal: an existing key's rank rises by one
+// exactly when the inserted key lands at or before it. Quantified over keys
+// rather than raw integers, for the same reason the insertion is: only encoded
+// keys can enter the support.
+axiom (forall t: {{Table}}, k: {{K}}, v: {{V}}, ek2: int ::
+        {{"{"}}{{ERK}}(AddTable(t, {{ENC}}(k), v), ek2)}
+    {{EWF}}(t) && !ContainsTable(t, {{ENC}}(k)) && ContainsTable(t, ek2) ==>
+        {{ERK}}(AddTable(t, {{ENC}}(k), v), ek2) ==
+            (if {{ERK}}(t, ek2) < {{ERK}}(AddTable(t, {{ENC}}(k), v), {{ENC}}(k))
+             then {{ERK}}(t, ek2) else {{ERK}}(t, ek2) + 1));
+
+{%- endif %}
+
 {%- if impl.fun_spec_new != "" %}
 function {:inline} {{impl.fun_spec_new}}{{S}}(): {{Self}} {
     {{SW1}}EmptyTable(){{SZ2}}
@@ -1236,12 +1470,18 @@ function {:inline} {{impl.fun_spec_aborts_borrow}}{{S}}(t: {{Self}}, k: {{K}}): 
 
 {#- Only emitted for a NATIVE-bound predicate (a defined spec fun is emitted
     by regular spec-function translation). The body mirrors the
-    `iter_borrow_mut` procedure's abort behavior exactly: end iterator or
-    absent key. -#}
+    `iter_borrow_mut` procedure's abort behavior exactly, per flavor: end
+    iterator or absent key when keyed, end iterator or out-of-range position
+    when position-based. -#}
 {%- if impl.fun_spec_aborts_iter_borrow_mut != "" and impl.fun_iter_borrow_mut != "" %}
-function {:inline} {{impl.fun_spec_aborts_iter_borrow_mut}}{{S}}(self: {{impl.iter_ptr_prefix}}'{{instance.0.suffix}}', t: {{Self}}): bool {
-    !(self is {{impl.iter_ptr_prefix}}'{{instance.0.suffix}}'_{{impl.iter_variant}})
+function {:inline} {{impl.fun_spec_aborts_iter_borrow_mut}}{{S}}(self: {{ITER}}, t: {{Self}}): bool {
+    !(self is {{ITER}}_{{impl.iter_variant}})
+{%- if impl.iter_is_index %}
+        || self->{{impl.iter_key_sel}} < 0
+        || self->{{impl.iter_key_sel}} >= LenTable(t{{U}})
+{%- else %}
         || !ContainsTable(t{{U}}, {{ENC}}(self->{{impl.iter_key_sel}}))
+{%- endif %}
 }
 {%- endif %}
 
@@ -1265,6 +1505,14 @@ function {:inline} {{impl.fun_spec_leaf_iter_valid}}{{S}}(it: {{impl.leaf_iter_v
 function {:inline} {{impl.fun_spec_iter_preserved}}{{S}}(t1: {{Self}}, t2: {{Self}}): bool {
     t1->$$validity == t2->$$validity
 }
+{%- endif %}
+
+{%- if impl.fun_spec_leaf_offset != "" %}
+// Position of a leaf walker in the enumeration. Left uninterpreted: unlike the
+// validity predicates there is nothing in the table representation to read it
+// from, so the map's own spec supplies the meaning — where the walk starts, how
+// each step advances it, and that it reaches the map's length at the end.
+function {{impl.fun_spec_leaf_offset}}{{S}}(it: {{impl.leaf_offset_prefix}}{% if impl.leaf_offset_generic %}'{{instance.0.suffix}}'{% endif %}, t: {{Self}}): int;
 {%- endif %}
 
 {% endmacro table_module %}
