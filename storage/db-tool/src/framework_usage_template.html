@@ -80,15 +80,25 @@ const report = JSON.parse(document.getElementById("report-data").textContent);
 const nf = new Intl.NumberFormat();
 const utc = usecs => new Date(Number(usecs) / 1000).toISOString();
 const esc = value => String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const moduleName = m => m ? `${m.address}::${m.name}` : "<script>";
+const shortAddress = address => {
+  const value = String(address ?? "");
+  const hex = value.replace(/^0x/i, "");
+  if (!/^[0-9a-f]+$/i.test(hex)) return value;
+  const compact = hex.replace(/^0+/, "") || "0";
+  return compact.length > 16 ? `${compact.slice(0, 8)}..${compact.slice(-4)}` : `0x${compact}`;
+};
+const rawModuleName = m => m ? `${m.address}::${m.name}` : "<script>";
+const rawFunctionName = f => f ? `${rawModuleName(f.module_id)}::${f.function_name}` : "<entrypoint>";
+const moduleName = m => m ? `${shortAddress(m.address)}::${m.name}` : "<script>";
 const functionName = f => f ? `${moduleName(f.module_id)}::${f.function_name}` : "<entrypoint>";
-const keyOf = f => functionName(f);
+const keyOf = f => rawFunctionName(f);
 const external = f => f.visibility !== "private" || f.is_entry;
 
 const functions = new Map();
 for (const f of report.functions) {
-  const id = `${moduleName(f.module_id)}::${f.function_name}`;
-  functions.set(id, {...f, id, invocations:0, transactions:0, successful:0, first:null, last:null, paths:[], callers:new Set()});
+  const id = `${rawModuleName(f.module_id)}::${f.function_name}`;
+  const displayId = `${moduleName(f.module_id)}::${f.function_name}`;
+  functions.set(id, {...f, id, displayId, invocations:0, transactions:0, successful:0, first:null, last:null, paths:[], callers:new Set()});
 }
 for (const u of report.function_usage) {
   const f = functions.get(keyOf(u.callee));
@@ -137,7 +147,7 @@ function renderFunctions() {
   const visibility = document.getElementById("visibility").value;
   const rows = all.filter(f => {
     const e = evidence(f, threshold);
-    if (query && !f.id.toLowerCase().includes(query)) return false;
+    if (query && !f.id.toLowerCase().includes(query) && !f.displayId.toLowerCase().includes(query)) return false;
     if (visibility !== "all" && f.visibility !== visibility) return false;
     if (classFilter === "candidates" && e.rank > 1) return false;
     if (classFilter === "unused" && f.invocations !== 0) return false;
@@ -145,13 +155,13 @@ function renderFunctions() {
     return true;
   }).sort((a,b) => {
     const ea=evidence(a,threshold), eb=evidence(b,threshold);
-    return ea.rank-eb.rank || a.transactions-b.transactions || a.invocations-b.invocations || a.id.localeCompare(b.id);
+    return ea.rank-eb.rank || a.transactions-b.transactions || a.invocations-b.invocations || a.displayId.localeCompare(b.displayId);
   });
   document.getElementById("table-title").textContent = `Functions (${nf.format(rows.length)} shown)`;
   document.getElementById("function-rows").innerHTML = rows.length ? rows.map(f => {
     const e=evidence(f,threshold);
     const flags=[f.is_entry?"entry":"",f.is_native?"native":"",f.type_parameter_count?`${f.type_parameter_count} type param${f.type_parameter_count===1?"":"s"}`:""] .filter(Boolean).join(" · ");
-    return `<tr><td><span class="badge ${e.cls}">${esc(e.text)}</span></td><td><button class="link" data-function="${esc(f.id)}"><code>${esc(f.id)}</code></button>${flags?`<div class="meta">${esc(flags)}</div>`:""}</td><td>${esc(f.visibility)}</td><td class="number">${nf.format(f.transactions)}</td><td class="number">${nf.format(f.invocations)}</td><td class="number">${nf.format(f.successful)}</td><td>${f.first===null?"Never":`${nf.format(f.first)}–${nf.format(f.last)}`}</td><td>${nf.format(f.callers.size)} address${f.callers.size===1?"":"es"}</td></tr>`;
+    return `<tr><td><span class="badge ${e.cls}">${esc(e.text)}</span></td><td><button class="link" data-function="${esc(f.id)}"><code title="${esc(f.id)}">${esc(f.displayId)}</code></button>${flags?`<div class="meta">${esc(flags)}</div>`:""}</td><td>${esc(f.visibility)}</td><td class="number">${nf.format(f.transactions)}</td><td class="number">${nf.format(f.invocations)}</td><td class="number">${nf.format(f.successful)}</td><td>${f.first===null?"Never":`${nf.format(f.first)}–${nf.format(f.last)}`}</td><td>${nf.format(f.callers.size)} address${f.callers.size===1?"":"es"}</td></tr>`;
   }).join("") : `<tr><td colspan="8" class="empty">No functions match these filters.</td></tr>`;
   for (const button of document.querySelectorAll("button[data-function]")) button.addEventListener("click", () => renderDetails(functions.get(button.dataset.function)));
 }
@@ -159,7 +169,7 @@ function renderFunctions() {
 function renderDetails(f) {
   const details=document.getElementById("details");
   details.hidden=false;
-  document.getElementById("detail-title").innerHTML=`<code>${esc(f.id)}</code>`;
+  document.getElementById("detail-title").innerHTML=`<code title="${esc(f.id)}">${esc(f.displayId)}</code>`;
   const summary=[
     ["Visibility",`${f.visibility}${f.is_entry?" · entry":""}${f.is_native?" · native":""}`],
     ["Transactions",nf.format(f.transactions)],
