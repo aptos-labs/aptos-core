@@ -13,11 +13,12 @@ h1 { margin:0; font-size:27px; letter-spacing:-.02em; }
 h2 { font-size:18px; margin:0 0 12px; }
 .subtitle { color:var(--muted); margin:5px 0 22px; }
 .notice { background:#fff9dd; border:1px solid #eadc93; border-radius:8px; padding:12px 14px; margin-bottom:18px; }
-.cards { display:grid; grid-template-columns:repeat(6,minmax(130px,1fr)); gap:10px; margin-bottom:18px; }
+.cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; margin-bottom:18px; }
 .card,.panel { background:var(--paper); border:1px solid var(--line); border-radius:9px; box-shadow:0 1px 2px #14202b0a; }
 .card { padding:13px; }
 .card .label { display:block; color:var(--muted); font-size:12px; }
 .card .value { display:block; font-size:21px; font-weight:700; margin-top:2px; }
+.card .value.time { font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
 .panel { padding:16px; margin-bottom:16px; }
 .controls { display:grid; grid-template-columns:minmax(240px,2fr) repeat(3,minmax(140px,1fr)); gap:10px; align-items:end; }
 label { color:var(--muted); font-size:12px; }
@@ -77,6 +78,7 @@ button.link { border:0; background:none; color:var(--accent); padding:0; cursor:
 "use strict";
 const report = JSON.parse(document.getElementById("report-data").textContent);
 const nf = new Intl.NumberFormat();
+const utc = usecs => new Date(Number(usecs) / 1000).toISOString();
 const esc = value => String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const moduleName = m => m ? `${m.address}::${m.name}` : "<script>";
 const functionName = f => f ? `${moduleName(f.module_id)}::${f.function_name}` : "<entrypoint>";
@@ -116,14 +118,15 @@ function renderCards() {
   const unusedExternal = all.filter(f => f.invocations === 0 && external(f)).length;
   const unused = all.filter(f => f.invocations === 0).length;
   const values = [
-    ["Ledger range", `${nf.format(report.start_version)}–${nf.format(report.end_version)}`],
-    ["Transactions replayed", nf.format(report.processed_transaction_count)],
-    ["User payload records", nf.format(report.transaction_usage_records)],
-    ["Framework functions", nf.format(all.length)],
-    ["Unobserved external", nf.format(unusedExternal)],
-    ["All unobserved", nf.format(unused)]
+    ["Ledger range", `${nf.format(report.start_version)}–${nf.format(report.end_version)}`, ""],
+    ["UTC range", `${utc(report.start_timestamp_usecs)} → ${utc(report.end_timestamp_usecs)}`, "time"],
+    ["Transactions replayed", nf.format(report.processed_transaction_count), ""],
+    ["User payload records", nf.format(report.transaction_usage_records), ""],
+    ["Framework functions", nf.format(all.length), ""],
+    ["Unobserved external", nf.format(unusedExternal), ""],
+    ["All unobserved", nf.format(unused), ""]
   ];
-  document.getElementById("cards").innerHTML = values.map(([label,value]) => `<div class="card"><span class="label">${esc(label)}</span><span class="value">${esc(value)}</span></div>`).join("");
+  document.getElementById("cards").innerHTML = values.map(([label,value,cls]) => `<div class="card"><span class="label">${esc(label)}</span><span class="value ${cls}">${esc(value)}</span></div>`).join("");
   document.getElementById("subtitle").textContent = `Replay ${nf.format(report.start_version)}–${nf.format(report.end_version)} · schema ${report.schema_version} · build ${report.git_sha || "unknown"}`;
 }
 

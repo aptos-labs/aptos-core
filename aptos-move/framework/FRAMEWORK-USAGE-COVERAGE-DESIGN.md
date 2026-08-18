@@ -318,6 +318,7 @@ Each shard contains:
 - schema version
 - processed inclusive version range
 - the replay image git SHA
+- ledger timestamps for the first and last version in the range
 - the target module list and complete function inventory
 - processed ledger transaction and user-transaction usage record counts
 - exact per-function and per-call-path aggregates

@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::framework_usage::FrameworkUsageCollector;
-use anyhow::{bail, Error, Ok, Result};
+use anyhow::{bail, Context, Error, Ok, Result};
 use aptos_backup_cli::utils::{ReplayConcurrencyLevelOpt, RocksdbOpt};
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_config::config::{
@@ -132,6 +132,16 @@ impl Opt {
                 verifier.start == self.start_version && verifier.limit == expected_limit,
                 "archive database does not contain the complete requested framework usage range"
             );
+        }
+        if let Some((collector, _, _)) = &function_usage {
+            let end = verifier
+                .start
+                .checked_add(verifier.limit - 1)
+                .context("framework usage end version overflow")?;
+            collector.set_ledger_timestamps(
+                verifier.arc_db.get_block_timestamp(verifier.start)?,
+                verifier.arc_db.get_block_timestamp(end)?,
+            )?;
         }
         let all_errors = verifier.run()?;
         if !all_errors.is_empty() {

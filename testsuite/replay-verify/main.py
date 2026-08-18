@@ -1458,6 +1458,7 @@ def merge_framework_usage_reports(
                 raise RuntimeError(f"framework usage shard metadata differs for {field}")
 
     cursor = expected_start
+    previous_end_timestamp = None
     for report in sorted(reports, key=lambda item: item["start_version"]):
         if report["start_version"] != cursor:
             raise RuntimeError(
@@ -1465,17 +1466,28 @@ def merge_framework_usage_reports(
             )
         if report["end_version"] < report["start_version"]:
             raise RuntimeError("framework usage shard has an invalid version range")
+        if report["end_timestamp_usecs"] < report["start_timestamp_usecs"]:
+            raise RuntimeError("framework usage shard has an invalid timestamp range")
+        if (
+            previous_end_timestamp is not None
+            and report["start_timestamp_usecs"] < previous_end_timestamp
+        ):
+            raise RuntimeError("framework usage shard timestamps are out of order")
+        previous_end_timestamp = report["end_timestamp_usecs"]
         cursor = report["end_version"] + 1
     if cursor != expected_end + 1:
         raise RuntimeError(
             f"framework usage range ended at {cursor - 1}, expected {expected_end}"
         )
 
+    reports_by_start = sorted(reports, key=lambda item: item["start_version"])
     merged = {
         "schema_version": reference["schema_version"],
         "network": network,
-        "start_version": min(report["start_version"] for report in reports),
-        "end_version": max(report["end_version"] for report in reports),
+        "start_version": reports_by_start[0]["start_version"],
+        "end_version": reports_by_start[-1]["end_version"],
+        "start_timestamp_usecs": reports_by_start[0]["start_timestamp_usecs"],
+        "end_timestamp_usecs": reports_by_start[-1]["end_timestamp_usecs"],
         "git_sha": reference["git_sha"],
         "target_modules": reference["target_modules"],
         "processed_transaction_count": sum(

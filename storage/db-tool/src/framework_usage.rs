@@ -20,7 +20,7 @@ use std::{
     sync::{Mutex, MutexGuard},
 };
 
-const SCHEMA_VERSION: u64 = 1;
+const SCHEMA_VERSION: u64 = 2;
 
 #[derive(Parser)]
 #[group(id = "FrameworkUsageOpt")]
@@ -119,6 +119,8 @@ struct FrameworkUsageReport {
     schema_version: u64,
     start_version: Version,
     end_version: Version,
+    start_timestamp_usecs: u64,
+    end_timestamp_usecs: u64,
     git_sha: String,
     target_modules: Vec<ModuleId>,
     processed_transaction_count: u64,
@@ -142,6 +144,7 @@ struct CollectorState {
     function_usage: BTreeMap<FunctionUsageKey, UsageCounts>,
     usage: BTreeMap<UsageKey, UsageCounts>,
     transaction_usage_records: u64,
+    ledger_timestamps: Option<(u64, u64)>,
 }
 
 pub(crate) struct FrameworkUsageCollector {
@@ -242,6 +245,24 @@ impl FrameworkUsageCollector {
         Ok(())
     }
 
+    pub(crate) fn set_ledger_timestamps(
+        &self,
+        start_timestamp_usecs: u64,
+        end_timestamp_usecs: u64,
+    ) -> Result<()> {
+        anyhow::ensure!(
+            start_timestamp_usecs <= end_timestamp_usecs,
+            "framework usage ledger timestamps are out of order"
+        );
+        let mut state = self.lock_state();
+        anyhow::ensure!(
+            state.ledger_timestamps.is_none(),
+            "framework usage ledger timestamps were already assigned"
+        );
+        state.ledger_timestamps = Some((start_timestamp_usecs, end_timestamp_usecs));
+        Ok(())
+    }
+
     pub(crate) fn write_report(&self, output: &Path, html_output: Option<&Path>) -> Result<()> {
         let state = self.lock_state();
         anyhow::ensure!(
@@ -254,10 +275,15 @@ impl FrameworkUsageCollector {
             .checked_sub(self.start_version)
             .and_then(|count| count.checked_add(1))
             .context("invalid or overflowing report version range")?;
+        let (start_timestamp_usecs, end_timestamp_usecs) = state
+            .ledger_timestamps
+            .context("framework usage ledger timestamps were not assigned")?;
         let report = FrameworkUsageReport {
             schema_version: SCHEMA_VERSION,
             start_version: self.start_version,
             end_version: self.end_version,
+            start_timestamp_usecs,
+            end_timestamp_usecs,
             git_sha: aptos_build_info::get_git_hash(),
             target_modules: self.target_modules.iter().cloned().collect(),
             processed_transaction_count,
@@ -383,6 +409,7 @@ mod tests {
             calls: vec![call.clone(), call],
         });
         collector.assign_version(HashValue::zero(), 12).unwrap();
+        collector.set_ledger_timestamps(1_000, 2_000).unwrap();
 
         let state = collector.lock_state();
         let function_counts = state.function_usage.values().next().unwrap();
@@ -404,6 +431,8 @@ mod tests {
             serde_json::from_reader(File::open(output).unwrap()).unwrap();
         assert_eq!(report["schema_version"], SCHEMA_VERSION);
         assert_eq!(report["processed_transaction_count"], 11);
+        assert_eq!(report["start_timestamp_usecs"], 1_000);
+        assert_eq!(report["end_timestamp_usecs"], 2_000);
         assert_eq!(report["function_usage"][0]["invocation_count"], 2);
         assert_eq!(report["usage"][0]["transaction_count"], 1);
         let html = std::fs::read_to_string(html_output).unwrap();
