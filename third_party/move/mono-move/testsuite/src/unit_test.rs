@@ -185,7 +185,8 @@ fn execute(
         natives,
         function,
     )
-    .with_extensions(seed_extensions());
+    // For Move unit tests, there is no user transaction context.
+    .with_extensions(seed_extensions(false));
 
     // Reference arguments point into this storage, so it must outlive `run()`.
     let _ref_args = marshal_args(&mut interpreter, function, &test.arguments);

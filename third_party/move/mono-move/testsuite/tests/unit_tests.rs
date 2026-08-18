@@ -43,7 +43,6 @@ fn aptos_stdlib_on_mono_move() {
 }
 
 #[test]
-#[ignore]
 fn aptos_framework_on_mono_move() {
     run_tests_for_pkg("aptos-framework", false);
 }

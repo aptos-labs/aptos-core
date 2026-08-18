@@ -10,9 +10,7 @@ use aptos_types::{
     error,
     transaction::{
         authenticator::AuthenticationKey,
-        user_transaction_context::{
-            EntryFunctionPayload, TransactionIndexKind, UserTransactionContext,
-        },
+        user_transaction_context::{EntryFunctionPayload, UserTransactionContext},
     },
 };
 use better_any::{Tid, TidAble};
@@ -186,22 +184,15 @@ fn native_monotonically_increasing_counter_internal(
         // monotonically_increasing_counter (128 bits) = `<reserved_byte (8 bits)> || timestamp_us (64 bits) || transaction_index (32 bits) || session counter (8 bits) || local_counter (16 bits)`
         // reserved_byte: 0 for block/chunk execution (V1), 1 for validation/simulation (TimestampNotYetAssignedV1)
         let timestamp_us = safely_pop_arg!(args, u64);
-        let transaction_index_kind = user_transaction_context.transaction_index_kind();
-
-        let (reserved_byte, transaction_index) = match transaction_index_kind {
-            TransactionIndexKind::BlockExecution { transaction_index } => {
-                (0u128, transaction_index)
-            },
-            TransactionIndexKind::ValidationOrSimulation { transaction_index } => {
-                (1u128, transaction_index)
-            },
-            TransactionIndexKind::NotAvailable => {
-                return Err(SafeNativeError::abort_with_message(
+        let (reserved_byte, transaction_index) = user_transaction_context
+            .transaction_index_kind()
+            .reserved_byte_and_transaction_index()
+            .ok_or_else(|| {
+                SafeNativeError::abort_with_message(
                     error::invalid_state(abort_codes::ETRANSACTION_INDEX_NOT_AVAILABLE),
                     "Transaction index is not available in this execution context",
-                ));
-            },
-        };
+                )
+            })?;
 
         let mut monotonically_increasing_counter: u128 = reserved_byte << 120;
         monotonically_increasing_counter |= (timestamp_us as u128) << 56;
@@ -374,7 +365,9 @@ fn native_chain_id_internal(
 
     let user_transaction_context_opt = get_user_transaction_context_opt_from_context(context);
     if let Some(transaction_context) = user_transaction_context_opt {
-        Ok(smallvec![Value::u8(transaction_context.chain_id())])
+        Ok(smallvec![Value::u8(
+            transaction_context.user_txn_chain_id()
+        )])
     } else {
         Err(SafeNativeError::abort_with_message(
             error::invalid_state(abort_codes::ETRANSACTION_CONTEXT_NOT_AVAILABLE),
