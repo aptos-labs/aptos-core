@@ -32,6 +32,15 @@ td { padding:9px; border-bottom:1px solid #e7ecef; vertical-align:top; }
 tbody tr:hover { background:#f7faff; }
 code { font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
 .number { text-align:right; font-variant-numeric:tabular-nums; }
+.function-column { width:320px; max-width:320px; }
+.function-column .link { max-width:100%; text-align:left; }
+.function-column code { overflow-wrap:anywhere; }
+.module-row:hover { background:transparent; }
+.module-row td { background:#e7edf2; border-bottom:1px solid #c5d0d9; padding:8px 10px; }
+.module-toggle { display:flex; align-items:center; gap:8px; width:100%; border:0; padding:0; background:none; color:var(--ink); cursor:pointer; text-align:left; font:inherit; }
+.module-toggle code { font-weight:700; }
+.module-chevron { width:12px; color:var(--muted); }
+.module-summary { margin-left:auto; color:var(--muted); font-size:12px; font-weight:400; }
 .badge { display:inline-block; border-radius:999px; padding:2px 7px; font-size:11px; font-weight:650; white-space:nowrap; }
 .unused-external { color:var(--danger); background:#fde7e7; }
 .rare-external { color:var(--warn); background:#fff0c9; }
@@ -70,7 +79,7 @@ button.link { border:0; background:none; color:var(--accent); padding:0; cursor:
   </section>
   <section class="panel">
     <h2 id="table-title">Functions</h2>
-    <div class="table-wrap"><table><thead><tr><th>Evidence</th><th>Function</th><th>Visibility</th><th class="number">Transactions</th><th class="number">Invocations</th><th class="number">Successful</th><th>Observed versions</th><th>Callers</th></tr></thead><tbody id="function-rows"></tbody></table></div>
+    <div class="table-wrap"><table><thead><tr><th>Evidence</th><th class="function-column">Function</th><th>Visibility</th><th class="number">Transactions</th><th class="number">Invocations</th><th class="number">Successful</th><th>Observed versions</th><th>Callers</th></tr></thead><tbody id="function-rows"></tbody></table></div>
   </section>
 </main>
 <script id="report-data" type="application/json">__FRAMEWORK_USAGE_REPORT__</script>
@@ -116,6 +125,13 @@ for (const p of report.usage) {
   if (p.caller?.module_id?.address) f.callers.add(p.caller.module_id.address);
 }
 const all = [...functions.values()];
+const modules = new Map();
+for (const f of all) {
+  const id = rawModuleName(f.module_id);
+  if (!modules.has(id)) modules.set(id, {id, displayId:moduleName(f.module_id), functions:[]});
+  modules.get(id).functions.push(f);
+}
+const collapsedModules = new Set();
 
 function evidence(f, threshold) {
   if (f.invocations === 0 && external(f)) return {rank:0, cls:"unused-external", text:"Unobserved external"};
@@ -157,12 +173,34 @@ function renderFunctions() {
     const ea=evidence(a,threshold), eb=evidence(b,threshold);
     return ea.rank-eb.rank || a.transactions-b.transactions || a.invocations-b.invocations || a.displayId.localeCompare(b.displayId);
   });
+  const grouped = new Map();
+  for (const f of rows) {
+    const moduleId = rawModuleName(f.module_id);
+    if (!grouped.has(moduleId)) grouped.set(moduleId, []);
+    grouped.get(moduleId).push(f);
+  }
+  const groups = [...grouped].sort(([left], [right]) => modules.get(left).displayId.localeCompare(modules.get(right).displayId));
   document.getElementById("table-title").textContent = `Functions (${nf.format(rows.length)} shown)`;
-  document.getElementById("function-rows").innerHTML = rows.length ? rows.map(f => {
+  const functionRow = f => {
     const e=evidence(f,threshold);
     const flags=[f.is_entry?"entry":"",f.is_native?"native":"",f.type_parameter_count?`${f.type_parameter_count} type param${f.type_parameter_count===1?"":"s"}`:""] .filter(Boolean).join(" · ");
-    return `<tr><td><span class="badge ${e.cls}">${esc(e.text)}</span></td><td><button class="link" data-function="${esc(f.id)}"><code title="${esc(f.id)}">${esc(f.displayId)}</code></button>${flags?`<div class="meta">${esc(flags)}</div>`:""}</td><td>${esc(f.visibility)}</td><td class="number">${nf.format(f.transactions)}</td><td class="number">${nf.format(f.invocations)}</td><td class="number">${nf.format(f.successful)}</td><td>${f.first===null?"Never":`${nf.format(f.first)}–${nf.format(f.last)}`}</td><td>${nf.format(f.callers.size)} address${f.callers.size===1?"":"es"}</td></tr>`;
+    return `<tr><td><span class="badge ${e.cls}">${esc(e.text)}</span></td><td class="function-column"><button class="link" data-function="${esc(f.id)}"><code title="${esc(f.id)}">${esc(f.function_name)}</code></button>${flags?`<div class="meta">${esc(flags)}</div>`:""}</td><td>${esc(f.visibility)}</td><td class="number">${nf.format(f.transactions)}</td><td class="number">${nf.format(f.invocations)}</td><td class="number">${nf.format(f.successful)}</td><td>${f.first===null?"Never":`${nf.format(f.first)}–${nf.format(f.last)}`}</td><td>${nf.format(f.callers.size)} address${f.callers.size===1?"":"es"}</td></tr>`;
+  };
+  document.getElementById("function-rows").innerHTML = groups.length ? groups.map(([moduleId, visibleFunctions]) => {
+    const module = modules.get(moduleId);
+    const observed = module.functions.filter(f => f.invocations > 0).length;
+    const candidates = module.functions.filter(f => evidence(f, threshold).rank <= 1).length;
+    const invocations = module.functions.reduce((total, f) => total + f.invocations, 0);
+    const collapsed = collapsedModules.has(moduleId);
+    const summary = `${nf.format(visibleFunctions.length)} shown of ${nf.format(module.functions.length)} · ${nf.format(observed)} observed · ${nf.format(candidates)} candidates · ${nf.format(invocations)} invocations`;
+    const header = `<tr class="module-row"><td colspan="8"><button class="module-toggle" data-module="${esc(moduleId)}" aria-expanded="${!collapsed}"><span class="module-chevron">${collapsed?"▸":"▾"}</span><code title="${esc(module.id)}">${esc(module.displayId)}</code><span class="module-summary">${esc(summary)}</span></button></td></tr>`;
+    return header + (collapsed ? "" : visibleFunctions.map(functionRow).join(""));
   }).join("") : `<tr><td colspan="8" class="empty">No functions match these filters.</td></tr>`;
+  for (const button of document.querySelectorAll("button[data-module]")) button.addEventListener("click", () => {
+    const moduleId = button.dataset.module;
+    if (collapsedModules.has(moduleId)) collapsedModules.delete(moduleId); else collapsedModules.add(moduleId);
+    renderFunctions();
+  });
   for (const button of document.querySelectorAll("button[data-function]")) button.addEventListener("click", () => renderDetails(functions.get(button.dataset.function)));
 }
 
