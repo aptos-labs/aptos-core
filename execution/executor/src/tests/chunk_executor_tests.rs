@@ -163,6 +163,59 @@ fn test_executor_execute_or_apply_and_commit_chunk() {
 }
 
 #[test]
+fn test_finished_executor_rejects_chunks_without_panicking() {
+    // State sync finishes the chunk executor as soon as it hands off to the continuous
+    // syncer or consensus, but chunks already queued in the storage synchronizer can
+    // still arrive afterwards. They must be rejected, not crash the node.
+    let batch_size: u64 = 10;
+    let (chunks, ledger_info) = create_transaction_chunks(vec![1..=batch_size]);
+
+    // Materialize the chunk as transaction outputs.
+    let output_chunk = {
+        let TestExecutor {
+            _path,
+            db,
+            executor,
+        } = TestExecutor::new();
+        executor
+            .execute_chunk(chunks[0].clone(), &ledger_info, None)
+            .unwrap();
+        executor.commit_chunk().unwrap();
+
+        let ledger_version = db.reader.expect_synced_version();
+        db.reader
+            .get_transaction_outputs(1, batch_size, ledger_version)
+            .unwrap()
+    };
+
+    let TestExecutor {
+        _path,
+        db: _db,
+        executor,
+    } = TestExecutor::new();
+    executor.reset().unwrap();
+    executor.finish();
+
+    // The outputs path used to `.expect("not reset")` here and take the node down.
+    assert!(executor
+        .enqueue_chunk_by_transaction_outputs(output_chunk, &ledger_info, None)
+        .is_err());
+    assert!(executor
+        .enqueue_chunk_by_execution(chunks[0].clone(), &ledger_info, None)
+        .is_err());
+    assert!(executor.update_ledger().is_err());
+    assert!(executor.commit_chunk().is_err());
+    assert!(executor.is_empty());
+
+    // A reset brings it back to a usable state.
+    executor.reset().unwrap();
+    executor
+        .execute_chunk(chunks[0].clone(), &ledger_info, None)
+        .unwrap();
+    executor.commit_chunk().unwrap();
+}
+
+#[test]
 fn test_executor_execute_and_commit_chunk_restart() {
     let first_batch_size = 30;
     let second_batch_size = 40;

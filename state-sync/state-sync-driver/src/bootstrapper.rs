@@ -32,6 +32,7 @@ use aptos_types::{
 };
 use futures::channel::oneshot;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use tokio::task::yield_now;
 
 // Useful bootstrapper constants
 const BOOTSTRAPPER_LOG_INTERVAL_SECS: u64 = 3;
@@ -419,6 +420,20 @@ impl<
                 }
             }
             self.reset_active_stream(None).await?;
+
+            // The stream is gone, but chunks we already handed to the storage
+            // synchronizer may still be in flight. Let them drain before tearing the
+            // chunk executor down, otherwise they hit an executor with no inner state.
+            while self.storage_synchronizer.pending_storage_data() {
+                sample!(
+                    SampleRate::Duration(Duration::from_secs(PENDING_DATA_LOG_FREQ_SECS)),
+                    info!("Waiting for the storage synchronizer to handle pending data!")
+                );
+
+                // Yield to avoid starving the storage synchronizer threads.
+                yield_now().await;
+            }
+
             self.storage_synchronizer.finish_chunk_executor(); // The bootstrapper is now complete
         }
 
