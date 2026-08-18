@@ -19,6 +19,8 @@ use mono_move_core::{
 // ETRANSACTION_CONTEXT_NOT_AVAILABLE.
 pub struct TransactionContextExtension {
     txn_hash: [u8; 32],
+    /// Chain id of the network the transaction runs on.
+    chain_id: u8,
     /// AUIDs issued so far in this transaction.
     auid_counter: u64,
     /// Per-session counter feeding the low bits of the monotonic counter.
@@ -36,11 +38,13 @@ pub struct TransactionContextExtension {
 impl TransactionContextExtension {
     pub fn new(
         txn_hash: [u8; 32],
+        chain_id: u8,
         session_counter: u8,
         transaction_index: Option<(u32, u8)>,
     ) -> Self {
         Self {
             txn_hash,
+            chain_id,
             auid_counter: 0,
             local_counter: 0,
             session_counter,
@@ -143,6 +147,19 @@ pub fn native_monotonically_increasing_counter_internal<C: NativeContext>(
     Ok(NativeStatus::Success)
 }
 
+/// `0x1::transaction_context::chain_id_internal(): u8` and the identical
+/// `0x1::type_info::chain_id_internal(): u8`.
+///
+/// Returns the chain id of the network the transaction runs on.
+//
+// TODO(metering): charge gas.
+pub fn native_chain_id<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
+    let ext = ctx.get_extension::<TransactionContextExtension>()?;
+    // SAFETY: return 0 is `u8`.
+    unsafe { ctx.set_return(0, ext.chain_id)? };
+    Ok(NativeStatus::Success)
+}
+
 /// Natives for the `transaction_context` module.
 pub fn make_all_transaction_context_natives<F: NativeContextFamily>() -> Vec<NativeEntry<F>> {
     monomorphic_natives![
@@ -153,6 +170,10 @@ pub fn make_all_transaction_context_natives<F: NativeContextFamily>() -> Vec<Nat
         (
             "0x1::transaction_context::monotonically_increasing_counter_internal",
             native_monotonically_increasing_counter_internal
+        ),
+        (
+            "0x1::transaction_context::chain_id_internal",
+            native_chain_id
         ),
     ]
 }

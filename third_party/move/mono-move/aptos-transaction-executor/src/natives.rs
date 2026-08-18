@@ -47,6 +47,7 @@ pub(crate) fn transaction_extensions(
     let mut extensions = NativeExtensions::new();
     extensions.add(TransactionContextExtension::new(
         txn_data.txn_hash,
+        txn_data.chain_id,
         txn_data.session_counter,
         txn_data.transaction_index,
     ));
