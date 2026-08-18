@@ -13,7 +13,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::Features,
     state_store::state_storage_usage::StateStorageUsage,
-    transaction::{EntryFunction, SignedTransaction, TransactionExecutableRef},
+    transaction::{AuxiliaryInfo, EntryFunction, SignedTransaction, TransactionExecutableRef},
 };
 use mono_move_core::{
     intern_type_tag, storage::module_provider::ModuleProvider, types::InternedTypeList, GasMeter,
@@ -44,6 +44,9 @@ pub struct AptosTransactionExecutor<'a> {
     features: &'a Features,
     /// State storage usage at the current epoch's beginning.
     usage: StateStorageUsage,
+    /// If set, the payload runs unmetered and the epilogue charges a zero
+    /// fee.
+    unmetered: bool,
 }
 
 impl<'a> AptosTransactionExecutor<'a> {
@@ -65,14 +68,29 @@ impl<'a> AptosTransactionExecutor<'a> {
             data_provider,
             features,
             usage,
+            unmetered: false,
         }
     }
 
+    /// Runs the payload unmetered, making the epilogue charge a zero fee.
+    /// For replay- and simulation-style callers that need gas-independent
+    /// outputs.
+    pub fn without_metering(mut self) -> Self {
+        self.unmetered = true;
+        self
+    }
+
     /// Executes one user transaction, returning its side effects unmaterialized (see [`TxnOutcome`]).
+    /// `aux_info` carries the transaction's index in its block, which seeds
+    /// `monotonically_increasing_number`.
     //
     // TODO(completeness): add logging. Should warn on unexpected errors/discards.
-    pub fn execute_user_transaction(&self, txn: &SignedTransaction) -> TxnOutcome {
-        match self.execute_user_transaction_impl(txn) {
+    pub fn execute_user_transaction(
+        &self,
+        txn: &SignedTransaction,
+        aux_info: &AuxiliaryInfo,
+    ) -> TxnOutcome {
+        match self.execute_user_transaction_impl(txn, aux_info) {
             Ok(outcome) => outcome,
             Err(reason) => TxnOutcome::Discarded(reason),
         }
@@ -82,6 +100,7 @@ impl<'a> AptosTransactionExecutor<'a> {
     fn execute_user_transaction_impl(
         &self,
         txn: &SignedTransaction,
+        aux_info: &AuxiliaryInfo,
     ) -> Result<TxnOutcome, DiscardReason> {
         let guard = self.guard;
 
@@ -92,7 +111,7 @@ impl<'a> AptosTransactionExecutor<'a> {
         // gas price bounds, intrinsic gas coverage. Without them a transaction
         // outside the configured bounds -- including a zero gas price -- buys a
         // full `max_gas_amount` budget for free.
-        let txn_data = TxnMetadata::new(txn);
+        let txn_data = TxnMetadata::new(txn, aux_info);
 
         let entry = match txn.payload().executable_ref() {
             Ok(TransactionExecutableRef::EntryFunction(entry)) => entry,
@@ -154,7 +173,14 @@ impl<'a> AptosTransactionExecutor<'a> {
         checkpoint(&mut interp)?;
 
         // ========================== User payload ============================
-        let payload_result = self.execute_entry_function(&mut interp, &txn_data, entry, ty_args);
+        // An unmetered payload leaves the balance untouched, making the
+        // epilogue charge nothing.
+        let payload_result = if self.unmetered {
+            interp
+                .unmetered(|interp| self.execute_entry_function(interp, &txn_data, entry, ty_args))
+        } else {
+            self.execute_entry_function(&mut interp, &txn_data, entry, ty_args)
+        };
         let gas_remaining = interp.gas_balance();
         let gas_used = max_gas.saturating_sub(gas_remaining);
 

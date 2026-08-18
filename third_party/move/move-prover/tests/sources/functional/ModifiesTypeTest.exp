@@ -1,5 +1,5 @@
 Move prover returns: exiting with bytecode transformation errors
-error: function `A::mutate_at` is opaque but its specification does not have a modifies clause for `A::S`
+warning: opaque call to `A::mutate_at` has an incomplete modifies frame; verification weakens its summary by havocing every address of 1 resource type
    ┌─ tests/sources/functional/ModifiesTypeTest.move:21:5
    │
 21 │ ╭     spec mutate_at {

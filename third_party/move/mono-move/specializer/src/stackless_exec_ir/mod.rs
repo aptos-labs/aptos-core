@@ -7,17 +7,19 @@
 //! eliminating the operand stack and allowing direct named-slot operands on each instruction.
 
 mod display;
+mod instr_seq;
 pub(crate) mod instr_utils;
 
 use crate::{gas::BlockCost, validate::TranslationWitness};
+pub use instr_seq::InstrSeq;
 pub use mono_move_core::CmpKind;
 use mono_move_core::{
     types::{InternedType, InternedTypeList},
     IntTy, PreparedModule,
 };
 use move_binary_format::file_format::{
-    ConstantPoolIndex, FieldHandleIndex, FunctionHandleIndex, IdentifierIndex,
-    VariantFieldHandleIndex,
+    ConstantPoolIndex, FieldHandleIndex, FunctionDefinitionIndex, FunctionHandleIndex,
+    IdentifierIndex, VariantFieldHandleIndex,
 };
 use move_core_types::{
     function::ClosureMask,
@@ -758,8 +760,9 @@ impl<SlotForm> Instr<SlotForm> {
 pub struct BasicBlock<SlotForm> {
     /// Label identifying this block.
     pub label: Label,
-    /// Instructions in this block.
-    pub instrs: Vec<Instr<SlotForm>>,
+    /// Instructions in this block, each carrying its originating bytecode
+    /// offset.
+    pub instrs: InstrSeq<SlotForm>,
 }
 
 /// IR for a single function, after slot allocation (named-slot form).
@@ -768,6 +771,8 @@ pub struct FunctionIR {
     pub name_idx: IdentifierIndex,
     /// Function handle index.
     pub handle_idx: FunctionHandleIndex,
+    /// This function's definition index in its module.
+    pub def_idx: FunctionDefinitionIndex,
     /// Number of parameters (count, not a slot).
     pub num_params: u16,
     /// Number of non-param locals (count, not a slot).
@@ -793,12 +798,14 @@ pub struct FunctionIR {
 impl FunctionIR {
     /// Iterate over all instructions across all blocks.
     pub fn instrs(&self) -> impl Iterator<Item = &Instr<NamedSlot>> {
-        self.blocks.iter().flat_map(|b| b.instrs.iter())
+        self.blocks.iter().flat_map(|block| block.instrs.iter())
     }
 
     /// Iterate mutably over all instructions across all blocks.
     pub fn instrs_mut(&mut self) -> impl Iterator<Item = &mut Instr<NamedSlot>> {
-        self.blocks.iter_mut().flat_map(|b| b.instrs.iter_mut())
+        self.blocks
+            .iter_mut()
+            .flat_map(|block| block.instrs.iter_mut())
     }
 }
 

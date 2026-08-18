@@ -688,11 +688,8 @@ module aptos_token_objects::token {
         if (royalty.is_some()) {
             royalty
         } else {
-            let creator = creator(token);
-            let collection_name = collection_name(token);
-            let collection_address = collection::create_collection_address(&creator, &collection_name);
-            let collection = object::address_to_object<collection::Collection>(collection_address);
-            royalty::get(collection)
+            // Use the canonical collection object stored in the token, not re-derived from name
+            royalty::get(borrow(&token).collection)
         }
     }
 
@@ -1261,6 +1258,146 @@ module aptos_token_objects::token {
         create_token_with_collection_helper(creator, collection, token_name);
 
         assert!(collection::count(collection) == option::some(2), 0);
+    }
+
+    #[test(creator = @0x123, attacker = @0x456)]
+    /// Regression test for royalty shadow collection vulnerability.
+    /// Verifies that token::royalty uses the canonical collection object stored in the token,
+    /// not a re-derived address that could point to an attacker's shadow collection.
+    fun test_royalty_after_collection_rename_no_shadow(creator: &signer, attacker: &signer) acquires Token {
+        let original_name = string::utf8(b"original collection");
+        let new_name = string::utf8(b"renamed collection");
+        let token_name = string::utf8(b"token");
+        let creator_address = signer::address_of(creator);
+
+        // Create collection with royalty
+        let canonical_royalty = royalty::create(5, 100, creator_address);
+        let constructor_ref = collection::create_fixed_collection(
+            creator,
+            string::utf8(b"description"),
+            10,
+            original_name,
+            option::some(canonical_royalty),
+            string::utf8(b"uri"),
+        );
+        let collection = constructor_ref.object_from_constructor_ref<Collection>();
+        let mutator_ref = collection::generate_mutator_ref(&constructor_ref);
+
+        // Create token without token-level royalty (will fall back to collection)
+        create_named_token_object(
+            creator,
+            collection,
+            string::utf8(b"token description"),
+            token_name,
+            option::none(),  // No token-level royalty
+            string::utf8(b"token uri"),
+        );
+
+        let token_addr = create_token_address(&creator_address, &original_name, &token_name);
+        let token = object::address_to_object<Token>(token_addr);
+
+        // Before rename: royalty should be canonical
+        assert!(option::some(canonical_royalty) == royalty(token), 0);
+
+        // Rename the collection
+        collection::set_name(&mutator_ref, new_name);
+
+        // Attacker creates a shadow collection at the renamed address with malicious royalty
+        let attacker_address = signer::address_of(attacker);
+        let malicious_royalty = royalty::create(99, 100, attacker_address);  // 99% to attacker!
+        collection::create_fixed_collection(
+            attacker,
+            string::utf8(b"shadow description"),
+            10,
+            new_name,  // Same name as renamed collection
+            option::some(malicious_royalty),
+            string::utf8(b"shadow uri"),
+        );
+
+        // CRITICAL: After rename, royalty should STILL be canonical, NOT shadow
+        // The fix ensures we use borrow(&token).collection, not re-derive from name
+        let actual_royalty = royalty(token);
+        assert!(option::some(canonical_royalty) == actual_royalty, 1);
+
+        // Verify it's NOT the malicious royalty
+        if (actual_royalty.is_some()) {
+            let r = actual_royalty.extract();
+            assert!(royalty::payee_address(&r) == creator_address, 2);  // Should be creator, not attacker
+            assert!(royalty::numerator(&r) == 5, 3);  // Should be 5%, not 99%
+        };
+    }
+
+    #[test(creator = @0x123)]
+    /// Verifies that collection-level royalty fallback works correctly without rename.
+    fun test_collection_royalty_fallback(creator: &signer) acquires Token {
+        let collection_name = string::utf8(b"collection");
+        let token_name = string::utf8(b"token");
+        let creator_address = signer::address_of(creator);
+
+        // Create collection with royalty
+        let expected_royalty = royalty::create(10, 100, creator_address);
+        let constructor_ref = collection::create_fixed_collection(
+            creator,
+            string::utf8(b"description"),
+            5,
+            collection_name,
+            option::some(expected_royalty),
+            string::utf8(b"uri"),
+        );
+        let collection = constructor_ref.object_from_constructor_ref<Collection>();
+
+        // Create token without royalty (should fall back to collection)
+        create_named_token_object(
+            creator,
+            collection,
+            string::utf8(b"token description"),
+            token_name,
+            option::none(),  // No token-level royalty
+            string::utf8(b"token uri"),
+        );
+
+        let token_addr = create_token_address(&creator_address, &collection_name, &token_name);
+        let token = object::address_to_object<Token>(token_addr);
+
+        // Verify fallback works
+        assert!(option::some(expected_royalty) == royalty(token), 0);
+    }
+
+    #[test(creator = @0x123)]
+    /// Verifies token-level royalty takes precedence over collection royalty.
+    fun test_token_royalty_overrides_collection(creator: &signer) acquires Token {
+        let collection_name = string::utf8(b"collection");
+        let token_name = string::utf8(b"token");
+        let creator_address = signer::address_of(creator);
+
+        // Create collection with one royalty
+        let collection_royalty = royalty::create(5, 100, creator_address);
+        let constructor_ref = collection::create_fixed_collection(
+            creator,
+            string::utf8(b"description"),
+            5,
+            collection_name,
+            option::some(collection_royalty),
+            string::utf8(b"uri"),
+        );
+        let collection = constructor_ref.object_from_constructor_ref<Collection>();
+
+        // Create token with different royalty
+        let token_royalty = royalty::create(10, 100, creator_address);
+        create_named_token_object(
+            creator,
+            collection,
+            string::utf8(b"token description"),
+            token_name,
+            option::some(token_royalty),  // Token has its own royalty
+            string::utf8(b"token uri"),
+        );
+
+        let token_addr = create_token_address(&creator_address, &collection_name, &token_name);
+        let token = object::address_to_object<Token>(token_addr);
+
+        // Token royalty should take precedence
+        assert!(option::some(token_royalty) == royalty(token), 0);
     }
 
     #[test_only]

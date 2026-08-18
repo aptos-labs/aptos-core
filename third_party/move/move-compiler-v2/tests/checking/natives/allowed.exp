@@ -1,0 +1,9 @@
+// -- Model dump before first bytecode pipeline
+module 0xa::m {
+    private native fun whatever(): u64;
+} // end 0xa::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xa::m {
+    native fun whatever(): u64;
+}

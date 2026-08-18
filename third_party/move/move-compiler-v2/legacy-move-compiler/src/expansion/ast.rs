@@ -2188,6 +2188,8 @@ impl AstDebug for Exp_ {
                     BehaviorKind::AbortsOf => "aborts_of",
                     BehaviorKind::EnsuresOf => "ensures_of",
                     BehaviorKind::ResultOf => "result_of",
+                    BehaviorKind::UnchangedOf => "unchanged_of",
+                    BehaviorKind::FoldsOf => "folds_of",
                 };
                 w.write(kind_str);
                 w.write("<");

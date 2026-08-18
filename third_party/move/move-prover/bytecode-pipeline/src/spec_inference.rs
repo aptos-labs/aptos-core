@@ -118,8 +118,8 @@ use move_model::{
         ABORTS_IF_IS_PARTIAL_PRAGMA, CONDITION_INFERRED_PROP, CONDITION_INFERRED_SATHARD,
         CONDITION_INFERRED_VACUOUS, INFERENCE_PRAGMA, OPAQUE_PRAGMA,
     },
-    pureness_checker::{FunctionPurenessChecker, FunctionPurenessCheckerMode},
     sourcifier::Sourcifier,
+    spec_derivation,
     symbol::Symbol,
     ty::{PrimitiveType, Type, BOOL_TYPE, NUM_TYPE},
     well_known,
@@ -627,10 +627,14 @@ impl FunctionTargetProcessor for SpecInferenceProcessor {
 // LambdaSpecInferenceProcessor
 
 /// Auto-infers specs for lambda-lifted functions which have no user-written spec
-/// conditions, in verify mode. Without an inferred spec, behavioral predicates over
-/// such a lambda degrade to trivial values at call sites (`bp_ensures_of = true`,
-/// `bp_aborts_of = false`, `result_of` unconstrained). Inferring `ensures result == …`
-/// and `aborts_if …` from the body gives callers real information.
+/// conditions, in verify mode. Lambdas passed to *non-inline* higher-order
+/// functions are lifted into function values; without an inferred spec,
+/// behavioral predicates over such a lambda degrade to trivial values at call
+/// sites (`bp_ensures_of = true`, `bp_aborts_of = false`, `result_of`
+/// unconstrained). Inferring `ensures result == …` and `aborts_if …` from the
+/// body gives callers real information. (Lambdas passed to inline functions
+/// are not lifted; behavioral predicates over them are inlined at the
+/// expansion site by the inliner instead.)
 ///
 /// Operates on the Baseline variant (before `SpecInstrumentationProcessor` would
 /// clear it for opaque callees). Best-effort: if the analyzer cannot summarize the
@@ -1458,6 +1462,30 @@ fn collect_modifies_targets(exp: &Exp, targets: &mut Vec<Exp>) {
 /// Check if an expression is a trivial boolean `true` literal
 fn is_trivial_true(exp: &Exp) -> bool {
     matches!(exp.as_ref(), ExpData::Value(_, Value::Bool(true)))
+}
+
+/// Check if an expression contains a state-anchor operation
+/// (`SaveStateAnchor` marker or `WithStateAnchor` wrapper). Such props must
+/// not be consumed as inference facts: the marker is a positional no-op, and
+/// an anchored condition refers to an intermediate program point's state.
+fn contains_state_anchor(exp: &Exp) -> bool {
+    let mut found = false;
+    exp.visit_pre_order(&mut |e| {
+        if matches!(
+            e,
+            ExpData::Call(
+                _,
+                AstOp::SaveStateAnchor(..)
+                    | AstOp::WithStateAnchor(..)
+                    | AstOp::FoldsCaptureAnchor(..),
+                _
+            )
+        ) {
+            found = true;
+        }
+        !found
+    });
+    found
 }
 
 /// Check if an expression is a verification-infrastructure assumption that
@@ -2522,7 +2550,7 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
                             );
                             *state = self.substitute_exp_state(state, dests[0], &spec_call);
                             self.global_env()
-                                .add_used_spec_fun(module_id.qualified(spec_fun_id));
+                                .add_used_spec_fun_transitive(module_id.qualified(spec_fun_id));
                             let (fun_exp, _) = self.mk_closure(
                                 *module_id,
                                 *fun_id,
@@ -3412,6 +3440,21 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
             Bytecode::Prop(id, kind, exp) => {
                 match kind {
                     PropKind::Assume | PropKind::Assert => {
+                        // Skip props carrying state-anchor operations. A
+                        // `SaveStateAnchor` marker is a positional no-op (it
+                        // directs where spec instrumentation snapshots state),
+                        // not a logical fact; and a condition under a
+                        // `WithStateAnchor` wrapper refers to the state of an
+                        // intermediate program point, which the WP state model
+                        // cannot represent. Such props arise in lambda bodies
+                        // into which the inliner expanded an anchored inline
+                        // call (e.g. a lambda wrapping an inline function's
+                        // once-applied function parameter). Dropping a fact
+                        // only weakens antecedents; the inferred spec is still
+                        // verified afterwards.
+                        if contains_state_anchor(exp) {
+                            return;
+                        }
                         // Treat WellFormed assumptions as no-ops for inference:
                         // they wrap every ensures in implications like
                         // `WellFormed(a) ==> WellFormed(b) ==> result == a + b`
@@ -4156,84 +4199,15 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         }
     }
 
-    /// Check if a callee has an associated pure spec function (created by the
-    /// spec rewriter) that can be called directly in spec expressions, returning
-    /// the spec function id and instantiated result type if so.
-    ///
-    /// A function qualifies if it has no `&mut` params, no function-type params,
-    /// and an associated spec function with empty `used_memory`. Native pure
-    /// functions are accepted even though their derived spec function has no
-    /// body — the Boogie backend resolves them through prelude theories.
+    /// The pure-spec-call test shared with the source-level derivation; see
+    /// [`spec_derivation::try_as_pure_spec_call`].
     fn try_as_pure_spec_call(
         &self,
         module_id: ModuleId,
         fun_id: FunId,
         type_inst: &[Type],
     ) -> Option<(SpecFunId, Type)> {
-        let callee = self.global_env().get_function(QualifiedId {
-            module_id,
-            id: fun_id,
-        });
-        // Must have no &mut params and no function-type params
-        if callee
-            .get_parameters()
-            .iter()
-            .any(|p| p.1.is_mutable_reference() || matches!(p.1.skip_reference(), Type::Fun(..)))
-        {
-            return None;
-        }
-        // Special case: intrinsic Move functions (e.g. SimpleMap::contains_key) are
-        // axiomatized in Boogie via their paired spec function (e.g. spec_contains_key).
-        // They have no `$name` spec function body, so find_spec_fun() returns None.
-        // Instead, look up the spec function through the IntrinsicsAnnotation pairing table.
-        let callee_qid = callee.get_qualified_id();
-        if let Some(spec_qid) = self
-            .global_env()
-            .get_intrinsics()
-            .get_spec_fun_for_move_fun(&callee_qid)
-        {
-            // Use the spec function's return type, not the Move function's (which may be &V).
-            let mod_env = self.global_env().get_module(spec_qid.module_id);
-            let spec_decl = mod_env.get_spec_fun(spec_qid.id);
-            let result_type = spec_decl.result_type.instantiate(type_inst);
-            return Some((spec_qid.id, result_type));
-        }
-
-        // Must have an associated spec function with a body and no memory use.
-        // `spec_rewriter` removes the body (`body = None`) for any spec function that
-        // contains imperative expressions (Loop, Assign, Mutate, Return, LoopCont), so
-        // a callee whose spec fun has side-effects or a while-loop body is rejected here.
-        let (spec_fun_id, decl) = callee.find_spec_fun()?;
-        // Non-native functions without a derived body cannot be expressed as a
-        // spec call — typical of effectful operations like `move_to`/`move_from`.
-        // Native body-less spec functions (e.g. `vector::length`) are pure and
-        // resolved natively by the backend, so we let them through.
-        if !decl.is_native && decl.body.is_none() {
-            return None;
-        }
-        // Must not access global memory.
-        if !decl.used_memory.is_empty() {
-            return None;
-        }
-        // Additionally check the Move function body for specification-mode purity:
-        // no Assign, Return, uninitialized let, or mutable borrows.
-        // `FunctionPurenessChecker` traverses all sub-expressions including those
-        // nested inside Loop nodes, so a while-loop body containing Assign is caught.
-        if let Some(def) = callee.get_def() {
-            let mut is_pure = true;
-            let mut checker = FunctionPurenessChecker::new(
-                FunctionPurenessCheckerMode::Specification,
-                |_, _, _| {
-                    is_pure = false;
-                },
-            );
-            checker.check_exp(self.global_env(), def);
-            if !is_pure {
-                return None;
-            }
-        }
-        let result_type = callee.get_result_type().instantiate(type_inst);
-        Some((spec_fun_id, result_type))
+        spec_derivation::try_as_pure_spec_call(self.global_env(), module_id, fun_id, type_inst)
     }
 
     fn add_direct_call_modifies(

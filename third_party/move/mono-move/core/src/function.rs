@@ -6,29 +6,56 @@ use crate::{
     interner::InternedModuleId,
 };
 use mono_move_alloc::{GlobalArenaPtr, LeakedBoxPtr};
+use move_binary_format::file_format::FunctionDefinitionIndex;
 use std::{fmt, ptr::NonNull};
 
-/// Function's micro-ops.
+/// Offset of an instruction in a function's original Move bytecode.
+pub type BytecodeOffset = move_binary_format::file_format::CodeOffset;
+
+/// Function's micro-ops, paired with each micro-op's originating bytecode
+/// offset. Owning both keeps the pair atomic: code can never be swapped
+/// without its provenance.
 // TODO(completeness): when demand-driven re-optimization swaps in new code at
 // runtime, the swap must not be observed by the transaction that triggered it.
 // Only future re-executions may see the new code; the running transaction keeps
 // executing against the code it started with.
 pub struct Code {
-    inner: Box<[MicroOp]>,
+    ops: Box<[MicroOp]>,
+    /// One entry per micro-op, or empty for code with no bytecode ancestry.
+    /// Cold: consulted only on error paths, never in dispatch.
+    origins: Box<[BytecodeOffset]>,
 }
 
 impl Code {
-    /// Builds code from a vector of micro-ops.
+    /// Builds code from a vector of micro-ops, with no bytecode origins.
     pub fn from_vec(ops: Vec<MicroOp>) -> Self {
         Self {
-            inner: ops.into_boxed_slice(),
+            ops: ops.into_boxed_slice(),
+            origins: Box::new([]),
+        }
+    }
+
+    /// Builds code with each micro-op's originating bytecode offset.
+    ///
+    /// The caller must ensure `origins` is parallel to `ops` (one entry per
+    /// micro-op).
+    pub fn with_origins(ops: Vec<MicroOp>, origins: Vec<BytecodeOffset>) -> Self {
+        Self {
+            ops: ops.into_boxed_slice(),
+            origins: origins.into_boxed_slice(),
         }
     }
 
     /// The function's micro-ops.
     #[inline(always)]
-    pub fn get(&self) -> &[MicroOp] {
-        &self.inner
+    pub fn ops(&self) -> &[MicroOp] {
+        &self.ops
+    }
+
+    /// Originating bytecode offset of each micro-op; empty for code with no
+    /// bytecode ancestry.
+    pub fn origins(&self) -> &[BytecodeOffset] {
+        &self.origins
     }
 }
 
@@ -141,6 +168,8 @@ impl SortedSafePointEntries {
 pub struct Function {
     pub name: GlobalArenaPtr<str>,
     pub module_id: InternedModuleId,
+    /// Definition index of this function in its defining module.
+    pub def_idx: FunctionDefinitionIndex,
     pub code: Code,
     /// Gas cost of the entry basic block.
     pub entry_gas: u64,
@@ -246,9 +275,13 @@ impl fmt::Display for Function {
         writeln!(f, "  frame_data_size: {}", self.param_and_local_sizes_sum)?;
         writeln!(f, "  entry_gas: {}", self.entry_gas)?;
         writeln!(f, "  code:")?;
-        let code = self.code.get();
+        let code = self.code.ops();
         for (i, op) in code.iter().enumerate() {
-            writeln!(f, "    {}: {}", i, op)?;
+            write!(f, "    {}: {}", i, op)?;
+            match self.code.origins().get(i) {
+                Some(origin) => writeln!(f, " @{}", origin)?,
+                None => writeln!(f)?,
+            }
         }
         let entries = self.safe_point_layouts.entries();
         if !entries.is_empty() {

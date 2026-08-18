@@ -39,14 +39,15 @@ impl NamedChain {
         *self as u8
     }
 
-    pub fn from_chain_id(chain_id: &ChainId) -> Result<NamedChain, String> {
+    pub fn from_chain_id(chain_id: &ChainId) -> Result<Self, String> {
         let chain_id = chain_id.id();
         match chain_id {
-            1 => Ok(NamedChain::MAINNET),
-            2 => Ok(NamedChain::TESTNET),
-            3 => Ok(NamedChain::DEVNET), // TODO: this is not correct and should removed. The devnet chain ID changes.
-            4 => Ok(NamedChain::TESTING),
-            5 => Ok(NamedChain::PREMAINNET),
+            1 => Ok(Self::MAINNET),
+            2 => Ok(Self::TESTNET),
+            // NOTE: hardcoded in internal-ops.
+            3 | 10..=49 | 225..=249 => Ok(Self::DEVNET),
+            4 => Ok(Self::TESTING),
+            5 => Ok(Self::PREMAINNET),
             _ => Err(format!("Not a named chain. Given ID: {:?}", chain_id)),
         }
     }
@@ -84,6 +85,11 @@ impl ChainId {
     /// Returns true iff the chain ID matches mainnet
     pub fn is_mainnet(&self) -> bool {
         self.matches_named_chain(NamedChain::MAINNET)
+    }
+
+    /// Returns true iff the chain ID matches devnet
+    pub fn is_devnet(&self) -> bool {
+        self.matches_named_chain(NamedChain::DEVNET)
     }
 
     /// Returns true iff the chain ID matches the given named chain
@@ -214,5 +220,20 @@ mod test {
         assert!(ChainId::from_str("255255").is_err());
         assert_eq!(ChainId::from_str("TESTING").unwrap(), ChainId::test());
         assert_eq!(ChainId::from_str("255").unwrap(), ChainId::new(255));
+    }
+
+    #[test]
+    fn test_chain_id_is_devnet() {
+        for id in [3, 10, 49, 225, 249] {
+            assert!(ChainId::new(id).is_devnet(), "{} should be devnet", id);
+        }
+        // Reserved named chains and IDs outside the devnet ranges.
+        for id in [1, 2, 4, 5, 9, 50, 224, 250, 255] {
+            assert!(!ChainId::new(id).is_devnet(), "{} should not be devnet", id);
+        }
+
+        assert!(!ChainId::mainnet().is_devnet());
+        assert!(!ChainId::testnet().is_devnet());
+        assert!(!ChainId::test().is_devnet());
     }
 }

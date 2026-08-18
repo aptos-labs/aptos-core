@@ -4,7 +4,7 @@
 use crate::{
     bytecode::{Decompile, Disassemble},
     coverage::{CoverageCommon, SummaryCoverage},
-    dispatch_transaction,
+    dispatch_transaction, exchange,
     fmt::Fmt,
     lint::LintPackage,
     local_simulation,
@@ -30,6 +30,7 @@ use aptos_cli_common::{
 };
 use aptos_crypto::HashValue;
 use aptos_framework::{
+    build_model,
     chunked_publish::{
         chunk_package_and_create_payloads, large_packages_cleanup_staging_area, PublishType,
     },
@@ -77,6 +78,7 @@ use serde_json::json;
 use std::{
     collections::BTreeMap,
     fmt::{Display, Formatter},
+    io::Write,
     path::{Path, PathBuf},
     str::FromStr,
     sync::Arc,
@@ -113,6 +115,7 @@ pub enum MoveTool {
     #[clap(alias = "doc")]
     Document(DocumentPackage),
     Download(DownloadPackage),
+    Exchange(ExchangePackage),
     Init(InitPackage),
     Lint(LintPackage),
     List(ListPackage),
@@ -162,6 +165,7 @@ impl MoveTool {
             MoveTool::Lint(tool) => tool.attach_env(env).execute_serialized().await,
             MoveTool::Show(tool) => tool.attach_env(env).execute_serialized().await,
             MoveTool::VerifyPackage(tool) => tool.attach_env(env).execute_serialized().await,
+            MoveTool::Exchange(tool) => tool.attach_env(env).execute_serialized().await,
             MoveTool::Prove(tool) => tool.attach_env(env).execute_serialized().await,
             MoveTool::Clean(tool) => tool.attach_env(env).execute_serialized().await,
             MoveTool::Coverage(tool) => tool.attach_env(env).execute().await,
@@ -725,6 +729,208 @@ impl CliCommand<&'static str> for ProvePackage {
             Ok(_) => Ok("Success"),
             Err(e) => Err(CliError::MoveProverError(format!("{:#}", e))),
         }
+    }
+}
+
+/// Exports Move code in the exchange format for external tools
+///
+/// The JSON dump contains the stackless-bytecode CFG, the specifications,
+/// and the loop metadata; its schema is defined by the datatypes of the
+/// `move-model-exchange` crate (`third_party/move/move-model/exchange`).
+/// The primary consumer today is the Lean formalization of the Move Prover
+/// (`third_party/move/lean`).
+///
+/// Package mode (default): compiles the package and writes one JSON file
+/// per target module; modules using features outside the supported
+/// fragment are skipped with a warning.
+///
+/// Single-file mode (`--masm-file` or `--move-file`, used by the Lean
+/// `masm%`/`move%` elaborators): processes one masm file resp. one
+/// self-contained Move module and writes the JSON to `--out-file` (or
+/// stdout is not used to keep it free for the CLI result).
+#[derive(Parser)]
+#[clap(group(clap::ArgGroup::new("single_file")
+    .multiple(false)
+    .args(&["masm_file", "move_file"])
+    .requires("out_file")))]
+pub struct ExchangePackage {
+    #[clap(flatten)]
+    move_options: MovePackageOptions,
+
+    /// Directory where to write the JSON files in package mode (defaults
+    /// to `exchange-json` under the package path)
+    #[clap(long, value_parser, conflicts_with = "single_file")]
+    export_dir: Option<PathBuf>,
+
+    /// A single masm file to export (instead of a package)
+    #[clap(long, value_parser)]
+    masm_file: Option<PathBuf>,
+
+    /// A single self-contained Move module file to export (instead of a
+    /// package)
+    #[clap(long, value_parser)]
+    move_file: Option<PathBuf>,
+
+    /// Output file for single-file mode (required with `--masm-file` or
+    /// `--move-file`)
+    #[clap(long, value_parser, requires = "single_file")]
+    out_file: Option<PathBuf>,
+
+    #[clap(skip)]
+    pub env: Arc<MoveEnv>,
+}
+
+#[cfg(test)]
+mod exchange_flag_tests {
+    use super::ExchangePackage;
+    use clap::Parser;
+
+    #[test]
+    fn single_file_flags_are_tied_together() {
+        assert!(ExchangePackage::try_parse_from(["exchange", "--out-file", "out.json"]).is_err());
+        assert!(
+            ExchangePackage::try_parse_from(["exchange", "--masm-file", "input.masm"]).is_err()
+        );
+        assert!(ExchangePackage::try_parse_from([
+            "exchange",
+            "--masm-file",
+            "input.masm",
+            "--out-file",
+            "out.json",
+        ])
+        .is_ok());
+    }
+
+    #[test]
+    fn package_and_single_file_outputs_conflict() {
+        assert!(ExchangePackage::try_parse_from([
+            "exchange",
+            "--masm-file",
+            "input.masm",
+            "--out-file",
+            "out.json",
+            "--export-dir",
+            "exports",
+        ])
+        .is_err());
+    }
+}
+
+#[async_trait]
+impl CliCommand<&'static str> for ExchangePackage {
+    fn command_name(&self) -> &'static str {
+        "ExchangePackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<&'static str> {
+        let ExchangePackage {
+            move_options,
+            export_dir,
+            masm_file,
+            move_file,
+            out_file,
+            env: _,
+        } = self;
+        if masm_file.is_some() || move_file.is_some() {
+            let out_file = out_file.ok_or_else(|| {
+                CliError::CommandArgumentError("single-file mode requires --out-file".to_string())
+            })?;
+            return task::spawn_blocking(move || {
+                let (path, is_move) = match (&masm_file, &move_file) {
+                    (Some(p), None) => (p, false),
+                    (None, Some(p)) => (p, true),
+                    _ => unreachable!("clap enforces exclusivity"),
+                };
+                let module = if is_move {
+                    exchange::move_file_to_module(path)
+                } else {
+                    let input = std::fs::read_to_string(path)
+                        .map_err(|e| CliError::IO(path.display().to_string(), e))?;
+                    exchange::masm_to_module(&input)
+                }
+                .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
+                let text = serde_json::to_string(&module).expect("serialization succeeds");
+                std::fs::write(&out_file, text)
+                    .map_err(|e| CliError::IO(out_file.display().to_string(), e))?;
+                Ok("Success")
+            })
+            .await
+            .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
+        }
+        let compiler_version = move_options
+            .compiler_version
+            .or_else(|| Some(CompilerVersion::latest_stable()));
+        let language_version = move_options
+            .language_version
+            .or_else(|| Some(LanguageVersion::latest_stable()));
+        task::spawn_blocking(move || {
+            let package_path = move_options.get_package_path()?;
+            let out_dir = export_dir.unwrap_or_else(|| package_path.join("exchange-json"));
+            let model = build_model(
+                move_options.dev,
+                false, // test_mode
+                true,  // verify_mode
+                package_path.as_path(),
+                move_options.named_addresses(),
+                None,
+                fix_bytecode_version(move_options.bytecode_version, language_version),
+                compiler_version,
+                language_version,
+                move_options.skip_attribute_checks,
+                extended_checks::get_all_attribute_names().clone(),
+                vec![],
+                true,  // with_bytecode
+                false, // all_files_as_targets
+            )
+            .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
+            model
+                .check_errors("in compilation")
+                .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
+            std::fs::create_dir_all(&out_dir)
+                .map_err(|e| CliError::IO(out_dir.display().to_string(), e))?;
+            // Remove the artifacts of previous runs, so that renamed or
+            // removed modules do not leave stale exports behind.
+            for entry in std::fs::read_dir(&out_dir)
+                .map_err(|e| CliError::IO(out_dir.display().to_string(), e))?
+            {
+                let path = entry
+                    .map_err(|e| CliError::IO(out_dir.display().to_string(), e))?
+                    .path();
+                if path.to_string_lossy().ends_with(".exchange.json") {
+                    std::fs::remove_file(&path)
+                        .map_err(|e| CliError::IO(path.display().to_string(), e))?;
+                }
+            }
+            let mut exported = 0usize;
+            for module in model.get_modules() {
+                if !module.is_target() {
+                    continue;
+                }
+                let name = module.get_full_name_str().replace("::", "_");
+                match exchange::dump_module_from_model(&model, module.get_id()) {
+                    Ok(module) => {
+                        let path = out_dir.join(format!("{}.exchange.json", name));
+                        let text = module.to_pretty_json();
+                        let mut tmp = tempfile::NamedTempFile::new_in(&out_dir)
+                            .map_err(|e| CliError::IO(out_dir.display().to_string(), e))?;
+                        tmp.write_all((text + "\n").as_bytes())
+                            .map_err(|e| CliError::IO(path.display().to_string(), e))?;
+                        tmp.persist_noclobber(&path)
+                            .map_err(|e| CliError::IO(path.display().to_string(), e.error))?;
+                        exported += 1;
+                    },
+                    Err(e) => eprintln!(
+                        "warning: skipping module `{}`: {:#}",
+                        module.get_full_name_str(),
+                        e
+                    ),
+                }
+            }
+            println!("Exported {} module(s) to {}", exported, out_dir.display());
+            Ok("Success")
+        })
+        .await
+        .map_err(|err| CliError::UnexpectedError(err.to_string()))?
     }
 }
 
@@ -3476,6 +3682,7 @@ impl_with_move_env!(
     CompilePackage,
     CompileScript,
     ProvePackage,
+    ExchangePackage,
     DocumentPackage,
     BuildPublishPayload,
     VerifyPackage,

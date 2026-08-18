@@ -1,0 +1,58 @@
+Move prover returns: exiting with verification errors
+error: unknown assertion failed
+   ┌─ tests/sources/functional/closures/inline/two_state_spec_fun.move:30:13
+   │
+30 │             assert ensures_of<f>(x, res); // error: the lambda adds 2, not 3, for the `delta_false` caller
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:50: delta_false
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:55: delta_false (spec)
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:50: delta_false
+   =         a = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:26: bump_then_apply
+   =         a' = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:27: bump_then_apply
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:55: delta_false (spec)
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:51: delta_false
+   =         res = <redacted>
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:30: bump_then_apply
+
+error: induction case of the loop invariant does not hold
+   ┌─ tests/sources/functional/closures/inline/two_state_spec_fun.move:70:13
+   │
+70 │             invariant forall j in 0..i: ensures_of<f>(v[j]); // error: entry delta is i, not 0, for the `loop_delta_false` caller
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:87: loop_delta_false
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:92: loop_delta_false (spec)
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:93: loop_delta_false (spec)
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:87: loop_delta_false
+   =         v = <redacted>
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:61: for_each_apply
+   =         a' = <redacted>
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:62: for_each_apply
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:63: for_each_apply
+   =         n = <redacted>
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:67: for_each_apply
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:68: for_each_apply
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:69: for_each_apply
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:70: for_each_apply
+   =     enter loop, variable(s) i havocked and reassigned
+   =         i = <redacted>
+   =     loop invariant holds at current state
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:68: for_each_apply
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:69: for_each_apply
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:70: for_each_apply
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:64: for_each_apply
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:65: for_each_apply
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:88: loop_delta_false
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:66: for_each_apply
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:64: for_each_apply
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:68: for_each_apply
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:69: for_each_apply
+   =     at tests/sources/functional/closures/inline/two_state_spec_fun.move:70: for_each_apply

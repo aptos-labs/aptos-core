@@ -1,0 +1,35 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/inline/state_hofs.move:88:9
+   │
+88 │         ensures forall i in 0..len(v): R[v[i]].v == old(R[v[i]].v) + 2; // error: off by one
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/state_hofs.move:78: bump_all_wrong
+   =     at tests/sources/functional/closures/inline/state_hofs.move:85: bump_all_wrong (spec)
+   =     at tests/sources/functional/closures/inline/state_hofs.move:86: bump_all_wrong (spec)
+   =     at tests/sources/functional/closures/inline/state_hofs.move:78: bump_all_wrong
+   =         v = <redacted>
+   =     at tests/sources/functional/closures/inline/state_hofs.move:27: for_each_addr
+   =         v = <redacted>
+   =     at tests/sources/functional/closures/inline/state_hofs.move:28: for_each_addr
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/inline/state_hofs.move:29: for_each_addr
+   =         n = <redacted>
+   =     at tests/sources/functional/closures/inline/state_hofs.move:33: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:34: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:35: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:36: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:37: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:38: for_each_addr
+   =     enter loop, variable(s) i havocked and reassigned
+   =         i = <redacted>
+   =     loop invariant holds at current state
+   =     at tests/sources/functional/closures/inline/state_hofs.move:34: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:35: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:36: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:37: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:38: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:30: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:87: bump_all_wrong (spec)
+   =     at tests/sources/functional/closures/inline/state_hofs.move:88: bump_all_wrong (spec)

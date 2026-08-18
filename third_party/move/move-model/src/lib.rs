@@ -50,6 +50,7 @@ pub mod options;
 pub mod pragmas;
 pub mod pureness_checker;
 pub mod sourcifier;
+pub mod spec_derivation;
 pub mod spec_translator;
 pub mod symbol;
 pub mod ty;

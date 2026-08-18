@@ -503,6 +503,9 @@ fn collect_struct_op_from_exp(func: &FunctionEnv, exp: &ExpData, ops: &mut Vec<S
             | Operation::Global(_)
             | Operation::CanModify
             | Operation::Old
+            | Operation::SaveStateAnchor(..)
+            | Operation::WithStateAnchor(..)
+            | Operation::FoldsCaptureAnchor(..)
             | Operation::Trace(_)
             | Operation::EmptyVec
             | Operation::SingleVec

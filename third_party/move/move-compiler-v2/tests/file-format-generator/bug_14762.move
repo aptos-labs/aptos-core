@@ -31,7 +31,7 @@ module 0xc0ffee::m {
             i = i + 1;
         };
         spec {
-            assert find ==> f(v[found_index]);
+            assert find ==> result_of<f>(v[found_index]);
         };
         (find, found_index)
     }

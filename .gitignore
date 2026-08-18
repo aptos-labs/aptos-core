@@ -145,6 +145,7 @@ genesis_antithesis_*/
 # ignore cursor rules / claude settings
 .cursor/rules
 .claude
+.atlas/
 
 #ignore proptest regressions
 **/proptest_regressions/*

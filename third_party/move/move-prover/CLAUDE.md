@@ -295,14 +295,14 @@ The `prove` accepts multiple options, among those:
       --proc-cores <PROC_CORES>
           The number of cores to use for parallel processing of verification conditions
 
-      --shards <SHARDS>
-          The number of shards to split the verification problem into. Shards are processed sequentially. This can be used to ease memory pressure for verification of large packages
-
-      --only-shard <ONLY_SHARD>
-          If there are multiple shards, the shard to which verification shall be narrowed
-
       --vc-timeout <VC_TIMEOUT>
           A (soft) timeout for the solver, per verification condition, in seconds
+
+      --seed-handoff-ratio <SEED_HANDOFF_RATIO>
+          With the implicit single-seed configuration, start a deterministic
+          fallback seed after this fraction of the VC soft timeout. Defaults
+          to 2/3; set to 0 to disable the fallback. Explicit multi-seed
+          configurations continue to race their seeds immediately.
 
       --check-inconsistency
           Whether to check consistency of specs by injecting impossible assertions
