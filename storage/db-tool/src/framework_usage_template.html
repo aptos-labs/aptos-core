@@ -41,6 +41,10 @@ code { font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
 .module-toggle code { font-weight:700; }
 .module-chevron { width:12px; color:var(--muted); }
 .module-summary { margin-left:auto; color:var(--muted); font-size:12px; font-weight:400; }
+.table-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.table-heading h2 { margin:0; }
+.module-control { border:1px solid #bdc7d0; border-radius:6px; padding:6px 9px; background:white; color:var(--ink); cursor:pointer; font:inherit; font-size:12px; }
+.module-control:disabled { cursor:default; opacity:.55; }
 .badge { display:inline-block; border-radius:999px; padding:2px 7px; font-size:11px; font-weight:650; white-space:nowrap; }
 .unused-external { color:var(--danger); background:#fde7e7; }
 .rare-external { color:var(--warn); background:#fff0c9; }
@@ -78,7 +82,7 @@ button.link { border:0; background:none; color:var(--accent); padding:0; cursor:
     <div class="paths table-wrap" id="detail-paths"></div>
   </section>
   <section class="panel">
-    <h2 id="table-title">Functions</h2>
+    <div class="table-heading"><h2 id="table-title">Functions</h2><button class="module-control" id="toggle-modules" type="button">Collapse all modules</button></div>
     <div class="table-wrap"><table><thead><tr><th>Evidence</th><th class="function-column">Function</th><th>Visibility</th><th class="number">Transactions</th><th class="number">Invocations</th><th class="number">Successful</th><th>Observed versions</th><th>Callers</th></tr></thead><tbody id="function-rows"></tbody></table></div>
   </section>
 </main>
@@ -132,6 +136,7 @@ for (const f of all) {
   modules.get(id).functions.push(f);
 }
 const collapsedModules = new Set();
+let visibleModuleIds = [];
 
 function evidence(f, threshold) {
   if (f.invocations === 0 && external(f)) return {rank:0, cls:"unused-external", text:"Unobserved external"};
@@ -180,6 +185,11 @@ function renderFunctions() {
     grouped.get(moduleId).push(f);
   }
   const groups = [...grouped].sort(([left], [right]) => modules.get(left).displayId.localeCompare(modules.get(right).displayId));
+  visibleModuleIds = groups.map(([moduleId]) => moduleId);
+  const toggle = document.getElementById("toggle-modules");
+  const allCollapsed = visibleModuleIds.length > 0 && visibleModuleIds.every(moduleId => collapsedModules.has(moduleId));
+  toggle.textContent = allCollapsed ? "Expand all modules" : "Collapse all modules";
+  toggle.disabled = visibleModuleIds.length === 0;
   document.getElementById("table-title").textContent = `Functions (${nf.format(rows.length)} shown)`;
   const functionRow = f => {
     const e=evidence(f,threshold);
@@ -222,6 +232,13 @@ function renderDetails(f) {
 }
 
 for (const id of ["search","class-filter","visibility","threshold"]) document.getElementById(id).addEventListener(id==="search"||id==="threshold"?"input":"change",renderFunctions);
+document.getElementById("toggle-modules").addEventListener("click", () => {
+  const expand = visibleModuleIds.length > 0 && visibleModuleIds.every(moduleId => collapsedModules.has(moduleId));
+  for (const moduleId of visibleModuleIds) {
+    if (expand) collapsedModules.delete(moduleId); else collapsedModules.add(moduleId);
+  }
+  renderFunctions();
+});
 renderCards();
 renderFunctions();
 </script>
