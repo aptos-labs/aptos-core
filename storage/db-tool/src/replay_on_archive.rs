@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use crate::framework_usage::FrameworkUsageCollector;
 use anyhow::{bail, Error, Ok, Result};
 use aptos_backup_cli::utils::{ReplayConcurrencyLevelOpt, RocksdbOpt};
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
@@ -25,7 +26,10 @@ use aptos_types::{
     },
     write_set::WriteSet,
 };
-use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
+use aptos_vm::{
+    aptos_vm::AptosVMBlockExecutor, function_usage::install_function_usage_sink, AptosVM,
+    VMBlockExecutor,
+};
 use aptos_vm_environment::prod_configs::{
     set_async_runtime_checks, set_layout_caches, set_paranoid_type_checks,
 };
@@ -89,7 +93,38 @@ pub struct Opt {
 
 impl Opt {
     pub async fn run(self) -> Result<()> {
-        let verifier = Verifier::new(&self)?;
+        self.run_impl(None).await
+    }
+
+    pub(crate) async fn run_with_function_usage(self, output: PathBuf) -> Result<()> {
+        anyhow::ensure!(
+            self.replay_concurrency_level.get() == 1,
+            "framework usage replay requires --replay-concurrency-level 1"
+        );
+        let collector = Arc::new(FrameworkUsageCollector::new(
+            self.start_version,
+            self.end_version,
+        ));
+        let _sink_guard = install_function_usage_sink(collector.clone())?;
+        self.run_impl(Some((collector, output))).await
+    }
+
+    async fn run_impl(
+        self,
+        function_usage: Option<(Arc<FrameworkUsageCollector>, PathBuf)>,
+    ) -> Result<()> {
+        let verifier = Verifier::new(&self, function_usage.as_ref().map(|(sink, _)| sink.clone()))?;
+        if function_usage.is_some() {
+            let expected_limit = self
+                .end_version
+                .checked_sub(self.start_version)
+                .and_then(|limit| limit.checked_add(1))
+                .ok_or_else(|| anyhow::anyhow!("invalid or overflowing framework usage range"))?;
+            anyhow::ensure!(
+                verifier.start == self.start_version && verifier.limit == expected_limit,
+                "archive database does not contain the complete requested framework usage range"
+            );
+        }
         let all_errors = verifier.run()?;
         if !all_errors.is_empty() {
             error!("{} failed transactions", all_errors.len());
@@ -97,6 +132,10 @@ impl Opt {
                 error!("Failed: {}", e);
             }
             process::exit(2);
+        }
+        if let Some((collector, output)) = function_usage {
+            collector.write_report(&output)?;
+            info!(output = ?output, "Wrote framework usage report.");
         }
         Ok(())
     }
@@ -132,6 +171,10 @@ impl ReplayTps {
     pub fn get_elapsed_secs(&self) -> u64 {
         self.timer.elapsed().as_secs()
     }
+
+    pub fn get_txn_cnt(&self) -> u64 {
+        self.txn_cnt.load(std::sync::atomic::Ordering::Relaxed)
+    }
 }
 
 struct Verifier {
@@ -144,10 +187,11 @@ struct Verifier {
     concurrent_replay: usize,
     replay_stat: ReplayTps,
     timeout_secs: Option<u64>,
+    function_usage: Option<Arc<FrameworkUsageCollector>>,
 }
 
 impl Verifier {
-    pub fn new(config: &Opt) -> Result<Self> {
+    pub fn new(config: &Opt, function_usage: Option<Arc<FrameworkUsageCollector>>) -> Result<Self> {
         // Open in write mode to create any new DBs necessary.
         {
             if let Err(e) = panic::catch_unwind(|| {
@@ -205,6 +249,7 @@ impl Verifier {
             concurrent_replay: config.concurrent_replay,
             replay_stat: ReplayTps::new(),
             timeout_secs: config.timeout_secs,
+            function_usage,
         })
     }
 
@@ -236,6 +281,12 @@ impl Verifier {
         for iter in res.into_iter() {
             all_failed_txns.extend(iter?);
         }
+        anyhow::ensure!(
+            self.replay_stat.get_txn_cnt() == self.limit,
+            "replayed {} transactions but expected {}",
+            self.replay_stat.get_txn_cnt(),
+            self.limit
+        );
         Ok(all_failed_txns)
     }
 
@@ -299,6 +350,7 @@ impl Verifier {
             }
         }
         // verify results
+        let cnt = cur_txns.len();
         let fail_txns = self.execute_and_verify(
             &executor,
             &mut chunk_start_version,
@@ -309,6 +361,7 @@ impl Verifier {
             &mut expected_writesets,
         )?;
         total_failed_txns.extend(fail_txns);
+        self.replay_stat.update_cnt(cnt as u64);
         Ok(total_failed_txns)
     }
 
@@ -343,7 +396,7 @@ impl Verifier {
             0
         };
 
-        Ok((start_version, limit))
+        Ok((start, limit))
     }
 
     fn execute_and_verify(
@@ -402,6 +455,12 @@ impl Verifier {
                 expected_writesets.drain(0..idx + 1);
 
                 return Ok(Some(err));
+            }
+
+            if let (Some(collector), Transaction::UserTransaction(txn)) =
+                (&self.function_usage, &cur_txns[idx])
+            {
+                collector.assign_version(txn.committed_hash(), version)?;
             }
         }
 

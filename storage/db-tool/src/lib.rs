@@ -6,6 +6,7 @@ extern crate core;
 mod backup;
 mod backup_maintenance;
 mod bootstrap;
+mod framework_usage;
 mod gen_replay_verify_jobs;
 mod replay_on_archive;
 mod replay_verify;
@@ -37,6 +38,8 @@ pub enum DBTool {
 
     GenReplayVerifyJobs(gen_replay_verify_jobs::Opt),
 
+    FrameworkUsage(framework_usage::Opt),
+
     #[clap(subcommand)]
     Restore(restore::Command),
 
@@ -56,6 +59,7 @@ impl DBTool {
                 ret
             },
             DBTool::GenReplayVerifyJobs(cmd) => cmd.run().await,
+            DBTool::FrameworkUsage(cmd) => cmd.run().await,
             DBTool::Restore(cmd) => cmd.run().await,
             DBTool::ReplayOnArchive(cmd) => cmd.run().await,
         }
