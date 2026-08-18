@@ -12,9 +12,11 @@ import Move.Semantics.Reference
 import Move.Semantics.Vector
 import Move.Semantics.Global
 import Move.Verify.Contract
+import Move.Verify.WP
 import Move.Verify.Borrow
 import Move.Verify.Compare
 import Move.Verify.Syntax
+import Move.Verify.Tactics
 import Move.Compiler.LIR
 import Move.Compiler.LCNF
 import Move.Compiler.Normalize

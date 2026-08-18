@@ -212,7 +212,7 @@ move_module OrderedMap where
       if entryKey == keyView then
         abort 1
     let entries ← &mut map.entries
-    entries.insert index { key, value }
+    Move.Vector.insert entries index { key, value }
 
   spec add {K : Type} {V : Type} [Move.Compare.Total K]
       (map : &mut Map K V) (key : K) (value : V) where
@@ -230,7 +230,7 @@ move_module OrderedMap where
       let entryKey ← &entriesView[index].key
       if entryKey == key then
         let entries ← &mut map.entries
-        let removed ← entries.remove index
+        let removed ← Move.Vector.remove entries index
         pure removed.value
       else
         abort 2
@@ -830,9 +830,11 @@ move_module OrderedMap where
                 Move.Semantics.Spec.pure entry := by
           apply Move.Semantics.Vector.borrowElemSpec_eq_pure
           simpa [target] using atTarget
-        by_cases equal : Move.Compare.equal entry.key key = true
-        · have same := (Move.Compare.equal_eq_true_iff entry.key key).mp equal
-          have equalBeq : (entry.key == key) = true := equal
+        by_cases equal : Move.Verify.Source.logicalBEq entry.key key = true
+        · have compareEqual : Move.Compare.equal entry.key key = true := by
+            simpa using equal
+          have same := (Move.Compare.equal_eq_true_iff entry.key key).mp compareEqual
+          have equalBeq := equal
           simp only [target, Move.Verify.Source.logicalLT_u64,
             Move.U64.toNat_ofNat, Move.Vector.length_toNat, inBounds,
             if_pos] at restExecution
@@ -844,7 +846,7 @@ move_module OrderedMap where
           constructor
           · exact ⟨entry, List.mem_of_getElem? atTarget, same, rfl⟩
           · exact middleEq
-        · have unequalBeq : ¬((entry.key == key) = true) := equal
+        · have unequalBeq := equal
           simp only [target, Move.Verify.Source.logicalLT_u64,
             Move.U64.toNat_ofNat, Move.Vector.length_toNat, inBounds,
             if_pos] at restExecution
@@ -873,8 +875,8 @@ move_module OrderedMap where
                   Move.Semantics.Spec.pure entry := by
             apply Move.Semantics.Vector.borrowElemSpec_eq_pure
             simpa [target] using atTarget
-          by_cases equal : Move.Compare.equal entry.key key = true
-          · have equalBeq : (entry.key == key) = true := equal
+          by_cases equal : Move.Verify.Source.logicalBEq entry.key key = true
+          · have equalBeq := equal
             simp only [target, Move.Verify.Source.logicalLT_u64,
               Move.U64.toNat_ofNat, Move.Vector.length_toNat, inBounds,
               if_pos] at restAbort
@@ -882,7 +884,7 @@ move_module OrderedMap where
             simp only [Move.Semantics.Spec.pure_bind] at restAbort
             rw [if_pos equalBeq] at restAbort
             simp [Move.Semantics.Spec.pure] at restAbort
-          · have unequalBeq : ¬((entry.key == key) = true) := equal
+          · have unequalBeq := equal
             simp only [target, Move.Verify.Source.logicalLT_u64,
               Move.U64.toNat_ofNat, Move.Vector.length_toNat, inBounds,
               if_pos] at restAbort
@@ -901,8 +903,8 @@ move_module OrderedMap where
               rw [atTarget] at atCandidate
               injection atCandidate with candidateEq
               subst candidate
-              exact equal
-                ((Move.Compare.equal_eq_true_iff entry.key key).mpr same)
+              apply equal
+              simpa using (Move.Compare.equal_eq_true_iff entry.key key).mpr same
             · rfl
         · simp [target, inBounds] at restAbort
           rcases restAbort with rfl
@@ -958,8 +960,8 @@ move_module OrderedMap where
                 Move.Semantics.Spec.pure entry := by
           apply Move.Semantics.Vector.borrowElemSpec_eq_pure
           simpa [target] using atTarget
-        have equalBeq : (entry.key == key) = true := by
-          change Move.Compare.equal entry.key key = true
+        have equalBeq : Move.Verify.Source.logicalBEq entry.key key = true := by
+          rw [Move.Verify.Source.logicalBEq_move]
           exact (Move.Compare.equal_eq_true_iff entry.key key).mpr same
         simp only [Move.Semantics.Mutation.read] at restExecution
         simp only [target, Move.Verify.Source.logicalLT_u64,
@@ -979,11 +981,11 @@ move_module OrderedMap where
                   Move.Semantics.Spec.pure entry := by
             apply Move.Semantics.Vector.borrowElemSpec_eq_pure
             simpa [target] using atTarget
-          have unequalBeq : ¬((entry.key == key) = true) := by
+          have unequalBeq : ¬Move.Verify.Source.logicalBEq entry.key key = true := by
             intro equal
             apply present
             exact ⟨entry, List.mem_of_getElem? atTarget,
-              (Move.Compare.equal_eq_true_iff entry.key key).mp equal⟩
+              (Move.Compare.equal_eq_true_iff entry.key key).mp (by simpa using equal)⟩
           simp only [Move.Semantics.Mutation.read] at restExecution
           simp only [target, Move.Verify.Source.logicalLT_u64,
             Move.U64.toNat_ofNat, Move.Vector.length_toNat, inBounds,
@@ -1099,7 +1101,7 @@ move_module OrderedMap where
             simp [Move.Semantics.Spec.abort] at restAbort
             constructor
             · exact ⟨entry, List.mem_of_getElem? atTarget,
-                (Move.Compare.equal_eq_true_iff entry.key key).mp equal⟩
+                (Move.Compare.equal_eq_true_iff entry.key key).mp (by simpa using equal)⟩
             · exact restAbort
           case isFalse equal =>
             have insertBound : target ≤ map.entries.toList.length := by
@@ -1191,7 +1193,7 @@ move_module OrderedMap where
           simp [Move.Semantics.Spec.abort] at restExecution
         case isTrue equal =>
           have same : entry.key = key :=
-            (Move.Compare.equal_eq_true_iff entry.key key).mp equal
+            (Move.Compare.equal_eq_true_iff entry.key key).mp (by simpa using equal)
           change (Move.Semantics.Spec.bind
             (Move.Semantics.withMutation map.entries fun entries =>
               Move.Semantics.Spec.bind
@@ -1304,8 +1306,8 @@ move_module OrderedMap where
               rw [atTarget] at atCandidate
               injection atCandidate with candidateEq
               subst candidate
-              exact unequal
-                ((Move.Compare.equal_eq_true_iff entry.key key).mpr same)
+              exact unequal (by
+                simpa using (Move.Compare.equal_eq_true_iff entry.key key).mpr same)
             · exact restAbort
         · simp only [Move.Semantics.Mutation.read] at restAbort
           simp [target, inBounds, Move.Semantics.Spec.abort] at restAbort

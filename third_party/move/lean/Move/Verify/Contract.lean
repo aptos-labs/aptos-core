@@ -1,6 +1,7 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
+import Move.Verify.SimpAttrs
 import Move.Semantics.Checked
 import Move.Semantics.Reference
 

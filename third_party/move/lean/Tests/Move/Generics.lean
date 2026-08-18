@@ -239,6 +239,17 @@ private def vaultKey (ty : MoveModel.IR.Ty) := MoveModel.IR.resourceKey vaultId 
 #guard vaultKey .u64 != vaultKey .bool
 #guard vaultKey (.vector .u64) != vaultKey (.vector .bool)
 
+-- Reading existence and publishing do not acquire a resource; removal does.
+#guard match compiled.funMeta.find? (·.name == "hasGeneric") with
+  | some info => info.acquires.isEmpty
+  | none => false
+#guard match compiled.funMeta.find? (·.name == "publishGeneric") with
+  | some info => info.acquires.isEmpty
+  | none => false
+#guard match compiled.funMeta.find? (·.name == "takeVault") with
+  | some info => info.acquires == [vaultId]
+  | none => false
+
 private def vaultMemory (address value : Nat) : MoveModel.IR.IMem :=
   [(vaultKey .u64, address, .struct [.u64 value])]
 

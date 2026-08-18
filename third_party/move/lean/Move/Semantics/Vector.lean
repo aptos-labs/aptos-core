@@ -25,6 +25,16 @@ def borrowElemSpec (values : Move.Vector α) (index : U64) : Spec σ α where
   aborts := fun _ code =>
     values.toList[index.toNat]? = none ∧ code = Resource.executionFailure
 
+/-- Checked functional update used by the compiler-facing `Vector.set`
+primitive. -/
+def setSpec (values : Move.Vector α) (index : U64) (value : α) :
+    Spec σ (Move.Vector α) where
+  ok := fun initial result final =>
+    (∃ old, values.toList[index.toNat]? = some old) ∧
+      result = Move.Vector.set values index value ∧ final = initial
+  aborts := fun _ code =>
+    values.toList[index.toNat]? = none ∧ code = Resource.executionFailure
+
 @[simp] theorem borrowElemSpec_eq_pure {values : Move.Vector α} {index : U64}
     {value : α} (present : values.toList[index.toNat]? = some value) :
     (borrowElemSpec values index : Spec σ α) = Spec.pure value := by

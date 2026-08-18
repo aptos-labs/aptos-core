@@ -53,21 +53,10 @@ move_module Read where
   /-! ## Proofs -/
 
   verify read by
-    unfold read.contract read.sourceSpec
-    intro State store addr initial permitted
+    contract_intro
     rcases Option.isSome_iff_exists.mp permitted with ⟨reading, lookup⟩
-    constructor
-    · intro result final execution
-      simp [Move.Semantics.Spec.bind, Move.Semantics.Spec.pure,
-        Move.Semantics.Resource.borrowSpec, lookup] at execution
-      rcases execution with ⟨value, ⟨valueEq, finalEq⟩, resultEq⟩
-      subst value
-      subst result
-      subst final
-      simp [Move.Semantics.ResourceStore.get, lookup]
-    · intro code execution
-      simp [Move.Semantics.Spec.bind, Move.Semantics.Spec.pure,
-        Move.Semantics.Resource.borrowSpec, lookup] at execution
+    rw [Move.Verify.wp_bind, Move.Verify.wp_borrowSpec]
+    simp [Move.Semantics.ResourceStore.get, lookup]
 
   verify readAtLeast by
     unfold readAtLeast.contract readAtLeast.sourceSpec

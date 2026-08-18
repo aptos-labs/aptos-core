@@ -62,6 +62,7 @@ def isLoopTokenJoinMarker (name : Name) : Bool := name == ``loopTokenJoin
 
 private structure LoopMarkerRegistration where
   function : Name
+  marker : Name
   label : Nat
   nonce : Nat
   deriving BEq
@@ -82,13 +83,14 @@ private initialize loopMarkerRegistrations :
   }
 
 def isRegisteredLoopMarker (env : Environment) (function : Name)
-    (label nonce : Nat) : Bool :=
-  (loopMarkerRegistrations.getState env).contains { function, label, nonce }
+    (marker : Name) (label nonce : Nat) : Bool :=
+  (loopMarkerRegistrations.getState env).contains
+    { function, marker, label, nonce }
 
-private def registerLoopMarker (function : Name) (label nonce : Nat) :
-    TermElabM Unit :=
+private def registerLoopMarker (function marker : Name) (label nonce : Nat) :
+  TermElabM Unit :=
   modifyEnv fun env =>
-    loopMarkerRegistrations.addEntry env { function, label, nonce }
+    loopMarkerRegistrations.addEntry env { function, marker, label, nonce }
 
 scoped syntax:max (name := borrowTerm) "&" term:40 : term
 scoped syntax:max (name := borrowMutTerm) "&mut " term:40 : term
@@ -122,7 +124,9 @@ loop. Keep this small source-scope analysis here so compilation and source
 verification agree on binding identity. -/
 
 private def loopReassignedIdent? (stx : Syntax) : Option Ident :=
-  if !stx.isOfKind ``Lean.Parser.Term.doReassign || stx.getNumArgs == 0 then
+  let isReassignment := stx.isOfKind ``Lean.Parser.Term.doReassign ||
+    stx.isOfKind ``Lean.Parser.Term.doReassignArrow
+  if !isReassignment || stx.getNumArgs == 0 then
     none
   else
     let decl := stx[0]
@@ -140,13 +144,25 @@ private partial def firstIdent? (stx : Syntax) : Option Ident :=
   if stx.isIdent then some ⟨stx⟩
   else stx.getArgs.findSome? firstIdent?
 
-private def loopBoundDoIdent? (stx : Syntax) : Option Ident :=
+private partial def patternIdents (stx : Syntax) : List Ident :=
+  if stx.isIdent then
+    [⟨stx⟩]
+  else
+    stx.getArgs.toList.flatMap patternIdents
+
+private def loopBoundDoIdents (stx : Syntax) : List Ident :=
   if !stx.isOfKind ``Lean.Parser.Term.doLet &&
       !stx.isOfKind ``Lean.Parser.Term.doLetArrow then
-    none
+    []
   else if stx.getNumArgs > 3 then
-    firstIdent? stx[3]
-  else none
+    let declaration := stx[3]
+    if declaration.isOfKind ``Lean.Parser.Term.letPatDecl ||
+        declaration.isOfKind ``Lean.Parser.Term.doPatDecl then
+      patternIdents declaration[0]!
+    else
+      (firstIdent? declaration).toList
+  else
+    []
 
 private def isDoSeqSyntax (stx : Syntax) : Bool :=
   stx.isOfKind ``Lean.Parser.Term.doSeqIndent ||
@@ -173,9 +189,7 @@ mutual
     let (_, found) := (Lean.Parser.Term.getDoElems seq).foldl
       (init := (bound, found)) fun (bound, found) element =>
         let found := collectLoopAssigned element.raw bound found
-        let bound := match loopBoundDoIdent? element.raw with
-          | some id => id.getId :: bound
-          | none => bound
+        let bound := (loopBoundDoIdents element.raw).map (·.getId) ++ bound
         (bound, found)
     found
 end
@@ -185,18 +199,9 @@ end
 def loopAssignedIdents (body : TSyntax ``Lean.Parser.Term.doSeq) : List Ident :=
   (collectLoopAssignedSeq body [] #[]).toList
 
-private partial def replaceFirstIdent (stx replacement : Syntax) : Syntax × Bool :=
-  if stx.isIdent then
-    (replacement, true)
-  else
-    let (args, replaced) := stx.getArgs.foldl
-      (init := (#[], false)) fun (args, replaced) child =>
-        if replaced then
-          (args.push child, true)
-        else
-          let (child, replaced) := replaceFirstIdent child replacement
-          (args.push child, replaced)
-    (stx.setArgs args, replaced)
+private partial def replaceIdent (name : Name) (replacement stx : Syntax) : Syntax :=
+  if stx.isIdent && stx.getId == name then replacement
+  else stx.setArgs (stx.getArgs.map (replaceIdent name replacement))
 
 private def mkLoopDoSeq (elems : Array Syntax) : Syntax :=
   mkNode ``Lean.Parser.Term.doSeqIndent #[mkNullNode <|
@@ -227,16 +232,20 @@ mutual
     let (elems, _) ← (Lean.Parser.Term.getDoElems seq).foldlM
       (init := (#[], renames)) fun (elems, renames) element => do
         let rewritten ← freshenLoopSyntax renames element.raw
-        match loopBoundDoIdent? element.raw with
-        | none => pure (elems.push rewritten, renames)
-        | some bound =>
-            let fresh := mkIdentFrom bound
-              (← mkFreshUserName `loopLocal)
+        match loopBoundDoIdents element.raw with
+        | [] => pure (elems.push rewritten, renames)
+        | bounds =>
+            let freshBindings : List (Name × Ident) ← bounds.mapM fun (bound : Ident) => do
+              let fresh := mkIdentFrom bound
+                (← mkFreshUserName `loopLocal)
+              pure (bound.getId, fresh)
             let declaration := rewritten[3]
-            let (declaration, _) := replaceFirstIdent declaration fresh.raw
+            let declaration := freshBindings.foldl (init := declaration)
+              fun declaration (bound, fresh) =>
+                replaceIdent bound fresh.raw declaration
             let rewritten := rewritten.setArgs
               (rewritten.getArgs.set! 3 declaration)
-            pure (elems.push rewritten, (bound.getId, fresh) :: renames)
+            pure (elems.push rewritten, freshBindings ++ renames)
     return ⟨mkLoopDoSeq elems⟩
 end
 
@@ -506,7 +515,6 @@ def elabMoveReassign : DoElab := fun stx cont => do
 
 private structure LoopFrame where
   label : Nat
-  nonce : Nat
   sourceLabel? : Option Name
   parentToken? : Option Ident
   controlTokens : List Ident
@@ -515,6 +523,8 @@ private structure LoopFrame where
 
 private initialize loopLabelState : IO.Ref (List LoopFrame × Nat) ←
   IO.mkRef ([], 0)
+
+private initialize loopMarkerNonce : IO.Ref Nat ← IO.mkRef 0
 
 private def pushLoopFrame (ref : Syntax) (sourceLabel? : Option Name)
     (parentToken? : Option Ident)
@@ -525,11 +535,8 @@ private def pushLoopFrame (ref : Syntax) (sourceLabel? : Option Name)
     if stack.any (·.sourceLabel? == some sourceLabel) then
       throwError "duplicate active loop label `{sourceLabel}`"
   let label := (ref.getPos?.map (·.byteIdx + 1)).getD next
-  let nonce := (hash (← mkFreshUserName `loopNonce)).toNat
-  if let some function ← getDeclName? then
-    registerLoopMarker function label nonce
   let token := mkIdent (← mkFreshUserName `loopTok)
-  let frame := { label, nonce, sourceLabel?, parentToken?, controlTokens, token, state }
+  let frame := { label, sourceLabel?, parentToken?, controlTokens, token, state }
   loopLabelState.set (frame :: stack, next + 1)
   return frame
 
@@ -548,6 +555,13 @@ private def labeledLoopFrame? (sourceLabel : Name) :
 
 private def currentLoopLabel? : TermElabM (Option Nat) := do
   return (← currentLoopFrame?).map (·.label)
+
+private def freshLoopMarkerNonce (marker : Name) (label : Nat) : TermElabM Nat := do
+  let nonce ← loopMarkerNonce.get
+  loopMarkerNonce.set (nonce + 1)
+  if let some function ← getDeclName? then
+    registerLoopMarker function marker label nonce
+  return nonce
 
 private def authoredLoopState
     (body : TSyntax ``Lean.Parser.Term.doSeq) : List Ident :=
@@ -584,7 +598,7 @@ private partial def packLoopState : List Ident → TermElabM (TSyntax `term)
 open Lean.Elab.Do Lean.Parser.Term in
 private def loopEnterDoElem (frame : LoopFrame) : TermElabM DoElem := do
   let labelTerm : TSyntax `term := quote frame.label
-  let nonceTerm : TSyntax `term := quote frame.nonce
+  let nonceTerm : TSyntax `term := quote (← freshLoopMarkerNonce ``loopEnter frame.label)
   let arityTerm : TSyntax `term := quote frame.state.length
   let state ← packLoopState frame.state
   let seed : TSyntax `term := match frame.parentToken? with
@@ -596,7 +610,7 @@ private def loopEnterDoElem (frame : LoopFrame) : TermElabM DoElem := do
 open Lean.Elab.Do Lean.Parser.Term in
 private def loopExitDoElem (marker : Name) (frame : LoopFrame) : TermElabM DoElem := do
   let labelTerm : TSyntax `term := quote frame.label
-  let nonceTerm : TSyntax `term := quote frame.nonce
+  let nonceTerm : TSyntax `term := quote (← freshLoopMarkerNonce marker frame.label)
   let arityTerm : TSyntax `term := quote frame.state.length
   let state ← packLoopState frame.state
   let markerIdent := mkIdent marker

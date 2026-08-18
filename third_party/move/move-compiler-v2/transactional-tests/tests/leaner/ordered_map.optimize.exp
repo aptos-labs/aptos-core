@@ -39,7 +39,7 @@ Error: Function execution failed with VMError: {
     sub_status: Some(2),
     location: 0x0::LeanerOrderedMap,
     indices: [],
-    offsets: [(FunctionDefinitionIndex(10), 28)],
+    offsets: [(FunctionDefinitionIndex(10), 31)],
 }
 task 18 lines 260-260:  run 0x0::LeanerOrderedMap::missingLookup --args @0x41
 Error: Function execution failed with VMError: {
@@ -47,5 +47,5 @@ Error: Function execution failed with VMError: {
     sub_status: Some(2),
     location: 0x0::LeanerOrderedMap,
     indices: [],
-    offsets: [(FunctionDefinitionIndex(2), 30)],
+    offsets: [(FunctionDefinitionIndex(2), 33)],
 }

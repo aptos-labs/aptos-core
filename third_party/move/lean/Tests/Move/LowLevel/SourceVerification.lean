@@ -11,6 +11,18 @@ open Move
 open Move.Semantics
 open Move.Verify
 
+example (left right : U64) :
+    if Move.Verify.Source.logicalLE left right then
+      left.toNat ≤ right.toNat
+    else
+      ¬left.toNat ≤ right.toNat := by
+  move_cases ordered : Move.Verify.Source.logicalLE left right <;>
+    assumption
+
+example (n : U64) :
+    if Move.Verify.Source.logicalLT 0 n then True else n = 0 := by
+  move_cases positive : Move.Verify.Source.logicalLT 0 n
+
 private def increment : ConcreteLoan Nat Unit := fun value => ((), value + 1)
 
 example (initial final : Nat) :
