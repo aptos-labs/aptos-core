@@ -47,8 +47,9 @@ use std::cell::RefCell;
 use thiserror::Error;
 use triomphe::Arc;
 
-/// Size of the provider's value arena.
-pub const DEFAULT_RESOURCE_ARENA_BYTES: usize = 64 * 1024 * 1024;
+/// Default size of the provider's value arena. Occupancy is bounded by one
+/// materialization per distinct key read, so this fits any realistic use.
+const DEFAULT_RESOURCE_ARENA_BYTES: usize = 64 * 1024 * 1024;
 
 /// Errors raised by these providers.
 #[derive(Debug, Error)]
@@ -151,9 +152,13 @@ pub struct StateViewResourceProvider<'a, 'ctx, S> {
 /// The provider's interior-mutable state: caches and the value arena.
 struct ProviderState {
     /// Bump arena holding the flat values that reads hand out pointers into.
-    /// Never collected or reset; must stay alive as long as those pointers
-    /// (through materialization).
+    /// Never collected or reset; occupancy is bounded by one materialization
+    /// per distinct key, thanks to the value cache.
     arena: Heap,
+    /// Materialized reads by key, including negative ones. Sound because
+    /// execution never mutates a value through a `StorageRead` pointer
+    /// (mutation copies into the transaction's own heap first).
+    values: FxHashMap<InMemoryStorageKey, StorageRead>,
     /// Resource-group membership per resource type, resolved from the defining
     /// module's metadata. `None` = not a group member.
     group_membership: FxHashMap<InternedType, Option<InternedType>>,
@@ -168,12 +173,22 @@ struct ProviderState {
 }
 
 impl<'a, 'ctx, S: StateView> StateViewResourceProvider<'a, 'ctx, S> {
-    pub fn new(guard: &'a ExecutionGuard<'ctx>, state_view: &'a S, arena_size: usize) -> Self {
+    pub fn new(guard: &'a ExecutionGuard<'ctx>, state_view: &'a S) -> Self {
+        Self::new_with_arena_size(guard, state_view, DEFAULT_RESOURCE_ARENA_BYTES)
+    }
+
+    /// Escape hatch for value arenas beyond the default's reach.
+    pub fn new_with_arena_size(
+        guard: &'a ExecutionGuard<'ctx>,
+        state_view: &'a S,
+        arena_size: usize,
+    ) -> Self {
         Self {
             guard,
             state_view,
             inner: RefCell::new(ProviderState {
                 arena: Heap::new(arena_size),
+                values: FxHashMap::default(),
                 group_membership: FxHashMap::default(),
                 module_metadata: FxHashMap::default(),
                 groups: FxHashMap::default(),
@@ -256,11 +271,18 @@ impl<'a, 'ctx, S: StateView> StateViewResourceProvider<'a, 'ctx, S> {
 }
 
 impl<S: StateView> ResourceProvider for StateViewResourceProvider<'_, '_, S> {
-    // No per-key cache: the read-write set's working map already deduplicates
-    // reads, so each key reaches the provider at most once.
+    /// Cached per key, so re-reads across executions reuse the already
+    /// materialized value.
     fn get_resource(&self, key: &InMemoryStorageKey) -> Result<StorageRead, ResourceProviderError> {
+        if let Some(read) = self.inner.borrow().values.get(key) {
+            return Ok(*read);
+        }
         let internal = |detail: String| ResourceProviderError::InvariantViolation(detail);
         let Some(blob) = self.fetch_bytes(key).map_err(|e| internal(e.to_string()))? else {
+            self.inner
+                .borrow_mut()
+                .values
+                .insert(key.clone(), StorageRead::DoesNotExist);
             return Ok(StorageRead::DoesNotExist);
         };
 
@@ -286,10 +308,12 @@ impl<S: StateView> ResourceProvider for StateViewResourceProvider<'_, '_, S> {
         // layout; `deserialize_into` writes the flat value there.
         unsafe { deserialize_into(self.guard, &mut inner.arena, ty, &blob, obj.as_ptr()) }
             .map_err(|e| internal(format!("stored value failed to deserialize: {e}")))?;
-        Ok(StorageRead::ExternalHeap {
+        let read = StorageRead::ExternalHeap {
             ptr: obj,
             version: 0,
-        })
+        };
+        inner.values.insert(key.clone(), read);
+        Ok(read)
     }
 }
 

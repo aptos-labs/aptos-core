@@ -16,13 +16,19 @@ mod address_derivation;
 pub mod aggregator_v2;
 pub mod aptos_hash;
 pub mod bcs;
+pub mod bls12381;
 pub mod cmp;
+pub mod consensus_config;
+pub mod ed25519;
 pub mod event;
 pub mod from_bytes;
 pub mod function_info;
 pub mod hash;
+pub mod init;
 pub mod mem;
+pub mod multi_ed25519;
 pub mod object;
+pub mod ristretto255_scalar;
 pub mod secp256k1;
 pub mod signer;
 pub mod state_storage;
@@ -37,13 +43,27 @@ pub mod vector;
 pub use aggregator_v2::make_all_aggregator_v2_natives;
 pub use aptos_hash::make_all_aptos_hash_natives;
 pub use bcs::make_all_bcs_natives;
+pub use bls12381::make_all_bls12381_natives;
+#[cfg(feature = "testing")]
+pub use bls12381::make_all_bls12381_test_natives;
 pub use cmp::make_all_cmp_natives;
+pub use consensus_config::make_all_consensus_config_natives;
+pub use ed25519::make_all_ed25519_natives;
+#[cfg(feature = "testing")]
+pub use ed25519::make_all_ed25519_test_natives;
 pub use event::{make_all_event_natives, EventEntry, EventKind, EventStore};
 pub use from_bytes::make_all_from_bytes_natives;
 pub use function_info::make_all_function_info_natives;
 pub use hash::make_all_hash_natives;
+pub use init::make_all_init_natives;
 pub use mem::make_all_mem_natives;
+pub use multi_ed25519::make_all_multi_ed25519_natives;
+#[cfg(feature = "testing")]
+pub use multi_ed25519::make_all_multi_ed25519_test_natives;
 pub use object::{make_all_object_natives, ObjectContextExtension};
+pub use ristretto255_scalar::make_all_ristretto255_scalar_natives;
+#[cfg(feature = "testing")]
+pub use ristretto255_scalar::make_all_ristretto255_scalar_test_natives;
 pub use secp256k1::make_all_secp256k1_natives;
 pub use signer::make_all_signer_natives;
 pub use state_storage::{make_all_state_storage_natives, StorageUsageAtEpochBoundary};
@@ -94,12 +114,18 @@ pub fn make_all_production_natives<F: NativeContextFamily>() -> Vec<NativeEntry<
     natives.extend(make_all_event_natives::<F>());
     natives.extend(make_all_hash_natives::<F>());
     natives.extend(make_all_aptos_hash_natives::<F>());
+    natives.extend(make_all_init_natives::<F>());
     natives.extend(make_all_string_natives::<F>());
     natives.extend(make_all_bcs_natives::<F>());
     natives.extend(make_all_cmp_natives::<F>());
+    natives.extend(make_all_consensus_config_natives::<F>());
     natives.extend(make_all_from_bytes_natives::<F>());
     natives.extend(make_all_table_natives::<F>());
     natives.extend(make_all_secp256k1_natives::<F>());
+    natives.extend(make_all_ed25519_natives::<F>());
+    natives.extend(make_all_multi_ed25519_natives::<F>());
+    natives.extend(make_all_bls12381_natives::<F>());
+    natives.extend(make_all_ristretto255_scalar_natives::<F>());
     natives.extend(make_all_vector_natives::<F>());
     natives
 }

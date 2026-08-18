@@ -5,7 +5,9 @@
 
 // Transformation which injects specifications (Move function spec blocks) into the bytecode.
 
-use crate::{options::ProverOptions, verification_analysis};
+use crate::{
+    number_operation::BvInternalBoundaryProps, options::ProverOptions, verification_analysis,
+};
 use itertools::Itertools;
 use move_core_types::function::ClosureMask;
 use move_model::{
@@ -18,7 +20,10 @@ use move_model::{
         FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, NodeId, QualifiedId, QualifiedInstId,
         SpecVarId, StructId,
     },
-    pragmas::{ABORTS_IF_IS_PARTIAL_PRAGMA, EMITS_IS_PARTIAL_PRAGMA, EMITS_IS_STRICT_PRAGMA},
+    pragmas::{
+        ABORTS_IF_IS_PARTIAL_PRAGMA, BV_INTERNAL_PRAGMA, CONDITION_ABSTRACT_PROP,
+        CONDITION_CONCRETE_PROP, EMITS_IS_PARTIAL_PRAGMA, EMITS_IS_STRICT_PRAGMA,
+    },
     spec_translator::{ProofAction, SpecTranslator, TranslatedSpec},
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type, TypeDisplayContext, BOOL_TYPE, NUM_TYPE},
@@ -40,6 +45,7 @@ use move_stackless_bytecode::{
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
+    sync::Mutex,
 };
 
 const REQUIRES_FAILS_MESSAGE: &str = "precondition does not hold at this call";
@@ -55,16 +61,40 @@ const CHOICE_WITNESS_FAILS_MESSAGE: &str = "choice expression requires a witness
 // ================================================================================================
 // # Spec Instrumenter
 
-pub struct SpecInstrumentationProcessor {}
+pub struct SpecInstrumentationProcessor {
+    opaque_callee_modifies:
+        Mutex<BTreeMap<QualifiedId<FunId>, BTreeSet<QualifiedInstId<StructId>>>>,
+}
 
 impl SpecInstrumentationProcessor {
     pub fn new() -> Box<Self> {
-        Box::new(Self {})
+        Box::new(Self {
+            opaque_callee_modifies: Mutex::new(BTreeMap::new()),
+        })
     }
 }
 
 impl FunctionTargetProcessor for SpecInstrumentationProcessor {
     fn initialize(&self, env: &GlobalEnv, targets: &mut FunctionTargetsHolder) {
+        let effects = targets
+            .get_funs()
+            .filter_map(|qid| {
+                let fun = env.get_function(qid);
+                fun.is_opaque().then(|| {
+                    let target = targets.get_target(&fun, &FunctionVariant::Baseline);
+                    (
+                        qid,
+                        usage_analysis::get_memory_usage(&target)
+                            .modified
+                            .all
+                            .iter()
+                            .cloned()
+                            .collect(),
+                    )
+                })
+            })
+            .collect();
+        *self.opaque_callee_modifies.lock().unwrap() = effects;
         // Perform static analysis part of modifies check.
         check_modifies(env, targets);
     }
@@ -86,14 +116,21 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
             verification_analysis::get_info(&FunctionTarget::new(fun_env, &data));
         let is_verified = verification_info.verified;
         let is_inlined = verification_info.inlined;
+        let opaque_callee_modifies = self.opaque_callee_modifies.lock().unwrap().clone();
 
         if is_verified {
             // Create a clone of the function data, moving annotations
             // out of this data and into the clone.
             let mut verification_data =
                 data.fork(FunctionVariant::Verification(VerificationFlavor::Regular));
-            let (instrumented, split_points) =
-                Instrumenter::run(&options, targets, fun_env, verification_data, scc_opt);
+            let (instrumented, split_points) = Instrumenter::run(
+                &options,
+                targets,
+                fun_env,
+                verification_data,
+                scc_opt,
+                &opaque_callee_modifies,
+            );
             verification_data = instrumented;
 
             if split_points.is_empty() || options.inference {
@@ -123,7 +160,14 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
 
         // Instrument baseline variant only if it is inlined.
         if is_inlined {
-            let (data, _) = Instrumenter::run(&options, targets, fun_env, data, scc_opt);
+            let (data, _) = Instrumenter::run(
+                &options,
+                targets,
+                fun_env,
+                data,
+                scc_opt,
+                &opaque_callee_modifies,
+            );
             data
         } else {
             // Clear code but keep function data stub.
@@ -178,6 +222,29 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
 
         Ok(())
     }
+}
+
+fn opaque_framed_memory(
+    env: &GlobalEnv,
+    callee: &FunctionEnv,
+) -> BTreeSet<QualifiedInstId<StructId>> {
+    callee
+        .get_frame_spec()
+        .map(|frame| {
+            frame
+                .modifies_targets
+                .iter()
+                .filter_map(
+                    |target| match env.get_node_type(target.node_id()).skip_reference() {
+                        Type::Struct(mid, sid, inst) => {
+                            Some(mid.qualified_inst(*sid, inst.clone()))
+                        },
+                        _ => None,
+                    },
+                )
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// Maximum number of split combinations before we emit an error.
@@ -369,10 +436,22 @@ struct Instrumenter<'a> {
     abort_label: Label,
     can_abort: bool,
     mem_info: &'a BTreeSet<QualifiedInstId<StructId>>,
+    /// Transitive memory effects of opaque callees in the original bytecode.
+    opaque_callee_modifies: BTreeMap<QualifiedId<FunId>, BTreeSet<QualifiedInstId<StructId>>>,
+    /// Resource types explicitly framed by opaque callees before call-site type
+    /// substitution.
+    opaque_callee_framed_memory: BTreeMap<QualifiedId<FunId>, BTreeSet<QualifiedInstId<StructId>>>,
+    /// Unframed memory possibly modified by opaque closures invoked in this function.
+    opaque_closure_modifies: BTreeSet<QualifiedInstId<StructId>>,
     /// Map from Nop AttrId to split expression and optional guard (for `split` proof items).
     /// AttrIds are stable across optimization passes, unlike bytecode offsets.
     /// The optional guard is a path condition from enclosing `if` in the proof block.
     split_points: Vec<(AttrId, Exp, Option<Exp>)>,
+    /// Whether the function being instrumented declares `pragma bv_internal`.
+    self_is_bv_internal: bool,
+    /// Locations of this function's `[concrete]` conditions: verified against the body,
+    /// never assumed by a caller, so not boundary language.
+    concrete_cond_locs: BTreeSet<Loc>,
 }
 
 // =================================================================================================
@@ -385,8 +464,12 @@ impl<'a> Instrumenter<'a> {
         fun_env: &FunctionEnv<'a>,
         data: FunctionData,
         scc_opt: Option<&[FunctionEnv]>,
+        all_opaque_callee_modifies: &BTreeMap<
+            QualifiedId<FunId>,
+            BTreeSet<QualifiedInstId<StructId>>,
+        >,
     ) -> (FunctionData, Vec<(AttrId, Exp, Option<Exp>)>) {
-        // Pre-collect properties in the original function data
+        // Pre-collect properties and opaque-callee effects from the original code.
         let props: Vec<_> = data
             .code
             .iter()
@@ -394,6 +477,63 @@ impl<'a> Instrumenter<'a> {
                 Bytecode::Prop(id, PropKind::Assume, exp)
                 | Bytecode::Prop(id, PropKind::Assert, exp) => Some((*id, exp.clone())),
                 _ => None,
+            })
+            .collect();
+        let opaque_callee_modifies = data
+            .code
+            .iter()
+            .filter_map(|bc| match bc {
+                Bytecode::Call(_, _, Operation::Function(mid, fid, _), _, _) => {
+                    let callee = fun_env.module_env.env.get_module(*mid).into_function(*fid);
+                    callee.is_opaque().then(|| {
+                        (
+                            mid.qualified(*fid),
+                            all_opaque_callee_modifies
+                                .get(&mid.qualified(*fid))
+                                .cloned()
+                                .unwrap_or_default(),
+                        )
+                    })
+                },
+                _ => None,
+            })
+            .collect();
+        let opaque_callee_framed_memory = data
+            .code
+            .iter()
+            .filter_map(|bc| match bc {
+                Bytecode::Call(_, _, Operation::Function(mid, fid, _), _, _) => {
+                    let callee = fun_env.module_env.env.get_module(*mid).into_function(*fid);
+                    callee.is_opaque().then(|| {
+                        (
+                            mid.qualified(*fid),
+                            opaque_framed_memory(fun_env.module_env.env, &callee),
+                        )
+                    })
+                },
+                _ => None,
+            })
+            .collect();
+        let opaque_closure_modifies = data
+            .code
+            .iter()
+            .filter_map(|bc| match bc {
+                Bytecode::Call(_, _, Operation::Closure(mid, fid, targs, _), _, _) => {
+                    let callee = fun_env.module_env.env.get_module(*mid).into_function(*fid);
+                    callee.is_opaque().then(|| (mid.qualified(*fid), targs))
+                },
+                _ => None,
+            })
+            .flat_map(|(callee_qid, targs)| {
+                let callee = fun_env.module_env.env.get_function(callee_qid);
+                let framed_memory = opaque_framed_memory(fun_env.module_env.env, &callee);
+                all_opaque_callee_modifies
+                    .get(&callee_qid)
+                    .into_iter()
+                    .flatten()
+                    .filter(|mem| !framed_memory.contains(mem))
+                    .map(|mem| mem.instantiate_ref(targs))
+                    .collect_vec()
             })
             .collect();
 
@@ -492,7 +632,25 @@ impl<'a> Instrumenter<'a> {
             abort_label,
             can_abort: false,
             mem_info: &mem_info,
+            opaque_callee_modifies,
+            opaque_callee_framed_memory,
+            opaque_closure_modifies,
             split_points: vec![],
+            self_is_bv_internal: fun_env.is_pragma_true(BV_INTERNAL_PRAGMA, || false),
+            concrete_cond_locs: fun_env
+                .get_spec()
+                .conditions
+                .iter()
+                .filter(|cond| {
+                    let env = &fun_env.module_env.env;
+                    env.is_property_true(&cond.properties, CONDITION_CONCRETE_PROP)
+                        .unwrap_or(false)
+                        && !env
+                            .is_property_true(&cond.properties, CONDITION_ABSTRACT_PROP)
+                            .unwrap_or(false)
+                })
+                .map(|cond| cond.loc.clone())
+                .collect(),
         };
         // Always inline spec lets in proof actions, independent of the
         // `inline_spec_lets` option. Proof-action exps are recorded in
@@ -545,15 +703,17 @@ impl<'a> Instrumenter<'a> {
         let old_code = std::mem::take(&mut self.builder.data.code);
 
         // Emit `let` bindings.
-        self.emit_lets(spec, false);
+        self.emit_lets(spec, false, self.self_is_bv_internal);
 
         // Inject preconditions as assumes. This is done for all self.variant values.
         self.builder
             .set_loc(self.builder.fun_env.get_loc().at_start()); // reset to function level
         for (loc, exp) in spec.pre_conditions(&self.builder) {
+            let is_concrete = self.is_concrete_cond(&loc);
             self.builder.set_loc(loc);
             self.builder
-                .emit_with(move |attr_id| Prop(attr_id, Assume, exp))
+                .emit_with(move |attr_id| Prop(attr_id, Assume, exp));
+            self.tag_contract_prop(self.self_is_bv_internal && !is_concrete);
         }
 
         // Emit well-formedness checks for choice expressions in let bindings.
@@ -711,6 +871,19 @@ impl<'a> Instrumenter<'a> {
             Call(id, dests, Function(mid, fid, targs), srcs, aa) => {
                 self.instrument_call(spec, id, dests, mid, fid, targs, srcs, aa);
             },
+            Call(id, dests, Invoke, srcs, _) => {
+                // Havoc before `$apply` so the closure's postconditions remain
+                // available after the invocation.
+                self.emit_global_havocs(self.opaque_closure_modifies.clone());
+                self.builder.emit(Call(
+                    id,
+                    dests,
+                    Invoke,
+                    srcs,
+                    Some(AbortAction(self.abort_label, self.abort_local)),
+                ));
+                self.can_abort = true;
+            },
             Call(id, dests, oper, srcs, _) if oper.can_abort() => {
                 self.builder.emit(Call(
                     id,
@@ -785,6 +958,7 @@ impl<'a> Instrumenter<'a> {
 
         let callee_env = env.get_module(mid).into_function(fid);
         let callee_opaque = callee_env.is_opaque();
+        let callee_is_bv_internal = callee_env.is_pragma_true(BV_INTERNAL_PRAGMA, || false);
         let mut callee_spec = SpecTranslator::translate_fun_spec(
             self.options.auto_trace_level.functions(),
             true,
@@ -817,7 +991,7 @@ impl<'a> Instrumenter<'a> {
         }
 
         // Emit `let` assignments.
-        self.emit_lets(&callee_spec, false);
+        self.emit_lets(&callee_spec, false, callee_is_bv_internal);
         self.builder.set_loc_from_attr(id);
 
         // Emit pre conditions if this is the verification variant or if the callee
@@ -837,6 +1011,7 @@ impl<'a> Instrumenter<'a> {
                     FunctionVariant::Baseline => Assume,
                 };
                 self.builder.emit_with(|id| Prop(id, prop_kind, cond));
+                self.tag_contract_prop(callee_is_bv_internal);
             }
         }
 
@@ -908,7 +1083,8 @@ impl<'a> Instrumenter<'a> {
             // aborts_if conditions. Uses abort_path=true to emit only the
             // defining fragment (label-defining conjuncts), not full postcondition
             // properties that reference post-havoc state.
-            let defining_indices = self.emit_state_label_assumes(&callee_spec, true);
+            let defining_indices =
+                self.emit_state_label_assumes(&callee_spec, true, callee_is_bv_internal);
             // Remove defining conditions from post so they aren't double-emitted
             // later when assumes for ensures are emitted on the non-abort path.
             if !defining_indices.is_empty() {
@@ -930,8 +1106,11 @@ impl<'a> Instrumenter<'a> {
 
             // Translate the abort condition. If the abort_cond_temp_opt is None, it indicates
             // that the abort condition is known to be false, so we can skip the abort handling.
-            let (abort_cond_temp_opt, code_cond) =
-                self.generate_abort_opaque_cond(callee_aborts_if_is_partial, &callee_spec);
+            let (abort_cond_temp_opt, code_cond) = self.generate_abort_opaque_cond(
+                callee_aborts_if_is_partial,
+                &callee_spec,
+                callee_is_bv_internal,
+            );
             if let Some(abort_cond_temp) = abort_cond_temp_opt {
                 let abort_local = self.abort_local;
                 let abort_label = self.abort_label;
@@ -943,6 +1122,7 @@ impl<'a> Instrumenter<'a> {
                 if let Some(cond) = code_cond {
                     self.emit_traces(&callee_spec, &cond);
                     self.builder.emit_with(move |id| Prop(id, Assume, cond));
+                    self.tag_contract_prop(callee_is_bv_internal);
                 }
                 // Aggregate `aborts_of<callee>` on the abort path so a
                 // caller's `aborts_of<callee>` assertion discharges directly.
@@ -979,11 +1159,30 @@ impl<'a> Instrumenter<'a> {
             // Note: saved_memory and saved_spec_vars were already emitted above,
             // before the label defines and abort condition evaluation.
 
-            // Emit modifies properties which havoc memory at the modified location.
+            // Emit precise, address-level memory havocs from the callee frame.
             for (_, exp) in std::mem::take(&mut callee_spec.modifies) {
                 self.emit_traces(&callee_spec, &exp);
                 self.builder.emit_with(|id| Prop(id, Modifies, exp));
             }
+
+            // An omitted address frame on an opaque callee is conservatively
+            // represented by havocing the complete memory for that resource.
+            // This preserves soundness while allowing coarse modular summaries.
+            let callee_qid = mid.qualified(fid);
+            let framed_memory = self
+                .opaque_callee_framed_memory
+                .get(&callee_qid)
+                .cloned()
+                .unwrap_or_default();
+            let unframed_memory = self
+                .opaque_callee_modifies
+                .get(&callee_qid)
+                .into_iter()
+                .flatten()
+                .filter(|mem| !framed_memory.contains(mem))
+                .map(|mem| mem.instantiate_ref(targs))
+                .collect_vec();
+            self.emit_global_havocs(unframed_memory);
 
             // Havoc all &mut parameters, their post-value are to be determined by the post
             // conditions.
@@ -1028,7 +1227,7 @@ impl<'a> Instrumenter<'a> {
             }
 
             // Emit `let post` assignments.
-            self.emit_lets(&callee_spec, true);
+            self.emit_lets(&callee_spec, true, callee_is_bv_internal);
 
             // Emit well-formedness checks for choice expressions in callee's post-state let bindings.
             self.emit_choice_wellformedness(&callee_spec, true);
@@ -1040,6 +1239,7 @@ impl<'a> Instrumenter<'a> {
             for (_, cond) in std::mem::take(&mut callee_spec.post) {
                 self.emit_traces(&callee_spec, &cond);
                 self.builder.emit_with(|id| Prop(id, Assume, cond));
+                self.tag_contract_prop(callee_is_bv_internal);
             }
 
             // Emit the events in the `emits` specs of the callee.
@@ -1139,6 +1339,36 @@ impl<'a> Instrumenter<'a> {
             // Generate OpaqueCallEnd instruction if invariant_v2.
             self.generate_opaque_call(dests, mid, fid, targs, srcs, aa, false);
         }
+    }
+
+    /// Mark the `Prop` just emitted as a `bv_internal` contract condition (`pre`, `post`,
+    /// `aborts`, `lets`) — the only ones proven in one context and assumed in another.
+    /// `owner_is_bv_internal` is the callee at a call site, not the enclosing function.
+    /// Whether `loc` is a `[concrete]` condition of this function.
+    fn is_concrete_cond(&self, loc: &Loc) -> bool {
+        self.concrete_cond_locs.contains(loc)
+    }
+
+    fn tag_contract_prop(&mut self, owner_is_bv_internal: bool) {
+        if !owner_is_bv_internal {
+            return;
+        }
+        let Some(Bytecode::Prop(attr_id, ..)) = self.builder.data.code.last() else {
+            return;
+        };
+        let attr_id = *attr_id;
+        let env = self.builder.global_env();
+        let mut boundary = env
+            .get_extension::<BvInternalBoundaryProps>()
+            .map(|rc| rc.as_ref().clone())
+            .unwrap_or_default();
+        boundary.insert(
+            self.builder.fun_env.module_env.get_id(),
+            self.builder.fun_env.get_id(),
+            self.builder.data.variant == FunctionVariant::Baseline,
+            attr_id,
+        );
+        env.set_extension(boundary);
     }
 }
 
@@ -1459,7 +1689,7 @@ impl<'a> Instrumenter<'a> {
         }
     }
 
-    fn emit_lets(&mut self, spec: &TranslatedSpec, post_state: bool) {
+    fn emit_lets(&mut self, spec: &TranslatedSpec, post_state: bool, owner_is_bv_internal: bool) {
         use Bytecode::*;
         let lets = spec
             .lets
@@ -1473,6 +1703,7 @@ impl<'a> Instrumenter<'a> {
                 .mk_identical(self.builder.mk_temporary(*temp), exp.clone());
             self.builder
                 .emit_with(|id| Prop(id, PropKind::Assume, assign));
+            self.tag_contract_prop(owner_is_bv_internal);
         }
     }
 
@@ -1972,6 +2203,13 @@ impl<'a> Instrumenter<'a> {
 
     /// Generates verification conditions for abort block.
     fn generate_abort_verify(&mut self, spec: &TranslatedSpec) {
+        // The aggregate is a disjunction over all `aborts_if`; it is boundary language
+        // only when some clause travels, i.e. is not `[concrete]`.
+        let aborts_travel = spec
+            .aborts
+            .iter()
+            .any(|(loc, ..)| !self.is_concrete_cond(loc));
+        let tag = self.self_is_bv_internal && aborts_travel;
         use Bytecode::*;
         use PropKind::*;
 
@@ -1982,7 +2220,7 @@ impl<'a> Instrumenter<'a> {
         // when address aliasing makes the abort condition depend on labeled state.
         // Use abort_path=true to assume only the defining fragment of each
         // condition, not extra properties that only hold on successful returns.
-        self.emit_state_label_assumes(spec, true);
+        self.emit_state_label_assumes(spec, true, self.self_is_bv_internal);
 
         let is_partial = self
             .builder
@@ -1996,6 +2234,7 @@ impl<'a> Instrumenter<'a> {
                 self.emit_traces(spec, &cond);
                 self.builder.set_loc_and_vc_info(loc, ABORT_NOT_COVERED);
                 self.builder.emit_with(move |id| Prop(id, Assert, cond));
+                self.tag_contract_prop(tag);
             }
         }
 
@@ -2009,6 +2248,7 @@ impl<'a> Instrumenter<'a> {
                     .set_loc_and_vc_info(loc, ABORTS_CODE_NOT_COVERED);
                 self.builder
                     .emit_with(move |id| Prop(id, Assert, code_cond));
+                self.tag_contract_prop(tag);
             }
         }
     }
@@ -2021,6 +2261,7 @@ impl<'a> Instrumenter<'a> {
         &mut self,
         is_partial: bool,
         spec: &TranslatedSpec,
+        owner_is_bv_internal: bool,
     ) -> (Option<TempIndex>, Option<Exp>) {
         let aborts_cond = if is_partial {
             None
@@ -2032,7 +2273,9 @@ impl<'a> Instrumenter<'a> {
                 return (None, None);
             }
             // Introduce a temporary to hold the value of the aborts condition.
-            self.builder.emit_let(cond).0
+            let t = self.builder.emit_let(cond).0;
+            self.tag_contract_prop(owner_is_bv_internal);
+            t
         } else {
             // Introduce a havoced temporary to hold an arbitrary value for the aborts
             // condition.
@@ -2062,7 +2305,7 @@ impl<'a> Instrumenter<'a> {
         // Emit specification variable updates. They are generated for both verified and inlined
         // function variants, as the evolution of state updates is always the same.
         let lets_emitted = if !spec.updates.is_empty() {
-            self.emit_lets(spec, true);
+            self.emit_lets(spec, true, self.self_is_bv_internal);
             self.emit_updates(spec, None);
             true
         } else {
@@ -2072,13 +2315,14 @@ impl<'a> Instrumenter<'a> {
         if self.is_verified() {
             // Emit `let` bindings if not already emitted.
             if !lets_emitted {
-                self.emit_lets(spec, true);
+                self.emit_lets(spec, true, self.self_is_bv_internal);
             }
 
             // Emit well-formedness checks for choice expressions in post-state let bindings.
             self.emit_choice_wellformedness(spec, true);
 
-            let defining_indices = self.emit_state_label_assumes(spec, false);
+            let defining_indices =
+                self.emit_state_label_assumes(spec, false, self.self_is_bv_internal);
 
             // Emit the negation of all aborts conditions.
             // For defining conditions (already assumed), assert the non-defining
@@ -2093,6 +2337,9 @@ impl<'a> Instrumenter<'a> {
                         self.builder
                             .set_loc_and_vc_info(loc.clone(), ABORTS_IF_FAILS_MESSAGE);
                         self.builder.emit_with(|id| Prop(id, Assert, exp));
+                        self.tag_contract_prop(
+                            self.self_is_bv_internal && !self.is_concrete_cond(loc),
+                        );
                     }
                     continue;
                 }
@@ -2100,7 +2347,8 @@ impl<'a> Instrumenter<'a> {
                 let exp = self.builder.mk_not(abort_cond.clone());
                 self.builder
                     .set_loc_and_vc_info(loc.clone(), ABORTS_IF_FAILS_MESSAGE);
-                self.builder.emit_with(|id| Prop(id, Assert, exp))
+                self.builder.emit_with(|id| Prop(id, Assert, exp));
+                self.tag_contract_prop(self.self_is_bv_internal && !self.is_concrete_cond(loc));
             }
 
             // Emit return-point proof actions (`post`-prefixed proof statements).
@@ -2120,6 +2368,9 @@ impl<'a> Instrumenter<'a> {
                         self.builder
                             .set_loc_and_vc_info(loc.clone(), ENSURES_FAILS_MESSAGE);
                         self.builder.emit_with(move |id| Prop(id, Assert, residual));
+                        self.tag_contract_prop(
+                            self.self_is_bv_internal && !self.is_concrete_cond(loc),
+                        );
                     }
                     continue;
                 }
@@ -2127,7 +2378,8 @@ impl<'a> Instrumenter<'a> {
                 self.builder
                     .set_loc_and_vc_info(loc.clone(), ENSURES_FAILS_MESSAGE);
                 self.builder
-                    .emit_with(move |id| Prop(id, Assert, cond.clone()))
+                    .emit_with(move |id| Prop(id, Assert, cond.clone()));
+                self.tag_contract_prop(self.self_is_bv_internal && !self.is_concrete_cond(loc));
             }
 
             // Emit all event `emits` checks.
@@ -2169,6 +2421,7 @@ impl<'a> Instrumenter<'a> {
         &mut self,
         spec: &TranslatedSpec,
         abort_path: bool,
+        owner_is_bv_internal: bool,
     ) -> BTreeSet<usize> {
         use Bytecode::*;
         use PropKind::*;
@@ -2186,6 +2439,14 @@ impl<'a> Instrumenter<'a> {
             .iter()
             .map(|(_, e)| e)
             .chain(spec.aborts.iter().map(|(_, e, _)| e))
+            .collect();
+        // Same index space as `all_conditions`: a `[concrete]` definer stays in
+        // body world, like its counterpart in the post and aborts loops.
+        let condition_locs: Vec<&Loc> = spec
+            .post
+            .iter()
+            .map(|(l, _)| l)
+            .chain(spec.aborts.iter().map(|(l, _, _)| l))
             .collect();
         for (idx, cond) in all_conditions.iter().enumerate() {
             for label in Self::defined_labels(cond) {
@@ -2240,6 +2501,9 @@ impl<'a> Instrumenter<'a> {
                             all_conditions[idx].clone()
                         };
                         self.builder.emit_with(move |id| Prop(id, Assume, cond));
+                        self.tag_contract_prop(
+                            owner_is_bv_internal && !self.is_concrete_cond(condition_locs[idx]),
+                        );
                         defining_indices.insert(idx);
                     }
                     emitted_labels.insert(label);
@@ -2411,6 +2675,33 @@ impl<'a> Instrumenter<'a> {
         };
         self.builder
             .emit_with(|id| Bytecode::Call(id, dests, opaque_op, srcs, aa));
+    }
+
+    fn emit_global_havocs(
+        &mut self,
+        memories: impl IntoIterator<Item = QualifiedInstId<StructId>>,
+    ) {
+        let env = self.builder.global_env();
+        for mem in memories.into_iter().filter(|mem| {
+            !env.is_wellknown_event_handle_type(&Type::Struct(mem.module_id, mem.id, vec![]))
+                && !env.get_struct_qid(mem.to_qualified_id()).is_ghost_memory()
+        }) {
+            let op = Operation::HavocGlobal(mem.module_id, mem.id, mem.inst.clone());
+            self.builder
+                .emit_with(|id| Bytecode::Call(id, vec![], op, vec![], None));
+            if let Some(exp) =
+                self.builder
+                    .mk_inst_mem_quant_opt(QuantKind::Forall, &mem, &mut |val| {
+                        Some(
+                            self.builder
+                                .mk_call(&BOOL_TYPE, ast::Operation::WellFormed, vec![val]),
+                        )
+                    })
+            {
+                self.builder
+                    .emit_with(|id| Bytecode::Prop(id, PropKind::Assume, exp));
+            }
+        }
     }
 }
 
@@ -2625,12 +2916,13 @@ fn find_behavior_pre_label_for_callee(
 /// Check modifies annotations. This is depending on usage analysis and is therefore
 /// invoked here from the initialize trait function of this processor.
 fn check_modifies(env: &GlobalEnv, targets: &FunctionTargetsHolder) {
+    let mut warned_coarse_callees = BTreeSet::new();
     for module_env in env.get_modules() {
         if module_env.is_target() {
             for fun_env in module_env.get_functions() {
                 if !fun_env.is_not_prover_target() && fun_env.is_compiled() {
                     check_caller_callee_modifies_relation(env, targets, &fun_env);
-                    check_opaque_modifies_completeness(env, targets, &fun_env);
+                    warn_coarse_opaque_calls(env, targets, &fun_env, &mut warned_coarse_callees);
                     check_reads_completeness(env, targets, &fun_env);
                 }
             }
@@ -2685,38 +2977,68 @@ fn check_caller_callee_modifies_relation(
     }
 }
 
-fn check_opaque_modifies_completeness(
+fn warn_coarse_opaque_calls(
     env: &GlobalEnv,
     targets: &FunctionTargetsHolder,
     fun_env: &FunctionEnv,
+    warned: &mut BTreeSet<QualifiedId<FunId>>,
 ) {
     let target = targets.get_target(fun_env, &FunctionVariant::Baseline);
-    if !target.is_opaque() {
+    let info = verification_analysis::get_info(&target);
+    if !info.verified && !info.inlined {
         return;
     }
-    // All memory directly or indirectly modified by this opaque function must be captured by
-    // a modifies clause. Otherwise we could introduce unsoundness.
-    // TODO: we currently except Event::EventHandle from this, because this is treated as
-    //   an immutable reference. We should find a better way how to deal with event handles.
-    for mem in usage_analysis::get_memory_usage(&target)
-        .modified
-        .all
+    let mut opaque_callees: BTreeSet<_> = fun_env
+        .get_called_functions()
+        .expect(COMPILED_MODULE_AVAILABLE)
         .iter()
+        .copied()
+        .collect();
+    if target
+        .get_bytecode()
+        .iter()
+        .any(|bc| matches!(bc, Bytecode::Call(_, _, Operation::Invoke, _, _)))
     {
-        if env.is_wellknown_event_handle_type(&Type::Struct(mem.module_id, mem.id, vec![])) {
+        opaque_callees.extend(target.get_bytecode().iter().filter_map(|bc| match bc {
+            Bytecode::Call(_, _, Operation::Closure(mid, fid, _, _), _, _) => {
+                Some(mid.qualified(*fid))
+            },
+            _ => None,
+        }));
+    }
+    for callee_qid in opaque_callees {
+        let callee = env.get_function(callee_qid);
+        if !callee.is_opaque() || !warned.insert(callee_qid) {
             continue;
         }
-        if env.get_struct_qid(mem.to_qualified_id()).is_ghost_memory() {
-            continue;
-        }
-        let found = target.get_modify_ids().iter().any(|id| mem == id);
-        if !found {
-            let loc = fun_env.get_spec_loc();
-            env.error(&loc,
-            &format!("function `{}` is opaque but its specification does not have a modifies clause for `{}`",
-                fun_env.get_full_name_str(),
-                env.display(mem))
-            )
+        let callee_target = targets.get_target(&callee, &FunctionVariant::Baseline);
+        let framed = callee_target.get_modify_ids();
+        let unframed_count = usage_analysis::get_memory_usage(&callee_target)
+            .modified
+            .all
+            .iter()
+            .filter(|mem| {
+                !env.is_wellknown_event_handle_type(&Type::Struct(mem.module_id, mem.id, vec![]))
+                    && !env.get_struct_qid(mem.to_qualified_id()).is_ghost_memory()
+                    && !framed.iter().any(|id| *mem == id)
+            })
+            .count();
+        if unframed_count > 0 {
+            let resource_types = if unframed_count == 1 {
+                "resource type"
+            } else {
+                "resource types"
+            };
+            env.warning(
+                &callee.get_spec_loc(),
+                &format!(
+                    "opaque call to `{}` has an incomplete modifies frame; verification weakens \
+                     its summary by havocing every address of {} {}",
+                    callee.get_full_name_str(),
+                    unframed_count,
+                    resource_types
+                ),
+            );
         }
     }
 }

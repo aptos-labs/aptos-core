@@ -2,7 +2,6 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::build_model;
-use anyhow::bail;
 use codespan_reporting::diagnostic::Severity;
 use log::{info, LevelFilter};
 use move_compiler_v2::Experiment;
@@ -12,11 +11,13 @@ use move_model::{
     model::{GlobalEnv, VerificationScope},
 };
 use move_prover::cli::Options;
+use move_prover_boogie_backend::boogie_wrapper::BoogieRunStatus;
 use std::{
     collections::{BTreeMap, BTreeSet},
-    fs,
+    fs::{self, File},
+    io::{LineWriter, Write},
     path::Path,
-    time::Instant,
+    time::{Duration, Instant, SystemTime},
 };
 use tempfile::TempDir;
 
@@ -51,19 +52,10 @@ pub struct ProverOptions {
     #[clap(long)]
     pub random_seed: Option<usize>,
 
-    /// The number of cores to use for parallel processing of verification conditions.
-    #[clap(long)]
+    /// The maximum number of Boogie processes to run concurrently. Can also be set with
+    /// `MVP_PROC_CORES`.
+    #[clap(long, env = "MVP_PROC_CORES")]
     pub proc_cores: Option<usize>,
-
-    /// The number of shards to split the verification problem into. Shards are
-    /// processed sequentially. This can be used to ease memory pressure for verification
-    /// of large packages.
-    #[clap(long)]
-    pub shards: Option<usize>,
-
-    /// If there are multiple shards, the shard to which verification shall be narrowed.
-    #[clap(long)]
-    pub only_shard: Option<usize>,
 
     /// A (soft) timeout for the solver, per verification condition, in seconds.
     #[clap(long)]
@@ -239,7 +231,7 @@ impl ProverOptions {
         configure_aptos_custom_natives(&mut options);
         if benchmark {
             // Special mode of benchmarking
-            run_prover_benchmark(package_path, &mut model, options)?;
+            run_prover_benchmark(package_path, &mut model, writer, options)?;
         } else {
             move_prover::run_move_prover_with_model_v2(&mut model, writer, options, now)?;
         }
@@ -292,8 +284,6 @@ impl ProverOptions {
                 boogie_flags: vec![],
                 generate_smt: self.dump || base_opts.backend.generate_smt,
                 proc_cores: self.proc_cores.unwrap_or(base_opts.backend.proc_cores),
-                shards: self.shards.unwrap_or(base_opts.backend.shards),
-                only_shard: self.only_shard.or(base_opts.backend.only_shard),
                 vc_timeout: self.vc_timeout.unwrap_or(base_opts.backend.vc_timeout),
                 global_timeout_overwrite: !self.disallow_global_timeout_to_be_overwritten,
                 keep_artifacts: self.dump || base_opts.backend.keep_artifacts,
@@ -333,85 +323,50 @@ impl ProverOptions {
 fn run_prover_benchmark(
     package_path: &Path,
     env: &mut GlobalEnv,
+    writer: &mut DiagWriter,
     mut options: Options,
 ) -> anyhow::Result<()> {
     info!("starting prover benchmark");
-    // Determine sources and dependencies from the env.
-    // We collect parent *directories* (not individual files) for both sources and deps so that
-    // the Move compiler finds all `.move` AND `.spec.move` files in each directory.
-    let mut sources: Vec<String> = vec![];
-    let mut deps: Vec<String> = vec![];
-    for module in env.get_modules() {
-        let file_name = module.get_source_path().to_string_lossy().to_string();
-        let target = if module.is_primary_target() {
-            &mut sources
-        } else {
-            &mut deps
-        };
-        if let Some(p) = Path::new(&file_name)
-            .parent()
-            .and_then(|p| p.canonicalize().ok())
-        {
-            // The prover doesn't like to have `p` and `p/s` as paths, filter those out
-            let p = p.to_string_lossy().to_string();
-            let mut done = false;
-            for d in target.iter_mut() {
-                // Use Path::starts_with for component-level prefix checks.
-                if Path::new(&p).starts_with(&*d) {
-                    // p is subsumed by d
-                    done = true;
-                    break;
-                } else if Path::new(&*d).starts_with(&p) {
-                    // p is more general or equal to d, swap it out
-                    *d = p.to_string();
-                    done = true;
-                    break;
-                }
-            }
-            if !done {
-                target.push(p)
-            }
-        } else {
-            bail!("invalid file path `{}`", file_name)
-        }
-    }
-    // Remove from `deps` any path that is already covered by a `sources` entry so the directory is not compiled twice.
-    deps.retain(|d| !sources.iter().any(|s| Path::new(d).starts_with(s)));
-
-    // Enrich the prover options by the aliases in the env
-    for (alias, address) in env.get_address_alias_map() {
-        options.move_named_address_values.push(format!(
-            "{}={}",
-            alias.display(env.symbol_pool()),
-            address.to_hex_literal()
-        ))
-    }
-
-    // Create or override a prover_benchmark.toml in the package dir, reflection `options`
+    options.backend.proc_cores = 1;
+    // Keep the effective options next to the data so benchmark runs are reproducible.
     let config_file = package_path.join("prover_benchmark.toml");
     let toml = toml::to_string(&options)?;
-    std::fs::write(&config_file, toml)?;
+    fs::write(&config_file, toml)?;
 
-    // Args for the benchmark API
-    let mut args = vec![
-        // Command name
-        "bench".to_string(),
-        // Benchmark by function not module
-        "--func".to_string(),
-        // Use as the config the file we derived from `options`
-        "--config".to_string(),
-        config_file.to_string_lossy().to_string(),
-    ];
-
-    // Add deps and sources to args and run the tool
-    for dep in deps {
-        args.push("-d".to_string());
-        args.push(dep)
+    let timings = move_prover::benchmark_move_prover_with_model_v2(env, writer, options)?;
+    let mut functions = BTreeMap::<String, (Duration, BoogieRunStatus)>::new();
+    for timing in timings {
+        let entry = functions
+            .entry(timing.function)
+            .or_insert((Duration::ZERO, BoogieRunStatus::Ok));
+        entry.0 += timing.duration;
+        if benchmark_status_rank(&timing.status) > benchmark_status_rank(&entry.1) {
+            entry.1 = timing.status;
+        }
     }
-    args.extend(sources);
-    move_prover_lab::benchmark::benchmark(&args);
+    env.clear_diag();
 
-    // The benchmark stores the result in `<config_file>.fun_data`, now plot it.
+    let main_data_file = config_file.with_extension("fun_data");
+    let mut out = LineWriter::new(File::create(&main_data_file)?);
+    writeln!(out, "# config: {}", config_file.display())?;
+    writeln!(
+        out,
+        "# time (unix s): {:.3}",
+        SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)?
+            .as_secs_f64()
+    )?;
+    for (function, (duration, status)) in functions {
+        writeln!(
+            out,
+            "{:<50} {:>15} {:>15}",
+            function,
+            duration.as_millis(),
+            status.as_str()
+        )?;
+    }
+    out.flush()?;
+
     // If there are any other `*.fun_data` files, add them to the plot.
     let mut args = vec![
         "plot".to_string(),
@@ -424,11 +379,7 @@ fn run_prover_benchmark(
         ),
         "--sort".to_string(),
     ];
-    let main_data_file = config_file
-        .as_path()
-        .with_extension("fun_data")
-        .to_string_lossy()
-        .to_string();
+    let main_data_file = main_data_file.to_string_lossy().to_string();
     args.push(main_data_file.clone());
     let paths = fs::read_dir(package_path)?;
     for p in paths.flatten() {
@@ -439,6 +390,14 @@ fn run_prover_benchmark(
         }
     }
     move_prover_lab::plot::plot_svg(&args)
+}
+
+fn benchmark_status_rank(status: &BoogieRunStatus) -> u8 {
+    match status {
+        BoogieRunStatus::Errors => 2,
+        BoogieRunStatus::Timeout => 1,
+        BoogieRunStatus::Ok => 0,
+    }
 }
 
 /// Sets `options.backend.custom_natives` to the Aptos-specific native Boogie implementations

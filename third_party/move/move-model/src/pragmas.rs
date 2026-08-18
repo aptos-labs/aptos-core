@@ -119,6 +119,13 @@ pub const INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID: &str = "map_spec_leaf_iter_val
 /// them) — the frame promise for operations that keep iterators valid.
 pub const INTRINSIC_FUN_MAP_SPEC_ITER_PRESERVED: &str = "map_spec_iter_preserved";
 
+/// Position of a leaf/node walker in the enumeration: the number of keys held
+/// before it. Uninterpreted — the map's own spec states where it starts, how
+/// it advances, and that it reaches the map's length when the walk ends, which
+/// is what lets a leaf walk carry a position-indexed invariant.
+/// `[spec] fun map_spec_leaf_offset<K, V>(leaf: LeafIter, m: Map<K, V>): num`
+pub const INTRINSIC_FUN_MAP_SPEC_LEAF_OFFSET: &str = "map_spec_leaf_offset";
+
 /// Get the value associated with key `k`.
 /// The behavior is undefined if `k` does not exist in the map
 /// `[spec] fun map_get<K, V>(m: Map<K, V>, k: K): V`
@@ -140,6 +147,15 @@ pub const INTRINSIC_FUN_MAP_SPEC_LEN: &str = "map_spec_len";
 /// Check whether the map is empty (the spec version)
 /// `[move] fun map_is_empty<K, V>(m: Map<K, V>): bool`
 pub const INTRINSIC_FUN_MAP_SPEC_IS_EMPTY: &str = "map_spec_is_empty";
+
+/// The i-th smallest key under `cmp::compare`, for `0 <= i < len`
+/// `[spec] fun map_key_at<K, V>(m: Map<K, V>, i: num): K`
+pub const INTRINSIC_FUN_MAP_SPEC_KEY_AT: &str = "map_spec_key_at";
+
+/// The position of contained key `k` in `cmp::compare` order; the inverse
+/// of `map_spec_key_at`
+/// `[spec] fun map_rank<K, V>(m: Map<K, V>, k: K): num`
+pub const INTRINSIC_FUN_MAP_SPEC_RANK: &str = "map_spec_rank";
 
 /// Get the number of entries in the map
 /// `[move] fun map_len<K, V>(m: &Map<K, V>): u64`
@@ -426,6 +442,10 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
                 IntrinsicFunDef::spec_fun(),
             ),
             (
+                INTRINSIC_FUN_MAP_SPEC_LEAF_OFFSET,
+                IntrinsicFunDef::spec_fun(),
+            ),
+            (
                 INTRINSIC_FUN_MAP_SPEC_ITER_PRESERVED,
                 IntrinsicFunDef::spec_fun(),
             ),
@@ -435,6 +455,8 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
             (INTRINSIC_FUN_MAP_SPEC_LEN, IntrinsicFunDef::spec_fun()),
             (INTRINSIC_FUN_MAP_SPEC_IS_EMPTY, IntrinsicFunDef::spec_fun()),
             (INTRINSIC_FUN_MAP_SPEC_HAS_KEY, IntrinsicFunDef::spec_fun()),
+            (INTRINSIC_FUN_MAP_SPEC_KEY_AT, IntrinsicFunDef::spec_fun()),
+            (INTRINSIC_FUN_MAP_SPEC_RANK, IntrinsicFunDef::spec_fun()),
             (
                 INTRINSIC_FUN_MAP_LEN,
                 IntrinsicFunDef::move_fun(Some(INTRINSIC_FUN_MAP_SPEC_LEN), None),
@@ -681,6 +703,7 @@ pub fn is_pragma_valid_for_block(
                 | DELEGATE_INVARIANTS_TO_CALLER_PRAGMA
                 | BV_PARAM_PROP
                 | BV_RET_PROP
+                | BV_INTERNAL_PRAGMA
                 | UNROLL_PRAGMA
                 | INFERENCE_PRAGMA
         ),
@@ -780,6 +803,11 @@ pub const BV_PARAM_PROP: &str = "bv";
 /// to explicitly specify which return value will be translated into a bv type in the boogie file
 /// example: bv_ret=b"0,1"
 pub const BV_RET_PROP: &str = "bv_ret";
+
+/// A pragma declaring a function's bitwise representation internal: the body verifies
+/// with bitvectors, while parameters, results and the contract are integers at the
+/// boundary. Requires `pragma opaque`.
+pub const BV_INTERNAL_PRAGMA: &str = "bv_internal";
 
 /// A function which determines whether a property is valid for a given condition kind.
 pub fn is_property_valid_for_condition(kind: &ConditionKind, prop: &str) -> bool {

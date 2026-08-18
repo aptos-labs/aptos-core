@@ -14,10 +14,6 @@ use super::package_data::VerifiedScope;
 use move_model::model::{GlobalEnv, VerificationScope};
 use std::path::Path;
 
-/// Upper bound on package-supplied `shards`. Bounded so a malicious
-/// `Prover.toml` can't expand a single MCP call into an unbounded shard fan-out.
-const MAX_SHARDS: usize = 16;
-
 /// Load prover options for an MCP call.
 ///
 /// When no `Prover.toml` is present, returns `Options::default()` — identical
@@ -28,7 +24,6 @@ const MAX_SHARDS: usize = 16;
 /// flags, fan-out, coverage toggles — stays at its safe default regardless of
 /// what the file says. Allowlist:
 ///
-/// - `backend.shards` (clamped to `[1, MAX_SHARDS]`)
 /// - `prover.borrow_natives`
 ///
 /// These are the only fields the framework's own `Prover.toml` uses; adding
@@ -52,7 +47,6 @@ pub(crate) fn load_sanitized_prover_options(
         )
     })?;
     let mut opts = move_prover::cli::Options::default();
-    opts.backend.shards = from_toml.backend.shards.clamp(1, MAX_SHARDS);
     opts.prover.borrow_natives = from_toml.prover.borrow_natives;
     Ok(opts)
 }

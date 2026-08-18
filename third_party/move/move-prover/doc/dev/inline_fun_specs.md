@@ -449,8 +449,8 @@ callee judged free of memory effects (`fun_has_no_memory_effects`) keeps
 the summary single-state; that judgment accepts exact frame conjuncts
 `X == old(X)` in the callee's spec (e.g. the `supply<CoinType>` frame on
 `coin::merge`), treats bodiless spec functions without used memory as
-state-independent, and trusts the specification alone for opaque callees
-(opaque without `modifies` means "modifies nothing").
+state-independent. Opaque callees without `modifies` are checked against their
+bodies because their call summaries conservatively havoc unframed effects.
 
 **Known boundary — bv-typed material:** behavioral-predicate Skolems and
 evaluators are emitted with non-bv Boogie types, so consuming specs whose

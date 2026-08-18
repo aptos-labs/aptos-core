@@ -210,7 +210,12 @@ pub struct ObjectHandle<'a> {
     idx: usize,
 }
 
-impl ObjectHandle<'_> {
+impl<'a> ObjectHandle<'a> {
+    /// The pool this handle is rooted in.
+    pub(crate) fn pool(&self) -> &'a RootPool {
+        self.pool
+    }
+
     /// Reads the current pointer to the object.
     ///
     /// # Safety

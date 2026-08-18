@@ -21,8 +21,8 @@ use crate::{
         acquires_checker, ast_simplifier, closure_checker, cmp_rewriter,
         cyclic_instantiation_checker, flow_insensitive_checkers, function_checker, inliner,
         inlining_optimization, lambda_lifter, lambda_lifter::LambdaLiftingOptions, model_ast_lints,
-        recursive_struct_checker, rewrite_target::RewritingScope, spec_checker, spec_rewriter,
-        struct_usage_collector, unused_params_checker, EnvProcessorPipeline,
+        native_checker, recursive_struct_checker, rewrite_target::RewritingScope, spec_checker,
+        spec_rewriter, struct_usage_collector, unused_params_checker, EnvProcessorPipeline,
     },
     pipeline::{
         ability_processor::AbilityProcessor,
@@ -60,7 +60,6 @@ use move_binary_format::errors::VMError;
 use move_bytecode_source_map::source_map::SourceMap;
 use move_core_types::vm_status::StatusType;
 use move_model::{
-    metadata::LanguageVersion,
     model::{GlobalEnv, Loc, MoveIrLoc},
     PackageInfo,
 };
@@ -197,6 +196,9 @@ pub fn run_move_compiler_to_model(mut options: Options) -> anyhow::Result<Global
     options.whole_program = true;
     options = options.set_experiment(Experiment::SPEC_REWRITE, true);
     options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
+    // Analysis models may include native declarations at non-special addresses;
+    // that check only applies when compiling for execution.
+    options = options.set_experiment(Experiment::NATIVE_CHECK, false);
 
     // Type checking + AST transforms.
     let mut env = run_checker_and_rewriters(options.clone())?;
@@ -415,9 +417,12 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
             "unused checks",
             flow_insensitive_checkers::check_for_unused_vars_and_params,
         );
+    }
+
+    if options.experiment_on(Experiment::NATIVE_CHECK) {
         env_pipeline.add(
-            "type parameter check",
-            function_checker::check_for_function_typed_parameters,
+            "native function and struct check",
+            native_checker::check_for_native_functions_and_structs,
         );
     }
 
@@ -453,14 +458,7 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
         env_pipeline.add("model AST lints", model_ast_lints::checker);
     }
 
-    // The comparison rewriter is a new features in Aptos Move 2.2 and onwards
-    let rewrite_cmp = options
-        .language_version
-        .unwrap_or_default()
-        .is_at_least(LanguageVersion::V2_2)
-        && options.experiment_on(Experiment::CMP_REWRITE);
-
-    if rewrite_cmp {
+    if options.experiment_on(Experiment::CMP_REWRITE) {
         env_pipeline.add("rewrite comparison operations", |env| {
             // This rewrite is suggested to run before inlining to avoid repeated rewriting
             cmp_rewriter::rewrite(env);
@@ -521,31 +519,19 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
         });
     }
 
-    if options
-        .language_version
-        .unwrap_or_default()
-        .is_at_least(LanguageVersion::V2_2)
-    {
-        let include_inline_functions = options.experiment_on(Experiment::LAMBDA_LIFTING_INLINE);
-        env_pipeline.add("lambda-lifting", move |env: &mut GlobalEnv| {
-            lambda_lifter::lift_lambdas(
-                LambdaLiftingOptions {
-                    include_inline_functions,
-                },
-                env,
-            )
-        });
-    }
+    let include_inline_functions = options.experiment_on(Experiment::LAMBDA_LIFTING_INLINE);
+    env_pipeline.add("lambda-lifting", move |env: &mut GlobalEnv| {
+        lambda_lifter::lift_lambdas(
+            LambdaLiftingOptions {
+                include_inline_functions,
+            },
+            env,
+        )
+    });
 
-    if options
-        .language_version
-        .unwrap_or_default()
-        .is_at_least(LanguageVersion::V2_2)
-    {
-        env_pipeline.add("closure-checker", |env: &mut GlobalEnv| {
-            closure_checker::check_closures(env)
-        });
-    }
+    env_pipeline.add("closure-checker", |env: &mut GlobalEnv| {
+        closure_checker::check_closures(env)
+    });
 
     if options.experiment_on(Experiment::SPEC_CHECK) {
         env_pipeline.add("specification checker", |env| {

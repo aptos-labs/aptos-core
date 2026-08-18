@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid modifier
+  ┌─ tests/checking/natives/native_enum.move:2:5
+  │
+2 │     native enum Bar;
+  │     ^^^^^^ native enums are not supported

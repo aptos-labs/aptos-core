@@ -8,12 +8,7 @@
 use crate::{
     ast::{MemoryRange, Operation, TraceKind, Value},
     builder::model_builder::{ConstEntry, EntryVisibility, ModelBuilder, SpecOrBuiltinFunEntry},
-    metadata::{
-        lang_feature_versions::{
-            LANGUAGE_VERSION_FOR_COMPILE_FOR_TESTING, LANGUAGE_VERSION_FOR_SINT,
-        },
-        LanguageVersion,
-    },
+    metadata::{lang_feature_versions::LANGUAGE_VERSION_FOR_SINT, LanguageVersion},
     model::{Parameter, TypeParameter, TypeParameterKind},
     options::ModelBuilderOptions,
     ty::{Constraint, PrimitiveType, ReferenceKind, Type},
@@ -79,17 +74,12 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
     };
 
     {
-        if options
-            .language_version
-            .is_at_least(LANGUAGE_VERSION_FOR_COMPILE_FOR_TESTING)
-        {
-            use EntryVisibility::SpecAndImpl;
-            // Compiler builtin constants.
-            trans.define_const(
-                trans.builtin_qualified_symbol("__COMPILE_FOR_TESTING__"),
-                mk_bool_const(options.compile_for_testing, SpecAndImpl),
-            );
-        }
+        use EntryVisibility::SpecAndImpl;
+        // Compiler builtin constants.
+        trans.define_const(
+            trans.builtin_qualified_symbol("__COMPILE_FOR_TESTING__"),
+            mk_bool_const(options.compile_for_testing, SpecAndImpl),
+        );
     }
 
     {
@@ -480,16 +470,11 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
             Type::new_prim(PrimitiveType::Num),
             Spec, // visible only in the spec language
         );
-        // Declare the implementation cmp ops
-        if trans
-            .env
-            .language_version()
-            .is_at_least(LanguageVersion::V2_2)
+        // Declare the implementation cmp ops. Comparison is supported on all types:
+        // - integer types supported by the VM natively
+        // - other types supported by the `compare` native function
+        //      - implicitly through compiler rewrite at the AST level
         {
-            // For LanguageVersion::V2_2 and later, we support comparison on all types.
-            // - integer types supported by the VM natively
-            // - other types supported by the `compare` native function
-            //      - implicitly through compiler rewrite at the AST level
             let ref_param_t = Type::Reference(ReferenceKind::Immutable, Box::new(param_t.clone()));
             // Allow cmp over both generic types and reference types
             for pt in [ref_param_t.clone(), param_t.clone()] {
@@ -501,22 +486,6 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
                     Impl, // visible only in the impl language
                 );
             }
-        } else {
-            // For LanguageVersion::V2_1 and earlier, we support only integer types.
-            // We use a generic function with a constraint, conceptually:
-            // `fun _cmp_<A>(x: A, y: A): bool where A: u8|u16|..|u256`.
-            declare_cmp_ops(
-                trans,
-                std::slice::from_ref(&param_t_decl),
-                &[(
-                    0,
-                    Constraint::SomeNumber(PrimitiveType::all_int_types().into_iter().collect()),
-                )]
-                .into_iter()
-                .collect(),
-                param_t.clone(),
-                Impl, // visible only in the impl language
-            );
         }
 
         declare_bin(trans, Range, Operation::Range, num_t, num_t, range_t, Spec);

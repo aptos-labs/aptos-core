@@ -14,20 +14,19 @@
 // covered by other tests, such as the e2e move tests. Note that the sender's
 // store is masked, so a wrong debit there is not caught.
 
-use aptos_language_e2e_tests::executor::FakeExecutor;
+use aptos_language_e2e_tests::{account::AccountData, executor::FakeExecutor};
 use aptos_types::{
     on_chain_config::{Features, OnChainConfig},
     state_store::StateView,
     transaction::{
-        ExecutionStatus, SignedTransaction, TransactionAuxiliaryData, TransactionOutput,
-        TransactionStatus,
+        AuxiliaryInfo, ExecutionStatus, PersistedAuxiliaryInfo, SignedTransaction,
+        TransactionAuxiliaryData, TransactionOutput, TransactionStatus,
     },
 };
-use mono_move_aptos_state_view_providers::{
-    StateViewModuleProvider, StateViewResourceProvider, DEFAULT_RESOURCE_ARENA_BYTES,
-};
+use mono_move_aptos_state_view_providers::{StateViewModuleProvider, StateViewResourceProvider};
 use mono_move_aptos_transaction_executor::{production_natives, AptosTransactionExecutor};
 use mono_move_global_context::GlobalContext;
+use move_core_types::vm_status::StatusCode;
 use std::collections::BTreeMap;
 
 /// Event types whose payload embeds gas amounts.
@@ -46,7 +45,7 @@ fn execute_v2<S: StateView>(state: &S, txn: &SignedTransaction) -> TransactionOu
         .expect("execution context is available");
     let natives = production_natives(&guard);
     let module_provider = StateViewModuleProvider::new(state);
-    let data_provider = StateViewResourceProvider::new(&guard, state, DEFAULT_RESOURCE_ARENA_BYTES);
+    let data_provider = StateViewResourceProvider::new(&guard, state);
     let features = Features::fetch_config(state)
         .ok()
         .flatten()
@@ -61,7 +60,7 @@ fn execute_v2<S: StateView>(state: &S, txn: &SignedTransaction) -> TransactionOu
         usage,
     );
     executor
-        .execute_user_transaction(txn)
+        .execute_user_transaction(txn, &AuxiliaryInfo::new(PersistedAuxiliaryInfo::None, None))
         .materialize(
             &guard,
             &data_provider,
@@ -71,13 +70,19 @@ fn execute_v2<S: StateView>(state: &S, txn: &SignedTransaction) -> TransactionOu
         .expect("the transaction output materializes")
 }
 
-#[test]
-fn p2p_transfer_matches_v1() {
+/// Fresh genesis with a funded sender (sequence number 10) and recipient.
+fn setup() -> (FakeExecutor, AccountData, AccountData) {
     let mut fx = FakeExecutor::from_head_genesis();
     let alice = fx.create_raw_account_data(1_000_000_000, 10);
     fx.add_account_data(&alice);
     let bob = fx.create_raw_account_data(100_000_000, 0);
     fx.add_account_data(&bob);
+    (fx, alice, bob)
+}
+
+#[test]
+fn p2p_transfer_matches_v1() {
+    let (fx, alice, bob) = setup();
 
     let txn = alice
         .account()
@@ -192,11 +197,7 @@ fn compare_outputs(
 /// epilogue still charges the fee and bumps the sequence number.
 #[test]
 fn p2p_transfer_insufficient_balance_aborts_like_v1() {
-    let mut fx = FakeExecutor::from_head_genesis();
-    let alice = fx.create_raw_account_data(1_000_000_000, 10);
-    fx.add_account_data(&alice);
-    let bob = fx.create_raw_account_data(100_000_000, 0);
-    fx.add_account_data(&bob);
+    let (fx, alice, bob) = setup();
 
     let txn = alice
         .account()
@@ -244,11 +245,7 @@ fn p2p_transfer_insufficient_balance_aborts_like_v1() {
 /// failure cleanup — including the abort location.
 #[test]
 fn p2p_transfer_draining_fee_payer_aborts_like_v1() {
-    let mut fx = FakeExecutor::from_head_genesis();
-    let alice = fx.create_raw_account_data(1_000_000_000, 10);
-    fx.add_account_data(&alice);
-    let bob = fx.create_raw_account_data(100_000_000, 0);
-    fx.add_account_data(&bob);
+    let (fx, alice, bob) = setup();
 
     // Send the entire balance: nothing is left for the fee at epilogue time.
     let txn = alice
@@ -297,9 +294,7 @@ fn nonexistent_entry_function_kept_like_v1() {
     use aptos_types::transaction::{EntryFunction, TransactionPayload};
     use move_core_types::{ident_str, language_storage::ModuleId};
 
-    let mut fx = FakeExecutor::from_head_genesis();
-    let alice = fx.create_raw_account_data(1_000_000_000, 10);
-    fx.add_account_data(&alice);
+    let (fx, alice, _bob) = setup();
 
     let txn = alice
         .account()
@@ -334,6 +329,55 @@ fn nonexistent_entry_function_kept_like_v1() {
     compare_outputs(&v1_output, &v2_output, *alice.address());
 }
 
+/// A multi-agent transaction supplying two senders to a one-signer entry
+/// function is rejected, like on the legacy VM.
+//
+// TODO(correctness): compare exact statuses once argument rejection gets a
+// real status instead of an invariant violation.
+#[test]
+fn extra_signers_rejected_like_v1() {
+    let (fx, alice, bob) = setup();
+
+    // `aptos_account::transfer` takes one `&signer`; supply two senders.
+    let txn = alice
+        .account()
+        .transaction()
+        .payload(aptos_cached_packages::aptos_stdlib::aptos_account_transfer(
+            *bob.address(),
+            1_000,
+        ))
+        .sequence_number(10)
+        .gas_unit_price(100)
+        .max_gas_amount(1_000_000)
+        .secondary_signers(vec![bob.account().clone()])
+        .sign_multi_agent();
+
+    let v1_output = fx.execute_transaction(txn.clone());
+    assert!(
+        matches!(
+            v1_output.status(),
+            TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+                StatusCode::NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH
+            )))
+        ),
+        "v1 did not reject the signer-count mismatch: {:?}",
+        v1_output.status()
+    );
+
+    let v2_output = execute_v2(fx.get_state_view(), &txn);
+    assert!(
+        matches!(
+            v2_output.status(),
+            TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(_))
+        ),
+        "v2 did not reject the signer-count mismatch: {:?}",
+        v2_output.status()
+    );
+
+    // Write sets are not compared: the gas divergence leaves v1 with fee
+    // writes v2 lacks.
+}
+
 /// Two dependent transfers executed sequentially, each transaction's outputs
 /// applied to the state before the next: the second transaction's prologue
 /// only passes if it observes the first one's sequence-number bump.
@@ -341,11 +385,7 @@ fn nonexistent_entry_function_kept_like_v1() {
 fn sequential_execution_applies_outputs() {
     use aptos_transaction_simulation::{DeltaStateStore, SimulationStateStore};
 
-    let mut fx = FakeExecutor::from_head_genesis();
-    let alice = fx.create_raw_account_data(1_000_000_000, 10);
-    fx.add_account_data(&alice);
-    let bob = fx.create_raw_account_data(100_000_000, 0);
-    fx.add_account_data(&bob);
+    let (fx, alice, bob) = setup();
 
     let transfer = |seq| {
         alice

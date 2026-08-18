@@ -1,4 +1,4 @@
-module 0x8675309::M {
+module 0x8::M {
     struct S { f: u64, g: bool }
 
     fun t0() {

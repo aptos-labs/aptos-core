@@ -1,4 +1,4 @@
-module 0x42::Test {
+module 0x4::Test {
 
     public native inline fun foo();
 

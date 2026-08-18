@@ -1604,10 +1604,10 @@ pub fn compute_evaluator_memory_union(
         }
         for info in closure_infos {
             let fun_env = env.get_function(info.fun.to_qualified_id());
-            for mem in fun_env.get_spec_used_memory() {
+            for mem in fun_env.get_spec_used_memory().iter() {
                 union_used_memory.insert(mem.clone().instantiate(&info.fun.inst));
             }
-            for mem in fun_env.get_spec_old_memory() {
+            for mem in fun_env.get_spec_old_memory().iter() {
                 union_old_memory.insert(mem.clone().instantiate(&info.fun.inst));
             }
         }

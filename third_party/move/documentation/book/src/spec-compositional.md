@@ -647,14 +647,19 @@ spec my_fun {
 }
 ```
 
-Both declarations are enforced. The prover checks that opaque functions have `modifies` clauses covering all resources they actually modify. If a function declares `reads`, the prover checks that every resource the function accesses is covered by either the `reads` or `modifies` declaration:
+Both declarations are enforced. An opaque function may omit `modifies`, but
+the resulting summary is coarse: the prover warns and havocs every address of
+each unframed resource type the implementation can modify. A precise
+`modifies` clause preserves all other addresses. If a function declares
+`reads`, the prover checks that every resource the function accesses is
+covered by either the `reads` or `modifies` declaration:
 
 ```
 error: function `my_fun` accesses resource `S`
        which is not covered by its `reads` or `modifies` declaration
 ```
 
-If no `reads` declaration is present, no read checking is performed — the prover only checks `modifies` for opaque functions.
+If no `reads` declaration is present, no read checking is performed.
 
 ### Read Access
 
