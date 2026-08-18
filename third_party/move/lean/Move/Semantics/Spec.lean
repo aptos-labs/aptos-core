@@ -86,6 +86,32 @@ theorem extensionality {left right : Spec σ α}
   cases right
   simp_all
 
+/-- A fixed point whose body does not call its recursive argument is just that
+body. This is the common semantic shape of a `loop` which exits directly via
+`break`, and keeps proofs independent of the finite-approximation encoding. -/
+@[simp] theorem fix_const (body : Args → Spec σ Result) :
+    fix (fun _ => body) = body := by
+  funext args
+  apply extensionality
+  · funext initial result final
+    apply propext
+    constructor
+    · rintro ⟨fuel, execution⟩
+      cases fuel with
+      | zero => exact execution.elim
+      | succ fuel => exact execution
+    · intro execution
+      exact ⟨1, execution⟩
+  · funext initial code
+    apply propext
+    constructor
+    · rintro ⟨fuel, execution⟩
+      cases fuel with
+      | zero => exact execution.elim
+      | succ fuel => exact execution
+    · intro execution
+      exact ⟨1, execution⟩
+
 @[simp] theorem pure_bind (value : α) (next : α → Spec σ β) :
     bind (pure value) next = next value := by
   apply extensionality
