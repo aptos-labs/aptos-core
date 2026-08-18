@@ -414,10 +414,13 @@ versions before tasks are created, and the resolved range is included in the
 manifest.
 
 The replay scheduler is extended with a framework-usage worker mode while
-retaining the same archive snapshot provisioning and cleanup behavior. Workers
-write result shards to a run-specific object-storage prefix. Object names use
-the requested range and workflow run identity. The worker must successfully
-upload the shard before its Kubernetes job is considered successful.
+retaining the same archive snapshot provisioning and cleanup behavior. For
+ranges of up to 10,000 transactions, completed workers delimit their report in
+the existing Kubernetes pod logs and the scheduler extracts and validates it.
+Larger runs require `RESULTS_BUCKET`; workers then write result shards to a
+run-specific object-storage prefix. Object names use the requested range and
+workflow run identity. The worker must successfully upload the shard before
+its Kubernetes job is considered successful.
 
 After every task succeeds, the GitHub runner downloads and merges the shards.
 The merge step rejects:
@@ -437,9 +440,9 @@ The final GitHub Actions artifact contains:
 - `framework-usage.json`: complete per-function and immediate/root caller
   aggregates plus run metadata
 
-The result bucket should have a lifecycle policy. CI cleanup always removes
-pods and temporary PVCs, while completed artifacts remain available for the
-configured retention period.
+When a result bucket is used, it should have a lifecycle policy. CI cleanup
+always removes pods and temporary PVCs, while completed workflow artifacts
+remain available for the configured retention period.
 
 ## Report Interpretation
 

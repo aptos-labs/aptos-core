@@ -108,10 +108,6 @@ jobs:
             exit 1
           fi
           if [ "$FRAMEWORK_USAGE" = "true" ]; then
-            if [ -z "$RESULTS_BUCKET" ]; then
-              echo "::error::RESULTS_BUCKET is required for framework usage collection."
-              exit 1
-            fi
             if [ -z "$START_VERSION" ] && [ -z "$START_TIME" ]; then
               echo "::error::A START_VERSION or START_TIME is required for framework usage collection."
               exit 1
@@ -222,8 +218,10 @@ jobs:
             ARGS+=(--image_tag "$IMAGE_TAG")
           fi
           if [ "$FRAMEWORK_USAGE" = "true" ]; then
-            ARGS+=(--framework-usage-bucket "$RESULTS_BUCKET")
             ARGS+=(--framework-usage-output-dir ../../framework-usage-results)
+            if [ -n "$RESULTS_BUCKET" ]; then
+              ARGS+=(--framework-usage-bucket "$RESULTS_BUCKET")
+            fi
           fi
           ARGS+=(--image_profile performance)
           poetry run python main.py "${ARGS[@]}"

@@ -51,6 +51,9 @@ PVC_TTL_SECS = 8 * 60 * 60
 # workers_per_pvc higher than this in ReplayConfig produces no throughput
 # gain — it just adds Pending pods that brush against the per-pod timeout.
 MAX_WORKERS_PER_PVC = 10
+MAX_LOG_TRANSPORT_TRANSACTIONS = 10_000
+REPORT_BEGIN_MARKER = "<<<FRAMEWORK_USAGE_REPORT_BEGIN>>>"
+REPORT_END_MARKER = "<<<FRAMEWORK_USAGE_REPORT_END>>>"
 
 # Per-pod timeout for Pending phase. A pod that hasn't reached Running
 # after this long is almost certainly stuck (image-pull failure, node
@@ -66,6 +69,23 @@ PENDING_TIMEOUT = 10 * 60
 REPLAY_CONCURRENCY_LEVEL = 1
 
 INT64_MAX = 9_223_372_036_854_775_807
+
+
+def extract_framework_usage_report_from_logs(
+    logs: str, expected_start: int, expected_end: int
+) -> dict:
+    begin = logs.rfind(REPORT_BEGIN_MARKER)
+    end = logs.rfind(REPORT_END_MARKER)
+    if begin < 0 or end < 0 or end <= begin:
+        raise RuntimeError("framework usage report markers missing from pod logs")
+    encoded_report = logs[begin + len(REPORT_BEGIN_MARKER) : end].strip()
+    report = json.loads(encoded_report)
+    if (
+        report["start_version"] != expected_start
+        or report["end_version"] != expected_end
+    ):
+        raise RuntimeError("framework usage report range differs from worker range")
+    return report
 
 
 class Network(Enum):
@@ -236,6 +256,7 @@ class WorkerPod:
         replay_config: ReplayConfig,
         network: Network = Network.TESTNET,
         namespace: str = "default",
+        framework_usage: bool = False,
         framework_usage_bucket: Optional[str] = None,
     ) -> None:
         self.worker_id = worker_id
@@ -258,6 +279,7 @@ class WorkerPod:
         self.image = image
         self.pvc_name = pvc_name
         self.config = replay_config
+        self.framework_usage = framework_usage
         self.framework_usage_bucket = framework_usage_bucket
 
     def update_status(self) -> None:
@@ -409,6 +431,21 @@ class WorkerPod:
             for status in container_statuses[1:]
         )
 
+    @retry(
+        stop=stop_after_attempt(MAX_RETRIES),
+        wait=wait_fixed(RETRY_DELAY),
+        retry=retry_if_exception_type(ApiException),
+    )
+    def read_framework_usage_report_from_logs(self) -> dict:
+        logs = self.client.read_namespaced_pod_log(
+            name=self.name,
+            namespace=self.namespace,
+            container=self.get_claim_name(),
+        )
+        return extract_framework_usage_report_from_logs(
+            logs, self.start_version, self.end_version
+        )
+
     def get_target_db_dir(self) -> str:
         return "/mnt/archive/db"
 
@@ -434,7 +471,7 @@ class WorkerPod:
         aptos_command = [
             "aptos-debugger",
             "aptos-db",
-            "framework-usage" if self.framework_usage_bucket else "replay-on-archive",
+            "framework-usage" if self.framework_usage else "replay-on-archive",
             "--start-version",
             str(self.start_version),
             "--end-version",
@@ -450,7 +487,7 @@ class WorkerPod:
             "--block-cache-size",
             f"{36 * 1024 * 1024 * 1024}",
         ]
-        if self.framework_usage_bucket:
+        if self.framework_usage:
             output_path = f"/results/{self.start_version}-{self.end_version}.json"
             aptos_command.extend(["--output", output_path])
             pod_manifest["spec"]["volumes"].append(
@@ -459,39 +496,54 @@ class WorkerPod:
             pod_manifest["spec"]["containers"][0]["volumeMounts"].append(
                 {"mountPath": "/results", "name": "results"}
             )
-            pod_manifest["spec"]["containers"][0]["command"] = [
-                "/bin/sh",
-                "-c",
-                '"$@"; status=$?; '
-                'if [ "$status" -eq 0 ]; then touch /results/ready; '
-                "else touch /results/failed; fi; exit \"$status\"",
-                "--",
-                *aptos_command,
-            ]
-            destination = (
-                f"gs://{self.framework_usage_bucket}/{self.label}/shards/"
-                f"{self.start_version}-{self.end_version}.json"
-            )
-            pod_manifest["spec"]["containers"].append(
-                {
-                    "name": "upload-framework-usage",
-                    "image": "gcr.io/google.com/cloudsdktool/google-cloud-cli:slim",
-                    "command": [
-                        "/bin/sh",
-                        "-c",
-                        "until [ -f /results/ready ] || [ -f /results/failed ]; do sleep 5; done; "
-                        "if [ -f /results/failed ]; then exit 1; fi; "
-                        "attempt=1; while [ \"$attempt\" -le 5 ]; do "
-                        'gcloud storage cp /results/*.json "$DESTINATION" && exit 0; '
-                        'attempt=$((attempt + 1)); sleep 10; done; exit 1',
-                    ],
-                    "env": [{"name": "DESTINATION", "value": destination}],
-                    "volumeMounts": [{"mountPath": "/results", "name": "results"}],
-                    "resources": {
-                        "requests": {"cpu": "100m", "memory": "256Mi"},
-                    },
-                }
-            )
+            if self.framework_usage_bucket:
+                pod_manifest["spec"]["containers"][0]["command"] = [
+                    "/bin/sh",
+                    "-c",
+                    '"$@"; status=$?; '
+                    'if [ "$status" -eq 0 ]; then touch /results/ready; '
+                    "else touch /results/failed; fi; exit \"$status\"",
+                    "--",
+                    *aptos_command,
+                ]
+                destination = (
+                    f"gs://{self.framework_usage_bucket}/{self.label}/shards/"
+                    f"{self.start_version}-{self.end_version}.json"
+                )
+                pod_manifest["spec"]["containers"].append(
+                    {
+                        "name": "upload-framework-usage",
+                        "image": "gcr.io/google.com/cloudsdktool/google-cloud-cli:slim",
+                        "command": [
+                            "/bin/sh",
+                            "-c",
+                            "until [ -f /results/ready ] || [ -f /results/failed ]; do sleep 5; done; "
+                            "if [ -f /results/failed ]; then exit 1; fi; "
+                            "attempt=1; while [ \"$attempt\" -le 5 ]; do "
+                            'gcloud storage cp /results/*.json "$DESTINATION" && exit 0; '
+                            'attempt=$((attempt + 1)); sleep 10; done; exit 1',
+                        ],
+                        "env": [{"name": "DESTINATION", "value": destination}],
+                        "volumeMounts": [{"mountPath": "/results", "name": "results"}],
+                        "resources": {
+                            "requests": {"cpu": "100m", "memory": "256Mi"},
+                        },
+                    }
+                )
+            else:
+                pod_manifest["spec"]["containers"][0]["command"] = [
+                    "/bin/sh",
+                    "-c",
+                    '"$@"; status=$?; '
+                    'if [ "$status" -eq 0 ]; then '
+                    f'echo "{REPORT_BEGIN_MARKER}"; cat "$REPORT"; echo; '
+                    f'echo "{REPORT_END_MARKER}"; fi; exit "$status"',
+                    "--",
+                    *aptos_command,
+                ]
+                pod_manifest["spec"]["containers"][0].setdefault("env", []).append(
+                    {"name": "REPORT", "value": output_path}
+                )
         else:
             pod_manifest["spec"]["containers"][0]["command"] = aptos_command
         # TODO(ibalajiarun): bump memory limit to 180GiB for heavy ranges
@@ -649,6 +701,7 @@ class ReplayScheduler:
         replay_config: ReplayConfig,
         network: Network = Network.TESTNET,
         namespace: str = "default",
+        framework_usage_output_dir: Optional[str] = None,
         framework_usage_bucket: Optional[str] = None,
     ) -> None:
         KubernetesConfig.load_kube_config()
@@ -671,6 +724,7 @@ class ReplayScheduler:
         self.pvcs: list[PVCInfo] = []
         self._snapshot_name: Optional[str] = None
         self.config = replay_config
+        self.framework_usage_output_dir = framework_usage_output_dir
         self.framework_usage_bucket = framework_usage_bucket
 
     def __str__(self):
@@ -1014,6 +1068,7 @@ class ReplayScheduler:
                         self.config,
                         self.network,
                         self.namespace,
+                        framework_usage=self.framework_usage_output_dir is not None,
                         framework_usage_bucket=self.framework_usage_bucket,
                     )
                     self.current_workers[i] = worker_pod
@@ -1076,6 +1131,30 @@ class ReplayScheduler:
                 self.current_workers[worker_idx] = None
                 self.task_stats[worker_pod.name].set_end_time()
         else:
+            if self.framework_usage_output_dir and not self.framework_usage_bucket:
+                try:
+                    report = worker_pod.read_framework_usage_report_from_logs()
+                    shard_dir = os.path.join(
+                        self.framework_usage_output_dir, "shards"
+                    )
+                    os.makedirs(shard_dir, exist_ok=True)
+                    shard_path = os.path.join(
+                        shard_dir,
+                        f"{worker_pod.start_version}-{worker_pod.end_version}.json",
+                    )
+                    tmp_path = f"{shard_path}.tmp"
+                    with open(tmp_path, "w") as output:
+                        json.dump(report, output)
+                    os.replace(tmp_path, shard_path)
+                except Exception as error:
+                    logger.error(
+                        f"Failed to retrieve framework usage report from "
+                        f"{worker_pod.name}: {error}"
+                    )
+                    self.failed_workpod_logs.append(worker_pod.get_humio_log_link())
+                    self.current_workers[worker_idx] = None
+                    self.task_stats[worker_pod.name].set_end_time()
+                    return
             logger.info(
                 f"Worker {worker_idx} completed: {worker_pod.name}, "
                 f"status=Succeeded, duration={duration}s"
@@ -1345,7 +1424,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--framework-usage-bucket",
         required=False,
-        help="GCS bucket for framework usage shards; enables framework usage mode",
+        help="Optional GCS bucket for large framework usage runs",
     )
     parser.add_argument(
         "--framework-usage-output-dir",
@@ -1359,9 +1438,9 @@ def parse_args() -> argparse.Namespace:
         parser.error("--start and --start-time are mutually exclusive")
     if args.end is not None and args.end_time is not None:
         parser.error("--end and --end-time are mutually exclusive")
-    if bool(args.framework_usage_bucket) != bool(args.framework_usage_output_dir):
+    if args.framework_usage_bucket and not args.framework_usage_output_dir:
         parser.error(
-            "--framework-usage-bucket and --framework-usage-output-dir must be used together"
+            "--framework-usage-bucket requires --framework-usage-output-dir"
         )
 
     return args
@@ -1432,7 +1511,7 @@ def _merge_usage_rows(reports: list[dict], field: str) -> list[dict]:
 
 
 def merge_framework_usage_reports(
-    bucket_name: str,
+    bucket_name: Optional[str],
     prefix: str,
     output_dir: str,
     expected_shards: int,
@@ -1440,14 +1519,28 @@ def merge_framework_usage_reports(
     expected_end: int,
     network: str,
 ) -> None:
-    storage_client = storage.Client()
-    blobs = list(storage_client.list_blobs(bucket_name, prefix=f"{prefix}/shards/"))
-    if len(blobs) != expected_shards:
-        raise RuntimeError(
-            f"expected {expected_shards} framework usage shards, found {len(blobs)} "
-            f"under gs://{bucket_name}/{prefix}/shards/"
+    if bucket_name:
+        storage_client = storage.Client()
+        blobs = list(storage_client.list_blobs(bucket_name, prefix=f"{prefix}/shards/"))
+        reports = [json.loads(blob.download_as_text()) for blob in blobs]
+        source = f"gs://{bucket_name}/{prefix}/shards/"
+    else:
+        shard_dir = os.path.join(output_dir, "shards")
+        shard_paths = sorted(
+            os.path.join(shard_dir, name)
+            for name in os.listdir(shard_dir)
+            if name.endswith(".json")
         )
-    reports = [json.loads(blob.download_as_text()) for blob in blobs]
+        reports = []
+        for shard_path in shard_paths:
+            with open(shard_path) as shard_file:
+                reports.append(json.load(shard_file))
+        source = shard_dir
+    if len(reports) != expected_shards:
+        raise RuntimeError(
+            f"expected {expected_shards} framework usage shards, found "
+            f"{len(reports)} under {source}"
+        )
     if not reports:
         raise RuntimeError("no framework usage reports were produced")
 
@@ -1497,7 +1590,7 @@ def merge_framework_usage_reports(
             report["transaction_usage_records"] for report in reports
         ),
         "shard_count": len(reports),
-        "gcs_prefix": f"gs://{bucket_name}/{prefix}/",
+        "gcs_prefix": f"gs://{bucket_name}/{prefix}/" if bucket_name else None,
         "functions": reference["functions"],
         "function_usage": _merge_usage_rows(reports, "function_usage"),
         "usage": _merge_usage_rows(reports, "usage"),
@@ -1629,7 +1722,7 @@ if __name__ == "__main__":
     run_id = f"{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}-{image[-5:]}"
     network = Network.from_string(args.network)
     config = ReplayConfig(network)
-    if args.framework_usage_bucket:
+    if args.framework_usage_output_dir:
         config.min_range_size = 1
         skip_ranges = []
     worker_cnt = (
@@ -1657,6 +1750,19 @@ if __name__ == "__main__":
         assert (
             args.end <= end
         ), f"end version {args.end} is out of range {start} - {end}"
+    if (
+        args.framework_usage_output_dir
+        and not args.framework_usage_bucket
+        and (args.end if args.end is not None else end)
+        - (args.start if args.start is not None else start)
+        + 1
+        > MAX_LOG_TRANSPORT_TRANSACTIONS
+    ):
+        raise ValueError(
+            "framework usage ranges over "
+            f"{MAX_LOG_TRANSPORT_TRANSACTIONS} transactions require "
+            "--framework-usage-bucket"
+        )
 
     scheduler = ReplayScheduler(
         run_id,
@@ -1669,6 +1775,7 @@ if __name__ == "__main__":
         replay_config=config,
         network=network,
         namespace=args.namespace,
+        framework_usage_output_dir=args.framework_usage_output_dir,
         framework_usage_bucket=args.framework_usage_bucket,
     )
     logger.info(f"scheduler: {scheduler}")
@@ -1692,7 +1799,7 @@ if __name__ == "__main__":
             if len(failed_logs) > 0:
                 logger.error("Failed tasks found.")
                 exit(1)
-            if args.framework_usage_bucket:
+            if args.framework_usage_output_dir:
                 merge_framework_usage_reports(
                     args.framework_usage_bucket,
                     scheduler.get_label(),

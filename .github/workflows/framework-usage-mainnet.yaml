@@ -24,9 +24,9 @@ on:
         type: string
         description: 'End time, for example "now" or "2026-08-08" (UTC).'
       RESULTS_BUCKET:
-        required: true
+        required: false
         type: string
-        description: GCS bucket for durable per-range report shards.
+        description: Optional GCS bucket; required for ranges over 10,000 transactions.
       DRY_RUN:
         required: false
         type: boolean
