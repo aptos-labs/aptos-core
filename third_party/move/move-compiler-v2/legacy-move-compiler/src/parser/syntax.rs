@@ -133,21 +133,6 @@ fn require_language_version_msg(
     }
 }
 
-fn require_move_version_and_advance(
-    min_language_version: LanguageVersion,
-    context: &mut Context,
-    description: &str,
-) -> Result<bool, Box<Diagnostic>> {
-    let loc = current_token_loc(context.tokens);
-    context.tokens.advance()?;
-    Ok(require_move_version(
-        min_language_version,
-        context,
-        loc,
-        description,
-    ))
-}
-
 pub fn make_loc(file_hash: FileHash, start: usize, end: usize) -> Loc {
     Loc::new(file_hash, start as u32, end as u32)
 }
@@ -1669,12 +1654,6 @@ fn parse_control_exp(context: &mut Context) -> Result<(Exp, bool), Box<Diagnosti
 
 fn parse_optional_label(context: &mut Context) -> Result<Option<Label>, Box<Diagnostic>> {
     if context.tokens.peek() == Tok::Label {
-        require_language_version(
-            context,
-            current_token_loc(context.tokens),
-            LanguageVersion::V2_1,
-            "loop labels are",
-        );
         let label = Label(Name::new(
             current_token_loc(context.tokens),
             Symbol::from(context.tokens.content()),
@@ -2008,12 +1987,6 @@ fn parse_lambda(
         let spec = parse_spec_block(vec![], context)?;
         let spec_end = context.tokens.previous_end_loc();
         let loc: Loc = make_loc(context.tokens.file_hash(), spec_start, spec_end);
-        require_move_version(
-            LanguageVersion::V2_2,
-            context,
-            loc,
-            "Specs on function expressions",
-        );
         let spec_exp = Exp::new(loc, Exp_::Spec(spec));
         Some(Box::new(spec_exp))
     } else {
@@ -2038,11 +2011,7 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
         Tok::Move | Tok::Copy
             if matches!(context.tokens.lookahead(), Ok(Tok::Pipe | Tok::PipePipe)) =>
         {
-            let _ = require_move_version_and_advance(
-                LanguageVersion::V2_2,
-                context,
-                "Modifier on lambda expression",
-            ); // consume the Move/Copy
+            context.tokens.advance()?; // consume the Move/Copy
             let capture_kind = match token {
                 Tok::Move => LambdaCaptureKind::Move,
                 Tok::Copy => LambdaCaptureKind::Copy,
@@ -2113,12 +2082,6 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
                 | Tok::XorEqual
                 | Tok::ShlEqual
                 | Tok::ShrEqual => {
-                    require_language_version(
-                        context,
-                        current_token_loc(context.tokens),
-                        LanguageVersion::V2_1,
-                        "op-equal operators are",
-                    );
                     let op_loc = context.tokens.advance_with_loc()?; // consume the "op="
                     let rhs = Box::new(parse_exp(context)?);
                     Exp_::Assign(
@@ -2388,31 +2351,22 @@ fn apply_dot_or_index_chain(
             Tok::Period => {
                 context.tokens.advance()?;
                 let n = parse_identifier_or_positional_field(context)?;
-                let is_2_2_or_later =
-                    context.env.flags().language_version() >= LanguageVersion::V2_2;
                 let has_generics = match context.tokens.peek() {
-                    Tok::Less
-                        if is_2_2_or_later
-                            && n.loc.end() as usize == context.tokens.start_loc() =>
-                    {
-                        true
-                    },
+                    Tok::Less if n.loc.end() as usize == context.tokens.start_loc() => true,
                     Tok::ColonColon
                         if context.tokens.lookahead().unwrap_or(Tok::ColonColon) == Tok::Less =>
                     {
                         let loc = context.tokens.advance_with_loc()?;
-                        if is_2_2_or_later {
-                            context.env.add_diag(diag!(
-                                Uncategorized::DeprecatedWillBeRemoved,
-                                (
-                                    loc,
-                                    format!(
-                                        "The `::` qualifier is obsolete since Move {}",
-                                        LanguageVersion::V2_2
-                                    )
+                        context.env.add_diag(diag!(
+                            Uncategorized::DeprecatedWillBeRemoved,
+                            (
+                                loc,
+                                format!(
+                                    "The `::` qualifier is obsolete since Move {}",
+                                    LanguageVersion::V2_2
                                 )
-                            ));
-                        }
+                            )
+                        ));
                         true
                     },
                     _ => false,
@@ -2917,18 +2871,7 @@ fn parse_type(context: &mut Context) -> Result<Type, Box<Diagnostic>> {
                     Type_::Unit,
                 )
             };
-            let abilities_start = context.tokens.start_loc();
             let abilities = parse_has_abilities_for_function_type(context)?;
-            if !abilities.is_empty() {
-                let abilities_end = context.tokens.previous_end_loc();
-                let loc = make_loc(context.tokens.file_hash(), abilities_start, abilities_end);
-                require_move_version(
-                    LanguageVersion::V2_2,
-                    context,
-                    loc,
-                    "Ability constraints on function types",
-                );
-            }
             return Ok(spanned(
                 context.tokens.file_hash(),
                 start_loc,

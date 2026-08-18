@@ -219,17 +219,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         et
     }
 
-    /// Returns `true` if language version is ok. Otherwise,
-    /// issues an error message and returns `false`.
-    pub fn test_language_version(
-        &self,
-        loc: &Loc,
-        feature: &str,
-        version_min: LanguageVersion,
-    ) -> bool {
-        self.parent.test_language_version(loc, feature, version_min)
-    }
-
     /// Returns `Some(())` if language version checks out.  Otherwise,
     /// issues an error message and returns `None`.
     pub fn check_language_version(
@@ -798,10 +787,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         params: &[(PA::Var, EA::Type)],
         for_move_fun: bool,
     ) -> Vec<Parameter> {
-        let is_lang_version_2_1 = self
-            .env()
-            .language_version
-            .is_at_least(LanguageVersion::V2_1);
         params
             .iter()
             .enumerate()
@@ -811,7 +796,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let sym = self.symbol_pool().make(var_str);
                 let loc = self.to_loc(&v.loc());
 
-                if !is_lang_version_2_1 || var_str != "_" {
+                if var_str != "_" {
                     self.define_local(
                         &loc,
                         sym,
@@ -1377,13 +1362,6 @@ impl ExpTranslator<'_, '_, '_> {
                 ResourceSpecifier::Any
             },
         };
-        if !matches!(resource, ResourceSpecifier::Resource(..)) {
-            self.check_language_version(
-                &loc,
-                "address and wildcard access specifiers. Only resource type names can be provided.",
-                LanguageVersion::V2_0,
-            )?;
-        };
         let address = self.translate_address_specifier(address)?;
         let kind = match kind {
             EA::AccessSpecifierKind::LegacyAcquires => AccessSpecifierKind::LegacyAcquires,
@@ -1403,31 +1381,12 @@ impl ExpTranslator<'_, '_, '_> {
         let loc = self.to_loc(&specifier.loc);
         let res = match &specifier.value {
             EA::AddressSpecifier_::Empty => (loc, AddressSpecifier::Any),
-            EA::AddressSpecifier_::Any => {
-                self.check_language_version(
-                    &loc,
-                    "wildcard address specifiers",
-                    LanguageVersion::V2_0,
-                )?;
-                (loc, AddressSpecifier::Any)
-            },
-            EA::AddressSpecifier_::Literal(addr) => {
-                self.check_language_version(
-                    &loc,
-                    "literal address specifiers",
-                    LanguageVersion::V2_0,
-                )?;
-                (
-                    loc,
-                    AddressSpecifier::Address(Address::Numerical(addr.into_inner())),
-                )
-            },
+            EA::AddressSpecifier_::Any => (loc, AddressSpecifier::Any),
+            EA::AddressSpecifier_::Literal(addr) => (
+                loc,
+                AddressSpecifier::Address(Address::Numerical(addr.into_inner())),
+            ),
             EA::AddressSpecifier_::Name(name) => {
-                self.check_language_version(
-                    &loc,
-                    "named address specifiers",
-                    LanguageVersion::V2_0,
-                )?;
                 // Construct an expansion name exp for regular type check
                 let maccess = sp(name.loc, EA::ModuleAccess_::Name(*name));
                 self.translate_name(
@@ -1443,11 +1402,6 @@ impl ExpTranslator<'_, '_, '_> {
                 )
             },
             EA::AddressSpecifier_::Call(maccess, type_args, name) => {
-                self.check_language_version(
-                    &loc,
-                    "derived address specifiers",
-                    LanguageVersion::V2_0,
-                )?;
                 // Construct an expansion function call for regular type check
                 let name_exp = sp(
                     name.loc,
@@ -3940,7 +3894,6 @@ impl ExpTranslator<'_, '_, '_> {
         // handles call of struct/variant with positional fields
         let expected_type = &self.subs.specialize(expected_type);
         if self.can_resolve_to_struct(expected_type, maccess) {
-            self.check_language_version(loc, "positional fields", LanguageVersion::V2_0)?;
             // translates StructName(e0, e1, ...) to pack<StructName> { 0: e0, 1: e1, ... }
             let fields: EA::Fields<_> =
                 EA::Fields::maybe_from_iter(args.iter().enumerate().map(|(i, &arg)| {
@@ -4815,7 +4768,6 @@ impl ExpTranslator<'_, '_, '_> {
                 .struct_table
                 .contains_key(&global_var_sym)
             {
-                self.check_language_version(loc, "resource indexing", LanguageVersion::V2_0)?;
                 if self
                     .parent
                     .parent
@@ -4841,7 +4793,6 @@ impl ExpTranslator<'_, '_, '_> {
             }
         }
         if !self.is_spec_mode() {
-            self.check_language_version(loc, "vector indexing", LanguageVersion::V2_0)?;
             // Translate to vector indexing in impl mode if the target is not a resource or a spec schema
             // spec mode is handled in `translate_index`
             if call.is_none() {
@@ -5718,11 +5669,6 @@ impl ExpTranslator<'_, '_, '_> {
         args: Vec<Exp>,
         expected_type: &Type,
     ) -> ExpData {
-        if !self.test_language_version(loc, "receiver style function calls", LanguageVersion::V2_0)
-        {
-            let id = self.new_node_id_with_type_loc(&Type::Error, loc);
-            return ExpData::Invalid(id);
-        }
         let generics = generics
             .as_ref()
             .map(|tys| self.translate_types_with_loc(tys));

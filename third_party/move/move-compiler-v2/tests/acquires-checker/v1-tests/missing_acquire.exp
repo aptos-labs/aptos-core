@@ -8,3 +8,5 @@ error: missing acquires annotation for `R1`
   ·
 9 │         borrow_global<R1>(a);
   │         -------------------- acquired here
+  │
+  = since Move 2.2, `acquires` is inferred by the compiler and can be omitted from the function declaration.

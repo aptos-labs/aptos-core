@@ -1,13 +1,32 @@
+// -- Model dump before first bytecode pipeline
+module 0x8675309::M {
+    public fun fun_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+    public inline fun macro_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+} // end 0x8675309::M
 
-Diagnostics:
-error: Functions may not return function-typed values, but function `M::macro_result_lambda_not_allowed` return type is the function type `|u64|`:
-  ┌─ tests/checking/inlining/lambda4.move:2:58
-  │
-2 │     public inline fun macro_result_lambda_not_allowed(): |u64| {  // expected lambda not allowed
-  │                                                          ^^^^^
+// -- Sourcified model before first bytecode pipeline
+module 0x8675309::M {
+    public fun fun_result_lambda_not_allowed(): |u64| {
+        abort 1
+    }
+    public inline fun macro_result_lambda_not_allowed(): |u64| {
+        abort 1
+    }
+}
 
-error: Functions may not return function-typed values, but function `M::fun_result_lambda_not_allowed` return type is the function type `|u64|`:
-  ┌─ tests/checking/inlining/lambda4.move:5:49
-  │
-5 │     public fun fun_result_lambda_not_allowed(): |u64| {  // expected lambda not allowed
-  │                                                 ^^^^^
+// -- Model dump before second bytecode pipeline
+module 0x8675309::M {
+    public fun fun_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+    public inline fun macro_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+} // end 0x8675309::M
+
+
+============ bytecode verification succeeded ========
