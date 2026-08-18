@@ -21,9 +21,17 @@ move_module Read where
 
   def E_TOO_SMALL : U64 := 7
 
+  /-! ## Functions -/
+
   fun read (addr : Address) : Action U64 := do
     let value ← &Reading[addr].value
     (*value)
+
+  spec read (addr : Address) where
+    requires exists<Reading>(addr);
+    ensures
+      result = old(Reading[addr].value) ∧ final = initial;
+    aborts_if False
 
   fun readAtLeast (addr : Address) (minimum : U64) : Action U64 := do
     let value ← &Reading[addr].value
@@ -31,6 +39,83 @@ move_module Read where
     if current < minimum then
       abort E_TOO_SMALL
     pure current
+
+  spec readAtLeast (addr : Address) (minimum : U64) where
+    requires exists<Reading>(addr);
+    ensures
+      result = old(Reading[addr].value) ∧
+      minimum.toNat ≤ result.toNat ∧
+      final = initial;
+    aborts_if
+      old(Reading[addr].value).toNat < minimum.toNat
+      with E_TOO_SMALL
+
+  /-! ## Proofs -/
+
+  verify read by
+    unfold read.contract read.sourceSpec
+    intro State store addr initial permitted
+    rcases Option.isSome_iff_exists.mp permitted with ⟨reading, lookup⟩
+    constructor
+    · intro result final execution
+      simp [Move.Semantics.Spec.bind, Move.Semantics.Spec.pure,
+        Move.Semantics.Resource.borrowSpec, lookup] at execution
+      rcases execution with ⟨value, ⟨valueEq, finalEq⟩, resultEq⟩
+      subst value
+      subst result
+      subst final
+      simp [Move.Semantics.ResourceStore.get, lookup]
+    · intro code execution
+      simp [Move.Semantics.Spec.bind, Move.Semantics.Spec.pure,
+        Move.Semantics.Resource.borrowSpec, lookup] at execution
+
+  verify readAtLeast by
+    unfold readAtLeast.contract readAtLeast.sourceSpec
+    intro State store args initial permitted
+    rcases args with ⟨addr, minimum⟩
+    rcases Option.isSome_iff_exists.mp permitted with ⟨reading, lookup⟩
+    by_cases tooSmallNat : reading.value.toNat < minimum.toNat
+    · constructor
+      · intro result final execution
+        simp [Move.Semantics.Spec.bind, Move.Semantics.Spec.pure,
+          Move.Semantics.Spec.abort, Move.Semantics.Resource.borrowSpec,
+          lookup] at execution
+        rcases execution with ⟨value, middle, ⟨valueEq, middleEq⟩, rest⟩
+        subst value
+        subst middle
+        simp [tooSmallNat] at rest
+      · intro code execution
+        simp [Move.Semantics.Spec.bind, Move.Semantics.Spec.pure,
+          Move.Semantics.Spec.abort, Move.Semantics.Resource.borrowSpec,
+          lookup] at execution
+        rcases execution with ⟨value, middle, ⟨valueEq, middleEq⟩, rest⟩
+        subst value
+        subst middle
+        simp [tooSmallNat] at rest
+        simpa [Move.Semantics.ResourceStore.get, lookup, tooSmallNat] using
+          And.intro tooSmallNat rest
+    · constructor
+      · intro result final execution
+        simp [Move.Semantics.Spec.bind, Move.Semantics.Spec.pure,
+          Move.Semantics.Spec.abort, Move.Semantics.Resource.borrowSpec,
+          lookup] at execution
+        rcases execution with ⟨value, middle, ⟨valueEq, middleEq⟩, rest⟩
+        subst value
+        subst middle
+        simp [tooSmallNat] at rest
+        rcases rest with ⟨rfl, rfl⟩
+        simp [Move.Semantics.ResourceStore.get, lookup,
+          Nat.le_of_not_gt tooSmallNat]
+      · intro code execution
+        simp [Move.Semantics.Spec.bind, Move.Semantics.Spec.pure,
+          Move.Semantics.Spec.abort, Move.Semantics.Resource.borrowSpec,
+          lookup] at execution
+        rcases execution with ⟨value, middle, ⟨valueEq, middleEq⟩, rest⟩
+        subst value
+        subst middle
+        simp [tooSmallNat] at rest
+
+  /-! ## Tests -/
 
   def compiled : MModule := move_module% "ReadTest"
 

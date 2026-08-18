@@ -16,11 +16,9 @@ namespace Tests.MovePrograms.Modules
 open Move
 open scoped Move Move.Compiler Move.Spec
 
-/-- Imported specifications and kernel-checked proofs are ordinary Lean
-declarations available to downstream proofs. -/
-theorem importedMathContract : Math.identity.contract := Math.identity.verified
-
 move_module Client where
+
+  /-! ## Functions -/
 
   fun importedIdentity (value : U64) : U64 :=
     Math.identity (Math.identity value)
@@ -28,6 +26,16 @@ move_module Client where
   spec importedIdentity (value : U64) where
     ensures result = value
 
+/-! ## Proofs -/
+
+/-- Imported specifications and kernel-checked proofs are ordinary Lean
+declarations available to downstream proofs. -/
+theorem importedMathContract : Math.identity.contract := Math.identity.verified
+
+namespace Client
+
   verify importedIdentity
+
+end Client
 
 end Tests.MovePrograms.Modules

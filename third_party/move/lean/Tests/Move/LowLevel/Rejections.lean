@@ -79,6 +79,51 @@ error: while compiling Move function `Tests.MovePrograms.Calls.Rejection.nonSelf
 def rejectedNonSelfContinue : MModule :=
   move_module% "RejectedNonSelfContinue" structs [] functions [continuedOther, nonSelfContinue]
 
+/--
+error: `break` must be nested inside a loop
+-/
+#guard_msgs in
+def bareBreak (n : U64) : U64 := Id.run do
+  break
+  n
+
+/--
+error: `continue` must be nested inside a loop
+-/
+#guard_msgs in
+def bareContinue (n : U64) : U64 := Id.run do
+  continue
+  n
+
+/--
+error: `continue f` cannot appear inside `loop` / `while`; use `continue`
+-/
+#guard_msgs in
+partial def continueCallInside (n : U64) : U64 := Id.run do
+  let mut n := n
+  while 0 < n do
+    continue continueCallInside (n - 1)
+  n
+
+/--
+error: unknown loop label `missing`
+-/
+#guard_msgs in
+def unknownLabel (n : U64) : U64 := Id.run do
+  loop@outer
+    break@missing
+  n
+
+/--
+error: duplicate active loop label `outer`
+-/
+#guard_msgs in
+def duplicateLabel (n : U64) : U64 := Id.run do
+  loop@outer
+    loop@outer
+      break
+  n
+
 move_module SourceVerificationRejection where
 
   @[move_struct]
@@ -94,7 +139,6 @@ move_module SourceVerificationRejection where
   -/
   #guard_msgs in
   spec unmodeledMoveFrom (address : Address) where
-    requires True;
     ensures True;
     aborts_if False
 
@@ -106,7 +150,6 @@ move_module SourceVerificationRejection where
   -/
   #guard_msgs in
   spec unmodeledVectorGet (values : Move.Vector U64) (index : U64) where
-    requires True;
     ensures True;
     aborts_if False
 
@@ -121,7 +164,6 @@ move_module SourceVerificationRejection where
   -/
   #guard_msgs in
   spec arithmeticCondition (value : U64) where
-    requires True;
     ensures True;
     aborts_if False
 
@@ -135,7 +177,6 @@ move_module SourceVerificationRejection where
   -/
   #guard_msgs in
   spec callsPureHelper (value : U64) where
-    requires True;
     ensures True;
     aborts_if False
 

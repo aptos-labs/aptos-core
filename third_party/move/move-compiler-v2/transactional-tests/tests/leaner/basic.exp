@@ -1,6 +1,6 @@
 processed 2 tasks
-task 0 lines 3-11:  publish [import Move]
-task 1 lines 13-13:  run 0x0::LeanerTxn::fail --args 7u64
+task 0 lines 3-15:  publish [import Move]
+task 1 lines 17-17:  run 0x0::LeanerTxn::fail --args 7u64
 Error: Function execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(7),

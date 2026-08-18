@@ -14,6 +14,8 @@ open scoped Move Move.Compiler Move.Spec
 
 move_module Calls where
 
+  /-! ## Functions -/
+
   @[move_struct]
   structure Counter where
     value : U64
@@ -21,14 +23,29 @@ move_module Calls where
 
   fun twice (value : U64) : U64 := value + value
 
+  spec twice (value : U64) where
+    ensures result = value + value;
+    aborts_if ¬value.toNat + value.toNat < U64.size
+      with Semantics.Checked.arithmeticAbortCode
+
   fun increment (value : U64) : Action U64 := do
     pure (value + 1)
+
+  spec increment (value : U64) where
+    ensures result = value + 1;
+    aborts_if ¬value.toNat + 1 < U64.size
+      with Semantics.Checked.arithmeticAbortCode
 
   fun pureCaller (value : U64) : Action U64 := do
     pure (twice value)
 
   fun effectCaller (value : U64) : Action U64 := do
     increment value
+
+  spec effectCaller (value : U64) where
+    ensures result = value + 1;
+    aborts_if ¬value.toNat + 1 < U64.size
+      with Semantics.Checked.arithmeticAbortCode
 
   fun composed (value : U64) : Action U64 := do
     let doubled := twice value
@@ -44,14 +61,30 @@ move_module Calls where
   fun choose (flag : Bool) : Action U64 := do
     if flag then pure 7 else pure 8
 
+  spec choose (flag : Bool) where
+    ensures result = if flag then 7 else 8;
+    aborts_if False
+
   fun callChoose (flag : Bool) : Action U64 := do
     choose flag
+
+  spec callChoose (flag : Bool) where
+    ensures result = if flag then 7 else 8;
+    aborts_if False
 
   partial fun recursiveChoose (done : Bool) : Action U64 := do
     if done then pure 7 else continue recursiveChoose true
 
+  spec recursiveChoose (done : Bool) where
+    ensures result = 7;
+    aborts_if False
+
   partial fun ordinaryRecursiveChoose (done : Bool) : Action U64 := do
     if done then pure 7 else ordinaryRecursiveChoose true
+
+  spec ordinaryRecursiveChoose (done : Bool) where
+    ensures result = 7;
+    aborts_if False
 
   partial fun sumDown (value : U64) : U64 :=
     if value < 1 then 0 else value + sumDown (value - 1)
@@ -104,27 +137,26 @@ move_module Calls where
     let value ← &Counter[addr].value
     (*value)
 
+  spec readCounter (addr : Address) where
+    requires exists<Counter>(addr);
+    ensures
+      result = old(Counter[addr].value) ∧ final = initial;
+    aborts_if False
+
   fun forwardedRead (addr : Address) : Action U64 := do
     readCounter addr
 
-  spec choose (flag : Bool) where
-    requires True;
-    ensures result = if flag then 7 else 8;
-    aborts_if False
+  /-! ## Proofs -/
+
+  verify twice
+
+  verify increment
+
+  verify effectCaller
 
   verify choose
 
-  spec callChoose (flag : Bool) where
-    requires True;
-    ensures result = if flag then 7 else 8;
-    aborts_if False
-
   verify callChoose
-
-  spec recursiveChoose (done : Bool) where
-    requires True;
-    ensures result = 7;
-    aborts_if False
 
   verify recursiveChoose by
     unfold recursiveChoose.contract recursiveChoose.sourceSpec
@@ -146,11 +178,6 @@ move_module Calls where
         constructor <;> intros <;>
           simp_all [Move.Semantics.Spec.pure]
 
-  spec ordinaryRecursiveChoose (done : Bool) where
-    requires True;
-    ensures result = 7;
-    aborts_if False
-
   verify ordinaryRecursiveChoose by
     unfold ordinaryRecursiveChoose.contract ordinaryRecursiveChoose.sourceSpec
     intro _moveSpecState
@@ -170,6 +197,25 @@ move_module Calls where
     | true =>
         constructor <;> intros <;>
           simp_all [Move.Semantics.Spec.pure]
+
+  verify readCounter by
+    unfold readCounter.contract readCounter.sourceSpec
+    intro State store addr initial permitted
+    rcases Option.isSome_iff_exists.mp permitted with ⟨counter, lookup⟩
+    constructor
+    · intro result final execution
+      simp [Move.Semantics.Spec.bind, Move.Semantics.Spec.pure,
+        Move.Semantics.Resource.borrowSpec, lookup] at execution
+      rcases execution with ⟨value, ⟨counterEq, finalEq⟩, resultEq⟩
+      subst value
+      subst result
+      subst final
+      simp [Move.Semantics.ResourceStore.get, lookup]
+    · intro code execution
+      simp [Move.Semantics.Spec.bind, Move.Semantics.Spec.pure,
+        Move.Semantics.Resource.borrowSpec, lookup] at execution
+
+  /-! ## Tests -/
 
   def compiled : MModule := move_module% "CallsTest"
 

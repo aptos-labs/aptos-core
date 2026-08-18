@@ -163,6 +163,28 @@ macro_rules
                 pure ⟨modifiers.raw.setArg 1 (mkNullNode #[attributes.raw])⟩
             | none => pure modifiers
         | _ => pure modifiers
+      let value ← match value with
+        | `(declVal| := $body:term) =>
+            match body with
+            | `(do $seq:doSeq) =>
+                let (_, type?) := Lean.Elab.expandOptDeclSig signature.raw
+                let isAction :=
+                  match type? with
+                  | some resultType =>
+                      let identName :=
+                        if resultType.isIdent then some resultType.getId
+                        else if resultType.isOfKind ``Lean.Parser.Term.app &&
+                            resultType.getNumArgs > 0 && resultType[0]!.isIdent then
+                          some resultType[0]!.getId
+                        else none
+                      identName == some `Action || identName == some ``Move.Action
+                  | none => false
+                if isAction = true then
+                  pure value
+                else
+                  `(declVal| := Id.run do $seq)
+            | _ => pure value
+        | _ => pure value
       `($modifiers:declModifiers def $declName:declId
         $signature:optDeclSig $value:declVal)
 

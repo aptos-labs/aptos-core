@@ -11,6 +11,8 @@ move_module LeanerEnums where
     | split (left right : U64)
     deriving Copy, Drop, Store
 
+  /-! ## Functions -/
+
   fun total (action : Action) : U64 :=
     match action with
     | .idle => 0
@@ -22,6 +24,8 @@ move_module LeanerEnums where
   fun transferTotal (amount : U64) : U64 := total (.transfer amount)
 
   fun splitTotal (left right : U64) : U64 := total (.split left right)
+
+/-! ## Tests -/
 
 --# run 0x0::LeanerEnums::idleTotal
 

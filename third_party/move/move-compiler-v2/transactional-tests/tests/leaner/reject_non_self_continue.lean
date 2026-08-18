@@ -4,6 +4,8 @@ import Move
 
 move_module LeanerRejectNonSelfContinue where
 
+  /-! ## Functions -/
+
   @[move_fun]
   fun twice (value : U64) : U64 := value + value
 

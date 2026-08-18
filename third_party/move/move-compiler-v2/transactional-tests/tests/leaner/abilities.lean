@@ -6,6 +6,8 @@ open scoped Move
 
 move_module LeanerAbilities where
 
+  /-! ## Functions -/
+
   @[move_struct]
   structure Plain where
     value : U64

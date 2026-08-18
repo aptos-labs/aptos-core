@@ -1,5 +1,5 @@
 processed 13 tasks
-task 0 lines 1-86:  publish [import Move]
+task 0 lines 1-90:  publish [import Move]
 warning: This assignment/binding to the left-hand-side variable `l2` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_l2`), or renaming to `_`
    ┌─ TEMPFILE:1:1
    │  
@@ -8,32 +8,32 @@ warning: This assignment/binding to the left-hand-side variable `l2` is unused. 
  3 │ │ open scoped Move
  4 │ │ move_module LeanerEnumPayloads where
    · │
-61 │ │     let values := Move.Vector.set values 0 (.right 7)
-62 │ │     score (Move.Vector.get values 0)
-   │ ╰────────────────────────────────────^
+63 │ │     score (Move.Vector.get values 0)
+64 │ │ /-! ## Tests -/
+   │ ╰───────────────^
 
 
-task 1 lines 88-88:  run 0x0::LeanerEnumPayloads::chooseAndScore --args false 10u64
+task 1 lines 92-92:  run 0x0::LeanerEnumPayloads::chooseAndScore --args false 10u64
 return values: 11
-task 2 lines 90-90:  run 0x0::LeanerEnumPayloads::chooseAndScore --args true 10u64
+task 2 lines 94-94:  run 0x0::LeanerEnumPayloads::chooseAndScore --args true 10u64
 return values: 12
-task 3 lines 92-92:  run 0x0::LeanerEnumPayloads::leftScore --args 10u64
+task 3 lines 96-96:  run 0x0::LeanerEnumPayloads::leftScore --args 10u64
 return values: 11
-task 4 lines 94-94:  run 0x0::LeanerEnumPayloads::rightScore --args 10u64
+task 4 lines 98-98:  run 0x0::LeanerEnumPayloads::rightScore --args 10u64
 return values: 12
-task 5 lines 96-96:  run 0x0::LeanerEnumPayloads::leftIsRight --args 10u64
+task 5 lines 100-100:  run 0x0::LeanerEnumPayloads::leftIsRight --args 10u64
 return values: 0
-task 6 lines 98-98:  run 0x0::LeanerEnumPayloads::rightIsRight --args 10u64
+task 6 lines 102-102:  run 0x0::LeanerEnumPayloads::rightIsRight --args 10u64
 return values: 1
-task 7 lines 100-100:  run 0x0::LeanerEnumPayloads::populatedBatch
+task 7 lines 104-104:  run 0x0::LeanerEnumPayloads::populatedBatch
 return values: 4
-task 8 lines 102-102:  run 0x0::LeanerEnumPayloads::emptyBatch
+task 8 lines 106-106:  run 0x0::LeanerEnumPayloads::emptyBatch
 return values: 0
-task 9 lines 104-104:  run 0x0::LeanerEnumPayloads::makePositional --args 8u64 9u64
+task 9 lines 108-108:  run 0x0::LeanerEnumPayloads::makePositional --args 8u64 9u64
 return values: 17
-task 10 lines 106-106:  run 0x0::LeanerEnumPayloads::makeWrapper --args 23u64
+task 10 lines 110-110:  run 0x0::LeanerEnumPayloads::makeWrapper --args 23u64
 return values: 23
-task 11 lines 108-108:  run 0x0::LeanerEnumPayloads::vectorOfEnums
+task 11 lines 112-112:  run 0x0::LeanerEnumPayloads::vectorOfEnums
 return values: 7
-task 12 lines 110-110:  run 0x0::LeanerEnumPayloads::replaceEnumElement
+task 12 lines 114-114:  run 0x0::LeanerEnumPayloads::replaceEnumElement
 return values: 9

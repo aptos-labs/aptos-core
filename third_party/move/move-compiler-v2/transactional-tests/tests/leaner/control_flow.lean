@@ -4,6 +4,8 @@ import Move
 
 move_module LeanerControlFlow where
 
+  /-! ## Functions -/
+
   fun classify (value : U64) : U64 :=
     if value < 10 then
       1
@@ -28,6 +30,8 @@ move_module LeanerControlFlow where
       accumulator
     else
       continue countdown (value - 1) (accumulator + 1)
+
+/-! ## Tests -/
 
 --# run 0x0::LeanerControlFlow::classify --args 9u64
 

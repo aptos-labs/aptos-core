@@ -4,6 +4,8 @@ import Move
 
 move_module LeanerTailRecursion where
 
+  /-! ## Functions -/
+
   partial fun countdown (remaining accumulator : U64) : U64 :=
     if remaining < 1 then
       accumulator
@@ -32,6 +34,8 @@ move_module LeanerTailRecursion where
 
   partial fun sumDown (value : U64) : U64 :=
     if value < 1 then 0 else value + sumDown (value - 1)
+
+/-! ## Tests -/
 
 --# run 0x0::LeanerTailRecursion::countdown --args 2000u64 40u64
 

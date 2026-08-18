@@ -6,6 +6,8 @@ open scoped Move
 
 move_module LeanerVectorOperations where
 
+  /-! ## Functions -/
+
   fun emptyLength : U64 :=
     Move.Vector.length (Move.Vector.empty : Move.Vector U64)
 
@@ -95,6 +97,8 @@ move_module LeanerVectorOperations where
     let values : Move.Vector U64 := vector![1]
     let valuesRef ← &mut values
     Move.Vector.remove valuesRef 1
+
+/-! ## Tests -/
 
 --# run 0x0::LeanerVectorOperations::emptyLength
 

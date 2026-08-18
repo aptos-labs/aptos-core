@@ -12,6 +12,8 @@ namespace Tests.MovePrograms.XIR
 open MoveModel.Frontend.XIR
 open Tests.MovePrograms.Account
 
+/-! ## Tests -/
+
 private def roundTrip : Except String String := do
   let encoded ← compiled.encodeJson
   let decoded ← decodeMModule encoded

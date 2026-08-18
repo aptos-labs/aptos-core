@@ -4,6 +4,8 @@ import Move
 
 move_module LeanerCalls where
 
+  /-! ## Functions -/
+
   fun twice (value : U64) : U64 :=
     value + value
 
@@ -28,6 +30,8 @@ move_module LeanerCalls where
     partial fun oddFlag (value : U64) : U64 :=
       if value < 1 then 0 else evenFlag (value - 1)
   end
+
+/-! ## Tests -/
 
 --# run 0x0::LeanerCalls::composed --args 7u64
 

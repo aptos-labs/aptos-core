@@ -369,7 +369,14 @@ private structure BuildState where
   descriptors : List (FVarId × Nat) := []
   natLiterals : List (FVarId × Nat) := []
   returnAliases : List (FVarId × Option FVarId) := []
-  joins : List (FVarId × String) := []
+  joins : List (FVarId × (String × Array FVarId)) := []
+  loopHeaders : List (Nat × String) := []
+  loopExits : List (Nat × String) := []
+  builtLoopExits : List Nat := []
+  loopStates : List (Nat × Array FVarId) := []
+  loopTails : List (Nat × (Array FVarId × Code .pure)) := []
+  products : List (FVarId × Array FVarId) := []
+  loopLiveResults : List FVarId := []
   blocks : Array LIR.Block := #[]
   calls : Array Name := #[]
   acquires : Array Name := #[]
@@ -381,6 +388,9 @@ private abbrev BuildM := StateT BuildState CoreM
 private def addLocal (env : Environment) (id : FVarId) (type : Expr) : BuildM Unit := do
   let state ← get
   if state.localIds.any (· == id) then return
+  -- Structured-loop tokens are compiler-only `Nat`s threaded through LCNF
+  -- join points solely to keep marker calls live.
+  if type.isConstOf ``Nat && id.name.toString.contains "loopTok" then return
   match translateTyWith env state.tyContext type with
   | .error message => throwError message
   | .ok none => return
@@ -480,6 +490,109 @@ private def emitBlock (name : String) (instrs : Array LIR.Instr)
 
 private def srcName (id : FVarId) : Local := localName id
 
+private def natLiteral? (id : FVarId) : BuildM (Option Nat) := do
+  return assocFind? id (← get).natLiterals
+
+private def loopMarkerNats (vars : Array FVarId) : BuildM (Array Nat) := do
+  let mut result := #[]
+  for id in vars do
+    if let some n ← natLiteral? id then
+      result := result.push n
+  return result
+
+private partial def flattenLoopState (arity : Nat) (id : FVarId) :
+    BuildM (Array FVarId) := do
+  if arity == 0 then return #[]
+  if arity == 1 then return #[id]
+  let some fields := assocFind? id (← get).products
+    | throwError "loop state tuple with {arity} fields was not retained by LCNF"
+  let some first := fields[0]?
+    | throwError "loop state tuple has no first field"
+  let some rest := fields[1]?
+    | throwError "loop state tuple has no tail"
+  return #[first] ++ (← flattenLoopState (arity - 1) rest)
+
+private inductive LoopMarker where
+  | enter (label : Nat) (state : Array FVarId)
+  | continue_ (label : Nat) (state : Array FVarId) (tail : Bool)
+  | break_ (label : Nat) (state : Array FVarId)
+
+private def loopMarker? (fn : Name) (vars : Array FVarId) : BuildM (Option LoopMarker) := do
+  let isMarker := fn == ``Move.loopEnter || fn == ``loopEnter ||
+    fn == ``Move.loopContinue || fn == ``loopContinue ||
+    fn == ``Move.loopContinueTail || fn == ``loopContinueTail ||
+    fn == ``Move.loopBreak || fn == ``loopBreak
+  unless isMarker do return none
+  let literals ← loopMarkerNats vars
+  let some label := literals[0]?
+    | throwError "loop marker is missing its static label"
+  let some arity := literals[1]?
+    | throwError "loop marker is missing its state arity"
+  let state ←
+    if arity == 0 then pure #[]
+    else
+      let some packed := vars.back?
+        | throwError "loop marker is missing its state"
+      flattenLoopState arity packed
+  if fn == ``Move.loopEnter || fn == ``loopEnter then
+    return some (.enter label state)
+  if fn == ``Move.loopContinue || fn == ``loopContinue then
+    return some (.continue_ label state false)
+  if fn == ``Move.loopContinueTail || fn == ``loopContinueTail then
+    return some (.continue_ label state true)
+  if fn == ``Move.loopBreak || fn == ``loopBreak then
+    return some (.break_ label state)
+  return none
+
+private def loopHeader (label : Nat) : BuildM String := do
+  if let some name := assocFind? label (← get).loopHeaders then
+    return name
+  let name ← freshBlock s!"loop.{label}"
+  modify fun s => { s with loopHeaders := (label, name) :: s.loopHeaders }
+  return name
+
+private def loopExit (label : Nat) : BuildM String := do
+  if let some name := assocFind? label (← get).loopExits then
+    return name
+  let name ← freshBlock s!"loop.exit.{label}"
+  modify fun s => { s with loopExits := (label, name) :: s.loopExits }
+  return name
+
+private def assignLoopState (label : Nat) (targets sources : Array FVarId)
+    (instrs : Array LIR.Instr) : BuildM (Array LIR.Instr) := do
+  unless targets.size == sources.size do
+    throwError "loop {label} edge has {sources.size} state values; expected {targets.size}"
+  let mut nextInstrs := instrs
+  let mut temps : Array String := #[]
+  for (target, source) in targets.zip sources do
+    let ty ← match ← localTy? target with
+      | some ty => pure ty
+      | none =>
+          let some ty ← localTy? source
+            | throwError "loop {label} state `{localName target}` has no Move type"
+          addLocalTy target ty
+          pure ty
+    let temp ← freshTemp ty
+    temps := temps.push temp
+    nextInstrs := nextInstrs.push (.assign temp (srcName source))
+  for (target, temp) in targets.zip temps do
+    nextInstrs := nextInstrs.push (.assign (srcName target) temp)
+  return nextInstrs
+
+private def emitLoopContinue (label : Nat) (state : Array FVarId)
+    (blockName : String) (instrs : Array LIR.Instr) : BuildM Unit := do
+  let some headerState := assocFind? label (← get).loopStates
+    | throwError "continue targets loop {label} before its header state was recorded"
+  let nextInstrs ← assignLoopState label headerState state instrs
+  emitBlock blockName nextInstrs (.jump (← loopHeader label))
+
+private def emitLoopBreak (label : Nat) (state : Array FVarId)
+    (blockName : String) (instrs : Array LIR.Instr) : BuildM Unit := do
+  let some headerState := assocFind? label (← get).loopStates
+    | throwError "break targets loop {label} before its header state was recorded"
+  let nextInstrs ← assignLoopState label headerState state instrs
+  emitBlock blockName nextInstrs (.jump (← loopExit label))
+
 private def continuedCall? (decl : LetDecl .pure)
     (next : Code .pure) : Option (Name × Array FVarId) :=
   match decl.value, next with
@@ -517,6 +630,24 @@ private def emitTailCall (_signature : FunSignature) (blockName : String)
     nextInstrs := nextInstrs.push (.assign param.name temp)
   emitBlock blockName nextInstrs (.jump "entry")
 
+private def emitJoinJump (blockName : String) (instrs : Array LIR.Instr)
+    (destination : String) (params : Array FVarId)
+    (args : Array (Arg .pure)) : BuildM Unit := do
+  unless params.size == args.size do
+    throwError "LCNF join jump has {args.size} arguments; expected {params.size}"
+  let mut nextInstrs := instrs
+  let mut assignments : Array (FVarId × String) := #[]
+  for (param, arg) in params.zip args do
+    if let some ty ← localTy? param then
+      let .fvar source := arg
+        | throwError "Move-valued join argument is not a local"
+      let temp ← freshTemp ty
+      nextInstrs := nextInstrs.push (.assign temp (srcName source))
+      assignments := assignments.push (param, temp)
+  for (param, temp) in assignments do
+    nextInstrs := nextInstrs.push (.assign (srcName param) temp)
+  emitBlock blockName nextInstrs (.jump destination)
+
 private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
     (instrs : Array LIR.Instr) : BuildM (Array LIR.Instr) := do
   match decl.value with
@@ -528,6 +659,13 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
       let types := typeArgs args
       if fn == ``continueMarker then
         throwError "`continue` must mark a direct self-call in tail position"
+      if fn == ``Move.loopTokenLive || fn == ``loopTokenLive then
+        modify fun s => { s with loopLiveResults := decl.fvarId :: s.loopLiveResults }
+        return instrs
+      if fn == ``Move.loopTokenJoin || fn == ``loopTokenJoin then
+        return instrs
+      if let some _ ← loopMarker? fn vars then
+        return instrs
       if let some (structName, numParams, numFields) := structConstructor? (← getEnv) fn then
         unless vars.size == numFields do
           throwError "structure constructor `{fn}` has {vars.size} runtime fields; expected {numFields}"
@@ -701,6 +839,7 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
           (decl.fvarId, .vectorRemove reference index elemTy) :: s.pending }
         return instrs
       if fn == ``Prod.mk then
+        modify fun s => { s with products := (decl.fvarId, vars) :: s.products }
         let some returnedType := types[0]? | throwError "product constructor is missing its first type"
         match ← translateCurrentTy (← getEnv) returnedType with
         | none =>
@@ -724,25 +863,19 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
         let some lhs := vars[0]? | throwError "binary operation is missing its left operand"
         let some rhs := vars[1]? | throwError "binary operation is missing its right operand"
         let ty := if op == .lt || op == .le || op == .eq then LIR.Ty.bool else .u64
-        modify fun s => { s with
-          locals := s.locals.push { name := localName decl.fvarId, ty := ty }
-          localIds := decl.fvarId :: s.localIds }
+        addLocalTy decl.fvarId ty
         return instrs.push (.call #[localName decl.fvarId] op #[srcName lhs, srcName rhs])
       if fn == ``U64.ofNat then
         let some source := vars[0]? | throwError "u64 literal is missing its natural value"
         let some n := assocFind? source (← get).natLiterals
           | throwError "u64 literal is not statically known"
-        modify fun s => { s with
-          locals := s.locals.push { name := localName decl.fvarId, ty := .u64 }
-          localIds := decl.fvarId :: s.localIds }
+        addLocalTy decl.fvarId .u64
         return instrs.push (.loadU64 (localName decl.fvarId) n)
       if fn == ``Bool.true || fn == ``Bool.false then
         addLocalTy decl.fvarId .bool
         return instrs.push (.loadBool (localName decl.fvarId) (fn == ``Bool.true))
       if let some n ← u64Constant? fn then
-        modify fun s => { s with
-          locals := s.locals.push { name := localName decl.fvarId, ty := .u64 }
-          localIds := decl.fvarId :: s.localIds }
+        addLocalTy decl.fvarId .u64
         return instrs.push (.loadU64 (localName decl.fvarId) n)
       if fn == ``Move.Vector.empty then
         let some elemType := types[0]? | throwError "empty vector is missing its element type"
@@ -839,6 +972,7 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
         throwError "callee `{fn}` is not selected in this `move_module%`"
       -- Type-class dictionaries and proof evidence are compiler-erased.
       if fn.toString.contains "instInhabited" then return instrs
+      if fn == ``PUnit.unit || fn == ``Unit.unit then return instrs
       throwError "unsupported call `{fn}` while compiling Move function"
   | .proj owner field source =>
       let state ← get
@@ -855,6 +989,61 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
   | .erased => return instrs
   | _ => throwError "unsupported LCNF let binding in Move function"
 
+private def trueAlternative? (alts : Array (Alt .pure)) : Option (Code .pure) :=
+  alts.findSome? fun
+    | .alt ctor _ body _ =>
+        if ctor == ``Bool.true || ctor == ``Decidable.isTrue then some body else none
+    | .default _ | .ctorAlt .. => none
+
+private partial def collectLoopMarkerInputs : Code .pure → BuildM Unit
+  | .let decl next => do
+      match decl.value with
+      | .lit (.nat n) =>
+          modify fun s => { s with natLiterals := (decl.fvarId, n) :: s.natLiterals }
+      | .const ``Prod.mk _ args _ =>
+          modify fun s => { s with products := (decl.fvarId, fvarArgs args) :: s.products }
+      | _ => pure ()
+      collectLoopMarkerInputs next
+  | .fun decl next _ | .jp decl next => do
+      collectLoopMarkerInputs decl.value
+      collectLoopMarkerInputs next
+  | .cases cases =>
+      for alt in cases.alts do collectLoopMarkerInputs alt.getCode
+  | .return _ | .jmp .. | .unreach _ => pure ()
+
+private partial def collectLoopStates : Code .pure → BuildM Unit
+  | .let decl next => do
+      if let .const fn _ args _ := decl.value then
+        match ← loopMarker? fn (fvarArgs args) with
+        | some (.enter label state) =>
+            modify fun s => { s with loopStates := (label, state) :: s.loopStates }
+        | some (.continue_ label state true) =>
+            modify fun s => { s with loopTails := (label, (state, next)) :: s.loopTails }
+        | _ => pure ()
+      collectLoopStates next
+  | .fun decl next _ | .jp decl next => do
+      collectLoopStates decl.value
+      collectLoopStates next
+  | .cases cases =>
+      for alt in cases.alts do collectLoopStates alt.getCode
+  | .return _ | .jmp .. | .unreach _ => pure ()
+
+private partial def collectJoinParams (env : Environment) : Code .pure → BuildM Unit
+  | .let _ next => collectJoinParams env next
+  | .fun decl next _ => do
+      collectJoinParams env decl.value
+      collectJoinParams env next
+  | .jp decl next => do
+      for param in decl.params do
+        unless param.type.isConstOf ``Nat &&
+            param.binderName.toString.contains "loopTok" do
+          addLocal env param.fvarId param.type
+      collectJoinParams env decl.value
+      collectJoinParams env next
+  | .cases cases =>
+      for alt in cases.alts do collectJoinParams env alt.getCode
+  | .return _ | .jmp .. | .unreach _ => pure ()
+
 private partial def walk (env : Environment) (signatures : FunSignatures) (self : Name)
     (signature : FunSignature) (code : Code .pure) (blockName : String)
     (instrs : Array LIR.Instr) : BuildM Unit := do
@@ -866,8 +1055,51 @@ private partial def walk (env : Environment) (signatures : FunSignatures) (self 
             throwError "`continue` in `{self}` calls `{callee}`; only a direct self-call can become a loop"
           emitTailCall signature blockName instrs vars
       | none =>
-          walk env signatures self signature next blockName
-            (← recognizeLet signatures decl instrs)
+          match decl.value with
+          | .const fn _ args _ =>
+              match ← loopMarker? fn (fvarArgs args) with
+              | some (.enter label state) =>
+                  modify fun s => { s with loopStates := (label, state) :: s.loopStates }
+                  discard <| loopExit label
+                  if let some header := assocFind? label (← get).loopHeaders then
+                    if instrs.isEmpty && blockName == header then
+                      walk env signatures self signature next blockName instrs
+                    else
+                      emitBlock blockName instrs (.jump header)
+                      walk env signatures self signature next header #[]
+                  else if instrs.isEmpty then
+                    modify fun s =>
+                      { s with loopHeaders := (label, blockName) :: s.loopHeaders }
+                    walk env signatures self signature next blockName instrs
+                  else
+                    let header ← loopHeader label
+                    emitBlock blockName instrs (.jump header)
+                    walk env signatures self signature next header #[]
+              | some (.continue_ label state tail) =>
+                  emitLoopContinue label state blockName instrs
+                  if tail && !(← get).builtLoopExits.contains label then
+                    modify fun s => { s with builtLoopExits := label :: s.builtLoopExits }
+                    let some headerState := assocFind? label (← get).loopStates
+                      | throwError "loop {label} has no header state"
+                    let exitInstrs ← assignLoopState label state headerState #[]
+                    walk env signatures self signature next (← loopExit label) exitInstrs
+              | some (.break_ label state) =>
+                  emitLoopBreak label state blockName instrs
+                  if !(← get).builtLoopExits.contains label then
+                    let some (tailState, tailNext) := assocFind? label (← get).loopTails
+                      | throwError "loop {label} has no retained tail continuation"
+                    modify fun s => { s with builtLoopExits := label :: s.builtLoopExits }
+                    let some headerState := assocFind? label (← get).loopStates
+                      | throwError "loop {label} has no header state"
+                    let exitInstrs ← assignLoopState label tailState headerState #[]
+                    walk env signatures self signature tailNext
+                      (← loopExit label) exitInstrs
+              | none =>
+                  walk env signatures self signature next blockName
+                    (← recognizeLet signatures decl instrs)
+          | _ =>
+              walk env signatures self signature next blockName
+                (← recognizeLet signatures decl instrs)
   | .fun decl next _ =>
       if let some field := projectionIndex? decl.value then
         modify fun s => { s with projections := (decl.fvarId, field) :: s.projections }
@@ -876,14 +1108,18 @@ private partial def walk (env : Environment) (signatures : FunSignatures) (self 
         throwError "captured local function `{decl.binderName}` is outside the Move subset"
   | .jp decl next =>
       let joinName ← freshBlock "join"
-      modify fun s => { s with joins := (decl.fvarId, joinName) :: s.joins }
-      for param in decl.params do addLocal env param.fvarId param.type
+      let joinParams := decl.params.map (·.fvarId)
+      modify fun s => { s with joins := (decl.fvarId, (joinName, joinParams)) :: s.joins }
+      for param in decl.params do
+        unless param.type.isConstOf ``Nat &&
+            param.binderName.toString.contains "loopTok" do
+          addLocal env param.fvarId param.type
       walk env signatures self signature decl.value joinName #[]
       walk env signatures self signature next blockName instrs
-  | .jmp target _ =>
-      let some destination := assocFind? target (← get).joins
+  | .jmp target args =>
+      let some (destination, params) := assocFind? target (← get).joins
         | throwError "jump to unknown LCNF join point"
-      emitBlock blockName instrs (.jump destination)
+      emitJoinJump blockName instrs destination params args
   | .return result =>
       match assocFind? result (← get).returnAliases with
       | some (some value) => emitBlock blockName instrs (.ret #[srcName value])
@@ -914,7 +1150,11 @@ private partial def walk (env : Environment) (signatures : FunSignatures) (self 
               let returns := if (← get).localIds.any (· == result) then #[srcName result] else #[]
               emitBlock blockName instrs (.ret returns)
   | .cases cases =>
-      match assocFind? cases.discr (← get).pending with
+      if (← get).loopLiveResults.contains cases.discr then
+        let some body := trueAlternative? cases.alts
+          | throwError "loop liveness test has no true branch"
+        walk env signatures self signature body blockName instrs
+      else match assocFind? cases.discr (← get).pending with
       | some (.abort code) => emitBlock blockName instrs (.abort (srcName code))
       | some (.call pending) =>
           let some alt := cases.alts[0]? | throwError "effect result has no product case"
@@ -1048,6 +1288,31 @@ private def visibility (env : Environment) (name : Name) : LIR.Visibility :=
   else if movePublicAttr.hasTag env name then .public_
   else .private_
 
+private def lirSuccessors : LIR.Terminator → Array String
+  | .jump block => #[block]
+  | .branch _ thenBlock elseBlock => #[thenBlock, elseBlock]
+  | .ret _ | .abort _ => #[]
+
+private partial def reversePostorder (blocks : Array LIR.Block)
+    (entry : String) : Array LIR.Block :=
+  let (_, postorder) := visit entry [] #[]
+  let reachable := postorder.toList.map (·.name)
+  postorder.reverse ++ blocks.filter fun block => !reachable.contains block.name
+where
+  visit (name : String) (visited : List String) (postorder : Array LIR.Block) :
+      List String × Array LIR.Block :=
+    if visited.contains name then
+      (visited, postorder)
+    else
+      match blocks.find? (·.name == name) with
+      | none => (name :: visited, postorder)
+      | some block =>
+          let (visited, postorder) :=
+            (lirSuccessors block.term).foldl (init := (name :: visited, postorder))
+              fun (visited, postorder) successor =>
+                visit successor visited postorder
+          (visited, postorder.push block)
+
 private def compileFun (env : Environment) (signatures : FunSignatures)
     (module : Move.ModuleRef) (name : Name) : CoreM LIR.FunDecl := do
   unless moveFunAttr.hasTag env name || movePublicAttr.hasTag env name || moveEntryAttr.hasTag env name do
@@ -1072,9 +1337,11 @@ private def compileFun (env : Environment) (signatures : FunSignatures)
   let initial : BuildState := {
     module, tyContext, localIds := paramIds, loopParams := params
   }
+  let (_, initial) ← (collectLoopMarkerInputs code).run initial
+  let (_, initial) ← (collectLoopStates code).run initial
+  let (_, initial) ← (collectJoinParams env code).run initial
   let (_, state) ← (walk env signatures name signature code "entry" #[]).run initial
-  let entry := state.blocks.filter (·.name == "entry")
-  let blocks := entry ++ state.blocks.filter (·.name != "entry")
+  let blocks := reversePostorder state.blocks "entry"
   return {
     leanName := name
     moveName := name.getString!

@@ -19,6 +19,7 @@ import Tests.Move.Abilities
 import Tests.Move.Arithmetic
 import Tests.Move.ResourceComposition
 import Tests.Move.Calls
+import Tests.Move.Loops
 import Tests.Move.Enums
 import Tests.Move.Generics
 import Tests.Move.EnumPatterns

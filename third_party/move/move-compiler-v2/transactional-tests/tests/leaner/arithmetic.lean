@@ -4,6 +4,8 @@ import Move
 
 move_module LeanerArithmetic where
 
+  /-! ## Functions -/
+
   fun calculate (left right : U64) : U64 :=
     ((left + right) * 3 - right) / 2 % 100
 
@@ -15,6 +17,8 @@ move_module LeanerArithmetic where
 
   fun divideByZero (value : U64) : U64 :=
     value / 0
+
+/-! ## Tests -/
 
 --# run 0x0::LeanerArithmetic::calculate --args 8u64 2u64
 

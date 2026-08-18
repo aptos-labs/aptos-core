@@ -6,6 +6,8 @@ open scoped Move
 
 move_module LeanerVectors where
 
+  /-! ## Functions -/
+
   fun length : U64 :=
     Move.Vector.length (vector![10, 20, 30] : Move.Vector U64)
 
@@ -24,6 +26,8 @@ move_module LeanerVectors where
     let value ← &mut values[1]
     value := 42
     (*value)
+
+/-! ## Tests -/
 
 --# run 0x0::LeanerVectors::length
 

@@ -103,6 +103,8 @@ move_module OrderedMap where
   end Search
   end Model
 
+  /-! ## Functions -/
+
   @[move_public]
   fun empty {K V : Type} : Map K V :=
     { entries := Move.Vector.empty }
@@ -148,7 +150,6 @@ move_module OrderedMap where
     pure entries.length
 
   spec length {K : Type} {V : Type} (map : Map K V) where
-    requires True;
     ensures result.toNat = map.entries.toList.length ∧ final = initial;
     aborts_if False
 
@@ -156,6 +157,12 @@ move_module OrderedMap where
   fun borrowKeyAt {K V : Type} (map : &Map K V) (index : U64) : Action (&K) := do
     let entries ← &map.entries
     &entries[index].key
+
+  spec borrowKeyAt {K : Type} {V : Type} (map : Map K V) (index : U64) where
+    ensures ∃ entry, map.entries.toList[index.toNat]? = some entry ∧
+      result = entry.key ∧ final = initial;
+    aborts_if map.entries.toList[index.toNat]? = none
+      with Semantics.Resource.executionFailure
 
   @[move_public]
   fun contains {K V : Type} (map : &Map K V) (key : &K) : Action Bool := do
@@ -238,103 +245,11 @@ move_module OrderedMap where
         some (map.entries.toList, result) ∧ Model.Sorted map;
     aborts_if ¬Model.Contains map key with 2
 
-  /- Concrete scenarios keep the compiled tests readable while exercising
-  generic bodies and type instantiation in the generated Move module. -/
-
-  fun lookupScenario : Action U64 := do
-    let map : Map U64 U64 := empty
-    let mapRef ← &mut map
-    add mapRef 30 300
-    add mapRef 10 100
-    add mapRef 20 200
-    let key : U64 := 20
-    let keyRef ← &key
-    let valueRef ← borrow mapRef keyRef
-    (*valueRef)
-
-  fun removeScenario : Action U64 := do
-    let map : Map U64 U64 := empty
-    let mapRef ← &mut map
-    add mapRef 30 300
-    add mapRef 10 100
-    add mapRef 20 200
-    let key : U64 := 20
-    let keyRef ← &key
-    let removed ← remove mapRef keyRef
-    let absent ← contains mapRef keyRef
-    if absent then pure 0 else pure removed
-
-  fun duplicateScenario : Action U64 := do
-    let map : Map U64 U64 := empty
-    let mapRef ← &mut map
-    add mapRef 10 100
-    add mapRef 10 999
-    pure 0
-
-  fun missingScenario : Action U64 := do
-    let map : Map U64 U64 := empty
-    let mapRef ← &mut map
-    let key : U64 := 10
-    let keyRef ← &key
-    let _ ← remove mapRef keyRef
-    pure 0
-
-  fun orderingScenario : Action U64 := do
-    let map : Map U64 U64 := empty
-    let mapRef ← &mut map
-    add mapRef 3 30
-    add mapRef 1 10
-    add mapRef 2 20
-    let firstKeyRef ← borrowKeyAt mapRef 0
-    let first ← *firstKeyRef
-    let secondKeyRef ← borrowKeyAt mapRef 1
-    let second ← *secondKeyRef
-    let thirdKeyRef ← borrowKeyAt mapRef 2
-    let third ← *thirdKeyRef
-    pure (first * 100 + second * 10 + third)
-
-  fun absentLookupScenario : Action U64 := do
-    let map : Map U64 U64 := empty
-    let mapRef ← &mut map
-    add mapRef 10 100
-    let key : U64 := 11
-    let keyRef ← &key
-    let present ← contains mapRef keyRef
-    if present then pure 0 else pure 1
-
-  fun boolKeyScenario : Action U64 := do
-    let map : Map Bool U64 := empty
-    let mapRef ← &mut map
-    add mapRef true 10
-    add mapRef false 20
-    let key : Bool := false
-    let keyRef ← &key
-    let valueRef ← borrow mapRef keyRef
-    (*valueRef)
-
-  fun removeEdgesScenario : Action U64 := do
-    let map : Map U64 U64 := empty
-    let mapRef ← &mut map
-    add mapRef 2 20
-    add mapRef 1 10
-    add mapRef 3 30
-    let firstKey : U64 := 1
-    let firstKeyRef ← &firstKey
-    let first ← remove mapRef firstKeyRef
-    let lastKey : U64 := 3
-    let lastKeyRef ← &lastKey
-    let last ← remove mapRef lastKeyRef
-    let middleKey : U64 := 2
-    let middleKeyRef ← &middleKey
-    let valueRef ← borrow mapRef middleKeyRef
-    let value ← *valueRef
-    pure (first + last + value)
-
-namespace OrderedMap
+  /-! ## Proofs -/
 
   namespace Model
 
-  /-! # Mathematical proof library
+  /-! ### Mathematical proof library
 
   The proof dependencies are deliberately grouped by operation:
 
@@ -360,7 +275,7 @@ namespace OrderedMap
   add_sorted` and `erase_sublist → erase_sorted`.
   -/
 
-  /-! ## Insertion proof chain
+  /-! ### Insertion proof chain
 
   `mem_insert` describes the new contents and `insert_sorted` proves invariant
   preservation. `add_sorted` lifts that fact from lists to maps. -/
@@ -441,7 +356,7 @@ namespace OrderedMap
 
   end Insertion
 
-  /-! ## Removal proof chain
+  /-! ### Removal proof chain
 
   `erase_sublist` proves that removal only deletes an entry. Pairwise order is
   inherited by sublists, yielding `erase_sorted`.
@@ -530,7 +445,7 @@ namespace OrderedMap
 
   end Removal
 
-  /-! ## Binary-search proof chain
+  /-! ### Binary-search proof chain
 
   The bound lemmas place entries on the correct side of the lower bound;
   together they preserve `Window` across either recursive branch.
@@ -643,23 +558,19 @@ namespace OrderedMap
 
   end Model
 
-  /-! # Verification proofs
+  /-! ### Verification proofs
 
   The specs are attached to their functions above. Proofs are ordered by
   dependency: direct reductions first, then search, then mutations. Search
   proves where an operation acts; insertion and removal prove what the update
   means and that it preserves sortedness. -/
 
-  /-! ## Direct proofs -/
+  /-! ### Direct proofs -/
 
   verify empty by
     simp [empty.contract, empty, Model.Sorted, Model.SortedEntries]
 
-  verify length by
-    unfold length.contract length.sourceSpec Move.Verify.Satisfies
-    simp [Move.Vector.length_toNat]
-
-  /-! ## Search proofs
+  /-! ### Search proofs
 
   `lowerBoundLoop.verified` establishes the loop invariant. The remaining
   read-only proofs reuse it through `lowerBound.verified`. -/
@@ -673,9 +584,9 @@ namespace OrderedMap
     rintro ⟨entries, key, low, high⟩ initial window
     change Model.Search.Window entries key low high at window
     rcases window with ⟨sorted, lowTarget, targetHigh, highLength, lengthBound⟩
-    by_cases loop : low.toNat < high.toNat
+    by_cases hloop : low.toNat < high.toNat
     · let middleNat := low.toNat + (high.toNat - low.toNat) / 2
-      have lowHigh : low.toNat ≤ high.toNat := Nat.le_of_lt loop
+      have lowHigh : low.toNat ≤ high.toNat := Nat.le_of_lt hloop
       have middleLtHigh : middleNat < high.toNat := by
         dsimp [middleNat]
         omega
@@ -742,12 +653,12 @@ namespace OrderedMap
         constructor
         · intro result final execution
           apply recursiveResult.1 result final
-          simpa [loop, goRight, middleNat, middleEntry, lowHigh,
+          simpa [hloop, goRight, middleNat, middleEntry, lowHigh,
             middleLtLength, middleLtSize, nextLtSize, twoNonzero,
             atMiddle, midpointSpec, borrowMiddleSpec, nextSpec] using execution
         · intro code execution
           apply recursiveResult.2 code
-          simpa [loop, goRight, middleNat, middleEntry, lowHigh,
+          simpa [hloop, goRight, middleNat, middleEntry, lowHigh,
             middleLtLength, middleLtSize, nextLtSize, twoNonzero,
             atMiddle, midpointSpec, borrowMiddleSpec, nextSpec] using execution
       · have targetBeforeMiddle := Model.Search.lowerBoundList_le_index_of_not_less
@@ -760,26 +671,26 @@ namespace OrderedMap
         constructor
         · intro result final execution
           apply recursiveResult.1 result final
-          simpa [loop, goRight, middleNat, middleEntry, lowHigh,
+          simpa [hloop, goRight, middleNat, middleEntry, lowHigh,
             middleLtLength, middleLtSize, twoNonzero, atMiddle,
             midpointSpec, borrowMiddleSpec] using execution
         · intro code execution
           apply recursiveResult.2 code
-          simpa [loop, goRight, middleNat, middleEntry, lowHigh,
+          simpa [hloop, goRight, middleNat, middleEntry, lowHigh,
             middleLtLength, middleLtSize, twoNonzero, atMiddle,
             midpointSpec, borrowMiddleSpec] using execution
     · have targetEq : Model.lowerBoundList entries.toList key = low.toNat := by
         omega
       constructor
       · intro result final execution
-        simp [loop, Move.Semantics.Spec.pure] at execution
+        simp [hloop, Move.Semantics.Spec.pure] at execution
         rcases execution with ⟨rfl, rfl⟩
         constructor
         · apply U64.ext
           simp [targetEq]
         · rfl
       · intro code execution
-        simp [loop, Move.Semantics.Spec.pure] at execution
+        simp [hloop, Move.Semantics.Spec.pure] at execution
 
   verify lowerBound by
     unfold lowerBound.contract Move.Verify.Satisfies
@@ -811,6 +722,24 @@ namespace OrderedMap
     · intro code execution
       apply loopResult.2 code
       simpa [lowerBound.sourceSpec] using execution
+
+  verify length by
+    unfold length.contract length.sourceSpec Move.Verify.Satisfies
+    simp [Move.Vector.length_toNat]
+
+  verify borrowKeyAt by
+    unfold borrowKeyAt.contract borrowKeyAt.sourceSpec Move.Verify.Satisfies
+    intro K _ V _ State
+    rintro ⟨map, index⟩ initial _
+    constructor
+    · intro result final execution
+      simp [Move.Semantics.Vector.borrowElemSpec, Move.Semantics.Spec.bind,
+        Move.Semantics.Spec.pure] at execution
+      rcases execution with ⟨entry, ⟨atIndex, finalEq⟩, resultEq⟩
+      exact ⟨entry, atIndex, resultEq, finalEq⟩
+    · intro code execution
+      simpa [Move.Semantics.Vector.borrowElemSpec, Move.Semantics.Spec.bind,
+        Move.Semantics.Spec.pure] using execution
 
   verify contains by
     unfold contains.contract Move.Verify.Satisfies
@@ -990,7 +919,7 @@ namespace OrderedMap
             simp at atTarget
           · rfl
 
-  /-! ## Mutation proofs
+  /-! ### Mutation proofs
 
   `add` uses the insertion bridge and invariant theorem; `remove` uses the
   corresponding removal theorems. Both reuse search correctness to select the
@@ -1039,8 +968,7 @@ namespace OrderedMap
         rw [borrowAtTarget] at restExecution
         simp only [Move.Semantics.Spec.pure_bind] at restExecution
         rw [if_pos equalBeq] at restExecution
-        simp [Move.Semantics.Spec.abort, Move.Semantics.Spec.bind]
-          at restExecution
+        simp [Move.Semantics.Spec.abort] at restExecution
       · by_cases inBounds : target < map.entries.toList.length
         · let entry := map.entries.toList[target]'inBounds
           have atTarget : map.entries.toList[target]? = some entry := by
@@ -1063,7 +991,6 @@ namespace OrderedMap
           rw [borrowAtTarget] at restExecution
           simp only [Move.Semantics.Spec.pure_bind] at restExecution
           rw [if_neg unequalBeq] at restExecution
-          simp only [Move.Semantics.Spec.pure_bind] at restExecution
           have insertBound : target ≤ map.entries.toList.length := by
             change target ≤ map.entries.toList.length at indexBound
             exact indexBound
@@ -1169,14 +1096,12 @@ namespace OrderedMap
           simp only [Move.Semantics.Spec.pure_bind] at restAbort
           split at restAbort
           case isTrue equal =>
-            simp [Move.Semantics.Spec.abort, Move.Semantics.Spec.bind]
-              at restAbort
+            simp [Move.Semantics.Spec.abort] at restAbort
             constructor
             · exact ⟨entry, List.mem_of_getElem? atTarget,
                 (Move.Compare.equal_eq_true_iff entry.key key).mp equal⟩
             · exact restAbort
           case isFalse equal =>
-            simp only [Move.Semantics.Spec.pure_bind] at restAbort
             have insertBound : target ≤ map.entries.toList.length := by
               change target ≤ map.entries.toList.length at indexBound
               exact indexBound
@@ -1396,6 +1321,101 @@ namespace OrderedMap
             rw [targetEq] at atTarget
             simp at atTarget
           · exact restAbort
+
+  /-! ## Tests -/
+
+  /- Concrete scenarios keep the compiled tests readable while exercising
+  generic bodies and type instantiation in the generated Move module. -/
+
+  fun lookupScenario : Action U64 := do
+    let map : Map U64 U64 := empty
+    let mapRef ← &mut map
+    add mapRef 30 300
+    add mapRef 10 100
+    add mapRef 20 200
+    let key : U64 := 20
+    let keyRef ← &key
+    let valueRef ← borrow mapRef keyRef
+    (*valueRef)
+
+  fun removeScenario : Action U64 := do
+    let map : Map U64 U64 := empty
+    let mapRef ← &mut map
+    add mapRef 30 300
+    add mapRef 10 100
+    add mapRef 20 200
+    let key : U64 := 20
+    let keyRef ← &key
+    let removed ← remove mapRef keyRef
+    let absent ← contains mapRef keyRef
+    if absent then pure 0 else pure removed
+
+  fun duplicateScenario : Action U64 := do
+    let map : Map U64 U64 := empty
+    let mapRef ← &mut map
+    add mapRef 10 100
+    add mapRef 10 999
+    pure 0
+
+  fun missingScenario : Action U64 := do
+    let map : Map U64 U64 := empty
+    let mapRef ← &mut map
+    let key : U64 := 10
+    let keyRef ← &key
+    let _ ← remove mapRef keyRef
+    pure 0
+
+  fun orderingScenario : Action U64 := do
+    let map : Map U64 U64 := empty
+    let mapRef ← &mut map
+    add mapRef 3 30
+    add mapRef 1 10
+    add mapRef 2 20
+    let firstKeyRef ← borrowKeyAt mapRef 0
+    let first ← *firstKeyRef
+    let secondKeyRef ← borrowKeyAt mapRef 1
+    let second ← *secondKeyRef
+    let thirdKeyRef ← borrowKeyAt mapRef 2
+    let third ← *thirdKeyRef
+    pure (first * 100 + second * 10 + third)
+
+  fun absentLookupScenario : Action U64 := do
+    let map : Map U64 U64 := empty
+    let mapRef ← &mut map
+    add mapRef 10 100
+    let key : U64 := 11
+    let keyRef ← &key
+    let present ← contains mapRef keyRef
+    if present then pure 0 else pure 1
+
+  fun boolKeyScenario : Action U64 := do
+    let map : Map Bool U64 := empty
+    let mapRef ← &mut map
+    add mapRef true 10
+    add mapRef false 20
+    let key : Bool := false
+    let keyRef ← &key
+    let valueRef ← borrow mapRef keyRef
+    (*valueRef)
+
+  fun removeEdgesScenario : Action U64 := do
+    let map : Map U64 U64 := empty
+    let mapRef ← &mut map
+    add mapRef 2 20
+    add mapRef 1 10
+    add mapRef 3 30
+    let firstKey : U64 := 1
+    let firstKeyRef ← &firstKey
+    let first ← remove mapRef firstKeyRef
+    let lastKey : U64 := 3
+    let lastKeyRef ← &lastKey
+    let last ← remove mapRef lastKeyRef
+    let middleKey : U64 := 2
+    let middleKeyRef ← &middleKey
+    let valueRef ← borrow mapRef middleKeyRef
+    let value ← *valueRef
+    pure (first + last + value)
+
   def compiled : MModule := move_module% "OrderedMapTest"
 
   private def run := Tests.run compiled
@@ -1408,7 +1428,5 @@ namespace OrderedMap
   #test run "absentLookupScenario" [] [] = Tests.okU64 1
   #test run "boolKeyScenario" [] [] = Tests.okU64 20
   #test run "removeEdgesScenario" [] [] = Tests.okU64 60
-
-end OrderedMap
 
 end Tests.MovePrograms

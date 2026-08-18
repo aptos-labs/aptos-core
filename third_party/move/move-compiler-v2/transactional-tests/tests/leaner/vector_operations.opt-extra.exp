@@ -1,30 +1,30 @@
 processed 18 tasks
-task 0 lines 1-97:  publish [import Move]
-task 1 lines 99-99:  run 0x0::LeanerVectorOperations::emptyLength
+task 0 lines 1-101:  publish [import Move]
+task 1 lines 103-103:  run 0x0::LeanerVectorOperations::emptyLength
 return values: 0
-task 2 lines 101-101:  run 0x0::LeanerVectorOperations::pushed
+task 2 lines 105-105:  run 0x0::LeanerVectorOperations::pushed
 return values: 9
-task 3 lines 103-103:  run 0x0::LeanerVectorOperations::setEdges
+task 3 lines 107-107:  run 0x0::LeanerVectorOperations::setEdges
 return values: 40
-task 4 lines 105-105:  run 0x0::LeanerVectorOperations::nested
+task 4 lines 109-109:  run 0x0::LeanerVectorOperations::nested
 return values: 3
-task 5 lines 107-107:  run 0x0::LeanerVectorOperations::boolRoundTrip --args true
+task 5 lines 111-111:  run 0x0::LeanerVectorOperations::boolRoundTrip --args true
 return values: true
-task 6 lines 109-109:  run 0x0::LeanerVectorOperations::boolRoundTrip --args false
+task 6 lines 113-113:  run 0x0::LeanerVectorOperations::boolRoundTrip --args false
 return values: false
-task 7 lines 111-111:  run 0x0::LeanerVectorOperations::mutateAndRead
+task 7 lines 115-115:  run 0x0::LeanerVectorOperations::mutateAndRead
 return values: 27
-task 8 lines 113-113:  run 0x0::LeanerVectorOperations::mutateThenBorrowOther
+task 8 lines 117-117:  run 0x0::LeanerVectorOperations::mutateThenBorrowOther
 return values: 30
-task 9 lines 115-115:  run 0x0::LeanerVectorOperations::freezeElement
+task 9 lines 119-119:  run 0x0::LeanerVectorOperations::freezeElement
 return values: 55
-task 10 lines 117-117:  run 0x0::LeanerVectorOperations::insertMiddle
+task 10 lines 121-121:  run 0x0::LeanerVectorOperations::insertMiddle
 return values: 20
-task 11 lines 119-119:  run 0x0::LeanerVectorOperations::insertEdges
+task 11 lines 123-123:  run 0x0::LeanerVectorOperations::insertEdges
 return values: 43
-task 12 lines 121-121:  run 0x0::LeanerVectorOperations::removeMiddle
+task 12 lines 125-125:  run 0x0::LeanerVectorOperations::removeMiddle
 return values: 52
-task 13 lines 123-123:  run 0x0::LeanerVectorOperations::getOutOfBounds
+task 13 lines 127-127:  run 0x0::LeanerVectorOperations::getOutOfBounds
 Error: Function execution failed with VMError: {
     major_status: VECTOR_OPERATION_ERROR,
     sub_status: Some(1),
@@ -32,7 +32,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(8), 9)],
 }
-task 14 lines 125-125:  run 0x0::LeanerVectorOperations::setOutOfBounds
+task 14 lines 129-129:  run 0x0::LeanerVectorOperations::setOutOfBounds
 Error: Function execution failed with VMError: {
     major_status: VECTOR_OPERATION_ERROR,
     sub_status: Some(1),
@@ -40,7 +40,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 12)],
 }
-task 15 lines 127-127:  run 0x0::LeanerVectorOperations::borrowOutOfBounds
+task 15 lines 131-131:  run 0x0::LeanerVectorOperations::borrowOutOfBounds
 Error: Function execution failed with VMError: {
     major_status: VECTOR_OPERATION_ERROR,
     sub_status: Some(1),
@@ -48,7 +48,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(6), 9)],
 }
-task 16 lines 129-129:  run 0x0::LeanerVectorOperations::insertOutOfBounds
+task 16 lines 133-133:  run 0x0::LeanerVectorOperations::insertOutOfBounds
 Error: Function execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(131072),
@@ -56,7 +56,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(9), 21)],
 }
-task 17 lines 131-131:  run 0x0::LeanerVectorOperations::removeOutOfBounds
+task 17 lines 135-135:  run 0x0::LeanerVectorOperations::removeOutOfBounds
 Error: Function execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(131072),

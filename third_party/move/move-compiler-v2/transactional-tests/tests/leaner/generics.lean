@@ -28,6 +28,8 @@ move_module LeanerGenerics where
     | some (value : T)
     deriving Copy, Drop, Store
 
+  /-! ## Functions -/
+
   fun identity {T : Type} (value : T) : T := value
 
   fun box {T : Type} (value : T) : Box T := { value }
@@ -93,6 +95,8 @@ move_module LeanerGenerics where
 
   @[move_public]
   fun hasBool (address : Address) : Action Bool := contains (T := Bool) address
+
+/-! ## Tests -/
 
 --# run 0x0::LeanerGenerics::roundTrip --args 37u64
 
