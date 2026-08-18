@@ -417,12 +417,14 @@ private partial def containsCheckedArithmeticCall (term : Syntax) :
 private def resolvePureMoveFunction? (identifier : TSyntax `ident) :
     CommandElabM (Option Name) := do
   let env ← getEnv
-  let currentNamespace ← getCurrNamespace
-  let candidates := #[currentNamespace ++ identifier.getId, identifier.getId]
-  let some functionName := candidates.find? fun name =>
-      Move.moveFunAttr.hasTag env name || Move.movePublicAttr.hasTag env name ||
-        Move.moveEntryAttr.hasTag env name
-    | return none
+  let functionName? ← try
+      pure (some (← resolveGlobalConstNoOverload identifier.raw))
+    catch _ => pure none
+  let some functionName := functionName? | return none
+  unless Move.moveFunAttr.hasTag env functionName ||
+      Move.movePublicAttr.hasTag env functionName ||
+      Move.moveEntryAttr.hasTag env functionName do
+    return none
   let some declaration := declarations.getState env |>.find? functionName
     | return none
   if (findTypeApplication? ``Move.Action declaration.resultType).isSome then
@@ -552,12 +554,15 @@ private def packCallArguments (_anchor : Syntax)
 private def resolveMoveFunction? (identifier : TSyntax `ident) :
     CommandElabM (Option Name) := do
   let env ← getEnv
-  let currentNamespace ← getCurrNamespace
-  let localName := currentNamespace ++ identifier.getId
-  let candidates := #[localName, identifier.getId]
-  return candidates.find? fun name =>
-    Move.moveFunAttr.hasTag env name || Move.movePublicAttr.hasTag env name ||
-      Move.moveEntryAttr.hasTag env name
+  let functionName? ← try
+      pure (some (← resolveGlobalConstNoOverload identifier.raw))
+    catch _ => pure none
+  let some functionName := functionName? | return none
+  if Move.moveFunAttr.hasTag env functionName ||
+      Move.movePublicAttr.hasTag env functionName ||
+      Move.moveEntryAttr.hasTag env functionName then
+    return some functionName
+  return none
 
 private def hasExplicitMutableParameter (functionName : Name) :
     CommandElabM Bool :=
@@ -714,58 +719,6 @@ private partial def containsProjectionOfIdentifier (name : Name)
 private partial def containsReturn (stx : Syntax) : Bool :=
   stx.isOfKind ``Lean.Parser.Term.doReturn || stx.getArgs.any containsReturn
 
-private def reassignedIdent? (stx : Syntax) : Option (TSyntax `ident) :=
-  if !stx.isOfKind ``Lean.Parser.Term.doReassign || stx.getNumArgs == 0 then
-    none
-  else
-    let decl := stx[0]
-    if decl.isIdent then
-      some ⟨decl⟩
-    else if decl.getNumArgs > 0 then
-      let idNode := decl[0]
-      if idNode.isIdent then some ⟨idNode⟩
-      else if idNode.getNumArgs > 0 && idNode[0].isIdent then some ⟨idNode[0]⟩
-      else none
-    else
-      none
-
-private partial def assignedLoopIdents (stx : Syntax)
-    (found : Array (TSyntax `ident) := #[]) : Array (TSyntax `ident) :=
-  let found :=
-    match reassignedIdent? stx with
-    | some name =>
-        if found.any (·.getId == name.getId) then found else found.push name
-    | none => found
-  stx.getArgs.foldl (init := found) fun found child =>
-    assignedLoopIdents child found
-
-private def boundDoIdentifier? (stx : Syntax) : Option (TSyntax `ident) :=
-  if stx.isOfKind ``Lean.Parser.Term.doLet && stx.getNumArgs > 3 then
-    let declaration := stx[3]
-    if declaration.getNumArgs > 0 then
-      let idNode := declaration[0]
-      if idNode.isIdent then some ⟨idNode⟩
-      else if idNode.getNumArgs > 0 && idNode[0].isIdent then some ⟨idNode[0]⟩
-      else none
-    else
-      none
-  else
-    none
-
-private partial def loopStateShadow? (assigned : List (TSyntax `ident))
-    (stx : Syntax) : Option (TSyntax `ident) :=
-  match boundDoIdentifier? stx with
-  | some bound =>
-      if assigned.any (·.getId == bound.getId) then some bound
-      else stx.getArgs.findSome? (loopStateShadow? assigned)
-  | none => stx.getArgs.findSome? (loopStateShadow? assigned)
-
-private def rejectLoopStateShadowing (assigned : List (TSyntax `ident))
-    (body : Syntax) : CommandElabM Unit := do
-  if let some shadow := loopStateShadow? assigned body then
-    throwErrorAt shadow
-      "automatic source specifications do not yet support shadowing loop state variable `{shadow.getId}`"
-
 private def freshLoopStateIdents (ref : Syntax)
     (assigned : List (TSyntax `ident)) : List (TSyntax `ident) :=
   assigned.zipIdx.map fun (_, index) =>
@@ -908,11 +861,11 @@ private partial def translateDo (context : TranslationContext)
         throwErrorAt first "duplicate active loop label `{sourceLabel}`"
     let bodyIndex := if sourceLabel?.isSome then 2 else 1
     let body : TSyntax ``Lean.Parser.Term.doSeq := ⟨first.raw[bodyIndex]!⟩
+    let body ← Lean.Elab.Command.liftCoreM <| Move.freshenLoopLocals body
     if containsReturn body.raw then
       throwErrorAt first
         "`return` inside `loop` / `while` is not yet supported for `verify`"
-    let assigned := (assignedLoopIdents body.raw).toList
-    rejectLoopStateShadowing assigned body.raw
+    let assigned := Move.loopAssignedIdents body
     let state := freshLoopStateIdents first.raw assigned
     let pack ← packLoopState assigned
     let recName := mkIdentFrom first `_moveSpecLoop
@@ -1102,6 +1055,10 @@ private partial def translateDo (context : TranslationContext)
       let valueSpec ← expressionSpec context value
       let nested ← translateRest rest
       `(Move.Semantics.Spec.bind $valueSpec (fun $name => $nested))
+  | `(doElem| let mut $name:ident : $_type:term := $value:term) =>
+      let valueSpec ← expressionSpec context value
+      let nested ← translateRest rest
+      `(Move.Semantics.Spec.bind $valueSpec (fun $name => $nested))
   | `(doElem| let mut $name:ident ← * $reference:term) =>
       let nested ← translateRest rest
       `(let $name := $(← rewritePure context.mutation? (← `(* $reference))); $nested)
@@ -1127,8 +1084,8 @@ private partial def translateDo (context : TranslationContext)
         throwErrorAt first
           "`return` inside `loop` / `while` is not yet supported for `verify`"
       let condition ← conditionTerm condition
-      let assigned := (assignedLoopIdents body.raw).toList
-      rejectLoopStateShadowing assigned body.raw
+      let body ← Lean.Elab.Command.liftCoreM <| Move.freshenLoopLocals body
+      let assigned := Move.loopAssignedIdents body
       let state := freshLoopStateIdents first.raw assigned
       let condition : TSyntax `term := ⟨replaceLoopState assigned state condition.raw⟩
       let condition ← rewritePure context.mutation? condition

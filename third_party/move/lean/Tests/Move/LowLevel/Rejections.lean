@@ -200,6 +200,43 @@ move_module SourceVerificationRejection where
     ensures True;
     aborts_if False
 
+  namespace OpenedHelpers
+
+    fun openedPredicate (value : U64) : Bool := value == 0
+
+    fun openedOverwrite (slot : &mut U64) : Action Unit := do
+      slot := 7
+
+    spec openedOverwrite (slot : &mut U64) where
+      ensures slot = 7;
+      aborts_if False
+
+  end OpenedHelpers
+
+  open OpenedHelpers
+
+  fun openedHelperCondition (value : U64) : Action U64 := do
+    if openedPredicate value then pure 1 else pure 2
+
+  /--
+  error: automatic source specifications do not yet model pure Move callee `Tests.MovePrograms.Calls.Rejection.SourceVerificationRejection.OpenedHelpers.openedPredicate`; inline it or omit `verify`
+  -/
+  #guard_msgs in
+  spec openedHelperCondition (value : U64) where
+    ensures True;
+    aborts_if False
+
+  fun callsOpenedOverwrite (slot : &mut U64) : Action Unit := do
+    openedOverwrite slot
+
+  /--
+  error: automatic source specifications do not yet model calls to effectful Move callee `Tests.MovePrograms.Calls.Rejection.SourceVerificationRejection.OpenedHelpers.openedOverwrite` with a mutable-reference parameter
+  -/
+  #guard_msgs in
+  spec callsOpenedOverwrite (slot : &mut U64) where
+    ensures slot = 7;
+    aborts_if False
+
   fun overwrite (slot : &mut U64) (replacement : U64) : Action Unit := do
     slot := replacement
 
@@ -216,21 +253,6 @@ move_module SourceVerificationRejection where
   #guard_msgs in
   spec callsOverwrite (slot : &mut U64) where
     ensures slot = 9;
-    aborts_if False
-
-  fun shadowedLoopState (value : U64) : U64 := do
-    loop
-      let mut value : U64 := 2
-      value := 1
-      break
-    value
-
-  /--
-  error: automatic source specifications do not yet support shadowing loop state variable `value`
-  -/
-  #guard_msgs in
-  spec shadowedLoopState (value : U64) where
-    ensures result = value;
     aborts_if False
 
   fun callsPureHelper (value : U64) : Action U64 :=

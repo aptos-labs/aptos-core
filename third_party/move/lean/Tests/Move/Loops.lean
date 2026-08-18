@@ -103,6 +103,28 @@ move_module Loops where
     ensures result = 7;
     aborts_if False
 
+  fun shadowedLoopState (n : U64) : U64 := do
+    loop
+      let mut n : U64 := 2
+      n := 1
+      break
+    n
+
+  spec shadowedLoopState (n : U64) where
+    ensures result = n;
+    aborts_if False
+
+  fun shadowedLoopArrow (n : U64) : Action U64 := do
+    loop
+      let mut n ← (pure 2 : Action U64)
+      n := 1
+      break
+    pure n
+
+  spec shadowedLoopArrow (n : U64) where
+    ensures result = n;
+    aborts_if False
+
   @[move_struct]
   structure Counter where
     value : U64
@@ -332,6 +354,54 @@ move_module Loops where
     constructor <;> intros <;>
       simp_all [Move.Semantics.Spec.pure]
 
+  verify shadowedLoopState by
+    unfold shadowedLoopState.contract shadowedLoopState.sourceSpec
+    intro State n initial _
+    constructor
+    · intro result final execution
+      rcases execution with ⟨fuel, execution⟩
+      cases fuel with
+      | zero => simp [Move.Semantics.Spec.fixApprox,
+          Move.Semantics.Spec.bottom] at execution
+      | succ fuel =>
+          simp only [Move.Semantics.Spec.fixApprox,
+            Move.Semantics.Spec.pure_bind,
+            Move.Semantics.Spec.pure_ok] at execution
+          exact execution.1
+    · intro code execution
+      rcases execution with ⟨fuel, execution⟩
+      cases fuel with
+      | zero => simp [Move.Semantics.Spec.fixApprox,
+          Move.Semantics.Spec.bottom] at execution
+      | succ fuel =>
+          simp only [Move.Semantics.Spec.fixApprox,
+            Move.Semantics.Spec.pure_bind,
+            Move.Semantics.Spec.pure_aborts] at execution
+
+  verify shadowedLoopArrow by
+    unfold shadowedLoopArrow.contract shadowedLoopArrow.sourceSpec
+    intro State n initial _
+    constructor
+    · intro result final execution
+      rcases execution with ⟨fuel, execution⟩
+      cases fuel with
+      | zero => simp [Move.Semantics.Spec.fixApprox,
+          Move.Semantics.Spec.bottom] at execution
+      | succ fuel =>
+          simp only [Move.Semantics.Spec.fixApprox,
+            Move.Semantics.Spec.pure_bind,
+            Move.Semantics.Spec.pure_ok] at execution
+          grind
+    · intro code execution
+      rcases execution with ⟨fuel, execution⟩
+      cases fuel with
+      | zero => simp [Move.Semantics.Spec.fixApprox,
+          Move.Semantics.Spec.bottom] at execution
+      | succ fuel =>
+          simp only [Move.Semantics.Spec.fixApprox,
+            Move.Semantics.Spec.pure_bind,
+            Move.Semantics.Spec.pure_aborts] at execution
+
   verify drain by
     unfold drain.contract drain.sourceSpec
     intro State store
@@ -506,6 +576,8 @@ move_module Loops where
   #test run "labeledExit" [] [.u64 5] = Tests.okU64 0
   #test run "labeledContinue" [] [.u64 5] = Tests.okU64 0
   #test run "labeledProof" [] [] = Tests.okU64 7
+  #test run "shadowedLoopState" [] [.u64 7] = Tests.okU64 7
+  #test run "shadowedLoopArrow" [] [.u64 7] = Tests.okU64 7
   #test run "drain" (memory 3 4) [.address 3]
     = Tests.okRet (memory 3 0) [.u64 0]
   #test run "early" [] [.bool true] = Tests.okU64 7

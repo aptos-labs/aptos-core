@@ -518,15 +518,20 @@ private inductive LoopMarker where
   | continue_ (label : Nat) (state : Array FVarId) (tail : Bool)
   | break_ (label : Nat) (state : Array FVarId)
 
-private def loopMarker? (fn : Name) (vars : Array FVarId) : BuildM (Option LoopMarker) := do
+private def loopMarker? (self fn : Name) (vars : Array FVarId) :
+    BuildM (Option LoopMarker) := do
   let isMarker := Move.isLoopEnterMarker fn || Move.isLoopContinueMarker fn ||
     Move.isLoopContinueTailMarker fn || Move.isLoopBreakMarker fn
   unless isMarker do return none
   let literals ← loopMarkerNats vars
   let some label := literals[0]?
     | throwError "loop marker is missing its static label"
-  let some arity := literals[1]?
+  let some nonce := literals[1]?
+    | throwError "loop marker is missing its provenance nonce"
+  let some arity := literals[2]?
     | throwError "loop marker is missing its state arity"
+  unless Move.isRegisteredLoopMarker (← getEnv) self label nonce do
+    throwError "unregistered compiler loop marker in `{self}`"
   let state ←
     if arity == 0 then pure #[]
     else
@@ -662,8 +667,6 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
         modify fun s => { s with loopLiveResults := decl.fvarId :: s.loopLiveResults }
         return instrs
       if Move.isLoopTokenJoinMarker fn then
-        return instrs
-      if let some _ ← loopMarker? fn vars then
         return instrs
       if let some (structName, numParams, numFields) := structConstructor? (← getEnv) fn then
         unless vars.size == numFields do
@@ -1010,21 +1013,21 @@ private partial def collectLoopMarkerInputs : Code .pure → BuildM Unit
       for alt in cases.alts do collectLoopMarkerInputs alt.getCode
   | .return _ | .jmp .. | .unreach _ => pure ()
 
-private partial def collectLoopStates : Code .pure → BuildM Unit
+private partial def collectLoopStates (self : Name) : Code .pure → BuildM Unit
   | .let decl next => do
       if let .const fn _ args _ := decl.value then
-        match ← loopMarker? fn (fvarArgs args) with
+        match ← loopMarker? self fn (fvarArgs args) with
         | some (.enter label state) =>
             modify fun s => { s with loopStates := (label, state) :: s.loopStates }
         | some (.continue_ label state true) =>
             modify fun s => { s with loopTails := (label, (state, next)) :: s.loopTails }
         | _ => pure ()
-      collectLoopStates next
+      collectLoopStates self next
   | .fun decl next _ | .jp decl next => do
-      collectLoopStates decl.value
-      collectLoopStates next
+      collectLoopStates self decl.value
+      collectLoopStates self next
   | .cases cases =>
-      for alt in cases.alts do collectLoopStates alt.getCode
+      for alt in cases.alts do collectLoopStates self alt.getCode
   | .return _ | .jmp .. | .unreach _ => pure ()
 
 private partial def collectJoinParams (env : Environment) : Code .pure → BuildM Unit
@@ -1056,7 +1059,7 @@ private partial def walk (env : Environment) (signatures : FunSignatures) (self 
       | none =>
           match decl.value with
           | .const fn _ args _ =>
-              match ← loopMarker? fn (fvarArgs args) with
+              match ← loopMarker? self fn (fvarArgs args) with
               | some (.enter label state) =>
                   modify fun s => { s with loopStates := (label, state) :: s.loopStates }
                   discard <| loopExit label
@@ -1337,7 +1340,7 @@ private def compileFun (env : Environment) (signatures : FunSignatures)
     module, tyContext, localIds := paramIds, loopParams := params
   }
   let (_, initial) ← (collectLoopMarkerInputs code).run initial
-  let (_, initial) ← (collectLoopStates code).run initial
+  let (_, initial) ← (collectLoopStates name code).run initial
   let (_, initial) ← (collectJoinParams env code).run initial
   let (_, state) ← (walk env signatures name signature code "entry" #[]).run initial
   let blocks := reversePostorder state.blocks "entry"
