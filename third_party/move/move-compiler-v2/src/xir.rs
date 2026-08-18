@@ -87,6 +87,22 @@ fn validate(module: &XirModule) -> Result<()> {
                 field.name,
                 decl.name
             );
+            validate_type_parameters(
+                &field.ty,
+                decl.type_parameters.len(),
+                &format!("struct `{}`", decl.name),
+            )?;
+        }
+        if let Some(variants) = &decl.variants {
+            for variant in variants {
+                for field in &variant.fields {
+                    validate_type_parameters(
+                        &field.ty,
+                        decl.type_parameters.len(),
+                        &format!("enum `{}` variant `{}`", decl.name, variant.name),
+                    )?;
+                }
+            }
         }
     }
     let mut function_names = BTreeSet::new();
@@ -122,12 +138,76 @@ fn validate(module: &XirModule) -> Result<()> {
             "too many locals in `{}`",
             decl.name
         );
+        for ty in decl.locals.iter().chain(&decl.returns) {
+            validate_type_parameters(
+                ty,
+                decl.type_parameters.len(),
+                &format!("function `{}`", decl.name),
+            )?;
+        }
+        for block in &decl.blocks {
+            for instruction in &block.instrs {
+                if let Instr::Call(_, operation, _) = instruction {
+                    validate_operation_type_parameters(
+                        operation,
+                        decl.type_parameters.len(),
+                        &decl.name,
+                    )?;
+                }
+            }
+        }
         ensure!(
             decl.loops.is_empty(),
             "loop metadata is not supported by the XIR reader yet in `{}`",
             decl.name
         );
         let _ = &decl.spec;
+    }
+    Ok(())
+}
+
+fn validate_type_parameters(ty: &Ty, count: usize, owner: &str) -> Result<()> {
+    match ty {
+        Ty::TypeParameter(index) => ensure!(
+            *index < count,
+            "type parameter index {index} is out of range in {owner}"
+        ),
+        Ty::StructInst(_, args) | Ty::EnumInst(_, args) => {
+            for arg in args {
+                validate_type_parameters(arg, count, owner)?;
+            }
+        },
+        Ty::Vector(element) | Ty::Ref(element) | Ty::MutRef(element) => {
+            validate_type_parameters(element, count, owner)?;
+        },
+        Ty::Bool | Ty::U64 | Ty::Address | Ty::Signer | Ty::Struct(_) | Ty::Enum(_) => {},
+    }
+    Ok(())
+}
+
+fn validate_operation_type_parameters(
+    operation: &Oper,
+    count: usize,
+    function: &str,
+) -> Result<()> {
+    let args = match operation {
+        Oper::PackInst(args)
+        | Oper::UnpackInst(args)
+        | Oper::PackVariantInst(_, args)
+        | Oper::UnpackVariantInst(_, args)
+        | Oper::TestVariantInst(_, args)
+        | Oper::GetFieldInst(_, args)
+        | Oper::GetGlobalInst(_, args)
+        | Oper::MoveToInst(_, args)
+        | Oper::MoveFromInst(_, args)
+        | Oper::ExistsInst(_, args)
+        | Oper::FunctionInst(_, args)
+        | Oper::BorrowFieldInst(_, args)
+        | Oper::BorrowGlobalInst(_, args) => args,
+        _ => return Ok(()),
+    };
+    for arg in args {
+        validate_type_parameters(arg, count, &format!("function `{function}` operation"))?;
     }
     Ok(())
 }
@@ -851,17 +931,35 @@ impl FunctionTranslator<'_> {
 
     fn operation(&self, dsts: &[usize], oper: &Oper, srcs: &[usize]) -> Result<StacklessOperation> {
         Ok(match oper {
-            Oper::Add => StacklessOperation::Add,
-            Oper::Sub => StacklessOperation::Sub,
-            Oper::Mul => StacklessOperation::Mul,
-            Oper::Div => StacklessOperation::Div,
-            Oper::Mod => StacklessOperation::Mod,
-            Oper::Lt => StacklessOperation::Lt,
-            Oper::Le => StacklessOperation::Le,
-            Oper::Eq => StacklessOperation::Eq,
-            Oper::And => StacklessOperation::And,
-            Oper::Or => StacklessOperation::Or,
-            Oper::Not => StacklessOperation::Not,
+            Oper::Add
+            | Oper::Sub
+            | Oper::Mul
+            | Oper::Div
+            | Oper::Mod
+            | Oper::Lt
+            | Oper::Le
+            | Oper::Eq
+            | Oper::And
+            | Oper::Or => {
+                arity(dsts, srcs, 1, 2, oper)?;
+                match oper {
+                    Oper::Add => StacklessOperation::Add,
+                    Oper::Sub => StacklessOperation::Sub,
+                    Oper::Mul => StacklessOperation::Mul,
+                    Oper::Div => StacklessOperation::Div,
+                    Oper::Mod => StacklessOperation::Mod,
+                    Oper::Lt => StacklessOperation::Lt,
+                    Oper::Le => StacklessOperation::Le,
+                    Oper::Eq => StacklessOperation::Eq,
+                    Oper::And => StacklessOperation::And,
+                    Oper::Or => StacklessOperation::Or,
+                    _ => unreachable!(),
+                }
+            },
+            Oper::Not => {
+                arity(dsts, srcs, 1, 1, oper)?;
+                StacklessOperation::Not
+            },
             Oper::VecPack => StacklessOperation::Vector,
             Oper::Pack => {
                 ensure!(dsts.len() == 1, "pack expects one destination");
@@ -981,7 +1079,10 @@ impl FunctionTranslator<'_> {
                     .with_context(|| format!("function id {id} is out of range"))?,
                 self.type_args(args)?,
             ),
-            Oper::BorrowLoc => StacklessOperation::BorrowLoc,
+            Oper::BorrowLoc => {
+                arity(dsts, srcs, 1, 1, oper)?;
+                StacklessOperation::BorrowLoc
+            },
             Oper::BorrowField(field) => {
                 arity(dsts, srcs, 1, 1, oper)?;
                 let sid = self.struct_from_type(self.local(srcs[0])?)?;
@@ -1004,9 +1105,18 @@ impl FunctionTranslator<'_> {
                 struct_at(self.struct_ids, *id, &self.decl.name)?,
                 self.type_args(args)?,
             ),
-            Oper::ReadRef => StacklessOperation::ReadRef,
-            Oper::WriteRef => StacklessOperation::WriteRef,
-            Oper::FreezeRef => StacklessOperation::FreezeRef(true),
+            Oper::ReadRef => {
+                arity(dsts, srcs, 1, 1, oper)?;
+                StacklessOperation::ReadRef
+            },
+            Oper::WriteRef => {
+                arity(dsts, srcs, 0, 2, oper)?;
+                StacklessOperation::WriteRef
+            },
+            Oper::FreezeRef => {
+                arity(dsts, srcs, 1, 1, oper)?;
+                StacklessOperation::FreezeRef(true)
+            },
             unsupported => bail!("unsupported XIR operation {unsupported:?}"),
         })
     }
@@ -1238,6 +1348,10 @@ mod tests {
         .unwrap()
     }
 
+    fn account_module() -> XirModule {
+        serde_json::from_str(&account_golden()).unwrap()
+    }
+
     #[test]
     fn account_golden_decodes() {
         let source = parse_source(
@@ -1281,5 +1395,37 @@ mod tests {
             panic!("expected module")
         };
         move_bytecode_verifier::verify_module(&module.module).unwrap();
+    }
+
+    #[test]
+    fn rejects_invalid_read_ref_arity() {
+        let mut module = account_module();
+        module.functions[0].blocks[0].instrs[0] = Instr::Call(vec![], Oper::ReadRef, vec![]);
+        let source = parse_source(
+            PathBuf::from("invalid-read-ref.xir.json"),
+            String::new(),
+            &serde_json::to_string(&module).unwrap(),
+        )
+        .unwrap();
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        let error = import_sources(&mut env, &[source], &mut targets).unwrap_err();
+        assert!(format!("{error:#}").contains("ReadRef expects 1 destinations and 1 sources"));
+    }
+
+    #[test]
+    fn rejects_out_of_range_type_parameter() {
+        let mut module = account_module();
+        module.functions[0].locals[0] = Ty::TypeParameter(0);
+        let error = parse_source(
+            PathBuf::from("invalid-type-parameter.xir.json"),
+            String::new(),
+            &serde_json::to_string(&module).unwrap(),
+        )
+        .err()
+        .expect("out-of-range type parameter should be rejected");
+        assert!(error
+            .to_string()
+            .contains("type parameter index 0 is out of range"));
     }
 }
