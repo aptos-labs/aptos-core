@@ -690,6 +690,50 @@ impl FunctionTargetProcessor for LambdaSpecInferenceProcessor {
         );
         data
     }
+
+    fn finalize(&self, env: &GlobalEnv, _targets: &mut FunctionTargetsHolder) {
+        // The lambdas' spec memory summaries were computed by the compiler's
+        // spec rewriter when they had no specs; the conditions attached above
+        // can reference global memory (directly or through behavioral
+        // predicates over callees), and the behavioral evaluators derive
+        // their memory parameters from the summaries — stale-empty summaries
+        // would make the evaluators reference memory globals, which Boogie
+        // rejects inside functions. Recomputed as a fixpoint here: a lambda
+        // can reference another lambda (a nested lambda has no static call
+        // edge, so per-function processing order guarantees nothing), and
+        // the recomputation reads the target's summaries. Unions only grow,
+        // so this terminates within the lambda nesting depth.
+        let inferred_sym = env.symbol_pool().make(CONDITION_INFERRED_PROP);
+        // Candidates are fixed across rounds — `set_spec_memory_usage` touches
+        // neither names nor conditions — so select them once. Restricted to
+        // lambdas whose contract was INFERRED above: a user-written lambda
+        // spec keeps its rewriter-computed summaries (which also fold
+        // `fun_param_access_of` contributions this recomputation does not).
+        let candidates: Vec<FunctionEnv> = env
+            .get_modules()
+            .flat_map(|module_env| module_env.into_functions())
+            .filter(|fun_env| {
+                is_lambda_lifted_name(fun_env)
+                    && fun_env
+                        .get_spec()
+                        .any(|c| c.properties.contains_key(&inferred_sym))
+            })
+            .collect();
+        let mut changed = true;
+        while changed {
+            changed = false;
+            for fun_env in &candidates {
+                let (used, old, uses_old) = fun_env.compute_spec_memory_usage();
+                let stale = *fun_env.get_spec_used_memory() != used
+                    || *fun_env.get_spec_old_memory() != old
+                    || fun_env.spec_uses_old() != uses_old;
+                if stale {
+                    fun_env.set_spec_memory_usage(used, old, uses_old);
+                    changed = true;
+                }
+            }
+        }
+    }
 }
 
 fn is_lambda_lifted_name(fun_env: &FunctionEnv) -> bool {
@@ -4435,19 +4479,29 @@ impl<'env> SpecInferenceAnalyzer<'env> {
                     extract_top_ensures_of_clause(clause)
                 {
                     let args2_natural: Vec<Exp> = args2.iter().map(strip_all_olds).collect();
-                    if calls_match(fun_exp, args_natural, &fun2, &args2_natural)
+                    // Anchors come in two shapes: void/state anchors carry
+                    // the inputs only; discarded-result anchors additionally
+                    // carry synthesized `result_of` projections. Both must be
+                    // replaced by the full-arity canonical (the evaluator
+                    // encoding expects trailing post-state slots), so match
+                    // on the input prefix.
+                    let shape_ok = args2.len() == num_inputs
+                        || args2.len() == num_inputs + num_declared_results;
+                    if shape_ok
+                        && calls_match(fun_exp, args_natural, &fun2, &args2_natural[..num_inputs])
                         && range2 == *range
-                        && args2.len() == num_inputs
                     {
                         anchors_for_site.push((idx, guard2));
                     }
                 }
             }
 
-            // Non-void calls need at least one captured `dest` to anchor
-            // on; otherwise leave any discarded-result anchor in place.
+            // Build a canonical only when something anchors this site: a
+            // captured `dest`, or an anchor clause — including the
+            // discarded-result shape, which cannot be left in place (its
+            // arity lacks the post-state slots).
             let has_result_of = !dests_by_idx.is_empty();
-            if !is_void && !has_result_of {
+            if !is_void && !has_result_of && anchors_for_site.is_empty() {
                 continue;
             }
 

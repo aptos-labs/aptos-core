@@ -1193,60 +1193,6 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
         .into_exp()
     }
 
-    /// For a two-state spec_fun call (whose declaration emits dual
-    /// `(old_p, p)` Boogie parameters for each `&mut` input), double each
-    /// `&mut` argument into a `(Old(arg), arg)` pair. The `Old` wrapper
-    /// triggers `save_param` during `rewrite_temporary`, so the pre-state
-    /// value is captured via a snapshot temp at function entry — matching
-    /// the mechanism used for `&mut` arguments to behavioral predicates.
-    ///
-    /// Idempotent: detects when args have already been doubled by comparing
-    /// `args.len()` against `decl.params.len()`.
-    fn wrap_mut_ref_spec_fun_inputs(&mut self, exp: &Exp) -> Exp {
-        let env = self.builder.global_env();
-        let ExpData::Call(node_id, Operation::SpecFunction(mid, fid, range), args) = exp.as_ref()
-        else {
-            return exp.clone();
-        };
-        let (uses_old, params) = {
-            let module_env = env.get_module(*mid);
-            let decl = module_env.get_spec_fun(*fid);
-            (decl.uses_old, decl.params.clone())
-        };
-        if !uses_old {
-            return exp.clone();
-        }
-        // Already doubled by a prior pass.
-        if args.len() != params.len() {
-            return exp.clone();
-        }
-        let any_mut = params
-            .iter()
-            .any(|crate::model::Parameter(_, ty, _)| ty.is_mutable_reference());
-        if !any_mut {
-            return exp.clone();
-        }
-        let mut new_args: Vec<Exp> = Vec::with_capacity(args.len() * 2);
-        for (param, arg) in params.iter().zip(args.iter()) {
-            let crate::model::Parameter(_, ty, _) = param;
-            if ty.is_mutable_reference() {
-                let arg_ty = env.get_node_type(arg.node_id());
-                let arg_loc = env.get_node_loc(arg.node_id());
-                let new_id = env.new_node(arg_loc, arg_ty);
-                new_args.push(ExpData::Call(new_id, Operation::Old, vec![arg.clone()]).into_exp());
-                new_args.push(arg.clone());
-            } else {
-                new_args.push(arg.clone());
-            }
-        }
-        ExpData::Call(
-            *node_id,
-            Operation::SpecFunction(*mid, *fid, range.clone()),
-            new_args,
-        )
-        .into_exp()
-    }
-
     /// True if `arg` is a stateful `&mut`-source shape: a ref-typed
     /// expression, `Borrow(Mut, ...)`, `Old(...)` of a stateful inner,
     /// a `Select`/`SelectVariants` rooted in a stateful inner, or a
@@ -1308,11 +1254,7 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
         // dual `(old_p, p)` parameters emitted by the Boogie backend. The `Old`
         // wrapper triggers `save_param` during descent, capturing the pre-state
         // value through a snapshot temp.
-        let exp = if let ExpData::Call(_, Operation::SpecFunction(_, _, _), _) = exp.as_ref() {
-            self.wrap_mut_ref_spec_fun_inputs(&exp)
-        } else {
-            exp
-        };
+        let exp = wrap_mut_ref_spec_fun_inputs(self.builder.global_env(), &exp).unwrap_or(exp);
 
         // Do some pre-processing of the expression before actual rewrite, reporting
         // errors.
@@ -1651,6 +1593,73 @@ fn needs_pre_label(kind: &BehaviorKind, in_old: bool) -> bool {
 /// (the spec translator runs before `mono_analysis`), so over-saving is
 /// acceptable: extra saved memory only adds a cheap `SaveMem` at procedure
 /// entry without affecting verification soundness.
+/// For a two-state spec_fun call (whose declaration emits dual `(old_p, p)`
+/// Boogie parameters for each `&mut` input), double each `&mut` argument into
+/// a `(Old(arg), arg)` pair. The `Old` wrapper triggers `save_param` during
+/// `rewrite_temporary`, so the pre-state value is captured via a snapshot temp
+/// at function entry — matching the mechanism used for `&mut` arguments to
+/// behavioral predicates.
+///
+/// Inspects only the top node; returns `None` when nothing needs doubling.
+/// Idempotent: detects when args have already been doubled by comparing
+/// `args.len()` against `decl.params.len()`.
+pub fn wrap_mut_ref_spec_fun_inputs(env: &GlobalEnv, exp: &Exp) -> Option<Exp> {
+    let ExpData::Call(node_id, Operation::SpecFunction(mid, fid, range), args) = exp.as_ref()
+    else {
+        return None;
+    };
+    let (uses_old, params) = {
+        let module_env = env.get_module(*mid);
+        let decl = module_env.get_spec_fun(*fid);
+        (decl.uses_old, decl.params.clone())
+    };
+    let any_mut = params
+        .iter()
+        .any(|Parameter(_, ty, _)| ty.is_mutable_reference());
+    // The length test rejects args already doubled by a prior pass.
+    if !uses_old || !any_mut || args.len() != params.len() {
+        return None;
+    }
+    let mut new_args: Vec<Exp> = Vec::with_capacity(args.len() * 2);
+    for (Parameter(_, ty, _), arg) in params.iter().zip(args.iter()) {
+        if ty.is_mutable_reference() {
+            let arg_ty = env.get_node_type(arg.node_id());
+            let arg_loc = env.get_node_loc(arg.node_id());
+            let new_id = env.new_node(arg_loc, arg_ty);
+            new_args.push(ExpData::Call(new_id, Operation::Old, vec![arg.clone()]).into_exp());
+        }
+        new_args.push(arg.clone());
+    }
+    Some(
+        ExpData::Call(
+            *node_id,
+            Operation::SpecFunction(*mid, *fid, range.clone()),
+            new_args,
+        )
+        .into_exp(),
+    )
+}
+
+/// Apply [`wrap_mut_ref_spec_fun_inputs`] to every spec-fun call in `exp`.
+/// The instrumenting path doubles per node as it descends; callers that
+/// translate a raw spec expression (with no instrumentation) need this
+/// standalone traversal to reach the same canonical form.
+pub fn wrap_mut_ref_spec_fun_inputs_deep(env: &GlobalEnv, exp: &Exp) -> Exp {
+    struct Doubler<'a> {
+        env: &'a GlobalEnv,
+    }
+    impl ExpRewriterFunctions for Doubler<'_> {
+        fn rewrite_call(&mut self, id: NodeId, oper: &Operation, args: &[Exp]) -> Option<Exp> {
+            if !matches!(oper, Operation::SpecFunction(..)) {
+                return None;
+            }
+            let exp = ExpData::Call(id, oper.clone(), args.to_vec()).into_exp();
+            wrap_mut_ref_spec_fun_inputs(self.env, &exp)
+        }
+    }
+    Doubler { env }.rewrite_exp(exp.clone())
+}
+
 fn collect_field_access_memory(
     env: &crate::model::GlobalEnv,
     struct_env: &crate::model::StructEnv,

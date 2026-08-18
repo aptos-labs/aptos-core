@@ -50,6 +50,7 @@ use move_model::{
         ADDITION_OVERFLOW_UNCHECKED_PRAGMA, INTRINSIC_TYPE_MAP, SEED_PRAGMA, TIMEOUT_PRAGMA,
         VERIFY_DURATION_ESTIMATE_PRAGMA,
     },
+    spec_translator::wrap_mut_ref_spec_fun_inputs_deep,
     symbol::Symbol,
     ty::{PrimitiveType, Type, TypeDisplayContext, BOOL_TYPE},
     well_known::{TYPE_INFO_MOVE, TYPE_NAME_GET_MOVE, TYPE_NAME_MOVE},
@@ -1542,8 +1543,8 @@ impl<'env> BoogieTranslator<'env> {
 
         // Build memory args (pre-state: both old and current slots use same variable)
         let fun_mem_args = self.build_spec_memory_args(
-            fun_env.get_spec_used_memory(),
-            fun_env.get_spec_old_memory(),
+            &fun_env.get_spec_used_memory(),
+            &fun_env.get_spec_old_memory(),
             &info.fun.inst,
             &None,
             None,
@@ -2456,6 +2457,32 @@ impl<'env> BoogieTranslator<'env> {
         }
     }
 
+    /// Whether `e` applies a behavioral predicate to a function VALUE (not a
+    /// concrete closure) whose per-type evaluator takes memory arguments.
+    /// `inst` instantiates the enclosing closure target's type parameters.
+    fn behavior_over_stateful_fun_value(&self, e: &ExpData, inst: &[Type]) -> bool {
+        let ExpData::Call(_, AstOperation::Behavior(..), args) = e else {
+            return false;
+        };
+        let Some(fun_arg) = args.first() else {
+            return false;
+        };
+        if matches!(
+            fun_arg.as_ref(),
+            ExpData::Call(_, AstOperation::Closure(..), _)
+        ) {
+            // Concrete closure: handled by the per-function path.
+            return false;
+        }
+        // The evaluator's memory signature is the union over ALL variants of
+        // the fun type — concrete closures, function parameters with declared
+        // `modifies_of`/`reads_of` footprints, and fun-typed struct fields —
+        // so ask the same oracle the evaluator's own emitter uses.
+        let ty = self.env.get_node_type(fun_arg.node_id()).instantiate(inst);
+        let (union_used, union_old) = compute_evaluator_memory_union(self.env, &ty);
+        !union_used.is_empty() || !union_old.is_empty()
+    }
+
     /// Generate per-function behavioral spec functions for closure target functions.
     /// For each unique closure target function, generate inline Boogie functions
     /// with concrete bodies from the function's spec conditions.
@@ -2482,6 +2509,31 @@ impl<'env> BoogieTranslator<'env> {
                 .into_iter()
                 .map(|ty| ty.instantiate(&info.fun.inst))
                 .collect();
+
+            // A behavioral reference to a captured function VALUE (not a
+            // concrete closure) dispatches through the per-type evaluator,
+            // whose memory parameterization is the union over that type's
+            // possible targets — state this function's own evaluator neither
+            // receives nor forwards. Until the evaluator encoding threads
+            // that union, reject the configuration when the union is
+            // non-empty rather than emitting state-dependent evaluators.
+            // Auxiliary expressions (e.g. `aborts_if .. with ..` codes) are
+            // scanned too, mirroring `compute_spec_memory_usage`.
+            let is_state_dependent = closure_spec.conditions.iter().any(|cond| {
+                cond.all_exps().any(|exp| {
+                    exp.any(&mut |e| self.behavior_over_stateful_fun_value(e, &info.fun.inst))
+                })
+            });
+            if is_state_dependent {
+                self.env.error(
+                    &fun_env.get_loc(),
+                    "the specification of this function (used as a function value) applies a \
+                     behavioral predicate to a function-typed parameter whose possible targets \
+                     or declared `modifies_of`/`reads_of` footprints access global memory; this \
+                     is not yet supported — give the lambda an explicit specification or exclude \
+                     it from verification",
+                );
+            }
 
             // Get function's spec memory
             let used_memory = fun_env.get_spec_used_memory();
@@ -2833,6 +2885,13 @@ impl<'env> BoogieTranslator<'env> {
                     is_two_state,
                     &cond.exp,
                 );
+                // Calls to two-state spec funs with `&mut` parameters take a
+                // doubled `(old(arg), arg)` pair per `&mut` slot in Boogie.
+                // Instrumentation doubles them for procedure contexts; here
+                // the raw spec is translated directly, so double them now —
+                // the `$Dereference` fixups below map the pair to the
+                // evaluator's input and post-state slots.
+                let exp = wrap_mut_ref_spec_fun_inputs_deep(self.env, &exp);
                 // Translate with old-aware memory context
                 let temp_writer = CodeWriter::new(self.env.internal_loc());
                 let mut temp_trans = SpecTranslator::new(&temp_writer, self.env, self.options);
@@ -3172,7 +3231,7 @@ impl<'env> BoogieTranslator<'env> {
         let mut old_memory_resources: BTreeSet<QualifiedInstId<StructId>> = BTreeSet::new();
         for info in closure_infos.iter() {
             let fun_env = env.get_function(info.fun.to_qualified_id());
-            for mem in fun_env.get_spec_old_memory() {
+            for mem in fun_env.get_spec_old_memory().iter() {
                 old_memory_resources.insert(mem.clone().instantiate(&info.fun.inst));
             }
         }
@@ -3199,10 +3258,10 @@ impl<'env> BoogieTranslator<'env> {
         let mut union_old_memory = BTreeSet::new();
         for info in closure_infos {
             let fun_env = env.get_function(info.fun.to_qualified_id());
-            for mem in fun_env.get_spec_used_memory() {
+            for mem in fun_env.get_spec_used_memory().iter() {
                 union_used_memory.insert(mem.clone().instantiate(&info.fun.inst));
             }
-            for mem in fun_env.get_spec_old_memory() {
+            for mem in fun_env.get_spec_old_memory().iter() {
                 union_old_memory.insert(mem.clone().instantiate(&info.fun.inst));
             }
         }
@@ -5698,13 +5757,13 @@ impl FunctionTranslator<'_> {
                         };
                     if let Some((inst, mid, fid)) = closure_info {
                         let closure_fun_env = env.get_function(mid.qualified(fid));
-                        for memory in closure_fun_env.get_spec_used_memory() {
+                        for memory in closure_fun_env.get_spec_used_memory().iter() {
                             let memory = memory.clone().instantiate(&inst);
                             for label in range.labels() {
                                 result.insert((label, memory.clone()));
                             }
                         }
-                        for memory in closure_fun_env.get_spec_old_memory() {
+                        for memory in closure_fun_env.get_spec_old_memory().iter() {
                             let memory = memory.clone().instantiate(&inst);
                             for label in range.labels() {
                                 result.insert((label, memory.clone()));
