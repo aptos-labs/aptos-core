@@ -3,10 +3,8 @@
 
 //! Natives for the `object` module, plus the extension backing them.
 
-use crate::{
-    address_derivation::object_address_from_object, monomorphic_natives, polymorphic_natives,
-    NativeEntry,
-};
+use crate::{monomorphic_natives, polymorphic_natives, NativeEntry};
+use aptos_types::transaction::authenticator::AuthenticationKey;
 use mono_move_core::{
     native::{NativeContext, NativeContextFamily, NativeExtension, NativeStatus},
     VMResult,
@@ -50,10 +48,10 @@ pub fn native_create_user_derived_object_address_impl<C: NativeContext>(
     let derive_from: AccountAddress = unsafe { ctx.arg(1)? };
 
     let mut ext = ctx.get_extension::<ObjectContextExtension>()?;
-    let address = *ext
-        .derived
-        .entry((source, derive_from))
-        .or_insert_with(|| object_address_from_object(&source, &derive_from));
+    let address = *ext.derived.entry((source, derive_from)).or_insert_with(|| {
+        let key = AuthenticationKey::object_address_from_object(&source, &derive_from);
+        key.account_address()
+    });
 
     // SAFETY: return 0 is `address`.
     unsafe { ctx.set_return(0, address)? };

@@ -97,13 +97,18 @@ pub struct CallSiteInfo {
     pub required_descriptors: Vec<DescriptorId>,
 }
 
-/// The global-storage resource types a native reads or writes — the types for
-/// which the specializer must publish a layout (to deserialize upon a map
-/// miss) and a struct descriptor (so the deserialized value is GC-traceable),
-/// just as it does for resource micro-ops.
+/// The types for which the specializer must publish a descriptor (and layout)
+/// on behalf of a native, surfaced to it through
+/// [`NativeABI::required_descriptor`]. Two uses:
+///  - Global-storage resource types a native reads or writes, so the value can
+///    be deserialized on a working-map miss and traced by the GC, just as the
+///    resource micro-ops do (`table`, `object`).
+///  - The outer type of a heap value a native builds as a return, so it can
+///    allocate it with a GC-traceable descriptor (`ristretto255_bulletproofs`'s
+///    batch prover returns a `vector<vector<u8>>`).
 ///
-/// These are conceptually the native's resource types -- fetching them from
-/// the callee's arguments is merely a convenience.
+/// Fetching these from the callee's arguments is merely a convenience; each is
+/// conceptually a property of the native itself.
 //
 // TODO(completeness): Instead of hard-coding them here, figure out a way to allow natives to declare them.
 fn resource_types_for_native(
@@ -118,9 +123,22 @@ fn resource_types_for_native(
     // interned module ids / identifiers once.
     let table = interner.module_id_of(&AccountAddress::ONE, ident_str!("table"));
     let object = interner.module_id_of(&AccountAddress::ONE, ident_str!("object"));
+    let bulletproofs = interner.module_id_of(
+        &AccountAddress::ONE,
+        ident_str!("ristretto255_bulletproofs"),
+    );
 
     if module_id == object && func_name == interner.identifier_of(ident_str!("exists_at")) {
         return callee_ty_args.first().copied().into_iter().collect();
+    }
+
+    // The batch prover returns a `vector<vector<u8>>` (the commitments); its
+    // first argument (`vals`) has that same type, so its descriptor lets the
+    // native allocate the return.
+    if module_id == bulletproofs
+        && func_name == interner.identifier_of(ident_str!("prove_batch_range_internal"))
+    {
+        return arg_types.first().copied().into_iter().collect();
     }
 
     if module_id == table {
@@ -149,6 +167,12 @@ fn publish_struct_descriptor_for(
     ty: InternedType,
     descriptors: &mut UnorderedMap<InternedType, DescriptorId>,
 ) -> VMResult<()> {
+    // A vector's descriptor is a `Vector` descriptor published by
+    // `discover_type_metadata`; a flat struct descriptor would mis-trace it
+    // (one pointer instead of one per element), so leave it untouched.
+    if matches!(view_type(ty), Type::Vector { .. }) {
+        return Ok(());
+    }
     if let Some((size, _)) = ctx.size_and_align(ty)
         && let Ok(ptr_offsets) = type_pointer_offsets(ctx, ty)
     {

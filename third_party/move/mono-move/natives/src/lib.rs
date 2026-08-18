@@ -12,7 +12,6 @@ pub use mono_move_core::native::NativeFunction;
 use mono_move_core::{native::NativeContextFamily, types::InternedType};
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 
-mod address_derivation;
 pub mod aggregator_v2;
 pub mod aptos_hash;
 pub mod bcs;
@@ -28,6 +27,7 @@ pub mod init;
 pub mod mem;
 pub mod multi_ed25519;
 pub mod object;
+pub mod ristretto255_bulletproofs;
 pub mod ristretto255_point;
 pub mod ristretto255_scalar;
 pub mod secp256k1;
@@ -62,6 +62,9 @@ pub use multi_ed25519::make_all_multi_ed25519_natives;
 #[cfg(feature = "testing")]
 pub use multi_ed25519::make_all_multi_ed25519_test_natives;
 pub use object::{make_all_object_natives, ObjectContextExtension};
+pub use ristretto255_bulletproofs::make_all_bulletproofs_natives;
+#[cfg(feature = "testing")]
+pub use ristretto255_bulletproofs::make_all_bulletproofs_test_natives;
 pub use ristretto255_point::{make_all_ristretto255_point_natives, RistrettoPointStore};
 pub use ristretto255_scalar::make_all_ristretto255_scalar_natives;
 #[cfg(feature = "testing")]
@@ -129,6 +132,7 @@ pub fn make_all_production_natives<F: NativeContextFamily>() -> Vec<NativeEntry<
     natives.extend(make_all_bls12381_natives::<F>());
     natives.extend(make_all_ristretto255_scalar_natives::<F>());
     natives.extend(make_all_ristretto255_point_natives::<F>());
+    natives.extend(make_all_bulletproofs_natives::<F>());
     natives.extend(make_all_vector_natives::<F>());
     natives
 }

@@ -16,8 +16,10 @@ aptos-crypto = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
 blake2-rfc = { workspace = true }
+bulletproofs = { workspace = true }
 curve25519-dalek = { package = "curve25519-dalek-ng", version = "4" }
 libsecp256k1 = { workspace = true }
+merlin = { workspace = true }
 mono-move-core = { workspace = true }
 move-core-types = { workspace = true }
 rand_core = { workspace = true, optional = true }

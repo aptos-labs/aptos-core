@@ -16,10 +16,10 @@ use mono_move_core::{
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
 use mono_move_natives::{
-    make_all_bls12381_test_natives, make_all_ed25519_test_natives,
-    make_all_multi_ed25519_test_natives, make_all_production_natives,
-    make_all_ristretto255_scalar_test_natives, make_all_test_natives, make_all_unit_test_natives,
-    Dispatch,
+    make_all_bls12381_test_natives, make_all_bulletproofs_test_natives,
+    make_all_ed25519_test_natives, make_all_multi_ed25519_test_natives,
+    make_all_production_natives, make_all_ristretto255_scalar_test_natives, make_all_test_natives,
+    make_all_unit_test_natives, Dispatch,
 };
 use mono_move_runtime::{
     InterpreterContext, ProductionContextFamily, ProductionNativeRegistry, RuntimeStatus,
@@ -129,6 +129,7 @@ pub fn build_natives(guard: &ExecutionGuard<'_>) -> ProductionNativeRegistry {
                 .chain(make_all_ristretto255_scalar_test_natives::<
                     ProductionContextFamily,
                 >())
+                .chain(make_all_bulletproofs_test_natives::<ProductionContextFamily>())
                 .chain(make_all_production_natives::<ProductionContextFamily>())
                 .map(|(addr, module, function, dispatch, func)| {
                     let module = guard.module_id_of(&addr, &module);
