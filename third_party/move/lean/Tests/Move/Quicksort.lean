@@ -25,6 +25,52 @@ move_module Quicksort where
     pivot : U64
     deriving Copy, Drop, Store
 
+  namespace Model
+
+  /- The recursive source translator does not yet derive semantics for this
+  example automatically. These relations are its small, explicit proof model. -/
+
+  def Sorted [Move.Compare.Lawful α] (values : Move.Vector α) : Prop :=
+    values.toList.Pairwise fun left right => ¬Move.Compare.Less right left
+
+  def Permutation (before after : Move.Vector α) : Prop :=
+    after.toList.Perm before.toList
+
+  inductive Partition (pivot : α) : List α → List α → List α → Prop where
+    | nil : Partition pivot [] [] []
+    | lower (value : α) (rest lower upper : List α)
+        (branch : Move.Compare.Less value pivot)
+        (next : Partition pivot rest lower upper) :
+        Partition pivot (value :: rest) (value :: lower) upper
+    | upper (value : α) (rest lower upper : List α)
+        (branch : ¬Move.Compare.Less value pivot)
+        (next : Partition pivot rest lower upper) :
+        Partition pivot (value :: rest) lower (value :: upper)
+
+  inductive QuickSort : List α → List α → Prop where
+    | nil : QuickSort [] []
+    | partition (pivot : α) (rest lower upper sortedLower sortedUpper : List α)
+        (scan : Partition pivot rest lower upper)
+        (sortLower : QuickSort lower sortedLower)
+        (sortUpper : QuickSort upper sortedUpper) :
+        QuickSort (pivot :: rest) (sortedLower ++ pivot :: sortedUpper)
+
+  def sourceSpec (values : Move.Vector α) :
+      Move.Semantics.Spec σ (Move.Vector α) :=
+    @Move.Semantics.Spec.mk σ (Move.Vector α)
+      (fun initial result final =>
+        QuickSort values.toList result.toList ∧ final = initial)
+      (fun _ _ => False)
+
+  end Model
+
+  /- The contract is the user-facing part of the proof. -/
+  def quickSort.sourceSpec {T : Type} [Inhabited T] {State : Type}
+      (values : Move.Vector T) : Move.Semantics.Spec State (Move.Vector T) :=
+    Model.sourceSpec values
+
+  /-! ## Functions -/
+
   /-- Lomuto partition of the half-open range ending at `pivotIndex`. -/
   partial fun partitionLoop {T : Type}
       (values : Move.Vector T) (pivotIndex scan store : U64) :
@@ -74,29 +120,14 @@ move_module Quicksort where
       (values : Move.Vector T) : Action (Move.Vector T) :=
     quickSortRange values 0 values.length
 
-namespace Quicksort
+  spec quickSort {T : Type} [Move.Compare.Lawful T]
+      (values : Move.Vector T) where
+    ensures Model.Sorted result ∧ Model.Permutation values result;
+    aborts_if False
+
+  /-! ## Proofs -/
 
   namespace Model
-
-  /- The recursive source translator does not yet derive semantics for this
-  example automatically. These relations are its small, explicit proof model. -/
-
-  def Sorted [Move.Compare.Lawful α] (values : Move.Vector α) : Prop :=
-    values.toList.Pairwise fun left right => ¬Move.Compare.Less right left
-
-  def Permutation (before after : Move.Vector α) : Prop :=
-    after.toList.Perm before.toList
-
-  inductive Partition (pivot : α) : List α → List α → List α → Prop where
-    | nil : Partition pivot [] [] []
-    | lower (value : α) (rest lower upper : List α)
-        (branch : Move.Compare.Less value pivot)
-        (next : Partition pivot rest lower upper) :
-        Partition pivot (value :: rest) (value :: lower) upper
-    | upper (value : α) (rest lower upper : List α)
-        (branch : ¬Move.Compare.Less value pivot)
-        (next : Partition pivot rest lower upper) :
-        Partition pivot (value :: rest) lower (value :: upper)
 
   namespace Partition
 
@@ -125,14 +156,6 @@ namespace Quicksort
         simpa only [List.mem_cons, forall_eq_or_imp] using And.intro branch ih
 
   end Partition
-
-  inductive QuickSort : List α → List α → Prop where
-    | nil : QuickSort [] []
-    | partition (pivot : α) (rest lower upper sortedLower sortedUpper : List α)
-        (scan : Partition pivot rest lower upper)
-        (sortLower : QuickSort lower sortedLower)
-        (sortUpper : QuickSort upper sortedUpper) :
-        QuickSort (pivot :: rest) (sortedLower ++ pivot :: sortedUpper)
 
   namespace QuickSort
 
@@ -172,13 +195,6 @@ namespace Quicksort
 
   end QuickSort
 
-  def sourceSpec (values : Move.Vector α) :
-      Move.Semantics.Spec σ (Move.Vector α) :=
-    @Move.Semantics.Spec.mk σ (Move.Vector α)
-      (fun initial result final =>
-        QuickSort values.toList result.toList ∧ final = initial)
-      (fun _ _ => False)
-
   theorem sourceSpec_satisfies [Move.Compare.Lawful α] :
       Move.Verify.Satisfies (sourceSpec (σ := σ) (α := α))
         (@Move.Verify.Contract.mk σ (Move.Vector α) (Move.Vector α)
@@ -194,20 +210,11 @@ namespace Quicksort
 
   end Model
 
-  /- The contract is the user-facing part of the proof. -/
-  def quickSort.sourceSpec {T : Type} [Inhabited T] {State : Type}
-      (values : Move.Vector T) : Move.Semantics.Spec State (Move.Vector T) :=
-    Model.sourceSpec values
-
-  spec quickSort {T : Type} [Move.Compare.Lawful T]
-      (values : Move.Vector T) where
-    requires True;
-    ensures Model.Sorted result ∧ Model.Permutation values result;
-    aborts_if False
-
   verify quickSort by
     intro T _ _ state
     exact Model.sourceSpec_satisfies
+
+  /-! ## Tests -/
 
   def compiled : MModule := move_module% "QuicksortTest"
 
@@ -226,7 +233,5 @@ namespace Quicksort
        .vector [.u64 1, .u64 3]]]
   #test run "quickSort" [] [.vector [.u64 2, .u64 1, .u64 2]] =
     Tests.okRet [] [.vector [.u64 1, .u64 2, .u64 2]]
-
-end Quicksort
 
 end Tests.MovePrograms

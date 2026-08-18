@@ -7,6 +7,8 @@ namespace LeanerTxnRejectRecursiveGenericType
 open Move
 open scoped Move Move.Compiler
 
+/-! ## Functions -/
+
 mutual
   @[move_struct]
   structure Left (T : Type) where
@@ -18,6 +20,8 @@ mutual
     left : Left T
     deriving Copy, Drop, Store
 end
+
+/-! ## Tests -/
 
 #export_leaner "LeanerRejectRecursiveGenericType" structs [Left, Right] functions []
 

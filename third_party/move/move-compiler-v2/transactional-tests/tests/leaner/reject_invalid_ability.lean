@@ -6,6 +6,8 @@ open scoped Move
 
 move_module LeanerRejectInvalidAbility where
 
+  /-! ## Functions -/
+
   @[move_struct]
   structure Resource where
     value : U64

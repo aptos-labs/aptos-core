@@ -14,16 +14,15 @@ open scoped Move Move.Compiler Move.Spec
 
 move_module Arithmetic where
 
+  /-! ## Functions -/
+
   fun addValues (left right : U64) : Action U64 :=
     pure (left + right)
 
   spec addValues (left : U64) (right : U64) where
-    requires True;
     ensures True;
     aborts_if ¬left.toNat + right.toNat < U64.size
       with Semantics.Checked.arithmeticAbortCode
-
-  verify addValues
 
   @[move_struct]
   structure Counter where
@@ -44,8 +43,6 @@ move_module Arithmetic where
       ¬old(Counter[addr].value).toNat * factor.toNat < U64.size
       with Semantics.Checked.arithmeticAbortCode
 
-  verify multiply
-
   @[entry]
   fun divide (addr : Address) (divisor : U64) : Action Unit := do
     let value ← &mut Counter[addr].value
@@ -58,7 +55,15 @@ move_module Arithmetic where
       Counter[addr].value = old(Counter[addr].value) / divisor;
     aborts_if divisor.toNat = 0 with Semantics.Checked.arithmeticAbortCode
 
+  /-! ## Proofs -/
+
+  verify addValues
+
+  verify multiply
+
   verify divide
+
+  /-! ## Tests -/
 
   def compiled : MModule := move_module% "ArithmeticTest"
 

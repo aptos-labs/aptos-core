@@ -14,6 +14,8 @@ open scoped Move Move.Compiler Move.Spec
 
 move_module Account where
 
+  /-! ## Functions -/
+
   @[move_struct]
   structure BalanceValue where
     value : U64
@@ -40,8 +42,6 @@ move_module Account where
       ¬old(Balance[addr].balance.value).toNat + amount.toNat < U64.size
       with Semantics.Checked.arithmeticAbortCode
 
-  verify deposit
-
   @[entry]
   fun withdraw (addr : Address) (amount : U64) : Action Unit := do
     let value ← &mut Balance[addr].balance.value
@@ -60,7 +60,13 @@ move_module Account where
       old(Balance[addr].balance.value).toNat < amount.toNat
       with E_INSUFFICIENT_BALANCE
 
+  /-! ## Proofs -/
+
+  verify deposit
+
   verify withdraw
+
+  /-! ## Tests -/
 
   def compiled : MModule := move_module% "AccountTest"
 

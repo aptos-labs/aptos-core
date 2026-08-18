@@ -35,52 +35,120 @@ move_module Generics where
     | some (value : T)
     deriving Copy, Drop, Store
 
+  /-! ## Functions -/
+
   fun identity {T : Type} (value : T) : T := value
+
+  spec identity {T : Type} [Inhabited T] (value : T) where
+    ensures result = value
 
   fun box {T : Type} (value : T) : Box T := { value }
 
+  spec box {T : Type} [Inhabited T] (value : T) where
+    ensures result = ({ value } : Box T)
+
   fun unbox {T : Type} (value : Box T) : T := value.value
+
+  spec unbox {T : Type} [Inhabited T] (value : Box T) where
+    ensures result = value.value
 
   fun swap {T U : Type} (value : Pair T U) : Pair U T :=
     { first := value.second, second := value.first }
+
+  spec swap {T : Type} {U : Type} [Inhabited T] [Inhabited U]
+      (value : Pair T U) where
+    ensures
+      result = ({ first := value.second, second := value.first } : Pair U T)
 
   fun chooseGeneric {T : Type} (fallback : T) (choice : Choice T) : T :=
     match choice with
     | .none => fallback
     | .some value => value
 
+  spec chooseGeneric {T : Type} [Inhabited T] (fallback : T) (choice : Choice T) where
+    ensures
+      result =
+        match choice with
+        | .none => fallback
+        | .some value => value
+
   fun singleton {T : Type} (value : T) : Move.Vector T := vector![value]
+
+  spec singleton {T : Type} [Inhabited T] (value : T) where
+    ensures result = vector![value]
 
   fun equalGeneric {T : Type} (left right : T) : Bool :=
     left == right
 
+  spec equalGeneric {T : Type} [Inhabited T] (left : T) (right : T) where
+    ensures result = (left == right)
+
   fun equalU64 (left right : U64) : Bool :=
     left == right
+
+  spec equalU64 (left : U64) (right : U64) where
+    ensures result = (left == right)
 
   fun equalBoxes (left right : U64) : Bool :=
     equalGeneric
       ({ value := left } : Box U64)
       ({ value := right } : Box U64)
 
+  spec equalBoxes (left : U64) (right : U64) where
+    ensures
+      result =
+        (({ value := left } : Box U64) ==
+          ({ value := right } : Box U64))
+
   fun equalChoices (left right : U64) : Bool :=
     equalGeneric (.some left : Choice U64) (.some right : Choice U64)
+
+  spec equalChoices (left : U64) (right : U64) where
+    ensures
+      result = ((.some left : Choice U64) == (.some right : Choice U64))
 
   fun equalVectors (left right : U64) : Bool :=
     equalGeneric (vector![left]) (vector![right])
 
+  spec equalVectors (left : U64) (right : U64) where
+    ensures result = (vector![left] == vector![right])
+
   fun wrap (value : U64) : Box U64 := { value := identity value }
 
+  spec wrap (value : U64) where
+    ensures result = ({ value } : Box U64)
+
   fun unwrap (box : Box U64) : U64 := box.value
+
+  spec unwrap (box : Box U64) where
+    ensures result = box.value
 
   fun choose (fallback : U64) (choice : Choice U64) : U64 :=
     chooseGeneric fallback choice
 
+  spec choose (fallback : U64) (choice : Choice U64) where
+    ensures
+      result =
+        match choice with
+        | .none => fallback
+        | .some value => value
+
   fun swapped (value : U64) : Pair U64 U64 :=
     swap ({ first := value, second := value + 1 } : Pair U64 U64)
+
+  spec swapped (value : U64) where
+    ensures
+      result = ({ first := value + 1, second := value } : Pair U64 U64)
 
   fun singletonLength (value : U64) : U64 :=
     Move.Vector.length (singleton value)
 
+  spec singletonLength (value : U64) where
+    ensures result = 1
+
+  -- Global-storage primitives are not yet modeled by automatic source
+  -- specifications, so the resource functions below intentionally remain
+  -- unspecced.
   fun publishGeneric {T : Type} (signer : Signer) (value : T) : Action Unit :=
     moveTo signer ({ value } : Vault T)
 
@@ -115,30 +183,32 @@ move_module Generics where
   fun hasBoolVault (address : Address) : Action Bool :=
     hasGeneric (T := Bool) address
 
-  spec wrap (value : U64) where
-    ensures result = ({ value } : Box U64)
+  /-! ## Proofs -/
 
+  verify identity
+  verify box
+  verify unbox
+  verify swap
+  verify chooseGeneric
+  verify singleton
+  verify equalGeneric
+  verify equalU64
+  verify equalBoxes
+  verify equalChoices
+  verify equalVectors
   verify wrap
-
-  spec unwrap (box : Box U64) where
-    ensures result = box.value
-
   verify unwrap
-
-  spec choose (fallback : U64) (choice : Choice U64) where
-    ensures
-      result =
-        match choice with
-        | .none => fallback
-        | .some value => value
-
   verify choose
-
-  spec swapped (value : U64) where
-    ensures
-      result = ({ first := value + 1, second := value } : Pair U64 U64)
-
   verify swapped
+
+  @[grind .] private theorem singletonVectorLength (value : U64) :
+      Move.Vector.length vector![value] = 1 := by
+    apply U64.ext
+    rfl
+
+  verify singletonLength
+
+  /-! ## Tests -/
 
   def compiled : MModule := move_module% "Generics"
 

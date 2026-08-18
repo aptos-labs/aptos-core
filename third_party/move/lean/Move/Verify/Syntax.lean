@@ -167,9 +167,11 @@ private partial def eraseReferenceType (type : TSyntax `term) : TSyntax `term :=
   | _ => type
 
 private def actionResultType (declaration : Declaration) : CommandElabM (TSyntax `term) := do
-  let some result := findTypeApplication? ``Move.Action declaration.resultType
-    | throwErrorAt declaration.resultType "expected the function result type to be `Action T`"
-  pure (eraseReferenceType ⟨result⟩)
+  match findTypeApplication? ``Move.Action declaration.resultType with
+  | some result => pure (eraseReferenceType ⟨result⟩)
+  | none =>
+      -- Pure `do` functions still retain a source body for verification.
+      pure (eraseReferenceType ⟨declaration.resultType⟩)
 
 /-- Result type retained for an effectful Move source declaration.  This is
 also used when a recursive function supplies its relational source semantics
@@ -318,12 +320,20 @@ private def localPlace? (contextResources : Array ResourceBinding)
   guard (!hasResource contextResources owner)
   some (owner, fields)
 
+private structure VerificationLoopFrame where
+  sourceLabel? : Option Name
+  recursive : TSyntax `term
+  after : TSyntax `term
+  assigned : List (TSyntax `ident)
+  state : List (TSyntax `ident)
+
 private structure TranslationContext where
   world : TSyntax `term
   resources : Array ResourceBinding
   functionName : Name
   recursiveSpec? : Option (TSyntax `term) := none
   mutation? : Option (TSyntax `ident) := none
+  loops : List VerificationLoopFrame := []
 
 private def mutationValue (context : TranslationContext)
     (owner : TSyntax `ident) : CommandElabM (TSyntax `term) := do
@@ -597,9 +607,14 @@ private def finish (context : TranslationContext) (valueSpec : TSyntax `term) :
       `(Move.Semantics.Spec.bind $valueSpec fun _moveSpecValue =>
           Move.Semantics.Spec.pure (_moveSpecValue, $mutation))
 
-private def emptyFinish (context : TranslationContext) : CommandElabM (TSyntax `term) := do
-  let unit ← `(term| ())
-  finish context (← expressionSpec context unit)
+private partial def packLoopState (ids : List (TSyntax `ident)) :
+    CommandElabM (TSyntax `term) := do
+  match ids with
+  | [] => `(())
+  | [id] => `($id)
+  | id :: rest =>
+      let tail ← packLoopState rest
+      `(($id, $tail))
 
 private def identifierExtends (root candidate : Name) : Bool :=
   let rootParts := fieldParts root
@@ -622,11 +637,114 @@ private partial def containsProjectionOfIdentifier (name : Name)
       candidateParts.take rootParts.length == rootParts) ||
     stx.getArgs.any (containsProjectionOfIdentifier name)
 
-private def boundIdentifier? (element : Lean.DoElem) : Option Name :=
+private partial def containsReturn (stx : Syntax) : Bool :=
+  stx.isOfKind ``Lean.Parser.Term.doReturn || stx.getArgs.any containsReturn
+
+private def reassignedIdent? (stx : Syntax) : Option (TSyntax `ident) :=
+  if !stx.isOfKind ``Lean.Parser.Term.doReassign || stx.getNumArgs == 0 then
+    none
+  else
+    let decl := stx[0]
+    if decl.isIdent then
+      some ⟨decl⟩
+    else if decl.getNumArgs > 0 then
+      let idNode := decl[0]
+      if idNode.isIdent then some ⟨idNode⟩
+      else if idNode.getNumArgs > 0 && idNode[0].isIdent then some ⟨idNode[0]⟩
+      else none
+    else
+      none
+
+private partial def assignedLoopIdents (stx : Syntax)
+    (found : Array (TSyntax `ident) := #[]) : Array (TSyntax `ident) :=
+  let found :=
+    match reassignedIdent? stx with
+    | some name =>
+        if found.any (·.getId == name.getId) then found else found.push name
+    | none => found
+  stx.getArgs.foldl (init := found) fun found child =>
+    assignedLoopIdents child found
+
+private def freshLoopStateIdents (ref : Syntax)
+    (assigned : List (TSyntax `ident)) : List (TSyntax `ident) :=
+  assigned.zipIdx.map fun (_, index) =>
+    mkIdentFrom ref (Name.mkSimple s!"_moveSpecLoopVar{index}")
+
+private def replaceLoopState (assigned state : List (TSyntax `ident))
+    (stx : Syntax) : Syntax :=
+  (assigned.zip state).foldl (init := stx) fun stx (source, replacement) =>
+    replaceIdentifier source.getId replacement.raw stx
+
+private def findVerificationLoop? (loops : List VerificationLoopFrame)
+    (sourceLabel? : Option Name) :
+    Option (List VerificationLoopFrame × VerificationLoopFrame) :=
+  match sourceLabel? with
+  | none => loops.head?.map ([], ·)
+  | some sourceLabel =>
+      let rec find (inner : List VerificationLoopFrame)
+          : List VerificationLoopFrame →
+            Option (List VerificationLoopFrame × VerificationLoopFrame)
+        | [] => none
+        | frame :: rest =>
+            if frame.sourceLabel? == some sourceLabel then
+              some (inner, frame)
+            else
+              find (frame :: inner) rest
+      find [] loops
+
+private def resolvedLoopState (inner : List VerificationLoopFrame)
+    (target : VerificationLoopFrame) : List (TSyntax `ident) :=
+  inner.foldl (init := target.state) fun current frame =>
+    current.map fun id =>
+      match (frame.assigned.zip frame.state).find? (·.1.getId == id.getId) with
+      | some (_, replacement) => replacement
+      | none => id
+
+private def loopContinueSpec (context : TranslationContext)
+    (sourceLabel? : Option Name) (ref : Syntax) :
+    CommandElabM (TSyntax `term) := do
+  let some (inner, frame) := findVerificationLoop? context.loops sourceLabel?
+    | match sourceLabel? with
+      | none => throwErrorAt ref "`continue` requires an enclosing `loop` or `while`"
+      | some sourceLabel => throwErrorAt ref "unknown loop label `{sourceLabel}`"
+  let pack ← packLoopState (resolvedLoopState inner frame)
+  `($(frame.recursive) $pack)
+
+private def loopBreakSpec (context : TranslationContext)
+    (sourceLabel? : Option Name) (ref : Syntax) :
+    CommandElabM (TSyntax `term) := do
+  let some (inner, frame) := findVerificationLoop? context.loops sourceLabel?
+    | match sourceLabel? with
+      | none => throwErrorAt ref "`break` requires an enclosing `loop` or `while`"
+      | some sourceLabel => throwErrorAt ref "unknown loop label `{sourceLabel}`"
+  let current := resolvedLoopState inner frame
+  return ⟨replaceLoopState frame.state current frame.after.raw⟩
+
+private def emptyFinish (context : TranslationContext) : CommandElabM (TSyntax `term) := do
+  if !context.loops.isEmpty then
+    loopContinueSpec context none Syntax.missing
+  else
+    let unit ← `(term| ())
+    finish context (← expressionSpec context unit)
+
+private partial def unpackLoopState (ids : List (TSyntax `ident)) (packed : TSyntax `term)
+    (body : TSyntax `term) : CommandElabM (TSyntax `term) := do
+  match ids with
+  | [] => `(let _ := $packed; $body)
+  | [id] => `(let $id := $packed; $body)
+  | id :: rest =>
+      let tail := mkIdentFrom id `_moveSpecLoopTail
+      let nested ← unpackLoopState rest ⟨tail.raw⟩ body
+      `(let ($id, $tail) := $packed; $nested)
+
+private def boundIdentifier? (element : Lean.DoElem) : Option (Name × Bool) :=
   match element with
-  | `(doElem| let $name:ident ← $_value:term) => some name.getId
-  | `(doElem| let $name:ident := $_value:term) => some name.getId
-  | `(doElem| let $name:ident : $_type:term := $_value:term) => some name.getId
+  | `(doElem| let mut $name:ident ← $_value:term) => some (name.getId, true)
+  | `(doElem| let mut $name:ident := $_value:term) => some (name.getId, true)
+  | `(doElem| let $name:ident ← $_value:term) => some (name.getId, false)
+  | `(doElem| let $name:ident := $_value:term) => some (name.getId, false)
+  | `(doElem| let $name:ident : $_type:term := $_value:term) =>
+      some (name.getId, false)
   | _ => none
 
 private partial def closeBorrowScope (elements : Array Lean.DoElem)
@@ -634,9 +752,10 @@ private partial def closeBorrowScope (elements : Array Lean.DoElem)
   let extended := (elements.extract 0 size).foldl (init := size) fun result element =>
     match boundIdentifier? element with
     | none => result
-    | some name =>
+    | some (name, includePlainUses) =>
         elements.zipIdx.foldl (init := result) fun result (candidate, index) =>
-          if containsProjectionOfIdentifier name candidate.raw then
+          if (if includePlainUses then containsIdentifier
+              else containsProjectionOfIdentifier) name candidate.raw then
             max result (index + 1)
           else
             result
@@ -665,17 +784,53 @@ private partial def translateDo (context : TranslationContext)
     let assignment : TSyntax ``Lean.Parser.Term.doReassign := ⟨first.raw⟩
     match assignment with
     | `(doReassign| $name:ident $[: $_]? :=%$_ $rhs:term) =>
-        let some mutation := context.mutation?
-          | throwErrorAt name
-              "automatic source specifications only support assignment through a mutable reference"
-        unless mutation.getId == name.getId do
-          throwErrorAt name "assignment to a non-borrowed local is not yet supported"
+        if let some mutation := context.mutation? then
+          if mutation.getId == name.getId then
+            let rhsSpec ← expressionSpec context rhs
+            let nested ← translateRest rest
+            return ← `(Move.Semantics.Spec.bind $rhsSpec fun _moveSpecValue =>
+                let $name := Move.Semantics.Mutation.write $name _moveSpecValue
+                $nested)
         let rhsSpec ← expressionSpec context rhs
         let nested ← translateRest rest
-        return ← `(Move.Semantics.Spec.bind $rhsSpec fun _moveSpecValue =>
-            let $name := Move.Semantics.Mutation.write $name _moveSpecValue
-            $nested)
+        return ← `(Move.Semantics.Spec.bind $rhsSpec fun $name => $nested)
     | _ => throwErrorAt first "unsupported assignment in automatic source specification"
+  if first.raw.isOfKind ``Move.moveLoopDo ||
+      first.raw.isOfKind ``Move.moveLoopLabeledDo then
+    let sourceLabel? :=
+      if first.raw.isOfKind ``Move.moveLoopLabeledDo then
+        some first.raw[1]!.getId
+      else
+        none
+    if let some sourceLabel := sourceLabel? then
+      if context.loops.any (·.sourceLabel? == some sourceLabel) then
+        throwErrorAt first "duplicate active loop label `{sourceLabel}`"
+    let bodyIndex := if sourceLabel?.isSome then 2 else 1
+    let body : TSyntax ``Lean.Parser.Term.doSeq := ⟨first.raw[bodyIndex]!⟩
+    if containsReturn body.raw then
+      throwErrorAt first
+        "`return` inside `loop` / `while` is not yet supported for `verify`"
+    let assigned := (assignedLoopIdents body.raw).toList
+    let state := freshLoopStateIdents first.raw assigned
+    let pack ← packLoopState assigned
+    let recName := mkIdentFrom first `_moveSpecLoop
+    let recTerm : TSyntax `term := ⟨recName.raw⟩
+    let afterElements := rest.map fun element =>
+      (⟨replaceLoopState assigned state element.raw⟩ : Lean.DoElem)
+    let after ← translateRest afterElements
+    let bodyElements := (Lean.Parser.Term.getDoElems body).map fun element =>
+      (⟨replaceLoopState assigned state element.raw⟩ : Lean.DoElem)
+    let frame : VerificationLoopFrame := {
+      sourceLabel?, recursive := recTerm, after, assigned, state }
+    let bodySpec ← translateDo
+      { context with
+        loops := frame :: context.loops }
+      bodyElements
+    let stateName := mkIdentFrom first `_moveSpecLoopState
+    let stateTerm : TSyntax `term := ⟨stateName.raw⟩
+    let unpacked ← unpackLoopState state stateTerm bodySpec
+    return ← `(Move.Semantics.Spec.fix
+        (fun $recName $stateName => $unpacked) $pack)
   match first with
   | `(doElem| let $name:ident ← &mut $vector:ident[$index:term]) =>
       unless context.mutation?.isNone do
@@ -841,20 +996,69 @@ private partial def translateDo (context : TranslationContext)
       let valueSpec ← expressionSpec context value
       let nested ← translateRest rest
       `(Move.Semantics.Spec.bind $valueSpec (fun $name => $nested))
+  | `(doElem| let mut $name:ident := $value:term) =>
+      let valueSpec ← expressionSpec context value
+      let nested ← translateRest rest
+      `(Move.Semantics.Spec.bind $valueSpec (fun $name => $nested))
+  | `(doElem| let mut $name:ident ← * $reference:term) =>
+      let nested ← translateRest rest
+      `(let $name := $(← rewritePure context.mutation? (← `(* $reference))); $nested)
+  | `(doElem| let mut $name:ident ← $value:term) =>
+      let valueSpec ← expressionSpec context value
+      let nested ← translateRest rest
+      `(Move.Semantics.Spec.bind $valueSpec (fun $name => $nested))
+  | `(doElem| return $value:term) =>
+      if !context.loops.isEmpty then
+        throwErrorAt first
+          "`return` inside `loop` / `while` is not yet supported for `verify`"
+      translateTerm context value
+  | `(doElem| break@$sourceLabel:ident) =>
+      loopBreakSpec context (some sourceLabel.getId) first.raw
+  | `(doElem| continue@$sourceLabel:ident) =>
+      loopContinueSpec context (some sourceLabel.getId) first.raw
+  | `(doElem| break) =>
+      loopBreakSpec context none first.raw
+  | `(doElem| continue) =>
+      loopContinueSpec context none first.raw
+  | `(doElem| while $condition:doIfCond do $body:doSeq) =>
+      if containsReturn body.raw then
+        throwErrorAt first
+          "`return` inside `loop` / `while` is not yet supported for `verify`"
+      let condition ← conditionTerm condition
+      let assigned := (assignedLoopIdents body.raw).toList
+      let state := freshLoopStateIdents first.raw assigned
+      let condition : TSyntax `term := ⟨replaceLoopState assigned state condition.raw⟩
+      let condition ← rewritePure context.mutation? condition
+      let pack ← packLoopState assigned
+      let recName := mkIdentFrom first `_moveSpecLoop
+      let recTerm : TSyntax `term := ⟨recName.raw⟩
+      let afterElements := rest.map fun element =>
+        (⟨replaceLoopState assigned state element.raw⟩ : Lean.DoElem)
+      let after ← translateRest afterElements
+      let bodyElements := (Lean.Parser.Term.getDoElems body).map fun element =>
+        (⟨replaceLoopState assigned state element.raw⟩ : Lean.DoElem)
+      let frame : VerificationLoopFrame := {
+        sourceLabel? := none
+        recursive := recTerm
+        after
+        assigned
+        state }
+      let bodySpec ← translateDo
+        { context with loops := frame :: context.loops }
+        bodyElements
+      let step ← `(if $condition then $bodySpec else $after)
+      let stateName := mkIdentFrom first `_moveSpecLoopState
+      let stateTerm : TSyntax `term := ⟨stateName.raw⟩
+      let unpacked ← unpackLoopState state stateTerm step
+      `(Move.Semantics.Spec.fix
+          (fun $recName $stateName => $unpacked) $pack)
   | `(doElem| if $condition:doIfCond then $thenBranch:doSeq) =>
       let condition ← conditionTerm condition
       let condition ← rewritePure context.mutation? condition
-      let thenSpec ← translateDo context (Lean.Parser.Term.getDoElems thenBranch)
-      let continuation ← translateRest rest
-      let thenAndContinuation ← match context.mutation? with
-        | none =>
-            `(Move.Semantics.Spec.bind $thenSpec (fun _ => $continuation))
-        | some mutation =>
-            let output := mkIdentFrom first `_moveSpecIfOutput
-            `(Move.Semantics.Spec.bind $thenSpec (fun ($output : Unit × _) =>
-                let $mutation := $output.2
-                $continuation))
-      `(if $condition then $thenAndContinuation else $continuation)
+      let thenSpec ← translateDo context
+        (Lean.Parser.Term.getDoElems thenBranch ++ rest)
+      let elseSpec ← translateRest rest
+      `(if $condition then $thenSpec else $elseSpec)
   | `(doElem| if $condition:doIfCond then $thenBranch:doSeq else $elseBranch:doSeq) =>
       unless rest.isEmpty do
         throwErrorAt first "an `if` with `else` must be in tail position for source specification generation"
@@ -878,6 +1082,9 @@ private partial def translateDo (context : TranslationContext)
             (fun $output =>
               let $mutation := $output.2
               $nested))
+      else if value.raw.isOfKind ``Move.abortTerm then
+        -- Abort is terminal, so this branch never executes its syntactic rest.
+        translateTerm context value
       else
         unless rest.isEmpty do
           throwErrorAt first
@@ -1248,6 +1455,25 @@ scoped syntax (name := inferredEffectfulSourceSpec)
     "ensures " term ";"
     "aborts " term : command
 
+/-- Omitted effectful preconditions mean `True`. -/
+scoped macro "spec " function:ident binder:moveSpecBinder* " on " world:term
+    " using " "[" resources:moveSpecResource,* "]" " where "
+    "ensures " postcondition:term ";"
+    "aborts " abortCondition:term : command =>
+  `(spec $function $binder* on $world using [$resources,*] where
+      requires True;
+      ensures $postcondition;
+      aborts $abortCondition)
+
+/-- Omitted inferred effectful preconditions mean `True`. -/
+scoped macro "spec " function:ident binder:moveSpecBinder* " where "
+    "ensures " postcondition:term ";"
+    "aborts " abortCondition:term : command =>
+  `(spec $function $binder* where
+      requires True;
+      ensures $postcondition;
+      aborts $abortCondition)
+
 /-- Move-style abort clause with an exact abort code. -/
 scoped macro "spec " function:ident binder:moveSpecBinder* " where "
     "requires " precondition:term ";"
@@ -1259,6 +1485,14 @@ scoped macro "spec " function:ident binder:moveSpecBinder* " where "
       ensures $postcondition;
       aborts ($condition ∧ $abortCode = Move.Spec.abortCodeOf $code))
 
+scoped macro "spec " function:ident binder:moveSpecBinder* " where "
+    "ensures " postcondition:term ";"
+    "aborts_if " condition:term " with " code:term : command =>
+  `(spec $function $binder* where
+      requires True;
+      ensures $postcondition;
+      aborts_if $condition with $code)
+
 /-- Move-style abort clause which constrains the abort condition but permits
 any abort code. -/
 scoped macro "spec " function:ident binder:moveSpecBinder* " where "
@@ -1269,6 +1503,14 @@ scoped macro "spec " function:ident binder:moveSpecBinder* " where "
       requires $precondition;
       ensures $postcondition;
       aborts $condition)
+
+scoped macro "spec " function:ident binder:moveSpecBinder* " where "
+    "ensures " postcondition:term ";"
+    "aborts_if " condition:term : command =>
+  `(spec $function $binder* where
+      requires True;
+      ensures $postcondition;
+      aborts_if $condition)
 
 @[command_elab inferredEffectfulSourceSpec]
 private def elabInferredEffectfulSourceSpec : CommandElab := fun stx => do
@@ -1492,6 +1734,7 @@ private def elabAutomaticSourceVerify : CommandElab := fun stx => do
     let command ← `(theorem $verifiedName : $contractName := by
       unfold $contractName
       simp_all [$unfoldLemmas,*,
+        Id.run, Pure.pure, Bind.bind,
         Move.U64.add, Move.U64.sub, Move.U64.mul,
         Move.U64.div, Move.U64.mod] <;>
       grind)

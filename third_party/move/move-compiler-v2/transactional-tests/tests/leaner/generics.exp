@@ -1,24 +1,24 @@
 processed 13 tasks
-task 0 lines 1-95:  publish [import Move]
-task 1 lines 97-97:  run 0x0::LeanerGenerics::roundTrip --args 37u64
+task 0 lines 1-99:  publish [import Move]
+task 1 lines 101-101:  run 0x0::LeanerGenerics::roundTrip --args 37u64
 return values: 37
-task 2 lines 99-99:  run 0x0::LeanerGenerics::enumRoundTrip --args 19u64
+task 2 lines 103-103:  run 0x0::LeanerGenerics::enumRoundTrip --args 19u64
 return values: 19
-task 3 lines 101-101:  run 0x0::LeanerGenerics::swapFirst --args 3u64 41u64
+task 3 lines 105-105:  run 0x0::LeanerGenerics::swapFirst --args 3u64 41u64
 return values: 41
-task 4 lines 103-103:  run 0x0::LeanerGenerics::genericVectorLength --args 23u64
+task 4 lines 107-107:  run 0x0::LeanerGenerics::genericVectorLength --args 23u64
 return values: 1
-task 5 lines 105-105:  run 0x0::LeanerGenerics::equalU64 --args 17u64 17u64
+task 5 lines 109-109:  run 0x0::LeanerGenerics::equalU64 --args 17u64 17u64
 return values: true
-task 6 lines 107-110:  run 0x0::LeanerGenerics::equalU64 --args 17u64 18u64 [-- The same generic resource at two instantiations must occupy distinct]
+task 6 lines 111-114:  run 0x0::LeanerGenerics::equalU64 --args 17u64 18u64 [-- The same generic resource at two instantiations must occupy distinct]
 return values: false
-task 7 lines 111-111:  run --args 29u64 --signers 0x42 -- 0x0::LeanerGenerics::publishU64
-task 8 lines 113-113:  run --args true --signers 0x42 -- 0x0::LeanerGenerics::publishBool
-task 9 lines 115-115:  run 0x0::LeanerGenerics::hasU64 --args @0x42
+task 7 lines 115-115:  run --args 29u64 --signers 0x42 -- 0x0::LeanerGenerics::publishU64
+task 8 lines 117-117:  run --args true --signers 0x42 -- 0x0::LeanerGenerics::publishBool
+task 9 lines 119-119:  run 0x0::LeanerGenerics::hasU64 --args @0x42
 return values: true
-task 10 lines 117-117:  run 0x0::LeanerGenerics::hasBool --args @0x42
+task 10 lines 121-121:  run 0x0::LeanerGenerics::hasBool --args @0x42
 return values: true
-task 11 lines 119-119:  run 0x0::LeanerGenerics::takeU64 --args @0x42
+task 11 lines 123-123:  run 0x0::LeanerGenerics::takeU64 --args @0x42
 return values: 29
-task 12 lines 121-121:  run 0x0::LeanerGenerics::takeBool --args @0x42
+task 12 lines 125-125:  run 0x0::LeanerGenerics::takeBool --args @0x42
 return values: true

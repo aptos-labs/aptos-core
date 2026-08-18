@@ -14,6 +14,8 @@ open scoped Move Move.Compiler
 
 move_module Abilities where
 
+  /-! ## Functions -/
+
   @[move_struct]
   structure Plain where
     value : U64
@@ -52,6 +54,8 @@ move_module Abilities where
     | first
     | second (value : U64)
     deriving Drop
+
+  /-! ## Tests -/
 
   def compiled : MModule := move_module% "AbilitiesTest"
 

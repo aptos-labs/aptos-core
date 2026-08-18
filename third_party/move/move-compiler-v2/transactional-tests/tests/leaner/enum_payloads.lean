@@ -28,6 +28,8 @@ move_module LeanerEnumPayloads where
     | wrap (value : U64)
     deriving Copy, Drop, Store
 
+  /-! ## Functions -/
+
   fun choose (right : Bool) (value : U64) : Choice :=
     if right then .right value else .left value
 
@@ -84,6 +86,8 @@ move_module LeanerEnumPayloads where
     let values : Move.Vector Choice := vector![.left 1]
     let values := Move.Vector.set values 0 (.right 7)
     score (Move.Vector.get values 0)
+
+/-! ## Tests -/
 
 --# run 0x0::LeanerEnumPayloads::chooseAndScore --args false 10u64
 

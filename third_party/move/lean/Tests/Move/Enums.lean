@@ -21,24 +21,18 @@ move_module Enums where
     | split (left right : U64)
     deriving Copy, Drop, Store
 
+  /-! ## Functions -/
+
   fun makeTransfer (amount : U64) : Action := .transfer amount
+
+  spec makeTransfer (amount : U64) where
+    ensures result = .transfer amount
 
   fun total (action : Action) : U64 :=
     match action with
     | .idle => 0
     | .transfer amount => amount
     | .split left right => left + right
-
-  fun classify (action : Action) : U64 :=
-    match action with
-    | .idle => 0
-    | .transfer _ => 1
-    | .split _ _ => 2
-
-  spec makeTransfer (amount : U64) where
-    ensures result = .transfer amount
-
-  verify makeTransfer
 
   spec total (action : Action) where
     ensures
@@ -48,7 +42,11 @@ move_module Enums where
         | .transfer amount => amount
         | .split left right => left + right
 
-  verify total
+  fun classify (action : Action) : U64 :=
+    match action with
+    | .idle => 0
+    | .transfer _ => 1
+    | .split _ _ => 2
 
   spec classify (action : Action) where
     ensures
@@ -58,7 +56,13 @@ move_module Enums where
         | .transfer _ => 1
         | .split _ _ => 2
 
+  /-! ## Proofs -/
+
+  verify makeTransfer
+  verify total
   verify classify
+
+  /-! ## Tests -/
 
   def compiled : MModule := move_module% "EnumsTest"
 

@@ -102,6 +102,14 @@ def modSpec (lhs rhs : U64) : Spec σ U64 where
   · funext initial code
     simp [subSpec, Spec.pure, safe]
 
+theorem subSpec_one_eq_pure_of_pos {value : U64}
+    (positive : 0 < value.toNat) :
+    (subSpec value 1 : Spec σ U64) =
+      Spec.pure (U64.ofNat (value.toNat - 1)) := by
+  apply subSpec_eq_pure
+  change 1 ≤ value.toNat
+  exact positive
+
 @[simp] theorem divSpec_eq_pure {lhs rhs : U64} (nonzero : rhs.toNat ≠ 0) :
     (divSpec lhs rhs : Spec σ U64) =
       Spec.pure (U64.ofNat (lhs.toNat / rhs.toNat)) := by

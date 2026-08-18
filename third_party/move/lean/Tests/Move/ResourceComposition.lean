@@ -15,6 +15,8 @@ open scoped Move Move.Compiler Move.Spec
 
 move_module ResourceComposition where
 
+  /-! ## Functions -/
+
   @[move_struct]
   structure Debit where
     value : U64
@@ -42,7 +44,11 @@ move_module ResourceComposition where
       Credit[addr].value = old(Credit[addr].value) + amount;
     aborts_if False
 
+  /-! ## Proofs -/
+
   verify shift
+
+  /-! ## Tests -/
 
   def compiled : MModule := move_module% "ResourceCompositionTest"
 

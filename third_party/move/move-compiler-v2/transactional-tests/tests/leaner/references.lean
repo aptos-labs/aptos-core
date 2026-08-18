@@ -17,6 +17,8 @@ structure Balance where
   balance : BalanceValue
   deriving Key
 
+/-! ## Functions -/
+
 @[move_fun]
 def readBalance (addr : Address) : Action U64 := do
   let value ← &Balance[addr].balance.value
@@ -35,6 +37,8 @@ def deposit (addr : Address) (amount : U64) : Action Unit := do
   functions [readBalance, addToBalance, deposit]
 
 end LeanerTxnReferences
+
+/-! ## Tests -/
 
 --# run 0x0::LeanerReferences::deposit --args @0x42 5u64
 

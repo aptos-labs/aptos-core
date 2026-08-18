@@ -17,6 +17,8 @@ move_module LeanerEnumPatterns where
     | two (left right : Atom)
     deriving Copy, Drop, Store
 
+  /-! ## Functions -/
+
   fun nestedTotal (envelope : Envelope) : U64 :=
     match envelope with
     | .one (.number value) => value
@@ -36,6 +38,8 @@ move_module LeanerEnumPatterns where
 
   fun rightMissing (left : U64) : U64 :=
     nestedTotal (.two (.number left) .none)
+
+/-! ## Tests -/
 
 --# run 0x0::LeanerEnumPatterns::oneNumber --args 7u64
 

@@ -194,6 +194,7 @@ const SEPARATE_BASELINE: &[&str] = &[
     // Offsets are different depending on optimizations
     "leaner/arithmetic.lean",
     "leaner/control_flow.lean",
+    "leaner/loops.lean",
     "leaner/vector_operations.lean",
     "leaner/ordered_map.lean",
     "control_flow/abort_complex.move",

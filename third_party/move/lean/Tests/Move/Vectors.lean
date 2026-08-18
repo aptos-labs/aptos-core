@@ -14,14 +14,17 @@ open scoped Move Move.Compiler Move.Spec
 
 move_module Vectors where
 
+  /-! ## Functions -/
+
   fun make : Move.Vector U64 := vector![10, 20, 30]
 
   spec make where
     ensures result = vector![10, 20, 30]
 
-  verify make
-
   fun length : U64 := make.length
+
+  spec length where
+    ensures result = 3
 
   fun middle : Action U64 := do
     let values := make
@@ -29,11 +32,8 @@ move_module Vectors where
     (*value)
 
   spec middle where
-    requires True;
     ensures result = 20;
     aborts_if False
-
-  verify middle
 
   fun replace : Action U64 := do
     let values := make
@@ -42,11 +42,8 @@ move_module Vectors where
     (*value)
 
   spec replace where
-    requires True;
     ensures result = 42;
     aborts_if False
-
-  verify replace
 
   fun insertMiddle : Action U64 := do
     let values : Move.Vector U64 := vector![10, 30]
@@ -57,11 +54,8 @@ move_module Vectors where
     (*middle)
 
   spec insertMiddle where
-    requires True;
     ensures result = 20;
     aborts_if False
-
-  verify insertMiddle
 
   fun removeMiddle : Action U64 := do
     let values : Move.Vector U64 := vector![10, 20, 30]
@@ -73,15 +67,32 @@ move_module Vectors where
     pure (removed + shiftedValue)
 
   spec removeMiddle where
-    requires True;
     ensures result = 50;
     aborts_if False
+
+  /-! ## Proofs -/
+
+  verify make
+
+  @[grind .] private theorem makeLength :
+      (((Move.Vector.empty.push (10 : U64)).push 20).push 30).length = 3 := by
+    decide
+
+  verify length
+
+  verify middle
+
+  verify replace
+
+  verify insertMiddle
 
   /-- The concrete result used by this smoke test cannot overflow `u64`. -/
   @[grind .] private theorem removeMiddleResultFitsU64 : 50 < U64.size := by
     decide
 
   verify removeMiddle
+
+  /-! ## Tests -/
 
   def compiled : MModule := move_module% "VectorsTest"
 

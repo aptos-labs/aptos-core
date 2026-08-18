@@ -8,5 +8,7 @@ import Tests.Move.Account
 
 open scoped Move.Compiler
 
+/-! ## Tests -/
+
 #export_leaner_xir Tests.MovePrograms.Account.compiled to
   "Tests/Move/Account.xir.json"

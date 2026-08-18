@@ -36,19 +36,19 @@
    "is_entry": true,
    "entry": 0,
    "blocks":
-   [{"term": {"branch": [8, 3, 2]},
+   [{"term": {"branch": [8, 3, 1]},
      "instrs":
      [{"call": [[2], {"borrow_global": 1}, [0]]},
       {"call": [[3], {"borrow_field": 0}, [2]]},
       {"call": [[4], {"borrow_field": 0}, [3]]},
       {"call": [[7], "read_ref", [4]]},
       {"call": [[8], "lt", [7, 1]]}]},
+    {"term": {"jump": 2}, "instrs": []},
     {"term": {"ret": []},
      "instrs":
      [{"call": [[5], "read_ref", [4]]},
       {"call": [[6], "sub", [5, 1]]},
       {"call": [[], "write_ref", [4, 6]]}]},
-    {"term": {"jump": 1}, "instrs": []},
     {"term": {"abort": 9}, "instrs": [{"load": [9, {"u64": "1"}]}]}],
    "acquires": [1]},
   {"visibility": "public",

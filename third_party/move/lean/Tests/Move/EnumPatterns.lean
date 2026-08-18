@@ -27,26 +27,13 @@ move_module EnumPatterns where
     | two (left right : Atom)
     deriving Copy, Drop, Store
 
+  /-! ## Functions -/
+
   fun nestedTotal (envelope : Envelope) : U64 :=
     match envelope with
     | .one (.number value) => value
     | .two (.number left) (.number right) => left + right
     | _ => 0
-
-  fun oneNumber (value : U64) : U64 :=
-    nestedTotal (.one (.number value))
-
-  fun oneNone : U64 :=
-    nestedTotal (.one .none)
-
-  fun twoNumbers (left right : U64) : U64 :=
-    nestedTotal (.two (.number left) (.number right))
-
-  fun leftMissing (right : U64) : U64 :=
-    nestedTotal (.two .none (.number right))
-
-  fun rightMissing (left : U64) : U64 :=
-    nestedTotal (.two (.number left) .none)
 
   spec nestedTotal (envelope : Envelope) where
     ensures
@@ -56,32 +43,46 @@ move_module EnumPatterns where
         | .two (.number left) (.number right) => left + right
         | _ => 0
 
-  verify nestedTotal
+  fun oneNumber (value : U64) : U64 :=
+    nestedTotal (.one (.number value))
 
   spec oneNumber (value : U64) where
     ensures result = value
 
-  verify oneNumber
+  fun oneNone : U64 :=
+    nestedTotal (.one .none)
 
   spec oneNone where
     ensures result = 0
 
-  verify oneNone
+  fun twoNumbers (left right : U64) : U64 :=
+    nestedTotal (.two (.number left) (.number right))
 
   spec twoNumbers (left : U64) (right : U64) where
     ensures result = left + right
 
-  verify twoNumbers
+  fun leftMissing (right : U64) : U64 :=
+    nestedTotal (.two .none (.number right))
 
   spec leftMissing (right : U64) where
     ensures result = 0
 
-  verify leftMissing
+  fun rightMissing (left : U64) : U64 :=
+    nestedTotal (.two (.number left) .none)
 
   spec rightMissing (left : U64) where
     ensures result = 0
 
+  /-! ## Proofs -/
+
+  verify nestedTotal
+  verify oneNumber
+  verify oneNone
+  verify twoNumbers
+  verify leftMissing
   verify rightMissing
+
+  /-! ## Tests -/
 
   def compiled : MModule := move_module% "EnumPatternsTest"
 

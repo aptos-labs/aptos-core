@@ -48,7 +48,7 @@ private def ordinaryLocalAssignment : Nat := Id.run do
       withdrawM.blocks.length == 4 &&
       match withdrawM.blocks with
       | entry :: _ :: _ :: abortBlock :: _ =>
-          entry.term == .branch 8 3 2 && abortBlock.term == .abort 9
+          entry.term == .branch 8 3 1 && abortBlock.term == .abort 9
       | _ => false
   | _ => false
 

@@ -32,6 +32,8 @@ move_module LeanerOrderedMap where
     map : Map Bool U64
     deriving Key
 
+  /-! ## Functions -/
+
   fun empty {K V : Type} : Map K V :=
     { entries := Move.Vector.empty }
 
@@ -218,6 +220,8 @@ move_module LeanerOrderedMap where
     let key : U64 := 11
     let keyRef ← &key
     getU64 mapRef keyRef
+
+/-! ## Tests -/
 
 --# run --signers 0x40 -- 0x0::LeanerOrderedMap::publishEmpty
 

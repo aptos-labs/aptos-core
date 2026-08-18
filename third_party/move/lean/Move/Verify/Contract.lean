@@ -115,6 +115,34 @@ theorem satisfies_fix
     obtain ⟨fuel, execution⟩ := execution
     exact (approximates fuel args initial permitted).2 code execution
 
+/-- Use an already established contract as the weakest-precondition fact for
+one concrete call. This avoids manually projecting normal and abort halves. -/
+theorem wp_of_satisfies
+    (verified : Satisfies function contract)
+    (permitted : contract.requires args initial) :
+    wp (function args)
+      (contract.ensures args initial)
+      (contract.aborts args initial)
+      initial :=
+  verified args initial permitted
+
+/-- Fixed-point induction with a `wp` step. Most Leaner loop proofs naturally
+reason about one call and need not duplicate success and abort forwarding. -/
+theorem satisfies_fix_of_wp
+    (body : (Args → Spec State Result) → Args → Spec State Result)
+    (contract : Contract State Args Result)
+    (step : ∀ recursive, Satisfies recursive contract →
+      ∀ args initial, contract.requires args initial →
+        wp (body recursive args)
+          (contract.ensures args initial)
+          (contract.aborts args initial)
+          initial) :
+    Satisfies (Spec.fix body) contract := by
+  apply satisfies_fix body contract
+  intro recursive recursiveVerified
+  exact satisfies_of_wp (body recursive) contract
+    (step recursive recursiveVerified)
+
 /-- Deterministic helper WP, used only to embed test computations into the
 authoritative relational semantics. -/
 def txnWP (action : Txn State Result)
