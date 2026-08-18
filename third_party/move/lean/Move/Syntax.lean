@@ -26,20 +26,24 @@ open Lean Meta Elab Term
 forge CFG control by calling the normalizer protocol directly. -/
 
 @[never_extract, noinline] private partial def loopEnter
-    {σ : Type} [Inhabited σ] (label arity token : Nat) (state : σ) : Nat :=
-  loopEnter label arity token state
+    {σ : Type} [Inhabited σ] (label nonce arity token : Nat)
+    (state : σ) : Nat :=
+  loopEnter label nonce arity token state
 
 @[never_extract, noinline] private partial def loopContinue
-    {σ : Type} [Inhabited σ] (label arity token : Nat) (state : σ) : Nat :=
-  loopContinue label arity token state
+    {σ : Type} [Inhabited σ] (label nonce arity token : Nat)
+    (state : σ) : Nat :=
+  loopContinue label nonce arity token state
 
 @[never_extract, noinline] private partial def loopContinueTail
-    {σ : Type} [Inhabited σ] (label arity token : Nat) (state : σ) : Nat :=
-  loopContinueTail label arity token state
+    {σ : Type} [Inhabited σ] (label nonce arity token : Nat)
+    (state : σ) : Nat :=
+  loopContinueTail label nonce arity token state
 
 @[never_extract, noinline] private partial def loopBreak
-    {σ : Type} [Inhabited σ] (label arity token : Nat) (state : σ) : Nat :=
-  loopBreak label arity token state
+    {σ : Type} [Inhabited σ] (label nonce arity token : Nat)
+    (state : σ) : Nat :=
+  loopBreak label nonce arity token state
 
 @[never_extract, noinline] private partial def loopTokenLive
     (token : Nat) : Bool :=
@@ -55,6 +59,36 @@ def isLoopContinueTailMarker (name : Name) : Bool := name == ``loopContinueTail
 def isLoopBreakMarker (name : Name) : Bool := name == ``loopBreak
 def isLoopTokenLiveMarker (name : Name) : Bool := name == ``loopTokenLive
 def isLoopTokenJoinMarker (name : Name) : Bool := name == ``loopTokenJoin
+
+private structure LoopMarkerRegistration where
+  function : Name
+  label : Nat
+  nonce : Nat
+  deriving BEq
+
+private def addLoopMarkerRegistration
+    (registrations : List LoopMarkerRegistration)
+    (registration : LoopMarkerRegistration) : List LoopMarkerRegistration :=
+  if registrations.contains registration then registrations
+  else registration :: registrations
+
+private initialize loopMarkerRegistrations :
+    SimplePersistentEnvExtension LoopMarkerRegistration
+      (List LoopMarkerRegistration) ←
+  registerSimplePersistentEnvExtension {
+    addEntryFn := addLoopMarkerRegistration
+    addImportedFn := fun entries =>
+      mkStateFromImportedEntries addLoopMarkerRegistration [] entries
+  }
+
+def isRegisteredLoopMarker (env : Environment) (function : Name)
+    (label nonce : Nat) : Bool :=
+  (loopMarkerRegistrations.getState env).contains { function, label, nonce }
+
+private def registerLoopMarker (function : Name) (label nonce : Nat) :
+    TermElabM Unit :=
+  modifyEnv fun env =>
+    loopMarkerRegistrations.addEntry env { function, label, nonce }
 
 scoped syntax:max (name := borrowTerm) "&" term:40 : term
 scoped syntax:max (name := borrowMutTerm) "&mut " term:40 : term
@@ -80,6 +114,138 @@ syntax (name := moveBreakLabeledDo) "break@" ident : doElem
 syntax (name := moveContinueLabeledDo) "continue@" ident : doElem
 syntax (name := moveBreakInternal) "__moveBreak" : doElem
 syntax (name := moveContinueInternal) "__moveContinue" : doElem
+
+/-! Loop state is the set of reassigned bindings that were visible when the
+loop was entered. `ControlInfo.reassigns` is intentionally textual, so it
+cannot distinguish an entry binding from a same-named local declared in the
+loop. Keep this small source-scope analysis here so compilation and source
+verification agree on binding identity. -/
+
+private def loopReassignedIdent? (stx : Syntax) : Option Ident :=
+  if !stx.isOfKind ``Lean.Parser.Term.doReassign || stx.getNumArgs == 0 then
+    none
+  else
+    let decl := stx[0]
+    if decl.isIdent then
+      some ⟨decl⟩
+    else if decl.getNumArgs > 0 then
+      let idNode := decl[0]
+      if idNode.isIdent then some ⟨idNode⟩
+      else if idNode.getNumArgs > 0 && idNode[0].isIdent then some ⟨idNode[0]⟩
+      else none
+    else
+      none
+
+private partial def firstIdent? (stx : Syntax) : Option Ident :=
+  if stx.isIdent then some ⟨stx⟩
+  else stx.getArgs.findSome? firstIdent?
+
+private def loopBoundDoIdent? (stx : Syntax) : Option Ident :=
+  if !stx.isOfKind ``Lean.Parser.Term.doLet &&
+      !stx.isOfKind ``Lean.Parser.Term.doLetArrow then
+    none
+  else if stx.getNumArgs > 3 then
+    firstIdent? stx[3]
+  else none
+
+private def isDoSeqSyntax (stx : Syntax) : Bool :=
+  stx.isOfKind ``Lean.Parser.Term.doSeqIndent ||
+    stx.isOfKind ``Lean.Parser.Term.doSeqBracketed
+
+mutual
+  private partial def collectLoopAssigned (stx : Syntax) (bound : List Name)
+      (found : Array Ident) : Array Ident :=
+    if isDoSeqSyntax stx then
+      collectLoopAssignedSeq ⟨stx⟩ bound found
+    else
+      let found := match loopReassignedIdent? stx with
+        | some id =>
+            if id.getId.toString.contains "loopTok" || bound.contains id.getId ||
+                found.any (·.getId == id.getId) then found
+            else found.push id
+        | none => found
+      stx.getArgs.foldl (init := found) fun found child =>
+        collectLoopAssigned child bound found
+
+  private partial def collectLoopAssignedSeq
+      (seq : TSyntax ``Lean.Parser.Term.doSeq)
+      (bound : List Name) (found : Array Ident) : Array Ident :=
+    let (_, found) := (Lean.Parser.Term.getDoElems seq).foldl
+      (init := (bound, found)) fun (bound, found) element =>
+        let found := collectLoopAssigned element.raw bound found
+        let bound := match loopBoundDoIdent? element.raw with
+          | some id => id.getId :: bound
+          | none => bound
+        (bound, found)
+    found
+end
+
+/-- Reassigned loop-entry bindings, in source order. Bindings introduced by a
+`let` in the loop are excluded, including through nested branches and loops. -/
+def loopAssignedIdents (body : TSyntax ``Lean.Parser.Term.doSeq) : List Ident :=
+  (collectLoopAssignedSeq body [] #[]).toList
+
+private partial def replaceFirstIdent (stx replacement : Syntax) : Syntax × Bool :=
+  if stx.isIdent then
+    (replacement, true)
+  else
+    let (args, replaced) := stx.getArgs.foldl
+      (init := (#[], false)) fun (args, replaced) child =>
+        if replaced then
+          (args.push child, true)
+        else
+          let (child, replaced) := replaceFirstIdent child replacement
+          (args.push child, replaced)
+    (stx.setArgs args, replaced)
+
+private def mkLoopDoSeq (elems : Array Syntax) : Syntax :=
+  mkNode ``Lean.Parser.Term.doSeqIndent #[mkNullNode <|
+    elems.map fun elem => mkNullNode #[elem, mkNullNode]]
+
+mutual
+  private partial def freshenLoopSyntax (renames : List (Name × Ident))
+      (stx : Syntax) : CoreM Syntax := do
+    if isDoSeqSyntax stx then
+      return (← freshenLoopSeq renames ⟨stx⟩).raw
+    if stx.isIdent then
+      if let some (_, replacement) := renames.find? (·.1 == stx.getId) then
+        return replacement.raw
+      return stx
+    let rewritten := stx.setArgs
+      (← stx.getArgs.mapM (freshenLoopSyntax renames))
+    if stx.isOfKind ``moveLoopLabeledDo ||
+        stx.isOfKind ``moveLoopLabeledNestedDo ||
+        stx.isOfKind ``moveBreakLabeledDo ||
+        stx.isOfKind ``moveContinueLabeledDo then
+      return rewritten.setArgs (rewritten.getArgs.set! 1 stx[1])
+    if stx.isOfKind ``Lean.Parser.Term.proj && stx.getNumArgs > 2 then
+      return rewritten.setArgs (rewritten.getArgs.set! 2 stx[2])
+    return rewritten
+
+  private partial def freshenLoopSeq (renames : List (Name × Ident))
+      (seq : TSyntax ``Lean.Parser.Term.doSeq) : CoreM (TSyntax ``Lean.Parser.Term.doSeq) := do
+    let (elems, _) ← (Lean.Parser.Term.getDoElems seq).foldlM
+      (init := (#[], renames)) fun (elems, renames) element => do
+        let rewritten ← freshenLoopSyntax renames element.raw
+        match loopBoundDoIdent? element.raw with
+        | none => pure (elems.push rewritten, renames)
+        | some bound =>
+            let fresh := mkIdentFrom bound
+              (← mkFreshUserName `loopLocal)
+            let declaration := rewritten[3]
+            let (declaration, _) := replaceFirstIdent declaration fresh.raw
+            let rewritten := rewritten.setArgs
+              (rewritten.getArgs.set! 3 declaration)
+            pure (elems.push rewritten, (bound.getId, fresh) :: renames)
+    return ⟨mkLoopDoSeq elems⟩
+end
+
+/-- Alpha-rename locals declared in a loop body. Besides making their lexical
+identity explicit for generated syntax, this prevents a loop-local name from
+capturing the elaborated continuation after a `break`. -/
+def freshenLoopLocals (body : TSyntax ``Lean.Parser.Term.doSeq) :
+    CoreM (TSyntax ``Lean.Parser.Term.doSeq) :=
+  freshenLoopSeq [] body
 
 macro_rules
   | `(abort $code:term) => `(Move.abort $code)
@@ -340,6 +506,7 @@ def elabMoveReassign : DoElab := fun stx cont => do
 
 private structure LoopFrame where
   label : Nat
+  nonce : Nat
   sourceLabel? : Option Name
   parentToken? : Option Ident
   controlTokens : List Ident
@@ -358,8 +525,11 @@ private def pushLoopFrame (ref : Syntax) (sourceLabel? : Option Name)
     if stack.any (·.sourceLabel? == some sourceLabel) then
       throwError "duplicate active loop label `{sourceLabel}`"
   let label := (ref.getPos?.map (·.byteIdx + 1)).getD next
+  let nonce := (hash (← mkFreshUserName `loopNonce)).toNat
+  if let some function ← getDeclName? then
+    registerLoopMarker function label nonce
   let token := mkIdent (← mkFreshUserName `loopTok)
-  let frame := { label, sourceLabel?, parentToken?, controlTokens, token, state }
+  let frame := { label, nonce, sourceLabel?, parentToken?, controlTokens, token, state }
   loopLabelState.set (frame :: stack, next + 1)
   return frame
 
@@ -379,15 +549,22 @@ private def labeledLoopFrame? (sourceLabel : Name) :
 private def currentLoopLabel? : TermElabM (Option Nat) := do
   return (← currentLoopFrame?).map (·.label)
 
-private def authoredLoopState (info : Lean.Elab.Do.ControlInfo) : List Ident :=
-  info.reassigns.toList
-    |>.filter (fun name => !name.toString.contains "loopTok")
-    |>.map mkIdent
+private def authoredLoopState
+    (body : TSyntax ``Lean.Parser.Term.doSeq) : List Ident :=
+  loopAssignedIdents body
 
 private def outerControlTokens (info : Lean.Elab.Do.ControlInfo) : List Ident :=
   info.reassigns.toList
     |>.filter (fun name => name.toString.contains "loopTok")
     |>.map mkIdent
+
+private def scopeLoopControlInfo (body : TSyntax ``Lean.Parser.Term.doSeq)
+    (info : Lean.Elab.Do.ControlInfo) : Lean.Elab.Do.ControlInfo :=
+  let authored := (authoredLoopState body).foldl (init := NameSet.empty)
+    fun names id => names.insert id.getId
+  let controls := (outerControlTokens info).foldl (init := authored)
+    fun names id => names.insert id.getId
+  { info with reassigns := controls }
 
 @[term_elab continueCallTerm]
 def elabContinueCall : TermElab := fun stx expectedType? => do
@@ -407,16 +584,19 @@ private partial def packLoopState : List Ident → TermElabM (TSyntax `term)
 open Lean.Elab.Do Lean.Parser.Term in
 private def loopEnterDoElem (frame : LoopFrame) : TermElabM DoElem := do
   let labelTerm : TSyntax `term := quote frame.label
+  let nonceTerm : TSyntax `term := quote frame.nonce
   let arityTerm : TSyntax `term := quote frame.state.length
   let state ← packLoopState frame.state
   let seed : TSyntax `term := match frame.parentToken? with
     | some parent => ⟨parent.raw⟩
     | none => quote 0
-  `(doElem| let mut $(frame.token) := loopEnter $labelTerm $arityTerm $seed $state)
+  `(doElem| let mut $(frame.token) :=
+      loopEnter $labelTerm $nonceTerm $arityTerm $seed $state)
 
 open Lean.Elab.Do Lean.Parser.Term in
 private def loopExitDoElem (marker : Name) (frame : LoopFrame) : TermElabM DoElem := do
   let labelTerm : TSyntax `term := quote frame.label
+  let nonceTerm : TSyntax `term := quote frame.nonce
   let arityTerm : TSyntax `term := quote frame.state.length
   let state ← packLoopState frame.state
   let markerIdent := mkIdent marker
@@ -429,7 +609,8 @@ private def loopExitDoElem (marker : Name) (frame : LoopFrame) : TermElabM DoEle
           `(loopTokenJoin $current $outerTerm)
     else
       pure (⟨token.raw⟩ : TSyntax `term)
-  `(doElem| $token:ident := $markerIdent $labelTerm $arityTerm $markerToken $state)
+  `(doElem| $token:ident :=
+      $markerIdent $labelTerm $nonceTerm $arityTerm $markerToken $state)
 
 open Lean.Elab.Do Lean.Parser.Term Lean.Parser.Term.InternalSyntax in
 private def loopLiveDoElem (frame : LoopFrame) : TermElabM DoElem :=
@@ -491,9 +672,10 @@ def elabMoveWhile : DoElab := fun stx cont => do
   unless stx.raw.isOfKind ``moveWhileInternal do throwUnsupportedSyntax
   let cond : TSyntax `term := ⟨stx.raw[1]!⟩
   let body : TSyntax ``doSeq := ⟨stx.raw[3]!⟩
+  let body ← freshenLoopLocals body
   let info ← InferControlInfo.ofSeq body
   let frame ← pushLoopFrame cond.raw none none (outerControlTokens info)
-    (authoredLoopState info)
+    (authoredLoopState body)
   try
     let continueElem ← loopExitDoElem ``loopContinueTail frame
     let breakElem ← loopExitDoElem ``loopBreak frame
@@ -515,7 +697,8 @@ def elabMoveWhile : DoElab := fun stx cont => do
 open Lean.Elab.Do in
 @[doElem_control_info moveWhileInternal]
 def controlInfoMoveWhile : ControlInfoHandler := fun stx => do
-  let info ← InferControlInfo.ofSeq ⟨stx.raw[3]!⟩
+  let body : TSyntax ``Lean.Parser.Term.doSeq := ⟨stx.raw[3]!⟩
+  let info := scopeLoopControlInfo body (← InferControlInfo.ofSeq body)
   return { info with
     numRegularExits := 1
     continues := false
@@ -525,7 +708,8 @@ def controlInfoMoveWhile : ControlInfoHandler := fun stx => do
 open Lean.Elab.Do in
 @[doElem_control_info moveLoopDo]
 def controlInfoMoveLoop : ControlInfoHandler := fun stx => do
-  let info ← InferControlInfo.ofSeq ⟨stx.raw[1]!⟩
+  let body : TSyntax ``Lean.Parser.Term.doSeq := ⟨stx.raw[1]!⟩
+  let info := scopeLoopControlInfo body (← InferControlInfo.ofSeq body)
   return { info with
     numRegularExits := 1
     continues := false
@@ -535,7 +719,8 @@ def controlInfoMoveLoop : ControlInfoHandler := fun stx => do
 open Lean.Elab.Do in
 @[doElem_control_info moveLoopLabeledDo]
 def controlInfoMoveLoopLabeled : ControlInfoHandler := fun stx => do
-  let info ← InferControlInfo.ofSeq ⟨stx.raw[2]!⟩
+  let body : TSyntax ``Lean.Parser.Term.doSeq := ⟨stx.raw[2]!⟩
+  let info := scopeLoopControlInfo body (← InferControlInfo.ofSeq body)
   return { info with
     numRegularExits := 1
     continues := false
@@ -545,7 +730,8 @@ def controlInfoMoveLoopLabeled : ControlInfoHandler := fun stx => do
 open Lean.Elab.Do in
 @[doElem_control_info moveLoopNestedDo]
 def controlInfoMoveLoopNested : ControlInfoHandler := fun stx => do
-  let info ← InferControlInfo.ofSeq ⟨stx.raw[2]!⟩
+  let body : TSyntax ``Lean.Parser.Term.doSeq := ⟨stx.raw[2]!⟩
+  let info := scopeLoopControlInfo body (← InferControlInfo.ofSeq body)
   return { info with
     numRegularExits := 1
     continues := false
@@ -555,7 +741,8 @@ def controlInfoMoveLoopNested : ControlInfoHandler := fun stx => do
 open Lean.Elab.Do in
 @[doElem_control_info moveLoopLabeledNestedDo]
 def controlInfoMoveLoopLabeledNested : ControlInfoHandler := fun stx => do
-  let info ← InferControlInfo.ofSeq ⟨stx.raw[3]!⟩
+  let body : TSyntax ``Lean.Parser.Term.doSeq := ⟨stx.raw[3]!⟩
+  let info := scopeLoopControlInfo body (← InferControlInfo.ofSeq body)
   return { info with
     numRegularExits := 1
     continues := false
@@ -603,9 +790,10 @@ open Lean.Elab.Do Lean.Parser.Term in
 def elabMoveLoop : DoElab := fun stx cont => do
   unless stx.raw.isOfKind ``moveLoopDo do throwUnsupportedSyntax
   let body : TSyntax ``doSeq := ⟨stx.raw[1]!⟩
+  let body ← freshenLoopLocals body
   let info ← InferControlInfo.ofSeq body
   let frame ← pushLoopFrame stx.raw none none (outerControlTokens info)
-    (authoredLoopState info)
+    (authoredLoopState body)
   try
     let enterElem ← loopEnterDoElem frame
     let continueElem ← loopExitDoElem ``loopContinueTail frame
@@ -624,9 +812,10 @@ def elabMoveLoopLabeled : DoElab := fun stx cont => do
   unless stx.raw.isOfKind ``moveLoopLabeledDo do throwUnsupportedSyntax
   let sourceLabel := stx.raw[1]!.getId
   let body : TSyntax ``doSeq := ⟨stx.raw[2]!⟩
+  let body ← freshenLoopLocals body
   let info ← InferControlInfo.ofSeq body
   let frame ← pushLoopFrame stx.raw (some sourceLabel) none
-    (outerControlTokens info) (authoredLoopState info)
+    (outerControlTokens info) (authoredLoopState body)
   try
     let enterElem ← loopEnterDoElem frame
     let continueElem ← loopExitDoElem ``loopContinueTail frame
@@ -645,9 +834,10 @@ def elabMoveLoopNested : DoElab := fun stx cont => do
   unless stx.raw.isOfKind ``moveLoopNestedDo do throwUnsupportedSyntax
   let parentToken : Ident := ⟨stx.raw[1]!⟩
   let body : TSyntax ``doSeq := ⟨stx.raw[2]!⟩
+  let body ← freshenLoopLocals body
   let info ← InferControlInfo.ofSeq body
   let frame ← pushLoopFrame stx.raw none (some parentToken)
-    (outerControlTokens info) (authoredLoopState info)
+    (outerControlTokens info) (authoredLoopState body)
   try
     let enterElem ← loopEnterDoElem frame
     let continueElem ← loopExitDoElem ``loopContinueTail frame
@@ -667,9 +857,10 @@ def elabMoveLoopLabeledNested : DoElab := fun stx cont => do
   let sourceLabel := stx.raw[1]!.getId
   let parentToken : Ident := ⟨stx.raw[2]!⟩
   let body : TSyntax ``doSeq := ⟨stx.raw[3]!⟩
+  let body ← freshenLoopLocals body
   let info ← InferControlInfo.ofSeq body
   let frame ← pushLoopFrame stx.raw (some sourceLabel) (some parentToken)
-    (outerControlTokens info) (authoredLoopState info)
+    (outerControlTokens info) (authoredLoopState body)
   try
     let enterElem ← loopEnterDoElem frame
     let continueElem ← loopExitDoElem ``loopContinueTail frame
