@@ -1,35 +1,18 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Address derivations replicated from
-//! `aptos_types::transaction::authenticator::AuthenticationKey`.
-//
-// TODO(completeness, cleanup): unify with aptos-core's `AuthenticationKey` so we don't end up having two
-// duplicate implementation of the same scheme and derivation algorithm.
+//! Address derivations, delegating to
+//! `aptos_types::transaction::authenticator::AuthenticationKey` so the scheme
+//! bytes and hashing stay in one place.
 
+use aptos_types::transaction::authenticator::AuthenticationKey;
 use mono_move_core::native::TableHandle;
 use move_core_types::account_address::AccountAddress;
 use sha3::{Digest, Sha3_256};
 
-/// `Scheme::DeriveAuid` discriminant.
-const DERIVE_AUID_SCHEME: u8 = 251;
-/// `Scheme::DeriveObjectAddressFromObject` discriminant.
-const DERIVE_OBJECT_FROM_OBJECT_SCHEME: u8 = 252;
-
-/// `sha3_256(preimage || scheme)` as an address, mirroring
-/// `AuthenticationKey::from_preimage`.
-fn address_from_preimage(mut preimage: Vec<u8>, scheme: u8) -> AccountAddress {
-    preimage.push(scheme);
-    let digest = Sha3_256::digest(&preimage);
-    AccountAddress::new(digest.into())
-}
-
 /// AUID address: `sha3_256(txn_hash || auid_counter_le || DeriveAuid)`.
 pub(crate) fn auid_address(txn_hash: &[u8], auid_counter: u64) -> AccountAddress {
-    let mut preimage = Vec::with_capacity(txn_hash.len() + 8);
-    preimage.extend_from_slice(txn_hash);
-    preimage.extend_from_slice(&auid_counter.to_le_bytes());
-    address_from_preimage(preimage, DERIVE_AUID_SCHEME)
+    AuthenticationKey::auid(txn_hash.to_vec(), auid_counter).account_address()
 }
 
 /// Object-from-object address:
@@ -38,9 +21,7 @@ pub(crate) fn object_address_from_object(
     source: &AccountAddress,
     derive_from: &AccountAddress,
 ) -> AccountAddress {
-    let mut preimage = source.to_vec();
-    preimage.extend_from_slice(derive_from.as_ref());
-    address_from_preimage(preimage, DERIVE_OBJECT_FROM_OBJECT_SCHEME)
+    AuthenticationKey::object_address_from_object(source, derive_from).account_address()
 }
 
 /// Table handle: `sha3_256(txn_hash || table_count_be_u32)`. Unlike the AUID and
@@ -55,13 +36,6 @@ pub(crate) fn table_handle(txn_hash: &[u8], table_count: u32) -> TableHandle {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // Pin the on-chain-frozen scheme discriminants.
-    #[test]
-    fn scheme_bytes_are_frozen() {
-        assert_eq!(DERIVE_AUID_SCHEME, 251);
-        assert_eq!(DERIVE_OBJECT_FROM_OBJECT_SCHEME, 252);
-    }
 
     // Known-answer tests, also cross-checked end-to-end against the legacy VM's
     // `AuthenticationKey` in the differential suite.

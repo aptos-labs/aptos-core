@@ -23,9 +23,7 @@ use aptos_types::{
         TransactionAuxiliaryData, TransactionOutput, TransactionStatus,
     },
 };
-use mono_move_aptos_state_view_providers::{
-    StateViewModuleProvider, StateViewResourceProvider, DEFAULT_RESOURCE_ARENA_BYTES,
-};
+use mono_move_aptos_state_view_providers::{StateViewModuleProvider, StateViewResourceProvider};
 use mono_move_aptos_transaction_executor::{production_natives, AptosTransactionExecutor};
 use mono_move_global_context::GlobalContext;
 use move_core_types::vm_status::StatusCode;
@@ -47,7 +45,7 @@ fn execute_v2<S: StateView>(state: &S, txn: &SignedTransaction) -> TransactionOu
         .expect("execution context is available");
     let natives = production_natives(&guard);
     let module_provider = StateViewModuleProvider::new(state);
-    let data_provider = StateViewResourceProvider::new(&guard, state, DEFAULT_RESOURCE_ARENA_BYTES);
+    let data_provider = StateViewResourceProvider::new(&guard, state);
     let features = Features::fetch_config(state)
         .ok()
         .flatten()
