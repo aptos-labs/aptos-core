@@ -376,6 +376,7 @@ private structure BuildState where
   builtLoopExits : List Nat := []
   loopStates : List (Nat × Array FVarId) := []
   loopTails : List (Nat × (Array FVarId × Code .pure)) := []
+  usedLoopMarkers : List (Name × Nat × Nat) := []
   products : List (FVarId × Array FVarId) := []
   loopLiveResults : List FVarId := []
   blocks : Array LIR.Block := #[]
@@ -514,9 +515,9 @@ private partial def flattenLoopState (arity : Nat) (id : FVarId) :
   return #[first] ++ (← flattenLoopState (arity - 1) rest)
 
 private inductive LoopMarker where
-  | enter (label : Nat) (state : Array FVarId)
-  | continue_ (label : Nat) (state : Array FVarId) (tail : Bool)
-  | break_ (label : Nat) (state : Array FVarId)
+  | enter (label nonce : Nat) (state : Array FVarId)
+  | continue_ (label nonce : Nat) (state : Array FVarId) (tail : Bool)
+  | break_ (label nonce : Nat) (state : Array FVarId)
 
 private def loopMarker? (self fn : Name) (vars : Array FVarId) :
     BuildM (Option LoopMarker) := do
@@ -530,7 +531,7 @@ private def loopMarker? (self fn : Name) (vars : Array FVarId) :
     | throwError "loop marker is missing its provenance nonce"
   let some arity := literals[2]?
     | throwError "loop marker is missing its state arity"
-  unless Move.isRegisteredLoopMarker (← getEnv) self label nonce do
+  unless Move.isRegisteredLoopMarker (← getEnv) self fn label nonce do
     throwError "unregistered compiler loop marker in `{self}`"
   let state ←
     if arity == 0 then pure #[]
@@ -539,14 +540,21 @@ private def loopMarker? (self fn : Name) (vars : Array FVarId) :
         | throwError "loop marker is missing its state"
       flattenLoopState arity packed
   if Move.isLoopEnterMarker fn then
-    return some (.enter label state)
+    return some (.enter label nonce state)
   if Move.isLoopContinueMarker fn then
-    return some (.continue_ label state false)
+    return some (.continue_ label nonce state false)
   if Move.isLoopContinueTailMarker fn then
-    return some (.continue_ label state true)
+    return some (.continue_ label nonce state true)
   if Move.isLoopBreakMarker fn then
-    return some (.break_ label state)
+    return some (.break_ label nonce state)
   return none
+
+private def claimLoopMarker (fn : Name) : LoopMarker → BuildM Unit
+  | .enter label nonce _ | .continue_ label nonce .. | .break_ label nonce _ => do
+      if (← get).usedLoopMarkers.contains (fn, label, nonce) then
+        throwError "reused compiler loop marker in `{fn}`"
+      modify fun s => { s with
+        usedLoopMarkers := (fn, label, nonce) :: s.usedLoopMarkers }
 
 private def loopHeader (label : Nat) : BuildM String := do
   if let some name := assocFind? label (← get).loopHeaders then
@@ -783,7 +791,8 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
         let typeArgs := match ownerTy with
           | .structInst _ args => args
           | _ => #[]
-        addAcquire owner
+        if fn == ``moveFrom then
+          addAcquire owner
         let resultTy := if fn == ``exists_ then some LIR.Ty.bool else some ownerTy
         let op := if fn == ``exists_ then LIR.Oper.exists_ owner typeArgs
           else .moveFrom owner typeArgs
@@ -802,7 +811,6 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
         let typeArgs := match ownerTy with
           | .structInst _ args => args
           | _ => #[]
-        addAcquire owner
         modify fun s => { s with pending :=
           (decl.fvarId, .call {
             op := .moveTo owner typeArgs
@@ -893,11 +901,20 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
           | throwError "vector element has compiler-erased type"
         addLocalTy decl.fvarId (.vector elemTy)
         return instrs.push (.call #[srcName decl.fvarId] .vecPush #[srcName vector, srcName value])
-      if fn == ``Move.Vector.length || fn == ``Move.Ref.length ||
-          fn == ``Move.MutRef.length then
+      if fn == ``Move.Vector.length then
         let some vector := vars[0]? | throwError "vector length is missing its vector"
         addLocalTy decl.fvarId .u64
         return instrs.push (.call #[srcName decl.fvarId] .vecLen #[srcName vector])
+      if fn == ``Move.Ref.length || fn == ``Move.MutRef.length then
+        let some reference := vars[0]? | throwError "vector length is missing its reference"
+        let some elemType := types[0]? | throwError "vector length is missing its element type"
+        let some elemTy ← translateCurrentTy (← getEnv) elemType
+          | throwError "vector length has a compiler-erased element type"
+        let vector ← freshTemp (.vector elemTy)
+        addLocalTy decl.fvarId .u64
+        return instrs
+          |>.push (.call #[vector] .readRef #[srcName reference])
+          |>.push (.call #[srcName decl.fvarId] .vecLen #[vector])
       if fn == ``Move.Vector.get then
         let runtimeVars := vars.extract (vars.size - 2) vars.size
         let some vector := runtimeVars[0]? | throwError "vector get is missing its vector"
@@ -1017,9 +1034,9 @@ private partial def collectLoopStates (self : Name) : Code .pure → BuildM Unit
   | .let decl next => do
       if let .const fn _ args _ := decl.value then
         match ← loopMarker? self fn (fvarArgs args) with
-        | some (.enter label state) =>
+        | some (.enter label _ state) =>
             modify fun s => { s with loopStates := (label, state) :: s.loopStates }
-        | some (.continue_ label state true) =>
+        | some (.continue_ label _ state true) =>
             modify fun s => { s with loopTails := (label, (state, next)) :: s.loopTails }
         | _ => pure ()
       collectLoopStates self next
@@ -1060,7 +1077,8 @@ private partial def walk (env : Environment) (signatures : FunSignatures) (self 
           match decl.value with
           | .const fn _ args _ =>
               match ← loopMarker? self fn (fvarArgs args) with
-              | some (.enter label state) =>
+              | some marker@(.enter label _ state) =>
+                  claimLoopMarker fn marker
                   modify fun s => { s with loopStates := (label, state) :: s.loopStates }
                   discard <| loopExit label
                   if let some header := assocFind? label (← get).loopHeaders then
@@ -1077,7 +1095,8 @@ private partial def walk (env : Environment) (signatures : FunSignatures) (self 
                     let header ← loopHeader label
                     emitBlock blockName instrs (.jump header)
                     walk env signatures self signature next header #[]
-              | some (.continue_ label state tail) =>
+              | some marker@(.continue_ label _ state tail) =>
+                  claimLoopMarker fn marker
                   emitLoopContinue label state blockName instrs
                   if tail && !(← get).builtLoopExits.contains label then
                     modify fun s => { s with builtLoopExits := label :: s.builtLoopExits }
@@ -1085,7 +1104,8 @@ private partial def walk (env : Environment) (signatures : FunSignatures) (self 
                       | throwError "loop {label} has no header state"
                     let exitInstrs ← assignLoopState label state headerState #[]
                     walk env signatures self signature next (← loopExit label) exitInstrs
-              | some (.break_ label state) =>
+              | some marker@(.break_ label _ state) =>
+                  claimLoopMarker fn marker
                   emitLoopBreak label state blockName instrs
                   if !(← get).builtLoopExits.contains label then
                     let some (tailState, tailNext) := assocFind? label (← get).loopTails

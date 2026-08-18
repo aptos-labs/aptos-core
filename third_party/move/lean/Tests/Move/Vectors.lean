@@ -48,7 +48,7 @@ move_module Vectors where
   fun insertMiddle : Action U64 := do
     let values : Move.Vector U64 := vector![10, 30]
     let valuesRef ← &mut values
-    valuesRef.insert 1 20
+    Move.Vector.insert valuesRef 1 20
     let updated ← *valuesRef
     let middle ← &updated[1]
     (*middle)
@@ -60,7 +60,7 @@ move_module Vectors where
   fun removeMiddle : Action U64 := do
     let values : Move.Vector U64 := vector![10, 20, 30]
     let valuesRef ← &mut values
-    let removed ← valuesRef.remove 1
+    let removed ← Move.Vector.remove valuesRef 1
     let updated ← *valuesRef
     let shifted ← &updated[1]
     let shiftedValue ← *shifted

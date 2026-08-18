@@ -159,24 +159,12 @@ move_module Calls where
   verify callChoose
 
   verify recursiveChoose by
-    unfold recursiveChoose.contract recursiveChoose.sourceSpec
-    intro _moveSpecState
-    apply Move.Verify.satisfies_fix
-    intro recursive recursiveVerified
-    unfold recursiveChoose.bodySpec Move.Verify.Satisfies at *
-    intro done initial _
-    cases done with
+    contract_intro
+    cases args with
     | false =>
-        constructor
-        · intro result final execution
-          apply (recursiveVerified true initial trivial).1 result final
-          simpa [Move.Semantics.Spec.bind, Move.Semantics.Spec.pure] using execution
-        · intro code execution
-          apply (recursiveVerified true initial trivial).2 code
-          simpa [Move.Semantics.Spec.bind, Move.Semantics.Spec.pure] using execution
-    | true =>
-        constructor <;> intros <;>
-          simp_all [Move.Semantics.Spec.pure]
+        simpa [wp_norm] using Move.Verify.wp_of_satisfies
+          (args := true) (initial := initial) recursiveVerified trivial
+    | true => simp [wp_norm]
 
   verify ordinaryRecursiveChoose by
     unfold ordinaryRecursiveChoose.contract ordinaryRecursiveChoose.sourceSpec

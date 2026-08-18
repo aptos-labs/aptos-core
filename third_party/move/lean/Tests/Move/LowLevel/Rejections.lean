@@ -237,12 +237,51 @@ move_module SourceVerificationRejection where
     ensures slot = 7;
     aborts_if False
 
+  namespace Vector
+
+    fun insert (_slot : &mut Move.Vector U64) (_index value : U64) :
+        Action Unit := do
+      abort value
+
+  end Vector
+
+  fun callsShadowedVectorInsert : Action Unit := do
+    let values : Move.Vector U64 := vector![1]
+    let slot ← &mut values
+    Vector.insert slot 0 7
+
+  /--
+  error: effectful Move callee `Tests.MovePrograms.Calls.Rejection.SourceVerificationRejection.Vector.insert` has no source specification; declare its `spec` before specifying this caller
+  -/
+  #guard_msgs in
+  spec callsShadowedVectorInsert where
+    ensures True;
+    aborts_if False
+
+  fun callsReceiverStyleVectorInsert : Action Unit := do
+    let values : Move.Vector U64 := vector![1]
+    let slot ← &mut values
+    slot.insert 0 7
+
+  /--
+  error: automatic source specifications require fully qualified `Move.Vector.insert` or `Move.Vector.remove`
+  -/
+  #guard_msgs in
+  spec callsReceiverStyleVectorInsert where
+    ensures True;
+    aborts_if False
+
   fun overwrite (slot : &mut U64) (replacement : U64) : Action Unit := do
     slot := replacement
 
   spec overwrite (slot : &mut U64) (replacement : U64) where
     ensures slot = replacement;
     aborts_if False
+
+  verify overwrite by
+    contract_intro
+    simp [wp_norm, Move.Verify.assignSpecBody,
+      Move.Semantics.Mutation.write]
 
   fun callsOverwrite (slot : &mut U64) : Action Unit := do
     overwrite slot 9

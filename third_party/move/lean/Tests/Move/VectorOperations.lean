@@ -59,6 +59,17 @@ move_module VectorOperations where
     ensures result = 3;
     aborts_if False
 
+  /-- Native vector length observes a borrowed vector through an explicit
+  reference read in the normalized IR. -/
+  fun borrowedLength : Action U64 := do
+    let values : Move.Vector U64 := vector![1, 2, 3]
+    let valuesRef ← &values
+    pure valuesRef.length
+
+  spec borrowedLength where
+    ensures result = 3;
+    aborts_if False
+
   fun boolRoundTrip (value : Bool) : Action Bool := do
     let values := vector![value]
     let result ← &values[0]
@@ -99,7 +110,7 @@ move_module VectorOperations where
   fun insertMiddle : Action U64 := do
     let values : Move.Vector U64 := vector![10, 30]
     let valuesRef ← &mut values
-    valuesRef.insert 1 20
+    Move.Vector.insert valuesRef 1 20
     let updated ← *valuesRef
     let middle ← &updated[1]
     (*middle)
@@ -111,8 +122,8 @@ move_module VectorOperations where
   fun insertEdges : Action U64 := do
     let values : Move.Vector U64 := vector![20]
     let valuesRef ← &mut values
-    valuesRef.insert 0 10
-    valuesRef.insert 2 30
+    Move.Vector.insert valuesRef 0 10
+    Move.Vector.insert valuesRef 2 30
     let updated ← *valuesRef
     let first ← &updated[0]
     let left ← *first
@@ -127,7 +138,7 @@ move_module VectorOperations where
   fun removeMiddle : Action U64 := do
     let values : Move.Vector U64 := vector![10, 20, 30]
     let valuesRef ← &mut values
-    let removed ← valuesRef.remove 1
+    let removed ← Move.Vector.remove valuesRef 1
     let updated ← *valuesRef
     let shifted ← &updated[1]
     let shiftedValue ← *shifted
@@ -140,7 +151,7 @@ move_module VectorOperations where
   fun insertOutOfBounds : Action U64 := do
     let values : Move.Vector U64 := vector![1]
     let valuesRef ← &mut values
-    valuesRef.insert 2 9
+    Move.Vector.insert valuesRef 2 9
     pure 0
 
   spec insertOutOfBounds where
@@ -150,7 +161,7 @@ move_module VectorOperations where
   fun removeOutOfBounds : Action U64 := do
     let values : Move.Vector U64 := vector![1]
     let valuesRef ← &mut values
-    valuesRef.remove 1
+    Move.Vector.remove valuesRef 1
 
   fun readOutOfBounds : Action U64 := do
     let values : Move.Vector U64 := vector![1]
@@ -229,6 +240,20 @@ move_module VectorOperations where
 
   verify nested
 
+  verify borrowedLength by
+    unfold borrowedLength.contract borrowedLength.sourceSpec Move.Verify.Satisfies
+    intro State
+    rintro ⟨⟩ initial _
+    constructor
+    · intro result final execution
+      simp only [Move.Semantics.Spec.bind, Move.Semantics.Spec.pure] at execution
+      rcases execution with ⟨value, middle, ⟨rfl, rfl⟩, rfl, rfl⟩
+      simp [Move.Vector.empty, Move.Vector.push, Move.Vector.length]
+      apply U64.ext
+      rfl
+    · intro code execution
+      simp at execution
+
   verify boolRoundTrip
 
   verify mutateAndRead by
@@ -289,6 +314,7 @@ move_module VectorOperations where
   #test run "pushed" [] [] = Tests.okU64 9
   #test run "setEdges" [] [] = Tests.okU64 40
   #test run "nested" [] [] = Tests.okU64 3
+  #test run "borrowedLength" [] [] = Tests.okU64 3
   #test run "boolRoundTrip" [] [.bool true] = Tests.okBool true
   #test run "boolRoundTrip" [] [.bool false] = Tests.okBool false
   #test run "mutateAndRead" [] [] = Tests.okU64 27

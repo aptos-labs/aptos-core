@@ -125,6 +125,15 @@ move_module Loops where
     ensures result = n;
     aborts_if False
 
+  /-- Reassigning a loop-entry binding through `←` must carry that binding
+  to the loop exit. -/
+  fun arrowReassignLoop (n : U64) : Action U64 := do
+    let mut n := n
+    loop
+      n ← pure 0
+      break
+    pure n
+
   @[move_struct]
   structure Counter where
     value : U64
@@ -165,22 +174,14 @@ move_module Loops where
   /-! ## Proofs -/
 
   verify countDown by
-    unfold countDown.contract countDown.sourceSpec
-    intro State
-    simp only [Move.Semantics.Spec.pure_bind]
-    apply Move.Verify.satisfies_fix_of_wp
-    intro recursive recursiveVerified
-    intro n initial _
-    by_cases hloop : Move.Verify.Source.logicalLT 0 n
-    · simp only [hloop, if_true]
-      change 0 < n.toNat at hloop
+    contract_intro
+    move_cases hloop : Move.Verify.Source.logicalLT 0 args
+    ·
       rw [Move.Semantics.Checked.subSpec_one_eq_pure_of_pos hloop,
         Move.Semantics.Spec.pure_bind]
       exact Move.Verify.wp_of_satisfies recursiveVerified trivial
-    · simp only [hloop, if_false]
-      change ¬0 < n.toNat at hloop
-      have nzero := Move.U64.eq_zero_of_not_pos hloop
-      subst n
+    ·
+      subst args
       simp [Move.Verify.wp, Move.Semantics.Spec.pure]
 
   verify countDownLoop by
@@ -192,11 +193,13 @@ move_module Loops where
     intro n initial _
     by_cases hloop : Move.Verify.Source.logicalLT n 1
     · simp only [hloop, if_true]
+      simp only [Move.Verify.Source.logicalLT_u64] at hloop
       change n.toNat < 1 at hloop
       have nzero := Move.U64.eq_zero_of_not_pos (by omega : ¬0 < n.toNat)
       subst n
       simp [Move.Verify.wp, Move.Semantics.Spec.pure]
     · simp only [hloop, if_false]
+      simp only [Move.Verify.Source.logicalLT_u64] at hloop
       change ¬n.toNat < 1 at hloop
       have positive : 0 < n.toNat := by omega
       rw [Move.Semantics.Checked.subSpec_one_eq_pure_of_pos positive,
@@ -225,6 +228,7 @@ move_module Loops where
       intro recursive recursiveVerified n initial permitted
       by_cases hloop : Move.Verify.Source.logicalLT n 3
       · simp only [hloop, if_true]
+        simp only [Move.Verify.Source.logicalLT_u64] at hloop
         change n.toNat < 3 at hloop
         have safe : n.toNat + 1 < U64.size := by
           simp [U64.size]
@@ -241,6 +245,7 @@ move_module Loops where
         simp [Move.U64.toNat_ofNat]
         omega
       · simp only [hloop, if_false]
+        simp only [Move.Verify.Source.logicalLT_u64] at hloop
         change ¬n.toNat < 3 at hloop
         have nequals : n = 3 := by
           apply Move.U64.ext
@@ -252,11 +257,13 @@ move_module Loops where
     intro recursive recursiveVerified n initial _
     by_cases hloop : Move.Verify.Source.logicalLT 0 n
     · simp only [hloop, if_true]
+      simp only [Move.Verify.Source.logicalLT_u64] at hloop
       change 0 < n.toNat at hloop
       rw [Move.Semantics.Checked.subSpec_one_eq_pure_of_pos hloop,
         Move.Semantics.Spec.pure_bind]
       exact Move.Verify.wp_of_satisfies recursiveVerified trivial
     · simp only [hloop, if_false]
+      simp only [Move.Verify.Source.logicalLT_u64] at hloop
       change ¬0 < n.toNat at hloop
       have nzero := Move.U64.eq_zero_of_not_pos hloop
       subst n
@@ -291,11 +298,13 @@ move_module Loops where
       intro recursive recursiveVerified n initial _
       by_cases hloop : Move.Verify.Source.logicalLT n 1
       · simp only [hloop, if_true]
+        simp only [Move.Verify.Source.logicalLT_u64] at hloop
         change n.toNat < 1 at hloop
         have nzero := Move.U64.eq_zero_of_not_pos (by omega : ¬0 < n.toNat)
         subst n
         simp [Move.Verify.wp, Move.Semantics.Spec.pure, loopContract]
       · simp only [hloop, if_false]
+        simp only [Move.Verify.Source.logicalLT_u64] at hloop
         change ¬n.toNat < 1 at hloop
         have positive : 0 < n.toNat := by omega
         rw [Move.Semantics.Checked.subSpec_one_eq_pure_of_pos positive,
@@ -327,11 +336,13 @@ move_module Loops where
       intro recursive recursiveVerified n initial _
       by_cases hloop : Move.Verify.Source.logicalLT n 1
       · simp only [hloop, if_true]
+        simp only [Move.Verify.Source.logicalLT_u64] at hloop
         change n.toNat < 1 at hloop
         have nzero := Move.U64.eq_zero_of_not_pos (by omega : ¬0 < n.toNat)
         subst n
         simp [Move.Verify.wp, Move.Semantics.Spec.pure, loopContract]
       · simp only [hloop, if_false]
+        simp only [Move.Verify.Source.logicalLT_u64] at hloop
         change ¬n.toNat < 1 at hloop
         have positive : 0 < n.toNat := by omega
         rw [Move.Semantics.Checked.subSpec_one_eq_pure_of_pos positive,
@@ -368,11 +379,13 @@ move_module Loops where
       intro recursive recursiveVerified n initial _
       by_cases hloop : Move.Verify.Source.logicalLT 0 n
       · simp only [hloop, if_true]
+        simp only [Move.Verify.Source.logicalLT_u64] at hloop
         change 0 < n.toNat at hloop
         rw [Move.Semantics.Checked.subSpec_one_eq_pure_of_pos hloop,
           Move.Semantics.Spec.pure_bind]
         exact Move.Verify.wp_of_satisfies recursiveVerified trivial
       · simp only [hloop, if_false]
+        simp only [Move.Verify.Source.logicalLT_u64] at hloop
         change ¬0 < n.toNat at hloop
         have nzero := Move.U64.eq_zero_of_not_pos hloop
         subst n
@@ -523,6 +536,7 @@ move_module Loops where
   #test run "labeledProof" [] [] = Tests.okU64 7
   #test run "shadowedLoopState" [] [.u64 7] = Tests.okU64 7
   #test run "shadowedLoopArrow" [] [.u64 7] = Tests.okU64 7
+  #test run "arrowReassignLoop" [] [.u64 3] = Tests.okU64 0
   #test run "drain" (memory 3 4) [.address 3]
     = Tests.okRet (memory 3 0) [.u64 0]
   #test run "early" [] [.bool true] = Tests.okU64 7
