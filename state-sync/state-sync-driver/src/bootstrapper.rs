@@ -32,6 +32,7 @@ use aptos_types::{
 };
 use futures::channel::oneshot;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use tokio::task::yield_now;
 
 // Useful bootstrapper constants
 const BOOTSTRAPPER_LOG_INTERVAL_SECS: u64 = 3;
@@ -386,9 +387,27 @@ impl<
 
     /// Marks bootstrapping as complete and notifies any listeners
     pub async fn bootstrapping_complete(&mut self) -> Result<(), Error> {
+        if self.is_bootstrapped() {
+            return Ok(());
+        }
+
+        self.reset_active_stream(None).await?;
+
+        // Chunks already handed to the storage synchronizer may still be in flight.
+        while self.storage_synchronizer.pending_storage_data() {
+            sample!(
+                SampleRate::Duration(Duration::from_secs(PENDING_DATA_LOG_FREQ_SECS)),
+                info!("Waiting for the storage synchronizer to handle pending data!")
+            );
+
+            // Yield to avoid starving the storage synchronizer threads.
+            yield_now().await;
+        }
+
+        self.storage_synchronizer.finish_chunk_executor();
+        self.bootstrapped = true;
         info!(LogSchema::new(LogEntry::Bootstrapper)
             .message("The node has successfully bootstrapped!"));
-        self.bootstrapped = true;
         self.notify_listeners_if_bootstrapped().await
     }
 
@@ -418,8 +437,6 @@ impl<
                     )));
                 }
             }
-            self.reset_active_stream(None).await?;
-            self.storage_synchronizer.finish_chunk_executor(); // The bootstrapper is now complete
         }
 
         Ok(())
