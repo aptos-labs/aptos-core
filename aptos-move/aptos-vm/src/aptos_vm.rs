@@ -8,7 +8,7 @@ use crate::{
     errors::{discarded_output, expect_only_successful_execution},
     function_usage::{
         finish_transaction_usage, get_function_usage_sink, new_transaction_calls_handle,
-        FunctionUsageTraceRecorder,
+        FunctionUsageSink, FunctionUsageTraceRecorder,
     },
     gas::{check_gas, make_prod_gas_meter, make_prod_gas_meter_impl},
     keyless_validation,
@@ -292,6 +292,8 @@ pub(crate) fn get_or_vm_startup_failure<'a, T>(
 pub struct AptosVM {
     is_simulation: bool,
     env: AptosEnvironment,
+    /// Opt-in off-chain function-usage observer, captured when this VM is constructed.
+    function_usage: Option<Arc<dyn FunctionUsageSink>>,
     /// If true, user payloads are allowed not to run extra checks and instead trace execution. If
     /// so, Block-STM replays the trace and performs these checks at post-commit time once. Note
     /// that checks might still be performed in-place based on a heuristic such as payload type.
@@ -306,6 +308,7 @@ impl AptosVM {
         Self {
             is_simulation: false,
             env: env.clone(),
+            function_usage: get_function_usage_sink(),
             // There is no tracing by default because it can only be done if there is access to
             // Block-STM.
             async_runtime_checks_enabled: false,
@@ -2363,8 +2366,10 @@ impl AptosVM {
             code_storage,
         );
 
-        let function_usage =
-            get_function_usage_sink().map(|sink| (sink, new_transaction_calls_handle()));
+        let function_usage = self
+            .function_usage
+            .as_ref()
+            .map(|sink| (Arc::clone(sink), new_transaction_calls_handle()));
         let async_runtime_checks = self.should_perform_async_runtime_checks_for_txn(txn);
         let (status, output) = match (&function_usage, async_runtime_checks) {
             (Some((sink, calls)), true) => self.execute_user_transaction_impl(

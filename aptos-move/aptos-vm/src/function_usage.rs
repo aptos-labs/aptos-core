@@ -12,10 +12,7 @@ use move_vm_runtime::{
 };
 use move_vm_types::instr::Instruction;
 use serde::{Deserialize, Serialize};
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc, Mutex, MutexGuard, OnceLock,
-};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 /// Stable function identity used by framework-usage reports.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -85,7 +82,6 @@ pub trait FunctionUsageSink: Send + Sync {
 }
 
 static FUNCTION_USAGE_SINK: OnceLock<Mutex<Option<Arc<dyn FunctionUsageSink>>>> = OnceLock::new();
-static FUNCTION_USAGE_ENABLED: AtomicBool = AtomicBool::new(false);
 
 fn sink_slot() -> &'static Mutex<Option<Arc<dyn FunctionUsageSink>>> {
     FUNCTION_USAGE_SINK.get_or_init(|| Mutex::new(None))
@@ -99,22 +95,23 @@ fn lock_sink_slot() -> MutexGuard<'static, Option<Arc<dyn FunctionUsageSink>>> {
 
 /// Installs the process-wide sink used by the dedicated off-chain replay command.
 ///
-/// Only one analysis may be active in a process. Dropping the returned guard uninstalls the sink.
+/// Only one analysis may be active in a process. Install the sink before constructing the VMs
+/// that execute the analysis. Dropping the returned guard uninstalls the sink for subsequently
+/// constructed VMs; existing VMs retain their captured sink.
 pub fn install_function_usage_sink(
     sink: Arc<dyn FunctionUsageSink>,
 ) -> anyhow::Result<FunctionUsageSinkGuard> {
     let mut slot = lock_sink_slot();
     anyhow::ensure!(slot.is_none(), "a function usage sink is already installed");
     *slot = Some(sink);
-    FUNCTION_USAGE_ENABLED.store(true, Ordering::Release);
     Ok(FunctionUsageSinkGuard { _private: () })
 }
 
-/// Returns the active off-chain usage sink, if collection is enabled.
+/// Returns the active off-chain usage sink for a VM being constructed.
+///
+/// VMs retain this `Option` for their lifetime, avoiding global synchronization on the hot
+/// transaction-execution path.
 pub(crate) fn get_function_usage_sink() -> Option<Arc<dyn FunctionUsageSink>> {
-    if !FUNCTION_USAGE_ENABLED.load(Ordering::Acquire) {
-        return None;
-    }
     lock_sink_slot().clone()
 }
 
@@ -124,7 +121,6 @@ pub struct FunctionUsageSinkGuard {
 
 impl Drop for FunctionUsageSinkGuard {
     fn drop(&mut self) {
-        FUNCTION_USAGE_ENABLED.store(false, Ordering::Release);
         *lock_sink_slot() = None;
     }
 }
