@@ -10,7 +10,7 @@ use aptos_vm::function_usage::{
 };
 use clap::Parser;
 use move_binary_format::{access::ModuleAccess, file_format::Visibility};
-use move_core_types::language_storage::ModuleId;
+use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
 use serde::Serialize;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
@@ -20,12 +20,17 @@ use std::{
     sync::{Mutex, MutexGuard},
 };
 
-const SCHEMA_VERSION: u64 = 3;
+const SCHEMA_VERSION: u64 = 4;
 
 // Caller and root-function identities originate in replayed transactions. Keep the detailed
 // call-path map bounded so a stream of uniquely addressed wrapper modules cannot exhaust a
 // replay worker. Per-function totals are collected independently and remain complete.
 const MAX_USAGE_DETAIL_ROWS: usize = 100_000;
+
+// Root entry functions are also transaction-controlled identities. Keep a separate, smaller
+// budget for the active-caller summary so it cannot reintroduce the unbounded growth avoided
+// above.
+const MAX_ACTIVE_ENTRY_FUNCTION_CALLER_ROWS: usize = 25_000;
 
 #[derive(Parser)]
 #[group(id = "FrameworkUsageOpt")]
@@ -93,9 +98,24 @@ struct FunctionUsageKey {
     outcome: TransactionOutcome,
 }
 
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+struct ActiveEntryFunctionCallerKey {
+    address: AccountAddress,
+    entry_function: FunctionId,
+    outcome: TransactionOutcome,
+}
+
 #[derive(Clone, Debug, Default, Serialize)]
 struct UsageCounts {
     invocation_count: u64,
+    transaction_count: u64,
+    first_version: Version,
+    last_version: Version,
+}
+
+#[derive(Clone, Debug, Default, Serialize)]
+struct ActiveEntryFunctionCallerCounts {
+    framework_invocation_count: u64,
     transaction_count: u64,
     first_version: Version,
     last_version: Version,
@@ -134,9 +154,14 @@ struct FrameworkUsageReport {
     usage_detail_truncated: bool,
     dropped_usage_invocation_count: u64,
     dropped_usage_transaction_count: u64,
+    active_entry_function_caller_row_limit: usize,
+    active_entry_function_callers_truncated: bool,
+    dropped_active_entry_function_framework_invocation_count: u64,
+    dropped_active_entry_function_transaction_count: u64,
     functions: Vec<FunctionInventoryRow>,
     function_usage: Vec<FunctionUsageRow>,
     usage: Vec<UsageRow>,
+    active_entry_function_callers: Vec<ActiveEntryFunctionCallerRow>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -147,14 +172,26 @@ struct FunctionUsageRow {
     counts: UsageCounts,
 }
 
+#[derive(Clone, Debug, Serialize)]
+struct ActiveEntryFunctionCallerRow {
+    #[serde(flatten)]
+    key: ActiveEntryFunctionCallerKey,
+    #[serde(flatten)]
+    counts: ActiveEntryFunctionCallerCounts,
+}
+
 #[derive(Default)]
 struct CollectorState {
     pending: HashMap<HashValue, TransactionFunctionUsage>,
     function_usage: BTreeMap<FunctionUsageKey, UsageCounts>,
     usage: BTreeMap<UsageKey, UsageCounts>,
+    active_entry_function_callers:
+        BTreeMap<ActiveEntryFunctionCallerKey, ActiveEntryFunctionCallerCounts>,
     transaction_usage_records: u64,
     dropped_usage_invocation_count: u64,
     dropped_usage_transaction_count: u64,
+    dropped_active_entry_function_framework_invocation_count: u64,
+    dropped_active_entry_function_transaction_count: u64,
     ledger_timestamps: Option<(u64, u64)>,
 }
 
@@ -164,6 +201,7 @@ pub(crate) struct FrameworkUsageCollector {
     target_modules: BTreeSet<ModuleId>,
     inventory: Vec<FunctionInventoryRow>,
     usage_detail_row_limit: usize,
+    active_entry_function_caller_row_limit: usize,
     state: Mutex<CollectorState>,
 }
 
@@ -208,6 +246,7 @@ impl FrameworkUsageCollector {
             target_modules,
             inventory,
             usage_detail_row_limit,
+            active_entry_function_caller_row_limit: MAX_ACTIVE_ENTRY_FUNCTION_CALLER_ROWS,
             state: Mutex::new(CollectorState::default()),
         }
     }
@@ -236,6 +275,45 @@ impl FrameworkUsageCollector {
             .context("transaction usage record count overflow")?;
 
         let outcome = TransactionOutcome::from(&transaction.status);
+        let root_function = transaction.root_function.clone();
+        let framework_invocation_count = u64::try_from(transaction.calls.len())
+            .context("framework invocation count does not fit in u64")?;
+        let entry_function_with_module = root_function
+            .as_ref()
+            .filter(|_| framework_invocation_count > 0)
+            .and_then(|entry_function| {
+                entry_function
+                    .module_id
+                    .as_ref()
+                    .map(|module_id| (entry_function, module_id))
+            });
+        if let Some((entry_function, module_id)) = entry_function_with_module {
+            let key = ActiveEntryFunctionCallerKey {
+                address: *module_id.address(),
+                entry_function: entry_function.clone(),
+                outcome: outcome.clone(),
+            };
+            if state.active_entry_function_callers.contains_key(&key)
+                || state.active_entry_function_callers.len()
+                    < self.active_entry_function_caller_row_limit
+            {
+                merge_active_entry_function_caller_counts(
+                    &mut state.active_entry_function_callers,
+                    key,
+                    framework_invocation_count,
+                    version,
+                )?;
+            } else {
+                state.dropped_active_entry_function_framework_invocation_count = state
+                    .dropped_active_entry_function_framework_invocation_count
+                    .checked_add(framework_invocation_count)
+                    .context("dropped active entry function framework invocation count overflow")?;
+                state.dropped_active_entry_function_transaction_count = state
+                    .dropped_active_entry_function_transaction_count
+                    .checked_add(1)
+                    .context("dropped active entry function transaction count overflow")?;
+            }
+        }
         let mut per_transaction = BTreeMap::<UsageKey, u64>::new();
         let mut per_function = BTreeMap::<FunctionUsageKey, u64>::new();
         let mut usage_detail_truncated = false;
@@ -252,7 +330,7 @@ impl FrameworkUsageCollector {
             let key = UsageKey {
                 callee: call.callee,
                 caller: call.caller,
-                root_function: transaction.root_function.clone(),
+                root_function: root_function.clone(),
                 call_kind: call.kind,
                 outcome: outcome.clone(),
             };
@@ -333,6 +411,14 @@ impl FrameworkUsageCollector {
             usage_detail_truncated: state.dropped_usage_invocation_count > 0,
             dropped_usage_invocation_count: state.dropped_usage_invocation_count,
             dropped_usage_transaction_count: state.dropped_usage_transaction_count,
+            active_entry_function_caller_row_limit: self.active_entry_function_caller_row_limit,
+            active_entry_function_callers_truncated: state
+                .dropped_active_entry_function_transaction_count
+                > 0,
+            dropped_active_entry_function_framework_invocation_count: state
+                .dropped_active_entry_function_framework_invocation_count,
+            dropped_active_entry_function_transaction_count: state
+                .dropped_active_entry_function_transaction_count,
             functions: self.inventory.clone(),
             function_usage: state
                 .function_usage
@@ -346,6 +432,14 @@ impl FrameworkUsageCollector {
                 .usage
                 .iter()
                 .map(|(key, counts)| UsageRow {
+                    key: key.clone(),
+                    counts: counts.clone(),
+                })
+                .collect(),
+            active_entry_function_callers: state
+                .active_entry_function_callers
+                .iter()
+                .map(|(key, counts)| ActiveEntryFunctionCallerRow {
                     key: key.clone(),
                     counts: counts.clone(),
                 })
@@ -406,6 +500,33 @@ fn merge_usage_counts<K: Ord>(
     Ok(())
 }
 
+fn merge_active_entry_function_caller_counts(
+    aggregate: &mut BTreeMap<ActiveEntryFunctionCallerKey, ActiveEntryFunctionCallerCounts>,
+    key: ActiveEntryFunctionCallerKey,
+    framework_invocation_count: u64,
+    version: Version,
+) -> Result<()> {
+    let counts = aggregate
+        .entry(key)
+        .or_insert(ActiveEntryFunctionCallerCounts {
+            framework_invocation_count: 0,
+            transaction_count: 0,
+            first_version: version,
+            last_version: version,
+        });
+    counts.framework_invocation_count = counts
+        .framework_invocation_count
+        .checked_add(framework_invocation_count)
+        .context("active entry function framework invocation count overflow")?;
+    counts.transaction_count = counts
+        .transaction_count
+        .checked_add(1)
+        .context("active entry function transaction count overflow")?;
+    counts.first_version = counts.first_version.min(version);
+    counts.last_version = counts.last_version.max(version);
+    Ok(())
+}
+
 impl FunctionUsageSink for FrameworkUsageCollector {
     fn is_target_module(&self, module_id: &ModuleId) -> bool {
         self.target_modules.contains(module_id)
@@ -437,8 +558,12 @@ mod tests {
         let collector = FrameworkUsageCollector::new(10, 20);
         let module_id = collector.target_modules.iter().next().unwrap().clone();
         let callee = FunctionId {
-            module_id: Some(module_id),
+            module_id: Some(module_id.clone()),
             function_name: "target".to_owned(),
+        };
+        let root_function = FunctionId {
+            module_id: Some(module_id),
+            function_name: "entry".to_owned(),
         };
         let call = aptos_vm::function_usage::FunctionCall {
             caller: None,
@@ -449,7 +574,7 @@ mod tests {
             transaction_hash: HashValue::zero(),
             sender: AccountAddress::ONE,
             multisig_address: None,
-            root_function: None,
+            root_function: Some(root_function),
             status: TransactionStatus::Keep(ExecutionStatus::Success),
             calls: vec![call.clone(), call],
         });
@@ -465,6 +590,10 @@ mod tests {
         let call_path_counts = state.usage.values().next().unwrap();
         assert_eq!(call_path_counts.invocation_count, 2);
         assert_eq!(call_path_counts.transaction_count, 1);
+        let active_entry_function_counts =
+            state.active_entry_function_callers.values().next().unwrap();
+        assert_eq!(active_entry_function_counts.framework_invocation_count, 2);
+        assert_eq!(active_entry_function_counts.transaction_count, 1);
         drop(state);
 
         let output_dir = aptos_temppath::TempPath::new();
@@ -482,6 +611,19 @@ mod tests {
         assert_eq!(report["usage_detail_truncated"], false);
         assert_eq!(report["dropped_usage_invocation_count"], 0);
         assert_eq!(report["dropped_usage_transaction_count"], 0);
+        assert_eq!(
+            report["active_entry_function_caller_row_limit"],
+            MAX_ACTIVE_ENTRY_FUNCTION_CALLER_ROWS
+        );
+        assert_eq!(report["active_entry_function_callers_truncated"], false);
+        assert_eq!(
+            report["active_entry_function_callers"][0]["entry_function"]["function_name"],
+            "entry"
+        );
+        assert_eq!(
+            report["active_entry_function_callers"][0]["framework_invocation_count"],
+            2
+        );
         assert_eq!(report["function_usage"][0]["invocation_count"], 2);
         assert_eq!(report["usage"][0]["transaction_count"], 1);
         let html = std::fs::read_to_string(html_output).unwrap();

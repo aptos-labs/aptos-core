@@ -1490,9 +1490,11 @@ def print_logs(failed_workpod_logs: list[str], txn_mismatch_logs: list[str]) -> 
             logger.info(log)
 
 
-def _merge_usage_rows(reports: list[dict], field: str) -> list[dict]:
+def _merge_usage_rows(
+    reports: list[dict], field: str, invocation_count_field: str = "invocation_count"
+) -> list[dict]:
     count_fields = {
-        "invocation_count",
+        invocation_count_field,
         "transaction_count",
         "first_version",
         "last_version",
@@ -1505,13 +1507,13 @@ def _merge_usage_rows(reports: list[dict], field: str) -> list[dict]:
             if encoded_key not in merged:
                 merged[encoded_key] = {
                     **key,
-                    "invocation_count": 0,
+                    invocation_count_field: 0,
                     "transaction_count": 0,
                     "first_version": row["first_version"],
                     "last_version": row["last_version"],
                 }
             aggregate = merged[encoded_key]
-            aggregate["invocation_count"] += row["invocation_count"]
+            aggregate[invocation_count_field] += row[invocation_count_field]
             aggregate["transaction_count"] += row["transaction_count"]
             aggregate["first_version"] = min(
                 aggregate["first_version"], row["first_version"]
@@ -1520,6 +1522,35 @@ def _merge_usage_rows(reports: list[dict], field: str) -> list[dict]:
                 aggregate["last_version"], row["last_version"]
             )
     return [merged[key] for key in sorted(merged)]
+
+
+def read_framework_usage_html_template() -> str:
+    template_path = os.path.abspath(
+        os.path.join(
+            os.path.dirname(__file__),
+            "../../storage/db-tool/src/framework_usage_template.rs",
+        )
+    )
+    with open(template_path) as template_file:
+        source = template_file.read()
+    start = 'pub(crate) const TEMPLATE: &str = r#"'
+    _, found_start, template = source.partition(start)
+    if not found_start:
+        raise RuntimeError(
+            "framework usage HTML template has an invalid Rust delimiter"
+        )
+    template, found_end, _ = template.partition('\n"#;')
+    if not found_end:
+        raise RuntimeError(
+            "framework usage HTML template has an invalid Rust delimiter"
+        )
+    return template
+
+
+def format_module_id(module_id: Optional[dict]) -> str:
+    if module_id is None:
+        return ""
+    return f"{module_id['address']}::{module_id['name']}"
 
 
 def merge_framework_usage_reports(
@@ -1564,6 +1595,7 @@ def merge_framework_usage_reports(
             "target_modules",
             "functions",
             "usage_detail_row_limit",
+            "active_entry_function_caller_row_limit",
         ):
             if report[field] != reference[field]:
                 raise RuntimeError(f"framework usage shard metadata differs for {field}")
@@ -1617,11 +1649,30 @@ def merge_framework_usage_reports(
         "dropped_usage_transaction_count": sum(
             report["dropped_usage_transaction_count"] for report in reports
         ),
+        "active_entry_function_caller_row_limit": reference[
+            "active_entry_function_caller_row_limit"
+        ],
+        "active_entry_function_callers_truncated": any(
+            report["active_entry_function_callers_truncated"] for report in reports
+        ),
+        "dropped_active_entry_function_framework_invocation_count": sum(
+            report["dropped_active_entry_function_framework_invocation_count"]
+            for report in reports
+        ),
+        "dropped_active_entry_function_transaction_count": sum(
+            report["dropped_active_entry_function_transaction_count"]
+            for report in reports
+        ),
         "shard_count": len(reports),
         "gcs_prefix": f"gs://{bucket_name}/{prefix}/" if bucket_name else None,
         "functions": reference["functions"],
         "function_usage": _merge_usage_rows(reports, "function_usage"),
         "usage": _merge_usage_rows(reports, "usage"),
+        "active_entry_function_callers": _merge_usage_rows(
+            reports,
+            "active_entry_function_callers",
+            "framework_invocation_count",
+        ),
     }
 
     os.makedirs(output_dir, exist_ok=True)
@@ -1630,14 +1681,7 @@ def merge_framework_usage_reports(
         json.dump(merged, output, indent=2)
         output.write("\n")
 
-    template_path = os.path.abspath(
-        os.path.join(
-            os.path.dirname(__file__),
-            "../../storage/db-tool/src/framework_usage_template.html",
-        )
-    )
-    with open(template_path) as template_file:
-        html = template_file.read()
+    html = read_framework_usage_html_template()
     embedded_json = json.dumps(merged, separators=(",", ":"))
     for character, escape in (
         ("&", r"\u0026"),
@@ -1695,6 +1739,7 @@ def merge_framework_usage_reports(
             writer.writerow(
                 {
                     **function,
+                    "module_id": format_module_id(function["module_id"]),
                     "invocation_count": total.get("invocation_count", 0),
                     "transaction_count": total.get("transaction_count", 0),
                     "first_version": total.get("first_version", ""),
@@ -1725,11 +1770,13 @@ def merge_framework_usage_reports(
             root = row.get("root_function") or {}
             writer.writerow(
                 {
-                    "callee_module_id": row["callee"].get("module_id", ""),
+                    "callee_module_id": format_module_id(
+                        row["callee"].get("module_id")
+                    ),
                     "callee_function": row["callee"]["function_name"],
-                    "caller_module_id": caller.get("module_id", ""),
+                    "caller_module_id": format_module_id(caller.get("module_id")),
                     "caller_function": caller.get("function_name", ""),
-                    "root_module_id": root.get("module_id", ""),
+                    "root_module_id": format_module_id(root.get("module_id")),
                     "root_function": root.get("function_name", ""),
                     "call_kind": row["call_kind"],
                     "outcome": row["outcome"],

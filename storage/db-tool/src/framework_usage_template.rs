@@ -86,6 +86,11 @@ button.link { border:0; background:none; color:var(--accent); padding:0; cursor:
     <div class="paths table-wrap" id="detail-paths"></div>
   </section>
   <section class="panel">
+    <h2>Active entry-function callers</h2>
+    <p class="meta">Observed entry functions that invoked framework code, grouped by their module address.</p>
+    <div class="table-wrap"><table><thead><tr><th>Module address</th><th class="function-column">Entry function</th><th>Outcome</th><th class="number">Transactions</th><th class="number">Framework invocations</th><th>Observed versions</th></tr></thead><tbody id="active-entry-function-callers"></tbody></table></div>
+  </section>
+  <section class="panel">
     <div class="table-heading"><h2 id="table-title">Functions</h2><button class="module-control" id="toggle-modules" type="button">Collapse all modules</button></div>
     <div class="table-wrap"><table><thead><tr><th>Evidence</th><th class="function-column">Function</th><th>Visibility</th><th class="number">Transactions</th><th class="number">Invocations</th><th class="number">Successful</th><th>Observed versions</th><th>Callers</th></tr></thead><tbody id="function-rows"></tbody></table></div>
   </section>
@@ -163,11 +168,35 @@ function renderCards() {
   ];
   document.getElementById("cards").innerHTML = values.map(([label,value,cls]) => `<div class="card"><span class="label">${esc(label)}</span><span class="value ${cls}">${esc(value)}</span></div>`).join("");
   document.getElementById("subtitle").textContent = `Replay ${nf.format(report.start_version)}–${nf.format(report.end_version)} · schema ${report.schema_version} · build ${report.git_sha || "unknown"}`;
+  const truncationNotices = [];
   if (report.usage_detail_truncated) {
+    truncationNotices.push(`Call-path detail is partial: it is capped at ${nf.format(report.usage_detail_row_limit)} rows; ${nf.format(report.dropped_usage_invocation_count)} invocation${report.dropped_usage_invocation_count === 1 ? " was" : "s were"} omitted across ${nf.format(report.dropped_usage_transaction_count)} transaction${report.dropped_usage_transaction_count === 1 ? "" : "s"}. Per-function totals remain complete.`);
+  }
+  if (report.active_entry_function_callers_truncated) {
+    truncationNotices.push(`Active entry-function callers are partial: they are capped at ${nf.format(report.active_entry_function_caller_row_limit)} rows; ${nf.format(report.dropped_active_entry_function_framework_invocation_count)} framework invocation${report.dropped_active_entry_function_framework_invocation_count === 1 ? " was" : "s were"} omitted across ${nf.format(report.dropped_active_entry_function_transaction_count)} transaction${report.dropped_active_entry_function_transaction_count === 1 ? "" : "s"}.`);
+  }
+  if (truncationNotices.length) {
     const warning = document.getElementById("usage-detail-warning");
     warning.hidden = false;
-    warning.textContent = `Call-path detail is partial: it is capped at ${nf.format(report.usage_detail_row_limit)} rows; ${nf.format(report.dropped_usage_invocation_count)} invocation${report.dropped_usage_invocation_count === 1 ? " was" : "s were"} omitted across ${nf.format(report.dropped_usage_transaction_count)} transaction${report.dropped_usage_transaction_count === 1 ? "" : "s"}. Per-function totals remain complete.`;
+    warning.textContent = truncationNotices.join(" ");
   }
+}
+
+function renderActiveEntryFunctionCallers() {
+  const groups = new Map();
+  for (const caller of report.active_entry_function_callers ?? []) {
+    if (!groups.has(caller.address)) groups.set(caller.address, []);
+    groups.get(caller.address).push(caller);
+  }
+  const rows = [...groups].sort(([left], [right]) => left.localeCompare(right)).map(([address, callers]) => {
+    callers.sort((left, right) => right.transaction_count - left.transaction_count || right.framework_invocation_count - left.framework_invocation_count || functionName(left.entry_function).localeCompare(functionName(right.entry_function)));
+    const transactionCount = callers.reduce((total, caller) => total + caller.transaction_count, 0);
+    const invocationCount = callers.reduce((total, caller) => total + caller.framework_invocation_count, 0);
+    const header = `<tr class="module-row"><td colspan="6"><code title="${esc(address)}">${esc(shortAddress(address))}</code><span class="module-summary">${nf.format(callers.length)} active entry function${callers.length === 1 ? "" : "s"} · ${nf.format(transactionCount)} transaction${transactionCount === 1 ? "" : "s"} · ${nf.format(invocationCount)} framework invocations</span></td></tr>`;
+    const callerRows = callers.map(caller => `<tr><td></td><td class="function-column"><code title="${esc(functionName(caller.entry_function))}">${esc(functionName(caller.entry_function))}</code></td><td>${esc(caller.outcome)}</td><td class="number">${nf.format(caller.transaction_count)}</td><td class="number">${nf.format(caller.framework_invocation_count)}</td><td>${nf.format(caller.first_version)}–${nf.format(caller.last_version)}</td></tr>`).join("");
+    return header + callerRows;
+  });
+  document.getElementById("active-entry-function-callers").innerHTML = rows.length ? rows.join("") : `<tr><td colspan="6" class="empty">No module entry functions invoked framework code in this replay range.</td></tr>`;
 }
 
 function renderFunctions() {
@@ -249,6 +278,7 @@ document.getElementById("toggle-modules").addEventListener("click", () => {
   renderFunctions();
 });
 renderCards();
+renderActiveEntryFunctionCallers();
 renderFunctions();
 </script>
 </body>
