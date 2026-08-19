@@ -72,9 +72,8 @@ impl ImageOptimizer {
                 while let Some(chunk) = stream.next().await {
                     let chunk = chunk.context("Failed to load image bytes")?;
                     if img_bytes.len() + chunk.len() > max_file_size_bytes as usize {
-                        FAILED_TO_OPTIMIZE_IMAGE_COUNT
-                            .with_label_values(&["Image file too large"])
-                            .inc();
+                        // The outer retry match arm records the failure metric, so
+                        // don't increment here or a single oversize body counts twice.
                         return Err(backoff::Error::permanent(anyhow::anyhow!(
                             "Image optimizer received file exceeding {} bytes, skipping",
                             max_file_size_bytes
@@ -87,7 +86,7 @@ impl ImageOptimizer {
                     image::guess_format(&img_bytes).context("Failed to guess image format")?;
 
                 match format {
-                    ImageFormat::Gif | ImageFormat::Avif => Ok((img_bytes.to_vec(), format)),
+                    ImageFormat::Gif | ImageFormat::Avif => Ok((img_bytes, format)),
                     _ => {
                         let img = image::load_from_memory(&img_bytes)
                             .context(format!("Failed to load image from memory: {} bytes", size))?;

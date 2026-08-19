@@ -71,9 +71,8 @@ impl JSONParser {
                 while let Some(chunk) = stream.next().await {
                     let chunk = chunk.context("Failed to get JSON")?;
                     if body.len() + chunk.len() > max_file_size_bytes as usize {
-                        FAILED_TO_PARSE_JSON_COUNT
-                            .with_label_values(&["json file too large"])
-                            .inc();
+                        // The outer retry match arm records the failure metric, so
+                        // don't increment here or a single oversize body counts twice.
                         return Err(backoff::Error::permanent(anyhow::anyhow!(
                             "JSON parser received file exceeding {} bytes, skipping",
                             max_file_size_bytes
