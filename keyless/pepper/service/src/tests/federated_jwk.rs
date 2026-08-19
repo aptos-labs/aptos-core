@@ -31,6 +31,7 @@ impl TestJWTPayload {
             iss: issuer,
             sub: "".into(),
             email: None,
+            email_verified: None,
             azp: None,
             aud: "".into(),
             iat: 0,

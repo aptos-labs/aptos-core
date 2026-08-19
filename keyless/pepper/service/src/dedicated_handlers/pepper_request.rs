@@ -324,6 +324,22 @@ fn get_uid_key_and_value(
                 EMAIL_UID_KEY
             ))
         })?;
+        // Only issue an email-keyed pepper for a verified email, matching the
+        // on-chain rule in Claims::get_uid_val. The claim may be a boolean or a
+        // boolean-as-a-string, so accept both true forms.
+        let email_verified = claims.claims.email_verified.as_ref().ok_or_else(|| {
+            PepperServiceError::BadRequest(
+                "The email uid_key was specified, but the email_verified claim was not found in the JWT".into(),
+            )
+        })?;
+        let verified =
+            email_verified.as_bool().unwrap_or(false) || email_verified.as_str() == Some("true");
+        if !verified {
+            return Err(PepperServiceError::BadRequest(
+                "The email uid_key was specified, but the email_verified claim was not \"true\""
+                    .into(),
+            ));
+        }
         return Ok((uid_key, uid_value));
     }
 
@@ -578,6 +594,37 @@ mod tests {
     }
 
     #[test]
+    fn test_get_uid_key_and_value_email_requires_verified() {
+        // A missing email_verified claim should be rejected for the email uid_key
+        let mut claims = create_test_token_data();
+        claims.claims.email_verified = None;
+        assert!(get_uid_key_and_value(Some(EMAIL_UID_KEY.into()), &claims).is_err());
+
+        // email_verified = false (bool or string) should be rejected
+        for value in [
+            serde_json::Value::Bool(false),
+            serde_json::Value::String("false".into()),
+        ] {
+            let mut claims = create_test_token_data();
+            claims.claims.email_verified = Some(value);
+            assert!(get_uid_key_and_value(Some(EMAIL_UID_KEY.into()), &claims).is_err());
+        }
+
+        // email_verified = true (bool or string) should be accepted
+        for value in [
+            serde_json::Value::Bool(true),
+            serde_json::Value::String("true".into()),
+        ] {
+            let mut claims = create_test_token_data();
+            claims.claims.email_verified = Some(value);
+            let (uid_key, uid_val) =
+                get_uid_key_and_value(Some(EMAIL_UID_KEY.into()), &claims).unwrap();
+            assert_eq!(uid_key, EMAIL_UID_KEY);
+            assert_eq!(uid_val, TEST_TOKEN_EMAIL);
+        }
+    }
+
+    #[test]
     fn test_invalid_derivation_path() {
         let invalid_path = Some("m/44'/637'/0'/0/0'".to_string()); // Invalid because one index is not hardened
         let result = get_verified_derivation_path(invalid_path);
@@ -741,6 +788,7 @@ mod tests {
                 iat: 0,
                 nonce: TEST_TOKEN_NONCE.into(),
                 email: Some(TEST_TOKEN_EMAIL.into()),
+                email_verified: Some(serde_json::Value::Bool(true)),
                 azp: None,
             },
             header: Default::default(),
