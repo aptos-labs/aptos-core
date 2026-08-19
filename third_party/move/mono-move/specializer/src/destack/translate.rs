@@ -64,7 +64,7 @@ pub fn translate_module(module: PreparedModule, interner: &impl Interner) -> VMR
             let ssa = ssa.with_fusion_passes()?.with_test_utils_passes(&module)?;
 
             // Pass: Greedy Slot Allocation (consumes SSA, produces named-slot IR)
-            let alloc = super::slot_alloc::allocate_slots(ssa)?;
+            let alloc = super::slot_alloc::allocate_slots(ssa, &module)?;
 
             Ok(Some(FunctionIR {
                 name_idx,

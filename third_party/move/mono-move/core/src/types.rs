@@ -176,7 +176,9 @@ pub fn strip_ref(ref_ty: InternedType) -> Option<InternedType> {
 /// Whether `ty` contains no [`Type::TypeParam`] node.
 ///
 /// Inherits safety contract of [`view_type`].
-/// TODO(metering): convert to non-recursive.
+/// TODO(metering): memoize by interned type and convert to non-recursive.
+/// The recursion has no cache and `.all()` short-circuits only on `false`,
+/// so a type whose interned tree shares subtypes is traversed exponentially.
 pub fn is_closed_type(ty: InternedType) -> bool {
     match view_type(ty) {
         Type::TypeParam { .. } => false,
