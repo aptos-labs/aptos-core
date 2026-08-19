@@ -39,6 +39,8 @@ concurrency:
 jobs:
   build-and-test:
     runs-on: runs-on,cpu=32,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    env:
+      LEAN_NUM_THREADS: "1"
     steps:
       - uses: actions/checkout@v4
 
@@ -48,11 +50,19 @@ jobs:
       - name: Build the frontend CLI
         run: cargo build --locked -p aptos --bin aptos
 
-      - name: Build Lean core, examples, and tests
+      - name: Build Lean core and examples
         working-directory: third_party/move/lean
         env:
           APTOS_CLI: ${{ github.workspace }}/target/debug/aptos
         run: |
           source "$HOME/.profile"
-          lake build Move
-          lake build Examples Tests
+          lake build MoveModel
+          lake build Examples
+
+      - name: Run Lean tests
+        working-directory: third_party/move/lean
+        env:
+          APTOS_CLI: ${{ github.workspace }}/target/debug/aptos
+        run: |
+          source "$HOME/.profile"
+          lake test

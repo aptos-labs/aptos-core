@@ -38,6 +38,7 @@ move-command-line-common = { workspace = true }
 move-core-types = { workspace = true }
 move-ir-types = { workspace = true }
 move-model = { workspace = true }
+move-model-exchange = { workspace = true }
 move-stackless-bytecode = { workspace = true }
 move-symbol-pool = { workspace = true }
 num = { workspace = true }

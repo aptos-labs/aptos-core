@@ -25,7 +25,11 @@ pub enum SpecSort {
     Bool,
     Num,
     Address,
+    TypeParameter(usize),
     Struct(usize),
+    StructInst(usize, Vec<SpecSort>),
+    Enum(usize),
+    EnumInst(usize, Vec<SpecSort>),
     Vector(Box<SpecSort>),
 }
 
@@ -35,7 +39,11 @@ impl fmt::Display for SpecSort {
             SpecSort::Bool => write!(f, "bool"),
             SpecSort::Num => write!(f, "num"),
             SpecSort::Address => write!(f, "address"),
+            SpecSort::TypeParameter(i) => write!(f, "type parameter {}", i),
             SpecSort::Struct(r) => write!(f, "struct {}", r),
+            SpecSort::StructInst(r, args) => write!(f, "struct {}<{:?}>", r, args),
+            SpecSort::Enum(r) => write!(f, "enum {}", r),
+            SpecSort::EnumInst(r, args) => write!(f, "enum {}<{:?}>", r, args),
             SpecSort::Vector(t) => write!(f, "vector<{}>", t),
         }
     }
@@ -48,9 +56,35 @@ impl SpecSort {
             Type::Bool => SpecSort::Bool,
             Type::U64 => SpecSort::Num,
             Type::Address | Type::Signer => SpecSort::Address,
+            Type::TypeParameter(i) => SpecSort::TypeParameter(*i),
             Type::Struct(r) => SpecSort::Struct(*r),
+            Type::StructInst(r, args) => {
+                SpecSort::StructInst(*r, args.iter().map(SpecSort::of).collect())
+            },
+            Type::Enum(r) => SpecSort::Enum(*r),
+            Type::EnumInst(r, args) => {
+                SpecSort::EnumInst(*r, args.iter().map(SpecSort::of).collect())
+            },
             Type::Vector(t) => SpecSort::Vector(Box::new(SpecSort::of(t))),
             Type::Ref(t) | Type::MutRef(t) => SpecSort::of(t),
+        }
+    }
+
+    fn instantiate(self, args: &[SpecSort]) -> SpecSort {
+        match self {
+            SpecSort::TypeParameter(i) => {
+                args.get(i).cloned().unwrap_or(SpecSort::TypeParameter(i))
+            },
+            SpecSort::StructInst(r, inner) => SpecSort::StructInst(
+                r,
+                inner.into_iter().map(|ty| ty.instantiate(args)).collect(),
+            ),
+            SpecSort::EnumInst(r, inner) => SpecSort::EnumInst(
+                r,
+                inner.into_iter().map(|ty| ty.instantiate(args)).collect(),
+            ),
+            SpecSort::Vector(inner) => SpecSort::Vector(Box::new(inner.instantiate(args))),
+            sort => sort,
         }
     }
 }
@@ -82,6 +116,30 @@ pub struct SpecCheckCtx<'a> {
 }
 
 impl SpecCheckCtx<'_> {
+    fn value_sort(value: &Value) -> Result<SpecSort, String> {
+        match value {
+            Value::Bool(_) => Ok(SpecSort::Bool),
+            Value::U64(_) => Ok(SpecSort::Num),
+            Value::Address(_) => Ok(SpecSort::Address),
+            Value::Vector(values) => {
+                let Some(first) = values.first() else {
+                    return Err("an empty vector constant has no inferable spec sort".to_string());
+                };
+                let elem = Self::value_sort(first)?;
+                for value in &values[1..] {
+                    let found = Self::value_sort(value)?;
+                    if found != elem {
+                        return Err(format!(
+                            "vector constant has elements of different sorts {} and {}",
+                            elem, found
+                        ));
+                    }
+                }
+                Ok(SpecSort::Vector(Box::new(elem)))
+            },
+        }
+    }
+
     /// Mutable references are represented by `Value.mut` in Lean, and
     /// specifications have no implicit operation which extracts its payload.
     /// Immutable references are represented transparently and remain valid
@@ -122,9 +180,7 @@ impl SpecCheckCtx<'_> {
         e: &SpecExp,
     ) -> Result<SpecSort, String> {
         match e {
-            SpecExp::Value(Value::Bool(_)) => Ok(SpecSort::Bool),
-            SpecExp::Value(Value::U64(_)) => Ok(SpecSort::Num),
-            SpecExp::Value(Value::Address(_)) => Ok(SpecSort::Address),
+            SpecExp::Value(value) => Self::value_sort(value),
             SpecExp::Local(i) => {
                 let bound = match pos {
                     ClausePos::Invariant | ClausePos::Any => self.locals.len(),
@@ -240,6 +296,9 @@ impl SpecCheckCtx<'_> {
             },
             SpecExp::Select(offset, e) => match self.sort(pos, binders, e)? {
                 SpecSort::Struct(r) => self.field_sort(r, *offset),
+                SpecSort::StructInst(r, args) => {
+                    Ok(self.field_sort(r, *offset)?.instantiate(&args))
+                },
                 s => Err(format!("field selection applies to a struct, found {}", s)),
             },
             SpecExp::Len(e) => match self.sort(pos, binders, e)? {
@@ -450,6 +509,7 @@ mod tests {
     fn empty_fun(locals: &[Type], returns: &[Type]) -> Function {
         Function {
             name: "f".to_string(),
+            type_parameters: vec![],
             params: 1,
             locals: locals.to_vec(),
             returns: returns.to_vec(),
@@ -516,10 +576,12 @@ mod tests {
     fn accepts_well_sorted_contract_and_invariant() {
         let structs = vec![Struct {
             name: "R".to_string(),
+            type_parameters: vec![],
             fields: vec![Field {
                 name: "v".to_string(),
                 ty: Type::U64,
             }],
+            variants: None,
         }];
         let locals = vec![Type::Address, Type::U64];
         let returns = vec![Type::U64];
@@ -574,7 +636,9 @@ mod tests {
     fn rejects_unknown_memory_labels() {
         let structs = vec![Struct {
             name: "R".to_string(),
+            type_parameters: vec![],
             fields: vec![],
+            variants: None,
         }];
         let locals = vec![Type::Address];
         let mut fun = empty_fun(&locals, &[]);

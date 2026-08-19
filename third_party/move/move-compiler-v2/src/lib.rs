@@ -14,6 +14,7 @@ pub mod logging;
 pub mod options;
 pub mod pipeline;
 pub mod plan_builder;
+pub mod xir;
 
 use crate::{
     diagnostics::Emitter,

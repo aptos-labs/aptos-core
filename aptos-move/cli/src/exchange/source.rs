@@ -32,11 +32,18 @@ pub fn move_source_to_module(source: &str) -> Result<exchange::Module> {
 
 /// Runs the source-mode frontend on a Move source file.
 pub fn move_file_to_module(path: &std::path::Path) -> Result<exchange::Module> {
+    // Vector bytecodes are represented in stackless code as calls into the
+    // standard `0x1::vector` module. Load the same source dependency used by
+    // compiler-v2's own tests so source checking and the model both have the
+    // native function declarations available.
+    let stdlib_sources = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../third_party/move/move-stdlib/sources")
+        .canonicalize()?;
     let compiler_options = move_compiler_v2::Options {
         sources: vec![path.to_string_lossy().to_string()],
-        dependencies: vec![],
+        dependencies: vec![stdlib_sources.to_string_lossy().to_string()],
         sources_deps: vec![],
-        named_address_mapping: vec![],
+        named_address_mapping: vec!["std=0x1".to_string()],
         compiler_version: Some(LATEST_STABLE_COMPILER_VERSION_VALUE),
         skip_attribute_checks: true,
         known_attributes: Default::default(),

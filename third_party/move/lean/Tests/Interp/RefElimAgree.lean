@@ -1,8 +1,8 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
-import Move.IR.RefElim
-import Move.IR.Interp
+import MoveModel.IR.RefElim.Transform
+import MoveModel.IR.Interp.Exec
 import Tests.Interp.References
 import Tests.Interp.Globals
 
@@ -22,8 +22,8 @@ death on only one branch edge (edge splitting).
 
 namespace Tests.Interp.RefElimAgree
 
-open Move.IR
-open Move.Frontend
+open MoveModel.IR
+open MoveModel.Frontend.XIR
 
 /-- Eliminate references from every function of a dumped module, through
 the whole-program pass (borrow summaries for cross-call references). -/
@@ -523,7 +523,7 @@ private def borrowImmSlot : FunDecl := mkFun 1
 #guard elimImmRefs noSigs borrowImmSlot matches .error _
 
 private def oneFieldΔ : StructDecls :=
-  fun r => if r = 0 then some ⟨[.u64]⟩ else none
+  fun r => if r = 0 then some { fields := [.u64] } else none
 
 /-- Reading a parent reference while a *written* derived reference is
 live: the parent's checked-out payload is stale below the child. -/
@@ -555,7 +555,7 @@ private def parentReadAfterDeath : FunDecl := mkFun 0
 #guard refElimFun (fun _ => none) oneFieldΔ parentReadAfterDeath matches .ok _
 
 private def twoFieldΔ : StructDecls :=
-  fun r => if r = 0 then some ⟨[.u64, .u64]⟩ else none
+  fun r => if r = 0 then some { fields := [.u64, .u64] } else none
 
 /-- Two live borrows of the *same* field (aliasing): rejected. -/
 private def sameFieldTwice : FunDecl := mkFun 1

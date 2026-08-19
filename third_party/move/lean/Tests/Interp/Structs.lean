@@ -1,9 +1,9 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
-import Move.Frontend.Elab
+import MoveModel.Frontend.Elab
 import Tests.Common
-import Move.IR.Interp
+import MoveModel.IR.Interp.Exec
 
 /-!
 # Interpreter Tests: Structs
@@ -15,8 +15,8 @@ structs, tuple returns, and structural equality.
 
 namespace Tests.Interp.Structs
 
-open Move.IR
-open Move.Frontend
+open MoveModel.IR
+open MoveModel.Frontend.XIR
 
 def structsM : MProgram := moveM% "
 module 0x42::structs {

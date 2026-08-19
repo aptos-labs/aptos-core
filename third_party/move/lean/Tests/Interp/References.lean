@@ -1,9 +1,9 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
-import Move.Frontend.Elab
+import MoveModel.Frontend.Elab
 import Tests.Common
-import Move.IR.Interp
+import MoveModel.IR.Interp.Exec
 
 /-!
 # Interpreter Tests: References (within one frame)
@@ -17,8 +17,8 @@ crossing call boundaries (the checkout call semantics) in
 
 namespace Tests.Interp.References
 
-open Move.IR
-open Move.Frontend
+open MoveModel.IR
+open MoveModel.Frontend.XIR
 
 def refsM : MProgram := moveM% "
 module 0x42::refs {
