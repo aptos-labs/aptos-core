@@ -943,7 +943,10 @@ impl FunctionTranslator<'_> {
                 arity(dsts, srcs, 1, 1, oper)?;
                 StacklessOperation::Not
             },
-            Oper::VecPack => StacklessOperation::Vector,
+            Oper::VecPack => {
+                ensure!(dsts.len() == 1, "vec_pack expects one destination");
+                StacklessOperation::Vector
+            },
             Oper::Pack => {
                 ensure!(dsts.len() == 1, "pack expects one destination");
                 let sid = self.struct_from_type(self.local(dsts[0])?)?;
@@ -1016,36 +1019,54 @@ impl FunctionTranslator<'_> {
                 self.field(sid, *field)?;
                 StacklessOperation::GetField(self.module_id, sid, self.type_args(args)?, *field)
             },
-            Oper::MoveTo(id) => StacklessOperation::MoveTo(
-                self.module_id,
-                struct_at(self.struct_ids, *id, &self.decl.name)?,
-                vec![],
-            ),
-            Oper::MoveToInst(id, args) => StacklessOperation::MoveTo(
-                self.module_id,
-                struct_at(self.struct_ids, *id, &self.decl.name)?,
-                self.type_args(args)?,
-            ),
-            Oper::MoveFrom(id) => StacklessOperation::MoveFrom(
-                self.module_id,
-                struct_at(self.struct_ids, *id, &self.decl.name)?,
-                vec![],
-            ),
-            Oper::MoveFromInst(id, args) => StacklessOperation::MoveFrom(
-                self.module_id,
-                struct_at(self.struct_ids, *id, &self.decl.name)?,
-                self.type_args(args)?,
-            ),
-            Oper::Exists(id) => StacklessOperation::Exists(
-                self.module_id,
-                struct_at(self.struct_ids, *id, &self.decl.name)?,
-                vec![],
-            ),
-            Oper::ExistsInst(id, args) => StacklessOperation::Exists(
-                self.module_id,
-                struct_at(self.struct_ids, *id, &self.decl.name)?,
-                self.type_args(args)?,
-            ),
+            Oper::MoveTo(id) => {
+                arity(dsts, srcs, 0, 2, oper)?;
+                StacklessOperation::MoveTo(
+                    self.module_id,
+                    struct_at(self.struct_ids, *id, &self.decl.name)?,
+                    vec![],
+                )
+            },
+            Oper::MoveToInst(id, args) => {
+                arity(dsts, srcs, 0, 2, oper)?;
+                StacklessOperation::MoveTo(
+                    self.module_id,
+                    struct_at(self.struct_ids, *id, &self.decl.name)?,
+                    self.type_args(args)?,
+                )
+            },
+            Oper::MoveFrom(id) => {
+                arity(dsts, srcs, 1, 1, oper)?;
+                StacklessOperation::MoveFrom(
+                    self.module_id,
+                    struct_at(self.struct_ids, *id, &self.decl.name)?,
+                    vec![],
+                )
+            },
+            Oper::MoveFromInst(id, args) => {
+                arity(dsts, srcs, 1, 1, oper)?;
+                StacklessOperation::MoveFrom(
+                    self.module_id,
+                    struct_at(self.struct_ids, *id, &self.decl.name)?,
+                    self.type_args(args)?,
+                )
+            },
+            Oper::Exists(id) => {
+                arity(dsts, srcs, 1, 1, oper)?;
+                StacklessOperation::Exists(
+                    self.module_id,
+                    struct_at(self.struct_ids, *id, &self.decl.name)?,
+                    vec![],
+                )
+            },
+            Oper::ExistsInst(id, args) => {
+                arity(dsts, srcs, 1, 1, oper)?;
+                StacklessOperation::Exists(
+                    self.module_id,
+                    struct_at(self.struct_ids, *id, &self.decl.name)?,
+                    self.type_args(args)?,
+                )
+            },
             Oper::Function(id) => StacklessOperation::Function(
                 self.module_id,
                 *self
@@ -1078,16 +1099,22 @@ impl FunctionTranslator<'_> {
                 self.field(sid, *field)?;
                 StacklessOperation::BorrowField(self.module_id, sid, self.type_args(args)?, *field)
             },
-            Oper::BorrowGlobal(id) => StacklessOperation::BorrowGlobal(
-                self.module_id,
-                struct_at(self.struct_ids, *id, &self.decl.name)?,
-                vec![],
-            ),
-            Oper::BorrowGlobalInst(id, args) => StacklessOperation::BorrowGlobal(
-                self.module_id,
-                struct_at(self.struct_ids, *id, &self.decl.name)?,
-                self.type_args(args)?,
-            ),
+            Oper::BorrowGlobal(id) => {
+                arity(dsts, srcs, 1, 1, oper)?;
+                StacklessOperation::BorrowGlobal(
+                    self.module_id,
+                    struct_at(self.struct_ids, *id, &self.decl.name)?,
+                    vec![],
+                )
+            },
+            Oper::BorrowGlobalInst(id, args) => {
+                arity(dsts, srcs, 1, 1, oper)?;
+                StacklessOperation::BorrowGlobal(
+                    self.module_id,
+                    struct_at(self.struct_ids, *id, &self.decl.name)?,
+                    self.type_args(args)?,
+                )
+            },
             Oper::ReadRef => {
                 arity(dsts, srcs, 1, 1, oper)?;
                 StacklessOperation::ReadRef
@@ -1438,6 +1465,42 @@ mod tests {
         let mut targets = FunctionTargetsHolder::default();
         let error = import_sources(&mut env, &[source], &mut targets).unwrap_err();
         assert!(format!("{error:#}").contains("ReadRef expects 1 destinations and 1 sources"));
+    }
+
+    #[test]
+    fn rejects_invalid_vector_and_global_operation_arities() {
+        for (oper, message) in [
+            (Oper::VecPack, "vec_pack expects one destination"),
+            (
+                Oper::MoveTo(0),
+                "MoveTo(0) expects 0 destinations and 2 sources",
+            ),
+            (
+                Oper::MoveFrom(0),
+                "MoveFrom(0) expects 1 destinations and 1 sources",
+            ),
+            (
+                Oper::Exists(0),
+                "Exists(0) expects 1 destinations and 1 sources",
+            ),
+            (
+                Oper::BorrowGlobal(0),
+                "BorrowGlobal(0) expects 1 destinations and 1 sources",
+            ),
+        ] {
+            let mut module = account_module();
+            module.functions[0].blocks[0].instrs[0] = Instr::Call(vec![], oper, vec![]);
+            let source = parse_source(
+                PathBuf::from("invalid-operation-arity.xir.json"),
+                String::new(),
+                &serde_json::to_string(&module).unwrap(),
+            )
+            .unwrap();
+            let mut env = GlobalEnv::new();
+            let mut targets = FunctionTargetsHolder::default();
+            let error = import_sources(&mut env, &[source], &mut targets).unwrap_err();
+            assert!(format!("{error:#}").contains(message));
+        }
     }
 
     #[test]

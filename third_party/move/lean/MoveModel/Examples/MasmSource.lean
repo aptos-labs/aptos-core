@@ -258,38 +258,83 @@ theorem masm_withdraw_verified : Verified account 0 := by
   rcases hacct with habs | ⟨b, hb, hpres⟩
   · -- Account absent: `move_from` aborts; the abort exit's assert needs
     -- the first `aborts_if` disjunct.
-    intro gt hgt hg
-    simp only [List.mem_cons, List.not_mem_nil, or_false] at hgt
-    rcases hgt with rfl | rfl
+    change m { resource := 0, typeArgs := [] } a = none at habs
+    refine (wpCmds_onOk_step rfl).mpr ?_
+    simp [initLocals, Oper.sem]
+    refine (wpCmds_onOk_step rfl).mpr ?_
+    simp [initLocals, Oper.sem, habs, VState.doAbort]
+    iterate 9 refine (wpCmds_onOk_skip rfl).mpr ?_
+    refine ⟨fun _ => ?_, fun hclear => ?_⟩
     · simp [wpCmds, Holds, VState.preEnvOf, VState.doAbort, preEnv,
         abortEnv, postEnv, initLocals, habs, Oper.sem, SpecEnv.memAt,
         Contract.abortsHolds, MoveState.writeLocal]
-    · simp [initLocals, habs, Oper.sem, VState.doAbort,
-        flagClear] at hg
-  · rcases Nat.lt_or_ge b amt with hlt | hge
+    · simp [flagClear, VState.doAbort] at hclear
+  · change m { resource := 0, typeArgs := [] } a = some (.struct [.u64 b]) at hpres
+    rcases Nat.lt_or_ge b amt with hlt | hge
     · -- Insufficient balance: `sub` aborts; second `aborts_if` disjunct.
-      intro gt hgt hg
-      simp only [List.mem_cons, List.not_mem_nil, or_false] at hgt
-      rcases hgt with rfl | rfl
+      refine (wpCmds_onOk_step rfl).mpr ?_
+      simp [initLocals, Oper.sem]
+      refine (wpCmds_onOk_step rfl).mpr ?_
+      simp [initLocals, Oper.sem, hpres, MoveState.writeLocals,
+        MoveState.writeLocal]
+      refine (wpCmds_onOk_step rfl).mpr ?_
+      simp [initLocals, Oper.sem, MoveState.writeLocals,
+        MoveState.writeLocal]
+      refine (wpCmds_onOk_step rfl).mpr ?_
+      simp [initLocals, Oper.sem, MoveState.writeLocals,
+        MoveState.writeLocal]
+      refine (wpCmds_onOk_step rfl).mpr ?_
+      simp [initLocals, Oper.sem, MoveState.writeLocals,
+        Nat.not_le.mpr hlt, VState.doAbort]
+      iterate 6 refine (wpCmds_onOk_skip rfl).mpr ?_
+      refine ⟨fun _ => ?_, fun hclear => ?_⟩
       · simp [wpCmds, Holds, VState.preEnvOf, VState.doAbort, preEnv,
           abortEnv, postEnv, initLocals, hpres, Oper.sem, SpecEnv.memAt,
           Contract.abortsHolds, MoveState.writeLocals,
           Nat.not_le.mpr hlt, hlt]
-      · simp [initLocals, hpres, Oper.sem, VState.doAbort,
-          flagClear, MoveState.writeLocals,           Nat.not_le.mpr hlt] at hg
+      · simp [flagClear, VState.doAbort] at hclear
     · -- Sufficient balance: normal path through the return exit.
-      intro gt hgt hg
-      simp only [List.mem_cons, List.not_mem_nil, or_false] at hgt
-      rcases hgt with rfl | rfl
-      · simp [initLocals, hpres, Oper.sem, flagSet, hge,
-          MoveState.writeLocals,           memRemove] at hg
+      refine (wpCmds_onOk_step rfl).mpr ?_
+      simp [initLocals, Oper.sem]
+      refine (wpCmds_onOk_step rfl).mpr ?_
+      simp [initLocals, Oper.sem, hpres, MoveState.writeLocals,
+        MoveState.writeLocal]
+      refine (wpCmds_onOk_step rfl).mpr ?_
+      simp [initLocals, Oper.sem, MoveState.writeLocals,
+        MoveState.writeLocal]
+      refine (wpCmds_onOk_step rfl).mpr ?_
+      simp [initLocals, Oper.sem, MoveState.writeLocals,
+        MoveState.writeLocal]
+      refine (wpCmds_onOk_step rfl).mpr ?_
+      simp [initLocals, Oper.sem, MoveState.writeLocals, hge]
+      refine (wpCmds_onOk_step rfl).mpr ?_
+      simp [initLocals, Oper.sem, MoveState.writeLocals,
+        MoveState.writeLocal]
+      refine (wpCmds_onOk_step rfl).mpr ?_
+      simp [initLocals, Oper.sem, MoveState.writeLocals,
+        MoveState.writeLocal]
+      refine (wpCmds_onOk_step rfl).mpr ?_
+      simp [initLocals, Oper.sem, MoveState.writeLocals,
+        MoveState.writeLocal]
+      refine (wpCmds_onOk_step rfl).mpr ?_
+      simp [initLocals, Oper.sem, MoveState.writeLocals,
+        MoveState.writeLocal]
+      refine (wpCmds_onOk_step rfl).mpr ?_
+      simp [initLocals, Oper.sem, MoveState.writeLocals, hpres, memRemove,
+        memWrite]
+      refine (wpCmds_onOk_step rfl).mpr ?_
+      simp [initLocals, Oper.sem, MoveState.writeLocals,
+        MoveState.writeLocal]
+      refine ⟨fun hset => ?_, fun _ => ?_⟩
+      · simp [flagSet] at hset
       · simp [wpCmds, Holds, VState.preEnvOf, VState.postEnvOf, preEnv,
           abortEnv, postEnv, initLocals, hpres, Oper.sem,
           SpecEnv.memAt, Contract.abortsFalse,
-          hge, memWrite, memRemove,           MoveState.writeLocals, agreesOutside, Contract.footprint]
+          hge, memWrite, memRemove, MoveState.writeLocals, agreesOutside, Contract.footprint]
         refine ⟨by omega, ?_⟩
         intro r a' hout
-        have hcond : ¬(r = 0 ∧ a' = a) := fun ⟨hr, ha'⟩ => hout hr.symm ha'
+        have hcond : ¬(r = { resource := 0 } ∧ a' = a) := fun ⟨hr, ha'⟩ =>
+          hout hr.symm ha'
         rw [if_neg hcond, if_neg hcond]
 
 def quantId : Program := masm% "
