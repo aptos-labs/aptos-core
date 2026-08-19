@@ -34,6 +34,8 @@ impl MaterializationError {
 pub enum DiscardReason {
     /// A transaction shape this executor does not support yet.
     Unsupported(&'static str),
+    /// A pre-execution check failed.
+    PreExecutionCheck(PreExecutionCheckFailure),
     /// A type argument failed to resolve.
     InvalidTypeArgument(String),
     Failure {
@@ -42,6 +44,22 @@ pub enum DiscardReason {
     },
     /// An executor-internal invariant violation.
     InvariantViolation(String),
+}
+
+/// The pre-execution bound a transaction violated. Sizes are in bytes, gas in
+/// gas units, prices in octas per gas unit.
+#[derive(Debug)]
+pub enum PreExecutionCheckFailure {
+    /// The signed transaction is larger than the allowed maximum.
+    TransactionTooLarge { size: u64, max: u64 },
+    /// The gas budget exceeds the per-transaction maximum.
+    GasBudgetAboveBound { max_gas: u64, bound: u64 },
+    /// The gas budget cannot cover the transaction's intrinsic cost.
+    GasBudgetBelowIntrinsicCost { max_gas: u64, min: u64 },
+    /// The gas unit price is below the on-chain minimum.
+    GasPriceBelowMinimum { price: u64, min: u64 },
+    /// The gas unit price is above the on-chain maximum.
+    GasPriceAboveMaximum { price: u64, max: u64 },
 }
 
 /// Which Move call the transaction was in when it failed.

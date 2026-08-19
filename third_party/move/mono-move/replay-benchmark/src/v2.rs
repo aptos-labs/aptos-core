@@ -12,9 +12,10 @@
 //! [`TransactionOutput`].
 
 use crate::{data::BenchmarkInput, measure, timing::TimingConfig, BenchmarkRun};
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
+use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_types::{
-    on_chain_config::{Features, OnChainConfig},
+    on_chain_config::{Features, GasScheduleV2, OnChainConfig},
     state_store::TStateView,
     transaction::{AuxiliaryInfo, TransactionAuxiliaryData, TransactionOutput},
 };
@@ -38,6 +39,15 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun
         .ok()
         .flatten()
         .unwrap_or_default();
+    let gas_schedule = GasScheduleV2::fetch_config(state_view)
+        .context("failed to read the gas schedule")?
+        .ok_or_else(|| anyhow!("no gas schedule in the captured state"))?;
+    let gas_feature_version = gas_schedule.feature_version;
+    let gas_params = AptosGasParameters::from_on_chain_gas_schedule(
+        &gas_schedule.into_btree_map(),
+        gas_feature_version,
+    )
+    .map_err(|e| anyhow!("malformed gas schedule: {e}"))?;
     let usage = state_view.get_usage()?;
     let executor = AptosTransactionExecutor::new(
         &guard,
@@ -45,6 +55,8 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun
         &module_provider,
         &data_provider,
         &features,
+        &gas_params,
+        gas_feature_version,
         usage,
     )
     .without_metering();

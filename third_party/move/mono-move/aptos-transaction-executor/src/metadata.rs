@@ -2,8 +2,9 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_types::transaction::{
+    authenticator::AnySignature,
     user_transaction_context::{TransactionIndexKind, UserTransactionContext},
-    AuxiliaryInfo, ReplayProtector, SessionId, SignedTransaction,
+    AuxiliaryInfo, PersistedAuxiliaryInfo, ReplayProtector, SessionId, SignedTransaction,
 };
 use move_core_types::account_address::AccountAddress;
 
@@ -17,6 +18,14 @@ pub(crate) struct TxnMetadata {
     pub secondary_auth_keys: Vec<Option<Vec<u8>>>,
     pub gas_unit_price: u64,
     pub max_gas_amount: u64,
+    /// Size of the full signed transaction.
+    pub transaction_size: u64,
+    /// Whether any signer authenticates with a keyless signature (a gas
+    /// surcharge applies).
+    pub is_keyless: bool,
+    /// Whether any signer authenticates with an SLH-DSA signature (a gas
+    /// surcharge applies).
+    pub is_slh_dsa: bool,
     pub expiration_timestamp_secs: u64,
     pub chain_id: u8,
     /// Whether the transaction carries an encrypted payload.
@@ -64,6 +73,18 @@ impl TxnMetadata {
                 .collect(),
             gas_unit_price: txn.gas_unit_price(),
             max_gas_amount: txn.max_gas_amount(),
+            transaction_size: txn.txn_bytes_len() as u64,
+            is_keyless: aptos_types::keyless::get_authenticators(txn)
+                .map(|auths| !auths.is_empty())
+                .unwrap_or(false),
+            is_slh_dsa: authenticator
+                .to_single_key_authenticators()
+                .map(|auths| {
+                    auths.iter().any(|auth| {
+                        matches!(auth.signature(), AnySignature::SlhDsa_Sha2_128s { .. })
+                    })
+                })
+                .unwrap_or(false),
             expiration_timestamp_secs: txn.expiration_timestamp_secs(),
             chain_id: txn.chain_id().id(),
             is_encrypted_txn: txn.is_encrypted_txn(),

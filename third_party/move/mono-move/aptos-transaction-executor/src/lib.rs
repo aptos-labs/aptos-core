@@ -16,11 +16,13 @@ mod materialize;
 mod metadata;
 mod natives;
 mod outcome;
+mod pre_execution_checks;
 mod providers;
 mod sys_calls;
 
 pub use errors::{
     DiscardReason, ExecutionStage, ExecutionStatus, MaterializationError, MoveExecutionFailure,
+    PreExecutionCheckFailure,
 };
 pub use executor::AptosTransactionExecutor;
 pub use natives::production_natives;

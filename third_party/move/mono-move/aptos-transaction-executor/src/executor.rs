@@ -7,8 +7,10 @@ use crate::{
     metadata::TxnMetadata,
     natives::transaction_extensions,
     outcome::TxnOutcome,
+    pre_execution_checks::PreExecutionChecker,
     sys_calls::{run_epilogue, run_prologue, TxnSigners},
 };
+use aptos_gas_schedule::AptosGasParameters;
 use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::Features,
@@ -42,6 +44,10 @@ pub struct AptosTransactionExecutor<'a> {
     // checks will -- but the coordinator already supplies them.
     #[allow(dead_code)]
     features: &'a Features,
+    /// The on-chain gas schedule, decoded; drives the pre-execution gas checks.
+    gas_params: &'a AptosGasParameters,
+    /// The gas schedule's feature version.
+    gas_feature_version: u64,
     /// State storage usage at the current epoch's beginning.
     usage: StateStorageUsage,
     /// If set, the payload runs unmetered and the epilogue charges a zero
@@ -59,6 +65,8 @@ impl<'a> AptosTransactionExecutor<'a> {
         module_provider: &'a dyn ModuleProvider,
         data_provider: &'a dyn ResourceProvider,
         features: &'a Features,
+        gas_params: &'a AptosGasParameters,
+        gas_feature_version: u64,
         usage: StateStorageUsage,
     ) -> Self {
         Self {
@@ -67,6 +75,8 @@ impl<'a> AptosTransactionExecutor<'a> {
             module_provider,
             data_provider,
             features,
+            gas_params,
+            gas_feature_version,
             usage,
             unmetered: false,
         }
@@ -106,12 +116,10 @@ impl<'a> AptosTransactionExecutor<'a> {
 
         // ======================== Pre-execution checks ========================
         // Reject what this executor cannot execute, before touching any state.
-        //
-        // TODO(metering, security): gas checks (`check_gas`): txn size bounds,
-        // gas price bounds, intrinsic gas coverage. Without them a transaction
-        // outside the configured bounds -- including a zero gas price -- buys a
-        // full `max_gas_amount` budget for free.
         let txn_data = TxnMetadata::new(txn, aux_info);
+        PreExecutionChecker::new(self.gas_params, self.gas_feature_version, &txn_data)
+            .run_checks()
+            .map_err(DiscardReason::PreExecutionCheck)?;
 
         let entry = match txn.payload().executable_ref() {
             Ok(TransactionExecutableRef::EntryFunction(entry)) => entry,

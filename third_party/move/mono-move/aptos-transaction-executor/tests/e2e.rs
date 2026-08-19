@@ -14,9 +14,10 @@
 // covered by other tests, such as the e2e move tests. Note that the sender's
 // store is masked, so a wrong debit there is not caught.
 
+use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_language_e2e_tests::{account::AccountData, executor::FakeExecutor};
 use aptos_types::{
-    on_chain_config::{Features, OnChainConfig},
+    on_chain_config::{Features, GasScheduleV2, OnChainConfig},
     state_store::StateView,
     transaction::{
         AuxiliaryInfo, ExecutionStatus, PersistedAuxiliaryInfo, SignedTransaction,
@@ -50,6 +51,15 @@ fn execute_v2<S: StateView>(state: &S, txn: &SignedTransaction) -> TransactionOu
         .ok()
         .flatten()
         .unwrap_or_default();
+    let gas_schedule = GasScheduleV2::fetch_config(state)
+        .expect("the gas schedule is readable")
+        .expect("genesis has a gas schedule");
+    let gas_feature_version = gas_schedule.feature_version;
+    let gas_params = AptosGasParameters::from_on_chain_gas_schedule(
+        &gas_schedule.into_btree_map(),
+        gas_feature_version,
+    )
+    .expect("the gas schedule decodes");
     let usage = state.get_usage().expect("usage is readable");
     let executor = AptosTransactionExecutor::new(
         &guard,
@@ -57,6 +67,8 @@ fn execute_v2<S: StateView>(state: &S, txn: &SignedTransaction) -> TransactionOu
         &module_provider,
         &data_provider,
         &features,
+        &gas_params,
+        gas_feature_version,
         usage,
     );
     executor
@@ -376,6 +388,74 @@ fn extra_signers_rejected_like_v1() {
 
     // Write sets are not compared: the gas divergence leaves v1 with fee
     // writes v2 lacks.
+}
+
+/// Transactions violating each pre-execution gas bound are discarded with the
+/// same status code as V1, before touching any state.
+#[test]
+fn gas_checks_discard_like_v1() {
+    let (fx, alice, bob) = setup();
+
+    let transfer = |price: u64, max_gas: u64| {
+        alice
+            .account()
+            .transaction()
+            .payload(aptos_cached_packages::aptos_stdlib::aptos_account_transfer(
+                *bob.address(),
+                1_000,
+            ))
+            .sequence_number(10)
+            .gas_unit_price(price)
+            .max_gas_amount(max_gas)
+            .sign()
+    };
+    let oversized = alice
+        .account()
+        .transaction()
+        .payload(
+            aptos_cached_packages::aptos_stdlib::aptos_account_batch_transfer(
+                vec![*bob.address(); 3_000],
+                vec![1; 3_000],
+            ),
+        )
+        .sequence_number(10)
+        .gas_unit_price(100)
+        .max_gas_amount(1_000_000)
+        .sign();
+
+    let cases = [
+        (oversized, StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE),
+        (
+            transfer(100, 100_000_000),
+            StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND,
+        ),
+        (
+            transfer(100, 10),
+            StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS,
+        ),
+        (
+            transfer(0, 1_000_000),
+            StatusCode::GAS_UNIT_PRICE_BELOW_MIN_BOUND,
+        ),
+        (
+            transfer(u64::MAX, 1_000_000),
+            StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND,
+        ),
+    ];
+    for (txn, expected) in cases {
+        let v1_status = fx.execute_transaction(txn.clone()).status().clone();
+        assert_eq!(
+            v1_status,
+            TransactionStatus::Discard(expected),
+            "v1 did not discard with {expected:?}"
+        );
+        let v2_output = execute_v2(fx.get_state_view(), &txn);
+        assert_eq!(
+            v2_output.status(),
+            &v1_status,
+            "v2 discard differs from v1 for {expected:?}"
+        );
+    }
 }
 
 /// Two dependent transfers executed sequentially, each transaction's outputs

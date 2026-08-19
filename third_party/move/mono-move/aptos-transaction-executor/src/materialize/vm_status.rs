@@ -5,6 +5,7 @@
 
 use crate::errors::{
     is_cant_pay_fee_abort, DiscardReason, ExecutionStage, ExecutionStatus, MoveExecutionFailure,
+    PreExecutionCheckFailure,
 };
 use aptos_types::{
     error::{split_canonical, INVALID_ARGUMENT, INVALID_STATE, OUT_OF_RANGE},
@@ -65,6 +66,7 @@ fn internal_error_to_status(err: &VMInternalError) -> VMStatus {
 pub(crate) fn discard_to_vm_status(reason: DiscardReason) -> VMStatus {
     match reason {
         DiscardReason::Unsupported(msg) => unsupported_status(msg),
+        DiscardReason::PreExecutionCheck(failure) => pre_execution_check_status(failure),
         DiscardReason::InvalidTypeArgument(detail) => {
             VMStatus::error(StatusCode::TYPE_RESOLUTION_FAILURE, Some(detail))
         },
@@ -77,6 +79,34 @@ pub(crate) fn discard_to_vm_status(reason: DiscardReason) -> VMStatus {
         },
         DiscardReason::InvariantViolation(detail) => invariant_status(detail),
     }
+}
+
+/// Converts a violated pre-execution bound into the legacy validation status.
+fn pre_execution_check_status(failure: PreExecutionCheckFailure) -> VMStatus {
+    use PreExecutionCheckFailure as F;
+    let (code, detail) = match failure {
+        F::TransactionTooLarge { size, max } => (
+            StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE,
+            format!("transaction size {size} exceeds the maximum {max}"),
+        ),
+        F::GasBudgetAboveBound { max_gas, bound } => (
+            StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND,
+            format!("max gas amount {max_gas} exceeds the bound {bound}"),
+        ),
+        F::GasBudgetBelowIntrinsicCost { max_gas, min } => (
+            StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS,
+            format!("max gas amount {max_gas} is below the intrinsic cost {min}"),
+        ),
+        F::GasPriceBelowMinimum { price, min } => (
+            StatusCode::GAS_UNIT_PRICE_BELOW_MIN_BOUND,
+            format!("gas unit price {price} is below the minimum {min}"),
+        ),
+        F::GasPriceAboveMaximum { price, max } => (
+            StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND,
+            format!("gas unit price {price} is above the maximum {max}"),
+        ),
+    };
+    VMStatus::error(code, Some(detail))
 }
 
 /// Converts an executed transaction's conclusion into its `VMStatus`.
