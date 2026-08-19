@@ -19,7 +19,6 @@
 !**/*.mrb
 !**/*.mpb
 !**/*.errmap
-!storage/db-tool/src/framework_usage_template.html
 !config/src/config/test_data
 !aptos-move/aptos-gas-profiling/templates/
 !aptos-move/aptos-release-builder/data/*.yaml

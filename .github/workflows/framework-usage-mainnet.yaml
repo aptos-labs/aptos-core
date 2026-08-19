@@ -26,7 +26,8 @@ on:
       RESULTS_BUCKET:
         required: false
         type: string
-        description: Optional GCS bucket; required for ranges over 10,000 transactions.
+        description: GCS bucket for worker shards; required for ranges over 10,000 transactions.
+        default: aptos-framework-usage-reports
       REPORT_BUCKET:
         required: false
         type: string

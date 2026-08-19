@@ -3,6 +3,7 @@
 
 //! Self-contained HTML renderer for framework usage reports.
 
+use crate::framework_usage_template::TEMPLATE;
 use anyhow::{Context, Result};
 use std::{fs::File, io::Write, path::Path};
 
@@ -36,5 +37,3 @@ pub(crate) fn write(output: &Path, report_json: &str) -> Result<()> {
         .with_context(|| format!("renaming HTML report {:?} to {:?}", tmp_output, output))?;
     Ok(())
 }
-
-const TEMPLATE: &str = include_str!("framework_usage_template.html");

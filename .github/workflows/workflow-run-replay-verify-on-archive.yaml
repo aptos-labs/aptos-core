@@ -243,7 +243,7 @@ jobs:
           path: framework-usage-results/
           if-no-files-found: error
 
-      - name: Publish framework usage HTML
+      - name: Publish framework usage reports
         if: ${{ inputs.DRY_RUN == false && inputs.FRAMEWORK_USAGE && inputs.REPORT_BUCKET != '' }}
         env:
           NETWORK: ${{ inputs.NETWORK }}
@@ -251,11 +251,18 @@ jobs:
         run: |
           REPORT_JSON="framework-usage-results/framework-usage.json"
           REPORT_HTML="framework-usage-results/framework-usage.html"
-          OBJECT_PATH="framework-usage/${NETWORK}/runs/${GITHUB_RUN_ID}/attempt-${GITHUB_RUN_ATTEMPT}/index.html"
-          REPORT_URL="https://storage.googleapis.com/${REPORT_BUCKET}/${OBJECT_PATH}"
+          REPORT_PREFIX="framework-usage/${NETWORK}/runs/${GITHUB_RUN_ID}/attempt-${GITHUB_RUN_ATTEMPT}"
+          HTML_OBJECT_PATH="${REPORT_PREFIX}/index.html"
+          JSON_OBJECT_PATH="${REPORT_PREFIX}/framework-usage.json"
+          HTML_REPORT_URL="https://storage.googleapis.com/${REPORT_BUCKET}/${HTML_OBJECT_PATH}"
+          JSON_REPORT_URL="https://storage.googleapis.com/${REPORT_BUCKET}/${JSON_OBJECT_PATH}"
 
-          gcloud storage cp "$REPORT_HTML" "gs://${REPORT_BUCKET}/${OBJECT_PATH}" \
+          gcloud storage cp "$REPORT_HTML" "gs://${REPORT_BUCKET}/${HTML_OBJECT_PATH}" \
             --content-type="text/html; charset=utf-8" \
+            --content-disposition=inline \
+            --cache-control="public,max-age=31536000,immutable"
+          gcloud storage cp "$REPORT_JSON" "gs://${REPORT_BUCKET}/${JSON_OBJECT_PATH}" \
+            --content-type="application/json" \
             --content-disposition=inline \
             --cache-control="public,max-age=31536000,immutable"
 
@@ -270,7 +277,10 @@ jobs:
           {
             echo "## Framework function usage report"
             echo
-            echo "### [Open interactive HTML report](${REPORT_URL})"
+            echo "### Reports"
+            echo
+            echo "- [Open interactive HTML report](${HTML_REPORT_URL})"
+            echo "- [Open merged JSON report](${JSON_REPORT_URL})"
             echo
             echo "| Property | Value |"
             echo "| --- | --- |"
@@ -280,6 +290,8 @@ jobs:
             echo "| Transactions processed | ${TRANSACTION_COUNT} |"
             echo "| Run attempt | ${GITHUB_RUN_ATTEMPT} |"
           } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "::notice title=Framework function usage report::HTML: ${HTML_REPORT_URL} | JSON: ${JSON_REPORT_URL}"
 
       # This is in case user manually cancel the step above, we still want to cleanup the resources
       - name: Post-run cleanup
