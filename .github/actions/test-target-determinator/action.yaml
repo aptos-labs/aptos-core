@@ -23,7 +23,7 @@ runs:
     # Do not use rust-setup here: it runs dev_setup with test-only dependencies
     # (including NodeSource, Move Prover, PostgreSQL, and protoc plugins).
     - name: Set up Rust toolchain
-      uses: dsherret/rust-toolchain-file@v1
+      uses: dsherret/rust-toolchain-file@3551321aa44dd44a0393eb3b6bdfbc5d25ecf621 # pin@v1
 
     # Target determination only builds aptos-cargo-cli. Avoid restoring or saving
     # the general workspace target cache, which is large and not useful here.

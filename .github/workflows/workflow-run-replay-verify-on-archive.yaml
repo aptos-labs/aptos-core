@@ -237,7 +237,7 @@ jobs:
 
       - name: Upload framework usage report
         if: ${{ inputs.DRY_RUN == false && inputs.FRAMEWORK_USAGE }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # pin@v4.6.2
         with:
           name: framework-usage-${{ inputs.NETWORK }}-${{ github.run_id }}
           path: framework-usage-results/

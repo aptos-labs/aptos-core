@@ -37,6 +37,7 @@ move-core-types = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+tempfile = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]

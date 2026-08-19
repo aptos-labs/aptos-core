@@ -14,11 +14,11 @@ use move_core_types::{account_address::AccountAddress, language_storage::ModuleI
 use serde::Serialize;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
-    fs::File,
     io::{BufWriter, Write},
     path::{Path, PathBuf},
     sync::{Mutex, MutexGuard},
 };
+use tempfile::NamedTempFile;
 
 const SCHEMA_VERSION: u64 = 4;
 
@@ -463,10 +463,9 @@ fn write_json_report(output: &Path, report: &FrameworkUsageReport) -> Result<()>
         "output directory {:?} does not exist",
         parent
     );
-    let tmp_output = temporary_output_path(output);
     let mut writer = BufWriter::new(
-        File::create(&tmp_output)
-            .with_context(|| format!("creating temporary report {:?}", tmp_output))?,
+        NamedTempFile::new_in(parent)
+            .with_context(|| format!("creating temporary report in {:?}", parent))?,
     );
     serde_json::to_writer_pretty(&mut writer, report)
         .context("serializing framework usage report")?;
@@ -477,18 +476,13 @@ fn write_json_report(output: &Path, report: &FrameworkUsageReport) -> Result<()>
         .into_inner()
         .map_err(|error| error.into_error())
         .context("closing temporary framework usage report")?;
-    file.sync_all()
+    file.as_file()
+        .sync_all()
         .context("syncing temporary framework usage report")?;
-    drop(file);
-    std::fs::rename(&tmp_output, output)
-        .with_context(|| format!("renaming report {:?} to {:?}", tmp_output, output))?;
+    file.persist(output)
+        .map_err(|error| error.error)
+        .with_context(|| format!("renaming temporary report to {:?}", output))?;
     Ok(())
-}
-
-fn temporary_output_path(output: &Path) -> PathBuf {
-    let mut path = output.as_os_str().to_os_string();
-    path.push(".tmp");
-    path.into()
 }
 
 fn merge_usage_counts<K: Ord>(
@@ -569,6 +563,7 @@ mod tests {
     use super::*;
     use aptos_types::transaction::TransactionStatus;
     use move_core_types::account_address::AccountAddress;
+    use std::fs::File;
 
     #[test]
     fn aggregates_invocations_and_distinct_transactions() {
@@ -698,14 +693,14 @@ mod tests {
     }
 
     #[test]
-    fn does_not_overwrite_json_output_that_ends_in_tmp() {
+    fn does_not_overwrite_json_output_when_html_output_is_its_old_temp_path() {
         let collector = FrameworkUsageCollector::new(10, 10);
         collector.set_ledger_timestamps(1_000, 1_000).unwrap();
 
         let output_dir = aptos_temppath::TempPath::new();
         output_dir.create_as_dir().unwrap();
         let output = output_dir.path().join("usage.tmp");
-        let html_output = output_dir.path().join("usage.html");
+        let html_output = output_dir.path().join("usage");
         collector.write_report(&output, Some(&html_output)).unwrap();
 
         let report: serde_json::Value =

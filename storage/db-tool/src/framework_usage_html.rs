@@ -5,11 +5,8 @@
 
 use crate::framework_usage_template::TEMPLATE;
 use anyhow::{Context, Result};
-use std::{
-    fs::File,
-    io::Write,
-    path::{Path, PathBuf},
-};
+use std::{io::Write, path::Path};
+use tempfile::NamedTempFile;
 
 pub(crate) fn write(output: &Path, report_json: &str) -> Result<()> {
     let parent = output.parent().unwrap_or_else(|| Path::new("."));
@@ -30,20 +27,15 @@ pub(crate) fn write(output: &Path, report_json: &str) -> Result<()> {
         .replace('\u{2029}', "\\u2029");
     let html = TEMPLATE.replace("__FRAMEWORK_USAGE_REPORT__", &embedded_json);
 
-    let tmp_output = temporary_output_path(output);
-    let mut file = File::create(&tmp_output)
-        .with_context(|| format!("creating temporary HTML report {:?}", tmp_output))?;
+    let mut file = NamedTempFile::new_in(parent)
+        .with_context(|| format!("creating temporary HTML report in {:?}", parent))?;
     file.write_all(html.as_bytes())
         .context("writing framework usage HTML report")?;
-    file.sync_all()
+    file.as_file()
+        .sync_all()
         .context("syncing framework usage HTML report")?;
-    std::fs::rename(&tmp_output, output)
-        .with_context(|| format!("renaming HTML report {:?} to {:?}", tmp_output, output))?;
+    file.persist(output)
+        .map_err(|error| error.error)
+        .with_context(|| format!("renaming temporary HTML report to {:?}", output))?;
     Ok(())
-}
-
-fn temporary_output_path(output: &Path) -> PathBuf {
-    let mut path = output.as_os_str().to_os_string();
-    path.push(".tmp");
-    path.into()
 }
