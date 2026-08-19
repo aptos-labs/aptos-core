@@ -424,13 +424,17 @@ pub trait ExpGenerator<'env> {
         ExpData::Call(node_id, Operation::TypeDomain, vec![]).into_exp()
     }
 
-    /// Makes an expression which selects a field from a struct.
+    /// Makes an expression which selects a field from a struct. The node
+    /// instantiation carries the struct type, following the convention of
+    /// the expression builder (`Select`/`UpdateField` nodes carry the
+    /// operand's struct type as their single instantiation).
     fn mk_field_select(&self, field_env: &FieldEnv<'_>, targs: &[Type], exp: Exp) -> Exp {
         let ty = field_env.get_type().instantiate(targs);
-        let node_id = self.new_node(ty, None);
         let mid = field_env.struct_env.module_env.get_id();
         let sid = field_env.struct_env.get_id();
         let fid = field_env.get_id();
+        let struct_ty = Type::Struct(mid, sid, targs.to_vec());
+        let node_id = self.new_node(ty, Some(vec![struct_ty]));
         let op = if field_env.get_variant().is_some() {
             Operation::SelectVariants(mid, sid, vec![fid])
         } else {
@@ -440,7 +444,8 @@ pub trait ExpGenerator<'env> {
     }
 
     /// Makes an expression which updates a field in a struct.
-    /// Returns `UpdateField(module_id, struct_id, field_id)(struct_exp, new_value)`
+    /// Returns `UpdateField(module_id, struct_id, field_id)(struct_exp, new_value)`,
+    /// with the struct type as the node instantiation (see `mk_field_select`).
     fn mk_field_update(
         &self,
         field_env: &FieldEnv<'_>,
@@ -453,7 +458,7 @@ pub trait ExpGenerator<'env> {
             field_env.struct_env.get_id(),
             targs.to_vec(),
         );
-        let node_id = self.new_node(struct_ty, None);
+        let node_id = self.new_node(struct_ty.clone(), Some(vec![struct_ty]));
         ExpData::Call(
             node_id,
             Operation::UpdateField(
@@ -796,9 +801,16 @@ pub trait ExpGenerator<'env> {
         self.mk_call(elem_ty, Operation::Index, vec![v, i])
     }
 
-    /// `v[from..to]` — range slice, result type `vec_ty`.
+    /// `v[from..to]` — range slice, result type `vec_ty`. The canonical
+    /// encoding takes the vector and a `Range(from, to)` argument (the
+    /// shape the Boogie backend translates to `$SliceVecByRange`).
     fn mk_slice(&self, v: Exp, from: Exp, to: Exp, vec_ty: &Type) -> Exp {
-        self.mk_call(vec_ty, Operation::Slice, vec![v, from, to])
+        let range = self.mk_call(
+            &Type::Primitive(PrimitiveType::Range),
+            Operation::Range,
+            vec![from, to],
+        );
+        self.mk_call(vec_ty, Operation::Slice, vec![v, range])
     }
 
     /// `in_range(v, i)` — bounds-check predicate.
@@ -935,6 +947,9 @@ pub trait ExpGenerator<'env> {
         // Use SpecFunction if the spec function exists (prover context),
         // fall back to MoveFunction otherwise.
         if let Some((spec_fun_id, _)) = address_of_fun.find_spec_fun() {
+            // The companion may not have been marked used yet (pre-inlining
+            // companion derivation); the backend only emits used ones.
+            env.add_used_spec_fun_transitive(mid.qualified(spec_fun_id));
             self.mk_call(
                 &addr_ty,
                 Operation::SpecFunction(mid, spec_fun_id, MemoryRange::default()),

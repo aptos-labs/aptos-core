@@ -90,7 +90,7 @@ struct FunctionVerifier<'a, P: DescriptorProvider + LayoutProvider + ?Sized> {
 
 impl<P: DescriptorProvider + LayoutProvider + ?Sized> FunctionVerifier<'_, P> {
     fn verify(&mut self) {
-        let code = self.func.code.get();
+        let code = self.func.code.ops();
 
         let base_offsets = &self.func.frame_layout.heap_ptr_offsets;
         let safe_point_layouts = self.func.safe_point_layouts.entries();
@@ -136,6 +136,22 @@ impl<P: DescriptorProvider + LayoutProvider + ?Sized> FunctionVerifier<'_, P> {
                 format!(
                     "param_and_local_sizes_sum ({}) must be 8-byte aligned",
                     self.func.param_and_local_sizes_sum
+                ),
+            );
+        }
+
+        // Origins: bytecode provenance parallel to the code.
+        // Either absent (hand-built functions with no bytecode ancestry) or
+        // one entry per micro-op; a partial table would attribute errors to
+        // wrong bytecode offsets.
+        let origins = self.func.code.origins();
+        if !origins.is_empty() && origins.len() != code.len() {
+            self.err(
+                None,
+                format!(
+                    "origins table has {} entries for {} micro-ops (must be empty or parallel)",
+                    origins.len(),
+                    code.len()
                 ),
             );
         }
@@ -1267,7 +1283,7 @@ impl<P: DescriptorProvider + LayoutProvider + ?Sized> FunctionVerifier<'_, P> {
 
     // TODO(metering): validate branch gas fields are populated.
     fn check_jump(&mut self, pc: usize, target: CodeOffset) {
-        let code_len = self.func.code.get().len();
+        let code_len = self.func.code.ops().len();
         if (target.0 as usize) >= code_len {
             self.err(
                 Some(pc),

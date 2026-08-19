@@ -1,0 +1,28 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/lambda_captured_fun_loop.move:22:19
+   │
+22 │           apply_mut(|v| {
+   │ ╭───────────────────^
+23 │ │             let i = 0;
+24 │ │             while (i < n) {
+25 │ │                 g(v);
+26 │ │                 i += 1;
+27 │ │             };
+28 │ │         }, x)
+   │ ╰─────────^
+   │
+   =     at tests/sources/functional/closures/lambda_captured_fun_loop.move:22: wrap2
+   =         n = <redacted>
+   =         g = <redacted>
+   =         v = <redacted>
+   =     at tests/sources/functional/closures/lambda_captured_fun_loop.move:23: wrap2
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/lambda_captured_fun_loop.move:24: wrap2
+   =     enter loop, variable(s) i havocked and reassigned
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/lambda_captured_fun_loop.move:24: wrap2
+   =     at tests/sources/functional/closures/lambda_captured_fun_loop.move:22: wrap2
+   =         v = <redacted>
+   =     at tests/sources/functional/closures/lambda_captured_fun_loop.move:28: wrap2
+   =     at tests/sources/functional/closures/lambda_captured_fun_loop.move:22: wrap2

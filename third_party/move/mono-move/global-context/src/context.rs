@@ -71,7 +71,8 @@ mod module_ids;
 use module_ids::ModuleIdInternerKey;
 mod loaded_module;
 pub use loaded_module::{
-    FunctionSlot, LoadedModule, LoadedModuleSlot, ModuleMandatoryDependencies, ModuleSlot,
+    FunctionIrLookup, FunctionSlot, LoadedModule, LoadedModuleSlot, ModuleMandatoryDependencies,
+    ModuleSlot,
 };
 mod module_cache;
 use module_cache::ModuleCache;
@@ -573,6 +574,15 @@ impl<'ctx> ExecutionGuard<'ctx> {
                     .unwrap_or_else(|e| panic!("publish_vec_descriptor: {e}"));
                 self.append_descriptor(desc)
             })
+    }
+
+    /// The struct-object descriptor already published for `struct_ty`, if any.
+    pub fn struct_descriptor(&self, struct_ty: InternedType) -> Option<DescriptorId> {
+        self.ctx
+            .descriptors
+            .struct_by_ty
+            .get(&struct_ty)
+            .map(|id| *id)
     }
 
     /// Materializes a struct-object descriptor for `struct_ty` (the inline

@@ -1,0 +1,36 @@
+Move prover returns: exiting with bytecode transformation errors
+error: a `map_spec_iter_valid` binding cannot be used in a data invariant (directly or through called spec functions): data invariants are assumed for opaque results, which would revalidate stale iterators
+   ┌─ tests/sources/functional/intrinsic_validity_data_inv_err.move:16:9
+   │
+16 │         invariant spec_iter_valid(self, spec_new<K, u64>());
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: a `map_spec_leaf_iter_valid` binding cannot be used in a data invariant (directly or through called spec functions): data invariants are assumed for opaque results, which would revalidate stale iterators
+   ┌─ tests/sources/functional/intrinsic_validity_data_inv_err.move:44:9
+   │
+44 │         invariant spec_node_valid(self, spec_new<u8, u64>());
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: a `map_spec_iter_valid` binding cannot be used in a data invariant (directly or through called spec functions): data invariants are assumed for opaque results, which would revalidate stale iterators
+   ┌─ tests/sources/functional/intrinsic_validity_data_inv_err.move:99:9
+   │
+99 │         invariant validity_inv_map::spec_iter_valid(self.it, validity_inv_map::spec_new<u8, u64>());
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: a `map_spec_iter_preserved` binding cannot be used in a data invariant (directly or through called spec functions): data invariants are assumed for opaque results, which would revalidate stale iterators
+    ┌─ tests/sources/functional/intrinsic_validity_data_inv_err.move:113:9
+    │
+113 │         invariant same_epoch(self);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: a behavioral predicate (`requires_of`, `aborts_of`, `ensures_of`, or `result_of`) cannot be used in a data invariant when iterator-validity bindings are present: it lifts a function's spec conditions — possibly stating validity — into an assumed context
+    ┌─ tests/sources/functional/intrinsic_validity_data_inv_err.move:129:9
+    │
+129 │         invariant requires_of<validity_gate>(self.it, validity_inv_map::spec_new<u8, u64>());
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: a behavioral predicate (`requires_of`, `aborts_of`, `ensures_of`, or `result_of`) cannot be used in a data invariant when iterator-validity bindings are present: it lifts a function's spec conditions — possibly stating validity — into an assumed context
+    ┌─ tests/sources/functional/intrinsic_validity_data_inv_err.move:146:9
+    │
+146 │         invariant gated(self.it);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^

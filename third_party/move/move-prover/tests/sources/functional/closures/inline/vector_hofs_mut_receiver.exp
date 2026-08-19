@@ -1,0 +1,41 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:105:9
+    │
+105 │         ensures forall i in 0..len(s.v): s.v[i] == old(s.v)[i] + 2; // error: off by one
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:94: bump_field_wrong
+    =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:103: bump_field_wrong (spec)
+    =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:94: bump_field_wrong
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:95: bump_field_wrong
+    =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:11: for_each_mut
+    =         v = <redacted>
+    =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:103: bump_field_wrong (spec)
+    =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:12: for_each_mut
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:13: for_each_mut
+    =         n = <redacted>
+    =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:17: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:18: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:19: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:20: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:21: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:22: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:23: for_each_mut
+    =     enter loop, variable(s) i havocked and reassigned
+    =         i = <redacted>
+    =     loop invariant holds at current state
+    =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:18: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:19: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:20: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:21: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:22: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:23: for_each_mut
+    =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:14: for_each_mut
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:94: bump_field_wrong
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:104: bump_field_wrong (spec)
+    =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:105: bump_field_wrong (spec)

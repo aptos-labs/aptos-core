@@ -288,6 +288,7 @@ pub struct SubmitProposal {
     pub(crate) args: SubmitProposalArgs,
 }
 
+/// Shared options for submitting a governance proposal
 #[derive(Parser)]
 pub struct SubmitProposalArgs {
     /// Location of the JSON metadata of the proposal
@@ -305,6 +306,11 @@ pub struct SubmitProposalArgs {
     #[clap(long)]
     pub(crate) metadata_path: Option<PathBuf>,
 
+    /// Submit the proposal as a multi-step proposal
+    ///
+    /// A multi-step proposal executes a sequence of scripts, where each script
+    /// commits to the hash of the next one. Without this flag the proposal is
+    /// submitted as a single-step proposal that executes exactly one script.
     #[clap(long)]
     pub(crate) is_multi_step: bool,
 
@@ -492,6 +498,9 @@ pub struct SubmitVote {
     pub(crate) args: SubmitVoteArgs,
 }
 
+/// Shared options for voting on a governance proposal
+///
+/// Exactly one of `--yes` or `--no` must be provided.
 #[derive(Parser)]
 #[group(id = "vote", required = true, multiple = false)]
 pub struct SubmitVoteArgs {
@@ -831,6 +840,11 @@ pub struct GenerateUpgradeProposal {
     #[clap(long)]
     pub(crate) testnet: bool,
 
+    /// Execution hash of the next script in a multi-step proposal
+    ///
+    /// Leave this empty to generate a single-step proposal. When set, the
+    /// generated script becomes part of a multi-step proposal and commits to
+    /// the next script to be executed.
     #[clap(long, default_value = "")]
     pub(crate) next_execution_hash: String,
 
@@ -884,8 +898,13 @@ impl CliCommand<()> for GenerateUpgradeProposal {
 /// Generate execution hash for a specified script.
 #[derive(Parser)]
 pub struct GenerateExecutionHash {
+    /// Path to the Move script to compile and hash
     #[clap(long)]
     pub script_path: Option<PathBuf>,
+
+    /// Local directory of the `aptos-framework` package to compile against
+    ///
+    /// Defaults to the copy of `aptos-framework` bundled with this CLI.
     #[clap(long)]
     pub framework_local_dir: Option<PathBuf>,
 }

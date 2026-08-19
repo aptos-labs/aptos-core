@@ -1,6 +1,7 @@
 // -- Model dump before first bytecode pipeline
 module 0x2::Map {
     struct T<K,V> {
+        dummy_field: bool,
     }
     public native fun remove<K,V>(m: &T<K, V>,k: &K): V;
     public native fun empty<K,V>(): T<K, V>;
@@ -283,7 +284,7 @@ module 0x70dd::ToddNickels {
 
 // -- Sourcified model before first bytecode pipeline
 module 0x2::Map {
-    struct T<K, V> has copy, drop, store {
+    struct T<phantom K, phantom V> has copy, drop, store {
     }
     public native fun remove<K, V>(m: &T<K, V>, k: &K): V;
     public native fun empty<K, V>(): T<K, V>;

@@ -1,0 +1,38 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/inline/folds_of_multi.move:65:9
+   │
+65 │         ensures len(v) == 2 ==> result_1 == v[0] + v[1]; // error: the count weight adds one
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/folds_of_multi.move:54: weighted_pair_wrong
+   =         v = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_multi.move:55: weighted_pair_wrong
+   =         sum = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_multi.move:56: weighted_pair_wrong
+   =         count = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_multi.move:8: each_ref
+   =         v = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_multi.move:54: weighted_pair_wrong
+   =     at tests/sources/functional/closures/inline/folds_of_multi.move:9: each_ref
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_multi.move:10: each_ref
+   =         n = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_multi.move:14: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_multi.move:15: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_multi.move:16: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_multi.move:17: each_ref
+   =     enter loop, variable(s) sum, count, i havocked and reassigned
+   =         sum = <redacted>
+   =         count = <redacted>
+   =         i = <redacted>
+   =     loop invariant holds at current state
+   =     at tests/sources/functional/closures/inline/folds_of_multi.move:15: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_multi.move:16: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_multi.move:17: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_multi.move:11: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_multi.move:54: weighted_pair_wrong
+   =         result_1 = <redacted>
+   =         result_2 = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_multi.move:69: weighted_pair_wrong (spec)
+   =     at tests/sources/functional/closures/inline/folds_of_multi.move:65: weighted_pair_wrong (spec)

@@ -8,8 +8,8 @@ use crate::{
     compile::{compile, compile_move_path, compile_move_stdlib, SourceKind},
     engine::RunResult,
     extensions::{
-        seed_extensions, TEST_SESSION_COUNTER, TEST_STATE_BYTES, TEST_STATE_ITEMS, TEST_TXN_HASH,
-        TEST_TXN_INDEX,
+        seed_extensions, TEST_CHAIN_ID, TEST_SESSION_COUNTER, TEST_STATE_BYTES, TEST_STATE_ITEMS,
+        TEST_TXN_HASH, TEST_TXN_INDEX,
     },
     matcher::check_output,
     module_provider::InMemoryModuleProvider,
@@ -317,7 +317,16 @@ fn v1_native_table() -> NativeFunctionTable {
         TimedFeaturesBuilder::enable_all().build(),
         Features::default(),
     );
-    table.extend(crate::v1_test_natives::make_all_v1_test_natives());
+    // The mirrors take precedence over same-name production natives (cargo
+    // feature unification can put `unit_test` natives into the production
+    // table), so both VMs run the same implementation in the comparison.
+    let overrides = crate::v1_test_natives::make_all_v1_test_natives();
+    table.retain(|(addr, module, fun, _)| {
+        !overrides.iter().any(|(o_addr, o_module, o_fun, _)| {
+            addr == o_addr && module == o_module && fun == o_fun
+        })
+    });
+    table.extend(overrides);
     table
 }
 
@@ -461,7 +470,7 @@ fn execute_function_v1(
         AccountAddress::ZERO,
         0,
         0,
-        0,
+        TEST_CHAIN_ID, // chain_id, read by transaction_context::chain_id_internal
         None,
         None,
         TransactionIndexKind::BlockExecution {
@@ -473,7 +482,7 @@ fn execute_function_v1(
     extensions.add(NativeTransactionContext::new(
         TEST_TXN_HASH.to_vec(),
         vec![],
-        0,
+        TEST_CHAIN_ID,
         Some(user_transaction_context),
         TEST_SESSION_COUNTER,
     ));

@@ -5,7 +5,6 @@
 //! transaction and a chain-backed state view, run it on V1 to record the read-set, then close the
 //! module dependency graph so V2 has every module it needs (not just the ones V1's path loads).
 
-use crate::data::ReadSet;
 use anyhow::{anyhow, Context, Result};
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
@@ -111,8 +110,7 @@ fn capture_blocking(
     // Close the module dependency graph so V2 (which needs the static closure) has every module.
     close_module_graph(&mut read_set, &state_view)?;
 
-    let inputs_bytes =
-        bcs::to_bytes(&vec![ReadSet { data: read_set }]).context("failed to serialize read-set")?;
+    let inputs_bytes = bcs::to_bytes(&vec![read_set]).context("failed to serialize read-set")?;
 
     std::fs::write(out_dir.join(format!("{version}_txns")), &txns_bytes)?;
     std::fs::write(out_dir.join(format!("{version}_inputs")), &inputs_bytes)?;
@@ -154,10 +152,10 @@ fn close_module_graph(
     let mut visited: HashSet<ModuleId> = HashSet::new();
     let mut queue: VecDeque<ModuleId> = VecDeque::new();
     for key in read_set.keys() {
-        if let Some(module_id) = module_id_of(key) {
-            if visited.insert(module_id.clone()) {
-                queue.push_back(module_id);
-            }
+        if let Some(module_id) = module_id_of(key)
+            && visited.insert(module_id.clone())
+        {
+            queue.push_back(module_id);
         }
     }
 
@@ -284,7 +282,10 @@ mod tests {
                 continue;
             }
             let read_sets = load_read_sets(&path).expect("load read-set");
-            let modules = read_sets[0].modules();
+            let modules: Vec<(ModuleId, Vec<u8>)> = read_sets[0]
+                .iter()
+                .filter_map(|(key, value)| module_id_of(key).map(|id| (id, value.bytes().to_vec())))
+                .collect();
             let present: HashSet<ModuleId> = modules.iter().map(|(id, _)| id.clone()).collect();
 
             // Modules referenced as dependencies of present modules but not themselves present.
@@ -336,12 +337,10 @@ mod tests {
         let (b_id, b_val) = bytes("b");
 
         // "Chain" has both modules; the read-set initially has only `a`.
-        let chain = ReadSet {
-            data: HashMap::from([
-                (StateKey::module_id(&a_id), a_val.clone()),
-                (StateKey::module_id(&b_id), b_val),
-            ]),
-        };
+        let chain = aptos_transaction_simulation::InMemoryStateStore::new_with_state_values([
+            (StateKey::module_id(&a_id), a_val.clone()),
+            (StateKey::module_id(&b_id), b_val),
+        ]);
         let mut read_set = HashMap::from([(StateKey::module_id(&a_id), a_val)]);
 
         close_module_graph(&mut read_set, &chain).expect("close");

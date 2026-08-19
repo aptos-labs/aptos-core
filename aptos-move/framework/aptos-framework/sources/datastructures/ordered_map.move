@@ -948,4 +948,447 @@ module aptos_framework::ordered_map {
         };
         map.destroy_empty();
     }
+
+    #[verify_only]
+    /// Witness-test support: derives the exact enumeration of a map holding
+    /// keys {1, 2, 3}, walking the stepwise assert ladder once; callers get
+    /// the facts from the ensures.
+    fun ground_enum_123(map: &OrderedMap<u64, u64>) {
+        // Also pulls in the key's cmp instantiation (gates the ascending axiom).
+        let (_fk, _fv) = map.borrow_front();
+        spec {
+            // Each contained key has an in-range rank that key_at inverts.
+            assert spec_rank(map, 1) >= 0 && spec_rank(map, 1) < 3
+                && spec_key_at(map, spec_rank(map, 1)) == (1 as u64);
+            assert spec_rank(map, 2) >= 0 && spec_rank(map, 2) < 3
+                && spec_key_at(map, spec_rank(map, 2)) == (2 as u64);
+            assert spec_rank(map, 3) >= 0 && spec_rank(map, 3) < 3
+                && spec_key_at(map, spec_rank(map, 3)) == (3 as u64);
+            // Ranks follow the key order; three distinct ordered positions
+            // in 0..3 pin them exactly, and with them the enumeration.
+            assert spec_rank(map, 1) < spec_rank(map, 2);
+            assert spec_rank(map, 2) < spec_rank(map, 3);
+            assert spec_rank(map, 1) == 0;
+            assert spec_rank(map, 2) == 1;
+            assert spec_rank(map, 3) == 2;
+            assert spec_key_at(map, 0) == (1 as u64);
+            assert spec_key_at(map, 1) == (2 as u64);
+            assert spec_key_at(map, 2) == (3 as u64);
+        };
+    }
+
+    spec ground_enum_123 {
+        requires spec_len(map) == 3;
+        requires spec_contains_key(map, 1);
+        requires spec_contains_key(map, 2);
+        requires spec_contains_key(map, 3);
+        ensures spec_rank(map, 1) == 0 && spec_rank(map, 2) == 1 && spec_rank(map, 3) == 2;
+        ensures spec_key_at(map, 0) == (1 as u64)
+            && spec_key_at(map, 1) == (2 as u64)
+            && spec_key_at(map, 2) == (3 as u64);
+    }
+
+    #[verify_only]
+    fun test_verify_enumeration_view() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let (fk, _fv) = map.borrow_front();
+        spec {
+            // Materialize ground membership facts for the quantifiers.
+            assert keys[0] == 1;
+            assert keys[1] == 2;
+            assert keys[2] == 3;
+            assert vector::spec_contains(keys, 1);
+            assert vector::spec_contains(keys, 2);
+            assert vector::spec_contains(keys, 3);
+            assert spec_contains_key(map, 1);
+            assert spec_contains_key(map, 2);
+            assert spec_contains_key(map, 3);
+            assert spec_len(map) == 3;
+        };
+        ground_enum_123(&map);
+        spec {
+            // Cross-checks: the ordering API agrees, and values compose.
+            assert fk == (1 as u64);
+            assert fk == spec_key_at(map, 0);
+            assert spec_get(map, spec_key_at(map, 0)) == (4 as u64);
+        };
+    }
+
+    #[verify_only]
+    fun test_verify_pop_rank() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[10, 20, 30];
+        let map = new_from(keys, values);
+        spec {
+            // Materialize ground membership facts for the quantifiers.
+            assert keys[0] == 1;
+            assert keys[1] == 2;
+            assert keys[2] == 3;
+            assert vector::spec_contains(keys, 1);
+            assert vector::spec_contains(keys, 2);
+            assert vector::spec_contains(keys, 3);
+            assert spec_contains_key(map, 1);
+            assert spec_contains_key(map, 2);
+            assert spec_contains_key(map, 3);
+            assert spec_len(map) == 3;
+        };
+        ground_enum_123(&map);
+        let (k, v) = map.pop_front();
+        spec {
+            // Popped key had rank 0; survivors' ranks shift down by one
+            // (mirrors the big_ordered_map test on the non-ghost template branch).
+            assert k == (1 as u64);
+            assert v == (10 as u64);
+            assert spec_len(map) == 2;
+            assert spec_rank(map, 2) == 0;
+            assert spec_rank(map, 3) == 1;
+            assert spec_key_at(map, 0) == (2 as u64);
+            assert spec_key_at(map, 1) == (3 as u64);
+        };
+        let (k2, v2) = map.pop_back();
+        spec {
+            // Back border: the popped key had the last rank.
+            assert k2 == (3 as u64);
+            assert v2 == (30 as u64);
+            assert spec_len(map) == 1;
+            assert spec_key_at(map, 0) == (2 as u64);
+        };
+    }
+
+    #[verify_only]
+    fun test_verify_remove_shift_symbolic(m: &mut OrderedMap<u64, u64>, k: u64) {
+        // Removal at an arbitrary rank, on the non-ghost template branch.
+        m.remove(&k);
+    }
+
+    spec test_verify_remove_shift_symbolic {
+        requires spec_contains_key(m, k);
+        aborts_if false;
+        ensures spec_len(m) == spec_len(old(m)) - 1;
+        ensures !spec_contains_key(m, k);
+        ensures forall i in 0..spec_len(m):
+            spec_key_at(m, i) ==
+                spec_key_at(old(m), if (i < spec_rank(old(m), k)) i else i + 1);
+        ensures forall i in 0..spec_len(m):
+            spec_get(m, spec_key_at(m, i)) == spec_get(old(m), spec_key_at(m, i));
+    }
+
+    #[verify_only]
+    fun test_verify_drain_symbolic(m: &mut OrderedMap<u64, u64>): u64 {
+        let count = 0u64;
+        while ({
+            spec {
+                invariant count + spec_len(m) == spec_len(old(m));
+                invariant forall i in 0..spec_len(m):
+                    spec_key_at(m, i) == spec_key_at(old(m), i + count);
+                invariant forall i in 0..spec_len(m):
+                    spec_get(m, spec_key_at(m, i)) == spec_get(old(m), spec_key_at(m, i));
+            };
+            !m.is_empty()
+        }) {
+            let (_k, _v) = m.pop_front();
+            count += 1;
+        };
+        count
+    }
+
+    spec test_verify_drain_symbolic {
+        aborts_if false;
+        ensures result == spec_len(old(m));
+        ensures spec_len(m) == 0;
+    }
+    #[verify_only]
+    fun test_verify_iter_collect_symbolic(m: &OrderedMap<u64, u64>): vector<u64> {
+        // A full iterator traversal of a symbolic map. OrderedMap's iterator is
+        // an index into the sorted entries, so the index is the position and the
+        // walk can be indexed by it directly.
+        let out = vector[];
+        let it = m.internal_new_begin_iter();
+        while ({
+            spec {
+                invariant len(out) <= spec_len(m);
+                invariant forall i in 0..len(out): out[i] == spec_key_at(m, i);
+                invariant !(it is IteratorPtr::End) ==>
+                    it.index == len(out) && it.index < spec_len(m);
+                invariant (it is IteratorPtr::End) ==> len(out) == spec_len(m);
+            };
+            !it.iter_is_end(m)
+        }) {
+            out.push_back(*it.iter_borrow_key(m));
+            it = it.iter_next(m);
+        };
+        out
+    }
+
+    spec test_verify_iter_collect_symbolic {
+        aborts_if false;
+        ensures len(result) == spec_len(m);
+        ensures forall i in 0..spec_len(m): result[i] == spec_key_at(m, i);
+    }
+
+    #[verify_only]
+    fun test_verify_iter_sum_symbolic(m: &OrderedMap<u64, u64>): u64 {
+        // The value-side walk: reads through iter_borrow land on the entry at
+        // the current position.
+        let sum = 0u64;
+        let it = m.internal_new_begin_iter();
+        let count = 0u64;
+        while ({
+            spec {
+                invariant count <= spec_len(m);
+                invariant !(it is IteratorPtr::End) ==>
+                    it.index == count && it.index < spec_len(m);
+                invariant sum == spec_om_sum_upto(m, count);
+                invariant (it is IteratorPtr::End) ==> count == spec_len(m);
+            };
+            !it.iter_is_end(m)
+        }) {
+            sum = sum + *it.iter_borrow(m);
+            it = it.iter_next(m);
+            count = count + 1;
+        };
+        sum
+    }
+
+    spec test_verify_iter_sum_symbolic {
+        // Aborts unspecified: the running u64 addition can overflow.
+        ensures result == spec_om_sum_upto(m, spec_len(m));
+    }
+
+    #[verify_only]
+    fun test_verify_iter_borrow_mut_symbolic(m: &mut OrderedMap<u64, u64>, k: u64) {
+        // Writing through a position-based iterator: the borrow resolves the
+        // position to a key through the enumeration, so the write lands on that
+        // key and moves nothing.
+        let it = m.internal_find(&k);
+        let v = it.iter_borrow_mut(m);
+        *v = 7;
+    }
+
+    spec test_verify_iter_borrow_mut_symbolic {
+        pragma verify = true;
+        requires spec_contains_key(m, k);
+        aborts_if false;
+        ensures spec_get(m, k) == 7;
+        ensures spec_len(m) == spec_len(old(m));
+        ensures forall i in 0..spec_len(m): spec_key_at(m, i) == spec_key_at(old(m), i);
+        ensures forall k2: u64 where k2 != k && spec_contains_key(old(m), k2):
+            spec_get(m, k2) == old(spec_get(m, k2));
+    }
+
+    #[verify_only]
+    fun test_verify_iter_replace_symbolic(m: &mut OrderedMap<u64, u64>, i: u64): u64 {
+        let it = IteratorPtr::Position { index: i };
+        it.iter_replace(m, 7)
+    }
+
+    spec test_verify_iter_replace_symbolic {
+        pragma verify = true;
+        requires i < spec_len(m);
+        aborts_if false;
+        ensures result == old(spec_get(m, spec_key_at(m, i)));
+        ensures spec_get(m, old(spec_key_at(m, i))) == 7;
+        ensures spec_len(m) == spec_len(old(m));
+        ensures forall j in 0..spec_len(m): spec_key_at(m, j) == spec_key_at(old(m), j);
+    }
+
+    #[verify_only]
+    fun test_verify_iter_remove_shift_at_position(m: &mut OrderedMap<u64, u64>, i: u64): u64 {
+        let it = IteratorPtr::Position { index: i };
+        it.iter_remove(m)
+    }
+
+    spec test_verify_iter_remove_shift_at_position {
+        pragma verify = true;
+        requires i < spec_len(m);
+        aborts_if false;
+        ensures result == old(spec_get(m, spec_key_at(m, i)));
+        ensures spec_len(m) == spec_len(old(m)) - 1;
+        ensures !spec_contains_key(m, old(spec_key_at(m, i)));
+        ensures forall j in 0..i: spec_key_at(m, j) == spec_key_at(old(m), j);
+        ensures forall j in i..spec_len(m): spec_key_at(m, j) == spec_key_at(old(m), j + 1);
+    }
+
+    #[verify_only]
+    fun test_verify_iter_add_append_symbolic(m: &mut OrderedMap<u64, u64>, k: u64) {
+        // Appending at the end iterator, the shape a queue uses: the new key
+        // takes the last position and every existing position is undisturbed.
+        m.internal_new_end_iter().iter_add(m, k, 7);
+    }
+
+    spec test_verify_iter_add_append_symbolic {
+        pragma verify = true;
+        requires spec_len(m) == 0
+            || cmp::compare(spec_key_at(m, spec_len(m) - 1), k) == cmp::Ordering::Less;
+        aborts_if false;
+        ensures spec_len(m) == spec_len(old(m)) + 1;
+        ensures spec_get(m, k) == 7;
+        ensures spec_rank(m, k) == spec_len(old(m));
+        ensures forall j in 0..spec_len(old(m)): spec_key_at(m, j) == spec_key_at(old(m), j);
+    }
+
+    #[verify_only]
+    fun test_verify_lower_bound_rank_symbolic(m: &OrderedMap<u64, u64>, k: u64): IteratorPtr {
+        // For a key that is present, the search lands exactly on its position:
+        // the characterization is by comparison, so reaching the enumeration
+        // needs the ascending order the model supplies.
+        m.internal_lower_bound(&k)
+    }
+
+    spec test_verify_lower_bound_rank_symbolic {
+        pragma verify = true;
+        requires spec_contains_key(m, k);
+        aborts_if false;
+        ensures !(result is IteratorPtr::End);
+        ensures result.index == spec_rank(m, k);
+        ensures spec_key_at(m, result.index) == k;
+    }
+
+    #[verify_only]
+    fun test_verify_lower_bound_gap_symbolic(m: &OrderedMap<u64, u64>, k: u64): IteratorPtr {
+        // For a key that is absent, it lands on the first larger key, so an
+        // insert there keeps the order — the `iter_add` precondition.
+        m.internal_lower_bound(&k)
+    }
+
+    spec test_verify_lower_bound_gap_symbolic {
+        pragma verify = true;
+        requires !spec_contains_key(m, k);
+        aborts_if false;
+        ensures !(result is IteratorPtr::End) ==>
+            cmp::compare(k, spec_key_at(m, result.index)) == cmp::Ordering::Less;
+        ensures !(result is IteratorPtr::End) && result.index > 0 ==>
+            cmp::compare(spec_key_at(m, result.index - 1), k) == cmp::Ordering::Less;
+        ensures (result is IteratorPtr::End) ==>
+            (forall i in 0..spec_len(m):
+                cmp::compare(spec_key_at(m, i), k) == cmp::Ordering::Less);
+    }
+
+    #[verify_only]
+    fun test_verify_iter_add_middle_symbolic(m: &mut OrderedMap<u64, u64>, i: u64, k: u64) {
+        // Inserting between two existing keys, which is the case an append
+        // cannot exercise: here the tail actually has to shift up.
+        let it = IteratorPtr::Position { index: i };
+        it.iter_add(m, k, 7);
+    }
+
+    spec test_verify_iter_add_middle_symbolic {
+        pragma verify = true;
+        requires i < spec_len(m);
+        requires i == 0 || cmp::compare(spec_key_at(m, i - 1), k) == cmp::Ordering::Less;
+        requires cmp::compare(k, spec_key_at(m, i)) == cmp::Ordering::Less;
+        aborts_if false;
+        ensures spec_len(m) == spec_len(old(m)) + 1;
+        ensures spec_get(m, k) == 7;
+        ensures spec_rank(m, k) == i;
+        ensures forall j in 0..i: spec_key_at(m, j) == spec_key_at(old(m), j);
+        ensures forall j in (i + 1)..spec_len(m): spec_key_at(m, j) == spec_key_at(old(m), j - 1);
+    }
+
+    #[verify_only]
+    fun test_aborts_if_iter_add_out_of_order(m: &mut OrderedMap<u64, u64>, k: u64) {
+        // A key that does not exceed the last one has no business at the end
+        // position; the body's ordering check rejects it, duplicates included.
+        m.internal_new_end_iter().iter_add(m, k, 7);
+    }
+
+    spec test_aborts_if_iter_add_out_of_order {
+        pragma verify = true;
+        requires spec_len(m) > 0;
+        requires cmp::compare(spec_key_at(m, spec_len(m) - 1), k) != cmp::Ordering::Less;
+        aborts_if true;
+    }
+
+    #[verify_only]
+    fun test_aborts_if_iter_remove_out_of_range(m: &mut OrderedMap<u64, u64>, i: u64): u64 {
+        let it = IteratorPtr::Position { index: i };
+        it.iter_remove(m)
+    }
+
+    spec test_aborts_if_iter_remove_out_of_range {
+        pragma verify = true;
+        requires i >= spec_len(m);
+        aborts_if true;
+    }
+
+    #[verify_only]
+    fun test_verify_iter_borrow_mut_at_position(m: &mut OrderedMap<u64, u64>, i: u64) {
+        // The borrow's positional meaning, stated directly: writing through the
+        // iterator at position `i` lands on the key sitting at `i`, and no other
+        // position is touched.
+        let it = IteratorPtr::Position { index: i };
+        *it.iter_borrow_mut(m) = 7;
+    }
+
+    spec test_verify_iter_borrow_mut_at_position {
+        pragma verify = true;
+        requires i < spec_len(m);
+        aborts_if false;
+        ensures spec_get(m, spec_key_at(old(m), i)) == 7;
+        ensures forall j in 0..spec_len(m): spec_key_at(m, j) == spec_key_at(old(m), j);
+        ensures forall j in 0..spec_len(m) where j != i:
+            spec_get(m, spec_key_at(m, j)) == old(spec_get(m, spec_key_at(m, j)));
+    }
+
+    #[verify_only]
+    fun test_aborts_if_iter_borrow_mut_end(m: &mut OrderedMap<u64, u64>) {
+        // No value at the end iterator.
+        let it = m.internal_new_end_iter();
+        *it.iter_borrow_mut(m) = 7;
+    }
+
+    spec test_aborts_if_iter_borrow_mut_end {
+        pragma verify = true;
+        aborts_if true;
+    }
+
+    #[verify_only]
+    fun test_aborts_if_iter_borrow_mut_out_of_range(m: &mut OrderedMap<u64, u64>, i: u64) {
+        // Nor at a position past the last one — a stale iterator degrades to
+        // this once the map has shrunk under it.
+        let it = IteratorPtr::Position { index: i };
+        *it.iter_borrow_mut(m) = 7;
+    }
+
+    spec test_aborts_if_iter_borrow_mut_out_of_range {
+        pragma verify = true;
+        requires i >= spec_len(m);
+        aborts_if true;
+    }
+
+    #[verify_only]
+    fun test_verify_iter_walk_mut_symbolic(m: &mut OrderedMap<u64, u64>) {
+        // The mutate-while-traversing shape: a walk that writes each value in
+        // place. Positions have to survive every write for the walk's own
+        // invariant to hold, which is what the enumeration-backed borrow gives.
+        let it = m.internal_new_begin_iter();
+        let count = 0u64;
+        while ({
+            spec {
+                invariant count <= spec_len(m);
+                invariant spec_len(m) == spec_len(old(m));
+                invariant forall i in 0..spec_len(m):
+                    spec_key_at(m, i) == spec_key_at(old(m), i);
+                invariant !(it is IteratorPtr::End) ==>
+                    it.index == count && it.index < spec_len(m);
+                invariant (it is IteratorPtr::End) ==> count == spec_len(m);
+                invariant forall i in 0..count: spec_get(m, spec_key_at(m, i)) == 7;
+            };
+            !it.iter_is_end(m)
+        }) {
+            *it.iter_borrow_mut(m) = 7;
+            it = it.iter_next(m);
+            count = count + 1;
+        };
+    }
+
+    spec test_verify_iter_walk_mut_symbolic {
+        pragma verify = true;
+        aborts_if false;
+        ensures spec_len(m) == spec_len(old(m));
+        ensures forall i in 0..spec_len(m): spec_key_at(m, i) == spec_key_at(old(m), i);
+        ensures forall i in 0..spec_len(m): spec_get(m, spec_key_at(m, i)) == 7;
+    }
 }

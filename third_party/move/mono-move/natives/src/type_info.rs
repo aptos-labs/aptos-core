@@ -3,7 +3,9 @@
 
 //! Natives for the `type_info` module.
 
-use crate::{polymorphic_natives, NativeEntry};
+use crate::{
+    monomorphic_natives, polymorphic_natives, transaction_context::native_chain_id, NativeEntry,
+};
 use mono_move_core::{
     native::{NativeContext, NativeContextFamily, NativeStatus, RootPool, VMValue, Vector},
     types::{type_to_string, view_name, view_type, view_type_list, Type},
@@ -137,8 +139,16 @@ pub fn native_type_of<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
 
 /// Natives for the `type_info` module.
 pub fn make_all_type_info_natives<F: NativeContextFamily>() -> Vec<NativeEntry<F>> {
-    polymorphic_natives![
+    let mut natives = polymorphic_natives![
         ("0x1::type_info::type_name", native_type_name),
         ("0x1::type_info::type_of", native_type_of),
-    ]
+    ];
+    // `chain_id_internal` is non-generic, so it registers as a monomorphic entry
+    // with empty type arguments. It shares its implementation with
+    // `transaction_context::chain_id_internal`.
+    natives.extend(monomorphic_natives![(
+        "0x1::type_info::chain_id_internal",
+        native_chain_id
+    )]);
+    natives
 }

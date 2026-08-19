@@ -6,69 +6,73 @@ fun none(): skipped (generic function not instantiated)
 fun some(): skipped (generic function not instantiated)
 
 fun copy_some() {
-  frame_data_size: 32
-  entry_gas: 301
+  frame_data_size: 40
+  entry_gas: 327
   code:
-    0: Move8 [56] <- [0]
-    1: CallIndirect 0x42::generic_enum_option::some<u64>
-    2: Move8 [8] <- [56]
-    3: StoreImm8 [64] <- #0
-    4: Move8 [56] <- [8]
-    5: CallIndirect 0x42::generic_enum_option::unwrap_or<u64>
-    6: Move8 [0] <- [56]
-    7: StoreImm8 [64] <- #0
-    8: Move8 [56] <- [8]
-    9: CallIndirect 0x42::generic_enum_option::unwrap_or<u64>
-    10: Move8 [16] <- [56]
-    11: AddU64 [24] <- [0] + [16]
-    12: Move8 [0] <- [24]
-    13: Return
+    0: Move8 [64] <- [0] @1
+    1: CallIndirect 0x42::generic_enum_option::some<u64> @1
+    2: Move8 [8] <- [64] @1
+    3: Move8 [24] <- [8] @3
+    4: DeepCopyHeapPtrs [24] deep-copy ptrs at [0] @3
+    5: StoreImm8 [72] <- #0 @5
+    6: Move8 [64] <- [8] @6
+    7: CallIndirect 0x42::generic_enum_option::unwrap_or<u64> @6
+    8: Move8 [0] <- [64] @6
+    9: StoreImm8 [72] <- #0 @8
+    10: Move8 [64] <- [24] @9
+    11: CallIndirect 0x42::generic_enum_option::unwrap_or<u64> @9
+    12: Move8 [16] <- [64] @9
+    13: AddU64 [32] <- [0] + [16] @13
+    14: Move8 [0] <- [32] @14
+    15: Return @14
+  safe_point_layouts:
+    4: []
 }
 
 fun run_bool() {
   frame_data_size: 24
   entry_gas: 3
   code:
-    0: JumpIntCmp @13 [0] != u64 #0 gas_taken=45 gas_fallthrough=36
-    1: CallIndirect 0x42::generic_enum_option::none<bool>
-    2: Move8 [8] <- [48]
-    3: StoreImm1 [56] <- #0
-    4: Move8 [48] <- [8]
-    5: CallIndirect 0x42::generic_enum_option::unwrap_or<bool>
-    6: JumpZeroByte @10 [48] gas_taken=56 gas_fallthrough=56
-    7: StoreImm8 [16] <- #1
-    8: Move8 [0] <- [16]
-    9: Return
-    10: StoreImm8 [16] <- #0
-    11: Move8 [0] <- [16]
-    12: Return
-    13: StoreImm1 [48] <- #1
-    14: CallIndirect 0x42::generic_enum_option::some<bool>
-    15: Move8 [8] <- [48]
-    16: Jump @3 gas=46
+    0: JumpIntCmp @13 [0] != u64 #0 gas_taken=45 gas_fallthrough=36 @1
+    1: CallIndirect 0x42::generic_enum_option::none<bool> @4
+    2: Move8 [8] <- [48] @4
+    3: StoreImm1 [56] <- #0 @7
+    4: Move8 [48] <- [8] @8
+    5: CallIndirect 0x42::generic_enum_option::unwrap_or<bool> @8
+    6: JumpZeroByte @10 [48] gas_taken=56 gas_fallthrough=56 @9
+    7: StoreImm8 [16] <- #1 @10
+    8: Move8 [0] <- [16] @11
+    9: Return @11
+    10: StoreImm8 [16] <- #0 @12
+    11: Move8 [0] <- [16] @13
+    12: Return @13
+    13: StoreImm1 [48] <- #1 @14
+    14: CallIndirect 0x42::generic_enum_option::some<bool> @15
+    15: Move8 [8] <- [48] @15
+    16: Jump @3 gas=46 @17
 }
 
 fun run_none() {
   frame_data_size: 8
   entry_gas: 126
   code:
-    0: CallIndirect 0x42::generic_enum_option::none<u64>
-    1: Move8 [40] <- [0]
-    2: CallIndirect 0x42::generic_enum_option::unwrap_or<u64>
-    3: Move8 [0] <- [32]
-    4: Return
+    0: CallIndirect 0x42::generic_enum_option::none<u64> @0
+    1: Move8 [40] <- [0] @2
+    2: CallIndirect 0x42::generic_enum_option::unwrap_or<u64> @2
+    3: Move8 [0] <- [32] @3
+    4: Return @3
 }
 
 fun run_some() {
   frame_data_size: 8
   entry_gas: 154
   code:
-    0: Move8 [32] <- [0]
-    1: CallIndirect 0x42::generic_enum_option::some<u64>
-    2: StoreImm8 [40] <- #0
-    3: CallIndirect 0x42::generic_enum_option::unwrap_or<u64>
-    4: Move8 [0] <- [32]
-    5: Return
+    0: Move8 [32] <- [0] @1
+    1: CallIndirect 0x42::generic_enum_option::some<u64> @1
+    2: StoreImm8 [40] <- #0 @2
+    3: CallIndirect 0x42::generic_enum_option::unwrap_or<u64> @3
+    4: Move8 [0] <- [32] @4
+    5: Return @4
 }
 
 fun unwrap_or(): skipped (generic function not instantiated)

@@ -1,6 +1,43 @@
 ============ initial translation from Move ================
 
 [variant baseline]
+fun Test::call_generic_collision($t0|addr: address, $t1|other: address) {
+     var $t2: address
+     var $t3: address
+     var $t4: u8
+  0: $t2 := move($t0)
+  1: $t3 := move($t1)
+  2: $t4 := 1
+  3: Test::set_generic<u8>($t2, $t3, $t4)
+  4: return ()
+}
+
+
+[variant baseline]
+fun Test::call_generic_frame($t0|addr: address, $t1|other: address) {
+     var $t2: address
+     var $t3: address
+     var $t4: bool
+  0: $t2 := move($t0)
+  1: $t3 := move($t1)
+  2: $t4 := true
+  3: Test::set_generic<bool>($t2, $t3, $t4)
+  4: return ()
+}
+
+
+[variant baseline]
+fun Test::call_without_frame($t0|addr: address, $t1|value: u64) {
+     var $t2: address
+     var $t3: u64
+  0: $t2 := move($t0)
+  1: $t3 := move($t1)
+  2: Test::set_without_frame($t2, $t3)
+  3: return ()
+}
+
+
+[variant baseline]
 fun Test::get_and_incr($t0|addr: address): u64 {
      var $t1|r: &mut 0x42::Test::R
      var $t2: address
@@ -58,7 +95,195 @@ fun Test::incr_twice() {
   6: return ()
 }
 
+
+[variant baseline]
+fun Test::set_generic<#0>($t0|addr: address, $t1|other: address, $t2|value: #0) {
+     var $t3|$t3: &mut #0
+     var $t4: address
+     var $t5: &mut 0x42::Test::Generic<#0>
+     var $t6: &mut #0
+     var $t7: #0
+     var $t8: &mut #0
+     var $t9: u8
+     var $t10: address
+     var $t11: &mut 0x42::Test::Generic<u8>
+     var $t12: &mut u8
+  0: $t4 := move($t0)
+  1: $t5 := borrow_global<0x42::Test::Generic<#0>>($t4)
+  2: $t6 := borrow_field<0x42::Test::Generic<#0>>.v($t5)
+  3: $t3 := $t6
+  4: $t7 := move($t2)
+  5: $t8 := move($t3)
+  6: write_ref($t8, $t7)
+  7: $t9 := 0
+  8: $t10 := move($t1)
+  9: $t11 := borrow_global<0x42::Test::Generic<u8>>($t10)
+ 10: $t12 := borrow_field<0x42::Test::Generic<u8>>.v($t11)
+ 11: write_ref($t12, $t9)
+ 12: return ()
+}
+
+
+[variant baseline]
+fun Test::set_without_frame($t0|addr: address, $t1|value: u64) {
+     var $t2|$t2: &mut u64
+     var $t3: address
+     var $t4: &mut 0x42::Test::R
+     var $t5: &mut u64
+     var $t6: u64
+     var $t7: &mut u64
+  0: $t3 := move($t0)
+  1: $t4 := borrow_global<0x42::Test::R>($t3)
+  2: $t5 := borrow_field<0x42::Test::R>.v($t4)
+  3: $t2 := $t5
+  4: $t6 := move($t1)
+  5: $t7 := move($t2)
+  6: write_ref($t7, $t6)
+  7: return ()
+}
+
 ============ after pipeline `spec_instrumentation` ================
+
+[variant baseline]
+fun Test::call_generic_collision($t0|addr: address, $t1|other: address) {
+     var $t2: u8
+     var $t3: bool
+     var $t4: num
+  0: $t2 := 1
+  1: opaque begin: Test::set_generic<u8>($t0, $t1, $t2)
+  2: $t3 := havoc[val]()
+  3: if ($t3) goto 4 else goto 7
+  4: label L3
+  5: trace_abort($t4)
+  6: goto 13
+  7: label L2
+  8: modifies global<0x42::Test::Generic<u8>>($t0)
+  9: havoc_global<0x42::Test::Generic<u8>>()
+ 10: assume forall $rsc: 0x42::Test::Generic<u8>: ResourceDomain<0x42::Test::Generic<u8>>(): WellFormed($rsc)
+ 11: opaque end: Test::set_generic<u8>($t0, $t1, $t2)
+ 12: return ()
+ 13: label L1
+ 14: abort($t4)
+}
+
+
+[variant verification]
+fun Test::call_generic_collision($t0|addr: address, $t1|other: address) {
+     var $t2: u8
+     var $t3: bool
+     var $t4: num
+  0: $t2 := 1
+  1: opaque begin: Test::set_generic<u8>($t0, $t1, $t2)
+  2: $t3 := havoc[val]()
+  3: if ($t3) goto 4 else goto 7
+  4: label L3
+  5: trace_abort($t4)
+  6: goto 13
+  7: label L2
+  8: modifies global<0x42::Test::Generic<u8>>($t0)
+  9: havoc_global<0x42::Test::Generic<u8>>()
+ 10: assume forall $rsc: 0x42::Test::Generic<u8>: ResourceDomain<0x42::Test::Generic<u8>>(): WellFormed($rsc)
+ 11: opaque end: Test::set_generic<u8>($t0, $t1, $t2)
+ 12: return ()
+ 13: label L1
+ 14: abort($t4)
+}
+
+
+[variant baseline]
+fun Test::call_generic_frame($t0|addr: address, $t1|other: address) {
+     var $t2: bool
+     var $t3: bool
+     var $t4: num
+  0: $t2 := true
+  1: opaque begin: Test::set_generic<bool>($t0, $t1, $t2)
+  2: $t3 := havoc[val]()
+  3: if ($t3) goto 4 else goto 7
+  4: label L3
+  5: trace_abort($t4)
+  6: goto 13
+  7: label L2
+  8: modifies global<0x42::Test::Generic<bool>>($t0)
+  9: havoc_global<0x42::Test::Generic<u8>>()
+ 10: assume forall $rsc: 0x42::Test::Generic<u8>: ResourceDomain<0x42::Test::Generic<u8>>(): WellFormed($rsc)
+ 11: opaque end: Test::set_generic<bool>($t0, $t1, $t2)
+ 12: return ()
+ 13: label L1
+ 14: abort($t4)
+}
+
+
+[variant verification]
+fun Test::call_generic_frame($t0|addr: address, $t1|other: address) {
+     var $t2: bool
+     var $t3: bool
+     var $t4: num
+  0: $t2 := true
+  1: opaque begin: Test::set_generic<bool>($t0, $t1, $t2)
+  2: $t3 := havoc[val]()
+  3: if ($t3) goto 4 else goto 7
+  4: label L3
+  5: trace_abort($t4)
+  6: goto 13
+  7: label L2
+  8: modifies global<0x42::Test::Generic<bool>>($t0)
+  9: havoc_global<0x42::Test::Generic<u8>>()
+ 10: assume forall $rsc: 0x42::Test::Generic<u8>: ResourceDomain<0x42::Test::Generic<u8>>(): WellFormed($rsc)
+ 11: opaque end: Test::set_generic<bool>($t0, $t1, $t2)
+ 12: return ()
+ 13: label L1
+ 14: abort($t4)
+}
+
+
+[variant baseline]
+fun Test::call_without_frame($t0|addr: address, $t1|value: u64) {
+     var $t2: bool
+     var $t3: num
+  0: assume exists<0x42::Test::R>($t0)
+  1: assume exists<0x42::Test::R>($t0)
+  2: opaque begin: Test::set_without_frame($t0, $t1)
+  3: $t2 := havoc[val]()
+  4: if ($t2) goto 5 else goto 8
+  5: label L3
+  6: trace_abort($t3)
+  7: goto 14
+  8: label L2
+  9: havoc_global<0x42::Test::R>()
+ 10: assume forall $rsc: 0x42::Test::R: ResourceDomain<0x42::Test::R>(): WellFormed($rsc)
+ 11: assume Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), $t1)
+ 12: opaque end: Test::set_without_frame($t0, $t1)
+ 13: return ()
+ 14: label L1
+ 15: abort($t3)
+}
+
+
+[variant verification]
+fun Test::call_without_frame($t0|addr: address, $t1|value: u64) {
+     var $t2: bool
+     var $t3: num
+  0: assume exists<0x42::Test::R>($t0)
+     # VC: precondition does not hold at this call at tests/spec_instrumentation/opaque_call.move:37:9+25
+  1: assert exists<0x42::Test::R>($t0)
+  2: opaque begin: Test::set_without_frame($t0, $t1)
+  3: $t2 := havoc[val]()
+  4: if ($t2) goto 5 else goto 8
+  5: label L3
+  6: trace_abort($t3)
+  7: goto 15
+  8: label L2
+  9: havoc_global<0x42::Test::R>()
+ 10: assume forall $rsc: 0x42::Test::R: ResourceDomain<0x42::Test::R>(): WellFormed($rsc)
+ 11: assume Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), $t1)
+ 12: opaque end: Test::set_without_frame($t0, $t1)
+     # VC: post-condition does not hold at tests/spec_instrumentation/opaque_call.move:46:9+35
+ 13: assert Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), $t1)
+ 14: return ()
+ 15: label L1
+ 16: abort($t3)
+}
+
 
 [variant baseline]
 fun Test::get_and_incr($t0|addr: address): u64 {
@@ -158,7 +383,7 @@ fun Test::incr_twice() {
   0: $t0 := 0x1
   1: assume Neq<address>($t0, 0x0)
   2: $t1 := opaque begin: Test::get_and_incr($t0)
-  3: @0 := save_mem(Test::R)
+  3: @9 := save_mem(Test::R)
   4: assume Identical($t2, Or(Not(exists<0x42::Test::R>($t0)), Ge(Add(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), 1), 18446744073709551615)))
   5: if ($t2) goto 6 else goto 10
   6: label L3
@@ -168,14 +393,14 @@ fun Test::incr_twice() {
  10: label L2
  11: modifies global<0x42::Test::R>($t0)
  12: assume WellFormed($t1)
- 13: assume Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), Add(select Test::R.v<0x42::Test::R>(global[@0]<0x42::Test::R>($t0)), 1))
+ 13: assume Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), Add(select Test::R.v<0x42::Test::R>(global[@9]<0x42::Test::R>($t0)), 1))
  14: assume Eq<u64>($t1, select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)))
  15: $t1 := opaque end: Test::get_and_incr($t0)
  16: drop($t1)
  17: $t4 := 0x1
  18: assume Neq<address>($t4, 0x0)
  19: $t5 := opaque begin: Test::get_and_incr($t4)
- 20: @1 := save_mem(Test::R)
+ 20: @11 := save_mem(Test::R)
  21: assume Identical($t6, Or(Not(exists<0x42::Test::R>($t4)), Ge(Add(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t4)), 1), 18446744073709551615)))
  22: if ($t6) goto 23 else goto 27
  23: label L5
@@ -185,7 +410,7 @@ fun Test::incr_twice() {
  27: label L4
  28: modifies global<0x42::Test::R>($t4)
  29: assume WellFormed($t5)
- 30: assume Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t4)), Add(select Test::R.v<0x42::Test::R>(global[@1]<0x42::Test::R>($t4)), 1))
+ 30: assume Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t4)), Add(select Test::R.v<0x42::Test::R>(global[@11]<0x42::Test::R>($t4)), 1))
  31: assume Eq<u64>($t5, select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t4)))
  32: $t5 := opaque end: Test::get_and_incr($t4)
  33: drop($t5)
@@ -209,7 +434,7 @@ fun Test::incr_twice() {
      # VC: precondition does not hold at this call at tests/spec_instrumentation/opaque_call.move:15:6+22
   2: assert Neq<address>($t0, 0x0)
   3: $t1 := opaque begin: Test::get_and_incr($t0)
-  4: @0 := save_mem(Test::R)
+  4: @4 := save_mem(Test::R)
   5: assume Identical($t2, Or(Not(exists<0x42::Test::R>($t0)), Ge(Add(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), 1), 18446744073709551615)))
   6: if ($t2) goto 7 else goto 11
   7: label L3
@@ -219,7 +444,7 @@ fun Test::incr_twice() {
  11: label L2
  12: modifies global<0x42::Test::R>($t0)
  13: assume WellFormed($t1)
- 14: assume Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), Add(select Test::R.v<0x42::Test::R>(global[@0]<0x42::Test::R>($t0)), 1))
+ 14: assume Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), Add(select Test::R.v<0x42::Test::R>(global[@4]<0x42::Test::R>($t0)), 1))
  15: assume Eq<u64>($t1, select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)))
  16: $t1 := opaque end: Test::get_and_incr($t0)
  17: drop($t1)
@@ -227,7 +452,7 @@ fun Test::incr_twice() {
      # VC: precondition does not hold at this call at tests/spec_instrumentation/opaque_call.move:15:6+22
  19: assert Neq<address>($t4, 0x0)
  20: $t5 := opaque begin: Test::get_and_incr($t4)
- 21: @1 := save_mem(Test::R)
+ 21: @6 := save_mem(Test::R)
  22: assume Identical($t6, Or(Not(exists<0x42::Test::R>($t4)), Ge(Add(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t4)), 1), 18446744073709551615)))
  23: if ($t6) goto 24 else goto 28
  24: label L5
@@ -237,7 +462,7 @@ fun Test::incr_twice() {
  28: label L4
  29: modifies global<0x42::Test::R>($t4)
  30: assume WellFormed($t5)
- 31: assume Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t4)), Add(select Test::R.v<0x42::Test::R>(global[@1]<0x42::Test::R>($t4)), 1))
+ 31: assume Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t4)), Add(select Test::R.v<0x42::Test::R>(global[@6]<0x42::Test::R>($t4)), 1))
  32: assume Eq<u64>($t5, select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t4)))
  33: $t5 := opaque end: Test::get_and_incr($t4)
  34: drop($t5)
@@ -255,8 +480,115 @@ fun Test::incr_twice() {
 }
 
 
+[variant baseline]
+fun Test::set_generic<#0>($t0|addr: address, $t1|other: address, $t2|value: #0) {
+     var $t3|$t3: &mut #0 [unused]
+     var $t4: &mut 0x42::Test::Generic<#0>
+     var $t5: num
+     var $t6: &mut #0
+     var $t7: u8
+     var $t8: &mut 0x42::Test::Generic<u8>
+     var $t9: &mut u8
+  0: $t4 := borrow_global<0x42::Test::Generic<#0>>($t0) on_abort goto 12 with $t5
+  1: $t6 := borrow_field<0x42::Test::Generic<#0>>.v($t4)
+  2: write_ref($t6, $t2)
+  3: write_back[Reference($t4).v (#0)]($t6)
+  4: write_back[0x42::Test::Generic<#0>@]($t4)
+  5: $t7 := 0
+  6: $t8 := borrow_global<0x42::Test::Generic<u8>>($t1) on_abort goto 12 with $t5
+  7: $t9 := borrow_field<0x42::Test::Generic<u8>>.v($t8)
+  8: write_ref($t9, $t7)
+  9: write_back[Reference($t8).v (u8)]($t9)
+ 10: write_back[0x42::Test::Generic<u8>@]($t8)
+ 11: return ()
+ 12: label L1
+ 13: abort($t5)
+}
+
+
+[variant verification]
+fun Test::set_generic<#0>($t0|addr: address, $t1|other: address, $t2|value: #0) {
+     var $t3|$t3: &mut #0
+     var $t4: &mut 0x42::Test::Generic<#0>
+     var $t5: num
+     var $t6: &mut #0
+     var $t7: u8
+     var $t8: &mut 0x42::Test::Generic<u8>
+     var $t9: &mut u8
+  0: assume CanModify<0x42::Test::Generic<#0>>($t0)
+     # VC: caller does not have permission to modify `Test::Generic<#0>` at given address at tests/spec_instrumentation/opaque_call.move:52:9+35
+  1: assert CanModify<0x42::Test::Generic<#0>>($t0)
+  2: $t4 := borrow_global<0x42::Test::Generic<#0>>($t0) on_abort goto 15 with $t5
+  3: $t6 := borrow_field<0x42::Test::Generic<#0>>.v($t4)
+  4: write_ref($t6, $t2)
+  5: write_back[Reference($t4).v (#0)]($t6)
+  6: write_back[0x42::Test::Generic<#0>@]($t4)
+  7: $t7 := 0
+     # VC: caller does not have permission to modify `Test::Generic<u8>` at given address at tests/spec_instrumentation/opaque_call.move:53:9+37
+  8: assert CanModify<0x42::Test::Generic<u8>>($t1)
+  9: $t8 := borrow_global<0x42::Test::Generic<u8>>($t1) on_abort goto 15 with $t5
+ 10: $t9 := borrow_field<0x42::Test::Generic<u8>>.v($t8)
+ 11: write_ref($t9, $t7)
+ 12: write_back[Reference($t8).v (u8)]($t9)
+ 13: write_back[0x42::Test::Generic<u8>@]($t8)
+ 14: return ()
+ 15: label L1
+ 16: abort($t5)
+}
+
+
+[variant baseline]
+fun Test::set_without_frame($t0|addr: address, $t1|value: u64) {
+     var $t2|$t2: &mut u64 [unused]
+     var $t3: &mut 0x42::Test::R
+     var $t4: num
+     var $t5: &mut u64
+  0: assume exists<0x42::Test::R>($t0)
+  1: $t3 := borrow_global<0x42::Test::R>($t0) on_abort goto 7 with $t4
+  2: $t5 := borrow_field<0x42::Test::R>.v($t3)
+  3: write_ref($t5, $t1)
+  4: write_back[Reference($t3).v (u64)]($t5)
+  5: write_back[0x42::Test::R@]($t3)
+  6: return ()
+  7: label L1
+  8: abort($t4)
+}
+
+
+[variant verification]
+fun Test::set_without_frame($t0|addr: address, $t1|value: u64) {
+     var $t2|$t2: &mut u64
+     var $t3: &mut 0x42::Test::R
+     var $t4: num
+     var $t5: &mut u64
+  0: assume exists<0x42::Test::R>($t0)
+  1: $t3 := borrow_global<0x42::Test::R>($t0) on_abort goto 8 with $t4
+  2: $t5 := borrow_field<0x42::Test::R>.v($t3)
+  3: write_ref($t5, $t1)
+  4: write_back[Reference($t3).v (u64)]($t5)
+  5: write_back[0x42::Test::R@]($t3)
+     # VC: post-condition does not hold at tests/spec_instrumentation/opaque_call.move:38:9+35
+  6: assert Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), $t1)
+  7: return ()
+  8: label L1
+  9: abort($t4)
+}
+
+
 
 ==== spec-instrumenter input specs ====
+
+fun Test::call_without_frame[baseline]
+spec {
+  requires exists<0x42::Test::R>($t0);
+  ensures Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), $t1);
+}
+
+fun Test::call_without_frame[verification]
+spec {
+  requires exists<0x42::Test::R>($t0);
+  ensures Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), $t1);
+}
 
 fun Test::get_and_incr[baseline]
 spec {
@@ -289,3 +621,45 @@ spec {
   aborts_if Not(exists<0x42::Test::R>(0x1));
   ensures Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>(0x1)), Add(select Test::R.v<0x42::Test::R>(Old<0x42::Test::R>(global<0x42::Test::R>(0x1))), 2));
 }
+
+fun Test::set_generic[baseline]
+spec {
+  modifies global<0x42::Test::Generic<#0>>($t0);
+}
+
+fun Test::set_generic[verification]
+spec {
+  modifies global<0x42::Test::Generic<#0>>($t0);
+}
+
+fun Test::set_without_frame[baseline]
+spec {
+  requires exists<0x42::Test::R>($t0);
+  ensures Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), $t1);
+}
+
+fun Test::set_without_frame[verification]
+spec {
+  requires exists<0x42::Test::R>($t0);
+  ensures Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), $t1);
+}
+
+============ Diagnostics ================
+warning: opaque call to `Test::set_without_frame` has an incomplete modifies frame; verification weakens its summary by havocing every address of 1 resource type
+   ┌─ tests/spec_instrumentation/opaque_call.move:35:5
+   │
+35 │ ╭     spec set_without_frame {
+36 │ │         pragma opaque;
+37 │ │         requires exists<R>(addr);
+38 │ │         ensures global<R>(addr).v == value;
+39 │ │     }
+   │ ╰─────^
+
+warning: opaque call to `Test::set_generic` has an incomplete modifies frame; verification weakens its summary by havocing every address of 1 resource type
+   ┌─ tests/spec_instrumentation/opaque_call.move:55:5
+   │
+55 │ ╭     spec set_generic {
+56 │ │         pragma opaque;
+57 │ │         modifies global<Generic<T>>(addr);
+58 │ │     }
+   │ ╰─────^

@@ -1010,6 +1010,8 @@ module aptos_framework::staking_contract {
         // Charge all stakeholders (except for the operator themselves) commission on any rewards earnt relatively to the
         // previous value of the distribution pool.
         let shareholders = &distribution_pool.shareholders();
+        // TODO(#20373): add exact functional specs for pool mutations so
+        // verification need not weaken this HOF's fold.
         shareholders.for_each_ref(
             |shareholder| {
                 let shareholder: address = *shareholder;

@@ -210,6 +210,8 @@ members = [
     "third_party/move/documentation/framework-book/builder",
     "third_party/move/extensions/move-table-extension",
     "third_party/move/mono-move/alloc",
+    "third_party/move/mono-move/aptos-state-view-providers",
+    "third_party/move/mono-move/aptos-transaction-executor",
     "third_party/move/mono-move/core",
     "third_party/move/mono-move/global-context",
     "third_party/move/mono-move/loader",
@@ -240,6 +242,7 @@ members = [
     "third_party/move/move-model/bytecode",
     "third_party/move/move-model/bytecode-test-utils",
     "third_party/move/move-model/bytecode/ast-generator-tests",
+    "third_party/move/move-model/exchange",
     "third_party/move/move-prover",
     "third_party/move/move-prover/boogie-backend",
     "third_party/move/move-prover/bytecode-pipeline",
@@ -902,6 +905,8 @@ aptos-position-natives = { path = "aptos-move/framework/position-natives" }
 aptos-table-natives = { path = "aptos-move/framework/table-natives" }
 legacy-move-compiler = { path = "third_party/move/move-compiler-v2/legacy-move-compiler" }
 mono-move-alloc = { path = "third_party/move/mono-move/alloc" }
+mono-move-aptos-state-view-providers = { path = "third_party/move/mono-move/aptos-state-view-providers" }
+mono-move-aptos-transaction-executor = { path = "third_party/move/mono-move/aptos-transaction-executor" }
 mono-move-core = { path = "third_party/move/mono-move/core" }
 mono-move-global-context = { path = "third_party/move/mono-move/global-context" }
 mono-move-loader = { path = "third_party/move/mono-move/loader" }
@@ -928,6 +933,7 @@ move-docgen = { path = "third_party/move/tools/move-docgen" }
 move-ir-types = { path = "third_party/move/move-ir/types" }
 move-linter = { path = "third_party/move/tools/move-linter" }
 move-model = { path = "third_party/move/move-model" }
+move-model-exchange = { path = "third_party/move/move-model/exchange" }
 move-package = { path = "third_party/move/tools/move-package" }
 move-package-cache = { path = "third_party/move/tools/move-package-cache" }
 move-package-manifest = { path = "third_party/move/tools/move-package-manifest" }

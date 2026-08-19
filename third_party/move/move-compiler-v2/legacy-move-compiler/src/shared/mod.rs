@@ -377,7 +377,7 @@ impl Flags {
             skip_attribute_checks: false,
             debug: debug_compiler_env_var(),
             warn_unused: false,
-            language_version: LanguageVersion::V2_0,
+            language_version: LanguageVersion::V2_2,
         }
     }
 
@@ -496,12 +496,6 @@ impl Flags {
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
 pub enum LanguageVersion {
-    #[value(name = "2")]
-    V2, /* V2 is the same as V2_1, here for the parser */
-    #[value(name = "2.0")]
-    V2_0,
-    #[value(name = "2.1")]
-    V2_1,
     #[value(name = "2.2")]
     V2_2,
     #[value(name = "2.3")]
@@ -516,12 +510,10 @@ impl LanguageVersion {
     fn to_ordinal(self) -> usize {
         use LanguageVersion::*;
         match self {
-            V2_0 => 1,
-            V2 | V2_1 => 2,
-            V2_2 => 3,
-            V2_3 => 4,
-            V2_4 => 5,
-            V2_5 => 6,
+            V2_2 => 1,
+            V2_3 => 2,
+            V2_4 => 3,
+            V2_5 => 4,
         }
     }
 }
@@ -549,9 +541,6 @@ impl Ord for LanguageVersion {
 impl std::fmt::Display for LanguageVersion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
-            LanguageVersion::V2 => "2",
-            LanguageVersion::V2_0 => "2.0",
-            LanguageVersion::V2_1 => "2.1",
             LanguageVersion::V2_2 => "2.2",
             LanguageVersion::V2_3 => "2.3",
             LanguageVersion::V2_4 => "2.4",

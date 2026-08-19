@@ -9,9 +9,10 @@ use aptos_block_executor::{
     check_resource_group_serialization,
     code_cache_global_manager::AptosModuleCacheManager,
     executor::BlockExecutor,
+    single_transaction_executor::LegacyTransactionExecutor,
     task::{
         ExecutorTask, LegacyTxnOutput as BlockExecutorLegacyTxnOutput,
-        TransactionOutput as BlockExecutorTransactionOutput,
+        TxnOutput as BlockExecutorTransactionOutput,
     },
     txn_commit_hook::TransactionCommitHook,
     txn_provider::TxnProvider,
@@ -427,11 +428,14 @@ impl<
             )
             .map_err(|status| BlockError::new(status.to_string()))?;
 
-        let executor =
-            BlockExecutor::<SignatureVerifiedTransaction, E, S, L, TP, AuxiliaryInfo>::new(
-                config,
-                transaction_commit_listener,
-            );
+        let executor = BlockExecutor::<
+            SignatureVerifiedTransaction,
+            LegacyTransactionExecutor<E>,
+            S,
+            L,
+            TP,
+            AuxiliaryInfo,
+        >::new(config, transaction_commit_listener);
 
         let ret = executor.execute_block(
             signature_verified_block,

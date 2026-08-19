@@ -17,5 +17,4 @@ bcs = { workspace = true }
 mono-move-core = { workspace = true }
 mono-move-natives = { workspace = true }
 mono-move-runtime = { workspace = true }
-move-core-types = { workspace = true }
 thiserror = { workspace = true }

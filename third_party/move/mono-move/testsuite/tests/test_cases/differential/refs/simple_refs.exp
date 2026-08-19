@@ -27,10 +27,10 @@ fun add(r0, r1): u64 {
     r1: u64
   code:
   L0:
-    0: x0 := imm_borrow_loc r0
-    1: x1 := imm_borrow_loc r1
-    2: [x0] := call add_refs, [x0, x1]
-    3: ret [x0]
+    0: x0 := imm_borrow_loc r0 @0
+    1: x1 := imm_borrow_loc r1 @1
+    2: [x0] := call add_refs, [x0, x1] @2
+    3: ret [x0] @3
 }
 
 fun add_refs(r0, r1): u64 {
@@ -41,10 +41,10 @@ fun add_refs(r0, r1): u64 {
     r3: u64
   code:
   L0:
-    0: r2 := read_ref r0
-    1: r3 := read_ref r1
-    2: r3 := add r2, r3
-    3: ret [r3]
+    0: r2 := read_ref r0 @1
+    1: r3 := read_ref r1 @3
+    2: r3 := add r2, r3 @4
+    3: ret [r3] @5
 }
 === micro-ops ===
 // module 0xc0ffee::refs
@@ -53,22 +53,22 @@ fun add() {
   frame_data_size: 16
   entry_gas: 168
   code:
-    0: SlotBorrow [40] <- &[0]
-    1: SlotBorrow [56] <- &[8]
-    2: CallIndirect 0xc0ffee::refs::add_refs
-    3: Move8 [0] <- [40]
-    4: Return
+    0: SlotBorrow [40] <- &[0] @0
+    1: SlotBorrow [56] <- &[8] @1
+    2: CallIndirect 0xc0ffee::refs::add_refs @2
+    3: Move8 [0] <- [40] @3
+    4: Return @3
 }
 
 fun add_refs() {
   frame_data_size: 48
   entry_gas: 111
   code:
-    0: ReadRef [32] <- *[0] (size=8)
-    1: ReadRef [40] <- *[16] (size=8)
-    2: AddU64 [40] <- [32] + [40]
-    3: Move8 [0] <- [40]
-    4: Return
+    0: ReadRef [32] <- *[0] (size=8) @1
+    1: ReadRef [40] <- *[16] (size=8) @3
+    2: AddU64 [40] <- [32] + [40] @4
+    3: Move8 [0] <- [40] @5
+    4: Return @5
 }
 === frame-layout ===
 // module 0xc0ffee::refs

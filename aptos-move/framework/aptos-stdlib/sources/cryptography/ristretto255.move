@@ -286,7 +286,13 @@ module aptos_std::ristretto255 {
     /// Serializes a vector of `RistrettoPoint`s into a vector of byte vectors.
     /// Each point is compressed and then converted to bytes.
     public fun points_to_bytes(points: &vector<RistrettoPoint>): vector<vector<u8>> {
-        points.map_ref(|p| point_compress_internal(p))
+        let result = vector[];
+        // `map_ref` is not supported in verification since the native result
+        // depends on hidden `PointStore` state (TODO(#20382)).
+        for (i in 0..points.length()) {
+            result.push_back(point_compress_internal(points.borrow(i)));
+        };
+        result
     }
 
     /// Returns a * point.

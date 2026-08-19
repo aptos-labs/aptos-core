@@ -50,13 +50,14 @@ pub mod options;
 pub mod pragmas;
 pub mod pureness_checker;
 pub mod sourcifier;
+pub mod spec_derivation;
 pub mod spec_translator;
 pub mod symbol;
 pub mod ty;
 pub mod ty_invariant_analysis;
 pub mod well_known;
 
-pub use builder::binary_module_loader;
+pub use builder::{binary_module_loader, xir_loader};
 
 /// Represents information about a package: the sources it contains and the package private
 /// address mapping.

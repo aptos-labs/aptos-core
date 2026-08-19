@@ -1,0 +1,35 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/inline/folds_of_collect.move:66:9
+   │
+66 │         ensures len(result) == len(v) + 1; // error: collected exactly the input
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/folds_of_collect.move:59: collect_wrong
+   =         v = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_collect.move:68: collect_wrong (spec)
+   =     at tests/sources/functional/closures/inline/folds_of_collect.move:60: collect_wrong
+   =         r = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_collect.move:9: each_ref
+   =         v = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_collect.move:60: collect_wrong
+   =     at tests/sources/functional/closures/inline/folds_of_collect.move:10: each_ref
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_collect.move:11: each_ref
+   =         n = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_collect.move:15: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_collect.move:16: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_collect.move:17: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_collect.move:18: each_ref
+   =     enter loop, variable(s) r, i havocked and reassigned
+   =         r = <redacted>
+   =         i = <redacted>
+   =     loop invariant holds at current state
+   =     at tests/sources/functional/closures/inline/folds_of_collect.move:16: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_collect.move:17: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_collect.move:18: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_collect.move:12: each_ref
+   =     at tests/sources/functional/closures/inline/folds_of_collect.move:62: collect_wrong
+   =     at tests/sources/functional/closures/inline/folds_of_collect.move:59: collect_wrong
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_collect.move:66: collect_wrong (spec)

@@ -75,16 +75,48 @@ pub(crate) struct VMRegisters {
 }
 
 impl VMRegisters {
+    /// Sentinel `pc` marking a context with no function installed yet.
+    /// Guarded at every entry point that would touch the registers, so the
+    /// dangling function pointer is never dereferenced.
+    const IDLE_PC: usize = usize::MAX;
+
     /// Registers initialized with a fresh root frame, ready to begin execution.
-    fn new(stack_base: *mut u8, func: &Function) -> Self {
+    fn new(stack: &MemoryRegion, func: &Function) -> Self {
         Self {
             pc: 0,
-            // SAFETY: `stack_base` points to a stack allocation far larger than
-            // `FRAME_METADATA_SIZE`, so the offset stays in bounds.
-            fp: unsafe { stack_base.add(FRAME_METADATA_SIZE) },
+            fp: root_frame_base(stack),
             func: NonNull::from(func),
         }
     }
+
+    /// Registers of an idle context; [`Self::new`] via `prepare_call` must run
+    /// before execution.
+    //
+    // TODO(cleanup): `func` has no value until the first call, so this hands
+    // out a dangling pointer and leans on `is_idle` instead of the `NonNull`
+    // invariant. Look for ways to get rid of this workaround in the future.
+    fn idle(stack: &MemoryRegion) -> Self {
+        Self {
+            pc: Self::IDLE_PC,
+            fp: root_frame_base(stack),
+            func: NonNull::dangling(),
+        }
+    }
+
+    fn is_idle(&self) -> bool {
+        self.pc == Self::IDLE_PC
+    }
+}
+
+/// Frame pointer of the root call frame, which sits above the stack's sentinel
+/// frame metadata.
+fn root_frame_base(stack: &MemoryRegion) -> *mut u8 {
+    assert!(
+        stack.len() > FRAME_METADATA_SIZE,
+        "stack is too small to hold a root frame"
+    );
+    // SAFETY: the offset is within `stack`, checked above.
+    unsafe { stack.as_ptr().add(FRAME_METADATA_SIZE) }
 }
 
 /// What a finished transaction leaves behind: the frozen heap, the
@@ -123,7 +155,7 @@ fn abort_location(module_id: InternedModuleId) -> VMResult<AbortLocation> {
 /// Per-transaction interpreter context with a unified call stack and a
 /// GC-managed heap: owns the transaction state (code loader and read-set, gas
 /// meter, native extensions, resource read-write set) and the machine state
-/// (stack, heap, VM registers). Interpreter sessions are [`Self::invoke`] /
+/// (stack, heap, VM registers). Interpreter sessions are [`Self::prepare_call`] /
 /// [`Self::reset`] calls on the same context, so state like the heap and the
 /// read-write set lives across sessions within one transaction.
 ///
@@ -227,9 +259,43 @@ impl<'guard> InterpreterContext<'guard> {
             natives,
             extensions: NativeExtensions::new(),
             resource_provider,
-            registers: VMRegisters::new(base, entry),
+            registers: VMRegisters::new(&stack, entry),
             stack,
             heap: Heap::new(heap_size),
+            root_pool: RootPool::new(),
+            read_write_set: ResourceReadWriteSet::new(),
+            rng: StdRng::seed_from_u64(0),
+        }
+    }
+
+    /// Creates a context with no function installed and an empty read-set:
+    /// for drivers that resolve their first function through the context
+    /// itself. [`prepare_call`](Self::prepare_call) must run before execution.
+    pub fn new_idle(
+        loader: Loader<'guard, 'guard>,
+        gas_meter: GasMeter,
+        resource_provider: &'guard dyn ResourceProvider,
+        natives: &'guard ProductionNativeRegistry,
+    ) -> Self {
+        let stack = MemoryRegion::new(DEFAULT_STACK_SIZE);
+        let base = stack.as_ptr();
+
+        unsafe {
+            write_u64(base, META_SAVED_PC_OFFSET, 0);
+            write_u64(base, META_SAVED_FP_OFFSET, 0);
+            write_ptr(base, META_SAVED_FUNC_PTR_OFFSET, null());
+        }
+
+        Self {
+            loader,
+            read_set: ModuleReadSet::new(),
+            gas_meter,
+            natives,
+            extensions: NativeExtensions::new(),
+            resource_provider,
+            registers: VMRegisters::idle(&stack),
+            stack,
+            heap: Heap::new(DEFAULT_HEAP_SIZE),
             root_pool: RootPool::new(),
             read_write_set: ResourceReadWriteSet::new(),
             rng: StdRng::seed_from_u64(0),
@@ -355,14 +421,25 @@ impl<'guard> InterpreterContext<'guard> {
         crate::write_set::build_write_set(&self.read_write_set, self.loader.guard())
     }
 
+    /// Runs `f` with gas metering suspended: the meter is swapped for an
+    /// effectively unbounded one and restored afterwards, so loads and
+    /// execution inside `f` never touch the transaction's budget. Used for
+    /// system code (prologue, epilogue) that runs unmetered by design.
+    pub fn unmetered<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
+        let saved = std::mem::replace(&mut self.gas_meter, GasMeter::with_max_budget());
+        let result = f(self);
+        self.gas_meter = saved;
+        result
+    }
+
     /// Reset the context to call a different function, preserving the heap.
     ///
     /// Use `set_root_arg` to place arguments before calling `run()`.
-    pub fn invoke(&mut self, func: &Function) {
+    pub fn prepare_call(&mut self, func: &Function) {
         let base = self.stack.as_ptr();
 
         // Reset execution state to root frame.
-        self.registers = VMRegisters::new(base, func);
+        self.registers = VMRegisters::new(&self.stack, func);
 
         // Re-write sentinel metadata so Return from root triggers Done.
         unsafe {
@@ -388,7 +465,7 @@ impl<'guard> InterpreterContext<'guard> {
     /// stack and heap buffers instead of reallocating them. Place arguments with
     /// [`set_root_arg`](Self::set_root_arg) before calling [`run`](Self::run).
     pub fn reset(&mut self, func: &Function, gas_budget: u64) {
-        self.invoke(func);
+        self.prepare_call(func);
         self.heap.reset();
         self.read_write_set = ResourceReadWriteSet::new();
         self.root_pool = RootPool::new();
@@ -461,6 +538,25 @@ impl<'guard> InterpreterContext<'guard> {
         }
     }
 
+    /// Place a reference to `target` in the root frame at the given byte offset.
+    ///
+    /// # Safety
+    ///
+    /// `target` must stay valid and pinned until the call finishes. Pointing
+    /// outside the VM heap also keeps it away from the GC.
+    pub unsafe fn set_root_ref_arg(&mut self, offset: u32, target: *const u8) {
+        // SAFETY: the offset is a parameter slot of the root frame, so it is
+        // within the stack and wide enough for a reference.
+        unsafe {
+            write_fat_ptr(
+                self.stack.as_ptr(),
+                FRAME_METADATA_SIZE + offset as usize,
+                target,
+                0,
+            )
+        };
+    }
+
     /// Read a raw heap pointer from the root frame at the given byte offset.
     pub fn root_heap_ptr(&self, offset: u32) -> *const u8 {
         unsafe { read_ptr(self.stack.as_ptr(), FRAME_METADATA_SIZE + offset as usize) }
@@ -495,6 +591,11 @@ impl<'guard> InterpreterContext<'guard> {
     /// as a `u64` suitable for embedding in args. Useful for passing pre-built
     /// data into a program without generating initialization micro-ops.
     pub fn alloc_u64_vec(&mut self, descriptor_id: DescriptorId, values: &[u64]) -> VMResult<u64> {
+        if self.registers.is_idle() {
+            invariant_violation!(Unreachable(
+                "allocation on an idle context: no call was prepared".to_string()
+            ));
+        }
         let n = values.len() as u64;
         let ptr = alloc_vec!(
             self,
@@ -1085,6 +1186,12 @@ impl InterpreterContext<'_> {
     }
 
     pub fn run(&mut self) -> VMResult<RuntimeStatus> {
+        if self.registers.is_idle() {
+            invariant_violation!(Unreachable(
+                "run on an idle context: no call was prepared".to_string()
+            ));
+        }
+
         // Hoist the VM registers into a local so the dispatch loop keeps
         // them in CPU registers rather than reloading from `self.registers`
         // each iteration. Only sync back to `self` on exit.
@@ -1100,7 +1207,7 @@ impl InterpreterContext<'_> {
             // executing a call instruction, which stores a valid pointer.
             let func = unsafe { regs.func.as_ref() };
 
-            let code = func.code.get();
+            let code = func.code.ops();
 
             if regs.pc >= code.len() {
                 invariant_violation!(PcOutOfBounds {

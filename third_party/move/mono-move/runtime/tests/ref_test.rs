@@ -10,8 +10,8 @@ mod common;
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    native::NativeExtensions, Code, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
-    SortedSafePointEntries, FRAME_METADATA_SIZE,
+    native::NativeExtensions, Code, FrameLayoutInfo, FrameOffset as FO, Function,
+    FunctionDefinitionIndex, MicroOp, SortedSafePointEntries, FRAME_METADATA_SIZE,
 };
 
 /// `ReadRef`/`WriteRef` whose runtime target aliases the dst/src slot.
@@ -40,6 +40,7 @@ fn ref_self_copy() {
     let function = Function {
         name: GlobalArenaPtr::from_static("test"),
         module_id: crate::program_module_id!("test"),
+        def_idx: FunctionDefinitionIndex(0),
         code: Code::from_vec(code),
         entry_gas: 0,
         param_slots: vec![],

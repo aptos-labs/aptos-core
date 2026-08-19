@@ -104,14 +104,14 @@ fn display_function(
     }
     writeln!(f, "  code:")?;
 
-    // Instructions
+    // Instructions, each with its originating bytecode offset (`@N`).
     let mut instr_num = 0;
     for block in &func.blocks {
         writeln!(f, "  L{}:", block.label.0)?;
-        for instr in &block.instrs {
+        for (instr, origin) in block.instrs.iter_with_origins() {
             write!(f, "    {}: ", instr_num)?;
             display_instr(f, module, instr)?;
-            writeln!(f)?;
+            writeln!(f, " @{}", origin)?;
             instr_num += 1;
         }
     }

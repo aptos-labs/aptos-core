@@ -106,7 +106,7 @@ pub struct Entry {
 
 /// The write an [`Entry`] contributes to the write set, by its `(read, write)`
 /// pair.
-pub(crate) enum WriteClass {
+pub enum WriteClass {
     /// Did not exist before, now does. Carries the value pointer to serialize.
     Creation(NonNull<u8>),
     /// Existed before, now (possibly) modified — any mutable borrow counts,
@@ -145,7 +145,7 @@ impl Entry {
 
     /// Classifies this entry's `(read, write)` into a [`WriteClass`], or
     /// [`None`] if it is not a write.
-    pub(crate) fn write_class(&self) -> Option<WriteClass> {
+    pub fn write_class(&self) -> Option<WriteClass> {
         match self.write {
             StorageWrite::NotModified => None,
             StorageWrite::LocalHeap { ptr, .. } => Some(match self.read {
@@ -407,9 +407,9 @@ impl ResourceReadWriteSet {
         self.journal.len()
     }
 
-    /// Yields each entry that is a write, with its [`WriteClass`]. Order is
-    /// unspecified (backing hash map); callers must sort before emitting.
-    pub(crate) fn writes(&self) -> impl Iterator<Item = (&InMemoryStorageKey, WriteClass)> {
+    /// Yields each entry that is a write, with its [`WriteClass`]. Callers must
+    /// sort before emitting.
+    pub fn writes_unordered(&self) -> impl Iterator<Item = (&InMemoryStorageKey, WriteClass)> {
         self.entries
             .iter()
             .filter_map(|(key, entry)| entry.write_class().map(|class| (key, class)))

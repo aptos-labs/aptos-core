@@ -21,6 +21,28 @@ error: data invariant does not hold
    =     at <PKG>/sources/amm_example.move:30
 
 error: data invariant does not hold
+   ┌─ <PKG>/sources/amm_example.move:34:9
+   │
+34 │ ╭         invariant forall S in *, r_in: u64, r_out: u64, amt: u64:
+35 │ │             S.. |~ result_of<self.pricing>(r_in, r_out, amt) <= r_out;
+   │ ╰──────────────────────────────────────────────────────────────────────^
+   │
+   =     at <PKG>/sources/amm_example.move:241: create_noncompliant_fee_pool
+   =         account = <redacted>
+   =     at <PKG>/sources/amm_example.move:242: create_noncompliant_fee_pool
+   =     at <PKG>/../../../../move-stdlib/sources/signer.move:26: address_of
+   =         s = <redacted>
+   =     at <PKG>/../../../../move-stdlib/sources/signer.move:27: address_of
+   =         result = <redacted>
+   =         owner = <redacted>
+   =     at <PKG>/sources/amm_example.move:245: create_noncompliant_fee_pool
+   =     at <PKG>/sources/amm_example.move:246: create_noncompliant_fee_pool
+   =     at <PKG>/sources/amm_example.move:247: create_noncompliant_fee_pool
+   =     at <PKG>/sources/amm_example.move:244: create_noncompliant_fee_pool
+   =     at <PKG>/sources/amm_example.move:30
+   =     at <PKG>/sources/amm_example.move:34
+
+error: data invariant does not hold
    ┌─ <PKG>/sources/amm_example.move:38:9
    │
 38 │ ╭         invariant forall S in *, r_in: u64, r_out: u64,

@@ -5,7 +5,7 @@
 
 use crate::{
     interner::{InternedIdentifier, InternedModuleId, Interner, TypeSubstitutionError},
-    types::{InternedType, InternedTypeList, EMPTY_TYPE_LIST},
+    types::{view_type, view_type_list, InternedType, InternedTypeList, Type, EMPTY_TYPE_LIST},
     ExecutionErrorKind, IntoExecutionError,
 };
 use move_binary_format::{
@@ -18,6 +18,7 @@ use move_binary_format::{
     },
     CompiledModule,
 };
+use move_core_types::language_storage::{FunctionParamOrReturnTag, StructTag, TypeTag};
 use shared_dsa::UnorderedMap;
 use std::ops::Deref;
 use thiserror::Error;
@@ -214,6 +215,113 @@ impl PreparedModule {
     pub fn interned_field_types(&self, name: InternedIdentifier) -> Option<&FieldTypes> {
         let idx = self.interned_nominal_type_def_idx(name)?;
         Some(&self.field_types[idx.0 as usize])
+    }
+
+    /// Whether a byte copy of `ty`'s frame bytes is by itself a complete,
+    /// faithful copy. False when the value owns heap storage (vectors,
+    /// closures, heap-boxed enums): both copies would then own the same
+    /// allocation, so a faithful copy must also clone that storage. True for
+    /// references: a copied reference must alias the same target, so copying
+    /// the fat pointer bytes is correct.
+    ///
+    /// Conservatively `false` whenever this cannot be established from this
+    /// module alone: type parameters, imported nominals, and type arguments
+    /// that are not directly substitutable.
+    ///
+    /// The last case makes the `false` answer an over-approximation. Given
+    ///
+    /// ```move
+    /// struct C<V> has copy { z: V }
+    /// struct B<U> has copy { y: U }
+    /// struct A<T> has copy { x: B<C<T>> }
+    /// ```
+    ///
+    /// `is_bitwise_copy_type(A<u64>)` returns `false`: `B`'s type argument
+    /// `C<T>` is a nominal rather than a bare type parameter, so `T` is never
+    /// bound to `u64` and answers `false` once `C`'s field is reached.
+    ///
+    /// Inherits safety contract of [`view_type`].
+    /// TODO(metering, perf): the uncached recursion revisits shared subtypes,
+    /// so an all-bitwise struct DAG is traversed exponentially at module load,
+    /// and every caller repeats the walk. Fix: return `false` for non-closed
+    /// types, substitute field types via the interner, and iterate instead of
+    /// recursing, caching the `InternedType -> bool` answer in the global
+    /// context beside the other type-keyed caches. Substitution makes every
+    /// key closed and hence module-independent (a free [`Type::TypeParam`] is
+    /// not a valid key: equal indices at different scopes intern to the same
+    /// pointer). Answering from the global context also gives the imported
+    /// nominal arm below the cross-module field types it lacks today, and
+    /// removes the over-approximation above.
+    pub fn is_bitwise_copy_type(&self, ty: InternedType) -> bool {
+        self.is_bitwise_copy_type_in_ty_env(ty, &[])
+    }
+
+    /// `ty_env` binds [`Type::TypeParam`] nodes to the enclosing nominal's type
+    /// arguments, and is empty at top level. A binding may itself contain type
+    /// parameters; those are looked up in an empty `ty_env`, so they answer
+    /// `false` instead of binding to the wrong parameter.
+    fn is_bitwise_copy_type_in_ty_env(&self, ty: InternedType, ty_env: &[InternedType]) -> bool {
+        match view_type(ty) {
+            Type::Bool
+            | Type::U8
+            | Type::U16
+            | Type::U32
+            | Type::U64
+            | Type::U128
+            | Type::U256
+            | Type::I8
+            | Type::I16
+            | Type::I32
+            | Type::I64
+            | Type::I128
+            | Type::I256
+            | Type::Address
+            | Type::Signer
+            | Type::ImmutRef { .. }
+            | Type::MutRef { .. } => true,
+
+            // Owned heap pointers.
+            Type::Vector { .. } | Type::Function { .. } => false,
+
+            Type::TypeParam { idx } => ty_env
+                .get(*idx as usize)
+                .is_some_and(|arg| self.is_bitwise_copy_type_in_ty_env(*arg, &[])),
+
+            Type::Nominal {
+                module_id,
+                name,
+                ty_args,
+            } => {
+                if *module_id != self.id {
+                    // An imported module's field types are not reachable from
+                    // here; see the TODO(metering, perf) on
+                    // [`Self::is_bitwise_copy_type`].
+                    return false;
+                }
+                let Some(FieldTypes::Struct(fields)) = self.interned_field_types(*name) else {
+                    // Enums are heap-boxed regardless of payload.
+                    return false;
+                };
+                // Resolve type arguments that are directly a type parameter of
+                // the current environment; anything deeper stays unresolved and
+                // fails conservatively inside the recursion (a precision loss
+                // removed by the substitution rewrite in the
+                // TODO(metering, perf) on [`Self::is_bitwise_copy_type`]).
+                let args: Vec<InternedType> = view_type_list(*ty_args)
+                    .iter()
+                    .map(|arg| {
+                        if let Type::TypeParam { idx } = view_type(*arg) {
+                            ty_env.get(*idx as usize).copied().unwrap_or(*arg)
+                        } else {
+                            *arg
+                        }
+                    })
+                    .collect();
+                fields
+                    .iter()
+                    .all(|field| self.is_bitwise_copy_type_in_ty_env(*field, &args))
+            },
+        }
     }
 
     /// Returns interned type corresponding to the compiled module's struct
@@ -488,6 +596,78 @@ pub fn intern_sig_token(
             interner.nominal_of(module_id, struct_name, interner.type_list_of(&ty_args))
         },
     }
+}
+
+/// Interns a runtime [`TypeTag`] (e.g. a transaction's type argument, or a
+/// resource's struct tag).
+//
+// TODO(metering): decide if this construction requires metering.
+pub fn intern_type_tag(tag: &TypeTag, interner: &impl Interner) -> anyhow::Result<InternedType> {
+    use crate::types as ty;
+    Ok(match tag {
+        TypeTag::Bool => ty::BOOL_TY,
+        TypeTag::U8 => ty::U8_TY,
+        TypeTag::U16 => ty::U16_TY,
+        TypeTag::U32 => ty::U32_TY,
+        TypeTag::U64 => ty::U64_TY,
+        TypeTag::U128 => ty::U128_TY,
+        TypeTag::U256 => ty::U256_TY,
+        TypeTag::I8 => ty::I8_TY,
+        TypeTag::I16 => ty::I16_TY,
+        TypeTag::I32 => ty::I32_TY,
+        TypeTag::I64 => ty::I64_TY,
+        TypeTag::I128 => ty::I128_TY,
+        TypeTag::I256 => ty::I256_TY,
+        TypeTag::Address => ty::ADDRESS_TY,
+        TypeTag::Signer => ty::SIGNER_TY,
+        TypeTag::Vector(elem) => interner.vector_of(intern_type_tag(elem, interner)?),
+        TypeTag::Struct(struct_tag) => intern_struct_tag(struct_tag, interner)?,
+        TypeTag::Function(function_tag) => {
+            let args = intern_function_param_tags(&function_tag.args, interner)?;
+            let results = intern_function_param_tags(&function_tag.results, interner)?;
+            interner.function_of(
+                interner.type_list_of(&args),
+                interner.type_list_of(&results),
+                function_tag.abilities,
+            )
+        },
+    })
+}
+
+/// Interns a function tag's parameter or return tags, applying each one's
+/// reference kind.
+fn intern_function_param_tags(
+    tags: &[FunctionParamOrReturnTag],
+    interner: &impl Interner,
+) -> anyhow::Result<Vec<InternedType>> {
+    tags.iter()
+        .map(|tag| {
+            Ok(match tag {
+                FunctionParamOrReturnTag::Value(tag) => intern_type_tag(tag, interner)?,
+                FunctionParamOrReturnTag::Reference(tag) => {
+                    interner.immut_ref_of(intern_type_tag(tag, interner)?)
+                },
+                FunctionParamOrReturnTag::MutableReference(tag) => {
+                    interner.mut_ref_of(intern_type_tag(tag, interner)?)
+                },
+            })
+        })
+        .collect()
+}
+
+/// Interns a struct tag into its nominal type.
+pub fn intern_struct_tag(
+    struct_tag: &StructTag,
+    interner: &impl Interner,
+) -> anyhow::Result<InternedType> {
+    let module_id = interner.module_id_of(&struct_tag.address, struct_tag.module.as_ident_str());
+    let name = interner.identifier_of(struct_tag.name.as_ident_str());
+    let args = struct_tag
+        .type_args
+        .iter()
+        .map(|arg| intern_type_tag(arg, interner))
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    Ok(interner.nominal_of(module_id, name, interner.type_list_of(&args)))
 }
 
 fn intern_struct_info(

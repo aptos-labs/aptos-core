@@ -59,6 +59,10 @@ pub enum TimedFeatureFlag {
     /// republished within the same transaction, so it binds to the current
     /// module version instead of executing stale pre-upgrade code.
     RevalidateResolvedClosures,
+
+    /// Charge `bcs::to_bytes` and `bcs::serialized_size` per input value node
+    /// instead of only per output byte.
+    MeterBcsByValueSize,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -107,7 +111,8 @@ impl TimedFeatureOverride {
                 | RevisedBoundsInProdConfig
                 | ConstantSerializedSizeLocalCache
                 | RejectV5ModulePublishing
-                | RevalidateResolvedClosures,
+                | RevalidateResolvedClosures
+                | MeterBcsByValueSize,
             ) => None,
         }
     }
@@ -262,6 +267,16 @@ impl TimedFeatureFlag {
                 .with_timezone(&Utc),
             (RevalidateResolvedClosures, MAINNET) => Los_Angeles
                 .with_ymd_and_hms(2026, 7, 24, 10, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            (MeterBcsByValueSize, TESTING) => Utc.with_ymd_and_hms(1970, 1, 1, 1, 0, 0).unwrap(),
+            (MeterBcsByValueSize, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 8, 4, 14, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (MeterBcsByValueSize, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 8, 6, 14, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
 

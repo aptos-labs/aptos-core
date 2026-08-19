@@ -1,0 +1,34 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/inline/folds_of_wrapper.move:162:9
+    │
+162 │ ╭         ensures result
+163 │ │             == spec_fold_idx<u64>(|acc, j| acc + entries[j].value, 0, len(entries)) + 1;
+    │ ╰────────────────────────────────────────────────────────────────────────────────────────^
+    │
+    =     at tests/sources/functional/closures/inline/folds_of_wrapper.move:154: sum_values_wrong
+    =         entries = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_wrapper.move:155: sum_values_wrong
+    =         sum = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_wrapper.move:17: each_ref
+    =         v = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_wrapper.move:154: sum_values_wrong
+    =     at tests/sources/functional/closures/inline/folds_of_wrapper.move:18: each_ref
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_wrapper.move:19: each_ref
+    =         n = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_wrapper.move:23: each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_wrapper.move:24: each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_wrapper.move:25: each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_wrapper.move:26: each_ref
+    =     enter loop, variable(s) sum, i havocked and reassigned
+    =         sum = <redacted>
+    =         i = <redacted>
+    =     loop invariant holds at current state
+    =     at tests/sources/functional/closures/inline/folds_of_wrapper.move:24: each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_wrapper.move:25: each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_wrapper.move:26: each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_wrapper.move:20: each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_wrapper.move:154: sum_values_wrong
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_wrapper.move:162: sum_values_wrong (spec)

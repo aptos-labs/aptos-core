@@ -8,7 +8,7 @@ use itertools::Itertools;
 use move_command_line_common::env::{read_bool_env_var, read_env_var};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::process::Command;
+use std::{process::Command, time::Duration};
 
 /// Default flags passed to boogie. Additional flags will be added to this via the -B option.
 const DEFAULT_BOOGIE_FLAGS: &[&str] = &[
@@ -21,6 +21,16 @@ const DEFAULT_BOOGIE_FLAGS: &[&str] = &[
 const MOD_SET_ANALYSIS_LEGACY_FLAG: &str = "-doModSetAnalysis";
 
 const MOD_SET_ANALYSIS_NEW_FLAG_SINCE_3_5_1: &str = "-inferModifies";
+
+fn parse_seed_handoff_ratio(value: &str) -> Result<f64, String> {
+    let ratio = value
+        .parse::<f64>()
+        .map_err(|_| "seed handoff ratio must be a number".to_string())?;
+    if !ratio.is_finite() || !(0.0..=1.0).contains(&ratio) {
+        return Err("seed handoff ratio must be between 0 and 1".to_string());
+    }
+    Ok(ratio)
+}
 
 /// Versions for boogie, z3, and cvc5. The upgrade of boogie and z3 is mostly backward compatible,
 /// but not always. Setting the max version allows Prover to warn users for the higher version of
@@ -143,16 +153,10 @@ pub struct BoogieOptions {
     /// A seed for the prover.
     #[arg(short = 'S', long = "seed", default_value_t = 1)]
     pub random_seed: usize,
-    /// The number of cores to use for parallel processing of verification conditions.
-    #[arg(long = "cores", default_value_t = 4)]
+    /// The maximum number of Boogie processes to run concurrently. Can also be set with
+    /// `MVP_PROC_CORES`.
+    #[arg(long = "cores", default_value_t = 4, env = "MVP_PROC_CORES")]
     pub proc_cores: usize,
-    /// The number of shards to split the verification problem into.
-    #[arg(skip)]
-    pub shards: usize,
-    /// If there are shards, specifies to only run the given shard. Shards are numbered
-    /// starting at 1.
-    #[arg(skip)]
-    pub only_shard: Option<usize>,
     /// A (soft) timeout for the solver, per verification condition, in seconds.
     #[arg(short = 'T', long = "timeout", default_value_t = 40)]
     pub vc_timeout: usize,
@@ -177,10 +181,18 @@ pub struct BoogieOptions {
     /// Whether to run Boogie instances sequentially.
     #[arg(skip)]
     pub sequential_task: bool,
+    /// Fraction of a VC's soft timeout after which to start the implicit fallback seed.
+    /// Zero disables the early fallback.
+    #[arg(long, default_value_t = 2.0 / 3.0, value_parser = parse_seed_handoff_ratio)]
+    pub seed_handoff_ratio: f64,
     /// A hard timeout for boogie execution; if the process does not terminate within
     /// this time frame, it will be killed. Zero for no timeout.
     #[arg(skip)]
     pub hard_timeout_secs: u64,
+    /// A deadline for the entire verification request. This is an embedding-only
+    /// safeguard; zero leaves package verification unbounded.
+    #[arg(skip)]
+    pub package_timeout_secs: u64,
     /// Whether to skip verification of type instantiations of functions. This may miss
     /// some verification conditions if different type instantiations can create
     /// different behavior via type reflection or storage access, but can speed up
@@ -213,6 +225,10 @@ pub struct BoogieOptions {
     /// condition.
     #[arg(long, default_value_t = 5)]
     pub error_limit: usize,
+    /// Maximum verifier errors retained for an entire package. Zero disables
+    /// this embedding-only safeguard.
+    #[arg(skip)]
+    pub package_error_limit: usize,
 }
 
 impl Default for BoogieOptions {
@@ -232,8 +248,6 @@ impl Default for BoogieOptions {
             serialize_bound: 0,
             random_seed: 1,
             proc_cores: 4,
-            shards: 1,
-            only_shard: None,
             vc_timeout: 40,
             global_timeout_overwrite: true,
             keep_artifacts: false,
@@ -242,7 +256,9 @@ impl Default for BoogieOptions {
             stable_test_output: false,
             num_instances: 1,
             sequential_task: false,
+            seed_handoff_ratio: 2.0 / 3.0,
             hard_timeout_secs: 0,
+            package_timeout_secs: 0,
             vector_theory: VectorTheory::BoogieArray,
             z3_trace_file: None,
             custom_natives: None,
@@ -251,11 +267,18 @@ impl Default for BoogieOptions {
             skip_instance_check: false,
             split_vcs_by_assert: false,
             error_limit: 5,
+            package_error_limit: 0,
         }
     }
 }
 
 impl BoogieOptions {
+    /// The derived process timeout is a watchdog for a wedged Boogie process,
+    /// not another VC timeout. It includes parsing, type checking, inlining,
+    /// and VC construction, none of which is covered by Boogie's `timeLimit`.
+    const MIN_PROCESS_TIMEOUT_SECS: u64 = 300;
+    const PROCESS_TIMEOUT_FACTOR: u64 = 4;
+
     /// Derive options based on other set options.
     pub fn derive_options(&mut self) {
         use VectorTheory::*;
@@ -359,6 +382,27 @@ impl BoogieOptions {
         } else {
             time
         }
+    }
+
+    /// Return the watchdog deadline for a BPL containing one verification
+    /// root. An explicit hard timeout takes precedence. Otherwise, use a
+    /// generous deadline independent of Boogie's solver-only soft timeout.
+    pub fn process_timeout_secs(&self, root_timeout_secs: usize) -> u64 {
+        if self.hard_timeout_secs > 0 {
+            self.hard_timeout_secs
+        } else if root_timeout_secs == 0 {
+            0
+        } else {
+            (self.adjust_timeout(root_timeout_secs) as u64)
+                .saturating_mul(Self::PROCESS_TIMEOUT_FACTOR)
+                .max(Self::MIN_PROCESS_TIMEOUT_SECS)
+        }
+    }
+
+    /// Return when the implicit fallback seed should begin for this root.
+    pub fn seed_handoff_after(&self, root_timeout_secs: usize) -> Option<Duration> {
+        (self.num_instances == 1 && root_timeout_secs > 0 && self.seed_handoff_ratio > 0.0)
+            .then(|| Duration::from_secs_f64(root_timeout_secs as f64 * self.seed_handoff_ratio))
     }
 
     /// Get the mod set analysis flag based on the boogie version.
@@ -496,5 +540,47 @@ impl BoogieOptions {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::BoogieOptions;
+    use std::time::Duration;
+
+    #[test]
+    fn derives_process_timeout_from_root_timeout() {
+        let mut options = BoogieOptions::default();
+        for root_timeout_secs in [40, 100] {
+            let expected = (options.adjust_timeout(root_timeout_secs) as u64)
+                .saturating_mul(BoogieOptions::PROCESS_TIMEOUT_FACTOR)
+                .max(BoogieOptions::MIN_PROCESS_TIMEOUT_SECS);
+            assert_eq!(options.process_timeout_secs(root_timeout_secs), expected);
+        }
+        assert_eq!(options.process_timeout_secs(0), 0);
+
+        options.hard_timeout_secs = 7;
+        assert_eq!(options.process_timeout_secs(40), 7);
+        assert_eq!(options.process_timeout_secs(0), 7);
+    }
+
+    #[test]
+    fn derives_seed_handoff_from_root_timeout() {
+        let mut options = BoogieOptions::default();
+        assert!(options.seed_handoff_after(0).is_none());
+        assert!((options.seed_handoff_after(60).unwrap().as_secs_f64() - 40.0).abs() < 0.001);
+
+        options.seed_handoff_ratio = 0.0;
+        assert!(options.seed_handoff_after(60).is_none());
+
+        options.seed_handoff_ratio = 1.0;
+        assert_eq!(
+            options.seed_handoff_after(60).unwrap(),
+            Duration::from_secs(60)
+        );
+
+        options.seed_handoff_ratio = 2.0 / 3.0;
+        options.num_instances = 2;
+        assert!(options.seed_handoff_after(60).is_none());
     }
 }

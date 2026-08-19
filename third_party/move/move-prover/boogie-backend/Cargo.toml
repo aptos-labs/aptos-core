@@ -26,7 +26,6 @@ move-stackless-bytecode = { workspace = true }
 num = { workspace = true }
 once_cell = { workspace = true }
 pretty = { workspace = true }
-rand = { workspace = true }
 regex = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 tera = { workspace = true }

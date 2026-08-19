@@ -6,8 +6,8 @@ module 0x42::M {
     *a = *b;
     *b = 0;
     spec {
-      assert old(a) == y;
-      assert old(b) == 0;
+      assert old(a) == y; // error: local under old
+      assert old(b) == 0; // error: local under old
       assert old(x != y);
     }
   }

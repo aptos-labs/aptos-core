@@ -1,25 +1,21 @@
 module 0x42::Test {
     use std::vector;
 
+    /// Removes all elements satisfying `predicate`, not preserving order. The
+    /// loop invariant constrains the retained prefix via `result_of` over the
+    /// predicate, which is derived per caller from the (spec-less) lambda.
     public inline fun filter<X: drop>(v: &mut vector<X>, predicate: |&X| bool) {
         let i = 0;
-        while ({
-            spec {
-                // TODO: this will cause a no-such-function error as `predicate`
-                // is inlined away in the implementation. We are aware of this
-                // issue and is working on a fix by bridging more information
-                // from inlined functions into the spec.
-                invariant forall k in 0..i: !predicate(v[k]);
-                // TODO: complete the set of loop invariants
-            };
-            (i < vector::length(v))
-        }) {
+        while (i < vector::length(v)) {
             if (predicate(vector::borrow(v, i))) {
                 vector::swap_remove(v, i);
             } else {
                 i = i + 1;
             };
-        }
+        } spec {
+            invariant i <= len(v);
+            invariant forall k in 0..i: !result_of<predicate>(v[k]);
+        };
     }
 
     public fun test_filter(): vector<u64> {
@@ -28,7 +24,7 @@ module 0x42::Test {
         v
     }
     spec test_filter {
-        pragma verify = true;
-        // TODO: turn-on the verification once inlining on spec side is done
+        aborts_if false;
+        ensures forall j in 0..len(result): result[j] <= 1;
     }
 }

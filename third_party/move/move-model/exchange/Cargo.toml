@@ -1,0 +1,23 @@
+[package]
+name = "move-model-exchange"
+version = "0.1.0"
+authors = ["Aptos Labs"]
+description = "External exchange format for Move stackless bytecode and specifications"
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptosfoundation.org/"
+license = "Apache-2.0"
+publish = false
+edition = { workspace = true }
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+aptos-move-cli = { workspace = true }
+datatest-stable = { workspace = true }
+move-prover-test-utils = { workspace = true }
+
+[[test]]
+name = "testsuite"
+harness = false

@@ -183,13 +183,19 @@ fn get_flags_and_baseline(
     // Determine the way how to configure tests based on directory of the path.
     let path_str = path.to_string_lossy();
 
-    let dep_flags = vec![
+    let use_aptos_stdlib = !extract_test_directives(path, "// use-aptos-stdlib")?.is_empty();
+    let mut dep_flags = if !use_aptos_stdlib {
         // stdlib is commonly required
-        "--dependency=../move-stdlib/sources",
-        "--dependency=../move-stdlib/nursery/sources",
-        // table extension is required
-        "--dependency=../extensions/move-table-extension/sources",
-    ];
+        vec![
+            "--dependency=../move-stdlib/sources",
+            "--dependency=../move-stdlib/nursery/sources",
+        ]
+    } else {
+        vec!["--dependency=../../../aptos-move/framework/move-stdlib/sources"]
+    };
+    if !use_aptos_stdlib {
+        dep_flags.push("--dependency=../extensions/move-table-extension/sources");
+    }
 
     let (base_flags, baseline_path) =
         if path_str.contains("diem-framework/") || path_str.contains("move-stdlib/") {

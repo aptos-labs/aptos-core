@@ -1,0 +1,33 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/inline/folds_of_idx.move:151:9
+    │
+151 │         ensures result == spec_fold_idx<u64>(|acc, j| acc + v[len(v) - 1 - j], 0, len(v)) + 1;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/inline/folds_of_idx.move:143: rev_sum_wrong
+    =         v = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_idx.move:144: rev_sum_wrong
+    =         sum = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_idx.move:117: rev_each_ref
+    =         v = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_idx.move:143: rev_sum_wrong
+    =     at tests/sources/functional/closures/inline/folds_of_idx.move:118: rev_each_ref
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_idx.move:119: rev_each_ref
+    =         n = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_idx.move:123: rev_each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_idx.move:124: rev_each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_idx.move:125: rev_each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_idx.move:126: rev_each_ref
+    =     enter loop, variable(s) sum, i havocked and reassigned
+    =         sum = <redacted>
+    =         i = <redacted>
+    =     loop invariant holds at current state
+    =     at tests/sources/functional/closures/inline/folds_of_idx.move:124: rev_each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_idx.move:125: rev_each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_idx.move:126: rev_each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_idx.move:120: rev_each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_idx.move:143: rev_sum_wrong
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_idx.move:151: rev_sum_wrong (spec)

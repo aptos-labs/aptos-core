@@ -20,8 +20,8 @@ use crate::{
     ast::{
         AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, Attribute, Exp, ExpData,
         FrameSpec, FriendDecl, FunParamAccessOf, GlobalInvariant, LemmaDecl, LemmaId, MemoryLabel,
-        ModuleName, PropertyBag, PropertyValue, ResourceSpecifier, Spec, SpecBlockInfo,
-        SpecBlockTarget, SpecFunDecl, SpecVarDecl, UseDecl, Value,
+        ModuleName, Operation, PropertyBag, PropertyValue, ResourceSpecifier, Spec, SpecBlockInfo,
+        SpecBlockTarget, SpecFunDecl, SpecVarDecl, UseDecl, Value, VisitorPosition,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -77,7 +77,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     any::{Any, TypeId},
     backtrace::{Backtrace, BacktraceStatus},
-    cell::{Ref, RefCell, RefMut},
+    cell::{Cell, Ref, RefCell, RefMut},
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet, VecDeque},
     ffi::OsStr,
@@ -636,6 +636,10 @@ pub struct GlobalEnv {
     /// can register new spec functions. Must not call `add_used_spec_fun` while a borrow
     /// from `is_spec_fun_used` or iteration is held.
     pub(crate) used_spec_funs: RefCell<BTreeSet<QualifiedId<SpecFunId>>>,
+    /// Spec-function calls originating in inlined behavioral predicates.
+    /// Locations survive AST cloning while node ids do not.
+    pub(crate) move_equality_congruence_spec_fun_calls:
+        RefCell<BTreeSet<(Loc, QualifiedId<SpecFunId>)>>,
     /// An annotation of all intrinsic declarations
     pub(crate) intrinsics: IntrinsicsAnnotation,
     /// A type-indexed container for storing extension data in the environment.
@@ -721,6 +725,7 @@ impl GlobalEnv {
             global_invariants: Default::default(),
             global_invariants_for_memory: Default::default(),
             used_spec_funs: RefCell::new(BTreeSet::new()),
+            move_equality_congruence_spec_fun_calls: RefCell::new(BTreeSet::new()),
             intrinsics: Default::default(),
             extensions: Default::default(),
             stdlib_address: None,
@@ -939,6 +944,25 @@ impl GlobalEnv {
     /// Returns a reference to the symbol pool owned by this environment.
     pub fn symbol_pool(&self) -> &SymbolPool {
         &self.symbol_pool
+    }
+
+    /// Creates an empty source map for a module loaded without sources,
+    /// with a virtual location constructed from `name` (the file name of
+    /// the module) and `unique_bytes` (bytes identifying it, e.g. the
+    /// serialized module).  The internal logic of the environments
+    /// currently needs both pieces of information to create new locations
+    /// (related to differences in Loc representation with legacy code).
+    pub fn empty_source_map(&mut self, name: &str, unique_bytes: &[u8]) -> SourceMap {
+        let file_id = self.add_source(
+            FileHash::new_from_bytes(unique_bytes),
+            Rc::new(BTreeMap::new()),
+            name,
+            "",
+            /*is_target*/ true,
+            /*is_primary_target*/ true,
+        );
+        let loc = Loc::new(file_id, Span::new(0, 0));
+        SourceMap::new(self.to_ir_loc(&loc), None)
     }
 
     /// Adds a source to this environment, returning a FileId for it.
@@ -1590,6 +1614,55 @@ impl GlobalEnv {
     /// Marks a spec fun to be used
     pub fn add_used_spec_fun(&self, id: QualifiedId<SpecFunId>) {
         self.used_spec_funs.borrow_mut().insert(id);
+    }
+
+    /// Marks a spec fun to be used, transitively including the spec
+    /// functions called from its body. Needed when a generated expression
+    /// references a companion spec function derived before the spec
+    /// rewriter's own usage marking (see
+    /// `spec_rewriter::run_pure_fun_companion_derivation`): the backend
+    /// only emits used `is_move_fun` spec functions, so a used companion's
+    /// companion callees must be marked as well.
+    pub fn add_used_spec_fun_transitive(&self, id: QualifiedId<SpecFunId>) {
+        let mut todo = vec![id];
+        let mut visited = BTreeSet::new();
+        while let Some(id) = todo.pop() {
+            if !visited.insert(id) {
+                continue;
+            }
+            self.add_used_spec_fun(id);
+            if let Some(body) = self.get_spec_fun(id).body.clone() {
+                todo.extend(
+                    body.called_spec_funs(self)
+                        .into_iter()
+                        .map(|qid| qid.to_qualified_id()),
+                );
+            }
+        }
+    }
+
+    /// Marks calls originating in an inlined behavioral predicate. Recording
+    /// call sites lets monomorphization ignore material later discarded by a
+    /// verification fallback.
+    pub fn mark_move_equality_congruence_spec_funs_in(&self, exp: &Exp) {
+        exp.visit_pre_order(&mut |sub| {
+            if let ExpData::Call(id, Operation::SpecFunction(mid, fid, _), _) = sub {
+                self.move_equality_congruence_spec_fun_calls
+                    .borrow_mut()
+                    .insert((self.get_node_loc(*id), mid.qualified(*fid)));
+            }
+            true
+        });
+    }
+
+    pub fn spec_fun_call_needs_move_equality_congruence(
+        &self,
+        id: NodeId,
+        fun: QualifiedId<SpecFunId>,
+    ) -> bool {
+        self.move_equality_congruence_spec_fun_calls
+            .borrow()
+            .contains(&(self.get_node_loc(id), fun))
     }
 
     /// Determines whether the given spec fun is recursive.
@@ -2383,9 +2456,9 @@ impl GlobalEnv {
             result_type,
             access_specifiers: None,
             fun_param_access_of: vec![],
-            spec_used_memory: BTreeSet::new(),
-            spec_old_memory: BTreeSet::new(),
-            spec_uses_old: false,
+            spec_used_memory: RefCell::new(BTreeSet::new()),
+            spec_old_memory: RefCell::new(BTreeSet::new()),
+            spec_uses_old: Cell::new(false),
             acquired_structs: None,
             spec: RefCell::new(spec_opt.unwrap_or_default()),
             def: Some(def),
@@ -2455,9 +2528,9 @@ impl GlobalEnv {
             result_type,
             access_specifiers: None,
             fun_param_access_of: vec![],
-            spec_used_memory: BTreeSet::new(),
-            spec_old_memory: BTreeSet::new(),
-            spec_uses_old: false,
+            spec_used_memory: RefCell::new(BTreeSet::new()),
+            spec_old_memory: RefCell::new(BTreeSet::new()),
+            spec_uses_old: Cell::new(false),
             acquired_structs: None,
             spec: RefCell::new(spec_opt.unwrap_or_default()),
             def: Some(def),
@@ -2484,6 +2557,39 @@ impl GlobalEnv {
             .spec_funs
             .get_mut(&fun.id)
             .unwrap()
+    }
+
+    /// Gets a lemma declaration mutably.
+    pub fn get_lemma_mut(&mut self, lemma: QualifiedId<LemmaId>) -> &mut LemmaDecl {
+        self.module_data
+            .get_mut(lemma.module_id.to_usize())
+            .unwrap()
+            .lemmas
+            .get_mut(&lemma.id)
+            .unwrap()
+    }
+
+    /// If the given function is the synthetic function of a lemma, mirrors the
+    /// given spec into the `LemmaDecl`. Lemma conditions live in two places:
+    /// the synthetic lemma function's spec, which is used to verify the lemma,
+    /// and the `LemmaDecl`, which is used to instantiate `apply` sites; any
+    /// update of the function spec must maintain the mirror.
+    pub fn sync_lemma_from_spec(&mut self, fun: QualifiedId<FunId>, spec: &Spec) {
+        let lemma_id = {
+            let fun_env = self.get_function(fun);
+            if !fun_env.is_lemma() {
+                return;
+            }
+            fun_env
+                .module_env
+                .find_lemma_by_name(fun_env.get_name())
+                .map(|(id, _)| id)
+        };
+        if let Some(lemma_id) = lemma_id {
+            let decl = self.get_lemma_mut(fun.module_id.qualified(lemma_id));
+            decl.conditions = spec.conditions.clone();
+            decl.proof = spec.proof.clone();
+        }
     }
 
     /// Adds a new specification function and returns id of it.
@@ -2621,9 +2727,9 @@ impl GlobalEnv {
             .function_data
             .get_mut(&qid.id)
             .expect("function data exists");
-        data.spec_used_memory = spec_used_memory;
-        data.spec_old_memory = spec_old_memory;
-        data.spec_uses_old = spec_uses_old;
+        data.spec_used_memory = RefCell::new(spec_used_memory);
+        data.spec_old_memory = RefCell::new(spec_old_memory);
+        data.spec_uses_old = Cell::new(spec_uses_old);
     }
 
     /// Sets derived memory on a function parameter's access_of entry.
@@ -4084,7 +4190,7 @@ impl<'env> ModuleEnv<'env> {
             == module_name
     }
 
-    fn is_module_in_std(&self, module_name: &str) -> bool {
+    pub fn is_module_in_std(&self, module_name: &str) -> bool {
         let addr = self.get_name().addr();
         *addr == self.env.get_stdlib_address() && self.match_module_name(module_name)
     }
@@ -4204,9 +4310,37 @@ impl StructData {
             users: BTreeSet::new(),
         }
     }
+
+    /// Constructs the runtime-facing part of a struct declaration.
+    ///
+    /// Source and binary loaders share this constructor so declarations which
+    /// do not originate in the Move AST still initialize the model with the
+    /// same abilities, fields, variants, and visibility invariants.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn new_runtime(
+        name: Symbol,
+        loc: Loc,
+        abilities: AbilitySet,
+        type_params: Vec<TypeParameter>,
+        field_data: BTreeMap<FieldId, FieldData>,
+        variants: Option<BTreeMap<Symbol, StructVariant>>,
+        is_native: bool,
+        visibility: Visibility,
+    ) -> Self {
+        Self {
+            abilities,
+            type_params,
+            field_data,
+            variants,
+            is_native,
+            visibility,
+            is_empty_struct: false,
+            ..Self::new(name, loc)
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct StructVariant {
     pub(crate) loc: Loc,
     pub(crate) attributes: Vec<Attribute>,
@@ -5063,12 +5197,14 @@ pub struct FunctionData {
     pub(crate) fun_param_access_of: Vec<FunParamAccessOf>,
 
     /// Memory used by this function's spec conditions (requires, ensures, aborts_if).
-    /// Computed during the spec_rewriter pass.
-    pub(crate) spec_used_memory: BTreeSet<QualifiedInstId<StructId>>,
+    /// Computed during the spec_rewriter pass; interior-mutable because a spec
+    /// attached later (lambda spec inference runs inside the prover pipeline,
+    /// with only shared access to the env) must refresh it.
+    pub(crate) spec_used_memory: RefCell<BTreeSet<QualifiedInstId<StructId>>>,
     /// Resources accessed in old() contexts within spec conditions.
-    pub(crate) spec_old_memory: BTreeSet<QualifiedInstId<StructId>>,
+    pub(crate) spec_old_memory: RefCell<BTreeSet<QualifiedInstId<StructId>>>,
     /// Whether any spec condition uses old() or the function has &mut params.
-    pub(crate) spec_uses_old: bool,
+    pub(crate) spec_uses_old: Cell<bool>,
 
     /// Acquires information, if available. This is either inferred or annotated by the
     /// user via a legacy acquires declaration.
@@ -5180,14 +5316,50 @@ impl FunctionData {
             result_type: Type::unit(),
             access_specifiers: None,
             fun_param_access_of: vec![],
-            spec_used_memory: BTreeSet::new(),
-            spec_old_memory: BTreeSet::new(),
-            spec_uses_old: false,
+            spec_used_memory: RefCell::new(BTreeSet::new()),
+            spec_old_memory: RefCell::new(BTreeSet::new()),
+            spec_uses_old: Cell::new(false),
             acquired_structs: None,
             spec: RefCell::new(Default::default()),
             def: None,
             called_funs: None,
             used_funs: None,
+        }
+    }
+
+    /// Constructs the runtime-facing part of a function declaration.
+    ///
+    /// `called_funs` is `None` when a later binary attachment will recover the
+    /// call graph. Source-independent IR loaders pass `Some`, including the
+    /// empty set, because no AST or compiled module exists to derive it from.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn new_runtime(
+        name: Symbol,
+        loc: Loc,
+        visibility: Visibility,
+        is_native: bool,
+        kind: FunctionKind,
+        attributes: Vec<Attribute>,
+        type_params: Vec<TypeParameter>,
+        params: Vec<Parameter>,
+        result_type: Type,
+        access_specifiers: Option<Vec<AccessSpecifier>>,
+        acquired_structs: Option<BTreeSet<StructId>>,
+        called_funs: Option<BTreeSet<QualifiedId<FunId>>>,
+    ) -> Self {
+        Self {
+            visibility,
+            is_native,
+            kind,
+            attributes,
+            type_params,
+            params,
+            result_type,
+            access_specifiers,
+            acquired_structs,
+            used_funs: called_funs.clone(),
+            called_funs,
+            ..Self::new(name, loc)
         }
     }
 }
@@ -5600,19 +5772,35 @@ impl<'env> FunctionEnv<'env> {
             })
     }
 
+    /// Returns true if this function has a parameter of function type.
+    pub fn has_function_parameters(&self) -> bool {
+        self.get_parameters_ref()
+            .iter()
+            .any(|Parameter(_, ty, _)| ty.is_function())
+    }
+
     /// Returns true if this is an inline function which is verified: in verify mode,
     /// inline functions with explicitly given specs are compiled to bytecode and their
-    /// bodies are checked against their specs, like regular functions.
+    /// bodies are checked against their specs, like regular functions. This is restricted
+    /// to inline functions without function-typed parameters; specs on other inline
+    /// functions are rejected by the model builder.
     pub fn is_inline_verified(&self) -> bool {
-        self.module_env.env.is_verify_mode() && self.is_inline() && self.has_explicit_spec()
+        self.module_env.env.is_verify_mode()
+            && self.is_inline()
+            && self.has_explicit_spec()
+            && !self.has_function_parameters()
     }
 
     /// Returns true if this is an inline function which is retained (not expanded at call
     /// sites) because the model is built for verification and the function is opaque.
     /// Such functions act like regular opaque functions in the prover: their spec is used
-    /// at call sites instead of their body.
+    /// at call sites instead of their body. As with `is_inline_verified`, this is
+    /// restricted to inline functions without function-typed parameters.
     pub fn is_inline_opaque_retained(&self) -> bool {
-        self.module_env.env.is_verify_mode() && self.is_inline() && self.is_opaque()
+        self.module_env.env.is_verify_mode()
+            && self.is_inline()
+            && self.is_opaque()
+            && !self.has_function_parameters()
     }
 
     /// Return true if this is a lemma function (synthesized from a lemma declaration).
@@ -5816,18 +6004,130 @@ impl<'env> FunctionEnv<'env> {
     }
 
     /// Returns memory used by this function's spec conditions.
-    pub fn get_spec_used_memory(&self) -> &BTreeSet<QualifiedInstId<StructId>> {
-        &self.data.spec_used_memory
+    pub fn get_spec_used_memory(&self) -> Ref<'_, BTreeSet<QualifiedInstId<StructId>>> {
+        self.data.spec_used_memory.borrow()
     }
 
     /// Returns memory accessed in old() contexts within spec conditions.
-    pub fn get_spec_old_memory(&self) -> &BTreeSet<QualifiedInstId<StructId>> {
-        &self.data.spec_old_memory
+    pub fn get_spec_old_memory(&self) -> Ref<'_, BTreeSet<QualifiedInstId<StructId>>> {
+        self.data.spec_old_memory.borrow()
     }
 
     /// Returns whether any spec condition uses old() or function has &mut params.
     pub fn spec_uses_old(&self) -> bool {
-        self.data.spec_uses_old
+        self.data.spec_uses_old.get()
+    }
+
+    /// Sets this function's spec memory summaries through interior mutability.
+    /// Used when a spec is attached after the compiler's spec rewriter ran
+    /// (lambda spec inference), so the summaries stay consistent with the
+    /// spec's conditions.
+    pub fn set_spec_memory_usage(
+        &self,
+        used: BTreeSet<QualifiedInstId<StructId>>,
+        old: BTreeSet<QualifiedInstId<StructId>>,
+        uses_old: bool,
+    ) {
+        *self.data.spec_used_memory.borrow_mut() = used;
+        *self.data.spec_old_memory.borrow_mut() = old;
+        self.data.spec_uses_old.set(uses_old);
+    }
+
+    /// Computes this function's spec memory summaries from its CURRENT spec
+    /// conditions. Mirrors the condition-level collection of the compiler's
+    /// spec rewriter (`spec_rewriter.rs`, which persists the summaries once at
+    /// model-build time), and additionally resolves behavioral references to
+    /// concrete closure targets — those arise only in inferred lambda specs,
+    /// and evaluating `aborts_of`/`ensures_of` of a target includes the
+    /// target's spec memory. The targets' own summaries must already be
+    /// final: named functions get them from the rewriter, and callee lambdas
+    /// are processed before their callers (call-graph order).
+    pub fn compute_spec_memory_usage(
+        &self,
+    ) -> (
+        BTreeSet<QualifiedInstId<StructId>>,
+        BTreeSet<QualifiedInstId<StructId>>,
+        bool,
+    ) {
+        let env = self.module_env.env;
+        let spec = self.get_spec();
+        let mut used = BTreeSet::new();
+        let mut old = BTreeSet::new();
+        for cond in &spec.conditions {
+            for exp in std::iter::once(&cond.exp).chain(&cond.additional_exps) {
+                used.extend(exp.directly_used_memory(env));
+                // Direct old() usage (mirrors the rewriter's
+                // `compute_direct_old_usage`).
+                let mut in_old_depth: usize = 0;
+                exp.visit_positions(&mut |pos, e| {
+                    match e {
+                        ExpData::Call(_, Operation::Old, _) => match pos {
+                            VisitorPosition::Pre => in_old_depth += 1,
+                            VisitorPosition::Post => in_old_depth -= 1,
+                            _ => {},
+                        },
+                        ExpData::Call(id, Operation::Global(_), _)
+                        | ExpData::Call(id, Operation::Exists(_), _)
+                            if in_old_depth > 0 && matches!(pos, VisitorPosition::Pre) =>
+                        {
+                            let inst = &env.get_node_instantiation(*id);
+                            let (mid, sid, sinst) = inst[0].require_struct();
+                            old.insert(mid.qualified_inst(sid, sinst.to_owned()));
+                        },
+                        ExpData::Call(
+                            id,
+                            Operation::SpecPublish(_)
+                            | Operation::SpecRemove(_)
+                            | Operation::SpecUpdate(_),
+                            _,
+                        ) if matches!(pos, VisitorPosition::Pre) => {
+                            let inst = &env.get_node_instantiation(*id);
+                            let (mid, sid, sinst) = inst[0].require_struct();
+                            old.insert(mid.qualified_inst(sid, sinst.to_owned()));
+                        },
+                        _ => {},
+                    }
+                    true
+                });
+                exp.visit_post_order(&mut |e: &ExpData| {
+                    match e {
+                        // Spec fun callees using old() need pre-state snapshots.
+                        ExpData::Call(id, Operation::SpecFunction(mid, fid, _), _) => {
+                            let inst = &env.get_node_instantiation(*id);
+                            let module = env.get_module(*mid);
+                            let sfun = module.get_spec_fun(*fid);
+                            for mem in &sfun.old_memory {
+                                old.insert(mem.clone().instantiate(inst));
+                            }
+                        },
+                        // Behavioral predicate over a concrete closure target:
+                        // its evaluator is defined over the target's memory.
+                        ExpData::Call(_, Operation::Behavior(..), args) => {
+                            if let Some(ExpData::Call(cid, Operation::Closure(mid, fid, _), _)) =
+                                args.first().map(|a| a.as_ref())
+                            {
+                                let target = env.get_function(mid.qualified(*fid));
+                                let inst = env.get_node_instantiation(*cid);
+                                for mem in target.get_spec_used_memory().iter() {
+                                    used.insert(mem.clone().instantiate(&inst));
+                                }
+                                for mem in target.get_spec_old_memory().iter() {
+                                    old.insert(mem.clone().instantiate(&inst));
+                                }
+                            }
+                        },
+                        _ => {},
+                    }
+                    true
+                });
+            }
+        }
+        let has_mut_params = self
+            .get_parameters()
+            .iter()
+            .any(|Parameter(_, ty, _)| ty.is_mutable_reference());
+        let uses_old = !old.is_empty() || has_mut_params;
+        (used, old, uses_old)
     }
 
     /// Returns the inferred acquired structs of this function. This is checked

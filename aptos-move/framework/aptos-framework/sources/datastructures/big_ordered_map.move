@@ -728,6 +728,10 @@ module aptos_framework::big_ordered_map {
             let child_iter2 = children2.internal_new_begin_iter();
 
             loop {
+                spec {
+                    invariant spec_leaf_iter_valid(iter1, self);
+                    invariant spec_leaf_iter_valid(iter2, other);
+                };
                 let key1 = child_iter1.iter_borrow_key(children1);
                 let key2 = child_iter2.iter_borrow_key(children2);
                 let inc1 = false;
@@ -772,7 +776,12 @@ module aptos_framework::big_ordered_map {
     /// Apply the function to a mutable reference of each key-value pair in the map.
     public inline fun for_each_mut<K: copy + drop + store, V: store>(self: &mut BigOrderedMap<K, V>, f: |&K, &mut V|) {
         let iter = self.internal_new_begin_iter();
-        while (!iter.iter_is_end(self)) {
+        while ({
+            spec {
+                invariant spec_iter_valid(iter, self);
+            };
+            !iter.iter_is_end(self)
+        }) {
             let key = *iter.iter_borrow_key();
             f(&key, iter.iter_borrow_mut(self));
             iter = iter.iter_next(self);
@@ -1000,7 +1009,12 @@ module aptos_framework::big_ordered_map {
     inline fun for_each_leaf_node_children_ref<K: store, V: store>(self: &BigOrderedMap<K, V>, f: |&OrderedMap<K, Child<V>>|) {
         let iter = self.internal_leaf_new_begin_iter();
 
-        while (!iter.internal_leaf_iter_is_end()) {
+        while ({
+            spec {
+                invariant spec_leaf_iter_valid(iter, self);
+            };
+            !iter.internal_leaf_iter_is_end()
+        }) {
             let (node, next_iter) = iter.internal_leaf_iter_borrow_entries_and_next_leaf_index(self);
             f(node);
             iter = next_iter;
@@ -1773,6 +1787,39 @@ module aptos_framework::big_ordered_map {
     // ========== Verify only functions ==========
 
     #[verify_only]
+    fun test_verify_modify() {
+        let map = new_from(vector[1u64], vector[10u64]);
+        // Closure without `requires`: `iter_modify`'s precondition on the
+        // closure is trivially dischargeable.
+        map.modify(&1, |v| { *v = 11; });
+        spec {
+            assert spec_get(map, 1) == 11;
+        };
+        // Constrained closure used within its precondition: the caller
+        // discharges `requires_of` from the map's current content and gets
+        // the closure's postcondition in return.
+        let iter = map.internal_find(&1);
+        let r = iter.iter_modify(&mut map, |v| {
+            *v = 12;
+            true
+        } spec {
+            requires v == 11;
+            ensures v == 12;
+            ensures result == true;
+        });
+        spec {
+            assert spec_get(map, 1) == 12;
+            assert r;
+        };
+        map.remove(&1);
+        map.destroy_empty();
+    }
+
+    spec test_verify_modify {
+        pragma verify = true;
+    }
+
+    #[verify_only]
     fun test_verify_borrow_front_key() {
         let keys: vector<u64> = vector[1, 2, 3];
         let values: vector<u64> = vector[4, 5, 6];
@@ -1861,6 +1908,30 @@ module aptos_framework::big_ordered_map {
     }
 
     spec test_verify_upsert {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_iter_across_upsert() {
+        let map = new_from(vector[1u64, 2u64], vector[10u64, 20u64]);
+        let iter = map.internal_find(&1);
+        // An existing-key upsert replaces the value in place: the iterator
+        // stays valid across it.
+        let old_value = map.upsert(2, 21);
+        spec {
+            assert old_value.is_some();
+            assert spec_iter_valid(iter, map);
+        };
+        let v = *iter.iter_borrow(&map);
+        spec {
+            assert v == 10;
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.destroy_empty();
+    }
+
+    spec test_verify_iter_across_upsert {
         pragma verify = true;
     }
 
@@ -1986,5 +2057,994 @@ module aptos_framework::big_ordered_map {
         pragma verify = true;
         aborts_if !spec_contains_key(map, 1);
      }
+
+    #[verify_only]
+    fun test_verify_iter_next() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let map = new_from(keys, vector[4, 5, 6]);
+        let it = map.internal_find(&1);
+        let k1 = *it.iter_borrow_key();
+        let it2 = it.iter_next(&map);
+        let k2 = *it2.iter_borrow_key();
+        let it3 = it2.iter_next(&map);
+        let k3 = *it3.iter_borrow_key();
+        let it_end = it3.iter_next(&map);
+        spec {
+            assert keys[0] == 1;
+            assert keys[1] == 2;
+            assert keys[2] == 3;
+            assert vector::spec_contains(keys, 1);
+            assert vector::spec_contains(keys, 2);
+            assert vector::spec_contains(keys, 3);
+            assert spec_contains_key(map, 1);
+            assert spec_contains_key(map, 2);
+            assert spec_contains_key(map, 3);
+            assert spec_len(map) == 3;
+        };
+        ground_enum_123(&map);
+        spec {
+            assert k1 == (1 as u64);
+            assert k2 == (2 as u64);
+            assert k3 == (3 as u64);
+            assert iter_is_end(it_end, map);
+            // Each step advances the rank; End follows the last rank.
+            assert spec_rank(map, k1) == 0;
+            assert spec_rank(map, k2) == 1;
+            assert spec_rank(map, k3) == 2;
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_iter_next {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_iter_prev() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let it_end = map.internal_new_end_iter();
+        let it3 = it_end.iter_prev(&map);
+        let k3 = *it3.iter_borrow_key();
+        let it2 = it3.iter_prev(&map);
+        let k2 = *it2.iter_borrow_key();
+        spec {
+            assert k3 == (3 as u64);
+            // Materialize the ground fact so the maximality quantifier of
+            // iter_prev's contract instantiates at k == 2.
+            assert keys[1] == 2;
+            assert vector::spec_contains(keys, 2);
+            assert spec_contains_key(map, 2);
+            assert k2 == (2 as u64);
+            // Stepping back from End lands on the last rank, then decrements.
+            assert spec_len(map) == 3;
+            assert spec_rank(map, k3) == 2;
+            assert spec_rank(map, k2) == 1;
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_iter_prev {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_iter_modify() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let it = map.internal_find(&2);
+        let old_v = it.iter_modify(&mut map, |v| { let o = *v; *v = 50; o });
+        spec {
+            assert old_v == (5 as u64);
+            assert spec_get(map, 2) == (50 as u64);
+            assert spec_len(map) == 3;
+            // Materialize ground membership facts so the frame quantifier
+            // (spec_unchanged_except_at) instantiates at keys 1 and 3.
+            assert keys[0] == 1;
+            assert vector::spec_contains(keys, 1);
+            assert keys[2] == 3;
+            assert vector::spec_contains(keys, 3);
+            // Frame: other keys are untouched.
+            assert spec_get(map, 1) == (4 as u64);
+            assert spec_get(map, 3) == (6 as u64);
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_iter_modify {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_keys_sorted() {
+        let map = new_from(vector[3, 1, 2], vector[6, 4, 5]);
+        let ks = map.keys();
+        spec {
+            assert len(ks) == 3;
+            // Sortedness and membership come from the keys() contract.
+            assert ks[0] < ks[1];
+            assert ks[1] < ks[2];
+            assert spec_contains_key(map, ks[0]);
+            assert spec_contains_key(map, ks[1]);
+            assert spec_contains_key(map, ks[2]);
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_keys_sorted {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_leaf_iter() {
+        let map = new_from(vector[1, 2, 3], vector[4, 5, 6]);
+        let lit = map.internal_leaf_new_begin_iter();
+        // The begin leaf iterator is never end, so this cannot abort.
+        let (entries, _next) = lit.internal_leaf_iter_borrow_entries_and_next_leaf_index(&map);
+        // Leaves of a nonempty map are nonempty, so borrowing the first leaf
+        // key cannot abort; the entry is a real map entry with matching value.
+        let ks = entries.keys();
+        let k0 = *ks.borrow(0);
+        let child = entries.borrow(&k0);
+        let v0 = *child.internal_leaf_borrow_value();
+        spec {
+            assert spec_contains_key(map, k0);
+            assert v0 == spec_get(map, k0);
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_leaf_iter {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    /// Witness-test support: derives the exact enumeration of a map holding
+    /// keys {1, 2, 3}, walking the stepwise assert ladder once; callers get
+    /// the facts from the ensures.
+    fun ground_enum_123(map: &BigOrderedMap<u64, u64>) {
+        // Also pulls in the key's cmp instantiation (gates the ascending axiom).
+        let _fk = map.front_key();
+        spec {
+            // Each contained key has an in-range rank that key_at inverts.
+            assert spec_rank(map, 1) >= 0 && spec_rank(map, 1) < 3
+                && spec_key_at(map, spec_rank(map, 1)) == (1 as u64);
+            assert spec_rank(map, 2) >= 0 && spec_rank(map, 2) < 3
+                && spec_key_at(map, spec_rank(map, 2)) == (2 as u64);
+            assert spec_rank(map, 3) >= 0 && spec_rank(map, 3) < 3
+                && spec_key_at(map, spec_rank(map, 3)) == (3 as u64);
+            // Ranks follow the key order.
+            assert spec_rank(map, 1) < spec_rank(map, 2);
+            assert spec_rank(map, 2) < spec_rank(map, 3);
+            // Three distinct ordered positions in 0..3 pin the ranks exactly.
+            assert spec_rank(map, 1) == 0;
+            assert spec_rank(map, 2) == 1;
+            assert spec_rank(map, 3) == 2;
+            // ... and therefore the enumeration itself.
+            assert spec_key_at(map, 0) == (1 as u64);
+            assert spec_key_at(map, 1) == (2 as u64);
+            assert spec_key_at(map, 2) == (3 as u64);
+        };
+    }
+
+    spec ground_enum_123 {
+        pragma verify = true;
+        requires spec_len(map) == 3;
+        requires spec_contains_key(map, 1);
+        requires spec_contains_key(map, 2);
+        requires spec_contains_key(map, 3);
+        ensures spec_rank(map, 1) == 0 && spec_rank(map, 2) == 1 && spec_rank(map, 3) == 2;
+        ensures spec_key_at(map, 0) == (1 as u64)
+            && spec_key_at(map, 1) == (2 as u64)
+            && spec_key_at(map, 2) == (3 as u64);
+    }
+
+    #[verify_only]
+    fun test_verify_enumeration_view() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let fk = map.front_key();
+        spec {
+            // Materialize ground membership facts for the quantifiers.
+            assert keys[0] == 1;
+            assert keys[1] == 2;
+            assert keys[2] == 3;
+            assert vector::spec_contains(keys, 1);
+            assert vector::spec_contains(keys, 2);
+            assert vector::spec_contains(keys, 3);
+            assert spec_contains_key(map, 1);
+            assert spec_contains_key(map, 2);
+            assert spec_contains_key(map, 3);
+            assert spec_len(map) == 3;
+        };
+        ground_enum_123(&map);
+        spec {
+            // Cross-checks: the ordering API agrees, and values compose.
+            assert fk == (1 as u64);
+            assert fk == spec_key_at(map, 0);
+            assert spec_get(map, spec_key_at(map, 0)) == (4 as u64);
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_enumeration_view {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_iter_rank_loop() {
+        let map = new_from(vector[1, 2, 3], vector[4, 5, 6]);
+        // Iterator loop counting entries; the invariant indexes the walk by rank.
+        let count = 0u64;
+        let it = map.internal_new_begin_iter();
+        while ({
+            spec {
+                invariant spec_iter_valid(it, map);
+                invariant !(it is IteratorPtr::End) ==>
+                    spec_contains_key(map, it.key)
+                        && count == spec_rank(map, it.key);
+                invariant (it is IteratorPtr::End) ==> count == spec_len(map);
+            };
+            !it.iter_is_end(&map)
+        }) {
+            count += 1;
+            it = it.iter_next(&map);
+        };
+        spec {
+            assert count == spec_len(map);
+            assert count == 3;
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_iter_rank_loop {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_pop_rank() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[10, 20, 30];
+        let map = new_from(keys, values);
+        spec {
+            // Materialize ground membership facts for the quantifiers.
+            assert keys[0] == 1;
+            assert keys[1] == 2;
+            assert keys[2] == 3;
+            assert vector::spec_contains(keys, 1);
+            assert vector::spec_contains(keys, 2);
+            assert vector::spec_contains(keys, 3);
+            assert spec_contains_key(map, 1);
+            assert spec_contains_key(map, 2);
+            assert spec_contains_key(map, 3);
+            assert spec_len(map) == 3;
+        };
+        ground_enum_123(&map);
+        let (k, v) = map.pop_front();
+        spec {
+            // Popped key had rank 0; survivors' ranks shift down by one.
+            assert k == (1 as u64);
+            assert v == (10 as u64);
+            assert spec_len(map) == 2;
+            assert spec_rank(map, 2) == 0;
+            assert spec_rank(map, 3) == 1;
+            assert spec_key_at(map, 0) == (2 as u64);
+            assert spec_key_at(map, 1) == (3 as u64);
+        };
+        let (k2, v2) = map.pop_back();
+        spec {
+            // Back border: the popped key had the last rank.
+            assert k2 == (3 as u64);
+            assert v2 == (30 as u64);
+            assert spec_len(map) == 1;
+            assert spec_key_at(map, 0) == (2 as u64);
+            assert spec_rank(map, 2) == 0;
+        };
+        let (k3, _v3) = map.pop_front();
+        spec {
+            assert k3 == (2 as u64);
+        };
+        map.destroy_empty();
+    }
+
+    spec test_verify_pop_rank {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_drain_loop(): u64 {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[10, 20, 30];
+        let map = new_from(keys, values);
+        spec {
+            // Materialize ground membership and value facts for the invariant.
+            assert keys[0] == 1;
+            assert keys[1] == 2;
+            assert keys[2] == 3;
+            assert vector::spec_contains(keys, 1);
+            assert vector::spec_contains(keys, 2);
+            assert vector::spec_contains(keys, 3);
+            assert spec_contains_key(map, 1);
+            assert spec_contains_key(map, 2);
+            assert spec_contains_key(map, 3);
+            assert spec_len(map) == 3;
+            assert spec_get(map, 1) == (10 as u64);
+            assert spec_get(map, 2) == (20 as u64);
+            assert spec_get(map, 3) == (30 as u64);
+        };
+        ground_enum_123(&map);
+        // The shift axioms carry the enumeration across pops, letting the
+        // invariant characterize the map and the sum by length alone.
+        let sum = 0u64;
+        while ({
+            spec {
+                invariant spec_len(map) <= 3;
+                invariant forall i in 0..spec_len(map):
+                    spec_key_at(map, i) == i + 4 - spec_len(map);
+                invariant forall i in 0..spec_len(map):
+                    spec_get(map, spec_key_at(map, i)) == 10 * spec_key_at(map, i);
+                invariant sum == 10 * (3 - spec_len(map)) * (4 - spec_len(map)) / 2;
+            };
+            !map.is_empty()
+        }) {
+            let (_k, v) = map.pop_front();
+            sum += v;
+        };
+        spec {
+            assert sum == 60;
+        };
+        map.destroy_empty();
+        sum
+    }
+
+    spec test_verify_drain_loop {
+        pragma verify = true;
+        ensures result == 60;
+    }
+
+    spec module {
+        /// Witness-test support: sum of the values at the first `n` keys.
+        fun spec_test_sum_upto(m: BigOrderedMap<u64, u64>, n: num): num {
+            if (n <= 0) { 0 }
+            else {
+                spec_test_sum_upto(m, n - 1) + spec_get(m, spec_key_at(m, n - 1))
+            }
+        }
+    }
+
+    #[verify_only]
+    fun test_verify_iter_sum_symbolic(m: &BigOrderedMap<u64, u64>): u64 {
+        // Symbolic map + iterator walk: exercises the general axiom chain,
+        // not a concrete model.
+        let sum = 0u64;
+        let it = m.internal_new_begin_iter();
+        while ({
+            spec {
+                invariant spec_iter_valid(it, m);
+                invariant !(it is IteratorPtr::End) ==>
+                    spec_contains_key(m, it.key)
+                        && sum == spec_test_sum_upto(m, spec_rank(m, it.key));
+                invariant (it is IteratorPtr::End) ==>
+                    sum == spec_test_sum_upto(m, spec_len(m));
+            };
+            !it.iter_is_end(m)
+        }) {
+            sum += *it.iter_borrow(m);
+            it = it.iter_next(m);
+        };
+        sum
+    }
+
+    spec test_verify_iter_sum_symbolic {
+        pragma verify = true;
+        // Aborts unspecified: the running u64 addition can overflow.
+        ensures result == spec_test_sum_upto(m, spec_len(m));
+    }
+
+    #[verify_only]
+    fun test_verify_drain_symbolic(m: &mut BigOrderedMap<u64, u64>): u64 {
+        // Symbolic drain: the current map stays the suffix of old(m) past
+        // the popped prefix.
+        let count = 0u64;
+        while ({
+            spec {
+                invariant count + spec_len(m) == spec_len(old(m));
+                invariant forall i in 0..spec_len(m):
+                    spec_key_at(m, i) == spec_key_at(old(m), i + count);
+                invariant forall i in 0..spec_len(m):
+                    spec_get(m, spec_key_at(m, i)) == spec_get(old(m), spec_key_at(m, i));
+            };
+            !m.is_empty()
+        }) {
+            let (_k, _v) = m.pop_front();
+            count += 1;
+        };
+        count
+    }
+
+    spec test_verify_drain_symbolic {
+        pragma verify = true;
+        aborts_if false;
+        ensures result == spec_len(old(m));
+        ensures spec_len(m) == 0;
+    }
+
+    #[verify_only]
+    fun test_verify_remove_shift_symbolic(m: &mut BigOrderedMap<u64, u64>, k: u64) {
+        // Removal at an ARBITRARY rank, not just a border: the surviving
+        // enumeration is the old one with that one position spliced out.
+        m.remove(&k);
+    }
+
+    spec test_verify_remove_shift_symbolic {
+        pragma verify = true;
+        requires spec_contains_key(m, k);
+        aborts_if false;
+        ensures spec_len(m) == spec_len(old(m)) - 1;
+        ensures !spec_contains_key(m, k);
+        ensures forall i in 0..spec_len(m):
+            spec_key_at(m, i) ==
+                spec_key_at(old(m), if (i < spec_rank(old(m), k)) i else i + 1);
+        ensures forall i in 0..spec_len(m):
+            spec_get(m, spec_key_at(m, i)) == spec_get(old(m), spec_key_at(m, i));
+    }
+
+    #[verify_only]
+    fun test_verify_pop_back_drain_symbolic(m: &mut BigOrderedMap<u64, u64>): u64 {
+        // Back-border mirror of the drain above: popping from the back keeps
+        // the map a PREFIX of the entry map.
+        let count = 0u64;
+        while ({
+            spec {
+                invariant count + spec_len(m) == spec_len(old(m));
+                invariant forall i in 0..spec_len(m):
+                    spec_key_at(m, i) == spec_key_at(old(m), i);
+                invariant forall i in 0..spec_len(m):
+                    spec_get(m, spec_key_at(m, i)) == spec_get(old(m), spec_key_at(m, i));
+            };
+            !m.is_empty()
+        }) {
+            let (_k, _v) = m.pop_back();
+            count += 1;
+        };
+        count
+    }
+
+    spec test_verify_pop_back_drain_symbolic {
+        pragma verify = true;
+        aborts_if false;
+        ensures result == spec_len(old(m));
+        ensures spec_len(m) == 0;
+    }
+
+    #[verify_only]
+    fun test_verify_iter_collect_symbolic(m: &BigOrderedMap<u64, u64>): vector<u64> {
+        // A full traversal that COLLECTS: the result is the whole key set in
+        // ascending order, position by position.
+        let out = vector[];
+        let it = m.internal_new_begin_iter();
+        while ({
+            spec {
+                invariant spec_iter_valid(it, m);
+                invariant len(out) <= spec_len(m);
+                invariant forall i in 0..len(out): out[i] == spec_key_at(m, i);
+                invariant !(it is IteratorPtr::End) ==>
+                    spec_contains_key(m, it.key) && len(out) == spec_rank(m, it.key);
+                invariant (it is IteratorPtr::End) ==> len(out) == spec_len(m);
+            };
+            !it.iter_is_end(m)
+        }) {
+            out.push_back(*it.iter_borrow_key());
+            it = it.iter_next(m);
+        };
+        out
+    }
+
+    spec test_verify_iter_collect_symbolic {
+        pragma verify = true;
+        aborts_if false;
+        ensures len(result) == spec_len(m);
+        ensures forall i in 0..spec_len(m): result[i] == spec_key_at(m, i);
+    }
+
+    #[verify_only]
+    fun test_verify_iter_valid_after_insert_symbolic(
+        m: &mut BigOrderedMap<u64, u64>, k: u64, v: u64
+    ) {
+        // A structural change invalidates outstanding iterators, but an
+        // iterator taken afterwards is valid and lands on a real entry.
+        m.add(k, v);
+        let it = m.internal_new_begin_iter();
+        spec {
+            assert spec_iter_valid(it, m);
+            assert !(it is IteratorPtr::End);
+            assert spec_contains_key(m, it.key);
+        };
+    }
+
+    spec test_verify_iter_valid_after_insert_symbolic {
+        pragma verify = true;
+        requires !spec_contains_key(m, k);
+        aborts_if false;
+        ensures spec_contains_key(m, k);
+        ensures spec_len(m) == spec_len(old(m)) + 1;
+    }
+
+    #[verify_only]
+    fun test_verify_back_key_rank_symbolic(m: &BigOrderedMap<u64, u64>): u64 {
+        m.back_key()
+    }
+
+    spec test_verify_back_key_rank_symbolic {
+        pragma verify = true;
+        requires spec_len(m) > 0;
+        aborts_if false;
+        ensures spec_contains_key(m, result);
+        ensures spec_rank(m, result) == spec_len(m) - 1;
+        ensures spec_key_at(m, spec_len(m) - 1) == result;
+    }
+
+    #[verify_only]
+    fun test_verify_iter_borrow_mut_symbolic(
+        m: &mut BigOrderedMap<u64, u64>, k: u64, nv: u64
+    ) {
+        // Write through the iterator's `&mut V`: the edge carried by the
+        // reference lands the update on the abstract map at `self.key`.
+        let it = m.internal_find(&k);
+        let v_ref = it.iter_borrow_mut(m);
+        *v_ref = nv;
+    }
+
+    spec test_verify_iter_borrow_mut_symbolic {
+        pragma verify = true;
+        requires spec_contains_key(m, k);
+        aborts_if false;
+        ensures spec_get(m, k) == nv;
+        ensures spec_len(m) == spec_len(old(m));
+        ensures spec_contains_key(m, k);
+        // Frame: no other entry is touched.
+        ensures forall other: u64 where other != k:
+            spec_contains_key(m, other) == spec_contains_key(old(m), other);
+        ensures forall other: u64 where other != k && spec_contains_key(old(m), other):
+            spec_get(m, other) == spec_get(old(m), other);
+        // A value write is not a structural change, so positions are intact.
+        ensures forall i in 0..spec_len(m): spec_key_at(m, i) == spec_key_at(old(m), i);
+        ensures spec_rank(m, k) == spec_rank(old(m), k);
+    }
+
+    #[verify_only]
+    fun test_verify_iter_remove_symbolic(m: &mut BigOrderedMap<u64, u64>, k: u64): u64 {
+        let it = m.internal_find_with_path(&k);
+        it.iter_remove(m)
+    }
+
+    spec test_verify_iter_remove_symbolic {
+        pragma verify = true;
+        requires spec_contains_key(m, k);
+        aborts_if false;
+        ensures result == spec_get(old(m), k);
+        ensures spec_len(m) == spec_len(old(m)) - 1;
+        ensures !spec_contains_key(m, k);
+        // Frame: every other entry survives with its value.
+        ensures forall other: u64 where other != k:
+            spec_contains_key(m, other) == spec_contains_key(old(m), other);
+        ensures forall other: u64 where other != k && spec_contains_key(old(m), other):
+            spec_get(m, other) == spec_get(old(m), other);
+    }
+
+    #[verify_only]
+    fun test_verify_iter_prev_loop_symbolic(m: &BigOrderedMap<u64, u64>): u64 {
+        // Backward traversal over a symbolic map: from End each step decrements
+        // the rank, so the step count measures the distance from the end, and
+        // reaching begin means the whole map was walked.
+        let count = 0u64;
+        let it = m.internal_new_end_iter();
+        while ({
+            spec {
+                invariant spec_iter_valid(it, m);
+                invariant count <= spec_len(m);
+                invariant (it is IteratorPtr::End) ==> count == 0;
+                invariant !(it is IteratorPtr::End) ==>
+                    spec_contains_key(m, it.key)
+                        && spec_rank(m, it.key) == spec_len(m) - count;
+            };
+            !it.iter_is_begin(m)
+        }) {
+            it = it.iter_prev(m);
+            count += 1;
+        };
+        count
+    }
+
+    spec test_verify_iter_prev_loop_symbolic {
+        pragma verify = true;
+        aborts_if false;
+        ensures result == spec_len(m);
+    }
+
+    #[verify_only]
+    fun test_verify_front_remove_drain_symbolic(m: &mut BigOrderedMap<u64, u64>): u64 {
+        // Peek-then-remove, the shape callers write when they need the key
+        // before deciding: front_key's border rank fact plus the removal splice
+        // keep the map a suffix of the entry map, without going through
+        // pop_front's template.
+        let count = 0u64;
+        while ({
+            spec {
+                invariant count + spec_len(m) == spec_len(old(m));
+                invariant forall i in 0..spec_len(m):
+                    spec_key_at(m, i) == spec_key_at(old(m), i + count);
+                invariant forall i in 0..spec_len(m):
+                    spec_get(m, spec_key_at(m, i)) == spec_get(old(m), spec_key_at(m, i));
+            };
+            !m.is_empty()
+        }) {
+            let k = m.front_key();
+            m.remove(&k);
+            count += 1;
+        };
+        count
+    }
+
+    spec test_verify_front_remove_drain_symbolic {
+        pragma verify = true;
+        aborts_if false;
+        ensures result == spec_len(old(m));
+        ensures spec_len(m) == 0;
+    }
+
+    #[verify_only]
+    fun test_verify_iter_write_loop_symbolic(m: &mut BigOrderedMap<u64, u64>, c: u64) {
+        // Writing values while traversing: the walk stays valid because a value
+        // write is not a structural mutation, and positions survive it, so the
+        // invariant can say "every position visited so far now holds c".
+        let count = 0u64;
+        let it = m.internal_new_begin_iter();
+        while ({
+            spec {
+                invariant spec_iter_valid(it, m);
+                invariant spec_len(m) == spec_len(old(m));
+                invariant count <= spec_len(m);
+                invariant forall i in 0..spec_len(m):
+                    spec_key_at(m, i) == spec_key_at(old(m), i);
+                invariant !(it is IteratorPtr::End) ==>
+                    spec_contains_key(m, it.key) && spec_rank(m, it.key) == count;
+                invariant (it is IteratorPtr::End) ==> count == spec_len(m);
+                invariant forall i in 0..count: spec_get(m, spec_key_at(m, i)) == c;
+            };
+            !it.iter_is_end(m)
+        }) {
+            let v_ref = it.iter_borrow_mut(m);
+            *v_ref = c;
+            it = it.iter_next(m);
+            count = count + 1;
+        };
+    }
+
+    spec test_verify_iter_write_loop_symbolic {
+        pragma verify = true;
+        aborts_if false;
+        ensures spec_len(m) == spec_len(old(m));
+        ensures forall i in 0..spec_len(m): spec_key_at(m, i) == spec_key_at(old(m), i);
+        ensures forall i in 0..spec_len(m): spec_get(m, spec_key_at(m, i)) == c;
+    }
+
+    #[verify_only]
+    fun test_verify_find_started_walk_symbolic(m: &BigOrderedMap<u64, u64>, k: u64): u64 {
+        // Entering the walk at a found key rather than at begin: `internal_find`
+        // pins the iterator to that key, so the step count measures distance
+        // from its rank. This is the shape callers write when resuming from a
+        // known position.
+        let count = 0u64;
+        let it = m.internal_find(&k);
+        while ({
+            spec {
+                invariant spec_iter_valid(it, m);
+                invariant count + spec_rank(m, k) <= spec_len(m);
+                invariant !(it is IteratorPtr::End) ==>
+                    spec_contains_key(m, it.key)
+                        && spec_rank(m, it.key) == spec_rank(m, k) + count;
+                invariant (it is IteratorPtr::End) ==>
+                    count + spec_rank(m, k) == spec_len(m);
+            };
+            !it.iter_is_end(m)
+        }) {
+            it = it.iter_next(m);
+            count += 1;
+        };
+        count
+    }
+
+    spec test_verify_find_started_walk_symbolic {
+        pragma verify = true;
+        requires spec_contains_key(m, k);
+        aborts_if false;
+        ensures result == spec_len(m) - spec_rank(m, k);
+    }
+
+    #[verify_only]
+    fun test_verify_early_exit_walk_symbolic(m: &BigOrderedMap<u64, u64>, target: u64): bool {
+        // Early exit on the first entry whose value meets a condition. What the
+        // prefix invariant buys: on a negative result every position was
+        // checked, so the answer is complete rather than merely sound.
+        let found = false;
+        let it = m.internal_new_begin_iter();
+        let seen = 0u64;
+        while ({
+            spec {
+                invariant spec_iter_valid(it, m);
+                invariant seen <= spec_len(m);
+                invariant !(it is IteratorPtr::End) ==>
+                    spec_contains_key(m, it.key) && spec_rank(m, it.key) == seen;
+                invariant (it is IteratorPtr::End) ==> seen == spec_len(m);
+                invariant !found ==>
+                    (forall i in 0..seen: spec_get(m, spec_key_at(m, i)) != target);
+            };
+            !found && !it.iter_is_end(m)
+        }) {
+            if (*it.iter_borrow(m) == target) {
+                found = true;
+            } else {
+                it = it.iter_next(m);
+                seen += 1;
+            }
+        };
+        found
+    }
+
+    spec test_verify_early_exit_walk_symbolic {
+        pragma verify = true;
+        aborts_if false;
+        // A false result is complete: no position holds the target.
+        ensures !result ==>
+            (forall i in 0..spec_len(m): spec_get(m, spec_key_at(m, i)) != target);
+    }
+
+    #[verify_only]
+    fun test_verify_bounded_walk_symbolic(m: &BigOrderedMap<u64, u64>, limit: u64): vector<u64> {
+        // Collect at most `limit` keys — the take-ready shape. The result is the
+        // bounded prefix of the enumeration, not just some subset of the keys.
+        let out = vector[];
+        let it = m.internal_new_begin_iter();
+        while ({
+            spec {
+                invariant spec_iter_valid(it, m);
+                invariant len(out) <= limit && len(out) <= spec_len(m);
+                invariant forall i in 0..len(out): out[i] == spec_key_at(m, i);
+                invariant !(it is IteratorPtr::End) ==>
+                    spec_contains_key(m, it.key) && spec_rank(m, it.key) == len(out);
+                invariant (it is IteratorPtr::End) ==> len(out) == spec_len(m);
+            };
+            out.length() < limit && !it.iter_is_end(m)
+        }) {
+            out.push_back(*it.iter_borrow_key());
+            it = it.iter_next(m);
+        };
+        out
+    }
+
+    spec test_verify_bounded_walk_symbolic {
+        pragma verify = true;
+        aborts_if false;
+        ensures len(result) == (if (limit < spec_len(m)) limit else spec_len(m));
+        ensures forall i in 0..len(result): result[i] == spec_key_at(m, i);
+    }
+
+    #[verify_only]
+    fun test_verify_keys_for_loop_symbolic(m: &BigOrderedMap<u64, u64>): u64 {
+        // Walking `keys()` with a `for` loop and summing the values it points
+        // at. The loop variable is a vector index, so this only closes if the
+        // returned vector agrees position-wise with the enumeration.
+        let ks = m.keys();
+        let sum = 0u64;
+        let n = ks.length();
+        for (i in 0..n) {
+            sum += *m.borrow(ks.borrow(i));
+        } spec {
+            invariant n == spec_len(m);
+            invariant i <= spec_len(m);
+            invariant sum == spec_test_sum_upto(m, i);
+        };
+        sum
+    }
+
+    spec test_verify_keys_for_loop_symbolic {
+        pragma verify = true;
+        // Aborts unspecified: the running u64 addition can overflow.
+        ensures result == spec_test_sum_upto(m, spec_len(m));
+    }
+
+    #[verify_only]
+    fun test_verify_next_key_scan_symbolic(m: &BigOrderedMap<u64, u64>): u64 {
+        // Key stepping rather than iterators: start at the front and follow
+        // `next_key` to the end, the shape of a full scan that holds no
+        // iterator across calls. Counting the steps requires knowing that a
+        // successor sits one position later.
+        let count = 1u64;
+        let k = m.front_key();
+        let nxt = m.next_key(&k);
+        while ({
+            spec {
+                invariant spec_contains_key(m, k);
+                invariant spec_rank(m, k) == count - 1;
+                invariant count <= spec_len(m);
+                invariant option::spec_is_some(nxt) ==>
+                    spec_contains_key(m, option::spec_borrow(nxt))
+                        && spec_rank(m, option::spec_borrow(nxt)) == count;
+                invariant option::spec_is_none(nxt) ==> count == spec_len(m);
+            };
+            nxt.is_some()
+        }) {
+            k = *nxt.borrow();
+            nxt = m.next_key(&k);
+            count += 1;
+        };
+        count
+    }
+
+    spec test_verify_next_key_scan_symbolic {
+        pragma verify = true;
+        requires spec_len(m) > 0;
+        aborts_if false;
+        ensures result == spec_len(m);
+    }
+
+    #[verify_only]
+    fun test_verify_insert_shift_symbolic(m: &mut BigOrderedMap<u64, u64>, k: u64, v: u64) {
+        // An insertion splices a position in: everything before the new key
+        // keeps its position, everything after moves up by one. Enumeration
+        // facts surviving an insert is what lets a caller reason about a map it
+        // has just added to.
+        m.add(k, v);
+    }
+
+    spec test_verify_insert_shift_symbolic {
+        pragma verify = true;
+        requires !spec_contains_key(m, k);
+        ensures spec_contains_key(m, k);
+        ensures spec_len(m) == spec_len(old(m)) + 1;
+        ensures spec_get(m, k) == v;
+        ensures forall i in 0..spec_rank(m, k): spec_key_at(m, i) == spec_key_at(old(m), i);
+        ensures forall i in (spec_rank(m, k) + 1)..spec_len(m):
+            spec_key_at(m, i) == spec_key_at(old(m), i - 1);
+    }
+
+    #[verify_only]
+    fun test_verify_lower_bound_scan_start_symbolic(m: &BigOrderedMap<u64, u64>, k: u64):
+        IteratorPtr<u64> {
+        // Where a range scan begins. The search is characterized by comparison,
+        // so these are the facts that carry it into the enumeration; no clause of
+        // its own is needed, unlike the ordered_map case, because that
+        // characterization quantifies over keys and so instantiates at the key
+        // being searched for.
+        m.internal_lower_bound(&k)
+    }
+
+    spec test_verify_lower_bound_scan_start_symbolic {
+        pragma verify = true;
+        aborts_if false;
+        // A scan starting here has skipped only smaller keys.
+        ensures !iter_is_end(result, m) ==>
+            (forall i in 0..spec_rank(m, result.key):
+                std::cmp::compare(spec_key_at(m, i), k) == std::cmp::Ordering::Less);
+        // A key that is present is landed on, not skipped past.
+        ensures spec_contains_key(m, k) ==> !iter_is_end(result, m) && result.key == k;
+    }
+
+    #[verify_only]
+    fun test_verify_iter_modify_ranks_symbolic(m: &mut BigOrderedMap<u64, u64>, k: u64): u64 {
+        // Writing a value through an iterator leaves the key set alone, so every
+        // position is untouched — what a traversal needs in order to keep a
+        // position-indexed invariant while updating as it goes.
+        let it = m.internal_find(&k);
+        it.iter_modify(m, |v| { *v = 7; *v })
+    }
+
+    spec test_verify_iter_modify_ranks_symbolic {
+        pragma verify = true;
+        requires spec_contains_key(m, k);
+        aborts_if false;
+        ensures result == 7;
+        ensures spec_get(m, k) == 7;
+        ensures spec_len(m) == spec_len(old(m));
+        ensures forall i in 0..spec_len(m): spec_key_at(m, i) == spec_key_at(old(m), i);
+        ensures spec_rank(m, k) == spec_rank(old(m), k);
+    }
+
+    #[verify_only]
+    fun test_verify_iter_remove_shift_symbolic(m: &mut BigOrderedMap<u64, u64>, k: u64): u64 {
+        // The mirror of the insert splice: removing through an iterator closes
+        // the position up, so keys before the removed one stay put and keys
+        // after it move down by one.
+        let it = m.internal_find_with_path(&k);
+        it.iter_remove(m)
+    }
+
+    spec test_verify_iter_remove_shift_symbolic {
+        pragma verify = true;
+        requires spec_contains_key(m, k);
+        aborts_if false;
+        ensures result == spec_get(old(m), k);
+        ensures !spec_contains_key(m, k);
+        ensures spec_len(m) == spec_len(old(m)) - 1;
+        ensures forall i in 0..spec_rank(old(m), k): spec_key_at(m, i) == spec_key_at(old(m), i);
+        ensures forall i in spec_rank(old(m), k)..spec_len(m):
+            spec_key_at(m, i) == spec_key_at(old(m), i + 1);
+    }
+
+    #[verify_only]
+    fun test_verify_leaf_walk_sum_symbolic(m: &BigOrderedMap<u64, u64>): u64 {
+        // The shape `for_each_ref` expands into: an outer walk over leaves and
+        // an inner walk over each leaf's entries. The leaf offset carries the
+        // aggregate across the nesting, so the total is the sum over every key
+        // — which needs the leaves to tile the enumeration, not merely to hold
+        // real entries.
+        let sum = 0u64;
+        let it = m.internal_leaf_new_begin_iter();
+        while ({
+            spec {
+                invariant spec_leaf_iter_valid(it, m);
+                invariant 0 <= spec_leaf_offset(it, m)
+                    && spec_leaf_offset(it, m) <= spec_len(m);
+                // Carried, not just stated at the producer: the loop head
+                // havocs `it`, so without this the walk could exit early.
+                invariant internal_leaf_iter_is_end(it) ==>
+                    spec_leaf_offset(it, m) == spec_len(m);
+                invariant sum == spec_test_sum_upto(m, spec_leaf_offset(it, m));
+            };
+            !it.internal_leaf_iter_is_end()
+        }) {
+            let (entries, next_it) = it.internal_leaf_iter_borrow_entries_and_next_leaf_index(m);
+            let oit = entries.internal_new_begin_iter();
+            while ({
+                spec {
+                    // `it` does not move during the inner walk, so its offset is
+                    // the stable base for the positions being consumed here.
+                    invariant !(oit is ordered_map::IteratorPtr::End) ==>
+                        oit.index < ordered_map::spec_len(entries);
+                    invariant sum == spec_test_sum_upto(m,
+                        spec_leaf_offset(it, m)
+                            + (if (oit is ordered_map::IteratorPtr::End)
+                               ordered_map::spec_len(entries) else oit.index));
+                };
+                !oit.iter_is_end(entries)
+            }) {
+                sum += *oit.iter_borrow(entries).internal_leaf_borrow_value();
+                oit = oit.iter_next(entries);
+            };
+            it = next_it;
+        };
+        sum
+    }
+
+    spec test_verify_leaf_walk_sum_symbolic {
+        pragma verify = true;
+        // Aborts unspecified: the running u64 addition can overflow.
+        ensures result == spec_test_sum_upto(m, spec_len(m));
+    }
 
 }

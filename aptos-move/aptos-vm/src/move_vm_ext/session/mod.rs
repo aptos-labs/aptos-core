@@ -65,7 +65,6 @@ use std::{borrow::Borrow, collections::BTreeMap};
 use triomphe::Arc as TriompheArc;
 
 pub mod respawned_session;
-pub mod session_id;
 pub(crate) mod user_transaction_sessions;
 pub mod view_with_change_set;
 

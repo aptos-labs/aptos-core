@@ -1,0 +1,21 @@
+Move prover returns: exiting with verification errors
+error: unknown assertion failed
+   ┌─ tests/sources/functional/closures/inline/anchor_opaque_label_collision.move:34:13
+   │
+34 │             assert ensures_of<f>(a); // error: for the `false_claim` caller, the delta from f's pre-state is +5, not +1
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/anchor_opaque_label_collision.move:39: false_claim
+   =     at tests/sources/functional/closures/inline/anchor_opaque_label_collision.move:46: false_claim (spec)
+   =     at tests/sources/functional/closures/inline/anchor_opaque_label_collision.move:39: false_claim
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/inline/anchor_opaque_label_collision.move:25: apply_then_bump
+   =         a = <redacted>
+   =     at tests/sources/functional/closures/inline/anchor_opaque_label_collision.move:46: false_claim (spec)
+   =     at tests/sources/functional/closures/inline/anchor_opaque_label_collision.move:41: false_claim
+   =         r = <redacted>
+   =     at tests/sources/functional/closures/inline/anchor_opaque_label_collision.move:27: apply_then_bump
+   =     at tests/sources/functional/closures/inline/anchor_opaque_label_collision.move:28: apply_then_bump
+   =     at tests/sources/functional/closures/inline/anchor_opaque_label_collision.move:29: apply_then_bump
+   =     at tests/sources/functional/closures/inline/anchor_opaque_label_collision.move:30: apply_then_bump
+   =     at tests/sources/functional/closures/inline/anchor_opaque_label_collision.move:34: apply_then_bump

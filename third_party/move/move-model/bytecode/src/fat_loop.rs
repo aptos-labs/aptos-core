@@ -260,7 +260,35 @@ impl FatLoopBuilder<'_> {
                         .map(|(attr_id, _)| *attr_id)
                 })
                 .collect();
+            // Natural-loop detection only sees code reachable from the entry, so a
+            // declaration in unreachable code (e.g. a dead copy left behind by
+            // inline expansion) can never be claimed by a loop. Such code is not
+            // verified, so the declaration is irrelevant rather than misplaced.
+            // One pass computes the attr ids of all reachable Prop bytecodes
+            // (invariants are asserts, unrolling marks assumes).
+            let reachable_prop_attrs: BTreeSet<AttrId> = {
+                let mut seen = BTreeSet::new();
+                let mut work = vec![cfg.entry_block()];
+                let mut attrs = BTreeSet::new();
+                while let Some(block) = work.pop() {
+                    if !seen.insert(block) {
+                        continue;
+                    }
+                    if let BlockContent::Basic { lower, upper } = cfg.content(block) {
+                        for offset in *lower..=*upper {
+                            if let Bytecode::Prop(attr, _, _) = &code[offset as usize] {
+                                attrs.insert(*attr);
+                            }
+                        }
+                    }
+                    work.extend(cfg.successors(block).iter().copied());
+                }
+                attrs
+            };
             for attr_id in func_target.data.loop_invariants.difference(&all_invariants) {
+                if !reachable_prop_attrs.contains(attr_id) {
+                    continue;
+                }
                 env.error(
                     &func_target.get_bytecode_loc(*attr_id),
                     "Loop invariants must be declared at the beginning of the loop header in a \
@@ -276,6 +304,9 @@ impl FatLoopBuilder<'_> {
             let declared_unrolling_marks: BTreeSet<_> =
                 func_target.data.loop_unrolling.keys().copied().collect();
             for attr_id in declared_unrolling_marks.difference(&all_unrolling_marks) {
+                if !reachable_prop_attrs.contains(attr_id) {
+                    continue;
+                }
                 env.error(
                     &func_target.get_bytecode_loc(*attr_id),
                     "Loop unrolling mark must be declared at the beginning of the loop header",

@@ -561,6 +561,8 @@ module aptos_framework::vesting {
         let grant = coin::zero<AptosCoin>();
         let grant_amount = 0;
         let grant_pool = pool_u64::create(MAXIMUM_SHAREHOLDERS);
+        // TODO(#20373): add exact functional specs for pool mutations so
+        // verification need not weaken this HOF's fold.
         shareholders.for_each_ref(|shareholder| {
             let shareholder: address = *shareholder;
             let (_, buy_in) = simple_map::remove(&mut buy_ins, &shareholder);

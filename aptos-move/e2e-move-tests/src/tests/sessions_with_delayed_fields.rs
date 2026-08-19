@@ -14,7 +14,8 @@ use aptos_aggregator::{
 use aptos_block_executor::{
     code_cache_global_manager::AptosModuleCacheManagerGuard,
     executor::BlockExecutor,
-    task::{ExecutionStatus, ExecutorTask, LegacyTxnOutput, TransactionOutput},
+    single_transaction_executor::LegacyTransactionExecutor,
+    task::{ExecutionStatus, ExecutorTask, LegacyTxnOutput, TxnOutput},
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::default::DefaultTxnProvider,
     types::InputOutputKey,
@@ -159,7 +160,7 @@ impl BlockExecutableTransaction for TestTransaction {
 #[derive(Debug)]
 struct TestOutput;
 
-impl TransactionOutput for TestOutput {
+impl TxnOutput for TestOutput {
     type CommittedOutput = aptos_types::transaction::TransactionOutput;
     type Key = StateKey;
     type Tag = StructTag;
@@ -366,7 +367,7 @@ fn testcase(label: &str, txn: TestTransaction, expected: Expected) {
     let mut guard = AptosModuleCacheManagerGuard::none_with_delayed_fields_for_testing(state_view);
     let executor = BlockExecutor::<
         TestTransaction,
-        TestTask,
+        LegacyTransactionExecutor<TestTask>,
         _,
         NoOpTransactionCommitHook<TestOutput>,
         DefaultTxnProvider<TestTransaction, AuxiliaryInfo>,

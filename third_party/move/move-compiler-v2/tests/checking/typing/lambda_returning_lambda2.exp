@@ -1,7 +1,31 @@
+// -- Model dump before first bytecode pipeline
+module 0x8675309::M {
+    public inline fun foreach_caller2<T>(_v: &vector<T>,_action: ||(|&T|)) {
+        Abort(1)
+    }
+    public fun whacky_foreach2() {
+        {
+          let v: vector<u64> = Vector<u64>(1, 2, 3);
+          {
+            let sum: u64 = 0;
+            {
+              let (_v: &vector<u64>): (&vector<u64>) = Tuple(Borrow(Immutable)(v));
+              Abort(1)
+            }
+          }
+        }
+    }
+} // end 0x8675309::M
 
-Diagnostics:
-error: Functions may not return function-typed values, but function `M::foreach_caller2` has a parameter of function type with function-typed result:
-  ┌─ tests/checking/typing/lambda_returning_lambda2.move:3:23
-  │
-3 │     public inline fun foreach_caller2<T>(_v: &vector<T>, _action: ||(|&T|)) {
-  │                       ^^^^^^^^^^^^^^^                    ------- Parameter `_action` has type `||(|&T|)`, which has function type `|&T|` as a function result type
+// -- Sourcified model before first bytecode pipeline
+module 0x8675309::M {
+    public inline fun foreach_caller2<T>(_v: &vector<T>, _action: ||(|&T|)) {
+        abort 1
+    }
+    public fun whacky_foreach2() {
+        let v = vector[1, 2, 3];
+        let sum = 0;
+        let _v = &v;
+        abort 1
+    }
+}

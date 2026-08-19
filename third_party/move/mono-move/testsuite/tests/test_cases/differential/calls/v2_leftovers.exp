@@ -6,7 +6,7 @@ fun identity(r0): u64 {
     r0: u64
   code:
   L0:
-    0: ret [r0]
+    0: ret [r0] @1
 }
 
 fun add_two(r0, r1): u64 {
@@ -16,8 +16,8 @@ fun add_two(r0, r1): u64 {
     r2: u64
   code:
   L0:
-    0: r2 := add r0, r1
-    1: ret [r2]
+    0: r2 := add r0, r1 @2
+    1: ret [r2] @3
 }
 
 fun copy_to_call(r0): u64 {
@@ -25,8 +25,8 @@ fun copy_to_call(r0): u64 {
     r0: u64
   code:
   L0:
-    0: [x0] := call identity, [r0]
-    1: ret [x0]
+    0: [x0] := call identity, [r0] @1
+    1: ret [x0] @2
 }
 
 fun move_to_call(r0): u64 {
@@ -34,8 +34,8 @@ fun move_to_call(r0): u64 {
     r0: u64
   code:
   L0:
-    0: [x0] := call identity, [r0]
-    1: ret [x0]
+    0: [x0] := call identity, [r0] @1
+    1: ret [x0] @2
 }
 
 fun multi_use_local_alias(r0): u64 {
@@ -44,9 +44,9 @@ fun multi_use_local_alias(r0): u64 {
     r1: u64
   code:
   L0:
-    0: r1 := add r0, #1
-    1: r1 := add r1, r0
-    2: ret [r1]
+    0: r1 := add r0, #1 @4
+    1: r1 := add r1, r0 @6
+    2: ret [r1] @7
 }
 
 fun copy_call_then_use(r0): u64 {
@@ -55,9 +55,9 @@ fun copy_call_then_use(r0): u64 {
     r1: u64
   code:
   L0:
-    0: [x0] := call identity, [r0]
-    1: r1 := add x0, r0
-    2: ret [r1]
+    0: [x0] := call identity, [r0] @3
+    1: r1 := add x0, r0 @5
+    2: ret [r1] @6
 }
 
 fun two_copies_to_call(r0, r1): u64 {
@@ -66,8 +66,8 @@ fun two_copies_to_call(r0, r1): u64 {
     r1: u64
   code:
   L0:
-    0: [x0] := call add_two, [r0, r1]
-    1: ret [x0]
+    0: [x0] := call add_two, [r0, r1] @2
+    1: ret [x0] @3
 }
 === micro-ops ===
 // module 0x66::v2_leftovers
@@ -76,66 +76,66 @@ fun identity() {
   frame_data_size: 8
   entry_gas: 54
   code:
-    0: Return
+    0: Return @1
 }
 
 fun add_two() {
   frame_data_size: 24
   entry_gas: 59
   code:
-    0: AddU64 [16] <- [0] + [8]
-    1: Move8 [0] <- [16]
-    2: Return
+    0: AddU64 [16] <- [0] + [8] @2
+    1: Move8 [0] <- [16] @3
+    2: Return @3
 }
 
 fun copy_to_call() {
   frame_data_size: 8
   entry_gas: 90
   code:
-    0: Move8 [32] <- [0]
-    1: CallIndirect 0x66::v2_leftovers::identity
-    2: Move8 [0] <- [32]
-    3: Return
+    0: Move8 [32] <- [0] @1
+    1: CallIndirect 0x66::v2_leftovers::identity @1
+    2: Move8 [0] <- [32] @2
+    3: Return @2
 }
 
 fun move_to_call() {
   frame_data_size: 8
   entry_gas: 90
   code:
-    0: Move8 [32] <- [0]
-    1: CallIndirect 0x66::v2_leftovers::identity
-    2: Move8 [0] <- [32]
-    3: Return
+    0: Move8 [32] <- [0] @1
+    1: CallIndirect 0x66::v2_leftovers::identity @1
+    2: Move8 [0] <- [32] @2
+    3: Return @2
 }
 
 fun multi_use_local_alias() {
   frame_data_size: 16
   entry_gas: 64
   code:
-    0: AddU64Imm [8] <- [0] + #1
-    1: AddU64 [8] <- [8] + [0]
-    2: Move8 [0] <- [8]
-    3: Return
+    0: AddU64Imm [8] <- [0] + #1 @4
+    1: AddU64 [8] <- [8] + [0] @6
+    2: Move8 [0] <- [8] @7
+    3: Return @7
 }
 
 fun copy_call_then_use() {
   frame_data_size: 16
   entry_gas: 95
   code:
-    0: Move8 [40] <- [0]
-    1: CallIndirect 0x66::v2_leftovers::identity
-    2: AddU64 [8] <- [40] + [0]
-    3: Move8 [0] <- [8]
-    4: Return
+    0: Move8 [40] <- [0] @3
+    1: CallIndirect 0x66::v2_leftovers::identity @3
+    2: AddU64 [8] <- [40] + [0] @5
+    3: Move8 [0] <- [8] @6
+    4: Return @6
 }
 
 fun two_copies_to_call() {
   frame_data_size: 16
   entry_gas: 116
   code:
-    0: Move8 [48] <- [8]
-    1: Move8 [40] <- [0]
-    2: CallIndirect 0x66::v2_leftovers::add_two
-    3: Move8 [0] <- [40]
-    4: Return
+    0: Move8 [48] <- [8] @2
+    1: Move8 [40] <- [0] @2
+    2: CallIndirect 0x66::v2_leftovers::add_two @2
+    3: Move8 [0] <- [40] @3
+    4: Return @3
 }

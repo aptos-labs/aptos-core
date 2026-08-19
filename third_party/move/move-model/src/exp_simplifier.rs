@@ -3750,14 +3750,34 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpRewriterFunctions for ExpSimplifier<'a,
             }
         }
 
-        // 7b. Select-of-update: update_field(e, f, v).f => v
+        // 7b. Select over field updates: `update_field(e, f, v).f => v`,
+        // and an update of a different field is skipped —
+        // `update_field(e, g, v).f => e.f` for `f != g` — since in a struct
+        // without variants updating one field never affects another
+        // (variant-qualified updates on enums are left untouched).
         if let Operation::Select(mid, sid, fid) = oper {
-            if let ExpData::Call(_, Operation::UpdateField(mid2, sid2, fid2), inner_args) =
-                args[0].as_ref()
-            {
-                if mid == mid2 && sid == sid2 && fid == fid2 {
+            let mut base = &args[0];
+            let mut skipped = false;
+            loop {
+                let ExpData::Call(_, Operation::UpdateField(mid2, sid2, fid2), inner_args) =
+                    base.as_ref()
+                else {
+                    break;
+                };
+                if mid != mid2 || sid != sid2 {
+                    break;
+                }
+                if fid == fid2 {
                     return Some(inner_args[1].clone());
                 }
+                if self.env().get_module(*mid).into_struct(*sid).has_variants() {
+                    break;
+                }
+                base = &inner_args[0];
+                skipped = true;
+            }
+            if skipped {
+                return Some(ExpData::Call(id, oper.clone(), vec![base.clone()]).into_exp());
             }
         }
 

@@ -6,7 +6,7 @@
 use super::ssa_conversion::SsaConverter;
 use crate::stackless_exec_ir::{FunctionIR, ModuleIR};
 use mono_move_core::{Interner, PreparedModule, VMResult};
-use move_binary_format::access::ModuleAccess;
+use move_binary_format::{access::ModuleAccess, file_format::FunctionDefinitionIndex};
 
 /// Convert an entire compiled module to stackless IR.
 ///
@@ -40,7 +40,8 @@ pub fn translate_module(module: PreparedModule, interner: &impl Interner) -> VMR
     let functions = module
         .function_defs
         .iter()
-        .map(|fdef| {
+        .enumerate()
+        .map(|(def_position, fdef)| {
             let Some(code) = fdef.code.as_ref() else {
                 return Ok(None);
             };
@@ -60,14 +61,15 @@ pub fn translate_module(module: PreparedModule, interner: &impl Interner) -> VMR
             // Pass: Bytecode -> Intra-Block SSA -> Fusion
             let converter = SsaConverter::new(local_types, interner);
             let (ssa, witness) = converter.convert_function(&module, &code.code)?;
-            let ssa = ssa.with_fusion_passes().with_test_utils_passes(&module)?;
+            let ssa = ssa.with_fusion_passes()?.with_test_utils_passes(&module)?;
 
             // Pass: Greedy Slot Allocation (consumes SSA, produces named-slot IR)
-            let alloc = super::slot_alloc::allocate_slots(ssa)?;
+            let alloc = super::slot_alloc::allocate_slots(ssa, &module)?;
 
             Ok(Some(FunctionIR {
                 name_idx,
                 handle_idx,
+                def_idx: FunctionDefinitionIndex(def_position as u16),
                 num_params,
                 num_locals,
                 num_home_slots: alloc.num_home_slots,

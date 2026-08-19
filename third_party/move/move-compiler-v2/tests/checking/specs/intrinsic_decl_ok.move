@@ -1,4 +1,4 @@
-module 0x42::M {
+module 0x4::M {
     struct MyTable1<phantom K, phantom V> {}
 
     native fun new<K, V>(): MyTable1<K, V>;

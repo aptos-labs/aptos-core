@@ -32,13 +32,16 @@ struct MovePackageVerifyParams {
     /// that produce counterexamples; useful for diagnosing per-function
     /// timeouts.
     split_vcs_by_assert: Option<bool>,
-    /// Maximum number of counterexamples reported per verification
-    /// condition.
+    /// Maximum number of counterexamples reported per verification condition.
+    /// The request also has a fixed aggregate diagnostic limit.
     error_limit: Option<usize>,
 }
 
 const DEFAULT_VC_TIMEOUT: usize = 10;
 const MAX_VC_TIMEOUT: usize = 60;
+const MCP_PROCESS_TIMEOUT_GRACE_SECS: u64 = 10;
+const MAX_VC_ERROR_LIMIT: usize = 20;
+const MAX_PACKAGE_ERROR_LIMIT: usize = 20;
 
 #[tool_router(router = package_verify_router, vis = "pub(crate)")]
 impl FlowSession {
@@ -70,14 +73,25 @@ impl FlowSession {
         let split_vcs_by_assert = params.split_vcs_by_assert.unwrap_or(false);
         let error_limit = params.error_limit;
 
-        if vc_timeout > MAX_VC_TIMEOUT {
+        if vc_timeout == 0 || vc_timeout > MAX_VC_TIMEOUT {
             return Ok(CallToolResult::error(vec![Content::text(
-                "timeout is too high; read the instructions about timeout management \
+                "timeout must be between 1 and 60 seconds; read the instructions about timeout management \
                  in the verification agent guide",
             )]));
         }
+        if error_limit.is_some_and(|n| !(1..=MAX_VC_ERROR_LIMIT).contains(&n)) {
+            return Ok(CallToolResult::error(vec![Content::text(format!(
+                "error_limit must be between 1 and {}",
+                MAX_VC_ERROR_LIMIT
+            ))]));
+        }
 
         let tool_timeout = self.tool_timeout();
+        let hard_timeout_secs = tool_timeout
+            .as_secs()
+            .saturating_sub(1)
+            .min(MAX_VC_TIMEOUT as u64 + MCP_PROCESS_TIMEOUT_GRACE_SECS)
+            .max(1);
         let result = tokio::time::timeout(
             tool_timeout,
             tokio::task::spawn_blocking(move || {
@@ -231,6 +245,9 @@ impl FlowSession {
                 options.prover.verify_scope = verification_scope;
                 options.prover.verify_exclude = prover_verify_exclude;
                 options.backend.vc_timeout = vc_timeout;
+                options.backend.hard_timeout_secs = hard_timeout_secs;
+                options.backend.package_timeout_secs = hard_timeout_secs;
+                options.backend.package_error_limit = MAX_PACKAGE_ERROR_LIMIT;
                 options.backend.split_vcs_by_assert = split_vcs_by_assert;
                 if let Some(n) = error_limit {
                     options.backend.error_limit = n;

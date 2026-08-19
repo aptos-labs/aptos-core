@@ -321,6 +321,16 @@ pub enum BehaviorKind {
     EnsuresOf,
     /// `result_of<f>(args)` — `choose r where ensures_of<f>(args, r, ...)`.
     ResultOf,
+    /// `unchanged_of<f>(args)` — the global memory `f` may modify at the
+    /// given arguments is unchanged relative to the pre-state.
+    UnchangedOf,
+    /// `folds_of<f>(v, i)` / `folds_of<f>(g, i)` — the values written by `f`
+    /// to its captured variables over the first `i` iterations are the fold
+    /// of a transformer derived from `f`'s body, starting from the captures'
+    /// pre-state values, and no prefix iteration aborts. In the element form
+    /// the iterations apply unary `f` to `v[0..i]`; in the general form the
+    /// literal index lambda `g` maps iteration `j` to `f`'s argument tuple.
+    FoldsOf,
     /// `write_of<f, j>(args)` — WP-internal selector for the post-state of
     /// the j-th `&mut` parameter (counted among `&mut` parameters). Not
     /// surface syntax; emitted by spec inference and translated by the
@@ -333,7 +343,11 @@ impl BehaviorKind {
     pub fn is_two_state(&self) -> bool {
         matches!(
             self,
-            BehaviorKind::EnsuresOf | BehaviorKind::ResultOf | BehaviorKind::WriteOf(_)
+            BehaviorKind::EnsuresOf
+                | BehaviorKind::ResultOf
+                | BehaviorKind::UnchangedOf
+                | BehaviorKind::FoldsOf
+                | BehaviorKind::WriteOf(_)
         )
     }
 }
@@ -346,6 +360,8 @@ impl fmt::Display for BehaviorKind {
             AbortsOf => write!(f, "aborts_of"),
             EnsuresOf => write!(f, "ensures_of"),
             ResultOf => write!(f, "result_of"),
+            UnchangedOf => write!(f, "unchanged_of"),
+            FoldsOf => write!(f, "folds_of"),
             WriteOf(j) => write!(f, "write_of_{}", j),
         }
     }
@@ -1298,6 +1314,26 @@ impl ExpData {
         }
     }
 
+    /// Compares two expressions for equivalence as specification values: up to
+    /// renaming of bound variables (alpha-equivalence), ignoring NodeIds,
+    /// reference operations (`Borrow`, `Deref`, and `Freeze` are transparent
+    /// in specifications), and lambda capture kinds. Specs attached to
+    /// lambdas must correspond: both absent, or spec-equivalent condition by
+    /// condition — behavioral predicates over a lambda resolve to its
+    /// attached spec when present, so it is part of the lambda's identity
+    /// here. Type-dependent nodes are compared via their instantiations
+    /// (and, for casts, their reference-stripped node types), so `env` is
+    /// required. Free variables must be identical in symbol, temporaries in
+    /// index, and both in reference-stripped node type: they become typed
+    /// context parameters of a unified specialization, so like-named
+    /// variables of different types must not be identified. This is used to
+    /// unify spec function specializations over lambdas stemming from
+    /// different contexts (e.g. a lambda argument of an inline function call
+    /// and its restatement in a lemma).
+    pub fn is_spec_equivalent(&self, env: &GlobalEnv, other: &ExpData) -> bool {
+        spec_equivalent(env, self, other, &mut vec![])
+    }
+
     /// Returns true if this expression is state-neutral: its value does not depend on
     /// global state and is the same regardless of which program state it's evaluated in.
     /// Such expressions can safely be extracted into spec-level `let` bindings.
@@ -1357,24 +1393,6 @@ impl ExpData {
             ExpData::Call(_, _, args) => args,
             _ => panic!("function must be called on Exp::Call(...)"),
         }
-    }
-
-    /// Peels a selection chain (`Select`, `SelectVariants`, `Index`, and optionally
-    /// `Deref`) to its first non-projection operand. Used to find the root variable
-    /// of an l-value or borrow target.
-    pub fn selection_chain_root(&self, peel_deref: bool) -> &ExpData {
-        let mut target = self;
-        while let ExpData::Call(_, op, args) = target {
-            let peel = matches!(
-                op,
-                Operation::Select(..) | Operation::SelectVariants(..) | Operation::Index
-            ) || (peel_deref && matches!(op, Operation::Deref));
-            if !peel || args.is_empty() {
-                break;
-            }
-            target = args[0].as_ref();
-        }
-        target
     }
 
     pub fn node_ids(&self) -> Vec<NodeId> {
@@ -2432,19 +2450,93 @@ impl ExpData {
                         | Pack(mid, sid, _) => {
                             usage.insert(mid.qualified(*sid));
                         },
-                        MoveFunction(..) | Closure(..) | Tuple | SpecFunction(..)
-                        | Behavior(..) | Result(..) | Index | Slice | Range | Implies | Iff
-                        | Identical | Add | Sub | Mul | Mod | Div | BitOr | BitAnd | Xor | Shl
-                        | Shr | And | Or | Eq | Neq | Lt | Gt | Le | Ge | Copy | Move | Not
-                        | Cast | Negate | Exists(..) | BorrowGlobal(..) | Borrow(..) | Deref
-                        | MoveTo | MoveFrom | Freeze(..) | Abort(..) | Vector | Len | TypeValue
-                        | TypeDomain | ResourceDomain | StateDomain | Global(..) | CanModify
-                        | Old | Trace(..) | SpecPublish(..) | SpecRemove(..) | SpecUpdate(..)
-                        | EmptyVec | SingleVec | UpdateVec | ConcatVec | IndexOfVec
-                        | ContainsVec | InRangeRange | InRangeVec | RangeVec | MaxU8 | MaxU16
-                        | MaxU32 | MaxU64 | MaxU128 | MaxU256 | Bv2Int | Int2Bv | AbortFlag
-                        | AbortCode | WellFormed | BoxValue | UnboxValue | EmptyEventStore
-                        | ExtendEventStore | EventStoreIncludes | EventStoreIncludedIn | NoOp => {},
+                        MoveFunction(..)
+                        | Closure(..)
+                        | Tuple
+                        | SpecFunction(..)
+                        | Behavior(..)
+                        | Result(..)
+                        | Index
+                        | Slice
+                        | Range
+                        | Implies
+                        | Iff
+                        | Identical
+                        | Add
+                        | Sub
+                        | Mul
+                        | Mod
+                        | Div
+                        | BitOr
+                        | BitAnd
+                        | Xor
+                        | Shl
+                        | Shr
+                        | And
+                        | Or
+                        | Eq
+                        | Neq
+                        | Lt
+                        | Gt
+                        | Le
+                        | Ge
+                        | Copy
+                        | Move
+                        | Not
+                        | Cast
+                        | Negate
+                        | Exists(..)
+                        | BorrowGlobal(..)
+                        | Borrow(..)
+                        | Deref
+                        | MoveTo
+                        | MoveFrom
+                        | Freeze(..)
+                        | Abort(..)
+                        | Vector
+                        | Len
+                        | TypeValue
+                        | TypeDomain
+                        | ResourceDomain
+                        | StateDomain
+                        | Global(..)
+                        | CanModify
+                        | Old
+                        | SaveStateAnchor(..)
+                        | WithStateAnchor(..)
+                        | FoldsCaptureAnchor(..)
+                        | InlineCallSummary
+                        | Trace(..)
+                        | SpecPublish(..)
+                        | SpecRemove(..)
+                        | SpecUpdate(..)
+                        | EmptyVec
+                        | SingleVec
+                        | UpdateVec
+                        | ConcatVec
+                        | IndexOfVec
+                        | ContainsVec
+                        | InRangeRange
+                        | InRangeVec
+                        | RangeVec
+                        | MaxU8
+                        | MaxU16
+                        | MaxU32
+                        | MaxU64
+                        | MaxU128
+                        | MaxU256
+                        | Bv2Int
+                        | Int2Bv
+                        | AbortFlag
+                        | AbortCode
+                        | WellFormed
+                        | BoxValue
+                        | UnboxValue
+                        | EmptyEventStore
+                        | ExtendEventStore
+                        | EventStoreIncludes
+                        | EventStoreIncludedIn
+                        | NoOp => {},
                     }
                     // Collect struct types from type instantiations (e.g., borrow_global<MyStruct>)
                     if let Some(inst) = env.get_node_instantiation_opt(*node_id) {
@@ -2542,6 +2634,398 @@ impl ExpData {
             self.node_id()
         }
     }
+}
+
+/// Compares node instantiations for `is_spec_equivalent`, modulo top-level
+/// references: references are transparent in specification contexts (see
+/// `skip_ref_ops`), and the type tags recorded in node instantiations may
+/// carry the reference-wrapped operand type on the code side — e.g. a
+/// `Select` over `&mut S` records `&mut S` where the spec side records `S`.
+fn inst_spec_equivalent(inst1: &[Type], inst2: &[Type]) -> bool {
+    inst1.len() == inst2.len()
+        && inst1
+            .iter()
+            .zip(inst2)
+            .all(|(t1, t2)| t1.skip_reference() == t2.skip_reference())
+}
+
+/// Strips reference operations, which are transparent in specification
+/// contexts, for `is_spec_equivalent` comparison.
+fn skip_ref_ops(e: &ExpData) -> &ExpData {
+    let mut cur = e;
+    while let ExpData::Call(
+        _,
+        Operation::Borrow(_) | Operation::Deref | Operation::Freeze(_),
+        args,
+    ) = cur
+    {
+        if args.len() != 1 {
+            break;
+        }
+        cur = args[0].as_ref();
+    }
+    cur
+}
+
+/// Implements `ExpData::is_spec_equivalent`. `bound` is the stack of
+/// corresponding bound variable pairs, innermost last.
+fn spec_equivalent(
+    env: &GlobalEnv,
+    e1: &ExpData,
+    e2: &ExpData,
+    bound: &mut Vec<(Symbol, Symbol)>,
+) -> bool {
+    use ExpData::*;
+    let e1 = skip_ref_ops(e1);
+    let e2 = skip_ref_ops(e2);
+    let all_equivalent = |exps1: &[Exp], exps2: &[Exp], bound: &mut Vec<(Symbol, Symbol)>| {
+        exps1.len() == exps2.len()
+            && exps1
+                .iter()
+                .zip(exps2)
+                .all(|(a1, a2)| spec_equivalent(env, a1, a2, bound))
+    };
+    match (e1, e2) {
+        (Value(_, v1), Value(_, v2)) => v1 == v2,
+        (LocalVar(id1, s1), LocalVar(id2, s2)) => match match_vars(*s1, *s2, bound) {
+            // Bound variables correspond positionally; their types follow
+            // from the compared binders.
+            VarMatch::Bound => true,
+            // A free variable is lifted into a context parameter of a
+            // unified specialization, typed from its occurrences:
+            // like-named variables of different types are not
+            // interchangeable.
+            VarMatch::Free => var_types_spec_equivalent(env, *id1, *id2),
+            VarMatch::Mismatch => false,
+        },
+        (Temporary(id1, t1), Temporary(id2, t2)) => {
+            // Temporaries reference the enclosing function's parameters by
+            // index; across contexts the same index can name parameters of
+            // different types, which — like free variables — must not
+            // share a specialization's context parameter.
+            t1 == t2 && var_types_spec_equivalent(env, *id1, *id2)
+        },
+        (Call(id1, op1, args1), Call(id2, op2, args2)) => {
+            op1 == op2
+                && (!op_inst_dependent_in_spec(op1)
+                    || inst_spec_equivalent(
+                        &env.get_node_instantiation(*id1),
+                        &env.get_node_instantiation(*id2),
+                    ))
+                && (!matches!(op1, Operation::Cast)
+                    || env.get_node_type(*id1).skip_reference()
+                        == env.get_node_type(*id2).skip_reference())
+                && all_equivalent(args1, args2, bound)
+        },
+        (Invoke(_, f1, args1), Invoke(_, f2, args2)) => {
+            spec_equivalent(env, f1, f2, bound) && all_equivalent(args1, args2, bound)
+        },
+        (Lambda(_, p1, body1, _, s1), Lambda(_, p2, body2, _, s2)) => {
+            // Capture kind is not part of the lambda's value semantics. The
+            // attached spec is: behavioral predicates over the lambda resolve
+            // to it when present, and to the body-derived spec otherwise, so
+            // the specs must correspond — both absent, or spec-equivalent
+            // condition by condition.
+            scoped_equivalent(env, p1, p2, bound, |env, bound| {
+                spec_equivalent(env, body1, body2, bound)
+                    && lambda_spec_equivalent(env, s1, s2, bound)
+            })
+        },
+        (Block(_, p1, opt1, body1), Block(_, p2, opt2, body2)) => {
+            opt_spec_equivalent(env, opt1, opt2, bound)
+                && scoped_equivalent(env, p1, p2, bound, |env, bound| {
+                    spec_equivalent(env, body1, body2, bound)
+                })
+        },
+        (Quant(_, k1, rs1, ts1, c1, b1), Quant(_, k2, rs2, ts2, c2, b2)) => {
+            if k1 != k2 || rs1.len() != rs2.len() {
+                return false;
+            }
+            // Ranges bind sequentially: each domain may reference earlier
+            // bound variables.
+            let mut pushed = 0;
+            let mut ranges_ok = true;
+            for ((p1, d1), (p2, d2)) in rs1.iter().zip(rs2) {
+                if !spec_equivalent(env, d1, d2, bound)
+                    || !collect_pattern_pairs(p1, p2, bound, &mut pushed)
+                {
+                    ranges_ok = false;
+                    break;
+                }
+            }
+            let result = ranges_ok
+                && ts1.len() == ts2.len()
+                && ts1
+                    .iter()
+                    .zip(ts2)
+                    .all(|(t1, t2)| all_equivalent(t1, t2, bound))
+                && opt_spec_equivalent(env, c1, c2, bound)
+                && spec_equivalent(env, b1, b2, bound);
+            bound.truncate(bound.len() - pushed);
+            result
+        },
+        (IfElse(_, c1, t1, e1), IfElse(_, c2, t2, e2)) => {
+            spec_equivalent(env, c1, c2, bound)
+                && spec_equivalent(env, t1, t2, bound)
+                && spec_equivalent(env, e1, e2, bound)
+        },
+        (Match(_, d1, arms1), Match(_, d2, arms2)) => {
+            spec_equivalent(env, d1, d2, bound)
+                && arms1.len() == arms2.len()
+                && arms1.iter().zip(arms2).all(|(a1, a2)| {
+                    scoped_equivalent(env, &a1.pattern, &a2.pattern, bound, |env, bound| {
+                        opt_spec_equivalent(env, &a1.condition, &a2.condition, bound)
+                            && spec_equivalent(env, &a1.body, &a2.body, bound)
+                    })
+                })
+        },
+        (Sequence(_, items1), Sequence(_, items2)) => all_equivalent(items1, items2, bound),
+        (Loop(_, body1), Loop(_, body2)) => spec_equivalent(env, body1, body2, bound),
+        (LoopCont(_, nest1, cont1), LoopCont(_, nest2, cont2)) => nest1 == nest2 && cont1 == cont2,
+        (Return(_, v1), Return(_, v2)) => spec_equivalent(env, v1, v2, bound),
+        (Mutate(_, l1, r1), Mutate(_, l2, r2)) => {
+            spec_equivalent(env, l1, l2, bound) && spec_equivalent(env, r1, r2, bound)
+        },
+        (Assign(_, p1, r1), Assign(_, p2, r2)) => {
+            // Assignment patterns reference existing variables, they do not
+            // bind fresh ones; compare their variables through the mapping.
+            assign_pattern_equivalent(env, p1, p2, bound) && spec_equivalent(env, r1, r2, bound)
+        },
+        (SpecBlock(_, s1), SpecBlock(_, s2)) => s1.structural_eq(s2),
+        _ => false,
+    }
+}
+
+/// Returns true if the specification semantics of the operation depend on
+/// its node instantiation. Arithmetic and relational operators only record
+/// the operand (bit-width) type there, which is irrelevant in specifications
+/// where arithmetic is over unbounded integers; one side may stem from code
+/// (concrete integer types) and the other from a spec context (widened to
+/// `num`). Bitwise and shift operations operate on the bit representation
+/// and stay instantiation-dependent, as does everything else (casts, packs,
+/// memory operations, function calls).
+fn op_inst_dependent_in_spec(op: &Operation) -> bool {
+    !matches!(
+        op,
+        Operation::Add
+            | Operation::Sub
+            | Operation::Mul
+            | Operation::Div
+            | Operation::Mod
+            | Operation::Lt
+            | Operation::Gt
+            | Operation::Le
+            | Operation::Ge
+            | Operation::Eq
+            | Operation::Neq
+            | Operation::Not
+            | Operation::And
+            | Operation::Or
+            // The generic vector value operations: their specification
+            // semantics is structural over the operand values and does not
+            // depend on the recorded element instantiation, which one side
+            // may omit (generated expressions) or widen (spec contexts).
+            // `EmptyVec` stays dependent: it has no operands pinning its
+            // element type.
+            | Operation::Len
+            | Operation::Index
+            | Operation::Slice
+            | Operation::ConcatVec
+            | Operation::SingleVec
+            | Operation::UpdateVec
+            | Operation::ContainsVec
+            | Operation::IndexOfVec
+            | Operation::InRangeVec
+            | Operation::RangeVec
+    )
+}
+
+/// Compares the attached specs of two lambdas: both absent, or spec-equivalent
+/// condition by condition (same kind and properties, expressions compared
+/// under the bound stack, which carries the corresponding lambda parameters).
+/// Spec members which cannot occur on a lambda spec must be absent on both
+/// sides.
+fn lambda_spec_equivalent(
+    env: &GlobalEnv,
+    s1: &Option<Exp>,
+    s2: &Option<Exp>,
+    bound: &mut Vec<(Symbol, Symbol)>,
+) -> bool {
+    let conditions_equivalent = |spec1: &Spec, spec2: &Spec, bound: &mut Vec<(Symbol, Symbol)>| {
+        spec1.conditions.len() == spec2.conditions.len()
+            && spec1
+                .conditions
+                .iter()
+                .zip(&spec2.conditions)
+                .all(|(c1, c2)| {
+                    c1.kind == c2.kind
+                        && c1.properties == c2.properties
+                        && spec_equivalent(env, &c1.exp, &c2.exp, bound)
+                        && c1.additional_exps.len() == c2.additional_exps.len()
+                        && c1
+                            .additional_exps
+                            .iter()
+                            .zip(&c2.additional_exps)
+                            .all(|(e1, e2)| spec_equivalent(env, e1, e2, bound))
+                })
+    };
+    match (s1, s2) {
+        (None, None) => true,
+        (Some(e1), Some(e2)) => match (e1.as_ref(), e2.as_ref()) {
+            (ExpData::SpecBlock(_, spec1), ExpData::SpecBlock(_, spec2)) => {
+                conditions_equivalent(spec1, spec2, bound)
+                    && spec1.properties == spec2.properties
+                    && spec1.on_impl.is_empty()
+                    && spec2.on_impl.is_empty()
+                    && spec1.update_map.is_empty()
+                    && spec2.update_map.is_empty()
+                    && spec1.proof.is_none()
+                    && spec2.proof.is_none()
+            },
+            _ => spec_equivalent(env, e1, e2, bound),
+        },
+        _ => false,
+    }
+}
+
+/// Compares two optional expressions for spec equivalence; `None` matches
+/// only `None`.
+fn opt_spec_equivalent(
+    env: &GlobalEnv,
+    o1: &Option<Exp>,
+    o2: &Option<Exp>,
+    bound: &mut Vec<(Symbol, Symbol)>,
+) -> bool {
+    match (o1, o2) {
+        (Some(e1), Some(e2)) => spec_equivalent(env, e1, e2, bound),
+        (None, None) => true,
+        _ => false,
+    }
+}
+
+/// The result of matching two variable references against the bound-pair
+/// stack: a corresponding bound pair, two identical free variables, or a
+/// mismatch.
+enum VarMatch {
+    Bound,
+    Free,
+    Mismatch,
+}
+
+/// Matches two variable references under the bound-pair stack (innermost
+/// binding wins); free variables must be identical.
+fn match_vars(s1: Symbol, s2: Symbol, bound: &[(Symbol, Symbol)]) -> VarMatch {
+    for (b1, b2) in bound.iter().rev() {
+        if *b1 == s1 || *b2 == s2 {
+            return if *b1 == s1 && *b2 == s2 {
+                VarMatch::Bound
+            } else {
+                VarMatch::Mismatch
+            };
+        }
+    }
+    if s1 == s2 {
+        VarMatch::Free
+    } else {
+        VarMatch::Mismatch
+    }
+}
+
+/// Compares the reference-stripped node types of two free variable (or
+/// temporary) occurrences for `is_spec_equivalent`. Free variables and
+/// temporaries of unified lambda material become typed context parameters
+/// of the shared specialization, so occurrences of different types must
+/// not be identified — sharing would splice one context's type into the
+/// other's calls.
+fn var_types_spec_equivalent(env: &GlobalEnv, id1: NodeId, id2: NodeId) -> bool {
+    env.get_node_type(id1).skip_reference() == env.get_node_type(id2).skip_reference()
+}
+
+/// Runs `body_cmp` with the corresponding variable pairs of two binding
+/// patterns pushed on the bound stack, restoring the stack afterwards.
+/// Returns false if the patterns do not correspond.
+fn scoped_equivalent(
+    env: &GlobalEnv,
+    p1: &Pattern,
+    p2: &Pattern,
+    bound: &mut Vec<(Symbol, Symbol)>,
+    body_cmp: impl FnOnce(&GlobalEnv, &mut Vec<(Symbol, Symbol)>) -> bool,
+) -> bool {
+    let mut pushed = 0;
+    let result = collect_pattern_pairs(p1, p2, bound, &mut pushed) && body_cmp(env, bound);
+    bound.truncate(bound.len() - pushed);
+    result
+}
+
+/// Structurally compares two patterns, delegating variable correspondence to
+/// `on_var` (receiving the variables' node ids and symbols), which may record
+/// binding pairs or check them against a scope.
+fn patterns_equivalent(
+    p1: &Pattern,
+    p2: &Pattern,
+    on_var: &mut impl FnMut(NodeId, Symbol, NodeId, Symbol) -> bool,
+) -> bool {
+    use Pattern::*;
+    match (p1, p2) {
+        (Var(id1, s1), Var(id2, s2)) => on_var(*id1, *s1, *id2, *s2),
+        (Wildcard(_), Wildcard(_)) => true,
+        (Tuple(_, ps1), Tuple(_, ps2)) => {
+            ps1.len() == ps2.len()
+                && ps1
+                    .iter()
+                    .zip(ps2)
+                    .all(|(q1, q2)| patterns_equivalent(q1, q2, on_var))
+        },
+        (Struct(_, id1, v1, ps1), Struct(_, id2, v2, ps2)) => {
+            id1 == id2
+                && v1 == v2
+                && ps1.len() == ps2.len()
+                && ps1
+                    .iter()
+                    .zip(ps2)
+                    .all(|(q1, q2)| patterns_equivalent(q1, q2, on_var))
+        },
+        (LiteralValue(_, v1), LiteralValue(_, v2)) => v1 == v2,
+        (Range(_, lo1, hi1, incl1), Range(_, lo2, hi2, incl2)) => {
+            lo1 == lo2 && hi1 == hi2 && incl1 == incl2
+        },
+        _ => false,
+    }
+}
+
+/// Structurally compares two binding patterns, pushing corresponding variable
+/// pairs onto the bound stack (`pushed` counts them, for later removal).
+fn collect_pattern_pairs(
+    p1: &Pattern,
+    p2: &Pattern,
+    bound: &mut Vec<(Symbol, Symbol)>,
+    pushed: &mut usize,
+) -> bool {
+    patterns_equivalent(p1, p2, &mut |_, s1, _, s2| {
+        bound.push((s1, s2));
+        *pushed += 1;
+        true
+    })
+}
+
+/// Compares two assignment patterns, whose variables reference existing
+/// bindings rather than introducing fresh ones; free variables get the
+/// same type requirement as free variable occurrences in expressions.
+fn assign_pattern_equivalent(
+    env: &GlobalEnv,
+    p1: &Pattern,
+    p2: &Pattern,
+    bound: &[(Symbol, Symbol)],
+) -> bool {
+    patterns_equivalent(
+        p1,
+        p2,
+        &mut |id1, s1, id2, s2| match match_vars(s1, s2, bound) {
+            VarMatch::Bound => true,
+            VarMatch::Free => var_types_spec_equivalent(env, id1, id2),
+            VarMatch::Mismatch => false,
+        },
+    )
 }
 
 struct ExpRewriter<'a> {
@@ -2683,6 +3167,21 @@ pub enum Operation {
     Global(Option<MemoryLabel>),
     CanModify,
     Old,
+    /// Prover-internal marker (no surface syntax), emitted as an `assume`
+    /// condition in an inline spec block: instructs spec instrumentation to
+    /// snapshot, at this program point, the memories and parameter values
+    /// which conditions anchored at the label reference under `old(..)`.
+    SaveStateAnchor(MemoryLabel),
+    /// Prover-internal wrapper (no surface syntax) around a condition whose
+    /// `old(..)` and pre-state references resolve to the state saved at the
+    /// matching `SaveStateAnchor` marker instead of function entry.
+    WithStateAnchor(MemoryLabel),
+    /// Marks where spec instrumentation snapshots values read through a
+    /// matching `WithStateAnchor`.
+    FoldsCaptureAnchor(MemoryLabel),
+    /// Exact result and abort summary for source derivation of an inline call.
+    /// Args: (result, aborts).
+    InlineCallSummary,
     Trace(TraceKind),
 
     // Spec-level mutation builtins. Two-state predicates carrying MemoryRange.
@@ -3655,17 +4154,21 @@ impl Operation {
             Vector => false,           // Move-related
 
             // Builtin functions (spec only)
-            Len => false,             // Spec
-            TypeValue => false,       // Spec
-            TypeDomain => false,      // Spec
-            ResourceDomain => false,  // Spec
-            Global(..) => false,      // Spec
-            CanModify => false,       // Spec
-            Old => false,             // Spec
-            Trace(..) => false,       // Spec
-            SpecPublish(..) => false, // Spec
-            SpecRemove(..) => false,  // Spec
-            SpecUpdate(..) => false,  // Spec
+            Len => false,                    // Spec
+            TypeValue => false,              // Spec
+            TypeDomain => false,             // Spec
+            ResourceDomain => false,         // Spec
+            Global(..) => false,             // Spec
+            CanModify => false,              // Spec
+            Old => false,                    // Spec
+            SaveStateAnchor(..) => false,    // Spec
+            WithStateAnchor(..) => false,    // Spec
+            FoldsCaptureAnchor(..) => false, // Spec
+            InlineCallSummary => false,      // Spec
+            Trace(..) => false,              // Spec
+            SpecPublish(..) => false,        // Spec
+            SpecRemove(..) => false,         // Spec
+            SpecUpdate(..) => false,         // Spec
 
             EmptyVec => false,     // Spec
             SingleVec => false,    // Spec

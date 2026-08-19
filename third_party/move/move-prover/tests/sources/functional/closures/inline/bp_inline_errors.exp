@@ -1,0 +1,213 @@
+Move prover returns: exiting with compilation errors
+error: cannot resolve `aborts_of` for this lambda argument: add a spec block to the lambda (e.g. `|x| .. spec { aborts_if ..; ensures ..; }`)
+   ┌─ tests/sources/functional/closures/inline/bp_inline_errors.move:8:21
+   │
+ 8 │                 assert !aborts_of<f>(x);
+   │                         ^^^^^^^^^^^^^^^
+   ·
+16 │ ╭           apply(|y| {
+   │ │ ╭───────────────'
+17 │ │ │             let acc = y;
+18 │ │ │             while (acc > 10) {
+19 │ │ │                 acc = acc - 10;
+20 │ │ │             };
+21 │ │ │             acc
+22 │ │ │         }, x) // error: cannot resolve `aborts_of`, lambda needs a spec block
+   │ ╰─│─────────────' from a call inlined at this callsite
+   │   ╰─────────' lambda argument
+
+error: `ensures_of` over a lambda with `&mut` parameters requires the canonical form with explicit post-state arguments
+   ┌─ tests/sources/functional/closures/inline/bp_inline_errors.move:31:20
+   │
+31 │             assert ensures_of<f>(r); // error: requires the canonical form with post-state arguments
+   │                    ^^^^^^^^^^^^^^^^
+   ·
+37 │         modify(|e| *e = *e + 1 spec { ensures e == old(e) + 1; }, &mut v);
+   │         -----------------------------------------------------------------
+   │         │      │
+   │         │      lambda argument
+   │         from a call inlined at this callsite
+
+error: cannot resolve `result_of` for this lambda argument: the attached spec has no `ensures result == E` condition and no result value can be derived from the body; add such an ensures to the spec block, or use `ensures_of` with an explicit result argument
+   ┌─ tests/sources/functional/closures/inline/bp_inline_errors.move:44:25
+   │
+44 │                 assert r == result_of<f>(x);
+   │                             ^^^^^^^^^^^^^^^
+   ·
+54 │ ╭           apply_result(|y| {
+   │ │ ╭──────────────────────'
+55 │ │ │             let acc = y;
+56 │ │ │             while (acc > 10) {
+57 │ │ │                 acc = acc - 10;
+58 │ │ │             };
+59 │ │ │             acc
+60 │ │ │         } spec { ensures result <= 10; }, x) // error: the attached spec has no `ensures result == E` condition and no result value can be derived from the body
+   │ ╰─│────────────────────────────────────────────' from a call inlined at this callsite
+   │   ╰────────────────────────────────────────' lambda argument
+
+error: `result_of` cannot constrain a lambda which writes the captured variable(s) `sum`: the captures' values at an application are not expressible; use `folds_of` in a loop invariant to constrain the cumulative effect
+    ┌─ tests/sources/functional/closures/inline/bp_inline_errors.move:44:25
+    │
+ 44 │                 assert r == result_of<f>(x);
+    │                             ^^^^^^^^^^^^^^^
+    ·
+158 │ ╭           apply_result(|y| {
+    │ │ ╭──────────────────────'
+159 │ │ │             sum = sum + y;
+160 │ │ │             sum
+161 │ │ │         }, x) // error: result_of cannot constrain a capture-writing lambda, use folds_of
+    │ ╰─│─────────────' from a call inlined at this callsite
+    │   ╰─────────' lambda argument
+
+error: the lambda has global state effects, which require a unique application of the function parameter in the inline function body to anchor the predicate's states
+   ┌─ tests/sources/functional/closures/inline/bp_inline_errors.move:71:21
+   │
+71 │                 assert !aborts_of<f>(a); // error: requires a unique application to anchor the predicate's states
+   │                         ^^^^^^^^^^^^^^^
+   ·
+76 │ ╭           apply_state_twice(|x| {
+   │ │ ╭───────────────────────────'
+77 │ │ │             let r = &mut R[x];
+78 │ │ │             r.v = r.v + 1;
+79 │ │ │         }, a);
+   │ ╰─│─────────────' from a call inlined at this callsite
+   │   ╰─────────' lambda argument
+
+error: cannot resolve `requires_of` for this lambda argument: the lambda's body calls `bp_inline_errors::with_requires`, which has a `requires` condition; add a spec block with `requires` to the lambda (e.g. `|x| .. spec { requires ..; }`)
+    ┌─ tests/sources/functional/closures/inline/bp_inline_errors.move:97:20
+    │
+ 97 │             assert requires_of<f>(x); // error: the lambda's body calls a function with a `requires` condition
+    │                    ^^^^^^^^^^^^^^^^^
+    ·
+103 │         apply_requires(|y| with_requires(y), x)
+    │         ---------------------------------------
+    │         │              │
+    │         │              lambda argument
+    │         from a call inlined at this callsite
+
+error: cannot resolve `requires_of` for this lambda argument: the lambda's body applies a function value whose `requires` is not known; add a spec block with `requires` to the lambda (e.g. `|x| .. spec { requires ..; }`)
+    ┌─ tests/sources/functional/closures/inline/bp_inline_errors.move:97:20
+    │
+ 97 │             assert requires_of<f>(x); // error: the lambda's body calls a function with a `requires` condition
+    │                    ^^^^^^^^^^^^^^^^^
+    ·
+111 │         apply_requires(|y| g(y), x) // error: the lambda's body applies a function value whose `requires` is not known
+    │         ---------------------------
+    │         │              │
+    │         │              lambda argument
+    │         from a call inlined at this callsite
+
+error: in the spec of a lambda constrained by a behavioral predicate of an inline function, `old(..)` can only be applied directly to a lambda parameter
+    ┌─ tests/sources/functional/closures/inline/bp_inline_errors.move:126:35
+    │
+117 │               assert ensures_of<f>(x, r);
+    │                      ------------------- the behavioral predicate substituted here
+    ·
+125 │ ╭         apply2(|y| y + c spec {
+126 │ │             ensures result == y + old(c); // error: old(..) must be applied directly to a lambda parameter
+    │ │                                   ^^^^^^
+127 │ │         }, x)
+    │ ╰─────────────' from a call inlined at this callsite
+
+error: `aborts_of` cannot constrain a lambda which writes the captured variable(s) `sum`: the captures' values at an application are not expressible; use `folds_of` in a loop invariant to constrain the cumulative effect
+    ┌─ tests/sources/functional/closures/inline/bp_inline_errors.move:138:42
+    │
+138 │             invariant forall j in 0..i: !aborts_of<f>(v[j]);
+    │                                          ^^^^^^^^^^^^^^^^^^
+    ·
+150 │         each_u64_aborts(v, |y| sum = sum + y); // error: aborts_of cannot constrain a capture-writing lambda, use folds_of
+    │         -------------------------------------
+    │         │                  │
+    │         │                  lambda argument
+    │         from a call inlined at this callsite
+
+warning: the memory footprint of this lambda argument cannot be determined exactly; weakening `unchanged_of` condition; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ tests/sources/functional/closures/inline/bp_inline_errors.move:189:41
+    │
+189 │             invariant forall j in i..n: unchanged_of<f>(v[j]);
+    │                                         ^^^^^^^^^^^^^^^^^^^^^
+    ·
+196 │         each_unchanged(v, |a| bump(a)); // warning: unchanged_of weakened
+    │         ------------------------------
+    │         │                 │
+    │         │                 lambda argument
+    │         from a call inlined at this callsite
+
+warning: the behavior of this lambda argument cannot be determined exactly; weakening loop invariant containing `ensures_of`; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ tests/sources/functional/closures/inline/bp_inline_errors.move:207:41
+    │
+207 │                 invariant forall j in 0..i: ensures_of<f>(v[j]);
+    │                                             ^^^^^^^^^^^^^^^^^^^
+    ·
+214 │ ╭           each_ensures(v, |a| {
+    │ │ ╭─────────────────────────'
+215 │ │ │             let i = 0;
+216 │ │ │             while (i < 1) {
+217 │ │ │                 i = i + 1;
+218 │ │ │             };
+219 │ │ │             let _ = a;
+220 │ │ │         }); // warning: underivable ensures_of loop invariant weakened
+    │ ╰─│──────────' from a call inlined at this callsite
+    │   ╰─────────' lambda argument
+
+warning: cannot derive `ensures_of` exactly for this lambda argument: a lambda with multiple dependent global state effects cannot be constrained in a loop invariant: intermediate memory states are not expressible; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ tests/sources/functional/closures/inline/bp_inline_errors.move:207:41
+    │
+207 │                 invariant forall j in 0..i: ensures_of<f>(v[j]);
+    │                                             ^^^^^^^^^^^^^^^^^^^
+    ·
+226 │ ╭           each_ensures(v, |a| {
+    │ │ ╭─────────────────────────'
+227 │ │ │             let r = &mut R[a];
+228 │ │ │             r.v = r.v + 1;
+229 │ │ │             let t = &mut T[a];
+230 │ │ │             t.w = t.w + 1;
+231 │ │ │         }); // warning: intermediate-state ensures_of invariant weakened
+    │ ╰─│──────────' from a call inlined at this callsite
+    │   ╰─────────' lambda argument
+
+error: a lambda with global state effects cannot be constrained in the body of a spec function
+    ┌─ tests/sources/functional/closures/inline/bp_inline_errors.move:238:9
+    │
+238 │           ensures_of<f>(a)
+    │           ^^^^^^^^^^^^^^^^
+    ·
+249 │           apply_addr(|x| {
+    │ ╭────────────────────'
+250 │ │             let R { v: _ } = move_from<R>(x);
+251 │ │         }, a); // error: a lambda with global state effects cannot be constrained in the body of a spec function
+    │ ╰─────────' lambda argument
+
+error: cannot resolve `result_of` for this lambda argument: add a spec block to the lambda (e.g. `|x| .. spec { aborts_if ..; ensures ..; }`)
+    ┌─ tests/sources/functional/closures/inline/bp_inline_errors.move:266:42
+    │
+266 │                 invariant forall j in 0..i: !result_of<p>(v[j]);
+    │                                              ^^^^^^^^^^^^^^^^^^
+    ·
+279 │ ╭           any(v, |e| {
+    │ │ ╭────────────────'
+280 │ │ │             let i = 0;
+281 │ │ │             while (i < *e) {
+282 │ │ │                 i = i + 1;
+283 │ │ │             };
+284 │ │ │             i == 0
+285 │ │ │         }) // error: cannot resolve `result_of`, lambda needs a spec block
+    │ ╰─│──────────' from a call inlined at this callsite
+    │   ╰─────────' lambda argument
+
+error: cannot resolve `result_of` for this lambda argument: add a spec block to the lambda (e.g. `|x| .. spec { aborts_if ..; ensures ..; }`)
+    ┌─ tests/sources/functional/closures/inline/bp_inline_errors.move:269:56
+    │
+269 │                 assert result <==> (exists j in 0..len(v): result_of<p>(v[j]));
+    │                                                            ^^^^^^^^^^^^^^^^^^
+    ·
+279 │ ╭           any(v, |e| {
+    │ │ ╭────────────────'
+280 │ │ │             let i = 0;
+281 │ │ │             while (i < *e) {
+282 │ │ │                 i = i + 1;
+283 │ │ │             };
+284 │ │ │             i == 0
+285 │ │ │         }) // error: cannot resolve `result_of`, lambda needs a spec block
+    │ ╰─│──────────' from a call inlined at this callsite
+    │   ╰─────────' lambda argument

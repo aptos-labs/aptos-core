@@ -15,7 +15,6 @@ use move_binary_format::file_format::Visibility;
 use move_model::{
     ast::{Exp, ExpData, Operation, Pattern, TempIndex},
     exp_rewriter::ExpRewriterFunctions,
-    metadata::LanguageVersion,
     model::{
         FunId, FunctionEnv, FunctionSize, GlobalEnv, Loc, ModuleEnv, ModuleId, NodeId, Parameter,
         QualifiedId,
@@ -764,13 +763,7 @@ impl CalleeRewriter<'_> {
                     .function_env
                     .env()
                     .new_node(loc.clone(), ty.instantiate(self.type_args));
-                if self
-                    .function_env
-                    .env()
-                    .language_version()
-                    .is_at_least(LanguageVersion::V2_1)
-                    && self.function_env.symbol_pool().string(*sym).as_ref() == "_"
-                {
+                if self.function_env.symbol_pool().string(*sym).as_ref() == "_" {
                     Pattern::Wildcard(id)
                 } else {
                     Pattern::Var(id, *sym)

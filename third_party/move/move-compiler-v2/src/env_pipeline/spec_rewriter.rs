@@ -31,13 +31,14 @@ use move_model::{
         Operation, SpecBlockTarget, SpecFunDecl, VisitorPosition,
     },
     exp_rewriter::ExpRewriterFunctions,
-    metadata::LanguageVersion,
     model::{
-        FunId, FunctionData, GlobalEnv, Loc, ModuleId, NodeId, Parameter, QualifiedId,
+        FunId, FunctionData, FunctionEnv, GlobalEnv, Loc, ModuleId, NodeId, Parameter, QualifiedId,
         QualifiedInstId, SpecFunId, StructEnv, StructId,
     },
+    pureness_checker::{FunctionPurenessChecker, FunctionPurenessCheckerMode},
     symbol::Symbol,
     ty::{ReferenceKind, Type},
+    well_known,
 };
 use petgraph::prelude::DiGraphMap;
 use std::{
@@ -142,13 +143,25 @@ pub fn run_spec_rewriter(env: &mut GlobalEnv) {
     // Derive spec functions for all called Move functions,
     // building a mapping between function ids. Also add
     // those new spec functions to `targets` for subsequent
-    // processing.
+    // processing. A companion derived by the pre-inlining stage
+    // (`run_pure_fun_companion_derivation`) is reused — its body is already
+    // converted, so it is not added to the conversion targets.
     let mut function_mapping = BTreeMap::new();
     for fun_id in called_funs {
-        let spec_fun_id = derive_spec_fun(env, fun_id, false);
+        let existing = env
+            .get_function(fun_id)
+            .find_spec_fun()
+            .map(|(id, _)| fun_id.module_id.qualified(id));
+        let spec_fun_id = match existing {
+            Some(id) => id,
+            None => {
+                let id = derive_spec_fun(env, fun_id, false);
+                // Add new spec fun to targets for later processing
+                targets.entry(RewriteTarget::SpecFun(id));
+                id
+            },
+        };
         function_mapping.insert(fun_id, spec_fun_id);
-        // Add new spec fun to targets for later processing
-        targets.entry(RewriteTarget::SpecFun(spec_fun_id));
         // Mark spec fun to be used in environment
         env.add_used_spec_fun(spec_fun_id)
     }
@@ -411,6 +424,242 @@ pub fn run_spec_rewriter_inline(
     }
     targets.write_to_env(env);
     function_data_mapping
+}
+
+// -------------------------------------------------------------------------------------------
+// Pre-Inlining Companion Derivation for Pure Functions
+
+/// Entry point for the pre-inlining companion-derivation stage (verify mode
+/// only, registered before the inliner): derives `$fun` companion spec
+/// functions for *hereditarily pure* Move functions, so the source-level
+/// specification derivation for lambda bodies
+/// (`move_model::spec_derivation`) can resolve calls to such functions as
+/// direct spec-function calls (`try_as_pure_spec_call`) while inline
+/// functions are expanded — instead of routing them through generic
+/// behavioral summaries, which clear the exact modifies footprint and
+/// introduce state labels. Without this stage, companions exist only after
+/// [`run_spec_rewriter`], which runs after inlining.
+///
+/// A function qualifies when it mirrors the criteria of
+/// `try_as_pure_spec_call` and the pure-function derivation in
+/// [`run_spec_rewriter`]: not inline/native/lemma, has a body, takes no
+/// `&mut` and no function-typed parameters, is pure in specification mode
+/// (`FunctionPurenessChecker`), and its body — outside of spec blocks,
+/// which the conversion drops — is free of global-memory operations and of
+/// function values; and every function it (transitively) calls qualifies
+/// likewise. Callees must qualify so the companion bodies can be fully
+/// converted here (in particular, no call may reach an inline function,
+/// whose expansion would change the body after this stage). Native callees
+/// are permitted only for the `std::vector` bytecode-instruction set and
+/// `std::signer::borrow_address`, whose `$`-spec versions the Boogie
+/// prelude defines.
+///
+/// The derived companions are *not* marked used here: the consumers mark a
+/// companion transitively used when they create a reference to it
+/// (`GlobalEnv::add_used_spec_fun_transitive`), so unused companions are
+/// not emitted by the backend. [`run_spec_rewriter`] later reuses these
+/// companions instead of deriving duplicates.
+pub fn run_pure_fun_companion_derivation(env: &mut GlobalEnv) {
+    if !env.is_verify_mode() {
+        return;
+    }
+    debug!("deriving companion spec functions for pure functions");
+
+    // Phase 1: per-function local qualification and call edges.
+    let all_funs = env
+        .get_modules()
+        .flat_map(|module| {
+            module
+                .get_functions()
+                .map(|fun| fun.get_qualified_id())
+                .collect_vec()
+        })
+        .collect_vec();
+    let mut locals: BTreeMap<QualifiedId<FunId>, CompanionLocalInfo> = BTreeMap::new();
+    for qid in all_funs {
+        let mut info = companion_local_qualification(env, &env.get_function(qid));
+        if info.ok {
+            // The definitive convertibility test: dry-run the spec
+            // conversion and reject bodies it judges imperative (e.g.
+            // loops, or statement sequences it cannot reduce) — such a
+            // companion could not serve as a pure spec call. The inline
+            // variant leaves Move function calls in place, so no callee
+            // mapping is needed.
+            let def = env
+                .get_function(qid)
+                .get_def()
+                .expect("definition exists for locally qualified function")
+                .clone();
+            let empty_mapping = BTreeMap::new();
+            let mut converter = SpecConverter::new_for_inline(env, &empty_mapping, true);
+            converter.rewrite_exp(def);
+            if converter.contains_imperative_expression {
+                info.ok = false;
+            }
+        }
+        locals.insert(qid, info);
+    }
+
+    // Phase 2: greatest fixpoint over the call edges — a function stays
+    // qualified only while all its callees are qualified or companion-safe
+    // natives (recursion cycles among qualified functions stay in).
+    let mut qualified: BTreeSet<QualifiedId<FunId>> = locals
+        .iter()
+        .filter(|(_, info)| info.ok)
+        .map(|(qid, _)| *qid)
+        .collect();
+    loop {
+        let to_remove = qualified
+            .iter()
+            .filter(|qid| {
+                !locals[*qid].callees.iter().all(|callee| {
+                    qualified.contains(callee)
+                        || is_companion_safe_native(&env.get_function(*callee))
+                })
+            })
+            .copied()
+            .collect_vec();
+        if to_remove.is_empty() {
+            break;
+        }
+        for qid in to_remove {
+            qualified.remove(&qid);
+        }
+    }
+
+    // The members needing companions: the qualified functions plus the
+    // companion-safe natives they reference.
+    let mut members = qualified.clone();
+    for qid in &qualified {
+        for callee in &locals[qid].callees {
+            if !qualified.contains(callee) {
+                members.insert(*callee);
+            }
+        }
+    }
+
+    // Phase 3: derive the companions and convert their bodies. All callees
+    // of a member are members, so the mapping is closed and the conversion
+    // cannot encounter an unmapped call.
+    let mut function_mapping = BTreeMap::new();
+    for qid in &members {
+        debug_assert!(
+            env.get_function(*qid).find_spec_fun().is_none(),
+            "companion derived twice"
+        );
+        let spec_fun_id = derive_spec_fun(env, *qid, false);
+        function_mapping.insert(*qid, spec_fun_id);
+    }
+    for spec_fun_id in function_mapping.values() {
+        let decl = env.get_spec_fun(*spec_fun_id);
+        if decl.is_native {
+            continue;
+        }
+        let body = decl.body.clone().expect("companion body");
+        let params = decl
+            .params
+            .iter()
+            .map(|Parameter(name, ..)| *name)
+            .collect_vec();
+        let mut converter =
+            SpecConverter::new(env, &function_mapping, true).symbolized_parameters(params);
+        let new_body = converter.rewrite_exp(body);
+        if converter.contains_imperative_expression {
+            // Defensive: qualification excludes imperative bodies; should
+            // this trigger nevertheless, the companion is unusable as a
+            // spec call (`try_as_pure_spec_call` rejects bodiless
+            // non-native companions).
+            let decl = env.get_spec_fun_mut(*spec_fun_id);
+            decl.uninterpreted = true;
+            decl.body = None;
+        } else {
+            env.get_spec_fun_mut(*spec_fun_id).body = Some(new_body);
+        }
+    }
+}
+
+/// The local (per-function) companion qualification result; see
+/// [`companion_local_qualification`].
+struct CompanionLocalInfo {
+    ok: bool,
+    callees: BTreeSet<QualifiedId<FunId>>,
+}
+
+/// The per-function part of the companion qualification: signature
+/// criteria, specification-mode pureness, and the body scan (memory
+/// operations, function values), collecting the called functions for the
+/// closure fixpoint. Content of spec blocks is included: although the
+/// conversion reduces the blocks themselves to unit, it still rewrites
+/// Move function calls within them, so they participate in the mapping
+/// closure (and memory operations there disqualify conservatively).
+fn companion_local_qualification(env: &GlobalEnv, fun: &FunctionEnv) -> CompanionLocalInfo {
+    let not_ok = || CompanionLocalInfo {
+        ok: false,
+        callees: BTreeSet::new(),
+    };
+    if fun.is_inline() || fun.is_native() || fun.is_lemma() {
+        return not_ok();
+    }
+    let Some(def) = fun.get_def() else {
+        return not_ok();
+    };
+    if fun.get_parameters().iter().any(|Parameter(_, ty, _)| {
+        ty.is_mutable_reference() || matches!(ty.skip_reference(), Type::Fun(..))
+    }) {
+        return not_ok();
+    }
+    // Specification-mode pureness, mirroring `try_as_pure_spec_call`. The
+    // checker recurses into callees itself.
+    let mut is_pure = true;
+    let mut checker =
+        FunctionPurenessChecker::new(FunctionPurenessCheckerMode::Specification, |_, _, _| {
+            is_pure = false;
+        });
+    checker.check_exp(env, def);
+    if !is_pure {
+        return not_ok();
+    }
+    // Scan the body (including spec blocks) for memory operations and
+    // function values, collecting call edges.
+    let mut ok = true;
+    let mut callees = BTreeSet::new();
+    def.visit_pre_order(&mut |e| {
+        match e {
+            ExpData::Lambda(..) | ExpData::Invoke(..) => ok = false,
+            ExpData::Call(_, oper, _) => match oper {
+                Operation::Global(_)
+                | Operation::Exists(_)
+                | Operation::BorrowGlobal(_)
+                | Operation::MoveTo
+                | Operation::MoveFrom
+                | Operation::SpecPublish(_)
+                | Operation::SpecRemove(_)
+                | Operation::SpecUpdate(_)
+                | Operation::Closure(..) => ok = false,
+                Operation::MoveFunction(mid, fid) => {
+                    callees.insert(mid.qualified(*fid));
+                },
+                _ => {},
+            },
+            _ => {},
+        }
+        ok
+    });
+    CompanionLocalInfo { ok, callees }
+}
+
+/// Whether the given native function may appear as a callee of a
+/// companion-derived pure function: its `$`-spec version is defined in the
+/// Boogie prelude (`native.bpl` for the `std::vector` bytecode-instruction
+/// natives, `prelude.bpl` for `$1_signer_$borrow_address`).
+fn is_companion_safe_native(fun: &FunctionEnv) -> bool {
+    if !fun.is_native() {
+        return false;
+    }
+    let name = fun.get_name_str();
+    (fun.module_env.is_std_vector()
+        && well_known::VECTOR_FUNCS_WITH_BYTECODE_INSTRS.contains(&name.as_str()))
+        || (fun.module_env.is_module_in_std("signer") && name == "borrow_address")
 }
 
 // -------------------------------------------------------------------------------------------
@@ -1107,12 +1356,7 @@ impl ExpRewriterFunctions for SpecConverter<'_> {
                 result
             } else {
                 let exp = self.rewrite_exp_descent(exp);
-                if self
-                    .env
-                    .language_version()
-                    .is_at_least(LanguageVersion::V2_2)
-                    && !self.for_inline
-                {
+                if !self.for_inline {
                     if let ExpData::Invoke(id, call, args) = exp.as_ref() {
                         if let ExpData::Call(_, Closure(mid, fid, mask), captured) = call.as_ref() {
                             let mut new_args = vec![];

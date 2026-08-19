@@ -2746,6 +2746,31 @@ impl<'a> ExpSourcifier<'a> {
             }),
 
             // Spec-only operations
+            Operation::SaveStateAnchor(label) => {
+                emit!(self.wr(), "save_state_anchor!(");
+                self.print_memory_label(label);
+                emit!(self.wr(), ")");
+                let _ = args;
+            },
+            Operation::FoldsCaptureAnchor(label) => {
+                emit!(self.wr(), "folds_capture_anchor!(");
+                self.print_memory_label(label);
+                emit!(self.wr(), ")");
+            },
+            Operation::InlineCallSummary => {
+                emit!(self.wr(), "inline_call_summary!(");
+                self.print_exp(Prio::General, false, &args[0]);
+                emit!(self.wr(), ", ");
+                self.print_exp(Prio::General, false, &args[1]);
+                emit!(self.wr(), ")");
+            },
+            Operation::WithStateAnchor(label) => {
+                emit!(self.wr(), "with_state_anchor!(");
+                self.print_memory_label(label);
+                emit!(self.wr(), ", ");
+                self.print_exp(Prio::General, false, &args[0]);
+                emit!(self.wr(), ")");
+            },
             Operation::Old => self.parenthesize(context_prio, Prio::Postfix, || {
                 emit!(self.wr(), "old(");
                 self.print_exp(Prio::General, false, &args[0]);
@@ -2838,11 +2863,11 @@ impl<'a> ExpSourcifier<'a> {
                 }
             }),
             Operation::Slice => self.parenthesize(context_prio, Prio::Postfix, || {
+                // Canonical form: `Slice(v, Range(from, to))`; the range
+                // argument prints as `from..to`.
                 self.print_exp(Prio::Postfix, false, &args[0]);
                 emit!(self.wr(), "[");
                 self.print_exp(Prio::General, false, &args[1]);
-                emit!(self.wr(), "..");
-                self.print_exp(Prio::General, false, &args[2]);
                 emit!(self.wr(), "]")
             }),
             Operation::Len => self.parenthesize(context_prio, Prio::Postfix, || {
@@ -3032,8 +3057,9 @@ impl<'a> ExpSourcifier<'a> {
                     })
                 };
                 if has_labels {
-                    // aborts_of/requires_of only take a pre-state (single state form),
-                    // ensures_of/result_of/write_of can have pre..post ranges.
+                    // aborts_of/requires_of only take a pre-state (single state form);
+                    // ensures_of/result_of/write_of can have pre..post ranges, and
+                    // unchanged_of/folds_of a pre-only range (`S.. |~`).
                     let is_single_state = matches!(
                         kind,
                         crate::ast::BehaviorKind::AbortsOf | crate::ast::BehaviorKind::RequiresOf

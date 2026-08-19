@@ -317,7 +317,36 @@ impl<'a, V> Vector<'a, V> {
         self.len() == 0
     }
 
+    /// Reinterprets the element type of a vector.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure the object's actual element layout matches
+    /// the target layout.
+    #[inline]
+    pub(crate) unsafe fn transmute_unchecked<U>(self) -> Vector<'a, U> {
+        Vector::from_handle(self.handle)
+    }
+
     // TODO(completeness): Other vector APIs, added on-demand.
+}
+
+impl<'a, V> Vector<'a, Vector<'a, V>> {
+    /// Returns element `i` of a `vector<vector<V>>` -- the inner `vector<V>` --
+    /// as a handle rooted for the rest of the native call.
+    ///
+    /// Each element of a nested vector is an 8-byte heap pointer to the inner
+    /// vector object, so this reads that pointer and roots it, mirroring
+    /// [`Ref::borrow`]. The caller must ensure `i < len()`.
+    #[inline]
+    pub fn get(&self, i: u64) -> Vector<'a, V> {
+        // SAFETY: element `i` (within bounds) of a `vector<vector<V>>` is an
+        // 8-byte heap pointer to the inner vector object.
+        let inner_ptr = unsafe { read_ptr(self.ptr(), VEC_DATA_OFFSET + i as usize * 8) };
+        // Root the inner vector so it survives GC for the rest of the call,
+        // even if the outer slot is later overwritten.
+        Vector::from_handle(unsafe { self.handle.pool().root_object(inner_ptr) })
+    }
 }
 
 impl Vector<'_, u8> {
@@ -439,5 +468,54 @@ mod tests {
             unsafe { read_fat_ptr(frame.as_ptr(), 16usize) },
             (base, offset)
         );
+    }
+
+    /// Lays out a `vector<u8>` heap object -- `[len: u64][bytes...]` -- in an
+    /// 8-byte-aligned buffer. The object's data pointer is the buffer's start:
+    /// the length is at `VEC_LENGTH_OFFSET`, the bytes at `VEC_DATA_OFFSET`.
+    fn byte_vec_object_for_test(bytes: &[u8]) -> Vec<u64> {
+        let mut buf = vec![0u64; 1 + bytes.len().div_ceil(8)];
+        buf[0] = bytes.len() as u64;
+        // SAFETY: `buf` has room for `bytes.len()` bytes after the length word.
+        let data = unsafe {
+            std::slice::from_raw_parts_mut(buf.as_mut_ptr().add(1) as *mut u8, bytes.len())
+        };
+        data.copy_from_slice(bytes);
+        buf
+    }
+
+    /// `Vector::<Vector<u8>>::get` reads each inner byte vector back by value,
+    /// including an empty inner vector.
+    #[test]
+    fn nested_byte_vector_get_reads_elements() {
+        let pool = RootPool::new();
+
+        // Three inner byte vectors, kept alive for the reads below.
+        let inners = [
+            byte_vec_object_for_test(b"hello"),
+            byte_vec_object_for_test(b""),
+            byte_vec_object_for_test(b"world!!"),
+        ];
+
+        // Outer object: `[len: u64][inner_ptr0][inner_ptr1][inner_ptr2]`.
+        let mut outer = vec![0u64; 1 + inners.len()];
+        outer[0] = inners.len() as u64;
+        for (i, inner) in inners.iter().enumerate() {
+            outer[1 + i] = inner.as_ptr() as u64;
+        }
+
+        // SAFETY: `outer` is a valid `vector<vector<u8>>` object and the inner
+        // buffers outlive the reads.
+        let vec: Vector<Vector<u8>> =
+            Vector::from_handle(unsafe { pool.root_object(outer.as_ptr() as *mut u8) });
+
+        assert_eq!(vec.len(), 3);
+        // Bind each inner handle so its bytes outlive the borrow.
+        let e0 = vec.get(0);
+        let e1 = vec.get(1);
+        let e2 = vec.get(2);
+        assert_eq!(unsafe { e0.as_bytes() }, b"hello");
+        assert_eq!(unsafe { e1.as_bytes() }, b"");
+        assert_eq!(unsafe { e2.as_bytes() }, b"world!!");
     }
 }

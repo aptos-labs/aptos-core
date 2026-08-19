@@ -3,43 +3,27 @@
 
 use crate::transaction_validation::APTOS_TRANSACTION_VALIDATION;
 use aptos_logger::{enabled, Level};
-use aptos_types::transaction::TransactionStatus;
+use aptos_types::{
+    error::{
+        split_canonical, INVALID_ARGUMENT, INVALID_STATE, NOT_FOUND, OUT_OF_RANGE,
+        PERMISSION_DENIED,
+    },
+    transaction::{
+        validation::{
+            EACCOUNT_DOES_NOT_EXIST, EBAD_ACCOUNT_AUTHENTICATION_KEY, EBAD_CHAIN_ID,
+            ECANT_PAY_GAS_DEPOSIT, EGAS_PAYER_ACCOUNT_MISSING,
+            EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT, ENONCE_ALREADY_USED,
+            ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH, ESEQUENCE_NUMBER_TOO_BIG,
+            ESEQUENCE_NUMBER_TOO_NEW, ESEQUENCE_NUMBER_TOO_OLD,
+            ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE, ETRANSACTION_EXPIRED,
+        },
+        TransactionStatus,
+    },
+};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::output::VMOutput;
 use move_binary_format::errors::VMError;
 use move_core_types::vm_status::{StatusCode, VMStatus};
-
-/// Error codes that can be emitted by the prologue. These have special significance to the VM when
-/// they are raised during the prologue.
-/// These errors are only expected from the module that is registered as the account module for the system.
-/// The prologue should not emit any other error codes or fail for any reason, doing so will result
-/// in the VM throwing an invariant violation
-// Auth key in transaction is invalid.
-pub const EBAD_ACCOUNT_AUTHENTICATION_KEY: u64 = 1001;
-// Transaction sequence number is too old.
-pub const ESEQUENCE_NUMBER_TOO_OLD: u64 = 1002;
-// Transaction sequence number is too new.
-pub const ESEQUENCE_NUMBER_TOO_NEW: u64 = 1003;
-// Transaction sender's account does not exist.
-pub const EACCOUNT_DOES_NOT_EXIST: u64 = 1004;
-// Insufficient balance (to pay for gas deposit).
-pub const ECANT_PAY_GAS_DEPOSIT: u64 = 1005;
-// Transaction expiration time exceeds block time.
-pub const ETRANSACTION_EXPIRED: u64 = 1006;
-// chain_id in transaction doesn't match the one on-chain.
-pub const EBAD_CHAIN_ID: u64 = 1007;
-// Transaction sequence number exceeds u64 max.
-pub const ESEQUENCE_NUMBER_TOO_BIG: u64 = 1008;
-// Counts of secondary keys and addresses don't match.
-pub const ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1009;
-// Gas payer account missing in gas payer tx
-pub const EGAS_PAYER_ACCOUNT_MISSING: u64 = 1010;
-// Insufficient balance to cover the required deposit.
-pub const EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT: u64 = 1011;
-// Nonce is already in the nonce history
-pub const ENONCE_ALREADY_USED: u64 = 1012;
-// Transaction expiration time is too far in the future.
-pub const ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE: u64 = 1013;
 
 // Specified account is not a multisig account.
 const EACCOUNT_NOT_MULTISIG: u64 = 2002;
@@ -73,18 +57,6 @@ const EMULTIPLIER_NOT_AVAILABLE: u64 = 8;
 // Stake pool is not in the current-epoch validator set.
 const EPOOL_NOT_IN_VALIDATOR_SET: u64 = 9;
 
-const INVALID_ARGUMENT: u8 = 0x1;
-const LIMIT_EXCEEDED: u8 = 0x2;
-const INVALID_STATE: u8 = 0x3;
-const PERMISSION_DENIED: u8 = 0x5;
-const NOT_FOUND: u8 = 0x6;
-
-fn error_split(code: u64) -> (u8, u64) {
-    let reason = code & 0xFFFF;
-    let category = ((code >> 16) & 0xFF) as u8;
-    (category, reason)
-}
-
 /// Converts particular Move abort codes to specific validation error codes for the prologue
 /// Any non-abort non-execution code is considered an invariant violation, specifically
 /// `UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION`
@@ -100,7 +72,7 @@ pub fn convert_prologue_error(
             code,
             message,
         } if APTOS_TRANSACTION_VALIDATION.is_transaction_limits_module_abort(&location) => {
-            let new_major_status = match error_split(code) {
+            let new_major_status = match split_canonical(code) {
                 (PERMISSION_DENIED, ENOT_STAKE_POOL_OWNER) => StatusCode::NOT_STAKE_POOL_OWNER,
                 (PERMISSION_DENIED, ENOT_DELEGATED_VOTER) => StatusCode::NOT_DELEGATED_VOTER,
                 (PERMISSION_DENIED, EINSUFFICIENT_STAKE) => StatusCode::INSUFFICIENT_STAKE,
@@ -138,7 +110,7 @@ pub fn convert_prologue_error(
             code,
             message,
         } if !APTOS_TRANSACTION_VALIDATION.is_account_module_abort(&location) => {
-            let new_major_status = match error_split(code) {
+            let new_major_status = match split_canonical(code) {
                 // TODO: Update these after adding the appropriate error codes into StatusCode
                 // in the Move repo.
                 (INVALID_STATE, EACCOUNT_NOT_MULTISIG) => StatusCode::ACCOUNT_NOT_MULTISIG,
@@ -178,7 +150,7 @@ pub fn convert_prologue_error(
             code,
             message,
         } => {
-            let new_major_status = match error_split(code) {
+            let new_major_status = match split_canonical(code) {
                 // Invalid authentication key
                 (INVALID_ARGUMENT, EBAD_ACCOUNT_AUTHENTICATION_KEY) => StatusCode::INVALID_AUTH_KEY,
                 // Sequence number too old
@@ -196,7 +168,7 @@ pub fn convert_prologue_error(
                 (INVALID_ARGUMENT, ETRANSACTION_EXPIRED) => StatusCode::TRANSACTION_EXPIRED,
                 (INVALID_ARGUMENT, EBAD_CHAIN_ID) => StatusCode::BAD_CHAIN_ID,
                 // Sequence number will overflow
-                (LIMIT_EXCEEDED, ESEQUENCE_NUMBER_TOO_BIG) => StatusCode::SEQUENCE_NUMBER_TOO_BIG,
+                (OUT_OF_RANGE, ESEQUENCE_NUMBER_TOO_BIG) => StatusCode::SEQUENCE_NUMBER_TOO_BIG,
                 (INVALID_ARGUMENT, ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH) => {
                     StatusCode::SECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH
                 },
@@ -263,7 +235,7 @@ pub fn convert_epilogue_error(
             code,
             message,
         } if !APTOS_TRANSACTION_VALIDATION.is_account_module_abort(&location) => {
-            let (category, reason) = error_split(code);
+            let (category, reason) = split_canonical(code);
             let mut err_msg = format!(
                 "[aptos_vm] Unexpected success epilogue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
                 location, code, category, reason
@@ -283,8 +255,8 @@ pub fn convert_epilogue_error(
             location,
             code,
             message,
-        } => match error_split(code) {
-            (LIMIT_EXCEEDED, ECANT_PAY_GAS_DEPOSIT) => VMStatus::MoveAbort {
+        } => match split_canonical(code) {
+            (OUT_OF_RANGE, ECANT_PAY_GAS_DEPOSIT) => VMStatus::MoveAbort {
                 location,
                 code,
                 message,

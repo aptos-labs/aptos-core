@@ -1,0 +1,14 @@
+Move prover returns: exiting with compilation errors
+error: cannot resolve `unchanged_of` for this lambda argument: add a spec block to the lambda (e.g. `|x| .. spec { aborts_if ..; ensures ..; }`)
+   ┌─ tests/sources/functional/closures/inline/unchanged_of_underivable.move:5:20
+   │
+ 5 │                 assert unchanged_of<f>(x);
+   │                        ^^^^^^^^^^^^^^^^^^
+   ·
+10 │ ╭           apply(|x| {
+   │ │ ╭───────────────'
+11 │ │ │             let i = x;
+12 │ │ │             while (i > 0) i = i - 1;
+13 │ │ │         }, 1);
+   │ ╰─│─────────────' from a call inlined at this callsite
+   │   ╰─────────' lambda argument

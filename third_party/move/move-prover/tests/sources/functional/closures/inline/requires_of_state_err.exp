@@ -1,0 +1,6 @@
+Move prover returns: exiting with compilation errors
+error: unable to infer instantiation of type `_` (consider providing type arguments or annotating the type)
+   ┌─ tests/sources/functional/closures/inline/requires_of_state_err.move:66:34
+   │
+66 │         let (g, _) = (|y| f(y), |y| y);
+   │                                  ^

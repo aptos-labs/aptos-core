@@ -434,7 +434,15 @@ module aptos_std::smart_table {
         f: |&V1|V2
     ): SmartTable<K, V2> {
         let new_table = new<K, V2>();
-        self.for_each_ref(|key, value| new_table.add(*key, f(value)));
+        // `for_each_ref` is not supported in verification since capture
+        // updates cannot depend on a forwarded HOF (TODO(#20383)).
+        for (i in 0..self.num_buckets()) {
+            let bucket = self.borrow_buckets().borrow(i);
+            for (j in 0..bucket.length()) {
+                let (key, value) = bucket.borrow(j).borrow_kv();
+                new_table.add(*key, f(value));
+            };
+        };
         new_table
     }
 

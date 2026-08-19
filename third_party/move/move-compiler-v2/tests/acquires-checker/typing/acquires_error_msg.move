@@ -3,8 +3,13 @@ module 0x42::test {
         value: u64
     }
 
-    public fun call_modify_without_acquire() {
-        modify(); // expect error message here
+    struct Other has key {
+        value: u64
+    }
+
+    public fun call_modify_without_acquire() acquires Other {
+        borrow_global<Other>(@0xcafe);
+        modify(); // expect error message here: `Test` acquired via this call
     }
 
     public fun modify() acquires Test {
