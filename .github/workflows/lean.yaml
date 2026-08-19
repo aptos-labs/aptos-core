@@ -50,11 +50,19 @@ jobs:
       - name: Build the frontend CLI
         run: cargo build --locked -p aptos --bin aptos
 
-      - name: Build Lean core, examples, and tests
+      - name: Build Lean core and examples
         working-directory: third_party/move/lean
         env:
           APTOS_CLI: ${{ github.workspace }}/target/debug/aptos
         run: |
           source "$HOME/.profile"
           lake build MoveModel
-          lake build Examples Tests
+          lake build Examples
+
+      - name: Run Lean tests
+        working-directory: third_party/move/lean
+        env:
+          APTOS_CLI: ${{ github.workspace }}/target/debug/aptos
+        run: |
+          source "$HOME/.profile"
+          lake test
