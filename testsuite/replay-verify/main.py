@@ -52,6 +52,10 @@ PVC_TTL_SECS = 8 * 60 * 60
 # gain — it just adds Pending pods that brush against the per-pod timeout.
 MAX_WORKERS_PER_PVC = 10
 MAX_LOG_TRANSPORT_TRANSACTIONS = 10_000
+# Worker reports are independently bounded; the merge must also cap its aggregate maps so the
+# scheduler's memory and generated artifacts do not grow with the shard count.
+MAX_MERGED_USAGE_DETAIL_ROWS = 100_000
+MAX_MERGED_ACTIVE_ENTRY_FUNCTION_CALLER_ROWS = 25_000
 REPORT_BEGIN_MARKER = "<<<FRAMEWORK_USAGE_REPORT_BEGIN>>>"
 REPORT_END_MARKER = "<<<FRAMEWORK_USAGE_REPORT_END>>>"
 
@@ -1490,38 +1494,55 @@ def print_logs(failed_workpod_logs: list[str], txn_mismatch_logs: list[str]) -> 
             logger.info(log)
 
 
-def _merge_usage_rows(
-    reports: list[dict], field: str, invocation_count_field: str = "invocation_count"
-) -> list[dict]:
+def merge_usage_rows(
+    aggregate_rows: dict[str, dict],
+    rows: list[dict],
+    invocation_count_field: str = "invocation_count",
+    max_rows: Optional[int] = None,
+) -> tuple[int, int]:
     count_fields = {
         invocation_count_field,
         "transaction_count",
         "first_version",
         "last_version",
     }
-    merged: dict[str, dict] = {}
-    for report in reports:
-        for row in report[field]:
-            key = {name: value for name, value in row.items() if name not in count_fields}
-            encoded_key = json.dumps(key, sort_keys=True, separators=(",", ":"))
-            if encoded_key not in merged:
-                merged[encoded_key] = {
-                    **key,
-                    invocation_count_field: 0,
-                    "transaction_count": 0,
-                    "first_version": row["first_version"],
-                    "last_version": row["last_version"],
-                }
-            aggregate = merged[encoded_key]
-            aggregate[invocation_count_field] += row[invocation_count_field]
-            aggregate["transaction_count"] += row["transaction_count"]
-            aggregate["first_version"] = min(
-                aggregate["first_version"], row["first_version"]
-            )
-            aggregate["last_version"] = max(
-                aggregate["last_version"], row["last_version"]
-            )
-    return [merged[key] for key in sorted(merged)]
+    dropped_invocation_count = 0
+    dropped_transaction_count = 0
+    for row in rows:
+        key = {name: value for name, value in row.items() if name not in count_fields}
+        encoded_key = json.dumps(key, sort_keys=True, separators=(",", ":"))
+        if encoded_key not in aggregate_rows:
+            if max_rows is not None and len(aggregate_rows) >= max_rows:
+                dropped_invocation_count += row[invocation_count_field]
+                dropped_transaction_count += row["transaction_count"]
+                continue
+            aggregate_rows[encoded_key] = {
+                **key,
+                invocation_count_field: 0,
+                "transaction_count": 0,
+                "first_version": row["first_version"],
+                "last_version": row["last_version"],
+            }
+        aggregate = aggregate_rows[encoded_key]
+        aggregate[invocation_count_field] += row[invocation_count_field]
+        aggregate["transaction_count"] += row["transaction_count"]
+        aggregate["first_version"] = min(
+            aggregate["first_version"], row["first_version"]
+        )
+        aggregate["last_version"] = max(
+            aggregate["last_version"], row["last_version"]
+        )
+    return dropped_invocation_count, dropped_transaction_count
+
+
+def shard_start_version(source: str) -> int:
+    file_name = os.path.basename(source)
+    try:
+        return int(file_name.removesuffix(".json").split("-", maxsplit=1)[0])
+    except ValueError as error:
+        raise RuntimeError(
+            f"framework usage shard has an invalid name: {source}"
+        ) from error
 
 
 def read_framework_usage_html_template() -> str:
@@ -1564,45 +1585,70 @@ def merge_framework_usage_reports(
 ) -> None:
     if bucket_name:
         storage_client = storage.Client()
-        blobs = list(storage_client.list_blobs(bucket_name, prefix=f"{prefix}/shards/"))
-        reports = [json.loads(blob.download_as_text()) for blob in blobs]
+        sources = sorted(
+            storage_client.list_blobs(bucket_name, prefix=f"{prefix}/shards/"),
+            key=lambda blob: shard_start_version(blob.name),
+        )
         source = f"gs://{bucket_name}/{prefix}/shards/"
     else:
         shard_dir = os.path.join(output_dir, "shards")
-        shard_paths = sorted(
-            os.path.join(shard_dir, name)
-            for name in os.listdir(shard_dir)
-            if name.endswith(".json")
+        sources = sorted(
+            (
+                os.path.join(shard_dir, name)
+                for name in os.listdir(shard_dir)
+                if name.endswith(".json")
+            ),
+            key=shard_start_version,
         )
-        reports = []
-        for shard_path in shard_paths:
-            with open(shard_path) as shard_file:
-                reports.append(json.load(shard_file))
         source = shard_dir
-    if len(reports) != expected_shards:
+    if len(sources) != expected_shards:
         raise RuntimeError(
             f"expected {expected_shards} framework usage shards, found "
-            f"{len(reports)} under {source}"
+            f"{len(sources)} under {source}"
         )
-    if not reports:
+    if not sources:
         raise RuntimeError("no framework usage reports were produced")
-
-    reference = reports[0]
-    for report in reports[1:]:
-        for field in (
-            "schema_version",
-            "git_sha",
-            "target_modules",
-            "functions",
-            "usage_detail_row_limit",
-            "active_entry_function_caller_row_limit",
-        ):
-            if report[field] != reference[field]:
-                raise RuntimeError(f"framework usage shard metadata differs for {field}")
 
     cursor = expected_start
     previous_end_timestamp = None
-    for report in sorted(reports, key=lambda item: item["start_version"]):
+    reference = None
+    start_timestamp_usecs = None
+    end_timestamp_usecs = None
+    processed_transaction_count = 0
+    transaction_usage_records = 0
+    usage_detail_truncated = False
+    dropped_usage_invocation_count = 0
+    dropped_usage_transaction_count = 0
+    active_entry_function_callers_truncated = False
+    dropped_active_entry_function_framework_invocation_count = 0
+    dropped_active_entry_function_transaction_count = 0
+    function_usage: dict[str, dict] = {}
+    usage: dict[str, dict] = {}
+    active_entry_function_callers: dict[str, dict] = {}
+    for shard_source in sources:
+        if bucket_name:
+            report = json.loads(shard_source.download_as_text())
+        else:
+            with open(shard_source) as shard_file:
+                report = json.load(shard_file)
+
+        if reference is None:
+            reference = report
+            start_timestamp_usecs = report["start_timestamp_usecs"]
+        else:
+            for field in (
+                "schema_version",
+                "git_sha",
+                "target_modules",
+                "functions",
+                "usage_detail_row_limit",
+                "active_entry_function_caller_row_limit",
+            ):
+                if report[field] != reference[field]:
+                    raise RuntimeError(
+                        f"framework usage shard metadata differs for {field}"
+                    )
+
         if report["start_version"] != cursor:
             raise RuntimeError(
                 f"framework usage range is incomplete or overlapping at version {cursor}"
@@ -1617,62 +1663,88 @@ def merge_framework_usage_reports(
         ):
             raise RuntimeError("framework usage shard timestamps are out of order")
         previous_end_timestamp = report["end_timestamp_usecs"]
+        end_timestamp_usecs = report["end_timestamp_usecs"]
         cursor = report["end_version"] + 1
+        processed_transaction_count += report["processed_transaction_count"]
+        transaction_usage_records += report["transaction_usage_records"]
+        usage_detail_truncated |= report["usage_detail_truncated"]
+        dropped_usage_invocation_count += report["dropped_usage_invocation_count"]
+        dropped_usage_transaction_count += report["dropped_usage_transaction_count"]
+        active_entry_function_callers_truncated |= report[
+            "active_entry_function_callers_truncated"
+        ]
+        dropped_active_entry_function_framework_invocation_count += report[
+            "dropped_active_entry_function_framework_invocation_count"
+        ]
+        dropped_active_entry_function_transaction_count += report[
+            "dropped_active_entry_function_transaction_count"
+        ]
+        merge_usage_rows(function_usage, report["function_usage"])
+        dropped_invocations, dropped_transactions = merge_usage_rows(
+            usage,
+            report["usage"],
+            max_rows=MAX_MERGED_USAGE_DETAIL_ROWS,
+        )
+        dropped_usage_invocation_count += dropped_invocations
+        dropped_usage_transaction_count += dropped_transactions
+        usage_detail_truncated |= dropped_invocations > 0
+        dropped_invocations, dropped_transactions = merge_usage_rows(
+            active_entry_function_callers,
+            report["active_entry_function_callers"],
+            invocation_count_field="framework_invocation_count",
+            max_rows=MAX_MERGED_ACTIVE_ENTRY_FUNCTION_CALLER_ROWS,
+        )
+        dropped_active_entry_function_framework_invocation_count += dropped_invocations
+        dropped_active_entry_function_transaction_count += dropped_transactions
+        active_entry_function_callers_truncated |= dropped_invocations > 0
     if cursor != expected_end + 1:
         raise RuntimeError(
             f"framework usage range ended at {cursor - 1}, expected {expected_end}"
         )
 
-    reports_by_start = sorted(reports, key=lambda item: item["start_version"])
+    assert reference is not None
+    assert start_timestamp_usecs is not None
+    assert end_timestamp_usecs is not None
     merged = {
         "schema_version": reference["schema_version"],
         "network": network,
-        "start_version": reports_by_start[0]["start_version"],
-        "end_version": reports_by_start[-1]["end_version"],
-        "start_timestamp_usecs": reports_by_start[0]["start_timestamp_usecs"],
-        "end_timestamp_usecs": reports_by_start[-1]["end_timestamp_usecs"],
+        "start_version": expected_start,
+        "end_version": expected_end,
+        "start_timestamp_usecs": start_timestamp_usecs,
+        "end_timestamp_usecs": end_timestamp_usecs,
         "git_sha": reference["git_sha"],
         "target_modules": reference["target_modules"],
-        "processed_transaction_count": sum(
-            report["processed_transaction_count"] for report in reports
-        ),
-        "transaction_usage_records": sum(
-            report["transaction_usage_records"] for report in reports
-        ),
+        "processed_transaction_count": processed_transaction_count,
+        "transaction_usage_records": transaction_usage_records,
         "usage_detail_row_limit": reference["usage_detail_row_limit"],
-        "usage_detail_truncated": any(
-            report["usage_detail_truncated"] for report in reports
-        ),
-        "dropped_usage_invocation_count": sum(
-            report["dropped_usage_invocation_count"] for report in reports
-        ),
-        "dropped_usage_transaction_count": sum(
-            report["dropped_usage_transaction_count"] for report in reports
-        ),
+        "merged_usage_detail_row_limit": MAX_MERGED_USAGE_DETAIL_ROWS,
+        "usage_detail_truncated": usage_detail_truncated,
+        "dropped_usage_invocation_count": dropped_usage_invocation_count,
+        "dropped_usage_transaction_count": dropped_usage_transaction_count,
         "active_entry_function_caller_row_limit": reference[
             "active_entry_function_caller_row_limit"
         ],
-        "active_entry_function_callers_truncated": any(
-            report["active_entry_function_callers_truncated"] for report in reports
+        "merged_active_entry_function_caller_row_limit": (
+            MAX_MERGED_ACTIVE_ENTRY_FUNCTION_CALLER_ROWS
         ),
-        "dropped_active_entry_function_framework_invocation_count": sum(
-            report["dropped_active_entry_function_framework_invocation_count"]
-            for report in reports
+        "active_entry_function_callers_truncated": (
+            active_entry_function_callers_truncated
         ),
-        "dropped_active_entry_function_transaction_count": sum(
-            report["dropped_active_entry_function_transaction_count"]
-            for report in reports
+        "dropped_active_entry_function_framework_invocation_count": (
+            dropped_active_entry_function_framework_invocation_count
         ),
-        "shard_count": len(reports),
+        "dropped_active_entry_function_transaction_count": (
+            dropped_active_entry_function_transaction_count
+        ),
+        "shard_count": len(sources),
         "gcs_prefix": f"gs://{bucket_name}/{prefix}/" if bucket_name else None,
         "functions": reference["functions"],
-        "function_usage": _merge_usage_rows(reports, "function_usage"),
-        "usage": _merge_usage_rows(reports, "usage"),
-        "active_entry_function_callers": _merge_usage_rows(
-            reports,
-            "active_entry_function_callers",
-            "framework_invocation_count",
-        ),
+        "function_usage": [function_usage[key] for key in sorted(function_usage)],
+        "usage": [usage[key] for key in sorted(usage)],
+        "active_entry_function_callers": [
+            active_entry_function_callers[key]
+            for key in sorted(active_entry_function_callers)
+        ],
     }
 
     os.makedirs(output_dir, exist_ok=True)

@@ -170,10 +170,12 @@ function renderCards() {
   document.getElementById("subtitle").textContent = `Replay ${nf.format(report.start_version)}–${nf.format(report.end_version)} · schema ${report.schema_version} · build ${report.git_sha || "unknown"}`;
   const truncationNotices = [];
   if (report.usage_detail_truncated) {
-    truncationNotices.push(`Call-path detail is partial: it is capped at ${nf.format(report.usage_detail_row_limit)} rows; ${nf.format(report.dropped_usage_invocation_count)} invocation${report.dropped_usage_invocation_count === 1 ? " was" : "s were"} omitted across ${nf.format(report.dropped_usage_transaction_count)} transaction${report.dropped_usage_transaction_count === 1 ? "" : "s"}. Per-function totals remain complete.`);
+    const rowLimit = report.merged_usage_detail_row_limit ?? report.usage_detail_row_limit;
+    truncationNotices.push(`Call-path detail is partial: it is capped at ${nf.format(rowLimit)} rows; ${nf.format(report.dropped_usage_invocation_count)} invocation${report.dropped_usage_invocation_count === 1 ? " was" : "s were"} omitted across ${nf.format(report.dropped_usage_transaction_count)} transaction${report.dropped_usage_transaction_count === 1 ? "" : "s"}. Per-function totals remain complete.`);
   }
   if (report.active_entry_function_callers_truncated) {
-    truncationNotices.push(`Active entry-function callers are partial: they are capped at ${nf.format(report.active_entry_function_caller_row_limit)} rows; ${nf.format(report.dropped_active_entry_function_framework_invocation_count)} framework invocation${report.dropped_active_entry_function_framework_invocation_count === 1 ? " was" : "s were"} omitted across ${nf.format(report.dropped_active_entry_function_transaction_count)} transaction${report.dropped_active_entry_function_transaction_count === 1 ? "" : "s"}.`);
+    const rowLimit = report.merged_active_entry_function_caller_row_limit ?? report.active_entry_function_caller_row_limit;
+    truncationNotices.push(`Active entry-function callers are partial: they are capped at ${nf.format(rowLimit)} rows; ${nf.format(report.dropped_active_entry_function_framework_invocation_count)} framework invocation${report.dropped_active_entry_function_framework_invocation_count === 1 ? " was" : "s were"} omitted across ${nf.format(report.dropped_active_entry_function_transaction_count)} transaction${report.dropped_active_entry_function_transaction_count === 1 ? "" : "s"}.`);
   }
   if (truncationNotices.length) {
     const warning = document.getElementById("usage-detail-warning");
