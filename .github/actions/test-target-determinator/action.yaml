@@ -25,13 +25,12 @@ runs:
     - name: Set up Rust toolchain
       uses: dsherret/rust-toolchain-file@3551321aa44dd44a0393eb3b6bdfbc5d25ecf621 # pin@v1
 
-    # Target determination only builds aptos-cargo-cli. Avoid restoring or saving
-    # the general workspace target cache, which is large and not useful here.
-    - name: Restore Cargo registry cache
+    # Restore the target cache, but never save an entry after compiling the
+    # pull request's code.
+    - name: Restore Cargo cache
       uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # pin@v2.9.1
       with:
         cache-bin: false
-        cache-targets: false
         save-if: false
 
     - name: Set up Git credentials
