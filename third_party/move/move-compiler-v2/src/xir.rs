@@ -777,23 +777,6 @@ impl FunctionTranslator<'_> {
                     Oper::GetFieldInst(_, args) => self.type_args(args)?,
                     _ => vec![],
                 };
-                let struct_env = self.env.get_struct(self.module_id.qualified(sid));
-                if !struct_env.get_abilities().has_ability(Ability::Drop) {
-                    ensure!(
-                        struct_env.get_field_count() == 1 && *field == 0,
-                        "cannot project field {field} from non-droppable {struct_type:?}; destructure all fields instead"
-                    );
-                    let module_id = self.module_id;
-                    return self.emit(|attr| {
-                        Bytecode::Call(
-                            attr,
-                            dsts.to_vec(),
-                            StacklessOperation::Unpack(module_id, sid, args),
-                            srcs.to_vec(),
-                            None,
-                        )
-                    });
-                }
                 let struct_ref = self.fresh_local(Type::Reference(
                     ReferenceKind::Immutable,
                     Box::new(struct_type),
@@ -1391,6 +1374,50 @@ mod tests {
         let units = crate::run_file_format_gen(&mut env, &targets);
         assert!(!env.has_errors());
         assert_eq!(units.len(), 1);
+        let legacy_move_compiler::compiled_unit::CompiledUnit::Module(module) = &units[0] else {
+            panic!("expected module")
+        };
+        move_bytecode_verifier::verify_module(&module.module).unwrap();
+    }
+
+    #[test]
+    fn get_field_preserves_non_droppable_struct() {
+        let mut module = account_module();
+        let function = &mut module.functions[0];
+        function.params = 2;
+        function.locals = vec![Ty::Signer, Ty::Struct(1), Ty::Struct(0)];
+        function.blocks = vec![Block {
+            instrs: vec![
+                Instr::Call(vec![2], Oper::GetField(0), vec![1]),
+                Instr::Call(vec![], Oper::MoveTo(1), vec![0, 1]),
+            ],
+            term: Term::Ret(vec![]),
+        }];
+        let source = parse_source(
+            PathBuf::from("get-field.xir.json"),
+            String::new(),
+            &serde_json::to_string(&module).unwrap(),
+        )
+        .unwrap();
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        import_sources(&mut env, &[source], &mut targets).unwrap();
+        let options = Options::default();
+        env.set_extension(options.clone());
+        crate::run_stackless_bytecode_pipeline(
+            &env,
+            crate::stackless_bytecode_check_pipeline(&options),
+            &mut targets,
+        );
+        assert!(!env.has_errors());
+        crate::run_stackless_bytecode_pipeline(
+            &env,
+            crate::stackless_bytecode_optimization_pipeline(&options),
+            &mut targets,
+        );
+        assert!(!env.has_errors());
+        let units = crate::run_file_format_gen(&mut env, &targets);
+        assert!(!env.has_errors());
         let legacy_move_compiler::compiled_unit::CompiledUnit::Module(module) = &units[0] else {
             panic!("expected module")
         };
