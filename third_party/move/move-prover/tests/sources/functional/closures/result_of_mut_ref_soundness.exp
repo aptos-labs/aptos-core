@@ -1,0 +1,43 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/result_of_mut_ref_soundness.move:12:9
+   │
+12 │         ensures result == result_of<f>(x);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/result_of_mut_ref_soundness.move:10: apply_mut
+   =         f = <redacted>
+   =         x = <redacted>
+   =         result = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/result_of_mut_ref_soundness.move:12: apply_mut (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/result_of_mut_ref_soundness.move:21:9
+   │
+21 │         ensures result == result_of<f>(p, q);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/result_of_mut_ref_soundness.move:17: apply_two_mut
+   =         f = <redacted>
+   =         p = <redacted>
+   =         q = <redacted>
+   =     at tests/sources/functional/closures/result_of_mut_ref_soundness.move:18: apply_two_mut
+   =         result = <redacted>
+   =         p = <redacted>
+   =         q = <redacted>
+   =     at tests/sources/functional/closures/result_of_mut_ref_soundness.move:21: apply_two_mut (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/result_of_mut_ref_soundness.move:28:9
+   │
+28 │         ensures (result_1, result_2) == result_of<f>(x);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/result_of_mut_ref_soundness.move:26: apply_mut_multi
+   =         f = <redacted>
+   =         x = <redacted>
+   =         result_1 = <redacted>
+   =         result_2 = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/result_of_mut_ref_soundness.move:28: apply_mut_multi (spec)

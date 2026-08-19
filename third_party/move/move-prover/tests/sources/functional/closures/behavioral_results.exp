@@ -1,0 +1,108 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+  ┌─ tests/sources/functional/closures/behavioral_results.move:9:9
+  │
+9 │         ensures result == result_of<f>(x);
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  │
+  =     at tests/sources/functional/closures/behavioral_results.move:7: apply
+  =         f = <redacted>
+  =         x = <redacted>
+  =         result = <redacted>
+  =     at tests/sources/functional/closures/behavioral_results.move:9: apply (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_results.move:27:9
+   │
+27 │         ensures result == result_of<f>(y);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_results.move:22: apply_seq
+   =     at tests/sources/functional/closures/behavioral_results.move:25: apply_seq (spec)
+   =     at tests/sources/functional/closures/behavioral_results.move:22: apply_seq
+   =         f = <redacted>
+   =         x = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/behavioral_results.move:27: apply_seq (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_results.move:33:9
+   │
+33 │         ensures result == result_of<f>(x, y);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_results.move:31: apply2
+   =         f = <redacted>
+   =         x = <redacted>
+   =         y = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/behavioral_results.move:33: apply2 (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_results.move:72:9
+   │
+72 │         ensures result == result_of<f>(x);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_results.move:70: apply_mut
+   =         f = <redacted>
+   =         x = <redacted>
+   =         result = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/behavioral_results.move:72: apply_mut (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_results.move:80:9
+   │
+80 │         ensures result == result_of<f>(x);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_results.move:78: apply_mut_sym
+   =         f = <redacted>
+   =         x = <redacted>
+   =         result = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/behavioral_results.move:80: apply_mut_sym (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_results.move:102:9
+    │
+102 │         ensures result == result_of<f>(x);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_results.move:100: apply_mut_canonical
+    =         f = <redacted>
+    =         x = <redacted>
+    =         result = <redacted>
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/behavioral_results.move:102: apply_mut_canonical (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_results.move:114:9
+    │
+114 │         ensures result == result_of<f>(p, q);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_results.move:110: apply_two_mut
+    =         f = <redacted>
+    =         p = <redacted>
+    =         q = <redacted>
+    =     at tests/sources/functional/closures/behavioral_results.move:111: apply_two_mut
+    =         result = <redacted>
+    =         p = <redacted>
+    =         q = <redacted>
+    =     at tests/sources/functional/closures/behavioral_results.move:114: apply_two_mut (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_results.move:125:9
+    │
+125 │         ensures (result_1, result_2) == result_of<f>(x);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_results.move:123: apply_mut_multi
+    =         f = <redacted>
+    =         x = <redacted>
+    =         result_1 = <redacted>
+    =         result_2 = <redacted>
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/behavioral_results.move:125: apply_mut_multi (spec)

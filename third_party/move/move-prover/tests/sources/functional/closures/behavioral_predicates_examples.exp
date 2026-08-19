@@ -19,6 +19,128 @@ error: precondition does not hold at this call
     =     at tests/sources/functional/closures/behavioral_predicates_examples.move:163: apply_no_abort_opaque_test_fail
     =     at tests/sources/functional/closures/behavioral_predicates_examples.move:123: apply_no_abort_opaque (spec)
 
+error: induction case of the loop invariant does not hold
+    ┌─ tests/sources/functional/closures/behavioral_predicates_examples.move:187:17
+    │
+187 │                 invariant forall j in 0..i: !result_of<pred>(v[j]);
+    │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:176: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:192: contains (spec)
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:176: contains
+    =         v = <redacted>
+    =         pred = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:177: contains
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:178: contains
+    =         len = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:185: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:186: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:187: contains
+    =     enter loop, variable(s) i havocked and reassigned
+    =         i = <redacted>
+    =     loop invariant holds at current state
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:186: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:187: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:179: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:180: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:183: contains
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:179: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:186: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:187: contains
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_predicates_examples.move:194:9
+    │
+194 │         ensures result == (exists k in 0..len(v): result_of<pred>(v[k]));
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:176: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:192: contains (spec)
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:176: contains
+    =         v = <redacted>
+    =         pred = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:177: contains
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:178: contains
+    =         len = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:185: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:186: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:187: contains
+    =     enter loop, variable(s) i havocked and reassigned
+    =         i = <redacted>
+    =     loop invariant holds at current state
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:186: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:187: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:179: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:180: contains
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:181: contains
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:193: contains (spec)
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:194: contains (spec)
+
+error: induction case of the loop invariant does not hold
+    ┌─ tests/sources/functional/closures/behavioral_predicates_examples.move:210:17
+    │
+210 │                 invariant forall j in 0..i: !result_of<pred>(v[j]);
+    │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:199: contains_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:216: contains_opaque (spec)
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:199: contains_opaque
+    =         v = <redacted>
+    =         pred = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:200: contains_opaque
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:201: contains_opaque
+    =         len = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:208: contains_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:209: contains_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:210: contains_opaque
+    =     enter loop, variable(s) i havocked and reassigned
+    =         i = <redacted>
+    =     loop invariant holds at current state
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:209: contains_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:210: contains_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:202: contains_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:203: contains_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:206: contains_opaque
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:202: contains_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:209: contains_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:210: contains_opaque
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_predicates_examples.move:218:9
+    │
+218 │         ensures result == (exists k in 0..len(v): result_of<pred>(v[k]));
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:199: contains_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:216: contains_opaque (spec)
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:199: contains_opaque
+    =         v = <redacted>
+    =         pred = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:200: contains_opaque
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:201: contains_opaque
+    =         len = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:208: contains_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:209: contains_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:210: contains_opaque
+    =     enter loop, variable(s) i havocked and reassigned
+    =         i = <redacted>
+    =     loop invariant holds at current state
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:209: contains_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:210: contains_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:202: contains_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:203: contains_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:204: contains_opaque
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:217: contains_opaque (spec)
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:218: contains_opaque (spec)
+
 error: post-condition does not hold
     ┌─ tests/sources/functional/closures/behavioral_predicates_examples.move:226:9
     │
@@ -65,6 +187,188 @@ error: post-condition does not hold
     =     at tests/sources/functional/closures/behavioral_predicates_examples.move:231: contains_opaque_test_found
     =         result = <redacted>
     =     at tests/sources/functional/closures/behavioral_predicates_examples.move:234: contains_opaque_test_found (spec)
+
+error: induction case of the loop invariant does not hold
+    ┌─ tests/sources/functional/closures/behavioral_predicates_examples.move:269:13
+    │
+269 │             invariant forall j in 0..i: !result_of<pred>(v[j]);
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:260: index
+    =         v = <redacted>
+    =         pred = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:261: index
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:262: index
+    =         len = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:267: index
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:268: index
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:269: index
+    =     enter loop, variable(s) i havocked and reassigned
+    =         i = <redacted>
+    =     loop invariant holds at current state
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:268: index
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:269: index
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:263: index
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:264: index
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:265: index
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:263: index
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:268: index
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:269: index
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_predicates_examples.move:276:9
+    │
+276 │         ensures result < len(v) ==> result_of<pred>(v[result]);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:260: index
+    =         v = <redacted>
+    =         pred = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:261: index
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:262: index
+    =         len = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:267: index
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:268: index
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:269: index
+    =     enter loop, variable(s) i havocked and reassigned
+    =         i = <redacted>
+    =     loop invariant holds at current state
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:268: index
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:269: index
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:263: index
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:264: index
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:274: index (spec)
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:275: index (spec)
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:276: index (spec)
+
+error: induction case of the loop invariant does not hold
+    ┌─ tests/sources/functional/closures/behavioral_predicates_examples.move:291:13
+    │
+291 │             invariant forall j in 0..i: !result_of<pred>(v[j]);
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:282: index_opaque
+    =         v = <redacted>
+    =         pred = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:283: index_opaque
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:284: index_opaque
+    =         len = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:289: index_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:290: index_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:291: index_opaque
+    =     enter loop, variable(s) i havocked and reassigned
+    =         i = <redacted>
+    =     loop invariant holds at current state
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:290: index_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:291: index_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:285: index_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:286: index_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:287: index_opaque
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:285: index_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:290: index_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:291: index_opaque
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_predicates_examples.move:299:9
+    │
+299 │         ensures result < len(v) ==> result_of<pred>(v[result]);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:282: index_opaque
+    =         v = <redacted>
+    =         pred = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:283: index_opaque
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:284: index_opaque
+    =         len = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:289: index_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:290: index_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:291: index_opaque
+    =     enter loop, variable(s) i havocked and reassigned
+    =         i = <redacted>
+    =     loop invariant holds at current state
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:290: index_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:291: index_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:285: index_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:286: index_opaque
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:297: index_opaque (spec)
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:298: index_opaque (spec)
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:299: index_opaque (spec)
+
+error: induction case of the loop invariant does not hold
+    ┌─ tests/sources/functional/closures/behavioral_predicates_examples.move:336:13
+    │
+336 │             invariant result == spec_reduce(reducer, vec, start, i);
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:326: reduce
+    =         vec = <redacted>
+    =         start = <redacted>
+    =         reducer = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:327: reduce
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:328: reduce
+    =         len = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:329: reduce
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:334: reduce
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:335: reduce
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:336: reduce
+    =     enter loop, variable(s) i, result havocked and reassigned
+    =         i = <redacted>
+    =         result = <redacted>
+    =     loop invariant holds at current state
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:335: reduce
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:336: reduce
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:330: reduce
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:331: reduce
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:332: reduce
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:330: reduce
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:335: reduce
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:336: reduce
+
+error: induction case of the loop invariant does not hold
+    ┌─ tests/sources/functional/closures/behavioral_predicates_examples.move:356:13
+    │
+356 │             invariant result == spec_reduce(reducer, vec, start, i);
+    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:346: reduce_opaque
+    =         vec = <redacted>
+    =         start = <redacted>
+    =         reducer = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:347: reduce_opaque
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:348: reduce_opaque
+    =         len = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:349: reduce_opaque
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:354: reduce_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:355: reduce_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:356: reduce_opaque
+    =     enter loop, variable(s) i, result havocked and reassigned
+    =         i = <redacted>
+    =         result = <redacted>
+    =     loop invariant holds at current state
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:355: reduce_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:356: reduce_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:350: reduce_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:351: reduce_opaque
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:352: reduce_opaque
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:350: reduce_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:355: reduce_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:356: reduce_opaque
 
 error: post-condition does not hold
     ┌─ tests/sources/functional/closures/behavioral_predicates_examples.move:395:9

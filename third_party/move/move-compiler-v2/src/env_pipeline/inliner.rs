@@ -84,6 +84,7 @@ use std::{
 const INLINE_HOF_WEAKENING_ISSUE: &str = "https://github.com/aptos-labs/aptos-core/issues/20371";
 const FORWARDED_FOLD_WEAKENING_ISSUE: &str =
     "https://github.com/aptos-labs/aptos-core/issues/20383";
+const FOLDS_OF_INVARIANT_MARKER: &str = "$inliner_folds_of_invariant";
 
 type QualifiedFunId = QualifiedId<FunId>;
 type CallSiteLocations = BTreeMap<(RewriteTarget, QualifiedFunId), BTreeSet<NodeId>>;
@@ -983,8 +984,13 @@ struct InlinedRewriter<'env, 'rewriter> {
     application_anchors: BTreeMap<Symbol, MemoryLabel>,
     /// The kind of the spec condition currently being rewritten, if any.
     current_condition_kind: Option<ConditionKind>,
-    /// Unresolved behavioral-predicate subexpressions in the current
-    /// condition. Only their enclosing conjunction arms are weakened.
+    /// Whether the current loop invariant contains `folds_of`.
+    current_condition_has_folds_of: bool,
+    /// Whether an unresolved behavioral predicate occurred in the current
+    /// spec block. Its behavioral loop invariants must be weakened together:
+    /// a `folds_of` invariant can depend on an unresolved `ensures_of`
+    /// invariant from the same inline expansion.
+    unresolved_behavior_in_spec: bool,
     /// The resolutions of `folds_of` predicates over lambda-bound
     /// parameters, keyed by the predicate's node id (verify mode; see
     /// `resolve_folds_of_occurrences`).
@@ -1078,6 +1084,8 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             target_fun,
             application_anchors,
             current_condition_kind: None,
+            current_condition_has_folds_of: false,
+            unresolved_behavior_in_spec: false,
             folds_of_resolutions,
         }
     }
@@ -1788,14 +1796,14 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         if context == BpContext::LoopInvariant {
             if let Some(kind) = underivable_concrete_behavior(self.env, &result) {
                 warn_underivable_concrete_behavior(self.env, &self.env.get_node_loc(new_id), kind);
-                return Some(weaken_or_mark_unresolved(self.env, result));
+                return Some(self.weaken_or_mark_unresolved(result));
             }
             if uses_generic_type_reflection(self.env, &result)
                 || lambda_uses_generic_type_reflection(self.env, &lambda)
                 || behavior_uses_generic_type_reflection(self.env, &result)
             {
                 warn_generic_type_reflection_behavior(self.env, &self.env.get_node_loc(new_id));
-                return Some(weaken_or_mark_unresolved(self.env, result));
+                return Some(self.weaken_or_mark_unresolved(result));
             }
         }
         // Values in an inlined behavioral predicate can be related to their
@@ -1810,7 +1818,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             ExpData::Call(_, Operation::Behavior(..), args)
                 if args.first().is_some_and(|t| matches!(t.as_ref(), ExpData::Lambda(..)))
         ) {
-            return Some(weaken_or_mark_unresolved(self.env, result));
+            return Some(self.weaken_or_mark_unresolved(result));
         }
         Some(result)
     }
@@ -1877,10 +1885,15 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             if let Some(kind) = spec.underivable_behavior(self.env) {
                 warn_underivable_concrete_behavior(self.env, &loc, kind);
                 let result = spec.make_call(self.env, loc, range, retained_args, &BTreeMap::new());
-                return Some(weaken_or_mark_unresolved(self.env, result));
+                return Some(self.weaken_or_mark_unresolved(result));
             }
         }
         Some(spec.make_call(self.env, loc, range, retained_args, &BTreeMap::new()))
+    }
+
+    fn weaken_or_mark_unresolved(&mut self, exp: Exp) -> Exp {
+        self.unresolved_behavior_in_spec = true;
+        weaken_or_mark_unresolved(self.env, exp)
     }
 
     /// Instantiates the given types with the type arguments of this expansion.
@@ -2062,9 +2075,12 @@ fn substitute_bp_by_lambda_spec(
         let Some(resolution) = folds_of else {
             // In verify mode, the pre-pass (`resolve_folds_of_occurrences`)
             // has already reported why this occurrence could not be
-            // resolved. In regular compilation, the enclosing condition is
-            // replaced by `true` through the unresolved-predicate seam.
-            return intact();
+            // resolved. Its summary cannot be used soundly, so remove this
+            // predicate from the loop invariant in both verification and
+            // regular compilation. Leaving it intact here relies on the
+            // later unresolved-predicate pass, but that pass can no longer
+            // identify this freshly rebuilt node after further inlining.
+            return env.new_bool_const(&loc, true);
         };
         if bp_args.len() != 2 {
             // Arity errors have already been reported by type checking.
@@ -3055,15 +3071,20 @@ fn lambda_uses_generic_type_reflection(env: &GlobalEnv, lambda: &Exp) -> bool {
             return false;
         };
         let fun = env.get_function(mid.qualified(*fid));
+        let inst = env.get_node_instantiation(*id);
         let specs_use_reflection = fun
             .get_spec()
             .conditions
             .iter()
-            .any(|cond| uses_generic_type_reflection(env, &cond.exp));
-        let is_generic_call = env
-            .get_node_instantiation(*id)
-            .iter()
-            .any(Type::is_type_parameter);
+            // Conditions are stored in the callee's type-parameter context.
+            // Apply the type arguments from this call before determining
+            // whether reflection remains generic at the inline site.
+            .any(|cond| {
+                cond.exp.called_spec_funs(env).iter().any(|qid| {
+                    env.spec_fun_uses_generic_type_reflection(&qid.clone().instantiate(&inst))
+                })
+            });
+        let is_generic_call = inst.iter().any(Type::is_type_parameter);
         let body_uses_reflection = fun.get_def().is_some_and(|def| {
             def.any(&mut |sub| {
                 let ExpData::Call(sub_id, Operation::MoveFunction(sub_mid, sub_fid), _) = sub
@@ -7374,6 +7395,13 @@ impl ExpRewriterFunctions for InlinedRewriter<'_, '_> {
     /// `try_inline_behavior_predicate` to detect loop invariants.
     fn rewrite_enter_condition(&mut self, _target: &SpecBlockTarget, cond: &Condition) {
         self.current_condition_kind = Some(cond.kind.clone());
+        self.current_condition_has_folds_of = cond.kind == ConditionKind::LoopInvariant
+            && cond.exp.any(&mut |exp| {
+                matches!(
+                    exp,
+                    ExpData::Call(_, Operation::Behavior(BehaviorKind::FoldsOf, _), _)
+                )
+            });
     }
 
     fn rewrite_condition(
@@ -7390,11 +7418,39 @@ impl ExpRewriterFunctions for InlinedRewriter<'_, '_> {
         if !matches!(cond.kind, ConditionKind::LoopInvariant) {
             return None;
         }
-        let (exp, changed) = weaken_unresolved_conjuncts(self.env, &cond.exp);
-        changed.then(|| Condition {
-            exp,
-            ..cond.clone()
-        })
+        let mut result = cond.clone();
+        let mut changed = false;
+        if self.current_condition_has_folds_of {
+            result.properties.insert(
+                self.env.symbol_pool().make(FOLDS_OF_INVARIANT_MARKER),
+                move_model::ast::PropertyValue::Value(Value::Bool(true)),
+            );
+            changed = true;
+        }
+        let (exp, unresolved) = weaken_unresolved_conjuncts(self.env, &cond.exp);
+        if unresolved {
+            self.unresolved_behavior_in_spec = true;
+            result.exp = exp;
+            changed = true;
+        }
+        changed.then_some(result)
+    }
+
+    fn rewrite_spec(&mut self, _target: &SpecBlockTarget, spec: &Spec) -> Option<Spec> {
+        let marker = self.env.symbol_pool().make(FOLDS_OF_INVARIANT_MARKER);
+        let weaken_behavioral_invariants = self.unresolved_behavior_in_spec;
+        self.unresolved_behavior_in_spec = false;
+        let mut result = spec.clone();
+        let mut changed = false;
+        for cond in &mut result.conditions {
+            let is_folds_of = cond.properties.remove(&marker).is_some();
+            changed |= is_folds_of;
+            if weaken_behavioral_invariants && is_folds_of {
+                let loc = self.env.get_node_loc(cond.exp.node_id());
+                cond.exp = self.env.new_bool_const(&loc, true);
+            }
+        }
+        changed.then_some(result)
     }
 
     /// Record that the provided symbols have local definitions, so renaming should be done.

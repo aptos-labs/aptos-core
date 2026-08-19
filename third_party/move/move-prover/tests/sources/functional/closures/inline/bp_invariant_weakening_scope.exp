@@ -45,7 +45,7 @@ warning: generic type reflection is not yet supported through behavioral predica
 25 │             invariant forall _j in 0..i: ensures_of<f>(x);
    │                                          ^^^^^^^^^^^^^^^^
    ·
-66 │         apply(|a| uses_generic_type_reflection<T>(a), x);
+72 │         apply(|a| uses_generic_type_reflection<T>(a), x);
    │         ------------------------------------------------ from a call inlined at this callsite
 
 warning: the behavior of this lambda argument cannot be determined exactly; weakening loop invariant containing `ensures_of`; see https://github.com/aptos-labs/aptos-core/issues/20371
@@ -97,3 +97,44 @@ error: base case of the loop invariant does not hold
    =     at tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:11: apply_both
    =     at tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:12: apply_both
    =     at tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:13: apply_both
+
+error: induction case of the loop invariant does not hold
+   ┌─ tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:25:13
+   │
+25 │             invariant forall _j in 0..i: ensures_of<f>(x);
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:75: monomorphic_reflection_invariant_is_not_weakened
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:18: apply
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:19: apply
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:23: apply
+   =     at tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:24: apply
+   =     at tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:25: apply
+   =     enter loop, variable(s) i havocked and reassigned
+   =         i = <redacted>
+   =     loop invariant holds at current state
+   =     at tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:24: apply
+   =     at tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:25: apply
+   =     at tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:20: apply
+   =     at tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:76: monomorphic_reflection_invariant_is_not_weakened
+   =     at tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:65: reflection_in_spec
+   =         _x = <redacted>
+   =     at tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:22: apply
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:20: apply
+   =     at tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:24: apply
+   =     at tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:25: apply
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:68:9
+   │
+68 │         ensures false;
+   │         ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:65: reflection_in_spec
+   =         _x = <redacted>
+   =     at tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:67: reflection_in_spec (spec)
+   =     at tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:68: reflection_in_spec (spec)

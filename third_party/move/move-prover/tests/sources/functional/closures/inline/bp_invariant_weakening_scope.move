@@ -62,7 +62,18 @@ module 0x42::bp_invariant_weakening_scope {
         let _ = type_name::get<T>();
     }
 
+    fun reflection_in_spec<T>(_x: u64) {}
+    spec reflection_in_spec {
+        ensures type_name::get<T>() == type_name::get<T>();
+        ensures false;
+    }
+
     fun generic_reflection_invariant_is_weakened<T>(x: u64) {
         apply(|a| uses_generic_type_reflection<T>(a), x);
+    }
+
+    fun monomorphic_reflection_invariant_is_not_weakened(x: u64) {
+        apply(|a| reflection_in_spec<u64>(a), x);
+        // error: the fully instantiated reflection does not weaken the false invariant
     }
 }

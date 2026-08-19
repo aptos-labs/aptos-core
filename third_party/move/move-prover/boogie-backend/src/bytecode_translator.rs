@@ -2461,9 +2461,9 @@ impl<'env> BoogieTranslator<'env> {
         let aborts_of_name = boogie_behavioral_eval_fun_name(env, fun_type, BehaviorKind::AbortsOf);
 
         // Inputs: memory, fun, p0..pN. No post-state inputs.
-        let mut param_decls: Vec<String> = eval_mem_decls;
+        let mut param_decls: Vec<String> = eval_mem_decls.clone();
         param_decls.push(format!("f: {}", fun_ty_boogie_name));
-        let mut input_args: Vec<String> = eval_mem_args;
+        let mut input_args: Vec<String> = eval_mem_args.clone();
         input_args.push("f".to_string());
         for (pos, ty) in params_flat.iter().enumerate() {
             param_decls.push(format!(
@@ -2514,6 +2514,26 @@ impl<'env> BoogieTranslator<'env> {
         );
 
         let result_of_call = format!("{}({})", result_of_name, input_args.join(", "));
+        // `result_of` denotes the value returned by an actual function-value
+        // invocation.  Connect the per-type evaluator directly to each
+        // variant's result Skolem before relating that value to `ensures_of`.
+        // The latter remains guarded by `requires_of` and `aborts_of`: a
+        // function's postconditions are only available on its valid,
+        // non-aborting domain, while its returned value is still the same
+        // evaluator value at a call site.
+        self.emit_result_of_variant_axioms(
+            fun_type,
+            closure_infos,
+            fun_param_infos,
+            struct_field_infos,
+            &union_used_memory,
+            &union_old_memory,
+            &output_types,
+            &eval_mem_decls,
+            &eval_mem_args,
+            &params_flat,
+            &result_of_name,
+        );
         let requires_of_call = format!("{}({})", requires_of_name, abort_args.join(", "));
         let aborts_of_call = format!("{}({})", aborts_of_name, abort_args.join(", "));
         let precond = Self::validity_precondition(env, &params_flat, "p");
@@ -2570,6 +2590,178 @@ impl<'env> BoogieTranslator<'env> {
                 param_decls.join(", "),
                 result_of_call,
                 body
+            );
+        }
+    }
+
+    /// Connect the public `result_of` evaluator to every concrete function
+    /// value variant. This is deliberately separate from the guarded
+    /// `result_of -> ensures_of` axiom above: callers observe a function's
+    /// return value even when its behavioral postcondition is unavailable.
+    #[allow(clippy::too_many_arguments)]
+    fn emit_result_of_variant_axioms(
+        &self,
+        fun_type: &Type,
+        closure_infos: &BTreeSet<ClosureInfo>,
+        fun_param_infos: &BTreeSet<FunParamInfo>,
+        struct_field_infos: &BTreeSet<StructFieldInfo>,
+        union_used_memory: &BTreeSet<QualifiedInstId<StructId>>,
+        union_old_memory: &BTreeSet<QualifiedInstId<StructId>>,
+        output_types: &[Type],
+        eval_mem_decls: &[String],
+        eval_mem_args: &[String],
+        params: &[Type],
+        result_of_name: &str,
+    ) {
+        let env = self.env;
+        let result_is_tuple = output_types.len() > 1;
+        let param_decls: Vec<String> = params
+            .iter()
+            .enumerate()
+            .map(|(pos, ty)| format!("p{}: {}", pos, boogie_type(env, ty.skip_reference(), false)))
+            .collect();
+        let param_args: Vec<String> = (0..params.len()).map(|pos| format!("p{}", pos)).collect();
+
+        for info in fun_param_infos {
+            let ctor = format!(
+                "{}()",
+                boogie_fun_param_name(env, &info.fun, info.param_sym)
+            );
+            let mut decls = eval_mem_decls.to_vec();
+            decls.extend(param_decls.iter().cloned());
+            let mut eval_args = eval_mem_args.to_vec();
+            eval_args.push(ctor);
+            eval_args.extend(param_args.iter().cloned());
+            let eval_call = format!("{}({})", result_of_name, eval_args.join(", "));
+
+            let (used_memory, old_memory) = Self::get_param_memory(env, &info.fun, info.param_sym);
+            let (_, mut rhs_args) = Self::build_memory_params(env, &used_memory, &old_memory);
+            rhs_args.extend(param_args.iter().cloned());
+            let rhs = format!(
+                "{}({})",
+                boogie_behavioral_result_fun_name(
+                    env,
+                    &info.fun,
+                    info.param_sym,
+                    &[],
+                    result_is_tuple,
+                ),
+                rhs_args.join(", ")
+            );
+            emitln!(
+                self.writer,
+                "axiom (forall {} :: {{{}}} {} == {});",
+                decls.join(", "),
+                eval_call,
+                eval_call,
+                rhs
+            );
+        }
+
+        for info in closure_infos {
+            let fun_env = env.get_function(info.fun.to_qualified_id());
+            let callee_tys = Type::instantiate_vec(fun_env.get_parameter_types(), &info.fun.inst);
+            let mut capture_decls = vec![];
+            let mut capture_args = vec![];
+            let mut captured = 0;
+            for (pos, ty) in callee_tys.iter().enumerate() {
+                if info.mask.is_captured(pos) {
+                    let name = format!("c{}", captured);
+                    capture_decls.push(format!(
+                        "{}: {}",
+                        name,
+                        boogie_type(env, ty.skip_reference(), false)
+                    ));
+                    capture_args.push(name);
+                    captured += 1;
+                }
+            }
+            let ctor_name = boogie_closure_pack_name(env, &info.fun, info.mask);
+            let ctor = if capture_args.is_empty() {
+                format!("{}()", ctor_name)
+            } else {
+                format!("{}({})", ctor_name, capture_args.join(", "))
+            };
+            let mut decls = eval_mem_decls.to_vec();
+            decls.extend(capture_decls);
+            decls.extend(param_decls.iter().cloned());
+            let mut eval_args = eval_mem_args.to_vec();
+            eval_args.push(ctor);
+            eval_args.extend(param_args.iter().cloned());
+            let eval_call = format!("{}({})", result_of_name, eval_args.join(", "));
+
+            let mut rhs_args = Self::build_instantiated_memory_args(env, &fun_env, &info.fun.inst);
+            let mut captured = 0;
+            let mut regular = 0;
+            for pos in 0..callee_tys.len() {
+                if info.mask.is_captured(pos) {
+                    rhs_args.push(format!("c{}", captured));
+                    captured += 1;
+                } else {
+                    rhs_args.push(format!("p{}", regular));
+                    regular += 1;
+                }
+            }
+            let rhs = format!(
+                "{}({})",
+                boogie_behavioral_fun_result_name(env, &info.fun, result_is_tuple),
+                rhs_args.join(", ")
+            );
+            emitln!(
+                self.writer,
+                "axiom (forall {} :: {{{}}} {} == {});",
+                decls.join(", "),
+                eval_call,
+                eval_call,
+                rhs
+            );
+        }
+
+        let fun_ty = boogie_type(env, fun_type, false);
+        for info in struct_field_infos {
+            let mut decls = eval_mem_decls.to_vec();
+            decls.push(format!("f: {}", fun_ty));
+            decls.extend(param_decls.iter().cloned());
+            let mut eval_args = eval_mem_args.to_vec();
+            eval_args.push("f".to_string());
+            eval_args.extend(param_args.iter().cloned());
+            let eval_call = format!("{}({})", result_of_name, eval_args.join(", "));
+
+            let struct_env = env.get_struct_qid(info.struct_id.to_qualified_id());
+            let access_decl = struct_env
+                .get_field_access_of()
+                .iter()
+                .find(|decl| decl.fun_param == info.field_sym);
+            let mut rhs_args = access_decl.map_or_else(Vec::new, |decl| {
+                Self::build_evaluator_memory_args_for_access(
+                    env,
+                    decl,
+                    union_used_memory,
+                    union_old_memory,
+                )
+            });
+            rhs_args.push("f->n".to_string());
+            rhs_args.extend(param_args.iter().cloned());
+            let rhs = format!(
+                "{}({})",
+                boogie_struct_field_result_fun_name(
+                    env,
+                    &info.struct_id,
+                    info.field_sym,
+                    &info.struct_id.inst,
+                    result_is_tuple,
+                ),
+                rhs_args.join(", ")
+            );
+            let ctor = boogie_struct_field_name(env, &info.struct_id, info.field_sym);
+            emitln!(
+                self.writer,
+                "axiom (forall {} :: {{{}}} (f is {}) ==> {} == {});",
+                decls.join(", "),
+                eval_call,
+                ctor,
+                eval_call,
+                rhs
             );
         }
     }
