@@ -1350,14 +1350,23 @@ def fullnode_api_url(network: str) -> str:
     return f"https://fullnode.{network}.aptoslabs.com/v1"
 
 
+def archival_api_url(network: str) -> str:
+    return f"https://archive.{network}.aptoslabs.com/v1"
+
+
 @retry(
     stop=stop_after_attempt(5),
     wait=wait_fixed(2),
     retry=retry_if_exception_type((urllib.error.HTTPError, urllib.error.URLError)),
 )
 def get_txn_timestamp_usecs(network: str, version: int) -> int:
-    """Get the timestamp (in microseconds) of a transaction by version."""
-    url = f"{fullnode_api_url(network)}/transactions/by_version/{version}"
+    """Get the timestamp (in microseconds) of a transaction by version.
+
+    Time range resolution binary-searches historical versions, which can be
+    older than the public fullnode's pruning window. The archival API retains
+    the versions needed by replay-on-archive.
+    """
+    url = f"{archival_api_url(network)}/transactions/by_version/{version}"
     data = json.loads(urllib.request.urlopen(url).read().decode())
     return int(data["timestamp"])
 
