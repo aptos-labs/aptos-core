@@ -15,7 +15,7 @@ use serde::Serialize;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     fs::File,
-    io::BufWriter,
+    io::{BufWriter, Write},
     path::{Path, PathBuf},
     sync::{Mutex, MutexGuard},
 };
@@ -464,11 +464,22 @@ fn write_json_report(output: &Path, report: &FrameworkUsageReport) -> Result<()>
         parent
     );
     let tmp_output = output.with_extension("tmp");
-    let writer = BufWriter::new(
+    let mut writer = BufWriter::new(
         File::create(&tmp_output)
             .with_context(|| format!("creating temporary report {:?}", tmp_output))?,
     );
-    serde_json::to_writer_pretty(writer, report).context("serializing framework usage report")?;
+    serde_json::to_writer_pretty(&mut writer, report)
+        .context("serializing framework usage report")?;
+    writer
+        .flush()
+        .context("flushing temporary framework usage report")?;
+    let file = writer
+        .into_inner()
+        .map_err(|error| error.into_error())
+        .context("closing temporary framework usage report")?;
+    file.sync_all()
+        .context("syncing temporary framework usage report")?;
+    drop(file);
     std::fs::rename(&tmp_output, output)
         .with_context(|| format!("renaming report {:?} to {:?}", tmp_output, output))?;
     Ok(())
