@@ -463,7 +463,7 @@ fn write_json_report(output: &Path, report: &FrameworkUsageReport) -> Result<()>
         "output directory {:?} does not exist",
         parent
     );
-    let tmp_output = output.with_extension("tmp");
+    let tmp_output = temporary_output_path(output);
     let mut writer = BufWriter::new(
         File::create(&tmp_output)
             .with_context(|| format!("creating temporary report {:?}", tmp_output))?,
@@ -483,6 +483,12 @@ fn write_json_report(output: &Path, report: &FrameworkUsageReport) -> Result<()>
     std::fs::rename(&tmp_output, output)
         .with_context(|| format!("renaming report {:?} to {:?}", tmp_output, output))?;
     Ok(())
+}
+
+fn temporary_output_path(output: &Path) -> PathBuf {
+    let mut path = output.as_os_str().to_os_string();
+    path.push(".tmp");
+    path.into()
 }
 
 fn merge_usage_counts<K: Ord>(
@@ -689,5 +695,24 @@ mod tests {
         assert_eq!(call_path_counts.transaction_count, 2);
         assert_eq!(state.dropped_usage_invocation_count, 1);
         assert_eq!(state.dropped_usage_transaction_count, 1);
+    }
+
+    #[test]
+    fn does_not_overwrite_json_output_that_ends_in_tmp() {
+        let collector = FrameworkUsageCollector::new(10, 10);
+        collector.set_ledger_timestamps(1_000, 1_000).unwrap();
+
+        let output_dir = aptos_temppath::TempPath::new();
+        output_dir.create_as_dir().unwrap();
+        let output = output_dir.path().join("usage.tmp");
+        let html_output = output_dir.path().join("usage.html");
+        collector.write_report(&output, Some(&html_output)).unwrap();
+
+        let report: serde_json::Value =
+            serde_json::from_reader(File::open(output).unwrap()).unwrap();
+        assert_eq!(report["schema_version"], SCHEMA_VERSION);
+        assert!(std::fs::read_to_string(html_output)
+            .unwrap()
+            .contains("Framework deprecation evidence"));
     }
 }

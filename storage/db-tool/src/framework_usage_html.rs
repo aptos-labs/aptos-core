@@ -5,7 +5,11 @@
 
 use crate::framework_usage_template::TEMPLATE;
 use anyhow::{Context, Result};
-use std::{fs::File, io::Write, path::Path};
+use std::{
+    fs::File,
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 pub(crate) fn write(output: &Path, report_json: &str) -> Result<()> {
     let parent = output.parent().unwrap_or_else(|| Path::new("."));
@@ -26,7 +30,7 @@ pub(crate) fn write(output: &Path, report_json: &str) -> Result<()> {
         .replace('\u{2029}', "\\u2029");
     let html = TEMPLATE.replace("__FRAMEWORK_USAGE_REPORT__", &embedded_json);
 
-    let tmp_output = output.with_extension("tmp");
+    let tmp_output = temporary_output_path(output);
     let mut file = File::create(&tmp_output)
         .with_context(|| format!("creating temporary HTML report {:?}", tmp_output))?;
     file.write_all(html.as_bytes())
@@ -36,4 +40,10 @@ pub(crate) fn write(output: &Path, report_json: &str) -> Result<()> {
     std::fs::rename(&tmp_output, output)
         .with_context(|| format!("renaming HTML report {:?} to {:?}", tmp_output, output))?;
     Ok(())
+}
+
+fn temporary_output_path(output: &Path) -> PathBuf {
+    let mut path = output.as_os_str().to_os_string();
+    path.push(".tmp");
+    path.into()
 }
