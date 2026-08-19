@@ -1,4 +1,4 @@
 processed 3 tasks
-task 1 lines 8-29:  publish --private-key Alice [module 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::object_type_check]
-task 2 lines 32-32:  run --signers Alice -- 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::object_type_check::closure_type_rejected
+task 1 lines 9-30:  publish --private-key Alice [module 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::object_type_check]
+task 2 lines 33-33:  run --signers Alice -- 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::object_type_check::closure_type_rejected
 Error: Failed to execute transaction. ExecutionStatus: ExecutionFailure { location: 0000000000000000000000000000000000000000000000000000000000000001::object, function: 2, code_offset: 0 }
