@@ -151,9 +151,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
-          # get the last 10 commits to find images that have been built
+          # Match forge.find_recent_images' 100-commit search window.
           # we can optionally use the IMAGE_TAG to find the exact commit to checkout
-          fetch-depth: 10
+          fetch-depth: 100
 
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         id: docker-setup

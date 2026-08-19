@@ -1450,18 +1450,21 @@ def get_image(profile: str, image_tag: str | None = None) -> str:
     shell = forge.LocalShell()
     git = forge.Git(shell)
     image_name = "tools"
-    default_latest_image = (
+    tag_prefix = "" if profile == "release" else f"{profile}_"
+    image_tag = (
         forge.find_recent_images(
             shell,
             git,
             1,
             image_name=image_name,
+            image_tag_prefixes=[tag_prefix],
         )[0]
         if image_tag is None
         else image_tag
     )
-    tag_prefix = "" if profile == "release" else f"{profile}_"
-    full_image = f"{forge.GAR_REPO_NAME}/{image_name}:{tag_prefix}{default_latest_image}"
+    if not image_tag.startswith(tag_prefix):
+        image_tag = f"{tag_prefix}{image_tag}"
+    full_image = f"{forge.GAR_REPO_NAME}/{image_name}:{image_tag}"
     return full_image
 
 
