@@ -569,11 +569,16 @@ mod tests {
         }
     }
 
-    // The map only stores and compares these pointers — it never reads through
-    // them (copying a value is the interpreter's job). So any non-null address
-    // is a valid stand-in for a heap value.
+    // The map only stores and compares these pointers, never reading through
+    // them, so any distinct non-null address works. Real allocation rather than
+    // an integer cast, which `-Zmiri-strict-provenance` rejects.
     fn fake_ptr(n: usize) -> NonNull<u8> {
-        NonNull::new(n as *mut u8).expect("non-null")
+        static BACKING: std::sync::OnceLock<Box<[u8]>> = std::sync::OnceLock::new();
+        let backing = BACKING.get_or_init(|| vec![0u8; 0x10000].into_boxed_slice());
+        assert!(n < backing.len(), "fake_ptr index out of range");
+        // SAFETY: `n` is within the backing allocation, as just asserted.
+        let ptr = unsafe { backing.as_ptr().add(n) as *mut u8 };
+        NonNull::new(ptr).expect("non-null")
     }
 
     /// Minimal in-crate provider: keys present here are external (committed)
