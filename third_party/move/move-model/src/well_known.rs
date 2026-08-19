@@ -108,6 +108,10 @@ pub const VECTOR_SPEC_FOLD: &str = "spec_fold";
 /// Name of the generic index-fold recursion in `std::vector`'s spec
 /// module, specialized by the general form of `folds_of`.
 pub const VECTOR_SPEC_FOLD_IDX: &str = "spec_fold_idx";
+/// Name of the generic `map_ref` result recursion in `std::vector`.
+pub const VECTOR_SPEC_MAP_REF: &str = "spec_map_ref";
+/// Name of the generic `map_ref` abort recursion in `std::vector`.
+pub const VECTOR_SPEC_MAP_REF_ABORTS: &str = "spec_map_ref_aborts";
 
 /// Looks up `std::vector::spec_fold` (see [`VECTOR_SPEC_FOLD`]).
 pub fn find_vector_spec_fold(env: &GlobalEnv) -> Option<QualifiedId<SpecFunId>> {
@@ -164,7 +168,7 @@ pub fn is_memory_free_native(fun_env: &FunctionEnv) -> bool {
 /// prover-intrinsic) functions with an exact WP arm in
 /// [`vector_intrinsic_wp`]: `singleton`, `contains`, `index_of`,
 /// `swap_remove`, `append`, `remove`, and `insert`.
-fn is_special_vector_bp_fun_name(fun_name: &str) -> bool {
+pub(crate) fn is_special_vector_bp_fun_name(fun_name: &str) -> bool {
     VECTOR_FUNCS_WITH_BYTECODE_INSTRS.contains(&fun_name)
         || matches!(
             fun_name,

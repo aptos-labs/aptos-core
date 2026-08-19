@@ -1,0 +1,22 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/lambda_spec_discarded_result.move:23:15
+   │
+23 │           apply(|v| {
+   │ ╭───────────────^
+24 │ │             vector::reverse(v);
+25 │ │             if (vector::length(v) > 0) {
+26 │ │                 vector::remove(v, 0); // result discarded
+27 │ │             };
+28 │ │         }, x)
+   │ ╰─────────^
+   │
+   =     at tests/sources/functional/closures/lambda_spec_discarded_result.move:23: drive
+   =         v = <redacted>
+   =     at tests/sources/functional/closures/lambda_spec_discarded_result.move:24: drive
+   =     at tests/sources/functional/closures/lambda_spec_discarded_result.move:25: drive
+   =     at tests/sources/functional/closures/lambda_spec_discarded_result.move:26: drive
+   =     at tests/sources/functional/closures/lambda_spec_discarded_result.move:23: drive
+   =         v = <redacted>
+   =     at tests/sources/functional/closures/lambda_spec_discarded_result.move:28: drive
+   =     at tests/sources/functional/closures/lambda_spec_discarded_result.move:23: drive

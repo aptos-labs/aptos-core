@@ -1,10 +1,8 @@
-// flag: --timeout=100
+// flag: --split-vcs-by-assert
 // Intrinsic-map mutators inside a `folds_of` lambda: the exact WP over the
 // map type's declared spec functions routes the map capture's post value
 // into the fold transformer (`spec_set` / `spec_del`), with the declared
-// abort conditions feeding the prefix no-abort invariant. The generous
-// timeout covers the table-theory + fold-recursion VCs of the `collect`
-// cases under parallel test load.
+// abort conditions feeding the prefix no-abort invariant.
 module 0x42::folds_of_map_intrinsic {
     use std::vector;
 

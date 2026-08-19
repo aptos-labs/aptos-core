@@ -95,6 +95,41 @@ module 0x42::folds_of {
         ensures result == spec_fold<u64, u64>(|acc, e| acc + e, v, 0, len(v));
     }
 
+    struct NoAbilities {
+        total: u64,
+    }
+
+    /// Capture snapshots require no abilities.
+    fun sum_without_abilities(v: &vector<u64>): u64 {
+        let acc = NoAbilities { total: 0 };
+        each_ref(v, |e| acc.total = acc.total + *e);
+        let NoAbilities { total } = acc;
+        total
+    }
+    spec sum_without_abilities {
+        pragma aborts_if_is_partial;
+        ensures result == spec_fold<u64, NoAbilities>(
+            |acc: NoAbilities, e| update_field(acc, total, acc.total + e),
+            v,
+            NoAbilities { total: 0 },
+            len(v),
+        ).total;
+    }
+
+    /// Mutated parameter captures are normalized for derivation.
+    fun accumulate_into_parameter(v: &vector<u64>, acc: &mut NoAbilities) {
+        each_ref(v, |e| acc.total = acc.total + *e);
+    }
+    spec accumulate_into_parameter {
+        pragma aborts_if_is_partial;
+        ensures acc.total == spec_fold<u64, NoAbilities>(
+            |acc: NoAbilities, e| update_field(acc, total, acc.total + e),
+            v,
+            old(acc),
+            len(v),
+        ).total;
+    }
+
     /// Pure-lambda degeneration through the same HOF: no captures, so
     /// `folds_of` reduces to the prefix no-abort condition, giving the
     /// exact abort condition of the division.

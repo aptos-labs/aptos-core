@@ -2373,6 +2373,7 @@ impl AssignTransformer<'_> {
                 | Operation::SaveStateAnchor(..)
                 | Operation::WithStateAnchor(..)
                 | Operation::FoldsCaptureAnchor(..)
+                | Operation::InlineCallSummary
                 | Operation::Trace(..)
                 | Operation::EmptyVec
                 | Operation::SingleVec

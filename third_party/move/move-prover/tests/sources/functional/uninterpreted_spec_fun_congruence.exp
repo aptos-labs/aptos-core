@@ -9,7 +9,7 @@ error: post-condition does not hold
    =         v = <redacted>
    =     at tests/sources/functional/uninterpreted_spec_fun_congruence.move:40: for_each_mut
    =         v = <redacted>
-   =         <redacted> = <redacted>
+   =     at tests/sources/functional/uninterpreted_spec_fun_congruence.move:73: scramble_all_wrong
    =     at tests/sources/functional/uninterpreted_spec_fun_congruence.move:41: for_each_mut
    =         i = <redacted>
    =     at tests/sources/functional/uninterpreted_spec_fun_congruence.move:42: for_each_mut

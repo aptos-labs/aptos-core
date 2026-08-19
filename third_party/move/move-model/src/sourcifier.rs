@@ -2757,6 +2757,13 @@ impl<'a> ExpSourcifier<'a> {
                 self.print_memory_label(label);
                 emit!(self.wr(), ")");
             },
+            Operation::InlineCallSummary => {
+                emit!(self.wr(), "inline_call_summary!(");
+                self.print_exp(Prio::General, false, &args[0]);
+                emit!(self.wr(), ", ");
+                self.print_exp(Prio::General, false, &args[1]);
+                emit!(self.wr(), ")");
+            },
             Operation::WithStateAnchor(label) => {
                 emit!(self.wr(), "with_state_anchor!(");
                 self.print_memory_label(label);

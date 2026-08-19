@@ -1521,7 +1521,8 @@ fn contains_state_anchor(exp: &Exp) -> bool {
                 _,
                 AstOp::SaveStateAnchor(..)
                     | AstOp::WithStateAnchor(..)
-                    | AstOp::FoldsCaptureAnchor(..),
+                    | AstOp::FoldsCaptureAnchor(..)
+                    | AstOp::InlineCallSummary,
                 _
             )
         ) {

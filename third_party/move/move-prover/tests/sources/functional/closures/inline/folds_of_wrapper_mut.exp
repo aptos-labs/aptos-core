@@ -9,7 +9,7 @@ error: post-condition does not hold
    =         entries = <redacted>
    =     at tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:15: each_mut
    =         v = <redacted>
-   =         <redacted> = <redacted>
+   =     at tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:79: mirror_keys_wrong
    =     at tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:16: each_mut
    =         i = <redacted>
    =     at tests/sources/functional/closures/inline/folds_of_wrapper_mut.move:17: each_mut

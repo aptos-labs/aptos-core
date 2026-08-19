@@ -1,0 +1,62 @@
+Move prover returns: exiting with compilation errors
+error: cannot resolve `result_of` for this lambda argument: add a spec block to the lambda (e.g. `|x| .. spec { aborts_if ..; ensures ..; }`)
+    ┌─ ../../../aptos-move/framework/move-stdlib/sources/vector.move:619:54
+    │
+619 │             invariant forall j in 0..i: result[j] == result_of<f>(self[j]);
+    │                                                      ^^^^^^^^^^^^^^^^^^^^^
+    │
+    ┌─ tests/sources/functional/closures/inline/stateful_nested_map_ref.move:7:9
+    │
+  7 │ ╭           v.map_ref(|inner| inner.map_ref(|x| {
+    │ │ ╭───────────────────'
+  8 │ │ │             R[@0x42].value = R[@0x42].value + 1;
+  9 │ │ │             *x + 1
+ 10 │ │ │         }))
+    │ ╰─│───────────' from a call inlined at this callsite
+    │   ╰──────────' lambda argument
+
+error: cannot resolve `aborts_of` for this lambda argument: add a spec block to the lambda (e.g. `|x| .. spec { aborts_if ..; ensures ..; }`)
+    ┌─ ../../../aptos-move/framework/move-stdlib/sources/vector.move:620:42
+    │
+620 │             invariant forall j in 0..i: !aborts_of<f>(self[j]);
+    │                                          ^^^^^^^^^^^^^^^^^^^^^
+    │
+    ┌─ tests/sources/functional/closures/inline/stateful_nested_map_ref.move:7:9
+    │
+  7 │ ╭           v.map_ref(|inner| inner.map_ref(|x| {
+    │ │ ╭───────────────────'
+  8 │ │ │             R[@0x42].value = R[@0x42].value + 1;
+  9 │ │ │             *x + 1
+ 10 │ │ │         }))
+    │ ╰─│───────────' from a call inlined at this callsite
+    │   ╰──────────' lambda argument
+
+error: cannot resolve `result_of` for this lambda argument: add a spec block to the lambda (e.g. `|x| .. spec { aborts_if ..; ensures ..; }`)
+    ┌─ ../../../aptos-move/framework/move-stdlib/sources/vector.move:913:21
+    │
+913 │                 vec(result_of<f>(v[end - 1]))
+    │                     ^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    ┌─ tests/sources/functional/closures/inline/stateful_nested_map_ref.move:7:19
+    │
+  7 │           v.map_ref(|inner| inner.map_ref(|x| {
+    │ ╭───────────────────'
+  8 │ │             R[@0x42].value = R[@0x42].value + 1;
+  9 │ │             *x + 1
+ 10 │ │         }))
+    │ ╰──────────' lambda argument
+
+error: cannot resolve `aborts_of` for this lambda argument: add a spec block to the lambda (e.g. `|x| .. spec { aborts_if ..; ensures ..; }`)
+    ┌─ ../../../aptos-move/framework/move-stdlib/sources/vector.move:923:24
+    │
+923 │                     || aborts_of<f>(v[end - 1])
+    │                        ^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    ┌─ tests/sources/functional/closures/inline/stateful_nested_map_ref.move:7:19
+    │
+  7 │           v.map_ref(|inner| inner.map_ref(|x| {
+    │ ╭───────────────────'
+  8 │ │             R[@0x42].value = R[@0x42].value + 1;
+  9 │ │             *x + 1
+ 10 │ │         }))
+    │ ╰──────────' lambda argument

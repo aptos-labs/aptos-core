@@ -11,8 +11,7 @@ error: post-condition does not hold
     =         sum = <redacted>
     =     at tests/sources/functional/closures/inline/folds_of_idx.move:117: rev_each_ref
     =         v = <redacted>
-    =     at tests/sources/functional/closures/inline/folds_of_idx.move:126: rev_each_ref
-    =         <redacted> = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_idx.move:143: rev_sum_wrong
     =     at tests/sources/functional/closures/inline/folds_of_idx.move:118: rev_each_ref
     =         i = <redacted>
     =     at tests/sources/functional/closures/inline/folds_of_idx.move:119: rev_each_ref

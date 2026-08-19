@@ -1,19 +1,18 @@
 Move prover returns: exiting with verification errors
 error: post-condition does not hold
-    ┌─ tests/sources/functional/closures/inline/folds_of.move:146:9
+    ┌─ tests/sources/functional/closures/inline/folds_of.move:181:9
     │
-146 │         ensures result == spec_sum(v, len(v)) + 1; // error: off by one
+181 │         ensures result == spec_sum(v, len(v)) + 1; // error: off by one
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/closures/inline/folds_of.move:139: sum_wrong
+    =     at tests/sources/functional/closures/inline/folds_of.move:174: sum_wrong
     =         v = <redacted>
-    =     at tests/sources/functional/closures/inline/folds_of.move:148: sum_wrong (spec)
-    =     at tests/sources/functional/closures/inline/folds_of.move:140: sum_wrong
+    =     at tests/sources/functional/closures/inline/folds_of.move:183: sum_wrong (spec)
+    =     at tests/sources/functional/closures/inline/folds_of.move:175: sum_wrong
     =         sum = <redacted>
     =     at tests/sources/functional/closures/inline/folds_of.move:18: each_ref
     =         v = <redacted>
-    =     at tests/sources/functional/closures/inline/folds_of.move:27: each_ref
-    =         <redacted> = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of.move:183: sum_wrong (spec)
     =     at tests/sources/functional/closures/inline/folds_of.move:19: each_ref
     =         i = <redacted>
     =     at tests/sources/functional/closures/inline/folds_of.move:20: each_ref
@@ -30,6 +29,6 @@ error: post-condition does not hold
     =     at tests/sources/functional/closures/inline/folds_of.move:26: each_ref
     =     at tests/sources/functional/closures/inline/folds_of.move:27: each_ref
     =     at tests/sources/functional/closures/inline/folds_of.move:21: each_ref
-    =     at tests/sources/functional/closures/inline/folds_of.move:139: sum_wrong
+    =     at tests/sources/functional/closures/inline/folds_of.move:174: sum_wrong
     =         result = <redacted>
-    =     at tests/sources/functional/closures/inline/folds_of.move:146: sum_wrong (spec)
+    =     at tests/sources/functional/closures/inline/folds_of.move:181: sum_wrong (spec)

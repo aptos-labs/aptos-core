@@ -90,12 +90,36 @@ callee-precondition material (the analysis reserves a requires field for future
 use); if the body calls a function carrying a `requires` condition, or applies a
 function value whose `requires` is unknown, `requires_of` reports an error rather
 than dishonestly claiming `true` (the callee preconditions themselves are still
-checked at their call sites within the beta-reduced expansion). Derivation fails —
-and the behavioral predicate reports the "add a spec block" error — for bodies with
-loops (no invariants are available), escaping lambda values, or writes through
-references of the enclosing scope. On any such failure the predicate is left
-intact over the resolved lambda, which keeps the expression well-typed (a
-constant would not be, for `result_of` over a non-bool lambda).
+checked at their call sites within the beta-reduced expansion). Derivation
+fails for bodies with loops (no invariants are available), escaping lambda
+values, or writes through references of the enclosing scope. In a loop
+invariant, underivable `ensures_of` warns and weakens the complete invariant
+condition to `true`; other predicates report the "add a spec block" error. On
+any such failure the predicate is first left intact over the resolved lambda,
+which keeps the expression well-typed (a constant would not be, for
+`result_of` over a non-bool lambda); the enclosing inliner then performs the
+diagnosed weakening where allowed.
+
+There is one compositional exception to the loop restriction. An inline
+`map_ref` can expose recursive `spec_map_ref` and `spec_map_ref_aborts`
+summaries and use both in its loop invariants. At expansion, the inliner
+specializes those recursions over the literal lambda and carries the resulting
+value and abort expressions in a prover-internal `InlineCallSummary` marker.
+If that expanded `map_ref` is itself inside a lambda, source derivation consumes
+the marker instead of symbolically executing the inner loop. The marker is
+prover-only and is removed during instrumentation; the executable expansion
+also asserts that its actual result equals the carried value summary, while its
+abort paths remain explicit. Thus nesting is compositional without trusting the
+summary or weakening verification. See `nested_map_ref.move`.
+
+A summarized call returning `&mut T` normally needs a place projection so
+later reads or writes through the result preserve its alias. If the call is a
+non-final sequence expression, however, Move discards that result immediately.
+The derivation then keeps the call's abort condition and `&mut`-argument
+post-values, but does not require a place for the unused result. This covers
+chaining-style mutators such as `scalar_mul_assign`; consuming their returned
+reference still requires a derivable projection. See
+`discarded_mut_ref_result.move`.
 
 Behavioral predicates are the *only* way to access a function value in a
 specification: directly applying one (`assert f(x)` in an in-body spec block, or in
@@ -230,11 +254,13 @@ the invariants *provable*; framing of the beta-reduced body itself is free,
 since Boogie's memory model sees the real per-address writes. See
 `tests/sources/functional/closures/inline/state_hofs.move`.
 
-What still errors (see `bp_inline_errors.move`):
+Remaining state limitations (see `bp_inline_errors.move`):
 
 - **Intermediate states**: two dependent global effects in one lambda leave a
   labeled (non-default) memory range after projection — the state between the
-  effects cannot be named in an invariant.
+  effects cannot be named in an invariant. An `ensures_of` loop invariant is
+  weakened with a warning; contexts which cannot soundly drop the condition
+  still error.
 - **State-dependent `result_of` values outside of loop invariants**: the value
   spliced for `result_of` — whether from an attached functional
   `ensures result == E` or derived from the body — cannot reference the
@@ -246,7 +272,8 @@ What still errors (see `bp_inline_errors.move`):
   covers these cases (see `result_of_attached_state.move`).
 - **Unknown callee footprints**: `unchanged_of` requires the modifies footprint
   derived from the lambda's own body; a lambda calling a state-mutating
-  function has none. (The callee's `ensures_of`/`aborts_of` summaries
+  function has none. The condition is weakened with a verifier-only warning.
+  (The callee's `ensures_of`/`aborts_of` summaries
   themselves *do* pass through, as nested predicates with the same
   entry/current meaning — note that `aborts_of<callee>` is a single-state
   predicate and evaluates at the current state.)
@@ -300,16 +327,17 @@ mode only), it:
    literal-lambda specialization path (previous section), so caller
    restatements with spec-equivalent lambdas unify onto the same specialized
    function;
-5. records snapshot bindings `let c$pre = c;` (dereferenced for `&mut`
-   captures) which the inliner wraps around the expanded body *inside* the
-   parameter binding — after the invocation's arguments are evaluated.
+5. records the captures' base values in verifier temporaries at an
+   expansion-entry `FoldsCaptureAnchor` (dereferencing `&mut` captures), and
+   routes the invariant's `old(..)` reads to that anchor. These snapshots do
+   not create Move values and therefore require no `copy` or `drop` ability.
 
 The substituted invariant is the bundle
 
 ```text
-(c1, .., ck) == spec_fold$N(v, c1$pre, .., ck$pre, i)      // the equation
+(c1, .., ck) == spec_fold$N(v, old@L(c1), .., old@L(ck), i) // the equation
 && forall j in 0..i:                                        // prefix no-abort
-     !ABORT[c1..ck -> spec_fold$N(v, c1$pre, .., ck$pre, j), e -> v[j]]
+     !ABORT[c1..ck -> spec_fold$N(v, old@L(c1), .., old@L(ck), j), e -> v[j]]
 ```
 
 where `ABORT` is the disjunction of the lambda's derived abort conditions with
@@ -365,12 +393,16 @@ capture count is bounded by the Boogie tuple maximum (8).
 lambda, `ensures_of` resolves by *dropping* the derived conjuncts that
 mention a capture — a sound weakening; the capture facts are `folds_of`
 material (a generic point-wise `ensures_of` invariant therefore stays
-applicable). `aborts_of` and `result_of` error, pointing to `folds_of`: the
-captures' values at a given application are not expressible point-wise.
-`unchanged_of` and `requires_of` are unaffected (capture writes do not touch
-memory, and requires-material is capture-independent).
+applicable). `aborts_of` errors, pointing to `folds_of`: the captures' values
+at a given application are not expressible point-wise. `result_of` accepts a
+derived result which is independent of every mutated capture; it errors when
+the result reads a mutated capture (or cannot be derived), because that value
+depends on the capture's unnameable per-application pre-state. `unchanged_of`
+and `requires_of` are unaffected (capture writes do not touch memory, and
+requires-material is capture-independent).
 
-**Boundaries** (all reported as errors, see `folds_of_errors.move`):
+**Semantic derivation boundaries** warn and weaken the complete loop-invariant
+condition to `true` (see `folds_of_errors.move`):
 
 - *Capture writes combined with global state access*: the transformer and the
   abort conditions must be pure and single-state — their per-iteration
@@ -378,6 +410,8 @@ memory, and requires-material is capture-independent).
 - *Underivable per-iteration effect*: loops in the lambda body, callees
   without a modular summary, or final capture values not expressible over the
   iteration's pre-state.
+- *State-reading general-form index function*: its per-iteration evaluation
+  state cannot be named by the loop invariant.
 - *Accumulation through a callee* (only when no post value can be routed,
   see "Consuming callee specs" below): a lambda passing the capture (or a
   `&mut` to it) to a function call whose effect on the `&mut` parameter is
@@ -385,30 +419,40 @@ memory, and requires-material is capture-independent).
   without a functional ensures, or aliasing `&mut` arguments; the remedy is
   to perform the update in the lambda body, call a helper returning the new
   value, or give the callee a functional `ensures` for the `&mut` parameter.
-- *Parameter writes*: a lambda writing a variable that names a parameter of
-  the enclosing function is rejected — the body reads a parameter as a
-  temporary but assigns it by symbol, so the derivation cannot connect the
-  reads to the capture's evolving value; the remedy is to copy the parameter
-  into a local and capture that.
-- *Non-copy/non-drop captures*: the snapshot binding records the capture's
-  value at expansion entry, requiring `copy` and `drop`.
+- *Unexpressible capture post-values*: aliasing or relational summaries may
+  establish conditions on the final captures without yielding values usable
+  as the fold transformer's next accumulator.
+
+**Structural boundaries** remain errors:
+
+- *Direct parameter reassignment*: mutation through an enclosing function's
+  parameter (including fields of an `&mut` parameter) is supported by
+  normalizing its AST temporary to a stable derivation symbol. A direct
+  assignment which instead names the parameter by symbol is still rejected:
+  its reads use a temporary, and the write-only symbol cannot be
+  distinguished from a shadowing local. Copy it into a local and capture
+  that instead.
+- *Capture abilities*: capture snapshots are verifier temporaries, so values
+  without `copy` or `drop` are supported.
 - *More than 8 captures* (the generated recursion returns the capture tuple).
 - *`&mut` lambda parameters*: the folded iteration arguments would evolve
   with the iteration; the `_mut` HOF variants keep their dual-form
   point-wise invariant sets instead.
 - *General-form index function*: must be a literal lambda producing a literal
-  tuple of the target's arguments; must not access global state; and must not
-  depend on a captured variable the lambda writes (the index arguments are
+  tuple of the target's arguments and must not depend on a captured variable
+  the lambda writes (the index arguments are
   re-evaluated per iteration, so a dependency on the evolving capture would
   make them state-dependent). It also cannot reference function-typed
   parameters.
 - *Outside a loop invariant*: `folds_of` is rejected in any other context.
-- *Consuming iteration*: the fold equation and the prefix no-abort condition
-  evaluate the vector (resp. the index arguments) in the loop's *current*
-  state, so a loop that consumes its elements as it iterates (`for_each`,
-  `fold` and the other by-value vector HOFs, which pop from a reversed
-  vector) cannot carry `folds_of` — the consumed prefix no longer exists in
-  any current-state expression.
+- *Non-compositional forwarding*: mixed capture-writing/forwarding lambdas
+  weaken the fold invariant with a verifier warning linked to #20383. A final
+  function-value target in a non-inline function remains an error.
+- *Consuming iteration*: an expansion-entry parameter anchor retains the
+  logical input without constructing a Move copy. A reverse-consuming loop
+  can therefore use the general form
+  `folds_of<f>(|j| old(v)[len(old(v)) - 1 - j], processed)` even after the
+  executable vector has popped those elements.
 
 In non-verify compilation, conditions containing unresolved behavioral
 predicates — including `folds_of` — are replaced by `true` through the
@@ -524,13 +568,14 @@ deferred occurrence carries an **anchor label** in its `MemoryRange`, and
 the expansion prepends a spec-transparent
 `Operation::FoldsCaptureAnchor(label)` marker statement (the
 `SaveStateAnchor` pattern) at the point where the snapshots belong. When an
-outer expansion finally resolves the anchored occurrence, a body post-pass
-inserts the snapshot bindings `let c$pre = c;` at the matching marker — so
-each entry into the marked region re-records the captures — and erases
-consumed or stale markers. Labels are freshened per expansion of a body
-carrying anchors, so the same wrapper expanded twice in one function cannot
-alias. In non-verify compilation the seam is unchanged: unresolved deferred
-predicates are replaced by `true`.
+outer expansion finally resolves the anchored occurrence, its generated
+invariant reads the base values through `WithStateAnchor(label, old(c))`.
+Spec instrumentation then records the referenced captures in verifier
+temporaries at the matching marker, so each entry into the marked region
+re-records them; a body post-pass erases only stale markers. Labels are
+freshened per expansion of a body carrying anchors, so the same wrapper
+expanded twice in one function cannot alias. In non-verify compilation the
+seam is unchanged: unresolved deferred predicates are replaced by `true`.
 
 **Per-bucket strength.** For a bucketed container, the deferred fold
 resolves once per inner loop: the caller obtains the fold equation and
@@ -539,10 +584,10 @@ bucket-loop entry. A whole-table vocabulary — a flat index across buckets
 with a locate lemma relating it to `(bucket, offset)` positions — is a
 named follow-up.
 
-**Boundaries** (each reported as a precise error): mixed forwarder shapes
-(see above); `folds_of` whose target resolves, after all expansion levels,
-to a non-lambda function value; bv-typed material (see the known boundary
-above). Relatedly, when restating a specialized fold in a caller condition,
+**Boundaries**: mixed capture-writing forwarders weaken the condition with a
+warning (see above). A `folds_of` target which resolves, after all expansion
+levels, to a non-lambda function value and bv-typed material remain precise
+errors. Relatedly, when restating a specialized fold in a caller condition,
 annotate integer literals with their concrete type (e.g. `1u64`): in spec
 contexts unannotated literals default to the widest type, and specialization
 unification requires the instantiations of the restatement and the code
@@ -557,31 +602,21 @@ dual-form `_mut` HOF invariants (`length(self) == length(old(self))`,
 `ensures_of<f>(old(self)[j], self[j])`, the suffix frame) mean: the
 enclosing function's entry state does not in general contain the receiver's
 value (a field projection `&mut s.v` or a `borrow_global_mut(..)` result is
-constructed at the call site). The inliner therefore records the
-parameters' entry values in snapshot bindings `let p$pre = *p;` inside the
-expansion's parameter-binding block — the same pattern as the `folds_of`
-capture snapshots — and redirects the conditions' `old(p)` references to
-the snapshots (`anchor_param_old_at_expansion_entry`). `old(..)` over
-anything other than a plain parameter (state reads, body locals, the
-parameters of an attached lambda spec) keeps its function-entry anchoring.
+constructed at the call site). The inliner therefore places a verifier-state
+anchor inside the expansion's parameter-binding block and redirects
+`old(p)` through the matching `WithStateAnchor` wrapper
+(`anchor_param_old_at_expansion_entry`). Spec instrumentation records the
+bound parameter in a verifier temporary at that point. No Move value is
+constructed, so owned and referenced parameters need neither `copy` nor
+`drop`; the same mechanism works through generic forwarding expansions.
 
-Recording the value requires the parameter's value type to have `copy` and
-`drop`. Two boundary cases:
-
-- **Non-copy receivers at final expansions.** When the expansion target is
-  a regular function, the instantiation is final; insufficient abilities
-  get a precise error naming the parameter and the call site.
-- **Generic inline forwarders.** An inline function's body is pre-expanded
-  once, bottom-up, with its own generic type parameters. When an inner
-  `_mut` HOF's receiver type is not copyable *at that level* (e.g.
-  `smart_table::for_each_mut` iterating buckets of `Entry<K, V>` with
-  unbounded `K, V`), the occurrence is skipped silently — an eventual
-  instantiation may well be copyable, and no caller exists to direct an
-  error at — and keeps its function-entry anchoring: non-entry receivers
-  reached through such a wrapper still fail the invariants' base case.
-  Anchoring these would take deferred snapshot materialization at the
-  outer expansion (the `FoldsCaptureAnchor` pattern extended to `old(..)`
-  anchors), which is not currently implemented.
+For a consuming fold, an anchored parameter read can appear in the generated
+accumulator transformer. Since `old(..)` cannot remain in the recursive
+single-state spec-function body, the specializer abstracts the anchored read
+into a context parameter and supplies its concrete verifier-state value at
+the loop invariant call. `old(..)` over anything other than a plain parameter
+(state reads, body locals, and parameters of an attached lambda spec) keeps
+its function-entry anchoring.
 
 ## Verification-Stage Boundaries
 

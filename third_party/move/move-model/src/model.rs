@@ -636,11 +636,10 @@ pub struct GlobalEnv {
     /// can register new spec functions. Must not call `add_used_spec_fun` while a borrow
     /// from `is_spec_fun_used` or iteration is held.
     pub(crate) used_spec_funs: RefCell<BTreeSet<QualifiedId<SpecFunId>>>,
-    /// Specification functions occurring in behavioral-predicate material
-    /// inlined from a lambda. Their applications can receive values related
-    /// only by Move equality, so uninterpreted members need an explicit
-    /// congruence axiom in non-extensional backend theories.
-    pub(crate) move_equality_congruence_spec_funs: RefCell<BTreeSet<QualifiedInstId<SpecFunId>>>,
+    /// Spec-function calls originating in inlined behavioral predicates.
+    /// Locations survive AST cloning while node ids do not.
+    pub(crate) move_equality_congruence_spec_fun_calls:
+        RefCell<BTreeSet<(Loc, QualifiedId<SpecFunId>)>>,
     /// An annotation of all intrinsic declarations
     pub(crate) intrinsics: IntrinsicsAnnotation,
     /// A type-indexed container for storing extension data in the environment.
@@ -726,7 +725,7 @@ impl GlobalEnv {
             global_invariants: Default::default(),
             global_invariants_for_memory: Default::default(),
             used_spec_funs: RefCell::new(BTreeSet::new()),
-            move_equality_congruence_spec_funs: RefCell::new(BTreeSet::new()),
+            move_equality_congruence_spec_fun_calls: RefCell::new(BTreeSet::new()),
             intrinsics: Default::default(),
             extensions: Default::default(),
             stdlib_address: None,
@@ -1642,37 +1641,28 @@ impl GlobalEnv {
         }
     }
 
-    /// Marks spec functions occurring in an inlined behavioral predicate,
-    /// transitively including spec functions called from their bodies. The
-    /// backend uses this narrow set to emit Move-equality congruence axioms
-    /// without burdening unrelated verification conditions with quantified
-    /// axioms for every uninterpreted spec function in the program.
+    /// Marks calls originating in an inlined behavioral predicate. Recording
+    /// call sites lets monomorphization ignore material later discarded by a
+    /// verification fallback.
     pub fn mark_move_equality_congruence_spec_funs_in(&self, exp: &Exp) {
-        let mut todo = exp.called_spec_funs(self).into_iter().collect_vec();
-        while let Some(id) = todo.pop() {
-            if !self
-                .move_equality_congruence_spec_funs
-                .borrow_mut()
-                .insert(id.clone())
-            {
-                continue;
+        exp.visit_pre_order(&mut |sub| {
+            if let ExpData::Call(id, Operation::SpecFunction(mid, fid, _), _) = sub {
+                self.move_equality_congruence_spec_fun_calls
+                    .borrow_mut()
+                    .insert((self.get_node_loc(*id), mid.qualified(*fid)));
             }
-            if let Some(body) = self.get_spec_fun(id.to_qualified_id()).body.clone() {
-                todo.extend(
-                    body.called_spec_funs(self)
-                        .into_iter()
-                        .map(|callee| callee.instantiate(&id.inst)),
-                );
-            }
-        }
+            true
+        });
     }
 
-    /// Whether this spec function needs Move-equality congruence because it
-    /// occurs in material inlined from a behavioral predicate.
-    pub fn spec_fun_needs_move_equality_congruence(&self, id: QualifiedInstId<SpecFunId>) -> bool {
-        self.move_equality_congruence_spec_funs
+    pub fn spec_fun_call_needs_move_equality_congruence(
+        &self,
+        id: NodeId,
+        fun: QualifiedId<SpecFunId>,
+    ) -> bool {
+        self.move_equality_congruence_spec_fun_calls
             .borrow()
-            .contains(&id)
+            .contains(&(self.get_node_loc(id), fun))
     }
 
     /// Determines whether the given spec fun is recursive.

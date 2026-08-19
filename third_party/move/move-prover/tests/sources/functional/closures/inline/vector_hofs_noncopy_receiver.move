@@ -1,8 +1,5 @@
-// Error case for expansion-entry anchoring of `old(..)` over inline
-// function parameters (see `vector_hofs_mut_receiver.move` for the
-// positive cases): recording the receiver's value at the expansion entry
-// requires the value type to have the `copy` and `drop` abilities.
-module 0x42::vector_hofs_mut_receiver_err {
+// Expansion-entry snapshots do not require `copy`.
+module 0x42::vector_hofs_noncopy_receiver {
     use std::vector;
 
     struct NoCopy has store, drop { x: u64 }
@@ -28,6 +25,10 @@ module 0x42::vector_hofs_mut_receiver_err {
         } spec {
             aborts_if false;
             ensures e.x == 0;
-        }); // error: element type without `copy` cannot be recorded at the expansion entry
+        });
+    }
+    spec clear_all {
+        aborts_if false;
+        ensures forall i in 0..len(h.v): h.v[i].x == 0;
     }
 }
