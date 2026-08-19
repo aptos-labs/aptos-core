@@ -177,3 +177,37 @@ error: a lambda with global state effects cannot be constrained in the body of a
 250 │ │             let R { v: _ } = move_from<R>(x);
 251 │ │         }, a); // error: a lambda with global state effects cannot be constrained in the body of a spec function
     │ ╰─────────' lambda argument
+
+error: cannot resolve `result_of` for this lambda argument: add a spec block to the lambda (e.g. `|x| .. spec { aborts_if ..; ensures ..; }`)
+    ┌─ tests/sources/functional/closures/inline/bp_inline_errors.move:266:42
+    │
+266 │                 invariant forall j in 0..i: !result_of<p>(v[j]);
+    │                                              ^^^^^^^^^^^^^^^^^^
+    ·
+279 │ ╭           any(v, |e| {
+    │ │ ╭────────────────'
+280 │ │ │             let i = 0;
+281 │ │ │             while (i < *e) {
+282 │ │ │                 i = i + 1;
+283 │ │ │             };
+284 │ │ │             i == 0
+285 │ │ │         }) // error: cannot resolve `result_of`, lambda needs a spec block
+    │ ╰─│──────────' from a call inlined at this callsite
+    │   ╰─────────' lambda argument
+
+error: cannot resolve `result_of` for this lambda argument: add a spec block to the lambda (e.g. `|x| .. spec { aborts_if ..; ensures ..; }`)
+    ┌─ tests/sources/functional/closures/inline/bp_inline_errors.move:269:56
+    │
+269 │                 assert result <==> (exists j in 0..len(v): result_of<p>(v[j]));
+    │                                                            ^^^^^^^^^^^^^^^^^^
+    ·
+279 │ ╭           any(v, |e| {
+    │ │ ╭────────────────'
+280 │ │ │             let i = 0;
+281 │ │ │             while (i < *e) {
+282 │ │ │                 i = i + 1;
+283 │ │ │             };
+284 │ │ │             i == 0
+285 │ │ │         }) // error: cannot resolve `result_of`, lambda needs a spec block
+    │ ╰─│──────────' from a call inlined at this callsite
+    │   ╰─────────' lambda argument

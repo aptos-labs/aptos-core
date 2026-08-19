@@ -250,4 +250,38 @@ module 0x42::bp_inline_errors {
             let R { v: _ } = move_from<R>(x);
         }, a); // error: a lambda with global state effects cannot be constrained in the body of a spec function
     }
+
+    inline fun any(v: &vector<u64>, p: |&u64|bool): bool {
+        let result = false;
+        let i = 0;
+        while (i < std::vector::length(v)) {
+            result = p(std::vector::borrow(v, i));
+            if (result) {
+                break
+            };
+            i = i + 1
+        } spec {
+            invariant i <= len(v);
+            invariant !result;
+            invariant forall j in 0..i: !result_of<p>(v[j]);
+        };
+        spec {
+            assert result <==> (exists j in 0..len(v): result_of<p>(v[j]));
+        };
+        result
+    }
+
+    /// A failing `result_of` substitution in an `any`-style HOF must also be
+    /// dropped from its post-loop assertion. Otherwise the assertion
+    /// retains a literal lambda after the inline expansion and later lambda
+    /// lifting fails while recovering from this diagnostic.
+    fun any_result_of_underivable(v: &vector<u64>): bool {
+        any(v, |e| {
+            let i = 0;
+            while (i < *e) {
+                i = i + 1;
+            };
+            i == 0
+        }) // error: cannot resolve `result_of`, lambda needs a spec block
+    }
 }

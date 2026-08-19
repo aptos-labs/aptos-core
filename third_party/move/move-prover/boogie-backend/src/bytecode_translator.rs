@@ -2648,14 +2648,7 @@ impl<'env> BoogieTranslator<'env> {
                 ),
                 rhs_args.join(", ")
             );
-            emitln!(
-                self.writer,
-                "axiom (forall {} :: {{{}}} {} == {});",
-                decls.join(", "),
-                eval_call,
-                eval_call,
-                rhs
-            );
+            self.emit_result_of_equivalence_axiom(&decls, &eval_call, &rhs);
         }
 
         for info in closure_infos {
@@ -2707,14 +2700,7 @@ impl<'env> BoogieTranslator<'env> {
                 boogie_behavioral_fun_result_name(env, &info.fun, result_is_tuple),
                 rhs_args.join(", ")
             );
-            emitln!(
-                self.writer,
-                "axiom (forall {} :: {{{}}} {} == {});",
-                decls.join(", "),
-                eval_call,
-                eval_call,
-                rhs
-            );
+            self.emit_result_of_equivalence_axiom(&decls, &eval_call, &rhs);
         }
 
         let fun_ty = boogie_type(env, fun_type, false);
@@ -2760,6 +2746,21 @@ impl<'env> BoogieTranslator<'env> {
                 decls.join(", "),
                 eval_call,
                 ctor,
+                eval_call,
+                rhs
+            );
+        }
+    }
+
+    fn emit_result_of_equivalence_axiom(&self, decls: &[String], eval_call: &str, rhs: &str) {
+        if decls.is_empty() {
+            emitln!(self.writer, "axiom {} == {};", eval_call, rhs);
+        } else {
+            emitln!(
+                self.writer,
+                "axiom (forall {} :: {{{}}} {} == {});",
+                decls.join(", "),
+                eval_call,
                 eval_call,
                 rhs
             );

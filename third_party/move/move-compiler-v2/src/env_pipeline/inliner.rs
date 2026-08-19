@@ -7415,12 +7415,9 @@ impl ExpRewriterFunctions for InlinedRewriter<'_, '_> {
                 ..cond.clone()
             });
         }
-        if !matches!(cond.kind, ConditionKind::LoopInvariant) {
-            return None;
-        }
         let mut result = cond.clone();
         let mut changed = false;
-        if self.current_condition_has_folds_of {
+        if cond.kind == ConditionKind::LoopInvariant && self.current_condition_has_folds_of {
             result.properties.insert(
                 self.env.symbol_pool().make(FOLDS_OF_INVARIANT_MARKER),
                 move_model::ast::PropertyValue::Value(Value::Bool(true)),
@@ -7429,7 +7426,7 @@ impl ExpRewriterFunctions for InlinedRewriter<'_, '_> {
         }
         let (exp, unresolved) = weaken_unresolved_conjuncts(self.env, &cond.exp);
         if unresolved {
-            self.unresolved_behavior_in_spec = true;
+            self.unresolved_behavior_in_spec |= cond.kind == ConditionKind::LoopInvariant;
             result.exp = exp;
             changed = true;
         }
