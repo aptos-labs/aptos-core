@@ -233,7 +233,9 @@ pub struct Heap {
 
 impl Heap {
     pub fn new(size: usize) -> Self {
-        let buffer = MemoryRegion::new(size);
+        // Uninitialized is safe: `heap_alloc` zeroes each object before handing
+        // out its pointer, and nothing reads `[bump_ptr, buffer.end)`.
+        let buffer = MemoryRegion::new_uninit(size);
         Self {
             bump_ptr: buffer.as_ptr(),
             buffer,
@@ -453,6 +455,13 @@ impl<'a> RootScanner<'a> {
 ///
 /// Returns [`AllocationError::OutOfHeapMemory`] when the heap is full
 /// so the caller can trigger GC and retry.
+///
+/// # Invariants
+///
+/// Prior to allocation, the region is zeroed. This is a safety mechanism
+/// when the heap buffer is allocated uninitialized to make sure that the
+/// inter-field padding or any extra memory allocated due to alignment is
+/// always zero.
 pub(crate) fn heap_alloc(
     heap: &mut Heap,
     total_size: usize,
@@ -494,11 +503,13 @@ pub(crate) fn heap_alloc(
         // material win for large/wide-variant enums). It is not a drop-in
         // change: `gc_copy_object` / `deep_copy` copy the full object image
         // including dead-variant tail and inter-field padding, which is
-        // deterministically zero today; leaving it uninitialized makes that
-        // image carry stale heap bytes. Prefer zeroing only the
-        // tail/padding the active variant does not write (still skipping the
-        // large active body), or audit that no byte-image consumer
-        // (state commit / hashing) depends on those bytes first.
+        // deterministically zero today because this memset is the sole
+        // initializer (the backing buffer is uninitialized). Skipping it makes
+        // that image read uninitialized memory (UB), not merely stale bytes.
+        // Prefer zeroing only the tail/padding the active variant does not
+        // write (still skipping the large active body), or audit that no
+        // byte-image consumer (state commit / hashing) depends on those bytes
+        // first.
         std::ptr::write_bytes(header_start, 0, aligned_size);
         let obj_ptr = header_start.add(OBJECT_HEADER_SIZE);
         write_object_header(obj_ptr, descriptor_id, aligned_size as u32);
@@ -812,7 +823,9 @@ pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
 ) -> VMResult<()> {
     heap.gc_count += 1;
 
-    let to_space = MemoryRegion::new(heap.buffer.len());
+    // Uninitialized is safe: the copy below fills to-space contiguously up to
+    // `free_ptr`, and the Phase-2 scan only reads `[to_space.start, free_ptr)`.
+    let to_space = MemoryRegion::new_uninit(heap.buffer.len());
     // `free_ptr` is a raw bump cursor — it points at the start of the
     // next *header* reservation, advancing by each object's total size.
     // Treating it as a raw cursor (rather than as an "object pointer"

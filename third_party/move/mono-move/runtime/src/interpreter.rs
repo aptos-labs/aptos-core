@@ -243,7 +243,7 @@ impl<'guard> InterpreterContext<'guard> {
                 .join("\n")
         );
 
-        let stack = MemoryRegion::new(DEFAULT_STACK_SIZE);
+        let stack = MemoryRegion::new_zeroed(DEFAULT_STACK_SIZE);
         let base = stack.as_ptr();
 
         unsafe {
@@ -277,7 +277,7 @@ impl<'guard> InterpreterContext<'guard> {
         resource_provider: &'guard dyn ResourceProvider,
         natives: &'guard ProductionNativeRegistry,
     ) -> Self {
-        let stack = MemoryRegion::new(DEFAULT_STACK_SIZE);
+        let stack = MemoryRegion::new_zeroed(DEFAULT_STACK_SIZE);
         let base = stack.as_ptr();
 
         unsafe {

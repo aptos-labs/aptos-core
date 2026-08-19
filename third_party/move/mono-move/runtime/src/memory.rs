@@ -22,13 +22,48 @@ pub struct MemoryRegion {
 impl MemoryRegion {
     /// Allocates a zeroed, [`MAX_ALIGN`]-aligned memory region of the given size.
     ///
+    /// Use this whenever a caller may read a slot before writing it (e.g. the
+    /// interpreter stack). For memory that is always written before it is read,
+    /// prefer [`Self::new_uninit`] to skip the zeroing.
+    ///
     /// OOM is handled by aborting via `handle_alloc_error`.
-    pub fn new(size: usize) -> Self {
+    pub fn new_zeroed(size: usize) -> Self {
+        Self::new::<true>(size)
+    }
+
+    /// Allocates an uninitialized, [`MAX_ALIGN`]-aligned memory region of the
+    /// given size. The bytes hold arbitrary values, so the region must be
+    /// written before it is read.
+    ///
+    /// # Safety
+    ///
+    /// This is safe for the heap buffer and the GC to-space because every byte
+    /// that is ever read is written first:
+    /// - `heap_alloc` zeroes each object's region before returning its pointer,
+    ///   and all reads go through object pointers within `[buffer.start, bump_ptr)`.
+    /// - The GC copies fill to-space contiguously up to `free_ptr` and only ever
+    ///   scan `[to_space.start, free_ptr)`; the unbumped tail is never touched.
+    ///
+    /// OOM is handled by aborting via `handle_alloc_error`.
+    pub fn new_uninit(size: usize) -> Self {
+        Self::new::<false>(size)
+    }
+
+    /// Shared body of [`Self::new_zeroed`] / [`Self::new_uninit`]. `ZEROED`
+    /// selects `alloc_zeroed` vs `alloc`; both paths null-check and abort via
+    /// `handle_alloc_error` on OOM.
+    fn new<const ZEROED: bool>(size: usize) -> Self {
         debug_assert!(size > 0);
         let layout = Layout::from_size_align(size, MAX_ALIGN).expect("invalid memory layout");
-        // SAFETY: layout is valid (power-of-two alignment) and `alloc_zeroed` handles
-        // zero-size layouts per the GlobalAlloc contract. Null is checked below.
-        let ptr = unsafe { alloc::alloc_zeroed(layout) };
+        // SAFETY: layout is valid (power-of-two alignment, non-zero size). Null
+        // is checked below.
+        let ptr = unsafe {
+            if ZEROED {
+                alloc::alloc_zeroed(layout)
+            } else {
+                alloc::alloc(layout)
+            }
+        };
         if ptr.is_null() {
             alloc::handle_alloc_error(layout);
         }
