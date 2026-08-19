@@ -15,34 +15,30 @@ outputs:
 runs:
   using: composite
   steps:
-    # Checkout the repository and set up only what target determination needs.
-    - uses: actions/checkout@v4
-      with:
-        ref: ${{ github.event.pull_request.head.sha }}
-        fetch-depth: 0 # Fetch all git history for accurate target determination
     # Do not use rust-setup here: it runs dev_setup with test-only dependencies
     # (including NodeSource, Move Prover, PostgreSQL, and protoc plugins).
     - name: Set up Rust toolchain
       uses: dsherret/rust-toolchain-file@3551321aa44dd44a0393eb3b6bdfbc5d25ecf621 # pin@v1
 
-    # Restore the target cache, but never save an entry after compiling the
-    # pull request's code.
-    - name: Restore Cargo cache
+    # Target determination only builds aptos-cargo-cli. Avoid restoring or saving
+    # the general workspace target cache, which is large and not useful here.
+    - name: Restore Cargo registry cache
       uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # pin@v2.9.1
       with:
         cache-bin: false
+        cache-targets: false
         save-if: false
 
-    - name: Set up Git credentials
-      if: inputs.GIT_CREDENTIALS != ''
-      shell: bash
-      run: |
-        git config --global credential.helper store
-        echo "${{ inputs.GIT_CREDENTIALS }}" > ~/.git-credentials
-
     # Output the changed files
-    - name: Output the changed files
-      run: cargo x changed-files -vv
+    - name: Set up Git credentials and output the changed files
+      env:
+        TARGET_DETERMINATOR_GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
+      run: |
+        if [[ -n "$TARGET_DETERMINATOR_GIT_CREDENTIALS" ]]; then
+          git config --global credential.helper store
+          printf '%s\n' "$TARGET_DETERMINATOR_GIT_CREDENTIALS" > ~/.git-credentials
+        fi
+        cargo x changed-files -vv
       shell: bash
 
     # Output the affected packages

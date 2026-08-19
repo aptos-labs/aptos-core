@@ -133,9 +133,16 @@ jobs:
       run_framework_upgrade_test: ${{ steps.determine_test_targets.outputs.run_framework_upgrade_test }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Target determination must analyze the PR revision with full history.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
       - name: Run the test target determinator
         id: determine_test_targets
-        uses: ./.github/actions/test-target-determinator
+        # This workflow runs on pull_request_target and then checks out the PR.
+        # Load the action outside the mutable workspace so changing its manifest
+        # in a future PR cannot break the runner's cached post-step metadata.
+        uses: aptos-labs/aptos-core/.github/actions/test-target-determinator@main
 
   # This is a PR required job.
   rust-images:
