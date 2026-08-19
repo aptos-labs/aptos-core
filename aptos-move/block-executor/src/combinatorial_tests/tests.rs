@@ -5,6 +5,7 @@ use crate::{
     code_cache_global_manager::AptosModuleCacheManagerGuard,
     errors::SequentialBlockExecutionError,
     executor::BlockExecutor,
+    single_transaction_executor::LegacyTransactionExecutor,
     proptest_types::{
         baseline::BaselineOutput,
         types::{
@@ -77,7 +78,7 @@ fn run_transactions<K, V, E>(
 
         let output = BlockExecutor::<
             MockTransaction<KeyType<K>, E>,
-            MockTask<KeyType<K>, E>,
+            LegacyTransactionExecutor<MockTask<KeyType<K>, E>>,
             MockStateView<KeyType<K>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<K>, E>, usize>,
             DefaultTxnProvider<MockTransaction<KeyType<K>, E>>,
@@ -277,7 +278,7 @@ fn publishing_fixed_params_with_block_gas_limit(
     let mut guard = AptosModuleCacheManagerGuard::none();
     let output = BlockExecutor::<
         MockTransaction<KeyType<[u8; 32]>, MockEvent>,
-        MockTask<KeyType<[u8; 32]>, MockEvent>,
+        LegacyTransactionExecutor<MockTask<KeyType<[u8; 32]>, MockEvent>>,
         DeltaDataView<KeyType<[u8; 32]>>,
         NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
         DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
@@ -327,7 +328,7 @@ fn publishing_fixed_params_with_block_gas_limit(
 
         let output = BlockExecutor::<
             MockTransaction<KeyType<[u8; 32]>, MockEvent>,
-            MockTask<KeyType<[u8; 32]>, MockEvent>,
+            LegacyTransactionExecutor<MockTask<KeyType<[u8; 32]>, MockEvent>>,
             DeltaDataView<KeyType<[u8; 32]>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
             DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
@@ -417,7 +418,7 @@ fn non_empty_group(
 
         let output = BlockExecutor::<
             MockTransaction<KeyType<[u8; 32]>, MockEvent>,
-            MockTask<KeyType<[u8; 32]>, MockEvent>,
+            LegacyTransactionExecutor<MockTask<KeyType<[u8; 32]>, MockEvent>>,
             NonEmptyGroupDataView<KeyType<[u8; 32]>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
             DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
@@ -441,7 +442,7 @@ fn non_empty_group(
 
         let output = BlockExecutor::<
             MockTransaction<KeyType<[u8; 32]>, MockEvent>,
-            MockTask<KeyType<[u8; 32]>, MockEvent>,
+            LegacyTransactionExecutor<MockTask<KeyType<[u8; 32]>, MockEvent>>,
             NonEmptyGroupDataView<KeyType<[u8; 32]>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
             DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,

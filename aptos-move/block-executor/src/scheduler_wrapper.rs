@@ -2,20 +2,18 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
+    captured_reads::TxnInput,
     executor_utilities::update_transaction_on_abort,
     scheduler::{DependencyResult, Scheduler, TWaitForDependency},
     scheduler_v2::SchedulerV2,
-    task::ExecutorTask,
+    task::TxnOutput,
     txn_last_input_output::TxnLastInputOutput,
 };
 use aptos_mvhashmap::{
     types::{Incarnation, TxnIndex},
     MVHashMap,
 };
-use aptos_types::{
-    block_executor::value::ValueWithLayout, error::PanicError,
-    transaction::BlockExecutableTransaction,
-};
+use aptos_types::{error::PanicError, transaction::BlockExecutableTransaction};
 use move_core_types::language_storage::ModuleId;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
@@ -24,7 +22,7 @@ use std::{
 };
 
 #[derive(Copy, Clone)]
-pub(crate) enum SchedulerWrapper<'a> {
+pub enum SchedulerWrapper<'a> {
     // The AtomicBool contains a flag that determines whether to skip module reads
     // when performing validation. BlockSTMv1 uses this as an optimization to
     // avoid unnecessary work when no modules have been published. BlockSTMv2 has
@@ -106,22 +104,23 @@ impl SchedulerWrapper<'_> {
         }
     }
 
-    pub(crate) fn abort_pre_final_reexecution<T, E>(
+    pub(crate) fn abort_pre_final_reexecution<T, I, O>(
         &self,
         txn_idx: TxnIndex,
         incarnation: Incarnation,
-        last_input_output: &TxnLastInputOutput<T, E::Output>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
+        last_input_output: &TxnLastInputOutput<T, I, O>,
+        versioned_cache: &MVHashMap<I::Key, I::Tag, I::Value, DelayedFieldID>,
     ) -> Result<(), PanicError>
     where
         T: BlockExecutableTransaction,
-        E: ExecutorTask<Txn = T>,
+        I: TxnInput,
+        O: TxnOutput<Txn = T, Key = I::Key, Tag = I::Tag>,
     {
         match self {
             SchedulerWrapper::V1(_, _) => {
                 // Updating the scheduler state not required as the execute method invoked
                 // in [executor::execute_txn_after_commit] does not take in the scheduler.
-                update_transaction_on_abort::<T, E>(txn_idx, last_input_output, versioned_cache);
+                update_transaction_on_abort(txn_idx, last_input_output, versioned_cache);
             },
             SchedulerWrapper::V2(scheduler, _) => {
                 scheduler.direct_abort(txn_idx, incarnation, true)?;
@@ -130,24 +129,21 @@ impl SchedulerWrapper<'_> {
         Ok(())
     }
 
-    pub(crate) fn prepare_for_block_epilogue<T, E>(
+    pub(crate) fn prepare_for_block_epilogue<T, I, O>(
         &self,
         block_epilogue_idx: TxnIndex,
-        last_input_output: &TxnLastInputOutput<T, E::Output>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, ValueWithLayout<T::Value>, DelayedFieldID>,
+        last_input_output: &TxnLastInputOutput<T, I, O>,
+        versioned_cache: &MVHashMap<I::Key, I::Tag, I::Value, DelayedFieldID>,
     ) -> Result<Incarnation, PanicError>
     where
         T: BlockExecutableTransaction,
-        E: ExecutorTask<Txn = T>,
+        I: TxnInput,
+        O: TxnOutput<Txn = T, Key = I::Key, Tag = I::Tag>,
     {
         match self {
             SchedulerWrapper::V1(scheduler, _) => {
                 let incarnation = scheduler.prepare_for_block_epilogue(block_epilogue_idx)?;
-                update_transaction_on_abort::<T, E>(
-                    block_epilogue_idx,
-                    last_input_output,
-                    versioned_cache,
-                );
+                update_transaction_on_abort(block_epilogue_idx, last_input_output, versioned_cache);
                 Ok(incarnation)
             },
             SchedulerWrapper::V2(scheduler, _) => {
