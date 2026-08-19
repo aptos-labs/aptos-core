@@ -20,7 +20,12 @@ use std::{
     sync::{Mutex, MutexGuard},
 };
 
-const SCHEMA_VERSION: u64 = 2;
+const SCHEMA_VERSION: u64 = 3;
+
+// Caller and root-function identities originate in replayed transactions. Keep the detailed
+// call-path map bounded so a stream of uniquely addressed wrapper modules cannot exhaust a
+// replay worker. Per-function totals are collected independently and remain complete.
+const MAX_USAGE_DETAIL_ROWS: usize = 100_000;
 
 #[derive(Parser)]
 #[group(id = "FrameworkUsageOpt")]
@@ -125,6 +130,10 @@ struct FrameworkUsageReport {
     target_modules: Vec<ModuleId>,
     processed_transaction_count: u64,
     transaction_usage_records: u64,
+    usage_detail_row_limit: usize,
+    usage_detail_truncated: bool,
+    dropped_usage_invocation_count: u64,
+    dropped_usage_transaction_count: u64,
     functions: Vec<FunctionInventoryRow>,
     function_usage: Vec<FunctionUsageRow>,
     usage: Vec<UsageRow>,
@@ -144,6 +153,8 @@ struct CollectorState {
     function_usage: BTreeMap<FunctionUsageKey, UsageCounts>,
     usage: BTreeMap<UsageKey, UsageCounts>,
     transaction_usage_records: u64,
+    dropped_usage_invocation_count: u64,
+    dropped_usage_transaction_count: u64,
     ledger_timestamps: Option<(u64, u64)>,
 }
 
@@ -152,11 +163,20 @@ pub(crate) struct FrameworkUsageCollector {
     end_version: Version,
     target_modules: BTreeSet<ModuleId>,
     inventory: Vec<FunctionInventoryRow>,
+    usage_detail_row_limit: usize,
     state: Mutex<CollectorState>,
 }
 
 impl FrameworkUsageCollector {
     pub(crate) fn new(start_version: Version, end_version: Version) -> Self {
+        Self::new_with_usage_detail_row_limit(start_version, end_version, MAX_USAGE_DETAIL_ROWS)
+    }
+
+    fn new_with_usage_detail_row_limit(
+        start_version: Version,
+        end_version: Version,
+        usage_detail_row_limit: usize,
+    ) -> Self {
         let mut target_modules = BTreeSet::new();
         let mut inventory = vec![];
 
@@ -187,6 +207,7 @@ impl FrameworkUsageCollector {
             end_version,
             target_modules,
             inventory,
+            usage_detail_row_limit,
             state: Mutex::new(CollectorState::default()),
         }
     }
@@ -217,6 +238,7 @@ impl FrameworkUsageCollector {
         let outcome = TransactionOutcome::from(&transaction.status);
         let mut per_transaction = BTreeMap::<UsageKey, u64>::new();
         let mut per_function = BTreeMap::<FunctionUsageKey, u64>::new();
+        let mut usage_detail_truncated = false;
         for call in transaction.calls {
             let function_key = FunctionUsageKey {
                 callee: call.callee.clone(),
@@ -234,10 +256,29 @@ impl FrameworkUsageCollector {
                 call_kind: call.kind,
                 outcome: outcome.clone(),
             };
-            let count = per_transaction.entry(key).or_default();
-            *count = count
+            if state.usage.contains_key(&key)
+                || per_transaction.contains_key(&key)
+                || state.usage.len().saturating_add(per_transaction.len())
+                    < self.usage_detail_row_limit
+            {
+                let count = per_transaction.entry(key).or_default();
+                *count = count
+                    .checked_add(1)
+                    .context("per-transaction invocation count overflow")?;
+            } else {
+                state.dropped_usage_invocation_count = state
+                    .dropped_usage_invocation_count
+                    .checked_add(1)
+                    .context("dropped usage invocation count overflow")?;
+                usage_detail_truncated = true;
+            }
+        }
+
+        if usage_detail_truncated {
+            state.dropped_usage_transaction_count = state
+                .dropped_usage_transaction_count
                 .checked_add(1)
-                .context("per-transaction invocation count overflow")?;
+                .context("dropped usage transaction count overflow")?;
         }
 
         merge_usage_counts(&mut state.function_usage, per_function, version)?;
@@ -288,6 +329,10 @@ impl FrameworkUsageCollector {
             target_modules: self.target_modules.iter().cloned().collect(),
             processed_transaction_count,
             transaction_usage_records: state.transaction_usage_records,
+            usage_detail_row_limit: self.usage_detail_row_limit,
+            usage_detail_truncated: state.dropped_usage_invocation_count > 0,
+            dropped_usage_invocation_count: state.dropped_usage_invocation_count,
+            dropped_usage_transaction_count: state.dropped_usage_transaction_count,
             functions: self.inventory.clone(),
             function_usage: state
                 .function_usage
@@ -433,11 +478,63 @@ mod tests {
         assert_eq!(report["processed_transaction_count"], 11);
         assert_eq!(report["start_timestamp_usecs"], 1_000);
         assert_eq!(report["end_timestamp_usecs"], 2_000);
+        assert_eq!(report["usage_detail_row_limit"], MAX_USAGE_DETAIL_ROWS);
+        assert_eq!(report["usage_detail_truncated"], false);
+        assert_eq!(report["dropped_usage_invocation_count"], 0);
+        assert_eq!(report["dropped_usage_transaction_count"], 0);
         assert_eq!(report["function_usage"][0]["invocation_count"], 2);
         assert_eq!(report["usage"][0]["transaction_count"], 1);
         let html = std::fs::read_to_string(html_output).unwrap();
         assert!(html.contains("Framework deprecation evidence"));
         assert!(html.contains("target"));
         assert!(html.contains("report-data"));
+    }
+
+    #[test]
+    fn caps_untrusted_call_path_details_without_losing_function_totals() {
+        let collector = FrameworkUsageCollector::new_with_usage_detail_row_limit(10, 20, 1);
+        let module_id = collector.target_modules.iter().next().unwrap().clone();
+        let callee = FunctionId {
+            module_id: Some(module_id),
+            function_name: "target".to_owned(),
+        };
+        let make_call = |caller_name: &str| aptos_vm::function_usage::FunctionCall {
+            caller: Some(FunctionId {
+                module_id: None,
+                function_name: caller_name.to_owned(),
+            }),
+            callee: callee.clone(),
+            kind: UsageCallKind::Call,
+        };
+        let record = |transaction_hash, call| {
+            collector.record_transaction(TransactionFunctionUsage {
+                transaction_hash,
+                sender: AccountAddress::ONE,
+                multisig_address: None,
+                root_function: None,
+                status: TransactionStatus::Keep(ExecutionStatus::Success),
+                calls: vec![call],
+            });
+        };
+
+        record(HashValue::zero(), make_call("first"));
+        collector.assign_version(HashValue::zero(), 10).unwrap();
+        record(HashValue::from_u64(1), make_call("second"));
+        collector
+            .assign_version(HashValue::from_u64(1), 11)
+            .unwrap();
+        record(HashValue::zero(), make_call("first"));
+        collector.assign_version(HashValue::zero(), 12).unwrap();
+
+        let state = collector.lock_state();
+        let function_counts = state.function_usage.values().next().unwrap();
+        assert_eq!(function_counts.invocation_count, 3);
+        assert_eq!(function_counts.transaction_count, 3);
+        assert_eq!(state.usage.len(), 1);
+        let call_path_counts = state.usage.values().next().unwrap();
+        assert_eq!(call_path_counts.invocation_count, 2);
+        assert_eq!(call_path_counts.transaction_count, 2);
+        assert_eq!(state.dropped_usage_invocation_count, 1);
+        assert_eq!(state.dropped_usage_transaction_count, 1);
     }
 }

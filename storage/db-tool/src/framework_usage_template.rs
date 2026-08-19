@@ -68,6 +68,7 @@ button.link { border:0; background:none; color:var(--accent); padding:0; cursor:
   <h1>Framework deprecation evidence</h1>
   <p class="subtitle" id="subtitle"></p>
   <div class="notice"><strong>Interpretation:</strong> no observed calls means “not seen in this replay range,” not “safe to remove.” Review longer and representative ranges, source-level dependencies, compatibility policy, and native/runtime coupling before deprecating code.</div>
+  <div class="notice" id="usage-detail-warning" hidden></div>
   <section class="cards" id="cards"></section>
   <section class="panel">
     <div class="controls">
@@ -162,6 +163,11 @@ function renderCards() {
   ];
   document.getElementById("cards").innerHTML = values.map(([label,value,cls]) => `<div class="card"><span class="label">${esc(label)}</span><span class="value ${cls}">${esc(value)}</span></div>`).join("");
   document.getElementById("subtitle").textContent = `Replay ${nf.format(report.start_version)}–${nf.format(report.end_version)} · schema ${report.schema_version} · build ${report.git_sha || "unknown"}`;
+  if (report.usage_detail_truncated) {
+    const warning = document.getElementById("usage-detail-warning");
+    warning.hidden = false;
+    warning.textContent = `Call-path detail is partial: it is capped at ${nf.format(report.usage_detail_row_limit)} rows; ${nf.format(report.dropped_usage_invocation_count)} invocation${report.dropped_usage_invocation_count === 1 ? " was" : "s were"} omitted across ${nf.format(report.dropped_usage_transaction_count)} transaction${report.dropped_usage_transaction_count === 1 ? "" : "s"}. Per-function totals remain complete.`;
+  }
 }
 
 function renderFunctions() {

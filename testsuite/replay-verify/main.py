@@ -501,8 +501,8 @@ class WorkerPod:
                     "/bin/sh",
                     "-c",
                     '"$@"; status=$?; '
-                    'if [ "$status" -eq 0 ]; then touch /results/ready; '
-                    "else touch /results/failed; fi; exit \"$status\"",
+                    + 'if [ "$status" -eq 0 ]; then touch /results/ready; '
+                    + "else touch /results/failed; fi; exit \"$status\"",
                     "--",
                     *aptos_command,
                 ]
@@ -518,10 +518,10 @@ class WorkerPod:
                             "/bin/sh",
                             "-c",
                             "until [ -f /results/ready ] || [ -f /results/failed ]; do sleep 5; done; "
-                            "if [ -f /results/failed ]; then exit 1; fi; "
-                            "attempt=1; while [ \"$attempt\" -le 5 ]; do "
-                            'gcloud storage cp /results/*.json "$DESTINATION" && exit 0; '
-                            'attempt=$((attempt + 1)); sleep 10; done; exit 1',
+                            + "if [ -f /results/failed ]; then exit 1; fi; "
+                            + "attempt=1; while [ \"$attempt\" -le 5 ]; do "
+                            + 'gcloud storage cp /results/*.json "$DESTINATION" && exit 0; '
+                            + 'attempt=$((attempt + 1)); sleep 10; done; exit 1',
                         ],
                         "env": [{"name": "DESTINATION", "value": destination}],
                         "volumeMounts": [{"mountPath": "/results", "name": "results"}],
@@ -535,9 +535,9 @@ class WorkerPod:
                     "/bin/sh",
                     "-c",
                     '"$@"; status=$?; '
-                    'if [ "$status" -eq 0 ]; then '
-                    f'echo "{REPORT_BEGIN_MARKER}"; cat "$REPORT"; echo; '
-                    f'echo "{REPORT_END_MARKER}"; fi; exit "$status"',
+                    + 'if [ "$status" -eq 0 ]; then '
+                    + f'echo "{REPORT_BEGIN_MARKER}"; cat "$REPORT"; echo; '
+                    + f'echo "{REPORT_END_MARKER}"; fi; exit "$status"',
                     "--",
                     *aptos_command,
                 ]
@@ -1558,7 +1558,13 @@ def merge_framework_usage_reports(
 
     reference = reports[0]
     for report in reports[1:]:
-        for field in ("schema_version", "git_sha", "target_modules", "functions"):
+        for field in (
+            "schema_version",
+            "git_sha",
+            "target_modules",
+            "functions",
+            "usage_detail_row_limit",
+        ):
             if report[field] != reference[field]:
                 raise RuntimeError(f"framework usage shard metadata differs for {field}")
 
@@ -1600,6 +1606,16 @@ def merge_framework_usage_reports(
         ),
         "transaction_usage_records": sum(
             report["transaction_usage_records"] for report in reports
+        ),
+        "usage_detail_row_limit": reference["usage_detail_row_limit"],
+        "usage_detail_truncated": any(
+            report["usage_detail_truncated"] for report in reports
+        ),
+        "dropped_usage_invocation_count": sum(
+            report["dropped_usage_invocation_count"] for report in reports
+        ),
+        "dropped_usage_transaction_count": sum(
+            report["dropped_usage_transaction_count"] for report in reports
         ),
         "shard_count": len(reports),
         "gcs_prefix": f"gs://{bucket_name}/{prefix}/" if bucket_name else None,
