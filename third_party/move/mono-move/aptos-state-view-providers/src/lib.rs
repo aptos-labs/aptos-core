@@ -11,27 +11,21 @@
 //!   materializing each value into a long-lived arena on first access, and
 //!   resolves resource-group placement.
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, Result};
 use aptos_framework::natives::code::PackageRegistry;
-use aptos_types::{
-    state_store::{state_key::StateKey, StateView},
-    vm::module_metadata::{get_metadata, RuntimeModuleMetadataV1},
-};
+use aptos_types::state_store::{state_key::StateKey, StateView};
 use bytes::Bytes;
 use fxhash::FxHashMap;
-use mono_move_aptos_transaction_executor::{
-    decode_group_members, AptosDataProvider, GroupMembers, StorageLocation,
-};
+use mono_move_aptos_transaction_executor::{decode_group_members, AptosDataProvider, GroupMembers};
 use mono_move_core::{
-    intern_struct_tag,
-    interner::{view_module_id, InternedModuleId},
+    nominal_tag,
     storage::{
         module_provider::ModuleProvider,
         resource_provider::{
             InMemoryStorageKey, ResourceProvider, ResourceProviderError, StorageRead,
         },
     },
-    types::{view_name, view_type, InternedType, Type},
+    types::InternedType,
     ExecutionErrorKind, IntoExecutionError, LayoutProvider, VMInternalError, VMResult,
     OBJECT_HEADER_SIZE,
 };
@@ -39,9 +33,7 @@ use mono_move_global_context::ExecutionGuard;
 use mono_move_runtime::{deserialize_into, Heap};
 use move_binary_format::CompiledModule;
 use move_core_types::{
-    account_address::AccountAddress,
-    identifier::{IdentStr, Identifier},
-    move_resource::MoveStructType,
+    account_address::AccountAddress, identifier::Identifier, move_resource::MoveStructType,
 };
 use std::cell::RefCell;
 use thiserror::Error;
@@ -155,16 +147,17 @@ struct ProviderState {
     /// Never collected or reset; occupancy is bounded by one materialization
     /// per distinct key, thanks to the value cache.
     arena: Heap,
-    /// Materialized reads by key, including negative ones. Sound because
-    /// execution never mutates a value through a `StorageRead` pointer
-    /// (mutation copies into the transaction's own heap first).
-    values: FxHashMap<InMemoryStorageKey, StorageRead>,
-    /// Resource-group membership per resource type, resolved from the defining
-    /// module's metadata. `None` = not a group member.
-    group_membership: FxHashMap<InternedType, Option<InternedType>>,
-    /// Aptos metadata of each module consulted for group membership so far.
-    /// `None` = module absent or without metadata.
-    module_metadata: FxHashMap<InternedModuleId, Option<Arc<RuntimeModuleMetadataV1>>>,
+    /// Materialized reads, including negative ones. Sound because execution
+    /// never mutates a value through a `StorageRead` pointer (mutation copies
+    /// into the transaction's own heap first).
+    ///
+    /// Keyed by the pair of storage key and group placement. A resource's
+    /// placement (own slot vs. a group container) is fixed by the reading
+    /// transaction's pinned module, not by storage, so the same key can resolve
+    /// to a different slot across executions that reuse this provider. Keying by
+    /// the pair keeps a `#[resource_group_member]` add or remove between
+    /// executions from serving the other placement's value.
+    values: FxHashMap<(InMemoryStorageKey, Option<InternedType>), StorageRead>,
     /// Members of each resource group read so far, keyed by the group's state key.
     ///
     /// Here it is safe to use a non-cryptographic hasher because `StateKey` already
@@ -189,100 +182,59 @@ impl<'a, 'ctx, S: StateView> StateViewResourceProvider<'a, 'ctx, S> {
             inner: RefCell::new(ProviderState {
                 arena: Heap::new(arena_size),
                 values: FxHashMap::default(),
-                group_membership: FxHashMap::default(),
-                module_metadata: FxHashMap::default(),
                 groups: FxHashMap::default(),
             }),
         }
     }
 
-    /// Resolves group membership from the defining module's Aptos metadata.
-    fn resolve_group_of(&self, ty: InternedType) -> Result<Option<InternedType>> {
-        let Type::Nominal {
-            module_id, name, ..
-        } = view_type(ty)
-        else {
-            bail!("resource type is not nominal");
-        };
-        let Some(metadata) = self.module_metadata(*module_id)? else {
-            return Ok(None);
-        };
-        let Some(group_tag) = metadata
-            .struct_attributes
-            .get(view_name(*name))
-            .into_iter()
-            .flatten()
-            .find_map(|attr| attr.get_resource_group_member())
-        else {
-            return Ok(None);
-        };
-        Ok(Some(intern_struct_tag(&group_tag, self.guard)?))
-    }
-
-    /// The Aptos metadata of a module, if any. Cached per module.
-    //
-    // TODO(perf): cache the metadata in the global context instead — this
-    // deserializes the whole defining module for its metadata, duplicating the
-    // loader's own fetch and deserialization of the same bytes.
-    fn module_metadata(
-        &self,
-        module_id: InternedModuleId,
-    ) -> Result<Option<Arc<RuntimeModuleMetadataV1>>> {
-        if let Some(metadata) = self.inner.borrow().module_metadata.get(&module_id) {
-            return Ok(metadata.clone());
-        }
-        let view = view_module_id(module_id);
-        let name = IdentStr::new(view_name(view.name()))
-            .map_err(|e| anyhow!("invalid module name: {e}"))?;
-        let key = StateKey::module(view.address(), name);
-        let metadata = match self
-            .state_view
-            .get_state_value(&key)
-            .map_err(|e| anyhow!("module read failed: {e}"))?
-        {
-            Some(value) => {
-                let module = CompiledModule::deserialize(value.bytes())
-                    .map_err(|e| anyhow!("deserialize failed: {e:?}"))?;
-                get_metadata(&module.metadata)
-            },
-            None => None,
-        };
-        self.inner
-            .borrow_mut()
-            .module_metadata
-            .insert(module_id, metadata.clone());
-        Ok(metadata)
-    }
-
     /// The stored BCS bytes for a key, looked up among the group's members
     /// for group-member keys. `None` = does not exist.
-    fn fetch_bytes(&self, key: &InMemoryStorageKey) -> Result<Option<Bytes>> {
-        match self.locate_key(key)? {
-            StorageLocation::OwnSlot(state_key) => Ok(self
-                .state_view
-                .get_state_value(&state_key)
-                .map_err(|e| anyhow!("state read failed: {e}"))?
-                .map(|value| value.bytes().clone())),
-            StorageLocation::GroupMember { group, member } => Ok(self
-                .group_members(&group)?
-                .and_then(|members| members.get(&member).cloned())),
+    fn fetch_bytes(
+        &self,
+        key: &InMemoryStorageKey,
+        group: Option<InternedType>,
+    ) -> Result<Option<Bytes>> {
+        match group {
+            None => {
+                let state_key = key.as_state_key()?;
+                Ok(self
+                    .state_view
+                    .get_state_value(&state_key)
+                    .map_err(|e| anyhow!("state read failed: {e}"))?
+                    .map(|value| value.bytes().clone()))
+            },
+            Some(group_ty) => {
+                let tag = nominal_tag(group_ty)?;
+                let group_key = StateKey::resource_group(&key.address(), &tag);
+                Ok(self
+                    .group_members(&group_key)?
+                    .and_then(|members| members.get(&key.value_ty()).cloned()))
+            },
         }
     }
 }
 
 impl<S: StateView> ResourceProvider for StateViewResourceProvider<'_, '_, S> {
-    /// Cached per key, so re-reads across executions reuse the already
-    /// materialized value.
-    fn get_resource(&self, key: &InMemoryStorageKey) -> Result<StorageRead, ResourceProviderError> {
-        if let Some(read) = self.inner.borrow().values.get(key) {
+    /// Cached per (key, group placement), so re-reads across executions reuse
+    /// the already materialized value only when the placement also matches.
+    fn get_resource(
+        &self,
+        key: &InMemoryStorageKey,
+        group: Option<InternedType>,
+    ) -> Result<StorageRead, ResourceProviderError> {
+        let cache_key = (key.clone(), group);
+        if let Some(read) = self.inner.borrow().values.get(&cache_key) {
             return Ok(*read);
         }
         let internal = |detail: String| ResourceProviderError::InvariantViolation(detail);
-        let Some(blob) = self.fetch_bytes(key).map_err(|e| internal(e.to_string()))? else {
+        let Some(blob) = self
+            .fetch_bytes(key, group)
+            .map_err(|e| internal(e.to_string()))?
+        else {
             self.inner
                 .borrow_mut()
                 .values
-                .insert(key.clone(), StorageRead::DoesNotExist);
+                .insert(cache_key, StorageRead::DoesNotExist);
             return Ok(StorageRead::DoesNotExist);
         };
 
@@ -312,22 +264,12 @@ impl<S: StateView> ResourceProvider for StateViewResourceProvider<'_, '_, S> {
             ptr: obj,
             version: 0,
         };
-        inner.values.insert(key.clone(), read);
+        inner.values.insert(cache_key, read);
         Ok(read)
     }
 }
 
 impl<S: StateView> AptosDataProvider for StateViewResourceProvider<'_, '_, S> {
-    /// Cached per resource type.
-    fn group_of(&self, ty: InternedType) -> Result<Option<InternedType>> {
-        if let Some(group) = self.inner.borrow().group_membership.get(&ty) {
-            return Ok(*group);
-        }
-        let group = self.resolve_group_of(ty)?;
-        self.inner.borrow_mut().group_membership.insert(ty, group);
-        Ok(group)
-    }
-
     /// Loaded from the state view on first access, caching absence as well so a
     /// missing group is read at most once.
     fn group_members(&self, group_key: &StateKey) -> Result<Option<Arc<GroupMembers>>> {
