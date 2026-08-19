@@ -15,7 +15,7 @@ use crate::{
     },
     memory::{
         read_descriptor, read_obj_size, read_ptr, read_vec_len, write_enum_tag, write_ptr,
-        write_u64,
+        write_u64, MemoryRegion,
     },
     types::{META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET},
 };
@@ -513,21 +513,27 @@ impl NativeContext for ProductionNativeContext<'_> {
         let layout = self.layouts.layout_by_ty(ty).ok_or_else(|| {
             native_invariant_violation("bcs deserialize: no layout for type".into())
         })?;
-        let mut out = vec![0u8; layout.size as usize];
+        // `MemoryRegion` meets the alignment `deserialize` requires. Zeroed, not
+        // uninit: the copy below reads padding the deserializer skips. `max(1)`
+        // keeps zero-size types on the normal path, so trailing input is still
+        // rejected.
+        let size = layout.size as usize;
+        let region = MemoryRegion::new_zeroed(size.max(1));
+        let dst = region.as_ptr();
         // SAFETY: heap and rws are distinct fields (see the type-level aliasing
         // rule), so reborrowing both through `&self` at once is sound.
         let heap = unsafe { &mut **self.heap.get() };
         let rws = unsafe { &mut **self.rws.get() };
         // `bytes` is off-heap (the native copied it), so it survives the GC the
         // retry may run.
-        // SAFETY: `out` is `layout.size` writable bytes.
+        // SAFETY: `dst` is `size` writable, correctly aligned bytes.
         let result = unsafe {
             deserialize_or_gc(
                 self.layouts,
                 heap,
                 ty,
                 bytes,
-                out.as_mut_ptr(),
+                dst,
                 self.desc_provider,
                 rws,
                 &self.pool,
@@ -537,7 +543,10 @@ impl NativeContext for ProductionNativeContext<'_> {
             )
         };
         match result {
-            Ok(()) => Ok(Some(out)),
+            // SAFETY: `deserialize_or_gc` initialized `size` bytes at `dst`.
+            Ok(()) => Ok(Some(
+                unsafe { std::slice::from_raw_parts(dst, size) }.to_vec(),
+            )),
             // Malformed input: the bytes are not a valid encoding of `ty`. Heap
             // exhaustion and missing layouts carry other kinds and still propagate.
             Err(e) if e.kind() == ExecutionErrorKind::InvalidOperation => Ok(None),

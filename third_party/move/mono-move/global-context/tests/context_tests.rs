@@ -9,7 +9,6 @@ use move_core_types::{account_address::AccountAddress, ident_str};
 use std::{
     sync::{Arc, Barrier},
     thread,
-    time::Duration,
 };
 
 #[test]
@@ -38,25 +37,35 @@ fn test_concurrent_execution_contexts() {
     let num_threads = 4;
 
     let ctx = Arc::new(GlobalContext::with_num_execution_workers(num_threads));
-    let barrier = Arc::new(Barrier::new(num_threads));
+    let ready = Arc::new(Barrier::new(num_threads));
+    let holding = Arc::new(Barrier::new(num_threads));
 
     let handles: Vec<_> = (0..num_threads)
         .map(|worker_id| {
             let ctx: Arc<GlobalContext> = Arc::clone(&ctx);
-            let barrier = Arc::clone(&barrier);
+            let ready = Arc::clone(&ready);
+            let holding = Arc::clone(&holding);
             thread::spawn(move || {
                 // Wait for all threads to be ready.
-                barrier.wait();
+                ready.wait();
 
                 // All threads should be able to acquire execution context simultaneously.
-                let _guard = ctx.try_execution_context(worker_id).unwrap();
-                thread::sleep(Duration::from_millis(1000));
+                let guard = ctx.try_execution_context(worker_id);
+
+                // Hold every guard until all threads have one. Every worker must
+                // reach this barrier even when acquisition fails, or the others
+                // block here forever and the failure becomes a hang.
+                holding.wait();
+                guard.is_some()
             })
         })
         .collect();
 
     for handle in handles {
-        handle.join().unwrap();
+        assert!(
+            handle.join().unwrap(),
+            "worker could not acquire its context"
+        );
     }
 }
 
@@ -66,25 +75,31 @@ fn test_block_execution_simulation() {
     let mut ctx = Arc::new(GlobalContext::with_num_execution_workers(num_threads));
 
     for _ in 0..5 {
-        // Execution phase: concurrent execution.
+        // Execution phase: every worker holds its guard until all of them do.
+        let holding = Arc::new(Barrier::new(num_threads));
         let handles: Vec<_> = (0..num_threads)
             .map(|worker_id| {
                 let ctx: Arc<GlobalContext> = Arc::clone(&ctx);
+                let holding = Arc::clone(&holding);
                 thread::spawn(move || {
-                    let _guard = ctx.try_execution_context(worker_id).unwrap();
-                    thread::sleep(Duration::from_millis(100));
+                    let guard = ctx.try_execution_context(worker_id);
+                    // Reached even on failure; see `test_concurrent_execution_contexts`.
+                    holding.wait();
+                    guard.is_some()
                 })
             })
             .collect();
 
         for handle in handles {
-            handle.join().unwrap();
+            assert!(
+                handle.join().unwrap(),
+                "worker could not acquire its context"
+            );
         }
 
         // Maintenance phase: single thread with exclusive access.
         let ctx = Arc::get_mut(&mut ctx).unwrap();
         let _guard = ctx.maintenance_context();
-        thread::sleep(Duration::from_millis(100));
     }
 }
 

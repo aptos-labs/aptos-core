@@ -441,6 +441,17 @@ impl<'a, T> VMValue<'a> for Boxed<'a, T> {
 mod tests {
     use super::*;
 
+    // `#[repr(align(N))]` needs a literal, so the buffers below use `u64`
+    // backing to get `MAX_ALIGN`.
+    //
+    // TODO(cleanup, testing): allocate through `MemoryRegion`, which is
+    // `MAX_ALIGN`-aligned by construction; it lives in `mono-move-runtime`,
+    // which this crate cannot depend on.
+    const _: () = assert!(
+        core::mem::align_of::<u64>() >= MAX_ALIGN,
+        "u64 no longer covers MAX_ALIGN"
+    );
+
     /// A `Ref` must preserve its value even after the frame slot it was read
     /// from is overwritten — e.g. by a `set_return` that reuses the argument
     /// region.
@@ -448,26 +459,31 @@ mod tests {
     fn ref_preserves_value_after_source_slot_overwritten() {
         let pool = RootPool::new();
 
-        // Slot 0 holds the reference; slot 1 is room for a write-back.
-        let mut frame = [0u8; 32];
-        let base = 0x1000_usize as *mut u8;
-        let offset = 24_u64;
-        unsafe { write_fat_ptr(frame.as_mut_ptr(), 0usize, base, offset) };
+        // A real allocation: `Ref::ptr` offsets `base`, which needs provenance.
+        let backing = vec![0u64; 0x400];
+        let base = backing.as_ptr() as *mut u8;
+        // SAFETY: 0x1000 is within `backing`.
+        let unrelated = unsafe { base.add(0x1000) };
 
-        let r: Ref<Opaque> = unsafe { Ref::read_from_frame(&pool, frame.as_ptr(), 0) };
+        // Slot 0 holds the reference; slot 1 takes the write-back. The frame is
+        // `MAX_ALIGN`-aligned because the fat-pointer halves are written as
+        // aligned 8-byte stores.
+        let mut frame = [0u64; 4];
+        let frame_ptr: *mut u8 = frame.as_mut_ptr().cast();
+        let offset = 24_u64;
+        unsafe { write_fat_ptr(frame_ptr, 0usize, base, offset) };
+
+        let reference: Ref<Opaque> = unsafe { Ref::read_from_frame(&pool, frame_ptr, 0) };
 
         // Overwrite slot 0 with unrelated bytes, as a later `set_return` would.
-        unsafe { write_fat_ptr(frame.as_mut_ptr(), 0usize, 0x9999_usize as *mut u8, 7) };
+        unsafe { write_fat_ptr(frame_ptr, 0usize, unrelated, 7) };
 
         // Reading the pointer still resolves the original referent.
-        assert_eq!(r.ptr(), unsafe { base.add(offset as usize) });
+        assert_eq!(reference.ptr(), unsafe { base.add(offset as usize) });
 
         // Writing the reference into slot 1 writes the original fat pointer.
-        unsafe { r.write_to_frame(frame.as_mut_ptr(), 16) };
-        assert_eq!(
-            unsafe { read_fat_ptr(frame.as_ptr(), 16usize) },
-            (base, offset)
-        );
+        unsafe { reference.write_to_frame(frame_ptr, 16) };
+        assert_eq!(unsafe { read_fat_ptr(frame_ptr, 16usize) }, (base, offset));
     }
 
     /// Lays out a `vector<u8>` heap object -- `[len: u64][bytes...]` -- in an
@@ -500,14 +516,17 @@ mod tests {
         // Outer object: `[len: u64][inner_ptr0][inner_ptr1][inner_ptr2]`.
         let mut outer = vec![0u64; 1 + inners.len()];
         outer[0] = inners.len() as u64;
+        let outer_ptr: *mut u8 = outer.as_mut_ptr().cast();
         for (i, inner) in inners.iter().enumerate() {
-            outer[1 + i] = inner.as_ptr() as u64;
+            // SAFETY: slot `i` is within `outer`. The pointers are stored with
+            // `write_ptr` rather than as `u64`, which would discard provenance
+            // and leave `get` reading through an address it cannot dereference.
+            unsafe { write_ptr(outer_ptr, VEC_DATA_OFFSET + i * 8, inner.as_ptr().cast()) };
         }
 
         // SAFETY: `outer` is a valid `vector<vector<u8>>` object and the inner
         // buffers outlive the reads.
-        let vec: Vector<Vector<u8>> =
-            Vector::from_handle(unsafe { pool.root_object(outer.as_ptr() as *mut u8) });
+        let vec: Vector<Vector<u8>> = Vector::from_handle(unsafe { pool.root_object(outer_ptr) });
 
         assert_eq!(vec.len(), 3);
         // Bind each inner handle so its bytes outlive the borrow.

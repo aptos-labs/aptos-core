@@ -1219,8 +1219,13 @@ macro_rules! impl_cast_type_wide {
                 )
             }
 
+            // Rendered through `BigInt` rather than the type's own `Display`,
+            // which reaches a `ethnum` formatting path that violates Stacked
+            // Borrows and aborts the whole binary under Miri. Decimal output is
+            // identical either way.
             fn decode(bytes: &[u8]) -> String {
-                <$ty>::from_le_bytes(bytes.try_into().unwrap()).to_string()
+                assert_eq!(bytes.len(), Self::WIDTH);
+                $bytes_to_big(bytes).to_string()
             }
 
             fn strategy() -> BoxedStrategy<Self> {
