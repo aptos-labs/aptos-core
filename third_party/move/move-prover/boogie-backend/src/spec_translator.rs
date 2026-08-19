@@ -4335,6 +4335,27 @@ impl SpecTranslator<'_> {
         }
     }
 
+    /// Whether this expression involves a signed integer anywhere, used to
+    /// decide whether a `num`-typed division needs the truncating helper.
+    /// Spec arithmetic widens to `num`, so a division over signed values can
+    /// reach the translator with its type erased — and only those disagree
+    /// with the body, which truncates toward zero. An all-unsigned expression
+    /// has no such disagreement, so it keeps the plain operator and its
+    /// encoding is untouched.
+    fn exp_involves_signed(&self, exp: &Exp) -> bool {
+        if self
+            .get_node_type(exp.node_id())
+            .skip_reference()
+            .is_signed_int()
+        {
+            return true;
+        }
+        match exp.as_ref() {
+            ExpData::Call(_, _, args) => args.iter().any(|a| self.exp_involves_signed(a)),
+            _ => false,
+        }
+    }
+
     /// Translates a binary arithmetic / relational op. `boogie_op` is the
     /// infix operator for the unsigned (Euclidean / boolean) case; `bv_op` is
     /// the bitwise function-name prefix (e.g. `Div`, `Lt`). `signed_helper`
@@ -4372,8 +4393,21 @@ impl SpecTranslator<'_> {
                 self.translate_op_operand(e, true, &conv_base)
             });
             emit!(self.writer, ")");
-        } else if let Some(helper) = signed_helper.filter(|_| ty0.skip_reference().is_signed_int())
-        {
+        } else if let Some(helper) = signed_helper.filter(|_| {
+            let ty = ty0.skip_reference();
+            // Spec arithmetic widens to `num`, so a division whose dividend
+            // is an expression rather than a variable or cast arrives here
+            // with its signed integer type erased, and falls back to Boogie's
+            // Euclidean `div` while the body truncates toward zero. Route it
+            // through the helper when signed values are involved anywhere in
+            // the operands. All-unsigned expressions are left alone: they have
+            // no disagreement to fix, and emitting the helper's conditional in
+            // place of a bare `div` would pessimize the unsigned arithmetic
+            // that dominates spec expressions.
+            ty.is_signed_int()
+                || (matches!(ty, Type::Primitive(PrimitiveType::Num))
+                    && args.iter().any(|a| self.exp_involves_signed(a)))
+        }) {
             emit!(self.writer, "{}(", helper);
             self.translate_seq(args.iter(), ", ", |e| {
                 self.translate_op_operand(e, false, "")
