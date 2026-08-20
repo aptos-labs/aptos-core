@@ -117,6 +117,9 @@ pub fn create_ready_storage_synchronizer(expect_reset_executor: bool) -> MockSto
     mock_storage_synchronizer
         .expect_pending_storage_data()
         .return_const(false);
+    mock_storage_synchronizer
+        .expect_pending_storage_data_error()
+        .return_const(false);
     if expect_reset_executor {
         mock_storage_synchronizer
             .expect_finish_chunk_executor()
@@ -454,6 +457,10 @@ mock! {
         ) -> AnyhowResult<JoinHandle<()>, crate::error::Error>;
 
         fn pending_storage_data(&self) -> bool;
+
+        fn pending_storage_data_error(&self) -> bool;
+
+        fn acknowledge_storage_data_error(&self);
 
         async fn save_state_values(
             &mut self,

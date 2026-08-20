@@ -88,6 +88,12 @@ pub trait StorageSynchronizerInterface {
     /// to be executed/applied or committed.
     fn pending_storage_data(&self) -> bool;
 
+    /// Returns true iff a storage data error is waiting to be handled by the driver.
+    fn pending_storage_data_error(&self) -> bool;
+
+    /// Marks one storage data error as handled by the driver.
+    fn acknowledge_storage_data_error(&self);
+
     /// Saves the given state values to storage, for whichever snapshot
     /// synchronizer was last initialized.
     async fn save_state_values(
@@ -163,6 +169,9 @@ pub struct StorageSynchronizer<ChunkExecutor, MetadataStorage> {
     // The number of storage data chunks pending execute/apply, or commit
     pending_data_chunks: Arc<AtomicU64>,
 
+    // The number of storage data errors waiting to be handled by the driver
+    pending_data_errors: Arc<AtomicU64>,
+
     // An optional runtime on which to spawn the storage synchronizer threads
     runtime: Option<Handle>,
 
@@ -190,6 +199,7 @@ impl<
             error_notification_sender: self.error_notification_sender.clone(),
             executor_notifier: self.executor_notifier.clone(),
             pending_data_chunks: self.pending_data_chunks.clone(),
+            pending_data_errors: Arc::clone(&self.pending_data_errors),
             metadata_storage: self.metadata_storage.clone(),
             runtime: self.runtime.clone(),
             state_snapshot_notifier: self.state_snapshot_notifier.clone(),
@@ -238,12 +248,14 @@ impl<
 
         // Create a shared pending data chunk counter
         let pending_data_chunks = Arc::new(AtomicU64::new(0));
+        let pending_data_errors = Arc::new(AtomicU64::new(0));
         let executor_handle = spawn_executor(
             chunk_executor.clone(),
             error_notification_sender.clone(),
             executor_listener,
             ledger_updater_notifier,
             pending_data_chunks.clone(),
+            Arc::clone(&pending_data_errors),
             runtime.clone(),
         );
 
@@ -254,6 +266,7 @@ impl<
             ledger_updater_listener,
             committer_notifier,
             pending_data_chunks.clone(),
+            Arc::clone(&pending_data_errors),
             runtime.clone(),
         );
 
@@ -264,6 +277,7 @@ impl<
             committer_listener,
             commit_post_processor_notifier,
             pending_data_chunks.clone(),
+            Arc::clone(&pending_data_errors),
             runtime.clone(),
             storage.reader.clone(),
         );
@@ -291,6 +305,7 @@ impl<
             error_notification_sender,
             executor_notifier,
             pending_data_chunks,
+            pending_data_errors,
             metadata_storage,
             runtime,
             state_snapshot_notifier: None,
@@ -398,6 +413,7 @@ impl<
             snapshot_listener,
             self.error_notification_sender.clone(),
             self.pending_data_chunks.clone(),
+            Arc::clone(&self.pending_data_errors),
             self.metadata_storage.clone(),
             self.storage.clone(),
             target_ledger_info,
@@ -411,6 +427,22 @@ impl<
 
     fn pending_storage_data(&self) -> bool {
         load_pending_data_chunks(self.pending_data_chunks.clone()) > 0
+    }
+
+    fn pending_storage_data_error(&self) -> bool {
+        self.pending_data_errors.load(Ordering::Acquire) > 0
+    }
+
+    fn acknowledge_storage_data_error(&self) {
+        if self
+            .pending_data_errors
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |count| {
+                count.checked_sub(1)
+            })
+            .is_err()
+        {
+            error!("Received a storage data error acknowledgement with no pending error!");
+        }
     }
 
     async fn save_state_values(
@@ -549,6 +581,7 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
     mut executor_listener: mpsc::Receiver<StorageDataChunk>,
     mut ledger_updater_notifier: mpsc::Sender<NotificationMetadata>,
     pending_data_chunks: Arc<AtomicU64>,
+    pending_data_errors: Arc<AtomicU64>,
     runtime: Option<Handle>,
 ) -> JoinHandle<()> {
     // Create an executor
@@ -625,6 +658,7 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                             error,
                             &error_notification_sender,
                             &pending_data_chunks,
+                            &pending_data_errors,
                         )
                         .await;
                     }
@@ -641,6 +675,7 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                         error,
                         &error_notification_sender,
                         &pending_data_chunks,
+                        &pending_data_errors,
                     )
                     .await;
                 },
@@ -677,6 +712,7 @@ fn spawn_ledger_updater<ChunkExecutor: ChunkExecutorTrait + 'static>(
     mut ledger_updater_listener: mpsc::Receiver<NotificationMetadata>,
     mut committer_notifier: mpsc::Sender<NotificationMetadata>,
     pending_data_chunks: Arc<AtomicU64>,
+    pending_data_errors: Arc<AtomicU64>,
     runtime: Option<Handle>,
 ) -> JoinHandle<()> {
     // Create a ledger updater
@@ -724,6 +760,7 @@ fn spawn_ledger_updater<ChunkExecutor: ChunkExecutorTrait + 'static>(
                             error,
                             &error_notification_sender,
                             &pending_data_chunks,
+                            &pending_data_errors,
                         )
                         .await;
                     }
@@ -736,6 +773,7 @@ fn spawn_ledger_updater<ChunkExecutor: ChunkExecutorTrait + 'static>(
                         error,
                         &error_notification_sender,
                         &pending_data_chunks,
+                        &pending_data_errors,
                     )
                     .await;
                 },
@@ -754,6 +792,7 @@ fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
     mut committer_listener: mpsc::Receiver<NotificationMetadata>,
     mut commit_post_processor_notifier: mpsc::Sender<ChunkCommitNotification>,
     pending_data_chunks: Arc<AtomicU64>,
+    pending_data_errors: Arc<AtomicU64>,
     runtime: Option<Handle>,
     storage: Arc<dyn DbReader>,
 ) -> JoinHandle<()> {
@@ -817,6 +856,7 @@ fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
                             error,
                             &error_notification_sender,
                             &pending_data_chunks,
+                            &pending_data_errors,
                         )
                         .await;
                     }
@@ -829,6 +869,7 @@ fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
                         error,
                         &error_notification_sender,
                         &pending_data_chunks,
+                        &pending_data_errors,
                     )
                     .await;
                 },
@@ -907,6 +948,7 @@ async fn apply_snapshot_chunk<MetadataStorage: MetadataStorageInterface + Clone>
     target_ledger_info: &LedgerInfoWithSignatures,
     error_notification_sender: &mpsc::UnboundedSender<ErrorNotification>,
     pending_data_chunks: &Arc<AtomicU64>,
+    pending_data_errors: &Arc<AtomicU64>,
     version: Version,
 ) -> ChunkApplyOutcome {
     let (operation, noun) = match kind {
@@ -966,6 +1008,7 @@ async fn apply_snapshot_chunk<MetadataStorage: MetadataStorageInterface + Clone>
                             error_notification_sender.clone(),
                             notification_id,
                             error,
+                            pending_data_errors,
                         )
                         .await;
                     }
@@ -977,6 +1020,7 @@ async fn apply_snapshot_chunk<MetadataStorage: MetadataStorageInterface + Clone>
                         error_notification_sender.clone(),
                         notification_id,
                         error,
+                        pending_data_errors,
                     )
                     .await;
                 },
@@ -1004,6 +1048,7 @@ fn spawn_snapshot_receiver<
     mut snapshot_listener: mpsc::Receiver<StorageDataChunk>,
     error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
     pending_data_chunks: Arc<AtomicU64>,
+    pending_data_errors: Arc<AtomicU64>,
     metadata_storage: MetadataStorage,
     storage: DbReaderWriter,
     target_ledger_info: LedgerInfoWithSignatures,
@@ -1042,6 +1087,7 @@ fn spawn_snapshot_receiver<
                                     "Failed to initialize the {:?} snapshot receiver! Error: {:?}",
                                     kind, error
                                 ),
+                                &pending_data_errors,
                             )
                             .await;
                         }
@@ -1061,6 +1107,7 @@ fn spawn_snapshot_receiver<
                 &target_ledger_info,
                 &error_notification_sender,
                 &pending_data_chunks,
+                &pending_data_errors,
                 version,
             )
             .await
@@ -1096,6 +1143,7 @@ fn spawn_snapshot_receiver<
                             error_notification_sender.clone(),
                             notification_id,
                             error,
+                            &pending_data_errors,
                         )
                         .await;
                     } else {
@@ -1150,7 +1198,7 @@ fn spawn(
 
 /// Returns the value currently held by the pending chunk counter
 fn load_pending_data_chunks(pending_data_chunks: Arc<AtomicU64>) -> u64 {
-    pending_data_chunks.load(Ordering::Relaxed)
+    pending_data_chunks.load(Ordering::Acquire)
 }
 
 /// Increments the pending data chunks
@@ -1167,7 +1215,8 @@ fn increment_pending_data_chunks(pending_data_chunks: Arc<AtomicU64>) {
 /// Decrements the pending data chunks
 fn decrement_pending_data_chunks(atomic_u64: Arc<AtomicU64>) {
     let delta = 1;
-    atomic_u64.fetch_sub(delta, Ordering::Relaxed);
+    // Publish stage completion after any pending error.
+    atomic_u64.fetch_sub(delta, Ordering::AcqRel);
     metrics::decrement_gauge(
         &metrics::STORAGE_SYNCHRONIZER_GAUGES,
         metrics::STORAGE_SYNCHRONIZER_PENDING_DATA,
@@ -1182,12 +1231,14 @@ async fn handle_storage_synchronizer_error(
     error: String,
     error_notification_sender: &mpsc::UnboundedSender<ErrorNotification>,
     pending_data_chunks: &Arc<AtomicU64>,
+    pending_data_errors: &Arc<AtomicU64>,
 ) {
     // Send an error notification to the driver
     send_storage_synchronizer_error(
         error_notification_sender.clone(),
         notification_metadata.notification_id,
         error,
+        pending_data_errors,
     )
     .await;
 
@@ -1252,6 +1303,7 @@ async fn send_storage_synchronizer_error(
     mut error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
     notification_id: NotificationId,
     error_message: String,
+    pending_data_errors: &Arc<AtomicU64>,
 ) {
     // Log the storage synchronizer error
     let error_message = format!("Storage synchronizer error: {:?}", error_message);
@@ -1260,6 +1312,8 @@ async fn send_storage_synchronizer_error(
     // Update the storage synchronizer error metrics
     let error = Error::UnexpectedError(error_message);
     metrics::increment_counter(&metrics::STORAGE_SYNCHRONIZER_ERRORS, error.get_label());
+    // Keep drain barriers closed until the driver handles this notification.
+    pending_data_errors.fetch_add(1, Ordering::Release);
 
     // Send an error notification to the driver
     let error_notification = ErrorNotification {

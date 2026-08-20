@@ -19,7 +19,7 @@ use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     test_helpers::transaction_test_helpers::{block, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
-    transaction::{TransactionListWithProofV2, Version},
+    transaction::{TransactionListWithProofV2, TransactionOutputListWithProofV2, Version},
 };
 use rand::Rng;
 
@@ -160,6 +160,42 @@ fn test_executor_execute_or_apply_and_commit_chunk() {
     executor.commit_chunk().unwrap();
     let li = db.reader.get_latest_ledger_info().unwrap();
     assert_eq!(li, ledger_info);
+}
+
+#[test]
+fn test_finished_executor_rejects_chunks_without_panicking() {
+    let batch_size: u64 = 10;
+    let (chunks, ledger_info) = create_transaction_chunks(vec![1..=batch_size]);
+
+    let TestExecutor {
+        _path,
+        db: _db,
+        executor,
+    } = TestExecutor::new();
+    executor.reset().unwrap();
+    executor.finish();
+
+    // The outputs path used to `.expect("not reset")` here and take the node down.
+    assert!(executor
+        .enqueue_chunk_by_transaction_outputs(
+            TransactionOutputListWithProofV2::new_empty(),
+            &ledger_info,
+            None,
+        )
+        .is_err());
+    assert!(executor
+        .enqueue_chunk_by_execution(chunks[0].clone(), &ledger_info, None)
+        .is_err());
+    assert!(executor.update_ledger().is_err());
+    assert!(executor.commit_chunk().is_err());
+    assert!(executor.is_empty());
+
+    // A reset brings it back to a usable state.
+    executor.reset().unwrap();
+    executor
+        .execute_chunk(chunks[0].clone(), &ledger_info, None)
+        .unwrap();
+    executor.commit_chunk().unwrap();
 }
 
 #[test]
