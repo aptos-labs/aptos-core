@@ -35,7 +35,7 @@ module aptos_experimental::pre_cancellation_tests {
             new_market(
                 admin,
                 market_signer,
-                new_market_config(false, true, PRE_CANCEL_WINDOW_SECS, false, 0)
+                new_market_config(false, true, PRE_CANCEL_WINDOW_SECS, false, 0, option::none(), option::none())
             );
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
@@ -113,7 +113,7 @@ module aptos_experimental::pre_cancellation_tests {
             new_market(
                 admin,
                 market_signer,
-                new_market_config(false, true, PRE_CANCEL_WINDOW_SECS, false, 0)
+                new_market_config(false, true, PRE_CANCEL_WINDOW_SECS, false, 0, option::none(), option::none())
             );
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();
@@ -175,7 +175,7 @@ module aptos_experimental::pre_cancellation_tests {
             new_market(
                 admin,
                 market_signer,
-                new_market_config(false, true, PRE_CANCEL_WINDOW_SECS, false, 0)
+                new_market_config(false, true, PRE_CANCEL_WINDOW_SECS, false, 0, option::none(), option::none())
             );
         clearinghouse_test::initialize(admin);
         let event_store = event_utils::new_event_store();

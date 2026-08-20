@@ -52,7 +52,9 @@ module aptos_experimental::market_tests_common {
                     true,
                     PRE_CANCEL_WINDOW_SECS,
                     false,
-                    0
+                    0,
+                    option::none(),
+                    option::none()
                 )
             );
         clearinghouse_test::initialize(admin);

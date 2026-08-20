@@ -572,7 +572,11 @@ module aptos_experimental::market_types {
             pre_cancellation_window_secs: u64,
             /// Enable dead man's switch functionality
             enable_dead_mans_switch: bool,
-            min_keep_alive_time_secs: u64
+            min_keep_alive_time_secs: u64,
+            /// Optional maker fee in basis points (10000 = 100%). None means use default fee.
+            maker_fee_bps: Option<u64>,
+            /// Optional taker fee in basis points (10000 = 100%). None means use default fee.
+            taker_fee_bps: Option<u64>
         }
     }
 
@@ -684,15 +688,39 @@ module aptos_experimental::market_types {
         allow_events_emission: bool,
         pre_cancellation_window_secs: u64,
         enable_dead_mans_switch: bool,
-        min_keep_alive_time_secs: u64
+        min_keep_alive_time_secs: u64,
+        maker_fee_bps: Option<u64>,
+        taker_fee_bps: Option<u64>
     ): MarketConfig {
         MarketConfig::V1 {
             allow_self_trade: allow_self_matching,
             allow_events_emission,
             pre_cancellation_window_secs,
             enable_dead_mans_switch,
-            min_keep_alive_time_secs
+            min_keep_alive_time_secs,
+            maker_fee_bps,
+            taker_fee_bps
         }
+    }
+
+    /// Convenience function to create a market config with zero fees.
+    /// Useful for stablecoin-to-stablecoin markets or other low-fee markets.
+    public fun new_market_config_with_zero_fees(
+        allow_self_matching: bool,
+        allow_events_emission: bool,
+        pre_cancellation_window_secs: u64,
+        enable_dead_mans_switch: bool,
+        min_keep_alive_time_secs: u64
+    ): MarketConfig {
+        new_market_config(
+            allow_self_matching,
+            allow_events_emission,
+            pre_cancellation_window_secs,
+            enable_dead_mans_switch,
+            min_keep_alive_time_secs,
+            option::some(0), // maker_fee_bps = 0
+            option::some(0) // taker_fee_bps = 0
+        )
     }
 
     public fun new_market<M: store + copy + drop>(
@@ -751,6 +779,26 @@ module aptos_experimental::market_types {
             market,
             min_keep_alive_time_secs
         );
+    }
+
+    public fun set_maker_fee_bps<M: store + copy + drop>(
+        self: &mut Market<M>, maker_fee_bps: Option<u64>
+    ) {
+        self.config.maker_fee_bps = maker_fee_bps;
+    }
+
+    public fun set_taker_fee_bps<M: store + copy + drop>(
+        self: &mut Market<M>, taker_fee_bps: Option<u64>
+    ) {
+        self.config.taker_fee_bps = taker_fee_bps;
+    }
+
+    public fun get_maker_fee_bps<M: store + copy + drop>(self: &Market<M>): Option<u64> {
+        self.config.maker_fee_bps
+    }
+
+    public fun get_taker_fee_bps<M: store + copy + drop>(self: &Market<M>): Option<u64> {
+        self.config.taker_fee_bps
     }
 
     public fun get_order_book<M: store + copy + drop>(self: &Market<M>): &OrderBook<M> {
@@ -1111,7 +1159,9 @@ module aptos_experimental::market_types {
             allow_events_emission: _,
             pre_cancellation_window_secs: _,
             enable_dead_mans_switch: _,
-            min_keep_alive_time_secs: _
+            min_keep_alive_time_secs: _,
+            maker_fee_bps: _,
+            taker_fee_bps: _
         } = config;
         destroy_tracker(pre_cancellation_tracker.remove(PRE_CANCELLATION_TRACKER_KEY));
         dead_mans_switch_tracker::destroy_tracker(

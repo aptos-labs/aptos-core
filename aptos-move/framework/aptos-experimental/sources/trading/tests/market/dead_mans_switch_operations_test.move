@@ -28,7 +28,9 @@ module aptos_experimental::dead_mans_switch_operations_test {
                     true, // allow_events_emission
                     1, // pre_cancellation_window_secs
                     true, // enable_dead_mans_switch
-                    MIN_KEEP_ALIVE_TIME_SECS
+                    MIN_KEEP_ALIVE_TIME_SECS,
+                    option::none(), // maker_fee_bps
+                    option::none() // taker_fee_bps
                 )
             );
         clearinghouse_test::initialize(admin);
@@ -186,7 +188,7 @@ module aptos_experimental::dead_mans_switch_operations_test {
             new_market(
                 &admin,
                 &mut market_signer,
-                new_market_config(false, true, 1, false, 0) // DMS disabled
+                new_market_config(false, true, 1, false, 0, option::none(), option::none()) // DMS disabled
             );
         clearinghouse_test::initialize(&admin);
 
@@ -608,7 +610,7 @@ module aptos_experimental::dead_mans_switch_operations_test {
             new_market(
                 &admin,
                 &mut market_signer,
-                new_market_config(false, true, 1, false, 0) // DMS disabled
+                new_market_config(false, true, 1, false, 0, option::none(), option::none()) // DMS disabled
             );
         clearinghouse_test::initialize(&admin);
 
