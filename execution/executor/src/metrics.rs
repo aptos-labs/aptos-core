@@ -80,6 +80,15 @@ pub static EXECUTOR_ERRORS: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!("aptos_executor_error_total", "Cumulative number of errors").unwrap()
 });
 
+pub static CHUNK_EXECUTOR_REQUEST_REJECTED: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_executor_chunk_executor_request_rejected_total",
+        "Cumulative number of rejected chunk executor requests, by entry point and reason",
+        &["entry_point", "reason"]
+    )
+    .unwrap()
+});
+
 pub static BLOCK_EXECUTION_WORKFLOW_WHOLE: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
