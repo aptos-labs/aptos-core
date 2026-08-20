@@ -39,17 +39,17 @@ def wp (action : Spec State Result)
   (∀ result final, action.ok initial result final → ensures result final) ∧
   (∀ code, action.aborts initial code → aborts code)
 
-@[simp] theorem wp_pure (value : Result) (state : State)
+@[simp, wp_norm] theorem wp_pure (value : Result) (state : State)
     (ensures : Result → State → Prop) (aborts : Nat → Prop) :
     wp (Spec.pure value) ensures aborts state ↔ ensures value state := by
   simp [wp, Spec.pure]
 
-@[simp] theorem wp_abort (code : Nat) (state : State)
+@[simp, wp_norm] theorem wp_abort (code : Nat) (state : State)
     (ensures : Result → State → Prop) (aborts : Nat → Prop) :
     wp (Spec.abort code) ensures aborts state ↔ aborts code := by
   simp [wp, Spec.abort]
 
-theorem wp_bind (action : Spec State α) (next : α → Spec State β)
+@[wp_norm] theorem wp_bind (action : Spec State α) (next : α → Spec State β)
     (ensures : β → State → Prop) (aborts : Nat → Prop) (initial : State) :
     wp (Spec.bind action next) ensures aborts initial ↔
       wp action (fun value state => wp (next value) ensures aborts state) aborts initial := by
@@ -126,6 +126,20 @@ theorem wp_of_satisfies
       (contract.aborts args initial)
       initial :=
   verified args initial permitted
+
+/-- Weaken an established weakest-precondition fact to a coarser
+postcondition and abort condition. This adapts a callee's contract to the
+caller's local obligation without reopening normal and abort halves. -/
+theorem wp_mono {action : Spec State Result}
+    {ensures ensures' : Result → State → Prop} {aborts aborts' : Nat → Prop}
+    {initial : State}
+    (established : wp action ensures aborts initial)
+    (weakenEnsures : ∀ result final, ensures result final → ensures' result final)
+    (weakenAborts : ∀ code, aborts code → aborts' code) :
+    wp action ensures' aborts' initial :=
+  ⟨fun result final execution =>
+      weakenEnsures result final (established.1 result final execution),
+    fun code execution => weakenAborts code (established.2 code execution)⟩
 
 /-- Fixed-point induction with a `wp` step. Most Leaner loop proofs naturally
 reason about one call and need not duplicate success and abort forwarding. -/

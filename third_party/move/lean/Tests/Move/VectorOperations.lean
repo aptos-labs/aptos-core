@@ -210,87 +210,25 @@ move_module VectorOperations where
 
   /-! ## Proofs -/
 
-  private theorem bindPureMap_ok_iff (action : Move.Semantics.Spec σ α)
-      (transform : α → β) :
-      (do
-        let value ← action
-        pure (transform value)).ok initial result final ↔
-        ∃ value middle, action.ok initial value middle ∧
-          result = transform value ∧ final = middle := by
-    rfl
-
-  private theorem bindPureMap_aborts_iff (action : Move.Semantics.Spec σ α)
-      (transform : α → β) :
-      (do
-        let value ← action
-        pure (transform value)).aborts initial code ↔
-        action.aborts initial code := by
-    change (Move.Semantics.Spec.bind action
-      (fun value => Move.Semantics.Spec.pure (transform value))).aborts
-        initial code ↔ action.aborts initial code
-    simp [Move.Semantics.Spec.bind, Move.Semantics.Spec.pure]
-
-  verify emptyLength by
-    simp [emptyLength.contract, emptyLength, Move.Vector.empty,
-      Move.Vector.length]
-    apply U64.ext
-    rfl
+  verify emptyLength
 
   verify pushed
 
   verify nested
 
   verify borrowedLength by
-    unfold borrowedLength.contract borrowedLength.sourceSpec Move.Verify.Satisfies
-    intro State
-    rintro ⟨⟩ initial _
-    constructor
-    · intro result final execution
-      simp only [Move.Semantics.Spec.bind, Move.Semantics.Spec.pure] at execution
-      rcases execution with ⟨value, middle, ⟨rfl, rfl⟩, rfl, rfl⟩
-      simp [Move.Vector.empty, Move.Vector.push, Move.Vector.length]
-      apply U64.ext
-      rfl
-    · intro code execution
-      simp at execution
+    contract_intro
+    rw [Move.Verify.wp_pure]
+    apply Move.U64.ext
+    rfl
 
   verify boolRoundTrip
 
   verify mutateAndRead by
-    unfold mutateAndRead.contract mutateAndRead.sourceSpec Move.Verify.Satisfies
-    intro State
-    rintro ⟨⟩ initial _
-    have oneNat : (1 : U64).toNat = 1 := rfl
-    have sevenNat : (7 : U64).toNat = 7 := rfl
-    have twentyNat : (20 : U64).toNat = 20 := rfl
-    have twentySeven : U64.ofNat 27 = (27 : U64) := rfl
-    constructor
-    · intro result final execution
-      simp [Move.Semantics.Vector.withBorrowElemMutSpec,
-        Move.Semantics.withMutation, Move.Semantics.Checked.addSpec,
-        Move.Semantics.Spec.bind, Move.Semantics.Spec.pure,
-        Move.Semantics.Mutation.read, Move.Semantics.Mutation.write,
-        Move.Vector.empty, Move.Vector.push, Move.Vector.set, Move.Vector.toList,
-        oneNat, sevenNat] at execution
-      rcases execution with ⟨values, middle, ⟨rfl, rfl⟩, execution⟩
-      simp at execution
-      rcases execution with ⟨updated, execution⟩
-      rw [bindPureMap_ok_iff] at execution
-      rcases execution with
-        ⟨output, bodyFinal, bodyExecution, resultEq, finalEq⟩
-      simp at bodyExecution
-      grind
-    · intro code execution
-      simp [Move.Semantics.Vector.withBorrowElemMutSpec,
-        Move.Semantics.withMutation, Move.Semantics.Checked.addSpec,
-        Move.Semantics.Spec.bind, Move.Semantics.Spec.pure,
-        Move.Semantics.Mutation.read, Move.Semantics.Mutation.write,
-        Move.Vector.empty, Move.Vector.push, Move.Vector.set, Move.Vector.toList,
-        oneNat, sevenNat] at execution
-      rcases execution with ⟨values, middle, ⟨rfl, rfl⟩, execution⟩
-      simp at execution
-      rw [bindPureMap_aborts_iff] at execution
-      simp [U64.size, twentyNat] at execution
+    contract_intro
+    simp [wp_norm, Move.Semantics.Mutation.read, Move.Semantics.Mutation.write,
+      Move.Vector.empty, Move.Vector.push, Move.Vector.toList, Move.U64.size]
+    decide
 
   verify insertMiddle
 

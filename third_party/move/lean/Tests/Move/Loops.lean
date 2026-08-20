@@ -185,172 +185,89 @@ move_module Loops where
       simp [Move.Verify.wp, Move.Semantics.Spec.pure]
 
   verify countDownLoop by
-    unfold countDownLoop.contract countDownLoop.sourceSpec
-    intro State
-    simp only [Move.Semantics.Spec.pure_bind]
-    apply Move.Verify.satisfies_fix_of_wp
-    intro recursive recursiveVerified
-    intro n initial _
-    by_cases hloop : Move.Verify.Source.logicalLT n 1
-    · simp only [hloop, if_true]
-      simp only [Move.Verify.Source.logicalLT_u64] at hloop
-      change n.toNat < 1 at hloop
-      have nzero := Move.U64.eq_zero_of_not_pos (by omega : ¬0 < n.toNat)
-      subst n
+    contract_intro
+    move_cases hloop : Move.Verify.Source.logicalLT args 1
+    · have argsZero : args = 0 := Move.U64.eq_zero_of_not_pos (by omega)
+      subst argsZero
       simp [Move.Verify.wp, Move.Semantics.Spec.pure]
-    · simp only [hloop, if_false]
-      simp only [Move.Verify.Source.logicalLT_u64] at hloop
-      change ¬n.toNat < 1 at hloop
-      have positive : 0 < n.toNat := by omega
-      rw [Move.Semantics.Checked.subSpec_one_eq_pure_of_pos positive,
+    · rw [Move.Semantics.Checked.subSpec_one_eq_pure_of_pos (by omega),
         Move.Semantics.Spec.pure_bind]
       exact Move.Verify.wp_of_satisfies recursiveVerified trivial
 
-  verify twoPhases by
-    unfold twoPhases.contract twoPhases.sourceSpec
-    intro State
-    simp only [Move.Semantics.Spec.pure_bind]
-    let upContract : Move.Verify.Contract State U64 U64 :=
-      @Move.Verify.Contract.mk State U64 U64
-        (fun n _ => n.toNat ≤ 3)
-        (fun _ initial result final => result = 3 ∧ final = initial)
-        (fun _ _ _ => False)
-    have upVerified :
-        Move.Verify.Satisfies
-          (Move.Semantics.Spec.fix fun recursive n =>
-            if Move.Verify.Source.logicalLT n 3 then
-              Move.Semantics.Spec.bind
-                (Move.Semantics.Checked.addSpec n 1) recursive
-            else
-              Move.Semantics.Spec.pure n)
-          upContract := by
-      apply Move.Verify.satisfies_fix_of_wp
-      intro recursive recursiveVerified n initial permitted
-      by_cases hloop : Move.Verify.Source.logicalLT n 3
-      · simp only [hloop, if_true]
-        simp only [Move.Verify.Source.logicalLT_u64] at hloop
-        change n.toNat < 3 at hloop
-        have safe : n.toNat + 1 < U64.size := by
-          simp [U64.size]
-          omega
-        have addStep :
-            (Move.Semantics.Checked.addSpec n 1 :
-              Move.Semantics.Spec State U64) =
-              Move.Semantics.Spec.pure
-                (Move.U64.ofNat (n.toNat + 1)) :=
-          Move.Semantics.Checked.addSpec_eq_pure safe
-        rw [addStep, Move.Semantics.Spec.pure_bind]
-        apply Move.Verify.wp_of_satisfies recursiveVerified
-        change (Move.U64.ofNat (n.toNat + 1)).toNat ≤ 3
-        simp [Move.U64.toNat_ofNat]
-        omega
-      · simp only [hloop, if_false]
-        simp only [Move.Verify.Source.logicalLT_u64] at hloop
-        change ¬n.toNat < 3 at hloop
-        have nequals : n = 3 := by
-          apply Move.U64.ext
-          change n.toNat = 3
-          omega
-        subst n
-        simp [Move.Verify.wp, Move.Semantics.Spec.pure, upContract]
+  /-- The second `twoPhases` loop counts up to exactly three. -/
+  private theorem upToThreeLoop (State : Type) :
+      Move.Verify.Satisfies
+        (Move.Semantics.Spec.fix fun recursive n =>
+          if Move.Verify.Source.logicalLT n 3 then
+            Move.Semantics.Spec.bind
+              (Move.Semantics.Checked.addSpec n 1) recursive
+          else
+            Move.Semantics.Spec.pure n)
+        (@Move.Verify.Contract.mk State U64 U64
+          (fun n _ => n.toNat ≤ 3)
+          (fun _ initial result final => result = 3 ∧ final = initial)
+          (fun _ _ _ => False)) := by
     apply Move.Verify.satisfies_fix_of_wp
-    intro recursive recursiveVerified n initial _
-    by_cases hloop : Move.Verify.Source.logicalLT 0 n
-    · simp only [hloop, if_true]
-      simp only [Move.Verify.Source.logicalLT_u64] at hloop
-      change 0 < n.toNat at hloop
+    intro recursive recursiveVerified n initial permitted
+    replace permitted : n.toNat ≤ 3 := permitted
+    move_cases hloop : Move.Verify.Source.logicalLT n 3
+    · spec_norm
+      apply Move.Verify.wp_of_satisfies recursiveVerified
+      show (Move.U64.ofNat (n.toNat + 1)).toNat ≤ 3
+      u64_omega
+    · have nEq : n = 3 := by u64_omega
+      subst nEq
+      simp [Move.Verify.wp, Move.Semantics.Spec.pure]
+
+  verify twoPhases by
+    contract_intro
+    by_cases hloop : Move.Verify.Source.logicalLT 0 args
+    · rw [if_pos hloop]
+      simp only [Move.Verify.Source.logicalLT_u64,
+        Move.U64.toNat_ofNat_numeral] at hloop
       rw [Move.Semantics.Checked.subSpec_one_eq_pure_of_pos hloop,
         Move.Semantics.Spec.pure_bind]
       exact Move.Verify.wp_of_satisfies recursiveVerified trivial
-    · simp only [hloop, if_false]
-      simp only [Move.Verify.Source.logicalLT_u64] at hloop
-      change ¬0 < n.toNat at hloop
-      have nzero := Move.U64.eq_zero_of_not_pos hloop
-      subst n
-      have verified := Move.Verify.wp_of_satisfies
-        (args := (0 : U64)) (initial := initial) upVerified (by
-          change (0 : U64).toNat ≤ 3
-          decide)
-      constructor
-      · intro result final execution
-        exact (verified.1 result final execution).1
-      · exact verified.2
+    · rw [if_neg hloop]
+      simp only [Move.Verify.Source.logicalLT_u64,
+        Move.U64.toNat_ofNat_numeral] at hloop
+      refine Move.Verify.wp_mono
+        (Move.Verify.wp_of_satisfies (upToThreeLoop _) ?_) ?_ ?_
+      · show args.toNat ≤ 3
+        omega
+      · exact fun result final h => h.1
+      · exact fun code h => h.elim
+
+  /-- Both labeled loop examples run one countdown to zero. -/
+  private theorem countToZeroLoop (State : Type) :
+      Move.Verify.Satisfies
+        (Move.Semantics.Spec.fix fun recursive n =>
+          if Move.Verify.Source.logicalLT n 1 then
+            Move.Semantics.Spec.pure n
+          else
+            Move.Semantics.Spec.bind
+              (Move.Semantics.Checked.subSpec n 1) recursive)
+        (@Move.Verify.Contract.mk State U64 U64
+          (fun _ _ => True)
+          (fun _ _ result _ => result = 0)
+          (fun _ _ _ => False)) := by
+    apply Move.Verify.satisfies_fix_of_wp
+    intro recursive recursiveVerified n initial _
+    move_cases hloop : Move.Verify.Source.logicalLT n 1
+    · have nZero : n = 0 := Move.U64.eq_zero_of_not_pos (by omega)
+      subst nZero
+      simp [Move.Verify.wp, Move.Semantics.Spec.pure]
+    · rw [Move.Semantics.Checked.subSpec_one_eq_pure_of_pos (by omega),
+        Move.Semantics.Spec.pure_bind]
+      exact Move.Verify.wp_of_satisfies recursiveVerified trivial
 
   verify labeledExit by
-    unfold labeledExit.contract labeledExit.sourceSpec
-    intro State
-    simp only [Move.Semantics.Spec.pure_bind]
-    let loopContract : Move.Verify.Contract State U64 U64 :=
-      @Move.Verify.Contract.mk State U64 U64
-        (fun _ _ => True)
-        (fun _ _ result _ => result = 0)
-        (fun _ _ _ => False)
-    have loopVerified :
-        Move.Verify.Satisfies
-          (Move.Semantics.Spec.fix fun recursive n =>
-            if Move.Verify.Source.logicalLT n 1 then
-              Move.Semantics.Spec.pure n
-            else
-              Move.Semantics.Spec.bind
-                (Move.Semantics.Checked.subSpec n 1) recursive)
-          loopContract := by
-      apply Move.Verify.satisfies_fix_of_wp
-      intro recursive recursiveVerified n initial _
-      by_cases hloop : Move.Verify.Source.logicalLT n 1
-      · simp only [hloop, if_true]
-        simp only [Move.Verify.Source.logicalLT_u64] at hloop
-        change n.toNat < 1 at hloop
-        have nzero := Move.U64.eq_zero_of_not_pos (by omega : ¬0 < n.toNat)
-        subst n
-        simp [Move.Verify.wp, Move.Semantics.Spec.pure, loopContract]
-      · simp only [hloop, if_false]
-        simp only [Move.Verify.Source.logicalLT_u64] at hloop
-        change ¬n.toNat < 1 at hloop
-        have positive : 0 < n.toNat := by omega
-        rw [Move.Semantics.Checked.subSpec_one_eq_pure_of_pos positive,
-          Move.Semantics.Spec.pure_bind]
-        exact Move.Verify.wp_of_satisfies recursiveVerified trivial
-    apply Move.Verify.satisfies_fix_of_wp
-    intro _ _ n initial _
-    exact Move.Verify.wp_of_satisfies loopVerified trivial
+    contract_intro
+    exact Move.Verify.wp_of_satisfies (countToZeroLoop _) trivial
 
   verify labeledContinue by
-    unfold labeledContinue.contract labeledContinue.sourceSpec
-    intro State
-    simp only [Move.Semantics.Spec.pure_bind]
-    let loopContract : Move.Verify.Contract State U64 U64 :=
-      @Move.Verify.Contract.mk State U64 U64
-        (fun _ _ => True)
-        (fun _ _ result _ => result = 0)
-        (fun _ _ _ => False)
-    have loopVerified :
-        Move.Verify.Satisfies
-          (Move.Semantics.Spec.fix fun recursive n =>
-            if Move.Verify.Source.logicalLT n 1 then
-              Move.Semantics.Spec.pure n
-            else
-              Move.Semantics.Spec.bind
-                (Move.Semantics.Checked.subSpec n 1) recursive)
-          loopContract := by
-      apply Move.Verify.satisfies_fix_of_wp
-      intro recursive recursiveVerified n initial _
-      by_cases hloop : Move.Verify.Source.logicalLT n 1
-      · simp only [hloop, if_true]
-        simp only [Move.Verify.Source.logicalLT_u64] at hloop
-        change n.toNat < 1 at hloop
-        have nzero := Move.U64.eq_zero_of_not_pos (by omega : ¬0 < n.toNat)
-        subst n
-        simp [Move.Verify.wp, Move.Semantics.Spec.pure, loopContract]
-      · simp only [hloop, if_false]
-        simp only [Move.Verify.Source.logicalLT_u64] at hloop
-        change ¬n.toNat < 1 at hloop
-        have positive : 0 < n.toNat := by omega
-        rw [Move.Semantics.Checked.subSpec_one_eq_pure_of_pos positive,
-          Move.Semantics.Spec.pure_bind]
-        exact Move.Verify.wp_of_satisfies recursiveVerified trivial
-    apply Move.Verify.satisfies_fix_of_wp
-    intro _ _ n initial _
-    exact Move.Verify.wp_of_satisfies loopVerified trivial
+    contract_intro
+    exact Move.Verify.wp_of_satisfies (countToZeroLoop _) trivial
 
   verify labeledProof
 
@@ -358,87 +275,46 @@ move_module Loops where
 
   verify shadowedLoopArrow
 
+  /-- The `drain` loop counts the borrowed value down to zero and writes the
+  final value back through the loan. -/
+  private theorem drainLoop (State : Type)
+      (reference : Move.Semantics.Mutation U64) :
+      Move.Verify.Satisfies
+        (Move.Semantics.Spec.fix fun recursive n =>
+          if Move.Verify.Source.logicalLT 0 n then
+            Move.Semantics.Spec.bind
+              (Move.Semantics.Checked.subSpec n 1) recursive
+          else
+            Move.Semantics.Spec.pure (n, reference.write n))
+        (@Move.Verify.Contract.mk State U64
+          (U64 × Move.Semantics.Mutation U64)
+          (fun _ _ => True)
+          (fun _ initial output final =>
+            output = (0, reference.write 0) ∧ final = initial)
+          (fun _ _ _ => False)) := by
+    apply Move.Verify.satisfies_fix_of_wp
+    intro recursive recursiveVerified n initial _
+    move_cases hloop : Move.Verify.Source.logicalLT 0 n
+    · rw [Move.Semantics.Checked.subSpec_one_eq_pure_of_pos hloop,
+        Move.Semantics.Spec.pure_bind]
+      exact Move.Verify.wp_of_satisfies recursiveVerified trivial
+    · simp [Move.Verify.wp, Move.Semantics.Spec.pure]
+
   verify drain by
-    unfold drain.contract drain.sourceSpec
-    intro State store
-    have loopVerified (reference : Move.Semantics.Mutation U64) :
-        Move.Verify.Satisfies
-          (Move.Semantics.Spec.fix fun recursive n =>
-            if Move.Verify.Source.logicalLT 0 n then
-              Move.Semantics.Spec.bind
-                (Move.Semantics.Checked.subSpec n 1) recursive
-            else
-              Move.Semantics.Spec.pure (n, reference.write n))
-          (@Move.Verify.Contract.mk State U64
-            (U64 × Move.Semantics.Mutation U64)
-            (fun _ _ => True)
-            (fun _ initial output final =>
-              output.1 = 0 ∧ output.2.current = 0 ∧ final = initial)
-            (fun _ _ _ => False)) := by
-      apply Move.Verify.satisfies_fix_of_wp
-      intro recursive recursiveVerified n initial _
-      by_cases hloop : Move.Verify.Source.logicalLT 0 n
-      · simp only [hloop, if_true]
-        simp only [Move.Verify.Source.logicalLT_u64] at hloop
-        change 0 < n.toNat at hloop
-        rw [Move.Semantics.Checked.subSpec_one_eq_pure_of_pos hloop,
-          Move.Semantics.Spec.pure_bind]
-        exact Move.Verify.wp_of_satisfies recursiveVerified trivial
-      · simp only [hloop, if_false]
-        simp only [Move.Verify.Source.logicalLT_u64] at hloop
-        change ¬0 < n.toNat at hloop
-        have nzero := Move.U64.eq_zero_of_not_pos hloop
-        subst n
-        simp [Move.Verify.wp, Move.Semantics.Spec.pure,
-          Move.Semantics.Mutation.write]
-    intro addr initial permitted
-    constructor
-    · intro result final execution
-      simp only [Move.Semantics.Spec.pure_bind] at execution
-      unfold Move.Semantics.Resource.withBorrowMutFocusSpec
-        Move.Semantics.Resource.withBorrowMutSpec at execution
-      rcases execution with ⟨owner, bodyWorld, finalOwner, lookup,
-        bodyExecution, finalEq⟩
-      rcases bodyExecution with ⟨output, mutationWorld, mutationExecution,
-        pureExecution⟩
-      rcases pureExecution with ⟨outputEq, worldEq⟩
-      unfold Move.Semantics.withMutation at mutationExecution
-      rcases mutationExecution with ⟨future, reference, loopExecution,
-        referenceFinished, outputFuture⟩
-      have verified := (loopVerified
-        ({ current := owner.value, prophecy := future } :
-          Move.Semantics.Mutation U64)
-        owner.value initial trivial).1 (output.1, reference) mutationWorld
-        loopExecution
-      have resultZero : output.1 = 0 := verified.1
-      have referenceZero : reference.current = 0 := verified.2.1
-      have mutationWorldEq : mutationWorld = initial := verified.2.2
-      have outputZero : output.2 = 0 := by
-        rw [outputFuture, ← referenceFinished, referenceZero]
-      rcases outputEq with ⟨rfl, rfl⟩
-      subst mutationWorld
-      subst final
-      simp [outputZero]
-    · intro code execution
-      simp only [Move.Semantics.Spec.pure_bind] at execution
-      unfold Move.Semantics.Resource.withBorrowMutFocusSpec
-        Move.Semantics.Resource.withBorrowMutSpec at execution
-      rcases execution with missing | ⟨owner, lookup, bodyAbort⟩
-      · change False
-        change Move.Semantics.ResourceStore.contains initial addr at permitted
-        have missingLookup :
-            Move.Semantics.ResourceStore.lookup initial addr = none :=
-          missing.1
-        simp [Move.Semantics.ResourceStore.contains, missingLookup] at permitted
-      · rcases bodyAbort with mutationAbort |
-          ⟨output, mutationWorld, _, pureAbort⟩
-        · unfold Move.Semantics.withMutation at mutationAbort
-          rcases mutationAbort with ⟨future, loopAbort⟩
-          exact (loopVerified
-            ({ current := owner.value, prophecy := future } :
-              Move.Semantics.Mutation U64)
-            owner.value initial trivial).2 code loopAbort
-        · exact pureAbort.elim
+    contract_intro
+    rcases Option.isSome_iff_exists.mp permitted with ⟨counter, lookup⟩
+    rw [Move.Verify.wp_withBorrowMutFocusSpec]
+    refine ⟨fun owner ownerLookup => ?_, fun missing => by simp_all⟩
+    rw [Move.Verify.wp_withMutation]
+    intro future
+    refine Move.Verify.wp_mono
+      (Move.Verify.wp_of_satisfies
+        (drainLoop _ { current := owner.value, prophecy := future })
+        trivial) ?_ ?_
+    · rintro output final ⟨rfl, rfl⟩ reconciled
+      simp only [Move.Semantics.Mutation.write] at reconciled ⊢
+      simp [← reconciled, Move.Semantics.ResourceStore.get]
+    · exact fun code h => h.elim
 
   verify early
 

@@ -348,8 +348,7 @@ def elabMoveFunctionApplication : TermElab := fun stx expectedType? => do
     try resolveGlobalConstNoOverload function
     catch _ => throwUnsupportedSyntax
   let env ← getEnv
-  unless moveFunAttr.hasTag env functionName || movePublicAttr.hasTag env functionName ||
-      moveEntryAttr.hasTag env functionName do
+  unless isMoveFunction env functionName do
     throwUnsupportedSyntax
   let functionExpr ← elabTerm function none
   let (parameters, binderInfos, _) ← forallMetaTelescope (← inferType functionExpr)

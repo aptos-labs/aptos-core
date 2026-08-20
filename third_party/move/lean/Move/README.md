@@ -121,6 +121,7 @@ Every piece of sugar has one compiler-visible core expansion:
 | `verify f` | automatically prove the associated contract (reduction for pure code, symbolic execution for `Action`) |
 | `verify f by ...` | supply an explicit proof for a pure or advanced contract |
 | `@[entry]` inside a module block | mark a function as a public Move entry function |
+| `public fun` / `friend fun` | declare a public resp. `public(friend)` Move function |
 | `#export_leaner "M"` | compile attributed declarations and export the deployable module |
 | `move_module% "M"` | compile attributed declarations in the current namespace to `MModule` |
 | `move_module% "M" structs [...] functions [...]` | compile an explicit declaration subset |
@@ -490,9 +491,14 @@ The first attributes are:
 @[move_enum]         -- native Move enum
 @[move_fun]          -- private Move function
 @[move_public]       -- public Move function
+@[move_friend]       -- public(friend) Move function
 @[move_entry]        -- public entry function
 @[move_native]       -- declaration supplied by a Move dependency
 ```
+
+Inside a `move_module`, visibility is normally written as a declaration
+keyword instead: `public fun` and `friend fun` expand to `@[move_public]`
+and `@[move_friend]`, and a plain `fun` stays private.
 
 The current attributes and ability derivations produce persistent declaration
 metadata. During module compilation Leaner extracts ordered fields from Lean's
@@ -972,8 +978,10 @@ not advertised as an end-to-end certificate for emitted bytecode.
 - closures and general higher-order compilation;
 - complete proof-side generic ability and memory typing;
 - all integer widths except `U64` until target semantics exist;
-- automatic source-semantics generation for every complex recursive/vector
-  algorithm (quicksort currently states a relational `sourceSpec` manually);
+- automatic source-semantics generation for the constructs listed as
+  rejections in `Tests/Move/LowLevel/Rejections.lean` (generic recursion with
+  vector mutation is covered: quicksort derives its relational semantics from
+  the authored source);
 - importing modules authored in Move into source-level Lean proofs;
 - qualified XIR type references for user-defined types imported from another
   Lean-authored module;

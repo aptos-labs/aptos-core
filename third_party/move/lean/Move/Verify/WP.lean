@@ -16,6 +16,106 @@ namespace Move.Verify
 
 open Move.Semantics
 
+/-- Checked addition in one obligation: the normal continuation under the
+no-overflow hypothesis, and the arithmetic abort otherwise. -/
+@[simp, wp_norm] theorem wp_addSpec (lhs rhs : Move.U64)
+    (ensures : Move.U64 → State → Prop) (aborts : Nat → Prop)
+    (initial : State) :
+    wp (Checked.addSpec lhs rhs : Spec State Move.U64) ensures aborts initial ↔
+      (lhs.toNat + rhs.toNat < Move.U64.size →
+        ensures (Move.U64.ofNat (lhs.toNat + rhs.toNat)) initial) ∧
+      (¬lhs.toNat + rhs.toNat < Move.U64.size →
+        aborts Checked.arithmeticAbortCode) := by
+  constructor
+  · rintro ⟨normal, abnormal⟩
+    exact ⟨fun safe => normal _ initial ⟨safe, rfl, rfl⟩,
+      fun overflow => abnormal _ ⟨rfl, overflow⟩⟩
+  · rintro ⟨normal, abnormal⟩
+    constructor
+    · rintro value final ⟨safe, rfl, rfl⟩
+      exact normal safe
+    · rintro code ⟨rfl, overflow⟩
+      exact abnormal overflow
+
+/-- Checked subtraction in one obligation: the normal continuation under the
+no-underflow hypothesis, and the arithmetic abort otherwise. -/
+@[simp, wp_norm] theorem wp_subSpec (lhs rhs : Move.U64)
+    (ensures : Move.U64 → State → Prop) (aborts : Nat → Prop)
+    (initial : State) :
+    wp (Checked.subSpec lhs rhs : Spec State Move.U64) ensures aborts initial ↔
+      (rhs.toNat ≤ lhs.toNat →
+        ensures (Move.U64.ofNat (lhs.toNat - rhs.toNat)) initial) ∧
+      (¬rhs.toNat ≤ lhs.toNat → aborts Checked.arithmeticAbortCode) := by
+  constructor
+  · rintro ⟨normal, abnormal⟩
+    exact ⟨fun safe => normal _ initial ⟨safe, rfl, rfl⟩,
+      fun underflow => abnormal _ ⟨rfl, underflow⟩⟩
+  · rintro ⟨normal, abnormal⟩
+    constructor
+    · rintro value final ⟨safe, rfl, rfl⟩
+      exact normal safe
+    · rintro code ⟨rfl, underflow⟩
+      exact abnormal underflow
+
+/-- Checked multiplication in one obligation. -/
+@[simp, wp_norm] theorem wp_mulSpec (lhs rhs : Move.U64)
+    (ensures : Move.U64 → State → Prop) (aborts : Nat → Prop)
+    (initial : State) :
+    wp (Checked.mulSpec lhs rhs : Spec State Move.U64) ensures aborts initial ↔
+      (lhs.toNat * rhs.toNat < Move.U64.size →
+        ensures (Move.U64.ofNat (lhs.toNat * rhs.toNat)) initial) ∧
+      (¬lhs.toNat * rhs.toNat < Move.U64.size →
+        aborts Checked.arithmeticAbortCode) := by
+  constructor
+  · rintro ⟨normal, abnormal⟩
+    exact ⟨fun safe => normal _ initial ⟨safe, rfl, rfl⟩,
+      fun overflow => abnormal _ ⟨rfl, overflow⟩⟩
+  · rintro ⟨normal, abnormal⟩
+    constructor
+    · rintro value final ⟨safe, rfl, rfl⟩
+      exact normal safe
+    · rintro code ⟨rfl, overflow⟩
+      exact abnormal overflow
+
+/-- Checked division in one obligation: the normal continuation under the
+nonzero-divisor hypothesis, and the arithmetic abort otherwise. -/
+@[simp, wp_norm] theorem wp_divSpec (lhs rhs : Move.U64)
+    (ensures : Move.U64 → State → Prop) (aborts : Nat → Prop)
+    (initial : State) :
+    wp (Checked.divSpec lhs rhs : Spec State Move.U64) ensures aborts initial ↔
+      (rhs.toNat ≠ 0 →
+        ensures (Move.U64.ofNat (lhs.toNat / rhs.toNat)) initial) ∧
+      (rhs.toNat = 0 → aborts Checked.arithmeticAbortCode) := by
+  constructor
+  · rintro ⟨normal, abnormal⟩
+    exact ⟨fun nonzero => normal _ initial ⟨nonzero, rfl, rfl⟩,
+      fun zero => abnormal _ ⟨rfl, zero⟩⟩
+  · rintro ⟨normal, abnormal⟩
+    constructor
+    · rintro value final ⟨nonzero, rfl, rfl⟩
+      exact normal nonzero
+    · rintro code ⟨rfl, zero⟩
+      exact abnormal zero
+
+/-- Checked remainder in one obligation. -/
+@[simp, wp_norm] theorem wp_modSpec (lhs rhs : Move.U64)
+    (ensures : Move.U64 → State → Prop) (aborts : Nat → Prop)
+    (initial : State) :
+    wp (Checked.modSpec lhs rhs : Spec State Move.U64) ensures aborts initial ↔
+      (rhs.toNat ≠ 0 →
+        ensures (Move.U64.ofNat (lhs.toNat % rhs.toNat)) initial) ∧
+      (rhs.toNat = 0 → aborts Checked.arithmeticAbortCode) := by
+  constructor
+  · rintro ⟨normal, abnormal⟩
+    exact ⟨fun nonzero => normal _ initial ⟨nonzero, rfl, rfl⟩,
+      fun zero => abnormal _ ⟨rfl, zero⟩⟩
+  · rintro ⟨normal, abnormal⟩
+    constructor
+    · rintro value final ⟨nonzero, rfl, rfl⟩
+      exact normal nonzero
+    · rintro code ⟨rfl, zero⟩
+      exact abnormal zero
+
 @[simp, wp_norm] theorem wp_borrowElemSpec (values : Move.Vector α)
     (index : Move.U64) (ensures : α → State → Prop) (aborts : Nat → Prop)
     (initial : State) :

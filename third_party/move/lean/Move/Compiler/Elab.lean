@@ -40,7 +40,8 @@ private def localTaggedNames (ns : Name) (attrs : Array TagAttribute) : TermElab
 private def discoverModuleDecls : TermElabM (Array Name × Array Name) := do
   let ns ← getCurrNamespace
   let structs ← localTaggedNames ns #[moveStructAttr, moveEnumAttr]
-  let functions ← localTaggedNames ns #[moveFunAttr, movePublicAttr, moveEntryAttr]
+  let functions ← localTaggedNames ns
+    #[moveFunAttr, movePublicAttr, moveFriendAttr, moveEntryAttr]
   return (structs, functions)
 
 scoped syntax (name := moveModuleTerm)

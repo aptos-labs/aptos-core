@@ -120,7 +120,7 @@ move_module Calls where
       if value < 1 then 0 else evenFlag (value - 1)
   end
 
-  fun addTo (addr : Address) (amount : U64) : Action Unit := do
+  friend fun addTo (addr : Address) (amount : U64) : Action Unit := do
     let value ← &mut Counter[addr].value
     value := *value + amount
 
@@ -167,41 +167,22 @@ move_module Calls where
     | true => simp [wp_norm]
 
   verify ordinaryRecursiveChoose by
-    unfold ordinaryRecursiveChoose.contract ordinaryRecursiveChoose.sourceSpec
-    intro _moveSpecState
-    apply Move.Verify.satisfies_fix
-    intro recursive recursiveVerified
-    unfold ordinaryRecursiveChoose.bodySpec Move.Verify.Satisfies at *
-    intro done initial _
-    cases done with
+    contract_intro
+    cases args with
     | false =>
-        constructor
-        · intro result final execution
-          apply (recursiveVerified true initial trivial).1 result final
-          simpa [Move.Semantics.Spec.bind, Move.Semantics.Spec.pure] using execution
-        · intro code execution
-          apply (recursiveVerified true initial trivial).2 code
-          simpa [Move.Semantics.Spec.bind, Move.Semantics.Spec.pure] using execution
-    | true =>
-        constructor <;> intros <;>
-          simp_all [Move.Semantics.Spec.pure]
+        simpa [wp_norm] using Move.Verify.wp_of_satisfies
+          (args := true) (initial := initial) recursiveVerified trivial
+    | true => simp [wp_norm]
 
   verify readCounter by
-    unfold readCounter.contract readCounter.sourceSpec
-    intro State store addr initial permitted
+    contract_intro
     rcases Option.isSome_iff_exists.mp permitted with ⟨counter, lookup⟩
-    constructor
-    · intro result final execution
-      simp [Move.Semantics.Spec.bind, Move.Semantics.Spec.pure,
-        Move.Semantics.Resource.borrowSpec, lookup] at execution
-      rcases execution with ⟨value, ⟨counterEq, finalEq⟩, resultEq⟩
-      subst value
-      subst result
-      subst final
-      simp [Move.Semantics.ResourceStore.get, lookup]
-    · intro code execution
-      simp [Move.Semantics.Spec.bind, Move.Semantics.Spec.pure,
-        Move.Semantics.Resource.borrowSpec, lookup] at execution
+    rw [Move.Verify.wp_bind, Move.Verify.wp_borrowSpec]
+    refine ⟨fun owner ownerLookup => ?_, fun missing => by simp_all⟩
+    rw [Move.Semantics.ResourceStore.descriptor_lookup, lookup] at ownerLookup
+    injection ownerLookup with ownerEq
+    subst ownerEq
+    simp [wp_norm, Move.Semantics.ResourceStore.get, lookup]
 
   /-! ## Tests -/
 
@@ -264,6 +245,20 @@ move_module Calls where
   #test run "forwardedRead" (memory 3 41) [.address 3]
     = Tests.okRet (memory 3 41) [.u64 41]
   #test run "forwardedRead" [] [.address 3] = Tests.aborted 0
+
+  -- The visibility keywords and the `@[entry]` alias map onto the exported
+  -- function metadata.
+  #guard match compiled.funMeta.find? (·.name == "addTo") with
+    | some info => info.visibility == MoveModel.IR.Visibility.friend &&
+        !info.isEntry
+    | none => false
+  #guard match compiled.funMeta.find? (·.name == "addTwice") with
+    | some info => info.visibility == MoveModel.IR.Visibility.public_ &&
+        info.isEntry
+    | none => false
+  #guard match compiled.funMeta.find? (·.name == "twice") with
+    | some info => info.visibility == MoveModel.IR.Visibility.private_
+    | none => false
 
   #emit_leaner_xir compiled
 

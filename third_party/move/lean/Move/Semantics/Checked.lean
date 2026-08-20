@@ -110,6 +110,16 @@ theorem subSpec_one_eq_pure_of_pos {value : U64}
   change 1 ≤ value.toNat
   exact positive
 
+@[simp] theorem mulSpec_eq_pure {lhs rhs : U64}
+    (safe : lhs.toNat * rhs.toNat < U64.size) :
+    (mulSpec lhs rhs : Spec σ U64) =
+      Spec.pure (U64.ofNat (lhs.toNat * rhs.toNat)) := by
+  apply Spec.extensionality
+  · funext initial value final
+    simp [mulSpec, Spec.pure, safe]
+  · funext initial code
+    simp [mulSpec, Spec.pure, safe]
+
 @[simp] theorem divSpec_eq_pure {lhs rhs : U64} (nonzero : rhs.toNat ≠ 0) :
     (divSpec lhs rhs : Spec σ U64) =
       Spec.pure (U64.ofNat (lhs.toNat / rhs.toNat)) := by
@@ -118,6 +128,15 @@ theorem subSpec_one_eq_pure_of_pos {value : U64}
     simp [divSpec, Spec.pure, nonzero]
   · funext initial code
     simp [divSpec, Spec.pure, nonzero]
+
+@[simp] theorem modSpec_eq_pure {lhs rhs : U64} (nonzero : rhs.toNat ≠ 0) :
+    (modSpec lhs rhs : Spec σ U64) =
+      Spec.pure (U64.ofNat (lhs.toNat % rhs.toNat)) := by
+  apply Spec.extensionality
+  · funext initial value final
+    simp [modSpec, Spec.pure, nonzero]
+  · funext initial code
+    simp [modSpec, Spec.pure, nonzero]
 
 @[simp] theorem add_success {lhs rhs : U64}
     (h : lhs.toNat + rhs.toNat < U64.size) :

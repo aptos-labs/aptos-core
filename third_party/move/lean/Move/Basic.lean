@@ -178,6 +178,11 @@ by the backend, not by Lean's native fixed-width arithmetic. -/
 
 instance (n : Nat) : OfNat U64 n := ⟨ofNat n⟩
 
+/-- Expose the mathematical value of a `u64` numeral literal directly, so
+proofs need no per-literal `rfl` facts. -/
+@[simp] theorem toNat_ofNat_numeral (n : Nat) :
+    (no_index (OfNat.ofNat n) : U64).toNat = n := rfl
+
 theorem eq_zero_of_not_pos {value : U64} (notPositive : ¬0 < value.toNat) :
     value = 0 := by
   apply ext

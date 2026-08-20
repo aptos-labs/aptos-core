@@ -439,9 +439,7 @@ private def resolvePureMoveFunction? (identifier : TSyntax `ident) :
       pure (some (← resolveGlobalConstNoOverload identifier.raw))
     catch _ => pure none
   let some functionName := functionName? | return none
-  unless Move.moveFunAttr.hasTag env functionName ||
-      Move.movePublicAttr.hasTag env functionName ||
-      Move.moveEntryAttr.hasTag env functionName do
+  unless Move.isMoveFunction env functionName do
     return none
   let some declaration := declarations.getState env |>.find? functionName
     | return none
@@ -581,9 +579,7 @@ private def resolveMoveFunction? (identifier : TSyntax `ident) :
       pure (some (← resolveGlobalConstNoOverload identifier.raw))
     catch _ => pure none
   let some functionName := functionName? | return none
-  if Move.moveFunAttr.hasTag env functionName ||
-      Move.movePublicAttr.hasTag env functionName ||
-      Move.moveEntryAttr.hasTag env functionName then
+  if Move.isMoveFunction env functionName then
     return some functionName
   return none
 
@@ -1816,19 +1812,14 @@ private def elabAutomaticSourceVerify : CommandElab := fun stx => do
       if let some value := info.value? (allowOpaque := true) then
         for dependency in value.getUsedConstants do
           if dependency != functionName &&
-              (moveFunAttr.hasTag env dependency ||
-                movePublicAttr.hasTag env dependency ||
-                moveEntryAttr.hasTag env dependency) then
+              Move.isMoveFunction env dependency then
             let dependencyTerm ← parseTerm dependency
             let dependencyLemma ←
               `(Lean.Parser.Tactic.simpLemma| $dependencyTerm:term)
             unfoldLemmas := unfoldLemmas.push dependencyLemma
     let command ← `(theorem $verifiedName : $contractName := by
       unfold $contractName
-      simp_all [$unfoldLemmas,*,
-        Id.run, Pure.pure, Bind.bind,
-        Move.U64.add, Move.U64.sub, Move.U64.mul,
-        Move.U64.div, Move.U64.mod] <;>
+      simp_all [$unfoldLemmas,*, move_spec] <;>
       grind)
     elabCommand command
     return
@@ -1841,9 +1832,7 @@ private def elabAutomaticSourceVerify : CommandElab := fun stx => do
     if let some value := info.value? (allowOpaque := true) then
       for dependency in value.getUsedConstants do
           if dependency != sourceSpecName &&
-              (moveFunAttr.hasTag env dependency ||
-                movePublicAttr.hasTag env dependency ||
-                moveEntryAttr.hasTag env dependency ||
+              (Move.isMoveFunction env dependency ||
                 nameSuffix? dependency == some "sourceSpec" ||
                 nameSuffix? dependency == some "bodySpec") then
           let dependencyTerm ← parseTerm dependency
@@ -1856,31 +1845,8 @@ private def elabAutomaticSourceVerify : CommandElab := fun stx => do
       intros
       constructor <;> intros
       all_goals
-        simp_all (config := { maxSteps := 1000000 }) [$sourceUnfoldLemmas,*,
-          Move.Semantics.ResourceStore.contains,
-          Move.Semantics.ResourceStore.get,
-          Move.Semantics.ResourceStore.descriptor,
-          Move.Semantics.Resource.withBorrowMutFocusSpec,
-          Move.Semantics.Resource.withBorrowMutSpec,
-          Move.Semantics.Vector.borrowElemSpec,
-          Move.Semantics.Vector.withBorrowElemMutSpec,
-          Move.Semantics.Vector.insertSpec,
-          Move.Semantics.Vector.removeSpec,
-          Move.Semantics.withMutation,
-          Bind.bind, Pure.pure,
-          Move.Semantics.Spec.bind, Move.Semantics.Spec.pure,
-          Move.Semantics.Spec.abort,
-          Move.Semantics.Mutation.read, Move.Semantics.Mutation.write,
-          Move.Vector.empty, Move.Vector.push, Move.Vector.set,
-          Move.Vector.ofList,
-          Move.Vector.toList,
-          Move.Semantics.Checked.addSpec, Move.Semantics.Checked.subSpec,
-          Move.Semantics.Checked.mulSpec, Move.Semantics.Checked.divSpec,
-          Move.Semantics.Checked.modSpec,
-          Move.U64.instOfNat, OfNat.ofNat,
-          Move.U64.toNat, Move.U64.ofNat,
-          Move.U64.add, Move.U64.sub, Move.U64.mul,
-          Move.U64.div, Move.U64.mod] <;>
+        simp_all (config := { maxSteps := 1000000 })
+          [$sourceUnfoldLemmas,*, move_spec] <;>
         grind)
   elabCommand command
 

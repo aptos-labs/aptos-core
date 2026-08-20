@@ -52,6 +52,12 @@ move_module OrderedMap where
   def Sorted (map : Map K V) : Prop :=
     SortedEntries map.entries.toList
 
+  /-- The shared operation precondition: the entries are sorted, and their
+  count is physically representable so index arithmetic cannot overflow. -/
+  structure WellFormed (map : Map K V) : Prop where
+    sorted : Sorted map
+    bounded : map.entries.toList.length < U64.size
+
   def Contains (map : Map K V) (key : K) : Prop :=
     ∃ entry ∈ map.entries.toList, entry.key = key
 
@@ -105,8 +111,7 @@ move_module OrderedMap where
 
   /-! ## Functions -/
 
-  @[move_public]
-  fun empty {K V : Type} : Map K V :=
+  public fun empty {K V : Type} : Map K V :=
     { entries := Move.Vector.empty }
 
   spec empty {K : Type} {V : Type} where
@@ -138,14 +143,13 @@ move_module OrderedMap where
 
   spec lowerBound {K : Type} {V : Type} [Move.Compare.Total K]
       (map : Map K V) (key : K) where
-    requires Model.Sorted map ∧ map.entries.toList.length < U64.size;
+    requires Model.WellFormed map;
     ensures result = U64.ofNat
       (Model.lowerBoundList map.entries.toList key) ∧
       result.toNat ≤ map.entries.toList.length ∧ final = initial;
     aborts_if False
 
-  @[move_public]
-  fun length {K V : Type} (map : &Map K V) : Action U64 := do
+  public fun length {K V : Type} (map : &Map K V) : Action U64 := do
     let entries ← &map.entries
     pure entries.length
 
@@ -164,8 +168,7 @@ move_module OrderedMap where
     aborts_if map.entries.toList[index.toNat]? = none
       with Semantics.Resource.executionFailure
 
-  @[move_public]
-  fun contains {K V : Type} (map : &Map K V) (key : &K) : Action Bool := do
+  public fun contains {K V : Type} (map : &Map K V) (key : &K) : Action Bool := do
     let index ← lowerBound map key
     let entries ← &map.entries
     if index < entries.length then
@@ -176,13 +179,12 @@ move_module OrderedMap where
 
   spec contains {K : Type} {V : Type} [Move.Compare.Total K]
       (map : Map K V) (key : K) where
-    requires Model.Sorted map ∧ map.entries.toList.length < U64.size;
+    requires Model.WellFormed map;
     ensures (result = true) ↔ Model.Contains map key;
     aborts_if False
 
   /-- Borrow the value stored under `key`, aborting when the key is absent. -/
-  @[move_public]
-  fun borrow {K V : Type} (map : &Map K V) (key : &K) : Action (&V) := do
+  public fun borrow {K V : Type} (map : &Map K V) (key : &K) : Action (&V) := do
     let index ← lowerBound map key
     let entries ← &map.entries
     if index < entries.length then
@@ -196,13 +198,12 @@ move_module OrderedMap where
 
   spec borrow {K : Type} {V : Type} [Move.Compare.Total K]
       (map : Map K V) (key : K) where
-    requires Model.Sorted map ∧ map.entries.toList.length < U64.size;
+    requires Model.WellFormed map;
     ensures Model.MapsTo map key result ∧ final = initial;
     aborts_if ¬Model.Contains map key with 2
 
   /-- Add a fresh key.  Abort code 1 matches `EKEY_ALREADY_EXISTS`. -/
-  @[move_public]
-  fun add {K V : Type} (map : &mut Map K V) (key : K) (value : V) :
+  public fun add {K V : Type} (map : &mut Map K V) (key : K) (value : V) :
       Action Unit := do
     let keyView ← &key
     let index ← lowerBound map keyView
@@ -216,14 +217,12 @@ move_module OrderedMap where
 
   spec add {K : Type} {V : Type} [Move.Compare.Total K]
       (map : &mut Map K V) (key : K) (value : V) where
-    requires Model.Sorted map ∧
-      map.entries.toList.length < U64.size;
+    requires Model.WellFormed map;
     ensures map = Model.add (old(map)) key value ∧ Model.Sorted map;
     aborts_if Model.Contains map key with 1
 
   /-- Remove an existing key.  Abort code 2 matches `EKEY_NOT_FOUND`. -/
-  @[move_public]
-  fun remove {K V : Type} (map : &mut Map K V) (key : &K) : Action V := do
+  public fun remove {K V : Type} (map : &mut Map K V) (key : &K) : Action V := do
     let index ← lowerBound map key
     let entriesView ← &map.entries
     if index < entriesView.length then
@@ -239,8 +238,7 @@ move_module OrderedMap where
 
   spec remove {K : Type} {V : Type} [Move.Compare.Total K]
       (map : &mut Map K V) (key : K) where
-    requires Model.Sorted map ∧
-      map.entries.toList.length < U64.size;
+    requires Model.WellFormed map;
     ensures Model.erase (old(map)).entries.toList key =
         some (map.entries.toList, result) ∧ Model.Sorted map;
     aborts_if ¬Model.Contains map key with 2
@@ -576,350 +574,153 @@ move_module OrderedMap where
   read-only proofs reuse it through `lowerBound.verified`. -/
 
   verify lowerBoundLoop by
-    unfold lowerBoundLoop.contract lowerBoundLoop.sourceSpec
-    intro K _ V _ _ State
-    apply Move.Verify.satisfies_fix
-    intro recursive recursiveVerified
-    unfold lowerBoundLoop.bodySpec Move.Verify.Satisfies at *
-    rintro ⟨entries, key, low, high⟩ initial window
-    change Model.Search.Window entries key low high at window
-    rcases window with ⟨sorted, lowTarget, targetHigh, highLength, lengthBound⟩
-    by_cases hloop : low.toNat < high.toNat
-    · let middleNat := low.toNat + (high.toNat - low.toNat) / 2
-      have lowHigh : low.toNat ≤ high.toNat := Nat.le_of_lt hloop
-      have middleLtHigh : middleNat < high.toNat := by
-        dsimp [middleNat]
-        omega
-      have middleLtLength : middleNat < entries.toList.length := by omega
-      have middleLtSize : middleNat < U64.size := by omega
-      have nextLtSize : middleNat + 1 < U64.size := by omega
-      have twoNonzero : (2 : U64).toNat ≠ 0 := by decide
-      have twoNat : (2 : U64).toNat = 2 := by decide
-      let middleEntry := entries.toList[middleNat]'middleLtLength
-      have atMiddle : entries.toList[middleNat]? = some middleEntry := by
-        simp [middleEntry, middleLtLength]
-      have midpointSafe :
-          low.toNat +
-              (U64.ofNat
-                ((high.toNat - low.toNat) / (2 : U64).toNat)).toNat <
-            U64.size := by
-        change low.toNat + (high.toNat - low.toNat) / 2 < U64.size
-        exact middleLtSize
-      have midpointSpec :
-          (Move.Semantics.Checked.addSpec low
-              (U64.ofNat
-                ((high.toNat - low.toNat) / (2 : U64).toNat)) :
-            Move.Semantics.Spec State U64) =
-            Move.Semantics.Spec.pure (U64.ofNat middleNat) := by
-        calc
-          _ = Move.Semantics.Spec.pure
-                (U64.ofNat
-                  (low.toNat +
-                    (U64.ofNat
-                      ((high.toNat - low.toNat) / (2 : U64).toNat)).toNat)) :=
-              Move.Semantics.Checked.addSpec_eq_pure midpointSafe
-          _ = Move.Semantics.Spec.pure (U64.ofNat middleNat) := by
-            simp [middleNat, twoNat]
-      have borrowMiddleSpec :
-          (Move.Semantics.Vector.borrowElemSpec entries
-              (U64.ofNat middleNat) :
-            Move.Semantics.Spec State (Entry K V)) =
-            Move.Semantics.Spec.pure middleEntry := by
-        apply Move.Semantics.Vector.borrowElemSpec_eq_pure
-        simpa using atMiddle
-      have nextSpec :
-          (Move.Semantics.Checked.addSpec (U64.ofNat middleNat) 1 :
-            Move.Semantics.Spec State U64) =
-            Move.Semantics.Spec.pure (U64.ofNat (middleNat + 1)) := by
-        have nextSafe :
-            (U64.ofNat middleNat).toNat + (1 : U64).toNat < U64.size := by
-          change middleNat + 1 < U64.size
-          exact nextLtSize
-        calc
-          _ = Move.Semantics.Spec.pure
-                (U64.ofNat
-                  ((U64.ofNat middleNat).toNat + (1 : U64).toNat)) :=
-              Move.Semantics.Checked.addSpec_eq_pure nextSafe
-          _ = Move.Semantics.Spec.pure (U64.ofNat (middleNat + 1)) := by
-            rfl
+    contract_intro
+    obtain ⟨entries, key, low, high⟩ := args
+    replace permitted : Model.Search.Window entries key low high := permitted
+    obtain ⟨sorted, lowTarget, targetHigh, highLength, lengthBound⟩ := permitted
+    by_cases hloop : Move.Verify.Source.logicalLT low high
+    · rw [if_pos hloop]
+      rw [Move.Verify.Source.logicalLT_u64] at hloop
+      have middleBound : low.toNat + (high.toNat - low.toNat) / 2 <
+          entries.toList.length := by omega
+      obtain ⟨middleEntry, atMiddle⟩ :
+          ∃ entry, entries.toList[low.toNat + (high.toNat - low.toNat) / 2]? =
+            some entry :=
+        ⟨_, List.getElem?_eq_getElem middleBound⟩
+      spec_norm
       by_cases goRight : middleEntry.key < key
-      · have targetAfterMiddle := Model.Search.index_lt_lowerBoundList_of_less
-          entries.toList key middleNat middleEntry sorted atMiddle goRight
-        have nextWindow : Model.Search.Window entries key
-            (U64.ofNat (middleNat + 1)) high := by
-          exact ⟨sorted, by simp; omega, targetHigh, highLength, lengthBound⟩
-        have recursiveResult := recursiveVerified
-          (entries, key, U64.ofNat (middleNat + 1), high) initial nextWindow
-        constructor
-        · intro result final execution
-          apply recursiveResult.1 result final
-          simpa [hloop, goRight, middleNat, middleEntry, lowHigh,
-            middleLtLength, middleLtSize, nextLtSize, twoNonzero,
-            atMiddle, midpointSpec, borrowMiddleSpec, nextSpec] using execution
-        · intro code execution
-          apply recursiveResult.2 code
-          simpa [hloop, goRight, middleNat, middleEntry, lowHigh,
-            middleLtLength, middleLtSize, nextLtSize, twoNonzero,
-            atMiddle, midpointSpec, borrowMiddleSpec, nextSpec] using execution
-      · have targetBeforeMiddle := Model.Search.lowerBoundList_le_index_of_not_less
-          entries.toList key middleNat middleEntry atMiddle goRight
-        have nextWindow : Model.Search.Window entries key low
-            (U64.ofNat middleNat) := by
-          exact ⟨sorted, lowTarget, by simp; omega, by simp; omega, lengthBound⟩
-        have recursiveResult := recursiveVerified
-          (entries, key, low, U64.ofNat middleNat) initial nextWindow
-        constructor
-        · intro result final execution
-          apply recursiveResult.1 result final
-          simpa [hloop, goRight, middleNat, middleEntry, lowHigh,
-            middleLtLength, middleLtSize, twoNonzero, atMiddle,
-            midpointSpec, borrowMiddleSpec] using execution
-        · intro code execution
-          apply recursiveResult.2 code
-          simpa [hloop, goRight, middleNat, middleEntry, lowHigh,
-            middleLtLength, middleLtSize, twoNonzero, atMiddle,
-            midpointSpec, borrowMiddleSpec] using execution
-    · have targetEq : Model.lowerBoundList entries.toList key = low.toNat := by
-        omega
-      constructor
-      · intro result final execution
-        simp [hloop, Move.Semantics.Spec.pure] at execution
-        rcases execution with ⟨rfl, rfl⟩
-        constructor
-        · apply U64.ext
-          simp [targetEq]
-        · rfl
-      · intro code execution
-        simp [hloop, Move.Semantics.Spec.pure] at execution
+      · rw [if_pos goRight]
+        have targetAfterMiddle := Model.Search.index_lt_lowerBoundList_of_less
+          entries.toList key _ middleEntry sorted atMiddle goRight
+        exact Move.Verify.wp_of_satisfies recursiveVerified
+          ⟨sorted, by simp; omega, targetHigh, highLength, lengthBound⟩
+      · rw [if_neg goRight]
+        have targetBeforeMiddle :=
+          Model.Search.lowerBoundList_le_index_of_not_less
+            entries.toList key _ middleEntry atMiddle goRight
+        exact Move.Verify.wp_of_satisfies recursiveVerified
+          ⟨sorted, lowTarget, by simp; omega, by simp; omega, lengthBound⟩
+    · rw [if_neg hloop]
+      rw [Move.Verify.Source.logicalLT_u64] at hloop
+      rw [Move.Verify.wp_pure]
+      exact ⟨by u64_omega, rfl⟩
 
   verify lowerBound by
-    unfold lowerBound.contract Move.Verify.Satisfies
-    intro K _ V _ _ State
-    rintro ⟨map, key⟩ initial ⟨sorted, lengthBound⟩
-    have initialWindow : Model.Search.Window map.entries key 0
-        map.entries.length := by
-      refine ⟨sorted, ?_, Model.Search.lowerBoundList_le _ _, ?_, lengthBound⟩
-      · change 0 ≤ Model.lowerBoundList map.entries.toList key
-        omega
-      · change map.entries.toList.length ≤ map.entries.toList.length
-        exact Nat.le_refl _
-    have loopResult := lowerBoundLoop.verified State
-      (map.entries, key, 0, map.entries.length) initial initialWindow
-    constructor
-    · intro result final execution
-      have loopExecution :
-          (lowerBoundLoop.sourceSpec
-            (map.entries, key, 0, map.entries.length)).ok
-              initial result final := by
-        simpa [lowerBound.sourceSpec] using execution
-      rcases loopResult.1 result final loopExecution with ⟨resultEq, finalEq⟩
-      constructor
-      · exact resultEq
-      · constructor
-        · rw [resultEq]
-          exact Model.Search.lowerBoundList_le map.entries.toList key
-        · exact finalEq
-    · intro code execution
-      apply loopResult.2 code
-      simpa [lowerBound.sourceSpec] using execution
+    contract_intro
+    obtain ⟨map, key⟩ := args
+    have window : Model.Search.Window map.entries key 0 map.entries.length :=
+      ⟨permitted.sorted, by simp, Model.Search.lowerBoundList_le _ _,
+        by simp, permitted.bounded⟩
+    refine Move.Verify.wp_mono
+      (Move.Verify.wp_of_satisfies (lowerBoundLoop.verified _) window) ?_ ?_
+    · rintro result final ⟨rfl, rfl⟩
+      exact ⟨rfl,
+        (by simp : (U64.ofNat (Model.lowerBoundList map.entries.toList key)).toNat ≤
+          map.entries.toList.length),
+        rfl⟩
+    · exact fun code h => h.elim
 
   verify length by
     unfold length.contract length.sourceSpec Move.Verify.Satisfies
     simp [Move.Vector.length_toNat]
 
   verify borrowKeyAt by
-    unfold borrowKeyAt.contract borrowKeyAt.sourceSpec Move.Verify.Satisfies
-    intro K _ V _ State
-    rintro ⟨map, index⟩ initial _
-    constructor
-    · intro result final execution
-      simp [Move.Semantics.Vector.borrowElemSpec, Move.Semantics.Spec.bind,
-        Move.Semantics.Spec.pure] at execution
-      rcases execution with ⟨entry, ⟨atIndex, finalEq⟩, resultEq⟩
-      exact ⟨entry, atIndex, resultEq, finalEq⟩
-    · intro code execution
-      simpa [Move.Semantics.Vector.borrowElemSpec, Move.Semantics.Spec.bind,
-        Move.Semantics.Spec.pure] using execution
+    contract_intro
+    obtain ⟨map, index⟩ := args
+    rw [Move.Verify.wp_bind, Move.Verify.wp_borrowElemSpec]
+    refine ⟨fun entry atIndex => ?_, fun missing => ⟨missing, rfl⟩⟩
+    rw [Move.Verify.wp_pure]
+    exact ⟨entry, atIndex, rfl, rfl⟩
 
   verify contains by
-    unfold contains.contract Move.Verify.Satisfies
-    intro K _ V _ _ State
-    rintro ⟨map, key⟩ initial permitted
-    have lowerResult := lowerBound.verified State (map, key) initial permitted
-    constructor
-    · intro result final execution
-      simp only [contains.sourceSpec, Move.Semantics.Spec.pure_bind] at execution
-      rcases execution with ⟨index, middle, indexExecution, restExecution⟩
-      rcases lowerResult.1 index middle indexExecution with
-        ⟨indexEq, indexBound, _⟩
-      subst index
-      let target := Model.lowerBoundList map.entries.toList key
-      by_cases inBounds : target < map.entries.toList.length
-      · let entry := map.entries.toList[target]'inBounds
-        have atTarget : map.entries.toList[target]? = some entry := by
-          simp [entry, inBounds]
-        simp [target, inBounds] at restExecution
-        rcases restExecution with ⟨rfl, rfl⟩
-        change ((entry.key == key) = true ↔
-          ∃ candidate ∈ map.entries.toList, candidate.key = key)
-        rw [Model.Search.contains_iff_lowerBound map.entries.toList key permitted.1]
+    contract_intro
+    obtain ⟨map, key⟩ := args
+    dsimp only
+    wp_call (lowerBound.verified _) using permitted
+    · rintro index middle ⟨rfl, _, rfl⟩
+      by_cases inBounds : Move.Verify.Source.logicalLT
+        (U64.ofNat (Model.lowerBoundList map.entries.toList key))
+        (Move.Vector.length map.entries)
+      · rw [if_pos inBounds]
+        simp only [Move.Verify.Source.logicalLT_u64, Move.U64.toNat_ofNat,
+          Move.Vector.length_toNat] at inBounds
+        obtain ⟨entry, atTarget⟩ :
+            ∃ entry, map.entries.toList[Model.lowerBoundList
+              map.entries.toList key]? = some entry :=
+          ⟨_, List.getElem?_eq_getElem inBounds⟩
+        rw [Move.Semantics.Vector.borrowElemSpec_eq_pure
+            (by simpa using atTarget),
+          Move.Semantics.Spec.pure_bind, Move.Verify.wp_pure]
+        show (Move.Verify.Source.logicalBEq entry.key key = true) ↔
+          Model.Contains map key
+        rw [Move.Verify.Source.logicalBEq_move,
+          Move.Compare.equal_eq_true_iff]
+        show _ ↔ ∃ candidate ∈ map.entries.toList, candidate.key = key
+        rw [Model.Search.contains_iff_lowerBound _ _ permitted.sorted]
         constructor
-        · intro equal
-          change Move.Compare.equal entry.key key = true at equal
-          exact ⟨entry, atTarget,
-            (Move.Compare.equal_eq_true_iff entry.key key).mp equal⟩
-        · rintro ⟨candidate, atCandidate, equal⟩
+        · exact fun same => ⟨entry, atTarget, same⟩
+        · rintro ⟨candidate, atCandidate, same⟩
           rw [atTarget] at atCandidate
-          injection atCandidate with same
-          subst candidate
-          change Move.Compare.equal entry.key key = true
-          exact (Move.Compare.equal_eq_true_iff entry.key key).mpr equal
-      · have targetEq : target = map.entries.toList.length := by
-          change target ≤ map.entries.toList.length at indexBound
-          omega
-        simp [target, inBounds] at restExecution
-        rcases restExecution with ⟨rfl, rfl⟩
-        change (false = true ↔ Model.Contains map key)
-        constructor
-        · simp
-        · intro present
-          change (∃ entry ∈ map.entries.toList, entry.key = key) at present
-          rw [Model.Search.contains_iff_lowerBound map.entries.toList key permitted.1]
-            at present
-          rcases present with ⟨entry, atTarget, _⟩
-          change map.entries.toList[target]? = some entry at atTarget
-          rw [targetEq] at atTarget
-          simp at atTarget
-    · intro code execution
-      simp only [contains.sourceSpec, Move.Semantics.Spec.pure_bind] at execution
-      rcases execution with lowerAbort | continuationAbort
-      · exact lowerResult.2 code lowerAbort
-      · rcases continuationAbort with
-          ⟨index, middle, indexExecution, restAbort⟩
-        rcases lowerResult.1 index middle indexExecution with
-          ⟨indexEq, indexBound, _⟩
-        subst index
-        let target := Model.lowerBoundList map.entries.toList key
-        by_cases inBounds : target < map.entries.toList.length
-        · let entry := map.entries.toList[target]'inBounds
-          have atTarget : map.entries.toList[target]? = some entry := by
-            simp [entry, inBounds]
-          simp [target, inBounds] at restAbort
-        · simp [target, inBounds] at restAbort
+          cases atCandidate
+          exact same
+      · rw [if_neg inBounds, Move.Verify.wp_pure]
+        simp only [Move.Verify.Source.logicalLT_u64, Move.U64.toNat_ofNat,
+          Move.Vector.length_toNat] at inBounds
+        show (false = true) ↔ Model.Contains map key
+        simp only [Bool.false_eq_true, false_iff]
+        intro present
+        obtain ⟨entry, atTarget, _⟩ :=
+          (Model.Search.contains_iff_lowerBound _ _ permitted.sorted).mp present
+        exact absurd (List.getElem?_eq_some_iff.mp atTarget).1 inBounds
+    · exact fun code h => h.elim
 
   verify borrow by
-    unfold borrow.contract Move.Verify.Satisfies
-    intro K _ V _ _ State
-    rintro ⟨map, key⟩ initial permitted
-    have lowerResult := lowerBound.verified State (map, key) initial permitted
-    constructor
-    · intro result final execution
-      simp only [borrow.sourceSpec, Move.Semantics.Spec.pure_bind] at execution
-      rcases execution with ⟨index, middle, indexExecution, restExecution⟩
-      rcases lowerResult.1 index middle indexExecution with
-        ⟨indexEq, indexBound, middleEq⟩
-      subst index
-      let target := Model.lowerBoundList map.entries.toList key
-      by_cases inBounds : target < map.entries.toList.length
-      · let entry := map.entries.toList[target]'inBounds
-        have atTarget : map.entries.toList[target]? = some entry := by
-          simp [entry, inBounds]
-        have borrowAtTarget :
-            (Move.Semantics.Vector.borrowElemSpec map.entries
-              (U64.ofNat target) : Move.Semantics.Spec State (Entry K V)) =
-                Move.Semantics.Spec.pure entry := by
-          apply Move.Semantics.Vector.borrowElemSpec_eq_pure
-          simpa [target] using atTarget
+    contract_intro
+    obtain ⟨map, key⟩ := args
+    dsimp only
+    wp_call (lowerBound.verified _) using permitted
+    · rintro index middle ⟨rfl, _, rfl⟩
+      by_cases inBounds : Move.Verify.Source.logicalLT
+        (U64.ofNat (Model.lowerBoundList map.entries.toList key))
+        (Move.Vector.length map.entries)
+      · rw [if_pos inBounds]
+        simp only [Move.Verify.Source.logicalLT_u64, Move.U64.toNat_ofNat,
+          Move.Vector.length_toNat] at inBounds
+        obtain ⟨entry, atTarget⟩ :
+            ∃ entry, map.entries.toList[Model.lowerBoundList
+              map.entries.toList key]? = some entry :=
+          ⟨_, List.getElem?_eq_getElem inBounds⟩
+        rw [Move.Semantics.Vector.borrowElemSpec_eq_pure
+            (by simpa using atTarget),
+          Move.Semantics.Spec.pure_bind]
         by_cases equal : Move.Verify.Source.logicalBEq entry.key key = true
-        · have compareEqual : Move.Compare.equal entry.key key = true := by
-            simpa using equal
-          have same := (Move.Compare.equal_eq_true_iff entry.key key).mp compareEqual
-          have equalBeq := equal
-          simp only [target, Move.Verify.Source.logicalLT_u64,
-            Move.U64.toNat_ofNat, Move.Vector.length_toNat, inBounds,
-            if_pos] at restExecution
-          rw [borrowAtTarget] at restExecution
-          simp only [Move.Semantics.Spec.pure_bind] at restExecution
-          rw [if_pos equalBeq] at restExecution
-          simp [Move.Semantics.Spec.pure] at restExecution
-          rcases restExecution with ⟨rfl, rfl⟩
-          constructor
-          · exact ⟨entry, List.mem_of_getElem? atTarget, same, rfl⟩
-          · exact middleEq
-        · have unequalBeq := equal
-          simp only [target, Move.Verify.Source.logicalLT_u64,
-            Move.U64.toNat_ofNat, Move.Vector.length_toNat, inBounds,
-            if_pos] at restExecution
-          rw [borrowAtTarget] at restExecution
-          simp only [Move.Semantics.Spec.pure_bind] at restExecution
-          rw [if_neg unequalBeq] at restExecution
-          simp [Move.Semantics.Spec.abort] at restExecution
-      · simp [target, inBounds, Move.Semantics.Spec.abort] at restExecution
-    · intro code execution
-      simp only [borrow.sourceSpec, Move.Semantics.Spec.pure_bind] at execution
-      rcases execution with lowerAbort | continuationAbort
-      · exact (lowerResult.2 code lowerAbort).elim
-      · rcases continuationAbort with
-          ⟨index, middle, indexExecution, restAbort⟩
-        rcases lowerResult.1 index middle indexExecution with
-          ⟨indexEq, indexBound, _⟩
-        subst index
-        let target := Model.lowerBoundList map.entries.toList key
-        by_cases inBounds : target < map.entries.toList.length
-        · let entry := map.entries.toList[target]'inBounds
-          have atTarget : map.entries.toList[target]? = some entry := by
-            simp [entry, inBounds]
-          have borrowAtTarget :
-              (Move.Semantics.Vector.borrowElemSpec map.entries
-                (U64.ofNat target) : Move.Semantics.Spec State (Entry K V)) =
-                  Move.Semantics.Spec.pure entry := by
-            apply Move.Semantics.Vector.borrowElemSpec_eq_pure
-            simpa [target] using atTarget
-          by_cases equal : Move.Verify.Source.logicalBEq entry.key key = true
-          · have equalBeq := equal
-            simp only [target, Move.Verify.Source.logicalLT_u64,
-              Move.U64.toNat_ofNat, Move.Vector.length_toNat, inBounds,
-              if_pos] at restAbort
-            rw [borrowAtTarget] at restAbort
-            simp only [Move.Semantics.Spec.pure_bind] at restAbort
-            rw [if_pos equalBeq] at restAbort
-            simp [Move.Semantics.Spec.pure] at restAbort
-          · have unequalBeq := equal
-            simp only [target, Move.Verify.Source.logicalLT_u64,
-              Move.U64.toNat_ofNat, Move.Vector.length_toNat, inBounds,
-              if_pos] at restAbort
-            rw [borrowAtTarget] at restAbort
-            simp only [Move.Semantics.Spec.pure_bind] at restAbort
-            rw [if_neg unequalBeq] at restAbort
-            simp [Move.Semantics.Spec.abort] at restAbort
-            rcases restAbort with rfl
-            constructor
-            · intro present
-              change (∃ candidate ∈ map.entries.toList,
-                candidate.key = key) at present
-              rw [Model.Search.contains_iff_lowerBound map.entries.toList key permitted.1]
-                at present
-              rcases present with ⟨candidate, atCandidate, same⟩
-              rw [atTarget] at atCandidate
-              injection atCandidate with candidateEq
-              subst candidate
-              apply equal
-              simpa using (Move.Compare.equal_eq_true_iff entry.key key).mpr same
-            · rfl
-        · simp [target, inBounds] at restAbort
-          rcases restAbort with rfl
-          constructor
-          · intro present
-            change (∃ entry ∈ map.entries.toList, entry.key = key) at present
-            rw [Model.Search.contains_iff_lowerBound map.entries.toList key permitted.1]
-              at present
-            rcases present with ⟨entry, atTarget, _⟩
-            change target ≤ map.entries.toList.length at indexBound
-            have targetEq : target = map.entries.toList.length := by omega
-            change map.entries.toList[target]? = some entry at atTarget
-            rw [targetEq] at atTarget
-            simp at atTarget
-          · rfl
+        · rw [if_pos equal]
+          simp only [Move.Semantics.Spec.pure_bind, Move.Verify.wp_pure]
+          have same := (Move.Compare.equal_eq_true_iff entry.key key).mp
+            (by rwa [Move.Verify.Source.logicalBEq_move] at equal)
+          exact ⟨⟨entry, List.mem_of_getElem? atTarget, same, rfl⟩, trivial⟩
+        · rw [if_neg equal]
+          simp only [Move.Verify.wp_abort]
+          refine ⟨?_, trivial⟩
+          intro present
+          obtain ⟨candidate, atCandidate, same⟩ :=
+            (Model.Search.contains_iff_lowerBound _ _ permitted.sorted).mp
+              present
+          rw [atTarget] at atCandidate
+          cases atCandidate
+          exact equal (by
+            rw [Move.Verify.Source.logicalBEq_move]
+            exact (Move.Compare.equal_eq_true_iff entry.key key).mpr same)
+      · rw [if_neg inBounds]
+        simp only [Move.Verify.Source.logicalLT_u64, Move.U64.toNat_ofNat,
+          Move.Vector.length_toNat] at inBounds
+        simp only [Move.Verify.wp_abort]
+        refine ⟨?_, trivial⟩
+        intro present
+        obtain ⟨entry, atTarget, _⟩ :=
+          (Model.Search.contains_iff_lowerBound _ _ permitted.sorted).mp present
+        exact absurd (List.getElem?_eq_some_iff.mp atTarget).1 inBounds
+    · exact fun code h => h.elim
 
   /-! ### Mutation proofs
 
@@ -928,401 +729,139 @@ move_module OrderedMap where
   concrete vector index. -/
 
   verify add by
-    unfold add.contract add.sourceSpec Move.Verify.Satisfies
-    intro K _ V _ _ State
-    rintro ⟨map, key, value⟩ initial permitted
-    constructor
-    · intro output final execution
-      simp only [Move.Semantics.withMutation,
-        Move.Semantics.Spec.pure_bind] at execution
-      rcases execution with
-        ⟨future, reference, bodyExecution, referenceCurrent, outputFinal⟩
-      rcases bodyExecution with
-        ⟨index, middle, indexExecution, restExecution⟩
-      have lowerResult := lowerBound.verified State
-        (map, key) initial permitted
-      rcases lowerResult.1 index middle indexExecution with
-        ⟨indexEq, indexBound, middleEq⟩
-      subst index
-      subst middle
-      let target := Model.lowerBoundList map.entries.toList key
-      by_cases present : Model.Contains map key
-      · have found :=
-          (Model.Search.contains_iff_lowerBound map.entries.toList key permitted.1).mp
-            present
-        rcases found with ⟨entry, atTarget, same⟩
-        have inBounds : target < map.entries.toList.length := by
-          change map.entries.toList[target]? = some entry at atTarget
-          exact (List.getElem?_eq_some_iff.mp atTarget).1
-        have borrowAtTarget :
-            (Move.Semantics.Vector.borrowElemSpec map.entries
-              (U64.ofNat target) : Move.Semantics.Spec State (Entry K V)) =
-                Move.Semantics.Spec.pure entry := by
-          apply Move.Semantics.Vector.borrowElemSpec_eq_pure
-          simpa [target] using atTarget
-        have equalBeq : Move.Verify.Source.logicalBEq entry.key key = true := by
-          rw [Move.Verify.Source.logicalBEq_move]
-          exact (Move.Compare.equal_eq_true_iff entry.key key).mpr same
-        simp only [Move.Semantics.Mutation.read] at restExecution
-        simp only [target, Move.Verify.Source.logicalLT_u64,
-          Move.U64.toNat_ofNat, Move.Vector.length_toNat, inBounds,
-          if_pos] at restExecution
-        rw [borrowAtTarget] at restExecution
-        simp only [Move.Semantics.Spec.pure_bind] at restExecution
-        rw [if_pos equalBeq] at restExecution
-        simp [Move.Semantics.Spec.abort] at restExecution
-      · by_cases inBounds : target < map.entries.toList.length
-        · let entry := map.entries.toList[target]'inBounds
-          have atTarget : map.entries.toList[target]? = some entry := by
-            simp [entry, inBounds]
-          have borrowAtTarget :
-              (Move.Semantics.Vector.borrowElemSpec map.entries
-                (U64.ofNat target) : Move.Semantics.Spec State (Entry K V)) =
-                  Move.Semantics.Spec.pure entry := by
-            apply Move.Semantics.Vector.borrowElemSpec_eq_pure
-            simpa [target] using atTarget
-          have unequalBeq : ¬Move.Verify.Source.logicalBEq entry.key key = true := by
-            intro equal
-            apply present
-            exact ⟨entry, List.mem_of_getElem? atTarget,
-              (Move.Compare.equal_eq_true_iff entry.key key).mp (by simpa using equal)⟩
-          simp only [Move.Semantics.Mutation.read] at restExecution
-          simp only [target, Move.Verify.Source.logicalLT_u64,
-            Move.U64.toNat_ofNat, Move.Vector.length_toNat, inBounds,
-            if_pos] at restExecution
-          rw [borrowAtTarget] at restExecution
-          simp only [Move.Semantics.Spec.pure_bind] at restExecution
-          rw [if_neg unequalBeq] at restExecution
-          have insertBound : target ≤ map.entries.toList.length := by
-            change target ≤ map.entries.toList.length at indexBound
-            exact indexBound
-          change (Move.Semantics.Spec.bind
-            (Move.Semantics.withMutation map.entries fun entries =>
-              Move.Semantics.Spec.bind
-                (Move.Semantics.Vector.insertSpec entries
-                  (U64.ofNat target) { key, value })
-                (fun vectorOutput =>
-                  Move.Semantics.Spec.pure ((), vectorOutput.2)))
-            (fun fieldOutput =>
-              Move.Semantics.Spec.pure
-                (fieldOutput.1,
-                  Move.Semantics.Mutation.write
-                    ({ current := map, prophecy := future } :
-                      Move.Semantics.Mutation (Map K V))
-                    { entries := fieldOutput.2 }))).ok
-              initial (output.1, reference) final at restExecution
-          rw [Move.Verify.withMutation_insertSpec_eq_pure
-            map.entries (U64.ofNat target) { key, value }
-            insertBound] at restExecution
-          simp only [Move.Semantics.Spec.pure_bind] at restExecution
-          simp [Move.Semantics.Spec.pure, Move.Semantics.Mutation.write]
-            at restExecution
-          rcases restExecution with ⟨outputFirst, referenceEq, finalEq⟩
-          subst reference
-          have futureEq : future = Model.add map key value := by
-            simpa [Model.add, Model.Insertion.insert_eq_take_lowerBound, target] using
-              referenceCurrent.symm
-          constructor
-          · exact outputFinal.trans futureEq
-          · rw [outputFinal, futureEq]
-            exact Model.Insertion.add_sorted map key value permitted.1 present
-        · simp only [Move.Semantics.Mutation.read] at restExecution
-          simp only [target, Move.Verify.Source.logicalLT_u64,
-            Move.U64.toNat_ofNat, Move.Vector.length_toNat, inBounds,
-            if_false] at restExecution
-          have insertBound : target ≤ map.entries.toList.length := by
-            change target ≤ map.entries.toList.length at indexBound
-            exact indexBound
-          change (Move.Semantics.Spec.bind
-            (Move.Semantics.withMutation map.entries fun entries =>
-              Move.Semantics.Spec.bind
-                (Move.Semantics.Vector.insertSpec entries
-                  (U64.ofNat target) { key, value })
-                (fun vectorOutput =>
-                  Move.Semantics.Spec.pure ((), vectorOutput.2)))
-            (fun fieldOutput =>
-              Move.Semantics.Spec.pure
-                (fieldOutput.1,
-                  Move.Semantics.Mutation.write
-                    ({ current := map, prophecy := future } :
-                      Move.Semantics.Mutation (Map K V))
-                    { entries := fieldOutput.2 }))).ok
-              initial (output.1, reference) final at restExecution
-          rw [Move.Verify.withMutation_insertSpec_eq_pure
-            map.entries (U64.ofNat target) { key, value }
-            insertBound] at restExecution
-          simp only [Move.Semantics.Spec.pure_bind] at restExecution
-          simp [Move.Semantics.Spec.pure, Move.Semantics.Mutation.write]
-            at restExecution
-          rcases restExecution with ⟨outputFirst, referenceEq, finalEq⟩
-          subst reference
-          have futureEq : future = Model.add map key value := by
-            simpa [Model.add, Model.Insertion.insert_eq_take_lowerBound, target] using
-              referenceCurrent.symm
-          constructor
-          · exact outputFinal.trans futureEq
-          · rw [outputFinal, futureEq]
-            exact Model.Insertion.add_sorted map key value permitted.1 present
-    · intro code execution
-      simp only [Move.Semantics.withMutation,
-        Move.Semantics.Spec.pure_bind] at execution
-      rcases execution with ⟨future, bodyAbort⟩
-      rcases bodyAbort with lowerAbort | continuationAbort
-      · have lowerResult := lowerBound.verified State
-          (map, key) initial permitted
-        exact (lowerResult.2 code lowerAbort).elim
-      · rcases continuationAbort with
-          ⟨index, middle, indexExecution, restAbort⟩
-        have lowerResult := lowerBound.verified State
-          (map, key) initial permitted
-        rcases lowerResult.1 index middle indexExecution with
-          ⟨indexEq, indexBound, middleEq⟩
-        subst index
-        subst middle
-        let target := Model.lowerBoundList map.entries.toList key
-        by_cases inBounds : target < map.entries.toList.length
-        · let entry := map.entries.toList[target]'inBounds
-          have atTarget : map.entries.toList[target]? = some entry := by
-            simp [entry, inBounds]
-          have borrowAtTarget :
-              (Move.Semantics.Vector.borrowElemSpec map.entries
-                (U64.ofNat target) : Move.Semantics.Spec State (Entry K V)) =
-                  Move.Semantics.Spec.pure entry := by
-            apply Move.Semantics.Vector.borrowElemSpec_eq_pure
-            simpa [target] using atTarget
-          simp only [Move.Semantics.Mutation.read] at restAbort
-          simp only [target, Move.Verify.Source.logicalLT_u64,
-            Move.U64.toNat_ofNat, Move.Vector.length_toNat, inBounds,
-            if_pos] at restAbort
-          rw [borrowAtTarget] at restAbort
-          simp only [Move.Semantics.Spec.pure_bind] at restAbort
-          split at restAbort
-          case isTrue equal =>
-            simp [Move.Semantics.Spec.abort] at restAbort
-            constructor
-            · exact ⟨entry, List.mem_of_getElem? atTarget,
-                (Move.Compare.equal_eq_true_iff entry.key key).mp (by simpa using equal)⟩
-            · exact restAbort
-          case isFalse equal =>
-            have insertBound : target ≤ map.entries.toList.length := by
-              change target ≤ map.entries.toList.length at indexBound
-              exact indexBound
-            change (Move.Semantics.Spec.bind
-              (Move.Semantics.withMutation map.entries fun entries =>
-                Move.Semantics.Spec.bind
-                  (Move.Semantics.Vector.insertSpec entries
-                    (U64.ofNat target) { key, value })
-                  (fun vectorOutput =>
-                    Move.Semantics.Spec.pure ((), vectorOutput.2)))
-              (fun fieldOutput =>
-                Move.Semantics.Spec.pure
-                  (fieldOutput.1,
-                    Move.Semantics.Mutation.write
-                      ({ current := map, prophecy := future } :
-                        Move.Semantics.Mutation (Map K V))
-                      { entries := fieldOutput.2 }))).aborts
-                initial code at restAbort
-            rw [Move.Verify.withMutation_insertSpec_eq_pure
-              map.entries (U64.ofNat target) { key, value }
-              insertBound] at restAbort
-            simp at restAbort
-        · simp only [Move.Semantics.Mutation.read] at restAbort
-          simp only [target, Move.Verify.Source.logicalLT_u64,
-            Move.U64.toNat_ofNat, Move.Vector.length_toNat, inBounds,
-            if_false] at restAbort
-          have insertBound : target ≤ map.entries.toList.length := by
-            change target ≤ map.entries.toList.length at indexBound
-            exact indexBound
-          change (Move.Semantics.Spec.bind
-            (Move.Semantics.withMutation map.entries fun entries =>
-              Move.Semantics.Spec.bind
-                (Move.Semantics.Vector.insertSpec entries
-                  (U64.ofNat target) { key, value })
-                (fun vectorOutput =>
-                  Move.Semantics.Spec.pure ((), vectorOutput.2)))
-            (fun fieldOutput =>
-              Move.Semantics.Spec.pure
-                (fieldOutput.1,
-                  Move.Semantics.Mutation.write
-                    ({ current := map, prophecy := future } :
-                      Move.Semantics.Mutation (Map K V))
-                    { entries := fieldOutput.2 }))).aborts
-              initial code at restAbort
-          rw [Move.Verify.withMutation_insertSpec_eq_pure
-            map.entries (U64.ofNat target) { key, value }
-            insertBound] at restAbort
-          simp at restAbort
+    contract_intro
+    obtain ⟨map, key, value⟩ := args
+    dsimp only
+    rw [Move.Verify.wp_withMutation]
+    intro future
+    simp only [Move.Semantics.Mutation.read]
+    wp_call (lowerBound.verified _) using permitted
+    · rintro index middle ⟨rfl, _, rfl⟩
+      have insertBound : Model.lowerBoundList map.entries.toList key ≤
+          map.entries.toList.length := Model.Search.lowerBoundList_le _ _
+      by_cases inBounds : Move.Verify.Source.logicalLT
+        (U64.ofNat (Model.lowerBoundList map.entries.toList key))
+        (Move.Vector.length map.entries)
+      · rw [if_pos inBounds]
+        simp only [Move.Verify.Source.logicalLT_u64, Move.U64.toNat_ofNat,
+          Move.Vector.length_toNat] at inBounds
+        obtain ⟨entry, atTarget⟩ :
+            ∃ entry, map.entries.toList[Model.lowerBoundList
+              map.entries.toList key]? = some entry :=
+          ⟨_, List.getElem?_eq_getElem inBounds⟩
+        rw [Move.Semantics.Vector.borrowElemSpec_eq_pure
+            (by simpa using atTarget),
+          Move.Semantics.Spec.pure_bind]
+        by_cases equal : Move.Verify.Source.logicalBEq entry.key key = true
+        · rw [if_pos equal]
+          simp only [Move.Verify.wp_abort]
+          refine ⟨⟨entry, List.mem_of_getElem? atTarget, ?_⟩, trivial⟩
+          exact (Move.Compare.equal_eq_true_iff entry.key key).mp
+            (by rwa [Move.Verify.Source.logicalBEq_move] at equal)
+        · rw [if_neg equal]
+          have fresh : ¬Model.Contains map key := by
+            intro present
+            obtain ⟨candidate, atCandidate, same⟩ :=
+              (Model.Search.contains_iff_lowerBound _ _ permitted.sorted).mp
+                present
+            rw [atTarget] at atCandidate
+            cases atCandidate
+            exact equal (by
+              rw [Move.Verify.Source.logicalBEq_move]
+              exact (Move.Compare.equal_eq_true_iff entry.key key).mpr same)
+          rw [Move.Verify.withMutation_insertSpec_eq_pure map.entries
+              (U64.ofNat (Model.lowerBoundList map.entries.toList key))
+              { key := key, value := value } (by simp)]
+          simp only [Move.Semantics.Spec.pure_bind, Move.Verify.wp_pure,
+            Move.Semantics.Mutation.write, Move.U64.toNat_ofNat]
+          intro reconciled
+          subst reconciled
+          rw [← Model.Insertion.insert_eq_take_lowerBound
+            map.entries.toList key value]
+          exact ⟨rfl,
+            Model.Insertion.add_sorted map key value permitted.sorted fresh⟩
+      · rw [if_neg inBounds]
+        simp only [Move.Verify.Source.logicalLT_u64, Move.U64.toNat_ofNat,
+          Move.Vector.length_toNat] at inBounds
+        have fresh : ¬Model.Contains map key := by
+          intro present
+          obtain ⟨entry, atTarget, _⟩ :=
+            (Model.Search.contains_iff_lowerBound _ _ permitted.sorted).mp
+              present
+          exact absurd (List.getElem?_eq_some_iff.mp atTarget).1 inBounds
+        rw [Move.Verify.withMutation_insertSpec_eq_pure map.entries
+            (U64.ofNat (Model.lowerBoundList map.entries.toList key))
+            { key := key, value := value } (by simp)]
+        simp only [Move.Semantics.Spec.pure_bind, Move.Verify.wp_pure,
+          Move.Semantics.Mutation.write, Move.U64.toNat_ofNat]
+        intro reconciled
+        subst reconciled
+        rw [← Model.Insertion.insert_eq_take_lowerBound
+          map.entries.toList key value]
+        exact ⟨rfl,
+          Model.Insertion.add_sorted map key value permitted.sorted fresh⟩
+    · exact fun code h => h.elim
 
   verify remove by
-    unfold remove.contract remove.sourceSpec Move.Verify.Satisfies
-    intro K _ V _ _ State
-    rintro ⟨map, key⟩ initial permitted
-    constructor
-    · intro output final execution
-      simp only [Move.Semantics.withMutation,
-        Move.Semantics.Spec.pure_bind] at execution
-      rcases execution with
-        ⟨future, reference, bodyExecution, referenceCurrent, outputFinal⟩
-      rcases bodyExecution with
-        ⟨index, middle, indexExecution, restExecution⟩
-      have lowerResult := lowerBound.verified State
-        (map, key) initial permitted
-      rcases lowerResult.1 index middle indexExecution with
-        ⟨indexEq, indexBound, middleEq⟩
-      subst index
-      subst middle
-      let target := Model.lowerBoundList map.entries.toList key
-      by_cases inBounds : target < map.entries.toList.length
-      · let entry := map.entries.toList[target]'inBounds
-        have atTarget : map.entries.toList[target]? = some entry := by
-          simp [entry, inBounds]
-        have borrowAtTarget :
-            (Move.Semantics.Vector.borrowElemSpec map.entries
-              (U64.ofNat target) : Move.Semantics.Spec State (Entry K V)) =
-                Move.Semantics.Spec.pure entry := by
-          apply Move.Semantics.Vector.borrowElemSpec_eq_pure
-          simpa [target] using atTarget
-        simp only [Move.Semantics.Mutation.read] at restExecution
-        simp only [target, Move.Verify.Source.logicalLT_u64,
-          Move.U64.toNat_ofNat, Move.Vector.length_toNat, inBounds,
-          if_pos] at restExecution
-        rw [borrowAtTarget] at restExecution
-        simp only [Move.Semantics.Spec.pure_bind] at restExecution
-        split at restExecution
-        case isFalse =>
-          simp [Move.Semantics.Spec.abort] at restExecution
-        case isTrue equal =>
-          have same : entry.key = key :=
-            (Move.Compare.equal_eq_true_iff entry.key key).mp (by simpa using equal)
-          change (Move.Semantics.Spec.bind
-            (Move.Semantics.withMutation map.entries fun entries =>
-              Move.Semantics.Spec.bind
-                (Move.Semantics.Vector.removeSpec entries (U64.ofNat target))
-                (fun vectorOutput =>
-                  Move.Semantics.Spec.pure
-                    (vectorOutput.1.value, vectorOutput.2)))
-            (fun fieldOutput =>
-              Move.Semantics.Spec.pure
-                (fieldOutput.1,
-                  Move.Semantics.Mutation.write
-                    ({ current := map, prophecy := future } :
-                      Move.Semantics.Mutation (Map K V))
-                    { entries := fieldOutput.2 }))).ok
-              initial (output.1, reference) final at restExecution
-          rw [Move.Verify.withMutation_removeSpec_eq_pure
-            map.entries (U64.ofNat target) entry
-            (fun candidate : Entry K V => candidate.value)
-            (by simpa [target] using atTarget)] at restExecution
-          simp only [Move.Semantics.Spec.pure_bind] at restExecution
-          simp [Move.Semantics.Spec.pure, Move.Semantics.Mutation.write]
-            at restExecution
-          rcases restExecution with
-            ⟨⟨outputValue, referenceEq⟩, finalEq⟩
-          subst reference
-          let remaining := map.entries.toList.take target ++
-            map.entries.toList.drop (target + 1)
-          have futureEq : future =
-              ({ entries := Move.Vector.ofList remaining } : Map K V) := by
-            simpa [remaining] using referenceCurrent.symm
+    contract_intro
+    obtain ⟨map, key⟩ := args
+    dsimp only
+    rw [Move.Verify.wp_withMutation]
+    intro future
+    simp only [Move.Semantics.Mutation.read]
+    wp_call (lowerBound.verified _) using permitted
+    · rintro index middle ⟨rfl, _, rfl⟩
+      by_cases inBounds : Move.Verify.Source.logicalLT
+        (U64.ofNat (Model.lowerBoundList map.entries.toList key))
+        (Move.Vector.length map.entries)
+      · rw [if_pos inBounds]
+        simp only [Move.Verify.Source.logicalLT_u64, Move.U64.toNat_ofNat,
+          Move.Vector.length_toNat] at inBounds
+        obtain ⟨entry, atTarget⟩ :
+            ∃ entry, map.entries.toList[Model.lowerBoundList
+              map.entries.toList key]? = some entry :=
+          ⟨_, List.getElem?_eq_getElem inBounds⟩
+        rw [Move.Semantics.Vector.borrowElemSpec_eq_pure
+            (by simpa using atTarget),
+          Move.Semantics.Spec.pure_bind]
+        by_cases equal : Move.Verify.Source.logicalBEq entry.key key = true
+        · rw [if_pos equal]
+          have same := (Move.Compare.equal_eq_true_iff entry.key key).mp
+            (by rwa [Move.Verify.Source.logicalBEq_move] at equal)
           have erased := Model.Removal.erase_eq_take_lowerBound
-            map.entries.toList key entry permitted.1 atTarget same
-          constructor
-          · calc
-              Model.erase map.entries.toList key =
-                  some (remaining, entry.value) := by
-                    simpa [remaining, target] using erased
-              _ = some (output.2.entries.toList, output.1) := by
-                rw [outputFinal, futureEq, outputValue]
-                simp [remaining]
-          · rw [outputFinal, futureEq]
-            exact Model.Removal.erase_sorted map.entries.toList key remaining
-              entry.value permitted.1 (by simpa [remaining, target] using erased)
-      · simp only [Move.Semantics.Mutation.read] at restExecution
-        simp [target, inBounds, Move.Semantics.Spec.abort] at restExecution
-    · intro code execution
-      simp only [Move.Semantics.withMutation,
-        Move.Semantics.Spec.pure_bind] at execution
-      rcases execution with ⟨future, bodyAbort⟩
-      rcases bodyAbort with lowerAbort | continuationAbort
-      · have lowerResult := lowerBound.verified State
-          (map, key) initial permitted
-        exact (lowerResult.2 code lowerAbort).elim
-      · rcases continuationAbort with
-          ⟨index, middle, indexExecution, restAbort⟩
-        have lowerResult := lowerBound.verified State
-          (map, key) initial permitted
-        rcases lowerResult.1 index middle indexExecution with
-          ⟨indexEq, indexBound, middleEq⟩
-        subst index
-        subst middle
-        let target := Model.lowerBoundList map.entries.toList key
-        by_cases inBounds : target < map.entries.toList.length
-        · let entry := map.entries.toList[target]'inBounds
-          have atTarget : map.entries.toList[target]? = some entry := by
-            simp [entry, inBounds]
-          have borrowAtTarget :
-              (Move.Semantics.Vector.borrowElemSpec map.entries
-                (U64.ofNat target) : Move.Semantics.Spec State (Entry K V)) =
-                  Move.Semantics.Spec.pure entry := by
-            apply Move.Semantics.Vector.borrowElemSpec_eq_pure
-            simpa [target] using atTarget
-          simp only [Move.Semantics.Mutation.read] at restAbort
-          simp only [target, Move.Verify.Source.logicalLT_u64,
-            Move.U64.toNat_ofNat, Move.Vector.length_toNat, inBounds,
-            if_pos] at restAbort
-          rw [borrowAtTarget] at restAbort
-          simp only [Move.Semantics.Spec.pure_bind] at restAbort
-          split at restAbort
-          case isTrue equal =>
-            change (Move.Semantics.Spec.bind
-              (Move.Semantics.withMutation map.entries fun entries =>
-                Move.Semantics.Spec.bind
-                  (Move.Semantics.Vector.removeSpec entries (U64.ofNat target))
-                  (fun vectorOutput =>
-                    Move.Semantics.Spec.pure
-                      (vectorOutput.1.value, vectorOutput.2)))
-              (fun fieldOutput =>
-                Move.Semantics.Spec.pure
-                  (fieldOutput.1,
-                    Move.Semantics.Mutation.write
-                      ({ current := map, prophecy := future } :
-                        Move.Semantics.Mutation (Map K V))
-                      { entries := fieldOutput.2 }))).aborts
-                initial code at restAbort
-            rw [Move.Verify.withMutation_removeSpec_eq_pure
-              map.entries (U64.ofNat target) entry
-              (fun candidate : Entry K V => candidate.value)
-              (by simpa [target] using atTarget)] at restAbort
-            simp at restAbort
-          case isFalse unequal =>
-            simp [Move.Semantics.Spec.abort] at restAbort
-            constructor
-            · intro present
-              change (∃ candidate ∈ map.entries.toList,
-                candidate.key = key) at present
-              rw [Model.Search.contains_iff_lowerBound map.entries.toList key permitted.1]
-                at present
-              rcases present with ⟨candidate, atCandidate, same⟩
-              rw [atTarget] at atCandidate
-              injection atCandidate with candidateEq
-              subst candidate
-              exact unequal (by
-                simpa using (Move.Compare.equal_eq_true_iff entry.key key).mpr same)
-            · exact restAbort
-        · simp only [Move.Semantics.Mutation.read] at restAbort
-          simp [target, inBounds, Move.Semantics.Spec.abort] at restAbort
-          constructor
-          · intro present
-            change (∃ entry ∈ map.entries.toList, entry.key = key) at present
-            rw [Model.Search.contains_iff_lowerBound map.entries.toList key permitted.1]
-              at present
-            rcases present with ⟨entry, atTarget, _⟩
-            change target ≤ map.entries.toList.length at indexBound
-            have targetEq : target = map.entries.toList.length := by omega
-            change map.entries.toList[target]? = some entry at atTarget
-            rw [targetEq] at atTarget
-            simp at atTarget
-          · exact restAbort
+            map.entries.toList key entry permitted.sorted atTarget same
+          rw [Move.Verify.withMutation_removeSpec_eq_pure map.entries
+              (U64.ofNat (Model.lowerBoundList map.entries.toList key))
+              entry Entry.value (by simpa using atTarget)]
+          simp only [Move.Semantics.Spec.pure_bind, Move.Verify.wp_pure,
+            Move.Semantics.Mutation.write, Move.U64.toNat_ofNat]
+          intro reconciled
+          subst reconciled
+          refine ⟨by simpa using erased, ?_⟩
+          exact Model.Removal.erase_sorted map.entries.toList key _
+            entry.value permitted.sorted (by simpa using erased)
+        · rw [if_neg equal]
+          simp only [Move.Verify.wp_abort]
+          refine ⟨?_, trivial⟩
+          intro present
+          obtain ⟨candidate, atCandidate, same⟩ :=
+            (Model.Search.contains_iff_lowerBound _ _ permitted.sorted).mp
+              present
+          rw [atTarget] at atCandidate
+          cases atCandidate
+          exact equal (by
+            rw [Move.Verify.Source.logicalBEq_move]
+            exact (Move.Compare.equal_eq_true_iff entry.key key).mpr same)
+      · rw [if_neg inBounds]
+        simp only [Move.Verify.Source.logicalLT_u64, Move.U64.toNat_ofNat,
+          Move.Vector.length_toNat] at inBounds
+        simp only [Move.Verify.wp_abort]
+        refine ⟨?_, trivial⟩
+        intro present
+        obtain ⟨entry, atTarget, _⟩ :=
+          (Model.Search.contains_iff_lowerBound _ _ permitted.sorted).mp present
+        exact absurd (List.getElem?_eq_some_iff.mp atTarget).1 inBounds
+    · exact fun code h => h.elim
 
   /-! ## Tests -/
 
@@ -1430,5 +969,12 @@ move_module OrderedMap where
   #test run "absentLookupScenario" [] [] = Tests.okU64 1
   #test run "boolKeyScenario" [] [] = Tests.okU64 20
   #test run "removeEdgesScenario" [] [] = Tests.okU64 60
+
+  -- The `public fun` operations export public visibility.
+  #guard ["empty", "length", "contains", "borrow", "add", "remove"].all
+    fun name =>
+      match compiled.funMeta.find? (·.name == name) with
+      | some info => info.visibility == MoveModel.IR.Visibility.public_
+      | none => false
 
 end Tests.MovePrograms

@@ -201,11 +201,6 @@ move_module Generics where
   verify choose
   verify swapped
 
-  @[grind .] private theorem singletonVectorLength (value : U64) :
-      Move.Vector.length vector![value] = 1 := by
-    apply U64.ext
-    rfl
-
   verify singletonLength
 
   /-! ## Tests -/

@@ -41,7 +41,7 @@ partial def Ty.instantiate (args : Array Ty) : Ty → Ty
   | ty => ty
 
 inductive Visibility where
-  | private_ | public_ | entry
+  | private_ | public_ | friend_ | entry
   deriving BEq, Repr
 
 structure LocalDecl where
@@ -323,6 +323,7 @@ private def lowerFun (structNames : Array (Name × String))
   let (visibility, isEntry) := match funDecl.visibility with
     | .private_ => (MoveModel.IR.Visibility.private_, false)
     | .public_ => (MoveModel.IR.Visibility.public_, false)
+    | .friend_ => (MoveModel.IR.Visibility.friend, false)
     | .entry => (MoveModel.IR.Visibility.public_, true)
   let decl : MoveModel.IR.FunDecl := {
     typeParams := funDecl.typeParams.toList

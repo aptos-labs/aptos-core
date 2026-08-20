@@ -74,10 +74,6 @@ move_module Vectors where
 
   verify make
 
-  @[grind .] private theorem makeLength :
-      (((Move.Vector.empty.push (10 : U64)).push 20).push 30).length = 3 := by
-    decide
-
   verify length
 
   verify middle
@@ -85,10 +81,6 @@ move_module Vectors where
   verify replace
 
   verify insertMiddle
-
-  /-- The concrete result used by this smoke test cannot overflow `u64`. -/
-  @[grind .] private theorem removeMiddleResultFitsU64 : 50 < U64.size := by
-    decide
 
   verify removeMiddle
 

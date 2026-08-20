@@ -938,8 +938,7 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
         | some signature => pure (some signature)
         | none => do
             let env ← getEnv
-            let tagged := moveFunAttr.hasTag env fn || movePublicAttr.hasTag env fn ||
-              moveEntryAttr.hasTag env fn
+            let tagged := Move.isMoveFunction env fn
             if !tagged then
               pure none
             else
@@ -949,7 +948,7 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
                 pure none
               else
                 unless movePublicAttr.hasTag env fn || moveEntryAttr.hasTag env fn do
-                  throwError "function `{fn}` is private to Move module `{owner.name}`"
+                  throwError "function `{fn}` is not visible outside Move module `{owner.name}`"
                 let externalDecl ← getBaseDecl fn
                 match signatureOf env externalDecl with
                 | .ok signature => pure (some signature)
@@ -986,8 +985,7 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
         | none =>
             modify fun s => { s with returnAliases := (decl.fvarId, none) :: s.returnAliases }
             return instrs.push (.call #[] (.function fn callTypeArgs) (callVars.map srcName))
-      if moveFunAttr.hasTag (← getEnv) fn || movePublicAttr.hasTag (← getEnv) fn ||
-          moveEntryAttr.hasTag (← getEnv) fn then
+      if Move.isMoveFunction (← getEnv) fn then
         throwError "callee `{fn}` is not selected in this `move_module%`"
       -- Type-class dictionaries and proof evidence are compiler-erased.
       if fn.toString.contains "instInhabited" then return instrs
@@ -1308,6 +1306,7 @@ private partial def walk (env : Environment) (signatures : FunSignatures) (self 
 private def visibility (env : Environment) (name : Name) : LIR.Visibility :=
   if moveEntryAttr.hasTag env name then .entry
   else if movePublicAttr.hasTag env name then .public_
+  else if moveFriendAttr.hasTag env name then .friend_
   else .private_
 
 private def lirSuccessors : LIR.Terminator → Array String
@@ -1337,7 +1336,7 @@ where
 
 private def compileFun (env : Environment) (signatures : FunSignatures)
     (module : Move.ModuleRef) (name : Name) : CoreM LIR.FunDecl := do
-  unless moveFunAttr.hasTag env name || movePublicAttr.hasTag env name || moveEntryAttr.hasTag env name do
+  unless Move.isMoveFunction env name do
     throwError "`{name}` is not annotated as a Move function"
   let decl ← getBaseDecl name
   let .code code := decl.value | throwError "Move function `{name}` has no body"
@@ -1505,7 +1504,7 @@ def compileModule (moduleName : String) (structNames funNames : Array Name) : Co
   }
   let mut signatures : FunSignatures := []
   for name in funNames do
-    unless moveFunAttr.hasTag env name || movePublicAttr.hasTag env name || moveEntryAttr.hasTag env name do
+    unless Move.isMoveFunction env name do
       throwError "`{name}` is not annotated as a Move function"
     let decl ← getBaseDecl name
     let signature ← match signatureOf env decl with

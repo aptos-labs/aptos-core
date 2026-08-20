@@ -62,7 +62,10 @@ subsequent command-level `fun` is also valid as the start of a Lean term. -/
 /-- A Move function declaration. This deliberately occupies command position,
 where Lean's term-level `fun` keyword is otherwise unavailable. It is intended
 for use inside `move_module`. The parser mirrors Lean's `def` signature and
-body grammar, including equation clauses and recursion modifiers. -/
+body grammar, including equation clauses and recursion modifiers.
+
+`public fun` declares a public Move function; Lean's `public` modifier is
+consumed by `declModifiers` and translated to `@[move_public]`. -/
 @[command_parser] def moveFunctionCommand := leading_parser
   Lean.Parser.Command.declModifiers false >>
   Lean.Parser.withPosition
@@ -71,10 +74,22 @@ body grammar, including equation clauses and recursion modifiers. -/
         (Lean.Parser.Command.optDeclSig >> Lean.Parser.Command.declVal) >>
       Lean.Parser.Command.optDefDeriving)
 
+/-- `friend fun` declares a Move function with `public(friend)` visibility.
+`friend` is not a Lean modifier, so this form has its own leading parser. -/
+@[command_parser] def moveFriendFunctionCommand := leading_parser
+  Lean.Parser.Command.declModifiers false >>
+  Lean.Parser.withPosition
+    ("friend " >> "fun " >>
+      Lean.Parser.Command.declId >>
+      Lean.Parser.ppIndent
+        (Lean.Parser.Command.optDeclSig >> Lean.Parser.Command.declVal) >>
+      Lean.Parser.Command.optDefDeriving)
+
 private partial def hasMoveDeclarationAttribute (stx : Syntax) : Bool :=
   if stx.isIdent then
     let name := stx.getId
-    name == `move_fun || name == `move_public || name == `move_entry
+    name == `move_fun || name == `move_public || name == `move_friend ||
+      name == `move_entry
   else
     stx.getArgs.any hasMoveDeclarationAttribute
 
@@ -124,24 +139,57 @@ private def addMoveTypeInhabitants
         expanded := expanded.push instanceBinder.raw
   pure ⟨signature.raw.setArg 0 (mkNullNode expanded)⟩
 
+/-- Prepend one Move declaration attribute to parsed modifiers. The attribute
+identifier is deliberately unhygienic so later passes can recognize it by
+name. -/
+private def prependDeclarationAttribute (attributeName : Name)
+    (modifiers : TSyntax ``Lean.Parser.Command.declModifiers) :
+    MacroM (TSyntax ``Lean.Parser.Command.declModifiers) := do
+  let attributeIdent : TSyntax `ident := mkIdent attributeName
+  let added ← `(attr| $attributeIdent:ident)
+  let attributes ← if modifiers.raw[1].isNone then
+    `(attributes|@[$added:attr])
+  else
+    let existing : TSyntax ``Lean.Parser.Term.attributes :=
+      ⟨modifiers.raw[1][0]⟩
+    let `(attributes|@[$attrs,*]) := existing
+      | Macro.throwErrorAt existing.raw "invalid declaration attributes"
+    `(attributes|@[$added:attr, $attrs,*])
+  pure ⟨modifiers.raw.setArg 1 (mkNullNode #[attributes.raw])⟩
+
+/-- Whether parsed modifiers carry Lean's `public` visibility keyword, which
+`fun` interprets as Move `public` visibility. -/
+private def hasPublicModifier
+    (modifiers : TSyntax ``Lean.Parser.Command.declModifiers) : Bool :=
+  modifiers.raw[2].getArgs.any fun visibility =>
+    visibility.isOfKind `Lean.Parser.Command.public
+
+/-- Remove Lean's `public` visibility keyword from parsed modifiers. -/
+private def dropPublicModifier
+    (modifiers : TSyntax ``Lean.Parser.Command.declModifiers) :
+    TSyntax ``Lean.Parser.Command.declModifiers :=
+  ⟨modifiers.raw.setArg 2 (mkNullNode)⟩
+
+macro_rules
+  | `($modifiers:declModifiers friend fun $declName:declId
+        $signature:optDeclSig $value:declVal) => do
+      let modifiers ← prependDeclarationAttribute `move_friend
+        ⟨expandLeanerAttributeAliases modifiers.raw⟩
+      `($modifiers:declModifiers fun $declName:declId
+        $signature:optDeclSig $value:declVal)
+
 macro_rules
   | `($modifiers:declModifiers fun $declName:declId
         $signature:optDeclSig $value:declVal) => do
       let signature ← addMoveTypeInhabitants signature
       let modifiers : TSyntax ``Lean.Parser.Command.declModifiers :=
         ⟨expandLeanerAttributeAliases modifiers.raw⟩
-      let modifiers ← if hasMoveDeclarationAttribute modifiers.raw then
+      let modifiers ← if hasPublicModifier modifiers then
+        prependDeclarationAttribute `move_public (dropPublicModifier modifiers)
+      else if hasMoveDeclarationAttribute modifiers.raw then
         pure modifiers
-      else do
-        let attributes ← if modifiers.raw[1].isNone then
-          `(attributes|@[move_fun])
-        else
-          let existing : TSyntax ``Lean.Parser.Term.attributes :=
-            ⟨modifiers.raw[1][0]⟩
-          let `(attributes|@[$attrs,*]) := existing
-            | Macro.throwErrorAt existing.raw "invalid declaration attributes"
-          `(attributes|@[move_fun, $attrs,*])
-        pure ⟨modifiers.raw.setArg 1 (mkNullNode #[attributes.raw])⟩
+      else
+        prependDeclarationAttribute `move_fun modifiers
       let modifiers ← match value with
         | `(declVal| := $body:term) =>
             let (_, type?) := Lean.Elab.expandOptDeclSig signature.raw

@@ -2,6 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import Move.Verify.WP
+import Move.Verify.Borrow
 import Move.Verify.Syntax
 import Lean.Elab.Tactic.Location
 
@@ -11,7 +12,84 @@ import Lean.Elab.Tactic.Location
 These are deliberately syntax wrappers over the public proof lemmas. They
 do not introduce a second verification semantics or hide generated proof
 terms behind an opaque tactic.
+
+This module is also the single inventory for the shared verification simp
+sets registered in `Move.Verify.SimpAttrs`:
+
+- `move_norm` normalizes value-level source semantics: `U64` numerals,
+  logical comparison operators, `Spec` monad laws, and the conditional
+  `*_eq_pure` equations whose side conditions a proof context can discharge.
+- `wp_norm` (populated at the rule definitions in `Move.Verify.WP` and
+  `Move.Verify.Borrow`) rewrites weakest-precondition obligations.
+- `move_spec` unfolds the raw relational semantics; it is the lemma
+  inventory of the automatic `verify f` command, and user proofs or
+  project-specific summaries can extend it with `@[move_spec]`.
 -/
+
+attribute [move_norm]
+  Move.U64.toNat_ofNat
+  Move.U64.toNat_ofNat_numeral
+  Move.Vector.length_toNat
+  Move.Vector.toList_empty
+  Move.Vector.toList_push
+  Move.Vector.toList_set
+  Move.Vector.toList_ofList
+  Move.Verify.Source.logicalLT_u64
+  Move.Verify.Source.logicalLE_u64
+  Move.Verify.Source.logicalBEq_u64
+  Move.Verify.Source.logicalLT_move
+  Move.Verify.Source.logicalBEq_move
+  Move.Semantics.Spec.pure_bind
+  Move.Semantics.Spec.bind_pure
+  Move.Semantics.Spec.fix_const
+  Move.Semantics.Checked.addSpec_eq_pure
+  Move.Semantics.Checked.subSpec_eq_pure
+  Move.Semantics.Checked.mulSpec_eq_pure
+  Move.Semantics.Checked.divSpec_eq_pure
+  Move.Semantics.Checked.modSpec_eq_pure
+  Move.Semantics.Vector.borrowElemSpec_eq_pure
+  Move.Verify.withBorrowElemMutSpec_write_eq_pure
+
+attribute [move_spec]
+  Id.run
+  Bind.bind
+  Pure.pure
+  Move.Semantics.ResourceStore.contains
+  Move.Semantics.ResourceStore.get
+  Move.Semantics.ResourceStore.descriptor
+  Move.Semantics.Resource.withBorrowMutFocusSpec
+  Move.Semantics.Resource.withBorrowMutSpec
+  Move.Semantics.Vector.borrowElemSpec
+  Move.Semantics.Vector.withBorrowElemMutSpec
+  Move.Semantics.Vector.insertSpec
+  Move.Semantics.Vector.removeSpec
+  Move.Semantics.withMutation
+  Move.Semantics.Spec.bind
+  Move.Semantics.Spec.pure
+  Move.Semantics.Spec.abort
+  Move.Semantics.Mutation.read
+  Move.Semantics.Mutation.write
+  Move.Vector.empty
+  Move.Vector.push
+  Move.Vector.set
+  Move.Vector.length
+  Move.Vector.ofList
+  Move.Vector.toList
+  Move.Semantics.Checked.addSpec
+  Move.Semantics.Checked.subSpec
+  Move.Semantics.Checked.mulSpec
+  Move.Semantics.Checked.divSpec
+  Move.Semantics.Checked.modSpec
+  Move.U64.instOfNat
+  OfNat.ofNat
+  Move.U64.size
+  Move.U64.toNat
+  Move.U64.ofNat
+  Move.U64.add
+  Move.U64.sub
+  Move.U64.mul
+  Move.U64.div
+  Move.U64.mod
 
 namespace Move.Verify
 
@@ -24,7 +102,13 @@ syntax "spec_norm" (Lean.Parser.Tactic.location)? : tactic
 
 macro_rules
   | `(tactic| spec_norm $[$location]?) =>
-      `(tactic| simp (disch := first | omega | decide | assumption)
+      `(tactic| simp
+        (disch := first
+          | omega
+          | (simp only [move_norm]; omega)
+          | (simp only [move_norm, Move.U64.size]; omega)
+          | decide
+          | assumption)
         only [move_norm] $[$location]?)
 
 /-- Normalize a WP goal using the primitive proof rules. -/
@@ -56,7 +140,8 @@ macro_rules
         by_cases $hypothesis : Move.Verify.Source.logicalLT 0 $value <;>
           simp only [$hypothesisLemma, if_true, if_false,
             Move.Verify.Source.logicalLT_u64] <;>
-          simp only [Move.Verify.Source.logicalLT_u64]
+          simp only [Move.Verify.Source.logicalLT_u64,
+            Move.U64.toNat_ofNat, Move.U64.toNat_ofNat_numeral]
             at $hypothesisLocation <;>
           try have $zeroFact : $value = 0 :=
             Move.U64.eq_zero_of_not_pos $hypothesis <;>
@@ -73,15 +158,23 @@ macro_rules
             Move.Verify.Source.logicalLT_u64,
             Move.Verify.Source.logicalLE_u64] <;>
           simp only [Move.Verify.Source.logicalLT_u64,
-            Move.Verify.Source.logicalLE_u64] at $hypothesisLocation)
+            Move.Verify.Source.logicalLE_u64,
+            Move.Verify.Source.logicalLT_move,
+            Move.Verify.Source.logicalBEq_move,
+            Move.U64.toNat_ofNat, Move.U64.toNat_ofNat_numeral]
+            at $hypothesisLocation)
 
 /-- Finish a numeric source-value goal directly, or first reduce equality of
 `U64` values to equality of their exposed natural values. -/
 syntax "u64_omega" : tactic
 macro_rules
   | `(tactic| u64_omega) =>
-      `(tactic| spec_norm <;>
-        first | rfl | omega | (apply Move.U64.ext; omega))
+      `(tactic| first
+          | rfl
+          | omega
+          | (spec_norm <;> omega)
+          | (apply Move.U64.ext <;> spec_norm <;> omega)
+          | (apply Move.U64.ext <;> omega))
 
 private partial def introUntilSatisfies : TacticM Unit := withMainContext do
   let target ← instantiateMVars (← getMainTarget)

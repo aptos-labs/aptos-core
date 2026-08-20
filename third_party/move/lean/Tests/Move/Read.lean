@@ -59,50 +59,18 @@ move_module Read where
     simp [Move.Semantics.ResourceStore.get, lookup]
 
   verify readAtLeast by
-    unfold readAtLeast.contract readAtLeast.sourceSpec
-    intro State store args initial permitted
-    rcases args with ⟨addr, minimum⟩
+    contract_intro
+    obtain ⟨addr, minimum⟩ := args
     rcases Option.isSome_iff_exists.mp permitted with ⟨reading, lookup⟩
-    by_cases tooSmallNat : reading.value.toNat < minimum.toNat
-    · constructor
-      · intro result final execution
-        simp [Move.Semantics.Spec.bind, Move.Semantics.Spec.pure,
-          Move.Semantics.Spec.abort, Move.Semantics.Resource.borrowSpec,
-          lookup] at execution
-        rcases execution with ⟨value, middle, ⟨valueEq, middleEq⟩, rest⟩
-        subst value
-        subst middle
-        simp [tooSmallNat] at rest
-      · intro code execution
-        simp [Move.Semantics.Spec.bind, Move.Semantics.Spec.pure,
-          Move.Semantics.Spec.abort, Move.Semantics.Resource.borrowSpec,
-          lookup] at execution
-        rcases execution with ⟨value, middle, ⟨valueEq, middleEq⟩, rest⟩
-        subst value
-        subst middle
-        simp [tooSmallNat] at rest
-        simpa [Move.Semantics.ResourceStore.get, lookup, tooSmallNat] using
-          And.intro tooSmallNat rest
-    · constructor
-      · intro result final execution
-        simp [Move.Semantics.Spec.bind, Move.Semantics.Spec.pure,
-          Move.Semantics.Spec.abort, Move.Semantics.Resource.borrowSpec,
-          lookup] at execution
-        rcases execution with ⟨value, middle, ⟨valueEq, middleEq⟩, rest⟩
-        subst value
-        subst middle
-        simp [tooSmallNat] at rest
-        rcases rest with ⟨rfl, rfl⟩
-        simp [Move.Semantics.ResourceStore.get, lookup,
-          Nat.le_of_not_gt tooSmallNat]
-      · intro code execution
-        simp [Move.Semantics.Spec.bind, Move.Semantics.Spec.pure,
-          Move.Semantics.Spec.abort, Move.Semantics.Resource.borrowSpec,
-          lookup] at execution
-        rcases execution with ⟨value, middle, ⟨valueEq, middleEq⟩, rest⟩
-        subst value
-        subst middle
-        simp [tooSmallNat] at rest
+    rw [Move.Verify.wp_bind, Move.Verify.wp_borrowSpec]
+    refine ⟨fun owner ownerLookup => ?_, fun missing => by simp_all⟩
+    rw [Move.Semantics.ResourceStore.descriptor_lookup, lookup] at ownerLookup
+    injection ownerLookup with ownerEq
+    subst ownerEq
+    move_cases tooSmall : Move.Verify.Source.logicalLT reading.value minimum
+    · simp [wp_norm, Move.Semantics.ResourceStore.get, lookup, tooSmall]
+    · simp [wp_norm, Move.Semantics.ResourceStore.get, lookup]
+      omega
 
   /-! ## Tests -/
 

@@ -112,11 +112,20 @@ initialize moveFunAttr : Lean.TagAttribute ←
 initialize movePublicAttr : Lean.TagAttribute ←
   Lean.registerTagAttribute `move_public "public Move function" preserveMoveCall
 
+initialize moveFriendAttr : Lean.TagAttribute ←
+  Lean.registerTagAttribute `move_friend
+    "friend-visible Move function" preserveMoveCall
+
 initialize moveEntryAttr : Lean.TagAttribute ←
   Lean.registerTagAttribute `move_entry "public Move entry function" preserveMoveCall
 
 initialize moveNativeAttr : Lean.TagAttribute ←
   Lean.registerTagAttribute `move_native "Move native function declaration"
+
+/-- Whether a declaration is a Move function of any visibility. -/
+def isMoveFunction (env : Environment) (name : Name) : Bool :=
+  moveFunAttr.hasTag env name || movePublicAttr.hasTag env name ||
+    moveFriendAttr.hasTag env name || moveEntryAttr.hasTag env name
 
 private def deriveAbility (tag : Lean.TagAttribute) : Lean.Elab.DerivingHandler :=
   fun typeNames => do

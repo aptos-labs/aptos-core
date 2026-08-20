@@ -159,6 +159,46 @@ theorem prophecyLoan_read_iff (initial result final : α) :
     ¬(withMutation initial (assignSpecBody value)).aborts state code := by
   simp [withMutation, assignSpecBody, Spec.pure]
 
+/-- Assignment through a mutable vector-element borrow is a checked functional
+update. The body shape is the one generated for `let r ← &mut v[i]; r := x`. -/
+theorem withBorrowElemMutSpec_write_eq_pure {values : Move.Vector α}
+    {index : Move.U64} {value old : α}
+    (present : values.toList[index.toNat]? = some old) :
+    (Move.Semantics.Vector.withBorrowElemMutSpec values index
+        (fun reference => Spec.pure ((), reference.write value)) :
+      Spec σ (Unit × Move.Vector α)) =
+      Spec.pure ((), Move.Vector.set values index value) := by
+  have bodyEq :
+      (fun reference =>
+        (Spec.pure ((), reference.write value) : Spec σ (Unit × Mutation α))) =
+        assignSpecBody value := rfl
+  rw [bodyEq]
+  apply Spec.extensionality
+  · funext initial output final
+    apply propext
+    simp only [Move.Semantics.Vector.withBorrowElemMutSpec, present]
+    change (Spec.bind (withMutation old (assignSpecBody value)) fun output =>
+      Spec.pure (output.1, Move.Vector.set values index output.2)).ok
+        initial output final ↔ _
+    simp only [Spec.bind, Spec.pure, withMutation_assign_ok_iff]
+    constructor
+    · rintro ⟨bodyOutput, middle, ⟨rfl, rfl⟩, rfl, rfl⟩
+      exact ⟨rfl, rfl⟩
+    · rintro ⟨rfl, rfl⟩
+      exact ⟨((), value), _, ⟨rfl, rfl⟩, rfl, rfl⟩
+  · funext initial code
+    apply propext
+    simp only [Move.Semantics.Vector.withBorrowElemMutSpec, present]
+    change (Spec.bind (withMutation old (assignSpecBody value)) fun output =>
+      Spec.pure (output.1, Move.Vector.set values index output.2)).aborts
+        initial code ↔ _
+    simp only [Spec.bind, Spec.pure, withMutation_assign_ok_iff,
+      withMutation_assign_not_aborts]
+    constructor
+    · rintro (impossible | ⟨bodyOutput, middle, ⟨rfl, rfl⟩, impossible⟩) <;>
+        exact impossible.elim
+    · exact fun impossible => impossible.elim
+
 @[simp] theorem withMutation_read_ok_iff (initial : α)
     (state finalState : σ) (output : α × α) :
     (withMutation initial readSpecBody).ok state output finalState ↔

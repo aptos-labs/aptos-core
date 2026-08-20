@@ -151,11 +151,6 @@ move_module EnumPayloads where
   verify isRight
   verify batchLength
 
-  @[grind .] private theorem fourElementVectorLength (a b c d : U64) :
-      Move.Vector.length vector![a, b, c, d] = 4 := by
-    apply U64.ext
-    rfl
-
   verify populatedBatch
   verify emptyBatch
   verify positionalTotal
