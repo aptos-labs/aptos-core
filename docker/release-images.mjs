@@ -41,6 +41,7 @@ import {
   lazyImports,
   parseArgsFromFlagOrEnv,
   pnpmInstall,
+  retryWithBackoff,
   waitForImageToBecomeAvailable,
   joinTagSegments,
 } from "./image-helpers.js";
@@ -161,8 +162,14 @@ async function main() {
             console.info(chalk.green(`INFO: copying ${imageSource} to ${imageTarget}`));
             console.info(chalk.green(`INFO: copying ${imageSource} to ${imageTargetWithSha}`));
           }
-          await $`${crane} copy ${imageSource} ${imageTarget}`;
-          await $`${crane} copy ${imageSource} ${imageTargetWithSha}`;
+          await retryWithBackoff(
+            `copy ${imageSource} to ${imageTarget}`,
+            () => $`${crane} copy ${imageSource} ${imageTarget}`,
+          );
+          await retryWithBackoff(
+            `copy ${imageSource} to ${imageTargetWithSha}`,
+            () => $`${crane} copy ${imageSource} ${imageTargetWithSha}`,
+          );
         }
       }
     }
