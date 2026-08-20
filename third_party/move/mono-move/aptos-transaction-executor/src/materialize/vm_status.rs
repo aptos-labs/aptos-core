@@ -242,7 +242,7 @@ fn runtime_error_to_status(err: &RuntimeError) -> VMStatus {
         | E::BCSRemainingInput { .. }
         | E::BCSInvalidBool { .. }
         | E::BCSSignerNotDeserializable => StatusCode::UNKNOWN_STATUS,
-        E::InvariantViolation(_) | E::ResourceProvider(_) => {
+        E::Unsupported(_) | E::InvariantViolation(_) | E::ResourceProvider(_) => {
             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
         },
     };
