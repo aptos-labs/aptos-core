@@ -5,6 +5,7 @@
 
 use crate::counters::HOT_STATE_OP_ACCUMULATOR_COUNTER as COUNTER;
 use aptos_metrics_core::IntCounterVecHelper;
+use aptos_types::error::PanicError;
 use std::{collections::BTreeSet, fmt::Debug, hash::Hash};
 
 pub struct BlockHotStateOpAccumulator<Key> {
@@ -12,10 +13,10 @@ pub struct BlockHotStateOpAccumulator<Key> {
     /// `hot_since_version` one is already hot but last refresh is far in the history) as the side
     /// effect of the block epilogue.
     ///
-    /// Unordered: `StateKey`'s `Hash`/`Eq` use the precomputed key hash and `Arc` pointer
-    /// equality, while `Ord` dereferences and compares key contents, so a per-read `BTreeSet`
-    /// insert is comparatively costly. The deterministic order the epilogue needs is imposed
-    /// once, when the cap is applied in `get_keys_to_make_hot`.
+    /// Unordered: accumulation needs only `Hash`/`Eq`. The deterministic order the epilogue
+    /// needs is imposed once, in `get_keys_to_make_hot`, after converting each key to its stable
+    /// storage key — `Key` itself may carry a non-deterministic order (e.g. interned pointer
+    /// identity) and must never drive it.
     to_make_hot: hashbrown::HashSet<Key>,
     /// Keep track of all the keys that are written to across the whole block, these keys are made
     /// hot (or have a refreshed `hot_since_version`) immediately at the version they got changed,
@@ -27,7 +28,7 @@ pub struct BlockHotStateOpAccumulator<Key> {
 
 impl<Key> BlockHotStateOpAccumulator<Key>
 where
-    Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + Debug,
+    Key: Send + Sync + Clone + Hash + Eq + Debug,
 {
     /// TODO(HotState): make on-chain config. Also consider capping by total key size instead of
     /// number.
@@ -69,25 +70,32 @@ where
         }
     }
 
-    pub fn get_keys_to_make_hot(&self) -> BTreeSet<Key> {
-        let num_eligible = self.to_make_hot.len();
-        if num_eligible <= self.max_promotions_per_block {
-            // Under the cap: collecting into the BTreeSet imposes the deterministic order.
-            return self.to_make_hot.iter().cloned().collect();
+    /// Converts each eligible key to its ordered storage key via `convert`, then applies the
+    /// promotion cap. Ordering and capping run on the converted key (a stable, deterministic
+    /// storage key), never on `Key`, whose interned-type order is process-dependent.
+    pub fn get_keys_to_make_hot<O, F>(&self, convert: F) -> Result<BTreeSet<O>, PanicError>
+    where
+        O: Ord,
+        F: Fn(&Key) -> Result<O, PanicError>,
+    {
+        let eligible = self
+            .to_make_hot
+            .iter()
+            .map(convert)
+            .collect::<Result<BTreeSet<O>, _>>()?;
+        if eligible.len() <= self.max_promotions_per_block {
+            return Ok(eligible);
         }
         COUNTER.inc_with_by(
             &["promotions_dropped_over_cap"],
-            (num_eligible - self.max_promotions_per_block) as u64,
+            (eligible.len() - self.max_promotions_per_block) as u64,
         );
-        // Over the cap: keep the smallest keys. `to_make_hot` is unordered, so sort before
-        // applying the cap to select the same subset regardless of read/iteration order.
-        let mut eligible = self.to_make_hot.iter().collect::<Vec<_>>();
-        eligible.sort_unstable();
-        eligible
+        // Over the cap: keep the smallest converted keys (`BTreeSet` iterates in ascending
+        // order), a deterministic subset independent of read/iteration order.
+        Ok(eligible
             .into_iter()
             .take(self.max_promotions_per_block)
-            .cloned()
-            .collect()
+            .collect())
     }
 }
 
@@ -107,6 +115,11 @@ mod tests {
         keys.iter().copied().collect()
     }
 
+    /// Identity converter: a test `u64` key is already its own ordered storage key.
+    fn identity(k: &u64) -> Result<u64, PanicError> {
+        Ok(*k)
+    }
+
     /// When more keys are eligible than the cap allows, the surviving subset must be the same
     /// regardless of the order reads are observed in (the bug being that HashSet-ordered reads
     /// made the dropped subset process-dependent).
@@ -123,8 +136,8 @@ mod tests {
         }
 
         let expected = set(&[0, 1, 2]);
-        assert_eq!(forward.get_keys_to_make_hot(), expected);
-        assert_eq!(reverse.get_keys_to_make_hot(), expected);
+        assert_eq!(forward.get_keys_to_make_hot(identity).unwrap(), expected);
+        assert_eq!(reverse.get_keys_to_make_hot(identity).unwrap(), expected);
     }
 
     #[test]
@@ -135,7 +148,7 @@ mod tests {
         accu.add_transaction([2u64].iter(), [1u64, 2, 3].iter());
         // A read of an already-written key in a later txn is likewise ignored.
         read(&mut accu, &[2]);
-        assert_eq!(accu.get_keys_to_make_hot(), set(&[1, 3]));
+        assert_eq!(accu.get_keys_to_make_hot(identity).unwrap(), set(&[1, 3]));
     }
 
     #[test]
@@ -143,6 +156,6 @@ mod tests {
         let mut accu = BlockHotStateOpAccumulator::<u64>::new_with_config(100);
         read(&mut accu, &[1, 2]);
         write(&mut accu, &[1]);
-        assert_eq!(accu.get_keys_to_make_hot(), set(&[2]));
+        assert_eq!(accu.get_keys_to_make_hot(identity).unwrap(), set(&[2]));
     }
 }

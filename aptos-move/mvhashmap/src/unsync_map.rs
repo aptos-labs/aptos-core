@@ -13,6 +13,7 @@ use aptos_types::{
     vm::modules::AptosModuleExtension,
 };
 use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
+use mono_move_runtime::Heap;
 use move_binary_format::{file_format::CompiledScript, CompiledModule};
 use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::{Module, Script};
@@ -29,6 +30,10 @@ use std::{
     },
 };
 
+/// Size of the resource arena backing MonoMove's materialized base values.
+/// Created lazily on first MonoMove use; legacy execution never builds one.
+const DEFAULT_RESOURCE_ARENA_BYTES: usize = 64 * 1024 * 1024;
+
 /// UnsyncMap is designed to mimic the functionality of MVHashMap for sequential execution.
 /// In this case only the latest recorded version is relevant, simplifying the implementation.
 pub struct UnsyncMap<K, T, V, I> {
@@ -43,6 +48,14 @@ pub struct UnsyncMap<K, T, V, I> {
 
     total_base_resource_size: AtomicU64,
     total_base_delayed_field_size: AtomicU64,
+
+    // MonoMove-only state, unused by legacy execution.
+    //
+    // The arena holds the flat base values MonoMove materializes reads into and
+    // hands out pointers into. It is created lazily on first use and is
+    // append-only: it is never reset or garbage-collected, so pointers stay
+    // valid for the whole block.
+    arena: RefCell<Option<Heap>>,
 }
 
 impl<K, T, V, I> Default for UnsyncMap<K, T, V, I> {
@@ -55,6 +68,7 @@ impl<K, T, V, I> Default for UnsyncMap<K, T, V, I> {
             delayed_field_map: RefCell::new(HashMap::new()),
             total_base_resource_size: AtomicU64::new(0),
             total_base_delayed_field_size: AtomicU64::new(0),
+            arena: RefCell::new(None),
         }
     }
 }
@@ -280,6 +294,15 @@ where
             Ordering::Relaxed,
         );
         self.delayed_field_map.borrow_mut().insert(id, value);
+    }
+
+    /// Runs `f` against the MonoMove resource arena, creating it on first use.
+    /// The arena is append-only and never garbage-collected, so pointers into
+    /// it stay valid for the lifetime of the map.
+    pub fn with_resource_arena<R>(&self, f: impl FnOnce(&mut Heap) -> R) -> R {
+        let mut arena = self.arena.borrow_mut();
+        let heap = arena.get_or_insert_with(|| Heap::new(DEFAULT_RESOURCE_ARENA_BYTES));
+        f(heap)
     }
 }
 
