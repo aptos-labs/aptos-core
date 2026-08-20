@@ -377,11 +377,16 @@ impl<F: FftField, T: DomainCoeff<F> + CanonicalSerialize + CanonicalDeserialize>
 impl FKDomain<Fr, G1Projective> {
     /// Compute the `H_j(tau)` commitments for the polynomial `f`.
     ///
-    /// Returns blst-native points -- the [`BlstG1`] return type is what selects
-    /// blst for the underlying Toeplitz evaluation's group arithmetic -- so that
-    /// callers doing an MSM next can feed them straight in without a round trip
-    /// through arkworks.
-    pub(crate) fn compute_h_term_commitments(&self, f: &[Fr], round: usize) -> Vec<BlstG1> {
+    /// The output representation `U` selects which library does the underlying
+    /// Toeplitz evaluation's group arithmetic; see [`EvalRepr`]. Callers pick
+    /// whichever form they consume next, so that neither of them pays for a
+    /// round trip: [`BlstG1`] for the blst MSM and group FFT paths,
+    /// `G1Projective` for the arkworks multi-point evaluation.
+    pub(crate) fn compute_h_term_commitments<U: EvalRepr<Fr, G1Projective>>(
+        &self,
+        f: &[Fr],
+        round: usize,
+    ) -> Vec<U> {
         let mut f = Vec::from(f);
         f.extend(std::iter::repeat_n(
             Fr::zero(),
@@ -402,7 +407,9 @@ impl FKDomain<Fr, G1Projective> {
     /// Compute the evaluation proofs for a KZG commitment of a polynomial `f`, committed to under
     /// `tau_powers`, on the FFT domain encapsulated by this [`FKDomain`].
     pub fn eval_proofs_at_roots_of_unity(&self, f: &[Fr], round: usize) -> Vec<G1Projective> {
-        let h_term_commitments = self.compute_h_term_commitments(f, round);
+        // The group FFT is blst point addition, so stay in blst for it and
+        // convert only the results.
+        let h_term_commitments: Vec<BlstG1> = self.compute_h_term_commitments(f, round);
         self.fft_domain
             .fft(&h_term_commitments)
             .iter()
@@ -416,11 +423,9 @@ impl FKDomain<Fr, G1Projective> {
         x_coords: &[Fr],
         round: usize,
     ) -> Vec<G1Projective> {
-        let h_term_commitments: Vec<G1Projective> = self
-            .compute_h_term_commitments(f, round)
-            .iter()
-            .map(BlstG1::to_ark)
-            .collect();
+        // `multi_point_eval` is arkworks throughout, so ask for arkworks points
+        // rather than converting a blst result back.
+        let h_term_commitments: Vec<G1Projective> = self.compute_h_term_commitments(f, round);
         multi_point_eval(&h_term_commitments, x_coords)
     }
 
@@ -430,7 +435,7 @@ impl FKDomain<Fr, G1Projective> {
         x_coords: &[Fr],
         round: usize,
     ) -> Vec<G1Projective> {
-        let h_term_commitments = self.compute_h_term_commitments(f, round);
+        let h_term_commitments: Vec<BlstG1> = self.compute_h_term_commitments(f, round);
 
         // All `x_coords.len()` MSMs share the same bases, so the blst Pippenger
         // table is built once and reused across them.
@@ -570,7 +575,10 @@ impl<'de, F: FftField, T: DomainCoeff<F> + CanonicalSerialize + CanonicalDeseria
 #[cfg(test)]
 mod tests {
     use super::FKDomain;
-    use crate::group::{Fr, G1Affine, G1Projective, G2Affine, G2Projective, PairingSetting};
+    use crate::{
+        group::{Fr, G1Affine, G1Projective, G2Affine, G2Projective, PairingSetting},
+        shared::blst_ops::BlstG1,
+    };
     use ark_ec::{pairing::Pairing, AffineRepr as _, PrimeGroup, ScalarMul as _, VariableBaseMSM};
     use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial, EvaluationDomain, Polynomial};
     use ark_std::{rand::thread_rng, One, UniformRand};
@@ -649,7 +657,7 @@ mod tests {
                 &fk_domain.toeplitz_for_poly(&poly.coeffs),
                 &fk_domain.prepared_toeplitz_inputs[0],
             );
-            let actual = fk_domain.compute_h_term_commitments(&poly.coeffs, 0);
+            let actual: Vec<BlstG1> = fk_domain.compute_h_term_commitments(&poly.coeffs, 0);
 
             assert_eq!(expected.len(), actual.len());
             for (e, a) in expected.iter().zip(&actual) {
