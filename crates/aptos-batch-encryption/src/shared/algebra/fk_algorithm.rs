@@ -1,10 +1,13 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use super::multi_point_eval::multi_point_eval;
-use crate::shared::algebra::multi_point_eval::multi_point_eval_naive;
+use crate::{
+    group::{Fr, G1Projective},
+    shared::blst_ops::{self, BlstG1, G1MsmBases},
+};
 use aptos_crypto::arkworks::serialization::{ark_de_uncompressed_no_validate, ark_se_uncompressed};
-use ark_ec::VariableBaseMSM;
-use ark_ff::FftField;
+use ark_ec::CurveGroup as _;
+use ark_ff::{FftField, Zero as _};
 use ark_poly::{domain::DomainCoeff, EvaluationDomain, Radix2EvaluationDomain};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rayon::iter::{
@@ -16,7 +19,7 @@ use serde::{
     ser::SerializeStruct as _,
     Deserialize, Serialize,
 };
-use std::{fmt, marker::PhantomData, ops::Mul};
+use std::{fmt, marker::PhantomData};
 
 /// To efficiently evaluate a Circulant matrix of size `n x n` over an input,
 /// a FFT-friendly subset of a field of size `n` is required. This struct
@@ -282,15 +285,7 @@ pub struct FKDomain<F: FftField, T: DomainCoeff<F> + CanonicalSerialize + Canoni
     pub prepared_toeplitz_inputs: Vec<PreparedInput<F, T>>,
 }
 
-impl<
-        F: FftField,
-        T: DomainCoeff<F>
-            + Mul<F, Output = T>
-            + VariableBaseMSM<ScalarField = F>
-            + CanonicalSerialize
-            + CanonicalDeserialize,
-    > FKDomain<F, T>
-{
+impl<F: FftField, T: DomainCoeff<F> + CanonicalSerialize + CanonicalDeserialize> FKDomain<F, T> {
     pub fn new(
         max_poly_degree: usize,
         eval_domain_size: usize,
@@ -342,92 +337,47 @@ impl<
 
         toeplitz
     }
+}
 
-    pub(crate) fn compute_h_term_commitments(&self, f: &[F], round: usize) -> Vec<T> {
+/// The FK evaluation-proof routines are specialized to BLS12-381, because their
+/// G1 arithmetic runs through blst rather than arkworks.
+impl FKDomain<Fr, G1Projective> {
+    /// Compute the `H_j(tau)` commitments for the polynomial `f`.
+    ///
+    /// This is a Toeplitz-matrix evaluation on the prepared (already FFT'd) tau
+    /// powers: an FFT of the circulant form of the matrix, a Hadamard product
+    /// against the prepared input, and a group inverse FFT. It is the same
+    /// computation as [`ToeplitzDomain::eval_prepared`], inlined here so that
+    /// the two group-arithmetic steps -- the Hadamard product's scalar
+    /// multiplications and the inverse FFT's butterflies -- can run over blst
+    /// points instead of arkworks ones.
+    ///
+    /// Returns blst-native points, so that callers doing an MSM next can feed
+    /// them straight in without a round trip through arkworks.
+    pub(crate) fn compute_h_term_commitments(&self, f: &[Fr], round: usize) -> Vec<BlstG1> {
         let mut f = Vec::from(f);
         f.extend(std::iter::repeat_n(
-            F::zero(),
+            Fr::zero(),
             self.toeplitz_domain.dimension() + 1 - f.len(),
         ));
         // f.len() = (degree of f) + 1. Degree of f should be equal to the toeplitz domain
         // dimension.
         debug_assert_eq!(self.toeplitz_domain.dimension(), f.len() - 1);
 
-        self.toeplitz_domain.eval_prepared(
-            &self.toeplitz_for_poly(&f),
-            // The Toeplitz matrix is only evaluated on the powers up to max_poly_degree - 1,
-            // since the H_j(X) polynomials have degree at most that
-            &self.prepared_toeplitz_inputs[round],
-        )
-    }
-
-    /// Compute the evaluation proofs for a KZG commitment of a polynomial `f`, committed to under
-    /// `tau_powers`, on the FFT domain encapsulated by this [`FKDomain`].
-    pub fn eval_proofs_at_roots_of_unity(&self, f: &[F], round: usize) -> Vec<T> {
-        let h_term_commitments = self.compute_h_term_commitments(f, round);
-        self.fft_domain.fft(&h_term_commitments)
-    }
-
-    pub fn eval_proofs_at_x_coords(&self, f: &[F], x_coords: &[F], round: usize) -> Vec<T> {
-        let h_term_commitments = self.compute_h_term_commitments(f, round);
-        multi_point_eval(&h_term_commitments, x_coords)
-    }
-
-    pub fn eval_proofs_at_x_coords_naive_multi_point_eval(
-        &self,
-        f: &[F],
-        x_coords: &[F],
-        round: usize,
-    ) -> Vec<T> {
-        let h_term_commitments = self.compute_h_term_commitments(f, round);
-
-        multi_point_eval_naive(
-            &h_term_commitments
-                .into_iter()
-                .map(T::MulBase::from)
-                .collect::<Vec<T::MulBase>>(),
-            x_coords,
-        )
-    }
-}
-
-impl FKDomain<crate::group::Fr, crate::group::G1Projective> {
-    /// Same as [`Self::compute_h_term_commitments`], but with all G1 point
-    /// operations (the Hadamard-product scalar multiplications and the group
-    /// iFFT butterflies) routed through blst via [`crate::shared::blst_ops::BlstG1`].
-    /// Returns blst-native points so callers can feed them straight into a
-    /// blst MSM without round-tripping through arkworks.
-    pub(crate) fn compute_h_term_commitments_blst(
-        &self,
-        f: &[crate::group::Fr],
-        round: usize,
-    ) -> Vec<crate::shared::blst_ops::BlstG1> {
-        use crate::{
-            group::{Fr, G1Projective},
-            shared::blst_ops::BlstG1,
-        };
-        use ark_ec::CurveGroup as _;
-        use ark_ff::Zero as _;
-
-        let mut f = Vec::from(f);
-        f.extend(std::iter::repeat_n(
-            Fr::zero(),
-            self.toeplitz_domain.dimension() + 1 - f.len(),
-        ));
-        debug_assert_eq!(self.toeplitz_domain.dimension(), f.len() - 1);
-
-        let toeplitz = self.toeplitz_for_poly(&f);
-        let circulant = self.toeplitz_domain.toeplitz_to_circulant(&toeplitz);
+        // The Toeplitz matrix is only evaluated on the powers up to max_poly_degree - 1,
+        // since the H_j(X) polynomials have degree at most that.
         let prepared_input = &self.prepared_toeplitz_inputs[round];
         let circulant_domain = &self.toeplitz_domain.circulant_domain;
+        let circulant = self
+            .toeplitz_domain
+            .toeplitz_to_circulant(&self.toeplitz_for_poly(&f));
 
         assert_eq!(circulant.len(), prepared_input.y.len());
         assert_eq!(circulant.len(), circulant_domain.dimension());
 
         let v = circulant_domain.fft_domain.fft(&circulant);
 
-        // One batch inversion to move the prepared (already-FFT'd) tau powers
-        // into blst representation.
+        // One batch inversion to move the prepared tau powers into blst representation.
         let y_affine = G1Projective::normalize_batch(&prepared_input.y);
         let mut u: Vec<BlstG1> = y_affine.iter().map(BlstG1::from_ark).collect();
 
@@ -437,6 +387,50 @@ impl FKDomain<crate::group::Fr, crate::group::G1Projective> {
 
         let h = circulant_domain.fft_domain.ifft(&u);
         Vec::from(&h[..self.toeplitz_domain.dimension()])
+    }
+
+    /// Compute the evaluation proofs for a KZG commitment of a polynomial `f`, committed to under
+    /// `tau_powers`, on the FFT domain encapsulated by this [`FKDomain`].
+    pub fn eval_proofs_at_roots_of_unity(&self, f: &[Fr], round: usize) -> Vec<G1Projective> {
+        let h_term_commitments = self.compute_h_term_commitments(f, round);
+        self.fft_domain
+            .fft(&h_term_commitments)
+            .iter()
+            .map(BlstG1::to_ark)
+            .collect()
+    }
+
+    pub fn eval_proofs_at_x_coords(
+        &self,
+        f: &[Fr],
+        x_coords: &[Fr],
+        round: usize,
+    ) -> Vec<G1Projective> {
+        let h_term_commitments: Vec<G1Projective> = self
+            .compute_h_term_commitments(f, round)
+            .iter()
+            .map(BlstG1::to_ark)
+            .collect();
+        multi_point_eval(&h_term_commitments, x_coords)
+    }
+
+    pub fn eval_proofs_at_x_coords_naive_multi_point_eval(
+        &self,
+        f: &[Fr],
+        x_coords: &[Fr],
+        round: usize,
+    ) -> Vec<G1Projective> {
+        let h_term_commitments = self.compute_h_term_commitments(f, round);
+
+        // All `x_coords.len()` MSMs share the same bases, so the blst Pippenger
+        // table is built once and reused across them.
+        let bases = G1MsmBases::from_blst(
+            &h_term_commitments
+                .iter()
+                .map(|p| p.0)
+                .collect::<Vec<blst::blst_p1>>(),
+        );
+        blst_ops::multi_point_eval_naive_with_bases(&bases, x_coords)
     }
 }
 
@@ -615,7 +609,7 @@ mod tests {
     }
 
     #[test]
-    fn compute_h_term_commitments_blst_matches_generic() {
+    fn compute_h_term_commitments_matches_arkworks() {
         for poly_degree_exp in 1..5 {
             let poly_degree = 2usize.pow(poly_degree_exp);
             let mut rng = thread_rng();
@@ -642,8 +636,14 @@ mod tests {
             let fk_domain =
                 FKDomain::new(poly_degree, poly_degree, tau_powers_g1_projective).unwrap();
 
-            let expected = fk_domain.compute_h_term_commitments(&poly.coeffs, 0);
-            let actual = fk_domain.compute_h_term_commitments_blst(&poly.coeffs, 0);
+            // Reference: the same Toeplitz evaluation done entirely in arkworks.
+            // `poly.coeffs` already has degree equal to the Toeplitz dimension,
+            // so no zero-padding is needed here.
+            let expected: Vec<G1Projective> = fk_domain.toeplitz_domain.eval_prepared(
+                &fk_domain.toeplitz_for_poly(&poly.coeffs),
+                &fk_domain.prepared_toeplitz_inputs[0],
+            );
+            let actual = fk_domain.compute_h_term_commitments(&poly.coeffs, 0);
 
             assert_eq!(expected.len(), actual.len());
             for (e, a) in expected.iter().zip(&actual) {

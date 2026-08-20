@@ -143,17 +143,16 @@ impl IdSet<ComputedCoeffs> {
         setup: &crate::shared::digest::DigestKey,
         round: usize,
     ) -> HashMap<Id, G1Affine> {
-        let h_term_commitments = setup
+        let pfs: Vec<G1Affine> = setup
             .fk_domain
-            .compute_h_term_commitments_blst(&self.poly_coeffs(), round);
-        let bases = crate::shared::blst_ops::G1MsmBases::from_blst(
-            &h_term_commitments.iter().map(|p| p.0).collect::<Vec<_>>(),
-        );
-        let pfs: Vec<G1Affine> =
-            crate::shared::blst_ops::multi_point_eval_naive_with_bases(&bases, &self.poly_roots)
-                .iter()
-                .map(|g| G1Affine::from(*g))
-                .collect();
+            .eval_proofs_at_x_coords_naive_multi_point_eval(
+                &self.poly_coeffs(),
+                &self.poly_roots,
+                round,
+            )
+            .iter()
+            .map(|g| G1Affine::from(*g))
+            .collect();
 
         HashMap::from_iter(
             self.as_vec()
