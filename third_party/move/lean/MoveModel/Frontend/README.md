@@ -128,6 +128,6 @@ Function and resource identifiers in `Program` are positional.  Retain an
 `MProgram.resourceId` when tests or examples should resolve declarations by
 name.
 
-Frontend-backed examples live under [`Move/Examples`](../Examples/).
+Frontend-backed examples live under [`MoveModel/Examples`](../Examples/).
 Interpreter tests live under [`Tests`](../../Tests); `Tests/Common.lean`
 provides the `#test` command and expected-outcome helpers.

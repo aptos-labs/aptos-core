@@ -47,7 +47,7 @@ theorem Ty.toTag_instantiate_eq {lhs rhs : List Ty}
     (hargs : TypeArgsTagEq lhs rhs) :
     ∀ ty : Ty, (ty.instantiate lhs).toTag = (ty.instantiate rhs).toTag
   | .bool => by simp [Ty.instantiate, Ty.toTag]
-  | .u64 => by simp [Ty.instantiate, Ty.toTag]
+  | .uint _ => by simp [Ty.instantiate, Ty.toTag]
   | .address => by simp [Ty.instantiate, Ty.toTag]
   | .signer => by simp [Ty.instantiate, Ty.toTag]
   | .struct resource => by simp [Ty.instantiate, Ty.toTag]

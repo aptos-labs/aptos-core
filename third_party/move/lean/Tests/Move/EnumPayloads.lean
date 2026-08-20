@@ -14,25 +14,21 @@ open scoped Move Move.Compiler Move.Spec
 
 move_module EnumPayloads where
 
-  @[move_enum]
-  inductive Choice where
+  enum Choice where
     | left (value : U64)
     | right (value : U64)
     deriving Copy, Drop, Store
 
-  @[move_enum]
-  inductive Batch where
+  enum Batch where
     | empty
     | items (values : Move.Vector U64)
     deriving Copy, Drop, Store
 
-  @[move_enum]
-  inductive Positional where
+  enum Positional where
     | pair : U64 → U64 → Positional
     deriving Copy, Drop, Store
 
-  @[move_enum]
-  inductive Wrapper where
+  enum Wrapper where
     | wrap (value : U64)
     deriving Copy, Drop, Store
 

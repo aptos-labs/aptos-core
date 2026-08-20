@@ -84,7 +84,10 @@ index) **execute** (references are runtime values, `RefTarget`) but do
 prover, verification requires the bytecode-level *reference elimination*
 (`RefElim.lean`), which rewrites them into the value-level operations. -/
 inductive Oper where
-  | add | sub | mul | div | mod
+  | add (w : IntWidth) | sub | mul (w : IntWidth) | div | mod
+  | bitAnd | bitOr | bitXor
+  | shl (w : IntWidth) | shr (w : IntWidth)
+  | cast (target : IntWidth)
   | lt | le | eq | and | or | not
   | pack
   | packInst (args : List Ty)

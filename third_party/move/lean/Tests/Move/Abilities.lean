@@ -16,41 +16,33 @@ move_module Abilities where
 
   /-! ## Functions -/
 
-  @[move_struct]
-  structure Plain where
+  struct Plain where
     value : U64
 
-  @[move_struct]
-  structure CopyDrop where
+  struct CopyDrop where
     value : U64
     deriving Copy, Drop
 
-  @[move_struct]
-  structure Stored where
+  struct Stored where
     value : U64
     deriving Store
 
-  @[move_struct]
-  structure Resource where
+  struct Resource where
     value : U64
     deriving Key
 
-  @[move_struct]
-  structure GenericValue (T : Type) where
+  struct GenericValue (T) where
     value : T
     deriving Copy, Drop, Store
 
-  @[move_struct]
-  structure GenericResource (T : Type) where
+  struct GenericResource (T) where
     value : T
     deriving Key, Drop
 
-  @[move_struct]
-  structure Phantom (T : Type) where
+  struct Phantom (T) where
     deriving Copy, Drop, Store
 
-  @[move_enum]
-  inductive Droppable where
+  enum Droppable where
     | first
     | second (value : U64)
     deriving Drop

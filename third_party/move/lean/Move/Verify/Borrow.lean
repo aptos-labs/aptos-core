@@ -40,7 +40,8 @@ def readSpecBody (reference : Mutation α) : Spec σ (α × Mutation α) :=
 /-- Derived proof rule for `vector::insert` through a scoped mutable borrow. -/
 theorem withMutation_insertSpec_eq_pure (values : Move.Vector α)
     (index : Move.U64) (value : α)
-    (inBounds : index.toNat ≤ values.toList.length) :
+    (room : index.toNat ≤ values.toList.length ∧
+      values.toList.length + 1 < Move.U64.size) :
     withMutation values
         (fun reference =>
           Spec.bind (Move.Semantics.Vector.insertSpec reference index value)
@@ -48,28 +49,53 @@ theorem withMutation_insertSpec_eq_pure (values : Move.Vector α)
       (Spec.pure
         ((), Move.Vector.ofList
           (values.toList.take index.toNat ++
-            value :: values.toList.drop index.toNat)) :
+            value :: values.toList.drop index.toNat)
+          (by
+            have inBounds := room.1
+            have hasRoom : values.toList.length + 1 <
+                MoveModel.IR.IntWidth.size .w64 := room.2
+            simp only [List.length_append, List.length_cons,
+              List.length_take, List.length_drop]
+            omega)) :
         Spec σ (Unit × Move.Vector α)) := by
   apply Spec.extensionality
   · funext state output finalState
     apply propext
-    simp [withMutation, Move.Semantics.Vector.insertSpec, inBounds,
+    simp [withMutation, Move.Semantics.Vector.insertSpec, room.1, room.2,
       Mutation.read, Mutation.write, Spec.bind, Spec.pure]
     constructor
     · rintro ⟨future, reference, ⟨rfl, stateEq⟩,
           currentEq, outputEq⟩
       subst future
-      exact ⟨by ext <;> simp_all, stateEq⟩
+      exact ⟨by ext; simp_all, stateEq⟩
     · rintro ⟨rfl, rfl⟩
-      let updated := Move.Vector.ofList
-        (values.toList.take index.toNat ++
-          value :: values.toList.drop index.toNat)
-      exact ⟨updated, { current := updated, prophecy := updated },
-        ⟨rfl, rfl⟩, rfl, rfl⟩
+      refine ⟨_, _, ⟨rfl, rfl⟩, rfl, rfl⟩
   · funext state code
     apply propext
-    simp [withMutation, Move.Semantics.Vector.insertSpec, inBounds,
+    simp [withMutation, Move.Semantics.Vector.insertSpec, room.1, room.2,
       Mutation.read, Mutation.write, Spec.bind, Spec.pure]
+
+/-- Abort-side proof rule for `vector::insert` through a scoped mutable
+borrow: out of bounds or out of the `u64` length domain. -/
+theorem withMutation_insertSpec_eq_abort (values : Move.Vector α)
+    (index : Move.U64) (value : α)
+    (noRoom : ¬(index.toNat ≤ values.toList.length ∧
+      values.toList.length + 1 < Move.U64.size)) :
+    withMutation values
+        (fun reference =>
+          Spec.bind (Move.Semantics.Vector.insertSpec reference index value)
+            (fun output => Spec.pure ((), output.2))) =
+      (Spec.abort Move.Semantics.Vector.indexOutOfBounds :
+        Spec σ (Unit × Move.Vector α)) := by
+  apply Spec.extensionality
+  · funext state output finalState
+    apply propext
+    simp [withMutation, Move.Semantics.Vector.insertSpec, noRoom,
+      Mutation.read, Spec.bind, Spec.pure, Spec.abort]
+  · funext state code
+    apply propext
+    simp [withMutation, Move.Semantics.Vector.insertSpec, noRoom,
+      Mutation.read, Spec.bind, Spec.pure, Spec.abort]
 
 /-- Derived proof rule for `vector::remove` through a scoped mutable borrow. -/
 theorem withMutation_removeSpec_eq_pure (values : Move.Vector α)
@@ -82,7 +108,13 @@ theorem withMutation_removeSpec_eq_pure (values : Move.Vector α)
       (Spec.pure
         (project removed, Move.Vector.ofList
           (values.toList.take index.toNat ++
-            values.toList.drop (index.toNat + 1))) :
+            values.toList.drop (index.toNat + 1))
+          (by
+            have bounded : values.toList.length <
+                MoveModel.IR.IntWidth.size .w64 := values.toList_length_lt
+            simp only [List.length_append, List.length_take,
+              List.length_drop]
+            omega)) :
         Spec σ (β × Move.Vector α)) := by
   apply Spec.extensionality
   · funext state output finalState
@@ -94,6 +126,111 @@ theorem withMutation_removeSpec_eq_pure (values : Move.Vector α)
     apply propext
     simp [withMutation, Move.Semantics.Vector.removeSpec, present,
       Mutation.read, Mutation.write, Spec.bind, Spec.pure]
+
+/-- Abort-side proof rule for `vector::remove` through a scoped mutable
+borrow. -/
+theorem withMutation_removeSpec_eq_abort (values : Move.Vector α)
+    (index : Move.U64) (project : α → β)
+    (missing : values.toList[index.toNat]? = none) :
+    withMutation values
+        (fun reference =>
+          Spec.bind (Move.Semantics.Vector.removeSpec reference index)
+            (fun output => Spec.pure (project output.1, output.2))) =
+      (Spec.abort Move.Semantics.Vector.indexOutOfBounds :
+        Spec σ (β × Move.Vector α)) := by
+  apply Spec.extensionality
+  · funext state output finalState
+    apply propext
+    simp [withMutation, Move.Semantics.Vector.removeSpec, missing,
+      Mutation.read, Spec.bind, Spec.pure, Spec.abort]
+  · funext state code
+    apply propext
+    simp [withMutation, Move.Semantics.Vector.removeSpec, missing,
+      Mutation.read, Spec.bind, Spec.pure, Spec.abort]
+
+/-- Weakest precondition of `vector::insert` through a scoped mutable borrow:
+the same two-branch shape as the checked arithmetic rules, so one tactic
+splits every checked operation. -/
+@[wp_norm high] theorem wp_withMutation_insertSpec (values : Move.Vector α)
+    (index : Move.U64) (value : α)
+    (ensures : (Unit × Move.Vector α) → σ → Prop) (aborts : Nat → Prop)
+    (state : σ) :
+    wp (withMutation values
+        (fun reference =>
+          Spec.bind (Move.Semantics.Vector.insertSpec reference index value)
+            (fun output => Spec.pure ((), output.2))))
+        ensures aborts state ↔
+      (∀ room : index.toNat ≤ values.toList.length ∧
+          values.toList.length + 1 < Move.U64.size,
+        ensures
+          ((), Move.Vector.ofList
+            (values.toList.take index.toNat ++
+              value :: values.toList.drop index.toNat)
+            (by
+              have inBounds := room.1
+              have hasRoom : values.toList.length + 1 <
+                  MoveModel.IR.IntWidth.size .w64 := room.2
+              simp only [List.length_append, List.length_cons,
+                List.length_take, List.length_drop]
+              omega))
+          state) ∧
+      (¬(index.toNat ≤ values.toList.length ∧
+          values.toList.length + 1 < Move.U64.size) →
+        aborts Move.Semantics.Vector.indexOutOfBounds) := by
+  by_cases room : index.toNat ≤ values.toList.length ∧
+      values.toList.length + 1 < Move.U64.size
+  · rw [withMutation_insertSpec_eq_pure values index value room]
+    simp only [wp_pure]
+    exact ⟨fun holds => ⟨fun _ => holds, fun noRoom => absurd room noRoom⟩,
+      fun holds => holds.1 room⟩
+  · rw [withMutation_insertSpec_eq_abort values index value room]
+    simp only [wp_abort]
+    exact ⟨fun holds =>
+        ⟨fun contradiction => absurd contradiction room, fun _ => holds⟩,
+      fun holds => holds.2 room⟩
+
+/-- Weakest precondition of `vector::remove` through a scoped mutable borrow.
+The removed element is produced by the success branch. -/
+@[wp_norm high] theorem wp_withMutation_removeSpec (values : Move.Vector α)
+    (index : Move.U64) (project : α → β)
+    (ensures : (β × Move.Vector α) → σ → Prop) (aborts : Nat → Prop)
+    (state : σ) :
+    wp (withMutation values
+        (fun reference =>
+          Spec.bind (Move.Semantics.Vector.removeSpec reference index)
+            (fun output => Spec.pure (project output.1, output.2))))
+        ensures aborts state ↔
+      (∀ removed, values.toList[index.toNat]? = some removed →
+        ensures
+          (project removed, Move.Vector.ofList
+            (values.toList.take index.toNat ++
+              values.toList.drop (index.toNat + 1))
+            (by
+              have bounded : values.toList.length <
+                  MoveModel.IR.IntWidth.size .w64 := values.toList_length_lt
+              simp only [List.length_append, List.length_take,
+                List.length_drop]
+              omega))
+          state) ∧
+      (values.toList[index.toNat]? = none →
+        aborts Move.Semantics.Vector.indexOutOfBounds) := by
+  cases present : values.toList[index.toNat]? with
+  | none =>
+      rw [withMutation_removeSpec_eq_abort values index project present]
+      simp only [wp_abort]
+      exact ⟨fun holds => ⟨fun actual equal => by simp at equal, fun _ => holds⟩,
+        fun holds => holds.2 trivial⟩
+  | some removed =>
+      rw [withMutation_removeSpec_eq_pure values index removed project present]
+      simp only [wp_pure]
+      constructor
+      · refine fun holds =>
+          ⟨fun actual equal => ?_, fun missing => by simp at missing⟩
+        injection equal with same
+        subst same
+        exact holds
+      · intro holds
+        exact holds.1 removed rfl
 
 theorem prophecyLoan_assign_iff (initial value final : α) :
     ProphecyLoan (assignBody value) initial () final ↔ final = value := by

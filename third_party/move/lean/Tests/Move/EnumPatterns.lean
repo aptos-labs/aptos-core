@@ -14,14 +14,12 @@ open scoped Move Move.Compiler Move.Spec
 
 move_module EnumPatterns where
 
-  @[move_enum]
-  inductive Atom where
+  enum Atom where
     | none
     | number (value : U64)
     deriving Copy, Drop, Store
 
-  @[move_enum]
-  inductive Envelope where
+  enum Envelope where
     | empty
     | one (value : Atom)
     | two (left right : Atom)

@@ -16,8 +16,7 @@ move_module Calls where
 
   /-! ## Functions -/
 
-  @[move_struct]
-  structure Counter where
+  struct Counter where
     value : U64
     deriving Key
 
@@ -35,6 +34,16 @@ move_module Calls where
     ensures result = value + 1;
     aborts_if ¬value.toNat + 1 < U64.size
       with Semantics.Checked.arithmeticAbortCode
+
+  fun incrementUnspecified (value : U64) : Action U64 := do
+    pure (value + 1)
+
+  -- Declaring no abort condition leaves abort behavior uninterpreted: any
+  -- abort code is permitted, but the postcondition still has to hold for
+  -- every successful execution.
+  spec incrementUnspecified (value : U64) where
+    requires value.toNat + 1 < U64.size;
+    ensures result = value + 1
 
   fun pureCaller (value : U64) : Action U64 := do
     pure (twice value)
@@ -124,12 +133,19 @@ move_module Calls where
     let value ← &mut Counter[addr].value
     value := *value + amount
 
-  @[entry]
-  fun addTwice (addr : Address) (amount : U64) : Action Unit := do
+  -- A family-level `modifies` leaves the family unconstrained while every
+  -- other resource stays framed.
+  spec addTo (addr : Address) (amount : U64) where
+    requires exists<Counter>(addr);
+    modifies Counter;
+    ensures Counter[addr].value = old(Counter[addr].value) + amount;
+    aborts_if ¬old(Counter[addr].value).toNat + amount.toNat < U64.size
+      with Semantics.Checked.arithmeticAbortCode
+
+  entry fun addTwice (addr : Address) (amount : U64) : Action Unit := do
     addTo addr (twice amount)
 
-  @[entry]
-  fun addTwiceThenOne (addr : Address) (amount : U64) : Action Unit := do
+  entry fun addTwiceThenOne (addr : Address) (amount : U64) : Action Unit := do
     addTwice addr amount
     addTo addr 1
 
@@ -140,7 +156,7 @@ move_module Calls where
   spec readCounter (addr : Address) where
     requires exists<Counter>(addr);
     ensures
-      result = old(Counter[addr].value) ∧ final = initial;
+      result = old(Counter[addr].value);
     aborts_if False
 
   fun forwardedRead (addr : Address) : Action U64 := do
@@ -151,6 +167,10 @@ move_module Calls where
   verify twice
 
   verify increment
+
+  verify incrementUnspecified
+
+  verify addTo
 
   verify effectCaller
 
@@ -246,8 +266,7 @@ move_module Calls where
     = Tests.okRet (memory 3 41) [.u64 41]
   #test run "forwardedRead" [] [.address 3] = Tests.aborted 0
 
-  -- The visibility keywords and the `@[entry]` alias map onto the exported
-  -- function metadata.
+  -- The visibility keywords map onto the exported function metadata.
   #guard match compiled.funMeta.find? (·.name == "addTo") with
     | some info => info.visibility == MoveModel.IR.Visibility.friend &&
         !info.isEntry

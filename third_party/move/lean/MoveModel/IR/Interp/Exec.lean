@@ -183,27 +183,46 @@ inductive IOpRes where
 interpreter loop). -/
 def interpOp (current : FrameId) (deref : RefTarget → Option Value) (op : Oper)
     (vs : List Value) (m : IMem) : Except InterpError IOpRes :=
-  let arith2 (f : Nat → Nat → Except InterpError IOpRes) :
+  let arith2 (f : Int → Int → Except InterpError IOpRes) :
       Except InterpError IOpRes :=
     match vs with
-    | [.u64 i, .u64 j] => f i j
+    | [.int i, .int j] => f i j
     | _ => throw (.stuck "ill-typed operands")
   match op with
-  | .add => arith2 fun i j =>
-      pure (if i + j < U64_SIZE then .ok [.u64 (i + j)] m else .abort)
+  | .add w => arith2 fun i j =>
+      pure (if i + j < (w.size : Int) then .ok [.int (i + j)] m else .abort)
   | .sub => arith2 fun i j =>
-      pure (if j ≤ i then .ok [.u64 (i - j)] m else .abort)
-  | .mul => arith2 fun i j =>
-      pure (if i * j < U64_SIZE then .ok [.u64 (i * j)] m else .abort)
+      pure (if j ≤ i then .ok [.int (i - j)] m else .abort)
+  | .mul w => arith2 fun i j =>
+      pure (if i * j < (w.size : Int) then .ok [.int (i * j)] m else .abort)
   | .div => arith2 fun i j =>
-      pure (if j = 0 then .abort else .ok [.u64 (i / j)] m)
+      pure (if j = 0 then .abort else .ok [.int (i / j)] m)
   | .mod => arith2 fun i j =>
-      pure (if j = 0 then .abort else .ok [.u64 (i % j)] m)
+      pure (if j = 0 then .abort else .ok [.int (i % j)] m)
+  | .bitAnd => arith2 fun i j =>
+      pure (.ok [.int (i.toNat &&& j.toNat : Nat)] m)
+  | .bitOr => arith2 fun i j =>
+      pure (.ok [.int (i.toNat ||| j.toNat : Nat)] m)
+  | .bitXor => arith2 fun i j =>
+      pure (.ok [.int (i.toNat ^^^ j.toNat : Nat)] m)
+  | .shl w => arith2 fun i k =>
+      pure (if k < (w.bits : Int) then
+        .ok [.int ((i.toNat <<< k.toNat) % w.size : Nat)] m
+      else .abort)
+  | .shr w => arith2 fun i k =>
+      pure (if k < (w.bits : Int) then
+        .ok [.int (i.toNat >>> k.toNat : Nat)] m
+      else .abort)
+  | .cast target =>
+    match vs with
+    | [.int i] =>
+        pure (if i < (target.size : Int) then .ok [.int i] m else .abort)
+    | _ => throw (.stuck "ill-typed operands")
   | .lt =>
     match vs with
     | [v₁, v₂] =>
       match v₁.derefWith deref, v₂.derefWith deref with
-      | some (.u64 i), some (.u64 j) =>
+      | some (.int i), some (.int j) =>
           pure (.ok [.bool (decide (i < j))] m)
       | some a, some b =>
           if a.refFree && b.refFree && a.sameTypeShape b then

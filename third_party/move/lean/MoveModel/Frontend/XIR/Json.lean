@@ -28,9 +28,17 @@ private def tupleTag (name : String) (values : List Json) : Json := tag name (ar
 private def encodeAddress (address : Address) : String :=
   "0x" ++ String.ofList (Nat.toDigits 16 address)
 
+private def widthName : IntWidth → String
+  | .w8 => "u8"
+  | .w16 => "u16"
+  | .w32 => "u32"
+  | .w64 => "u64"
+  | .w128 => "u128"
+  | .w256 => "u256"
+
 private partial def encodeTy : Ty → Json
   | .bool => .str "bool"
-  | .u64 => .str "u64"
+  | .uint w => .str (widthName w)
   | .address => .str "address"
   | .signer => .str "signer"
   | .typeParam i => tag "type_parameter" (nat i)
@@ -43,7 +51,7 @@ private partial def encodeTy : Ty → Json
   | .mutRef elem => tag "mut_ref" (encodeTy elem)
 
 private def encodeValue : Value → JsonResult Json
-  | .u64 n => pure (tag "u64" (.str (toString n)))
+  | .int i => pure (tag "num" (.str (toString i)))
   | .bool b => pure (tag "bool" (.bool b))
   | .address a => pure (tag "address" (.str (encodeAddress a)))
   | .struct _ => throw "struct values are not valid XIR load constants"
@@ -52,9 +60,18 @@ private def encodeValue : Value → JsonResult Json
   | .ref _ | .mut _ _ => throw "references are not valid XIR load constants"
 
 private def encodeOper : Oper → JsonResult Json
-  | .add => pure (.str "add") | .sub => pure (.str "sub")
-  | .mul => pure (.str "mul") | .div => pure (.str "div")
-  | .mod => pure (.str "mod") | .lt => pure (.str "lt")
+  | .add w => pure (tag "add" (.str (widthName w)))
+  | .sub => pure (.str "sub")
+  | .mul w => pure (tag "mul" (.str (widthName w)))
+  | .div => pure (.str "div")
+  | .mod => pure (.str "mod")
+  | .bitAnd => pure (.str "bit_and")
+  | .bitOr => pure (.str "bit_or")
+  | .bitXor => pure (.str "bit_xor")
+  | .shl w => pure (tag "shl" (.str (widthName w)))
+  | .shr w => pure (tag "shr" (.str (widthName w)))
+  | .cast target => pure (tag "cast" (.str (widthName target)))
+  | .lt => pure (.str "lt")
   | .le => pure (.str "le") | .eq => pure (.str "eq")
   | .and => pure (.str "and") | .or => pure (.str "or")
   | .not => pure (.str "not") | .pack => pure (.str "pack")
@@ -204,6 +221,27 @@ private def encodeTypeParam (param : TypeParamDecl) : Json :=
 private def encodeTypeParams (params : List TypeParamDecl) : Json :=
   arr (params.map encodeTypeParam)
 
+private partial def encodeAttributeArg : AttributeArg → Json
+  | .name path args =>
+      if args.isEmpty then Json.mkObj [("name", .str path)] else
+        Json.mkObj [("name", .str path), ("args", arr (args.map encodeAttributeArg))]
+  | .num value => Json.mkObj [("num", .str (toString value))]
+  | .bool value => Json.mkObj [("bool", .bool value)]
+
+private def encodeAttribute (decl : Attribute) : Json :=
+  if decl.args.isEmpty then Json.mkObj [("name", .str decl.name)] else
+    Json.mkObj [
+      ("name", .str decl.name),
+      ("args", arr (decl.args.map encodeAttributeArg))
+    ]
+
+/-- Attributes are an optional additive field: absent when empty, so modules
+without attributes keep their established encoding. -/
+private def attributeFields (attributes : List Attribute) :
+    List (String × Json) :=
+  if attributes.isEmpty then [] else
+    [("attributes", arr (attributes.map encodeAttribute))]
+
 private def encodeStruct (decl : MStruct) (info : StructMeta) : JsonResult Json := do
   unless decl.name = info.name do
     throw s!"struct body `{decl.name}` does not match metadata `{info.name}`"
@@ -225,7 +263,7 @@ private def encodeStruct (decl : MStruct) (info : StructMeta) : JsonResult Json 
     ("type_parameters", encodeTypeParams decl.typeParams),
     ("abilities", encodeAbilities info.abilities),
     ("fields", arr fields)
-  ]
+  ] ++ attributeFields info.attributes
   return Json.mkObj <| match variants with
     | none => fields
     | some variants => fields ++ [("variants", variants)]
@@ -238,7 +276,7 @@ private def encodeVisibility : Visibility → String
 private def encodeFun (decl : MFun) (info : FunMeta) : JsonResult Json := do
   unless decl.name = info.name do
     throw s!"function body `{decl.name}` does not match metadata `{info.name}`"
-  return Json.mkObj [
+  return Json.mkObj <| [
     ("name", .str decl.name),
     ("type_parameters", encodeTypeParams decl.typeParams),
     ("visibility", .str (encodeVisibility info.visibility)),
@@ -251,7 +289,7 @@ private def encodeFun (decl : MFun) (info : FunMeta) : JsonResult Json := do
     ("entry", nat decl.entry),
     ("loops", arr (← decl.loops.mapM encodeLoop)),
     ("spec", ← encodeContract decl.spec)
-  ]
+  ] ++ attributeFields info.attributes
 
 private def encodeDialect : Dialect → String
   | .stackless => "stackless"
@@ -330,6 +368,44 @@ private def decodeDialect (text : String) : JsonResult Dialect :=
 private def decodeNatArray (json : Json) : JsonResult (List Nat) := do
   (← json.getArr?).toList.mapM Json.getNat?
 
+private def decodeAttributeArgs (json : Json)
+    (decodeArg : Json → JsonResult AttributeArg) :
+    JsonResult (List AttributeArg) := do
+  match json.getObjVal? "args" with
+  | .ok argsJson => (← argsJson.getArr?).toList.mapM decodeArg
+  | .error _ => return []
+
+private partial def decodeAttributeArg (json : Json) :
+    JsonResult AttributeArg := do
+  match json.getObjVal? "name" with
+  | .ok nameJson =>
+      return .name (← nameJson.getStr?)
+        (← decodeAttributeArgs json decodeAttributeArg)
+  | .error _ =>
+  match json.getObjVal? "num" with
+  | .ok value =>
+      let text ← value.getStr?
+      let some number := text.toNat?
+        | throw s!"invalid numeric attribute argument `{text}`"
+      unless number < 2 ^ 64 do
+        throw s!"attribute argument `{text}` does not fit in 64 bits"
+      return .num number
+  | .error _ =>
+  match json.getObjVal? "bool" with
+  | .ok value => return .bool (← value.getBool?)
+  | .error _ => throw "unknown attribute argument"
+
+private def decodeAttribute (json : Json) : JsonResult Attribute := do
+  return {
+    name := ← (← json.getObjVal? "name").getStr?
+    args := ← decodeAttributeArgs json decodeAttributeArg
+  }
+
+private def decodeAttributes (json : Json) : JsonResult (List Attribute) := do
+  match json.getObjVal? "attributes" with
+  | .ok attributesJson => (← attributesJson.getArr?).toList.mapM decodeAttribute
+  | .error _ => return []
+
 /-- Decode schema-versioned deployable XIR JSON.  The body decoder is shared
 with the established exchange-v5 format, while module metadata is checked
 separately. -/
@@ -349,7 +425,7 @@ def decodeMModule (text : String) : JsonResult MModule := do
     | .ok value => value.getArr?
     | .error _ => pure #[]
   let legacy := Json.mkObj [
-    ("version", nat 7),
+    ("version", nat 8),
     ("structs", .arr structsJson),
     ("funs", .arr functionsJson)
   ]
@@ -372,6 +448,7 @@ def decodeMModule (text : String) : JsonResult MModule := do
       fieldNames := fieldNames
       variantNames := variantNames
       abilities := ← decodeAbilities (← structJson.getObjVal? "abilities")
+      attributes := ← decodeAttributes structJson
     } : StructMeta)
   let funMeta ← functionsJson.toList.mapM fun functionJson => do
     return ({
@@ -379,6 +456,7 @@ def decodeMModule (text : String) : JsonResult MModule := do
       visibility := ← decodeVisibility (← (← functionJson.getObjVal? "visibility").getStr?)
       isEntry := ← (← functionJson.getObjVal? "is_entry").getBool?
       acquires := ← decodeNatArray (← functionJson.getObjVal? "acquires")
+      attributes := ← decodeAttributes functionJson
     } : FunMeta)
   let externalFuns ← externalFunsJson.toList.mapM fun functionJson => do
     return ({

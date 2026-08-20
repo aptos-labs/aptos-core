@@ -14,8 +14,7 @@ open scoped Move Move.Compiler Move.Spec
 
 move_module Read where
 
-  @[move_struct]
-  structure Reading where
+  struct Reading where
     value : U64
     deriving Key
 
@@ -30,7 +29,7 @@ move_module Read where
   spec read (addr : Address) where
     requires exists<Reading>(addr);
     ensures
-      result = old(Reading[addr].value) ∧ final = initial;
+      result = old(Reading[addr].value);
     aborts_if False
 
   fun readAtLeast (addr : Address) (minimum : U64) : Action U64 := do
@@ -44,8 +43,7 @@ move_module Read where
     requires exists<Reading>(addr);
     ensures
       result = old(Reading[addr].value) ∧
-      minimum.toNat ≤ result.toNat ∧
-      final = initial;
+      minimum.toNat ≤ result.toNat;
     aborts_if
       old(Reading[addr].value).toNat < minimum.toNat
       with E_TOO_SMALL
@@ -70,7 +68,6 @@ move_module Read where
     move_cases tooSmall : Move.Verify.Source.logicalLT reading.value minimum
     · simp [wp_norm, Move.Semantics.ResourceStore.get, lookup, tooSmall]
     · simp [wp_norm, Move.Semantics.ResourceStore.get, lookup]
-      omega
 
   /-! ## Tests -/
 

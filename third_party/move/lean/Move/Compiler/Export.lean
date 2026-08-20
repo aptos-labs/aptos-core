@@ -47,17 +47,23 @@ between its Lean namespace and on-chain Move identity. -/
 syntax (name := registerMoveModuleIdentity)
   "#register_move_module_identity " str str : command
 
-/-- Defines a Lean namespace and exports it as a Move module with the same
-name. `fun` declarations are private Move functions, while ordinary `def`s
-remain Lean-only helpers. `@[entry]` is the block-scoped spelling of
-`@[move_entry]`. Compilation remains deferred until end of input. Each child
-command establishes an indentation boundary; this is essential because a
-subsequent command-level `fun` is also valid as the start of a Lean term. -/
-@[command_parser] def moveModuleCommand := leading_parser
-  Lean.Parser.withPosition
-    ("move_module " >> ident >> " where" >>
-      Lean.Parser.many1 (Lean.Parser.ppLine >> Lean.Parser.checkColGt >>
-        Lean.Parser.withPosition Lean.Parser.commandParser))
+/-- One attribute or pragma instance: a head name applied to arguments. -/
+def moveAttributeInstance := leading_parser
+  Lean.Parser.ident >>
+    Lean.Parser.many (Lean.Parser.categoryParser `moveAttrArg 0)
+
+/-- A source attribute list, written before the leading keyword of a
+`struct`, `enum`, or `fun` declaration inside a `move_module`. -/
+def moveAttributes := leading_parser
+  "@[" >>
+    Lean.Parser.withoutPosition
+      (Lean.Parser.sepBy1 moveAttributeInstance ", ") >>
+    "]"
+
+/-- Internal command emitted by `move_module` to persist the user-provided
+source attributes of one declaration. -/
+@[command_parser] def registerMoveAttributes := leading_parser
+  "#register_move_attributes " >> Lean.Parser.ident >> moveAttributes
 
 /-- A Move function declaration. This deliberately occupies command position,
 where Lean's term-level `fun` keyword is otherwise unavailable. It is intended
@@ -74,16 +80,86 @@ consumed by `declModifiers` and translated to `@[move_public]`. -/
         (Lean.Parser.Command.optDeclSig >> Lean.Parser.Command.declVal) >>
       Lean.Parser.Command.optDefDeriving)
 
-/-- `friend fun` declares a Move function with `public(friend)` visibility.
-`friend` is not a Lean modifier, so this form has its own leading parser. -/
-@[command_parser] def moveFriendFunctionCommand := leading_parser
-  Lean.Parser.Command.declModifiers false >>
+/-! `struct`, `enum`, `entry fun`, and `friend fun` are module-scoped
+keywords: their leading words stay ordinary identifiers everywhere else, so
+they are parsed by `move_module`'s item parser rather than registered as
+global command tokens. The `move_module` expander rewrites them to the
+attributed core declarations.
+
+Each keyword may be preceded by a doc comment and a source attribute list
+`@[name arg ..., ...]`. In this position `@[...]` always uses the Move
+attribute grammar: well-known internal names desugar to the persistent tag
+attributes, every other instance is recorded as user-provided metadata. -/
+
+/-- The leading doc comment and source attribute list accepted before a
+module-scoped keyword. Lean declaration attributes cannot parse the open
+attribute-argument grammar, so the list is parsed before `declModifiers`. -/
+def moveItemPrefix :=
+  Lean.Parser.optional (Lean.Parser.Command.docComment) >>
+  Lean.Parser.optional moveAttributes >>
+  Lean.Parser.Command.declModifiers false
+
+/-- `struct Name ... where` declares a Move structure; the expander rewrites
+it to `@[move_struct] structure`. -/
+def moveStructItem := leading_parser
+  Lean.Parser.atomic
+    (moveItemPrefix >> Lean.Parser.nonReservedSymbol "struct ") >>
+  Lean.Parser.Command.declId >> Lean.Parser.Command.optDeclSig >>
+  " where " >> Lean.Parser.Command.structFields >>
+  Lean.Parser.Command.optDeriving
+
+/-- `enum Name ... where` declares a Move enum; the expander rewrites it to
+`@[move_enum] inductive`. -/
+def moveEnumItem := leading_parser
+  Lean.Parser.atomic
+    (moveItemPrefix >> Lean.Parser.nonReservedSymbol "enum ") >>
+  Lean.Parser.Command.declId >> Lean.Parser.Command.optDeclSig >>
+  " where " >> Lean.Parser.many Lean.Parser.Command.ctor >>
+  Lean.Parser.Command.optDeriving
+
+/-- `entry fun` declares a public Move entry function. -/
+def moveEntryFunItem := leading_parser
+  Lean.Parser.atomic
+    (moveItemPrefix >> Lean.Parser.nonReservedSymbol "entry " >> "fun ") >>
+  Lean.Parser.Command.declId >>
+  Lean.Parser.ppIndent
+    (Lean.Parser.Command.optDeclSig >> Lean.Parser.Command.declVal) >>
+  Lean.Parser.Command.optDefDeriving
+
+/-- `friend fun` declares a Move function with `public(friend)` visibility. -/
+def moveFriendFunItem := leading_parser
+  Lean.Parser.atomic
+    (moveItemPrefix >> Lean.Parser.nonReservedSymbol "friend " >> "fun ") >>
+  Lean.Parser.Command.declId >>
+  Lean.Parser.ppIndent
+    (Lean.Parser.Command.optDeclSig >> Lean.Parser.Command.declVal) >>
+  Lean.Parser.Command.optDefDeriving
+
+/-- A plain `fun` carrying a source attribute list. Attribute-less `fun`
+declarations keep parsing through the global `moveFunctionCommand`. -/
+def moveFunItem := leading_parser
+  Lean.Parser.atomic
+    (Lean.Parser.optional (Lean.Parser.Command.docComment) >>
+      moveAttributes >>
+      Lean.Parser.Command.declModifiers false >> "fun ") >>
+  Lean.Parser.Command.declId >>
+  Lean.Parser.ppIndent
+    (Lean.Parser.Command.optDeclSig >> Lean.Parser.Command.declVal) >>
+  Lean.Parser.Command.optDefDeriving
+
+/-- Defines a Lean namespace and exports it as a Move module with the same
+name. `fun` declarations are private Move functions, while ordinary `def`s
+remain Lean-only helpers. Compilation remains deferred until end of input.
+Each child item establishes an indentation boundary; this is essential
+because a subsequent command-level `fun` is also valid as the start of a Lean
+term. -/
+@[command_parser] def moveModuleCommand := leading_parser
   Lean.Parser.withPosition
-    ("friend " >> "fun " >>
-      Lean.Parser.Command.declId >>
-      Lean.Parser.ppIndent
-        (Lean.Parser.Command.optDeclSig >> Lean.Parser.Command.declVal) >>
-      Lean.Parser.Command.optDefDeriving)
+    ("move_module " >> ident >> " where" >>
+      Lean.Parser.many1 (Lean.Parser.ppLine >> Lean.Parser.checkColGt >>
+        Lean.Parser.withPosition
+          (moveStructItem <|> moveEnumItem <|> moveEntryFunItem <|>
+            moveFriendFunItem <|> moveFunItem <|> Lean.Parser.commandParser)))
 
 private partial def hasMoveDeclarationAttribute (stx : Syntax) : Bool :=
   if stx.isIdent then
@@ -115,7 +191,8 @@ private def normalizeRetainedBody (source : String) : String :=
 /-- Move type parameters are always inhabited.  Lean needs the corresponding
 instance for the opaque implementations of operations such as vector indexing
 and abort, but source authors should not have to repeat this compiler detail
-in every generic Move function signature. -/
+in every generic Move function signature. A bare implicit binder `{T}` is a
+Move type parameter, so its `: Type` ascription may be omitted. -/
 private def addMoveTypeInhabitants
     (signature : TSyntax ``Lean.Parser.Command.optDeclSig) : MacroM
       (TSyntax ``Lean.Parser.Command.optDeclSig) := do
@@ -127,17 +204,35 @@ private def addMoveTypeInhabitants
     | _ => names
   let mut expanded := #[]
   for binderRaw in binders.getArgs do
-    expanded := expanded.push binderRaw
     let binder : TSyntax ``Lean.Parser.Term.bracketedBinder := ⟨binderRaw⟩
-    let typeNames : Array (TSyntax `ident) ← match binder with
-      | `(bracketedBinder| {$names:ident* : Type}) => pure names
-      | `(bracketedBinder| ($names:ident* : Type)) => pure names
-      | _ => pure #[]
+    let (binderRaw, typeNames) ← match binder with
+      | `(bracketedBinder| {$names:ident* : Type}) => pure (binderRaw, names)
+      | `(bracketedBinder| {$names:ident*}) => do
+          let typed ← `(bracketedBinder| {$names:ident* : Type})
+          pure (typed.raw, names)
+      | `(bracketedBinder| ($names:ident* : Type)) => pure (binderRaw, names)
+      | _ => pure (binderRaw, #[])
+    expanded := expanded.push binderRaw
     for name in typeNames do
       unless inhabitedNames.contains name.getId do
         let instanceBinder ← `(bracketedBinder| [Inhabited $name])
         expanded := expanded.push instanceBinder.raw
   pure ⟨signature.raw.setArg 0 (mkNullNode expanded)⟩
+
+/-- In `struct` and `enum` headers every binder is a Move type parameter, so
+`: Type` may be omitted in both `(T)` and `{T}` binders. The ascription is
+inserted into the parsed binder in place, preserving its source info. -/
+private def normalizeTypeParameterBinders
+    (signature : Syntax) : MacroM Syntax := do
+  let typeTerm ← `(Type)
+  let ascription := mkNullNode #[mkAtom ":", typeTerm.raw]
+  let binders := signature[0].getArgs.map fun binderRaw =>
+    let bare := (binderRaw.isOfKind ``Lean.Parser.Term.explicitBinder ||
+        binderRaw.isOfKind ``Lean.Parser.Term.implicitBinder) &&
+      binderRaw.getNumArgs > 2 && binderRaw[2].isNone &&
+      binderRaw[1].getArgs.all (·.isIdent)
+    if bare then binderRaw.setArg 2 ascription else binderRaw
+  return signature.setArg 0 (mkNullNode binders)
 
 /-- Prepend one Move declaration attribute to parsed modifiers. The attribute
 identifier is deliberately unhygienic so later passes can recognize it by
@@ -169,14 +264,6 @@ private def dropPublicModifier
     (modifiers : TSyntax ``Lean.Parser.Command.declModifiers) :
     TSyntax ``Lean.Parser.Command.declModifiers :=
   ⟨modifiers.raw.setArg 2 (mkNullNode)⟩
-
-macro_rules
-  | `($modifiers:declModifiers friend fun $declName:declId
-        $signature:optDeclSig $value:declVal) => do
-      let modifiers ← prependDeclarationAttribute `move_friend
-        ⟨expandLeanerAttributeAliases modifiers.raw⟩
-      `($modifiers:declModifiers fun $declName:declId
-        $signature:optDeclSig $value:declVal)
 
 macro_rules
   | `($modifiers:declModifiers fun $declName:declId
@@ -261,23 +348,142 @@ private partial def preserveLeanHelperBoundaries (stx : Syntax) : MacroM Syntax 
   let args ← stx.getArgs.mapM preserveLeanHelperBoundaries
   return stx.setArgs args
 
-macro_rules
-  | `(move_module $moduleName:ident where $commands:command*) => do
-      let exportName : TSyntax `str := ⟨Syntax.mkStrLit moduleName.getId.toString⟩
-      let exportCommand ← `(#export_leaner $exportName)
-      let namespaceCommand ← `(namespace $moduleName)
-      let address : TSyntax `str := ⟨Syntax.mkStrLit "0x0"⟩
-      let identityCommand ← `(#register_move_module_identity $address $exportName)
-      let openLeanerCommand ← `(open Move)
-      let openLeanerScopeCommand ← `(open scoped Move)
-      let endCommand ← `(end $moduleName)
-      let body ← commands.foldlM (init := #[]) fun result command => do
-        let command := expandLeanerCommandAliases command.raw
-        return result.push (← preserveLeanHelperBoundaries command)
-      return mkNullNode <|
-        #[namespaceCommand, identityCommand, exportCommand, openLeanerCommand,
-          openLeanerScopeCommand] ++
-          body ++ #[endCommand]
+/-- The well-known internal declaration attributes accepted by name in a
+source attribute list, mapped to their tag-attribute spelling. -/
+private def wellKnownAttribute? (name : Name) : Option Name :=
+  match name with
+  | `move_fun | `move_public | `move_friend | `move_entry
+  | `move_struct | `move_enum | `move_native => some name
+  | `entry => some `move_entry
+  | _ => none
+
+/-- Split a parsed source attribute list into well-known internal attribute
+names and user-provided attribute instances. -/
+private def splitAttributeInstances (attrs : Syntax) :
+    MacroM (Array Name × Array Syntax) := do
+  let some attrs := if attrs.isOfKind ``moveAttributes then some attrs
+    else attrs.getOptional?
+    | return (#[], #[])
+  let mut wellKnown := #[]
+  let mut user := #[]
+  for instanceStx in attrs[1].getArgs do
+    unless instanceStx.isOfKind ``moveAttributeInstance do continue
+    match wellKnownAttribute? instanceStx[0].getId with
+    | some name =>
+        unless instanceStx[1].getArgs.isEmpty do
+          Macro.throwErrorAt instanceStx
+            s!"internal attribute `{instanceStx[0].getId}` takes no arguments"
+        wellKnown := wellKnown.push name
+    | none => user := user.push instanceStx
+  return (wellKnown, user)
+
+/-- Attach a hoisted leading doc comment to parsed modifiers. -/
+private def applyDocComment (doc : Syntax)
+    (modifiers : TSyntax ``Lean.Parser.Command.declModifiers) :
+    MacroM (TSyntax ``Lean.Parser.Command.declModifiers) := do
+  if doc.isNone then return modifiers
+  unless modifiers.raw[0].isNone do
+    Macro.throwErrorAt doc "duplicate doc comment"
+  return ⟨modifiers.raw.setArg 0 doc⟩
+
+/-- Prepend distinct Move declaration attributes to parsed modifiers. -/
+private def prependDeclarationAttributes (names : Array Name)
+    (modifiers : TSyntax ``Lean.Parser.Command.declModifiers) :
+    MacroM (TSyntax ``Lean.Parser.Command.declModifiers) := do
+  let mut modifiers := modifiers
+  let mut seen : Array Name := #[]
+  for name in names do
+    unless seen.contains name do
+      seen := seen.push name
+      modifiers ← prependDeclarationAttribute name modifiers
+  return modifiers
+
+/-- The registration command persisting user-provided attributes of the
+declaration named by `declId`. -/
+private def buildAttributeRegistration (declId : Syntax)
+    (user : Array Syntax) : Syntax :=
+  let separated := user.foldl (init := #[]) fun result instanceStx =>
+    if result.isEmpty then #[instanceStx]
+    else result ++ #[mkAtom ", ", instanceStx]
+  mkNode ``registerMoveAttributes #[
+    mkAtom "#register_move_attributes ", declId[0],
+    mkNode ``moveAttributes
+      #[mkAtom "@[", mkNullNode separated, mkAtom "]"]]
+
+private def withAttributeRegistration (declaration declId : Syntax)
+    (user : Array Syntax) : Array Syntax :=
+  if user.isEmpty then #[declaration]
+  else #[declaration, buildAttributeRegistration declId user]
+
+/-- Rewrite one module-scoped keyword item to its attributed core
+declaration, followed by a registration command when the item carries
+user-provided attributes. Ordinary commands pass through unchanged. -/
+private def desugarModuleItem (stx : Syntax) : MacroM (Array Syntax) := do
+  if stx.isOfKind ``moveStructItem then
+    let (wellKnown, user) ← splitAttributeInstances stx[1]
+    let modifiers ← prependDeclarationAttributes (#[`move_struct] ++ wellKnown)
+      (← applyDocComment stx[0] ⟨stx[2]⟩)
+    let signature ← normalizeTypeParameterBinders stx[5]
+    let structureNode := mkNode ``Lean.Parser.Command.structure #[
+      mkNode ``Lean.Parser.Command.structureTk #[mkAtomFrom stx[3] "structure"],
+      stx[4], signature,
+      mkNullNode,
+      mkNullNode #[mkAtom "where", mkNullNode, stx[7]],
+      stx[8]]
+    let declaration := mkNode ``Lean.Parser.Command.declaration
+      #[modifiers.raw, structureNode]
+    return withAttributeRegistration declaration stx[4] user
+  if stx.isOfKind ``moveEnumItem then
+    let (wellKnown, user) ← splitAttributeInstances stx[1]
+    let modifiers ← prependDeclarationAttributes (#[`move_enum] ++ wellKnown)
+      (← applyDocComment stx[0] ⟨stx[2]⟩)
+    let signature ← normalizeTypeParameterBinders stx[5]
+    let inductiveNode := mkNode ``Lean.Parser.Command.inductive #[
+      mkAtomFrom stx[3] "inductive", stx[4], signature,
+      mkNullNode #[mkAtom "where"],
+      stx[7],
+      mkNullNode,
+      stx[8]]
+    let declaration := mkNode ``Lean.Parser.Command.declaration
+      #[modifiers.raw, inductiveNode]
+    return withAttributeRegistration declaration stx[4] user
+  if stx.isOfKind ``moveEntryFunItem || stx.isOfKind ``moveFriendFunItem then
+    let attributeName :=
+      if stx.isOfKind ``moveEntryFunItem then `move_entry else `move_friend
+    let (wellKnown, user) ← splitAttributeInstances stx[1]
+    let modifiers ← prependDeclarationAttributes (#[attributeName] ++ wellKnown)
+      (← applyDocComment stx[0] ⟨stx[2]⟩)
+    let declaration := mkNode ``moveFunctionCommand
+      #[modifiers.raw, mkAtomFrom stx[4] "fun ", stx[5], stx[6], stx[7], stx[8]]
+    return withAttributeRegistration declaration stx[5] user
+  if stx.isOfKind ``moveFunItem then
+    let (wellKnown, user) ← splitAttributeInstances stx[1]
+    let modifiers ← prependDeclarationAttributes wellKnown
+      (← applyDocComment stx[0] ⟨stx[2]⟩)
+    let declaration := mkNode ``moveFunctionCommand
+      #[modifiers.raw, mkAtomFrom stx[3] "fun ", stx[4], stx[5], stx[6], stx[7]]
+    return withAttributeRegistration declaration stx[4] user
+  return #[stx]
+
+@[macro moveModuleCommand] def expandMoveModuleCommand : Macro := fun stx => do
+  unless stx.isOfKind ``moveModuleCommand do Macro.throwUnsupported
+  let moduleName : TSyntax `ident := ⟨stx[1]⟩
+  let exportName : TSyntax `str := ⟨Syntax.mkStrLit moduleName.getId.toString⟩
+  let exportCommand ← `(#export_leaner $exportName)
+  let namespaceCommand ← `(namespace $moduleName)
+  let address : TSyntax `str := ⟨Syntax.mkStrLit "0x0"⟩
+  let identityCommand ← `(#register_move_module_identity $address $exportName)
+  let openLeanerCommand ← `(open Move)
+  let openLeanerScopeCommand ← `(open scoped Move)
+  let endCommand ← `(end $moduleName)
+  let body ← stx[3].getArgs.foldlM (init := #[]) fun result item => do
+    (← desugarModuleItem item).foldlM (init := result) fun result command => do
+      let command := expandLeanerCommandAliases command
+      return result.push (← preserveLeanHelperBoundaries command)
+  return mkNullNode <|
+    #[namespaceCommand.raw, identityCommand.raw, exportCommand.raw,
+      openLeanerCommand.raw, openLeanerScopeCommand.raw] ++
+      body ++ #[endCommand.raw]
 
 @[command_elab registerMoveModuleIdentity]
 def elabRegisterMoveModuleIdentity : CommandElab := fun stx => do
@@ -287,6 +493,22 @@ def elabRegisterMoveModuleIdentity : CommandElab := fun stx => do
     | throwErrorAt stx[2] "expected a module name string"
   let leanNamespace ← getCurrNamespace
   modifyEnv fun env => Move.registerModuleNamespace env leanNamespace { address, name }
+
+@[command_elab registerMoveAttributes]
+def elabRegisterMoveAttributes : CommandElab := fun stx => do
+  let name := stx[1].getId
+  let name ← if (`_root_).isPrefixOf name then
+      pure (name.replacePrefix `_root_ .anonymous)
+    else
+      pure ((← getCurrNamespace) ++ name)
+  let mut attributes := #[]
+  for instanceStx in stx[2][1].getArgs do
+    unless instanceStx.isOfKind ``moveAttributeInstance do continue
+    match Move.decodeAttributeInstance instanceStx with
+    | .ok decoded => attributes := attributes.push decoded
+    | .error message => throwErrorAt instanceStx message
+  modifyEnv fun env =>
+    Move.registerUserAttributes env name attributes.toList
 
 private structure PendingExport where
   marker : Syntax

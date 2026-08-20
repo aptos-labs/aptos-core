@@ -66,7 +66,9 @@ pub fn translate_exp(
     let label = in_old.then_some(0);
     match exp {
         ExpData::Value(_, v) => match v {
-            ModelValue::Number(n) => Ok(exchange::SpecExp::Value(exchange::Value::U64(u64_of(n)?))),
+            ModelValue::Number(n) => Ok(exchange::SpecExp::Value(exchange::Value::Num(
+                u64_of(n)?.to_string(),
+            ))),
             ModelValue::Bool(b) => Ok(exchange::SpecExp::Value(exchange::Value::Bool(*b))),
             ModelValue::Address(Address::Numerical(a)) => Ok(exchange::SpecExp::Value(
                 exchange::Value::Address(a.to_hex_literal()),

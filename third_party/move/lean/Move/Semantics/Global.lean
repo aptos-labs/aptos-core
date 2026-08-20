@@ -31,6 +31,12 @@ class ResourceStore (State Value : Type) where
     lookup (insert state address value) address = some value
   lookup_erase_eq : ∀ state address,
     lookup (erase state address) address = none
+  /-- Distinct addresses of one family are disjoint locations. This is what
+  lets a contract frame the global memory it does not modify. -/
+  lookup_insert_ne : ∀ state written query value, query ≠ written →
+    lookup (insert state written value) query = lookup state query
+  lookup_erase_ne : ∀ state written query, query ≠ written →
+    lookup (erase state written) query = lookup state query
 
 /-- Distinct typed resource families occupy disjoint portions of global
 state. One instance per pair supplies the frame laws needed to compose
@@ -87,6 +93,18 @@ def get [Inhabited Value] [store : ResourceStore State Value]
     (state : State) (address : Move.Address) (value : Value) :
     (descriptor (State := State) (Value := Value)).insert state address value =
       store.insert state address value := rfl
+
+@[grind =, simp] theorem lookup_insert_other [store : ResourceStore State Value]
+    (state : State) (written query : Move.Address) (value : Value)
+    (distinct : query ≠ written) :
+    store.lookup (store.insert state written value) query =
+      store.lookup state query :=
+  store.lookup_insert_ne state written query value distinct
+
+@[grind =, simp] theorem lookup_erase_other [store : ResourceStore State Value]
+    (state : State) (written query : Move.Address) (distinct : query ≠ written) :
+    store.lookup (store.erase state written) query = store.lookup state query :=
+  store.lookup_erase_ne state written query distinct
 
 @[grind =, simp] theorem lookup_insert_same [store : ResourceStore State Value]
     (state : State) (address : Move.Address) (value : Value) :

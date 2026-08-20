@@ -18,13 +18,13 @@ open Move.Semantics
 
 /-- Checked addition in one obligation: the normal continuation under the
 no-overflow hypothesis, and the arithmetic abort otherwise. -/
-@[simp, wp_norm] theorem wp_addSpec (lhs rhs : Move.U64)
-    (ensures : Move.U64 → State → Prop) (aborts : Nat → Prop)
+@[simp, wp_norm] theorem wp_addSpec {W : Type} [Move.Width W] (lhs rhs : Move.UInt W)
+    (ensures : Move.UInt W → State → Prop) (aborts : Nat → Prop)
     (initial : State) :
-    wp (Checked.addSpec lhs rhs : Spec State Move.U64) ensures aborts initial ↔
-      (lhs.toNat + rhs.toNat < Move.U64.size →
-        ensures (Move.U64.ofNat (lhs.toNat + rhs.toNat)) initial) ∧
-      (¬lhs.toNat + rhs.toNat < Move.U64.size →
+    wp (Checked.addSpec lhs rhs : Spec State (Move.UInt W)) ensures aborts initial ↔
+      (lhs.toNat + rhs.toNat < (Move.widthOf W).size →
+        ensures (Move.UInt.ofNat (lhs.toNat + rhs.toNat)) initial) ∧
+      (¬lhs.toNat + rhs.toNat < (Move.widthOf W).size →
         aborts Checked.arithmeticAbortCode) := by
   constructor
   · rintro ⟨normal, abnormal⟩
@@ -39,12 +39,12 @@ no-overflow hypothesis, and the arithmetic abort otherwise. -/
 
 /-- Checked subtraction in one obligation: the normal continuation under the
 no-underflow hypothesis, and the arithmetic abort otherwise. -/
-@[simp, wp_norm] theorem wp_subSpec (lhs rhs : Move.U64)
-    (ensures : Move.U64 → State → Prop) (aborts : Nat → Prop)
+@[simp, wp_norm] theorem wp_subSpec {W : Type} [Move.Width W] (lhs rhs : Move.UInt W)
+    (ensures : Move.UInt W → State → Prop) (aborts : Nat → Prop)
     (initial : State) :
-    wp (Checked.subSpec lhs rhs : Spec State Move.U64) ensures aborts initial ↔
+    wp (Checked.subSpec lhs rhs : Spec State (Move.UInt W)) ensures aborts initial ↔
       (rhs.toNat ≤ lhs.toNat →
-        ensures (Move.U64.ofNat (lhs.toNat - rhs.toNat)) initial) ∧
+        ensures (Move.UInt.ofNat (lhs.toNat - rhs.toNat)) initial) ∧
       (¬rhs.toNat ≤ lhs.toNat → aborts Checked.arithmeticAbortCode) := by
   constructor
   · rintro ⟨normal, abnormal⟩
@@ -58,13 +58,13 @@ no-underflow hypothesis, and the arithmetic abort otherwise. -/
       exact abnormal underflow
 
 /-- Checked multiplication in one obligation. -/
-@[simp, wp_norm] theorem wp_mulSpec (lhs rhs : Move.U64)
-    (ensures : Move.U64 → State → Prop) (aborts : Nat → Prop)
+@[simp, wp_norm] theorem wp_mulSpec {W : Type} [Move.Width W] (lhs rhs : Move.UInt W)
+    (ensures : Move.UInt W → State → Prop) (aborts : Nat → Prop)
     (initial : State) :
-    wp (Checked.mulSpec lhs rhs : Spec State Move.U64) ensures aborts initial ↔
-      (lhs.toNat * rhs.toNat < Move.U64.size →
-        ensures (Move.U64.ofNat (lhs.toNat * rhs.toNat)) initial) ∧
-      (¬lhs.toNat * rhs.toNat < Move.U64.size →
+    wp (Checked.mulSpec lhs rhs : Spec State (Move.UInt W)) ensures aborts initial ↔
+      (lhs.toNat * rhs.toNat < (Move.widthOf W).size →
+        ensures (Move.UInt.ofNat (lhs.toNat * rhs.toNat)) initial) ∧
+      (¬lhs.toNat * rhs.toNat < (Move.widthOf W).size →
         aborts Checked.arithmeticAbortCode) := by
   constructor
   · rintro ⟨normal, abnormal⟩
@@ -79,12 +79,12 @@ no-underflow hypothesis, and the arithmetic abort otherwise. -/
 
 /-- Checked division in one obligation: the normal continuation under the
 nonzero-divisor hypothesis, and the arithmetic abort otherwise. -/
-@[simp, wp_norm] theorem wp_divSpec (lhs rhs : Move.U64)
-    (ensures : Move.U64 → State → Prop) (aborts : Nat → Prop)
+@[simp, wp_norm] theorem wp_divSpec {W : Type} [Move.Width W] (lhs rhs : Move.UInt W)
+    (ensures : Move.UInt W → State → Prop) (aborts : Nat → Prop)
     (initial : State) :
-    wp (Checked.divSpec lhs rhs : Spec State Move.U64) ensures aborts initial ↔
+    wp (Checked.divSpec lhs rhs : Spec State (Move.UInt W)) ensures aborts initial ↔
       (rhs.toNat ≠ 0 →
-        ensures (Move.U64.ofNat (lhs.toNat / rhs.toNat)) initial) ∧
+        ensures (Move.UInt.ofNat (lhs.toNat / rhs.toNat)) initial) ∧
       (rhs.toNat = 0 → aborts Checked.arithmeticAbortCode) := by
   constructor
   · rintro ⟨normal, abnormal⟩
@@ -97,13 +97,77 @@ nonzero-divisor hypothesis, and the arithmetic abort otherwise. -/
     · rintro code ⟨rfl, zero⟩
       exact abnormal zero
 
-/-- Checked remainder in one obligation. -/
-@[simp, wp_norm] theorem wp_modSpec (lhs rhs : Move.U64)
-    (ensures : Move.U64 → State → Prop) (aborts : Nat → Prop)
+
+/-- Checked left shift in one obligation: the normal continuation under the
+in-range shift-amount hypothesis, and the arithmetic abort otherwise. -/
+@[simp, wp_norm] theorem wp_shlSpec {W : Type} [Move.Width W] (lhs : Move.UInt W)
+    (amount : Move.UInt Move.W8)
+    (ensures : Move.UInt W → State → Prop) (aborts : Nat → Prop)
     (initial : State) :
-    wp (Checked.modSpec lhs rhs : Spec State Move.U64) ensures aborts initial ↔
+    wp (Checked.shlSpec lhs amount : Spec State (Move.UInt W))
+        ensures aborts initial ↔
+      (amount.toNat < (Move.widthOf W).bits → ensures (Move.UInt.shl lhs amount) initial) ∧
+      (¬amount.toNat < (Move.widthOf W).bits → aborts Checked.arithmeticAbortCode) := by
+  constructor
+  · rintro ⟨normal, abnormal⟩
+    exact ⟨fun safe => normal _ initial ⟨safe, rfl, rfl⟩,
+      fun overflow => abnormal _ ⟨rfl, overflow⟩⟩
+  · rintro ⟨normal, abnormal⟩
+    constructor
+    · rintro value final ⟨safe, rfl, rfl⟩
+      exact normal safe
+    · rintro code ⟨rfl, overflow⟩
+      exact abnormal overflow
+
+/-- Checked right shift in one obligation. -/
+@[simp, wp_norm] theorem wp_shrSpec {W : Type} [Move.Width W] (lhs : Move.UInt W)
+    (amount : Move.UInt Move.W8)
+    (ensures : Move.UInt W → State → Prop) (aborts : Nat → Prop)
+    (initial : State) :
+    wp (Checked.shrSpec lhs amount : Spec State (Move.UInt W))
+        ensures aborts initial ↔
+      (amount.toNat < (Move.widthOf W).bits → ensures (Move.UInt.shr lhs amount) initial) ∧
+      (¬amount.toNat < (Move.widthOf W).bits → aborts Checked.arithmeticAbortCode) := by
+  constructor
+  · rintro ⟨normal, abnormal⟩
+    exact ⟨fun safe => normal _ initial ⟨safe, rfl, rfl⟩,
+      fun overflow => abnormal _ ⟨rfl, overflow⟩⟩
+  · rintro ⟨normal, abnormal⟩
+    constructor
+    · rintro value final ⟨safe, rfl, rfl⟩
+      exact normal safe
+    · rintro code ⟨rfl, overflow⟩
+      exact abnormal overflow
+
+/-- Checked integer cast in one obligation: the normal continuation under the
+fits-in-target hypothesis, and the arithmetic abort otherwise. -/
+@[simp, wp_norm] theorem wp_castSpec {W W' : Type} [Move.Width W]
+    [Move.Width W'] (value : Move.UInt W)
+    (ensures : Move.UInt W' → State → Prop) (aborts : Nat → Prop)
+    (initial : State) :
+    wp (Checked.castSpec value : Spec State (Move.UInt W'))
+        ensures aborts initial ↔
+      (value.toNat < (Move.widthOf W').size →
+        ensures (Move.UInt.cast value) initial) ∧
+      (¬value.toNat < (Move.widthOf W').size → aborts Checked.arithmeticAbortCode) := by
+  constructor
+  · rintro ⟨normal, abnormal⟩
+    exact ⟨fun safe => normal _ initial ⟨safe, rfl, rfl⟩,
+      fun overflow => abnormal _ ⟨rfl, overflow⟩⟩
+  · rintro ⟨normal, abnormal⟩
+    constructor
+    · rintro result final ⟨safe, rfl, rfl⟩
+      exact normal safe
+    · rintro code ⟨rfl, overflow⟩
+      exact abnormal overflow
+
+/-- Checked remainder in one obligation. -/
+@[simp, wp_norm] theorem wp_modSpec {W : Type} [Move.Width W] (lhs rhs : Move.UInt W)
+    (ensures : Move.UInt W → State → Prop) (aborts : Nat → Prop)
+    (initial : State) :
+    wp (Checked.modSpec lhs rhs : Spec State (Move.UInt W)) ensures aborts initial ↔
       (rhs.toNat ≠ 0 →
-        ensures (Move.U64.ofNat (lhs.toNat % rhs.toNat)) initial) ∧
+        ensures (Move.UInt.ofNat (lhs.toNat % rhs.toNat)) initial) ∧
       (rhs.toNat = 0 → aborts Checked.arithmeticAbortCode) := by
   constructor
   · rintro ⟨normal, abnormal⟩
@@ -238,18 +302,29 @@ relational representation. -/
     (ensures : (Unit × Mutation (Move.Vector α)) → State → Prop)
     (aborts : Nat → Prop) (initial : State) :
     wp (Vector.insertSpec reference index value) ensures aborts initial ↔
-      if index.toNat ≤ reference.current.toList.length then
+      if room : index.toNat ≤ reference.current.toList.length ∧
+          reference.current.toList.length + 1 < Move.U64.size then
         ensures
           ((), reference.write (Move.Vector.ofList
             (reference.current.toList.take index.toNat ++
-              value :: reference.current.toList.drop index.toNat)))
+              value :: reference.current.toList.drop index.toNat)
+            (by
+              have inBounds := room.1
+              have hasRoom : reference.current.toList.length + 1 <
+                  MoveModel.IR.IntWidth.size .w64 := room.2
+              simp only [List.length_append, List.length_cons,
+                List.length_take, List.length_drop]
+              omega)))
           initial
       else
         aborts Vector.indexOutOfBounds := by
-  by_cases inBounds : index.toNat ≤ reference.current.toList.length
-  · simp only [Vector.insertSpec, Mutation.read, inBounds, if_pos]
+  by_cases room : index.toNat ≤ reference.current.toList.length ∧
+      reference.current.toList.length + 1 < Move.U64.size
+  · simp only [Vector.insertSpec, Mutation.read]
+    rw [dif_pos room, dif_pos room]
     exact wp_pure _ _ _ _
-  · simp only [Vector.insertSpec, Mutation.read, inBounds]
+  · simp only [Vector.insertSpec, Mutation.read]
+    rw [dif_neg room, dif_neg room]
     exact wp_abort _ _ _ _
 
 @[simp, wp_norm] theorem wp_removeSpec (reference : Mutation (Move.Vector α))
@@ -263,7 +338,14 @@ relational representation. -/
           ensures
             (removed, reference.write (Move.Vector.ofList
               (reference.current.toList.take index.toNat ++
-                reference.current.toList.drop (index.toNat + 1))))
+                reference.current.toList.drop (index.toNat + 1))
+              (by
+                have bounded : reference.current.toList.length <
+                    MoveModel.IR.IntWidth.size .w64 :=
+                  reference.current.toList_length_lt
+                simp only [List.length_append, List.length_take,
+                  List.length_drop]
+                omega)))
             initial := by
   cases present : reference.current.toList[index.toNat]? with
   | none =>

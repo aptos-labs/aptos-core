@@ -132,6 +132,15 @@ body. This is the common semantic shape of a `loop` which exits directly via
     · intro execution
       exact .inr ⟨value, initial, ⟨rfl, rfl⟩, execution⟩
 
+/-- Binding after an abort stays that abort. -/
+@[simp] theorem abort_bind (code : Nat) (next : α → Spec σ β) :
+    (Spec.abort code : Spec σ α).bind next = Spec.abort code := by
+  apply Spec.extensionality
+  · funext initial value final
+    simp [Spec.bind, Spec.abort]
+  · funext initial actual
+    simp [Spec.bind, Spec.abort]
+
 @[simp] theorem bind_pure (action : Spec σ α) :
     bind action pure = action := by
   apply extensionality

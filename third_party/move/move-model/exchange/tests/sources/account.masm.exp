@@ -1,5 +1,5 @@
 {
-  "version": 7,
+  "version": 8,
   "structs": [{"name": "Account", "fields": [{"name": "balance", "ty": "u64"}]}],
   "funs": [
     {

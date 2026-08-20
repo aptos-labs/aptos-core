@@ -72,13 +72,20 @@ theorem CodeTySubs.semantic { Δ : StructDecls } :
 /-- Operation typing: operand types and result types of the non-call,
 non-reference operations. -/
 inductive WfOp (Δ : StructDecls) : Oper → List Ty → List Ty → Prop where
-  | add : WfOp Δ .add [.u64, .u64] [.u64]
-  | sub : WfOp Δ .sub [.u64, .u64] [.u64]
-  | mul : WfOp Δ .mul [.u64, .u64] [.u64]
-  | div : WfOp Δ .div [.u64, .u64] [.u64]
-  | mod : WfOp Δ .mod [.u64, .u64] [.u64]
-  | lt : WfOp Δ .lt [.u64, .u64] [.bool]
-  | le : WfOp Δ .le [.u64, .u64] [.bool]
+  | add (w : IntWidth) : WfOp Δ (.add w) [.uint w, .uint w] [.uint w]
+  | sub (w : IntWidth) : WfOp Δ .sub [.uint w, .uint w] [.uint w]
+  | mul (w : IntWidth) : WfOp Δ (.mul w) [.uint w, .uint w] [.uint w]
+  | div (w : IntWidth) : WfOp Δ .div [.uint w, .uint w] [.uint w]
+  | mod (w : IntWidth) : WfOp Δ .mod [.uint w, .uint w] [.uint w]
+  | bitAnd (w : IntWidth) : WfOp Δ .bitAnd [.uint w, .uint w] [.uint w]
+  | bitOr (w : IntWidth) : WfOp Δ .bitOr [.uint w, .uint w] [.uint w]
+  | bitXor (w : IntWidth) : WfOp Δ .bitXor [.uint w, .uint w] [.uint w]
+  | shl (w : IntWidth) : WfOp Δ (.shl w) [.uint w, .uint .w8] [.uint w]
+  | shr (w : IntWidth) : WfOp Δ (.shr w) [.uint w, .uint .w8] [.uint w]
+  | cast (w target : IntWidth) :
+      WfOp Δ (.cast target) [.uint w] [.uint target]
+  | lt (w : IntWidth) : WfOp Δ .lt [.uint w, .uint w] [.bool]
+  | le (w : IntWidth) : WfOp Δ .le [.uint w, .uint w] [.bool]
   | eq (t : Ty) : WfOp Δ .eq [t, t] [.bool]
   | and : WfOp Δ .and [.bool, .bool] [.bool]
   | or : WfOp Δ .or [.bool, .bool] [.bool]
@@ -184,7 +191,8 @@ def Oper.isRefOp : Oper → Bool
   | .borrowLoc | .borrowField _ | .borrowFieldInst _ _
   | .borrowGlobal _ | .borrowGlobalInst _ _ | .borrowVecElem
   | .readRef | .writeRef | .freezeRef => true
-  | .add | .sub | .mul | .div | .mod
+  | .add _ | .sub | .mul _ | .div | .mod
+  | .bitAnd | .bitOr | .bitXor | .shl _ | .shr _ | .cast _
   | .lt | .le | .eq | .and | .or | .not
   | .pack | .packInst _ | .unpack | .unpackInst _
   | .packVariant _ | .packVariantInst _ _
@@ -390,6 +398,19 @@ theorem TypedLocals.writeLocal {Δ : StructDecls}
   · rw [if_neg hix] at hw
     exact h i t w ht hw
 
+/-- Writing an in-range integer to a local declared at the same width
+preserves local typing. -/
+theorem TypedLocals.writeUInt {Δ : StructDecls}
+    {decl : LocalIndex → Option Ty} {s : MoveState} {x : Nat} {i : Int}
+    {w : IntWidth}
+    (h : TypedLocals Δ decl s.locals) (hx : decl x = some (.uint w))
+    (h0 : 0 ≤ i) (hi : i < (w.size : Int)) :
+    TypedLocals Δ decl (s.writeLocal x (.int i)).locals :=
+  h.writeLocal fun t ht => by
+    rw [hx] at ht
+    cases ht
+    exact .int h0 hi
+
 /-- Writing an in-range `u64` to a local declared as `u64` preserves local
 typing. -/
 theorem TypedLocals.writeU64 {Δ : StructDecls}
@@ -397,10 +418,7 @@ theorem TypedLocals.writeU64 {Δ : StructDecls}
     (h : TypedLocals Δ decl s.locals) (hx : decl x = some .u64)
     (hn : n < U64_SIZE) :
     TypedLocals Δ decl (s.writeLocal x (.u64 n)).locals :=
-  h.writeLocal fun t ht => by
-    rw [hx] at ht
-    cases ht
-    exact .u64 hn
+  h.writeUInt hx (by omega) (by rw [u64_size_eq]; exact_mod_cast hn)
 
 /-- Writing a boolean to a local declared as `bool` preserves local typing. -/
 theorem TypedLocals.writeBool {Δ : StructDecls}
@@ -626,85 +644,168 @@ theorem WfOp.sem_preserves {Δ : StructDecls} {op : Oper}
     (hsem : op.sem current deref vs m = some (.ok rets m')) :
     IsValidList Δ rts rets ∧ TypedMemory Δ m' := by
   cases hop with
-  | add =>
+  | add w =>
     cases hvs with | cons hv₁ htl =>
     cases htl with | cons hv₂ htl =>
     cases htl
-    rw [isValid_u64_iff] at hv₁ hv₂
-    obtain ⟨i, rfl, hi⟩ := hv₁
-    obtain ⟨j, rfl, hj⟩ := hv₂
+    rw [isValid_uint_iff] at hv₁ hv₂
+    obtain ⟨i, rfl, h0i, hi⟩ := hv₁
+    obtain ⟨j, rfl, h0j, hj⟩ := hv₂
     simp only [Oper.sem] at hsem
     split at hsem
-    next h => cases hsem; exact ⟨.cons (.u64 h) .nil, hm⟩
+    next h => cases hsem; exact ⟨.cons (.int (by omega) h) .nil, hm⟩
     next => cases hsem
-  | sub =>
+  | sub w =>
     cases hvs with | cons hv₁ htl =>
     cases htl with | cons hv₂ htl =>
     cases htl
-    rw [isValid_u64_iff] at hv₁ hv₂
-    obtain ⟨i, rfl, hi⟩ := hv₁
-    obtain ⟨j, rfl, hj⟩ := hv₂
+    rw [isValid_uint_iff] at hv₁ hv₂
+    obtain ⟨i, rfl, h0i, hi⟩ := hv₁
+    obtain ⟨j, rfl, h0j, hj⟩ := hv₂
+    simp only [Oper.sem] at hsem
+    split at hsem
+    next h =>
+      cases hsem
+      exact ⟨.cons (.int (by omega) (by omega)) .nil, hm⟩
+    next => cases hsem
+  | mul w =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    rw [isValid_uint_iff] at hv₁ hv₂
+    obtain ⟨i, rfl, h0i, hi⟩ := hv₁
+    obtain ⟨j, rfl, h0j, hj⟩ := hv₂
+    simp only [Oper.sem] at hsem
+    split at hsem
+    next h => cases hsem; exact ⟨.cons (.int (Int.mul_nonneg h0i h0j) h) .nil, hm⟩
+    next => cases hsem
+  | div w =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    rw [isValid_uint_iff] at hv₁ hv₂
+    obtain ⟨i, rfl, h0i, hi⟩ := hv₁
+    obtain ⟨j, rfl, h0j, hj⟩ := hv₂
+    simp only [Oper.sem] at hsem
+    split at hsem
+    next => cases hsem
+    next =>
+      cases hsem
+      have hle : i / j ≤ i := Int.ediv_le_self j h0i
+      have h0 : 0 ≤ i / j := Int.ediv_nonneg h0i h0j
+      exact ⟨.cons (.int h0 (by omega)) .nil, hm⟩
+  | mod w =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    rw [isValid_uint_iff] at hv₁ hv₂
+    obtain ⟨i, rfl, h0i, hi⟩ := hv₁
+    obtain ⟨j, rfl, h0j, hj⟩ := hv₂
+    simp only [Oper.sem] at hsem
+    split at hsem
+    next => cases hsem
+    next hj0 =>
+      cases hsem
+      have h0 : 0 ≤ i % j := Int.emod_nonneg i hj0
+      have hlt : i % j < j := Int.emod_lt_of_pos i (by omega)
+      exact ⟨.cons (.int h0 (by omega)) .nil, hm⟩
+  | bitAnd w =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    rw [isValid_uint_iff] at hv₁ hv₂
+    obtain ⟨i, rfl, h0i, hi⟩ := hv₁
+    obtain ⟨j, rfl, h0j, hj⟩ := hv₂
+    simp only [Oper.sem] at hsem
+    cases hsem
+    have hle : i.toNat &&& j.toNat ≤ i.toNat := Nat.and_le_left
+    exact ⟨.cons (.int (by omega) (by omega)) .nil, hm⟩
+  | bitOr w =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    rw [isValid_uint_iff] at hv₁ hv₂
+    obtain ⟨i, rfl, h0i, hi⟩ := hv₁
+    obtain ⟨j, rfl, h0j, hj⟩ := hv₂
+    simp only [Oper.sem] at hsem
+    cases hsem
+    have hlt : i.toNat ||| j.toNat < 2 ^ w.bits :=
+      Nat.or_lt_two_pow (by change _ < w.size; omega)
+        (by change _ < w.size; omega)
+    have hlt' : i.toNat ||| j.toNat < w.size := hlt
+    exact ⟨.cons (.int (by omega) (by omega)) .nil, hm⟩
+  | bitXor w =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    rw [isValid_uint_iff] at hv₁ hv₂
+    obtain ⟨i, rfl, h0i, hi⟩ := hv₁
+    obtain ⟨j, rfl, h0j, hj⟩ := hv₂
+    simp only [Oper.sem] at hsem
+    cases hsem
+    have hlt : i.toNat ^^^ j.toNat < 2 ^ w.bits :=
+      Nat.xor_lt_two_pow (by change _ < w.size; omega)
+        (by change _ < w.size; omega)
+    have hlt' : i.toNat ^^^ j.toNat < w.size := hlt
+    exact ⟨.cons (.int (by omega) (by omega)) .nil, hm⟩
+  | shl w =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    rw [isValid_uint_iff] at hv₁ hv₂
+    obtain ⟨i, rfl, h0i, hi⟩ := hv₁
+    obtain ⟨k, rfl, h0k, hk⟩ := hv₂
     simp only [Oper.sem] at hsem
     split at hsem
     next =>
       cases hsem
-      exact ⟨.cons (.u64 (Nat.lt_of_le_of_lt (Nat.sub_le i j) hi)) .nil, hm⟩
-    next => cases hsem
-  | mul =>
-    cases hvs with | cons hv₁ htl =>
-    cases htl with | cons hv₂ htl =>
-    cases htl
-    rw [isValid_u64_iff] at hv₁ hv₂
-    obtain ⟨i, rfl, hi⟩ := hv₁
-    obtain ⟨j, rfl, hj⟩ := hv₂
-    simp only [Oper.sem] at hsem
-    split at hsem
-    next h => cases hsem; exact ⟨.cons (.u64 h) .nil, hm⟩
-    next => cases hsem
-  | div =>
-    cases hvs with | cons hv₁ htl =>
-    cases htl with | cons hv₂ htl =>
-    cases htl
-    rw [isValid_u64_iff] at hv₁ hv₂
-    obtain ⟨i, rfl, hi⟩ := hv₁
-    obtain ⟨j, rfl, hj⟩ := hv₂
-    simp only [Oper.sem] at hsem
-    split at hsem
-    next => cases hsem
-    next =>
-      cases hsem
-      exact ⟨.cons (.u64 (Nat.lt_of_le_of_lt (Nat.div_le_self i j) hi)) .nil,
+      have hlt : (i.toNat <<< k.toNat) % w.size < w.size :=
+        Nat.mod_lt _ (Nat.two_pow_pos w.bits)
+      exact ⟨.cons (.int (Int.natCast_nonneg _) (by exact_mod_cast hlt)) .nil,
         hm⟩
-  | mod =>
+    next => cases hsem
+  | shr w =>
     cases hvs with | cons hv₁ htl =>
     cases htl with | cons hv₂ htl =>
     cases htl
-    rw [isValid_u64_iff] at hv₁ hv₂
-    obtain ⟨i, rfl, hi⟩ := hv₁
-    obtain ⟨j, rfl, hj⟩ := hv₂
+    rw [isValid_uint_iff] at hv₁ hv₂
+    obtain ⟨i, rfl, h0i, hi⟩ := hv₁
+    obtain ⟨k, rfl, h0k, hk⟩ := hv₂
     simp only [Oper.sem] at hsem
     split at hsem
-    next => cases hsem
     next =>
       cases hsem
-      exact ⟨.cons (.u64 (Nat.lt_of_le_of_lt (Nat.mod_le i j) hi)) .nil, hm⟩
-  | lt =>
+      have hlt : i.toNat >>> k.toNat < w.size :=
+        Nat.lt_of_le_of_lt (Nat.shiftRight_le i.toNat k.toNat) (by omega)
+      exact ⟨.cons (.int (Int.natCast_nonneg _) (by exact_mod_cast hlt)) .nil,
+        hm⟩
+    next => cases hsem
+  | cast w target =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl
+    rw [isValid_uint_iff] at hv₁
+    obtain ⟨i, rfl, h0i, hi⟩ := hv₁
+    simp only [Oper.sem] at hsem
+    split at hsem
+    next h => cases hsem; exact ⟨.cons (.int h0i h) .nil, hm⟩
+    next => cases hsem
+  | lt w =>
     cases hvs with | cons hv₁ htl =>
     cases htl with | cons hv₂ htl =>
     cases htl
-    rw [isValid_u64_iff] at hv₁ hv₂
-    obtain ⟨i, rfl, hi⟩ := hv₁
-    obtain ⟨j, rfl, hj⟩ := hv₂
+    rw [isValid_uint_iff] at hv₁ hv₂
+    obtain ⟨i, rfl, h0i, hi⟩ := hv₁
+    obtain ⟨j, rfl, h0j, hj⟩ := hv₂
     simp only [Oper.sem] at hsem
     cases hsem
     exact ⟨.cons (.bool _) .nil, hm⟩
-  | le =>
+  | le w =>
     cases hvs with | cons hv₁ htl =>
     cases htl with | cons hv₂ htl =>
     cases htl
-    rw [isValid_u64_iff] at hv₁ hv₂
-    obtain ⟨i, rfl, hi⟩ := hv₁
-    obtain ⟨j, rfl, hj⟩ := hv₂
+    rw [isValid_uint_iff] at hv₁ hv₂
+    obtain ⟨i, rfl, h0i, hi⟩ := hv₁
+    obtain ⟨j, rfl, h0j, hj⟩ := hv₂
     simp only [Oper.sem] at hsem
     cases hsem
     exact ⟨.cons (.bool _) .nil, hm⟩

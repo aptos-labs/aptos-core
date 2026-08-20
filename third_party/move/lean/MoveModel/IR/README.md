@@ -284,7 +284,7 @@ is already derived mechanically and is no longer a field of the certificate.
   in this directory.
 - Put a transformation here when it directly consumes and produces Move IR;
   keep generally reusable machinery separate from its correctness proof.
-- Put executable frontend decoding and elaboration under `Move/Frontend`.
+- Put executable frontend decoding and elaboration under `MoveModel/Frontend`.
 - Put IVL and weakest-precondition theory under `MoveModel/Prover/Ivl`.
 - Put the Move IR to IVL compiler and its adequacy proofs under
   `MoveModel/Prover/Translate`.

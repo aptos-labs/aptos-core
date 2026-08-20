@@ -12,9 +12,9 @@ open scoped Move Move.Compiler Move.Spec
 
 move_module Math where
 
-  public fun identity {T : Type} (value : T) : T := value
+  public fun identity {T} (value : T) : T := value
 
-  spec identity {T : Type} [Inhabited T] (value : T) where
+  spec identity {T} [Inhabited T] (value : T) where
     ensures result = value
 
   verify identity

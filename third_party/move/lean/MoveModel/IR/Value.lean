@@ -8,10 +8,15 @@ This module defines runtime values for the supported Move fragment. After
 reference elimination, translated programs compute on the
 plain-value portion of this domain (TACAS'22 §3.1).
 
-The model currently has one integer width, `u64`. Struct values are field
-lists because Move erases their type information from values; global storage
-keys retain a resource declaration and its structural type-argument tags.
-Vector values are element lists.
+Integer values are signed unbounded integers, as in the Move Prover's Boogie
+model: one `int` carrier for every integer width, constrained by the validity
+predicates of `ValueTyping.lean` (`IsValid` at `.uint w` bounds the carrier
+to `[0, w.size)`, the `$IsValid'u64'` discipline). Widths appear in types and
+in the operations whose semantics needs a bound; `u64` abbreviations keep the
+dominant width convenient. Struct values are field lists because Move erases
+their type information from values; global storage keys retain a resource
+declaration and its structural type-argument tags. Vector values are element
+lists.
 
 The module also defines the specification domain `SVal`.  Move specifications
 use the unbounded integer type `num`, so `SVal` replaces runtime `u64` values
@@ -23,6 +28,32 @@ namespace MoveModel.IR
 /-- Account addresses (Move's 256-bit addresses, abstracted to `Nat`). -/
 abbrev Address := Nat
 
+/-- The widths of Move's unsigned integer types. -/
+inductive IntWidth where
+  | w8 | w16 | w32 | w64 | w128 | w256
+  deriving BEq, DecidableEq, ReflBEq, LawfulBEq, Ord, Repr
+
+/-- The number of bits of an integer width. -/
+def IntWidth.bits : IntWidth → Nat
+  | .w8 => 8
+  | .w16 => 16
+  | .w32 => 32
+  | .w64 => 64
+  | .w128 => 128
+  | .w256 => 256
+
+/-- The number of values of an integer width; checked arithmetic producing a
+result `≥ w.size` aborts (Move aborts on arithmetic overflow). -/
+def IntWidth.size (w : IntWidth) : Nat := 2 ^ w.bits
+
+/-- Every width admits values. -/
+theorem IntWidth.size_pos (w : IntWidth) : 0 < w.size :=
+  Nat.two_pow_pos w.bits
+
+/-- Every width admits at least the values zero and one. -/
+theorem IntWidth.one_lt_size (w : IntWidth) : 1 < w.size :=
+  Nat.one_lt_two_pow_iff.mpr (by cases w <;> simp [IntWidth.bits])
+
 /-- A resource declaration identifier, e.g. the declaration shared by all
 instantiations of `Coin<T>`. -/
 abbrev ResourceId := Nat
@@ -32,12 +63,15 @@ which contain other types record their arity, making the encoding structural
 and unambiguous.  It is deliberately separate from `Ty` to avoid an import
 cycle between values and declaration typing. -/
 inductive TypeTagToken where
-  | bool | u64 | address | signer
+  | bool | uint (w : IntWidth) | address | signer
   | typeParam (index : Nat)
   | struct (resource : ResourceId) (arity : Nat)
   | enum (resource : ResourceId) (arity : Nat)
   | vector | ref | mutRef
   deriving BEq, DecidableEq, ReflBEq, LawfulBEq, Ord, Repr
+
+/-- The dominant integer width, abbreviated. -/
+abbrev TypeTagToken.u64 : TypeTagToken := .uint .w64
 
 /-- Collision-free prefix encoding of one Move type. -/
 abbrev TypeTag := List TypeTagToken
@@ -129,9 +163,12 @@ theorem isParentTarget_parts {pat : List (Option Nat)} {tp tc : RefTarget}
       (List.take_append_drop tp.path.length tc.path).symm
     _ = tp.path ++ tc.path.drop tp.path.length := by rw [h.1.2]
 
-/-- The number of `u64` values; arithmetic producing a result `≥ U64_SIZE`
-aborts (Move aborts on arithmetic overflow). -/
+/-- The number of `u64` values; vector lengths and cursor arithmetic are
+bounded by it. -/
 def U64_SIZE : Nat := 2 ^ 64
+
+/-- `U64_SIZE` is the size of the dominant width. -/
+theorem u64_size_eq : IntWidth.w64.size = U64_SIZE := rfl
 
 /-- IR runtime values.  `ref` values arise only from the borrow
 instructions (see `RefTarget`).  `mut` values are the *mutation* datum of
@@ -141,7 +178,7 @@ location — reusing `RefTarget` — together with the checked-out value it
 carries during a read-update-write cycle.  They arise only from the
 mutation operations of eliminated code, never from source programs. -/
 inductive Value where
-  | u64 (n : Nat)
+  | int (i : Int)
   | bool (b : Bool)
   | address (a : Address)
   | struct (fields : List Value)
@@ -153,6 +190,9 @@ inductive Value where
 
 namespace Value
 
+/-- A nonnegative integer value, as written by `u64`-typed code. -/
+abbrev u64 (n : Nat) : Value := .int n
+
 mutual
   /-- Whether two reference-free values have compatible erased runtime type
   shapes.  This rejects observable heterogeneous equality (for example `u64`
@@ -160,7 +200,7 @@ mutual
   with any vector because their element type is erased from runtime values;
   well-typed IR supplies the stronger static guarantee. -/
   @[simp] def sameTypeShape : Value → Value → Bool
-    | .u64 _, .u64 _ | .bool _, .bool _ | .address _, .address _ => true
+    | .int _, .int _ | .bool _, .bool _ | .address _, .address _ => true
     | .struct xs, .struct ys => sameTypeShapeList xs ys
     | .variant tx xs, .variant ty ys =>
         if tx == ty then sameTypeShapeList xs ys else true
@@ -180,7 +220,7 @@ mutual
 keeps references out of structs, vectors, global memory, and constants;
 operations that store or build values are stuck on offending payloads. -/
 @[simp] def refFree : Value → Bool
-  | .u64 _ | .bool _ | .address _ => true
+  | .int _ | .bool _ | .address _ => true
   | .struct fs => refFreeList fs
   | .variant _ fs => refFreeList fs
   | .vector es => refFreeList es
@@ -288,13 +328,14 @@ inductive SVal where
   | ref (t : RefTarget)
   | mut (t : RefTarget) (sv : SVal)
 
-/-- Embed a runtime value into the specification domain (`u64 n` ↦ the
-unbounded integer `n`).  References and mutations embed *opaquely* (their
+/-- Embed a runtime value into the specification domain.  Runtime integers
+are already the unbounded integers of Move's `num`, so they embed as
+themselves.  References and mutations embed *opaquely* (their
 own constructors), so a specification-level integer or boolean pins the
 underlying runtime shape — the loop typed havoc and the invariant assumes
 rely on this to exclude mutation values from value-typed locals. -/
 @[simp] def Value.toSVal : Value → SVal
-  | .u64 n => .int n
+  | .int i => .int i
   | .bool b => .bool b
   | .address a => .address a
   | .struct fs => .struct (fs.map Value.toSVal)

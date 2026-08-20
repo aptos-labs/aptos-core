@@ -20,7 +20,7 @@ abbrev AbilitySet := MoveModel.IR.AbilitySet
 abbrev TypeParamDecl := MoveModel.IR.TypeParamDecl
 
 inductive Ty where
-  | bool | u64 | address | signer
+  | bool | uint (w : MoveModel.IR.IntWidth) | address | signer
   | typeParam (index : Nat)
   | struct (name : Name)
   | structInst (name : Name) (args : Array Ty)
@@ -30,6 +30,9 @@ inductive Ty where
   | ref (elem : Ty)
   | mutRef (elem : Ty)
   deriving BEq, Repr
+
+/-- The dominant integer width, abbreviated. -/
+abbrev Ty.u64 : Ty := .uint .w64
 
 partial def Ty.instantiate (args : Array Ty) : Ty → Ty
   | .typeParam index => args[index]?.getD (.typeParam index)
@@ -50,7 +53,12 @@ structure LocalDecl where
   deriving BEq, Repr
 
 inductive Oper where
-  | add | sub | mul | div | mod | lt | le | eq
+  | add (w : MoveModel.IR.IntWidth) | sub
+  | mul (w : MoveModel.IR.IntWidth) | div | mod
+  | bitAnd | bitOr | bitXor
+  | shl (w : MoveModel.IR.IntWidth) | shr (w : MoveModel.IR.IntWidth)
+  | cast (target : MoveModel.IR.IntWidth)
+  | lt | le | eq
   | vecPack | vecLen | vecGet | vecSet | vecPush | vecPop
   | vecInsert | vecRemove
   | pack (structName : Name) (typeArgs : Array Ty)
@@ -72,7 +80,7 @@ inductive Oper where
 
 inductive Instr where
   | loadBool (dst : String) (value : Bool)
-  | loadU64 (dst : String) (value : Nat)
+  | loadUInt (w : MoveModel.IR.IntWidth) (dst : String) (value : Nat)
   | assign (dst src : String)
   | call (dsts : Array String) (op : Oper) (srcs : Array String)
   deriving BEq, Repr
@@ -109,6 +117,7 @@ structure StructDecl where
   abilities : AbilitySet
   fields : Array FieldDecl
   variants : Option (Array VariantDecl) := none
+  attributes : List MoveModel.IR.Attribute := []
   deriving BEq, Repr
 
 structure FunDecl where
@@ -122,6 +131,7 @@ structure FunDecl where
   blocks : Array Block
   calls : Array Name
   acquires : Array Name
+  attributes : List MoveModel.IR.Attribute := []
   deriving BEq, Repr
 
 /-- A callable function owned by another Move module. `leanName` resolves the
@@ -180,7 +190,7 @@ private def parseAddress (address : String) : Except String MoveModel.IR.Address
 private partial def lowerTy (structNames : Array (Name × String)) :
     Move.Compiler.LIR.Ty → Except String MoveModel.IR.Ty
   | .bool => pure .bool
-  | .u64 => pure .u64
+  | .uint w => pure (.uint w)
   | .address => pure .address
   | .signer => pure .signer
   | .typeParam index => pure (.typeParam index)
@@ -209,9 +219,12 @@ private partial def lowerTy (structNames : Array (Name × String)) :
 private def lowerOper (structNames : Array (Name × String))
     (funNames : Array (Name × String)) (externalFunNames : Array Name) :
     Move.Compiler.LIR.Oper → Except String MoveModel.IR.Oper
-  | .add => pure .add | .sub => pure .sub | .mul => pure .mul
-  | .div => pure .div | .mod => pure .mod | .lt => pure .lt
-  | .le => pure .le | .eq => pure .eq
+  | .add w => pure (.add w) | .sub => pure .sub
+  | .mul w => pure (.mul w) | .div => pure .div | .mod => pure .mod
+  | .bitAnd => pure .bitAnd | .bitOr => pure .bitOr | .bitXor => pure .bitXor
+  | .shl w => pure (.shl w) | .shr w => pure (.shr w)
+  | .cast target => pure (.cast target)
+  | .lt => pure .lt | .le => pure .le | .eq => pure .eq
   | .vecPack => pure .vecPack | .vecLen => pure .vecLen
   | .vecGet => pure .vecGet | .vecSet => pure .vecSet
   | .vecPush => pure .vecPush | .vecPop => pure .vecPop
@@ -296,10 +309,10 @@ private def lowerFun (structNames : Array (Name × String))
       match instr with
       | .loadBool dst value =>
           instrs := instrs ++ [.load (← localId dst) (.bool value)]
-      | .loadU64 dst value =>
-          unless value < 2 ^ 64 do
-            throw s!"u64 literal `{value}` does not fit in 64 bits"
-          instrs := instrs ++ [.load (← localId dst) (.u64 value)]
+      | .loadUInt w dst value =>
+          unless value < w.size do
+            throw s!"integer literal `{value}` does not fit the width"
+          instrs := instrs ++ [.load (← localId dst) (.int value)]
       | .assign dst src =>
           instrs := instrs ++ [.assign (← localId dst) (← localId src)]
       | .call dsts op srcs =>
@@ -345,6 +358,7 @@ private def lowerFun (structNames : Array (Name × String))
     visibility := visibility
     isEntry := isEntry
     acquires := acquires
+    attributes := funDecl.attributes
   }
   return (decl, info)
 
@@ -376,6 +390,7 @@ def Module.toIR (module : Module) : Except String MoveModel.IR.Module := do
         variants.toList.map fun variant =>
           (variant.moveName, variant.fields.toList.map (·.moveName))
       abilities := structDecl.abilities
+      attributes := structDecl.attributes
     }
   let mut funs : Array MoveModel.IR.FunDecl := #[]
   let mut funMeta : Array MoveModel.IR.FunMeta := #[]

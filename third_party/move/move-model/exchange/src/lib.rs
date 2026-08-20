@@ -23,7 +23,7 @@
 //!   is a single-key object whose payload is the value itself
 //!   (`{"move_from": 0}`, `{"ret": [7]}`), and a tuple variant is a
 //!   single-key object with the argument list
-//!   (`{"load": [1, {"u64": "5"}]}`, `{"call": [[2], "eq", [0, 1]]}`).
+//!   (`{"load": [1, {"num": "5"}]}`, `{"call": [[2], "eq", [0, 1]]}`).
 //!   Note that the variant *arity* determines array-wrapping: changing a
 //!   newtype variant to a tuple variant changes the wire shape, which is
 //!   why the tests below pin exact wire fragments.
@@ -55,14 +55,17 @@
 //! `pack_variant`/`unpack_variant`/`test_variant` operations and vector
 //! load constants; version 7 preserves declaration type parameters, ability
 //! constraints, phantom markers, instantiated user types, and operation type
-//! arguments.
+//! arguments; version 8 adds the remaining integer widths (`u8` ... `u256`
+//! types, one `num` constant form, width annotations on the
+//! overflow-checked resp. truncating operations `add`, `mul`, `shl`, `shr`),
+//! the bitwise operations `bit_and`/`bit_or`/`bit_xor`, and `cast`.
 
 pub mod check;
 
 use serde::{Deserialize, Serialize};
 
 /// The current version of the exchange format.
-pub const FORMAT_VERSION: u64 = 7;
+pub const FORMAT_VERSION: u64 = 8;
 
 /// Schema identifier for a finite, deployable XIR module.
 pub const XIR_SCHEMA: &str = "move-xir-module";
@@ -193,6 +196,8 @@ pub struct XirStruct {
     pub fields: Vec<Field>,
     #[serde(default)]
     pub variants: Option<Vec<Variant>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attributes: Vec<XirAttribute>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -211,6 +216,40 @@ pub struct XirFunction {
     pub entry: BlockId,
     pub loops: Vec<Loop>,
     pub spec: Contract,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attributes: Vec<XirAttribute>,
+}
+
+/// A user-provided source attribute of a struct or function: a head name
+/// applied to positional arguments. Well-known producer-internal markers are
+/// not represented here; visibility and entry status have dedicated fields.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct XirAttribute {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub args: Vec<XirAttributeArg>,
+}
+
+/// One positional attribute argument: a name path (optionally instantiated,
+/// so it can denote a constant, function, or type), a `u64` constant (a
+/// decimal string, per the format conventions), or a boolean constant.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum XirAttributeArg {
+    Name {
+        name: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        args: Vec<XirAttributeArg>,
+    },
+    Num {
+        #[serde(rename = "num")]
+        value: String,
+    },
+    Bool {
+        #[serde(rename = "bool")]
+        value: bool,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -219,6 +258,18 @@ pub enum XirVisibility {
     Private,
     Public,
     Friend,
+}
+
+/// A Move integer width, as carried by the width-annotated operations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IntType {
+    U8,
+    U16,
+    U32,
+    U64,
+    U128,
+    U256,
 }
 
 /// Line width for [`Module::to_pretty_json`]'s inlining decision.
@@ -352,8 +403,18 @@ fn pretty_json(m: &Measured, indent: usize, out: &mut String) {
 pub enum Type {
     /// `"bool"`
     Bool,
+    /// `"u8"`
+    U8,
+    /// `"u16"`
+    U16,
+    /// `"u32"`
+    U32,
     /// `"u64"`
     U64,
+    /// `"u128"`
+    U128,
+    /// `"u256"`
+    U256,
     /// `"address"`
     Address,
     /// `"signer"` — signer values are addresses.
@@ -468,11 +529,25 @@ pub enum Instr {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Oper {
-    Add,
+    /// `{"add": width}` — the width bounds the overflow check.
+    Add(IntType),
     Sub,
-    Mul,
+    /// `{"mul": width}` — the width bounds the overflow check.
+    Mul(IntType),
     Div,
     Mod,
+    BitAnd,
+    BitOr,
+    BitXor,
+    /// `{"shl": width}` — truncates to the width; aborts when the `u8`
+    /// amount reaches the width's bit count.
+    Shl(IntType),
+    /// `{"shr": width}` — aborts when the `u8` amount reaches the width's
+    /// bit count.
+    Shr(IntType),
+    /// `{"cast": width}` — aborts when the operand exceeds the target
+    /// width's range.
+    Cast(IntType),
     Lt,
     Le,
     Eq,
@@ -583,8 +658,10 @@ pub enum Term {
 pub enum Value {
     /// `{"bool": true}`
     Bool(bool),
-    /// `{"u64": "5"}` — decimal string, see the crate docs.
-    U64(#[serde(with = "u64_as_string")] u64),
+    /// `{"num": "5"}` — an integer constant of any width, as a decimal
+    /// string (see the crate docs); the local or declaration type supplies
+    /// the width.
+    Num(String),
     /// `{"address": "0x42"}` — `0x`-prefixed hex literal.
     Address(String),
     /// `{"vector": [values...]}` — a recursively encoded vector constant.
@@ -726,21 +803,6 @@ pub struct Loop {
     pub invariants: Vec<SpecExp>,
 }
 
-/// `u64` as a decimal string on the wire; see the crate docs.
-mod u64_as_string {
-    use serde::{de::Error, Deserialize, Deserializer, Serializer};
-
-    pub fn serialize<S: Serializer>(v: &u64, s: S) -> Result<S::Ok, S::Error> {
-        s.serialize_str(&v.to_string())
-    }
-
-    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<u64, D::Error> {
-        let s = String::deserialize(d)?;
-        s.parse()
-            .map_err(|e| D::Error::custom(format!("invalid u64 `{}`: {}", s, e)))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -789,14 +851,14 @@ mod tests {
                 blocks: vec![
                     Block {
                         instrs: vec![
-                            Instr::Load(1, Value::U64(u64::MAX)),
+                            Instr::Load(1, Value::Num(u64::MAX.to_string())),
                             Instr::Load(2, Value::Bool(true)),
                             Instr::Load(3, Value::Address("0x42".to_string())),
                             Instr::Assign(4, 1),
                             Instr::Nop,
-                            Instr::Call(vec![5], Oper::Add, vec![1, 4]),
+                            Instr::Call(vec![5], Oper::Add(IntType::U64), vec![1, 4]),
                             Instr::Call(vec![6], Oper::Sub, vec![5, 1]),
-                            Instr::Call(vec![7], Oper::Mul, vec![6, 6]),
+                            Instr::Call(vec![7], Oper::Mul(IntType::U64), vec![6, 6]),
                             Instr::Call(vec![7], Oper::Div, vec![7, 6]),
                             Instr::Call(vec![7], Oper::Mod, vec![7, 6]),
                             Instr::Call(vec![8], Oper::Lt, vec![6, 7]),
@@ -844,7 +906,7 @@ mod tests {
                     invariants: vec![SpecExp::binop(
                         SpecBinOp::Le,
                         SpecExp::Local(1),
-                        SpecExp::Value(Value::U64(10)),
+                        SpecExp::Value(Value::Num("10".to_string())),
                     )],
                 }],
                 spec: Contract {
@@ -908,7 +970,7 @@ mod tests {
         // array-wrapping, so an innocent-looking refactor of a variant
         // changes the format.
         let json = serde_json::to_value(full_module()).unwrap();
-        assert_eq!(json["version"], json!(7));
+        assert_eq!(json["version"], json!(8));
         assert_eq!(
             json["structs"][0]["fields"][0],
             json!({"name": "balance", "ty": "u64"})
@@ -921,12 +983,12 @@ mod tests {
         let instrs = &json["funs"][0]["blocks"][0]["instrs"];
         assert_eq!(
             instrs[0],
-            json!({"load": [1, {"u64": "18446744073709551615"}]})
+            json!({"load": [1, {"num": "18446744073709551615"}]})
         );
         assert_eq!(instrs[2], json!({"load": [3, {"address": "0x42"}]}));
         assert_eq!(instrs[3], json!({"assign": [4, 1]}));
         assert_eq!(instrs[4], json!("nop"));
-        assert_eq!(instrs[5], json!({"call": [[5], "add", [1, 4]]}));
+        assert_eq!(instrs[5], json!({"call": [[5], {"add": "u64"}, [1, 4]]}));
         assert_eq!(instrs[18], json!({"call": [[11], {"get_field": 0}, [9]]}));
         assert_eq!(
             serde_json::to_value(Oper::UpdateField(1)).unwrap(),
@@ -1021,15 +1083,46 @@ mod tests {
         let lp = &json["funs"][0]["loops"][0];
         assert_eq!(
             lp["invariants"][0],
-            json!({"binop": ["le", {"local": 1}, {"value": {"u64": "10"}}]})
+            json!({"binop": ["le", {"local": 1}, {"value": {"num": "10"}}]})
         );
+    }
+
+    #[test]
+    fn attribute_wire_shape() {
+        // Pin the exact wire shape produced by the Leaner XIR exporter.
+        let json = json!({
+            "name": "resource_group",
+            "args": [
+                {"name": "scope", "args": [{"name": "global"}]},
+                {"num": "7"},
+                {"bool": true}
+            ]
+        });
+        let attribute: XirAttribute = serde_json::from_value(json.clone()).unwrap();
+        assert_eq!(attribute, XirAttribute {
+            name: "resource_group".to_string(),
+            args: vec![
+                XirAttributeArg::Name {
+                    name: "scope".to_string(),
+                    args: vec![XirAttributeArg::Name {
+                        name: "global".to_string(),
+                        args: vec![],
+                    }],
+                },
+                XirAttributeArg::Num {
+                    value: "7".to_string(),
+                },
+                XirAttributeArg::Bool { value: true },
+            ],
+        });
+        assert_eq!(serde_json::to_value(&attribute).unwrap(), json);
     }
 
     #[test]
     fn pretty_json_fill_layout() {
         let pretty = full_module().to_pretty_json();
         // Small subtrees are inlined; the document as a whole is broken.
-        assert!(pretty.contains(r#"{"call": [[5], "add", [1, 4]]}"#));
+        assert!(pretty.contains(r#"{"call": [[5], {"add": "u64"}, [1, 4]]}"#));
         assert!(pretty.contains("\"blocks\": [\n"));
         // The rendering is still valid JSON denoting the same module.
         let back: Module = serde_json::from_str(&pretty).unwrap();
@@ -1041,17 +1134,19 @@ mod tests {
         let mut module = full_module();
         module.version = 1;
         assert!(module.check_version().is_err());
-        let err = serde_json::from_value::<Module>(json!({
-            "version": 4, "structs": [],
+        // Integer constants travel as opaque decimal strings; validation
+        // against the local's width happens in the consumer.
+        let module = serde_json::from_value::<Module>(json!({
+            "version": 8, "structs": [],
             "funs": [{"name": "f", "params": 0,
                       "locals": ["u64"], "returns": [],
-                      "blocks": [{"instrs": [{"load": [0, {"u64": "not-a-number"}]}],
+                      "blocks": [{"instrs": [{"load": [0, {"num": "5"}]}],
                                   "term": {"ret": []}}],
                       "loops": [],
                       "spec": {"requires": [], "aborts_if": [], "ensures": [],
                                "modifies": []}}]
         }))
-        .unwrap_err();
-        assert!(err.to_string().contains("invalid u64"));
+        .unwrap();
+        assert!(module.check_version().is_ok());
     }
 }

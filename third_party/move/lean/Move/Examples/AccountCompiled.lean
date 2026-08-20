@@ -37,7 +37,7 @@ private def ordinaryLocalAssignment : Nat := Id.run do
         .call [3] (.borrowField 0) [2],
         .call [4] (.borrowField 0) [3],
         .call [5] .readRef [4],
-        .call [6] .add [5, 1],
+        .call [6] (.add .w64) [5, 1],
         .call [] .writeRef [4, 6]
       ]
       term := .ret []

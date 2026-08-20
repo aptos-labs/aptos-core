@@ -28,14 +28,12 @@ open scoped Move Move.Compiler Move.Spec
 
 move_module OrderedMap where
 
-  @[move_struct]
-  structure Entry (K V : Type) where
+  struct Entry (K V) where
     key : K
     value : V
     deriving Copy, Drop, Store
 
-  @[move_struct]
-  structure Map (K V : Type) where
+  struct Map (K V) where
     entries : Move.Vector (Entry K V)
     deriving Copy, Drop, Store
 
@@ -56,7 +54,6 @@ move_module OrderedMap where
   count is physically representable so index arithmetic cannot overflow. -/
   structure WellFormed (map : Map K V) : Prop where
     sorted : Sorted map
-    bounded : map.entries.toList.length < U64.size
 
   def Contains (map : Map K V) (key : K) : Prop :=
     ∃ entry ∈ map.entries.toList, entry.key = key
@@ -79,8 +76,11 @@ move_module OrderedMap where
         if entry.key < key then entry :: insert rest key value
         else { key, value } :: entry :: rest
 
-  def add (map : Map K V) (key : K) (value : V) : Map K V :=
-    { entries := Move.Vector.ofList (insert map.entries.toList key value) }
+  /-- The inserted entry list; the map-level result is pinned through
+  `entries.toList` since only vectors within Move's length domain are
+  representable. -/
+  def add (map : Map K V) (key : K) (value : V) : List (Entry K V) :=
+    insert map.entries.toList key value
 
   def erase (entries : List (Entry K V)) (key : K) :
       Option (List (Entry K V) × V) :=
@@ -111,14 +111,14 @@ move_module OrderedMap where
 
   /-! ## Functions -/
 
-  public fun empty {K V : Type} : Map K V :=
+  public fun empty {K V} : Map K V :=
     { entries := Move.Vector.empty }
 
-  spec empty {K : Type} {V : Type} where
+  spec empty {K} {V} where
     ensures (result : Map K V).entries.toList = [] ∧ Model.Sorted result
 
   /-- Index of the first entry whose key is not less than `key`. -/
-  partial fun lowerBoundLoop {K V : Type} (entries : &Move.Vector (Entry K V))
+  partial fun lowerBoundLoop {K V} (entries : &Move.Vector (Entry K V))
       (key : &K) (low high : U64) : Action U64 := do
     if low < high then
       let middle := low + ((high - low) / 2)
@@ -130,45 +130,45 @@ move_module OrderedMap where
     else
       pure low
 
-  spec lowerBoundLoop {K : Type} {V : Type} [Move.Compare.Total K]
+  spec lowerBoundLoop {K} {V} [Move.Compare.Total K]
       (entries : Move.Vector (Entry K V)) (key : K) (low : U64) (high : U64) where
     requires Model.Search.Window entries key low high;
     ensures result = U64.ofNat
-      (Model.lowerBoundList entries.toList key) ∧ final = initial;
+      (Model.lowerBoundList entries.toList key);
     aborts_if False
 
-  fun lowerBound {K V : Type} (map : &Map K V) (key : &K) : Action U64 := do
+  fun lowerBound {K V} (map : &Map K V) (key : &K) : Action U64 := do
     let entries ← &map.entries
     lowerBoundLoop entries key 0 entries.length
 
-  spec lowerBound {K : Type} {V : Type} [Move.Compare.Total K]
+  spec lowerBound {K} {V} [Move.Compare.Total K]
       (map : Map K V) (key : K) where
     requires Model.WellFormed map;
     ensures result = U64.ofNat
       (Model.lowerBoundList map.entries.toList key) ∧
-      result.toNat ≤ map.entries.toList.length ∧ final = initial;
+      result.toNat ≤ map.entries.toList.length;
     aborts_if False
 
-  public fun length {K V : Type} (map : &Map K V) : Action U64 := do
+  public fun length {K V} (map : &Map K V) : Action U64 := do
     let entries ← &map.entries
     pure entries.length
 
-  spec length {K : Type} {V : Type} (map : Map K V) where
-    ensures result.toNat = map.entries.toList.length ∧ final = initial;
+  spec length {K} {V} (map : Map K V) where
+    ensures result.toNat = map.entries.toList.length;
     aborts_if False
 
   /-- Borrow a key directly through the vector element and field places. -/
-  fun borrowKeyAt {K V : Type} (map : &Map K V) (index : U64) : Action (&K) := do
+  fun borrowKeyAt {K V} (map : &Map K V) (index : U64) : Action (&K) := do
     let entries ← &map.entries
     &entries[index].key
 
-  spec borrowKeyAt {K : Type} {V : Type} (map : Map K V) (index : U64) where
+  spec borrowKeyAt {K} {V} (map : Map K V) (index : U64) where
     ensures ∃ entry, map.entries.toList[index.toNat]? = some entry ∧
-      result = entry.key ∧ final = initial;
+      result = entry.key;
     aborts_if map.entries.toList[index.toNat]? = none
       with Semantics.Resource.executionFailure
 
-  public fun contains {K V : Type} (map : &Map K V) (key : &K) : Action Bool := do
+  public fun contains {K V} (map : &Map K V) (key : &K) : Action Bool := do
     let index ← lowerBound map key
     let entries ← &map.entries
     if index < entries.length then
@@ -177,14 +177,14 @@ move_module OrderedMap where
     else
       pure false
 
-  spec contains {K : Type} {V : Type} [Move.Compare.Total K]
+  spec contains {K} {V} [Move.Compare.Total K]
       (map : Map K V) (key : K) where
     requires Model.WellFormed map;
     ensures (result = true) ↔ Model.Contains map key;
     aborts_if False
 
   /-- Borrow the value stored under `key`, aborting when the key is absent. -/
-  public fun borrow {K V : Type} (map : &Map K V) (key : &K) : Action (&V) := do
+  public fun borrow {K V} (map : &Map K V) (key : &K) : Action (&V) := do
     let index ← lowerBound map key
     let entries ← &map.entries
     if index < entries.length then
@@ -196,14 +196,14 @@ move_module OrderedMap where
     else
       abort 2
 
-  spec borrow {K : Type} {V : Type} [Move.Compare.Total K]
+  spec borrow {K} {V} [Move.Compare.Total K]
       (map : Map K V) (key : K) where
     requires Model.WellFormed map;
-    ensures Model.MapsTo map key result ∧ final = initial;
+    ensures Model.MapsTo map key result;
     aborts_if ¬Model.Contains map key with 2
 
   /-- Add a fresh key.  Abort code 1 matches `EKEY_ALREADY_EXISTS`. -/
-  public fun add {K V : Type} (map : &mut Map K V) (key : K) (value : V) :
+  public fun add {K V} (map : &mut Map K V) (key : K) (value : V) :
       Action Unit := do
     let keyView ← &key
     let index ← lowerBound map keyView
@@ -215,14 +215,17 @@ move_module OrderedMap where
     let entries ← &mut map.entries
     Move.Vector.insert entries index { key, value }
 
-  spec add {K : Type} {V : Type} [Move.Compare.Total K]
+  spec add {K} {V} [Move.Compare.Total K]
       (map : &mut Map K V) (key : K) (value : V) where
     requires Model.WellFormed map;
-    ensures map = Model.add (old(map)) key value ∧ Model.Sorted map;
-    aborts_if Model.Contains map key with 1
+    ensures map.entries.toList = Model.add (old(map)) key value ∧
+      Model.Sorted map;
+    aborts_if Model.Contains map key with 1;
+    aborts_if U64.size ≤ map.entries.toList.length + 1
+      with Move.Semantics.Vector.indexOutOfBounds
 
   /-- Remove an existing key.  Abort code 2 matches `EKEY_NOT_FOUND`. -/
-  public fun remove {K V : Type} (map : &mut Map K V) (key : &K) : Action V := do
+  public fun remove {K V} (map : &mut Map K V) (key : &K) : Action V := do
     let index ← lowerBound map key
     let entriesView ← &map.entries
     if index < entriesView.length then
@@ -236,7 +239,7 @@ move_module OrderedMap where
     else
       abort 2
 
-  spec remove {K : Type} {V : Type} [Move.Compare.Total K]
+  spec remove {K} {V} [Move.Compare.Total K]
       (map : &mut Map K V) (key : K) where
     requires Model.WellFormed map;
     ensures Model.erase (old(map)).entries.toList key =
@@ -349,7 +352,7 @@ move_module OrderedMap where
   theorem add_sorted {K V : Type} [Move.Compare.Total K]
       (map : Map K V) (key : K) (value : V)
       (sorted : Sorted map) (fresh : ¬Contains map key) :
-      Sorted (add map key value) := by
+      SortedEntries (add map key value) := by
     exact insert_sorted map.entries.toList key value sorted fresh
 
   end Insertion
@@ -580,7 +583,7 @@ move_module OrderedMap where
     obtain ⟨sorted, lowTarget, targetHigh, highLength, lengthBound⟩ := permitted
     by_cases hloop : Move.Verify.Source.logicalLT low high
     · rw [if_pos hloop]
-      rw [Move.Verify.Source.logicalLT_u64] at hloop
+      rw [Move.Verify.Source.logicalLT_uint] at hloop
       have middleBound : low.toNat + (high.toNat - low.toNat) / 2 <
           entries.toList.length := by omega
       obtain ⟨middleEntry, atMiddle⟩ :
@@ -593,31 +596,40 @@ move_module OrderedMap where
         have targetAfterMiddle := Model.Search.index_lt_lowerBoundList_of_less
           entries.toList key _ middleEntry sorted atMiddle goRight
         exact Move.Verify.wp_of_satisfies recursiveVerified
-          ⟨sorted, by simp; omega, targetHigh, highLength, lengthBound⟩
+          ⟨sorted, by u64_omega, targetHigh, highLength, lengthBound⟩
       · rw [if_neg goRight]
         have targetBeforeMiddle :=
           Model.Search.lowerBoundList_le_index_of_not_less
             entries.toList key _ middleEntry atMiddle goRight
         exact Move.Verify.wp_of_satisfies recursiveVerified
-          ⟨sorted, lowTarget, by simp; omega, by simp; omega, lengthBound⟩
+          ⟨sorted, lowTarget, by u64_omega, by u64_omega, lengthBound⟩
     · rw [if_neg hloop]
-      rw [Move.Verify.Source.logicalLT_u64] at hloop
+      rw [Move.Verify.Source.logicalLT_uint] at hloop
       rw [Move.Verify.wp_pure]
       exact ⟨by u64_omega, rfl⟩
 
   verify lowerBound by
     contract_intro
     obtain ⟨map, key⟩ := args
-    have window : Model.Search.Window map.entries key 0 map.entries.length :=
-      ⟨permitted.sorted, by simp, Model.Search.lowerBoundList_le _ _,
-        by simp, permitted.bounded⟩
+    have lengthToNat : (Move.Vector.length map.entries).toNat =
+        map.entries.toList.length := by
+      rw [Move.Vector.length_toNat]
+    have window : Model.Search.Window map.entries key 0 map.entries.length := by
+      refine ⟨permitted.sorted, by simp, ?_, ?_, map.entries.toList_length_lt⟩
+      · rw [lengthToNat]
+        exact Model.Search.lowerBoundList_le _ _
+      · rw [lengthToNat]
+        exact Nat.le_refl _
     refine Move.Verify.wp_mono
       (Move.Verify.wp_of_satisfies (lowerBoundLoop.verified _) window) ?_ ?_
-    · rintro result final ⟨rfl, rfl⟩
-      exact ⟨rfl,
-        (by simp : (U64.ofNat (Model.lowerBoundList map.entries.toList key)).toNat ≤
-          map.entries.toList.length),
-        rfl⟩
+    · rintro result final ⟨established, rfl⟩
+      dsimp only at established
+      obtain ⟨rfl, -⟩ := established
+      refine ⟨⟨rfl, ?_⟩, rfl⟩
+      have targetLe := Model.Search.lowerBoundList_le map.entries.toList key
+      have bounded := map.entries.toList_length_lt
+      spec_norm
+      omega
     · exact fun code h => h.elim
 
   verify length by
@@ -630,27 +642,37 @@ move_module OrderedMap where
     rw [Move.Verify.wp_bind, Move.Verify.wp_borrowElemSpec]
     refine ⟨fun entry atIndex => ?_, fun missing => ⟨missing, rfl⟩⟩
     rw [Move.Verify.wp_pure]
-    exact ⟨entry, atIndex, rfl, rfl⟩
+    exact ⟨fun _ => ⟨entry, atIndex, rfl⟩, rfl⟩
 
   verify contains by
     contract_intro
     obtain ⟨map, key⟩ := args
     dsimp only
     wp_call (lowerBound.verified _) using permitted
-    · rintro index middle ⟨rfl, _, rfl⟩
+    · rintro index middle ⟨⟨rfl, -⟩, rfl⟩
       by_cases inBounds : Move.Verify.Source.logicalLT
         (U64.ofNat (Model.lowerBoundList map.entries.toList key))
         (Move.Vector.length map.entries)
       · rw [if_pos inBounds]
-        simp only [Move.Verify.Source.logicalLT_u64, Move.U64.toNat_ofNat,
+        have bounded : map.entries.toList.length < 18446744073709551616 := by
+          have := map.entries.toList_length_lt
+          simp only [move_norm, Nat.reducePow] at this
+          exact this
+        have targetLe := Model.Search.lowerBoundList_le map.entries.toList key
+        simp only [Move.Verify.Source.logicalLT_uint, Move.UInt.toNat_ofNat,
           Move.Vector.length_toNat] at inBounds
+        spec_norm at inBounds
         obtain ⟨entry, atTarget⟩ :
             ∃ entry, map.entries.toList[Model.lowerBoundList
               map.entries.toList key]? = some entry :=
           ⟨_, List.getElem?_eq_getElem inBounds⟩
         rw [Move.Semantics.Vector.borrowElemSpec_eq_pure
-            (by simpa using atTarget),
+            (by
+            simp only [move_norm, Nat.reducePow]
+            rw [Nat.mod_eq_of_lt (by omega)]
+            exact atTarget),
           Move.Semantics.Spec.pure_bind, Move.Verify.wp_pure]
+        refine ⟨?_, rfl⟩
         show (Move.Verify.Source.logicalBEq entry.key key = true) ↔
           Model.Contains map key
         rw [Move.Verify.Source.logicalBEq_move,
@@ -664,8 +686,15 @@ move_module OrderedMap where
           cases atCandidate
           exact same
       · rw [if_neg inBounds, Move.Verify.wp_pure]
-        simp only [Move.Verify.Source.logicalLT_u64, Move.U64.toNat_ofNat,
+        have bounded : map.entries.toList.length < 18446744073709551616 := by
+          have := map.entries.toList_length_lt
+          simp only [move_norm, Nat.reducePow] at this
+          exact this
+        have targetLe := Model.Search.lowerBoundList_le map.entries.toList key
+        simp only [Move.Verify.Source.logicalLT_uint, Move.UInt.toNat_ofNat,
           Move.Vector.length_toNat] at inBounds
+        spec_norm at inBounds
+        refine ⟨?_, rfl⟩
         show (false = true) ↔ Model.Contains map key
         simp only [Bool.false_eq_true, false_iff]
         intro present
@@ -679,29 +708,39 @@ move_module OrderedMap where
     obtain ⟨map, key⟩ := args
     dsimp only
     wp_call (lowerBound.verified _) using permitted
-    · rintro index middle ⟨rfl, _, rfl⟩
+    · rintro index middle ⟨⟨rfl, -⟩, rfl⟩
       by_cases inBounds : Move.Verify.Source.logicalLT
         (U64.ofNat (Model.lowerBoundList map.entries.toList key))
         (Move.Vector.length map.entries)
       · rw [if_pos inBounds]
-        simp only [Move.Verify.Source.logicalLT_u64, Move.U64.toNat_ofNat,
+        have bounded : map.entries.toList.length < 18446744073709551616 := by
+          have := map.entries.toList_length_lt
+          simp only [move_norm, Nat.reducePow] at this
+          exact this
+        have targetLe := Model.Search.lowerBoundList_le map.entries.toList key
+        simp only [Move.Verify.Source.logicalLT_uint, Move.UInt.toNat_ofNat,
           Move.Vector.length_toNat] at inBounds
+        spec_norm at inBounds
         obtain ⟨entry, atTarget⟩ :
             ∃ entry, map.entries.toList[Model.lowerBoundList
               map.entries.toList key]? = some entry :=
           ⟨_, List.getElem?_eq_getElem inBounds⟩
         rw [Move.Semantics.Vector.borrowElemSpec_eq_pure
-            (by simpa using atTarget),
+            (by
+            simp only [move_norm, Nat.reducePow]
+            rw [Nat.mod_eq_of_lt (by omega)]
+            exact atTarget),
           Move.Semantics.Spec.pure_bind]
         by_cases equal : Move.Verify.Source.logicalBEq entry.key key = true
         · rw [if_pos equal]
           simp only [Move.Semantics.Spec.pure_bind, Move.Verify.wp_pure]
           have same := (Move.Compare.equal_eq_true_iff entry.key key).mp
             (by rwa [Move.Verify.Source.logicalBEq_move] at equal)
-          exact ⟨⟨entry, List.mem_of_getElem? atTarget, same, rfl⟩, trivial⟩
+          exact ⟨fun _ => ⟨entry, List.mem_of_getElem? atTarget, same, rfl⟩,
+            trivial⟩
         · rw [if_neg equal]
           simp only [Move.Verify.wp_abort]
-          refine ⟨?_, trivial⟩
+          abort_clause
           intro present
           obtain ⟨candidate, atCandidate, same⟩ :=
             (Model.Search.contains_iff_lowerBound _ _ permitted.sorted).mp
@@ -712,8 +751,14 @@ move_module OrderedMap where
             rw [Move.Verify.Source.logicalBEq_move]
             exact (Move.Compare.equal_eq_true_iff entry.key key).mpr same)
       · rw [if_neg inBounds]
-        simp only [Move.Verify.Source.logicalLT_u64, Move.U64.toNat_ofNat,
+        have bounded : map.entries.toList.length < 18446744073709551616 := by
+          have := map.entries.toList_length_lt
+          simp only [move_norm, Nat.reducePow] at this
+          exact this
+        have targetLe := Model.Search.lowerBoundList_le map.entries.toList key
+        simp only [Move.Verify.Source.logicalLT_uint, Move.UInt.toNat_ofNat,
           Move.Vector.length_toNat] at inBounds
+        spec_norm at inBounds
         simp only [Move.Verify.wp_abort]
         refine ⟨?_, trivial⟩
         intro present
@@ -731,75 +776,105 @@ move_module OrderedMap where
   verify add by
     contract_intro
     obtain ⟨map, key, value⟩ := args
+    have wf := permitted
     dsimp only
     rw [Move.Verify.wp_withMutation]
     intro future
     simp only [Move.Semantics.Mutation.read]
-    wp_call (lowerBound.verified _) using permitted
-    · rintro index middle ⟨rfl, _, rfl⟩
+    wp_call (lowerBound.verified _) using wf
+    · rintro index middle ⟨⟨rfl, -⟩, rfl⟩
       have insertBound : Model.lowerBoundList map.entries.toList key ≤
           map.entries.toList.length := Model.Search.lowerBoundList_le _ _
       by_cases inBounds : Move.Verify.Source.logicalLT
         (U64.ofNat (Model.lowerBoundList map.entries.toList key))
         (Move.Vector.length map.entries)
       · rw [if_pos inBounds]
-        simp only [Move.Verify.Source.logicalLT_u64, Move.U64.toNat_ofNat,
+        have bounded : map.entries.toList.length < 18446744073709551616 := by
+          have := map.entries.toList_length_lt
+          simp only [move_norm, Nat.reducePow] at this
+          exact this
+        have targetLe := Model.Search.lowerBoundList_le map.entries.toList key
+        simp only [Move.Verify.Source.logicalLT_uint, Move.UInt.toNat_ofNat,
           Move.Vector.length_toNat] at inBounds
+        spec_norm at inBounds
         obtain ⟨entry, atTarget⟩ :
             ∃ entry, map.entries.toList[Model.lowerBoundList
               map.entries.toList key]? = some entry :=
           ⟨_, List.getElem?_eq_getElem inBounds⟩
         rw [Move.Semantics.Vector.borrowElemSpec_eq_pure
-            (by simpa using atTarget),
+            (by
+            simp only [move_norm, Nat.reducePow]
+            rw [Nat.mod_eq_of_lt (by omega)]
+            exact atTarget),
           Move.Semantics.Spec.pure_bind]
         by_cases equal : Move.Verify.Source.logicalBEq entry.key key = true
         · rw [if_pos equal]
           simp only [Move.Verify.wp_abort]
-          refine ⟨⟨entry, List.mem_of_getElem? atTarget, ?_⟩, trivial⟩
-          exact (Move.Compare.equal_eq_true_iff entry.key key).mp
-            (by rwa [Move.Verify.Source.logicalBEq_move] at equal)
+          abort_clause
+          exact ⟨entry, List.mem_of_getElem? atTarget,
+            (Move.Compare.equal_eq_true_iff entry.key key).mp
+              (by rwa [Move.Verify.Source.logicalBEq_move] at equal)⟩
         · rw [if_neg equal]
           have fresh : ¬Model.Contains map key := by
             intro present
             obtain ⟨candidate, atCandidate, same⟩ :=
-              (Model.Search.contains_iff_lowerBound _ _ permitted.sorted).mp
+              (Model.Search.contains_iff_lowerBound _ _ wf.sorted).mp
                 present
             rw [atTarget] at atCandidate
             cases atCandidate
             exact equal (by
               rw [Move.Verify.Source.logicalBEq_move]
               exact (Move.Compare.equal_eq_true_iff entry.key key).mpr same)
-          rw [Move.Verify.withMutation_insertSpec_eq_pure map.entries
-              (U64.ofNat (Model.lowerBoundList map.entries.toList key))
-              { key := key, value := value } (by simp)]
-          simp only [Move.Semantics.Spec.pure_bind, Move.Verify.wp_pure,
-            Move.Semantics.Mutation.write, Move.U64.toNat_ofNat]
-          intro reconciled
-          subst reconciled
-          rw [← Model.Insertion.insert_eq_take_lowerBound
-            map.entries.toList key value]
-          exact ⟨rfl,
-            Model.Insertion.add_sorted map key value permitted.sorted fresh⟩
+          checked_cases room
+          simp only [Move.UInt.toNat_ofNat_of_lt
+              (W := Move.W64)
+              (n := Model.lowerBoundList map.entries.toList key)
+              (by
+                simp only [move_norm, Nat.reducePow]
+                exact Nat.lt_of_le_of_lt targetLe bounded),
+            move_norm, Nat.reducePow,
+            Move.Semantics.Mutation.write]
+          rintro rfl
+          refine ⟨?_, trivial⟩
+          intro _noContains _hasRoom
+          refine ⟨?_, ?_⟩ <;>
+            simp only [Model.Sorted, Move.Vector.toList_ofList,
+              ← Model.Insertion.insert_eq_take_lowerBound
+                map.entries.toList key value]
+          · rfl
+          · exact Model.Insertion.add_sorted map key value wf.sorted fresh
       · rw [if_neg inBounds]
-        simp only [Move.Verify.Source.logicalLT_u64, Move.U64.toNat_ofNat,
+        have bounded : map.entries.toList.length < 18446744073709551616 := by
+          have := map.entries.toList_length_lt
+          simp only [move_norm, Nat.reducePow] at this
+          exact this
+        have targetLe := Model.Search.lowerBoundList_le map.entries.toList key
+        simp only [Move.Verify.Source.logicalLT_uint, Move.UInt.toNat_ofNat,
           Move.Vector.length_toNat] at inBounds
+        spec_norm at inBounds
         have fresh : ¬Model.Contains map key := by
           intro present
           obtain ⟨entry, atTarget, _⟩ :=
-            (Model.Search.contains_iff_lowerBound _ _ permitted.sorted).mp
+            (Model.Search.contains_iff_lowerBound _ _ wf.sorted).mp
               present
           exact absurd (List.getElem?_eq_some_iff.mp atTarget).1 inBounds
-        rw [Move.Verify.withMutation_insertSpec_eq_pure map.entries
-            (U64.ofNat (Model.lowerBoundList map.entries.toList key))
-            { key := key, value := value } (by simp)]
-        simp only [Move.Semantics.Spec.pure_bind, Move.Verify.wp_pure,
-          Move.Semantics.Mutation.write, Move.U64.toNat_ofNat]
-        intro reconciled
-        subst reconciled
-        rw [← Model.Insertion.insert_eq_take_lowerBound
-          map.entries.toList key value]
-        exact ⟨rfl,
-          Model.Insertion.add_sorted map key value permitted.sorted fresh⟩
+        checked_cases room
+        simp only [Move.UInt.toNat_ofNat_of_lt
+            (W := Move.W64)
+            (n := Model.lowerBoundList map.entries.toList key)
+            (by
+              simp only [move_norm, Nat.reducePow]
+              exact Nat.lt_of_le_of_lt targetLe bounded),
+          move_norm, Nat.reducePow, Move.Semantics.Mutation.write]
+        rintro rfl
+        refine ⟨?_, trivial⟩
+        intro _noContains _hasRoom
+        refine ⟨?_, ?_⟩ <;>
+          simp only [Model.Sorted, Move.Vector.toList_ofList,
+            ← Model.Insertion.insert_eq_take_lowerBound
+              map.entries.toList key value]
+        · rfl
+        · exact Model.Insertion.add_sorted map key value wf.sorted fresh
     · exact fun code h => h.elim
 
   verify remove by
@@ -810,19 +885,28 @@ move_module OrderedMap where
     intro future
     simp only [Move.Semantics.Mutation.read]
     wp_call (lowerBound.verified _) using permitted
-    · rintro index middle ⟨rfl, _, rfl⟩
+    · rintro index middle ⟨⟨rfl, -⟩, rfl⟩
       by_cases inBounds : Move.Verify.Source.logicalLT
         (U64.ofNat (Model.lowerBoundList map.entries.toList key))
         (Move.Vector.length map.entries)
       · rw [if_pos inBounds]
-        simp only [Move.Verify.Source.logicalLT_u64, Move.U64.toNat_ofNat,
+        have bounded : map.entries.toList.length < 18446744073709551616 := by
+          have := map.entries.toList_length_lt
+          simp only [move_norm, Nat.reducePow] at this
+          exact this
+        have targetLe := Model.Search.lowerBoundList_le map.entries.toList key
+        simp only [Move.Verify.Source.logicalLT_uint, Move.UInt.toNat_ofNat,
           Move.Vector.length_toNat] at inBounds
+        spec_norm at inBounds
         obtain ⟨entry, atTarget⟩ :
             ∃ entry, map.entries.toList[Model.lowerBoundList
               map.entries.toList key]? = some entry :=
           ⟨_, List.getElem?_eq_getElem inBounds⟩
         rw [Move.Semantics.Vector.borrowElemSpec_eq_pure
-            (by simpa using atTarget),
+            (by
+            simp only [move_norm, Nat.reducePow]
+            rw [Nat.mod_eq_of_lt (by omega)]
+            exact atTarget),
           Move.Semantics.Spec.pure_bind]
         by_cases equal : Move.Verify.Source.logicalBEq entry.key key = true
         · rw [if_pos equal]
@@ -830,13 +914,20 @@ move_module OrderedMap where
             (by rwa [Move.Verify.Source.logicalBEq_move] at equal)
           have erased := Model.Removal.erase_eq_take_lowerBound
             map.entries.toList key entry permitted.sorted atTarget same
-          rw [Move.Verify.withMutation_removeSpec_eq_pure map.entries
-              (U64.ofNat (Model.lowerBoundList map.entries.toList key))
-              entry Entry.value (by simpa using atTarget)]
-          simp only [Move.Semantics.Spec.pure_bind, Move.Verify.wp_pure,
-            Move.Semantics.Mutation.write, Move.U64.toNat_ofNat]
-          intro reconciled
-          subst reconciled
+          checked_cases removed
+          simp only [Move.UInt.toNat_ofNat_of_lt
+              (W := Move.W64) (n := Model.lowerBoundList map.entries.toList key)
+              (by
+                simp only [move_norm, Nat.reducePow]
+                exact Nat.lt_of_le_of_lt targetLe bounded),
+            move_norm, Move.Semantics.Mutation.write]
+          intro lookup
+          rw [atTarget] at lookup
+          injection lookup with sameEntry
+          subst sameEntry
+          rintro rfl
+          refine ⟨?_, trivial⟩
+          intro _present
           refine ⟨by simpa using erased, ?_⟩
           exact Model.Removal.erase_sorted map.entries.toList key _
             entry.value permitted.sorted (by simpa using erased)
@@ -853,8 +944,14 @@ move_module OrderedMap where
             rw [Move.Verify.Source.logicalBEq_move]
             exact (Move.Compare.equal_eq_true_iff entry.key key).mpr same)
       · rw [if_neg inBounds]
-        simp only [Move.Verify.Source.logicalLT_u64, Move.U64.toNat_ofNat,
+        have bounded : map.entries.toList.length < 18446744073709551616 := by
+          have := map.entries.toList_length_lt
+          simp only [move_norm, Nat.reducePow] at this
+          exact this
+        have targetLe := Model.Search.lowerBoundList_le map.entries.toList key
+        simp only [Move.Verify.Source.logicalLT_uint, Move.UInt.toNat_ofNat,
           Move.Vector.length_toNat] at inBounds
+        spec_norm at inBounds
         simp only [Move.Verify.wp_abort]
         refine ⟨?_, trivial⟩
         intro present

@@ -83,7 +83,7 @@ class TestShow (α : Type) where
 instance (priority := low) [Repr α] : TestShow α := ⟨reprStr⟩
 
 private partial def valueStr : Value → String
-  | .u64 n => s!".u64 {n}"
+  | .int i => s!".int {i}"
   | .bool b => s!".bool {b}"
   | .address a => s!".address {a}"
   | .struct fs => ".struct [" ++ ", ".intercalate (fs.map valueStr) ++ "]"

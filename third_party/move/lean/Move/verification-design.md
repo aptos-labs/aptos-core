@@ -21,16 +21,24 @@ The first proof-facing semantic slice is implemented:
   semantics and its monadic composition;
 - `Move.Semantics.Outcome` and `Txn` provide a deterministic embedding used by
   semantic unit tests, not a source execution engine;
-- `Move.Semantics.Checked` defines checked `u64` arithmetic and its lifting into
-  transactions;
+- `Move.Semantics.Checked` defines checked integer arithmetic, shifts, and
+  casts, generic over the width, and their lifting into transactions;
 - `Move.Semantics.Reference` defines immutable-reference erasure, mutation
   values, prophecy loans, concrete-loan erasure, lenses, and nested reborrows;
 - `Move.Semantics.Global` defines typed resource descriptors and scoped mutable
   global checkout/restoration, plus compositional `ResourceStore` views and
   pairwise frame laws for independent resource families;
-- `Move.Verify.Contract` defines contracts, satisfaction, and primitive WP
-  rules;
-- `Move.Verify.Borrow` supplies derived prophecy rules for reads and writes.
+- `Move.Verify.Contract` defines contracts, satisfaction, fixed-point
+  induction, and the wp calculus core;
+- `Move.Verify.WP` states one-obligation wp rules for the supported
+  primitives, including checked arithmetic;
+- `Move.Verify.Borrow` supplies derived prophecy rules for reads, writes, and
+  vector mutation through borrows;
+- `Move.Verify.Tactics` provides the proof tactics (`contract_intro`,
+  `checked_cases`, `abort_clause`, `spec_norm`, `move_cases`, `wp_call`,
+  `u64_omega`) and the shared
+  `move_norm`/`wp_norm`/`move_spec` simp inventories used by both manual
+  proofs and the automatic `verify`;
 - `Move.Verify.Syntax` provides function-associated `spec` and `verify`
   commands. Pure contracts reduce the source function directly. Effectful
   contracts retain the unexpanded `fun` body and generate `f.sourceSpec`,
@@ -41,9 +49,12 @@ The first proof-facing semantic slice is implemented:
   performs the standard symbolic proof;
 - effectful source generation covers immutable and mutable local, vector, and
   global-field borrows; prophecy-backed reads and writes; vector insertion and
-  removal; checked `u64` arithmetic; conditionals; calls through an
-  Action-returning callee's `sourceSpec`; finite relational recursion; returns;
-  and aborts. Calls to pure compiled helpers are rejected until they have an
+  removal; checked integer arithmetic, shifts, and casts at every width;
+  conditionals; structured `while` /
+  `loop` / `break` / `continue` (including labels) as fixed-point semantics;
+  calls through an Action-returning callee's `sourceSpec`; finite relational
+  recursion, including generic recursive functions over vectors; returns; and
+  aborts. Calls to pure compiled helpers are rejected until they have an
   equivalent relational summary. Unsupported source forms are rejected at the
   `spec` command;
 - ordinary Lean imports make another Lean-authored module's definitions,
@@ -80,12 +91,15 @@ The commands associate the generated declarations structurally as
 The compiler-facing `Move.Action` primitives remain markers with their
 reducible `StateM` shape. The `fun` command also retains their source syntax
 for verification, and an effectful `spec` generates the corresponding
-relational core directly. The ordered-map benchmark now verifies generated
-recursive source semantics by fixed-point induction; quicksort still states a
+relational core directly. The ordered-map benchmark verifies generated
+recursive binary search by fixed-point induction, `Tests.Move.Loops` verifies
+structured loops, and `Tests.Move.Quicksort` verifies a generic in-place sort
+against the semantics derived from its authored body — no example states a
 relational `sourceSpec` manually. Automatic global publication/removal,
-mutual-recursion SCC semantics, loop invariants, and all nested-loan shapes
-also remain incomplete. Most importantly, the compiler-correctness theorem
-connecting generated `Spec` behavior to LIR lowering has not yet been proved.
+mutual-recursion SCC semantics, invariant annotations for `continue`-lowered
+loops, and some nested-loan shapes remain incomplete. Most importantly, the
+compiler-correctness theorem connecting generated `Spec` behavior to LIR
+lowering has not yet been proved.
 
 ## Goals
 
@@ -351,18 +365,67 @@ reference identities. For example, a contract for `increment : &mut U64 ->
 Action Unit` relates the pre-state current value to the post-state prophecy.
 
 Mutual and ordinary calls are verified modularly from these relations.
-Explicit `continue f ...` tail calls use loop invariants over current owned
-values and prophecy obligations; they do not require reference state in
+Explicit `continue f ...` tail calls share the finite-unfolding recursion
+semantics of ordinary self-calls; they do not require reference state in
 `World`.
+
+`aborts_if` clauses may be repeated; their conditions and exact codes are
+disjoined into one abort predicate. The postcondition follows the standard
+Move reading `¬ aborts_cond → ensures_cond`: it must hold exactly where the
+declared aborts are ruled out. This implication is part of the semantics of
+contract satisfaction itself, not text written into the generated clauses,
+so `contract_intro` presents each abort condition's negation as a hypothesis
+of the `ensures` proof (clauses written `aborts_if False` add nothing).
+
+A specification also frames global memory implicitly. A function changes only
+what its `modifies` clause lists, so the contract carries that frame as its
+own component — `Contract.frame`, defaulting to "changes nothing" — and no
+contract states one by hand.  The frame is owed by every successful
+execution, unconditionally: unlike the postcondition it is not excused where
+a declared abort may happen.  What the clause generates:
+
+- no `modifies` clause — no global memory changes, expressed on the abstract
+  state as `final = initial`;
+- `modifies R[addr]` — every other address of `R`, and every other resource
+  family the function uses, has the same `ResourceStore.lookup` in the final
+  state as in the initial one;
+- `modifies R` — the family is unconstrained, and the others are still framed.
+
+Address-level framing needs the store abstraction to know that distinct
+addresses are distinct locations, which is why `ResourceStore` carries
+`lookup_insert_ne` and `lookup_erase_ne` beside the hit laws.
+
+Abort behavior therefore has two independent components, and a contract
+carries both:
+
+- `aborts` — which abort outcomes the contract permits. This is what an
+  aborting execution is checked against, and what a caller inherits.
+- `mayAbort` — the states in which a declared abort excuses the
+  postcondition. This is the disjunction of the declared abort conditions.
+
+For declared conditions the two agree, and `mayAbort` is exactly what the
+clauses say. They come apart when a contract declares no abort condition at
+all: abort behavior is then *uninterpreted*, so every code is permitted while
+nothing is excused, and every successful execution must still establish
+`ensures`. Deriving one component from the other would make an omitted clause
+silently void the postcondition, which is why both are recorded.
+
+Because `aborts_if` is read as an over-approximation — the function *may*
+abort where the condition holds — a contract cannot express that a function
+*must* abort. `ensures False; aborts_if True` states that any abort carries
+the declared code, not that the function never succeeds.
 
 ## Checked Move operations
 
 Source operations must have Move behavior before direct proofs are useful.
-In particular, `U64` arithmetic is bounded and partial:
+In particular, integer arithmetic is bounded and partial at every width:
 
 - addition and multiplication abort on overflow;
 - subtraction aborts on underflow;
 - division and remainder abort on zero;
+- shifts abort when the `u8` amount reaches the width's bit count, and left
+  shift truncates shifted-out bits;
+- casts abort when the value does not fit the target width;
 - division overflow rules follow the corresponding Move integer operation.
 
 The familiar notation remains available. The source elaborator or compiler
@@ -459,13 +522,38 @@ scope with a `MutRef current final`, and reconciles the scope's final current
 with that value. User proofs should normally see the derived read, write, and
 borrow lemmas rather than this primitive rule.
 
-The implemented `verify f` command unfolds the generated source semantics,
-applies the standard rules, simplifies typed resource lookup and prophecy
-equalities, and leaves domain-specific arithmetic or data-structure
-obligations to ordinary Lean tactics. `Move.Verify.satisfies_fix` supplies
-fixed-point induction for supported direct recursion. More advanced automation
-for mutually recursive SCCs and invariant-driven `continue` loops remains
-future work.
+The implemented `verify f` command unfolds the generated source semantics
+once, before the normal and abort obligations are split apart — unfolding
+each half separately repeats the whole traversal and dominates verification
+time — then applies the standard rules through the shared `move_spec`
+inventory,
+simplifies typed resource lookup and prophecy equalities, and leaves
+domain-specific arithmetic or data-structure obligations to ordinary Lean
+tactics. `Move.Verify.satisfies_fix` — with its wp form `satisfies_fix_of_wp`,
+packaged as the `contract_intro` tactic — supplies fixed-point induction for
+direct recursion and structured loops. More advanced automation for mutually
+recursive SCCs and invariant-driven `continue` loops remains future work.
+
+Every checked operation has the same two-branch weakest precondition — a
+success condition and an abort with a fixed code — so one tactic splits them
+all. `checked_cases h` normalizes the leading checked operation of a wp goal,
+names the branch condition `h`, and discharges the abort branch against the
+contract's declared clauses; `abort_clause` does that discharge alone. The
+observed abort code selects the matching clause, arithmetic proves its
+condition, and a branch no clause admits is refuted from the context. A
+condition needing a semantic argument (a model-level `Contains`, say) is left
+as the only remaining goal, so the tactic never hides real proof obligations.
+`Move.Verify.wp_withMutation_insertSpec` and `wp_withMutation_removeSpec` put
+vector insertion and removal through a mutable borrow into that same shape.
+
+`<` and `==` in retained source denote Move's sealed structural comparison
+markers uniformly (`logicalLT`/`logicalBEq` are the marker relations
+themselves). Two axioms, `Move.Verify.Source.logicalLT_uint` and
+`logicalBEq_uint`, state the compiler semantic fact that the comparison
+instructions are numeric on the integer types, at every width. They are the
+verification interface for the compiler-implemented ordering and an explicit
+part of the trust base; the generic bridges `logicalLT_move`/`logicalBEq_move`
+under `[Move.Compare.Total T]` are definitional.
 
 ## Accepted-program evidence
 
@@ -566,10 +654,13 @@ Move/
     Reference.lean        prophecy and ownership-passing borrows
     Vector.lean           checked vector operations and element loans
   Verify/
-    Contract.lean         contracts and satisfaction
+    SimpAttrs.lean        shared simp-set registrations
+    Contract.lean         contracts, satisfaction, and the wp core
+    WP.lean               one-obligation wp rules for primitives
     Borrow.lean           prophecy and reborrow proof rules
     Compare.lean          structural Move comparisons
     Syntax.lean           `spec`, source-semantics generation, and `verify`
+    Tactics.lean          proof tactics and the simp-set inventory
 ```
 
 The intended compiler-correctness proof does not yet have checked-in modules:
@@ -706,8 +797,9 @@ The implementation is incomplete until the following properties are proved:
 
 - Whether `WellBorrowed` initially rechecks LIR borrow graphs or has a smaller
   source-specific certificate format.
-- How to derive readable source semantics automatically for the remaining
-  complex recursive vector algorithms which provide a manual `sourceSpec`.
+- How to extend automatic source semantics to the constructs still rejected
+  at `spec`: the global publication/removal primitives, pure Move callees,
+  and effectful callees with mutable-reference parameters.
 - The surface syntax and induction support for loop invariants and mutually
   recursive SCCs.
 - How much `verify` should elaborate into generated simplification versus a

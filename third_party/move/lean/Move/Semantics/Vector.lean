@@ -56,13 +56,22 @@ def withBorrowElemMutSpec (values : Move.Vector α) (index : U64)
       let output ← withMutation value body
       pure (output.1, Move.Vector.set values index output.2)
 
-/-- Prophecy semantics of `vector::insert` through a mutable reference. -/
+/-- Prophecy semantics of `vector::insert` through a mutable reference. Like
+the runtime operation, it aborts both out of bounds and when the grown
+vector would leave Move's `u64` length domain. -/
 def insertSpec (reference : Mutation (Move.Vector α)) (index : U64)
     (value : α) : Spec σ (Unit × Mutation (Move.Vector α)) :=
   let values := reference.read.toList
-  if index.toNat ≤ values.length then
+  if room : index.toNat ≤ values.length ∧ values.length + 1 < U64.size then
     let updated := Move.Vector.ofList
       (values.take index.toNat ++ value :: values.drop index.toNat)
+      (by
+        have inBounds := room.1
+        have hasRoom : values.length + 1 <
+            MoveModel.IR.IntWidth.size .w64 := room.2
+        simp only [List.length_append, List.length_cons, List.length_take,
+          List.length_drop]
+        omega)
     Spec.pure ((), reference.write updated)
   else
     Spec.abort indexOutOfBounds
@@ -76,6 +85,11 @@ def removeSpec (reference : Mutation (Move.Vector α)) (index : U64) :
   | some removed =>
       let updated := Move.Vector.ofList
         (values.take index.toNat ++ values.drop (index.toNat + 1))
+        (by
+          have bounded : values.length < MoveModel.IR.IntWidth.size .w64 :=
+            reference.read.toList_length_lt
+          simp only [List.length_append, List.length_take, List.length_drop]
+          omega)
       Spec.pure (removed, reference.write updated)
 
 end Move.Semantics.Vector

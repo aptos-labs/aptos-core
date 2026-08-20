@@ -1,5 +1,5 @@
 {
-  "version": 7,
+  "version": 8,
   "structs": [],
   "funs": [
     {
@@ -7,7 +7,7 @@
       "params": 0,
       "locals": ["u64"],
       "returns": ["u64"],
-      "blocks": [{"instrs": [{"load": [0, {"u64": "0"}]}], "term": {"ret": [0]}}],
+      "blocks": [{"instrs": [{"load": [0, {"num": "0"}]}], "term": {"ret": [0]}}],
       "loops": [],
       "spec": {"requires": [], "aborts_if": [{"value": {"bool": false}}], "ensures": [], "modifies": []}
     }

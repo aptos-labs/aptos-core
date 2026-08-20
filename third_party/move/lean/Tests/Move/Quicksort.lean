@@ -20,8 +20,7 @@ open scoped Move Move.Compiler Move.Spec
 
 move_module Quicksort where
 
-  @[move_struct]
-  structure PartitionResult (T : Type) where
+  struct PartitionResult (T) where
     values : Move.Vector T
     pivot : U64
     deriving Copy, Drop, Store
@@ -96,7 +95,7 @@ move_module Quicksort where
   /-! ## Functions -/
 
   /-- Lomuto partition of the half-open range ending at `pivotIndex`. -/
-  partial fun partitionLoop {T : Type}
+  partial fun partitionLoop {T}
       (values : Move.Vector T) (pivotIndex scan store : U64) :
       Action (PartitionResult T) := do
     let pivotRef ← &values[pivotIndex]
@@ -125,16 +124,16 @@ move_module Quicksort where
         source := stored
       pure { values, pivot := store }
 
-  spec partitionLoop {T : Type} [Move.Compare.Total T]
+  spec partitionLoop {T} [Move.Compare.Total T]
       (values : Move.Vector T) (pivotIndex : U64) (scan : U64)
       (store : U64) where
     requires Model.PartitionPre values.toList
       pivotIndex.toNat scan.toNat store.toNat;
     ensures Model.Partitioned values.toList pivotIndex.toNat store.toNat
-      result.values.toList result.pivot.toNat ∧ final = initial;
-    aborts_if Move.U64.size ≤ values.toList.length
+      result.values.toList result.pivot.toNat;
+    aborts_if False
 
-  partial fun quickSortRange {T : Type}
+  partial fun quickSortRange {T}
       (values : Move.Vector T) (low high : U64) :
       Action (Move.Vector T) := do
     if low < high then
@@ -148,26 +147,24 @@ move_module Quicksort where
     else
       pure values
 
-  spec quickSortRange {T : Type} [Move.Compare.Total T]
+  spec quickSortRange {T} [Move.Compare.Total T]
       (values : Move.Vector T) (low : U64) (high : U64) where
     requires high.toNat ≤ values.toList.length;
-    ensures Model.Sorts values.toList low.toNat high.toNat result.toList ∧
-      final = initial;
-    aborts_if Move.U64.size ≤ values.toList.length
+    ensures Model.Sorts values.toList low.toNat high.toNat result.toList;
+    aborts_if False
 
   /-- Generic in-place sort using Move's built-in lexicographic comparison. -/
-  public fun quickSort {T : Type}
+  public fun quickSort {T}
       (values : Move.Vector T) : Action (Move.Vector T) :=
     quickSortRange values 0 values.length
 
-  /- The abort clause is honest about the logical model: `Move.Vector` does
-  not carry Move's physical length bound, and sorting a vector of at least
-  `2 ^ 64` elements overflows the `u64` cursor arithmetic. Every physically
-  representable vector satisfies the bound, so no abort is reachable. -/
-  spec quickSort {T : Type} [Move.Compare.Total T]
+  /- `Move.Vector` certifies Move's physical length bound by construction,
+  so the `u64` cursor arithmetic provably never overflows: sorting neither
+  requires anything nor aborts. -/
+  spec quickSort {T} [Move.Compare.Total T]
       (values : Move.Vector T) where
     ensures Model.Sorted result ∧ Model.Permutation values result;
-    aborts_if Move.U64.size ≤ values.toList.length
+    aborts_if False
 
   /-! ## Proofs -/
 
@@ -664,7 +661,7 @@ move_module Quicksort where
       Move.Semantics.Spec.pure_bind]
     by_cases hscan : Move.Verify.Source.logicalLT scan pivotIndex
     · rw [if_pos hscan]
-      rw [Move.Verify.Source.logicalLT_u64] at hscan
+      rw [Move.Verify.Source.logicalLT_uint] at hscan
       rw [Move.Semantics.Vector.borrowElemSpec_eq_pure
           (Model.entry_getElem? (by omega)),
         Move.Semantics.Spec.pure_bind]
@@ -676,7 +673,7 @@ move_module Quicksort where
         by_cases hstore : Move.Verify.Source.logicalLT store scan
         · -- Strictly smaller candidate, swapped into the store slot.
           rw [if_pos hstore]
-          rw [Move.Verify.Source.logicalLT_u64] at hstore
+          rw [Move.Verify.Source.logicalLT_uint] at hstore
           rw [Move.Semantics.Vector.borrowElemSpec_eq_pure
               (Model.entry_getElem?
                 (by omega : store.toNat < values.toList.length)),
@@ -692,69 +689,55 @@ move_module Quicksort where
             exact Model.entry_getElem? (by omega)
           rw [Move.Verify.withBorrowElemMutSpec_write_eq_pure present2,
             Move.Semantics.Spec.pure_bind]
-          simp only [Move.Verify.wp_bind, Move.Verify.wp_addSpec]
-          refine ⟨fun _ => ⟨fun _ => ?_, fun overflow => ?_⟩,
-            fun overflow => ?_⟩
-          · refine Move.Verify.wp_mono
-              (Move.Verify.wp_of_satisfies recursiveVerified ?_) ?_ ?_
-            · exact Model.PartitionPre.advance_swap permitted hscan hstore
-            · rintro result final ⟨part, rfl⟩
-              exact ⟨Model.Partitioned.advance_swap permitted hscan hstore
-                hcand part, rfl⟩
-            · intro code h
-              show U64.size ≤ values.toList.length
-              simpa using h
-          · show U64.size ≤ values.toList.length
-            rw [oneNat] at overflow
-            omega
-          · show U64.size ≤ values.toList.length
-            rw [oneNat] at overflow
-            omega
+          checked_cases hno1
+          checked_cases hno2
+          refine Move.Verify.wp_mono
+            (Move.Verify.wp_of_satisfies recursiveVerified ?_) ?_ ?_
+          · spec_norm
+            exact Model.PartitionPre.advance_swap permitted hscan hstore
+          · rintro result final ⟨part, rfl⟩
+            spec_norm at part ⊢
+            exact ⟨Model.Partitioned.advance_swap permitted hscan hstore
+              hcand part, trivial⟩
+          · intro code h
+            exact h
         · -- Strictly smaller candidate already in place.
           rw [if_neg hstore]
-          rw [Move.Verify.Source.logicalLT_u64] at hstore
+          rw [Move.Verify.Source.logicalLT_uint] at hstore
           have storeEq : store.toNat = scan.toNat := by
             have := permitted.store_le_scan; omega
-          simp only [Move.Verify.wp_bind, Move.Verify.wp_addSpec]
-          refine ⟨fun _ => ⟨fun _ => ?_, fun overflow => ?_⟩,
-            fun overflow => ?_⟩
-          · refine Move.Verify.wp_mono
-              (Move.Verify.wp_of_satisfies recursiveVerified ?_) ?_ ?_
-            · show Model.PartitionPre values.toList pivotIndex.toNat
-                (scan.toNat + 1) (store.toNat + 1)
-              rw [storeEq] at permitted ⊢
-              exact Model.PartitionPre.advance_self permitted hscan
-            · rintro result final ⟨part, rfl⟩
-              refine ⟨?_, rfl⟩
-              rw [storeEq] at permitted part ⊢
-              exact Model.Partitioned.advance_self permitted hscan
-                (by rw [← storeEq] at hcand ⊢; exact hcand) part
-            · intro code h
-              exact h
-          · show U64.size ≤ values.toList.length
-            rw [oneNat] at overflow
-            omega
-          · show U64.size ≤ values.toList.length
-            rw [oneNat] at overflow
-            omega
+          checked_cases hno1
+          checked_cases hno2
+          refine Move.Verify.wp_mono
+            (Move.Verify.wp_of_satisfies recursiveVerified ?_) ?_ ?_
+          · spec_norm
+            show Model.PartitionPre values.toList pivotIndex.toNat
+              (scan.toNat + 1) (store.toNat + 1)
+            rw [storeEq] at permitted ⊢
+            exact Model.PartitionPre.advance_self permitted hscan
+          · rintro result final ⟨part, rfl⟩
+            spec_norm at part ⊢
+            refine ⟨?_, trivial⟩
+            rw [storeEq] at permitted part ⊢
+            exact Model.Partitioned.advance_self permitted hscan
+              (by rw [← storeEq] at hcand ⊢; exact hcand) part
+          · intro code h
+            exact h
       · -- Candidate not smaller: scanned range extends.
         rw [if_neg hcand]
         rw [Move.Verify.Source.logicalLT_move] at hcand
-        simp only [Move.Verify.wp_bind, Move.Verify.wp_addSpec]
-        refine ⟨fun _ => ?_, fun overflow => ?_⟩
-        · exact Move.Verify.wp_of_satisfies recursiveVerified
-            (Model.PartitionPre.advance_ge permitted hscan hcand)
-        · show U64.size ≤ values.toList.length
-          rw [oneNat] at overflow
-          omega
+        checked_cases overflow
+        refine Move.Verify.wp_of_satisfies recursiveVerified ?_
+        spec_norm
+        exact Model.PartitionPre.advance_ge permitted hscan hcand
     · rw [if_neg hscan]
-      rw [Move.Verify.Source.logicalLT_u64] at hscan
+      rw [Move.Verify.Source.logicalLT_uint] at hscan
       have scanEq : scan.toNat = pivotIndex.toNat := by
         have := permitted.scan_le_pivot; omega
       by_cases hstore : Move.Verify.Source.logicalLT store pivotIndex
       · -- Terminal swap of the pivot into the store slot.
         rw [if_pos hstore]
-        rw [Move.Verify.Source.logicalLT_u64] at hstore
+        rw [Move.Verify.Source.logicalLT_uint] at hstore
         rw [Move.Semantics.Vector.borrowElemSpec_eq_pure
             (Model.entry_getElem?
               (by omega : store.toNat < values.toList.length)),
@@ -774,7 +757,7 @@ move_module Quicksort where
         exact ⟨Model.Partitioned.final_swap permitted hstore, rfl⟩
       · -- Empty working range: the pivot already sits at the store slot.
         rw [if_neg hstore]
-        rw [Move.Verify.Source.logicalLT_u64] at hstore
+        rw [Move.Verify.Source.logicalLT_uint] at hstore
         rw [Move.Verify.wp_pure]
         have storeEq : store.toNat = pivotIndex.toNat := by
           have := permitted.store_le_scan; omega
@@ -790,26 +773,26 @@ move_module Quicksort where
     simp only [Move.Semantics.Spec.pure_bind]
     by_cases hrange : Move.Verify.Source.logicalLT low high
     · rw [if_pos hrange]
-      rw [Move.Verify.Source.logicalLT_u64] at hrange
+      rw [Move.Verify.Source.logicalLT_uint] at hrange
       rw [Move.Semantics.Checked.subSpec_eq_pure
           (by omega : low.toNat ≤ high.toNat),
         Move.Semantics.Spec.pure_bind]
       by_cases hspan : Move.Verify.Source.logicalLT 1
         (U64.ofNat (high.toNat - low.toNat))
       · rw [if_pos hspan]
-        rw [Move.Verify.Source.logicalLT_u64] at hspan
-        rw [oneNat, Move.U64.toNat_ofNat] at hspan
+        rw [Move.Verify.Source.logicalLT_uint] at hspan
+        spec_norm at hspan
         rw [Move.Semantics.Checked.subSpec_eq_pure
             (by omega : (1 : U64).toNat ≤ high.toNat),
           Move.Semantics.Spec.pure_bind, Move.Verify.wp_bind]
         refine Move.Verify.wp_mono
           (Move.Verify.wp_of_satisfies
             (partitionLoop.verified _moveSpecState) ?_) ?_ ?_
-        · exact ⟨Nat.le_refl _, by simp; omega, by simp; omega,
+        · exact ⟨Nat.le_refl _, by u64_omega, by u64_omega,
             fun i lower upper => absurd (Nat.lt_of_lt_of_le upper lower)
               (Nat.lt_irrefl i)⟩
         · rintro partitioned final ⟨part, rfl⟩
-          simp only [Move.U64.toNat_ofNat, oneNat] at part
+          spec_norm at part
           rw [Move.Verify.wp_bind]
           have pivotHigh : partitioned.pivot.toNat < high.toNat := by
             have := part.le_pivot; omega
@@ -823,37 +806,29 @@ move_module Quicksort where
           · rintro left final ⟨sortsLeft, rfl⟩
             have leftLength : left.toList.length = values.toList.length :=
               sortsLeft.length_eq.trans partLength
-            simp only [Move.Verify.wp_bind, Move.Verify.wp_addSpec]
-            refine ⟨fun _ => ?_, fun overflow => ?_⟩
-            · refine Move.Verify.wp_mono
-                (Move.Verify.wp_of_satisfies recursiveVerified ?_) ?_ ?_
-              · show high.toNat ≤ left.toList.length
-                omega
-              · rintro result final ⟨sortsRight, rfl⟩
-                simp only [Move.U64.toNat_ofNat, oneNat] at sortsRight
-                exact ⟨Model.Sorts.compose permitted (by omega) part
-                  sortsLeft sortsRight, rfl⟩
-              · intro code h
-                replace h : U64.size ≤ left.toList.length := h
-                show U64.size ≤ values.toList.length
-                omega
-            · show U64.size ≤ values.toList.length
-              rw [oneNat] at overflow
-              have := part.le_pivot
+            have pivotBound := part.le_pivot
+            checked_cases overflow
+            refine Move.Verify.wp_mono
+              (Move.Verify.wp_of_satisfies recursiveVerified ?_) ?_ ?_
+            · show high.toNat ≤ left.toList.length
               omega
+            · rintro result final ⟨sortsRight, rfl⟩
+              spec_norm at sortsRight
+              exact ⟨Model.Sorts.compose permitted (by omega) part
+                sortsLeft sortsRight, rfl⟩
+            · intro code h
+              exact h
           · intro code h
-            replace h : U64.size ≤ partitioned.values.toList.length := h
-            show U64.size ≤ values.toList.length
-            omega
+            exact h
         · intro code h
           exact h
       · rw [if_neg hspan]
-        rw [Move.Verify.Source.logicalLT_u64] at hspan
-        rw [oneNat, Move.U64.toNat_ofNat] at hspan
+        rw [Move.Verify.Source.logicalLT_uint] at hspan
+        spec_norm at hspan
         rw [Move.Verify.wp_pure]
         exact ⟨Model.Sorts.small (by omega), rfl⟩
     · rw [if_neg hrange]
-      rw [Move.Verify.Source.logicalLT_u64] at hrange
+      rw [Move.Verify.Source.logicalLT_uint] at hrange
       rw [Move.Verify.wp_pure]
       exact ⟨Model.Sorts.small (by omega), rfl⟩
 
@@ -863,10 +838,13 @@ move_module Quicksort where
       (Move.Verify.wp_of_satisfies
         (quickSortRange.verified _moveSpecState) ?_) ?_ ?_
     · show (Move.Vector.length args).toNat ≤ args.toList.length
-      simp
+      rw [Move.Vector.length_toNat]
+      exact Nat.le_refl _
     · rintro result final ⟨sorts, rfl⟩
+      dsimp only at sorts
+      rw [Move.Vector.length_toNat] at sorts
       obtain ⟨sorted, perm⟩ := Model.Sorts.whole sorts
-      exact ⟨sorted, perm⟩
+      exact ⟨⟨sorted, perm⟩, rfl⟩
     · intro code h
       exact h
 

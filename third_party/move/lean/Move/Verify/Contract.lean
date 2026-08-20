@@ -16,19 +16,42 @@ namespace Move.Verify
 
 open Move.Semantics
 
+/-- A source contract.  Abort behavior has two independent components: which
+abort outcomes the contract permits, and where a declared abort excuses the
+postcondition.  They coincide for declared conditions, but not when abort
+behavior is left uninterpreted: then every code is permitted while nothing is
+excused. -/
 structure Contract (State Args Result : Type) where
+  /-- States in which callers may invoke the function. -/
   requires : Args → State → Prop
+  /-- Relation established by a successful execution. -/
   ensures : Args → State → Result → State → Prop
+  /-- Abort outcomes the contract permits.  Uninterpreted abort behavior
+  permits every code. -/
   aborts : Args → State → Nat → Prop
+  /-- States where a declared abort excuses the postcondition.  This is the
+  disjunction of the declared abort conditions, and `False` when no abort
+  condition is declared — uninterpreted aborts excuse nothing, so successful
+  executions must still establish `ensures`. -/
+  mayAbort : Args → State → Prop
+  /-- What a successful execution leaves unchanged.  A specification changes
+  only the global memory its `modifies` clause lists, so this defaults to
+  changing nothing at all and is never written by hand. -/
+  frame : Args → State → State → Prop := fun _ initial final => final = initial
 
 /-- A relational source computation satisfies its contract for every
-permitted initial state. -/
+permitted initial state.  Two things hold of every successful execution: the
+frame, unconditionally, and the postcondition wherever the declared aborts
+are ruled out.  Both readings are these semantics — not anything written in
+the clauses. -/
 def Satisfies (function : Args → Spec State Result)
     (contract : Contract State Args Result) : Prop :=
   ∀ args initial,
     contract.requires args initial →
       (∀ result final, (function args).ok initial result final →
-        contract.ensures args initial result final) ∧
+        (¬contract.mayAbort args initial →
+          contract.ensures args initial result final) ∧
+        contract.frame args initial final) ∧
       (∀ code, (function args).aborts initial code →
         contract.aborts args initial code)
 
@@ -79,7 +102,10 @@ theorem satisfies_of_wp (function : Args → Spec State Result)
     (contract : Contract State Args Result)
     (proof : ∀ args initial, contract.requires args initial →
       wp (function args)
-        (contract.ensures args initial)
+        (fun result final =>
+          (¬contract.mayAbort args initial →
+            contract.ensures args initial result final) ∧
+          contract.frame args initial final)
         (contract.aborts args initial)
         initial) :
     Satisfies function contract := by
@@ -117,15 +143,33 @@ theorem satisfies_fix
     exact (approximates fuel args initial permitted).2 code execution
 
 /-- Use an already established contract as the weakest-precondition fact for
-one concrete call. This avoids manually projecting normal and abort halves. -/
+one concrete call. This avoids manually projecting normal and abort halves.
+The callee's postcondition speaks only where its declared aborts are ruled
+out; for a callee without reachable aborts the final argument discharges
+itself. -/
 theorem wp_of_satisfies
     (verified : Satisfies function contract)
-    (permitted : contract.requires args initial) :
+    (permitted : contract.requires args initial)
+    (noAbort : ¬contract.mayAbort args initial := by simp) :
     wp (function args)
-      (contract.ensures args initial)
+      (fun result final =>
+        contract.ensures args initial result final ∧
+        contract.frame args initial final)
       (contract.aborts args initial)
       initial :=
-  verified args initial permitted
+  ⟨fun result final execution =>
+      let established := (verified args initial permitted).1 result final execution
+      ⟨established.1 noAbort, established.2⟩,
+    (verified args initial permitted).2⟩
+
+/-- The abort half of an established contract, usable without ruling the
+declared aborts out. -/
+theorem aborts_of_satisfies
+    (verified : Satisfies function contract)
+    (permitted : contract.requires args initial) :
+    ∀ code, (function args).aborts initial code →
+      contract.aborts args initial code :=
+  (verified args initial permitted).2
 
 /-- Weaken an established weakest-precondition fact to a coarser
 postcondition and abort condition. This adapts a callee's contract to the
@@ -149,7 +193,10 @@ theorem satisfies_fix_of_wp
     (step : ∀ recursive, Satisfies recursive contract →
       ∀ args initial, contract.requires args initial →
         wp (body recursive args)
-          (contract.ensures args initial)
+          (fun result final =>
+            (¬contract.mayAbort args initial →
+              contract.ensures args initial result final) ∧
+            contract.frame args initial final)
           (contract.aborts args initial)
           initial) :
     Satisfies (Spec.fix body) contract := by
@@ -171,7 +218,9 @@ theorem satisfies_of_txnWP (function : Args → Txn State Result)
     (contract : Contract State Args Result)
     (proof : ∀ args initial, contract.requires args initial →
       txnWP (function args)
-        (contract.ensures args initial)
+        (fun result final =>
+          contract.ensures args initial result final ∧
+          contract.frame args initial final)
         (contract.aborts args initial)
         initial) :
     Satisfies (fun args => Spec.ofTxn (function args)) contract := by
@@ -184,7 +233,7 @@ theorem satisfies_of_txnWP (function : Args → Txn State Result)
       · intro actual actualFinal heq
         simp [Spec.ofTxn, houtcome] at heq
         obtain ⟨rfl, rfl⟩ := heq
-        exact h
+        exact ⟨fun _ => h.1, h.2⟩
       · intro code
         simp [Spec.ofTxn, houtcome]
   | abort code =>

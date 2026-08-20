@@ -67,7 +67,7 @@ def incDecl : FunDecl where
     { blocks := (fun b =>
         if b = 0 then
           some ⟨[.call [1] .readRef [0], .load 2 (.u64 1),
-                 .call [3] .add [1, 2], .call [] .writeRef [0, 3]], .ret []⟩
+                 .call [3] (.add .w64) [1, 2], .call [] .writeRef [0, 3]], .ret []⟩
         else none),
       entry := 0,
       size := 1 }
@@ -131,7 +131,7 @@ def incElim : FunDecl := { incDecl with
     { blocks := (fun b =>
         if b = 0 then
           some ⟨[.call [1] .getMut [0], .load 2 (.u64 1),
-                 .call [3] .add [1, 2], .call [0] .setMut [0, 3]],
+                 .call [3] (.add .w64) [1, 2], .call [0] .setMut [0, 3]],
                 .ret [0]⟩
         else none),
       entry := 0,
@@ -204,16 +204,16 @@ theorem inc_verified : Verified elimProg 1 := by
   simp only [typedEntry, TypedArgs] at htyped
   obtain ⟨⟨-, hvalid⟩, -⟩ := htyped
   have hv := hvalid 0 (.mutRef .u64) v rfl rfl
-  simp only [isValid_mutRef_iff, isValid_u64_iff] at hv
-  obtain ⟨rt, w, rfl, k, rfl, hk⟩ := hv
-  rcases Nat.lt_or_ge (k + 1) U64_SIZE with hlt | hge
+  simp only [isValid_mutRef_iff, isValid_uint_iff] at hv
+  obtain ⟨rt, w, rfl, k, rfl, h0k, hk⟩ := hv
+  by_cases hlt : k + 1 < (IntWidth.w64.size : Int)
   · -- normal path: read, bump, replace, return the final
     refine (wpCmds_onOk_step rfl).mpr ?_
     simp [initLocals, Oper.sem, MoveState.writeLocals, MoveState.writeLocal]
     refine (wpCmds_onOk_step rfl).mpr ?_
     simp [initLocals, Oper.sem, MoveState.writeLocals, MoveState.writeLocal]
     refine (wpCmds_onOk_step rfl).mpr ?_
-    simp [initLocals, Oper.sem, MoveState.writeLocals,       hlt]
+    simp [initLocals, Oper.sem, MoveState.writeLocals, hlt]
     refine (wpCmds_onOk_step rfl).mpr ?_
     simp [initLocals, Oper.sem, MoveState.writeLocals, MoveState.writeLocal]
     refine (wpCmds_onOk_step rfl).mpr ?_
@@ -223,19 +223,20 @@ theorem inc_verified : Verified elimProg 1 := by
     · simp [wpCmds, Holds, VState.preEnvOf, VState.postEnvOf, preEnv,
         abortEnv, postEnv, initLocals, Oper.sem, SpecEnv.memAt, Contract.abortsFalse,
         agreesOutside, Contract.footprint, incContract, hlt]
-      exact_mod_cast hlt
+      rw [← u64_size_eq]; exact hlt
   · -- overflow: the bump aborts, as claimed by `aborts_if`
     refine (wpCmds_onOk_step rfl).mpr ?_
     simp [initLocals, Oper.sem, MoveState.writeLocals, MoveState.writeLocal]
     refine (wpCmds_onOk_step rfl).mpr ?_
     simp [initLocals, Oper.sem, MoveState.writeLocals, MoveState.writeLocal]
     refine (wpCmds_onOk_step rfl).mpr ?_
-    simp [initLocals, Oper.sem, MoveState.writeLocals,       Nat.not_lt.mpr hge, VState.doAbort]
+    simp [initLocals, Oper.sem, MoveState.writeLocals, hlt, VState.doAbort]
     iterate 2 refine (wpCmds_onOk_skip rfl).mpr ?_
     refine ⟨fun _ => ?_, fun hclear => ?_⟩
     · simp [wpCmds, Holds, VState.preEnvOf, preEnv, initLocals,
         abortEnv, postEnv, SpecEnv.memAt, Contract.abortsHolds, incContract,
-        Nat.not_lt.mpr hge, VState.doAbort]
+        hlt, VState.doAbort]
+      rw [u64_size_eq] at hlt
       omega
     · simp [flagClear, VState.doAbort] at hclear
 

@@ -175,7 +175,7 @@ move_module SourceVerificationRejection where
     aborts_if False
 
   fun explicitArithmeticCondition (value : U64) : Action U64 := do
-    if Move.U64.add value 1 < 2 then pure value else pure 0
+    if Move.UInt.add value 1 < 2 then pure value else pure 0
 
   /--
   error: automatic source specifications do not yet support arithmetic in this context; bind it to a local first

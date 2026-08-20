@@ -1,6 +1,8 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
+import MoveModel.IR.Value
+
 /-!
 # Leaner source types
 
@@ -9,6 +11,8 @@ implementations are not the runtime representation used by MoveModel.
 -/
 
 namespace Move
+
+export MoveModel.IR (IntWidth)
 
 /-- Identity marker used by the `continue f args...` syntax.  The Leaner
 normalizer consumes this call and requires the marked application to become a
@@ -29,24 +33,57 @@ structure Signer where
   private dummy : Nat
   deriving Inhabited
 
-/-- Move's unsigned fixed-width integer types.  Only `U64` is enabled in the
-first lowering milestone; the others reserve the source names. -/
-structure U8 where private mk :: private dummy : Nat deriving Inhabited
-structure U16 where private mk :: private dummy : Nat deriving Inhabited
-structure U32 where private mk :: private dummy : Nat deriving Inhabited
-structure U64 where
-  private mk ::
-  private value : Nat
-  deriving Inhabited, DecidableEq, Repr
-structure U128 where private mk :: private dummy : Nat deriving Inhabited
-structure U256 where private mk :: private dummy : Nat deriving Inhabited
+/-- Type-level names for Move's integer widths.  The Lean compiler's
+intermediate representation erases value indices from types, so `UInt` is
+indexed by a tag *type*; `Width` maps the tag back to the semantic width. -/
+structure W8 where private mk ::
+structure W16 where private mk ::
+structure W32 where private mk ::
+structure W64 where private mk ::
+structure W128 where private mk ::
+structure W256 where private mk ::
 
-/-- A homogeneous Move vector. Its list payload exists only to give source
-programs an ordinary Lean type; Move supplies the runtime representation. -/
+/-- The semantic width named by a width-tag type. -/
+class Width (W : Type) where
+  width : IntWidth
+
+instance : Width W8 := ⟨.w8⟩
+instance : Width W16 := ⟨.w16⟩
+instance : Width W32 := ⟨.w32⟩
+instance : Width W64 := ⟨.w64⟩
+instance : Width W128 := ⟨.w128⟩
+instance : Width W256 := ⟨.w256⟩
+
+/-- The semantic width of a width-tag type. -/
+abbrev widthOf (W : Type) [Width W] : IntWidth := Width.width W
+
+/-- Move's unsigned integer of the width named by `W`: the subtype of signed
+unbounded integers within the width's range
+(`{ x : Int // 0 ≤ x ∧ x < 2 ^ bits }`, the model's `IsValid` bound as a
+type).  One generic carrier serves every width; `U8` ... `U256` abbreviate
+the six Move widths. -/
+structure UInt (W : Type) [Width W] where
+  private mk ::
+  val : Int
+  nonneg : 0 ≤ val
+  isLt : val < ((widthOf W).size : Int)
+
+abbrev U8 := UInt W8
+abbrev U16 := UInt W16
+abbrev U32 := UInt W32
+abbrev U64 := UInt W64
+abbrev U128 := UInt W128
+abbrev U256 := UInt W256
+
+/-- A homogeneous Move vector: a list of elements certified to fit Move's
+`u64` length domain, as every runtime vector does by construction. The
+certificate is carried by the type, like the integer subtype bound; the
+list payload exists only to give source programs an ordinary Lean type,
+and Move supplies the runtime representation. -/
 structure Vector (α : Type) where
   private mk ::
   private elems : List α
-  deriving Inhabited
+  private bounded : elems.length < MoveModel.IR.IntWidth.size .w64
 
 /- Move's built-in structural comparison.  Compiler-v2 implements ordering as
 `std::cmp::compare<T>` and equality as the generic bytecode equality operator.
@@ -133,103 +170,325 @@ namespace Field
 
 end Field
 
-namespace U64
+namespace UInt
 
-/-- The exclusive upper bound of Move's `u64` value range. -/
-def size : Nat := 2 ^ 64
+variable {W : Type} [Width W]
 
-/-- Expose the mathematical value of a source `u64` for specifications. -/
-def toNat (value : U64) : Nat := value.value
+/-- Expose the mathematical value of a source integer for specifications. -/
+def toNat (value : UInt W) : Nat := value.val.toNat
 
-/-- Source `u64` values are determined by their mathematical value. -/
-@[ext] theorem ext {left right : U64}
+/-- The subtype carrier is the cast of its natural-number view. -/
+theorem val_eq_toNat (value : UInt W) : value.val = (value.toNat : Int) :=
+  (Int.toNat_of_nonneg value.nonneg).symm
+
+/-- Source integers are determined by their mathematical value. -/
+@[ext] theorem ext {left right : UInt W}
     (equal : left.toNat = right.toNat) : left = right := by
   cases left
   cases right
-  simp [toNat] at equal
-  cases equal
-  rfl
+  simp only [toNat] at equal
+  simp only [UInt.mk.injEq]
+  omega
 
-/-- Whether a source value belongs to Move's runtime `u64` domain. The
-compiler only constructs valid values; keeping this predicate explicit lets
-the source semantics state that invariant without identifying `U64` with
-Lean's wrapping `UInt64`. -/
-def Valid (value : U64) : Prop := value.toNat < size
+/-- The natural-number view is bounded by the width's range. -/
+theorem toNat_lt (value : UInt W) : value.toNat < (widthOf W).size := by
+  have hlt := value.isLt
+  have h0 := value.nonneg
+  simp only [toNat]
+  omega
 
-/-- Compiler-recognized `u64` literal. Kept out of line so LCNF preserves the
-named marker while remaining reducible for source-level proofs. -/
-@[noinline] def ofNat (n : Nat) : U64 := ⟨n⟩
+/-- Compiler-recognized integer literal, wrapping into the width's range;
+checked semantics never constructs an out-of-range argument. Kept out of
+line so LCNF preserves the named marker while remaining reducible for
+source-level proofs. -/
+@[noinline, nospecialize] def ofNat (n : Nat) : UInt W :=
+  ⟨(n : Int) % ((widthOf W).size : Int),
+   Int.emod_nonneg _ (by have := (widthOf W).size_pos; omega),
+   Int.emod_lt_of_pos _ (by have := (widthOf W).size_pos; omega)⟩
 
-@[simp] theorem toNat_ofNat (n : Nat) : (ofNat n).toNat = n := rfl
+@[simp] theorem toNat_ofNat (n : Nat) :
+    (ofNat (W := W) n).toNat = n % (widthOf W).size := by
+  have hpos : 0 < (widthOf W).size := (widthOf W).size_pos
+  simp only [toNat, ofNat]
+  omega
 
-/-- Compiler-recognized Move arithmetic.  Move overflow behavior is supplied
-by the backend, not by Lean's native fixed-width arithmetic. -/
-@[noinline] def add : U64 → U64 → U64 := fun a b => ⟨a.value + b.value⟩
-@[noinline] def sub : U64 → U64 → U64 := fun a b => ⟨a.value - b.value⟩
-@[noinline] def mul : U64 → U64 → U64 := fun a b => ⟨a.value * b.value⟩
-@[noinline] def div : U64 → U64 → U64 := fun a b => ⟨a.value / b.value⟩
-@[noinline] def mod : U64 → U64 → U64 := fun a b => ⟨a.value % b.value⟩
+/-- The literal view without wrapping, available whenever the literal is in
+range. -/
+theorem toNat_ofNat_of_lt {n : Nat} (h : n < (widthOf W).size) :
+    (ofNat (W := W) n).toNat = n := by
+  rw [toNat_ofNat, Nat.mod_eq_of_lt h]
+
+/-- Compiler-recognized Move arithmetic.  Move abort behavior is supplied
+by the backend; the wrapping host values agree with the checked semantics
+on every non-aborting execution. -/
+@[noinline, nospecialize] def add : UInt W → UInt W → UInt W :=
+  fun a b => ofNat (a.toNat + b.toNat)
+@[noinline, nospecialize] def sub : UInt W → UInt W → UInt W :=
+  fun a b => ofNat (a.toNat - b.toNat)
+@[noinline, nospecialize] def mul : UInt W → UInt W → UInt W :=
+  fun a b => ofNat (a.toNat * b.toNat)
+@[noinline, nospecialize] def div : UInt W → UInt W → UInt W :=
+  fun a b => ofNat (a.toNat / b.toNat)
+@[noinline, nospecialize] def mod : UInt W → UInt W → UInt W :=
+  fun a b => ofNat (a.toNat % b.toNat)
+
+/-- Compiler-recognized Move bit operations. `land`, `lor`, and `lxor` are
+width-preserving; shifts take a `u8` amount, truncate (`shl`) resp. drop
+(`shr`) shifted-out bits, and abort in checked semantics when the amount
+reaches the width. -/
+@[noinline, nospecialize] def land : UInt W → UInt W → UInt W :=
+  fun a b => ofNat (a.toNat &&& b.toNat)
+@[noinline, nospecialize] def lor : UInt W → UInt W → UInt W :=
+  fun a b => ofNat (a.toNat ||| b.toNat)
+@[noinline, nospecialize] def lxor : UInt W → UInt W → UInt W :=
+  fun a b => ofNat (a.toNat ^^^ b.toNat)
+@[noinline, nospecialize] def shl : UInt W → UInt W8 → UInt W :=
+  fun a k => ofNat (a.toNat <<< k.toNat)
+@[noinline, nospecialize] def shr : UInt W → UInt W8 → UInt W :=
+  fun a k => ofNat (a.toNat >>> k.toNat)
+
+/-- Compiler-recognized integer cast (Move's `as`).  The host value wraps;
+the checked semantics aborts whenever the value does not fit, so both agree
+on non-aborting executions. The target width is directed by the expected
+type: `(x.cast : U8)`. -/
+@[noinline, nospecialize] def cast {W' : Type} [Width W'] (a : UInt W) : UInt W' :=
+  ofNat a.toNat
 
 /-- Compiler-recognized comparison, represented by a `Bool` so Lean's ordinary
 `if` lowering exposes a direct case split in LCNF. -/
-@[noinline] opaque less : U64 → U64 → Bool := fun a b => decide (a.value < b.value)
-@[noinline] opaque lessEq : U64 → U64 → Bool := fun a b => decide (a.value ≤ b.value)
-@[noinline] opaque equal : U64 → U64 → Bool := fun a b => decide (a.value = b.value)
+@[noinline, nospecialize] opaque less : UInt W → UInt W → Bool :=
+  fun a b => decide (a.toNat < b.toNat)
+@[noinline, nospecialize] opaque lessEq : UInt W → UInt W → Bool :=
+  fun a b => decide (a.toNat ≤ b.toNat)
+@[noinline, nospecialize] opaque equal : UInt W → UInt W → Bool :=
+  fun a b => decide (a.toNat = b.toNat)
 
-instance (n : Nat) : OfNat U64 n := ⟨ofNat n⟩
+instance (n : Nat) : OfNat (UInt W) n := ⟨ofNat n⟩
+instance : Inhabited (UInt W) := ⟨ofNat 0⟩
+instance : DecidableEq (UInt W) := fun a b =>
+  decidable_of_iff (a.toNat = b.toNat) ⟨ext, fun h => h ▸ rfl⟩
+instance : Repr (UInt W) where
+  reprPrec value prec := reprPrec value.toNat prec
 
-/-- Expose the mathematical value of a `u64` numeral literal directly, so
+/-- Expose the mathematical value of an integer numeral literal directly, so
 proofs need no per-literal `rfl` facts. -/
 @[simp] theorem toNat_ofNat_numeral (n : Nat) :
-    (no_index (OfNat.ofNat n) : U64).toNat = n := rfl
+    (no_index (OfNat.ofNat n) : UInt W).toNat = n % (widthOf W).size :=
+  toNat_ofNat n
 
-theorem eq_zero_of_not_pos {value : U64} (notPositive : ¬0 < value.toNat) :
-    value = 0 := by
+/-! The operations whose results always stay in range collapse without side
+conditions: the wrap in `ofNat` is invisible for them.  Stated on the
+`ofNat`-of-view shapes the operation lemmas produce, at high priority so they
+win over the generic `toNat_ofNat`. -/
+
+@[simp high] theorem toNat_ofNat_sub (a b : UInt W) :
+    (ofNat (a.toNat - b.toNat) : UInt W).toNat = a.toNat - b.toNat := by
+  rw [toNat_ofNat, Nat.mod_eq_of_lt
+    (Nat.lt_of_le_of_lt (Nat.sub_le _ _) a.toNat_lt)]
+
+@[simp high] theorem toNat_ofNat_div (a : UInt W) (n : Nat) :
+    (ofNat (a.toNat / n) : UInt W).toNat = a.toNat / n := by
+  rw [toNat_ofNat, Nat.mod_eq_of_lt
+    (Nat.lt_of_le_of_lt (Nat.div_le_self _ _) a.toNat_lt)]
+
+@[simp high] theorem toNat_ofNat_mod (a : UInt W) (n : Nat) :
+    (ofNat (a.toNat % n) : UInt W).toNat = a.toNat % n := by
+  rw [toNat_ofNat, Nat.mod_eq_of_lt
+    (Nat.lt_of_le_of_lt (Nat.mod_le _ _) a.toNat_lt)]
+
+@[simp high] theorem toNat_ofNat_land (a b : UInt W) :
+    (ofNat (a.toNat &&& b.toNat) : UInt W).toNat = a.toNat &&& b.toNat := by
+  rw [toNat_ofNat, Nat.mod_eq_of_lt
+    (Nat.lt_of_le_of_lt Nat.and_le_left a.toNat_lt)]
+
+@[simp high] theorem toNat_ofNat_lor (a b : UInt W) :
+    (ofNat (a.toNat ||| b.toNat) : UInt W).toNat = a.toNat ||| b.toNat := by
+  have hlt : a.toNat ||| b.toNat < (widthOf W).size :=
+    Nat.or_lt_two_pow a.toNat_lt b.toNat_lt
+  rw [toNat_ofNat, Nat.mod_eq_of_lt hlt]
+
+@[simp high] theorem toNat_ofNat_lxor (a b : UInt W) :
+    (ofNat (a.toNat ^^^ b.toNat) : UInt W).toNat = a.toNat ^^^ b.toNat := by
+  have hlt : a.toNat ^^^ b.toNat < (widthOf W).size :=
+    Nat.xor_lt_two_pow a.toNat_lt b.toNat_lt
+  rw [toNat_ofNat, Nat.mod_eq_of_lt hlt]
+
+@[simp high] theorem toNat_ofNat_shr (a : UInt W) (n : Nat) :
+    (ofNat (a.toNat >>> n) : UInt W).toNat = a.toNat >>> n := by
+  rw [toNat_ofNat, Nat.mod_eq_of_lt
+    (Nat.lt_of_le_of_lt (Nat.shiftRight_le _ _) a.toNat_lt)]
+
+/-- Numeric literals are the literal constructor, definitionally. -/
+theorem numeral_eq_ofNat (n : Nat) :
+    (no_index (OfNat.ofNat n) : UInt W) = UInt.ofNat n := rfl
+
+/-- Per-width literal views with the range as a numeral, giving decision
+procedures ground arithmetic to work with. -/
+theorem toNat_ofNat_u8 (n : Nat) :
+    (ofNat n : U8).toNat = n % 256 := toNat_ofNat n
+theorem toNat_ofNat_u16 (n : Nat) :
+    (ofNat n : U16).toNat = n % 65536 := toNat_ofNat n
+theorem toNat_ofNat_u32 (n : Nat) :
+    (ofNat n : U32).toNat = n % 4294967296 := toNat_ofNat n
+theorem toNat_ofNat_u64 (n : Nat) :
+    (ofNat n : U64).toNat = n % 18446744073709551616 := toNat_ofNat n
+theorem toNat_ofNat_u128 (n : Nat) :
+    (ofNat n : U128).toNat =
+      n % 340282366920938463463374607431768211456 := toNat_ofNat n
+theorem toNat_ofNat_u256 (n : Nat) :
+    (ofNat n : U256).toNat =
+      n % 115792089237316195423570985008687907853269984665640564039457584007913129639936 :=
+  toNat_ofNat n
+
+/-- The two ubiquitous numerals are always in range. -/
+@[simp] theorem toNat_zero : (0 : UInt W).toNat = 0 := by
+  rw [toNat_ofNat_numeral, Nat.zero_mod]
+
+@[simp] theorem toNat_one : (1 : UInt W).toNat = 1 := by
+  rw [toNat_ofNat_numeral, Nat.mod_eq_of_lt (widthOf W).one_lt_size]
+
+theorem eq_zero_of_not_pos {value : UInt W}
+    (notPositive : ¬0 < value.toNat) : value = 0 := by
   apply ext
-  change value.toNat = 0
-  exact Nat.eq_zero_of_not_pos notPositive
+  rw [toNat_ofNat_numeral, Nat.zero_mod]
+  omega
 
-instance : Add U64 := ⟨add⟩
-instance : Sub U64 := ⟨sub⟩
-instance : Mul U64 := ⟨mul⟩
-instance : Div U64 := ⟨div⟩
-instance : Mod U64 := ⟨mod⟩
-instance : BEq U64 := ⟨equal⟩
+instance : Add (UInt W) := ⟨add⟩
+instance : Sub (UInt W) := ⟨sub⟩
+instance : Mul (UInt W) := ⟨mul⟩
+instance : Div (UInt W) := ⟨div⟩
+instance : Mod (UInt W) := ⟨mod⟩
+instance : BEq (UInt W) := ⟨equal⟩
+instance : AndOp (UInt W) := ⟨land⟩
+instance : OrOp (UInt W) := ⟨lor⟩
+instance : XorOp (UInt W) := ⟨lxor⟩
+instance : HShiftLeft (UInt W) (UInt W8) (UInt W) := ⟨shl⟩
+instance : HShiftRight (UInt W) (UInt W8) (UInt W) := ⟨shr⟩
 
-@[simp] theorem add_eq_ofNat (a b : U64) :
+@[simp] theorem add_eq_ofNat (a b : UInt W) :
     a + b = ofNat (a.toNat + b.toNat) := rfl
 
-@[simp] theorem sub_eq_ofNat (a b : U64) :
+@[simp] theorem sub_eq_ofNat (a b : UInt W) :
     a - b = ofNat (a.toNat - b.toNat) := rfl
 
-@[simp] theorem mul_eq_ofNat (a b : U64) :
+@[simp] theorem mul_eq_ofNat (a b : UInt W) :
     a * b = ofNat (a.toNat * b.toNat) := rfl
 
-@[simp] theorem div_eq_ofNat (a b : U64) :
+@[simp] theorem div_eq_ofNat (a b : UInt W) :
     a / b = ofNat (a.toNat / b.toNat) := rfl
 
-@[simp] theorem mod_eq_ofNat (a b : U64) :
+@[simp] theorem mod_eq_ofNat (a b : UInt W) :
     a % b = ofNat (a.toNat % b.toNat) := rfl
 
+@[simp] theorem land_eq_ofNat (a b : UInt W) :
+    a &&& b = ofNat (a.toNat &&& b.toNat) := rfl
+
+@[simp] theorem lor_eq_ofNat (a b : UInt W) :
+    a ||| b = ofNat (a.toNat ||| b.toNat) := rfl
+
+@[simp] theorem lxor_eq_ofNat (a b : UInt W) :
+    a ^^^ b = ofNat (a.toNat ^^^ b.toNat) := rfl
+
+@[simp] theorem shl_eq_ofNat (a : UInt W) (k : UInt W8) :
+    a <<< k = ofNat (a.toNat <<< k.toNat) := rfl
+
+@[simp] theorem shr_eq_ofNat (a : UInt W) (k : UInt W8) :
+    a >>> k = ofNat (a.toNat >>> k.toNat) := rfl
+
+@[simp] theorem toNat_cast {W' : Type} [Width W'] (a : UInt W) :
+    (cast (W' := W') a).toNat = a.toNat % (widthOf W').size :=
+  toNat_ofNat a.toNat
+
+/-! The raw operation names appear in checked-semantics propositions; expose
+the same `ofNat`-of-view equations for them as for the notations. -/
+
+@[simp] theorem add_def (a b : UInt W) :
+    add a b = ofNat (a.toNat + b.toNat) := rfl
+@[simp] theorem sub_def (a b : UInt W) :
+    sub a b = ofNat (a.toNat - b.toNat) := rfl
+@[simp] theorem mul_def (a b : UInt W) :
+    mul a b = ofNat (a.toNat * b.toNat) := rfl
+@[simp] theorem div_def (a b : UInt W) :
+    div a b = ofNat (a.toNat / b.toNat) := rfl
+@[simp] theorem mod_def (a b : UInt W) :
+    mod a b = ofNat (a.toNat % b.toNat) := rfl
+@[simp] theorem land_def (a b : UInt W) :
+    land a b = ofNat (a.toNat &&& b.toNat) := rfl
+@[simp] theorem lor_def (a b : UInt W) :
+    lor a b = ofNat (a.toNat ||| b.toNat) := rfl
+@[simp] theorem lxor_def (a b : UInt W) :
+    lxor a b = ofNat (a.toNat ^^^ b.toNat) := rfl
+@[simp] theorem shl_def (a : UInt W) (k : UInt W8) :
+    shl a k = ofNat (a.toNat <<< k.toNat) := rfl
+@[simp] theorem shr_def (a : UInt W) (k : UInt W8) :
+    shr a k = ofNat (a.toNat >>> k.toNat) := rfl
+@[simp] theorem cast_def {W' : Type} [Width W'] (a : UInt W) :
+    (cast a : UInt W') = ofNat a.toNat := rfl
+
 /-- `<` remains ordinary Lean syntax.  Its decision procedure is the named
-`U64.less` primitive, which the backend lowers to `MoveModel.IR.Oper.lt`. -/
-instance : LT U64 := ⟨fun a b => less a b = true⟩
-instance (a b : U64) : Decidable (a < b) :=
+`UInt.less` primitive, which the backend lowers to `MoveModel.IR.Oper.lt`. -/
+instance : LT (UInt W) := ⟨fun a b => less a b = true⟩
+instance (a b : UInt W) : Decidable (a < b) :=
   inferInstanceAs (Decidable (less a b = true))
 
-end U64
+end UInt
+
+/-- Resolve the width of each tag for specification normalization, in both
+the `widthOf` and the raw instance-projection spelling. -/
+@[simp] theorem widthOf_W8 : widthOf W8 = .w8 := rfl
+@[simp] theorem widthOf_W16 : widthOf W16 = .w16 := rfl
+@[simp] theorem widthOf_W32 : widthOf W32 = .w32 := rfl
+@[simp] theorem widthOf_W64 : widthOf W64 = .w64 := rfl
+@[simp] theorem widthOf_W128 : widthOf W128 = .w128 := rfl
+@[simp] theorem widthOf_W256 : widthOf W256 = .w256 := rfl
+
+@[simp] theorem width_W8 : Width.width W8 = .w8 := rfl
+@[simp] theorem width_W16 : Width.width W16 = .w16 := rfl
+@[simp] theorem width_W32 : Width.width W32 = .w32 := rfl
+@[simp] theorem width_W64 : Width.width W64 = .w64 := rfl
+@[simp] theorem width_W128 : Width.width W128 = .w128 := rfl
+@[simp] theorem width_W256 : Width.width W256 = .w256 := rfl
+
+/-- Width-directed literal constructors, as named specification surface. -/
+abbrev U8.ofNat : Nat → U8 := UInt.ofNat
+abbrev U16.ofNat : Nat → U16 := UInt.ofNat
+abbrev U32.ofNat : Nat → U32 := UInt.ofNat
+abbrev U64.ofNat : Nat → U64 := UInt.ofNat
+abbrev U128.ofNat : Nat → U128 := UInt.ofNat
+abbrev U256.ofNat : Nat → U256 := UInt.ofNat
+
+/-- The exclusive upper bounds of the Move integer value ranges, as named
+specification constants. -/
+abbrev U8.size : Nat := MoveModel.IR.IntWidth.size .w8
+abbrev U16.size : Nat := MoveModel.IR.IntWidth.size .w16
+abbrev U32.size : Nat := MoveModel.IR.IntWidth.size .w32
+abbrev U64.size : Nat := MoveModel.IR.IntWidth.size .w64
+abbrev U128.size : Nat := MoveModel.IR.IntWidth.size .w128
+abbrev U256.size : Nat := MoveModel.IR.IntWidth.size .w256
 
 namespace Vector
 
-@[noinline] def empty : Vector α := ⟨[]⟩
+@[noinline] def empty : Vector α :=
+  ⟨[], MoveModel.IR.IntWidth.size_pos _⟩
+
+/-- Push is total on the certified type: at the (unreachable without an
+abort) maximum length it leaves the vector unchanged, agreeing with the
+checked semantics on every non-aborting execution. -/
 @[noinline] def push : Vector α → α → Vector α :=
-  fun values value => ⟨values.elems ++ [value]⟩
+  fun values value =>
+    if grows : values.elems.length + 1 < MoveModel.IR.IntWidth.size .w64 then
+      ⟨values.elems ++ [value], by simpa using grows⟩
+    else
+      values
 @[noinline] def length : Vector α → U64 :=
-  fun values => U64.ofNat values.elems.length
+  fun values => UInt.ofNat values.elems.length
 @[noinline] def get [Inhabited α] : Vector α → U64 → α :=
   fun values index => values.elems[index.toNat]?.getD Inhabited.default
 @[noinline] def set : Vector α → U64 → α → Vector α :=
-  fun values index value => ⟨values.elems.set index.toNat value⟩
+  fun values index value =>
+    ⟨values.elems.set index.toNat value, by simpa using values.bounded⟩
+
+instance : Inhabited (Vector α) := ⟨empty⟩
 
 /-- Logical contents of a source vector. This is a specification accessor and
 is never selected for Move lowering. -/
@@ -238,16 +497,50 @@ def toList (values : Vector α) : List α := values.elems
 /-- Construct a logical source vector from a list.  This is a verification
 helper, not a compiler primitive; deployable source builds vectors with the
 ordinary vector operations. -/
-def ofList (values : List α) : Vector α := ⟨values⟩
+def ofList (values : List α)
+    (bounded : values.length < MoveModel.IR.IntWidth.size .w64 := by
+      decide) : Vector α :=
+  ⟨values, bounded⟩
+
+/-- Every vector fits Move's `u64` length domain, by construction. -/
+theorem toList_length_lt (values : Vector α) :
+    values.toList.length < U64.size := values.bounded
+
+/-- Source vectors are determined by their logical contents. -/
+@[ext] theorem ext {left right : Vector α}
+    (equal : left.toList = right.toList) : left = right := by
+  cases left
+  cases right
+  simp only [toList] at equal
+  subst equal
+  rfl
+
+@[simp] theorem toList_mk (values : List α)
+    (bounded : values.length < MoveModel.IR.IntWidth.size .w64) :
+    (⟨values, bounded⟩ : Vector α).toList = values := rfl
 
 @[simp] theorem toList_empty : (empty : Vector α).toList = [] := rfl
-@[simp] theorem toList_push (values : Vector α) (value : α) :
-    (push values value).toList = values.toList ++ [value] := rfl
+
+@[simp] theorem toList_push (values : Vector α) (value : α)
+    (grows : values.toList.length + 1 < U64.size) :
+    (push values value).toList = values.toList ++ [value] := by
+  have grows' : values.elems.length + 1 < MoveModel.IR.IntWidth.size .w64 :=
+    grows
+  rw [push, dif_pos grows']
+  rfl
+
 @[simp] theorem length_toNat (values : Vector α) :
-    (length values).toNat = values.toList.length := rfl
+    (length values).toNat = values.toList.length := by
+  have bounded : values.elems.length < (widthOf W64).size := values.bounded
+  rw [length, UInt.toNat_ofNat, Nat.mod_eq_of_lt bounded]
+  rfl
+
 @[simp] theorem toList_set (values : Vector α) (index : U64) (value : α) :
     (set values index value).toList = values.toList.set index.toNat value := rfl
-@[simp] theorem toList_ofList (values : List α) : (ofList values).toList = values := rfl
+
+@[simp] theorem toList_ofList (values : List α)
+    (bounded : values.length < MoveModel.IR.IntWidth.size .w64) :
+    (ofList values bounded).toList = values := rfl
 
 end Vector
 

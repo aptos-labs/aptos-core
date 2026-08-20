@@ -246,7 +246,6 @@ theorem withdraw_verified : Verified prog 0 := by
           abortEnv, postEnv, initLocals, hpres, Oper.sem, SpecEnv.memAt,
           Contract.abortsFalse, curBal, oldBal, oldExists, hge, memWrite,
           MoveState.writeLocals, agreesOutside, Contract.footprint]
-        refine ⟨by omega, ?_⟩
         intro r a' hout hr ha'
         exact absurd ha' (hout hr.symm)
 

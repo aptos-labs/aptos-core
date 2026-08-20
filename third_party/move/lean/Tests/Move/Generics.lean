@@ -13,74 +13,70 @@ open scoped Move Move.Compiler Move.Spec
 
 move_module Generics where
 
-  @[move_struct]
-  structure Box (T : Type) where
+  struct Box (T) where
     value : T
     deriving Copy, Drop, Store
 
-  @[move_struct]
-  structure Pair (T U : Type) where
+  struct Pair (T U) where
     first : T
     second : U
     deriving Copy, Drop, Store
 
-  @[move_struct]
-  structure Vault (T : Type) where
+  struct Vault (T) where
     value : T
     deriving Key
 
-  @[move_enum]
-  inductive Choice (T : Type) where
+  enum Choice (T) where
     | none
     | some (value : T)
     deriving Copy, Drop, Store
 
   /-! ## Functions -/
 
-  fun identity {T : Type} (value : T) : T := value
+  fun identity {T} (value : T) : T := value
 
-  spec identity {T : Type} [Inhabited T] (value : T) where
+  spec identity {T} [Inhabited T] (value : T) where
     ensures result = value
 
-  fun box {T : Type} (value : T) : Box T := { value }
+  fun box {T} (value : T) : Box T := { value }
 
-  spec box {T : Type} [Inhabited T] (value : T) where
+  spec box {T} [Inhabited T] (value : T) where
     ensures result = ({ value } : Box T)
 
-  fun unbox {T : Type} (value : Box T) : T := value.value
+  fun unbox {T} (value : Box T) : T := value.value
 
-  spec unbox {T : Type} [Inhabited T] (value : Box T) where
+  spec unbox {T} [Inhabited T] (value : Box T) where
     ensures result = value.value
 
-  fun swap {T U : Type} (value : Pair T U) : Pair U T :=
+  fun swap {T U} (value : Pair T U) : Pair U T :=
     { first := value.second, second := value.first }
 
-  spec swap {T : Type} {U : Type} [Inhabited T] [Inhabited U]
+  spec swap {T} {U} [Inhabited T] [Inhabited U]
       (value : Pair T U) where
     ensures
       result = ({ first := value.second, second := value.first } : Pair U T)
 
-  fun chooseGeneric {T : Type} (fallback : T) (choice : Choice T) : T :=
+  fun chooseGeneric {T} (fallback : T) (choice : Choice T) : T :=
     match choice with
     | .none => fallback
     | .some value => value
 
-  spec chooseGeneric {T : Type} [Inhabited T] (fallback : T) (choice : Choice T) where
+  spec chooseGeneric {T} [Inhabited T] (fallback : T) (choice : Choice T) where
     ensures
       result =
         match choice with
         | .none => fallback
         | .some value => value
 
-  fun singleton {T : Type} (value : T) : Move.Vector T := vector![value]
+  fun singleton {T} (value : T) : Move.Vector T := vector![value]
 
-  spec singleton {T : Type} [Inhabited T] (value : T) where
+  spec singleton {T} [Inhabited T] (value : T) where
     ensures result = vector![value]
 
-  fun equalGeneric {T : Type} (left right : T) : Bool :=
+  fun equalGeneric {T} (left right : T) : Bool :=
     left == right
 
-  spec equalGeneric {T : Type} [Inhabited T] (left : T) (right : T) where
+  spec equalGeneric {T} [Inhabited T] (left : T) (right : T) where
     ensures result = (left == right)
 
   fun equalU64 (left right : U64) : Bool :=
@@ -149,16 +145,16 @@ move_module Generics where
   -- Global-storage primitives are not yet modeled by automatic source
   -- specifications, so the resource functions below intentionally remain
   -- unspecced.
-  fun publishGeneric {T : Type} (signer : Signer) (value : T) : Action Unit :=
+  fun publishGeneric {T} (signer : Signer) (value : T) : Action Unit :=
     moveTo signer ({ value } : Vault T)
 
-  fun hasGeneric {T : Type} (address : Address) : Action Bool :=
+  fun hasGeneric {T} (address : Address) : Action Bool :=
     exists_ (Vault T) address
 
   -- One generic body observing the same resource declaration at `T`, `U`, and
   -- a concrete type exercises all runtime-tag equality combinations used by
   -- verification monomorphization.
-  fun tagInteractions {T U : Type} (address : Address) : Action Bool := do
+  fun tagInteractions {T U} (address : Address) : Action Bool := do
     let hasT ← exists_ (Vault T) address
     let hasU ← exists_ (Vault U) address
     let hasU64 ← exists_ (Vault U64) address

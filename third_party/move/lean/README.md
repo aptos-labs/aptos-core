@@ -32,7 +32,7 @@ production reference-elimination pass.
 
 For Lean-authored modules, direct `spec`/`verify` proofs and executable XIR
 generation are separate branches. XIR is a compiler exchange format, not a
-proof artifact; see the [source API flow](Move/README.md#compiler-architecture)
+proof artifact; see the [compiler plan](Move/design-plan.md)
 and [verification design](Move/verification-design.md).
 
 ## Small example

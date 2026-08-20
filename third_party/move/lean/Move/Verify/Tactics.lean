@@ -27,26 +27,71 @@ sets registered in `Move.Verify.SimpAttrs`:
 -/
 
 attribute [move_norm]
-  Move.U64.toNat_ofNat
-  Move.U64.toNat_ofNat_numeral
+  Nat.mod_eq_of_lt
+  MoveModel.IR.IntWidth.size
+  MoveModel.IR.IntWidth.bits
+  Move.U8.size
+  Move.U16.size
+  Move.U32.size
+  Move.U64.size
+  Move.U128.size
+  Move.U256.size
+  Move.widthOf_W8
+  Move.widthOf_W16
+  Move.widthOf_W32
+  Move.widthOf_W64
+  Move.widthOf_W128
+  Move.widthOf_W256
+  Move.width_W8
+  Move.width_W16
+  Move.width_W32
+  Move.width_W64
+  Move.width_W128
+  Move.width_W256
+  Move.UInt.add_def
+  Move.UInt.sub_def
+  Move.UInt.mul_def
+  Move.UInt.div_def
+  Move.UInt.mod_def
+  Move.UInt.land_def
+  Move.UInt.lor_def
+  Move.UInt.lxor_def
+  Move.UInt.shl_def
+  Move.UInt.shr_def
+  Move.UInt.cast_def
+  Move.UInt.toNat_ofNat_sub
+  Move.UInt.toNat_ofNat_div
+  Move.UInt.toNat_ofNat_mod
+  Move.UInt.toNat_ofNat_land
+  Move.UInt.toNat_ofNat_lor
+  Move.UInt.toNat_ofNat_lxor
+  Move.UInt.toNat_ofNat_shr
+  Move.UInt.toNat_ofNat
+  Move.UInt.toNat_ofNat_numeral
+  Move.UInt.toNat_zero
+  Move.UInt.toNat_one
   Move.Vector.length_toNat
   Move.Vector.toList_empty
   Move.Vector.toList_push
   Move.Vector.toList_set
   Move.Vector.toList_ofList
-  Move.Verify.Source.logicalLT_u64
-  Move.Verify.Source.logicalLE_u64
-  Move.Verify.Source.logicalBEq_u64
+  Move.Verify.Source.logicalLT_uint
+  Move.Verify.Source.logicalLE_uint
+  Move.Verify.Source.logicalBEq_uint
   Move.Verify.Source.logicalLT_move
   Move.Verify.Source.logicalBEq_move
   Move.Semantics.Spec.pure_bind
   Move.Semantics.Spec.bind_pure
+  Move.Semantics.Spec.abort_bind
   Move.Semantics.Spec.fix_const
   Move.Semantics.Checked.addSpec_eq_pure
   Move.Semantics.Checked.subSpec_eq_pure
   Move.Semantics.Checked.mulSpec_eq_pure
   Move.Semantics.Checked.divSpec_eq_pure
   Move.Semantics.Checked.modSpec_eq_pure
+  Move.Semantics.Checked.shlSpec_eq_pure
+  Move.Semantics.Checked.shrSpec_eq_pure
+  Move.Semantics.Checked.castSpec_eq_pure
   Move.Semantics.Vector.borrowElemSpec_eq_pure
   Move.Verify.withBorrowElemMutSpec_write_eq_pure
 
@@ -80,16 +125,10 @@ attribute [move_spec]
   Move.Semantics.Checked.mulSpec
   Move.Semantics.Checked.divSpec
   Move.Semantics.Checked.modSpec
-  Move.U64.instOfNat
-  OfNat.ofNat
+  Move.Semantics.Checked.shlSpec
+  Move.Semantics.Checked.shrSpec
+  Move.Semantics.Checked.castSpec
   Move.U64.size
-  Move.U64.toNat
-  Move.U64.ofNat
-  Move.U64.add
-  Move.U64.sub
-  Move.U64.mul
-  Move.U64.div
-  Move.U64.mod
 
 namespace Move.Verify
 
@@ -101,15 +140,21 @@ hypothesis, keeping normalization predictable. -/
 syntax "spec_norm" (Lean.Parser.Tactic.location)? : tactic
 
 macro_rules
-  | `(tactic| spec_norm $[$location]?) =>
-      `(tactic| simp
+  | `(tactic| spec_norm $[$location]?) => do
+      let core ← `(tactic| simp
         (disch := first
           | omega
-          | (simp only [move_norm]; omega)
-          | (simp only [move_norm, Move.U64.size]; omega)
+          | (simp only [move_norm, Nat.reducePow, Nat.reduceMod]; omega)
+          | (simp only [move_norm, Move.U64.size, Nat.reducePow,
+              Nat.reduceMod]; omega)
           | decide
-          | assumption)
-        only [move_norm] $[$location]?)
+          | assumption
+          | (simp (disch := omega) only [move_norm, Nat.mod_eq_of_lt,
+              Nat.reducePow, Nat.reduceMod]
+             assumption))
+        only [move_norm, Nat.mod_eq_of_lt, Nat.reducePow, Nat.reduceMod]
+        $[$location]?)
+      `(tactic| (uint_bounds; $core))
 
 /-- Normalize a WP goal using the primitive proof rules. -/
 syntax "wp_norm" (Lean.Parser.Tactic.location)? : tactic
@@ -119,7 +164,7 @@ macro_rules
 
 /-- Split a source condition, rewrite the corresponding conditional, and
 normalize the named hypothesis in both branches. In particular,
-`logicalLT_u64` and `logicalLE_u64` turn numeric Move conditions into
+`logicalLT_uint` and `logicalLE_uint` turn numeric Move conditions into
 natural-number facts without simplifying unrelated hypotheses. For the common
 `0 < n` loop guard, the false branch also receives a fact named `nZero`. -/
 syntax "move_cases " ident " : " term : tactic
@@ -139,12 +184,13 @@ macro_rules
       `(tactic|
         by_cases $hypothesis : Move.Verify.Source.logicalLT 0 $value <;>
           simp only [$hypothesisLemma, if_true, if_false,
-            Move.Verify.Source.logicalLT_u64] <;>
-          simp only [Move.Verify.Source.logicalLT_u64,
-            Move.U64.toNat_ofNat, Move.U64.toNat_ofNat_numeral]
+            Move.Verify.Source.logicalLT_uint] <;>
+          simp only [Move.Verify.Source.logicalLT_uint,
+            Move.UInt.toNat_ofNat, Move.UInt.toNat_ofNat_numeral,
+            move_norm, Nat.reducePow, Nat.reduceMod, Nat.zero_mod]
             at $hypothesisLocation <;>
           try have $zeroFact : $value = 0 :=
-            Move.U64.eq_zero_of_not_pos $hypothesis <;>
+            Move.UInt.eq_zero_of_not_pos $hypothesis <;>
           try simp only [$zeroFactLemma])
   | `(tactic| move_cases $hypothesis:ident : $condition:term) => do
       let hypothesisTerm : TSyntax `term := ⟨hypothesis.raw⟩
@@ -155,13 +201,14 @@ macro_rules
       `(tactic|
         by_cases $hypothesis : $condition <;>
           simp only [$hypothesisLemma, if_true, if_false,
-            Move.Verify.Source.logicalLT_u64,
-            Move.Verify.Source.logicalLE_u64] <;>
-          simp only [Move.Verify.Source.logicalLT_u64,
-            Move.Verify.Source.logicalLE_u64,
+            Move.Verify.Source.logicalLT_uint,
+            Move.Verify.Source.logicalLE_uint] <;>
+          simp only [Move.Verify.Source.logicalLT_uint,
+            Move.Verify.Source.logicalLE_uint,
             Move.Verify.Source.logicalLT_move,
             Move.Verify.Source.logicalBEq_move,
-            Move.U64.toNat_ofNat, Move.U64.toNat_ofNat_numeral]
+            Move.UInt.toNat_ofNat, Move.UInt.toNat_ofNat_numeral,
+            move_norm, Nat.reducePow, Nat.reduceMod, Nat.zero_mod]
             at $hypothesisLocation)
 
 /-- Finish a numeric source-value goal directly, or first reduce equality of
@@ -171,10 +218,10 @@ macro_rules
   | `(tactic| u64_omega) =>
       `(tactic| first
           | rfl
-          | omega
+          | (uint_bounds; omega)
           | (spec_norm <;> omega)
-          | (apply Move.U64.ext <;> spec_norm <;> omega)
-          | (apply Move.U64.ext <;> omega))
+          | (apply Move.UInt.ext <;> spec_norm <;> omega)
+          | (apply Move.UInt.ext <;> uint_bounds <;> omega))
 
 private partial def introUntilSatisfies : TacticM Unit := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
@@ -216,6 +263,84 @@ private def targetUsesFix : TacticM Bool := withMainContext do
     return hasFixHead function
   return false
 
+/-- Normalize the semantic `¬ mayAbort → ...` guard on the postcondition into
+one negated hypothesis per declared abort condition — and none at all when no
+abort condition is declared or it is `False`. `contract_intro` applies this
+automatically; use it directly after a manual
+`satisfies_of_wp`/`satisfies_fix_of_wp`. -/
+syntax "abort_norm" : tactic
+macro_rules
+  | `(tactic| abort_norm) =>
+    `(tactic|
+      try simp only [false_and, and_false, exists_false, exists_const,
+        not_false_eq_true, true_implies, not_true_eq_false, false_implies,
+        implies_true, exists_and_left, exists_eq, exists_eq', and_true,
+        not_or, exists_or, and_imp])
+
+/-- Discharge the arithmetic side of an abort obligation, or refute a branch
+that no declared clause admits. -/
+syntax "abort_arith" : tactic
+macro_rules
+  | `(tactic| abort_arith) =>
+    `(tactic| first
+        | assumption
+        | omega
+        | (spec_norm; omega)
+        | (uint_bounds; simp only [move_norm, Nat.reducePow, Nat.reduceMod] at *
+           omega)
+        | (simp only [move_norm, Nat.reducePow, Nat.reduceMod] at *; omega)
+        | (simp_all [move_norm, Nat.reducePow, Nat.reduceMod]; omega))
+
+/-- Prove the abort code of the clause under consideration. Selecting the
+matching clause is what makes the surrounding search deterministic. -/
+syntax "abort_code" : tactic
+macro_rules
+  | `(tactic| abort_code) =>
+    `(tactic| first
+        | rfl
+        | trivial
+        | (simp only [move_norm, Nat.reducePow, Nat.reduceMod]; done)
+        | (simp [move_norm, Nat.reducePow, Nat.reduceMod]; done))
+
+/-- Close an abort obligation against the contract's declared abort clauses.
+The observed abort code selects the clause, and its condition is discharged
+by arithmetic; a condition needing a semantic argument is left as the only
+remaining goal. A branch that no clause admits is refuted instead. -/
+syntax "abort_clause" : tactic
+macro_rules
+  | `(tactic| abort_clause) =>
+    `(tactic| first
+        | done
+        | (refine Or.inl ?_; abort_clause)
+        | (refine Or.inr ?_; abort_clause)
+        | (refine ⟨?_, ?_⟩
+           rotate_left
+           abort_code
+           try abort_arith)
+        | trivial
+        | abort_arith)
+
+/-- Split the leading checked operation of a weakest-precondition goal into
+its success and abort branches, naming the branch hypothesis, and discharge
+the abort branch against the contract's declared abort clauses. Every checked
+operation — arithmetic, casts, shifts, element borrows, and vector insert or
+remove through a mutable borrow — has the same two-branch weakest
+precondition, so one tactic covers them all. A remaining abort obligation is
+left as the last goal. -/
+syntax (name := checkedCases) "checked_cases " ident : tactic
+
+@[tactic checkedCases]
+private def elabCheckedCases : Tactic := fun stx => withMainContext do
+  let branch : TSyntax `ident := ⟨stx[1]⟩
+  evalTactic (← `(tactic| try wp_norm))
+  evalTactic (← `(tactic| refine ⟨fun $branch => ?_, fun $branch => ?_⟩))
+  match ← getGoals with
+  | success :: abortObligation :: rest =>
+      setGoals [abortObligation]
+      evalTactic (← `(tactic| try abort_clause))
+      setGoals (success :: (← getGoals) ++ rest)
+  | _ => pure ()
+
 /-- Open the generated contract at the current goal and switch to weakest-
 precondition reasoning. The source function is recovered from a goal of the
 form `f.contract`. Nonrecursive functions use `satisfies_of_wp`; recursive
@@ -224,6 +349,9 @@ functions unfold `f.sourceSpec`, use `satisfies_fix_of_wp`, and expose
 unfolded and the remaining binders are named `args`, `initial`, and
 `permitted`. -/
 syntax (name := contractIntro) "contract_intro" : tactic
+
+private def normalizeMayAbort : TacticM Unit := do
+  evalTactic (← `(tactic| abort_norm))
 
 @[tactic contractIntro]
 private def elabContractIntro : Tactic := fun stx => withMainContext do
@@ -264,11 +392,13 @@ private def elabContractIntro : Tactic := fun stx => withMainContext do
       introNamed `permitted
       if env.contains bodySpecName then
         evalTactic (← `(tactic| unfold $bodySpec))
+      normalizeMayAbort
     else
       evalTactic (← `(tactic| apply Move.Verify.satisfies_of_wp))
       introNamed `args
       introNamed `initial
       introNamed `permitted
+      normalizeMayAbort
 
 /-- Step through a bound call using its established contract. This leaves the
 normal-postcondition weakening and abort forwarding obligations as the two

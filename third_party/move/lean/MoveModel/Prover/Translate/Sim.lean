@@ -346,6 +346,20 @@ theorem compileInstr_skips (P : Program) (i : Instr) :
              subst hc; exact skipCmd_onOk _
     | mod => intro c hc; simp only [compileInstr, List.mem_singleton] at hc
              subst hc; exact skipCmd_onOk _
+    | bitAnd => intro c hc; simp only [compileInstr, List.mem_singleton] at hc
+                subst hc; exact skipCmd_onOk _
+    | bitOr => intro c hc; simp only [compileInstr, List.mem_singleton] at hc
+               subst hc; exact skipCmd_onOk _
+    | bitXor => intro c hc; simp only [compileInstr, List.mem_singleton] at hc
+                subst hc; exact skipCmd_onOk _
+    | shl w => intro c hc; simp only [compileInstr, List.mem_singleton] at hc
+               subst hc; exact skipCmd_onOk _
+    | shr w => intro c hc; simp only [compileInstr, List.mem_singleton] at hc
+               subst hc; exact skipCmd_onOk _
+    | cast target =>
+      intro c hc
+      simp only [compileInstr, List.mem_singleton] at hc
+      subst hc; exact skipCmd_onOk _
     | lt => intro c hc; simp only [compileInstr, List.mem_singleton] at hc
             subst hc; exact skipCmd_onOk _
     | le => intro c hc; simp only [compileInstr, List.mem_singleton] at hc

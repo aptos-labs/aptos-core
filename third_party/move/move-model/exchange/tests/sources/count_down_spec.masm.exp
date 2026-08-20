@@ -1,5 +1,5 @@
 {
-  "version": 7,
+  "version": 8,
   "structs": [],
   "funs": [
     {
@@ -9,13 +9,13 @@
       "returns": ["u64"],
       "blocks": [
         {
-          "instrs": [{"assign": [1, 0]}, {"load": [2, {"u64": "0"}]}, {"call": [[3], "lt", [2, 1]]}],
+          "instrs": [{"assign": [1, 0]}, {"load": [2, {"num": "0"}]}, {"call": [[3], "lt", [2, 1]]}],
           "term": {"branch": [3, 1, 2]}
         },
         {
           "instrs": [
             {"assign": [4, 0]},
-            {"load": [5, {"u64": "1"}]},
+            {"load": [5, {"num": "1"}]},
             {"call": [[6], "sub", [4, 5]]},
             {"assign": [0, 6]}
           ],
@@ -29,13 +29,13 @@
           "members": [0, 1],
           "val_targets": [0, 1, 2, 3, 4, 5, 6],
           "mem_targets": [],
-          "invariants": [{"binop": ["lt", {"local": 0}, {"value": {"u64": "1000"}}]}]
+          "invariants": [{"binop": ["lt", {"local": 0}, {"value": {"num": "1000"}}]}]
         }
       ],
       "spec": {
-        "requires": [{"binop": ["lt", {"local": 0}, {"value": {"u64": "1000"}}]}],
+        "requires": [{"binop": ["lt", {"local": 0}, {"value": {"num": "1000"}}]}],
         "aborts_if": [],
-        "ensures": [{"binop": ["eq", {"result": 0}, {"value": {"u64": "0"}}]}],
+        "ensures": [{"binop": ["eq", {"result": 0}, {"value": {"num": "0"}}]}],
         "modifies": []
       }
     }

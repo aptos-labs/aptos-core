@@ -38,12 +38,30 @@ inductive Dialect where
   | referenceEliminated
   deriving BEq, Repr
 
+/-- One positional argument of a user-provided attribute: a name path
+(optionally instantiated, so it can denote a constant, function, or type) or
+a source constant. -/
+inductive AttributeArg where
+  | name (path : String) (args : List AttributeArg)
+  | num (value : Nat)
+  | bool (value : Bool)
+  deriving BEq, Repr
+
+/-- A user-provided source attribute: a head name applied to positional
+arguments. Well-known internal declaration markers are not represented here;
+this carries only open-ended source metadata. -/
+structure Attribute where
+  name : String
+  args : List AttributeArg
+  deriving BEq, Repr
+
 /-- Non-semantic information for one positional struct declaration. -/
 structure StructMeta where
   name : String
   fieldNames : List String
   variantNames : Option (List (String × List String)) := none
   abilities : AbilitySet
+  attributes : List Attribute := []
   deriving BEq, Repr
 
 /-- Non-semantic information for one positional function declaration. -/
@@ -52,6 +70,7 @@ structure FunMeta where
   visibility : Visibility
   isEntry : Bool
   acquires : List ResourceId
+  attributes : List Attribute := []
   deriving BEq, Repr
 
 /-- A finite, deployable view of a semantic program. -/

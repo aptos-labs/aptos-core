@@ -81,26 +81,41 @@ stored to global memory or packed into structs and vectors must be
 reference-free (`Value.refFree`), as in the Move VM. -/
 def Oper.sem (current : FrameId) (deref : RefTarget → Option Value) :
     Oper → List Value → Memory → Option OpOutcome
-  | .add, [.u64 i, .u64 j], m =>
-      some (if i + j < U64_SIZE then .ok [.u64 (i + j)] m else .abort)
-  | .sub, [.u64 i, .u64 j], m =>
-      some (if j ≤ i then .ok [.u64 (i - j)] m else .abort)
-  | .mul, [.u64 i, .u64 j], m =>
-      some (if i * j < U64_SIZE then .ok [.u64 (i * j)] m else .abort)
-  | .div, [.u64 i, .u64 j], m =>
-      some (if j = 0 then .abort else .ok [.u64 (i / j)] m)
-  | .mod, [.u64 i, .u64 j], m =>
-      some (if j = 0 then .abort else .ok [.u64 (i % j)] m)
+  | .add w, [.int i, .int j], m =>
+      some (if i + j < (w.size : Int) then .ok [.int (i + j)] m else .abort)
+  | .sub, [.int i, .int j], m =>
+      some (if j ≤ i then .ok [.int (i - j)] m else .abort)
+  | .mul w, [.int i, .int j], m =>
+      some (if i * j < (w.size : Int) then .ok [.int (i * j)] m else .abort)
+  | .div, [.int i, .int j], m =>
+      some (if j = 0 then .abort else .ok [.int (i / j)] m)
+  | .mod, [.int i, .int j], m =>
+      some (if j = 0 then .abort else .ok [.int (i % j)] m)
+  | .bitAnd, [.int i, .int j], m =>
+      some (.ok [.int (i.toNat &&& j.toNat : Nat)] m)
+  | .bitOr, [.int i, .int j], m =>
+      some (.ok [.int (i.toNat ||| j.toNat : Nat)] m)
+  | .bitXor, [.int i, .int j], m =>
+      some (.ok [.int (i.toNat ^^^ j.toNat : Nat)] m)
+  | .shl w, [.int i, .int k], m =>
+      some (if k < (w.bits : Int) then
+        .ok [.int ((i.toNat <<< k.toNat) % w.size : Nat)] m
+      else .abort)
+  | .shr w, [.int i, .int k], m =>
+      some (if k < (w.bits : Int) then .ok [.int (i.toNat >>> k.toNat : Nat)] m
+        else .abort)
+  | .cast target, [.int i], m =>
+      some (if i < (target.size : Int) then .ok [.int i] m else .abort)
   | .lt, [v₁, v₂], m => do
       let a ← v₁.derefWith deref
       let b ← v₂.derefWith deref
       match a, b with
-      | .u64 i, .u64 j => pure (.ok [.bool (decide (i < j))] m)
+      | .int i, .int j => pure (.ok [.bool (decide (i < j))] m)
       | a, b =>
           if a.refFree && b.refFree && a.sameTypeShape b then
             pure (.ok [.bool (compare a b == .lt)] m)
           else none
-  | .le, [.u64 i, .u64 j], m => some (.ok [.bool (decide (i ≤ j))] m)
+  | .le, [.int i, .int j], m => some (.ok [.bool (decide (i ≤ j))] m)
   | .eq, [v₁, v₂], m => do
       let a ← v₁.derefWith deref
       let b ← v₂.derefWith deref

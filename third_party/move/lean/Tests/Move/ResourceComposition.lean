@@ -17,13 +17,11 @@ move_module ResourceComposition where
 
   /-! ## Functions -/
 
-  @[move_struct]
-  structure Debit where
+  struct Debit where
     value : U64
     deriving Key
 
-  @[move_struct]
-  structure Credit where
+  struct Credit where
     value : U64
     deriving Key
 
@@ -39,6 +37,7 @@ move_module ResourceComposition where
       exists<Credit>(addr) ∧
       amount.toNat ≤ old(Debit[addr].value).toNat ∧
       old(Credit[addr].value).toNat + amount.toNat < U64.size;
+    modifies Debit[addr], Credit[addr];
     ensures
       Debit[addr].value = old(Debit[addr].value) - amount ∧
       Credit[addr].value = old(Credit[addr].value) + amount;

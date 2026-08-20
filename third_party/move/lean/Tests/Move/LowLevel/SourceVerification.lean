@@ -83,29 +83,31 @@ example : wp (withMutation 10 readSpecBody)
 example :
     (Move.Semantics.Vector.insertSpec
       ({ current := Move.Vector.ofList [1], prophecy := Move.Vector.ofList [1] } :
-        Mutation (Move.Vector U64)) (Move.U64.ofNat 2) 7).aborts ()
+        Mutation (Move.Vector U64)) (Move.UInt.ofNat 2) 7).aborts ()
       Move.Semantics.Vector.indexOutOfBounds := by
   simp [Move.Semantics.Vector.insertSpec, Move.Semantics.Vector.indexOutOfBounds,
     Move.Semantics.Mutation.read,
-    Move.Vector.toList, Move.Vector.ofList]
+    Move.Vector.toList, Move.Vector.ofList,
+    move_norm, Nat.reducePow]
 
 example :
     (Move.Semantics.Vector.removeSpec
       ({ current := Move.Vector.ofList [1], prophecy := Move.Vector.ofList [1] } :
-        Mutation (Move.Vector U64)) (Move.U64.ofNat 1)).aborts ()
+        Mutation (Move.Vector U64)) (Move.UInt.ofNat 1)).aborts ()
       Move.Semantics.Vector.indexOutOfBounds := by
   simp [Move.Semantics.Vector.removeSpec, Move.Semantics.Vector.indexOutOfBounds,
     Move.Semantics.Mutation.read,
-    Move.Vector.toList, Move.Vector.ofList]
+    Move.Vector.toList, Move.Vector.ofList,
+    move_norm, Nat.reducePow]
 
 private def addFiveSpec (_ : Unit) : Spec Unit U64 :=
   Checked.addSpec (U64.ofNat 10) (U64.ofNat 5)
 
 private def relationalAddContract : Contract Unit Unit U64 where
   requires := fun _ _ => True
-  ensures := fun _ initial result final =>
-    result = U64.ofNat 15 ∧ final = initial
+  ensures := fun _ _ result _ => result = U64.ofNat 15
   aborts := fun _ _ _ => False
+  mayAbort := fun _ _ => False
 
 example : Satisfies addFiveSpec relationalAddContract := by
   apply satisfies_of_wp
@@ -114,7 +116,10 @@ example : Satisfies addFiveSpec relationalAddContract := by
   constructor
   · intro result final h
     rcases h with ⟨_, hresult, hfinal⟩
-    exact ⟨by simpa using hresult, hfinal⟩
+    exact ⟨fun _ => by
+        simpa [relationalAddContract, move_norm, Nat.reducePow, Nat.reduceMod]
+          using hresult,
+      hfinal⟩
   · intro code h
     exact h.2 (by native_decide)
 
@@ -200,6 +205,10 @@ private def addFiveContract : Contract CounterWorld Unit Unit where
   ensures := fun _ _ result final =>
     result = () ∧ final = (some (U64.ofNat 15), 1)
   aborts := fun _ _ _ => False
+  mayAbort := fun _ _ => False
+  -- This function does change the counter world, so it frames nothing. A
+  -- generated contract would say the same through its `modifies` clause.
+  frame := fun _ _ _ => True
 
 example : Satisfies (fun _ => Spec.ofTxn (addToCounter (U64.ofNat 5)))
     addFiveContract := by
@@ -207,17 +216,16 @@ example : Satisfies (fun _ => Spec.ofTxn (addToCounter (U64.ofNat 5)))
   intro args initial hinitial
   cases args
   subst initial
-  change match addToCounter (U64.ofNat 5) (some (U64.ofNat 10), 0) with
-    | .ok result final => result = () ∧ final = (some (U64.ofNat 15), 1)
-    | .abort _ => False
+  unfold txnWP
   rw [show addToCounter (U64.ofNat 5) (some (U64.ofNat 10), 0) =
     .ok () (some (U64.ofNat 15), 1) by native_decide]
-  exact ⟨rfl, rfl⟩
+  exact ⟨⟨rfl, rfl⟩, trivial⟩
 
 private def alwaysAbortContract : Contract Nat Unit Unit where
   requires := fun _ _ => True
   ensures := fun _ _ _ _ => False
   aborts := fun _ initial code => initial = 3 → code = 7
+  mayAbort := fun _ _ => True
 
 example : Satisfies (fun _ => Spec.ofTxn setStateAndAbort) alwaysAbortContract := by
   apply satisfies_of_txnWP

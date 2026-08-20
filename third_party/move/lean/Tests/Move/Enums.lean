@@ -14,8 +14,7 @@ open scoped Move Move.Compiler Move.Spec
 
 move_module Enums where
 
-  @[move_enum]
-  inductive Action where
+  enum Action where
     | idle
     | transfer (amount : U64)
     | split (left right : U64)

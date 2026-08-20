@@ -37,7 +37,7 @@ class AbortCodeValue (Code : Type) where
   toNat : Code → Nat
 
 instance : AbortCodeValue Nat := ⟨id⟩
-instance : AbortCodeValue Move.U64 := ⟨Move.U64.toNat⟩
+instance : AbortCodeValue Move.U64 := ⟨Move.UInt.toNat⟩
 
 def abortCodeOf [AbortCodeValue Code] (code : Code) : Nat :=
   AbortCodeValue.toNat code
@@ -55,65 +55,65 @@ open Lean.Parser.Term
 open scoped Move Move.Spec
 
 /-- Logical interpretation of authored `<` for the comparison operation that
-the Move compiler lowers. `U64` uses its mathematical value; every other
-source type uses Move's sealed structural comparison marker. This is direct
-dispatch on the type, rather than typeclass dispatch, so source verification
-cannot select semantics different from the generated Move instruction. -/
-noncomputable def logicalLT {T : Type} (left right : T) : Prop := by
-  classical
-  exact if h : T = Move.U64 then
-    (cast h left).toNat < (cast h right).toNat
-  else
-    Move.Compare.Less left right
+the Move compiler lowers: Move's sealed structural comparison marker,
+uniformly for every source type. Direct use of the marker, rather than
+typeclass dispatch, ensures source verification cannot select semantics
+different from the generated Move instruction. -/
+def logicalLT {T : Type} (left right : T) : Prop :=
+  Move.Compare.Less left right
 
-noncomputable instance (left right : T) : Decidable (logicalLT left right) := by
-  classical
-  unfold logicalLT
-  split <;> infer_instance
+instance (left right : T) : Decidable (logicalLT left right) :=
+  inferInstanceAs (Decidable (Move.Compare.less left right = true))
 
-@[simp] theorem logicalLT_u64 (left right : Move.U64) :
-    logicalLT left right ↔ left.toNat < right.toNat := by simp [logicalLT]
+/-- The comparison instruction on Move's integer types is numeric: the
+sealed marker denotes the mathematical order at every width. Part of the
+explicit trust base, like `logicalLT_move`. -/
+axiom logicalLT_uint {W : Type} [Move.Width W] (left right : Move.UInt W) :
+    logicalLT left right ↔ left.toNat < right.toNat
 
-/-- The compiler's generic comparison marker denotes the same native ordering
-as the direct `U64` operation at a `U64` instantiation. The marker is opaque
-in executable source, so this is the verification interface for that compiler
-semantic fact. The comparator is fixed to `Move.Compare.genericLT`; it never
-uses a caller-selected `LT` instance. -/
-axiom logicalLT_move [Move.Compare.Total T] (left right : T) :
+attribute [simp] logicalLT_uint
+
+/-- The compiler's generic comparison marker denotes the fixed structural
+ordering at a generic instantiation. The marker is opaque in executable
+source, so this is the verification interface for that compiler semantic
+fact. The comparator is fixed to `Move.Compare.genericLT`; it never uses a
+caller-selected `LT` instance. -/
+theorem logicalLT_move [Move.Compare.Total T] (left right : T) :
     logicalLT left right ↔
-      @LT.lt T (Move.Compare.genericLT (T := T)) left right
+      @LT.lt T (Move.Compare.genericLT (T := T)) left right := Iff.rfl
 
 attribute [simp] logicalLT_move
 
-/-- Logical interpretation of authored `≤`, sealed to the same `U64`
-semantics used by the generated Move `U64.lessEq` instruction. -/
-def logicalLE (left right : Move.U64) : Prop := left.toNat ≤ right.toNat
+/-- Logical interpretation of authored `≤`, sealed to the same numeric
+semantics used by the generated Move `lessEq` instruction. -/
+def logicalLE {W : Type} [Move.Width W] (left right : Move.UInt W) : Prop :=
+  left.toNat ≤ right.toNat
 
-instance (left right : Move.U64) : Decidable (logicalLE left right) :=
+instance {W : Type} [Move.Width W] (left right : Move.UInt W) :
+    Decidable (logicalLE left right) :=
   by unfold logicalLE; infer_instance
 
-@[simp] theorem logicalLE_u64 (left right : Move.U64) :
+@[simp] theorem logicalLE_uint {W : Type} [Move.Width W] (left right : Move.UInt W) :
     logicalLE left right ↔ left.toNat ≤ right.toNat := Iff.rfl
 
-/-- Sealed logical equality for authored `==`. It selects the same native
-`U64.equal` semantics for `U64` and Move's fixed structural equality marker
-for every other source type, without consulting a caller-provided `BEq`
-instance when a source contract is generated. -/
-noncomputable def logicalBEq {T : Type} (left right : T) : Bool := by
-  classical
-  exact if h : T = Move.U64 then
-    decide ((cast h left).toNat = (cast h right).toNat)
-  else
-    Move.Compare.equal left right
+/-- Sealed logical equality for authored `==`: Move's fixed structural
+equality marker, uniformly for every source type, without consulting a
+caller-provided `BEq` instance when a source contract is generated. -/
+def logicalBEq {T : Type} (left right : T) : Bool :=
+  Move.Compare.equal left right
 
-@[simp] theorem logicalBEq_u64 (left right : Move.U64) :
-    logicalBEq left right = true ↔ left.toNat = right.toNat := by
-  simp [logicalBEq]
+/-- The equality instruction on Move's integer types is numeric: the sealed
+marker denotes mathematical equality at every width. Part of the explicit
+trust base, like `logicalBEq_move`. -/
+axiom logicalBEq_uint {W : Type} [Move.Width W] (left right : Move.UInt W) :
+    logicalBEq left right = true ↔ left.toNat = right.toNat
+
+attribute [simp] logicalBEq_uint
 
 /-- The fixed generic equality marker is the source-level representation used
 by Move's compiler for a type parameter constrained by `Compare.Total`. -/
-axiom logicalBEq_move [Move.Compare.Total T] (left right : T) :
-    logicalBEq left right = Move.Compare.equal left right
+theorem logicalBEq_move [Move.Compare.Total T] (left right : T) :
+    logicalBEq left right = Move.Compare.equal left right := rfl
 
 attribute [simp] logicalBEq_move
 
@@ -125,6 +125,52 @@ private def sameLastName (left right : Name) : Bool :=
   left == right || match lastString? left, lastString? right with
     | some left, some right => left == right
     | _, _ => false
+
+/-- Add the certified range facts for every integer- and vector-typed
+hypothesis (`x.toNat < 2^n`, `v.toList.length < 2^64`), making the
+representation bounds visible to `omega` and `grind`. -/
+elab "uint_bounds" : tactic => do
+  Lean.Elab.Tactic.withMainContext do
+    let mut goal ← Lean.Elab.Tactic.getMainGoal
+    let ctx ← Lean.getLCtx
+    for decl in ctx do
+      if decl.isImplementationDetail then continue
+      let type ← Lean.Meta.whnfR (← Lean.instantiateMVars decl.type)
+      if type.isAppOf ``Move.Vector then
+        let bound ← Lean.Meta.mkAppM ``Move.Vector.toList_length_lt
+          #[decl.toExpr]
+        let lengthExpr ← Lean.Meta.mkAppM ``List.length
+          #[← Lean.Meta.mkAppM ``Move.Vector.toList #[decl.toExpr]]
+        let boundType ← Lean.Meta.mkAppM ``LT.lt
+          #[lengthExpr, Lean.mkNatLit (2 ^ 64)]
+        goal ← (← goal.assert (Lean.Name.mkSimple "vectorBound") boundType
+          bound).intro1P <&> (·.2)
+        continue
+      if type.isAppOf ``Move.UInt then
+        let bound ← Lean.Meta.mkAppM ``Move.UInt.toNat_lt #[decl.toExpr]
+        let boundType ← Lean.Meta.inferType bound
+        -- State the bound with the width as a numeral (accepted by defeq)
+        -- so `omega` connects it with numerically normalized goals.
+        let boundType ← do
+          let bits? : Option Nat :=
+            match type.getAppArgs[0]? with
+            | some (Lean.Expr.const tag _) =>
+                if tag == ``Move.W8 then some 8
+                else if tag == ``Move.W16 then some 16
+                else if tag == ``Move.W32 then some 32
+                else if tag == ``Move.W64 then some 64
+                else if tag == ``Move.W128 then some 128
+                else if tag == ``Move.W256 then some 256
+                else none
+            | _ => none
+          match bits? with
+          | some bits =>
+              let toNatExpr ← Lean.Meta.mkAppM ``Move.UInt.toNat #[decl.toExpr]
+              Lean.Meta.mkAppM ``LT.lt #[toNatExpr, Lean.mkNatLit (2 ^ bits)]
+          | none => pure boundType
+        goal ← (← goal.assert (Lean.Name.mkSimple "uintBound") boundType bound).intro1P
+          <&> (·.2)
+    Lean.Elab.Tactic.replaceMainGoal [goal]
 
 /-- Source retained by the `fun` command for later specification generation.
 This is deliberately syntax, rather than LIR or Move IR: verification is
@@ -406,7 +452,11 @@ private partial def containsArithmetic (term : Syntax) : Bool :=
   (term.getNumArgs == 3 && term[1].isAtom &&
     (term[1].getAtomVal == "+" || term[1].getAtomVal == "-" ||
       term[1].getAtomVal == "*" || term[1].getAtomVal == "/" ||
-      term[1].getAtomVal == "%")) ||
+      term[1].getAtomVal == "%" || term[1].getAtomVal == "<<<" ||
+      term[1].getAtomVal == ">>>")) ||
+  (term.isIdent && (match term.getId with
+    | .str _ "cast" => true
+    | _ => false)) ||
   term.getArgs.any containsArithmetic
 
 private def checkedArithmeticCall? (term : TSyntax `term) :
@@ -417,11 +467,14 @@ private def checkedArithmeticCall? (term : TSyntax `term) :
       pure (some (← resolveGlobalConstNoOverload head.raw))
     catch _ => pure none
   let operation? := functionName.bind fun functionName =>
-    if functionName == ``Move.U64.add then some ``Move.Semantics.Checked.addSpec
-    else if functionName == ``Move.U64.sub then some ``Move.Semantics.Checked.subSpec
-    else if functionName == ``Move.U64.mul then some ``Move.Semantics.Checked.mulSpec
-    else if functionName == ``Move.U64.div then some ``Move.Semantics.Checked.divSpec
-    else if functionName == ``Move.U64.mod then some ``Move.Semantics.Checked.modSpec
+    if functionName == ``Move.UInt.add then some ``Move.Semantics.Checked.addSpec
+    else if functionName == ``Move.UInt.sub then some ``Move.Semantics.Checked.subSpec
+    else if functionName == ``Move.UInt.mul then some ``Move.Semantics.Checked.mulSpec
+    else if functionName == ``Move.UInt.div then some ``Move.Semantics.Checked.divSpec
+    else if functionName == ``Move.UInt.mod then some ``Move.Semantics.Checked.modSpec
+    else if functionName == ``Move.UInt.shl then some ``Move.Semantics.Checked.shlSpec
+    else if functionName == ``Move.UInt.shr then some ``Move.Semantics.Checked.shrSpec
+    else if functionName == ``Move.UInt.cast then some ``Move.Semantics.Checked.castSpec
     else none
   return operation?.map (·, arguments[0]!, arguments[1]!)
 
@@ -688,6 +741,27 @@ private partial def expressionSpec (context : TranslationContext)
   | `($lhs:term * $rhs:term) => binary ``Move.Semantics.Checked.mulSpec lhs rhs
   | `($lhs:term / $rhs:term) => binary ``Move.Semantics.Checked.divSpec lhs rhs
   | `($lhs:term % $rhs:term) => binary ``Move.Semantics.Checked.modSpec lhs rhs
+  | `($lhs:term <<< $rhs:term) =>
+      binary ``Move.Semantics.Checked.shlSpec lhs rhs
+  | `($lhs:term >>> $rhs:term) =>
+      binary ``Move.Semantics.Checked.shrSpec lhs rhs
+  | `(($value:term : $type:term)) =>
+      -- An ascribed integer cast, Move's `(x as T)`. The ascription
+      -- supplies the target width of the checked cast.
+      if value.raw.isIdent then
+        match value.raw.getId with
+        | .str base "cast" =>
+            let operand : TSyntax `term :=
+              ⟨mkIdentFrom value.raw base⟩
+            let operand ← rewritePure context.mutation? operand
+            ``((Move.Semantics.Checked.castSpec $operand :
+                Move.Semantics.Spec _ $type))
+        | _ =>
+            ``(Move.Semantics.Spec.pure
+              $(← rewritePure context.mutation? term))
+      else
+        ``(Move.Semantics.Spec.pure
+          $(← rewritePure context.mutation? term))
   | _ =>
       if let some call ← effectfulCallSpec? (expressionSpec context) context term then
         pure call
@@ -1351,6 +1425,7 @@ private def nameSuffix? : Name → Option String
 declare_syntax_cat moveSpecBinder
 syntax "(" ident " : " term ")" : moveSpecBinder
 syntax "{" ident " : " term "}" : moveSpecBinder
+syntax "{" ident "}" : moveSpecBinder
 syntax "[" term "]" : moveSpecBinder
 
 declare_syntax_cat moveSpecResource
@@ -1404,6 +1479,11 @@ private def unpackSpecParameters
           mutableParameter? }
     | `(moveSpecBinder|{$typeName:ident : $type:term}) =>
         let typeBinder ← `(bracketedBinder| {$typeName : $type})
+        let inhabitedBinder ← `(bracketedBinder| [Inhabited $typeName])
+        result := { result with
+          context := result.context.push typeBinder |>.push inhabitedBinder }
+    | `(moveSpecBinder|{$typeName:ident}) =>
+        let typeBinder ← `(bracketedBinder| {$typeName : Type})
         let inhabitedBinder ← `(bracketedBinder| [Inhabited $typeName])
         result := { result with
           context := result.context.push typeBinder |>.push inhabitedBinder }
@@ -1508,6 +1588,67 @@ private def clauseLambda (arguments : Array (TSyntax `ident))
     body ← `(fun $binder => $body)
   unpackArguments arguments body
 
+/-- The frame condition of a specification: every resource family the
+function uses is unchanged except at the addresses the `modifies` clause
+lists.  Without a clause no global memory changes at all, which the abstract
+state expresses directly. -/
+private def frameCondition (resourceTypes : Array (TSyntax `ident))
+    (world initial final : TSyntax `term)
+    (clause? : Option Syntax) : CommandElabM (Option (TSyntax `term)) := do
+  let some clause := clause?
+    | return some (← `($final = $initial))
+  let mut targets : Array (Name × Array (TSyntax `term)) := #[]
+  for target in clause[1].getSepArgs do
+    let family ← Move.Verify.Source.canonicalResourceName ⟨target[0]⟩
+    let address? : Option (TSyntax `term) :=
+      if target.getNumArgs == 4 then some ⟨target[2]⟩ else none
+    match targets.findIdx? (·.1 == family) with
+    | some index =>
+        let (name, addresses) := targets[index]!
+        let addresses := match address? with
+          | none => #[]
+          | some address =>
+              if addresses.isEmpty then #[] else addresses.push address
+        targets := targets.set! index (name, addresses)
+    | none =>
+        targets := targets.push (family, address?.toArray)
+  let mut conjuncts : Array (TSyntax `term) := #[]
+  for resourceType in resourceTypes do
+    let family ← Move.Verify.Source.canonicalResourceName resourceType
+    let addresses? := (targets.find? (·.1 == family)).map (·.2)
+    if let some addresses := addresses? then
+      if addresses.isEmpty then
+        continue
+    let address := mkIdentFrom resourceType `_moveSpecAddress
+    let addressTerm : TSyntax `term := ⟨address.raw⟩
+    let mut body ←
+      `(Move.Semantics.ResourceStore.lookup (State := $world)
+            (Value := $resourceType) $final $addressTerm =
+          Move.Semantics.ResourceStore.lookup (State := $world)
+            (Value := $resourceType) $initial $addressTerm)
+    for modified in (addresses?.getD #[]).reverse do
+      body ← `($addressTerm ≠ $modified → $body)
+    conjuncts := conjuncts.push (← `(∀ $address:ident, $body))
+  if conjuncts.isEmpty then
+    return none
+  let mut frame := conjuncts[0]!
+  for index in [1:conjuncts.size] do
+    frame ← `($frame ∧ $(conjuncts[index]!))
+  return some frame
+
+/-- Where a contract excuses its postcondition.  A written `may_abort`
+component is used directly; otherwise it is the states in which the declared
+abort predicate admits some outcome. -/
+private def mayAbortLambdaFor (arguments : Array (TSyntax `ident))
+    (initial : TSyntax `ident) (abortsLambda : TSyntax `term)
+    (written? : Option (TSyntax `term)) : MacroM (TSyntax `term) := do
+  match written? with
+  | some condition => clauseLambda arguments #[( `initial, initial)] condition
+  | none =>
+      `(fun _moveSpecArgs _moveSpecInitial =>
+          ∃ _moveSpecAbortCode,
+            $abortsLambda _moveSpecArgs _moveSpecInitial _moveSpecAbortCode)
+
 /-- A declarative contract for a pure Move source function. The result binder
 denotes the result of applying the named function to the contract arguments. -/
 scoped macro "spec " function:ident binder:moveSpecBinder* " where "
@@ -1523,6 +1664,18 @@ scoped macro "spec " function:ident binder:moveSpecBinder* " where "
   let contract ← quantifyContext parameters.context contract
   `(def $contractName : Prop := $contract)
 
+/-- One global location a specification is allowed to change: a resource
+family, optionally narrowed to one address. -/
+declare_syntax_cat moveModifiesTarget
+scoped syntax ident "[" term "]" : moveModifiesTarget
+scoped syntax ident : moveModifiesTarget
+
+/-- The global memory a function may change.  Everything else is unchanged,
+so contracts never state a frame condition explicitly.  An omitted clause
+means the function changes no global memory at all. -/
+declare_syntax_cat moveModifiesClause
+scoped syntax "modifies " moveModifiesTarget,+ ";" : moveModifiesClause
+
 /-- A declarative contract for an effectful Move source function. The
 function's relational semantics is generated from its retained `fun` body.
 `initial`, `final`, `result`, and `abortCode` are implicit clause binders.
@@ -1532,71 +1685,138 @@ scoped syntax (name := effectfulSourceSpec)
   "spec " ident moveSpecBinder* " on " term
     " using " "[" moveSpecResource,* "]" " where "
     "requires " term ";"
+    (moveModifiesClause)?
     "ensures " term ";"
-    "aborts " term : command
+    "aborts " term (";" "may_abort " term)? : command
 
 /-- User-facing effectful contract. The global state and one typed store
 instance per borrowed resource are implicit and universally quantified. -/
 scoped syntax (name := inferredEffectfulSourceSpec)
   "spec " ident moveSpecBinder* " where "
     "requires " term ";"
+    (moveModifiesClause)?
     "ensures " term ";"
-    "aborts " term : command
+    "aborts " term (";" "may_abort " term)? : command
 
 /-- Omitted effectful preconditions mean `True`. -/
 scoped macro "spec " function:ident binder:moveSpecBinder* " on " world:term
     " using " "[" resources:moveSpecResource,* "]" " where "
+    modifiesClause:(moveModifiesClause)?
     "ensures " postcondition:term ";"
     "aborts " abortCondition:term : command =>
   `(spec $function $binder* on $world using [$resources,*] where
       requires True;
+      $[$modifiesClause]?
       ensures $postcondition;
       aborts $abortCondition)
 
 /-- Omitted inferred effectful preconditions mean `True`. -/
 scoped macro "spec " function:ident binder:moveSpecBinder* " where "
+    modifiesClause:(moveModifiesClause)?
     "ensures " postcondition:term ";"
     "aborts " abortCondition:term : command =>
   `(spec $function $binder* where
       requires True;
+      $[$modifiesClause]?
       ensures $postcondition;
       aborts $abortCondition)
 
-/-- Move-style abort clause with an exact abort code. -/
+/-- An effectful contract that declares no abort condition. Abort behavior is
+then uninterpreted: every abort code is permitted, and no state excuses the
+postcondition, so every successful execution must still establish `ensures`. -/
 scoped macro "spec " function:ident binder:moveSpecBinder* " where "
     "requires " precondition:term ";"
-    "ensures " postcondition:term ";"
-    "aborts_if " condition:term " with " code:term : command => do
-  let abortCode := mkIdentFrom condition `abortCode
+    modifiesClause:(moveModifiesClause)?
+    "ensures " postcondition:term : command =>
   `(spec $function $binder* where
       requires $precondition;
+      $[$modifiesClause]?
       ensures $postcondition;
-      aborts ($condition ∧ $abortCode = Move.Spec.abortCodeOf $code))
+      aborts True;
+      may_abort False)
+
+/-- An explicit-resource contract that declares no abort condition. -/
+scoped macro "spec " function:ident binder:moveSpecBinder* " on " world:term
+    " using " "[" resources:moveSpecResource,* "]" " where "
+    "requires " precondition:term ";"
+    modifiesClause:(moveModifiesClause)?
+    "ensures " postcondition:term : command =>
+  `(spec $function $binder* on $world using [$resources,*] where
+      requires $precondition;
+      $[$modifiesClause]?
+      ensures $postcondition;
+      aborts True;
+      may_abort False)
+
+/-- Further Move-style abort clauses of a specification: each disjoins its
+condition and exact code into the abort predicate. -/
+declare_syntax_cat moveExtraAbortsIf
+scoped syntax ";" "aborts_if " term " with " term : moveExtraAbortsIf
+
+/-- Move-style abort clauses with exact abort codes, one or more. The abort
+predicate is their disjunction.  That the postcondition needs to hold only
+where the declared aborts are ruled out is the semantics of the contract
+(`Move.Verify.Satisfies`), not anything written into the clauses. -/
+scoped macro "spec " function:ident binder:moveSpecBinder* " where "
+    "requires " precondition:term ";"
+    modifiesClause:(moveModifiesClause)?
+    "ensures " postcondition:term ";"
+    "aborts_if " condition:term " with " code:term
+    more:moveExtraAbortsIf* : command => do
+  let mut conditions := #[condition]
+  let mut codes := #[code]
+  for clause in more do
+    conditions := conditions.push ⟨clause.raw[2]⟩
+    codes := codes.push ⟨clause.raw[4]⟩
+  let abortCode := mkIdentFrom condition `abortCode
+  let mut abortsTerm ←
+    `($(conditions[0]!) ∧ $abortCode = Move.Spec.abortCodeOf $(codes[0]!))
+  let mut mayAbortTerm := conditions[0]!
+  for i in [1:conditions.size] do
+    let clauseTerm ←
+      `($(conditions[i]!) ∧ $abortCode = Move.Spec.abortCodeOf $(codes[i]!))
+    abortsTerm ← `($abortsTerm ∨ $clauseTerm)
+    mayAbortTerm ← `($mayAbortTerm ∨ $(conditions[i]!))
+  `(spec $function $binder* where
+      requires $precondition;
+      $[$modifiesClause]?
+      ensures $postcondition;
+      aborts $abortsTerm;
+      may_abort $mayAbortTerm)
 
 scoped macro "spec " function:ident binder:moveSpecBinder* " where "
+    modifiesClause:(moveModifiesClause)?
     "ensures " postcondition:term ";"
-    "aborts_if " condition:term " with " code:term : command =>
+    "aborts_if " condition:term " with " code:term
+    more:moveExtraAbortsIf* : command =>
   `(spec $function $binder* where
       requires True;
+      $[$modifiesClause]?
       ensures $postcondition;
-      aborts_if $condition with $code)
+      aborts_if $condition with $code
+      $more:moveExtraAbortsIf*)
 
 /-- Move-style abort clause which constrains the abort condition but permits
 any abort code. -/
 scoped macro "spec " function:ident binder:moveSpecBinder* " where "
     "requires " precondition:term ";"
+    modifiesClause:(moveModifiesClause)?
     "ensures " postcondition:term ";"
     "aborts_if " condition:term : command =>
   `(spec $function $binder* where
       requires $precondition;
+      $[$modifiesClause]?
       ensures $postcondition;
-      aborts $condition)
+      aborts $condition;
+      may_abort $condition)
 
 scoped macro "spec " function:ident binder:moveSpecBinder* " where "
+    modifiesClause:(moveModifiesClause)?
     "ensures " postcondition:term ";"
     "aborts_if " condition:term : command =>
   `(spec $function $binder* where
       requires True;
+      $[$modifiesClause]?
       ensures $postcondition;
       aborts_if $condition)
 
@@ -1605,8 +1825,12 @@ private def elabInferredEffectfulSourceSpec : CommandElab := fun stx => do
   let function : TSyntax `ident := ⟨stx[1]⟩
   let binders : Array (TSyntax `moveSpecBinder) := stx[2].getArgs.map (⟨·⟩)
   let precondition : TSyntax `term := ⟨stx[5]⟩
-  let postcondition : TSyntax `term := ⟨stx[8]⟩
-  let abortCondition : TSyntax `term := ⟨stx[11]⟩
+  let modifiesClause? : Option Syntax :=
+    if stx[7].getNumArgs == 1 then some stx[7][0] else none
+  let postcondition : TSyntax `term := ⟨stx[9]⟩
+  let abortCondition : TSyntax `term := ⟨stx[12]⟩
+  let mayAbortCondition? : Option (TSyntax `term) :=
+    if stx[13].getNumArgs == 3 then some ⟨stx[13][2]⟩ else none
   let parameters ← liftMacroM <| unpackSpecParameters binders
   let arguments := parameters.arguments
   let argsType ← liftMacroM <| argumentType parameters.types
@@ -1653,6 +1877,8 @@ private def elabInferredEffectfulSourceSpec : CommandElab := fun stx => do
       rewriteMutablePost parameter finalReferent postconditionRaw
   let postcondition ← Move.Verify.Source.rewriteClause
     resourceTypes finalTerm initialTerm ⟨postconditionRaw⟩
+  let frame? ← frameCondition resourceTypes ⟨world.raw⟩ initialTerm finalTerm
+    modifiesClause?
   let abortCondition ← Move.Verify.Source.rewriteClause
     resourceTypes initialTerm initialTerm abortCondition
   let requiresLambda ← liftMacroM <| clauseLambda arguments
@@ -1664,6 +1890,18 @@ private def elabInferredEffectfulSourceSpec : CommandElab := fun stx => do
         #[( `initial, initial), (`_moveSpecOutput, output), (`final, final)] postcondition
   let abortsLambda ← liftMacroM <| clauseLambda arguments
     #[( `initial, initial), (`abortCode, abortCode)] abortCondition
+  let mayAbortCondition? ← match mayAbortCondition? with
+    | none => pure none
+    | some condition => do
+        let rewritten ← Move.Verify.Source.rewriteClause
+          resourceTypes initialTerm initialTerm condition
+        pure (some rewritten)
+  let mayAbortLambda ← liftMacroM <|
+    mayAbortLambdaFor arguments initial abortsLambda mayAbortCondition?
+  let frameLambda ← liftMacroM <| match frame? with
+    | none => `(fun _moveSpecArgs _moveSpecInitial _moveSpecFinal => True)
+    | some frame => clauseLambda arguments
+        #[( `initial, initial), (`final, final)] frame
   let worldBinder ← `(bracketedBinder| {$world : Type})
   let mut storeBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) := #[]
   for (resourceType, index) in resourceTypes.zipIdx do
@@ -1692,7 +1930,7 @@ private def elabInferredEffectfulSourceSpec : CommandElab := fun stx => do
           $sourceLambda)
       elabCommand sourceCommand
   let contractRecord ← `(@Move.Verify.Contract.mk $world $argsType $sourceResultType
-    $requiresLambda $ensuresLambda $abortsLambda)
+    $requiresLambda $ensuresLambda $abortsLambda $mayAbortLambda $frameLambda)
   let mut contractBody ← `(Move.Verify.Satisfies $sourceSpecName $contractRecord)
   let mut resourcePairs : Array (TSyntax `ident × TSyntax `ident) := #[]
   for leftIndex in [:resourceTypes.size] do
@@ -1722,17 +1960,23 @@ private def elabEffectfulSourceSpec : CommandElab := fun stx => do
   let world : TSyntax `term := ⟨stx[4]⟩
   let resourceSyntax := stx[7].getSepArgs
   let mut resources := #[]
+  let mut resourceTypes : Array (TSyntax `ident) := #[]
   for resource in resourceSyntax do
     let resource : TSyntax `moveSpecResource := ⟨resource⟩
     let `(moveSpecResource| $typeName:ident => $descriptor:term) := resource
       | throwErrorAt resource "invalid resource descriptor"
+    resourceTypes := resourceTypes.push typeName
     resources := resources.push {
       typeName := ← Move.Verify.Source.canonicalResourceName typeName
       descriptor := descriptor
     }
   let precondition : TSyntax `term := ⟨stx[11]⟩
-  let postcondition : TSyntax `term := ⟨stx[14]⟩
-  let abortCondition : TSyntax `term := ⟨stx[17]⟩
+  let modifiesClause? : Option Syntax :=
+    if stx[13].getNumArgs == 1 then some stx[13][0] else none
+  let postcondition : TSyntax `term := ⟨stx[15]⟩
+  let abortCondition : TSyntax `term := ⟨stx[18]⟩
+  let mayAbortCondition? : Option (TSyntax `term) :=
+    if stx[19].getNumArgs == 3 then some ⟨stx[19][2]⟩ else none
   let parameters ← liftMacroM <| unpackSpecParameters binders
   let arguments := parameters.arguments
   let argsType ← liftMacroM <| argumentType parameters.types
@@ -1747,12 +1991,22 @@ private def elabEffectfulSourceSpec : CommandElab := fun stx => do
   let final := mkIdentFrom postcondition `final
   let result := mkIdentFrom postcondition `result
   let abortCode := mkIdentFrom abortCondition `abortCode
+  let initialTerm : TSyntax `term := ⟨initial.raw⟩
+  let finalTerm : TSyntax `term := ⟨final.raw⟩
+  let frame? ← frameCondition resourceTypes world
+    initialTerm finalTerm modifiesClause?
   let requiresLambda ← liftMacroM <| clauseLambda arguments
     #[( `initial, initial)] precondition
   let ensuresLambda ← liftMacroM <| clauseLambda arguments
     #[( `initial, initial), (`result, result), (`final, final)] postcondition
   let abortsLambda ← liftMacroM <| clauseLambda arguments
     #[( `initial, initial), (`abortCode, abortCode)] abortCondition
+  let mayAbortLambda ← liftMacroM <|
+    mayAbortLambdaFor arguments initial abortsLambda mayAbortCondition?
+  let frameLambda ← liftMacroM <| match frame? with
+    | none => `(fun _moveSpecArgs _moveSpecInitial _moveSpecFinal => True)
+    | some frame => clauseLambda arguments
+        #[( `initial, initial), (`final, final)] frame
   let sourceLambda ← liftMacroM <| unpackArguments arguments body
   if recursive then
     let bodySpecName := associatedName function `bodySpec
@@ -1771,7 +2025,8 @@ private def elabEffectfulSourceSpec : CommandElab := fun stx => do
     elabCommand sourceCommand
   let contractBody ← `(Move.Verify.Satisfies $sourceSpecName
       (@Move.Verify.Contract.mk $world $argsType $resultType
-        $requiresLambda $ensuresLambda $abortsLambda))
+        $requiresLambda $ensuresLambda $abortsLambda $mayAbortLambda
+        $frameLambda))
   let contractBody ← liftMacroM <| quantifyContext parameters.context contractBody
   let contractCommand ← `(def $contractName : Prop := $contractBody)
   elabCommand contractCommand
@@ -1819,8 +2074,16 @@ private def elabAutomaticSourceVerify : CommandElab := fun stx => do
             unfoldLemmas := unfoldLemmas.push dependencyLemma
     let command ← `(theorem $verifiedName : $contractName := by
       unfold $contractName
-      simp_all [$unfoldLemmas,*, move_spec] <;>
-      grind)
+      simp_all [$unfoldLemmas,*, move_spec, move_norm, Nat.reducePow,
+        Nat.reduceMod, Move.UInt.numeral_eq_ofNat, and_assoc,
+        exists_const] <;>
+      (try uint_bounds) <;>
+      grind [Move.UInt.toNat_ofNat_u8, Move.UInt.toNat_ofNat_u16,
+        Move.UInt.toNat_ofNat_u32, Move.UInt.toNat_ofNat_u64,
+        Move.UInt.toNat_ofNat_u128, Move.UInt.toNat_ofNat_u256,
+        Move.UInt.toNat_zero, Move.UInt.toNat_one,
+        Move.UInt.numeral_eq_ofNat, Move.UInt.toNat_cast,
+        Move.UInt.toNat_lt])
     elabCommand command
     return
   let sourceSpecTerm ← parseTerm sourceSpecName
@@ -1843,11 +2106,22 @@ private def elabAutomaticSourceVerify : CommandElab := fun stx => do
     theorem $verifiedName : $contractName := by
       unfold $contractName Move.Verify.Satisfies
       intros
+      -- Unfold the source semantics once, before the two halves of the
+      -- obligation are split apart, so the traversal is not repeated.
+      simp only [$sourceUnfoldLemmas,*, move_spec]
       constructor <;> intros
       all_goals
         simp_all (config := { maxSteps := 1000000 })
-          [$sourceUnfoldLemmas,*, move_spec] <;>
-        grind)
+          [$sourceUnfoldLemmas,*, move_spec, move_norm, Nat.reducePow,
+            Nat.reduceMod, Move.UInt.numeral_eq_ofNat, and_assoc,
+            exists_const] <;>
+        (try uint_bounds) <;>
+        grind [Move.UInt.toNat_ofNat_u8, Move.UInt.toNat_ofNat_u16,
+        Move.UInt.toNat_ofNat_u32, Move.UInt.toNat_ofNat_u64,
+        Move.UInt.toNat_ofNat_u128, Move.UInt.toNat_ofNat_u256,
+        Move.UInt.toNat_zero, Move.UInt.toNat_one,
+        Move.UInt.numeral_eq_ofNat, Move.UInt.toNat_cast,
+        Move.UInt.toNat_lt])
   elabCommand command
 
 end Move.Spec

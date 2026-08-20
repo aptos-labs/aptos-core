@@ -1,5 +1,5 @@
 {
-  "version": 7,
+  "version": 8,
   "structs": [
     {
       "name": "Box",
@@ -142,7 +142,7 @@
             {"assign": [8, 2]},
             {"assign": [9, 1]},
             {"call": [[], {"unpack_variant_inst": [0, ["u64"]]}, [9]]},
-            {"load": [10, {"u64": "0"}]}
+            {"load": [10, {"num": "0"}]}
           ],
           "term": {"ret": [10]}
         },
@@ -158,7 +158,7 @@
           "instrs": [{"assign": [13, 1]}, {"call": [[14], {"unpack_variant_inst": [1, ["u64"]]}, [13]]}],
           "term": {"ret": [14]}
         },
-        {"instrs": [{"load": [15, {"u64": "14566554180833181697"}]}], "term": {"abort": 15}}
+        {"instrs": [{"load": [15, {"num": "14566554180833181697"}]}], "term": {"abort": 15}}
       ],
       "loops": [],
       "spec": {"requires": [], "aborts_if": [], "ensures": [], "modifies": []}
@@ -247,7 +247,7 @@
             {"call": [[2], {"function_inst": [3, ["u64"]]}, [1]]},
             {"call": [[3], {"pack_inst": ["u64"]}, [2]]},
             {"call": [[4], {"unpack_inst": ["u64"]}, [3]]},
-            {"load": [5, {"u64": "0"}]},
+            {"load": [5, {"num": "0"}]},
             {"load": [6, {"bool": true}]},
             {"call": [[7], {"function_inst": [2, ["u64"]]}, [4, 5, 6]]}
           ],

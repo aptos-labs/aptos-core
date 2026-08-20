@@ -372,7 +372,12 @@ fn translate_type(maps: &NameMaps, ty: &move_model::ty::Type) -> Result<exchange
     use move_model::ty::{PrimitiveType, ReferenceKind, Type};
     match ty {
         Type::Primitive(PrimitiveType::Bool) => Ok(exchange::Type::Bool),
+        Type::Primitive(PrimitiveType::U8) => Ok(exchange::Type::U8),
+        Type::Primitive(PrimitiveType::U16) => Ok(exchange::Type::U16),
+        Type::Primitive(PrimitiveType::U32) => Ok(exchange::Type::U32),
         Type::Primitive(PrimitiveType::U64) => Ok(exchange::Type::U64),
+        Type::Primitive(PrimitiveType::U128) => Ok(exchange::Type::U128),
+        Type::Primitive(PrimitiveType::U256) => Ok(exchange::Type::U256),
         Type::Primitive(PrimitiveType::Address) => Ok(exchange::Type::Address),
         Type::Primitive(PrimitiveType::Signer) => Ok(exchange::Type::Signer),
         Type::TypeParameter(index) => Ok(exchange::Type::TypeParameter(*index as usize)),
@@ -771,7 +776,12 @@ fn dump_function(
 fn constant_value(cons: &Constant) -> Result<exchange::Value> {
     match cons {
         Constant::Bool(b) => Ok(exchange::Value::Bool(*b)),
-        Constant::U64(x) => Ok(exchange::Value::U64(*x)),
+        Constant::U8(x) => Ok(exchange::Value::Num(x.to_string())),
+        Constant::U16(x) => Ok(exchange::Value::Num(x.to_string())),
+        Constant::U32(x) => Ok(exchange::Value::Num(x.to_string())),
+        Constant::U64(x) => Ok(exchange::Value::Num(x.to_string())),
+        Constant::U128(x) => Ok(exchange::Value::Num(x.to_string())),
+        Constant::U256(x) => Ok(exchange::Value::Num(x.to_string())),
         Constant::Address(Address::Numerical(a)) => {
             Ok(exchange::Value::Address(a.to_hex_literal()))
         },
@@ -782,6 +792,19 @@ fn constant_value(cons: &Constant) -> Result<exchange::Value> {
                 .collect::<Result<Vec<_>>>()?,
         )),
         cons => bail!("unsupported constant {:?}", cons),
+    }
+}
+
+/// The exchange width of an integer-typed local.
+fn int_width(locals: &[exchange::Type], local: usize) -> Result<exchange::IntType> {
+    match locals.get(local) {
+        Some(exchange::Type::U8) => Ok(exchange::IntType::U8),
+        Some(exchange::Type::U16) => Ok(exchange::IntType::U16),
+        Some(exchange::Type::U32) => Ok(exchange::IntType::U32),
+        Some(exchange::Type::U64) => Ok(exchange::IntType::U64),
+        Some(exchange::Type::U128) => Ok(exchange::IntType::U128),
+        Some(exchange::Type::U256) => Ok(exchange::IntType::U256),
+        other => bail!("integer operation on non-integer local {local}: {other:?}"),
     }
 }
 
@@ -820,11 +843,22 @@ fn translate_call(
             .ok_or_else(|| anyhow!("variant of foreign or ordinary struct not supported"))
     };
     let instr = match op {
-        Add => simple(exchange::Oper::Add),
+        Add => simple(exchange::Oper::Add(int_width(locals, dsts[0])?)),
         Sub => simple(exchange::Oper::Sub),
-        Mul => simple(exchange::Oper::Mul),
+        Mul => simple(exchange::Oper::Mul(int_width(locals, dsts[0])?)),
         Div => simple(exchange::Oper::Div),
         Mod => simple(exchange::Oper::Mod),
+        BitAnd => simple(exchange::Oper::BitAnd),
+        BitOr => simple(exchange::Oper::BitOr),
+        Xor => simple(exchange::Oper::BitXor),
+        Shl => simple(exchange::Oper::Shl(int_width(locals, dsts[0])?)),
+        Shr => simple(exchange::Oper::Shr(int_width(locals, dsts[0])?)),
+        CastU8 => simple(exchange::Oper::Cast(exchange::IntType::U8)),
+        CastU16 => simple(exchange::Oper::Cast(exchange::IntType::U16)),
+        CastU32 => simple(exchange::Oper::Cast(exchange::IntType::U32)),
+        CastU64 => simple(exchange::Oper::Cast(exchange::IntType::U64)),
+        CastU128 => simple(exchange::Oper::Cast(exchange::IntType::U128)),
+        CastU256 => simple(exchange::Oper::Cast(exchange::IntType::U256)),
         Lt => simple(exchange::Oper::Lt),
         Le => simple(exchange::Oper::Le),
         Eq => simple(exchange::Oper::Eq),
@@ -1212,11 +1246,17 @@ fn collect_loops(
                                 "writes through references inside loops not yet supported \
                                  by loop-target collection"
                             ),
-                            Oper::Add
+                            Oper::Add(_)
                             | Oper::Sub
-                            | Oper::Mul
+                            | Oper::Mul(_)
                             | Oper::Div
                             | Oper::Mod
+                            | Oper::BitAnd
+                            | Oper::BitOr
+                            | Oper::BitXor
+                            | Oper::Shl(_)
+                            | Oper::Shr(_)
+                            | Oper::Cast(_)
                             | Oper::Lt
                             | Oper::Le
                             | Oper::Eq

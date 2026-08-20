@@ -776,7 +776,10 @@ theorem interp_sound_at (fuel : Nat) :
                     | none => simp [ht, hi] at hexec
                     | some iv =>
                       cases iv <;> try { simp [ht, hi] at hexec }
-                      case u64 idx =>
+                      case int idxInt =>
+                      cases idxInt with
+                      | negSucc _ => simp [ht, hi] at hexec
+                      | ofNat idx =>
                         cases hv : readTargetI s rt with
                         | none => simp [ht, hi, hv] at hexec
                         | some rv =>
@@ -961,7 +964,10 @@ theorem interp_sound_at (fuel : Nat) :
                 | none => simp [hcode] at hexec
                 | some cv =>
                   cases cv <;> try { simp [hcode] at hexec }
-                  case u64 code' =>
+                  case int codeInt =>
+                  cases codeInt with
+                  | negSucc _ => simp [hcode] at hexec
+                  | ofNat code' =>
                     simp only [hcode] at hexec
                     change Except.ok (.abort s'.memory code') = .ok o at hexec
                     injection hexec with hexec

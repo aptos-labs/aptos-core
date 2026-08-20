@@ -5,6 +5,7 @@ import Lean
 import Lean.Compiler.InlineAttrs
 import Lean.Elab.Declaration
 import Lean.Elab.Deriving.Basic
+import MoveModel.IR.Module
 
 /-!
 # Leaner declaration attributes
@@ -12,11 +13,83 @@ import Lean.Elab.Deriving.Basic
 Move abilities use Lean's standard `deriving` surface, backed by persistent
 declaration metadata. They are not inferred through open-world typeclass
 search during compilation.
+
+Source attributes written as `@[name arg ...]` before a `struct`, `enum`, or
+`fun` keyword come in two kinds: the closed set of well-known internal
+declaration markers (`move_struct`, `move_public`, ...), which desugar to the
+tag attributes below, and open-ended user-provided attributes, which are
+recorded structurally as `MoveModel.IR.Attribute` metadata. The argument
+grammar (`moveAttrArg`) is shared with specification pragmas.
 -/
+
+/-- Argument of a user-provided Move attribute or pragma: a name path, a
+numeric or boolean constant, or a parenthesized instantiated type. -/
+declare_syntax_cat moveAttrArg
 
 namespace Move
 
 open Lean Elab Command
+
+syntax (name := moveAttrArgIdent) ident : moveAttrArg
+syntax (name := moveAttrArgNum) num : moveAttrArg
+syntax (name := moveAttrArgApply) "(" ident moveAttrArg* ")" : moveAttrArg
+
+private def decodeAttributeName (path : Name) : MoveModel.IR.AttributeArg :=
+  match path with
+  | `true => .bool true
+  | `false => .bool false
+  | _ => .name path.toString []
+
+private def decodeAttributeNum (stx : Syntax) :
+    Except String MoveModel.IR.AttributeArg := do
+  let some value := stx.isNatLit?
+    | throw "expected a numeric attribute argument"
+  unless value < 2 ^ 64 do
+    throw s!"attribute argument `{value}` does not fit in 64 bits"
+  return .num value
+
+private partial def decodeAttributeArg (stx : Syntax) :
+    Except String MoveModel.IR.AttributeArg := do
+  if stx.isOfKind ``moveAttrArgIdent then
+    return decodeAttributeName stx[0].getId
+  if stx.isOfKind ``moveAttrArgNum then
+    return ← decodeAttributeNum stx[0]
+  if stx.isOfKind ``moveAttrArgApply then
+    let args ← stx[2].getArgs.toList.mapM decodeAttributeArg
+    return .name stx[1].getId.toString args
+  throw "unsupported attribute argument"
+
+/-- Decode one parsed attribute or pragma instance (`ident moveAttrArg*`)
+into structured metadata. -/
+def decodeAttributeInstance (stx : Syntax) :
+    Except String MoveModel.IR.Attribute := do
+  let args ← stx[1].getArgs.toList.mapM decodeAttributeArg
+  return { name := stx[0].getId.toString, args }
+
+private def insertUserAttributes
+    (map : NameMap (List MoveModel.IR.Attribute))
+    (entry : Name × List MoveModel.IR.Attribute) :
+    NameMap (List MoveModel.IR.Attribute) :=
+  map.insert entry.1 entry.2
+
+private initialize moveUserAttributeExt :
+    SimplePersistentEnvExtension (Name × List MoveModel.IR.Attribute)
+      (NameMap (List MoveModel.IR.Attribute)) ←
+  registerSimplePersistentEnvExtension {
+    addEntryFn := insertUserAttributes
+    addImportedFn := fun entries =>
+      mkStateFromImportedEntries insertUserAttributes {} entries
+  }
+
+/-- Record the user-provided attributes of one Move declaration. -/
+def registerUserAttributes (env : Environment) (declaration : Name)
+    (attributes : List MoveModel.IR.Attribute) : Environment :=
+  moveUserAttributeExt.addEntry env (declaration, attributes)
+
+/-- The user-provided attributes recorded for a Move declaration. -/
+def userAttributes (env : Environment) (declaration : Name) :
+    List MoveModel.IR.Attribute :=
+  ((moveUserAttributeExt.getState env).find? declaration).getD []
 
 /-- The on-chain identity assigned to declarations enclosed by a
 `move_module`. This metadata is persisted in `.olean` files, so an imported

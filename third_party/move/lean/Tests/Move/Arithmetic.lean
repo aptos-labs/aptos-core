@@ -25,7 +25,7 @@ move_module Arithmetic where
       with Semantics.Checked.arithmeticAbortCode
 
   fun explicitAdd (left right : U64) : Action U64 :=
-    pure (Move.U64.add left right)
+    pure (Move.UInt.add left right)
 
   spec explicitAdd (left : U64) (right : U64) where
     ensures True;
@@ -33,39 +33,38 @@ move_module Arithmetic where
       with Semantics.Checked.arithmeticAbortCode
 
   fun explicitDiv (left right : U64) : Action U64 :=
-    pure (Move.U64.div left right)
+    pure (Move.UInt.div left right)
 
   spec explicitDiv (left : U64) (right : U64) where
     ensures True;
     aborts_if right.toNat = 0 with Semantics.Checked.arithmeticAbortCode
 
-  @[move_struct]
-  structure Counter where
+  struct Counter where
     value : U64
     deriving Key
 
-  @[entry]
-  fun multiply (addr : Address) (factor : U64) : Action Unit := do
+  entry fun multiply (addr : Address) (factor : U64) : Action Unit := do
     let value ← &mut Counter[addr].value
     let old ← *value
     value := old * factor
 
   spec multiply (addr : Address) (factor : U64) where
     requires exists<Counter>(addr);
+    modifies Counter[addr];
     ensures
       Counter[addr].value = old(Counter[addr].value) * factor;
     aborts_if
       ¬old(Counter[addr].value).toNat * factor.toNat < U64.size
       with Semantics.Checked.arithmeticAbortCode
 
-  @[entry]
-  fun divide (addr : Address) (divisor : U64) : Action Unit := do
+  entry fun divide (addr : Address) (divisor : U64) : Action Unit := do
     let value ← &mut Counter[addr].value
     let old ← *value
     value := old / divisor
 
   spec divide (addr : Address) (divisor : U64) where
     requires exists<Counter>(addr);
+    modifies Counter[addr];
     ensures
       Counter[addr].value = old(Counter[addr].value) / divisor;
     aborts_if divisor.toNat = 0 with Semantics.Checked.arithmeticAbortCode

@@ -16,6 +16,8 @@ import Tests.Frontend.Generics
 import Tests.Frontend.Vectors
 import Tests.Move.Account
 import Tests.Move.Abilities
+import Tests.Move.Attributes
+import Tests.Move.Integers
 import Tests.Move.Arithmetic
 import Tests.Move.ResourceComposition
 import Tests.Move.Calls

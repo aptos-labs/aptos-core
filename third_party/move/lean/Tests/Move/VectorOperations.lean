@@ -219,15 +219,15 @@ move_module VectorOperations where
   verify borrowedLength by
     contract_intro
     rw [Move.Verify.wp_pure]
-    apply Move.U64.ext
-    rfl
+    exact ⟨Move.UInt.ext rfl, rfl⟩
 
   verify boolRoundTrip
 
   verify mutateAndRead by
     contract_intro
     simp [wp_norm, Move.Semantics.Mutation.read, Move.Semantics.Mutation.write,
-      Move.Vector.empty, Move.Vector.push, Move.Vector.toList, Move.U64.size]
+      Move.Vector.empty, Move.Vector.push, Move.Vector.toList,
+      move_norm, Nat.reducePow]
     decide
 
   verify insertMiddle

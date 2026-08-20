@@ -6,37 +6,39 @@ import Move.Semantics.Spec
 /-!
 # Checked source arithmetic
 
-Faithful computations for Move `u64` arithmetic. The existing functions in
-`Move.Basic` remain compiler markers; the source verifier interprets those
-markers with these checked operations.
+Faithful computations for Move integer arithmetic, generic over the width.
+The existing functions in `Move.Basic` remain compiler markers; the source
+verifier interprets those markers with these checked operations.
 -/
 
 namespace Move.Semantics.Checked
 
 open Move
 
+variable {W : Type} [Width W]
+
 /-- The VM uses code zero for arithmetic and bounds failures in the modeled
 IR. This is an execution failure code, not a user-written `abort` constant. -/
 def arithmeticAbortCode : Nat := 0
 
-private def result (value : Nat) : Except Nat U64 :=
-  if value < U64.size then .ok (U64.ofNat value) else .error arithmeticAbortCode
+private def result (value : Nat) : Except Nat (UInt W) :=
+  if value < (widthOf W).size then .ok (UInt.ofNat value) else .error arithmeticAbortCode
 
-def add (lhs rhs : U64) : Except Nat U64 := result (lhs.toNat + rhs.toNat)
+def add (lhs rhs : UInt W) : Except Nat (UInt W) := result (lhs.toNat + rhs.toNat)
 
-def sub (lhs rhs : U64) : Except Nat U64 :=
-  if rhs.toNat ≤ lhs.toNat then .ok (U64.ofNat (lhs.toNat - rhs.toNat))
+def sub (lhs rhs : UInt W) : Except Nat (UInt W) :=
+  if rhs.toNat ≤ lhs.toNat then .ok (UInt.ofNat (lhs.toNat - rhs.toNat))
   else .error arithmeticAbortCode
 
-def mul (lhs rhs : U64) : Except Nat U64 := result (lhs.toNat * rhs.toNat)
+def mul (lhs rhs : UInt W) : Except Nat (UInt W) := result (lhs.toNat * rhs.toNat)
 
-def div (lhs rhs : U64) : Except Nat U64 :=
+def div (lhs rhs : UInt W) : Except Nat (UInt W) :=
   if rhs.toNat = 0 then .error arithmeticAbortCode
-  else .ok (U64.ofNat (lhs.toNat / rhs.toNat))
+  else .ok (UInt.ofNat (lhs.toNat / rhs.toNat))
 
-def mod (lhs rhs : U64) : Except Nat U64 :=
+def mod (lhs rhs : UInt W) : Except Nat (UInt W) :=
   if rhs.toNat = 0 then .error arithmeticAbortCode
-  else .ok (U64.ofNat (lhs.toNat % rhs.toNat))
+  else .ok (UInt.ofNat (lhs.toNat % rhs.toNat))
 
 /-- Lift a checked value operation into transaction semantics. -/
 def lift (operation : Except Nat α) : Txn σ α := fun state =>
@@ -44,120 +46,183 @@ def lift (operation : Except Nat α) : Txn σ α := fun state =>
   | .ok value => .ok value state
   | .error code => .abort code
 
-def addM (lhs rhs : U64) : Txn σ U64 := lift (add lhs rhs)
-def subM (lhs rhs : U64) : Txn σ U64 := lift (sub lhs rhs)
-def mulM (lhs rhs : U64) : Txn σ U64 := lift (mul lhs rhs)
-def divM (lhs rhs : U64) : Txn σ U64 := lift (div lhs rhs)
-def modM (lhs rhs : U64) : Txn σ U64 := lift (mod lhs rhs)
+def addM (lhs rhs : UInt W) : Txn σ (UInt W) := lift (add lhs rhs)
+def subM (lhs rhs : UInt W) : Txn σ (UInt W) := lift (sub lhs rhs)
+def mulM (lhs rhs : UInt W) : Txn σ (UInt W) := lift (mul lhs rhs)
+def divM (lhs rhs : UInt W) : Txn σ (UInt W) := lift (div lhs rhs)
+def modM (lhs rhs : UInt W) : Txn σ (UInt W) := lift (mod lhs rhs)
 
 /-! Relational operations used by direct verification. -/
 
-def addSpec (lhs rhs : U64) : Spec σ U64 where
+def addSpec (lhs rhs : UInt W) : Spec σ (UInt W) where
   ok := fun initial value final =>
-    lhs.toNat + rhs.toNat < U64.size ∧
-      value = U64.ofNat (lhs.toNat + rhs.toNat) ∧ final = initial
+    lhs.toNat + rhs.toNat < (widthOf W).size ∧
+      value = UInt.ofNat (lhs.toNat + rhs.toNat) ∧ final = initial
   aborts := fun _ code =>
-    code = arithmeticAbortCode ∧ ¬lhs.toNat + rhs.toNat < U64.size
+    code = arithmeticAbortCode ∧ ¬lhs.toNat + rhs.toNat < (widthOf W).size
 
-def subSpec (lhs rhs : U64) : Spec σ U64 where
+def subSpec (lhs rhs : UInt W) : Spec σ (UInt W) where
   ok := fun initial value final =>
     rhs.toNat ≤ lhs.toNat ∧
-      value = U64.ofNat (lhs.toNat - rhs.toNat) ∧ final = initial
+      value = UInt.ofNat (lhs.toNat - rhs.toNat) ∧ final = initial
   aborts := fun _ code =>
     code = arithmeticAbortCode ∧ ¬rhs.toNat ≤ lhs.toNat
 
-def mulSpec (lhs rhs : U64) : Spec σ U64 where
+def mulSpec (lhs rhs : UInt W) : Spec σ (UInt W) where
   ok := fun initial value final =>
-    lhs.toNat * rhs.toNat < U64.size ∧
-      value = U64.ofNat (lhs.toNat * rhs.toNat) ∧ final = initial
+    lhs.toNat * rhs.toNat < (widthOf W).size ∧
+      value = UInt.ofNat (lhs.toNat * rhs.toNat) ∧ final = initial
   aborts := fun _ code =>
-    code = arithmeticAbortCode ∧ ¬lhs.toNat * rhs.toNat < U64.size
+    code = arithmeticAbortCode ∧ ¬lhs.toNat * rhs.toNat < (widthOf W).size
 
-def divSpec (lhs rhs : U64) : Spec σ U64 where
+def divSpec (lhs rhs : UInt W) : Spec σ (UInt W) where
   ok := fun initial value final =>
-    rhs.toNat ≠ 0 ∧ value = U64.ofNat (lhs.toNat / rhs.toNat) ∧ final = initial
+    rhs.toNat ≠ 0 ∧ value = UInt.ofNat (lhs.toNat / rhs.toNat) ∧ final = initial
   aborts := fun _ code => code = arithmeticAbortCode ∧ rhs.toNat = 0
 
-def modSpec (lhs rhs : U64) : Spec σ U64 where
+def modSpec (lhs rhs : UInt W) : Spec σ (UInt W) where
   ok := fun initial value final =>
-    rhs.toNat ≠ 0 ∧ value = U64.ofNat (lhs.toNat % rhs.toNat) ∧ final = initial
+    rhs.toNat ≠ 0 ∧ value = UInt.ofNat (lhs.toNat % rhs.toNat) ∧ final = initial
   aborts := fun _ code => code = arithmeticAbortCode ∧ rhs.toNat = 0
 
-@[simp] theorem addSpec_eq_pure {lhs rhs : U64}
-    (safe : lhs.toNat + rhs.toNat < U64.size) :
-    (addSpec lhs rhs : Spec σ U64) =
-      Spec.pure (U64.ofNat (lhs.toNat + rhs.toNat)) := by
+@[simp] theorem addSpec_eq_pure {lhs rhs : UInt W}
+    (safe : lhs.toNat + rhs.toNat < (widthOf W).size) :
+    (addSpec lhs rhs : Spec σ (UInt W)) =
+      Spec.pure (UInt.ofNat (lhs.toNat + rhs.toNat)) := by
   apply Spec.extensionality
   · funext initial value final
     simp [addSpec, Spec.pure, safe]
   · funext initial code
     simp [addSpec, Spec.pure, safe]
 
-@[simp] theorem subSpec_eq_pure {lhs rhs : U64} (safe : rhs.toNat ≤ lhs.toNat) :
-    (subSpec lhs rhs : Spec σ U64) =
-      Spec.pure (U64.ofNat (lhs.toNat - rhs.toNat)) := by
+@[simp] theorem subSpec_eq_pure {lhs rhs : UInt W} (safe : rhs.toNat ≤ lhs.toNat) :
+    (subSpec lhs rhs : Spec σ (UInt W)) =
+      Spec.pure (UInt.ofNat (lhs.toNat - rhs.toNat)) := by
   apply Spec.extensionality
   · funext initial value final
     simp [subSpec, Spec.pure, safe]
   · funext initial code
     simp [subSpec, Spec.pure, safe]
 
-theorem subSpec_one_eq_pure_of_pos {value : U64}
+theorem subSpec_one_eq_pure_of_pos {value : UInt W}
     (positive : 0 < value.toNat) :
-    (subSpec value 1 : Spec σ U64) =
-      Spec.pure (U64.ofNat (value.toNat - 1)) := by
+    (subSpec value 1 : Spec σ (UInt W)) =
+      Spec.pure (UInt.ofNat (value.toNat - 1)) := by
+  have hone : (1 : UInt W).toNat = 1 := by
+    rw [UInt.toNat_ofNat_numeral, Nat.mod_eq_of_lt (widthOf W).one_lt_size]
+  rw [show UInt.ofNat (value.toNat - 1)
+      = UInt.ofNat (value.toNat - (1 : UInt W).toNat) by rw [hone]]
   apply subSpec_eq_pure
-  change 1 ≤ value.toNat
-  exact positive
+  omega
 
-@[simp] theorem mulSpec_eq_pure {lhs rhs : U64}
-    (safe : lhs.toNat * rhs.toNat < U64.size) :
-    (mulSpec lhs rhs : Spec σ U64) =
-      Spec.pure (U64.ofNat (lhs.toNat * rhs.toNat)) := by
+@[simp] theorem mulSpec_eq_pure {lhs rhs : UInt W}
+    (safe : lhs.toNat * rhs.toNat < (widthOf W).size) :
+    (mulSpec lhs rhs : Spec σ (UInt W)) =
+      Spec.pure (UInt.ofNat (lhs.toNat * rhs.toNat)) := by
   apply Spec.extensionality
   · funext initial value final
     simp [mulSpec, Spec.pure, safe]
   · funext initial code
     simp [mulSpec, Spec.pure, safe]
 
-@[simp] theorem divSpec_eq_pure {lhs rhs : U64} (nonzero : rhs.toNat ≠ 0) :
-    (divSpec lhs rhs : Spec σ U64) =
-      Spec.pure (U64.ofNat (lhs.toNat / rhs.toNat)) := by
+@[simp] theorem divSpec_eq_pure {lhs rhs : UInt W} (nonzero : rhs.toNat ≠ 0) :
+    (divSpec lhs rhs : Spec σ (UInt W)) =
+      Spec.pure (UInt.ofNat (lhs.toNat / rhs.toNat)) := by
   apply Spec.extensionality
   · funext initial value final
     simp [divSpec, Spec.pure, nonzero]
   · funext initial code
     simp [divSpec, Spec.pure, nonzero]
 
-@[simp] theorem modSpec_eq_pure {lhs rhs : U64} (nonzero : rhs.toNat ≠ 0) :
-    (modSpec lhs rhs : Spec σ U64) =
-      Spec.pure (U64.ofNat (lhs.toNat % rhs.toNat)) := by
+@[simp] theorem modSpec_eq_pure {lhs rhs : UInt W} (nonzero : rhs.toNat ≠ 0) :
+    (modSpec lhs rhs : Spec σ (UInt W)) =
+      Spec.pure (UInt.ofNat (lhs.toNat % rhs.toNat)) := by
   apply Spec.extensionality
   · funext initial value final
     simp [modSpec, Spec.pure, nonzero]
   · funext initial code
     simp [modSpec, Spec.pure, nonzero]
 
-@[simp] theorem add_success {lhs rhs : U64}
-    (h : lhs.toNat + rhs.toNat < U64.size) :
-    add lhs rhs = .ok (U64.ofNat (lhs.toNat + rhs.toNat)) := by
+@[simp] theorem add_success {lhs rhs : UInt W}
+    (h : lhs.toNat + rhs.toNat < (widthOf W).size) :
+    add lhs rhs = .ok (UInt.ofNat (lhs.toNat + rhs.toNat)) := by
   simp [add, result, h]
 
-@[simp] theorem add_overflow {lhs rhs : U64}
-    (h : ¬lhs.toNat + rhs.toNat < U64.size) :
+@[simp] theorem add_overflow {lhs rhs : UInt W}
+    (h : ¬lhs.toNat + rhs.toNat < (widthOf W).size) :
     add lhs rhs = .error arithmeticAbortCode := by
   simp [add, result, h]
 
-@[simp] theorem sub_success {lhs rhs : U64} (h : rhs.toNat ≤ lhs.toNat) :
-    sub lhs rhs = .ok (U64.ofNat (lhs.toNat - rhs.toNat)) := by
+@[simp] theorem sub_success {lhs rhs : UInt W} (h : rhs.toNat ≤ lhs.toNat) :
+    sub lhs rhs = .ok (UInt.ofNat (lhs.toNat - rhs.toNat)) := by
   simp [sub, h]
 
-@[simp] theorem sub_underflow {lhs rhs : U64} (h : ¬rhs.toNat ≤ lhs.toNat) :
+@[simp] theorem sub_underflow {lhs rhs : UInt W} (h : ¬rhs.toNat ≤ lhs.toNat) :
     sub lhs rhs = .error arithmeticAbortCode := by
   simp [sub, h]
 
-@[simp] theorem div_zero (lhs : U64) :
-    div lhs (U64.ofNat 0) = .error arithmeticAbortCode := by
+@[simp] theorem div_zero (lhs : UInt W) :
+    div lhs (UInt.ofNat 0) = .error arithmeticAbortCode := by
   simp [div]
+
+/-! Checked shifts and casts. Bitwise `&&&`, `|||`, and `^^^` never abort, so
+the pure markers of `Move.Basic` are already their faithful semantics. -/
+
+def shl (lhs : UInt W) (amount : UInt W8) : Except Nat (UInt W) :=
+  if amount.toNat < (widthOf W).bits then .ok (UInt.shl lhs amount)
+  else .error arithmeticAbortCode
+
+def shr (lhs : UInt W) (amount : UInt W8) : Except Nat (UInt W) :=
+  if amount.toNat < (widthOf W).bits then .ok (UInt.shr lhs amount)
+  else .error arithmeticAbortCode
+
+def cast {W' : Type} [Width W'] (value : UInt W) : Except Nat (UInt W') :=
+  if value.toNat < (widthOf W').size then .ok (UInt.cast value)
+  else .error arithmeticAbortCode
+
+def shlSpec (lhs : UInt W) (amount : UInt W8) : Spec σ (UInt W) where
+  ok := fun initial value final =>
+    amount.toNat < (widthOf W).bits ∧ value = UInt.shl lhs amount ∧ final = initial
+  aborts := fun _ code =>
+    code = arithmeticAbortCode ∧ ¬amount.toNat < (widthOf W).bits
+
+def shrSpec (lhs : UInt W) (amount : UInt W8) : Spec σ (UInt W) where
+  ok := fun initial value final =>
+    amount.toNat < (widthOf W).bits ∧ value = UInt.shr lhs amount ∧ final = initial
+  aborts := fun _ code =>
+    code = arithmeticAbortCode ∧ ¬amount.toNat < (widthOf W).bits
+
+def castSpec {W' : Type} [Width W'] (value : UInt W) : Spec σ (UInt W') where
+  ok := fun initial result final =>
+    value.toNat < (widthOf W').size ∧ result = UInt.cast value ∧ final = initial
+  aborts := fun _ code =>
+    code = arithmeticAbortCode ∧ ¬value.toNat < (widthOf W').size
+
+@[simp] theorem shlSpec_eq_pure {lhs : UInt W} {amount : UInt W8}
+    (safe : amount.toNat < (widthOf W).bits) :
+    (shlSpec lhs amount : Spec σ (UInt W)) = Spec.pure (UInt.shl lhs amount) := by
+  apply Spec.extensionality
+  · funext initial value final
+    simp [shlSpec, Spec.pure, safe]
+  · funext initial code
+    simp [shlSpec, Spec.pure, safe]
+
+@[simp] theorem shrSpec_eq_pure {lhs : UInt W} {amount : UInt W8}
+    (safe : amount.toNat < (widthOf W).bits) :
+    (shrSpec lhs amount : Spec σ (UInt W)) = Spec.pure (UInt.shr lhs amount) := by
+  apply Spec.extensionality
+  · funext initial value final
+    simp [shrSpec, Spec.pure, safe]
+  · funext initial code
+    simp [shrSpec, Spec.pure, safe]
+
+@[simp] theorem castSpec_eq_pure {W' : Type} [Width W'] {value : UInt W}
+    (safe : value.toNat < (widthOf W').size) :
+    (castSpec value : Spec σ (UInt W')) = Spec.pure (UInt.cast value) := by
+  apply Spec.extensionality
+  · funext initial result final
+    simp [castSpec, Spec.pure, safe]
+  · funext initial code
+    simp [castSpec, Spec.pure, safe]
 
 end Move.Semantics.Checked

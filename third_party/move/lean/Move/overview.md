@@ -57,8 +57,7 @@ open scoped Move Move.Spec
 
 move_module Approval where
 
-  @[move_enum]
-  inductive Decision where
+  enum Decision where
     | pending
     | approved
     | rejected
@@ -106,8 +105,9 @@ Lean-authored Move module ---+   -> kernel-checked Lean theorem
                                  -> Move bytecode + production verifier
 ```
 
-The detailed architecture and developer reference are in the
-[Move README](README.md).
+The example-based developer reference is in the [Move README](README.md),
+the language definition in [`leaner-move.md`](leaner-move.md), and the
+detailed architecture in [`design-plan.md`](design-plan.md).
 
 Lean's compiler exposes typed base LCNF, which gives us a stable, explicit
 representation of the selected declarations. We normalize the supported
@@ -133,16 +133,16 @@ emitted bytecode is still required for a complete end-to-end certificate.
 This is a working prototype, not yet a replacement for the full Move language.
 Its current boundary is intentional:
 
-- there is no general `while`, `for`, or arbitrary loop construct;
-- the stack-safe loop mechanism is explicit tail recursion, written
-  `continue f args...`; the compiler checks that the call is in tail position
-  and lowers it to parallel parameter assignments and a back edge;
+- structured `while` / `loop` / `break` / `continue` (with labels) compile to
+  in-function CFG loops; `for` syntax does not exist;
+- explicit tail recursion written `continue f args...` remains the checked
+  tail-call-to-loop form: the compiler verifies tail position and lowers it to
+  parallel parameter assignments and a back edge;
 - ordinary recursive function calls are supported, but non-tail recursion is
   not converted into a loop;
 - source-level proofs cannot yet import modules authored in Move;
 - higher-order functions, closures, recursive data types, and several complex
   nested-loan shapes remain outside the accepted compiler fragment;
-- only `U64` currently has complete checked source arithmetic;
 - the compiler-preservation proof from verified Lean source through LIR,
   Move IR, XIR, compiler v2, and final bytecode remains future work.
 

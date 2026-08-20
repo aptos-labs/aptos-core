@@ -243,8 +243,8 @@ Move features or of the complete production prover pipeline.
 
 Examples exercise this path for arithmetic contracts, loops, global memory,
 embedded masm and Move source, reference elimination, and cross-call contract
-reasoning; see [`Move/Examples`](../Examples.lean).  In particular,
-[`Move/Examples/Adequacy.lean`](../Examples/Adequacy.lean) constructs a
+reasoning; see [`MoveModel/Examples`](../Examples.lean).  In particular,
+[`MoveModel/Examples/Adequacy.lean`](../Examples/Adequacy.lean) constructs a
 well-formed source program and compiled IVL certificate, proves `Verified`,
 and applies `prover_sound` with every assumption instantiated.  This makes
 changes that accidentally render the theorem unusable visible to the Lean
@@ -289,8 +289,8 @@ README:
 - Put compilation and cross-language correctness under
   `MoveModel/Prover/Translate`.
 - Put reusable Move IR concepts, analyses, execution templates, and IR-to-IR
-  transformations under [`Move/IR`](../IR/README.md).
-- Put frontend decoding and source elaboration under `Move/Frontend`.
+  transformations under [`MoveModel/IR`](../IR/README.md).
+- Put frontend decoding and source elaboration under `MoveModel/Frontend`.
 
 Every public declaration should have a concise documentation comment stating
 what it represents or proves and which abstraction layer it belongs to.

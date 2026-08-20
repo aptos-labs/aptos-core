@@ -39,6 +39,22 @@ private structure TyContext where
   bvars : List (Nat × LIR.Ty) := []
   fvars : List (FVarId × LIR.Ty) := []
 
+/-- Recognize a width-tag type name. -/
+private def widthOfTagName? (name : Name) : Option MoveModel.IR.IntWidth :=
+  if name == ``Move.W8 then some .w8
+  else if name == ``Move.W16 then some .w16
+  else if name == ``Move.W32 then some .w32
+  else if name == ``Move.W64 then some .w64
+  else if name == ``Move.W128 then some .w128
+  else if name == ``Move.W256 then some .w256
+  else none
+
+/-- Recognize a width-tag type expression. -/
+private def widthOfExpr? (type : Expr) : Option MoveModel.IR.IntWidth :=
+  match type with
+  | .const name _ => widthOfTagName? name
+  | _ => none
+
 private partial def translateTyWith (env : Environment) (ctx : TyContext)
     (type : Expr) : Except String (Option LIR.Ty) := do
   if let .bvar index := type then
@@ -51,7 +67,19 @@ private partial def translateTyWith (env : Environment) (ctx : TyContext)
     return some ty
   if type.isSort then return none
   if type.isConstOf ``Bool then return some .bool
-  if type.isConstOf ``U64 then return some .u64
+  if type.isConstOf ``U8 then return some (.uint .w8)
+  if type.isConstOf ``U16 then return some (.uint .w16)
+  if type.isConstOf ``U32 then return some (.uint .w32)
+  if type.isConstOf ``U64 then return some (.uint .w64)
+  if type.isConstOf ``U128 then return some (.uint .w128)
+  if type.isConstOf ``U256 then return some (.uint .w256)
+  if type.isAppOf ``Move.UInt then
+    let some tag := type.getAppArgs[0]?
+      | throw s!"integer type `{type}` is missing its width tag"
+    let some w := widthOfExpr? tag
+      | throw s!"integer width of `{type}` is not statically known"
+    return some (.uint w)
+  if type.isAppOf ``Move.Width then return none
   if type.isConstOf ``Address then return some .address
   if type.isConstOf ``Signer then return some .signer
   if type.isConstOf ``World || type.isConstOf ``PUnit || type.isConstOf ``Unit then
@@ -106,7 +134,12 @@ private def forallBinders : Expr → List (Name × Expr)
 private def syntheticType (name : Name) : Option LIR.Ty :=
   match name.getString! with
   | "Bool" => some .bool
-  | "U64" => some .u64
+  | "U8" => some (.uint .w8)
+  | "U16" => some (.uint .w16)
+  | "U32" => some (.uint .w32)
+  | "U64" => some (.uint .w64)
+  | "U128" => some (.uint .w128)
+  | "U256" => some (.uint .w256)
   | "Address" => some .address
   | "Signer" => some .signer
   | _ => none
@@ -237,6 +270,7 @@ private def compileStruct (env : Environment) (name : Name) : Except String LIR.
     typeParams := inferredTypeParams paramNames abilities (fields.map (·.ty))
     abilities := abilities
     fields := fields
+    attributes := Move.userAttributes env name
   }
 
 private def compileEnum (env : Environment) (name : Name) : Except String LIR.StructDecl := do
@@ -283,6 +317,7 @@ private def compileEnum (env : Environment) (name : Name) : Except String LIR.St
     abilities := abilities
     fields := #[]
     variants := some variants
+    attributes := Move.userAttributes env name
   }
 
 private def fvarArgs (args : Array (Arg .pure)) : Array FVarId :=
@@ -321,7 +356,8 @@ private def structConstructor? (env : Environment) (name : Name) : Option (Name 
       else none
   | _ => none
 
-private partial def u64Constant? (name : Name) : CoreM (Option Nat) := do
+private partial def uintConstant? (name : Name) :
+    CoreM (Option (MoveModel.IR.IntWidth × Nat)) := do
   let decl ← match (← Lean.Compiler.LCNF.getBaseDecl? name) with
     | some decl => pure decl
     | none =>
@@ -329,24 +365,27 @@ private partial def u64Constant? (name : Name) : CoreM (Option Nat) := do
         let some decl ← Lean.Compiler.LCNF.getBaseDecl? name | return none
         pure decl
   let .code code := decl.value | return none
-  let rec scan (values : List (FVarId × Nat)) : Code .pure → Option Nat
+  let rec scan (nats : List (FVarId × Nat))
+      (results : List (FVarId × (MoveModel.IR.IntWidth × Nat))) :
+      Code .pure → Option (MoveModel.IR.IntWidth × Nat)
     | .let letDecl next =>
         match letDecl.value with
-        | .lit (.nat n) => scan ((letDecl.fvarId, n) :: values) next
+        | .lit (.nat n) => scan ((letDecl.fvarId, n) :: nats) results next
         | .const fn _ args _ =>
-            if fn == ``U64.ofNat then
-              match (fvarArgs args)[0]? with
-              | some arg =>
-                  match assocFind? arg values with
-                  | some n => scan ((letDecl.fvarId, n) :: values) next
-                  | none => none
-              | none => none
+            if fn == ``UInt.ofNat then
+              match (typeArgs args)[0]?, (fvarArgs args).back? with
+              | some tag, some natArg =>
+                  match widthOfExpr? tag, assocFind? natArg nats with
+                  | some w, some n =>
+                      scan nats ((letDecl.fvarId, (w, n)) :: results) next
+                  | _, _ => none
+              | _, _ => none
             else
-              scan values next
-        | _ => scan values next
-    | .return result => assocFind? result values
+              scan nats results next
+        | _ => scan nats results next
+    | .return result => assocFind? result results
     | _ => none
-  return scan [] code
+  return scan [] [] code
 
 private structure PendingCall where
   op : LIR.Oper
@@ -860,33 +899,73 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
             modify fun s => { s with
               returnAliases := (decl.fvarId, some value) :: s.returnAliases }
         return instrs
-      let arithmetic? : Option LIR.Oper :=
-        if fn == ``U64.add then some .add else if fn == ``U64.sub then some .sub
-        else if fn == ``U64.mul then some .mul else if fn == ``U64.div then some .div
-        else if fn == ``U64.mod then some .mod else if fn == ``U64.less then some .lt
-        else if fn == ``U64.lessEq then some .le else if fn == ``U64.equal then some .eq
-        else if fn == ``Move.Compare.less then some .lt
-        else if fn == ``Move.Compare.equal then some .eq
-        else if fn == ``Move.Compare.genericDecidableLT then some .lt
-        else if fn == ``U64.instDecidableLt then some .lt else none
-      if let some op := arithmetic? then
-        let some lhs := vars[0]? | throwError "binary operation is missing its left operand"
-        let some rhs := vars[1]? | throwError "binary operation is missing its right operand"
-        let ty := if op == .lt || op == .le || op == .eq then LIR.Ty.bool else .u64
+      -- Integer operations carry their width as the leading width-tag type
+      -- argument; the `Width` instance is erased and the value operands are
+      -- the trailing locals. Only operations whose Move semantics depends on
+      -- the width annotate the LIR operation with it.
+      let widthOfType (index : Nat) : BuildM MoveModel.IR.IntWidth := do
+        let some tag := types[index]?
+          | throwError "integer operation is missing its width tag"
+        let some w := widthOfExpr? tag
+          | throwError "integer width is not statically known"
+        pure w
+      let uintBinary? : Option (MoveModel.IR.IntWidth → LIR.Oper) :=
+        if fn == ``UInt.add then some (.add ·)
+        else if fn == ``UInt.sub then some (fun _ => .sub)
+        else if fn == ``UInt.mul then some (.mul ·)
+        else if fn == ``UInt.div then some (fun _ => .div)
+        else if fn == ``UInt.mod then some (fun _ => .mod)
+        else if fn == ``UInt.land then some (fun _ => .bitAnd)
+        else if fn == ``UInt.lor then some (fun _ => .bitOr)
+        else if fn == ``UInt.lxor then some (fun _ => .bitXor)
+        else if fn == ``UInt.shl then some (.shl ·)
+        else if fn == ``UInt.shr then some (.shr ·)
+        else if fn == ``UInt.less then some (fun _ => .lt)
+        else if fn == ``UInt.lessEq then some (fun _ => .le)
+        else if fn == ``UInt.equal then some (fun _ => .eq)
+        else if fn == ``UInt.instDecidableLt then some (fun _ => .lt)
+        else none
+      if let some mkOp := uintBinary? then
+        let some lhs := vars[vars.size - 2]?
+          | throwError "binary operation is missing its left operand"
+        let some rhs := vars[vars.size - 1]?
+          | throwError "binary operation is missing its right operand"
+        let w ← widthOfType 0
+        let op := mkOp w
+        let ty := if op matches .lt | .le | .eq then LIR.Ty.bool else .uint w
         addLocalTy decl.fvarId ty
         return instrs.push (.call #[localName decl.fvarId] op #[srcName lhs, srcName rhs])
-      if fn == ``U64.ofNat then
-        let some source := vars[0]? | throwError "u64 literal is missing its natural value"
+      let generic? : Option LIR.Oper :=
+        if fn == ``Move.Compare.less then some .lt
+        else if fn == ``Move.Compare.equal then some .eq
+        else if fn == ``Move.Compare.genericDecidableLT then some .lt
+        else none
+      if let some op := generic? then
+        let some lhs := vars[0]? | throwError "binary operation is missing its left operand"
+        let some rhs := vars[1]? | throwError "binary operation is missing its right operand"
+        addLocalTy decl.fvarId .bool
+        return instrs.push (.call #[localName decl.fvarId] op #[srcName lhs, srcName rhs])
+      if fn == ``UInt.cast then
+        let some operand := vars[vars.size - 1]?
+          | throwError "integer cast is missing its operand"
+        let target ← widthOfType 1
+        addLocalTy decl.fvarId (.uint target)
+        return instrs.push
+          (.call #[localName decl.fvarId] (.cast target) #[srcName operand])
+      if fn == ``UInt.ofNat then
+        let some source := vars[vars.size - 1]?
+          | throwError "integer literal is missing its natural value"
         let some n := assocFind? source (← get).natLiterals
-          | throwError "u64 literal is not statically known"
-        addLocalTy decl.fvarId .u64
-        return instrs.push (.loadU64 (localName decl.fvarId) n)
+          | throwError "integer literal is not statically known"
+        let w ← widthOfType 0
+        addLocalTy decl.fvarId (.uint w)
+        return instrs.push (.loadUInt w (localName decl.fvarId) n)
       if fn == ``Bool.true || fn == ``Bool.false then
         addLocalTy decl.fvarId .bool
         return instrs.push (.loadBool (localName decl.fvarId) (fn == ``Bool.true))
-      if let some n ← u64Constant? fn then
-        addLocalTy decl.fvarId .u64
-        return instrs.push (.loadU64 (localName decl.fvarId) n)
+      if let some (w, n) ← uintConstant? fn then
+        addLocalTy decl.fvarId (.uint w)
+        return instrs.push (.loadUInt w (localName decl.fvarId) n)
       if fn == ``Move.Vector.empty then
         let some elemType := types[0]? | throwError "empty vector is missing its element type"
         let some elemTy ← translateCurrentTy (← getEnv) elemType
@@ -989,6 +1068,7 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
         throwError "callee `{fn}` is not selected in this `move_module%`"
       -- Type-class dictionaries and proof evidence are compiler-erased.
       if fn.toString.contains "instInhabited" then return instrs
+      if fn.toString.contains "instWidth" then return instrs
       if fn == ``PUnit.unit || fn == ``Unit.unit then return instrs
       throwError "unsupported call `{fn}` while compiling Move function"
   | .proj owner field source =>
@@ -1374,6 +1454,7 @@ private def compileFun (env : Environment) (signatures : FunSignatures)
     blocks := blocks
     calls := state.calls
     acquires := state.acquires
+    attributes := Move.userAttributes env name
   }
 
 private def addNames (names additions : Array Name) : Array Name :=
@@ -1440,7 +1521,7 @@ private def abilitySetHas : LIR.AbilitySet → RequiredAbility → Bool
 private partial def typeHasAbility (structs : Array LIR.StructDecl)
     (typeParams : Array LIR.TypeParamDecl) (fuel : Nat)
     (required : RequiredAbility) : LIR.Ty → Bool
-  | .bool | .u64 | .address => required != .key
+  | .bool | .uint _ | .address => required != .key
   | .signer => required == .drop
   | .typeParam index =>
       typeParams[index]?.any fun param => abilitySetHas param.abilities required

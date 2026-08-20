@@ -31,8 +31,9 @@ use move_model::{
     },
 };
 use move_model_exchange::{
-    Block, Instr, Oper, Term, Type as Ty, TypeParameter as TypeParameterDecl, Value as Constant,
-    XirDialect, XirFunction as FunctionDecl, XirModule, XirStruct as StructDecl, XirVisibility,
+    Block, Instr, IntType, Oper, Term, Type as Ty, TypeParameter as TypeParameterDecl,
+    Value as Constant, XirDialect, XirFunction as FunctionDecl, XirModule, XirStruct as StructDecl,
+    XirVisibility,
 };
 use move_stackless_bytecode::{
     function_target::FunctionData as TargetFunctionData,
@@ -203,7 +204,17 @@ fn validate_type_parameters(ty: &Ty, count: usize, owner: &str) -> Result<()> {
         Ty::Vector(element) | Ty::Ref(element) | Ty::MutRef(element) => {
             validate_type_parameters(element, count, owner)?;
         },
-        Ty::Bool | Ty::U64 | Ty::Address | Ty::Signer | Ty::Struct(_) | Ty::Enum(_) => {},
+        Ty::Bool
+        | Ty::U8
+        | Ty::U16
+        | Ty::U32
+        | Ty::U64
+        | Ty::U128
+        | Ty::U256
+        | Ty::Address
+        | Ty::Signer
+        | Ty::Struct(_)
+        | Ty::Enum(_) => {},
     }
     Ok(())
 }
@@ -538,7 +549,12 @@ fn move_visibility(visibility: &XirVisibility) -> MoveVisibility {
 fn model_type(ty: &Ty, module_id: ModuleId, structs: &[StructId]) -> Result<Type> {
     Ok(match ty {
         Ty::Bool => Type::Primitive(PrimitiveType::Bool),
+        Ty::U8 => Type::Primitive(PrimitiveType::U8),
+        Ty::U16 => Type::Primitive(PrimitiveType::U16),
+        Ty::U32 => Type::Primitive(PrimitiveType::U32),
         Ty::U64 => Type::Primitive(PrimitiveType::U64),
+        Ty::U128 => Type::Primitive(PrimitiveType::U128),
+        Ty::U256 => Type::Primitive(PrimitiveType::U256),
         Ty::Address => Type::Primitive(PrimitiveType::Address),
         Ty::Signer => Type::Primitive(PrimitiveType::Signer),
         Ty::TypeParameter(index) => {
@@ -830,8 +846,8 @@ impl FunctionTranslator<'_> {
     fn translate_instruction(&mut self, instruction: &Instr) -> Result<()> {
         match instruction {
             Instr::Load(dst, constant) => {
-                self.local(*dst)?;
-                let constant = stackless_constant(constant)?;
+                let ty = self.local(*dst)?.clone();
+                let constant = stackless_constant(constant, &ty)?;
                 self.emit(|attr| Bytecode::Load(attr, *dst, constant))
             },
             Instr::Assign(dst, src) => {
@@ -1206,11 +1222,16 @@ impl FunctionTranslator<'_> {
 
     fn operation(&self, dsts: &[usize], oper: &Oper, srcs: &[usize]) -> Result<StacklessOperation> {
         Ok(match oper {
-            Oper::Add
+            Oper::Add(_)
             | Oper::Sub
-            | Oper::Mul
+            | Oper::Mul(_)
             | Oper::Div
             | Oper::Mod
+            | Oper::BitAnd
+            | Oper::BitOr
+            | Oper::BitXor
+            | Oper::Shl(_)
+            | Oper::Shr(_)
             | Oper::Lt
             | Oper::Le
             | Oper::Eq
@@ -1218,17 +1239,33 @@ impl FunctionTranslator<'_> {
             | Oper::Or => {
                 arity(dsts, srcs, 1, 2, oper)?;
                 match oper {
-                    Oper::Add => StacklessOperation::Add,
+                    Oper::Add(_) => StacklessOperation::Add,
                     Oper::Sub => StacklessOperation::Sub,
-                    Oper::Mul => StacklessOperation::Mul,
+                    Oper::Mul(_) => StacklessOperation::Mul,
                     Oper::Div => StacklessOperation::Div,
                     Oper::Mod => StacklessOperation::Mod,
+                    Oper::BitAnd => StacklessOperation::BitAnd,
+                    Oper::BitOr => StacklessOperation::BitOr,
+                    Oper::BitXor => StacklessOperation::Xor,
+                    Oper::Shl(_) => StacklessOperation::Shl,
+                    Oper::Shr(_) => StacklessOperation::Shr,
                     Oper::Lt => StacklessOperation::Lt,
                     Oper::Le => StacklessOperation::Le,
                     Oper::Eq => StacklessOperation::Eq,
                     Oper::And => StacklessOperation::And,
                     Oper::Or => StacklessOperation::Or,
                     _ => unreachable!(),
+                }
+            },
+            Oper::Cast(target) => {
+                arity(dsts, srcs, 1, 1, oper)?;
+                match target {
+                    IntType::U8 => StacklessOperation::CastU8,
+                    IntType::U16 => StacklessOperation::CastU16,
+                    IntType::U32 => StacklessOperation::CastU32,
+                    IntType::U64 => StacklessOperation::CastU64,
+                    IntType::U128 => StacklessOperation::CastU128,
+                    IntType::U256 => StacklessOperation::CastU256,
                 }
             },
             Oper::Not => {
@@ -1935,9 +1972,32 @@ fn local_is_read_after(local: usize, instrs: &[Instr], term: &Term) -> bool {
     }
 }
 
-fn stackless_constant(constant: &Constant) -> Result<StacklessConstant> {
+fn stackless_constant(constant: &Constant, ty: &Type) -> Result<StacklessConstant> {
     Ok(match constant {
-        Constant::U64(value) => StacklessConstant::U64(*value),
+        Constant::Num(value) => {
+            let parse_err = || format!("invalid integer constant `{value}`");
+            match ty {
+                Type::Primitive(PrimitiveType::U8) => {
+                    StacklessConstant::U8(value.parse().with_context(parse_err)?)
+                },
+                Type::Primitive(PrimitiveType::U16) => {
+                    StacklessConstant::U16(value.parse().with_context(parse_err)?)
+                },
+                Type::Primitive(PrimitiveType::U32) => {
+                    StacklessConstant::U32(value.parse().with_context(parse_err)?)
+                },
+                Type::Primitive(PrimitiveType::U64) => {
+                    StacklessConstant::U64(value.parse().with_context(parse_err)?)
+                },
+                Type::Primitive(PrimitiveType::U128) => {
+                    StacklessConstant::U128(value.parse().with_context(parse_err)?)
+                },
+                Type::Primitive(PrimitiveType::U256) => {
+                    StacklessConstant::U256(value.parse::<ethnum::U256>().with_context(parse_err)?)
+                },
+                other => bail!("integer constant loaded into non-integer type {other:?}"),
+            }
+        },
         Constant::Bool(value) => StacklessConstant::Bool(*value),
         Constant::Address(value) => StacklessConstant::Address(Address::Numerical(
             AccountAddress::from_hex_literal(value)
@@ -2145,7 +2205,7 @@ mod tests {
         assert!(local_is_read_after(1, &[], &Term::Ret(vec![1])));
         assert!(!local_is_read_after(
             1,
-            &[Instr::Load(1, Constant::U64(0))],
+            &[Instr::Load(1, Constant::Num("0".to_string()))],
             &Term::Ret(vec![]),
         ));
     }

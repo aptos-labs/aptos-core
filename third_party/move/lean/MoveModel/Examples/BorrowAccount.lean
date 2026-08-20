@@ -300,7 +300,6 @@ theorem borrow_withdraw_verified : Verified elimProg 0 := by
           Contract.abortsFalse, Account.curBal, Account.oldBal,
           Account.oldExists, hge, memWrite, MoveState.writeLocals,
           agreesOutside, Contract.footprint]
-        refine ⟨by omega, ?_⟩
         intro r a' hout hr ha'
         exact absurd ha' (hout hr.symm)
 

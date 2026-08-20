@@ -4453,7 +4453,7 @@ theorem elimImmInstr_readRef_inv {d : FunDecl} {st st' : ElimSt}
   | .ref u, h =>
       simp only [pure, Except.pure, Except.ok.injEq, Prod.mk.injEq] at h
       exact ⟨h.1.symm, Or.inl ⟨by simp [isImmLocal, hloc], h.2.symm⟩⟩
-  | .mutRef u, h | .u64, h | .bool, h | .address, h | .signer, h
+  | .mutRef u, h | .uint _, h | .bool, h | .address, h | .signer, h
   | .typeParam _, h | .struct _, h | .structInst _ _, h
   | .enum _, h | .enumInst _ _, h | .vector _, h =>
       simp only [pure, Except.pure, Except.ok.injEq, Prod.mk.injEq] at h

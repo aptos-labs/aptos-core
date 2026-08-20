@@ -151,7 +151,7 @@ private def diamondBorrow : FunDecl := mkFun 3
    ⟨[.call [3] .borrowLoc [2]], .jump 3⟩,
    ⟨[.call [4] .readRef [3],
      .load 5 (.u64 100),
-     .call [4] .add [4, 5],
+     .call [4] (.add .w64) [4, 5],
      .call [] .writeRef [3, 4]], .ret [1, 2]⟩]
 
 #guard (elim1 diamondBorrow).isSome

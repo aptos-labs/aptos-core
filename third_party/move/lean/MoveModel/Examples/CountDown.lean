@@ -137,14 +137,16 @@ theorem count_down_verified : Verified prog 0 := by
       -- the back edge
       simp [hab, hl0, Oper.sem,         MoveState.writeLocals] at hg2
       have hk1 : 1 ≤ k := hg2
+      have hk1Int : (1 : Int) ≤ (k : Int) := by omega
       have hTL1 := hTL.writeU64 (x := 1) (n := 0) (by simp [countDownDecl])
         (by simp [U64_SIZE])
       have hTL2 := hTL1.writeBool (x := 2) (b := true) (by simp [countDownDecl])
       have hTL3 := hTL2.writeU64 (x := 3) (n := 1) (by simp [countDownDecl])
         (by simp [U64_SIZE])
-      have hTL4 := hTL3.writeU64 (x := 0) (n := k - 1) (by simp [countDownDecl])
-        (by omega)
-      simp [wpCmds, compileInstr, onOk, hab, hl0, hg2, hk1,
+      have hTL4 := hTL3.writeUInt (x := 0) (i := (k : Int) - 1) (w := .w64)
+        (by simp [countDownDecl]) (by omega)
+        (by rw [u64_size_eq]; omega)
+      simp [wpCmds, compileInstr, onOk, hab, hl0, hg2, hk1, hk1Int,
         Oper.sem, MoveState.writeLocals, Holds,
         VState.curEnv, VState.doAbort]
       intro g' b' hedge hg'

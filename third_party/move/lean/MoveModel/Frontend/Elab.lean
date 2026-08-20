@@ -36,6 +36,7 @@ open Lean
 
 /-! ## Quotation: `ToExpr` instances for the first-order representation -/
 
+deriving instance ToExpr for IntWidth
 deriving instance ToExpr for Ty
 deriving instance ToExpr for TypeTagToken
 deriving instance ToExpr for ResourceKey
@@ -53,6 +54,8 @@ deriving instance ToExpr for AbilitySet
 deriving instance ToExpr for TypeParamDecl
 deriving instance ToExpr for MoveModel.IR.Visibility
 deriving instance ToExpr for Dialect
+deriving instance ToExpr for AttributeArg
+deriving instance ToExpr for MoveModel.IR.Attribute
 deriving instance ToExpr for StructMeta
 deriving instance ToExpr for FunMeta
 deriving instance ToExpr for ExternalFunRef

@@ -16,25 +16,23 @@ move_module Account where
 
   /-! ## Functions -/
 
-  @[move_struct]
-  structure BalanceValue where
+  struct BalanceValue where
     value : U64
     deriving Copy, Drop, Store
 
-  @[move_struct]
-  structure Balance where
+  struct Balance where
     balance : BalanceValue
     deriving Key
 
   def E_INSUFFICIENT_BALANCE : U64 := 1
 
-  @[entry]
-  fun deposit (addr : Address) (amount : U64) : Action Unit := do
+  entry fun deposit (addr : Address) (amount : U64) : Action Unit := do
     let value ← &mut Balance[addr].balance.value
     value := *value + amount
 
   spec deposit (addr : Address) (amount : U64) where
     requires exists<Balance>(addr);
+    modifies Balance[addr];
     ensures
       Balance[addr].balance.value =
         old(Balance[addr].balance.value) + amount;
@@ -42,8 +40,7 @@ move_module Account where
       ¬old(Balance[addr].balance.value).toNat + amount.toNat < U64.size
       with Semantics.Checked.arithmeticAbortCode
 
-  @[entry]
-  fun withdraw (addr : Address) (amount : U64) : Action Unit := do
+  entry fun withdraw (addr : Address) (amount : U64) : Action Unit := do
     let value ← &mut Balance[addr].balance.value
     let old ← *value
     if old < amount then
@@ -53,6 +50,7 @@ move_module Account where
   spec withdraw (addr : Address) (amount : U64) where
     requires
       exists<Balance>(addr);
+    modifies Balance[addr];
     ensures
       Balance[addr].balance.value =
         old(Balance[addr].balance.value) - amount;

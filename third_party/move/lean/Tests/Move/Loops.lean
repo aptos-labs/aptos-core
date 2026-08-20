@@ -134,8 +134,7 @@ move_module Loops where
       break
     pure n
 
-  @[move_struct]
-  structure Counter where
+  struct Counter where
     value : U64
     deriving Key
 
@@ -149,6 +148,7 @@ move_module Loops where
 
   spec drain (addr : Address) where
     requires exists<Counter>(addr);
+    modifies Counter[addr];
     ensures Counter[addr].value = 0;
     aborts_if False
 
@@ -187,7 +187,7 @@ move_module Loops where
   verify countDownLoop by
     contract_intro
     move_cases hloop : Move.Verify.Source.logicalLT args 1
-    · have argsZero : args = 0 := Move.U64.eq_zero_of_not_pos (by omega)
+    · have argsZero : args = 0 := Move.UInt.eq_zero_of_not_pos (by omega)
       subst argsZero
       simp [Move.Verify.wp, Move.Semantics.Spec.pure]
     · rw [Move.Semantics.Checked.subSpec_one_eq_pure_of_pos (by omega),
@@ -203,17 +203,19 @@ move_module Loops where
               (Move.Semantics.Checked.addSpec n 1) recursive
           else
             Move.Semantics.Spec.pure n)
-        (@Move.Verify.Contract.mk State U64 U64
-          (fun n _ => n.toNat ≤ 3)
-          (fun _ initial result final => result = 3 ∧ final = initial)
-          (fun _ _ _ => False)) := by
+        ({ «requires» := fun n _ => n.toNat ≤ 3
+           «ensures» := fun _ _ result _ => result = 3
+           «aborts» := fun _ _ _ => False
+           mayAbort := fun _ _ => False } :
+          Move.Verify.Contract State U64 U64) := by
     apply Move.Verify.satisfies_fix_of_wp
     intro recursive recursiveVerified n initial permitted
+    abort_norm
     replace permitted : n.toNat ≤ 3 := permitted
     move_cases hloop : Move.Verify.Source.logicalLT n 3
     · spec_norm
       apply Move.Verify.wp_of_satisfies recursiveVerified
-      show (Move.U64.ofNat (n.toNat + 1)).toNat ≤ 3
+      show (Move.UInt.ofNat (n.toNat + 1)).toNat ≤ 3
       u64_omega
     · have nEq : n = 3 := by u64_omega
       subst nEq
@@ -223,19 +225,19 @@ move_module Loops where
     contract_intro
     by_cases hloop : Move.Verify.Source.logicalLT 0 args
     · rw [if_pos hloop]
-      simp only [Move.Verify.Source.logicalLT_u64,
-        Move.U64.toNat_ofNat_numeral] at hloop
+      simp only [Move.Verify.Source.logicalLT_uint,
+        Move.UInt.toNat_ofNat_numeral, move_norm, Nat.reducePow, Nat.reduceMod] at hloop
       rw [Move.Semantics.Checked.subSpec_one_eq_pure_of_pos hloop,
         Move.Semantics.Spec.pure_bind]
       exact Move.Verify.wp_of_satisfies recursiveVerified trivial
     · rw [if_neg hloop]
-      simp only [Move.Verify.Source.logicalLT_u64,
-        Move.U64.toNat_ofNat_numeral] at hloop
+      simp only [Move.Verify.Source.logicalLT_uint,
+        Move.UInt.toNat_ofNat_numeral, move_norm, Nat.reducePow, Nat.reduceMod] at hloop
       refine Move.Verify.wp_mono
         (Move.Verify.wp_of_satisfies (upToThreeLoop _) ?_) ?_ ?_
       · show args.toNat ≤ 3
         omega
-      · exact fun result final h => h.1
+      · exact fun result final h => h
       · exact fun code h => h.elim
 
   /-- Both labeled loop examples run one countdown to zero. -/
@@ -247,14 +249,16 @@ move_module Loops where
           else
             Move.Semantics.Spec.bind
               (Move.Semantics.Checked.subSpec n 1) recursive)
-        (@Move.Verify.Contract.mk State U64 U64
-          (fun _ _ => True)
-          (fun _ _ result _ => result = 0)
-          (fun _ _ _ => False)) := by
+        ({ «requires» := fun _ _ => True
+           «ensures» := fun _ _ result _ => result = 0
+           «aborts» := fun _ _ _ => False
+           mayAbort := fun _ _ => False } :
+          Move.Verify.Contract State U64 U64) := by
     apply Move.Verify.satisfies_fix_of_wp
     intro recursive recursiveVerified n initial _
+    abort_norm
     move_cases hloop : Move.Verify.Source.logicalLT n 1
-    · have nZero : n = 0 := Move.U64.eq_zero_of_not_pos (by omega)
+    · have nZero : n = 0 := Move.UInt.eq_zero_of_not_pos (by omega)
       subst nZero
       simp [Move.Verify.wp, Move.Semantics.Spec.pure]
     · rw [Move.Semantics.Checked.subSpec_one_eq_pure_of_pos (by omega),
@@ -286,14 +290,15 @@ move_module Loops where
               (Move.Semantics.Checked.subSpec n 1) recursive
           else
             Move.Semantics.Spec.pure (n, reference.write n))
-        (@Move.Verify.Contract.mk State U64
-          (U64 × Move.Semantics.Mutation U64)
-          (fun _ _ => True)
-          (fun _ initial output final =>
-            output = (0, reference.write 0) ∧ final = initial)
-          (fun _ _ _ => False)) := by
+        ({ «requires» := fun _ _ => True
+           «ensures» := fun _ _ output _ => output = (0, reference.write 0)
+           «aborts» := fun _ _ _ => False
+           mayAbort := fun _ _ => False } :
+          Move.Verify.Contract State U64
+            (U64 × Move.Semantics.Mutation U64)) := by
     apply Move.Verify.satisfies_fix_of_wp
     intro recursive recursiveVerified n initial _
+    abort_norm
     move_cases hloop : Move.Verify.Source.logicalLT 0 n
     · rw [Move.Semantics.Checked.subSpec_one_eq_pure_of_pos hloop,
         Move.Semantics.Spec.pure_bind]
@@ -313,7 +318,9 @@ move_module Loops where
         trivial) ?_ ?_
     · rintro output final ⟨rfl, rfl⟩ reconciled
       simp only [Move.Semantics.Mutation.write] at reconciled ⊢
-      simp [← reconciled, Move.Semantics.ResourceStore.get]
+      refine ⟨by simp [← reconciled, Move.Semantics.ResourceStore.get], ?_⟩
+      exact fun _ distinct => Move.Semantics.ResourceStore.lookup_insert_other
+        _ _ _ _ distinct
     · exact fun code h => h.elim
 
   verify early

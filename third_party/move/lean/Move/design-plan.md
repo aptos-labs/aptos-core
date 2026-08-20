@@ -177,8 +177,8 @@ structure AbilitySet where
 ```
 
 Move structures and enums declare exact abilities using Lean's deriving
-surface: `deriving Copy, Drop, Store, Key`. `@[move_struct]` itself grants no
-abilities, and a resource is represented by `@[move_struct] ... deriving Key`.
+surface: `deriving Copy, Drop, Store, Key`. `struct` itself grants no
+abilities, and a resource is represented by `struct ... deriving Key`.
 Lowering records these abilities in LIR, Move IR, and XIR; the production Move
 compiler validates that field types support them.
 
@@ -266,7 +266,8 @@ A module-aware reference-elimination wrapper must update the dialect to
 5. Assign block IDs in layout order and preserve the actual entry ID.
 6. Construct `MoveModel.IR.StructDecl`, `FunDecl`, `Cfg`, `Block`, `Instr`, and
    `Term` values directly.
-7. Convert an LIR `.entry` visibility to IR `.public_` plus `isEntry := true`.
+7. Convert an LIR `.entry` visibility to IR `.public_` plus `isEntry := true`,
+   and `.friend_` to IR `.friend`.
 8. Attach abilities, names, address, and `acquires` to `MoveModel.IR.Module`.
 9. Mark the result as `.stackless`.
 
@@ -275,8 +276,11 @@ self-call written `continue f args...` whose result is immediately returned is
 lowered to parallel parameter assignment followed by a back edge to the entry
 block. The call-site marker is rejected if it targets another function or is
 not in tail position. All ordinary recursive calls—including calls in a
-function which also contains `continue`—retain call semantics. Recursive struct
-types remain rejected for the prototype.
+function which also contains `continue`—retain call semantics. Structured
+`while` / `loop` bodies lower to internal CFG headers and back edges inside
+the same `FunDecl`; no helper functions are generated
+([`loop-design.md`](loop-design.md)). Recursive struct types remain rejected
+for the prototype.
 
 ## MoveModel.Frontend.XIR extensions
 
@@ -384,7 +388,7 @@ Encoding rules:
 
 - Use explicit encoders rather than generic `Repr` output.
 - Use snake-case externally tagged enum variants.
-- Encode `u64` constants as decimal strings.
+- Encode integer constants as decimal strings.
 - Encode module addresses as canonical hexadecimal strings.
 - Keep resource, function, field, local, and block references positional.
 - Preserve declaration and block order deterministically.
@@ -413,10 +417,10 @@ builds just validate the module.
 
 The preferred authoring form is `move_module Module where ...`. This macro
 creates the same-named Lean namespace, opens the `Move` API and syntax, and
-registers its export in one command. `fun` declarations receive `move_fun`
-automatically, while plain `def`s remain Lean-only helpers for specifications
-and proofs. Entry points use the block-scoped `@[entry]` spelling, which
-expands to the compatibility `move_entry` attribute.
+registers its export in one command. `struct` / `enum` / `fun` /
+`entry fun` / `friend fun` items expand to the persistent metadata
+attributes, while plain `def`s remain Lean-only helpers for specifications
+and proofs.
 
 ## Rust XIR model loader
 
@@ -466,7 +470,8 @@ the stackless boundary.
 
 The implemented scalar/resource backend supports:
 
-- `bool`, `u64`, address, signer, structs, native enums, vectors, and references
+- `bool`, all integer widths (`u8` ... `u256`), address, signer, structs,
+  native enums, vectors, and references
 - Constants and local assignment
 - Arithmetic, comparison, and Boolean operations present in `MoveModel.IR`
 - Struct pack/unpack and reference-based field access
@@ -479,10 +484,17 @@ The implemented scalar/resource backend supports:
 - Jump, branch, return, and abort
 - True generic functions, structs, enums, resources, operations, and calls
 - Same-module and supported cross-module calls between Lean-authored modules
-- Private, public, and entry functions
+- Private, public, `public(friend)`, and entry functions (`public fun` /
+  `friend fun` / `entry fun`)
+- User-provided source attributes (`@[resource_group (scope global)]`)
+  recorded as struct and function metadata and carried through the XIR
+  exchange
 - `acquires`
 - Recursive and mutually recursive functions; direct self-calls explicitly
   marked with `continue` lower to stack-safe CFG loops
+- Structured `while` / `loop` / labeled `break` / `continue` lowered to
+  in-function CFG loops, and `return` from any block (see
+  [`loop-design.md`](loop-design.md))
 
 The current boundary rejects:
 
@@ -495,7 +507,6 @@ The current boundary rejects:
 - Recursive struct types
 - Reference-eliminated mutation-algebra operations
 - Closures and general higher-order values
-- Integer widths other than `u64` until their target semantics are modeled
 - Specification-only constructs with no bytecode meaning
 - Any `MoveModel.IR` operation not explicitly mapped by the backend
 
@@ -672,3 +683,7 @@ table indices and byte offsets need not match.
   cross-module Lean-authored calls. Documented direct source verification as a
   branch separate from XIR generation and recorded source-to-IR semantic
   preservation as the remaining end-to-end proof boundary.
+- 2026-08-20: Recorded implemented structured `while`/`loop` CFG lowering, the
+  `public fun` / `friend fun` visibility keywords with `public(friend)`
+  export, and the split of the language definition into
+  [`leaner-move.md`](leaner-move.md).

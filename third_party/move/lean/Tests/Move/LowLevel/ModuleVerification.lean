@@ -55,22 +55,22 @@ move_module SourceVerification where
   def incrementSpec (value : U64) : Semantics.Spec Unit U64 :=
     Semantics.Checked.addSpec value 1
 
-  def incrementContract : Verify.Contract Unit U64 U64 := Verify.Contract.mk
-    (fun _ _ => True)
-    (fun value initial result final =>
-      value.toNat + 1 < U64.size ∧
-        result = U64.ofNat (value.toNat + 1) ∧ final = initial)
-    (fun value _ code =>
+  def incrementContract : Verify.Contract Unit U64 U64 where
+    «requires» := fun _ _ => True
+    «ensures» := fun value _ result _ =>
+      value.toNat + 1 < U64.size ∧ result = U64.ofNat (value.toNat + 1)
+    «aborts» := fun value _ code =>
       code = Semantics.Checked.arithmeticAbortCode ∧
-        ¬value.toNat + 1 < U64.size)
+        ¬value.toNat + 1 < U64.size
+    mayAbort := fun value _ => ¬value.toNat + 1 < U64.size
 
   /-- Both successful execution and overflow are covered by one contract. -/
   theorem increment_verified :
       Verify.Satisfies incrementSpec incrementContract := by
     intro value initial _
     constructor
-    · intro result final execution
-      exact execution
+    · exact fun result final execution =>
+        ⟨fun _ => ⟨execution.1, execution.2.1⟩, execution.2.2⟩
     · intro code execution
       exact execution
 
@@ -88,11 +88,11 @@ move_module SourceVerification where
         (Verify.assignSpecBody replacement))
       (fun output => Semantics.Spec.pure output.2)
 
-  def replaceContract : Verify.Contract Unit U64 U64 := Verify.Contract.mk
-    (fun _ _ => True)
-    (fun replacement initial result final =>
-      result = replacement ∧ final = initial)
-    (fun _ _ _ => False)
+  def replaceContract : Verify.Contract Unit U64 U64 where
+    «requires» := fun _ _ => True
+    «ensures» := fun replacement _ result _ => result = replacement
+    «aborts» := fun _ _ _ => False
+    mayAbort := fun _ _ => False
 
   theorem replace_verified :
       Verify.Satisfies replaceSpec replaceContract := by
