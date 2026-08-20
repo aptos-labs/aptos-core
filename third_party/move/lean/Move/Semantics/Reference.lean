@@ -102,6 +102,45 @@ def withMutation (initial : α)
   aborts := fun initialState code =>
     ∃ (future : α),
       (body { current := initial, prophecy := future }).aborts initialState code
+  undefined := fun initialState =>
+    ∃ (future : α),
+      (body { current := initial, prophecy := future }).undefined initialState
+
+@[simp] theorem withMutation_ok (initial : α)
+    (body : Mutation α → Spec σ (β × Mutation α)) :
+    (withMutation initial body).ok state output finalState ↔
+      ∃ (future : α) (reference : Mutation α),
+        (body { current := initial, prophecy := future }).ok
+          state (output.1, reference) finalState ∧
+        reference.current = future ∧ output.2 = future := Iff.rfl
+
+@[simp] theorem withMutation_aborts (initial : α)
+    (body : Mutation α → Spec σ (β × Mutation α)) :
+    (withMutation initial body).aborts state code ↔
+      ∃ (future : α),
+        (body { current := initial, prophecy := future }).aborts state code :=
+  Iff.rfl
+
+/-- Pointwise well-definedness of a scoped mutation. -/
+theorem withMutation_defined {initial : α} {state : σ}
+    {body : Mutation α → Spec σ (β × Mutation α)}
+    (scope : ∀ reference, ¬(body reference).undefined state) :
+    ¬(withMutation initial body).undefined state := by
+  rintro ⟨future, obligation⟩
+  exact scope _ obligation
+
+theorem withMutation_total {initial : α}
+    {body : Mutation α → Spec σ (β × Mutation α)}
+    (total : ∀ reference, Spec.Total (body reference)) :
+    Spec.Total (withMutation initial body) := by
+  rintro state ⟨future, obligation⟩
+  exact total _ state obligation
+
+theorem withMutation_undefined (initial : α)
+    (body : Mutation α → Spec σ (β × Mutation α)) (state : σ) :
+    (withMutation initial body).undefined state ↔
+      ∃ future, (body { current := initial, prophecy := future }).undefined state :=
+  Iff.rfl
 
 /-- A total functional lens used for field and already-bounds-checked vector
 element reborrows. The laws make nested prophecy reconciliation provable. -/

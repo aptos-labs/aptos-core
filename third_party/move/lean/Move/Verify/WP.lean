@@ -26,6 +26,7 @@ no-overflow hypothesis, and the arithmetic abort otherwise. -/
         ensures (Move.UInt.ofNat (lhs.toNat + rhs.toNat)) initial) ∧
       (¬lhs.toNat + rhs.toNat < (Move.widthOf W).size →
         aborts Checked.arithmeticAbortCode) := by
+  rw [wp_total_iff (by simp [Checked.addSpec])]
   constructor
   · rintro ⟨normal, abnormal⟩
     exact ⟨fun safe => normal _ initial ⟨safe, rfl, rfl⟩,
@@ -37,6 +38,24 @@ no-overflow hypothesis, and the arithmetic abort otherwise. -/
     · rintro code ⟨rfl, overflow⟩
       exact abnormal overflow
 
+/-- Creating a certified value: the invariant is the obligation, and the
+continuation may use it. -/
+@[simp, wp_norm] theorem wp_certified {Invariant : Prop}
+    (build : Invariant → α) (ensures : α → State → Prop) (aborts : Nat → Prop)
+    (initial : State) :
+    wp (Spec.certified build : Spec State α) ensures aborts initial ↔
+      Invariant ∧ ∀ holds : Invariant, ensures (build holds) initial := by
+  simp only [wp, Spec.certified]
+  constructor
+  · rintro ⟨normal, -, holds⟩
+    have holds : Invariant := Classical.byContradiction holds
+    exact ⟨holds, fun holds => normal _ initial ⟨holds, rfl, rfl⟩⟩
+  · rintro ⟨holds, normal⟩
+    refine ⟨?_, ?_, fun refuted => refuted holds⟩
+    · rintro result final ⟨actual, rfl, rfl⟩
+      exact normal actual
+    · exact fun code absurd => absurd.elim
+
 /-- Checked subtraction in one obligation: the normal continuation under the
 no-underflow hypothesis, and the arithmetic abort otherwise. -/
 @[simp, wp_norm] theorem wp_subSpec {W : Type} [Move.Width W] (lhs rhs : Move.UInt W)
@@ -46,6 +65,7 @@ no-underflow hypothesis, and the arithmetic abort otherwise. -/
       (rhs.toNat ≤ lhs.toNat →
         ensures (Move.UInt.ofNat (lhs.toNat - rhs.toNat)) initial) ∧
       (¬rhs.toNat ≤ lhs.toNat → aborts Checked.arithmeticAbortCode) := by
+  rw [wp_total_iff (by simp [Checked.subSpec])]
   constructor
   · rintro ⟨normal, abnormal⟩
     exact ⟨fun safe => normal _ initial ⟨safe, rfl, rfl⟩,
@@ -66,6 +86,7 @@ no-underflow hypothesis, and the arithmetic abort otherwise. -/
         ensures (Move.UInt.ofNat (lhs.toNat * rhs.toNat)) initial) ∧
       (¬lhs.toNat * rhs.toNat < (Move.widthOf W).size →
         aborts Checked.arithmeticAbortCode) := by
+  rw [wp_total_iff (by simp [Checked.mulSpec])]
   constructor
   · rintro ⟨normal, abnormal⟩
     exact ⟨fun safe => normal _ initial ⟨safe, rfl, rfl⟩,
@@ -86,6 +107,7 @@ nonzero-divisor hypothesis, and the arithmetic abort otherwise. -/
       (rhs.toNat ≠ 0 →
         ensures (Move.UInt.ofNat (lhs.toNat / rhs.toNat)) initial) ∧
       (rhs.toNat = 0 → aborts Checked.arithmeticAbortCode) := by
+  rw [wp_total_iff (by simp [Checked.divSpec])]
   constructor
   · rintro ⟨normal, abnormal⟩
     exact ⟨fun nonzero => normal _ initial ⟨nonzero, rfl, rfl⟩,
@@ -108,6 +130,7 @@ in-range shift-amount hypothesis, and the arithmetic abort otherwise. -/
         ensures aborts initial ↔
       (amount.toNat < (Move.widthOf W).bits → ensures (Move.UInt.shl lhs amount) initial) ∧
       (¬amount.toNat < (Move.widthOf W).bits → aborts Checked.arithmeticAbortCode) := by
+  rw [wp_total_iff (by simp [Checked.shlSpec])]
   constructor
   · rintro ⟨normal, abnormal⟩
     exact ⟨fun safe => normal _ initial ⟨safe, rfl, rfl⟩,
@@ -128,6 +151,7 @@ in-range shift-amount hypothesis, and the arithmetic abort otherwise. -/
         ensures aborts initial ↔
       (amount.toNat < (Move.widthOf W).bits → ensures (Move.UInt.shr lhs amount) initial) ∧
       (¬amount.toNat < (Move.widthOf W).bits → aborts Checked.arithmeticAbortCode) := by
+  rw [wp_total_iff (by simp [Checked.shrSpec])]
   constructor
   · rintro ⟨normal, abnormal⟩
     exact ⟨fun safe => normal _ initial ⟨safe, rfl, rfl⟩,
@@ -150,6 +174,7 @@ fits-in-target hypothesis, and the arithmetic abort otherwise. -/
       (value.toNat < (Move.widthOf W').size →
         ensures (Move.UInt.cast value) initial) ∧
       (¬value.toNat < (Move.widthOf W').size → aborts Checked.arithmeticAbortCode) := by
+  rw [wp_total_iff (by simp [Checked.castSpec])]
   constructor
   · rintro ⟨normal, abnormal⟩
     exact ⟨fun safe => normal _ initial ⟨safe, rfl, rfl⟩,
@@ -169,6 +194,7 @@ fits-in-target hypothesis, and the arithmetic abort otherwise. -/
       (rhs.toNat ≠ 0 →
         ensures (Move.UInt.ofNat (lhs.toNat % rhs.toNat)) initial) ∧
       (rhs.toNat = 0 → aborts Checked.arithmeticAbortCode) := by
+  rw [wp_total_iff (by simp [Checked.modSpec])]
   constructor
   · rintro ⟨normal, abnormal⟩
     exact ⟨fun nonzero => normal _ initial ⟨nonzero, rfl, rfl⟩,
@@ -186,6 +212,7 @@ fits-in-target hypothesis, and the arithmetic abort otherwise. -/
     wp (Vector.borrowElemSpec (σ := State) values index) ensures aborts initial ↔
       (∀ value, values.toList[index.toNat]? = some value → ensures value initial) ∧
       (values.toList[index.toNat]? = none → aborts Resource.executionFailure) := by
+  rw [wp_total_iff (by simp [Vector.borrowElemSpec])]
   constructor
   · rintro ⟨normal, abnormal⟩
     constructor
@@ -215,6 +242,7 @@ fits-in-target hypothesis, and the arithmetic abort otherwise. -/
       ((∃ old, values.toList[index.toNat]? = some old) →
         ensures (Move.Vector.set values index value) initial) ∧
       (values.toList[index.toNat]? = none → aborts Resource.executionFailure) := by
+  rw [wp_total_iff (by simp [Vector.setSpec])]
   constructor
   · rintro ⟨normal, abnormal⟩
     constructor
@@ -255,22 +283,26 @@ relational representation. -/
             ensures (output.1, future) final)
           aborts initial := by
   constructor
-  · rintro ⟨normal, abnormal⟩ future
-    constructor
+  · rintro ⟨normal, abnormal, defined⟩ future
+    refine ⟨?_, ?_, ?_⟩
     · intro output final execution current
       apply normal (output.1, future) final
       exact ⟨future, output.2, execution, current, rfl⟩
     · intro code execution
       exact abnormal code ⟨future, execution⟩
+    · intro obligation
+      exact defined ⟨future, obligation⟩
   · intro bodyWP
-    constructor
+    refine ⟨?_, ?_, ?_⟩
     · rintro ⟨result, finalOwner⟩ final
         ⟨future, reference, execution, current, ownerEq⟩
       change finalOwner = future at ownerEq
       subst finalOwner
       exact (bodyWP future).1 (result, reference) final execution current
     · rintro code ⟨future, execution⟩
-      exact (bodyWP future).2 code execution
+      exact (bodyWP future).2.1 code execution
+    · rintro ⟨future, obligation⟩
+      exact (bodyWP future).2.2 obligation
 
 @[simp, wp_norm] theorem wp_withBorrowElemMutSpec (values : Move.Vector α)
     (index : Move.U64) (body : Mutation α → Spec State (β × Mutation α))
@@ -360,6 +392,7 @@ relational representation. -/
     (initial : World) :
     wp (resource.containsSpec key) ensures aborts initial ↔
       ensures (resource.lookup initial key).isSome initial := by
+  rw [wp_total_iff (by simp [Resource.containsSpec])]
   constructor
   · rintro ⟨normal, _⟩
     apply normal _ initial
@@ -379,6 +412,7 @@ relational representation. -/
     wp (resource.borrowSpec key) ensures aborts initial ↔
       (∀ value, resource.lookup initial key = some value → ensures value initial) ∧
       (resource.lookup initial key = none → aborts Resource.executionFailure) := by
+  rw [wp_total_iff (by simp [Resource.borrowSpec])]
   constructor
   · rintro ⟨normal, abnormal⟩
     constructor
@@ -404,6 +438,7 @@ relational representation. -/
       (∀ value, resource.lookup initial key = some value →
         ensures value (resource.erase initial key)) ∧
       (resource.lookup initial key = none → aborts Resource.executionFailure) := by
+  rw [wp_total_iff (by simp [Resource.moveFromSpec])]
   constructor
   · rintro ⟨normal, abnormal⟩
     constructor
@@ -430,6 +465,7 @@ relational representation. -/
         ensures () (resource.insert initial key value)) ∧
       ((∃ old, resource.lookup initial key = some old) →
         aborts Resource.executionFailure) := by
+  rw [wp_total_iff (by simp [Resource.moveToSpec])]
   constructor
   · rintro ⟨normal, abnormal⟩
     constructor
@@ -464,20 +500,22 @@ same predicate. -/
           aborts initial) ∧
       (resource.lookup initial key = none → aborts Resource.executionFailure) := by
   constructor
-  · rintro ⟨normal, abnormal⟩
-    constructor
+  · rintro ⟨normal, abnormal, defined⟩
+    refine ⟨?_, ?_⟩
     · intro value present
-      constructor
+      refine ⟨?_, ?_, ?_⟩
       · intro output bodyWorld execution
         apply normal output.1 (resource.insert bodyWorld key output.2)
         exact ⟨value, bodyWorld, output.2, present, execution, rfl⟩
       · intro code execution
         exact abnormal code (.inr ⟨value, present, execution⟩)
+      · intro obligation
+        exact defined ⟨value, present, obligation⟩
     · intro missing
       apply abnormal Resource.executionFailure
       exact .inl ⟨missing, rfl⟩
   · rintro ⟨bodyWP, missingWP⟩
-    constructor
+    refine ⟨?_, ?_, ?_⟩
     · rintro result finalWorld
         ⟨value, bodyWorld, finalValue, present, execution, finalEq⟩
       subst finalWorld
@@ -487,7 +525,9 @@ same predicate. -/
         subst code
         exact missingWP notPresent
       · rcases bodyAbort with ⟨value, present, execution⟩
-        exact (bodyWP value present).2 code execution
+        exact (bodyWP value present).2.1 code execution
+    · rintro ⟨value, present, obligation⟩
+      exact (bodyWP value present).2.2 obligation
 
 @[wp_norm] theorem wp_withBorrowMutFocusSpec
     (resource : Resource World Key Owner) (key : Key)

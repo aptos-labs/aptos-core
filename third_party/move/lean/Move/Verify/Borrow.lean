@@ -75,6 +75,19 @@ theorem withMutation_insertSpec_eq_pure (values : Move.Vector α)
     simp [withMutation, Move.Semantics.Vector.insertSpec, room.1, room.2,
       Mutation.read, Mutation.write, Spec.bind, Spec.pure]
 
+  · funext state
+    apply propext
+    constructor
+    · intro obligation
+      exact absurd obligation (by
+        apply Move.Semantics.withMutation_total
+        intro reference
+        apply Move.Semantics.Spec.Total.bind
+        · first
+            | apply Move.Semantics.Vector.insertSpec_total
+            | apply Move.Semantics.Vector.removeSpec_total
+        · exact fun _ _ contradiction => contradiction.elim)
+    · exact fun contradiction => contradiction.elim
 /-- Abort-side proof rule for `vector::insert` through a scoped mutable
 borrow: out of bounds or out of the `u64` length domain. -/
 theorem withMutation_insertSpec_eq_abort (values : Move.Vector α)
@@ -97,6 +110,19 @@ theorem withMutation_insertSpec_eq_abort (values : Move.Vector α)
     simp [withMutation, Move.Semantics.Vector.insertSpec, noRoom,
       Mutation.read, Spec.bind, Spec.pure, Spec.abort]
 
+  · funext state
+    apply propext
+    constructor
+    · intro obligation
+      exact absurd obligation (by
+        apply Move.Semantics.withMutation_total
+        intro reference
+        apply Move.Semantics.Spec.Total.bind
+        · first
+            | apply Move.Semantics.Vector.insertSpec_total
+            | apply Move.Semantics.Vector.removeSpec_total
+        · exact fun _ _ contradiction => contradiction.elim)
+    · exact fun contradiction => contradiction.elim
 /-- Derived proof rule for `vector::remove` through a scoped mutable borrow. -/
 theorem withMutation_removeSpec_eq_pure (values : Move.Vector α)
     (index : Move.U64) (removed : α) (project : α → β)
@@ -127,6 +153,19 @@ theorem withMutation_removeSpec_eq_pure (values : Move.Vector α)
     simp [withMutation, Move.Semantics.Vector.removeSpec, present,
       Mutation.read, Mutation.write, Spec.bind, Spec.pure]
 
+  · funext state
+    apply propext
+    constructor
+    · intro obligation
+      exact absurd obligation (by
+        apply Move.Semantics.withMutation_total
+        intro reference
+        apply Move.Semantics.Spec.Total.bind
+        · first
+            | apply Move.Semantics.Vector.insertSpec_total
+            | apply Move.Semantics.Vector.removeSpec_total
+        · exact fun _ _ contradiction => contradiction.elim)
+    · exact fun contradiction => contradiction.elim
 /-- Abort-side proof rule for `vector::remove` through a scoped mutable
 borrow. -/
 theorem withMutation_removeSpec_eq_abort (values : Move.Vector α)
@@ -148,6 +187,19 @@ theorem withMutation_removeSpec_eq_abort (values : Move.Vector α)
     simp [withMutation, Move.Semantics.Vector.removeSpec, missing,
       Mutation.read, Spec.bind, Spec.pure, Spec.abort]
 
+  · funext state
+    apply propext
+    constructor
+    · intro obligation
+      exact absurd obligation (by
+        apply Move.Semantics.withMutation_total
+        intro reference
+        apply Move.Semantics.Spec.Total.bind
+        · first
+            | apply Move.Semantics.Vector.insertSpec_total
+            | apply Move.Semantics.Vector.removeSpec_total
+        · exact fun _ _ contradiction => contradiction.elim)
+    · exact fun contradiction => contradiction.elim
 /-- Weakest precondition of `vector::insert` through a scoped mutable borrow:
 the same two-branch shape as the checked arithmetic rules, so one tactic
 splits every checked operation. -/
@@ -335,6 +387,18 @@ theorem withBorrowElemMutSpec_write_eq_pure {values : Move.Vector α}
     · rintro (impossible | ⟨bodyOutput, middle, ⟨rfl, rfl⟩, impossible⟩) <;>
         exact impossible.elim
     · exact fun impossible => impossible.elim
+  · funext state
+    apply propext
+    simp only [Move.Semantics.Vector.withBorrowElemMutSpec, present]
+    change (Spec.bind (withMutation old (assignSpecBody value)) fun output =>
+      Spec.pure (output.1, Move.Vector.set values index output.2)).undefined
+        state ↔ _
+    constructor
+    · intro obligation
+      refine absurd obligation (Spec.Total.bind ?_ ?_ state)
+      · exact Move.Semantics.withMutation_total fun _ _ h => h.elim
+      · exact fun _ _ h => h.elim
+    · exact fun contradiction => contradiction.elim
 
 @[simp] theorem withMutation_read_ok_iff (initial : α)
     (state finalState : σ) (output : α × α) :
@@ -363,12 +427,28 @@ theorem withBorrowElemMutSpec_write_eq_pure {values : Move.Vector α}
     (state : σ) (ensures : (Unit × α) → σ → Prop) (aborts : Nat → Prop) :
     wp (withMutation initial (assignSpecBody value)) ensures aborts state ↔
       ensures ((), value) state := by
-  simp [wp]
+  simp only [wp, withMutation_assign_ok_iff, withMutation_assign_not_aborts]
+  constructor
+  · exact fun holds => holds.1 ((), value) state ⟨rfl, rfl⟩
+  · refine fun holds => ⟨?_, fun code absurd => absurd.elim,
+      Move.Semantics.withMutation_total
+        (body := assignSpecBody value) (fun _ _ h => h.elim) state⟩
+    rintro output final ⟨rfl, rfl⟩
+    exact holds
 
 @[simp] theorem wp_withMutation_read (initial : α)
     (state : σ) (ensures : (α × α) → σ → Prop) (aborts : Nat → Prop) :
     wp (withMutation initial readSpecBody) ensures aborts state ↔
       ensures (initial, initial) state := by
-  simp [wp]
+  simp only [wp, withMutation_read_ok_iff]
+  constructor
+  · exact fun holds => holds.1 (initial, initial) state ⟨rfl, rfl⟩
+  · refine fun holds => ⟨?_, ?_,
+      Move.Semantics.withMutation_total
+        (body := readSpecBody) (fun _ _ h => h.elim) state⟩
+    · rintro output final ⟨rfl, rfl⟩
+      exact holds
+    · rintro code ⟨future, absurd⟩
+      exact absurd.elim
 
 end Move.Verify

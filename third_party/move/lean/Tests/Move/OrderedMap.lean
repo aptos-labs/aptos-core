@@ -33,12 +33,9 @@ move_module OrderedMap where
     value : V
     deriving Copy, Drop, Store
 
-  struct Map (K V) where
-    entries : Move.Vector (Entry K V)
-    deriving Copy, Drop, Store
-
   /-! The contracts use this small mathematical model. Proofs connecting it
-  to binary search and vector updates are kept in the proof section below. -/
+  to binary search and vector updates are kept in the proof section below.
+  Sortedness comes first: it is the data invariant of the map itself. -/
 
   namespace Model
 
@@ -47,13 +44,19 @@ move_module OrderedMap where
     | entry :: rest =>
         (∀ next ∈ rest, entry.key < next.key) ∧ SortedEntries rest
 
-  def Sorted (map : Map K V) : Prop :=
-    SortedEntries map.entries.toList
+  end Model
 
-  /-- The shared operation precondition: the entries are sorted, and their
-  count is physically representable so index arithmetic cannot overflow. -/
-  structure WellFormed (map : Map K V) : Prop where
-    sorted : Sorted map
+  struct Map (K V) where
+    entries : Move.Vector (Entry K V)
+    deriving Copy, Drop, Store
+
+  -- Every map is sorted, and carries the proof.  Operations therefore need
+  -- no well-formedness precondition, and re-establish sortedness only where
+  -- a map is created.
+  spec Map {K} {V} where
+    invariant Model.SortedEntries this.entries.toList
+
+  namespace Model
 
   def Contains (map : Map K V) (key : K) : Prop :=
     ∃ entry ∈ map.entries.toList, entry.key = key
@@ -115,7 +118,7 @@ move_module OrderedMap where
     { entries := Move.Vector.empty }
 
   spec empty {K} {V} where
-    ensures (result : Map K V).entries.toList = [] ∧ Model.Sorted result
+    ensures (result : Map K V).entries.toList = []
 
   /-- Index of the first entry whose key is not less than `key`. -/
   partial fun lowerBoundLoop {K V} (entries : &Move.Vector (Entry K V))
@@ -143,7 +146,6 @@ move_module OrderedMap where
 
   spec lowerBound {K} {V} [Move.Compare.Total K]
       (map : Map K V) (key : K) where
-    requires Model.WellFormed map;
     ensures result = U64.ofNat
       (Model.lowerBoundList map.entries.toList key) ∧
       result.toNat ≤ map.entries.toList.length;
@@ -179,7 +181,6 @@ move_module OrderedMap where
 
   spec contains {K} {V} [Move.Compare.Total K]
       (map : Map K V) (key : K) where
-    requires Model.WellFormed map;
     ensures (result = true) ↔ Model.Contains map key;
     aborts_if False
 
@@ -198,7 +199,6 @@ move_module OrderedMap where
 
   spec borrow {K} {V} [Move.Compare.Total K]
       (map : Map K V) (key : K) where
-    requires Model.WellFormed map;
     ensures Model.MapsTo map key result;
     aborts_if ¬Model.Contains map key with 2
 
@@ -217,9 +217,7 @@ move_module OrderedMap where
 
   spec add {K} {V} [Move.Compare.Total K]
       (map : &mut Map K V) (key : K) (value : V) where
-    requires Model.WellFormed map;
-    ensures map.entries.toList = Model.add (old(map)) key value ∧
-      Model.Sorted map;
+    ensures map.entries.toList = Model.add (old(map)) key value;
     aborts_if Model.Contains map key with 1;
     aborts_if U64.size ≤ map.entries.toList.length + 1
       with Move.Semantics.Vector.indexOutOfBounds
@@ -241,9 +239,8 @@ move_module OrderedMap where
 
   spec remove {K} {V} [Move.Compare.Total K]
       (map : &mut Map K V) (key : K) where
-    requires Model.WellFormed map;
     ensures Model.erase (old(map)).entries.toList key =
-        some (map.entries.toList, result) ∧ Model.Sorted map;
+        some (map.entries.toList, result);
     aborts_if ¬Model.Contains map key with 2
 
   /-! ## Proofs -/
@@ -351,7 +348,8 @@ move_module OrderedMap where
   /-- Final invariant theorem used by `add.verified`. -/
   theorem add_sorted {K V : Type} [Move.Compare.Total K]
       (map : Map K V) (key : K) (value : V)
-      (sorted : Sorted map) (fresh : ¬Contains map key) :
+      (sorted : SortedEntries map.entries.toList)
+      (fresh : ¬Contains map key) :
       SortedEntries (add map key value) := by
     exact insert_sorted map.entries.toList key value sorted fresh
 
@@ -569,7 +567,7 @@ move_module OrderedMap where
   /-! ### Direct proofs -/
 
   verify empty by
-    simp [empty.contract, empty, Model.Sorted, Model.SortedEntries]
+    simp [empty.contract, empty, Model.SortedEntries]
 
   /-! ### Search proofs
 
@@ -615,7 +613,7 @@ move_module OrderedMap where
         map.entries.toList.length := by
       rw [Move.Vector.length_toNat]
     have window : Model.Search.Window map.entries key 0 map.entries.length := by
-      refine ⟨permitted.sorted, by simp, ?_, ?_, map.entries.toList_length_lt⟩
+      refine ⟨map.invariant, by simp, ?_, ?_, map.entries.toList_length_lt⟩
       · rw [lengthToNat]
         exact Model.Search.lowerBoundList_le _ _
       · rw [lengthToNat]
@@ -678,7 +676,7 @@ move_module OrderedMap where
         rw [Move.Verify.Source.logicalBEq_move,
           Move.Compare.equal_eq_true_iff]
         show _ ↔ ∃ candidate ∈ map.entries.toList, candidate.key = key
-        rw [Model.Search.contains_iff_lowerBound _ _ permitted.sorted]
+        rw [Model.Search.contains_iff_lowerBound _ _ map.invariant]
         constructor
         · exact fun same => ⟨entry, atTarget, same⟩
         · rintro ⟨candidate, atCandidate, same⟩
@@ -699,7 +697,7 @@ move_module OrderedMap where
         simp only [Bool.false_eq_true, false_iff]
         intro present
         obtain ⟨entry, atTarget, _⟩ :=
-          (Model.Search.contains_iff_lowerBound _ _ permitted.sorted).mp present
+          (Model.Search.contains_iff_lowerBound _ _ map.invariant).mp present
         exact absurd (List.getElem?_eq_some_iff.mp atTarget).1 inBounds
     · exact fun code h => h.elim
 
@@ -743,7 +741,7 @@ move_module OrderedMap where
           abort_clause
           intro present
           obtain ⟨candidate, atCandidate, same⟩ :=
-            (Model.Search.contains_iff_lowerBound _ _ permitted.sorted).mp
+            (Model.Search.contains_iff_lowerBound _ _ map.invariant).mp
               present
           rw [atTarget] at atCandidate
           cases atCandidate
@@ -763,7 +761,7 @@ move_module OrderedMap where
         refine ⟨?_, trivial⟩
         intro present
         obtain ⟨entry, atTarget, _⟩ :=
-          (Model.Search.contains_iff_lowerBound _ _ permitted.sorted).mp present
+          (Model.Search.contains_iff_lowerBound _ _ map.invariant).mp present
         exact absurd (List.getElem?_eq_some_iff.mp atTarget).1 inBounds
     · exact fun code h => h.elim
 
@@ -776,12 +774,11 @@ move_module OrderedMap where
   verify add by
     contract_intro
     obtain ⟨map, key, value⟩ := args
-    have wf := permitted
     dsimp only
     rw [Move.Verify.wp_withMutation]
     intro future
     simp only [Move.Semantics.Mutation.read]
-    wp_call (lowerBound.verified _) using wf
+    wp_call (lowerBound.verified _) using trivial
     · rintro index middle ⟨⟨rfl, -⟩, rfl⟩
       have insertBound : Model.lowerBoundList map.entries.toList key ≤
           map.entries.toList.length := Model.Search.lowerBoundList_le _ _
@@ -818,7 +815,7 @@ move_module OrderedMap where
           have fresh : ¬Model.Contains map key := by
             intro present
             obtain ⟨candidate, atCandidate, same⟩ :=
-              (Model.Search.contains_iff_lowerBound _ _ wf.sorted).mp
+              (Model.Search.contains_iff_lowerBound _ _ map.invariant).mp
                 present
             rw [atTarget] at atCandidate
             cases atCandidate
@@ -834,15 +831,17 @@ move_module OrderedMap where
                 exact Nat.lt_of_le_of_lt targetLe bounded),
             move_norm, Nat.reducePow,
             Move.Semantics.Mutation.write]
-          rintro rfl
-          refine ⟨?_, trivial⟩
-          intro _noContains _hasRoom
-          refine ⟨?_, ?_⟩ <;>
-            simp only [Model.Sorted, Move.Vector.toList_ofList,
+          refine ⟨?_, ?_⟩
+          · simp only [Map.Invariant, Move.Vector.toList_ofList,
               ← Model.Insertion.insert_eq_take_lowerBound
                 map.entries.toList key value]
-          · rfl
-          · exact Model.Insertion.add_sorted map key value wf.sorted fresh
+            exact Model.Insertion.add_sorted map key value map.invariant fresh
+          · rintro holds rfl
+            refine ⟨?_, trivial⟩
+            intro _noContains _hasRoom
+            simp only [Move.Vector.toList_ofList, Model.add,
+              ← Model.Insertion.insert_eq_take_lowerBound
+                map.entries.toList key value]
       · rw [if_neg inBounds]
         have bounded : map.entries.toList.length < 18446744073709551616 := by
           have := map.entries.toList_length_lt
@@ -855,7 +854,7 @@ move_module OrderedMap where
         have fresh : ¬Model.Contains map key := by
           intro present
           obtain ⟨entry, atTarget, _⟩ :=
-            (Model.Search.contains_iff_lowerBound _ _ wf.sorted).mp
+            (Model.Search.contains_iff_lowerBound _ _ map.invariant).mp
               present
           exact absurd (List.getElem?_eq_some_iff.mp atTarget).1 inBounds
         checked_cases room
@@ -866,15 +865,17 @@ move_module OrderedMap where
               simp only [move_norm, Nat.reducePow]
               exact Nat.lt_of_le_of_lt targetLe bounded),
           move_norm, Nat.reducePow, Move.Semantics.Mutation.write]
-        rintro rfl
-        refine ⟨?_, trivial⟩
-        intro _noContains _hasRoom
-        refine ⟨?_, ?_⟩ <;>
-          simp only [Model.Sorted, Move.Vector.toList_ofList,
+        refine ⟨?_, ?_⟩
+        · simp only [Map.Invariant, Move.Vector.toList_ofList,
             ← Model.Insertion.insert_eq_take_lowerBound
               map.entries.toList key value]
-        · rfl
-        · exact Model.Insertion.add_sorted map key value wf.sorted fresh
+          exact Model.Insertion.add_sorted map key value map.invariant fresh
+        · rintro holds rfl
+          refine ⟨?_, trivial⟩
+          intro _noContains _hasRoom
+          simp only [Move.Vector.toList_ofList, Model.add,
+            ← Model.Insertion.insert_eq_take_lowerBound
+              map.entries.toList key value]
     · exact fun code h => h.elim
 
   verify remove by
@@ -913,7 +914,7 @@ move_module OrderedMap where
           have same := (Move.Compare.equal_eq_true_iff entry.key key).mp
             (by rwa [Move.Verify.Source.logicalBEq_move] at equal)
           have erased := Model.Removal.erase_eq_take_lowerBound
-            map.entries.toList key entry permitted.sorted atTarget same
+            map.entries.toList key entry map.invariant atTarget same
           checked_cases removed
           simp only [Move.UInt.toNat_ofNat_of_lt
               (W := Move.W64) (n := Model.lowerBoundList map.entries.toList key)
@@ -925,18 +926,20 @@ move_module OrderedMap where
           rw [atTarget] at lookup
           injection lookup with sameEntry
           subst sameEntry
-          rintro rfl
-          refine ⟨?_, trivial⟩
-          intro _present
-          refine ⟨by simpa using erased, ?_⟩
-          exact Model.Removal.erase_sorted map.entries.toList key _
-            entry.value permitted.sorted (by simpa using erased)
+          refine ⟨?_, ?_⟩
+          · simp only [Map.Invariant, Move.Vector.toList_ofList]
+            exact Model.Removal.erase_sorted map.entries.toList key _
+              entry.value map.invariant (by simpa using erased)
+          · rintro holds rfl
+            refine ⟨?_, trivial⟩
+            intro _present
+            simpa using erased
         · rw [if_neg equal]
           simp only [Move.Verify.wp_abort]
           refine ⟨?_, trivial⟩
           intro present
           obtain ⟨candidate, atCandidate, same⟩ :=
-            (Model.Search.contains_iff_lowerBound _ _ permitted.sorted).mp
+            (Model.Search.contains_iff_lowerBound _ _ map.invariant).mp
               present
           rw [atTarget] at atCandidate
           cases atCandidate
@@ -956,7 +959,7 @@ move_module OrderedMap where
         refine ⟨?_, trivial⟩
         intro present
         obtain ⟨entry, atTarget, _⟩ :=
-          (Model.Search.contains_iff_lowerBound _ _ permitted.sorted).mp present
+          (Model.Search.contains_iff_lowerBound _ _ map.invariant).mp present
         exact absurd (List.getElem?_eq_some_iff.mp atTarget).1 inBounds
     · exact fun code h => h.elim
 

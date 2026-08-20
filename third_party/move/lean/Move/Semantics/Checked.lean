@@ -95,6 +95,7 @@ def modSpec (lhs rhs : UInt W) : Spec σ (UInt W) where
   · funext initial code
     simp [addSpec, Spec.pure, safe]
 
+  · rfl
 @[simp] theorem subSpec_eq_pure {lhs rhs : UInt W} (safe : rhs.toNat ≤ lhs.toNat) :
     (subSpec lhs rhs : Spec σ (UInt W)) =
       Spec.pure (UInt.ofNat (lhs.toNat - rhs.toNat)) := by
@@ -104,6 +105,7 @@ def modSpec (lhs rhs : UInt W) : Spec σ (UInt W) where
   · funext initial code
     simp [subSpec, Spec.pure, safe]
 
+  · rfl
 theorem subSpec_one_eq_pure_of_pos {value : UInt W}
     (positive : 0 < value.toNat) :
     (subSpec value 1 : Spec σ (UInt W)) =
@@ -125,6 +127,7 @@ theorem subSpec_one_eq_pure_of_pos {value : UInt W}
   · funext initial code
     simp [mulSpec, Spec.pure, safe]
 
+  · rfl
 @[simp] theorem divSpec_eq_pure {lhs rhs : UInt W} (nonzero : rhs.toNat ≠ 0) :
     (divSpec lhs rhs : Spec σ (UInt W)) =
       Spec.pure (UInt.ofNat (lhs.toNat / rhs.toNat)) := by
@@ -134,6 +137,7 @@ theorem subSpec_one_eq_pure_of_pos {value : UInt W}
   · funext initial code
     simp [divSpec, Spec.pure, nonzero]
 
+  · rfl
 @[simp] theorem modSpec_eq_pure {lhs rhs : UInt W} (nonzero : rhs.toNat ≠ 0) :
     (modSpec lhs rhs : Spec σ (UInt W)) =
       Spec.pure (UInt.ofNat (lhs.toNat % rhs.toNat)) := by
@@ -143,6 +147,7 @@ theorem subSpec_one_eq_pure_of_pos {value : UInt W}
   · funext initial code
     simp [modSpec, Spec.pure, nonzero]
 
+  · rfl
 @[simp] theorem add_success {lhs rhs : UInt W}
     (h : lhs.toNat + rhs.toNat < (widthOf W).size) :
     add lhs rhs = .ok (UInt.ofNat (lhs.toNat + rhs.toNat)) := by
@@ -207,6 +212,7 @@ def castSpec {W' : Type} [Width W'] (value : UInt W) : Spec σ (UInt W') where
   · funext initial code
     simp [shlSpec, Spec.pure, safe]
 
+  · rfl
 @[simp] theorem shrSpec_eq_pure {lhs : UInt W} {amount : UInt W8}
     (safe : amount.toNat < (widthOf W).bits) :
     (shrSpec lhs amount : Spec σ (UInt W)) = Spec.pure (UInt.shr lhs amount) := by
@@ -216,6 +222,7 @@ def castSpec {W' : Type} [Width W'] (value : UInt W) : Spec σ (UInt W') where
   · funext initial code
     simp [shrSpec, Spec.pure, safe]
 
+  · rfl
 @[simp] theorem castSpec_eq_pure {W' : Type} [Width W'] {value : UInt W}
     (safe : value.toNat < (widthOf W').size) :
     (castSpec value : Spec σ (UInt W')) = Spec.pure (UInt.cast value) := by
@@ -224,5 +231,31 @@ def castSpec {W' : Type} [Width W'] (value : UInt W) : Spec σ (UInt W') where
     simp [castSpec, Spec.pure, safe]
   · funext initial code
     simp [castSpec, Spec.pure, safe]
+
+  · rfl
+/-- The checked operations abort rather than leaving an obligation. -/
+@[simp] theorem total_addSpec (lhs rhs : Move.UInt W) :
+    Spec.Total (addSpec lhs rhs : Spec σ _) := fun _ h => h.elim
+
+@[simp] theorem total_subSpec (lhs rhs : Move.UInt W) :
+    Spec.Total (subSpec lhs rhs : Spec σ _) := fun _ h => h.elim
+
+@[simp] theorem total_mulSpec (lhs rhs : Move.UInt W) :
+    Spec.Total (mulSpec lhs rhs : Spec σ _) := fun _ h => h.elim
+
+@[simp] theorem total_divSpec (lhs rhs : Move.UInt W) :
+    Spec.Total (divSpec lhs rhs : Spec σ _) := fun _ h => h.elim
+
+@[simp] theorem total_modSpec (lhs rhs : Move.UInt W) :
+    Spec.Total (modSpec lhs rhs : Spec σ _) := fun _ h => h.elim
+
+@[simp] theorem total_shlSpec (lhs : Move.UInt W) (amount : Move.U8) :
+    Spec.Total (shlSpec lhs amount : Spec σ _) := fun _ h => h.elim
+
+@[simp] theorem total_shrSpec (lhs : Move.UInt W) (amount : Move.U8) :
+    Spec.Total (shrSpec lhs amount : Spec σ _) := fun _ h => h.elim
+
+@[simp] theorem total_castSpec {W' : Type} [Move.Width W'] (value : Move.UInt W) :
+    Spec.Total (castSpec value : Spec σ (Move.UInt W')) := fun _ h => h.elim
 
 end Move.Semantics.Checked

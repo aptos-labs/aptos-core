@@ -23,8 +23,10 @@ This README is an example-based tour. The language itself is defined in
 [`leaner-move.md`](leaner-move.md); the verification design is in
 [`verification-design.md`](verification-design.md); compiler and proof
 roadmaps are in [`design-plan.md`](design-plan.md) with a short overview in
-[`overview.md`](overview.md) and loop lowering in
-[`loop-design.md`](loop-design.md).
+[`overview.md`](overview.md), loop lowering in
+[`loop-design.md`](loop-design.md), data invariants in
+[`invariant-design.md`](invariant-design.md), and the cost analysis of the
+verification encoding in [`performance-analysis.md`](performance-analysis.md).
 
 ## A complete module
 
@@ -150,6 +152,57 @@ Global state stays abstract and compositional: each generated theorem
 quantifies over one typed `ResourceStore` per resource family the function
 uses, so adding a resource in another module never forces a shared `World`
 record.
+
+## Data invariants
+
+A `spec` on a type constrains every value of it, and the value carries the
+proof. Operations therefore need no precondition, and the invariant is owed
+only where a value is created:
+
+```lean
+struct Percent where
+  value : U64
+
+spec Percent where
+  invariant .value.toNat ≤ 100
+```
+
+Clauses read like the other spec blocks and may be repeated, conjoined:
+
+```lean
+spec Range where
+  invariant .low.toNat ≤ .high.toNat;
+  invariant .high.toNat ≤ 1000
+```
+
+`this` denotes the value and `.field` abbreviates `this.field`. An enum
+invariant matches on `this`, and each constructor then carries the proof of
+its own variant, so patterns bind it with a trailing `_`:
+
+```lean
+enum Payment where
+  | none
+  | direct (amount : U64)
+
+spec Payment where
+  invariant match this with
+    | .none => True
+    | .direct amount => 0 < amount.toNat
+
+fun firstPart (payment : Payment) : U64 :=
+  match payment with
+  | .none _ => 0
+  | .direct amount _ => amount
+```
+
+A literal like `{ value := 50 }` or `.direct 5` discharges its obligation
+during elaboration, so source carries no proof text and a violation is
+reported at the literal; creating a value under a condition uses the
+dependent `if h : 0 < amount then .direct amount else .none`, whose branch
+hypothesis discharges it. Mutation is unconstrained while a borrow is live:
+the obligation lands where the value is rebuilt, when the loan dies — for a
+local value and for a resource behind `&mut R[addr].field` alike. The proof is
+erased before Move sees the type.
 
 ## Integers
 

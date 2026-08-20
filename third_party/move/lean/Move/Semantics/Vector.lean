@@ -44,6 +44,7 @@ def setSpec (values : Move.Vector α) (index : U64) (value : α) :
   · funext initial code
     simp [borrowElemSpec, Spec.pure, present]
 
+  · rfl
 /-- Checked mutable element borrow. The element is represented by a prophecy
 mutation while the vector owner is suspended. Successful reconciliation
 returns both the body result and the updated logical vector. -/
@@ -91,5 +92,59 @@ def removeSpec (reference : Mutation (Move.Vector α)) (index : U64) :
           simp only [List.length_append, List.length_take, List.length_drop]
           omega)
       Spec.pure (removed, reference.write updated)
+
+/-- Both vector mutations are total: they abort out of bounds rather than
+leaving an obligation behind. -/
+@[simp] theorem insertSpec_undefined (reference : Mutation (Move.Vector α))
+    (index : U64) (value : α) (state : σ) :
+    ¬(insertSpec reference index value : Spec σ _).undefined state := by
+  simp only [insertSpec]
+  split <;> simp
+
+@[simp] theorem removeSpec_undefined (reference : Mutation (Move.Vector α))
+    (index : U64) (state : σ) :
+    ¬(removeSpec reference index : Spec σ _).undefined state := by
+  simp only [removeSpec]
+  split <;> simp
+
+@[simp] theorem total_borrowElemSpec (values : Move.Vector α) (index : U64) :
+    Spec.Total (borrowElemSpec values index : Spec σ α) := fun _ h => h.elim
+
+@[simp] theorem total_setSpec (values : Move.Vector α) (index : U64) (value : α) :
+    Spec.Total (setSpec values index value : Spec σ _) := fun _ h => h.elim
+
+/-- Pointwise well-definedness of a mutable element borrow. -/
+theorem withBorrowElemMutSpec_defined {values : Move.Vector α} {index : U64}
+    {state : σ} {body : Mutation α → Spec σ (β × Mutation α)}
+    (scope : ∀ reference, ¬(body reference).undefined state) :
+    ¬(withBorrowElemMutSpec values index body).undefined state := by
+  simp only [withBorrowElemMutSpec]
+  split
+  · exact fun h => h.elim
+  · refine Spec.bind_defined (Move.Semantics.withMutation_defined scope) ?_
+    intro output middle _
+    exact fun h => h.elim
+
+theorem withBorrowElemMutSpec_total {values : Move.Vector α} {index : U64}
+    {body : Mutation α → Spec σ (β × Mutation α)}
+    (total : ∀ reference, Spec.Total (body reference)) :
+    Spec.Total (withBorrowElemMutSpec values index body) := by
+  intro state
+  simp only [withBorrowElemMutSpec]
+  split
+  · exact fun h => h.elim
+  · refine Spec.Total.bind (Move.Semantics.withMutation_total total) ?_ state
+    intro output
+    exact fun _ h => h.elim
+
+theorem insertSpec_total (reference : Mutation (Move.Vector α))
+    (index : U64) (value : α) :
+    Spec.Total (insertSpec reference index value : Spec σ _) :=
+  insertSpec_undefined reference index value
+
+theorem removeSpec_total (reference : Mutation (Move.Vector α))
+    (index : U64) :
+    Spec.Total (removeSpec reference index : Spec σ _) :=
+  removeSpec_undefined reference index
 
 end Move.Semantics.Vector

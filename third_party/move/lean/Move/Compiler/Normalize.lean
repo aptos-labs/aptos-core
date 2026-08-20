@@ -114,6 +114,26 @@ private partial def translateTyWith (env : Environment) (ctx : TyContext)
 private def translateTy (env : Environment) (type : Expr) : Except String (Option LIR.Ty) :=
   translateTyWith env {} type
 
+/-- Whether a declaration's type ends in `Prop`. -/
+private partial def resultIsProp : Expr → Bool
+  | .forallE _ _ body _ => resultIsProp body
+  | .sort level => level.isZero
+  | _ => false
+
+/-- Whether a structure field carries a data invariant rather than data: its
+type is a proposition, so LCNF erases it and Move never sees it. -/
+private partial def isDataInvariantField (env : Environment) (type : Expr) : Bool :=
+  match type.cleanupAnnotations with
+  | .forallE _ _ body _ => isDataInvariantField env body
+  | result =>
+      match result.getAppFn with
+      | .const name _ =>
+          match env.find? name with
+          | some info => resultIsProp info.type
+          | none => false
+      | .sort level => level.isZero
+      | _ => false
+
 private def resultType (type : Expr) : Expr :=
   match type with
   | .forallE _ _ body _ => resultType body
@@ -255,6 +275,8 @@ private def compileStruct (env : Environment) (name : Name) : Except String LIR.
     let projectionName := name ++ fieldName
     let some constInfo := env.find? projectionName
       | throw s!"missing projection `{projectionName}`"
+    if isDataInvariantField env constInfo.type then
+      continue
     let binders := forallBinders constInfo.type
     let ctx := bvarContext binders.length induct.numParams
     let some ty ← translateTyWith env ctx (resultType constInfo.type)
@@ -291,6 +313,9 @@ private def compileEnum (env : Environment) (name : Name) : Except String LIR.St
     let binders := allBinders.drop ctor.numParams |>.take ctor.numFields
     let mut fields := #[]
     for ((fieldName, fieldType), index) in binders.zipIdx do
+      -- The proof of a data invariant rides in the constructor but is
+      -- erased before Move sees the variant.
+      if isDataInvariantField env fieldType then continue
       let ctx := bvarContext (ctor.numParams + index) ctor.numParams
       let some ty ← translateTyWith env ctx fieldType
         | throw s!"field {index} of enum constructor `{ctorName}` has an erased type"
@@ -340,19 +365,40 @@ private def projectionIndex? : Code .pure → Option Nat
       | _ => none
   | _ => none
 
+/-- Runtime fields of any Move constructor: its declared fields minus the
+proofs of data invariants, which LCNF erases. -/
+private def runtimeCtorFields (env : Environment) (ctor : ConstructorVal) : Nat :=
+  let binders := forallBinders ctor.type |>.drop ctor.numParams |>.take ctor.numFields
+  binders.foldl (init := ctor.numFields) fun count (_, type) =>
+    if isDataInvariantField env type then count - 1 else count
+
 private def enumConstructor? (env : Environment) (name : Name) : Option (Name × Nat × Nat × Nat) :=
   match env.find? name with
   | some (.ctorInfo ctor) =>
       if moveEnumAttr.hasTag env ctor.induct then
-        some (ctor.induct, ctor.cidx, ctor.numParams, ctor.numFields)
+        some (ctor.induct, ctor.cidx, ctor.numParams, runtimeCtorFields env ctor)
       else none
   | _ => none
+
+/-- Runtime fields of a Move constructor: LCNF erases the proof carried by a
+certified value, so a data-invariant field is not passed to `pack`. -/
+private def runtimeFields (env : Environment) (induct : Name) (declared : Nat) :
+    Nat :=
+  match getStructureInfo? env induct with
+  | none => declared
+  | some info =>
+      info.fieldNames.foldl (init := declared) fun count fieldName =>
+        match env.find? (induct ++ fieldName) with
+        | some constInfo =>
+            if isDataInvariantField env constInfo.type then count - 1 else count
+        | none => count
 
 private def structConstructor? (env : Environment) (name : Name) : Option (Name × Nat × Nat) :=
   match env.find? name with
   | some (.ctorInfo ctor) =>
       if moveStructAttr.hasTag env ctor.induct then
-        some (ctor.induct, ctor.numParams, ctor.numFields)
+        some (ctor.induct, ctor.numParams,
+          runtimeFields env ctor.induct ctor.numFields)
       else none
   | _ => none
 
@@ -1304,6 +1350,7 @@ private partial def walk (env : Environment) (signatures : FunSignatures) (self 
                     throwError "case constructor `{ctor}` does not belong to enum `{cases.typeName}`"
                   let mut dsts := #[]
                   for param in params do
+                    if param.type.isConstOf ``lcErased then continue
                     match ← translateCurrentTy env param.type with
                     | none => pure ()
                     | some _ =>
@@ -1357,6 +1404,7 @@ private partial def walk (env : Environment) (signatures : FunSignatures) (self 
                   throwError "case constructor `{ctor}` does not belong to structure `{cases.typeName}`"
                 let mut dsts := #[]
                 for param in params do
+                  if param.type.isConstOf ``lcErased then continue
                   match ← translateCurrentTy env param.type with
                   | none => pure ()
                   | some _ =>

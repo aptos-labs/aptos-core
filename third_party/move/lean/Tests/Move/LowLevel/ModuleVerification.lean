@@ -68,11 +68,12 @@ move_module SourceVerification where
   theorem increment_verified :
       Verify.Satisfies incrementSpec incrementContract := by
     intro value initial _
-    constructor
+    refine ⟨?_, ?_, ?_⟩
     · exact fun result final execution =>
         ⟨fun _ => ⟨execution.1, execution.2.1⟩, execution.2.2⟩
     · intro code execution
       exact execution
+    · simp [incrementSpec, Semantics.Checked.addSpec]
 
   /-- Mutable source syntax lowers normally; its proof semantics uses a
   prophecy loan and returns the owner value at loan death. -/

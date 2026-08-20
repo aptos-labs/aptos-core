@@ -245,6 +245,59 @@ def withBorrowMutSpec (resource : Resource World Key Value) (key : Key)
   aborts := fun initial code =>
     (resource.lookup initial key = none ∧ code = executionFailure) ∨
       ∃ value, resource.lookup initial key = some value ∧ (body value).aborts initial code
+  undefined := fun initial =>
+    ∃ value, resource.lookup initial key = some value ∧ (body value).undefined initial
+
+@[simp] theorem total_containsSpec (resource : Resource World Key Value)
+    (key : Key) : Spec.Total (containsSpec resource key) := fun _ h => h.elim
+
+@[simp] theorem total_borrowSpec (resource : Resource World Key Value)
+    (key : Key) : Spec.Total (borrowSpec resource key) := fun _ h => h.elim
+
+@[simp] theorem total_moveFromSpec (resource : Resource World Key Value)
+    (key : Key) : Spec.Total (moveFromSpec resource key) := fun _ h => h.elim
+
+@[simp] theorem total_moveToSpec (resource : Resource World Key Value)
+    (key : Key) (value : Value) :
+    Spec.Total (moveToSpec resource key value) := fun _ h => h.elim
+
+@[simp] theorem withBorrowMutSpec_ok (resource : Resource World Key Value)
+    (key : Key) (body : Value → Spec World (Result × Value)) :
+    (withBorrowMutSpec resource key body).ok initial result finalWorld ↔
+      ∃ value bodyWorld finalValue,
+        resource.lookup initial key = some value ∧
+        (body value).ok initial (result, finalValue) bodyWorld ∧
+        finalWorld = resource.insert bodyWorld key finalValue := Iff.rfl
+
+@[simp] theorem withBorrowMutSpec_aborts (resource : Resource World Key Value)
+    (key : Key) (body : Value → Spec World (Result × Value)) :
+    (withBorrowMutSpec resource key body).aborts initial code ↔
+      (resource.lookup initial key = none ∧ code = executionFailure) ∨
+        ∃ value, resource.lookup initial key = some value ∧
+          (body value).aborts initial code := Iff.rfl
+
+theorem withBorrowMutSpec_undefined (resource : Resource World Key Value)
+    (key : Key) (body : Value → Spec World (Result × Value)) :
+    (withBorrowMutSpec resource key body).undefined initial ↔
+      ∃ value, resource.lookup initial key = some value ∧
+        (body value).undefined initial := Iff.rfl
+
+/-- Pointwise well-definedness of a mutable global borrow: the body only owes
+a proof for the value actually stored. -/
+theorem withBorrowMutSpec_defined {resource : Resource World Key Value}
+    {key : Key} {state : World} {body : Value → Spec World (Result × Value)}
+    (scope : ∀ value, resource.lookup state key = some value →
+      ¬(body value).undefined state) :
+    ¬(withBorrowMutSpec resource key body).undefined state := by
+  rintro ⟨value, present, obligation⟩
+  exact scope value present obligation
+
+theorem withBorrowMutSpec_total {resource : Resource World Key Value}
+    {key : Key} {body : Value → Spec World (Result × Value)}
+    (total : ∀ value, Spec.Total (body value)) :
+    Spec.Total (withBorrowMutSpec resource key body) := by
+  rintro state ⟨value, -, obligation⟩
+  exact total value state obligation
 
 /-- Verification semantics for a mutable borrow focused through one or more
 structure fields. The global resource is checked out by ownership, the focus
@@ -344,6 +397,30 @@ def withBorrowMutFocusSpec (resource : Resource World Key Owner) (key : Key)
     (resource.withBorrowMutSpec key body).aborts initial code ↔
       code = executionFailure := by
   simp [withBorrowMutSpec, hlookup]
+
+/-- Pointwise well-definedness of a focused mutable global borrow. -/
+theorem withBorrowMutFocusSpec_defined {resource : Resource World Key Owner}
+    {key : Key} {get : Owner → Focus} {set : Owner → Focus → Owner}
+    {state : World}
+    {body : Mutation Focus → Spec World (Result × Mutation Focus)}
+    (scope : ∀ reference, ¬(body reference).undefined state) :
+    ¬(withBorrowMutFocusSpec resource key get set body).undefined state := by
+  refine withBorrowMutSpec_defined ?_
+  intro owner _
+  refine Spec.bind_defined (Move.Semantics.withMutation_defined scope) ?_
+  intro output middle _
+  exact fun h => h.elim
+
+theorem withBorrowMutFocusSpec_total {resource : Resource World Key Owner}
+    {key : Key} {get : Owner → Focus} {set : Owner → Focus → Owner}
+    {body : Mutation Focus → Spec World (Result × Mutation Focus)}
+    (total : ∀ reference, Spec.Total (body reference)) :
+    Spec.Total (withBorrowMutFocusSpec resource key get set body) := by
+  refine withBorrowMutSpec_total ?_
+  intro owner
+  refine Spec.Total.bind (Move.Semantics.withMutation_total total) ?_
+  intro output
+  exact fun _ h => h.elim
 
 end Resource
 

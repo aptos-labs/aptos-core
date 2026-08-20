@@ -91,6 +91,27 @@ def userAttributes (env : Environment) (declaration : Name) :
     List MoveModel.IR.Attribute :=
   ((moveUserAttributeExt.getState env).find? declaration).getD []
 
+private def insertDataInvariant (map : NameMap Name) (entry : Name × Name) :
+    NameMap Name :=
+  map.insert entry.1 entry.2
+
+private initialize moveDataInvariantExt :
+    SimplePersistentEnvExtension (Name × Name) (NameMap Name) ←
+  registerSimplePersistentEnvExtension {
+    addEntryFn := insertDataInvariant
+    addImportedFn := fun entries =>
+      mkStateFromImportedEntries insertDataInvariant {} entries
+  }
+
+/-- Record that values of a Move type certify a data invariant. -/
+def registerDataInvariant (env : Environment) (type : Name)
+    (invariant : Name) : Environment :=
+  moveDataInvariantExt.addEntry env (type, invariant)
+
+/-- The data invariant a Move type certifies, if it declares one. -/
+def dataInvariant? (env : Environment) (type : Name) : Option Name :=
+  (moveDataInvariantExt.getState env).find? type
+
 /-- The on-chain identity assigned to declarations enclosed by a
 `move_module`. This metadata is persisted in `.olean` files, so an imported
 Lean module retains the Move identity needed by cross-module lowering. -/
@@ -241,7 +262,17 @@ private def moveTypeDeclarationName (stx : Syntax) : CommandElabM Name := do
 
 private def canDeriveInhabited (name : Name) : CommandElabM Bool := do
   let some (.inductInfo info) := (← getEnv).find? name | return true
-  return !info.isRec && !info.ctors.isEmpty
+  unless !info.isRec && !info.ctors.isEmpty do return false
+  -- A certified type carries a proof in its constructors, so an inhabitant
+  -- needs that proof as well; its instance is generated where the invariant
+  -- is known.
+  let certified ← liftTermElabM do
+    info.ctors.anyM fun ctorName => do
+      let some (.ctorInfo ctor) := (← getEnv).find? ctorName | return false
+      Lean.Meta.forallTelescopeReducing ctor.type fun binders _ =>
+        binders.anyM fun binder => do
+          Lean.Meta.isProp (← Lean.Meta.inferType binder)
+  return !certified
 
 /-- Move values are always inhabited. Generate the corresponding host-side
 instance for every Move structure and enum, without requiring a

@@ -14,3 +14,7 @@ which changes the interpretation of existing semantic binders named `Key`.
 register_simp_attr move_norm
 register_simp_attr wp_norm
 register_simp_attr move_spec
+
+/-- Generated data-invariant definitions, so the creation-site discharger can
+unfold exactly the conditions in play. -/
+register_simp_attr move_invariant_norm

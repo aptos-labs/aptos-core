@@ -53,14 +53,31 @@ def Satisfies (function : Args → Spec State Result)
           contract.ensures args initial result final) ∧
         contract.frame args initial final) ∧
       (∀ code, (function args).aborts initial code →
-        contract.aborts args initial code)
+        contract.aborts args initial code) ∧
+      ¬(function args).undefined initial
 
-/-- Weakest precondition of the relational verification semantics. -/
+/-- Weakest precondition of the relational verification semantics.  Besides
+the normal and abort outcomes it demands well-definedness: a program point
+that owes a proof the language never checks at run time — re-establishing a
+data invariant after a mutation — must not be reachable with that proof
+outstanding. -/
 def wp (action : Spec State Result)
     (ensures : Result → State → Prop) (aborts : Nat → Prop)
     (initial : State) : Prop :=
   (∀ result final, action.ok initial result final → ensures result final) ∧
-  (∀ code, action.aborts initial code → aborts code)
+  (∀ code, action.aborts initial code → aborts code) ∧
+  ¬action.undefined initial
+
+/-- A total operation — one that owes no proof the language does not check —
+has the plain two-obligation weakest precondition.  Every primitive is total;
+only re-establishing a data invariant after a mutation is not. -/
+theorem wp_total_iff {action : Spec State Result}
+    {ensures : Result → State → Prop} {aborts : Nat → Prop} {initial : State}
+    (total : ¬action.undefined initial) :
+    wp action ensures aborts initial ↔
+      (∀ result final, action.ok initial result final → ensures result final) ∧
+      (∀ code, action.aborts initial code → aborts code) := by
+  simp [wp, total]
 
 @[simp, wp_norm] theorem wp_pure (value : Result) (state : State)
     (ensures : Result → State → Prop) (aborts : Nat → Prop) :
@@ -77,18 +94,22 @@ def wp (action : Spec State Result)
     wp (Spec.bind action next) ensures aborts initial ↔
       wp action (fun value state => wp (next value) ensures aborts state) aborts initial := by
   constructor
-  · rintro ⟨hok, habort⟩
-    refine ⟨?_, ?_⟩
+  · rintro ⟨hok, habort, hdefined⟩
+    refine ⟨?_, ?_, ?_⟩
     · intro value middle ha
-      refine ⟨?_, ?_⟩
+      refine ⟨?_, ?_, ?_⟩
       · intro result final hn
         exact hok result final ⟨value, middle, ha, hn⟩
       · intro code hn
         exact habort code (.inr ⟨value, middle, ha, hn⟩)
+      · intro obligation
+        exact hdefined (.inr ⟨value, middle, ha, obligation⟩)
     · intro code ha
       exact habort code (.inl ha)
-  · rintro ⟨haction, habort⟩
-    refine ⟨?_, ?_⟩
+    · intro obligation
+      exact hdefined (.inl obligation)
+  · rintro ⟨haction, habort, hdefined⟩
+    refine ⟨?_, ?_, ?_⟩
     · rintro result final ⟨value, middle, ha, hn⟩
       exact (haction value middle ha).1 result final hn
     · intro code h
@@ -96,7 +117,13 @@ def wp (action : Spec State Result)
       | inl ha => exact habort code ha
       | inr hn =>
           obtain ⟨value, middle, ha, hn⟩ := hn
-          exact (haction value middle ha).2 code hn
+          exact (haction value middle ha).2.1 code hn
+    · intro obligation
+      cases obligation with
+      | inl ha => exact hdefined ha
+      | inr hn =>
+          obtain ⟨value, middle, ha, hn⟩ := hn
+          exact (haction value middle ha).2.2 hn
 
 theorem satisfies_of_wp (function : Args → Spec State Result)
     (contract : Contract State Args Result)
@@ -134,13 +161,15 @@ theorem satisfies_fix
     | succ fuel induction =>
         simpa [Spec.fixApprox] using step (Spec.fixApprox body fuel) induction
   intro args initial permitted
-  constructor
+  refine ⟨?_, ?_, ?_⟩
   · intro result final execution
     obtain ⟨fuel, execution⟩ := execution
     exact (approximates fuel args initial permitted).1 result final execution
   · intro code execution
     obtain ⟨fuel, execution⟩ := execution
-    exact (approximates fuel args initial permitted).2 code execution
+    exact (approximates fuel args initial permitted).2.1 code execution
+  · rintro ⟨fuel, obligation⟩
+    exact (approximates fuel args initial permitted).2.2 obligation
 
 /-- Use an already established contract as the weakest-precondition fact for
 one concrete call. This avoids manually projecting normal and abort halves.
@@ -160,7 +189,8 @@ theorem wp_of_satisfies
   ⟨fun result final execution =>
       let established := (verified args initial permitted).1 result final execution
       ⟨established.1 noAbort, established.2⟩,
-    (verified args initial permitted).2⟩
+    (verified args initial permitted).2.1,
+    (verified args initial permitted).2.2⟩
 
 /-- The abort half of an established contract, usable without ruling the
 declared aborts out. -/
@@ -169,7 +199,7 @@ theorem aborts_of_satisfies
     (permitted : contract.requires args initial) :
     ∀ code, (function args).aborts initial code →
       contract.aborts args initial code :=
-  (verified args initial permitted).2
+  (verified args initial permitted).2.1
 
 /-- Weaken an established weakest-precondition fact to a coarser
 postcondition and abort condition. This adapts a callee's contract to the
@@ -183,7 +213,8 @@ theorem wp_mono {action : Spec State Result}
     wp action ensures' aborts' initial :=
   ⟨fun result final execution =>
       weakenEnsures result final (established.1 result final execution),
-    fun code execution => weakenAborts code (established.2 code execution)⟩
+    fun code execution => weakenAborts code (established.2.1 code execution),
+    established.2.2⟩
 
 /-- Fixed-point induction with a `wp` step. Most Leaner loop proofs naturally
 reason about one call and need not duplicate success and abort forwarding. -/
@@ -229,21 +260,23 @@ theorem satisfies_of_txnWP (function : Args → Txn State Result)
   cases houtcome : function args initial with
   | ok result final =>
       simp [txnWP, houtcome] at h
-      refine ⟨?_, ?_⟩
+      refine ⟨?_, ?_, ?_⟩
       · intro actual actualFinal heq
         simp [Spec.ofTxn, houtcome] at heq
         obtain ⟨rfl, rfl⟩ := heq
         exact ⟨fun _ => h.1, h.2⟩
       · intro code
         simp [Spec.ofTxn, houtcome]
+      · simp [Spec.ofTxn]
   | abort code =>
       simp [txnWP, houtcome] at h
-      refine ⟨?_, ?_⟩
+      refine ⟨?_, ?_, ?_⟩
       · intro result final
         simp [Spec.ofTxn, houtcome]
       · intro actual heq
         simp [Spec.ofTxn, houtcome] at heq
         subst actual
         exact h
+      · simp [Spec.ofTxn]
 
 end Move.Verify

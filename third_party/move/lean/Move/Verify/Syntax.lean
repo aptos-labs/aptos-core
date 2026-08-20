@@ -338,6 +338,42 @@ private partial def updatePath (owner newValue : TSyntax `term)
       let parsed := replaceIdentifier valuePlaceholder newField.raw parsed
       pure ⟨parsed⟩
 
+/-- The type a mutable parameter refers to, if source translation can name
+it. -/
+private def referentTypeName? (type : TSyntax `term) : CommandElabM (Option Name) := do
+  let head := if type.raw.isIdent then type.raw else
+    (Lean.Syntax.getArgs type.raw)[0]? |>.getD type.raw
+  unless head.isIdent do return none
+  try
+    return some (← resolveGlobalConstNoOverload head)
+  catch _ =>
+    return none
+
+/-- Rebuild the owner of a mutated field.  A certified owner is re-created
+through `Spec.certified`, which is where its data invariant is owed; an
+ordinary owner is a plain structure update. -/
+private def rebuildOwner (owner newValue : TSyntax `term)
+    (fields : List (TSyntax `ident)) (certified? : Option (Name × Name)) :
+    CommandElabM (Option (TSyntax `term)) := do
+  let some (typeName, invariantName) := certified? | return none
+  let field :: rest := fields
+    | throwError "a mutable borrow into `{typeName}` must select a field"
+  let env ← getEnv
+  let some info := getStructureInfo? env typeName | return none
+  let dataFields := info.fieldNames.filter (· != `invariant)
+  let arguments ← dataFields.mapM fun fieldName =>
+    if fieldName == field.getId then
+      if rest.isEmpty then pure newValue
+      else do updatePath (← `($owner.$field)) newValue rest
+    else
+      `($owner.$(mkIdent fieldName))
+  let rawValue ← `($(mkIdent (typeName ++ `Raw ++ `mk)) $arguments*)
+  let holds := mkIdentFrom field `_moveSpecInvariant
+  let built ← `(fun $holds =>
+    $(mkIdent (typeName ++ `mk)) $arguments* $holds)
+  return some (← `(Move.Semantics.Spec.certified
+    (Invariant := $(mkIdent invariantName) $rawValue) $built))
+
 private structure ResourceBinding where
   typeName : Name
   descriptor : TSyntax `term
@@ -397,6 +433,9 @@ private structure TranslationContext where
   functionName : Name
   recursiveSpec? : Option (TSyntax `term) := none
   mutation? : Option (TSyntax `ident) := none
+  /-- The type and data invariant of the mutable parameter's referent, when it
+  certifies one.  Rebuilding it after a field mutation is a creation site. -/
+  certifiedOwner? : Option (Name × Name) := none
   loops : List VerificationLoopFrame := []
 
 private def mutationValue (context : TranslationContext)
@@ -1018,15 +1057,26 @@ private partial def translateDo (context : TranslationContext)
         let output := mkIdentFrom place `_moveSpecFieldOutput
         let outputTerm : TSyntax `term := ⟨output.raw⟩
         let finalField ← `($outputTerm.2)
-        let updated ← updatePath parentValue finalField fields.toList
         let borrow ← `(Move.Semantics.withMutation $focused (fun $name => $nested))
         let after ← if continuation.isEmpty then
           finish context (← `(Move.Semantics.Spec.pure $outputTerm.1))
         else
           translateDo context continuation
-        `(Move.Semantics.Spec.bind $borrow (fun $output =>
-            let $parent := Move.Semantics.Mutation.write $parent $updated
-            $after))
+        -- Re-creating a certified owner is a creation site: its data
+        -- invariant is owed here, when the loan dies, and nowhere else.
+        match ← rebuildOwner parentValue finalField fields.toList
+            context.certifiedOwner? with
+        | some creation =>
+            let rebuilt := mkIdentFrom place `_moveSpecRebuilt
+            `(Move.Semantics.Spec.bind $borrow (fun $output =>
+                Move.Semantics.Spec.bind $creation (fun $rebuilt =>
+                  let $parent := Move.Semantics.Mutation.write $parent $rebuilt
+                  $after)))
+        | none =>
+            let updated ← updatePath parentValue finalField fields.toList
+            `(Move.Semantics.Spec.bind $borrow (fun $output =>
+                let $parent := Move.Semantics.Mutation.write $parent $updated
+                $after))
       else if place.raw.isIdent && !(← hasResource context.resources ⟨place.raw⟩) then
         let localIdent : TSyntax `ident := ⟨place.raw⟩
         -- Keep values produced in the loan body in lexical scope, but refresh
@@ -1066,11 +1116,32 @@ private partial def translateDo (context : TranslationContext)
         let ownerTerm : TSyntax `term := ⟨owner.raw⟩
         let replacementTerm : TSyntax `term := ⟨replacement.raw⟩
         let focused ← projectPath ownerTerm fields
-        let updated ← updatePath ownerTerm replacementTerm fields.toList
-        let borrow ← `(Move.Semantics.Resource.withBorrowMutFocusSpec $descriptor $key
-            (fun $owner => $focused)
-            (fun $owner $replacement => $updated)
-            (fun $name => $nested))
+        let resourceName ← Move.Verify.Source.canonicalResourceName resourceType
+        let certified? := (Move.dataInvariant? (← getEnv) resourceName).map
+          (resourceName, ·)
+        let borrow ← match ← rebuildOwner ownerTerm replacementTerm fields.toList
+            certified? with
+          | some creation =>
+              -- A certified resource is re-created when the loan dies: its
+              -- data invariant is owed there, and the stored value stays
+              -- certified.
+              let output := mkIdentFrom place `_moveSpecFocusOutput
+              let rebuilt := mkIdentFrom place `_moveSpecRebuilt
+              `(Move.Semantics.Resource.withBorrowMutSpec $descriptor $key
+                  (fun $owner =>
+                    Move.Semantics.Spec.bind
+                      (Move.Semantics.withMutation $focused (fun $name => $nested))
+                      (fun $output =>
+                        let $replacement := $output.2
+                        Move.Semantics.Spec.bind $creation
+                          (fun $rebuilt =>
+                            Move.Semantics.Spec.pure ($output.1, $rebuilt)))))
+          | none =>
+              let updated ← updatePath ownerTerm replacementTerm fields.toList
+              `(Move.Semantics.Resource.withBorrowMutFocusSpec $descriptor $key
+                  (fun $owner => $focused)
+                  (fun $owner $replacement => $updated)
+                  (fun $name => $nested))
         if continuation.isEmpty then
           pure borrow
         else
@@ -1313,12 +1384,20 @@ def translate (function world : Syntax) (resources : Array ResourceBinding)
   let resultType ← actionResultType declaration
   let body ← sourceBody declaration
   let functionName := (← getCurrNamespace) ++ function.getId
+  let certifiedOwner? ← match mutableParameter? with
+    | none => pure none
+    | some (_, referent) => do
+        match ← referentTypeName? referent with
+        | none => pure none
+        | some typeName =>
+            pure ((Move.dataInvariant? (← getEnv) typeName).map (typeName, ·))
   let spec ← translateTerm {
     world := ⟨world⟩
     resources
     functionName
     recursiveSpec?
     mutation? := mutableParameter?.map (·.1)
+    certifiedOwner?
   } body
   match mutableParameter? with
   | none => pure (spec, resultType)
@@ -1648,6 +1727,210 @@ private def mayAbortLambdaFor (arguments : Array (TSyntax `ident))
       `(fun _moveSpecArgs _moveSpecInitial =>
           ∃ _moveSpecAbortCode,
             $abortsLambda _moveSpecArgs _moveSpecInitial _moveSpecAbortCode)
+
+/-- Further invariant clauses of a data specification; they are conjoined. -/
+declare_syntax_cat moveExtraInvariant
+scoped syntax ";" "invariant " term : moveExtraInvariant
+
+/-- A data invariant: every value of the named struct or enum satisfies the
+declared conditions, and carries their proof.  `this` denotes the value being
+constrained and a leading `.field` abbreviates `this.field`.  Clauses read
+like the other spec blocks and may be repeated:
+
+```lean
+spec Map {K} {V} where
+  invariant Model.SortedEntries this.entries.toList
+```
+
+The declaration is consumed by the enclosing `move_module`, which attaches
+the invariant to the type it names. -/
+scoped syntax (name := dataInvariantSpec)
+  "spec " ident moveSpecBinder* " where "
+    "invariant " term moveExtraInvariant* : command
+
+@[macro dataInvariantSpec] def expandDataInvariantSpec : Macro := fun stx =>
+  Macro.throwErrorAt stx
+    ("a data invariant must be declared inside the `move_module` which " ++
+      "declares its type")
+
+/-- Total primitives of the relational semantics, with the lemma that says
+so.  Every step of the discharger below applies exactly one of these, or one
+combinator rule, chosen by the head symbol of the goal — it never lets
+unification unfold a body. -/
+private def totalPrimitiveLemma : Name → Option Name
+  | ``Move.Semantics.Spec.pure => some ``Move.Semantics.Spec.pure_undefined
+  | ``Move.Semantics.Spec.abort => some ``Move.Semantics.Spec.abort_undefined
+  | ``Move.Semantics.Spec.bottom => some ``Move.Semantics.Spec.bottom_undefined
+  | ``Move.Semantics.Spec.get => some ``Move.Semantics.Spec.total_get
+  | ``Move.Semantics.Spec.set => some ``Move.Semantics.Spec.total_set
+  | ``Move.Semantics.Spec.modify => some ``Move.Semantics.Spec.total_modify
+  | ``Move.Semantics.Spec.ofTxn => some ``Move.Semantics.Spec.total_ofTxn
+  | ``Move.Semantics.Checked.addSpec => some ``Move.Semantics.Checked.total_addSpec
+  | ``Move.Semantics.Checked.subSpec => some ``Move.Semantics.Checked.total_subSpec
+  | ``Move.Semantics.Checked.mulSpec => some ``Move.Semantics.Checked.total_mulSpec
+  | ``Move.Semantics.Checked.divSpec => some ``Move.Semantics.Checked.total_divSpec
+  | ``Move.Semantics.Checked.modSpec => some ``Move.Semantics.Checked.total_modSpec
+  | ``Move.Semantics.Checked.shlSpec => some ``Move.Semantics.Checked.total_shlSpec
+  | ``Move.Semantics.Checked.shrSpec => some ``Move.Semantics.Checked.total_shrSpec
+  | ``Move.Semantics.Checked.castSpec => some ``Move.Semantics.Checked.total_castSpec
+  | ``Move.Semantics.Resource.containsSpec =>
+      some ``Move.Semantics.Resource.total_containsSpec
+  | ``Move.Semantics.Resource.borrowSpec =>
+      some ``Move.Semantics.Resource.total_borrowSpec
+  | ``Move.Semantics.Resource.moveFromSpec =>
+      some ``Move.Semantics.Resource.total_moveFromSpec
+  | ``Move.Semantics.Resource.moveToSpec =>
+      some ``Move.Semantics.Resource.total_moveToSpec
+  | ``Move.Semantics.Vector.borrowElemSpec =>
+      some ``Move.Semantics.Vector.total_borrowElemSpec
+  | ``Move.Semantics.Vector.setSpec => some ``Move.Semantics.Vector.total_setSpec
+  | ``Move.Semantics.Vector.insertSpec =>
+      some ``Move.Semantics.Vector.insertSpec_undefined
+  | ``Move.Semantics.Vector.removeSpec =>
+      some ``Move.Semantics.Vector.removeSpec_undefined
+  | _ => none
+
+/-- The computation a well-definedness goal `¬ X.undefined s` is about. -/
+private def definednessSubject? (target : Expr) : Option Expr := do
+  guard (target.isAppOfArity ``Not 1)
+  let inner := target.appArg!
+  guard (inner.isAppOfArity ``Move.Semantics.Spec.undefined 4)
+  return inner.getArg! 2
+
+/-- A hypothesis `∀ a s, ¬ (recursive a).undefined s` for the recursive call
+of an enclosing fixed point. -/
+private def recursiveDefinedHypothesis? (recursive : FVarId) :
+    Lean.Elab.Tactic.TacticM (Option FVarId) := do
+  let lctx ← getLCtx
+  for decl in lctx do
+    if decl.isImplementationDetail then continue
+    let type ← instantiateMVars decl.type
+    let isHypothesis ← Lean.Meta.forallTelescopeReducing type fun _ body => do
+      match definednessSubject? body with
+      | some subject =>
+          pure (subject.getAppFn == .fvar recursive && subject.getAppNumArgs == 1)
+      | none => pure false
+    if isHypothesis then return some decl.fvarId
+  return none
+
+/-- Establish that a source computation owes no proof, by its structure: the
+primitives are total by definition, the combinators preserve it, and the only
+obligation that survives is the data invariant of a created value, which is
+left as the goal `Invariant`.  Each step is chosen by the goal's head symbol
+and applies one lemma, so the cost is linear in the body and a body the
+discharger does not understand fails immediately with its head symbol. -/
+syntax (name := specDefined) "spec_defined" : tactic
+
+private partial def dischargeDefined (fuel : Nat := 10000) :
+    Lean.Elab.Tactic.TacticM Unit := Lean.Elab.Tactic.withMainContext do
+  if fuel == 0 then throwError "spec_defined: body too large"
+  let goal ← Lean.Elab.Tactic.getMainGoal
+  let target ← instantiateMVars (← goal.getType)
+  let some subject := definednessSubject? target
+    | throwError "spec_defined: expected a goal `¬ X.undefined s`, got{indentExpr target}"
+  let recurse := dischargeDefined (fuel - 1)
+  let step (stx : TSyntax `tactic) : Lean.Elab.Tactic.TacticM Unit := do
+    Lean.Elab.Tactic.evalTactic stx
+  let onEveryGoal (action : Lean.Elab.Tactic.TacticM Unit) :
+      Lean.Elab.Tactic.TacticM Unit := do
+    let produced ← Lean.Elab.Tactic.getGoals
+    let mut remaining := #[]
+    for produced in produced do
+      Lean.Elab.Tactic.setGoals [produced]
+      action
+      remaining := remaining ++ (← Lean.Elab.Tactic.getGoals)
+    Lean.Elab.Tactic.setGoals remaining.toList
+  match subject.getAppFn with
+  | .lam .. | .letE .. | .mdata .. | .proj .. =>
+      step (← `(tactic| dsimp only))
+      Lean.Elab.Tactic.withMainContext do
+        let after ← instantiateMVars (← (← Lean.Elab.Tactic.getMainGoal).getType)
+        if after == target then
+          throwError "spec_defined: cannot reduce{indentExpr subject}"
+        recurse
+  | .fvar recursive =>
+      let some hypothesis ← recursiveDefinedHypothesis? recursive
+        | throwError "spec_defined: no well-definedness hypothesis for recursive call{indentExpr subject}"
+      step (← `(tactic| exact $(mkIdent (← hypothesis.getUserName)) _ _))
+  | .const name _ =>
+      if name == ``Move.Semantics.Spec.bind then
+        step (← `(tactic| refine Move.Semantics.Spec.bind_defined ?_ (fun _ _ _ => ?_)))
+        onEveryGoal recurse
+      else if name == ``Move.Semantics.Spec.fix then
+        step (← `(tactic| refine Move.Semantics.Spec.fix_defined
+          (fun _recursive _recursiveDefined _ _ => ?_)))
+        recurse
+      else if name == ``Move.Semantics.withMutation then
+        step (← `(tactic| refine Move.Semantics.withMutation_defined (fun _ => ?_)))
+        recurse
+      else if name == ``Move.Semantics.Resource.withBorrowMutSpec then
+        step (← `(tactic| refine Move.Semantics.Resource.withBorrowMutSpec_defined
+          (fun _ _ => ?_)))
+        recurse
+      else if name == ``Move.Semantics.Resource.withBorrowMutFocusSpec then
+        step (← `(tactic| refine Move.Semantics.Resource.withBorrowMutFocusSpec_defined
+          (fun _ => ?_)))
+        recurse
+      else if name == ``Move.Semantics.Vector.withBorrowElemMutSpec then
+        step (← `(tactic| refine Move.Semantics.Vector.withBorrowElemMutSpec_defined
+          (fun _ => ?_)))
+        recurse
+      else if name == ``Move.Semantics.Spec.certified then
+        -- The one genuine obligation: the data invariant of a created value.
+        step (← `(tactic| rw [Move.Semantics.Spec.certified_defined_iff]))
+      else if name == ``ite || name == ``dite ||
+          (← Lean.Meta.isMatcher name) then
+        step (← `(tactic| split))
+        onEveryGoal recurse
+      else if let some lemma := totalPrimitiveLemma name then
+        step (← `(tactic| apply $(mkIdent lemma)))
+      else
+        throwError "spec_defined: no well-definedness rule for `{name}`"
+  | other =>
+      throwError "spec_defined: unexpected head{indentExpr other}"
+
+@[tactic specDefined] private def elabSpecDefined : Lean.Elab.Tactic.Tactic :=
+  fun _ => dischargeDefined
+
+/-- Discharge the data invariant of a value being created.  Creation is the
+only place an invariant is owed, so this runs wherever a literal of a
+certified type is elaborated; when it cannot close the goal the error points
+at the literal. -/
+syntax "move_invariant" : tactic
+macro_rules
+  | `(tactic| move_invariant) =>
+    `(tactic| first
+        | trivial
+        | rfl
+        | decide
+        | assumption
+        -- Every alternative must close the goal, or `first` would stop at
+        -- a partial simplification and report it as the failure.
+        | (simp [move_invariant_norm, move_norm, Nat.reducePow, Nat.reduceMod]
+           done)
+        | (simp [move_invariant_norm, move_norm, Nat.reducePow, Nat.reduceMod]
+           omega)
+        | (simp_all [move_invariant_norm, move_norm, Nat.reducePow,
+            Nat.reduceMod]
+           done)
+        | (simp_all [move_invariant_norm, move_norm, Nat.reducePow,
+            Nat.reduceMod]
+           omega)
+        | fail "cannot establish the data invariant of this value here (if this is a pattern of a certified enum, bind the proof with a trailing `_`)")
+
+/-- Rewrite the leading-dot field abbreviations of an invariant condition to
+projections of the constrained value. -/
+partial def bindInvariantValue (this : TSyntax `ident) (condition : Syntax) :
+    Syntax :=
+  if condition.isOfKind ``Lean.Parser.Term.dotIdent then
+    mkNode ``Lean.Parser.Term.proj #[this.raw, mkAtom ".", condition[1]]
+  else if condition.isOfKind ``Lean.Parser.Term.matchAlt then
+    -- The patterns of a `match this with | .ctor …` are constructor names,
+    -- not field abbreviations: rewrite only the right-hand side.
+    let last := condition.getNumArgs - 1
+    condition.setArg last (bindInvariantValue this condition[last])
+  else
+    condition.setArgs (condition.getArgs.map (bindInvariantValue this))
 
 /-- A declarative contract for a pure Move source function. The result binder
 denotes the result of applying the named function to the contract arguments. -/
@@ -2074,8 +2357,8 @@ private def elabAutomaticSourceVerify : CommandElab := fun stx => do
             unfoldLemmas := unfoldLemmas.push dependencyLemma
     let command ← `(theorem $verifiedName : $contractName := by
       unfold $contractName
-      simp_all [$unfoldLemmas,*, move_spec, move_norm, Nat.reducePow,
-        Nat.reduceMod, Move.UInt.numeral_eq_ofNat, and_assoc,
+      simp_all [$unfoldLemmas,*, move_spec, move_invariant_norm, move_norm,
+        Nat.reducePow, Nat.reduceMod, Move.UInt.numeral_eq_ofNat, and_assoc,
         exists_const] <;>
       (try uint_bounds) <;>
       grind [Move.UInt.toNat_ofNat_u8, Move.UInt.toNat_ofNat_u16,
@@ -2102,19 +2385,38 @@ private def elabAutomaticSourceVerify : CommandElab := fun stx => do
           let dependencyLemma ←
             `(Lean.Parser.Tactic.simpLemma| $dependencyTerm:term)
           sourceUnfoldLemmas := sourceUnfoldLemmas.push dependencyLemma
-  let command ← `(set_option maxHeartbeats 2000000 in
+  let command ← `(set_option maxHeartbeats 400000 in
     theorem $verifiedName : $contractName := by
       unfold $contractName Move.Verify.Satisfies
       intros
-      -- Unfold the source semantics once, before the two halves of the
-      -- obligation are split apart, so the traversal is not repeated.
+      -- Peel off well-definedness first: it is structural, and keeping it
+      -- out of the unfolding saves a copy of the whole body there.
+      rw [← and_assoc]
+      refine ⟨?main, ?wellDefined⟩
+      case wellDefined =>
+        simp only [$sourceUnfoldLemmas,*]
+        spec_defined
+        all_goals
+          simp_all (config := { maxSteps := 1000000 })
+            [$sourceUnfoldLemmas,*, move_spec, move_invariant_norm, move_norm,
+              Nat.reducePow, Nat.reduceMod, Move.UInt.numeral_eq_ofNat,
+              and_assoc, exists_const] <;>
+          (try uint_bounds) <;>
+          grind [Move.UInt.toNat_ofNat_u8, Move.UInt.toNat_ofNat_u16,
+            Move.UInt.toNat_ofNat_u32, Move.UInt.toNat_ofNat_u64,
+            Move.UInt.toNat_ofNat_u128, Move.UInt.toNat_ofNat_u256,
+            Move.UInt.toNat_zero, Move.UInt.toNat_one,
+            Move.UInt.numeral_eq_ofNat, Move.UInt.toNat_cast,
+            Move.UInt.toNat_lt]
+      -- Unfold the source semantics once, before the two remaining
+      -- obligations are split apart, so the traversal is not repeated.
       simp only [$sourceUnfoldLemmas,*, move_spec]
-      constructor <;> intros
+      refine ⟨?_, ?_⟩ <;> intros
       all_goals
         simp_all (config := { maxSteps := 1000000 })
-          [$sourceUnfoldLemmas,*, move_spec, move_norm, Nat.reducePow,
-            Nat.reduceMod, Move.UInt.numeral_eq_ofNat, and_assoc,
-            exists_const] <;>
+          [$sourceUnfoldLemmas,*, move_spec, move_invariant_norm, move_norm,
+            Nat.reducePow, Nat.reduceMod, Move.UInt.numeral_eq_ofNat,
+            and_assoc, exists_const] <;>
         (try uint_bounds) <;>
         grind [Move.UInt.toNat_ofNat_u8, Move.UInt.toNat_ofNat_u16,
         Move.UInt.toNat_ofNat_u32, Move.UInt.toNat_ofNat_u64,

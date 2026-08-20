@@ -113,7 +113,7 @@ example : Satisfies addFiveSpec relationalAddContract := by
   apply satisfies_of_wp
   intro args initial _
   cases args
-  constructor
+  refine ⟨?_, ?_, ?_⟩
   · intro result final h
     rcases h with ⟨_, hresult, hfinal⟩
     exact ⟨fun _ => by
@@ -122,6 +122,7 @@ example : Satisfies addFiveSpec relationalAddContract := by
       hfinal⟩
   · intro code h
     exact h.2 (by native_decide)
+  · simp [addFiveSpec, Checked.addSpec]
 
 private abbrev CounterWorld := Option U64 × Nat
 

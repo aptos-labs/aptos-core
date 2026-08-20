@@ -265,6 +265,12 @@ type: `(x.cast : U8)`. -/
 
 instance (n : Nat) : OfNat (UInt W) n := ⟨ofNat n⟩
 instance : Inhabited (UInt W) := ⟨ofNat 0⟩
+
+/-- The default integer is zero, which a data invariant's inhabitant proof
+needs to see. -/
+@[simp] theorem toNat_default : (default : UInt W).toNat = 0 := by
+  show (ofNat 0).toNat = 0
+  simp [toNat_ofNat]
 instance : DecidableEq (UInt W) := fun a b =>
   decidable_of_iff (a.toNat = b.toNat) ⟨ext, fun h => h ▸ rfl⟩
 instance : Repr (UInt W) where
@@ -430,6 +436,17 @@ the same `ofNat`-of-view equations for them as for the notations. -/
 instance : LT (UInt W) := ⟨fun a b => less a b = true⟩
 instance (a b : UInt W) : Decidable (a < b) :=
   inferInstanceAs (Decidable (less a b = true))
+
+/-- Trust base: the integer comparison primitive the backend lowers to
+`MoveModel.IR.Oper.lt` is numeric.  This is the integer-specific
+counterpart of the verification axiom `logicalLT_uint` for the generic
+structural order; both state what the compiler implements. -/
+axiom less_eq_true_iff (a b : UInt W) : less a b = true ↔ a.toNat < b.toNat
+
+/-- Source `<` on integers, as the numeric fact a proof needs — for example
+the hypothesis of a dependent `if h : a < b` at a creation site. -/
+@[simp] theorem lt_iff_toNat_lt (a b : UInt W) : a < b ↔ a.toNat < b.toNat :=
+  less_eq_true_iff a b
 
 end UInt
 

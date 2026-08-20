@@ -70,6 +70,7 @@ attribute [move_norm]
   Move.UInt.toNat_ofNat_numeral
   Move.UInt.toNat_zero
   Move.UInt.toNat_one
+  Move.UInt.lt_iff_toNat_lt
   Move.Vector.length_toNat
   Move.Vector.toList_empty
   Move.Vector.toList_push
@@ -103,15 +104,33 @@ attribute [move_spec]
   Move.Semantics.ResourceStore.get
   Move.Semantics.ResourceStore.descriptor
   Move.Semantics.Resource.withBorrowMutFocusSpec
-  Move.Semantics.Resource.withBorrowMutSpec
+  Move.Semantics.Resource.withBorrowMutSpec_ok
+  Move.Semantics.Resource.withBorrowMutSpec_aborts
+  Move.Semantics.Resource.withBorrowMutSpec_undefined
   Move.Semantics.Vector.borrowElemSpec
   Move.Semantics.Vector.withBorrowElemMutSpec
   Move.Semantics.Vector.insertSpec
   Move.Semantics.Vector.removeSpec
-  Move.Semantics.withMutation
-  Move.Semantics.Spec.bind
-  Move.Semantics.Spec.pure
-  Move.Semantics.Spec.abort
+  Move.Semantics.withMutation_ok
+  Move.Semantics.withMutation_aborts
+  Move.Semantics.withMutation_undefined
+  Move.Semantics.Spec.bind_ok
+  Move.Semantics.Spec.bind_aborts
+  Move.Semantics.Spec.bind_undefined
+  Move.Semantics.Spec.pure_ok
+  Move.Semantics.Spec.pure_aborts
+  Move.Semantics.Spec.abort_ok
+  Move.Semantics.Spec.abort_aborts
+  Move.Semantics.Spec.certified_ok
+  Move.Semantics.Spec.certified_aborts
+  Move.Semantics.Spec.ok_ite
+  Move.Semantics.Spec.aborts_ite
+  Move.Semantics.Spec.undefined_ite
+  Move.Semantics.Spec.ok_dite
+  Move.Semantics.Spec.aborts_dite
+  Move.Semantics.Spec.undefined_dite
+  Move.Semantics.Spec.pure_undefined
+  Move.Semantics.Spec.abort_undefined
   Move.Semantics.Mutation.read
   Move.Semantics.Mutation.write
   Move.Vector.empty

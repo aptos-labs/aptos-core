@@ -60,6 +60,11 @@ def moveAttributes := leading_parser
       (Lean.Parser.sepBy1 moveAttributeInstance ", ") >>
     "]"
 
+/-- Internal command emitted by `move_module` to persist the data invariant a
+type certifies, so source translation knows where a value is created. -/
+scoped syntax (name := registerMoveInvariant)
+  "#register_move_invariant " ident ident : command
+
 /-- Internal command emitted by `move_module` to persist the user-provided
 source attributes of one declaration. -/
 @[command_parser] def registerMoveAttributes := leading_parser
@@ -415,38 +420,272 @@ private def withAttributeRegistration (declaration declId : Syntax)
   if user.isEmpty then #[declaration]
   else #[declaration, buildAttributeRegistration declId user]
 
+/-- The field names a `structFields` node declares, in order. -/
+private def structFieldNames (fields : Syntax) : Array (TSyntax `ident) :=
+  let args := if fields.getNumArgs == 1 && fields[0].isOfKind nullKind then
+      fields[0].getArgs
+    else
+      fields.getArgs
+  args.filterMap fun field =>
+    if field.isOfKind ``Lean.Parser.Command.structSimpleBinder then
+      some ⟨field[1]⟩
+    else
+      none
+
+/-- The names a binder introduces, so a generated declaration can apply the
+type it belongs to. -/
+private def binderNames (binder : Syntax) : Array (TSyntax `ident) :=
+  if binder.isOfKind ``Lean.Parser.Term.explicitBinder ||
+      binder.isOfKind ``Lean.Parser.Term.implicitBinder ||
+      binder.isOfKind ``Lean.Parser.Term.strictImplicitBinder then
+    binder[1].getArgs.filterMap fun argument =>
+      if argument.isIdent then some ⟨argument⟩ else none
+  else
+    #[]
+
+/-- Add the certifying field: the invariant of this very value, defaulted to
+a tactic so an ordinary literal carries no proof text. -/
+private def appendInvariantField (item : Syntax) (fields : Syntax)
+    (invariantName : TSyntax `ident) : MacroM Syntax := do
+  let fieldNames := structFieldNames fields
+  let assignments ← fieldNames.mapM fun field =>
+    `(Lean.Parser.Term.structInstField| $field:ident := $field:ident)
+  let value ← `({ $assignments,* : _ })
+  let invariantField := mkIdentFrom item[7] `invariant
+  let field ← `(Lean.Parser.Command.structSimpleBinder|
+    $invariantField:ident : $invariantName $value := by move_invariant)
+  -- `structFields` wraps its binders in a single null node.
+  let existing := if fields.getNumArgs == 1 && fields[0].isOfKind nullKind then
+      fields[0].getArgs
+    else
+      fields.getArgs
+  let updated := mkNullNode (existing.push field.raw)
+  return if fields.getNumArgs == 1 && fields[0].isOfKind nullKind then
+      fields.setArg 0 updated
+    else
+      updated
+
+/-- Attach a declared data invariant to the struct that carries it: a
+proof-free twin used to state the condition, and the condition itself.  The
+certified structure gains the proof as a field, so a value carries its
+invariant and only creating one owes a proof. -/
+private def certifiedStructDeclarations (item : Syntax)
+    (conditions : Array Syntax) :
+    MacroM (Array Syntax × Array Syntax × TSyntax `ident) := do
+  let declId := item[4]
+  let name : TSyntax `ident := ⟨declId[0]⟩
+  let rawName := mkIdentFrom name (name.getId ++ `Raw)
+  let invariantName := mkIdentFrom name (name.getId ++ `Invariant)
+  let signature ← normalizeTypeParameterBinders item[5]
+  -- The condition's parameters are implicit, so it applies to a value
+  -- without repeating the type arguments.
+  let binders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) ←
+    signature[0].getArgs.mapM fun binder =>
+      if binder.isOfKind ``Lean.Parser.Term.explicitBinder then do
+        let names : Array (TSyntax `ident) := binder[1].getArgs.map (⟨·⟩)
+        let type : TSyntax `term := ⟨binder[2][1]⟩
+        `(bracketedBinder| {$names:ident* : $type})
+      else
+        pure ⟨binder⟩
+  let parameters := signature[0].getArgs.flatMap binderNames
+  let this := mkIdentFrom item[7] `this
+  let bound := conditions.map fun condition =>
+    (⟨Move.Spec.bindInvariantValue this condition⟩ : TSyntax `term)
+  let mut condition := bound[0]!
+  for index in [1:bound.size] do
+    condition ← `($condition ∧ $(bound[index]!))
+  let rawStructure := mkNode ``Lean.Parser.Command.structure #[
+    mkNode ``Lean.Parser.Command.structureTk #[mkAtomFrom item[3] "structure"],
+    mkNode ``Lean.Parser.Command.declId #[rawName.raw, mkNullNode],
+    signature, mkNullNode,
+    mkNullNode #[mkAtom "where", mkNullNode, item[7]],
+    mkNullNode]
+  let rawDeclaration := mkNode ``Lean.Parser.Command.declaration
+    #[mkNullNode, rawStructure]
+  let rawType : TSyntax `term ← if parameters.isEmpty then
+      pure ⟨rawName.raw⟩
+    else
+      `($rawName $(parameters.map fun p => (⟨p.raw⟩ : TSyntax `term))*)
+  let invariantCommand ←
+    `(@[move_invariant_norm] def $invariantName $binders*
+        ($this : $rawType) : Prop := $condition)
+  let inhabitedSignature ← addMoveTypeInhabitants ⟨signature⟩
+  let inhabitedBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) :=
+    inhabitedSignature.raw[0].getArgs.map (⟨·⟩)
+  let certifiedType : TSyntax `term ← if parameters.isEmpty then
+      pure ⟨name.raw⟩
+    else
+      `($name $(parameters.map fun p => (⟨p.raw⟩ : TSyntax `term))*)
+  let fieldNames := structFieldNames item[7]
+  let defaults ← fieldNames.mapM fun field =>
+    `(Lean.Parser.Term.structInstField| $field:ident := default)
+  let inhabitedCommand ←
+    `(instance $inhabitedBinders:bracketedBinder* :
+        Inhabited $certifiedType :=
+          ⟨({ $defaults,* : $certifiedType })⟩)
+  let registration ←
+    `(#register_move_invariant $name $invariantName)
+  -- The twin and the condition precede the type; its inhabitant follows it.
+  return (#[rawDeclaration, invariantCommand.raw],
+    #[inhabitedCommand.raw, registration.raw], invariantName)
+
+/-- The binders of a constructor's signature, with the names they bind. -/
+private def constructorBinders (ctor : Syntax) : Syntax × Nat := Id.run do
+  for index in [0:ctor.getNumArgs] do
+    if ctor[index].isOfKind ``Lean.Parser.Command.optDeclSig then
+      return (ctor[index], index)
+  return (mkNullNode, ctor.getNumArgs)
+
+private def constructorName (ctor : Syntax) : Option (TSyntax `ident) := Id.run do
+  for index in [0:ctor.getNumArgs] do
+    if ctor[index].isIdent then return some ⟨ctor[index]⟩
+  return none
+
+/-- Attach a declared data invariant to the enum that carries it: a
+proof-free twin states the condition (so it can `match this`), and every
+constructor of the certified enum gains a trailing proof argument whose
+default discharges the obligation at construction.  Patterns of a certified
+enum bind that argument with a trailing `_`. -/
+private def certifiedEnumDeclarations (item : Syntax)
+    (conditions : Array Syntax) :
+    MacroM (Array Syntax × Array Syntax × Syntax × TSyntax `ident) := do
+  let declId := item[4]
+  let name : TSyntax `ident := ⟨declId[0]⟩
+  let rawName := mkIdentFrom name (name.getId ++ `Raw)
+  let invariantName := mkIdentFrom name (name.getId ++ `Invariant)
+  let signature ← normalizeTypeParameterBinders item[5]
+  let binders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) ←
+    signature[0].getArgs.mapM fun binder =>
+      if binder.isOfKind ``Lean.Parser.Term.explicitBinder then do
+        let names : Array (TSyntax `ident) := binder[1].getArgs.map (⟨·⟩)
+        let type : TSyntax `term := ⟨binder[2][1]⟩
+        `(bracketedBinder| {$names:ident* : $type})
+      else
+        pure ⟨binder⟩
+  let parameters := signature[0].getArgs.flatMap binderNames
+  let this := mkIdentFrom item[7] `this
+  let bound := conditions.map fun condition =>
+    (⟨Move.Spec.bindInvariantValue this condition⟩ : TSyntax `term)
+  let mut condition := bound[0]!
+  for index in [1:bound.size] do
+    condition ← `($condition ∧ $(bound[index]!))
+  -- The twin: the same constructors, no proof, never compiled.
+  let rawInductive := mkNode ``Lean.Parser.Command.inductive #[
+    mkAtomFrom item[3] "inductive",
+    mkNode ``Lean.Parser.Command.declId #[rawName.raw, mkNullNode],
+    signature, mkNullNode #[mkAtom "where"], item[7], mkNullNode, mkNullNode]
+  let rawDeclaration := mkNode ``Lean.Parser.Command.declaration
+    #[mkNullNode, rawInductive]
+  let rawType : TSyntax `term ← if parameters.isEmpty then
+      pure ⟨rawName.raw⟩
+    else
+      `($rawName $(parameters.map fun p => (⟨p.raw⟩ : TSyntax `term))*)
+  let invariantCommand ←
+    `(@[move_invariant_norm] def $invariantName $binders*
+        ($this : $rawType) : Prop := $condition)
+  -- The certified constructors: each carries the proof of its own variant.
+  let invariantField := mkIdentFrom item[7] `invariant
+  let mut certifiedCtors : Array Syntax := #[]
+  let mut firstCtor : Option (TSyntax `ident × Nat) := none
+  for ctor in item[7].getArgs do
+    let some ctorName := constructorName ctor
+      | Macro.throwErrorAt ctor "unsupported enum constructor shape"
+    let (sig, sigIndex) := constructorBinders ctor
+    let ctorBinders := sig[0].getArgs
+    let fieldNames := ctorBinders.flatMap binderNames
+    let rawCtor := mkIdentFrom ctorName (rawName.getId ++ ctorName.getId)
+    let rawValue : TSyntax `term ← if fieldNames.isEmpty then
+        pure ⟨rawCtor.raw⟩
+      else
+        `($rawCtor $(fieldNames.map fun f => (⟨f.raw⟩ : TSyntax `term))*)
+    let proofBinder ← `(bracketedBinder|
+      ($invariantField:ident : $invariantName $rawValue := by move_invariant))
+    let newSig := sig.setArg 0 (mkNullNode (ctorBinders.push proofBinder.raw))
+    certifiedCtors := certifiedCtors.push (ctor.setArg sigIndex newSig)
+    if firstCtor.isNone then firstCtor := some (ctorName, fieldNames.size)
+  let certifiedCtorsNode := item[7].setArgs certifiedCtors
+  -- An inhabitant: the first constructor on default fields, its proof
+  -- discharged like any other creation.
+  let inhabitedSignature ← addMoveTypeInhabitants ⟨signature⟩
+  let inhabitedBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) :=
+    inhabitedSignature.raw[0].getArgs.map (⟨·⟩)
+  let certifiedType : TSyntax `term ← if parameters.isEmpty then
+      pure ⟨name.raw⟩
+    else
+      `($name $(parameters.map fun p => (⟨p.raw⟩ : TSyntax `term))*)
+  let some (firstName, arity) := firstCtor
+    | Macro.throwErrorAt item "a Move enum must declare at least one variant"
+  let firstFull := mkIdentFrom firstName (name.getId ++ firstName.getId)
+  let defaults ← (List.range arity).toArray.mapM fun _ => `(default)
+  let witness : TSyntax `term ← if arity == 0 then pure ⟨firstFull.raw⟩
+    else `($firstFull $defaults*)
+  let inhabitedCommand ←
+    `(instance $inhabitedBinders:bracketedBinder* :
+        Inhabited $certifiedType := ⟨($witness : $certifiedType)⟩)
+  let registration ← `(#register_move_invariant $name $invariantName)
+  return (#[rawDeclaration, invariantCommand.raw],
+    #[inhabitedCommand.raw, registration.raw], certifiedCtorsNode, invariantName)
+
 /-- Rewrite one module-scoped keyword item to its attributed core
 declaration, followed by a registration command when the item carries
 user-provided attributes. Ordinary commands pass through unchanged. -/
-private def desugarModuleItem (stx : Syntax) : MacroM (Array Syntax) := do
+private def desugarModuleItem (invariants : Array (Name × Array Syntax))
+    (stx : Syntax) : MacroM (Array Syntax) := do
+  if stx.isOfKind ``Move.Spec.dataInvariantSpec then
+    -- Consumed by the type it names.
+    return #[]
   if stx.isOfKind ``moveStructItem then
     let (wellKnown, user) ← splitAttributeInstances stx[1]
     let modifiers ← prependDeclarationAttributes (#[`move_struct] ++ wellKnown)
       (← applyDocComment stx[0] ⟨stx[2]⟩)
     let signature ← normalizeTypeParameterBinders stx[5]
+    let declared := stx[4][0].getId
+    let invariant? := invariants.find? (·.1 == declared) |>.map (·.2)
+    let mut preface : Array Syntax := #[]
+    let mut postface : Array Syntax := #[]
+    let mut fields := stx[7]
+    if let some conditions := invariant? then
+      let (declarations, inhabitant, invariantName) ←
+        certifiedStructDeclarations stx conditions
+      preface := declarations
+      postface := inhabitant
+      fields ← appendInvariantField stx fields invariantName
     let structureNode := mkNode ``Lean.Parser.Command.structure #[
       mkNode ``Lean.Parser.Command.structureTk #[mkAtomFrom stx[3] "structure"],
       stx[4], signature,
       mkNullNode,
-      mkNullNode #[mkAtom "where", mkNullNode, stx[7]],
+      mkNullNode #[mkAtom "where", mkNullNode, fields],
       stx[8]]
     let declaration := mkNode ``Lean.Parser.Command.declaration
       #[modifiers.raw, structureNode]
-    return withAttributeRegistration declaration stx[4] user
+    return preface ++ withAttributeRegistration declaration stx[4] user ++
+      postface
   if stx.isOfKind ``moveEnumItem then
     let (wellKnown, user) ← splitAttributeInstances stx[1]
     let modifiers ← prependDeclarationAttributes (#[`move_enum] ++ wellKnown)
       (← applyDocComment stx[0] ⟨stx[2]⟩)
     let signature ← normalizeTypeParameterBinders stx[5]
+    let declared := stx[4][0].getId
+    let invariant? := invariants.find? (·.1 == declared) |>.map (·.2)
+    let mut preface : Array Syntax := #[]
+    let mut postface : Array Syntax := #[]
+    let mut ctors := stx[7]
+    if let some conditions := invariant? then
+      let (declarations, inhabitant, certifiedCtors, _) ←
+        certifiedEnumDeclarations stx conditions
+      preface := declarations
+      postface := inhabitant
+      ctors := certifiedCtors
     let inductiveNode := mkNode ``Lean.Parser.Command.inductive #[
       mkAtomFrom stx[3] "inductive", stx[4], signature,
       mkNullNode #[mkAtom "where"],
-      stx[7],
+      ctors,
       mkNullNode,
       stx[8]]
     let declaration := mkNode ``Lean.Parser.Command.declaration
       #[modifiers.raw, inductiveNode]
-    return withAttributeRegistration declaration stx[4] user
+    return preface ++ withAttributeRegistration declaration stx[4] user ++
+      postface
   if stx.isOfKind ``moveEntryFunItem || stx.isOfKind ``moveFriendFunItem then
     let attributeName :=
       if stx.isOfKind ``moveEntryFunItem then `move_entry else `move_friend
@@ -476,8 +715,14 @@ private def desugarModuleItem (stx : Syntax) : MacroM (Array Syntax) := do
   let openLeanerCommand ← `(open Move)
   let openLeanerScopeCommand ← `(open scoped Move)
   let endCommand ← `(end $moduleName)
+  let invariants := stx[3].getArgs.filterMap fun item =>
+    if item.isOfKind ``Move.Spec.dataInvariantSpec then
+      let extras := item[6].getArgs.map fun clause => clause[2]
+      some (item[1].getId, #[item[5]] ++ extras)
+    else
+      none
   let body ← stx[3].getArgs.foldlM (init := #[]) fun result item => do
-    (← desugarModuleItem item).foldlM (init := result) fun result command => do
+    (← desugarModuleItem invariants item).foldlM (init := result) fun result command => do
       let command := expandLeanerCommandAliases command
       return result.push (← preserveLeanHelperBoundaries command)
   return mkNullNode <|
@@ -493,6 +738,12 @@ def elabRegisterMoveModuleIdentity : CommandElab := fun stx => do
     | throwErrorAt stx[2] "expected a module name string"
   let leanNamespace ← getCurrNamespace
   modifyEnv fun env => Move.registerModuleNamespace env leanNamespace { address, name }
+
+@[command_elab registerMoveInvariant]
+def elabRegisterMoveInvariant : CommandElab := fun stx => do
+  let typeName ← resolveGlobalConstNoOverload stx[1]
+  let invariantName ← resolveGlobalConstNoOverload stx[2]
+  modifyEnv fun env => Move.registerDataInvariant env typeName invariantName
 
 @[command_elab registerMoveAttributes]
 def elabRegisterMoveAttributes : CommandElab := fun stx => do

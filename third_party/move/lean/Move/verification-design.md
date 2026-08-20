@@ -36,7 +36,8 @@ The first proof-facing semantic slice is implemented:
   vector mutation through borrows;
 - `Move.Verify.Tactics` provides the proof tactics (`contract_intro`,
   `checked_cases`, `abort_clause`, `spec_norm`, `move_cases`, `wp_call`,
-  `u64_omega`) and the shared
+  `u64_omega`; well-definedness is discharged structurally by
+  `spec_defined`) and the shared
   `move_norm`/`wp_norm`/`move_spec` simp inventories used by both manual
   proofs and the automatic `verify`;
 - `Move.Verify.Syntax` provides function-associated `spec` and `verify`
@@ -415,6 +416,25 @@ abort where the condition holds — a contract cannot express that a function
 *must* abort. `ensures False; aborts_if True` states that any abort carries
 the declared code, not that the function never succeeds.
 
+## Data invariants
+
+A type may declare an invariant with `spec T where <condition>`. Values of
+such a type are certified: the generated structure carries the proof as a
+field, so reading, passing, storing, and returning one need no obligation and
+contracts need no precondition. What states the condition is a generated
+proof-free twin `T.Raw`, since the certified type cannot exist before its own
+condition; `this` is a value of that twin, which is what lets an enum
+invariant match on it.
+
+Creation is the only obligation, in two forms. A literal discharges it during
+elaboration through the field's `by move_invariant` default. Re-establishing
+it after a mutation cannot be discharged there — it depends on run-time values
+— so the translator emits `Spec.certified`, whose `undefined` component is the
+negated condition; `wp_certified` turns that into a positive obligation at the
+point the loan dies. This is why `Spec` carries well-definedness at all: a
+rule whose `ok` relation were merely empty on violation would make `wp` hold
+vacuously.
+
 ## Checked Move operations
 
 Source operations must have Move behavior before direct proofs are useful.
@@ -550,7 +570,10 @@ vector insertion and removal through a mutable borrow into that same shape.
 markers uniformly (`logicalLT`/`logicalBEq` are the marker relations
 themselves). Two axioms, `Move.Verify.Source.logicalLT_uint` and
 `logicalBEq_uint`, state the compiler semantic fact that the comparison
-instructions are numeric on the integer types, at every width. They are the
+instructions are numeric on the integer types, at every width; a third,
+`Move.UInt.less_eq_true_iff`, states the same for the integer-specific
+`UInt.less` primitive behind the `<` instance of `UInt` in ordinary (pure)
+function bodies. They are the
 verification interface for the compiler-implemented ordering and an explicit
 part of the trust base; the generic bridges `logicalLT_move`/`logicalBEq_move`
 under `[Move.Compare.Total T]` are definitional.
