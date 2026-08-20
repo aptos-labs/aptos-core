@@ -22,6 +22,7 @@ use aptos_types::{
         AuxiliaryInfo, ExecutionStatus, PersistedAuxiliaryInfo, SignedTransaction,
         TransactionAuxiliaryData, TransactionOutput, TransactionStatus,
     },
+    write_set::TransactionWrite,
 };
 use mono_move_aptos_state_view_providers::{StateViewModuleProvider, StateViewResourceProvider};
 use mono_move_aptos_transaction_executor::{production_natives, AptosTransactionExecutor};
@@ -116,6 +117,66 @@ fn p2p_transfer_matches_v1() {
     compare_outputs(&v1_output, &v2_output, *alice.address());
 }
 
+/// A transfer to an account that does not yet exist creates the recipient's
+/// primary fungible store, whose `ObjectGroup` slot is written for the first
+/// time. The reassembled group must be a *creation*, not a modification. This
+/// is the create-vs-modify case the old pre-image snapshot handled and the new
+/// reassembly recomputes from the members alone.
+#[test]
+fn p2p_transfer_to_fresh_recipient_matches_v1() {
+    use aptos_types::state_store::state_key::StateKey;
+    use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
+    use std::str::FromStr;
+
+    let (fx, alice, _bob) = setup();
+    // An address with no account, so the transfer must create the recipient's
+    // primary store from scratch.
+    let fresh = AccountAddress::from_hex_literal("0xf00dcafe").unwrap();
+
+    let txn = alice
+        .account()
+        .transaction()
+        .payload(aptos_cached_packages::aptos_stdlib::aptos_account_transfer(
+            fresh, 1_000,
+        ))
+        .sequence_number(10)
+        .gas_unit_price(100)
+        .max_gas_amount(1_000_000)
+        .sign();
+
+    let v1_output = fx.execute_transaction(txn.clone());
+    assert_eq!(
+        v1_output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::Success),
+        "v1 rejected the transfer: {:?}",
+        v1_output.status()
+    );
+
+    let v2_output = execute_v2(fx.get_state_view(), &txn);
+    assert_eq!(
+        v2_output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::Success),
+        "v2 failed the transfer"
+    );
+
+    compare_outputs(&v1_output, &v2_output, *alice.address());
+
+    // The recipient's object group must be freshly created (not modified), so
+    // the test actually exercises the group-slot creation path.
+    let object_group = StructTag::from_str("0x1::object::ObjectGroup").unwrap();
+    let recipient_store = aptos_types::account_config::fungible_store::primary_apt_store(fresh);
+    let recipient_group = StateKey::resource_group(&recipient_store, &object_group);
+    let v2_writes: BTreeMap<_, _> = v2_output.write_set().write_op_iter().collect();
+    let op = v2_writes
+        .get(&recipient_group)
+        .expect("v2 must write the recipient's object group");
+    assert!(
+        op.is_creation(),
+        "recipient object group must be a creation, was {:?}",
+        op.write_op_kind()
+    );
+}
+
 /// Compares the two outputs' write sets and events, masking only what gas
 /// divergence explains.
 fn compare_outputs(
@@ -141,6 +202,15 @@ fn compare_outputs(
     let mut num_diffs = 0;
     for (key, v1_op) in &v1_writes {
         let v2_op = &v2_writes[*key];
+        // The write-op kind (creation / modification / deletion) must match even
+        // where the fee makes the bytes diverge. For a resource group this is
+        // the slot's create-vs-modify decision, which the reassembly path
+        // recomputes from the members without a pre-image snapshot.
+        assert_eq!(
+            v1_op.write_op_kind(),
+            v2_op.write_op_kind(),
+            "write op kind differs at {key:?}"
+        );
         if v1_op.bytes() == v2_op.bytes() {
             continue;
         }

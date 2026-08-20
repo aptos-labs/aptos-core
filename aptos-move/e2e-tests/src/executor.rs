@@ -924,7 +924,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
     fn maybe_snapshot_hot_cache(
         &self,
         state_view: &(impl StateView + Sync),
-        local_cfg: &BlockExecutorModuleCacheLocalConfig,
+        local_cfg: &BlockExecutorLocalConfig,
         metadata: TransactionSliceMetadata,
     ) -> Option<ModuleHotCacheSnapshot> {
         match &self.block_state {
@@ -943,7 +943,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
     fn maybe_rollback_hot_cache(
         &self,
         state_view: &(impl StateView + Sync),
-        local_cfg: &BlockExecutorModuleCacheLocalConfig,
+        local_cfg: &BlockExecutorLocalConfig,
         metadata: TransactionSliceMetadata,
         snapshot: Option<ModuleHotCacheSnapshot>,
     ) {
@@ -1026,11 +1026,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         #[cfg(fuzzing)]
         {
             if mode == ExecutorMode::BothComparison {
-                snapshot = self.maybe_snapshot_hot_cache(
-                    state_view,
-                    &config.local.module_cache_config,
-                    metadata,
-                );
+                snapshot = self.maybe_snapshot_hot_cache(state_view, &config.local, metadata);
                 assert!(
                     snapshot.is_some(),
                     "snapshot should be Some if mode is BothComparison"
@@ -1051,12 +1047,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         #[cfg(fuzzing)]
         {
             if mode == ExecutorMode::BothComparison {
-                self.maybe_rollback_hot_cache(
-                    state_view,
-                    &config.local.module_cache_config,
-                    metadata,
-                    snapshot.take(),
-                );
+                self.maybe_rollback_hot_cache(state_view, &config.local, metadata, snapshot.take());
             }
         }
 

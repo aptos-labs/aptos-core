@@ -5,6 +5,7 @@ use bumpalo::Bump;
 use crossbeam_utils::CachePadded;
 use parking_lot::{Mutex, MutexGuard};
 use std::{
+    fmt,
     hash::{Hash, Hasher},
     ptr::NonNull,
 };
@@ -96,6 +97,13 @@ impl<T: ?Sized> Eq for GlobalArenaPtr<T> {}
 impl<T: ?Sized> Hash for GlobalArenaPtr<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.as_raw_ptr().hash(state)
+    }
+}
+
+// TODO(security): remove this Debug impl: needed by block executor trait bound.
+impl<T: ?Sized> fmt::Debug for GlobalArenaPtr<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "GlobalArenaPtr({:p})", self.as_raw_ptr() as *const ())
     }
 }
 

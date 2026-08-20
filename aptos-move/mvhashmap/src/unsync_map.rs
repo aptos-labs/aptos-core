@@ -13,6 +13,7 @@ use aptos_types::{
     vm::modules::AptosModuleExtension,
 };
 use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
+use mono_move_runtime::Heap;
 use move_binary_format::{file_format::CompiledScript, CompiledModule};
 use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::{Module, Script};
@@ -20,7 +21,7 @@ use move_vm_types::code::{ModuleCache, ModuleCode, UnsyncModuleCache, UnsyncScri
 use serde::Serialize;
 use std::{
     cell::RefCell,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fmt::Debug,
     hash::Hash,
     sync::{
@@ -28,6 +29,10 @@ use std::{
         Arc,
     },
 };
+
+/// Size of the resource arena backing MonoMove's materialized base values.
+/// Created lazily on first MonoMove use; legacy execution never builds one.
+const DEFAULT_RESOURCE_ARENA_BYTES: usize = 64 * 1024 * 1024;
 
 /// UnsyncMap is designed to mimic the functionality of MVHashMap for sequential execution.
 /// In this case only the latest recorded version is relevant, simplifying the implementation.
@@ -43,6 +48,18 @@ pub struct UnsyncMap<K, T, V, I> {
 
     total_base_resource_size: AtomicU64,
     total_base_delayed_field_size: AtomicU64,
+
+    // MonoMove-only state, unused by legacy execution.
+    //
+    // The arena holds the flat base values MonoMove materializes reads into and
+    // hands out pointers into. It is created lazily on first use and is
+    // append-only: it is never reset or garbage-collected, so pointers stay
+    // valid for the whole block. `group_tags` is the reverse index from a group
+    // slot to its member types; it is add-only, so a deleted member stays
+    // recorded and is filtered out at enumeration by its tombstone in
+    // `resource_map`.
+    arena: RefCell<Option<Heap>>,
+    group_tags: RefCell<HashMap<K, HashSet<T>>>,
 }
 
 impl<K, T, V, I> Default for UnsyncMap<K, T, V, I> {
@@ -55,6 +72,8 @@ impl<K, T, V, I> Default for UnsyncMap<K, T, V, I> {
             delayed_field_map: RefCell::new(HashMap::new()),
             total_base_resource_size: AtomicU64::new(0),
             total_base_delayed_field_size: AtomicU64::new(0),
+            arena: RefCell::new(None),
+            group_tags: RefCell::new(HashMap::new()),
         }
     }
 }
@@ -280,6 +299,37 @@ where
             Ordering::Relaxed,
         );
         self.delayed_field_map.borrow_mut().insert(id, value);
+    }
+
+    /// Runs `f` against the MonoMove resource arena, creating it on first use.
+    /// The arena is append-only and never garbage-collected, so pointers into
+    /// it stay valid for the lifetime of the map.
+    pub fn with_resource_arena<R>(&self, f: impl FnOnce(&mut Heap) -> R) -> R {
+        let mut arena = self.arena.borrow_mut();
+        let heap = arena.get_or_insert_with(|| Heap::new(DEFAULT_RESOURCE_ARENA_BYTES));
+        f(heap)
+    }
+
+    /// Records that `tag` is a member of the group behind `group_key`, so the
+    /// group can later be enumerated. Add-only: tags are never removed. A
+    /// deleted member keeps its tag here and is filtered out at enumeration by
+    /// its tombstone in `resource_map`.
+    pub fn record_group_member(&self, group_key: K, tag: T) {
+        self.group_tags
+            .borrow_mut()
+            .entry(group_key)
+            .or_default()
+            .insert(tag);
+    }
+
+    /// A snapshot of the member tags recorded for the group behind `group_key`,
+    /// or empty if none. The snapshot decouples enumeration from the borrow.
+    pub fn group_member_tags(&self, group_key: &K) -> Vec<T> {
+        self.group_tags
+            .borrow()
+            .get(group_key)
+            .map(|tags| tags.iter().cloned().collect())
+            .unwrap_or_default()
     }
 }
 

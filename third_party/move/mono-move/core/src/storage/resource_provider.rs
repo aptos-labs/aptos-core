@@ -26,7 +26,9 @@ pub type Version = u64;
 /// The key is "in-memory" because it embeds interned, arena-backed data that
 /// must not outlive the current execution. It is not a stable, serializable
 /// storage key.
-#[derive(Clone, Eq, PartialEq, Hash)]
+///
+/// TODO(security): Remove Debug trait in favour of debug under context.
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum InMemoryStorageKey {
     /// Every resource can be identified in storage by the address where it is
     /// published and its struct/enum type.
@@ -49,7 +51,20 @@ pub enum InMemoryStorageKey {
         /// The stored value's type, needed to materialize the item from storage.
         value_ty: InternedType,
     },
+    /// The slot of a resource group, identified by the address it is published
+    /// under and the group's type. It never holds a value of its own: group
+    /// members live under their own [`InMemoryStorageKey::Resource`] keys. This
+    /// key is only an identity for the group slot -- it keys the reverse index
+    /// of member types and lowers to a resource-group state key.
+    Group {
+        address: AccountAddress,
+        group_ty: InternedType,
+    },
 }
+
+// In-memory storage key cannot use pointer-based ordering since it is
+// non-deterministic).
+static_assertions::assert_not_impl_any!(InMemoryStorageKey: PartialOrd, Ord);
 
 impl InMemoryStorageKey {
     /// Builds a resource key from its publishing address and interned type.
@@ -66,20 +81,30 @@ impl InMemoryStorageKey {
         }
     }
 
+    /// Builds a resource-group slot key from its publishing address and the
+    /// interned group type.
+    pub fn group(address: AccountAddress, group_ty: InternedType) -> Self {
+        InMemoryStorageKey::Group { address, group_ty }
+    }
+
     /// Returns the address a key is anchored at: the publishing address for a
-    /// resource, or the table handle for a table item.
+    /// resource or group, or the table handle for a table item.
     pub fn address(&self) -> AccountAddress {
         match self {
             InMemoryStorageKey::Resource { address, .. } => *address,
             InMemoryStorageKey::TableItem { handle, .. } => handle.address(),
+            InMemoryStorageKey::Group { address, .. } => *address,
         }
     }
 
-    /// The type of the value stored at this key.
+    /// The type of the value stored at this key. For a group slot this is the
+    /// group type itself; the slot never materializes a value, so the type only
+    /// serves identity and state-key lowering.
     pub fn value_ty(&self) -> InternedType {
         match self {
             InMemoryStorageKey::Resource { ty, .. } => *ty,
             InMemoryStorageKey::TableItem { value_ty, .. } => *value_ty,
+            InMemoryStorageKey::Group { group_ty, .. } => *group_ty,
         }
     }
 }
@@ -137,7 +162,17 @@ pub trait ResourceProvider {
     /// Returns [`StorageRead::DoesNotExist`] if the resource does not exist.
     /// Returns a [`ResourceProviderError`] if the backend cannot satisfy the
     /// read.
-    fn get_resource(&self, key: &InMemoryStorageKey) -> Result<StorageRead, ResourceProviderError>;
+    ///
+    /// `group` is the resource group the key's type belongs to, resolved by the
+    /// caller from its version-pinned read-set: [`Some`] means the value lives
+    /// as a member of that group's slot, [`None`] means it lives in its own
+    /// slot. The backend uses this to place the read without re-resolving
+    /// membership itself.
+    fn get_resource(
+        &self,
+        key: &InMemoryStorageKey,
+        group: Option<InternedType>,
+    ) -> Result<StorageRead, ResourceProviderError>;
 }
 
 /// Empty storage with no resources.
@@ -147,6 +182,7 @@ impl ResourceProvider for NoResourceProvider {
     fn get_resource(
         &self,
         _key: &InMemoryStorageKey,
+        _group: Option<InternedType>,
     ) -> Result<StorageRead, ResourceProviderError> {
         Ok(StorageRead::DoesNotExist)
     }

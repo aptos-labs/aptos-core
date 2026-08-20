@@ -25,4 +25,4 @@ pub use errors::{
 pub use executor::AptosTransactionExecutor;
 pub use natives::production_natives;
 pub use outcome::TxnOutcome;
-pub use providers::{decode_group_members, AptosDataProvider, GroupMembers, StorageLocation};
+pub use providers::{decode_group_members, AptosDataProvider, GroupMembers};

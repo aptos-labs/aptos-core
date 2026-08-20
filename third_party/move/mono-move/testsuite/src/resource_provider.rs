@@ -75,6 +75,9 @@ impl<'guard, 'ctx> InMemoryResourceProvider<'guard, 'ctx> {
                 self.table_items.get(&(handle.address(), key.to_vec()))?,
                 *value_ty,
             )),
+            // This provider stores only own-slot resources and table items; a
+            // group slot never holds a value here.
+            InMemoryStorageKey::Group { .. } => None,
         }
     }
 }

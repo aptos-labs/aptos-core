@@ -37,7 +37,7 @@ pub(crate) fn build_write_set<L: LayoutProvider + ?Sized>(
     layouts: &L,
 ) -> VMResult<WriteSet> {
     let mut writes = Vec::new();
-    for (key, class) in rws.writes_unordered() {
+    for (key, class, _group) in rws.writes_unordered() {
         let state_key = state_key_of(key)?;
         // TODO(correctness): these are metadata-less legacy write ops; we need to set the
         // `StateValueMetadata` (slot deposit / refund) carried over from the pre-state.
@@ -84,6 +84,13 @@ fn state_key_of(key: &InMemoryStorageKey) -> VMResult<StateKey> {
         InMemoryStorageKey::TableItem { handle, key, .. } => {
             Ok(StateKey::table_item(&TableHandle(handle.address()), key))
         },
+        // The runtime's read-write set never holds a group-slot key: group
+        // members are `Resource` keys. Reaching here is an invariant violation.
+        InMemoryStorageKey::Group { .. } => {
+            invariant_violation!(Unreachable(
+                "runtime write set must not contain a group slot key".to_string()
+            ));
+        },
     }
 }
 
@@ -92,6 +99,7 @@ fn value_type(key: &InMemoryStorageKey) -> InternedType {
     match key {
         InMemoryStorageKey::Resource { ty, .. } => *ty,
         InMemoryStorageKey::TableItem { value_ty, .. } => *value_ty,
+        InMemoryStorageKey::Group { group_ty, .. } => *group_ty,
     }
 }
 

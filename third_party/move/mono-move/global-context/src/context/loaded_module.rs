@@ -5,13 +5,17 @@
 //! with the lowered monomorphic functions and generic function instantiations.
 
 use crate::context::ExecutionGuard;
+use anyhow::anyhow;
+use aptos_types::vm::module_metadata::get_metadata;
 use mono_move_alloc::{LeakedBoxPtr, VersionedLeakedBoxPtr};
 use mono_move_core::{
+    intern_struct_tag,
     interner::{InternedIdentifier, InternedModuleId},
-    types::InternedTypeList,
-    Function, FunctionDefinitionIndex, FunctionPtr,
+    types::{InternedType, InternedTypeList},
+    Function, FunctionDefinitionIndex, FunctionPtr, Interner,
 };
 use move_binary_format::access::ModuleAccess;
+use move_core_types::identifier::IdentStr;
 use parking_lot::Mutex;
 use shared_dsa::{Entry, UnorderedMap};
 use specializer::{FunctionIR, ModuleIR};
@@ -177,6 +181,12 @@ pub struct LoadedModule {
     // TODO(cleanup): revisit data structure used for actual monomorphized function storage.
     instantiated_functions:
         Mutex<UnorderedMap<(InternedIdentifier, InternedTypeList), FunctionSlot>>,
+    /// Resource-group membership for this module's structs, keyed by the
+    /// struct's interned simple name. A present entry means the struct is a
+    /// member of the mapped group type; an absent entry means it is not a group
+    /// member. Built eagerly at load from the module's Aptos metadata, so group
+    /// resolution never re-deserializes the defining module.
+    resource_group_members: UnorderedMap<InternedIdentifier, InternedType>,
 }
 
 impl LoadedModule {
@@ -184,7 +194,8 @@ impl LoadedModule {
         ir: ModuleIR,
         cost: u64,
         mandatory_dependencies: ModuleMandatoryDependencies,
-    ) -> Box<Self> {
+        interner: &impl Interner,
+    ) -> anyhow::Result<Box<Self>> {
         let mut functions = UnorderedMap::with_capacity(ir.functions.len());
         let mut function_indices = UnorderedMap::with_capacity(ir.functions.len());
 
@@ -210,14 +221,25 @@ impl LoadedModule {
                 functions.insert(name, OnceLock::new());
             }
         }
-        Box::new(Self {
+        // Deliberately eager: a malformed group-member attribute fails the
+        // module load rather than surfacing at a later global-storage op.
+        let resource_group_members = build_resource_group_members(&ir, interner)?;
+        Ok(Box::new(Self {
             ir,
             cost,
             mandatory_dependencies,
             functions,
             function_indices,
             instantiated_functions: Mutex::new(UnorderedMap::new()),
-        })
+            resource_group_members,
+        }))
+    }
+
+    /// The resource group the struct with the given interned name belongs to,
+    /// or [`None`] if it is not a group member. Resolved from this module's
+    /// metadata at load time, so lookups pin the version this transaction read.
+    pub fn resource_group_of(&self, name: InternedIdentifier) -> Option<InternedType> {
+        self.resource_group_members.get(&name).copied()
     }
 
     /// Returns the polymorphic stackless IR.
@@ -295,6 +317,33 @@ impl LoadedModule {
             Entry::Vacant(e) => e.insert(FunctionSlot::new(function, function_ms)).function,
         }
     }
+}
+
+/// Builds the struct-name to group-type index from a module's Aptos metadata.
+/// A struct is included only if it carries a resource-group-member attribute.
+/// Returns an error if a struct name or group container tag is malformed.
+fn build_resource_group_members(
+    ir: &ModuleIR,
+    interner: &impl Interner,
+) -> anyhow::Result<UnorderedMap<InternedIdentifier, InternedType>> {
+    let mut members = UnorderedMap::new();
+    let Some(metadata) = get_metadata(&ir.module.metadata) else {
+        return Ok(members);
+    };
+    for (struct_name, attrs) in &metadata.struct_attributes {
+        let Some(group_tag) = attrs
+            .iter()
+            .find_map(|attr| attr.get_resource_group_member())
+        else {
+            continue;
+        };
+        let name = interner.identifier_of(
+            IdentStr::new(struct_name)
+                .map_err(|e| anyhow!("invalid struct name {struct_name:?}: {e}"))?,
+        );
+        members.insert(name, intern_struct_tag(&group_tag, interner)?);
+    }
+    Ok(members)
 }
 
 impl Drop for LoadedModule {

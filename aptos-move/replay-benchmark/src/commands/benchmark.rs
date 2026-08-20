@@ -5,6 +5,7 @@ use crate::{
     commands::init_logger_and_metrics,
     runner::{BenchmarkRunner, ReplayBlock},
     state_view::ReadSet,
+    workload::retain_user_transactions_only,
 };
 use anyhow::{anyhow, bail};
 use aptos_logger::Level;
@@ -39,6 +40,16 @@ pub struct BenchmarkCommand {
         help = "Number of blocks to skip for time measurement. Allows to warm-up caches"
     )]
     num_blocks_to_skip: usize,
+
+    #[clap(
+        long,
+        default_value_t = 0,
+        help = "Number of untimed warm-up passes over all blocks before timing. A single executor \
+                is reused across warm-up and every measured repeat, so the module and code caches \
+                populated during warm-up stay warm when timing. Use 1 to benchmark a single block \
+                warm, e.g. for MonoMove whose global context is built cold per executor"
+    )]
+    num_warmups: usize,
 
     #[clap(
         long,
@@ -78,6 +89,17 @@ pub struct BenchmarkCommand {
         help = "If true, Move VM runs traces execution, and Block-STM performs checks later"
     )]
     async_runtime_checks: bool,
+
+    #[clap(
+        long,
+        default_value_t = false,
+        help = "If set, keep only signed user transactions in each block, dropping block \
+                metadata, state checkpoint, block epilogue, validator, and genesis transactions \
+                (and dropping blocks left empty). Must match the value passed to `initialize` so \
+                the saved input states line up with the replayed workload. Useful for VMs that \
+                execute only user transactions, e.g. MonoMove"
+    )]
+    user_txns_only: bool,
 }
 
 impl BenchmarkCommand {
@@ -95,6 +117,11 @@ impl BenchmarkCommand {
         let txn_blocks_bytes = fs::read(PathBuf::from(&self.transactions_file)).await?;
         let txn_blocks: Vec<TransactionBlock> = bcs::from_bytes(&txn_blocks_bytes)
             .map_err(|err| anyhow!("Error when deserializing blocks of transactions: {:?}", err))?;
+        let txn_blocks = if self.user_txns_only {
+            retain_user_transactions_only(txn_blocks)
+        } else {
+            txn_blocks
+        };
 
         let inputs_read_set_bytes = fs::read(PathBuf::from(&self.inputs_file)).await?;
         let inputs_read_set: Vec<ReadSet> = bcs::from_bytes(&inputs_read_set_bytes)
@@ -134,6 +161,7 @@ impl BenchmarkCommand {
             self.num_repeats,
             self.measure_overall_time,
             self.num_blocks_to_skip,
+            self.num_warmups,
         )
         .measure_execution_time(&blocks);
         Ok(())

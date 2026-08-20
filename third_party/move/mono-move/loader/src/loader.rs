@@ -630,8 +630,10 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         deps: ModuleMandatoryDependencies,
     ) -> VMResult<&'guard LoadedModule> {
         let (module_ir, cost) = self.get_verified_module_from_storage(id)?;
+        let module = LoadedModule::new(module_ir, cost, deps, self.guard)
+            .map_err(|e| VMInternalError::new(LoaderError::GlobalContext(e)))?;
         self.guard
-            .insert_module(LoadedModule::new(module_ir, cost, deps))
+            .insert_module(module)
             .map_err(|e| VMInternalError::new(LoaderError::GlobalContext(e)))
     }
 

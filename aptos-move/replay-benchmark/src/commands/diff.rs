@@ -2,8 +2,11 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    commands::init_logger_and_metrics, diff::TransactionDiffBuilder, execution::execute_workload,
-    state_view::ReadSet, workload::Workload,
+    commands::init_logger_and_metrics,
+    diff::TransactionDiffBuilder,
+    execution::execute_workload,
+    state_view::ReadSet,
+    workload::{retain_user_transactions_only, Workload},
 };
 use anyhow::{anyhow, bail};
 use aptos_logger::Level;
@@ -41,6 +44,17 @@ pub struct DiffCommand {
         help = "If true, when comparing output diffs changes related to gas usage are ignored"
     )]
     allow_different_gas_usage: bool,
+
+    #[clap(
+        long,
+        default_value_t = false,
+        help = "If set, keep only signed user transactions in each block, dropping block \
+                metadata, state checkpoint, block epilogue, validator, and genesis transactions \
+                (and dropping blocks left empty). Must match the value passed to `initialize` so \
+                the saved input states line up with the replayed workload. Useful for VMs that \
+                execute only user transactions, e.g. MonoMove"
+    )]
+    user_txns_only: bool,
 }
 
 impl DiffCommand {
@@ -50,6 +64,11 @@ impl DiffCommand {
         let txn_blocks_bytes = fs::read(PathBuf::from(&self.transactions_file)).await?;
         let txn_blocks: Vec<TransactionBlock> = bcs::from_bytes(&txn_blocks_bytes)
             .map_err(|err| anyhow!("Error when deserializing blocks of transactions: {:?}", err))?;
+        let txn_blocks = if self.user_txns_only {
+            retain_user_transactions_only(txn_blocks)
+        } else {
+            txn_blocks
+        };
         if txn_blocks.is_empty() {
             bail!("There must be at least one transaction to execute");
         }

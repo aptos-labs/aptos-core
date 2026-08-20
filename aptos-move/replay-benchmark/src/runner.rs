@@ -15,8 +15,22 @@ pub struct ReplayBlock {
 }
 
 impl ReplayBlock {
-    /// Executes the workload using the specified concurrency level.
-    pub(crate) fn run(&self, executor: &AptosVMBlockExecutor, concurrency_level: usize) {
+    /// Executes the workload for an untimed warm-up pass.
+    ///
+    /// Split out from [ReplayBlock::run_timed] and marked `#[inline(never)]` so a sampling profiler
+    /// attributes warm-up samples to their own frame instead of merging them with the timed pass.
+    /// The `black_box` marker keeps the two identical bodies from being folded together.
+    #[inline(never)]
+    pub(crate) fn run_warmup(&self, executor: &AptosVMBlockExecutor, concurrency_level: usize) {
+        std::hint::black_box("warmup");
+        execute_workload(executor, &self.workload, &self.inputs, concurrency_level);
+    }
+
+    /// Executes the workload for a timed measurement pass. See [ReplayBlock::run_warmup] for why
+    /// this is a separate, never-inlined function.
+    #[inline(never)]
+    pub(crate) fn run_timed(&self, executor: &AptosVMBlockExecutor, concurrency_level: usize) {
+        std::hint::black_box("timed");
         execute_workload(executor, &self.workload, &self.inputs, concurrency_level);
     }
 }
@@ -27,6 +41,7 @@ pub struct BenchmarkRunner {
     num_repeats: usize,
     measure_overall_instead_of_per_block_time: bool,
     num_blocks_to_skip: usize,
+    num_warmups: usize,
 }
 
 impl BenchmarkRunner {
@@ -35,12 +50,14 @@ impl BenchmarkRunner {
         num_repeats: usize,
         measure_overall_instead_of_per_block_time: bool,
         num_blocks_to_skip: usize,
+        num_warmups: usize,
     ) -> Self {
         Self {
             concurrency_levels,
             num_repeats,
             measure_overall_instead_of_per_block_time,
             num_blocks_to_skip,
+            num_warmups,
         }
     }
 
@@ -61,11 +78,21 @@ impl BenchmarkRunner {
             .map(|_| Vec::with_capacity(self.num_repeats))
             .collect::<Vec<_>>();
 
+        // A single executor is reused for the warm-up passes and all measured repeats, so the
+        // module and code caches populated during warm-up stay warm when timing. This matters for
+        // MonoMove, whose global context is built cold per executor and is never flushed between
+        // blocks. With zero warm-up passes the first repeat is cold and the rest are warm.
+        let executor = AptosVMBlockExecutor::new();
+        for _ in 0..self.num_warmups {
+            for block in blocks {
+                block.run_warmup(&executor, concurrency_level);
+            }
+        }
+
         for _ in 0..self.num_repeats {
-            let executor = AptosVMBlockExecutor::new();
             for (idx, block) in blocks.iter().enumerate() {
                 let start_time = Instant::now();
-                block.run(&executor, concurrency_level);
+                block.run_timed(&executor, concurrency_level);
                 let time = start_time.elapsed().as_micros();
                 times[idx].push(time);
             }
@@ -91,18 +118,26 @@ impl BenchmarkRunner {
     /// Runs the sequence of blocks, measuring the end-to-end execution time.
     fn measure_overall_execution_time(&self, blocks: &[ReplayBlock], concurrency_level: usize) {
         let mut times = Vec::with_capacity(self.num_repeats);
-        for _ in 0..self.num_repeats {
-            let executor = AptosVMBlockExecutor::new();
 
-            // Warm-up.
+        // A single executor is reused for the warm-up passes and all measured repeats, so the
+        // caches populated during warm-up stay warm when timing.
+        let executor = AptosVMBlockExecutor::new();
+        for _ in 0..self.num_warmups {
+            for block in blocks {
+                block.run_warmup(&executor, concurrency_level);
+            }
+        }
+
+        for _ in 0..self.num_repeats {
+            // Untimed warm-up of the leading blocks.
             for block in &blocks[..self.num_blocks_to_skip] {
-                block.run(&executor, concurrency_level);
+                block.run_warmup(&executor, concurrency_level);
             }
 
             // Actual measurement.
             let start_time = Instant::now();
             for block in &blocks[self.num_blocks_to_skip..] {
-                block.run(&executor, concurrency_level);
+                block.run_timed(&executor, concurrency_level);
             }
             let time = start_time.elapsed().as_micros();
             times.push(time);
