@@ -27,15 +27,13 @@ use crate::{
     },
     value_utils,
 };
-use aptos_types::write_set::WriteSet;
 use mono_move_core::{
     captured_values_size,
     interner::{module_id_of, InternedIdentifier, InternedModuleId},
     native::{NativeABI, NativeExtensions, NativeIdx, NativeStatus, ObjectHandle, RootPool},
     next_captured_value_offset,
     storage::resource_provider::InMemoryStorageKey,
-    types::{view_type_list, InternedType, InternedTypeList},
-    value_layout::LayoutProvider,
+    types::{view_type, view_type_list, InternedType, InternedTypeList, Type},
     CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex, DescriptorId,
     FrameOffset, Function, FunctionPtr, FunctionRef, GasMeter, IntBinaryOp, IntCastOp, IntNegateOp,
     IntOperand, IntShiftOp, IntTy, MicroOp, PackClosureOp, ResourceProvider, ShiftOperand,
@@ -52,6 +50,25 @@ use move_core_types::{
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::ptr::{null, NonNull};
+
+/// Resolves the resource-group container a resource type belongs to from the
+/// read-set-pinned defining module, or [`None`] for an own storage slot.
+macro_rules! resolve_resource_group {
+    ($ctx:expr, $ty:expr) => {{
+        let Type::Nominal {
+            module_id, name, ..
+        } = view_type($ty)
+        else {
+            // Global-storage ops always operate on nominal (struct/enum) types.
+            invariant_violation!(Unreachable(
+                "resource type must be a nominal type".to_string()
+            ));
+        };
+        let arena_ref = $ctx.loader.guard().arena_ref_for_module_id(*module_id);
+        Ok($ctx.read_set.get_loaded(arena_ref)?.resource_group_of(name))
+    }};
+}
+
 // ---------------------------------------------------------------------------
 // Runtime state
 // ---------------------------------------------------------------------------
@@ -132,13 +149,6 @@ pub struct SessionEffects {
     pub heap: Heap,
     pub read_write_set: ResourceReadWriteSet,
     pub extensions: NativeExtensions,
-}
-
-impl SessionEffects {
-    /// The transaction's write set.
-    pub fn write_set(&self, layouts: &impl LayoutProvider) -> VMResult<WriteSet> {
-        crate::write_set::build_write_set(&self.read_write_set, layouts)
-    }
 }
 
 /// Materializes the [`AbortLocation`] naming the module that raised an abort.
@@ -345,6 +355,13 @@ impl<'guard> InterpreterContext<'guard> {
         ))
     }
 
+    /// Resolves the resource-group container a resource type belongs to, or
+    /// [`None`] if it lives in its own storage slot. Membership is read from the
+    /// resource's defining module, which must be available.
+    fn resource_group_of(&self, ty: InternedType) -> VMResult<Option<InternedType>> {
+        resolve_resource_group!(self, ty)
+    }
+
     /// Returns the transaction's read-set.
     pub fn read_set(&self) -> &ModuleReadSet<'guard> {
         &self.read_set
@@ -412,13 +429,6 @@ impl<'guard> InterpreterContext<'guard> {
             read_write_set: self.read_write_set,
             extensions: self.extensions,
         }
-    }
-
-    /// The transaction's write set, read out of the still-live context.
-    ///
-    /// Used for testing and benchmarking.
-    pub fn write_set(&self) -> VMResult<WriteSet> {
-        crate::write_set::build_write_set(&self.read_write_set, self.loader.guard())
     }
 
     /// Runs `f` with gas metering suspended: the meter is swapped for an
@@ -2100,18 +2110,22 @@ impl InterpreterContext<'_> {
 
                     MicroOp::Exists { addr, ty, dst } => {
                         let address = read_account_address(fp, addr);
+                        let group = self.resource_group_of(ty)?;
                         let exists = self.read_write_set.exists(
                             self.resource_provider,
                             &InMemoryStorageKey::resource(address, ty),
+                            group,
                         )?;
                         write_bool(fp, dst, exists);
                     },
 
                     MicroOp::BorrowGlobal { addr, ty, dst } => {
                         let address = read_account_address(fp, addr);
+                        let group = self.resource_group_of(ty)?;
                         let ptr = self.read_write_set.borrow_global(
                             self.resource_provider,
                             &InMemoryStorageKey::resource(address, ty),
+                            group,
                         )?;
                         // A reference is a 16-byte fat pointer; the borrow points
                         // at the start of the resource, so the offset half is 0.
@@ -2120,11 +2134,13 @@ impl InterpreterContext<'_> {
 
                     MicroOp::BorrowGlobalMut { addr, ty, dst } => {
                         let address = read_account_address(fp, addr);
+                        let group = self.resource_group_of(ty)?;
                         let key = InMemoryStorageKey::resource(address, ty);
-                        let ptr = match self
-                            .read_write_set
-                            .try_borrow_global_mut(self.resource_provider, &key)?
-                        {
+                        let ptr = match self.read_write_set.try_borrow_global_mut(
+                            self.resource_provider,
+                            &key,
+                            group,
+                        )? {
                             EntryPtr::Writable(ptr) => ptr,
                             EntryPtr::NonWritable(ptr) => {
                                 let ptr = self.deep_copy(regs, ptr)?;
@@ -2139,10 +2155,13 @@ impl InterpreterContext<'_> {
 
                     MicroOp::MoveFrom { addr, ty, dst } => {
                         let address = read_account_address(fp, addr);
+                        let group = self.resource_group_of(ty)?;
                         let key = InMemoryStorageKey::resource(address, ty);
-                        let entry_ptr = self
-                            .read_write_set
-                            .try_move_from(self.resource_provider, &key)?;
+                        let entry_ptr = self.read_write_set.try_move_from(
+                            self.resource_provider,
+                            &key,
+                            group,
+                        )?;
                         let ptr = match entry_ptr {
                             EntryPtr::Writable(ptr) => ptr,
                             EntryPtr::NonWritable(ptr) => {
@@ -2165,10 +2184,12 @@ impl InterpreterContext<'_> {
                         let Some(ptr) = NonNull::new(read_ptr(fp, src)) else {
                             invariant_violation!(MoveToNullSource);
                         };
+                        let group = self.resource_group_of(ty)?;
 
                         self.read_write_set.move_to(
                             self.resource_provider,
                             &InMemoryStorageKey::resource(address, ty),
+                            group,
                             ptr,
                         )?;
                     },
@@ -3105,6 +3126,7 @@ impl InterpreterContext<'_> {
             // — clearer once everything (rws → table natives, gas → all) is
             // wired up.
             let guard = self.loader.guard();
+            let resolve_resource_group = |ty| resolve_resource_group!(self, ty);
             let ctx = ProductionNativeContext::new(
                 new_fp,
                 abi,
@@ -3113,6 +3135,7 @@ impl InterpreterContext<'_> {
                 guard,
                 guard,
                 self.resource_provider,
+                &resolve_resource_group,
                 &mut self.heap,
                 &mut self.read_write_set,
                 &self.extensions,

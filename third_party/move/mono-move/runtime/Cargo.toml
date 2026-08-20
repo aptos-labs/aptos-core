@@ -14,7 +14,6 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-types = { workspace = true }
 bcs = { workspace = true }
 hashbrown = { workspace = true }
 mono-move-alloc = { workspace = true }

@@ -54,8 +54,8 @@ pub use prepared_module::{
 };
 pub use root_pool::{ObjectHandle, ReferenceHandle, RootPool};
 pub use storage::{
-    ModuleProvider, NoModuleProvider, NoResourceProvider, ResourceProvider, ResourceProviderError,
-    StorageRead,
+    nominal_tag, ModuleProvider, NoModuleProvider, NoResourceProvider, ResourceProvider,
+    ResourceProviderError, StorageRead,
 };
 pub use types::{convert_mut_to_immut_ref, strip_ref};
 pub use value_layout::{

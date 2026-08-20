@@ -12945,6 +12945,7 @@ name = "mono-move-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-types",
  "bitflags 2.11.0",
  "bytes",
  "fxhash",
@@ -12962,6 +12963,7 @@ version = "0.1.0"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
+ "aptos-types",
  "boxcar",
  "dashmap 7.0.0-rc2",
  "fxhash",
@@ -13063,7 +13065,6 @@ name = "mono-move-runtime"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-types",
  "bcs 0.1.4",
  "hashbrown 0.14.3",
  "mono-move-alloc",

@@ -3,20 +3,19 @@
 
 //! Creates a `TransactionOutput` from a transaction's side effects.
 
-use crate::{
-    errors::MaterializationError,
-    providers::{nominal_tag, AptosDataProvider, StorageLocation},
-};
+use crate::{errors::MaterializationError, providers::AptosDataProvider};
 use aptos_types::{
     state_store::state_key::StateKey,
     transaction::{TransactionAuxiliaryData, TransactionOutput, TransactionStatus},
     write_set::{WriteOp, WriteSet},
 };
 use bytes::Bytes;
-use mono_move_core::{storage::resource_provider::InMemoryStorageKey, types::InternedType};
+use mono_move_core::{
+    nominal_tag, storage::resource_provider::InMemoryStorageKey, types::InternedType,
+};
 use mono_move_global_context::ExecutionGuard;
 use mono_move_output::to_contract_events;
-use mono_move_runtime::{serialize_value, SessionEffects, WriteClass};
+use mono_move_runtime::{serialize, SessionEffects, WriteClass};
 use move_core_types::{language_storage::StructTag, vm_status::StatusCode};
 use std::{
     collections::{BTreeMap, HashMap},
@@ -90,13 +89,18 @@ fn drain_write_set(
     // SAFETY: written pointers refer to live values in the effects' frozen
     // heap, and no GC runs during the drain.
     let written_bytes = |ptr: NonNull<u8>, ty: InternedType| -> Result<Bytes, String> {
-        let blob = unsafe { serialize_value(guard, ptr, ty) }
+        // SAFETY: forwarded from this function's contract.
+        let blob = unsafe { serialize(guard, ptr.as_ptr(), ty) }
             .map_err(|e| format!("failed to serialize written value: {e}"))?;
         Ok(Bytes::from(blob))
     };
-    let mut convert = |key: &InMemoryStorageKey, class: WriteClass| -> Result<(), String> {
-        match provider.locate_key(key).map_err(|e| format!("{e:#}"))? {
-            StorageLocation::OwnSlot(state_key) => {
+    let mut convert = |key: &InMemoryStorageKey,
+                       class: WriteClass,
+                       group: Option<InternedType>|
+     -> Result<(), String> {
+        match group {
+            None => {
+                let state_key = key.as_state_key().map_err(|e| format!("{e:#}"))?;
                 let op = match class {
                     WriteClass::Creation(ptr) => {
                         WriteOp::legacy_creation(written_bytes(ptr, key.value_ty())?)
@@ -108,7 +112,11 @@ fn drain_write_set(
                 };
                 writes.push((state_key, op));
             },
-            StorageLocation::GroupMember { group, member } => {
+            Some(group_ty) => {
+                let group_key = StateKey::resource_group(
+                    &key.address(),
+                    &nominal_tag(group_ty).map_err(|e| format!("{e:#}"))?,
+                );
                 let member_op = match class {
                     WriteClass::Creation(ptr) | WriteClass::Modification(ptr) => {
                         Some(written_bytes(ptr, key.value_ty())?)
@@ -116,9 +124,9 @@ fn drain_write_set(
                     WriteClass::Deletion => None,
                 };
                 group_ops
-                    .entry(group)
+                    .entry(group_key)
                     .or_default()
-                    .insert(member, member_op);
+                    .insert(key.value_ty(), member_op);
             },
         }
         Ok(())
@@ -129,12 +137,12 @@ fn drain_write_set(
     // TODO(correctness): consider sorting the keys first to ensure determinism. This
     // cannot currently be done because keys contain `InternedType`, which is
     // basically a pointer and does not implement `Ord`.
-    for (key, class) in effects.read_write_set.writes_unordered() {
+    for (key, class, group) in effects.read_write_set.writes_unordered() {
         // TODO(perf): currently we collect all errors and sort them to ensure determinism.
         // We should however revisit the design later and see if we want to switch to an alternative approach.
         //   - What if you want to fail fast on error?
         //   - Are we concerned about too many writes here?
-        if let Err(e) = convert(key, class) {
+        if let Err(e) = convert(key, class, group) {
             failures.push(e);
         }
     }
