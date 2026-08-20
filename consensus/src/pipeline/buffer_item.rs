@@ -60,6 +60,7 @@ fn log_execution_state_for_mismatch(
             "commit_info mismatch — dumping executed block state before panic"
         );
 
+        let txns = cr.transactions_to_commit();
         for (i, (info, info_hash)) in lu
             .transaction_infos
             .iter()
@@ -72,6 +73,7 @@ fn log_execution_state_for_mismatch(
                 version = parent_version + i as u64,
                 info_hash = ?info_hash,
                 info = ?info,
+                txn = ?txns.get(i),
                 "commit_info mismatch — dumping txn info before panic"
             );
         }
