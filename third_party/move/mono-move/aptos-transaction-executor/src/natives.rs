@@ -47,9 +47,10 @@ pub(crate) fn transaction_extensions(
     let mut extensions = NativeExtensions::new();
     extensions.add(TransactionContextExtension::new(
         txn_data.txn_hash,
+        txn_data.script_hash.clone(),
         txn_data.chain_id,
         txn_data.session_counter,
-        txn_data.transaction_index,
+        Some(txn_data.as_user_transaction_context()),
     ));
     extensions.add(ObjectContextExtension::new());
     extensions.add(StorageUsageAtEpochBoundary::new(

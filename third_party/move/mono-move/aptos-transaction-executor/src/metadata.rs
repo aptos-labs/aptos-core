@@ -2,7 +2,8 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_types::transaction::{
-    AuxiliaryInfo, PersistedAuxiliaryInfo, ReplayProtector, SessionId, SignedTransaction,
+    user_transaction_context::{TransactionIndexKind, UserTransactionContext},
+    AuxiliaryInfo, ReplayProtector, SessionId, SignedTransaction,
 };
 use move_core_types::account_address::AccountAddress;
 
@@ -18,33 +19,30 @@ pub(crate) struct TxnMetadata {
     pub max_gas_amount: u64,
     pub expiration_timestamp_secs: u64,
     pub chain_id: u8,
+    /// Whether the transaction carries an encrypted payload.
+    pub is_encrypted_txn: bool,
     pub replay_protector: ReplayProtector,
     /// Seeds unique-address generation. Derived like the legacy VM's, from the
     /// payload session's id, so generated addresses match.
     pub txn_hash: [u8; 32],
+    /// Hash of the executed script, or empty when the payload is not a script.
+    pub script_hash: Vec<u8>,
     /// The payload session's counter, one term of
     /// `monotonically_increasing_number`; matches the legacy VM's.
     pub session_counter: u8,
-    /// The transaction's index within its block plus the counter's reserved
-    /// byte (0 for block execution, 1 for validation/simulation), or `None`
-    /// when the auxiliary info carries no index — the legacy VM aborts
-    /// `monotonically_increasing_number` in that case.
-    pub transaction_index: Option<(u32, u8)>,
+    /// The transaction's index within its block and whether it comes from block
+    /// execution or validation/simulation.
+    pub transaction_index_kind: TransactionIndexKind,
 }
 
 impl TxnMetadata {
     pub fn new(txn: &SignedTransaction, aux_info: &AuxiliaryInfo) -> Self {
-        let transaction_index = match *aux_info.persisted_info() {
-            PersistedAuxiliaryInfo::V1 { transaction_index } => Some((transaction_index, 0)),
-            PersistedAuxiliaryInfo::TimestampNotYetAssignedV1 { transaction_index } => {
-                Some((transaction_index, 1))
-            },
-            PersistedAuxiliaryInfo::None => None,
-        };
+        let transaction_index_kind = aux_info.transaction_index_kind();
+        let script_hash = txn.payload().script_hash();
         let session_id = SessionId::txn(
             txn.sender(),
             txn.replay_protector(),
-            txn.payload().script_hash(),
+            script_hash.clone(),
             txn.expiration_timestamp_secs(),
         );
         let authenticator = txn.authenticator_ref();
@@ -68,14 +66,36 @@ impl TxnMetadata {
             max_gas_amount: txn.max_gas_amount(),
             expiration_timestamp_secs: txn.expiration_timestamp_secs(),
             chain_id: txn.chain_id().id(),
+            is_encrypted_txn: txn.is_encrypted_txn(),
             replay_protector: txn.replay_protector(),
             txn_hash: session_id.txn_hash(),
+            script_hash,
             session_counter: session_id.session_counter(),
-            transaction_index,
+            transaction_index_kind,
         }
     }
 
     pub fn is_orderless(&self) -> bool {
         matches!(self.replay_protector, ReplayProtector::Nonce(_))
+    }
+
+    /// Builds the user transaction context used by some native functions.
+    //
+    // TODO(completeness): `entry_function_payload` and `multisig_payload` are
+    // left `None`; no implemented mono-move native reads them yet.
+    pub(crate) fn as_user_transaction_context(&self) -> UserTransactionContext {
+        UserTransactionContext::new(
+            self.sender,
+            self.secondary_signers.clone(),
+            self.fee_payer.unwrap_or(self.sender),
+            self.max_gas_amount,
+            self.gas_unit_price,
+            self.chain_id,
+            None,
+            None,
+            self.transaction_index_kind,
+            self.is_encrypted_txn,
+            self.is_orderless(),
+        )
     }
 }

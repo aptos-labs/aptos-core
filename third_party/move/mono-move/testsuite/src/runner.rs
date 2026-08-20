@@ -8,8 +8,8 @@ use crate::{
     compile::{compile, compile_move_path, compile_move_stdlib, SourceKind},
     engine::RunResult,
     extensions::{
-        seed_extensions, TEST_CHAIN_ID, TEST_SESSION_COUNTER, TEST_STATE_BYTES, TEST_STATE_ITEMS,
-        TEST_TXN_HASH, TEST_TXN_INDEX,
+        seed_extensions, test_user_transaction_context, TEST_CHAIN_ID, TEST_SCRIPT_HASH,
+        TEST_SESSION_COUNTER, TEST_STATE_BYTES, TEST_STATE_ITEMS, TEST_TXN_HASH,
     },
     matcher::check_output,
     module_provider::InMemoryModuleProvider,
@@ -30,7 +30,6 @@ use aptos_types::{
         errors::StateViewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
         StateViewId,
     },
-    transaction::user_transaction_context::{TransactionIndexKind, UserTransactionContext},
 };
 use aptos_vm::natives::aptos_natives;
 use aptos_vm_types::resolver::StateStorageView;
@@ -464,26 +463,11 @@ fn execute_function_v1(
         usage: StateStorageUsage::new(TEST_STATE_ITEMS as usize, TEST_STATE_BYTES as usize),
     };
     let mut extensions = NativeContextExtensions::default();
-    let user_transaction_context = UserTransactionContext::new(
-        AccountAddress::ZERO,
-        vec![],
-        AccountAddress::ZERO,
-        0,
-        0,
-        TEST_CHAIN_ID, // chain_id, read by transaction_context::chain_id_internal
-        None,
-        None,
-        TransactionIndexKind::BlockExecution {
-            transaction_index: TEST_TXN_INDEX,
-        },
-        false, // is_encrypted_txn
-        false, // is_orderless_txn
-    );
     extensions.add(NativeTransactionContext::new(
         TEST_TXN_HASH.to_vec(),
-        vec![],
+        TEST_SCRIPT_HASH.to_vec(),
         TEST_CHAIN_ID,
-        Some(user_transaction_context),
+        Some(test_user_transaction_context()),
         TEST_SESSION_COUNTER,
     ));
     extensions.add(NativeObjectContext::default());
@@ -558,8 +542,8 @@ fn execute_function_v2(
     return_kinds: &[PrimitiveKind],
     heap_size: Option<usize>,
 ) -> (Output, usize) {
-    // Seed extensions with the same fixed inputs as the legacy side.
-    let extensions = seed_extensions();
+    // For differential tests, treat transaction as a user transaction.
+    let extensions = seed_extensions(true);
 
     // Run through the shared pipeline engine. Argument placement and result
     // reading mirror mono-move's frame slot layout.
