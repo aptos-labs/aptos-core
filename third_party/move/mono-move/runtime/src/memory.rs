@@ -35,25 +35,36 @@ impl MemoryRegion {
     /// given size. The bytes hold arbitrary values, so the region must be
     /// written before it is read.
     ///
-    /// # Safety
+    /// # Invariants
     ///
-    /// This is safe for the heap buffer and the GC to-space because every byte
-    /// that is ever read is written first:
-    /// - `heap_alloc` zeroes each object's region before returning its pointer,
-    ///   and all reads go through object pointers within `[buffer.start, bump_ptr)`.
-    /// - The GC copies fill to-space contiguously up to `free_ptr` and only ever
-    ///   scan `[to_space.start, free_ptr)`; the unbumped tail is never touched.
+    /// The caller must write every byte before it is read. The region carries
+    /// no guarantee about its initial contents; callers must not rely on any
+    /// (in particular, must not assume it is zeroed).
     ///
     /// OOM is handled by aborting via `handle_alloc_error`.
     pub fn new_uninit(size: usize) -> Self {
-        Self::new::<false>(size)
+        let region = Self::new::<false>(size);
+
+        // The allocator often hands back fresh, already-zeroed OS pages, so in
+        // practice uninitialized memory reads as zeros and code that wrongly
+        // relies on the old zeroing would keep passing. Poison the region in
+        // debug builds so the write-before-read contract is exercised in tests
+        // and CI. Gated on `not(miri)`: this write initializes the memory, which
+        // would otherwise hide genuine uninitialized reads from Miri.
+        #[cfg(all(debug_assertions, not(miri)))]
+        // SAFETY: `region.ptr` is a valid, `size`-byte allocation just returned
+        // by `Self::new` above.
+        unsafe {
+            std::ptr::write_bytes(region.ptr, 0xAA, size);
+        }
+        region
     }
 
     /// Shared body of [`Self::new_zeroed`] / [`Self::new_uninit`]. `ZEROED`
     /// selects `alloc_zeroed` vs `alloc`; both paths null-check and abort via
     /// `handle_alloc_error` on OOM.
     fn new<const ZEROED: bool>(size: usize) -> Self {
-        debug_assert!(size > 0);
+        assert!(size > 0);
         let layout = Layout::from_size_align(size, MAX_ALIGN).expect("invalid memory layout");
         // SAFETY: layout is valid (power-of-two alignment, non-zero size). Null
         // is checked below.

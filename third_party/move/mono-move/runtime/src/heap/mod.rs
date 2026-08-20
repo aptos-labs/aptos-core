@@ -232,9 +232,12 @@ pub struct Heap {
 }
 
 impl Heap {
+    /// Creates a heap backed by an uninitialized buffer of the given size.
+    ///
+    /// The buffer is not zeroed. This is sound only while this contract holds:
+    /// every heap object is fully written before any byte of it is read, and
+    /// nothing reads the unbumped tail `[bump_ptr, buffer.end)`.
     pub fn new(size: usize) -> Self {
-        // Uninitialized is safe: `heap_alloc` zeroes each object before handing
-        // out its pointer, and nothing reads `[bump_ptr, buffer.end)`.
         let buffer = MemoryRegion::new_uninit(size);
         Self {
             bump_ptr: buffer.as_ptr(),
@@ -458,10 +461,10 @@ impl<'a> RootScanner<'a> {
 ///
 /// # Invariants
 ///
-/// Prior to allocation, the region is zeroed. This is a safety mechanism
-/// when the heap buffer is allocated uninitialized to make sure that the
-/// inter-field padding or any extra memory allocated due to alignment is
-/// always zero.
+/// Each object's region is zeroed before it is returned. The GC and deep-copy
+/// copy the full object image, including inter-field padding and alignment
+/// gaps. Zeroing makes those bytes reproducibly zero, so the copied image is
+/// deterministic rather than arbitrary heap contents.
 pub(crate) fn heap_alloc(
     heap: &mut Heap,
     total_size: usize,
@@ -504,8 +507,11 @@ pub(crate) fn heap_alloc(
         // change: `gc_copy_object` / `deep_copy` copy the full object image
         // including dead-variant tail and inter-field padding, which is
         // deterministically zero today because this memset is the sole
-        // initializer (the backing buffer is uninitialized). Skipping it makes
-        // that image read uninitialized memory (UB), not merely stale bytes.
+        // initializer (the backing buffer is uninitialized). Skipping it leaves
+        // those bytes uninitialized. A raw byte copy of them is fine in
+        // principle, but compilers (e.g. LLVM) may lower a small copy to a
+        // typed integer load/store, and reading uninitialized bytes as a typed
+        // value is UB, not merely a stale read.
         // Prefer zeroing only the tail/padding the active variant does not
         // write (still skipping the large active body), or audit that no
         // byte-image consumer (state commit / hashing) depends on those bytes
