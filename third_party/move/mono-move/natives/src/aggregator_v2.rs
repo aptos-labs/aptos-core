@@ -8,18 +8,28 @@
 //!
 //! TODO(completeness): delayed fields integration needed.
 //! TODO(metering): missing gas charging for natives.
-//! TODO(completeness): support DerivedStringSnapshot.
 
 use crate::{monomorphic_natives, NativeEntry};
+use aptos_types::{
+    delayed_fields::{calculate_width_for_constant_string, U128_MAX_DIGITS, U64_MAX_DIGITS},
+    error,
+    serde_helper::bcs_utils::{bcs_size_of_byte_array, size_u32_as_uleb128},
+};
 use mono_move_core::{
     native::{
         native_invariant_violation, NativeContext, NativeContextFamily, NativeStatus, Opaque, Ref,
-        RootPool, VMValue,
+        RootPool, VMValue, Vector,
     },
     types::{U128_TY, U64_TY},
     VMResult,
 };
 use std::{fmt::Display, marker::PhantomData};
+
+/// Matches the framework limit on derived-string input length.
+const DERIVED_STRING_INPUT_MAX_LENGTH: usize = 1024;
+
+/// Matches the native abort code for over-long derived-string input.
+const EINPUT_STRING_LENGTH_TOO_LARGE: u64 = error::invalid_state(8);
 
 /// A reference to an aggregator or a snapshot. Wraps a Move reference (a 16-byte
 /// fat pointer), rooted for the lifetime of the native call so it survives GC.
@@ -32,6 +42,10 @@ impl<'a, T> VMValue<'a> for AggregatorOrSnapshotRef<'a, T> {
     // A reference is a 16-byte fat pointer.
     const FRAME_SLOT_SIZE: usize = 16;
 
+    /// # Safety
+    ///
+    /// `offset..offset + FRAME_SLOT_SIZE` must lie within the current frame's
+    /// arg / return region.
     unsafe fn read_from_frame(pool: &'a RootPool, frame_ptr: *const u8, offset: usize) -> Self {
         Self {
             inner: unsafe { Ref::read_from_frame(pool, frame_ptr, offset) },
@@ -39,6 +53,10 @@ impl<'a, T> VMValue<'a> for AggregatorOrSnapshotRef<'a, T> {
         }
     }
 
+    /// # Safety
+    ///
+    /// `offset..offset + FRAME_SLOT_SIZE` must lie within the current frame's
+    /// arg / return region.
     unsafe fn write_to_frame(self, frame_ptr: *mut u8, offset: usize) {
         unsafe { self.inner.write_to_frame(frame_ptr, offset) }
     }
@@ -75,6 +93,10 @@ struct Aggregator<T> {
 impl<'a, T: VMValue<'a>> VMValue<'a> for Aggregator<T> {
     const FRAME_SLOT_SIZE: usize = 2 * <T as VMValue<'a>>::FRAME_SLOT_SIZE;
 
+    /// # Safety
+    ///
+    /// `offset..offset + FRAME_SLOT_SIZE` must lie within the current frame's
+    /// arg / return region.
     unsafe fn read_from_frame(pool: &'a RootPool, frame_ptr: *const u8, offset: usize) -> Self {
         let value = unsafe { T::read_from_frame(pool, frame_ptr, offset) };
         let max_value = unsafe {
@@ -87,6 +109,10 @@ impl<'a, T: VMValue<'a>> VMValue<'a> for Aggregator<T> {
         Self { value, max_value }
     }
 
+    /// # Safety
+    ///
+    /// `offset..offset + FRAME_SLOT_SIZE` must lie within the current frame's
+    /// arg / return region.
     unsafe fn write_to_frame(self, frame_ptr: *mut u8, offset: usize) {
         unsafe {
             self.value.write_to_frame(frame_ptr, offset);
@@ -104,15 +130,66 @@ struct AggregatorSnapshot<T> {
 impl<'a, T: VMValue<'a>> VMValue<'a> for AggregatorSnapshot<T> {
     const FRAME_SLOT_SIZE: usize = <T as VMValue<'a>>::FRAME_SLOT_SIZE;
 
+    /// # Safety
+    ///
+    /// `offset..offset + FRAME_SLOT_SIZE` must lie within the current frame's
+    /// arg / return region.
     unsafe fn read_from_frame(pool: &'a RootPool, frame_ptr: *const u8, offset: usize) -> Self {
         // SAFETY: `value` is the 0th (and only) snapshot field.
         let value = unsafe { T::read_from_frame(pool, frame_ptr, offset) };
         Self { value }
     }
 
+    /// # Safety
+    ///
+    /// `offset..offset + FRAME_SLOT_SIZE` must lie within the current frame's
+    /// arg / return region.
     unsafe fn write_to_frame(self, frame_ptr: *mut u8, offset: usize) {
         // SAFETY: `value` is the 0th (and only) snapshot field.
         unsafe { self.value.write_to_frame(frame_ptr, offset) };
+    }
+}
+
+/// Mirrors `0x1::aggregator_v2::DerivedStringSnapshot` in Move. Both fields are
+/// heap-boxed vectors, so each occupies an 8-byte pointer in the frame: the
+/// single-field `String` is flattened to its `bytes` vector, and `padding` is a
+/// `vector<u8>`.
+struct DerivedStringSnapshot<'a> {
+    value: Vector<'a, u8>,
+    padding: Vector<'a, u8>,
+}
+
+impl<'a> VMValue<'a> for DerivedStringSnapshot<'a> {
+    const FRAME_SLOT_SIZE: usize = 2 * <Vector<'a, u8> as VMValue<'a>>::FRAME_SLOT_SIZE;
+
+    /// # Safety
+    ///
+    /// `offset..offset + FRAME_SLOT_SIZE` must lie within the current frame's
+    /// arg / return region.
+    unsafe fn read_from_frame(pool: &'a RootPool, frame_ptr: *const u8, offset: usize) -> Self {
+        unsafe {
+            let value = Vector::read_from_frame(pool, frame_ptr, offset);
+            let padding = Vector::read_from_frame(
+                pool,
+                frame_ptr,
+                offset + <Vector<'a, u8> as VMValue<'a>>::FRAME_SLOT_SIZE,
+            );
+            Self { value, padding }
+        }
+    }
+
+    /// # Safety
+    ///
+    /// `offset..offset + FRAME_SLOT_SIZE` must lie within the current frame's
+    /// arg / return region.
+    unsafe fn write_to_frame(self, frame_ptr: *mut u8, offset: usize) {
+        unsafe {
+            self.value.write_to_frame(frame_ptr, offset);
+            self.padding.write_to_frame(
+                frame_ptr,
+                offset + <Vector<'a, u8> as VMValue<'a>>::FRAME_SLOT_SIZE,
+            );
+        }
     }
 }
 
@@ -122,6 +199,8 @@ trait UnsignedInt: Copy + Ord + Display + for<'a> VMValue<'a> {
     const MAX: Self;
     /// Byte size of the value in a frame slot.
     const SIZE: usize;
+    /// Number of decimal digits in [`Self::MAX`]; the worst-case rendered width.
+    const MAX_DECIMAL_DIGITS: usize;
     fn checked_add(self, other: Self) -> Option<Self>;
     fn checked_sub(self, other: Self) -> Option<Self>;
 
@@ -142,6 +221,7 @@ trait UnsignedInt: Copy + Ord + Display + for<'a> VMValue<'a> {
 
 impl UnsignedInt for u64 {
     const MAX: Self = u64::MAX;
+    const MAX_DECIMAL_DIGITS: usize = U64_MAX_DIGITS;
     const SIZE: usize = 8;
     const ZERO: Self = 0;
 
@@ -164,6 +244,7 @@ impl UnsignedInt for u64 {
 
 impl UnsignedInt for u128 {
     const MAX: Self = u128::MAX;
+    const MAX_DECIMAL_DIGITS: usize = U128_MAX_DIGITS;
     const SIZE: usize = 16;
     const ZERO: Self = 0;
 
@@ -337,6 +418,132 @@ fn native_read_snapshot<C: NativeContext, T: UnsignedInt>(ctx: &C) -> VMResult<N
     Ok(NativeStatus::Success)
 }
 
+/// Builds a `DerivedStringSnapshot` whose BCS serialization is exactly `width`
+/// bytes wide, padding the `value` string with trailing zero bytes. Mirrors
+/// `bytes_and_width_to_derived_string_struct`, so the serialized layout matches
+/// byte-for-byte.
+fn build_derived_string_snapshot<C: NativeContext>(
+    ctx: &C,
+    bytes: Vec<u8>,
+    width: usize,
+) -> VMResult<NativeStatus> {
+    let value_width = bcs_size_of_byte_array(bytes.len());
+    // The padding vector needs at least its own 1-byte length prefix.
+    let padding_len = width.checked_sub(value_width + 1).ok_or_else(|| {
+        native_invariant_violation(format!(
+            "DerivedStringSnapshot has no space for padding: value_width {value_width}, width {width}"
+        ))
+    })?;
+    // Padding stays short enough to serialize its length in a single byte.
+    if size_u32_as_uleb128(padding_len) > 1 {
+        return Err(native_invariant_violation(format!(
+            "DerivedStringSnapshot padding is too large: padding_len {padding_len}, width {width}"
+        )));
+    }
+
+    let value = ctx.new_byte_vector(&bytes)?;
+    let padding = ctx.new_byte_vector(&vec![0u8; padding_len])?;
+    // SAFETY: return 0 is `DerivedStringSnapshot { value: String, padding: vector<u8> }`.
+    unsafe { ctx.set_return(0, DerivedStringSnapshot { value, padding }) }?;
+    Ok(NativeStatus::Success)
+}
+
+/// `0x1::aggregator_v2::create_derived_string(value: String): DerivedStringSnapshot`
+///
+/// Wraps `value` into a derived string snapshot, padded so that its serialized
+/// width is fixed.
+//
+// TODO(metering): charge gas for the input-length-proportional work.
+fn native_create_derived_string<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
+    // SAFETY: arg 0 is `value: String`, which flattens to `vector<u8>`.
+    let value = unsafe { ctx.arg::<Vector<u8>>(0) }?;
+    // Copy off the VM heap before any allocation may relocate it.
+    let value_bytes = unsafe { value.as_bytes() }.to_vec();
+
+    if value_bytes.len() > DERIVED_STRING_INPUT_MAX_LENGTH {
+        return Ok(NativeStatus::Abort {
+            code: EINPUT_STRING_LENGTH_TOO_LARGE,
+            message: Some(format!(
+                "Derived string snapshot input length ({}) exceeds maximum {}",
+                value_bytes.len(),
+                DERIVED_STRING_INPUT_MAX_LENGTH
+            )),
+        });
+    }
+
+    let width = calculate_width_for_constant_string(value_bytes.len());
+    build_derived_string_snapshot(ctx, value_bytes, width)
+}
+
+/// `0x1::aggregator_v2::derive_string_concat<T>(before: String, snapshot: &AggregatorSnapshot<T>, after: String): DerivedStringSnapshot`
+///
+/// Concatenates `before`, the snapshot's decimal value, and `after` into a
+/// derived string snapshot, padded so that its serialized width is fixed.
+//
+// TODO(metering): charge gas for the input-length-proportional work.
+fn native_derive_string_concat<C: NativeContext, T: UnsignedInt>(
+    ctx: &C,
+) -> VMResult<NativeStatus> {
+    // SAFETY: arg 0 is `before: String` (flattens to `vector<u8>`), arg 1 is the
+    // snapshot reference (fat pointer), and arg 2 is `after: String`.
+    let before = unsafe { ctx.arg::<Vector<u8>>(0) }?;
+    let snapshot = unsafe { ctx.arg::<AggregatorOrSnapshotRef<T>>(1) }?;
+    let after = unsafe { ctx.arg::<Vector<u8>>(2) }?;
+
+    // Copy the strings off the VM heap and read the snapshot value before any
+    // allocation, which may relocate the borrowed bytes.
+    let prefix = unsafe { before.as_bytes() }.to_vec();
+    let suffix = unsafe { after.as_bytes() }.to_vec();
+    let value = snapshot.read_value();
+
+    if prefix.len() + suffix.len() > DERIVED_STRING_INPUT_MAX_LENGTH {
+        return Ok(NativeStatus::Abort {
+            code: EINPUT_STRING_LENGTH_TOO_LARGE,
+            message: Some(format!(
+                "Derived string snapshot input length ({} + {}) exceeds maximum {}",
+                prefix.len(),
+                suffix.len(),
+                DERIVED_STRING_INPUT_MAX_LENGTH
+            )),
+        });
+    }
+
+    // The width reserves room for the worst-case (max-digit) integer, so the
+    // actual (shorter) value is padded up to a fixed width.
+    let width = bcs_size_of_byte_array(prefix.len() + suffix.len() + T::MAX_DECIMAL_DIGITS) + 1;
+
+    // output = before ++ decimal(value) ++ after.
+    let mut output = prefix;
+    output.extend_from_slice(value.to_string().as_bytes());
+    output.extend_from_slice(&suffix);
+
+    build_derived_string_snapshot(ctx, output, width)
+}
+
+/// `0x1::aggregator_v2::read_derived_string(self: &DerivedStringSnapshot): String`
+///
+/// Returns the `value` string held by the derived string snapshot, dropping the
+/// padding.
+//
+// TODO(metering): charge gas for the input-length-proportional copy.
+fn native_read_derived_string<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
+    // SAFETY: arg 0 is `&DerivedStringSnapshot`. Its 0th field, `value`, is a
+    // flattened `String`, i.e. a `vector<u8>` at offset 0 of the referent.
+    let snapshot = unsafe { ctx.arg::<Ref<Vector<u8>>>(0) }?;
+    // Copy the bytes off the VM heap before allocating: `new_byte_vector` may
+    // trigger a GC that relocates them.
+    let bytes = {
+        let value = snapshot.borrow();
+        // SAFETY: the bytes are consumed immediately into an owned Vec.
+        unsafe { value.as_bytes() }.to_vec()
+    };
+
+    let value = ctx.new_byte_vector(&bytes)?;
+    // SAFETY: return 0 is `String`, flattened to `vector<u8>`.
+    unsafe { ctx.set_return(0, value) }?;
+    Ok(NativeStatus::Success)
+}
+
 // Only u64 and u128 types are supported.
 pub fn make_all_aggregator_v2_natives<F: NativeContextFamily>() -> Vec<NativeEntry<F>> {
     monomorphic_natives![
@@ -425,6 +632,24 @@ pub fn make_all_aggregator_v2_natives<F: NativeContextFamily>() -> Vec<NativeEnt
             "0x1::aggregator_v2::read_snapshot",
             &[U128_TY],
             native_read_snapshot::<_, u128>
+        ),
+        (
+            "0x1::aggregator_v2::create_derived_string",
+            native_create_derived_string
+        ),
+        (
+            "0x1::aggregator_v2::read_derived_string",
+            native_read_derived_string
+        ),
+        (
+            "0x1::aggregator_v2::derive_string_concat",
+            &[U64_TY],
+            native_derive_string_concat::<_, u64>
+        ),
+        (
+            "0x1::aggregator_v2::derive_string_concat",
+            &[U128_TY],
+            native_derive_string_concat::<_, u128>
         ),
     ]
 }
