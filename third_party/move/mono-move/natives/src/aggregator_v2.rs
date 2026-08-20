@@ -11,7 +11,7 @@
 
 use crate::{monomorphic_natives, NativeEntry};
 use aptos_types::{
-    delayed_fields::calculate_width_for_constant_string,
+    delayed_fields::{calculate_width_for_constant_string, U128_MAX_DIGITS, U64_MAX_DIGITS},
     error,
     serde_helper::bcs_utils::{bcs_size_of_byte_array, size_u32_as_uleb128},
 };
@@ -25,10 +25,10 @@ use mono_move_core::{
 };
 use std::{fmt::Display, marker::PhantomData};
 
-/// Matches the legacy framework limit on derived-string input length.
+/// Matches the framework limit on derived-string input length.
 const DERIVED_STRING_INPUT_MAX_LENGTH: usize = 1024;
 
-/// Matches the legacy native abort code for over-long derived-string input.
+/// Matches the native abort code for over-long derived-string input.
 const EINPUT_STRING_LENGTH_TOO_LARGE: u64 = error::invalid_state(8);
 
 /// A reference to an aggregator or a snapshot. Wraps a Move reference (a 16-byte
@@ -42,6 +42,10 @@ impl<'a, T> VMValue<'a> for AggregatorOrSnapshotRef<'a, T> {
     // A reference is a 16-byte fat pointer.
     const FRAME_SLOT_SIZE: usize = 16;
 
+    /// # Safety
+    ///
+    /// `offset..offset + FRAME_SLOT_SIZE` must lie within the current frame's
+    /// arg / return region.
     unsafe fn read_from_frame(pool: &'a RootPool, frame_ptr: *const u8, offset: usize) -> Self {
         Self {
             inner: unsafe { Ref::read_from_frame(pool, frame_ptr, offset) },
@@ -49,6 +53,10 @@ impl<'a, T> VMValue<'a> for AggregatorOrSnapshotRef<'a, T> {
         }
     }
 
+    /// # Safety
+    ///
+    /// `offset..offset + FRAME_SLOT_SIZE` must lie within the current frame's
+    /// arg / return region.
     unsafe fn write_to_frame(self, frame_ptr: *mut u8, offset: usize) {
         unsafe { self.inner.write_to_frame(frame_ptr, offset) }
     }
@@ -85,6 +93,10 @@ struct Aggregator<T> {
 impl<'a, T: VMValue<'a>> VMValue<'a> for Aggregator<T> {
     const FRAME_SLOT_SIZE: usize = 2 * <T as VMValue<'a>>::FRAME_SLOT_SIZE;
 
+    /// # Safety
+    ///
+    /// `offset..offset + FRAME_SLOT_SIZE` must lie within the current frame's
+    /// arg / return region.
     unsafe fn read_from_frame(pool: &'a RootPool, frame_ptr: *const u8, offset: usize) -> Self {
         let value = unsafe { T::read_from_frame(pool, frame_ptr, offset) };
         let max_value = unsafe {
@@ -97,6 +109,10 @@ impl<'a, T: VMValue<'a>> VMValue<'a> for Aggregator<T> {
         Self { value, max_value }
     }
 
+    /// # Safety
+    ///
+    /// `offset..offset + FRAME_SLOT_SIZE` must lie within the current frame's
+    /// arg / return region.
     unsafe fn write_to_frame(self, frame_ptr: *mut u8, offset: usize) {
         unsafe {
             self.value.write_to_frame(frame_ptr, offset);
@@ -114,12 +130,20 @@ struct AggregatorSnapshot<T> {
 impl<'a, T: VMValue<'a>> VMValue<'a> for AggregatorSnapshot<T> {
     const FRAME_SLOT_SIZE: usize = <T as VMValue<'a>>::FRAME_SLOT_SIZE;
 
+    /// # Safety
+    ///
+    /// `offset..offset + FRAME_SLOT_SIZE` must lie within the current frame's
+    /// arg / return region.
     unsafe fn read_from_frame(pool: &'a RootPool, frame_ptr: *const u8, offset: usize) -> Self {
         // SAFETY: `value` is the 0th (and only) snapshot field.
         let value = unsafe { T::read_from_frame(pool, frame_ptr, offset) };
         Self { value }
     }
 
+    /// # Safety
+    ///
+    /// `offset..offset + FRAME_SLOT_SIZE` must lie within the current frame's
+    /// arg / return region.
     unsafe fn write_to_frame(self, frame_ptr: *mut u8, offset: usize) {
         // SAFETY: `value` is the 0th (and only) snapshot field.
         unsafe { self.value.write_to_frame(frame_ptr, offset) };
@@ -138,6 +162,10 @@ struct DerivedStringSnapshot<'a> {
 impl<'a> VMValue<'a> for DerivedStringSnapshot<'a> {
     const FRAME_SLOT_SIZE: usize = 2 * <Vector<'a, u8> as VMValue<'a>>::FRAME_SLOT_SIZE;
 
+    /// # Safety
+    ///
+    /// `offset..offset + FRAME_SLOT_SIZE` must lie within the current frame's
+    /// arg / return region.
     unsafe fn read_from_frame(pool: &'a RootPool, frame_ptr: *const u8, offset: usize) -> Self {
         unsafe {
             let value = Vector::read_from_frame(pool, frame_ptr, offset);
@@ -150,6 +178,10 @@ impl<'a> VMValue<'a> for DerivedStringSnapshot<'a> {
         }
     }
 
+    /// # Safety
+    ///
+    /// `offset..offset + FRAME_SLOT_SIZE` must lie within the current frame's
+    /// arg / return region.
     unsafe fn write_to_frame(self, frame_ptr: *mut u8, offset: usize) {
         unsafe {
             self.value.write_to_frame(frame_ptr, offset);
@@ -189,7 +221,7 @@ trait UnsignedInt: Copy + Ord + Display + for<'a> VMValue<'a> {
 
 impl UnsignedInt for u64 {
     const MAX: Self = u64::MAX;
-    const MAX_DECIMAL_DIGITS: usize = 20;
+    const MAX_DECIMAL_DIGITS: usize = U64_MAX_DIGITS;
     const SIZE: usize = 8;
     const ZERO: Self = 0;
 
@@ -212,7 +244,7 @@ impl UnsignedInt for u64 {
 
 impl UnsignedInt for u128 {
     const MAX: Self = u128::MAX;
-    const MAX_DECIMAL_DIGITS: usize = 39;
+    const MAX_DECIMAL_DIGITS: usize = U128_MAX_DIGITS;
     const SIZE: usize = 16;
     const ZERO: Self = 0;
 
@@ -387,9 +419,9 @@ fn native_read_snapshot<C: NativeContext, T: UnsignedInt>(ctx: &C) -> VMResult<N
 }
 
 /// Builds a `DerivedStringSnapshot` whose BCS serialization is exactly `width`
-/// bytes wide, padding the `value` string with trailing zero bytes. Mirrors the
-/// legacy `bytes_and_width_to_derived_string_struct`, so the serialized layout
-/// matches the legacy VM byte-for-byte.
+/// bytes wide, padding the `value` string with trailing zero bytes. Mirrors
+/// `bytes_and_width_to_derived_string_struct`, so the serialized layout matches
+/// byte-for-byte.
 fn build_derived_string_snapshot<C: NativeContext>(
     ctx: &C,
     bytes: Vec<u8>,
