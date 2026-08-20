@@ -12,7 +12,7 @@ use crate::{
     group::{Fr, G1Affine, G2Affine, PairingOutput, PairingSetting},
     shared::{
         blst_ops,
-        ciphertext::bibe::{BIBECTEncrypt, InnerCiphertext},
+        ciphertext::bibe::{BIBECTEncrypt, InnerCiphertext, PreparedG2},
         digest::{Digest, EvalProof},
         encryption_key::AugmentedEncryptionKey,
         ids::Id,
@@ -64,7 +64,7 @@ impl InnerCiphertext for BIBESuccinctCiphertext {
         PreparedBIBECiphertext {
             id: self.id,
             pairing_output,
-            ct_g2: self.ct_g2[0],
+            ct_g2: PreparedG2::new(self.ct_g2[0]),
             padded_key: self.padded_key.clone(),
             symmetric_ciphertext: self.symmetric_ciphertext.clone(),
         }
