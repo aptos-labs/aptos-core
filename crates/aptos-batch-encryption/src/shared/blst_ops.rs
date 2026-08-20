@@ -10,9 +10,12 @@
 //! BLS12-381 only; if `crate::group` is switched to another curve this module
 //! must be disabled.
 
-use crate::group::{Fr, G1Affine, G1Projective, PairingOutput};
+use crate::{
+    group::{Fr, G1Affine, G1Projective, PairingOutput},
+    shared::algebra::{fk_algorithm::EvalRepr, multi_point_eval::powers_of},
+};
 use ark_bls12_381::{Fq, Fq12, Fq2, Fq6, G2Affine};
-use ark_ec::AffineRepr;
+use ark_ec::{AffineRepr, CurveGroup as _};
 use ark_ff::{BigInteger, PrimeField, Zero};
 use blst::{
     blst_bendian_from_fp, blst_final_exp, blst_fp, blst_fp12, blst_fp12_mul, blst_fp_from_bendian,
@@ -89,17 +92,7 @@ fn blst_fp12_to_ark(f: &blst_fp12) -> Fq12 {
 
 /// Equivalent to `PairingSetting::pairing(p, q)`, computed with blst.
 pub fn pairing(p: &G1Affine, q: &G2Affine) -> PairingOutput {
-    if p.is_zero() || q.is_zero() {
-        return PairingOutput::zero();
-    }
-    let p = g1_to_blst_affine(p);
-    let q = g2_to_blst_affine(q);
-    let mut acc = blst_fp12::default();
-    unsafe {
-        blst_miller_loop(&mut acc, &q, &p);
-        blst_final_exp(&mut acc, &acc);
-    }
-    ark_ec::pairing::PairingOutput(blst_fp12_to_ark(&acc))
+    multi_pairing(std::slice::from_ref(p), std::slice::from_ref(q))
 }
 
 /// Equivalent to `PairingSetting::multi_pairing(ps, qs)`, computed with blst.
@@ -136,6 +129,7 @@ pub fn multi_pairing(ps: &[G1Affine], qs: &[G2Affine]) -> PairingOutput {
 /// generic (parallel) FFT routines run over blst point arithmetic instead of
 /// arkworks' own. The all-zero `blst_p1` is the point at infinity.
 #[derive(Clone, Copy, Debug)]
+#[repr(transparent)]
 pub struct BlstG1(pub blst_p1);
 
 impl BlstG1 {
@@ -148,6 +142,20 @@ impl BlstG1 {
 
     pub fn to_ark(&self) -> G1Projective {
         blst_p1_to_ark(&self.0)
+    }
+}
+
+/// Lets the Toeplitz/circulant evaluation in [`crate::shared::algebra::fk_algorithm`]
+/// run its Hadamard product and group inverse FFT over blst points: the prepared
+/// tau powers are converted in one batch up front, and everything downstream is
+/// blst arithmetic.
+impl EvalRepr<Fr, G1Projective> for BlstG1 {
+    fn from_prepared(prepared: &[G1Projective]) -> Vec<Self> {
+        // A single batch inversion for the whole conversion.
+        G1Projective::normalize_batch(prepared)
+            .iter()
+            .map(Self::from_ark)
+            .collect()
     }
 }
 
@@ -235,22 +243,15 @@ pub struct G1MsmBases {
 
 impl G1MsmBases {
     pub fn new(bases: &[G1Affine]) -> Self {
-        let points: Vec<blst_p1> = bases
-            .iter()
-            .map(|b| {
-                let aff = g1_to_blst_affine(b);
-                let mut p = blst_p1::default();
-                unsafe { blst_p1_from_affine(&mut p, &aff) };
-                p
-            })
-            .collect();
-        Self::from_blst(&points)
+        Self::from_blst(&bases.iter().map(BlstG1::from_ark).collect::<Vec<BlstG1>>())
     }
 
-    pub fn from_blst(points: &[blst_p1]) -> Self {
+    pub fn from_blst(points: &[BlstG1]) -> Self {
         let n = points.len();
         let mut affine = vec![blst_p1_affine::default(); n];
-        let point_ptrs = [points.as_ptr(), std::ptr::null()];
+        // `BlstG1` is a transparent newtype, so this slice is layout-compatible
+        // with the `blst_p1[]` that blst expects.
+        let point_ptrs = [points.as_ptr().cast::<blst_p1>(), std::ptr::null()];
         unsafe { blst::blst_p1s_to_affine(affine.as_mut_ptr(), point_ptrs.as_ptr(), n) };
 
         let table_len = unsafe { blst::blst_p1s_mult_wbits_precompute_sizeof(MSM_WBITS, n) }
@@ -318,18 +319,9 @@ pub fn multi_point_eval_naive(f: &[G1Affine], x_coords: &[Fr]) -> Vec<G1Projecti
 /// Same as [`multi_point_eval_naive`], but starting from an already-built
 /// Pippenger table (e.g. from blst-native points, skipping ark conversions).
 pub fn multi_point_eval_naive_with_bases(bases: &G1MsmBases, x_coords: &[Fr]) -> Vec<G1Projective> {
-    let f_len = bases.len;
     x_coords
         .par_iter()
-        .map(|x| {
-            let mut powers = Vec::with_capacity(f_len);
-            let mut xp = Fr::from(1u64);
-            for _ in 0..f_len {
-                powers.push(xp);
-                xp *= x;
-            }
-            bases.msm(&powers)
-        })
+        .map(|x| bases.msm(&powers_of(x, bases.len)))
         .collect()
 }
 

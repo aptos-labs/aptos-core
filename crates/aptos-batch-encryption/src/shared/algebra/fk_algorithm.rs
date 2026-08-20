@@ -6,7 +6,6 @@ use crate::{
     shared::blst_ops::{self, BlstG1, G1MsmBases},
 };
 use aptos_crypto::arkworks::serialization::{ark_de_uncompressed_no_validate, ark_se_uncompressed};
-use ark_ec::CurveGroup as _;
 use ark_ff::{FftField, Zero as _};
 use ark_poly::{domain::DomainCoeff, EvaluationDomain, Radix2EvaluationDomain};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
@@ -20,6 +19,27 @@ use serde::{
     Deserialize, Serialize,
 };
 use std::{fmt, marker::PhantomData};
+
+/// The representation in which a circulant evaluation's group arithmetic -- the
+/// Hadamard product and the inverse FFT -- is actually carried out.
+///
+/// A [`PreparedInput`] always stores its points as `T`, since that is the form
+/// that gets serialized. The arithmetic on top of it, though, need not happen in
+/// `T`: any representation we can batch-convert into will do, and some are much
+/// faster. The blanket impl below is the identity -- stay in `T`, use arkworks
+/// throughout -- while [`BlstG1`] converts into blst points, so that the same
+/// evaluation code drives blst's curve arithmetic instead.
+pub trait EvalRepr<F: FftField, T>: DomainCoeff<F> {
+    /// Batch-convert the prepared (already FFT'd) input points into this
+    /// representation.
+    fn from_prepared(prepared: &[T]) -> Vec<Self>;
+}
+
+impl<F: FftField, T: DomainCoeff<F>> EvalRepr<F, T> for T {
+    fn from_prepared(prepared: &[T]) -> Vec<T> {
+        prepared.to_vec()
+    }
+}
 
 /// To efficiently evaluate a Circulant matrix of size `n x n` over an input,
 /// a FFT-friendly subset of a field of size `n` is required. This struct
@@ -121,11 +141,18 @@ impl<F: FftField> CirculantDomain<F> {
 
     /// Evaluate a circulant matrix given by the vector `circulant`, on a prepared input
     /// `prepared_input`.
-    pub fn eval_prepared<T: DomainCoeff<F> + CanonicalSerialize + CanonicalDeserialize>(
+    ///
+    /// The output representation `U` selects which library performs the group
+    /// arithmetic; see [`EvalRepr`]. It defaults to `T` by inference, which is
+    /// the all-arkworks path.
+    pub fn eval_prepared<
+        T: DomainCoeff<F> + CanonicalSerialize + CanonicalDeserialize,
+        U: EvalRepr<F, T>,
+    >(
         &self,
         circulant: &[F],
         prepared_input: &PreparedInput<F, T>,
-    ) -> Vec<T> {
+    ) -> Vec<U> {
         assert_eq!(circulant.len(), prepared_input.y.len());
         assert_eq!(circulant.len(), self.dimension());
 
@@ -133,10 +160,10 @@ impl<F: FftField> CirculantDomain<F> {
 
         // Hadamard product of y and v
         // Would like to write
-        // let u : Vec<T> = zip(y, v).map(|(yi, vi)| yi * vi).collect();
+        // let u : Vec<U> = zip(y, v).map(|(yi, vi)| yi * vi).collect();
         // but looks like DomainCoeff only is required to implement MulAssign<F> and not Mul<F>...
         // so have to do something uglier:
-        let mut u: Vec<T> = prepared_input.y.clone();
+        let mut u: Vec<U> = U::from_prepared(&prepared_input.y);
         u.par_iter_mut().zip(v.par_iter()).for_each(|(u, v)| {
             *u *= *v;
         });
@@ -259,11 +286,17 @@ impl<F: FftField + Sized> ToeplitzDomain<F> {
 
     /// Evaluate a Toeplitz matrix given by the vector `toeplitz`, on a prepared input
     /// `prepared_input`.
-    pub fn eval_prepared<T: DomainCoeff<F> + CanonicalSerialize + CanonicalDeserialize>(
+    ///
+    /// As in [`CirculantDomain::eval_prepared`], `U` selects the representation
+    /// the group arithmetic runs in.
+    pub fn eval_prepared<
+        T: DomainCoeff<F> + CanonicalSerialize + CanonicalDeserialize,
+        U: EvalRepr<F, T>,
+    >(
         &self,
         toeplitz: &[F],
         prepared_input: &PreparedInput<F, T>,
-    ) -> Vec<T> {
+    ) -> Vec<U> {
         assert_eq!(toeplitz.len() + 1, self.circulant_domain.dimension());
         assert_eq!(prepared_input.y.len(), self.circulant_domain.dimension());
 
@@ -344,16 +377,10 @@ impl<F: FftField, T: DomainCoeff<F> + CanonicalSerialize + CanonicalDeserialize>
 impl FKDomain<Fr, G1Projective> {
     /// Compute the `H_j(tau)` commitments for the polynomial `f`.
     ///
-    /// This is a Toeplitz-matrix evaluation on the prepared (already FFT'd) tau
-    /// powers: an FFT of the circulant form of the matrix, a Hadamard product
-    /// against the prepared input, and a group inverse FFT. It is the same
-    /// computation as [`ToeplitzDomain::eval_prepared`], inlined here so that
-    /// the two group-arithmetic steps -- the Hadamard product's scalar
-    /// multiplications and the inverse FFT's butterflies -- can run over blst
-    /// points instead of arkworks ones.
-    ///
-    /// Returns blst-native points, so that callers doing an MSM next can feed
-    /// them straight in without a round trip through arkworks.
+    /// Returns blst-native points -- the [`BlstG1`] return type is what selects
+    /// blst for the underlying Toeplitz evaluation's group arithmetic -- so that
+    /// callers doing an MSM next can feed them straight in without a round trip
+    /// through arkworks.
     pub(crate) fn compute_h_term_commitments(&self, f: &[Fr], round: usize) -> Vec<BlstG1> {
         let mut f = Vec::from(f);
         f.extend(std::iter::repeat_n(
@@ -364,29 +391,12 @@ impl FKDomain<Fr, G1Projective> {
         // dimension.
         debug_assert_eq!(self.toeplitz_domain.dimension(), f.len() - 1);
 
-        // The Toeplitz matrix is only evaluated on the powers up to max_poly_degree - 1,
-        // since the H_j(X) polynomials have degree at most that.
-        let prepared_input = &self.prepared_toeplitz_inputs[round];
-        let circulant_domain = &self.toeplitz_domain.circulant_domain;
-        let circulant = self
-            .toeplitz_domain
-            .toeplitz_to_circulant(&self.toeplitz_for_poly(&f));
-
-        assert_eq!(circulant.len(), prepared_input.y.len());
-        assert_eq!(circulant.len(), circulant_domain.dimension());
-
-        let v = circulant_domain.fft_domain.fft(&circulant);
-
-        // One batch inversion to move the prepared tau powers into blst representation.
-        let y_affine = G1Projective::normalize_batch(&prepared_input.y);
-        let mut u: Vec<BlstG1> = y_affine.iter().map(BlstG1::from_ark).collect();
-
-        u.par_iter_mut().zip(v.par_iter()).for_each(|(u, v)| {
-            *u *= *v;
-        });
-
-        let h = circulant_domain.fft_domain.ifft(&u);
-        Vec::from(&h[..self.toeplitz_domain.dimension()])
+        self.toeplitz_domain.eval_prepared(
+            &self.toeplitz_for_poly(&f),
+            // The Toeplitz matrix is only evaluated on the powers up to max_poly_degree - 1,
+            // since the H_j(X) polynomials have degree at most that
+            &self.prepared_toeplitz_inputs[round],
+        )
     }
 
     /// Compute the evaluation proofs for a KZG commitment of a polynomial `f`, committed to under
@@ -424,12 +434,7 @@ impl FKDomain<Fr, G1Projective> {
 
         // All `x_coords.len()` MSMs share the same bases, so the blst Pippenger
         // table is built once and reused across them.
-        let bases = G1MsmBases::from_blst(
-            &h_term_commitments
-                .iter()
-                .map(|p| p.0)
-                .collect::<Vec<blst::blst_p1>>(),
-        );
+        let bases = G1MsmBases::from_blst(&h_term_commitments);
         blst_ops::multi_point_eval_naive_with_bases(&bases, x_coords)
     }
 }
@@ -636,9 +641,10 @@ mod tests {
             let fk_domain =
                 FKDomain::new(poly_degree, poly_degree, tau_powers_g1_projective).unwrap();
 
-            // Reference: the same Toeplitz evaluation done entirely in arkworks.
-            // `poly.coeffs` already has degree equal to the Toeplitz dimension,
-            // so no zero-padding is needed here.
+            // Reference: the same evaluation, but with `G1Projective` as the
+            // representation, so the arithmetic runs in arkworks. `poly.coeffs`
+            // already has degree equal to the Toeplitz dimension, so no
+            // zero-padding is needed here.
             let expected: Vec<G1Projective> = fk_domain.toeplitz_domain.eval_prepared(
                 &fk_domain.toeplitz_for_poly(&poly.coeffs),
                 &fk_domain.prepared_toeplitz_inputs[0],
