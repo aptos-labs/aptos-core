@@ -69,8 +69,8 @@ impl<'a> AptosTransactionExecutor<'a> {
 
     /// Executes any transaction, dispatching to its kind's entry point.
     //
-    // TODO(completeness): genesis, state-checkpoint, validator, and
-    // block-epilogue transactions; some may stay the block coordinator's job.
+    // TODO(completeness): genesis and validator transactions; some may stay the
+    // block coordinator's job.
     pub fn execute_transaction(&self, txn: &Transaction, aux_info: &AuxiliaryInfo) -> TxnOutcome {
         match txn {
             Transaction::UserTransaction(txn) => self.execute_user_transaction(txn, aux_info),
@@ -80,17 +80,13 @@ impl<'a> AptosTransactionExecutor<'a> {
             Transaction::BlockMetadataExt(block_metadata_ext) => {
                 self.execute_block_metadata_ext_transaction(block_metadata_ext, aux_info)
             },
+            Transaction::StateCheckpoint(_) => self.execute_state_checkpoint(),
+            Transaction::BlockEpilogue(payload) => self.execute_block_epilogue(payload),
             Transaction::GenesisTransaction(_) => {
                 TxnOutcome::Discarded(DiscardReason::Unsupported("genesis transactions"))
             },
-            Transaction::StateCheckpoint(_) => {
-                TxnOutcome::Discarded(DiscardReason::Unsupported("state checkpoints"))
-            },
             Transaction::ValidatorTransaction(_) => {
                 TxnOutcome::Discarded(DiscardReason::Unsupported("validator transactions"))
-            },
-            Transaction::BlockEpilogue(_) => {
-                TxnOutcome::Discarded(DiscardReason::Unsupported("block epilogues"))
             },
         }
     }

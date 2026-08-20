@@ -150,6 +150,7 @@ pub use executor_utilities::{check_resource_group_serialization, Materializer};
 pub mod explicit_sync_wrapper;
 pub mod hot_state_op_accumulator;
 mod limit_processor;
+pub mod mono_move;
 mod scheduler;
 mod scheduler_status;
 mod scheduler_v2;

@@ -10,17 +10,21 @@ use aptos_aggregator::types::DelayedFieldValue;
 use aptos_types::{
     block_executor::value::SpeculativeValue,
     error::{code_invariant_error, PanicError},
+    state_store::state_key::StateKey,
     vm::modules::AptosModuleExtension,
 };
 use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
+use bytes::Bytes;
+use mono_move_core::types::InternedType;
+use mono_move_runtime::Heap;
 use move_binary_format::{file_format::CompiledScript, CompiledModule};
-use move_core_types::language_storage::ModuleId;
+use move_core_types::language_storage::{ModuleId, StructTag};
 use move_vm_runtime::{Module, Script};
 use move_vm_types::code::{ModuleCache, ModuleCode, UnsyncModuleCache, UnsyncScriptCache};
 use serde::Serialize;
 use std::{
     cell::RefCell,
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     fmt::Debug,
     hash::Hash,
     sync::{
@@ -28,6 +32,28 @@ use std::{
         Arc,
     },
 };
+
+/// Size of the resource arena backing MonoMove's materialized base values.
+/// Created lazily on first MonoMove use; legacy execution never builds one.
+const DEFAULT_RESOURCE_ARENA_BYTES: usize = 64 * 1024 * 1024;
+
+/// The stored (pre-block) members of a resource group, decoded and interned:
+/// member type -> stored bytes. `None` caches a group's absence from storage.
+/// `triomphe::Arc` so a lookup hands out a cheap clone that outlives the cache
+/// borrow.
+type GroupBase = Option<triomphe::Arc<HashMap<InternedType, Bytes>>>;
+
+/// The running merged state of a resource group during sequential materialization:
+/// its current members in canonical struct-tag map form, plus whether the group
+/// slot currently exists in the running committed state. Seeded once from the
+/// stored members, then mutated in place as each transaction's group writes are
+/// materialized, so it accumulates every earlier transaction's member writes.
+/// Member reads still go through `group_base`; this is used only to assemble the
+/// per-transaction group blob.
+pub struct RunningGroup {
+    pub members: BTreeMap<StructTag, Bytes>,
+    pub exists: bool,
+}
 
 /// UnsyncMap is designed to mimic the functionality of MVHashMap for sequential execution.
 /// In this case only the latest recorded version is relevant, simplifying the implementation.
@@ -43,6 +69,27 @@ pub struct UnsyncMap<K, T, V, I> {
 
     total_base_resource_size: AtomicU64,
     total_base_delayed_field_size: AtomicU64,
+
+    // MonoMove-only state, unused by legacy execution.
+    //
+    // The arena holds the flat base values MonoMove materializes reads into and
+    // hands out pointers into. It is created lazily on first use and is
+    // append-only: it is never reset or garbage-collected, so pointers stay
+    // valid for the whole block.
+    arena: RefCell<Option<Heap>>,
+
+    // The stored (pre-block) members of each resource group decoded so far,
+    // keyed by the group's state key, caching absence too. Block-lived and
+    // shared across every provider built during the block (execution and
+    // materialization, all transactions), so a group's base blob is read,
+    // decoded, and interned at most once per block.
+    group_base: RefCell<HashMap<StateKey, GroupBase>>,
+
+    // The running merged members of each resource group written so far this
+    // block, keyed by the group's state key. Seeded from `group_base` on the
+    // first write and mutated in place across transactions; sequential-only,
+    // since in-place mutation is sound only under in-order commit.
+    group_running: RefCell<HashMap<StateKey, RunningGroup>>,
 }
 
 impl<K, T, V, I> Default for UnsyncMap<K, T, V, I> {
@@ -55,6 +102,9 @@ impl<K, T, V, I> Default for UnsyncMap<K, T, V, I> {
             delayed_field_map: RefCell::new(HashMap::new()),
             total_base_resource_size: AtomicU64::new(0),
             total_base_delayed_field_size: AtomicU64::new(0),
+            arena: RefCell::new(None),
+            group_base: RefCell::new(HashMap::new()),
+            group_running: RefCell::new(HashMap::new()),
         }
     }
 }
@@ -280,6 +330,49 @@ where
             Ordering::Relaxed,
         );
         self.delayed_field_map.borrow_mut().insert(id, value);
+    }
+
+    /// Runs `f` against the MonoMove resource arena, creating it on first use.
+    /// The arena is append-only and never garbage-collected, so pointers into
+    /// it stay valid for the lifetime of the map.
+    pub fn with_resource_arena<R>(&self, f: impl FnOnce(&mut Heap) -> R) -> R {
+        let mut arena = self.arena.borrow_mut();
+        let heap = arena.get_or_insert_with(|| Heap::new(DEFAULT_RESOURCE_ARENA_BYTES));
+        f(heap)
+    }
+
+    /// The decoded, interned base members of the group at `key`, if any provider
+    /// has read them this block. `Some(None)` caches a group absent from storage.
+    pub fn group_base_cached(&self, key: &StateKey) -> Option<GroupBase> {
+        self.group_base.borrow().get(key).cloned()
+    }
+
+    /// Caches the decoded base members of the group at `key` (absence included)
+    /// for the rest of the block.
+    pub fn cache_group_base(&self, key: StateKey, members: GroupBase) {
+        self.group_base.borrow_mut().insert(key, members);
+    }
+
+    /// Runs `f` against the running merged state of the group at `key`, seeding
+    /// it with `seed` on first use. Sequential-only: the state is mutated in
+    /// place across transactions, which is sound only under in-order commit.
+    ///
+    /// `seed` may read other caches on the same map (e.g. the base group cache),
+    /// which are held behind distinct `RefCell`s, so no re-entrant borrow occurs.
+    pub fn with_group_running_mut<R>(
+        &self,
+        key: &StateKey,
+        seed: impl FnOnce() -> anyhow::Result<RunningGroup>,
+        f: impl FnOnce(&mut RunningGroup) -> anyhow::Result<R>,
+    ) -> anyhow::Result<R> {
+        let mut running = self.group_running.borrow_mut();
+        if !running.contains_key(key) {
+            running.insert(key.clone(), seed()?);
+        }
+        let group = running
+            .get_mut(key)
+            .expect("group running state was just seeded");
+        f(group)
     }
 }
 

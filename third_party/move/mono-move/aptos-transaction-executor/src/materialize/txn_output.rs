@@ -17,10 +17,7 @@ use mono_move_global_context::ExecutionGuard;
 use mono_move_output::to_contract_events;
 use mono_move_runtime::{serialize, SessionEffects, WriteClass};
 use move_core_types::{language_storage::StructTag, vm_status::StatusCode};
-use std::{
-    collections::{BTreeMap, HashMap},
-    ptr::NonNull,
-};
+use std::{collections::HashMap, ptr::NonNull};
 
 // TODO(security): audit all error messages and make sure they do not lead to
 // deep recursions or OOMs.
@@ -83,7 +80,7 @@ fn drain_write_set(
     provider: &dyn AptosDataProvider,
 ) -> Result<WriteSet, Vec<String>> {
     let mut writes: Vec<(StateKey, WriteOp)> = vec![];
-    let mut group_ops: HashMap<StateKey, HashMap<InternedType, MemberOp>> = HashMap::new();
+    let mut group_ops: HashMap<StateKey, HashMap<StructTag, MemberOp>> = HashMap::new();
     let mut failures: Vec<String> = vec![];
 
     // SAFETY: written pointers refer to live values in the effects' frozen
@@ -117,6 +114,7 @@ fn drain_write_set(
                     &key.address(),
                     &nominal_tag(group_ty).map_err(|e| format!("{e:#}"))?,
                 );
+                let member_tag = nominal_tag(key.value_ty()).map_err(|e| format!("{e:#}"))?;
                 let member_op = match class {
                     WriteClass::Creation(ptr) | WriteClass::Modification(ptr) => {
                         Some(written_bytes(ptr, key.value_ty())?)
@@ -126,7 +124,7 @@ fn drain_write_set(
                 group_ops
                     .entry(group_key)
                     .or_default()
-                    .insert(key.value_ty(), member_op);
+                    .insert(member_tag, member_op);
             },
         }
         Ok(())
@@ -147,12 +145,12 @@ fn drain_write_set(
         }
     }
 
-    // Merge each group's member ops into its stored members and emit one write
-    // per group.
+    // Emit one write per group: the provider overlays this transaction's member
+    // ops onto the group's current state and returns the slot's write op.
     for (group_key, member_ops) in group_ops {
-        match merge_group(provider, &group_key, member_ops) {
+        match provider.group_write_op(&group_key, member_ops) {
             Ok(op) => writes.push((group_key, op)),
-            Err(e) => failures.push(e),
+            Err(e) => failures.push(format!("failed to write group {group_key:?}: {e:#}")),
         }
     }
 
@@ -162,64 +160,4 @@ fn drain_write_set(
     // `WriteSet::new` collects into a `BTreeMap`, so we do not need to sort the
     // `writes` vector here.
     WriteSet::new(writes).map_err(|e| vec![format!("failed to build the write set: {e:?}")])
-}
-
-/// Merges a group's member ops into a single write for the group's slot.
-///
-/// The stored blob is canonical in struct-tag order.
-///
-/// SAFETY: this function needs to guarantee that its result (both the write set
-/// and the error) are deterministic, not depending on iteration order.
-fn merge_group(
-    provider: &dyn AptosDataProvider,
-    group_key: &StateKey,
-    member_ops: HashMap<InternedType, MemberOp>,
-) -> Result<WriteOp, String> {
-    let old = provider
-        .group_members(group_key)
-        .map_err(|e| format!("failed to read the members of group {group_key:?}: {e:#}"))?;
-    let mut members: BTreeMap<StructTag, Bytes> = BTreeMap::new();
-
-    // Members the transaction did not touch, then the ones it wrote, which take
-    // precedence. Removed members are left out as part of this process.
-    let untouched = old
-        .iter()
-        .flat_map(|stored| stored.iter())
-        .filter(|(ty, _)| !member_ops.contains_key(ty));
-    let written = member_ops
-        .iter()
-        .filter_map(|(ty, op)| Some((ty, op.as_ref()?)));
-    for (ty, bytes) in untouched.chain(written) {
-        // The error must not name the member to avoid non-determinism -- both
-        // iterators are unordered.
-        let tag = nominal_tag(*ty)
-            .map_err(|_| format!("group {group_key:?} has a non-nominal member"))?;
-        members.insert(tag, bytes.clone());
-    }
-    let new_bytes = if members.is_empty() {
-        None
-    } else {
-        let blob = bcs::to_bytes(&members)
-            .map_err(|e| format!("failed to encode the members of group {group_key:?}: {e}"))?;
-        Some(Bytes::from(blob))
-    };
-    group_op(old.is_some(), new_bytes)
-}
-
-/// Builds the write op for a resource-group slot: creation/modification/
-/// deletion by whether the group existed before and has members after.
-//
-// TODO(correctness): ops carry no `StateValueMetadata` (slot deposits, refunds,
-// creation time); the legacy VM's `WriteOpConverter` fills these.
-fn group_op(existed: bool, new_bytes: Option<Bytes>) -> Result<WriteOp, String> {
-    Ok(match (existed, new_bytes) {
-        (false, Some(bytes)) => WriteOp::legacy_creation(bytes),
-        (true, Some(bytes)) => WriteOp::legacy_modification(bytes),
-        (true, None) => WriteOp::legacy_deletion(),
-        (false, None) => {
-            // Unreachable: a member deletion implies the member (and so the
-            // group) existed in storage.
-            return Err("an empty group emitted a write".to_string());
-        },
-    })
 }

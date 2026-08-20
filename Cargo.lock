@@ -744,6 +744,11 @@ dependencies = [
  "fail",
  "hashbrown 0.14.3",
  "itertools 0.13.0",
+ "mono-move-aptos-state-view-providers",
+ "mono-move-aptos-transaction-executor",
+ "mono-move-core",
+ "mono-move-global-context",
+ "mono-move-runtime",
  "move-binary-format",
  "move-core-types",
  "move-vm-runtime",
@@ -3432,6 +3437,8 @@ dependencies = [
  "dashmap 7.0.0-rc2",
  "equivalent",
  "fail",
+ "mono-move-core",
+ "mono-move-runtime",
  "move-binary-format",
  "move-core-types",
  "move-vm-runtime",
@@ -3442,6 +3449,7 @@ dependencies = [
  "rayon",
  "serde",
  "test-case",
+ "triomphe",
 ]
 
 [[package]]
@@ -8890,6 +8898,7 @@ dependencies = [
  "claims",
  "hex",
  "memory-stats",
+ "mono-move-global-context",
  "move-binary-format",
  "move-bytecode-utils",
  "move-core-types",

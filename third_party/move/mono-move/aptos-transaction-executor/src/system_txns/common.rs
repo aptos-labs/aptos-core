@@ -34,7 +34,7 @@ impl SystemTxnMetadata {
         Self::from_session_id(SessionId::block_meta_ext(block_metadata_ext))
     }
 
-    fn from_session_id(session_id: SessionId) -> Self {
+    pub(super) fn from_session_id(session_id: SessionId) -> Self {
         Self {
             txn_hash: session_id.txn_hash(),
             session_counter: session_id.session_counter(),

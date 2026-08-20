@@ -49,7 +49,10 @@ use move_core_types::{
     vm_status::AbortLocation,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use std::ptr::{null, NonNull};
+use std::{
+    ptr::{null, NonNull},
+    sync::Arc,
+};
 
 /// Resolves the resource-group container a resource type belongs to from the
 /// read-set-pinned defining module, or [`None`] for an own storage slot.
@@ -146,7 +149,11 @@ fn root_frame_base(stack: &MemoryRegion) -> *mut u8 {
 // they can outlive the guard and dereference freed arenas after a maintenance
 // reset. Tie them to the guard lifetime (`SessionEffects<'guard>`).
 pub struct SessionEffects {
-    pub heap: Heap,
+    /// The transaction's frozen heap, shared. Every write pointer in
+    /// `read_write_set` and the event payloads in `extensions` address values
+    /// inside it, so consumers that outlive the transaction (the multi-version
+    /// map's write values) keep an `Arc` clone to hold the heap alive.
+    pub heap: Arc<Heap>,
     pub read_write_set: ResourceReadWriteSet,
     pub extensions: NativeExtensions,
 }
@@ -425,7 +432,7 @@ impl<'guard> InterpreterContext<'guard> {
     /// as long as the returned effects live.
     pub fn finish(self) -> SessionEffects {
         SessionEffects {
-            heap: self.heap,
+            heap: Arc::new(self.heap),
             read_write_set: self.read_write_set,
             extensions: self.extensions,
         }

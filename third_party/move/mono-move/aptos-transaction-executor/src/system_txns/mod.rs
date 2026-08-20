@@ -5,5 +5,6 @@
 //! and always expected to succeed — when one fails (unexpectedly), the whole
 //! block is aborted. Each kind lives in its own submodule.
 
+mod block_ending;
 mod block_metadata;
 mod common;
