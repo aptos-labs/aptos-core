@@ -470,8 +470,10 @@ impl BufferItem {
                     return Ok(());
                 }
             },
+            // Match the whole LedgerInfo: a differing consensus_data_hash means the
+            // signature is over another message. Mirrors create_signature_aggregator.
             Self::Executed(executed) => {
-                if executed.commit_info == *target_commit_info {
+                if executed.partial_commit_proof.data() == vote.ledger_info() {
                     executed
                         .partial_commit_proof
                         .add_signature(author, signature);
@@ -479,7 +481,7 @@ impl BufferItem {
                 }
             },
             Self::Signed(signed) => {
-                if signed.partial_commit_proof.data().commit_info() == target_commit_info {
+                if signed.partial_commit_proof.data() == vote.ledger_info() {
                     signed.partial_commit_proof.add_signature(author, signature);
                     return Ok(());
                 }
@@ -832,6 +834,75 @@ mod test {
             BufferItem::Aggregated(aggregated_item_inner) => {
                 assert_eq!(aggregated_item_inner.executed_blocks, vec![pipelined_block]);
                 assert_eq!(aggregated_item_inner.commit_proof, commit_proof);
+            },
+            _ => panic!("Expected aggregated item."),
+        }
+    }
+
+    /// A differing consensus_data_hash signs a different message, so it must not
+    /// enter our aggregator.
+    #[test]
+    fn test_reject_commit_vote_with_mismatched_consensus_data_hash() {
+        let (validator_signers, validator_verifier) = create_validators();
+        let pipelined_block = create_pipelined_block();
+        let block_info = pipelined_block.block_info();
+
+        let honest_li = LedgerInfo::new(block_info.clone(), HashValue::zero());
+        let ordered_proof =
+            LedgerInfoWithSignatures::new(honest_li.clone(), AggregateSignature::empty());
+
+        // 4 honest votes; quorum is 5 of 7.
+        let honest_votes =
+            create_valid_commit_votes(validator_signers[0..4].to_vec(), honest_li.clone());
+        let mut ordered_item = BufferItem::new_ordered(
+            vec![pipelined_block.clone()],
+            ordered_proof.clone(),
+            HashMap::new(),
+        );
+        for vote in &honest_votes {
+            ordered_item.add_signature_if_matched(vote.clone()).unwrap();
+        }
+        let mut executed_item = ordered_item.advance_to_executed_or_aggregated(
+            vec![pipelined_block.clone()],
+            &validator_verifier,
+            None,
+            true,
+        );
+        assert!(executed_item.is_executed());
+
+        let attacker = &validator_signers[6];
+        // Any failed verification puts the author here, so this is always reachable.
+        validator_verifier.add_pessimistic_verify_set(attacker.author());
+
+        let poisoned_li = LedgerInfo::new(block_info.clone(), HashValue::random());
+        let poisoned_vote = CommitVote::new(attacker.author(), poisoned_li, attacker).unwrap();
+
+        // Valid over its own message, so this passes and sets the verified flag.
+        poisoned_vote
+            .verify(attacker.author(), &validator_verifier)
+            .expect("valid signature over its own ledger info");
+        assert!(poisoned_vote.signature_with_status().is_verified());
+
+        assert!(
+            executed_item
+                .add_signature_if_matched(poisoned_vote)
+                .is_err(),
+            "vote signed over a different LedgerInfo must be rejected"
+        );
+
+        // An honest fifth vote still reaches quorum and produces a valid certificate.
+        let fifth = create_valid_commit_votes(vec![validator_signers[4].clone()], honest_li);
+        executed_item
+            .add_signature_if_matched(fifth[0].clone())
+            .unwrap();
+        match executed_item.try_advance_to_aggregated(&validator_verifier) {
+            BufferItem::Aggregated(item) => {
+                validator_verifier
+                    .verify_multi_signatures(
+                        item.commit_proof.ledger_info(),
+                        item.commit_proof.signatures(),
+                    )
+                    .expect("aggregated certificate must verify against its own ledger info");
             },
             _ => panic!("Expected aggregated item."),
         }

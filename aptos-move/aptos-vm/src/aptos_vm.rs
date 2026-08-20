@@ -6,6 +6,10 @@ use crate::{
     counters::*,
     data_cache::{AsMoveResolver, StorageAdapter},
     errors::{discarded_output, expect_only_successful_execution},
+    function_usage::{
+        finish_transaction_usage, get_function_usage_sink, new_transaction_calls_handle,
+        FunctionUsageSink, FunctionUsageTraceRecorder,
+    },
     gas::{check_gas, make_prod_gas_meter, make_prod_gas_meter_impl},
     keyless_validation,
     move_vm_ext::{
@@ -288,6 +292,8 @@ pub(crate) fn get_or_vm_startup_failure<'a, T>(
 pub struct AptosVM {
     is_simulation: bool,
     env: AptosEnvironment,
+    /// Opt-in off-chain function-usage observer, captured when this VM is constructed.
+    function_usage: Option<Arc<dyn FunctionUsageSink>>,
     /// If true, user payloads are allowed not to run extra checks and instead trace execution. If
     /// so, Block-STM replays the trace and performs these checks at post-commit time once. Note
     /// that checks might still be performed in-place based on a heuristic such as payload type.
@@ -302,6 +308,7 @@ impl AptosVM {
         Self {
             is_simulation: false,
             env: env.clone(),
+            function_usage: get_function_usage_sink(),
             // There is no tracing by default because it can only be done if there is access to
             // Block-STM.
             async_runtime_checks_enabled: false,
@@ -2359,8 +2366,39 @@ impl AptosVM {
             code_storage,
         );
 
-        let (status, output) = if self.should_perform_async_runtime_checks_for_txn(txn) {
-            self.execute_user_transaction_impl(
+        let function_usage = self
+            .function_usage
+            .as_ref()
+            .map(|sink| (Arc::clone(sink), new_transaction_calls_handle()));
+        let async_runtime_checks = self.should_perform_async_runtime_checks_for_txn(txn);
+        let (status, output) = match (&function_usage, async_runtime_checks) {
+            (Some((sink, calls)), true) => self.execute_user_transaction_impl(
+                resolver,
+                code_storage,
+                txn,
+                txn_metadata,
+                log_context,
+                &mut gas_meter,
+                FunctionUsageTraceRecorder::new(
+                    FullTraceRecorder::new(),
+                    Arc::clone(sink),
+                    Arc::clone(calls),
+                ),
+            ),
+            (Some((sink, calls)), false) => self.execute_user_transaction_impl(
+                resolver,
+                code_storage,
+                txn,
+                txn_metadata,
+                log_context,
+                &mut gas_meter,
+                FunctionUsageTraceRecorder::new(
+                    NoOpTraceRecorder,
+                    Arc::clone(sink),
+                    Arc::clone(calls),
+                ),
+            ),
+            (None, true) => self.execute_user_transaction_impl(
                 resolver,
                 code_storage,
                 txn,
@@ -2368,9 +2406,8 @@ impl AptosVM {
                 log_context,
                 &mut gas_meter,
                 FullTraceRecorder::new(),
-            )
-        } else {
-            self.execute_user_transaction_impl(
+            ),
+            (None, false) => self.execute_user_transaction_impl(
                 resolver,
                 code_storage,
                 txn,
@@ -2378,8 +2415,18 @@ impl AptosVM {
                 log_context,
                 &mut gas_meter,
                 NoOpTraceRecorder,
-            )
+            ),
         };
+
+        if let Some((sink, calls)) = function_usage {
+            sink.record_transaction(finish_transaction_usage(
+                calls,
+                txn.committed_hash(),
+                txn.sender(),
+                txn.multisig_address(),
+                output.status().clone(),
+            ));
+        }
 
         Ok((status, output, gas_meter))
     }

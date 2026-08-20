@@ -15,6 +15,20 @@ use move_core_types::function::ClosureMask;
 use move_vm_types::instr::Instruction;
 use std::hash::{Hash, Hasher};
 
+/// Describes how control entered a function.
+///
+/// This is intentionally independent of the bytecode execution trace. Call observers can use it
+/// for lightweight function-usage collection without enabling trace replay or changing runtime
+/// checking behavior.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FunctionCallKind {
+    Entrypoint,
+    Call,
+    CallGeneric,
+    CallClosure,
+    NativeDynamicDispatch,
+}
+
 /// Interface for recording the trace at runtime. It is sufficient to record branch decisions as
 /// well as dynamic function calls originating from closures.
 pub trait TraceRecorder {
@@ -38,6 +52,20 @@ pub trait TraceRecorder {
     /// Called for every successful set-up of the closure call (i.e., immediately before the first
     /// instruction of the callee is executed).
     fn record_call_closure(&mut self, function: &LoadedFunction, mask: ClosureMask);
+
+    /// Called when control enters, or is about to enter, a function.
+    ///
+    /// Move calls are recorded after call validation and gas charging. Native calls are recorded
+    /// immediately before invoking the native implementation so calls which abort are retained.
+    /// The default implementation keeps existing trace recorders source-compatible and makes
+    /// function usage collection opt-in.
+    fn record_function_call(
+        &mut self,
+        _caller: Option<&LoadedFunction>,
+        _callee: &LoadedFunction,
+        _kind: FunctionCallKind,
+    ) {
+    }
 }
 
 /// Records the fingerprint of executed bytecode instructions to check trace replay integrity.

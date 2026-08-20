@@ -33,6 +33,19 @@ on:
         type: boolean
         description: If true, the workflow will not run replay verify.
         default: false
+      FRAMEWORK_USAGE:
+        required: false
+        type: boolean
+        description: Collect framework function usage instead of only replay-verifying.
+        default: false
+      RESULTS_BUCKET:
+        required: false
+        type: string
+        description: GCS bucket used for framework usage shards.
+      REPORT_BUCKET:
+        required: false
+        type: string
+        description: Public GCS bucket used to publish the rendered HTML report.
 
   workflow_dispatch:
     inputs:
@@ -65,6 +78,19 @@ on:
         type: boolean
         description: If true, the workflow will not run replay verify.
         default: false
+      FRAMEWORK_USAGE:
+        required: false
+        type: boolean
+        description: Collect framework function usage instead of only replay-verifying.
+        default: false
+      RESULTS_BUCKET:
+        required: false
+        type: string
+        description: GCS bucket used for framework usage shards.
+      REPORT_BUCKET:
+        required: false
+        type: string
+        description: Public GCS bucket used to publish the rendered HTML report.
 permissions:
   contents: read
 
@@ -78,6 +104,8 @@ jobs:
           START_TIME: ${{ inputs.START_TIME }}
           END_VERSION: ${{ inputs.END_VERSION }}
           END_TIME: ${{ inputs.END_TIME }}
+          FRAMEWORK_USAGE: ${{ inputs.FRAMEWORK_USAGE }}
+          RESULTS_BUCKET: ${{ inputs.RESULTS_BUCKET }}
         run: |
           if [ -n "$START_VERSION" ] && [ -n "$START_TIME" ]; then
             echo "::error::START_VERSION and START_TIME are mutually exclusive. Please specify only one."
@@ -86,6 +114,16 @@ jobs:
           if [ -n "$END_VERSION" ] && [ -n "$END_TIME" ]; then
             echo "::error::END_VERSION and END_TIME are mutually exclusive. Please specify only one."
             exit 1
+          fi
+          if [ "$FRAMEWORK_USAGE" = "true" ]; then
+            if [ -z "$START_VERSION" ] && [ -z "$START_TIME" ]; then
+              echo "::error::A START_VERSION or START_TIME is required for framework usage collection."
+              exit 1
+            fi
+            if [ -z "$END_VERSION" ] && [ -z "$END_TIME" ]; then
+              echo "::error::An END_VERSION or END_TIME is required for framework usage collection."
+              exit 1
+            fi
           fi
 
   build-images:
@@ -113,9 +151,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
-          # get the last 10 commits to find images that have been built
+          # Match forge.find_recent_images' 100-commit search window.
           # we can optionally use the IMAGE_TAG to find the exact commit to checkout
-          fetch-depth: 10
+          fetch-depth: 100
 
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         id: docker-setup
@@ -167,6 +205,8 @@ jobs:
           START_TIME: ${{ inputs.START_TIME }}
           END_TIME: ${{ inputs.END_TIME }}
           IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
+          FRAMEWORK_USAGE: ${{ inputs.FRAMEWORK_USAGE }}
+          RESULTS_BUCKET: ${{ inputs.RESULTS_BUCKET }}
         run: |
           cd testsuite/replay-verify
           ARGS=(--network "$NETWORK")
@@ -185,9 +225,74 @@ jobs:
           if [ -n "$IMAGE_TAG" ]; then
             ARGS+=(--image_tag "$IMAGE_TAG")
           fi
+          if [ "$FRAMEWORK_USAGE" = "true" ]; then
+            ARGS+=(--framework-usage-output-dir ../../framework-usage-results)
+            if [ -n "$RESULTS_BUCKET" ]; then
+              ARGS+=(--framework-usage-bucket "$RESULTS_BUCKET")
+            fi
+          fi
           ARGS+=(--image_profile performance)
           poetry run python main.py "${ARGS[@]}"
         timeout-minutes: 420 # 7 hours
+
+      - name: Upload framework usage report
+        if: ${{ inputs.DRY_RUN == false && inputs.FRAMEWORK_USAGE }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # pin@v4.6.2
+        with:
+          name: framework-usage-${{ inputs.NETWORK }}-${{ github.run_id }}
+          path: framework-usage-results/
+          if-no-files-found: error
+
+      - name: Publish framework usage reports
+        if: ${{ inputs.DRY_RUN == false && inputs.FRAMEWORK_USAGE && inputs.REPORT_BUCKET != '' }}
+        env:
+          NETWORK: ${{ inputs.NETWORK }}
+          REPORT_BUCKET: ${{ inputs.REPORT_BUCKET }}
+        run: |
+          REPORT_JSON="framework-usage-results/framework-usage.json"
+          REPORT_HTML="framework-usage-results/framework-usage.html"
+          REPORT_PREFIX="framework-usage/${NETWORK}/runs/${GITHUB_RUN_ID}/attempt-${GITHUB_RUN_ATTEMPT}"
+          HTML_OBJECT_PATH="${REPORT_PREFIX}/index.html"
+          JSON_OBJECT_PATH="${REPORT_PREFIX}/framework-usage.json"
+          HTML_REPORT_URL="https://storage.googleapis.com/${REPORT_BUCKET}/${HTML_OBJECT_PATH}"
+          JSON_REPORT_URL="https://storage.googleapis.com/${REPORT_BUCKET}/${JSON_OBJECT_PATH}"
+
+          gcloud storage cp "$REPORT_HTML" "gs://${REPORT_BUCKET}/${HTML_OBJECT_PATH}" \
+            --content-type="text/html; charset=utf-8" \
+            --content-disposition=inline \
+            --cache-control="public,max-age=31536000,immutable"
+          gcloud storage cp "$REPORT_JSON" "gs://${REPORT_BUCKET}/${JSON_OBJECT_PATH}" \
+            --content-type="application/json" \
+            --content-disposition=inline \
+            --cache-control="public,max-age=31536000,immutable"
+
+          START_VERSION="$(jq -r '.start_version' "$REPORT_JSON")"
+          END_VERSION="$(jq -r '.end_version' "$REPORT_JSON")"
+          TRANSACTION_COUNT="$(jq -r '.processed_transaction_count' "$REPORT_JSON")"
+          START_TIMESTAMP_USECS="$(jq -r '.start_timestamp_usecs' "$REPORT_JSON")"
+          END_TIMESTAMP_USECS="$(jq -r '.end_timestamp_usecs' "$REPORT_JSON")"
+          START_TIMESTAMP="$(date --utc --date="@$((START_TIMESTAMP_USECS / 1000000))" '+%Y-%m-%d %H:%M:%S UTC')"
+          END_TIMESTAMP="$(date --utc --date="@$((END_TIMESTAMP_USECS / 1000000))" '+%Y-%m-%d %H:%M:%S UTC')"
+
+          {
+            echo "## Framework function usage report"
+            echo
+            echo "### Reports"
+            echo
+            echo "- [Open interactive HTML report](${HTML_REPORT_URL})"
+            echo "- [Open merged JSON report](${JSON_REPORT_URL})"
+            echo
+            echo "| Property | Value |"
+            echo "| --- | --- |"
+            echo "| Network | ${NETWORK} |"
+            echo "| Ledger versions | ${START_VERSION}&ndash;${END_VERSION} |"
+            echo "| UTC range | ${START_TIMESTAMP}&ndash;${END_TIMESTAMP} |"
+            echo "| Transactions processed | ${TRANSACTION_COUNT} |"
+            echo "| Run attempt | ${GITHUB_RUN_ATTEMPT} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "::notice title=Framework function usage report::HTML: ${HTML_REPORT_URL} | JSON: ${JSON_REPORT_URL}"
+
       # This is in case user manually cancel the step above, we still want to cleanup the resources
       - name: Post-run cleanup
         env:

@@ -144,7 +144,10 @@ async fn test_apply_outputs_error() {
 
     // Verify we get an error notification and that there's no pending data
     verify_error_notification(&mut error_listener, notification_id).await;
+    assert!(storage_synchronizer.pending_storage_data_error());
     verify_no_pending_data(&storage_synchronizer);
+    storage_synchronizer.acknowledge_storage_data_error();
+    assert!(!storage_synchronizer.pending_storage_data_error());
 }
 
 #[tokio::test(flavor = "multi_thread")]
