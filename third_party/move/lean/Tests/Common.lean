@@ -2,8 +2,8 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import Lean
-import Move.IR.Interp
-import Move.Frontend.Repr
+import MoveModel.IR.Interp.Exec
+import MoveModel.Frontend.XIR
 
 /-!
 # Test Infrastructure
@@ -27,7 +27,7 @@ Expected interpreter outcomes are written with the helper constructors
 
 namespace Tests
 
-open Move.IR
+open MoveModel.IR
 
 /-! ## Expected-outcome constructors -/
 
@@ -69,7 +69,7 @@ def abortedIn (mem : IMem) (code : Nat) : Outcome := .ok (.abort mem code)
 
 /-- Runs a function of a dumped module by name, with the suite's standard
 fuel.  Test files partially apply this to their module. -/
-def run (m : Move.Frontend.MProgram) (f : String) (mem : IMem)
+def run (m : MoveModel.Frontend.XIR.MProgram) (f : String) (mem : IMem)
     (args : List Value) : Outcome :=
   interpFun m.toProgram 1000 (m.funId f) mem args
 
@@ -87,6 +87,7 @@ private partial def valueStr : Value → String
   | .bool b => s!".bool {b}"
   | .address a => s!".address {a}"
   | .struct fs => ".struct [" ++ ", ".intercalate (fs.map valueStr) ++ "]"
+  | .variant tag fs => s!".variant {tag} [" ++ ", ".intercalate (fs.map valueStr) ++ "]"
   | .vector es => ".vector [" ++ ", ".intercalate (es.map valueStr) ++ "]"
   | .ref t => s!".ref ({reprStr t})"
   | .mut t v => s!".mut ({reprStr t}) ({valueStr v})"
@@ -96,7 +97,7 @@ private def valsStr (vs : List Value) : String :=
 
 private def memStr (m : IMem) : String :=
   "[" ++ ", ".intercalate
-    (m.map fun (r, a, v) => s!"({r}, {a}, {valueStr v})") ++ "]"
+    (m.map fun (r, a, v) => s!"({reprStr r}, {a}, {valueStr v})") ++ "]"
 
 instance : TestShow Outcome where
   render

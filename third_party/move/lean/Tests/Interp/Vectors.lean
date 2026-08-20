@@ -2,7 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import Tests.Common
-import Move.IR.Interp
+import MoveModel.IR.Interp.Exec
 
 /-!
 # Interpreter Tests: Vectors
@@ -16,7 +16,7 @@ there is no `move%` authoring path for these operations.
 
 namespace Tests.Interp.Vectors
 
-open Move.IR
+open MoveModel.IR
 
 /-- A one-block function: parameters are the prefix of `locals`, the block
 runs `instrs` and returns the locals `rets`. -/

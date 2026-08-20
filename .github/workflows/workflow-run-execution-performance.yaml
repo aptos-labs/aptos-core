@@ -116,6 +116,9 @@ jobs:
       run_execution_performance_test: ${{ steps.determine_test_targets.outputs.run_execution_performance_test }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.GIT_SHA }}
+          fetch-depth: 0
       - name: Run the test target determinator
         id: determine_test_targets
         uses: ./.github/actions/test-target-determinator

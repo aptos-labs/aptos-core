@@ -1038,11 +1038,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
         self.push_proof_action(loc.clone(), ProofAction::Assume(guarded));
     }
 
-    /// Returns the temp holding the old-state snapshot of the given
-    /// parameter, creating one on first use. Snapshots are scoped by the
-    /// current anchor: within a `WithStateAnchor` region the snapshot is
-    /// taken at the anchor's marker, outside at function entry, so the same
-    /// parameter gets distinct snapshot temps per scope.
+    /// Returns the temporary's old-state snapshot in the current anchor scope.
     fn save_param(&mut self, idx: TempIndex) -> TempIndex {
         let saved_opt = match self.current_anchor {
             None => self.result.saved_params.get(&idx),
@@ -1271,7 +1267,11 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                 // the evaluator at the old state.
                 let is_behavior =
                     matches!(arg.as_ref(), ExpData::Call(_, Operation::Behavior(..), _));
-                if arg.is_pure(self.builder.global_env()) && !is_behavior {
+                // Internal anchors may snapshot otherwise-pure owned locals.
+                if self.current_anchor.is_none()
+                    && arg.is_pure(self.builder.global_env())
+                    && !is_behavior
+                {
                     let loc = self.builder.global_env().get_node_loc(*id);
                     // Compute labels for any sub-expressions which are included into this
                     // expression via substitution (from schema inclusion, for example). This

@@ -6,7 +6,7 @@
 use crate::{
     config::VMConfig,
     data_cache::MoveVmDataCache,
-    execution_tracing::TraceRecorder,
+    execution_tracing::{FunctionCallKind, TraceRecorder},
     frame::Frame,
     frame_type_cache::{FrameTypeCache, PerInstructionCache},
     interpreter_caches::InterpreterFunctionCaches,
@@ -376,6 +376,11 @@ where
         )
         .map_err(|err| self.set_location(err))?;
 
+        trace_recorder.record_function_call(
+            None,
+            current_frame.function.as_ref(),
+            FunctionCallKind::Entrypoint,
+        );
         trace_recorder.record_entrypoint(current_frame.function.as_ref());
         loop {
             let exit_code = current_frame
@@ -511,6 +516,11 @@ where
                         .map_err(|e| set_err_info!(current_frame, e))?;
 
                     if function.is_native() {
+                        trace_recorder.record_function_call(
+                            Some(current_frame.function.as_ref()),
+                            function.as_ref(),
+                            FunctionCallKind::Call,
+                        );
                         let dispatched = self.call_native::<RTTCheck, RTRCheck>(
                             &mut current_frame,
                             data_cache,
@@ -524,11 +534,17 @@ where
                         )?;
                         trace_recorder.record_successful_instruction(&Instruction::Call(fh_idx));
                         if dispatched {
+                            trace_recorder.record_function_call(
+                                Some(function.as_ref()),
+                                current_frame.function.as_ref(),
+                                FunctionCallKind::NativeDynamicDispatch,
+                            );
                             trace_recorder.record_entrypoint(&current_frame.function)
                         }
                         continue;
                     }
 
+                    let caller = Rc::clone(&current_frame.function);
                     self.set_new_call_frame::<RTTCheck, RTRCheck>(
                         &mut current_frame,
                         gas_meter,
@@ -539,6 +555,11 @@ where
                         ClosureMask::empty(),
                         vec![],
                     )?;
+                    trace_recorder.record_function_call(
+                        Some(caller.as_ref()),
+                        current_frame.function.as_ref(),
+                        FunctionCallKind::Call,
+                    );
                     trace_recorder.record_successful_instruction(&Instruction::Call(fh_idx));
                 },
                 ExitCode::CallGeneric(idx) => {
@@ -633,6 +654,11 @@ where
                         .map_err(|e| set_err_info!(current_frame, e))?;
 
                     if function.is_native() {
+                        trace_recorder.record_function_call(
+                            Some(current_frame.function.as_ref()),
+                            function.as_ref(),
+                            FunctionCallKind::CallGeneric,
+                        );
                         let dispatched = self.call_native::<RTTCheck, RTRCheck>(
                             &mut current_frame,
                             data_cache,
@@ -647,11 +673,17 @@ where
                         trace_recorder
                             .record_successful_instruction(&Instruction::CallGeneric(idx));
                         if dispatched {
+                            trace_recorder.record_function_call(
+                                Some(function.as_ref()),
+                                current_frame.function.as_ref(),
+                                FunctionCallKind::NativeDynamicDispatch,
+                            );
                             trace_recorder.record_entrypoint(&current_frame.function)
                         }
                         continue;
                     }
 
+                    let caller = Rc::clone(&current_frame.function);
                     self.set_new_call_frame::<RTTCheck, RTRCheck>(
                         &mut current_frame,
                         gas_meter,
@@ -662,6 +694,11 @@ where
                         ClosureMask::empty(),
                         vec![],
                     )?;
+                    trace_recorder.record_function_call(
+                        Some(caller.as_ref()),
+                        current_frame.function.as_ref(),
+                        FunctionCallKind::CallGeneric,
+                    );
                     trace_recorder.record_successful_instruction(&Instruction::CallGeneric(idx));
                 },
                 ExitCode::CallClosure(sig_idx) => {
@@ -769,6 +806,11 @@ where
 
                     // Call function
                     if callee.is_native() {
+                        trace_recorder.record_function_call(
+                            Some(current_frame.function.as_ref()),
+                            callee.as_ref(),
+                            FunctionCallKind::CallClosure,
+                        );
                         let dispatched = self.call_native::<RTTCheck, RTRCheck>(
                             &mut current_frame,
                             data_cache,
@@ -787,9 +829,15 @@ where
                             .record_successful_instruction(&Instruction::CallClosure(sig_idx));
                         trace_recorder.record_call_closure(&callee, mask);
                         if dispatched {
+                            trace_recorder.record_function_call(
+                                Some(callee.as_ref()),
+                                current_frame.function.as_ref(),
+                                FunctionCallKind::NativeDynamicDispatch,
+                            );
                             trace_recorder.record_entrypoint(&current_frame.function)
                         }
                     } else {
+                        let caller = Rc::clone(&current_frame.function);
                         let frame_cache = if self.vm_config.enable_function_caches {
                             function_caches.get_or_create_frame_cache(&callee)
                         } else {
@@ -805,6 +853,11 @@ where
                             mask,
                             captured_vec,
                         )?;
+                        trace_recorder.record_function_call(
+                            Some(caller.as_ref()),
+                            current_frame.function.as_ref(),
+                            FunctionCallKind::CallClosure,
+                        );
                         trace_recorder
                             .record_successful_instruction(&Instruction::CallClosure(sig_idx));
                         trace_recorder.record_call_closure(current_frame.function.as_ref(), mask);

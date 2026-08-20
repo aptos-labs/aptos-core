@@ -121,19 +121,19 @@ error: `aborts_of` cannot constrain a lambda which writes the captured variable(
     │         │                  lambda argument
     │         from a call inlined at this callsite
 
-error: cannot resolve `unchanged_of` for this lambda argument: the memory footprint of the lambda's body cannot be determined exactly
+warning: the memory footprint of this lambda argument cannot be determined exactly; weakening `unchanged_of` condition; see https://github.com/aptos-labs/aptos-core/issues/20371
     ┌─ tests/sources/functional/closures/inline/bp_inline_errors.move:189:41
     │
 189 │             invariant forall j in i..n: unchanged_of<f>(v[j]);
     │                                         ^^^^^^^^^^^^^^^^^^^^^
     ·
-196 │         each_unchanged(v, |a| bump(a)); // error: the memory footprint of the lambda's body cannot be determined exactly
+196 │         each_unchanged(v, |a| bump(a)); // warning: unchanged_of weakened
     │         ------------------------------
     │         │                 │
     │         │                 lambda argument
     │         from a call inlined at this callsite
 
-error: a lambda with multiple dependent global state effects cannot be constrained in a loop invariant: intermediate memory states are not expressible
+warning: the behavior of this lambda argument cannot be determined exactly; weakening loop invariant containing `ensures_of`; see https://github.com/aptos-labs/aptos-core/issues/20371
     ┌─ tests/sources/functional/closures/inline/bp_inline_errors.move:207:41
     │
 207 │                 invariant forall j in 0..i: ensures_of<f>(v[j]);
@@ -141,22 +141,73 @@ error: a lambda with multiple dependent global state effects cannot be constrain
     ·
 214 │ ╭           each_ensures(v, |a| {
     │ │ ╭─────────────────────────'
-215 │ │ │             let r = &mut R[a];
-216 │ │ │             r.v = r.v + 1;
-217 │ │ │             let t = &mut T[a];
-218 │ │ │             t.w = t.w + 1;
-219 │ │ │         }); // error: intermediate memory states are not expressible in a loop invariant
+215 │ │ │             let i = 0;
+216 │ │ │             while (i < 1) {
+217 │ │ │                 i = i + 1;
+218 │ │ │             };
+219 │ │ │             let _ = a;
+220 │ │ │         }); // warning: underivable ensures_of loop invariant weakened
+    │ ╰─│──────────' from a call inlined at this callsite
+    │   ╰─────────' lambda argument
+
+warning: cannot derive `ensures_of` exactly for this lambda argument: a lambda with multiple dependent global state effects cannot be constrained in a loop invariant: intermediate memory states are not expressible; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ tests/sources/functional/closures/inline/bp_inline_errors.move:207:41
+    │
+207 │                 invariant forall j in 0..i: ensures_of<f>(v[j]);
+    │                                             ^^^^^^^^^^^^^^^^^^^
+    ·
+226 │ ╭           each_ensures(v, |a| {
+    │ │ ╭─────────────────────────'
+227 │ │ │             let r = &mut R[a];
+228 │ │ │             r.v = r.v + 1;
+229 │ │ │             let t = &mut T[a];
+230 │ │ │             t.w = t.w + 1;
+231 │ │ │         }); // warning: intermediate-state ensures_of invariant weakened
     │ ╰─│──────────' from a call inlined at this callsite
     │   ╰─────────' lambda argument
 
 error: a lambda with global state effects cannot be constrained in the body of a spec function
-    ┌─ tests/sources/functional/closures/inline/bp_inline_errors.move:226:9
+    ┌─ tests/sources/functional/closures/inline/bp_inline_errors.move:238:9
     │
-226 │           ensures_of<f>(a)
+238 │           ensures_of<f>(a)
     │           ^^^^^^^^^^^^^^^^
     ·
-237 │           apply_addr(|x| {
+249 │           apply_addr(|x| {
     │ ╭────────────────────'
-238 │ │             let R { v: _ } = move_from<R>(x);
-239 │ │         }, a); // error: a lambda with global state effects cannot be constrained in the body of a spec function
+250 │ │             let R { v: _ } = move_from<R>(x);
+251 │ │         }, a); // error: a lambda with global state effects cannot be constrained in the body of a spec function
     │ ╰─────────' lambda argument
+
+error: cannot resolve `result_of` for this lambda argument: add a spec block to the lambda (e.g. `|x| .. spec { aborts_if ..; ensures ..; }`)
+    ┌─ tests/sources/functional/closures/inline/bp_inline_errors.move:266:42
+    │
+266 │                 invariant forall j in 0..i: !result_of<p>(v[j]);
+    │                                              ^^^^^^^^^^^^^^^^^^
+    ·
+279 │ ╭           any(v, |e| {
+    │ │ ╭────────────────'
+280 │ │ │             let i = 0;
+281 │ │ │             while (i < *e) {
+282 │ │ │                 i = i + 1;
+283 │ │ │             };
+284 │ │ │             i == 0
+285 │ │ │         }) // error: cannot resolve `result_of`, lambda needs a spec block
+    │ ╰─│──────────' from a call inlined at this callsite
+    │   ╰─────────' lambda argument
+
+error: cannot resolve `result_of` for this lambda argument: add a spec block to the lambda (e.g. `|x| .. spec { aborts_if ..; ensures ..; }`)
+    ┌─ tests/sources/functional/closures/inline/bp_inline_errors.move:269:56
+    │
+269 │                 assert result <==> (exists j in 0..len(v): result_of<p>(v[j]));
+    │                                                            ^^^^^^^^^^^^^^^^^^
+    ·
+279 │ ╭           any(v, |e| {
+    │ │ ╭────────────────'
+280 │ │ │             let i = 0;
+281 │ │ │             while (i < *e) {
+282 │ │ │                 i = i + 1;
+283 │ │ │             };
+284 │ │ │             i == 0
+285 │ │ │         }) // error: cannot resolve `result_of`, lambda needs a spec block
+    │ ╰─│──────────' from a call inlined at this callsite
+    │   ╰─────────' lambda argument

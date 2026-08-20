@@ -38,8 +38,8 @@ module 0x42::specialize_forward_bodyless {
                 let n: u64 = vector::length<u64>(v);
                 loop {
                   if spec {
-                    invariant Le(i, n);
-                    invariant Eq<u64>(acc, specialize_forward_bodyless::spec_fold(closure#0specialize_forward_bodyless::__lambda__1__sum(), v, init, i));
+                    invariant true;
+                    invariant true;
                   }
                   ;
                   Lt<u64>(i, n) {
@@ -73,8 +73,8 @@ module 0x42::specialize_forward_bodyless {
                 let n: u64 = vector::length<u64>(v);
                 loop {
                   if spec {
-                    invariant Le(i, n);
-                    invariant Eq<u64>(acc, specialize_forward_bodyless::spec_fold(closure#0specialize_forward_bodyless::__lambda__1__sum_again(), v, init, i));
+                    invariant true;
+                    invariant true;
                   }
                   ;
                   Lt<u64>(i, n) {
@@ -97,23 +97,11 @@ module 0x42::specialize_forward_bodyless {
     spec {
     }
 
-    private fun __lambda__1__sum(acc: u64,e: u64): u64 {
-        Add<u64>(acc, e)
-    }
-    private fun __lambda__1__sum_again(acc: u64,e: u64): u64 {
-        Add<u64>(acc, e)
-    }
     spec fun opaque_fold(f: |u64, u64|u64,v: vector<u64>,init: u64,end: u64): u64;
     spec fun spec_fold(f: |u64, u64|u64,v: vector<u64>,init: u64,end: u64): u64 {
         specialize_forward_bodyless::opaque_fold(f, v, init, end)
     }
     spec fun spec_fold$lambda$0(v: vector<u64>,init: u64,end: u64): u64;
-    spec fun $__lambda__1__sum(acc: u64,e: u64): u64 {
-        Add<u64>(acc, e)
-    }
-    spec fun $__lambda__1__sum_again(acc: u64,e: u64): u64 {
-        Add<u64>(acc, e)
-    }
 } // end 0x42::specialize_forward_bodyless
 
 // -- Sourcified model before first bytecode pipeline
@@ -144,8 +132,8 @@ module 0x42::specialize_forward_bodyless {
             };
             i = i + 1;
         } spec {
-            invariant i <= n;
-            invariant acc == spec_fold(|x,y| lambda__1__sum(x, y), v, init, i);
+            invariant true;
+            invariant true;
         };
         acc
     }
@@ -166,8 +154,8 @@ module 0x42::specialize_forward_bodyless {
             };
             i = i + 1;
         } spec {
-            invariant i <= n;
-            invariant acc == spec_fold(|x,y| lambda__1__sum_again(x, y), v, init, i);
+            invariant true;
+            invariant true;
         };
         acc
     }
@@ -176,12 +164,6 @@ module 0x42::specialize_forward_bodyless {
         pragma aborts_if_is_partial = true;
     }
 
-    fun lambda__1__sum(acc: u64, e: u64): u64 {
-        acc + e
-    }
-    fun lambda__1__sum_again(acc: u64, e: u64): u64 {
-        acc + e
-    }
 }
 
 // -- Model dump before second bytecode pipeline
@@ -224,8 +206,8 @@ module 0x42::specialize_forward_bodyless {
                 let n: u64 = vector::length<u64>(v);
                 loop {
                   if spec {
-                    invariant Le(i, n);
-                    invariant Eq<u64>(acc, specialize_forward_bodyless::spec_fold(closure#0specialize_forward_bodyless::__lambda__1__sum(), v, 0, i));
+                    invariant true;
+                    invariant true;
                   }
                   ;
                   Lt<u64>(i, n) {
@@ -259,8 +241,8 @@ module 0x42::specialize_forward_bodyless {
                 let n: u64 = vector::length<u64>(v);
                 loop {
                   if spec {
-                    invariant Le(i, n);
-                    invariant Eq<u64>(acc, specialize_forward_bodyless::spec_fold(closure#0specialize_forward_bodyless::__lambda__1__sum_again(), v, 0, i));
+                    invariant true;
+                    invariant true;
                   }
                   ;
                   Lt<u64>(i, n) {
@@ -283,23 +265,11 @@ module 0x42::specialize_forward_bodyless {
     spec {
     }
 
-    private fun __lambda__1__sum(acc: u64,e: u64): u64 {
-        Add<u64>(acc, e)
-    }
-    private fun __lambda__1__sum_again(acc: u64,e: u64): u64 {
-        Add<u64>(acc, e)
-    }
     spec fun opaque_fold(f: |u64, u64|u64,v: vector<u64>,init: u64,end: u64): u64;
     spec fun spec_fold(f: |u64, u64|u64,v: vector<u64>,init: u64,end: u64): u64 {
         specialize_forward_bodyless::opaque_fold(f, v, init, end)
     }
     spec fun spec_fold$lambda$0(v: vector<u64>,init: u64,end: u64): u64;
-    spec fun $__lambda__1__sum(acc: u64,e: u64): u64 {
-        Add<u64>(acc, e)
-    }
-    spec fun $__lambda__1__sum_again(acc: u64,e: u64): u64 {
-        Add<u64>(acc, e)
-    }
 } // end 0x42::specialize_forward_bodyless
 
 
@@ -308,104 +278,84 @@ module 0x42::specialize_forward_bodyless {
 module 0x42::specialize_forward_bodyless
 // Function definition at index 0
 fun sum(l0: &vector<u64>): u64
-    local l1: &vector<u64>
+    local l1: u64
     local l2: u64
     local l3: u64
     local l4: u64
     local l5: u64
-    local l6: u64
-    move_loc l0
+    ld_u64 0
     st_loc l1
     ld_u64 0
     st_loc l2
-    ld_u64 0
+    copy_loc l0
     // @5
-    st_loc l3
-    copy_loc l1
     vec_len <u64>
-    st_loc l4
+    st_loc l3
 l1: nop
-    // @10
+    copy_loc l2
     copy_loc l3
-    copy_loc l4
+    // @10
     lt
     br_false l0
-    move_loc l2
+    move_loc l1
+    copy_loc l0
+    copy_loc l2
     // @15
-    copy_loc l1
-    copy_loc l3
     vec_borrow <u64>
     read_ref
     add
+    st_loc l1
+    move_loc l2
     // @20
-    st_loc l2
-    move_loc l3
     ld_u64 1
     add
-    st_loc l3
-    // @25
+    st_loc l2
     branch l1
-l0: move_loc l1
+l0: move_loc l0
+    // @25
     pop
-    move_loc l2
+    move_loc l1
     ret
 
 // Function definition at index 1
 fun sum_again(l0: &vector<u64>): u64
-    local l1: &vector<u64>
+    local l1: u64
     local l2: u64
     local l3: u64
     local l4: u64
     local l5: u64
-    local l6: u64
-    move_loc l0
+    ld_u64 0
     st_loc l1
     ld_u64 0
     st_loc l2
-    ld_u64 0
+    copy_loc l0
     // @5
-    st_loc l3
-    copy_loc l1
     vec_len <u64>
-    st_loc l4
+    st_loc l3
 l1: nop
-    // @10
+    copy_loc l2
     copy_loc l3
-    copy_loc l4
+    // @10
     lt
     br_false l0
-    move_loc l2
+    move_loc l1
+    copy_loc l0
+    copy_loc l2
     // @15
-    copy_loc l1
-    copy_loc l3
     vec_borrow <u64>
     read_ref
     add
+    st_loc l1
+    move_loc l2
     // @20
-    st_loc l2
-    move_loc l3
     ld_u64 1
     add
-    st_loc l3
-    // @25
+    st_loc l2
     branch l1
-l0: move_loc l1
+l0: move_loc l0
+    // @25
     pop
-    move_loc l2
-    ret
-
-// Function definition at index 2
-fun __lambda__1__sum(l0: u64, l1: u64): u64
-    move_loc l0
     move_loc l1
-    add
-    ret
-
-// Function definition at index 3
-fun __lambda__1__sum_again(l0: u64, l1: u64): u64
-    move_loc l0
-    move_loc l1
-    add
     ret
 
 

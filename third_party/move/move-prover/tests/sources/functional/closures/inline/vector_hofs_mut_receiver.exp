@@ -12,7 +12,7 @@ error: post-condition does not hold
     =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:95: bump_field_wrong
     =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:11: for_each_mut
     =         v = <redacted>
-    =         <redacted> = <redacted>
+    =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:103: bump_field_wrong (spec)
     =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:12: for_each_mut
     =         i = <redacted>
     =     at tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:13: for_each_mut

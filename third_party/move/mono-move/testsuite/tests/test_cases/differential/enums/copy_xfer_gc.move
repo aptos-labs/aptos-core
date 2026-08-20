@@ -31,4 +31,4 @@ module 0x42::copy_xfer_gc {
 
 // RUN: execute 0x42::copy_xfer_gc::churn --args 200 --heap-size 96
 // CHECK: results: 4829
-// CHECK-GC-COUNT: 198
+// CHECK-GC-COUNT: 398

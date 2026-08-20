@@ -51,14 +51,23 @@
 //! `aborts_if` list the prover's partial semantics (no claim); version 5
 //! adds vectors (the `vector` type, the `vec_*` value operations, the
 //! `borrow_vec_elem` reference operation, and the spec-level
-//! `len`/`index`).
+//! `len`/`index`); version 6 adds enum declarations and the
+//! `pack_variant`/`unpack_variant`/`test_variant` operations and vector
+//! load constants; version 7 preserves declaration type parameters, ability
+//! constraints, phantom markers, instantiated user types, and operation type
+//! arguments.
 
 pub mod check;
 
 use serde::{Deserialize, Serialize};
 
 /// The current version of the exchange format.
-pub const FORMAT_VERSION: u64 = 5;
+pub const FORMAT_VERSION: u64 = 7;
+
+/// Schema identifier for a finite, deployable XIR module.
+pub const XIR_SCHEMA: &str = "move-xir-module";
+/// Current version of the deployable XIR module wrapper.
+pub const XIR_VERSION: u64 = 2;
 
 /// Index of a local of a function (a `LocalIndex` in move-model terms).
 /// Parameters come first.
@@ -116,6 +125,87 @@ impl Module {
         pretty_json(&Measured::of(&value), 0, &mut out);
         out
     }
+}
+
+/// A finite XIR module suitable for loading into compiler-v2.
+///
+/// Its declaration bodies reuse the exchange format below, while this wrapper
+/// supplies the deployment and file-format metadata absent from [`Module`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct XirModule {
+    pub schema: String,
+    pub version: u64,
+    pub module: XirModuleMetadata,
+    pub structs: Vec<XirStruct>,
+    pub functions: Vec<XirFunction>,
+}
+
+impl XirModule {
+    /// Checks the deployable wrapper's schema and version.
+    pub fn check_version(&self) -> Result<(), String> {
+        if self.schema != XIR_SCHEMA {
+            return Err(format!("unsupported XIR schema `{}`", self.schema));
+        }
+        if self.version != XIR_VERSION {
+            return Err(format!("unsupported XIR version {}", self.version));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct XirModuleMetadata {
+    pub address: String,
+    pub name: String,
+    pub dialect: XirDialect,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum XirDialect {
+    Stackless,
+    ReferenceEliminated,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct XirStruct {
+    pub name: String,
+    #[serde(default)]
+    pub abilities: Vec<String>,
+    #[serde(default)]
+    pub type_parameters: Vec<TypeParameter>,
+    pub fields: Vec<Field>,
+    #[serde(default)]
+    pub variants: Option<Vec<Variant>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct XirFunction {
+    pub name: String,
+    #[serde(default)]
+    pub type_parameters: Vec<TypeParameter>,
+    pub visibility: XirVisibility,
+    pub is_entry: bool,
+    pub acquires: Vec<ResourceId>,
+    pub params: usize,
+    pub locals: Vec<Type>,
+    pub returns: Vec<Type>,
+    pub blocks: Vec<Block>,
+    pub entry: BlockId,
+    pub loops: Vec<Loop>,
+    pub spec: Contract,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum XirVisibility {
+    Private,
+    Public,
+    Friend,
 }
 
 /// Line width for [`Module::to_pretty_json`]'s inlining decision.
@@ -255,8 +345,16 @@ pub enum Type {
     Address,
     /// `"signer"` — signer values are addresses.
     Signer,
+    /// `{\"type_parameter\": index}` — a declaration-scoped type parameter.
+    TypeParameter(usize),
     /// `{"struct": resource}`
     Struct(ResourceId),
+    /// `{\"struct_inst\": [resource, [type arguments]]}`.
+    StructInst(ResourceId, Vec<Type>),
+    /// `{"enum": resource}`
+    Enum(ResourceId),
+    /// `{\"enum_inst\": [resource, [type arguments]]}`.
+    EnumInst(ResourceId, Vec<Type>),
     /// `{"vector": type}` — a vector with the given element type.
     Vector(Box<Type>),
     /// `{"ref": type}` — immutable reference.  Transported for
@@ -264,6 +362,16 @@ pub enum Type {
     Ref(Box<Type>),
     /// `{"mut_ref": type}` — mutable reference.
     MutRef(Box<Type>),
+}
+
+/// A declaration-scoped Move type parameter.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TypeParameter {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub abilities: Vec<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub phantom: bool,
 }
 
 /// A struct field: name (documentation; consumers address fields by their
@@ -279,7 +387,20 @@ pub struct Field {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Struct {
     pub name: String,
-    /// Fields in offset order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub type_parameters: Vec<TypeParameter>,
+    /// Fields in offset order. Empty for an enum.
+    pub fields: Vec<Field>,
+    /// Variants in declaration order. `None` distinguishes an ordinary
+    /// struct from an enum, including an enum whose variants have no fields.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub variants: Option<Vec<Variant>>,
+}
+
+/// One enum variant and its fields, both in source declaration order.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Variant {
+    pub name: String,
     pub fields: Vec<Field>,
 }
 
@@ -288,6 +409,8 @@ pub struct Struct {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Function {
     pub name: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub type_parameters: Vec<TypeParameter>,
     /// Number of parameters; locals `0..params` are the parameters.
     pub params: usize,
     /// Declared types of *all* locals: parameters first, then the remaining
@@ -345,10 +468,23 @@ pub enum Oper {
     Not,
     /// `"pack"` — build a struct value from field operands.
     Pack,
+    /// `{\"pack_inst\": [type arguments]}`.
+    PackInst(Vec<Type>),
     /// `"unpack"` — decompose a struct value into its fields.
     Unpack,
+    UnpackInst(Vec<Type>),
+    /// `{"pack_variant": variant}` — build an enum variant value.
+    PackVariant(usize),
+    PackVariantInst(usize, Vec<Type>),
+    /// `{"unpack_variant": variant}` — decompose the selected enum variant.
+    UnpackVariant(usize),
+    UnpackVariantInst(usize, Vec<Type>),
+    /// `{"test_variant": variant}` — test an enum value's tag.
+    TestVariant(usize),
+    TestVariantInst(usize, Vec<Type>),
     /// `{"get_field": offset}` — select a field of a struct value.
     GetField(FieldOffset),
+    GetFieldInst(FieldOffset, Vec<Type>),
     /// `{"update_field": offset}` — functionally replace a field of a
     /// struct value.  Not emitted by the current producers; it is the
     /// residue of reference elimination (write through a field borrow).
@@ -373,26 +509,33 @@ pub enum Oper {
     VecPop,
     /// `{"get_global": resource}` — read a resource from global memory.
     GetGlobal(ResourceId),
+    GetGlobalInst(ResourceId, Vec<Type>),
     /// `{"write_global": resource}` — overwrite a resource in global
     /// memory.  Not emitted by the current producers; it is the residue of
     /// reference elimination (`borrow_global` + write-back).
     WriteGlobal(ResourceId),
     /// `{"move_to": resource}` — publish a resource (signer, value).
     MoveTo(ResourceId),
+    MoveToInst(ResourceId, Vec<Type>),
     /// `{"move_from": resource}` — remove and return a resource.
     MoveFrom(ResourceId),
+    MoveFromInst(ResourceId, Vec<Type>),
     /// `{"exists": resource}` — test resource existence.
     Exists(ResourceId),
+    ExistsInst(ResourceId, Vec<Type>),
     /// `{"function": fun}` — call a function of the same module.
     Function(FunId),
+    FunctionInst(FunId, Vec<Type>),
     /// The reference operations below are transported for completeness;
     /// consumers may reject them (the Lean model executes them; verifying
     /// borrow-based code goes through its reference elimination).
     BorrowLoc,
     /// `{"borrow_field": offset}`
     BorrowField(FieldOffset),
+    BorrowFieldInst(FieldOffset, Vec<Type>),
     /// `{"borrow_global": resource}`
     BorrowGlobal(ResourceId),
+    BorrowGlobalInst(ResourceId, Vec<Type>),
     /// `"borrow_vec_elem"` — borrow the element at a dynamic index
     /// (reference to a vector, index).
     BorrowVecElem,
@@ -426,6 +569,8 @@ pub enum Value {
     U64(#[serde(with = "u64_as_string")] u64),
     /// `{"address": "0x42"}` — `0x`-prefixed hex literal.
     Address(String),
+    /// `{"vector": [values...]}` — a recursively encoded vector constant.
+    Vector(Vec<Value>),
 }
 
 /// A specification expression.  Quantifiers bind a single variable,
@@ -588,13 +733,16 @@ mod tests {
         Module::new(
             vec![Struct {
                 name: "Account".to_string(),
+                type_parameters: vec![],
                 fields: vec![Field {
                     name: "balance".to_string(),
                     ty: Type::U64,
                 }],
+                variants: None,
             }],
             vec![Function {
                 name: "f".to_string(),
+                type_parameters: vec![],
                 params: 1,
                 locals: vec![
                     Type::Ref(Box::new(Type::Signer)),
@@ -742,7 +890,7 @@ mod tests {
         // array-wrapping, so an innocent-looking refactor of a variant
         // changes the format.
         let json = serde_json::to_value(full_module()).unwrap();
-        assert_eq!(json["version"], json!(5));
+        assert_eq!(json["version"], json!(7));
         assert_eq!(
             json["structs"][0]["fields"][0],
             json!({"name": "balance", "ty": "u64"})
@@ -769,6 +917,14 @@ mod tests {
         assert_eq!(
             serde_json::to_value(Type::Vector(Box::new(Type::U64))).unwrap(),
             json!({"vector": "u64"})
+        );
+        assert_eq!(
+            serde_json::to_value(Type::Enum(1)).unwrap(),
+            json!({"enum": 1})
+        );
+        assert_eq!(
+            serde_json::to_value(Oper::PackVariant(2)).unwrap(),
+            json!({"pack_variant": 2})
         );
         assert_eq!(
             serde_json::to_value(Oper::VecPack).unwrap(),

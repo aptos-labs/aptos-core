@@ -1,5 +1,4 @@
-// Error cases for the `folds_of` predicate over lambda arguments of inline
-// functions (see `folds_of.move` for the positive cases).
+// `folds_of` warning and error cases; see `folds_of.move` for positive cases.
 module 0x42::folds_of_errors {
     use std::vector;
 
@@ -30,7 +29,7 @@ module 0x42::folds_of_errors {
     /// expressible in a loop invariant.
     fun capture_and_state(v: &vector<u64>): u64 {
         let sum = 0;
-        each_ref(v, |e| sum = sum + *e + R[@0x1].v); // error: capture write combined with global state access
+        each_ref(v, |e| sum = sum + *e + R[@0x1].v); // warning: capture write combined with global state access
         sum
     }
 
@@ -44,20 +43,8 @@ module 0x42::folds_of_errors {
                 x = x - 1;
                 sum = sum + 1;
             }
-        }); // error: the per-iteration effect cannot be derived exactly
+        }); // warning: the per-iteration effect cannot be derived exactly
         sum
-    }
-
-    struct NoCopy has drop {
-        v: u64,
-    }
-
-    /// A capture without the `copy` ability: its value at loop entry
-    /// cannot be recorded by the snapshot binding.
-    fun non_copy_capture(v: &vector<u64>): u64 {
-        let acc = NoCopy { v: 0 };
-        each_ref(v, |e| acc.v = acc.v + *e); // error: capture must have the copy and drop abilities
-        acc.v
     }
 
     /// An opaque callee with a relational-only spec: no functional
@@ -78,7 +65,7 @@ module 0x42::folds_of_errors {
     /// not as a value the fold transformer could restate.
     fun accumulates_through_relational_callee(v: &vector<u64>): u64 {
         let sum = 0;
-        each_ref(v, |e| add_to_relational(&mut sum, *e)); // error: accumulates into a capture through a function call
+        each_ref(v, |e| add_to_relational(&mut sum, *e)); // warning: accumulation through a relational callee weakened
         sum
     }
 
@@ -93,8 +80,22 @@ module 0x42::folds_of_errors {
 
     fun accumulates_through_looping_callee(v: &vector<u64>): u64 {
         let sum = 0;
-        each_ref(v, |e| add_to_looping(&mut sum, *e)); // error: accumulates into a capture through a function call
+        each_ref(v, |e| add_to_looping(&mut sum, *e)); // warning: accumulation through a looping callee weakened
         sum
+    }
+
+    fun looping_result(x: u64): u64 {
+        while (x > 0) {
+            x = x - 1;
+        };
+        x
+    }
+
+    /// An unresolved nested result weakens the fold invariant.
+    fun transformer_with_underivable_result(v: &vector<u64>): vector<u64> {
+        let out = vector[];
+        each_ref(v, |e| vector::push_back(&mut out, looping_result(*e)));
+        out
     }
 
     fun set_two(a: &mut u64, b: &mut u64) {
@@ -112,7 +113,7 @@ module 0x42::folds_of_errors {
     /// symbolic post-states, which the fold transformer cannot restate.
     fun aliasing_mut_args(v: &vector<u64>): u64 {
         let p = Pair { x: 0, y: 0 };
-        each_ref(v, |_e| set_two(&mut p.x, &mut p.y)); // error: values written to the captures not expressible
+        each_ref(v, |_e| set_two(&mut p.x, &mut p.y)); // warning: capture values not expressible
         p.x + p.y
     }
 

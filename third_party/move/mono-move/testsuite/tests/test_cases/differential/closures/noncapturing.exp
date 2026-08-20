@@ -43,18 +43,20 @@ fun identity(l0: u64): u64
 // module 0x99::noncapturing
 
 fun call_double_twice(r0): u64 {
-  slots: params(1), locals(1), temps(2)
+  slots: params(1), locals(1), temps(3)
     r0: u64
     r1: |u64|u64
-    r2: u64
+    r2: |u64|u64
     r3: u64
+    r4: u64
   code:
   L0:
     0: r1 := pack_closure double, 0, [] @0
-    1: [r2] := call_closure [|u64|u64], [r0, r1] @4
-    2: [r3] := call_closure [|u64|u64], [r0, r1] @7
-    3: r3 := add r2, r3 @8
-    4: ret [r3] @9
+    1: r2 := copy r1 @3
+    2: [r3] := call_closure [|u64|u64], [r0, r2] @4
+    3: [r4] := call_closure [|u64|u64], [r0, r1] @7
+    4: r4 := add r3, r4 @8
+    5: ret [r4] @9
 }
 
 fun call_identity(r0): u64 {
@@ -90,19 +92,22 @@ fun identity(r0): u64 {
 // module 0x99::noncapturing
 
 fun call_double_twice() {
-  frame_data_size: 32
-  entry_gas: 244
+  frame_data_size: 40
+  entry_gas: 270
   code:
     0: PackClosure [8] <- func_ref=Unresolved(double), mask=0, captured_desc=<none>, captured=[] @0
-    1: CallClosure closure=[8], provided_args=[[0](8)] @4
-    2: Move8 [16] <- [56] @4
-    3: CallClosure closure=[8], provided_args=[[0](8)] @7
-    4: Move8 [24] <- [56] @7
-    5: AddU64 [24] <- [16] + [24] @8
-    6: Move8 [0] <- [24] @9
-    7: Return @9
+    1: Move8 [16] <- [8] @3
+    2: DeepCopyHeapPtrs [16] deep-copy ptrs at [0] @3
+    3: CallClosure closure=[16], provided_args=[[0](8)] @4
+    4: Move8 [24] <- [64] @4
+    5: CallClosure closure=[8], provided_args=[[0](8)] @7
+    6: Move8 [32] <- [64] @7
+    7: AddU64 [32] <- [24] + [32] @8
+    8: Move8 [0] <- [32] @9
+    9: Return @9
   safe_point_layouts:
     0: []
+    2: []
 }
 
 fun call_identity() {

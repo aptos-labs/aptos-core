@@ -65,13 +65,15 @@ module aptos_framework::sigma_protocol_statement_builder {
     public(friend) fun add_points_cloned<P>(self: &mut StatementBuilder<P>, v: &vector<CompressedRistretto>): (u64, vector<RistrettoPoint>) {
         let start = self.points.length();
         let cloned = vector[];
-        v.for_each_ref(|p| {
-            let p_val = *p;
+        // `for_each_ref` is not supported in verification since
+        // `point_clone` lacks a functional result spec (TODO(#20376)).
+        for (i in 0..v.length()) {
+            let p_val = v[i];
             let decompressed = p_val.point_decompress();
             cloned.push_back(decompressed.point_clone());
             self.points.push_back(decompressed);
             self.compressed_points.push_back(p_val);
-        });
+        };
         (start, cloned)
     }
 

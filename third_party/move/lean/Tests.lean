@@ -10,13 +10,17 @@ import Tests.Interp.References
 import Tests.Interp.CrossCallRefs
 import Tests.Interp.Globals
 import Tests.Interp.RefElimAgree
+import Tests.IR.Mono
+import Tests.Frontend.Enums
+import Tests.Frontend.Generics
+import Tests.Frontend.Vectors
 
 /-!
 # Test Suite
 
 Unit tests for the computable parts of the formalization, primarily the
-bytecode interpreter, with test programs authored as embedded Move source
-(`move%`).  A test case is a `#test` (or plain `#guard`) command: it is
+bytecode interpreter. Programs are authored as embedded Move source
+(`move%`). A test case is a `#test` (or plain `#guard`) command: it is
 evaluated at elaboration time and fails the build on failure, so running
 the tests is
 

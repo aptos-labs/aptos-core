@@ -1,9 +1,9 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
-import Move.Frontend.Elab
+import MoveModel.Frontend.Elab
 import Tests.Common
-import Move.IR.Interp
+import MoveModel.IR.Interp.Exec
 
 /-!
 # Interpreter Tests: Control Flow, Calls, Aborts, Fuel
@@ -15,8 +15,8 @@ aborts which carry code 0), and fuel exhaustion on divergence.
 
 namespace Tests.Interp.ControlFlow
 
-open Move.IR
-open Move.Frontend
+open MoveModel.IR
+open MoveModel.Frontend.XIR
 
 def controlM : MProgram := moveM% "
 module 0x42::control {

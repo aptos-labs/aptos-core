@@ -288,6 +288,11 @@ impl ValidatorVerifier {
         Ok(())
     }
 
+    /// Verifies every signature against `message`, keeping those that hold and adding
+    /// the rest's senders to the pessimistic verify set.
+    ///
+    /// Ignores cached verification status: that flag records *that* a signature
+    /// verified, not *which message*, so honoring it would retain cross-message ones.
     pub fn filter_invalid_signatures<T: Send + Sync + Serialize + CryptoHash>(
         &self,
         message: &T,
@@ -299,10 +304,9 @@ impl ValidatorVerifier {
             .into_par_iter()
             .with_min_len(4) // At least 4 signatures are verified in each task
             .filter_map(|(account_address, signature)| {
-                if signature.is_verified()
-                    || signature
-                        .decompressed_signature()
-                        .is_ok_and(|sig| self.verify(account_address, message, &sig).is_ok())
+                if signature
+                    .decompressed_signature()
+                    .is_ok_and(|sig| self.verify(account_address, message, &sig).is_ok())
                 {
                     signature.set_verified();
                     Some((account_address, signature))

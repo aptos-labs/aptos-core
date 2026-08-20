@@ -133,6 +133,22 @@ module 0x42::folds_of_wrapper {
                 + spec_fold_idx<u64>(|acc, j| acc + b[j].value, 0, len(b));
     }
 
+    /// The intermediate inline function has no specification. Its fold
+    /// summary must survive until the specified outer caller is expanded.
+    inline fun sum_values_inline(entries: &vector<Entry>): u64 {
+        let sum = 0;
+        each_kv_ref(entries, |_k, v| sum = sum + *v);
+        sum
+    }
+
+    fun sum_values_through_inline(entries: &vector<Entry>): u64 {
+        sum_values_inline(entries)
+    }
+    spec sum_values_through_inline {
+        pragma aborts_if_is_partial;
+        ensures result == spec_fold_idx<u64>(|acc, j| acc + entries[j].value, 0, len(entries));
+    }
+
     // ===== Non-vacuity canary =====
 
     fun sum_values_wrong(entries: &vector<Entry>): u64 {
