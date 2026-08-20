@@ -18,10 +18,10 @@ use ark_bls12_381::{Fq, Fq12, Fq2, Fq6, G2Affine};
 use ark_ec::{AffineRepr, CurveGroup as _};
 use ark_ff::{BigInteger, PrimeField, Zero};
 use blst::{
-    blst_bendian_from_fp, blst_final_exp, blst_fp, blst_fp12, blst_fp12_mul, blst_fp_from_bendian,
-    blst_miller_loop, blst_p1, blst_p1_add_or_double, blst_p1_affine, blst_p1_cneg,
-    blst_p1_from_affine, blst_p1_is_equal, blst_p1_is_inf, blst_p1_mult, blst_p1_serialize,
-    blst_p2_affine,
+    blst_bendian_from_fp, blst_final_exp, blst_fp, blst_fp12, blst_fp12_mul, blst_fp6,
+    blst_fp_from_bendian, blst_miller_loop, blst_miller_loop_lines, blst_p1, blst_p1_add_or_double,
+    blst_p1_affine, blst_p1_cneg, blst_p1_from_affine, blst_p1_is_equal, blst_p1_is_inf,
+    blst_p1_mult, blst_p1_serialize, blst_p2_affine, blst_precompute_lines,
 };
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator as _};
 use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
@@ -122,6 +122,56 @@ pub fn multi_pairing(ps: &[G1Affine], qs: &[G2Affine]) -> PairingOutput {
             unsafe { blst_final_exp(&mut acc, &acc) };
             ark_ec::pairing::PairingOutput(blst_fp12_to_ark(&acc))
         },
+    }
+}
+
+/// The number of Miller-loop line coefficients blst precomputes for a G2 point.
+/// Fixed by `blst.h`'s `blst_precompute_lines(blst_fp6 Qlines[68], ...)`: the
+/// BLS12-381 Miller loop runs 63 doublings and 5 additions over the bits of `x`.
+const N_LINES: usize = 68;
+
+/// blst's precomputed Miller-loop line coefficients for a fixed G2 point -- the
+/// analogue of arkworks' `G2Prepared`, and usable the same way: build it once
+/// while the G2 point is known, then pair against many G1 points without
+/// redoing the G2-side work.
+///
+/// Note that this is *not* interchangeable with `G2Prepared` despite holding
+/// the same count and shape of coefficients (68 triples of Fq2). blst derives
+/// its lines in Jacobian coordinates and arkworks in homogeneous projective, so
+/// corresponding entries differ by per-step projective scalars; the Miller loop
+/// only tolerates those because their product dies in the final exponentiation.
+#[derive(Clone)]
+pub struct G2Lines {
+    lines: Box<[blst_fp6; N_LINES]>,
+    infinity: bool,
+}
+
+impl G2Lines {
+    pub fn new(q: &G2Affine) -> Self {
+        let mut lines = Box::new([blst_fp6::default(); N_LINES]);
+        if !q.is_zero() {
+            let q = g2_to_blst_affine(q);
+            unsafe { blst_precompute_lines(lines.as_mut_ptr(), &q) };
+        }
+        Self {
+            lines,
+            infinity: q.is_zero(),
+        }
+    }
+
+    /// Equivalent to `pairing(p, q)` for the `q` these lines were built from,
+    /// but skipping the G2-side line computation.
+    pub fn pairing(&self, p: &G1Affine) -> PairingOutput {
+        if self.infinity || p.is_zero() {
+            return PairingOutput::zero();
+        }
+        let p = g1_to_blst_affine(p);
+        let mut ml = blst_fp12::default();
+        unsafe {
+            blst_miller_loop_lines(&mut ml, self.lines.as_ptr(), &p);
+            blst_final_exp(&mut ml, &ml);
+        }
+        ark_ec::pairing::PairingOutput(blst_fp12_to_ark(&ml))
     }
 }
 
@@ -344,6 +394,154 @@ mod tests {
             pairing(&G1Affine::zero(), &G2Affine::rand(&mut rng)),
             PairingSetting::pairing(G1Affine::zero(), G2Affine::rand(&mut rng))
         );
+    }
+
+    #[test]
+    fn test_g2_lines_pairing_matches_ark() {
+        let mut rng = thread_rng();
+        for _ in 0..3 {
+            let p = G1Affine::rand(&mut rng);
+            let q = G2Affine::rand(&mut rng);
+            assert_eq!(G2Lines::new(&q).pairing(&p), PairingSetting::pairing(p, q));
+        }
+        // Either argument at infinity gives the identity in Gt.
+        let q = G2Affine::rand(&mut rng);
+        assert!(G2Lines::new(&q).pairing(&G1Affine::zero()).is_zero());
+        assert!(G2Lines::new(&G2Affine::zero())
+            .pairing(&G1Affine::rand(&mut rng))
+            .is_zero());
+    }
+
+    /// Are arkworks' `G2Prepared` line coefficients and blst's precomputed lines
+    /// the same bytes? If they were, an existing `G2Prepared` could be handed
+    /// straight to `blst_miller_loop_lines` and the two libraries' prepared
+    /// forms would be interchangeable.
+    ///
+    /// They are not -- blst works in Jacobian coordinates and arkworks in
+    /// homogeneous projective -- but that is a structural argument, so check it
+    /// rather than assert it. Run with:
+    ///   cargo test -p aptos-batch-encryption --release -- perf_probe --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn perf_probe_lines_layout() {
+        use crate::group::G2Prepared;
+
+        let mut rng = thread_rng();
+        let q = G2Affine::rand(&mut rng);
+
+        let ark = G2Prepared::from(q);
+        let blst = G2Lines::new(&q);
+
+        println!("ark ell_coeffs: {}", ark.ell_coeffs.len());
+        println!("blst lines:     {}", N_LINES);
+
+        let mut matching = 0usize;
+        for (i, (c0, c1, c2)) in ark.ell_coeffs.iter().enumerate() {
+            // Both sides store Fq as 6 little-endian u64 limbs in Montgomery
+            // form with the same R and modulus, so the limbs are directly
+            // comparable.
+            let ark_limbs: Vec<[u64; 6]> = [c0, c1, c2]
+                .iter()
+                .flat_map(|c| [c.c0.0 .0, c.c1.0 .0])
+                .collect();
+            let blst_limbs: Vec<[u64; 6]> = (0..3)
+                .flat_map(|j| {
+                    let fp2 = blst.lines[i].fp2[j];
+                    [fp2.fp[0].l, fp2.fp[1].l]
+                })
+                .collect();
+            if ark_limbs == blst_limbs {
+                matching += 1;
+            }
+        }
+        println!("entries matching byte-for-byte: {}/{}", matching, N_LINES);
+
+        // Whatever the layout, the two must agree on the pairing itself.
+        let p = G1Affine::rand(&mut rng);
+        assert_eq!(blst.pairing(&p), PairingSetting::pairing(p, q));
+    }
+
+    /// How much of a pairing is the G2-side line precompute? That is the work
+    /// `prepare()` could absorb so that `decrypt()` does not have to.
+    ///
+    /// Timed for both libraries, because the split is what the two designs
+    /// differ on: baseline stored an arkworks `G2Prepared`, so its precompute
+    /// already sat in `prepare()`, while the blst port pairs from a `G2Affine`
+    /// and pays for the lines inside `decrypt()`.
+    #[test]
+    #[ignore]
+    fn perf_probe_lines_timing() {
+        use crate::group::G2Prepared;
+        use std::time::Instant;
+
+        let mut rng = thread_rng();
+        let p = G1Affine::rand(&mut rng);
+        let q = G2Affine::rand(&mut rng);
+        let lines = G2Lines::new(&q);
+        let prepared = G2Prepared::from(q);
+
+        // Warm up, and confirm every route agrees before timing them.
+        let expected = PairingSetting::pairing(p, q);
+        assert_eq!(pairing(&p, &q), expected);
+        assert_eq!(lines.pairing(&p), expected);
+
+        const N: u32 = 200;
+        let time = |label: &str, f: &dyn Fn()| {
+            let start = Instant::now();
+            for _ in 0..N {
+                f();
+            }
+            let ns = start.elapsed().as_nanos() as f64 / f64::from(N);
+            println!("  {label:<30} {:>9.1} µs", ns / 1000.0);
+            ns
+        };
+
+        // The decrypt half, spelled out: arkworks' `pairing()` prepares
+        // internally, so the prepared path has to go through `multi_miller_loop`
+        // and `final_exponentiation` by hand.
+        let ark_from_prepared = || {
+            let ml = PairingSetting::multi_miller_loop([p], [prepared.clone()]);
+            PairingSetting::final_exponentiation(ml).unwrap()
+        };
+        assert_eq!(ark_from_prepared(), expected);
+
+        println!("\narkworks");
+        let ark_full = time("full pairing", &|| {
+            let _ = std::hint::black_box(PairingSetting::pairing(p, q));
+        });
+        let ark_prep = time("G2Prepared::from  (prepare)", &|| {
+            std::hint::black_box(G2Prepared::from(q));
+        });
+        let ark_rest = time("miller_loop + final_exp (decrypt)", &|| {
+            let _ = std::hint::black_box(ark_from_prepared());
+        });
+
+        println!("\nblst");
+        let blst_full = time("full pairing", &|| {
+            let _ = std::hint::black_box(pairing(&p, &q));
+        });
+        let blst_prep = time("precompute_lines  (prepare)", &|| {
+            std::hint::black_box(G2Lines::new(&q));
+        });
+        let blst_rest = time("miller_loop_lines + final_exp (decrypt)", &|| {
+            let _ = std::hint::black_box(lines.pairing(&p));
+        });
+
+        println!(
+            "\n{:<10} {:>10} {:>10} {:>10} {:>10}",
+            "", "full", "prepare", "decrypt", "prep %"
+        );
+        let row = |label: &str, full: f64, prep: f64, rest: f64| {
+            println!(
+                "{label:<10} {:>9.1} {:>9.1} {:>9.1} {:>9.1}%",
+                full / 1000.0,
+                prep / 1000.0,
+                rest / 1000.0,
+                100.0 * prep / full
+            );
+        };
+        row("arkworks", ark_full, ark_prep, ark_rest);
+        row("blst", blst_full, blst_prep, blst_rest);
     }
 
     #[test]
