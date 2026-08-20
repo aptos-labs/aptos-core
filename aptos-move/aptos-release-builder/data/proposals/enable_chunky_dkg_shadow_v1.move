@@ -16,7 +16,7 @@ script {
         let config = chunky_dkg_config::new_shadow_v1(
             fixed_point64::create_from_rational(1, 2), // secrecy_threshold: 1/2
             fixed_point64::create_from_rational(2, 3), // reconstruction_threshold: 2/3
-            60,                                        // grace_period_secs
+            120,                                       // grace_period_secs
         );
         chunky_dkg_config::set_for_next_epoch(&framework, config);
         aptos_governance::reconfigure(&framework);
