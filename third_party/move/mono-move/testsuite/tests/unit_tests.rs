@@ -38,7 +38,6 @@ fn move_stdlib_on_mono_move() {
 }
 
 #[test]
-#[ignore]
 fn aptos_stdlib_on_mono_move() {
     run_tests_for_pkg("aptos-stdlib", false);
 }
