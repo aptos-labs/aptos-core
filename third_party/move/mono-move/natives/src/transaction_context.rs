@@ -99,6 +99,12 @@ const TRANSACTION_CONTEXT_NOT_AVAILABLE: u64 = error::invalid_state(1);
 
 const TXN_INDEX_NOT_AVAILABLE: u64 = error::invalid_state(5);
 
+fn txn_context_unavailable_msg(subject: &str) -> String {
+    format!(
+        "Transaction context is not available ({subject} can only be accessed during transaction execution)"
+    )
+}
+
 /// `0x1::transaction_context::generate_unique_address(): address`
 ///
 /// Returns a freshly derived address, which is guaranteed to be unique within
@@ -176,7 +182,7 @@ pub fn native_transaction_context_chain_id<C: NativeContext>(ctx: &C) -> VMResul
     unsafe {
         return_user_transaction_context_field(
             ctx,
-            "Transaction context is not available (chain ID can only be accessed during transaction execution)",
+            "chain ID",
             UserTransactionContext::user_txn_chain_id,
         )
     }
@@ -188,7 +194,7 @@ pub fn native_sender<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     unsafe {
         return_user_transaction_context_field(
             ctx,
-            "Transaction context is not available (sender information can only be accessed during transaction execution)",
+            "sender information",
             UserTransactionContext::sender,
         )
     }
@@ -200,7 +206,7 @@ pub fn native_gas_payer<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     unsafe {
         return_user_transaction_context_field(
             ctx,
-            "Transaction context is not available (gas payer information can only be accessed during transaction execution)",
+            "gas payer information",
             UserTransactionContext::gas_payer,
         )
     }
@@ -212,7 +218,7 @@ pub fn native_max_gas_amount<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus
     unsafe {
         return_user_transaction_context_field(
             ctx,
-            "Transaction context is not available (max gas amount can only be accessed during transaction execution)",
+            "max gas amount",
             UserTransactionContext::max_gas_amount,
         )
     }
@@ -224,7 +230,7 @@ pub fn native_gas_unit_price<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus
     unsafe {
         return_user_transaction_context_field(
             ctx,
-            "Transaction context is not available (gas unit price can only be accessed during transaction execution)",
+            "gas unit price",
             UserTransactionContext::gas_unit_price,
         )
     }
@@ -236,7 +242,7 @@ pub fn native_is_encrypted_txn<C: NativeContext>(ctx: &C) -> VMResult<NativeStat
     unsafe {
         return_user_transaction_context_field(
             ctx,
-            "Transaction context is not available (is_encrypted_txn can only be accessed during transaction execution)",
+            "is_encrypted_txn",
             UserTransactionContext::is_encrypted_txn,
         )
     }
@@ -276,9 +282,7 @@ pub fn native_secondary_signers<C: NativeContext>(ctx: &C) -> VMResult<NativeSta
         let Some(user_transaction_context) = &ext.user_transaction_context else {
             return Ok(NativeStatus::Abort {
                 code: TRANSACTION_CONTEXT_NOT_AVAILABLE,
-                message: Some(
-                    "Transaction context is not available (secondary signers can only be accessed during transaction execution)".into(),
-                ),
+                message: Some(txn_context_unavailable_msg("secondary signers")),
             });
         };
         user_transaction_context.secondary_signers()
@@ -300,7 +304,7 @@ pub fn native_is_orderless_txn<C: NativeContext>(ctx: &C) -> VMResult<NativeStat
     unsafe {
         return_user_transaction_context_field(
             ctx,
-            "Transaction context is not available (is_orderless_txn can only be accessed during transaction execution)",
+            "is_orderless_txn",
             UserTransactionContext::is_orderless_txn,
         )
     }
@@ -358,7 +362,7 @@ pub fn native_monotonically_increasing_counter_for_test_only<C: NativeContext>(
 // TODO(metering): charge gas.
 unsafe fn return_user_transaction_context_field<'a, C, T>(
     ctx: &'a C,
-    not_available_message: &'static str,
+    subject: &str,
     read: impl FnOnce(&UserTransactionContext) -> T,
 ) -> VMResult<NativeStatus>
 where
@@ -369,7 +373,7 @@ where
     let Some(user_transaction_context) = &ext.user_transaction_context else {
         return Ok(NativeStatus::Abort {
             code: TRANSACTION_CONTEXT_NOT_AVAILABLE,
-            message: Some(not_available_message.into()),
+            message: Some(txn_context_unavailable_msg(subject)),
         });
     };
     let value = read(user_transaction_context);
