@@ -107,7 +107,7 @@ pub(crate) static ALLOWED_NO_SELF_IDENTIFIERS: &str =
 /// An owned identifier.
 ///
 /// For more details, see the module level documentation.
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 #[cfg_attr(
     any(test, feature = "fuzzing"),
     derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
@@ -167,6 +167,26 @@ impl Identifier {
     /// Converts this `Identifier` into a UTF-8-encoded byte sequence.
     pub fn into_bytes(self) -> Vec<u8> {
         self.into_string().into_bytes()
+    }
+}
+
+// A custom `Deserialize` impl which, unlike the derived one, enforces the
+// validity invariant on the deserialized identifier. Without this check, BCS
+// deserialization of untrusted bytes can produce an `Identifier` for which
+// `is_valid` does not hold (e.g., one containing whitespace), breaking
+// invariants downstream consumers rely on, such as the Display/parse roundtrip
+// for type tags.
+//
+// Note: deserializing the inner `Box<str>` directly keeps the wire format of
+// the derived impl, since serde data formats treat newtype structs as
+// transparent wrappers around their inner value.
+impl<'de> Deserialize<'de> for Identifier {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = <Box<str>>::deserialize(deserializer)?;
+        Self::new(s).map_err(serde::de::Error::custom)
     }
 }
 
