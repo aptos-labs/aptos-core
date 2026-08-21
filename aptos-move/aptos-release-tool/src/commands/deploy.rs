@@ -6,13 +6,13 @@
 //! Drives the full test-network governance ceremony using the bundle's scripts
 //! exactly as reviewed -- nothing is regenerated:
 //!
-//! 1. `verify-bundle`, with sign-off required by default;
+//! 1. `verify-bundle`, with sign-off required by default -- this includes
+//!    checking each compiled script in `bytecode/` against the execution hash
+//!    stamped on its source, so what was audited is what gets deployed;
 //! 2. refuse to run against mainnet (chain id check);
-//! 3. compile the bundle's scripts and check each against its stamped
-//!    execution hash: a mismatch means the local toolchain no longer
-//!    reproduces the bytecode the multi-step hash chain approves, which would
-//!    otherwise strand the proposal midway through execution;
-//! 4. simulate the proposal against the target network (skippable);
+//! 3. load the bundle's compiled scripts: the exact bytes the multi-step
+//!    hash chain approves, no recompilation involved;
+//! 4. simulate those same bytes against the target network (skippable);
 //! 5. shrink the voting period (root, `get_signer_testnet_only`), propose and
 //!    vote with the validator, wait for voting to close, then execute each
 //!    step -- restoring the voting period even when execution fails.
@@ -40,7 +40,7 @@ use move_core_types::diag_writer::DiagWriter;
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 use std::{
     fs,
-    path::{Path, PathBuf},
+    path::Path,
     time::{Duration, Instant},
 };
 use url::Url;
@@ -72,10 +72,11 @@ pub struct Signers {
     pub validator_key: String,
 }
 
-/// A bundle script compiled against the local framework.
-struct CompiledScript {
+/// A compiled script loaded from the bundle's `bytecode/` directory.
+struct BundleScript {
     name: String,
     blob: Vec<u8>,
+    /// The script's on-chain execution hash: the hash of `blob`.
     hash: HashValue,
 }
 
@@ -95,6 +96,17 @@ pub async fn run(
     // 1. Bundle integrity, and by default the full sign-off.
     verify::run(bundle_path, !skip_signoff)?;
 
+    // The metadata location recorded on-chain is informational only; nothing
+    // fetches it. The on-chain limit is 256 bytes; check here rather than
+    // fail mid-ceremony.
+    if metadata_url.len() > 256 {
+        bail!(
+            "metadata URL exceeds the on-chain 256-byte limit ({} bytes): {}",
+            metadata_url.len(),
+            metadata_url
+        );
+    }
+
     // 2. Network guard: never mainnet.
     let client = build_client(endpoint.clone(), node_api_key.as_deref())?;
     let chain_id = client
@@ -107,20 +119,23 @@ pub async fn run(
         bail!("refusing to deploy to mainnet: this command drives the test-network-only governance flow");
     }
 
-    // 3. Compile the bundle's scripts and check the stamped execution hashes.
-    let scripts = compile_bundle_scripts(bundle_path, core_path)?;
-    println!(
-        "Compiled {} script(s); all match their stamped execution hashes.",
-        scripts.len()
-    );
+    // 3. Load the bundle's compiled scripts (verify-bundle above checked them
+    //    against the stamped execution hashes and the manifest checksums).
+    let scripts = load_bundle_scripts(bundle_path)?;
+    println!("Loaded {} compiled script(s) from the bundle.", scripts.len());
 
-    // 4. Simulate against the target network before touching it.
+    // 4. Simulate the exact bytes to be submitted against the target network.
     if skip_simulation {
         println!("WARNING: skipping simulation (--skip-simulation)");
     } else {
-        aptos_release_builder::simulate::simulate_all_proposals(
+        let named_blobs: Vec<(String, Vec<u8>)> = scripts
+            .iter()
+            .map(|s| (s.name.clone(), s.blob.clone()))
+            .collect();
+        aptos_release_builder::simulate::simulate_compiled_scripts(
             endpoint.clone(),
-            bundle_path,
+            &bundle_path.join("gas-profiling"), // unused: gas profiling is off
+            &named_blobs,
             false,
             node_api_key.clone(),
         )
@@ -168,7 +183,7 @@ pub async fn run(
         &validator,
         &scripts,
         bundle_path,
-        metadata_url,
+        &metadata_url,
     )
     .await;
     let restore = set_resolution_time(&client, &factory, &root, core_path, DEFAULT_RESOLUTION_SECS)
@@ -197,7 +212,7 @@ async fn run_governance(
     client: &Client,
     factory: &TransactionFactory,
     validator: &LocalAccount,
-    scripts: &[CompiledScript],
+    scripts: &[BundleScript],
     bundle_path: &Path,
     metadata_url: &str,
 ) -> Result<u64> {
@@ -416,65 +431,14 @@ async fn wait_for_voting_closed(client: &Client, proposal_id: u64) -> Result<()>
 /// Compile every script in the bundle (in execution order) and require each to
 /// match the execution hash stamped at generation time. The compiled blobs are
 /// what later gets submitted, so what we validate is what we deploy.
-fn compile_bundle_scripts(bundle_path: &Path, core_path: &Path) -> Result<Vec<CompiledScript>> {
-    let scripts_dir = bundle_path.join(crate::bundle::SCRIPTS_DIR);
-    let mut paths: Vec<PathBuf> = fs::read_dir(&scripts_dir)
-        .with_context(|| format!("failed to read {}", scripts_dir.display()))?
-        .filter_map(|e| e.ok().map(|e| e.path()))
-        .filter(|p| p.extension().map(|x| x == "move").unwrap_or(false))
-        .collect();
-    paths.sort();
-    if paths.is_empty() {
-        bail!("no scripts found in {}", scripts_dir.display());
-    }
-
-    let mut compiled = vec![];
-    let mut errors = vec![];
-    for path in &paths {
-        let name = path
-            .file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_string();
-        let source =
-            fs::read_to_string(path).with_context(|| format!("failed to read {}", name))?;
-        let Some(stamped) = stamped_hash(&source) else {
-            bail!(
-                "{} has no stamped execution hash (expected a leading \
-                 '// Script hash: ...' comment, added by generate-bundle)",
-                name
-            );
-        };
-        let (blob, hash) = compile_script(path, core_path)
-            .with_context(|| format!("failed to compile {}", name))?;
-        if hash.to_hex().to_lowercase() != stamped {
-            errors.push(format!(
-                "{}: compiled hash {} does not match stamped hash {}",
-                name,
-                hash.to_hex(),
-                stamped
-            ));
-        }
-        compiled.push(CompiledScript { name, blob, hash });
-    }
-    if !errors.is_empty() {
-        bail!(
-            "the local toolchain no longer reproduces the bundle's approved \
-             bytecode; deploying would strand the proposal mid-execution.\n  - {}\n\
-             Run from the bundle's recorded source commit (see bundle.toml).",
-            errors.join("\n  - ")
-        );
-    }
-    Ok(compiled)
-}
-
-/// The execution hash stamped as the script's first line by generate-bundle.
-fn stamped_hash(source: &str) -> Option<String> {
-    source
-        .lines()
-        .next()?
-        .strip_prefix("// Script hash: ")
-        .map(|s| s.trim().trim_start_matches("0x").to_lowercase())
+fn load_bundle_scripts(bundle_path: &Path) -> Result<Vec<BundleScript>> {
+    Ok(crate::bundle::load_compiled_scripts(bundle_path)?
+        .into_iter()
+        .map(|(name, blob)| {
+            let hash = HashValue::sha3_256_of(&blob);
+            BundleScript { name, blob, hash }
+        })
+        .collect())
 }
 
 fn compile_script(path: &Path, core_path: &Path) -> Result<(Vec<u8>, HashValue)> {
@@ -522,18 +486,4 @@ fn extract_proposal_id(txn: &Transaction) -> Result<u64> {
         .and_then(|id| id.as_str())
         .and_then(|id| id.parse::<u64>().ok())
         .ok_or_else(|| anyhow!("no CreateProposal event found in the proposal transaction"))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::stamped_hash;
-
-    #[test]
-    fn stamped_hash_parses_the_leading_comment() {
-        let source = "// Script hash: 0xAB12ef\nscript { fun main() {} }";
-        assert_eq!(stamped_hash(source), Some("ab12ef".to_string()));
-
-        let unstamped = "script { fun main() {} }";
-        assert_eq!(stamped_hash(unstamped), None);
-    }
 }

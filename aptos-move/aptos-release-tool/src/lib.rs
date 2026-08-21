@@ -111,11 +111,11 @@ enum Commands {
         #[clap(long, env)]
         node_api_key: Option<String>,
 
-        /// Metadata URL recorded on-chain with the proposal.
-        #[clap(
-            long,
-            default_value = "https://raw.githubusercontent.com/aptos-labs/aptos-core/b4fb9acfc297327c43d030def2b59037c4376611/testsuite/smoke-test/src/upgrade_multi_step_test_metadata.txt"
-        )]
+        /// Metadata URL recorded on-chain with the proposal. Informational
+        /// only; nothing in this flow fetches it. The default is a dummy URL
+        /// on the RFC 2606 reserved `.invalid` TLD, which is guaranteed to
+        /// never resolve.
+        #[clap(long, default_value = "https://dummy.invalid/proposal-metadata.json")]
         metadata_url: String,
 
         /// Mint gas funds to the validator first (root-signed). For throwaway
