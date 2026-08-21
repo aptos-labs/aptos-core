@@ -628,6 +628,18 @@ impl ResolvingGraph {
         }
         Ok(())
     }
+
+    pub fn download_and_update_with_lock<W: Write>(
+        dep_name: PackageName,
+        dep: &Dependency,
+        skip_fetch_latest_git_deps: bool,
+        writer: &mut W,
+    ) -> Result<()> {
+        let mutx = crate::package_lock::PackageLock::strict_lock();
+        Self::download_and_update_if_remote(dep_name, dep, skip_fetch_latest_git_deps, writer)?;
+        mutx.unlock();
+        Ok(())
+    }
 }
 
 impl ResolvingPackage {
