@@ -38,20 +38,23 @@ on:
         type: boolean
         description: Collect framework function usage instead of only replay-verifying.
         default: false
-      RESULTS_BUCKET:
+    secrets:
+      APTOS_BOT_PAT:
         required: false
-        type: string
-        description: GCS bucket used for framework usage shards.
-      REPORT_REPOSITORY:
+      AWS_ACCESS_KEY_ID:
         required: false
-        type: string
-        description: Private GitHub repository whose Pages site publishes framework usage reports.
-        default: aptos-labs/aptos-core-private
-      REPORT_BRANCH:
+      AWS_DOCKER_ARTIFACT_REPO:
         required: false
-        type: string
-        description: GitHub Pages branch in REPORT_REPOSITORY.
-        default: gh-pages
+      AWS_SECRET_ACCESS_KEY:
+        required: false
+      ENV_ECR_AWS_ACCOUNT_NUM:
+        required: false
+      GCP_SERVICE_ACCOUNT_EMAIL:
+        required: false
+      GCP_WORKLOAD_IDENTITY_PROVIDER:
+        required: false
+      GIT_CREDENTIALS:
+        required: false
 
   workflow_dispatch:
     inputs:
@@ -89,20 +92,6 @@ on:
         type: boolean
         description: Collect framework function usage instead of only replay-verifying.
         default: false
-      RESULTS_BUCKET:
-        required: false
-        type: string
-        description: GCS bucket used for framework usage shards.
-      REPORT_REPOSITORY:
-        required: false
-        type: string
-        description: Private GitHub repository whose Pages site publishes framework usage reports.
-        default: aptos-labs/aptos-core-private
-      REPORT_BRANCH:
-        required: false
-        type: string
-        description: GitHub Pages branch in REPORT_REPOSITORY.
-        default: gh-pages
 permissions:
   contents: read
 
@@ -117,7 +106,6 @@ jobs:
           END_VERSION: ${{ inputs.END_VERSION }}
           END_TIME: ${{ inputs.END_TIME }}
           FRAMEWORK_USAGE: ${{ inputs.FRAMEWORK_USAGE }}
-          RESULTS_BUCKET: ${{ inputs.RESULTS_BUCKET }}
         run: |
           if [ -n "$START_VERSION" ] && [ -n "$START_TIME" ]; then
             echo "::error::START_VERSION and START_TIME are mutually exclusive. Please specify only one."
@@ -143,8 +131,15 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    secrets: inherit
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      ENV_ECR_AWS_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
+      GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+    uses: ./.github/workflows/workflow-run-docker-rust-build.yaml
     with:
       GIT_SHA: ${{ inputs.IMAGE_TAG || github.event.pull_request.head.sha || github.sha }}
       TARGET_CACHE_ID: ${{ github.event.number && format('pr-{0}', github.event.number) || github.ref_name }}
@@ -155,6 +150,10 @@ jobs:
     runs-on: 4cpu-gh-ubuntu24-x64
     timeout-minutes: 420 # 7 hours
     needs: build-images
+    env:
+      FRAMEWORK_USAGE_BUCKET: aptos-framework-usage-reports
+      REPORT_BRANCH: gh-pages
+      REPORT_REPOSITORY: aptos-labs/aptos-core-private
     permissions:
       contents: read
       id-token: write
@@ -203,6 +202,20 @@ jobs:
         shell: bash
         run: gcloud config set project aptos-devinfra-0
 
+      - name: Verify private framework usage shard bucket
+        if: ${{ inputs.DRY_RUN == false && inputs.FRAMEWORK_USAGE }}
+        run: |
+          PUBLIC_ACCESS_PREVENTION="$(gcloud storage buckets describe "gs://${FRAMEWORK_USAGE_BUCKET}" --format='value(public_access_prevention)')"
+          UNIFORM_BUCKET_ACCESS="$(gcloud storage buckets describe "gs://${FRAMEWORK_USAGE_BUCKET}" --format='value(uniform_bucket_level_access)')"
+          if [ "$PUBLIC_ACCESS_PREVENTION" != "enforced" ]; then
+            echo "::error::Framework usage shard bucket must enforce public access prevention."
+            exit 1
+          fi
+          if [ "$UNIFORM_BUCKET_ACCESS" != "true" ]; then
+            echo "::error::Framework usage shard bucket must use uniform bucket-level access."
+            exit 1
+          fi
+
       - uses: ./.github/actions/python-setup
         with:
           pyproject_directory: testsuite/replay-verify
@@ -218,7 +231,6 @@ jobs:
           END_TIME: ${{ inputs.END_TIME }}
           IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
           FRAMEWORK_USAGE: ${{ inputs.FRAMEWORK_USAGE }}
-          RESULTS_BUCKET: ${{ inputs.RESULTS_BUCKET }}
         run: |
           cd testsuite/replay-verify
           ARGS=(--network "$NETWORK")
@@ -239,9 +251,7 @@ jobs:
           fi
           if [ "$FRAMEWORK_USAGE" = "true" ]; then
             ARGS+=(--framework-usage-output-dir ../../framework-usage-results)
-            if [ -n "$RESULTS_BUCKET" ]; then
-              ARGS+=(--framework-usage-bucket "$RESULTS_BUCKET")
-            fi
+            ARGS+=(--framework-usage-bucket "$FRAMEWORK_USAGE_BUCKET")
           fi
           ARGS+=(--image_profile performance)
           poetry run python main.py "${ARGS[@]}"
@@ -251,8 +261,6 @@ jobs:
         if: ${{ inputs.DRY_RUN == false && inputs.FRAMEWORK_USAGE }}
         env:
           GH_TOKEN: ${{ secrets.APTOS_BOT_PAT }}
-          REPORT_REPOSITORY: ${{ inputs.REPORT_REPOSITORY }}
-          REPORT_BRANCH: ${{ inputs.REPORT_BRANCH }}
         run: |
           REPOSITORY_PRIVATE="$(gh api "repos/${REPORT_REPOSITORY}" --jq '.private')"
           PAGES_PUBLIC="$(gh api "repos/${REPORT_REPOSITORY}/pages" --jq '.public')"
@@ -275,8 +283,8 @@ jobs:
         if: ${{ inputs.DRY_RUN == false && inputs.FRAMEWORK_USAGE }}
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # pin@v4.4.0
         with:
-          repository: ${{ inputs.REPORT_REPOSITORY }}
-          ref: ${{ inputs.REPORT_BRANCH }}
+          repository: aptos-labs/aptos-core-private
+          ref: gh-pages
           path: framework-usage-pages
           token: ${{ secrets.APTOS_BOT_PAT }}
           fetch-depth: 1
@@ -285,8 +293,6 @@ jobs:
         if: ${{ inputs.DRY_RUN == false && inputs.FRAMEWORK_USAGE }}
         env:
           NETWORK: ${{ inputs.NETWORK }}
-          REPORT_REPOSITORY: ${{ inputs.REPORT_REPOSITORY }}
-          REPORT_BRANCH: ${{ inputs.REPORT_BRANCH }}
           GH_TOKEN: ${{ secrets.APTOS_BOT_PAT }}
         run: |
           REPORT_JSON="framework-usage-results/framework-usage.json"
