@@ -295,3 +295,12 @@ impl TreeWriter<StateKey> for PositionMerkleDb {
         self.inner.write_node_batch(node_batch)
     }
 }
+
+pub const COMPOSITE_STATE_ROOT_DOMAIN: &[u8] = b"APTOS::StateRoot";
+
+pub fn compose_state_root(main_state_root: HashValue, position_root: HashValue) -> HashValue {
+    let mut hasher = aptos_crypto::hash::DefaultHasher::new(COMPOSITE_STATE_ROOT_DOMAIN);
+    hasher.update(main_state_root.as_ref());
+    hasher.update(position_root.as_ref());
+    hasher.finish()
+}
