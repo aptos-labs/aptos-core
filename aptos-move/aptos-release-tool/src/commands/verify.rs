@@ -5,7 +5,9 @@
 
 use crate::{bundle, commands::combine_errors, config::BundleConfig, summary};
 use anyhow::Result;
+use aptos_crypto::HashValue;
 use std::{
+    collections::BTreeMap,
     fs,
     path::{Path, PathBuf},
 };
@@ -70,23 +72,115 @@ pub fn run(bundle_path: &Path, require_signoff: bool) -> Result<()> {
     }
 }
 
-/// Check the single-proposal layout: a top-level `metadata.json` and a
-/// non-empty `scripts/` directory.
+/// Check the single-proposal layout: a top-level `metadata.json`, plus the
+/// script sources and compiled bytecode (see [`check_scripts`]).
 fn check_layout(bundle_path: &Path, errors: &mut Vec<String>) {
     if !bundle_path.join(bundle::METADATA_JSON).is_file() {
         errors.push(format!("missing {}", bundle::METADATA_JSON));
     }
+    check_scripts(bundle_path, errors);
+}
 
-    let scripts_dir = bundle_path.join(bundle::SCRIPTS_DIR);
-    let has_move = fs::read_dir(&scripts_dir)
-        .map(|rd| {
-            rd.filter_map(|e| e.ok())
-                .any(|e| e.path().extension().map(|x| x == "move").unwrap_or(false))
-        })
-        .unwrap_or(false);
-    if !has_move {
+/// Check that `scripts/` sources and `bytecode/` blobs pair 1:1 by file stem,
+/// and that each blob's hash matches the execution hash stamped on its source
+/// -- so what was audited (the stamped source) is what gets deployed (the
+/// blob), without needing a compiler.
+fn check_scripts(bundle_path: &Path, errors: &mut Vec<String>) {
+    let sources = files_by_stem(&bundle_path.join(bundle::SCRIPTS_DIR), "move");
+    let blobs = files_by_stem(&bundle_path.join(bundle::BYTECODE_DIR), "mv");
+    if sources.is_empty() {
         errors.push(format!("{}/ has no .move scripts", bundle::SCRIPTS_DIR));
     }
+    if blobs.is_empty() {
+        errors.push(format!(
+            "{}/ has no compiled .mv scripts",
+            bundle::BYTECODE_DIR
+        ));
+    }
+
+    for (stem, source_path) in &sources {
+        let Some(blob_path) = blobs.get(stem) else {
+            errors.push(format!(
+                "{}/{}.move has no compiled counterpart {}/{}.mv",
+                bundle::SCRIPTS_DIR,
+                stem,
+                bundle::BYTECODE_DIR,
+                stem
+            ));
+            continue;
+        };
+        let source = match fs::read_to_string(source_path) {
+            Ok(source) => source,
+            Err(e) => {
+                errors.push(format!("failed to read {}: {}", source_path.display(), e));
+                continue;
+            },
+        };
+        let blob = match fs::read(blob_path) {
+            Ok(blob) => blob,
+            Err(e) => {
+                errors.push(format!("failed to read {}: {}", blob_path.display(), e));
+                continue;
+            },
+        };
+        match stamped_hash(&source) {
+            None => errors.push(format!(
+                "{}/{}.move has no stamped execution hash (expected a leading \
+                 '// Script hash: ...' comment, added by generate-bundle)",
+                bundle::SCRIPTS_DIR,
+                stem
+            )),
+            Some(stamped) => {
+                let actual = HashValue::sha3_256_of(&blob).to_hex().to_lowercase();
+                if actual != stamped {
+                    errors.push(format!(
+                        "{}/{}.mv hash {} does not match the hash stamped on its source {}",
+                        bundle::BYTECODE_DIR,
+                        stem,
+                        actual,
+                        stamped
+                    ));
+                }
+            },
+        }
+    }
+    for stem in blobs.keys() {
+        if !sources.contains_key(stem) {
+            errors.push(format!(
+                "{}/{}.mv has no source counterpart {}/{}.move",
+                bundle::BYTECODE_DIR,
+                stem,
+                bundle::SCRIPTS_DIR,
+                stem
+            ));
+        }
+    }
+}
+
+/// The files with the given extension directly under `dir`, keyed by file
+/// stem; an absent or unreadable directory yields an empty map.
+fn files_by_stem(dir: &Path, extension: &str) -> BTreeMap<String, PathBuf> {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return BTreeMap::new();
+    };
+    entries
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().map(|x| x == extension).unwrap_or(false))
+        .filter_map(|p| {
+            let stem = p.file_stem()?.to_string_lossy().into_owned();
+            Some((stem, p))
+        })
+        .collect()
+}
+
+/// The execution hash stamped as the script's first line by generate-bundle.
+fn stamped_hash(source: &str) -> Option<String> {
+    source
+        .lines()
+        .next()?
+        .strip_prefix("// Script hash: ")
+        .map(|s| s.trim().trim_start_matches("0x").to_lowercase())
 }
 
 /// Every `*.md` file under `summary/` as `(path, contents)`, sorted by path;
@@ -139,5 +233,19 @@ fn check_signoff(bundle_path: &Path, errors: &mut Vec<String>) {
                 path.file_name().unwrap_or_default().to_string_lossy()
             ));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::stamped_hash;
+
+    #[test]
+    fn stamped_hash_parses_the_leading_comment() {
+        let source = "// Script hash: 0xAB12ef\nscript { fun main() {} }";
+        assert_eq!(stamped_hash(source), Some("ab12ef".to_string()));
+
+        let unstamped = "script { fun main() {} }";
+        assert_eq!(stamped_hash(unstamped), None);
     }
 }
