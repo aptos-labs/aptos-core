@@ -4142,11 +4142,13 @@ dependencies = [
  "aptos-sdk",
  "aptos-types",
  "aptos-warp-webserver",
+ "async-trait",
  "bcs 0.1.4",
  "clap 4.5.60",
  "futures",
  "hex",
  "itertools 0.13.0",
+ "mockall 0.11.4",
  "move-core-types",
  "once_cell",
  "reqwest 0.11.23",
@@ -4155,6 +4157,7 @@ dependencies = [
  "tokio",
  "url",
  "warp",
+ "wiremock",
 ]
 
 [[package]]
@@ -8301,12 +8304,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "deadpool"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fb84100978c1c7b37f09ed3ce3e5f843af02c2a2c431bae5b19230dad2c1b490"
+dependencies = [
+ "async-trait",
+ "deadpool-runtime",
+ "num_cpus",
+ "tokio",
+]
+
+[[package]]
 name = "deadpool-redis"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b8bde44cbfdf17ae5baa45c9f43073b320f1a19955389315629304a23909ad2"
 dependencies = [
- "deadpool",
+ "deadpool 0.9.5",
  "redis",
 ]
 
@@ -11094,7 +11109,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2 0.5.5",
+ "socket2 0.4.10",
  "tokio",
  "tower-service",
  "tracing",
@@ -21424,6 +21439,30 @@ checksum = "a277a57398d4bfa075df44f501a17cfdf8542d224f0d36095a2adc7aee4ef0a5"
 dependencies = [
  "cfg-if",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "wiremock"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2b8b99d4cdbf36b239a9532e31fe4fb8acc38d1897c1761e161550a7dc78e6a"
+dependencies = [
+ "assert-json-diff",
+ "async-trait",
+ "base64 0.22.1",
+ "deadpool 0.10.0",
+ "futures",
+ "http 1.1.0",
+ "http-body-util",
+ "hyper 1.4.1",
+ "hyper-util",
+ "log",
+ "once_cell",
+ "regex",
+ "serde",
+ "serde_json",
+ "tokio",
+ "url",
 ]
 
 [[package]]
