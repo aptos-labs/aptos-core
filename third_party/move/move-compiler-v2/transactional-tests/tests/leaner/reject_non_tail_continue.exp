@@ -1,0 +1,9 @@
+processed 1 task
+task 0 lines 1-10:  publish [import Move]
+Error: compilation errors:
+ 
+Leaner elaboration failed for `TEMPFILE`:
+TEMPFILE:6:65: error: while compiling Move function `LeanerRejectNonTailContinue.sumDown`:
+`continue` must mark a direct self-call in tail position
+TEMPFILE:6:65: error: cannot evaluate code because 'sorryAx' uses 'sorry' and/or contains errors
+

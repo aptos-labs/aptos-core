@@ -1242,6 +1242,8 @@ fn collect_loops(
                             | Oper::VecSet
                             | Oper::VecPush
                             | Oper::VecPop
+                            | Oper::VecInsert
+                            | Oper::VecRemove
                             | Oper::GetGlobal(_)
                             | Oper::GetGlobalInst(_, _)
                             | Oper::Exists(_)

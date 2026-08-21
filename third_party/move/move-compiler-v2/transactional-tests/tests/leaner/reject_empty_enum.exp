@@ -1,0 +1,8 @@
+processed 1 task
+task 0 lines 1-20:  publish [import Move]
+Error: compilation errors:
+ 
+Leaner elaboration failed for `TEMPFILE`:
+TEMPFILE:12:28: error: Move enum `LeanerTxnRejectEmptyEnum.Empty` must declare at least one variant
+TEMPFILE:12:28: error: cannot evaluate code because 'sorryAx' uses 'sorry' and/or contains errors
+

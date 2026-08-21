@@ -1,0 +1,8 @@
+processed 1 task
+task 0 lines 1-19:  publish [import Move]
+Error: compilation errors:
+ 
+Leaner elaboration failed for `TEMPFILE`:
+TEMPFILE:13:17: error: Move type `InvalidCopy` derives `Copy`, but field `resource` does not have the required `Copy` ability
+TEMPFILE:13:17: error: cannot evaluate code because 'sorryAx' uses 'sorry' and/or contains errors
+

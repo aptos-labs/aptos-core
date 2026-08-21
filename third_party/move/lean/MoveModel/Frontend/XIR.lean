@@ -79,6 +79,7 @@ structure MModule extends MProgram where
   dialect : Dialect
   structMeta : List StructMeta
   funMeta : List FunMeta
+  externalFuns : List ExternalFunRef := []
 
 /-- Conjunction of a clause list (empty = `true`). -/
 def andAll : List SpecExp → SpecExp
@@ -150,6 +151,7 @@ def MModule.toModule (m : MModule) : Module where
   numFuns := m.funs.length
   structMeta := fun r => m.structMeta[r]?
   funMeta := fun f => m.funMeta[f]?
+  externalFuns := m.externalFuns
   dialect := m.dialect
 
 /-- Resolve a function name in a deployable XIR module. -/

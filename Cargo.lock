@@ -13318,6 +13318,7 @@ dependencies = [
  "once_cell",
  "petgraph 0.6.5",
  "serde_json",
+ "tempfile",
  "walkdir",
 ]
 
@@ -13838,6 +13839,7 @@ dependencies = [
  "move-vm-types",
  "once_cell",
  "regex",
+ "smallvec",
  "tempfile",
  "tera",
  "termcolor",

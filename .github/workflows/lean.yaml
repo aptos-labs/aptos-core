@@ -45,7 +45,14 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Lean toolchain
-        run: scripts/dev_setup.sh -b -p -l -k
+        run: |
+          scripts/dev_setup.sh -b -p -l -k
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Lean toolchain
+        run: |
+          lean --version
+          lake --version
 
       - name: Build the frontend CLI
         run: cargo build --locked -p aptos --bin aptos
@@ -66,3 +73,9 @@ jobs:
         run: |
           source "$HOME/.profile"
           lake test
+
+      - name: Test compiler-v2 Lean integration
+        run: |
+          cargo test --locked -p move-compiler-v2 leaner::tests
+          cargo test --locked -p move-compiler-v2-transactional-tests \
+            --test tests -- leaner/

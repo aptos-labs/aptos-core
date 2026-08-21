@@ -246,7 +246,7 @@ missing operand leaves the state unchanged. -/
           { v with
             cur := MoveState.writeLocals (v.cur.setMemory m') dsts rets }
         else v
-    | some .abort => v.doAbort runtimeAbortCode
+    | some .abort => v.doAbort op.abortCode
     | none => v
   | none =>
     match dsts, op, srcs with

@@ -37,7 +37,7 @@ inductive TypeTagToken where
   | struct (resource : ResourceId) (arity : Nat)
   | enum (resource : ResourceId) (arity : Nat)
   | vector | ref | mutRef
-  deriving BEq, DecidableEq, ReflBEq, LawfulBEq, Repr
+  deriving BEq, DecidableEq, ReflBEq, LawfulBEq, Ord, Repr
 
 /-- Collision-free prefix encoding of one Move type. -/
 abbrev TypeTag := List TypeTagToken
@@ -47,7 +47,7 @@ resource types even when they share the same declaration id. -/
 structure ResourceKey where
   resource : ResourceId
   typeArgs : List TypeTag := []
-  deriving BEq, DecidableEq, ReflBEq, LawfulBEq, Repr
+  deriving BEq, DecidableEq, ReflBEq, LawfulBEq, Ord, Repr
 
 /-- A nongeneric resource id denotes the empty instantiation. -/
 instance : Coe ResourceId ResourceKey where
@@ -73,7 +73,7 @@ function calls. -/
 inductive RefRoot where
   | loc (frame : FrameId) (x : LocalIndex)
   | global (r : ResourceKey) (a : Address)
-  deriving BEq, DecidableEq, ReflBEq, LawfulBEq, Repr
+  deriving BEq, DecidableEq, ReflBEq, LawfulBEq, Ord, Repr
 
 /-- A runtime reference: a root location plus a path of offsets — the borrow
 chain `borrow_loc`/`borrow_global` followed by `borrow_field`s and
@@ -85,7 +85,7 @@ seen by the specification language. -/
 structure RefTarget where
   root : RefRoot
   path : List Nat
-  deriving BEq, DecidableEq, ReflBEq, LawfulBEq, Repr
+  deriving BEq, DecidableEq, ReflBEq, LawfulBEq, Ord, Repr
 
 /-- Does a path residue match an edge pattern?  `some i` requires the
 exact offset, `none` is the dynamic-index wildcard (MVP's `-1` edge
@@ -149,7 +149,7 @@ inductive Value where
   | vector (elems : List Value)
   | ref (t : RefTarget)
   | mut (t : RefTarget) (v : Value)
-  deriving BEq, Repr
+  deriving BEq, Ord, Repr
 
 namespace Value
 
@@ -159,15 +159,16 @@ mutual
   versus `bool`) in ill-typed configurations.  Empty vectors are compatible
   with any vector because their element type is erased from runtime values;
   well-typed IR supplies the stronger static guarantee. -/
-  def sameTypeShape : Value → Value → Bool
+  @[simp] def sameTypeShape : Value → Value → Bool
     | .u64 _, .u64 _ | .bool _, .bool _ | .address _, .address _ => true
     | .struct xs, .struct ys => sameTypeShapeList xs ys
-    | .variant tx xs, .variant ty ys => tx == ty && sameTypeShapeList xs ys
+    | .variant tx xs, .variant ty ys =>
+        if tx == ty then sameTypeShapeList xs ys else true
     | .vector [], .vector _ | .vector _, .vector [] => true
     | .vector (x :: _), .vector (y :: _) => sameTypeShape x y
     | _, _ => false
 
-  def sameTypeShapeList : List Value → List Value → Bool
+  @[simp] def sameTypeShapeList : List Value → List Value → Bool
     | [], [] => true
     | x :: xs, y :: ys => sameTypeShape x y && sameTypeShapeList xs ys
     | _, _ => false
@@ -196,7 +197,7 @@ end
 /-- Resolve a top-level reference through `deref`; a mutation is its
 carried value; any other value is itself.  Move's `==` compares the values
 references refer to. -/
-def derefWith (deref : RefTarget → Option Value) : Value → Option Value
+@[simp] def derefWith (deref : RefTarget → Option Value) : Value → Option Value
   | .ref t => deref t
   | .mut _ v => some v
   | v => some v

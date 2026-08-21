@@ -14,6 +14,7 @@ use move_transactional_test_runner::{
 };
 use std::{
     path::{Path, PathBuf},
+    process::Command,
     string::ToString,
 };
 use walkdir::WalkDir;
@@ -192,6 +193,11 @@ const TEST_CONFIGS: &[TestConfig] = &[
 /// separate baseline output file `test.foo.exp`.
 const SEPARATE_BASELINE: &[&str] = &[
     // Offsets are different depending on optimizations
+    "leaner/arithmetic.lean",
+    "leaner/control_flow.lean",
+    "leaner/loops.lean",
+    "leaner/vector_operations.lean",
+    "leaner/ordered_map.lean",
     "control_flow/abort_complex.move",
     "control_flow/abort_invalid.move",
     "control_flow/abort_vector.move",
@@ -253,7 +259,7 @@ fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
         TestRunConfig::new(language_version, experiments).with_runtime_ref_checks();
     // For cross compilation, we need to always append the config name as a part of the
     // outcome file suffix, as optimizations affect the generated code.
-    if config.cross_compile {
+    if config.cross_compile && path.extension().is_some_and(|ext| ext == "move") {
         vm_test_config = vm_test_config.cross_compile_into(
             SyntaxChoice::Source,
             true,
@@ -266,7 +272,15 @@ fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
     vm_test_harness::run_test_with_config_and_exp_suffix(vm_test_config, path, &exp_suffix)
 }
 
+fn lake_available() -> bool {
+    Command::new("lake")
+        .arg("--version")
+        .output()
+        .is_ok_and(|output| output.status.success())
+}
+
 fn main() {
+    let has_lake = lake_available();
     let files = WalkDir::new("tests")
         .follow_links(false)
         .min_depth(1)
@@ -274,7 +288,7 @@ fn main() {
         .flatten()
         .filter_map(|e| {
             let p = e.path().display().to_string();
-            if p.ends_with(".move") {
+            if p.ends_with(".move") || p.ends_with(".lean") {
                 Some(p)
             } else {
                 None
@@ -294,10 +308,14 @@ fn main() {
                 .map(|file| {
                     let prompt = format!("compiler-v2-txn[config={}]::{}", config.name, file);
                     let path = PathBuf::from(file);
+                    let requires_lean = path
+                        .extension()
+                        .is_some_and(|extension| extension == "lean");
                     let runner = config.runner;
                     Trial::test(prompt, move || {
                         runner(&path).map_err(|err| format!("{:?}", err).into())
                     })
+                    .with_ignored_flag(requires_lean && !has_lake)
                 })
         })
         .collect_vec();

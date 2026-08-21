@@ -25,8 +25,8 @@ Conventions:
 * `Oper.sem` is a deterministic partial function for non-call operations.
   `none` means that the arguments are ill typed and execution is stuck.
   `some .abort` denotes a runtime abort, such as arithmetic overflow,
-  division by zero, or a resource error.  Runtime aborts use the fixed code
-  `runtimeAbortCode`; `Term.abort` uses the value of its operand.
+  division by zero, or a resource error.  `Oper.abortCode` supplies its code;
+  `Term.abort` uses the value of its operand.
 * Branching on a non-boolean local, jumping to an undeclared block, and
   calling an undeclared function are likewise stuck.
 * Local reference roots are frame-qualified.  Calls pass reference values
@@ -52,8 +52,16 @@ Conventions:
 
 namespace MoveModel.IR
 
-/-- Abort code used for all runtime aborts. -/
+/-- Default code used for runtime execution failures. -/
 def runtimeAbortCode : Nat := 0
+
+/-- Observable abort code of a failed primitive operation. Stable vector
+insertion and removal mirror `std::vector::EINDEX_OUT_OF_BOUNDS`; the remaining
+runtime failures retain the model's generic execution-failure code. -/
+def Oper.abortCode : Oper → Nat
+  | .vecInsert => 0x20000
+  | .vecRemove => 0x20000
+  | _ => runtimeAbortCode
 
 /-- Result of a non-call operation: result values plus the updated memory,
 or a runtime abort. -/
@@ -67,10 +75,10 @@ function of the operand values and the current memory.  `none` = ill-typed
 reference operations are handled relationally by `RunFrom` (they need the
 locals resp. the operand *indices*, not just values).
 
-`deref` resolves reference values, used by `eq`: Move's `==` compares the
-values references refer to.  Values stored to global memory or packed into
-structs and vectors must be reference-free (`Value.refFree`), as in the
-Move VM. -/
+`deref` resolves reference values for observations: Move equality, structural
+ordering, and vector length operate on the values references denote. Values
+stored to global memory or packed into structs and vectors must be
+reference-free (`Value.refFree`), as in the Move VM. -/
 def Oper.sem (current : FrameId) (deref : RefTarget → Option Value) :
     Oper → List Value → Memory → Option OpOutcome
   | .add, [.u64 i, .u64 j], m =>
@@ -83,7 +91,15 @@ def Oper.sem (current : FrameId) (deref : RefTarget → Option Value) :
       some (if j = 0 then .abort else .ok [.u64 (i / j)] m)
   | .mod, [.u64 i, .u64 j], m =>
       some (if j = 0 then .abort else .ok [.u64 (i % j)] m)
-  | .lt, [.u64 i, .u64 j], m => some (.ok [.bool (decide (i < j))] m)
+  | .lt, [v₁, v₂], m => do
+      let a ← v₁.derefWith deref
+      let b ← v₂.derefWith deref
+      match a, b with
+      | .u64 i, .u64 j => pure (.ok [.bool (decide (i < j))] m)
+      | a, b =>
+          if a.refFree && b.refFree && a.sameTypeShape b then
+            pure (.ok [.bool (compare a b == .lt)] m)
+          else none
   | .le, [.u64 i, .u64 j], m => some (.ok [.bool (decide (i ≤ j))] m)
   | .eq, [v₁, v₂], m => do
       let a ← v₁.derefWith deref
@@ -120,7 +136,9 @@ def Oper.sem (current : FrameId) (deref : RefTarget → Option Value) :
       else none
   | .vecPack, vs, m =>
       if Value.refFreeList vs then some (.ok [.vector vs] m) else none
-  | .vecLen, [.vector es], m => some (.ok [.u64 es.length] m)
+  | .vecLen, [value], m => do
+      let .vector es ← value.derefWith deref | none
+      pure (.ok [.u64 es.length] m)
   | .vecGet, [.vector es, .u64 i], m =>
       some (match es[i]? with
         | some v => .ok [v] m
@@ -136,6 +154,15 @@ def Oper.sem (current : FrameId) (deref : RefTarget → Option Value) :
   | .vecPop, [.vector es], m =>
       some (match es.getLast? with
         | some v => .ok [.vector es.dropLast, v] m
+        | none => .abort)
+  | .vecInsert, [.vector es, .u64 i, v], m =>
+      if !v.refFree then none
+      else some (if i ≤ es.length && es.length + 1 < U64_SIZE then
+        .ok [.vector (es.take i ++ v :: es.drop i)] m
+      else .abort)
+  | .vecRemove, [.vector es, .u64 i], m =>
+      some (match es[i]? with
+        | some v => .ok [.vector (es.take i ++ es.drop (i + 1)), v] m
         | none => .abort)
   | .mkMutLoc x, [v], m =>
       if v.refFree then some (.ok [.mut ⟨.loc current x, []⟩ v] m) else none
@@ -247,7 +274,7 @@ inductive RunFrom (P : Program) : Cfg → List Instr → Term → MoveState →
       (hsrcs : srcs.mapM s.locals = some vs)
       (hop : op.sem s.current s.readTarget vs s.memory = some .abort) :
       RunFrom P G (.call dsts op srcs :: rest) term s
-        (.abort s.memory runtimeAbortCode)
+        (.abort s.memory op.abortCode)
   /-- A guarded write-back candidate whose may-parent is absent does not
   match.  Unlike ordinary operations, this internal dispatch test is total
   on an uninitialized first operand. -/
@@ -447,10 +474,12 @@ def FunExec (P : Program) (f : FunId) (m : Memory) (args : List Value)
     RunBlock P d.body d.body.entry (MoveState.initial args m) o
 
 set_option maxHeartbeats 500000 in
-/-- Non-equality operations do not inspect the supplied reference dereferencer. -/
+/-- Operations other than equality, generic ordering, and borrowed-vector
+length do not inspect the supplied reference dereferencer. -/
 theorem Oper.sem_deref_irrel {op : Oper} {current : FrameId}
     {deref₁ deref₂ : RefTarget → Option Value} {vs : List Value}
-    {m : Memory} (hne : op ≠ .eq) :
+    {m : Memory} (hne : op ≠ .eq) (hnlt : op ≠ .lt)
+    (hnlen : op ≠ .vecLen) :
     op.sem current deref₁ vs m = op.sem current deref₂ vs m := by
   generalize hi : op.sem current deref₁ vs m = out
   fun_cases op.sem current deref₁ vs m <;> try rfl

@@ -1,0 +1,27 @@
+processed 7 tasks
+task 0 lines 1-49:  publish [import Move]
+warning: This assignment/binding to the left-hand-side variable `l7` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_l7`), or renaming to `_`
+   ┌─ TEMPFILE:1:1
+   │  
+ 1 │ ╭ 
+ 2 │ │ import Move
+ 3 │ │ open scoped Move
+ 4 │ │ move_module LeanerLoops where
+   · │
+38 │ │     n
+39 │ │ /-! ## Tests -/
+   │ ╰───────────────^
+
+
+task 1 lines 51-51:  run 0x0::LeanerLoops::countDown --args 5u64
+return values: 0
+task 2 lines 53-53:  run 0x0::LeanerLoops::countDownLoop --args 5u64
+return values: 0
+task 3 lines 55-55:  run 0x0::LeanerLoops::skipEvens --args 5u64 0u64
+return values: 2
+task 4 lines 57-57:  run 0x0::LeanerLoops::labeledCountDown --args 5u64
+return values: 0
+task 5 lines 59-59:  run 0x0::LeanerLoops::returnInLoop --args 5u64
+return values: 1
+task 6 lines 61-61:  run 0x0::LeanerLoops::returnInLoop --args 2u64
+return values: 0
