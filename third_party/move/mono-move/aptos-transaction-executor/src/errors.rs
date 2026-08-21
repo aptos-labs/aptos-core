@@ -48,17 +48,17 @@ pub enum DiscardReason {
 
 /// The pre-execution bound a transaction violated. Sizes are in bytes, gas in
 /// gas units, prices in octas per gas unit.
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum PreExecutionCheckFailure {
-    /// The signed transaction is larger than the allowed maximum.
+    #[error("transaction size {size} exceeds the maximum {max}")]
     TransactionTooLarge { size: u64, max: u64 },
-    /// The gas budget exceeds the per-transaction maximum.
+    #[error("max gas amount {max_gas} exceeds the bound {bound}")]
     GasBudgetAboveBound { max_gas: u64, bound: u64 },
-    /// The gas budget cannot cover the transaction's intrinsic cost.
+    #[error("max gas amount {max_gas} is below the transaction's base cost {min}")]
     GasBudgetBelowIntrinsicCost { max_gas: u64, min: u64 },
-    /// The gas unit price is below the on-chain minimum.
+    #[error("gas unit price {price} is below the minimum {min}")]
     GasPriceBelowMinimum { price: u64, min: u64 },
-    /// The gas unit price is above the on-chain maximum.
+    #[error("gas unit price {price} is above the maximum {max}")]
     GasPriceAboveMaximum { price: u64, max: u64 },
 }
 

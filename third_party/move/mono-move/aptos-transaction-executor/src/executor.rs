@@ -10,13 +10,12 @@ use crate::{
     pre_execution_checks::PreExecutionChecker,
     sys_calls::{run_epilogue, run_prologue, TxnSigners},
 };
-use aptos_gas_schedule::AptosGasParameters;
 use aptos_types::{
     fee_statement::FeeStatement,
-    on_chain_config::Features,
     state_store::state_storage_usage::StateStorageUsage,
     transaction::{AuxiliaryInfo, EntryFunction, SignedTransaction, TransactionExecutableRef},
 };
+use aptos_vm_environment::environment::AptosEnvironment;
 use mono_move_core::{
     intern_type_tag, storage::module_provider::ModuleProvider, types::InternedTypeList, GasMeter,
     Interner, ResourceProvider,
@@ -36,18 +35,11 @@ pub struct AptosTransactionExecutor<'a> {
     natives: &'a ProductionNativeRegistry,
     module_provider: &'a dyn ModuleProvider,
     data_provider: &'a dyn ResourceProvider,
-    // TODO(completeness): Consider growing these into the full `AptosEnvironment` supplied by
-    // the coordinator.
-    // Should however rethink whether we can simply reuse the existing `AptosEnvironment` struct.
+    /// The on-chain configs (features, gas schedule) at the current state.
     //
-    // Nothing reads the features yet -- gas configuration and the pre-execution
-    // checks will -- but the coordinator already supplies them.
-    #[allow(dead_code)]
-    features: &'a Features,
-    /// The on-chain gas schedule, decoded; drives the pre-execution gas checks.
-    gas_params: &'a AptosGasParameters,
-    /// The gas schedule's feature version.
-    gas_feature_version: u64,
+    // TODO(cleanup): reusing the legacy VM's environment type is transitional;
+    // revisit once the executor grows its own config surface.
+    env: &'a AptosEnvironment,
     /// State storage usage at the current epoch's beginning.
     usage: StateStorageUsage,
     /// If set, the payload runs unmetered and the epilogue charges a zero
@@ -64,9 +56,7 @@ impl<'a> AptosTransactionExecutor<'a> {
         natives: &'a ProductionNativeRegistry,
         module_provider: &'a dyn ModuleProvider,
         data_provider: &'a dyn ResourceProvider,
-        features: &'a Features,
-        gas_params: &'a AptosGasParameters,
-        gas_feature_version: u64,
+        env: &'a AptosEnvironment,
         usage: StateStorageUsage,
     ) -> Self {
         Self {
@@ -74,9 +64,7 @@ impl<'a> AptosTransactionExecutor<'a> {
             natives,
             module_provider,
             data_provider,
-            features,
-            gas_params,
-            gas_feature_version,
+            env,
             usage,
             unmetered: false,
         }
@@ -117,7 +105,10 @@ impl<'a> AptosTransactionExecutor<'a> {
         // ======================== Pre-execution checks ========================
         // Reject what this executor cannot execute, before touching any state.
         let txn_data = TxnMetadata::new(txn, aux_info);
-        PreExecutionChecker::new(self.gas_params, self.gas_feature_version, &txn_data)
+        let gas_params = self.env.gas_params().as_ref().map_err(|e| {
+            DiscardReason::InvariantViolation(format!("the gas schedule is unavailable: {e}"))
+        })?;
+        PreExecutionChecker::new(gas_params, self.env.gas_feature_version(), &txn_data)
             .run_checks()
             .map_err(DiscardReason::PreExecutionCheck)?;
 

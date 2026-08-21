@@ -14,16 +14,15 @@
 // covered by other tests, such as the e2e move tests. Note that the sender's
 // store is masked, so a wrong debit there is not caught.
 
-use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_language_e2e_tests::{account::AccountData, executor::FakeExecutor};
 use aptos_types::{
-    on_chain_config::{Features, GasScheduleV2, OnChainConfig},
     state_store::StateView,
     transaction::{
         AuxiliaryInfo, ExecutionStatus, PersistedAuxiliaryInfo, SignedTransaction,
         TransactionAuxiliaryData, TransactionOutput, TransactionStatus,
     },
 };
+use aptos_vm_environment::environment::AptosEnvironment;
 use mono_move_aptos_state_view_providers::{StateViewModuleProvider, StateViewResourceProvider};
 use mono_move_aptos_transaction_executor::{production_natives, AptosTransactionExecutor};
 use mono_move_global_context::GlobalContext;
@@ -47,28 +46,14 @@ fn execute_v2<S: StateView>(state: &S, txn: &SignedTransaction) -> TransactionOu
     let natives = production_natives(&guard);
     let module_provider = StateViewModuleProvider::new(state);
     let data_provider = StateViewResourceProvider::new(&guard, state);
-    let features = Features::fetch_config(state)
-        .ok()
-        .flatten()
-        .unwrap_or_default();
-    let gas_schedule = GasScheduleV2::fetch_config(state)
-        .expect("the gas schedule is readable")
-        .expect("genesis has a gas schedule");
-    let gas_feature_version = gas_schedule.feature_version;
-    let gas_params = AptosGasParameters::from_on_chain_gas_schedule(
-        &gas_schedule.into_btree_map(),
-        gas_feature_version,
-    )
-    .expect("the gas schedule decodes");
+    let env = AptosEnvironment::new(state);
     let usage = state.get_usage().expect("usage is readable");
     let executor = AptosTransactionExecutor::new(
         &guard,
         &natives,
         &module_provider,
         &data_provider,
-        &features,
-        &gas_params,
-        gas_feature_version,
+        &env,
         usage,
     );
     executor
@@ -76,7 +61,7 @@ fn execute_v2<S: StateView>(state: &S, txn: &SignedTransaction) -> TransactionOu
         .materialize(
             &guard,
             &data_provider,
-            &features,
+            env.features(),
             TransactionAuxiliaryData::default(),
         )
         .expect("the transaction output materializes")

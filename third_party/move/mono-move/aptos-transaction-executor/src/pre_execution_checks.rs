@@ -42,7 +42,7 @@ impl<'a> PreExecutionChecker<'a> {
         Ok(())
     }
 
-    fn txn_params(&self) -> &TransactionGasParameters {
+    fn txn_gas_params(&self) -> &TransactionGasParameters {
         &self.gas_params.vm.txn
     }
 
@@ -62,7 +62,7 @@ impl<'a> PreExecutionChecker<'a> {
     // TODO(completeness): approved governance scripts get a larger size
     // allowance (`max_transaction_size_in_bytes_gov`); revisit with scripts.
     fn check_transaction_size(&self) -> Result<(), PreExecutionCheckFailure> {
-        let max = self.txn_params().max_transaction_size_in_bytes;
+        let max = self.txn_gas_params().max_transaction_size_in_bytes;
         if self.txn_size() > max {
             return Err(PreExecutionCheckFailure::TransactionTooLarge {
                 size: self.txn_size().into(),
@@ -72,9 +72,30 @@ impl<'a> PreExecutionChecker<'a> {
         Ok(())
     }
 
+    /// Checks if the gas unit price is within the allowed global minimum and maximum.
+    fn check_gas_price_bounds(&self) -> Result<(), PreExecutionCheckFailure> {
+        let min = self.txn_gas_params().min_price_per_gas_unit;
+        if self.gas_price() < min {
+            return Err(PreExecutionCheckFailure::GasPriceBelowMinimum {
+                price: self.gas_price().into(),
+                min: min.into(),
+            });
+        }
+        // TODO(completeness): the staking high-limit minimum price, once
+        // transaction-limits requests are supported.
+        let max = self.txn_gas_params().max_price_per_gas_unit;
+        if self.gas_price() > max {
+            return Err(PreExecutionCheckFailure::GasPriceAboveMaximum {
+                price: self.gas_price().into(),
+                max: max.into(),
+            });
+        }
+        Ok(())
+    }
+
     /// Checks if the gas budget of the transaction is within the global maximum.
     fn check_gas_budget_upper_bound(&self) -> Result<(), PreExecutionCheckFailure> {
-        let bound = self.txn_params().maximum_number_of_gas_units;
+        let bound = self.txn_gas_params().maximum_number_of_gas_units;
         if self.max_gas() > bound {
             return Err(PreExecutionCheckFailure::GasBudgetAboveBound {
                 max_gas: self.max_gas().into(),
@@ -100,36 +121,15 @@ impl<'a> PreExecutionChecker<'a> {
         // TODO(completeness): the encrypted-transaction decryption surcharge
         // and minimum price, once encrypted payloads are supported.
         let intrinsic = self
-            .txn_params()
+            .txn_gas_params()
             .calculate_intrinsic_gas(self.txn_size())
             .evaluate(self.gas_feature_version, &self.gas_params.vm);
         let min_gas: Gas =
-            (intrinsic + keyless + slh_dsa).to_unit_round_up_with_params(self.txn_params());
+            (intrinsic + keyless + slh_dsa).to_unit_round_up_with_params(self.txn_gas_params());
         if self.max_gas() < min_gas {
             return Err(PreExecutionCheckFailure::GasBudgetBelowIntrinsicCost {
                 max_gas: self.max_gas().into(),
                 min: min_gas.into(),
-            });
-        }
-        Ok(())
-    }
-
-    /// Checks if the gas unit price is within the allowed global minimum and maximum.
-    fn check_gas_price_bounds(&self) -> Result<(), PreExecutionCheckFailure> {
-        let min = self.txn_params().min_price_per_gas_unit;
-        if self.gas_price() < min {
-            return Err(PreExecutionCheckFailure::GasPriceBelowMinimum {
-                price: self.gas_price().into(),
-                min: min.into(),
-            });
-        }
-        // TODO(completeness): the staking high-limit minimum price, once
-        // transaction-limits requests are supported.
-        let max = self.txn_params().max_price_per_gas_unit;
-        if self.gas_price() > max {
-            return Err(PreExecutionCheckFailure::GasPriceAboveMaximum {
-                price: self.gas_price().into(),
-                max: max.into(),
             });
         }
         Ok(())

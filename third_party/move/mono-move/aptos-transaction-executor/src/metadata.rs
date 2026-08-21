@@ -4,7 +4,7 @@
 use aptos_types::transaction::{
     authenticator::AnySignature,
     user_transaction_context::{TransactionIndexKind, UserTransactionContext},
-    AuxiliaryInfo, PersistedAuxiliaryInfo, ReplayProtector, SessionId, SignedTransaction,
+    AuxiliaryInfo, ReplayProtector, SessionId, SignedTransaction,
 };
 use move_core_types::account_address::AccountAddress;
 

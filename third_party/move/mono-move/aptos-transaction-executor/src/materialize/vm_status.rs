@@ -84,29 +84,16 @@ pub(crate) fn discard_to_vm_status(reason: DiscardReason) -> VMStatus {
 /// Converts a violated pre-execution bound into the legacy validation status.
 fn pre_execution_check_status(failure: PreExecutionCheckFailure) -> VMStatus {
     use PreExecutionCheckFailure as F;
-    let (code, detail) = match failure {
-        F::TransactionTooLarge { size, max } => (
-            StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE,
-            format!("transaction size {size} exceeds the maximum {max}"),
-        ),
-        F::GasBudgetAboveBound { max_gas, bound } => (
-            StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND,
-            format!("max gas amount {max_gas} exceeds the bound {bound}"),
-        ),
-        F::GasBudgetBelowIntrinsicCost { max_gas, min } => (
-            StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS,
-            format!("max gas amount {max_gas} is below the intrinsic cost {min}"),
-        ),
-        F::GasPriceBelowMinimum { price, min } => (
-            StatusCode::GAS_UNIT_PRICE_BELOW_MIN_BOUND,
-            format!("gas unit price {price} is below the minimum {min}"),
-        ),
-        F::GasPriceAboveMaximum { price, max } => (
-            StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND,
-            format!("gas unit price {price} is above the maximum {max}"),
-        ),
+    let code = match &failure {
+        F::TransactionTooLarge { .. } => StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE,
+        F::GasBudgetAboveBound { .. } => StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND,
+        F::GasBudgetBelowIntrinsicCost { .. } => {
+            StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS
+        },
+        F::GasPriceBelowMinimum { .. } => StatusCode::GAS_UNIT_PRICE_BELOW_MIN_BOUND,
+        F::GasPriceAboveMaximum { .. } => StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND,
     };
-    VMStatus::error(code, Some(detail))
+    VMStatus::error(code, Some(failure.to_string()))
 }
 
 /// Converts an executed transaction's conclusion into its `VMStatus`.
