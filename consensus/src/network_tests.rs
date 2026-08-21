@@ -688,6 +688,7 @@ mod tests {
             test_utils::placeholder_sync_info(),
         );
         let previous_qc = certificate_for_genesis();
+        let epoch_change_ledger_info = previous_qc.ledger_info().clone();
         let proposal = ProposalMsg::new(
             Block::new_proposal(
                 Payload::empty(false),
@@ -728,6 +729,17 @@ mod tests {
                     ConsensusMsg::ProposalMsg(p) => assert_eq!(*p, proposal),
                     _ => panic!("unexpected messages"),
                 }
+            }
+            nodes[0]
+                .send_epoch_change_from_ledger_info(epoch_change_ledger_info.clone())
+                .await;
+            let (peer, msg) = receivers[0].consensus_messages.next().await.unwrap();
+            assert_eq!(peer, peers[0]);
+            match msg {
+                ConsensusMsg::EpochChangeProof(proof) => {
+                    assert_eq!(proof.ledger_info_with_sigs, vec![epoch_change_ledger_info])
+                },
+                _ => panic!("unexpected message"),
             }
         });
     }

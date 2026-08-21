@@ -64,6 +64,7 @@ use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{
     block_info::BlockInfo,
     epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{
         OnChainChunkyDKGConfig, OnChainConsensusConfig, OnChainJWKConsensusConfig,
         OnChainRandomnessConfig, ValidatorTxnConfig,
@@ -401,6 +402,7 @@ pub enum VerifiedEvent {
     RoundTimeoutMsg(Box<RoundTimeoutMsg>),
     OrderVoteMsg(Box<OrderVoteMsg>),
     UnverifiedSyncInfo(Box<SyncInfo>),
+    CommitCert(Box<LedgerInfoWithSignatures>),
     BatchMsg(Box<BatchMsg<BatchInfoExt>>),
     SignedBatchInfo(Box<SignedBatchInfoMsg<BatchInfoExt>>),
     ProofOfStoreMsg(Box<ProofOfStoreMsg<BatchInfoExt>>),
@@ -1027,6 +1029,28 @@ impl RoundManager {
         } else {
             Ok(())
         }
+    }
+
+    /// Process a commit certificate using the same state-sync threshold as SyncInfo. If the node
+    /// is too far behind, send the certificate through the local epoch-change path to shut down the
+    /// current processor and sync to the epoch-ending ledger info. Otherwise, send it to the buffer
+    /// manager, which retains it until the corresponding block is locally ordered and executed.
+    async fn process_commit_cert(
+        &mut self,
+        ledger_info: LedgerInfoWithSignatures,
+    ) -> anyhow::Result<()> {
+        if self
+            .block_store
+            .need_sync_for_ledger_info(&ledger_info)
+            .is_some()
+        {
+            self.network
+                .send_epoch_change_from_ledger_info(ledger_info)
+                .await;
+        } else {
+            self.network.send_commit_proof(ledger_info).await;
+        }
+        Ok(())
     }
 
     /// The function makes sure that it ensures the message_round equal to what we have locally,
@@ -2322,6 +2346,10 @@ impl RoundManager {
                                 self.process_sync_info_msg(*sync_info, peer_id).await
                             )
                         }
+                        VerifiedEvent::CommitCert(ledger_info) => monitor!(
+                            "process_commit_cert",
+                            self.process_commit_cert(*ledger_info).await
+                        ),
                         VerifiedEvent::LocalTimeout(round) => monitor!(
                             "process_local_timeout",
                             self.process_local_timeout(round).await

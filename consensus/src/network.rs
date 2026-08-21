@@ -528,6 +528,11 @@ impl NetworkSender {
         self.send(msg, vec![self.author]).await
     }
 
+    pub async fn send_epoch_change_from_ledger_info(&self, ledger_info: LedgerInfoWithSignatures) {
+        self.send_epoch_change(EpochChangeProof::new(vec![ledger_info], false))
+            .await;
+    }
+
     /// Sends the ledger info to self buffer manager
     pub async fn send_commit_proof(&self, ledger_info: LedgerInfoWithSignatures) {
         fail_point!("consensus::send::commit_decision", |_| ());
