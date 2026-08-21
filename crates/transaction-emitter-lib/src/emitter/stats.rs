@@ -16,6 +16,7 @@ pub struct TxnStats {
     pub submitted: u64,
     pub committed: u64,
     pub expired: u64,
+    pub unresolved: u64,
     pub failed_submission: u64,
     pub latency: u64,         // total milliseconds across all latency measurements
     pub latency_samples: u64, // number of events with latency measured
@@ -28,6 +29,7 @@ pub struct TxnStatsRate {
     pub submitted: f64,         // per second
     pub committed: f64,         // per second
     pub expired: f64,           // per second
+    pub unresolved: f64,        // per second
     pub failed_submission: f64, // per second
     pub latency: f64,           // mean latency (milliseconds)
     pub latency_samples: u64,   // number latency-measured events
@@ -41,11 +43,12 @@ impl fmt::Display for TxnStatsRate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "committed: {:.2} txn/s{}{}{}, latency: {:.2} ms, (p50: {} ms, p70: {}, p90: {} ms, p99: {} ms), latency samples: {}",
+            "committed: {:.2} txn/s{}{}{}{}, latency: {:.2} ms, (p50: {} ms, p70: {}, p90: {} ms, p99: {} ms), latency samples: {}",
             self.committed,
             if self.submitted != self.committed { format!(", submitted: {:.2} txn/s", self.submitted) } else { "".to_string()},
             if self.failed_submission != 0.0 { format!(", failed submission: {:.2} txn/s", self.failed_submission) } else { "".to_string()},
             if self.expired != 0.0 { format!(", expired: {:.2} txn/s", self.expired) } else { "".to_string()},
+            if self.unresolved != 0.0 { format!(", unresolved: {:.2} txn/s", self.unresolved) } else { "".to_string()},
             self.latency, self.p50_latency, self.p70_latency, self.p90_latency, self.p99_latency, self.latency_samples,
         )
     }
@@ -58,6 +61,7 @@ impl TxnStats {
             submitted: (self.submitted as f64) / window_secs,
             committed: (self.committed as f64) / window_secs,
             expired: (self.expired as f64) / window_secs,
+            unresolved: (self.unresolved as f64) / window_secs,
             failed_submission: (self.failed_submission as f64) / window_secs,
             latency: if self.latency_samples == 0 {
                 0.0
@@ -77,8 +81,8 @@ impl fmt::Display for TxnStats {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "submitted: {}, committed: {}, expired: {}, failed submission: {}",
-            self.submitted, self.committed, self.expired, self.failed_submission,
+            "submitted: {}, committed: {}, expired: {}, unresolved: {}, failed submission: {}",
+            self.submitted, self.committed, self.expired, self.unresolved, self.failed_submission,
         )
     }
 }
@@ -91,6 +95,7 @@ impl Sub for &TxnStats {
             submitted: self.submitted - other.submitted,
             committed: self.committed - other.committed,
             expired: self.expired - other.expired,
+            unresolved: self.unresolved - other.unresolved,
             failed_submission: self.failed_submission - other.failed_submission,
             latency: self.latency - other.latency,
             latency_samples: self.latency_samples - other.latency_samples,
@@ -108,6 +113,7 @@ impl Add for &TxnStats {
             submitted: self.submitted + other.submitted,
             committed: self.committed + other.committed,
             expired: self.expired + other.expired,
+            unresolved: self.unresolved + other.unresolved,
             failed_submission: self.failed_submission + other.failed_submission,
             latency: self.latency + other.latency,
             latency_samples: self.latency_samples + other.latency_samples,
@@ -122,6 +128,7 @@ pub struct StatsAccumulator {
     pub submitted: AtomicU64,
     pub committed: AtomicU64,
     pub expired: AtomicU64,
+    pub unresolved: AtomicU64,
     pub failed_submission: AtomicU64,
     pub latency: AtomicU64, // total milliseconds across all latency measurements
     pub latency_samples: AtomicU64, // number of events with latency measured
@@ -134,6 +141,7 @@ impl StatsAccumulator {
             submitted: self.submitted.load(Ordering::Relaxed),
             committed: self.committed.load(Ordering::Relaxed),
             expired: self.expired.load(Ordering::Relaxed),
+            unresolved: self.unresolved.load(Ordering::Relaxed),
             failed_submission: self.failed_submission.load(Ordering::Relaxed),
             latency: self.latency.load(Ordering::Relaxed),
             latency_samples: self.latency_samples.load(Ordering::Relaxed),
@@ -400,6 +408,7 @@ mod test {
             submitted: 0,
             committed: 10,
             expired: 0,
+            unresolved: 0,
             failed_submission: 0,
             latency: 0,
             latency_samples: 0,
