@@ -1797,7 +1797,34 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     "Proof from epoch {}", msg_epoch,
                 );
                 if msg_epoch == self.epoch() {
-                    monitor!("process_epoch_proof", self.initiate_new_epoch(*proof).await)?;
+                    // A single-entry proof from a peer is also a commit certificate for this
+                    // epoch's reconfiguration block. Let the round manager process that certificate
+                    // through the normal local commit path. Persistence will send the proof back to
+                    // us from self, and only then do we initiate the epoch transition.
+                    let forward_to_round_manager = peer_id != self.author
+                        && proof.ledger_info_with_sigs.len() == 1
+                        && !self.recovery_mode;
+                    if forward_to_round_manager {
+                        proof
+                            .verify(self.epoch_state())
+                            .context("[EpochManager] Invalid EpochChangeProof")?;
+                        let ledger_info = proof.ledger_info_with_sigs[0].clone();
+                        let event = VerifiedEvent::CommitCert(Box::new(ledger_info));
+                        let key = (peer_id, discriminant(&event));
+                        let forwarded = self
+                            .round_manager_tx
+                            .as_mut()
+                            .is_some_and(|sender| sender.push(key, (peer_id, event)).is_ok());
+                        if !forwarded {
+                            warn!(
+                                remote_peer = peer_id,
+                                "Failed to forward epoch change commit certificate to round manager; falling back to state sync",
+                            );
+                            monitor!("process_epoch_proof", self.initiate_new_epoch(*proof).await)?;
+                        }
+                    } else {
+                        monitor!("process_epoch_proof", self.initiate_new_epoch(*proof).await)?;
+                    }
                 } else {
                     info!(
                         remote_peer = peer_id,

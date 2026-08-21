@@ -64,6 +64,7 @@ use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{
     block_info::BlockInfo,
     epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{
         OnChainChunkyDKGConfig, OnChainConsensusConfig, OnChainJWKConsensusConfig,
         OnChainRandomnessConfig, ValidatorTxnConfig,
@@ -401,6 +402,7 @@ pub enum VerifiedEvent {
     RoundTimeoutMsg(Box<RoundTimeoutMsg>),
     OrderVoteMsg(Box<OrderVoteMsg>),
     UnverifiedSyncInfo(Box<SyncInfo>),
+    CommitCert(Box<LedgerInfoWithSignatures>),
     BatchMsg(Box<BatchMsg<BatchInfoExt>>),
     SignedBatchInfo(Box<SignedBatchInfoMsg<BatchInfoExt>>),
     ProofOfStoreMsg(Box<ProofOfStoreMsg<BatchInfoExt>>),
@@ -1027,6 +1029,14 @@ impl RoundManager {
         } else {
             Ok(())
         }
+    }
+
+    /// Forward a commit certificate to the decoupled-execution pipeline when its block is locally
+    /// ordered. Persistence emits the local epoch change proof after the block commits.
+    fn process_commit_cert(&mut self, ledger_info: LedgerInfoWithSignatures) -> anyhow::Result<()> {
+        self.block_store
+            .forward_commit_proof_if_locally_ordered(&ledger_info, self.network.clone());
+        Ok(())
     }
 
     /// The function makes sure that it ensures the message_round equal to what we have locally,
@@ -2322,6 +2332,10 @@ impl RoundManager {
                                 self.process_sync_info_msg(*sync_info, peer_id).await
                             )
                         }
+                        VerifiedEvent::CommitCert(ledger_info) => monitor!(
+                            "process_commit_cert",
+                            self.process_commit_cert(*ledger_info)
+                        ),
                         VerifiedEvent::LocalTimeout(round) => monitor!(
                             "process_local_timeout",
                             self.process_local_timeout(round).await

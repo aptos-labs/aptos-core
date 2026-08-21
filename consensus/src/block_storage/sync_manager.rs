@@ -226,11 +226,10 @@ impl BlockStore {
         )
         .await?;
 
-        self.sync_to_highest_commit_cert(
+        self.forward_commit_proof_if_locally_ordered(
             sync_info.highest_commit_cert().ledger_info(),
             retriever.network.clone(),
-        )
-        .await;
+        );
 
         // The insert_ordered_cert(order_cert) function call expects that order_cert.commit_info().id() block
         // is already stored in block_store. So, we first call insert_quorum_cert(highest_quorum_cert).
@@ -640,20 +639,24 @@ impl BlockStore {
         Ok(recovery_data)
     }
 
-    /// Fast forward in the decoupled-execution pipeline if the block exists there
-    async fn sync_to_highest_commit_cert(
+    /// Forward a commit proof to the decoupled-execution pipeline when the certified block is
+    /// already present between the commit and ordered roots.
+    pub(crate) fn forward_commit_proof_if_locally_ordered(
         &self,
         ledger_info: &LedgerInfoWithSignatures,
         network: Arc<NetworkSender>,
     ) {
-        // if the block exists between commit root and ordered root
-        if self.commit_root().round() < ledger_info.commit_info().round()
-            && self.block_exists(ledger_info.commit_info().id())
-            && self.ordered_root().round() >= ledger_info.commit_info().round()
-        {
+        if self.can_forward_commit_proof(ledger_info) {
             let proof = ledger_info.clone();
             tokio::spawn(async move { network.send_commit_proof(proof).await });
         }
+    }
+
+    /// Whether the certified block exists between the local commit and ordered roots.
+    pub(crate) fn can_forward_commit_proof(&self, ledger_info: &LedgerInfoWithSignatures) -> bool {
+        self.commit_root().round() < ledger_info.commit_info().round()
+            && self.block_exists(ledger_info.commit_info().id())
+            && self.ordered_root().round() >= ledger_info.commit_info().round()
     }
 
     pub async fn process_block_retrieval_inner(
