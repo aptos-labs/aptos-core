@@ -1,6 +1,5 @@
 import argparse
 from collections import Counter
-import csv
 from dataclasses import dataclass
 import datetime
 import dateparser
@@ -1442,7 +1441,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--framework-usage-output-dir",
         required=False,
-        help="Local directory for merged framework usage artifacts",
+        help="Local directory for merged framework usage reports",
     )
     parser.add_argument("--cleanup", required=False, action="store_true", default=False)
     args = parser.parse_args()
@@ -1566,12 +1565,6 @@ def read_framework_usage_html_template() -> str:
             "framework usage HTML template has an invalid Rust delimiter"
         )
     return template
-
-
-def format_module_id(module_id: Optional[dict]) -> str:
-    if module_id is None:
-        return ""
-    return f"{module_id['address']}::{module_id['name']}"
 
 
 def merge_framework_usage_reports(
@@ -1770,95 +1763,7 @@ def merge_framework_usage_reports(
     with open(html_path, "w") as output:
         output.write(html.replace(marker, embedded_json))
 
-    totals: dict[str, dict] = {}
-    for row in merged["function_usage"]:
-        encoded_callee = json.dumps(row["callee"], sort_keys=True)
-        if encoded_callee not in totals:
-            totals[encoded_callee] = {
-                "invocation_count": 0,
-                "transaction_count": 0,
-                "first_version": row["first_version"],
-                "last_version": row["last_version"],
-            }
-        total = totals[encoded_callee]
-        total["invocation_count"] += row["invocation_count"]
-        total["transaction_count"] += row["transaction_count"]
-        total["first_version"] = min(total["first_version"], row["first_version"])
-        total["last_version"] = max(total["last_version"], row["last_version"])
-
-    summary_path = os.path.join(output_dir, "framework-usage-summary.csv")
-    columns = [
-        "module_id",
-        "function_name",
-        "visibility",
-        "is_entry",
-        "is_native",
-        "type_parameter_count",
-        "invocation_count",
-        "transaction_count",
-        "first_version",
-        "last_version",
-    ]
-    with open(summary_path, "w", newline="") as output:
-        writer = csv.DictWriter(output, fieldnames=columns)
-        writer.writeheader()
-        for function in merged["functions"]:
-            function_id = {
-                "module_id": function["module_id"],
-                "function_name": function["function_name"],
-            }
-            total = totals.get(json.dumps(function_id, sort_keys=True), {})
-            writer.writerow(
-                {
-                    **function,
-                    "module_id": format_module_id(function["module_id"]),
-                    "invocation_count": total.get("invocation_count", 0),
-                    "transaction_count": total.get("transaction_count", 0),
-                    "first_version": total.get("first_version", ""),
-                    "last_version": total.get("last_version", ""),
-                }
-            )
-
-    callers_path = os.path.join(output_dir, "framework-usage-callers.csv")
-    caller_columns = [
-        "callee_module_id",
-        "callee_function",
-        "caller_module_id",
-        "caller_function",
-        "root_module_id",
-        "root_function",
-        "call_kind",
-        "outcome",
-        "invocation_count",
-        "transaction_count",
-        "first_version",
-        "last_version",
-    ]
-    with open(callers_path, "w", newline="") as output:
-        writer = csv.DictWriter(output, fieldnames=caller_columns)
-        writer.writeheader()
-        for row in merged["usage"]:
-            caller = row.get("caller") or {}
-            root = row.get("root_function") or {}
-            writer.writerow(
-                {
-                    "callee_module_id": format_module_id(
-                        row["callee"].get("module_id")
-                    ),
-                    "callee_function": row["callee"]["function_name"],
-                    "caller_module_id": format_module_id(caller.get("module_id")),
-                    "caller_function": caller.get("function_name", ""),
-                    "root_module_id": format_module_id(root.get("module_id")),
-                    "root_function": root.get("function_name", ""),
-                    "call_kind": row["call_kind"],
-                    "outcome": row["outcome"],
-                    "invocation_count": row["invocation_count"],
-                    "transaction_count": row["transaction_count"],
-                    "first_version": row["first_version"],
-                    "last_version": row["last_version"],
-                }
-            )
-    logger.info(f"Wrote merged framework usage artifacts to {output_dir}")
+    logger.info(f"Wrote merged framework usage reports to {output_dir}")
 
 
 if __name__ == "__main__":
