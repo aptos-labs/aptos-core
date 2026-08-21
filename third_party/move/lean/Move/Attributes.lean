@@ -103,6 +103,29 @@ private initialize moveDataInvariantExt :
       mkStateFromImportedEntries insertDataInvariant {} entries
   }
 
+private def insertGlobalInvariant (map : NameMap Name) (entry : Name × Name) :
+    NameMap Name :=
+  map.insert entry.1 entry.2
+
+private initialize moveGlobalInvariantExt :
+    SimplePersistentEnvExtension (Name × Name) (NameMap Name) ←
+  registerSimplePersistentEnvExtension {
+    addEntryFn := insertGlobalInvariant
+    addImportedFn := fun entries =>
+      mkStateFromImportedEntries insertGlobalInvariant {} entries
+  }
+
+/-- Record that a resource family carries a global invariant, whose body (a
+predicate over one stored value) is the named declaration.  The store-level
+invariant is `Move.Semantics.forallStored body`. -/
+def registerGlobalInvariant (env : Environment) (family : Name)
+    (body : Name) : Environment :=
+  moveGlobalInvariantExt.addEntry env (family, body)
+
+/-- The global-invariant body a resource family declares, if any. -/
+def globalInvariant? (env : Environment) (family : Name) : Option Name :=
+  (moveGlobalInvariantExt.getState env).find? family
+
 /-- Record that values of a Move type certify a data invariant. -/
 def registerDataInvariant (env : Environment) (type : Name)
     (invariant : Name) : Environment :=

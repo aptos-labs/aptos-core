@@ -65,6 +65,11 @@ type certifies, so source translation knows where a value is created. -/
 scoped syntax (name := registerMoveInvariant)
   "#register_move_invariant " ident ident : command
 
+/-- Internal command: persist that a resource family carries a global
+invariant with the named body predicate. -/
+scoped syntax (name := registerMoveGlobalInvariant)
+  "#register_move_global_invariant " ident ident : command
+
 /-- Internal command emitted by `move_module` to persist the user-provided
 source attributes of one declaration. -/
 @[command_parser] def registerMoveAttributes := leading_parser
@@ -634,6 +639,22 @@ private def desugarModuleItem (invariants : Array (Name × Array Syntax))
   if stx.isOfKind ``Move.Spec.dataInvariantSpec then
     -- Consumed by the type it names.
     return #[]
+  if stx.isOfKind ``Move.Spec.globalInvariantSpec then do
+    -- `spec global where invariant R: P; …`: one body predicate per family,
+    -- registered so the source translator asserts it at each write to R.
+    let clauses := #[(stx[4], stx[6])] ++ stx[7].getArgs.map fun c => (c[2], c[4])
+    let mut commands : Array Syntax := #[]
+    for (familyStx, bodyStx) in clauses do
+      let family : TSyntax `ident := ⟨familyStx⟩
+      let this := mkIdentFrom bodyStx `this
+      let body : TSyntax `term := ⟨Move.Spec.bindInvariantValue this bodyStx⟩
+      let bodyName := mkIdentFrom family
+        (Name.mkSimple s!"GlobalInvariant_{family.getId.getString!}")
+      let bodyCommand ← `(@[move_invariant_norm] def $bodyName
+        ($this : $family) : Prop := $body)
+      let registration ← `(#register_move_global_invariant $family $bodyName)
+      commands := commands ++ #[bodyCommand.raw, registration.raw]
+    return commands
   if stx.isOfKind ``moveStructItem then
     let (wellKnown, user) ← splitAttributeInstances stx[1]
     let modifiers ← prependDeclarationAttributes (#[`move_struct] ++ wellKnown)
@@ -744,6 +765,12 @@ def elabRegisterMoveInvariant : CommandElab := fun stx => do
   let typeName ← resolveGlobalConstNoOverload stx[1]
   let invariantName ← resolveGlobalConstNoOverload stx[2]
   modifyEnv fun env => Move.registerDataInvariant env typeName invariantName
+
+@[command_elab registerMoveGlobalInvariant]
+def elabRegisterMoveGlobalInvariant : CommandElab := fun stx => do
+  let family ← resolveGlobalConstNoOverload stx[1]
+  let bodyName ← resolveGlobalConstNoOverload stx[2]
+  modifyEnv fun env => Move.registerGlobalInvariant env family bodyName
 
 @[command_elab registerMoveAttributes]
 def elabRegisterMoveAttributes : CommandElab := fun stx => do

@@ -1748,6 +1748,29 @@ scoped syntax (name := dataInvariantSpec)
   "spec " ident moveSpecBinder* " where "
     "invariant " term moveExtraInvariant* : command
 
+/-- Further clauses of a global-invariant spec; each names a resource family
+and a body over one stored value (`this`, `.field`). -/
+declare_syntax_cat moveExtraGlobalInvariant
+scoped syntax ";" "invariant " ident ": " term : moveExtraGlobalInvariant
+
+/-- A global invariant: every stored value of the named resource family
+satisfies the body, and it is re-established at each state change.  Clauses
+read like data invariants but name their family (`this` is a stored value):
+
+```lean
+spec global where
+  invariant Counter: 0 < this.value.toNat
+```
+
+Consumed by the enclosing `move_module`. -/
+scoped syntax (name := globalInvariantSpec) (priority := high)
+  "spec " &"global" " where "
+    "invariant " ident ": " term moveExtraGlobalInvariant* : command
+
+@[macro globalInvariantSpec] def expandGlobalInvariantSpec : Macro := fun stx =>
+  Macro.throwErrorAt stx
+    "a global invariant must be declared inside a `move_module`"
+
 @[macro dataInvariantSpec] def expandDataInvariantSpec : Macro := fun stx =>
   Macro.throwErrorAt stx
     ("a data invariant must be declared inside the `move_module` which " ++
