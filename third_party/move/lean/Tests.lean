@@ -26,6 +26,7 @@ import Tests.Move.Enums
 import Tests.Move.Invariants
 import Tests.Move.Generics
 import Tests.Move.GlobalInv
+import Tests.Move.CrossInv
 import Tests.Move.EnumPatterns
 import Tests.Move.EnumPayloads
 import Tests.Move.Read

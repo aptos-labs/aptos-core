@@ -288,6 +288,36 @@ def certifyState (invariant : State → Prop) : Spec State Unit where
 @[simp] theorem certifyState_undefined (invariant : State → Prop) :
     (certifyState invariant).undefined initial ↔ ¬ invariant initial := Iff.rfl
 
+/-- Assert a relation between the state before and after an operation.  This
+certifies an *update* global invariant, which — unlike a regular invariant —
+constrains a state transition rather than a single state: it is asserted at
+each update (`rel initial final`) but never assumed on entry.  `op` is the
+state-changing operation the invariant is injected around. -/
+def certifyUpdate (relation : State → State → Prop) (op : Spec State α) :
+    Spec State α where
+  ok := fun initial result final => op.ok initial result final ∧ relation initial final
+  aborts := op.aborts
+  undefined := fun initial =>
+    op.undefined initial ∨
+      ∃ result final, op.ok initial result final ∧ ¬ relation initial final
+
+@[simp] theorem certifyUpdate_ok (relation : State → State → Prop)
+    (op : Spec State α) :
+    (certifyUpdate relation op).ok initial result final ↔
+      op.ok initial result final ∧ relation initial final := Iff.rfl
+
+@[simp] theorem certifyUpdate_aborts (relation : State → State → Prop)
+    (op : Spec State α) :
+    (certifyUpdate relation op).aborts initial code ↔ op.aborts initial code :=
+  Iff.rfl
+
+@[simp] theorem certifyUpdate_undefined (relation : State → State → Prop)
+    (op : Spec State α) :
+    (certifyUpdate relation op).undefined initial ↔
+      op.undefined initial ∨
+        ∃ result final, op.ok initial result final ∧ ¬ relation initial final :=
+  Iff.rfl
+
 /-- Embed a deterministic helper computation into the authoritative
 relational semantics. This is useful for tests, not required for deployment. -/
 def ofTxn (action : Txn σ α) : Spec σ α where

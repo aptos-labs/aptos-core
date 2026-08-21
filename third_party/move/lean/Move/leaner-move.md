@@ -134,7 +134,10 @@ spec-decl       = "spec" ident { spec-binder } "where" spec-clauses ;
 spec-binder     = "{" ident [ ":" "Type" ] "}"
                 | "[" term "]"                  (* instance assumption *)
                 | "(" ident ":" param-type ")" ;
-spec-clauses    = "ensures" term                (* pure function *)
+spec-clauses    = "ensures" term                (* only a postcondition:
+                                                   pure value predicate, or an
+                                                   effectful contract if `f`
+                                                   returns `Action _` *)
                 | [ "requires" term ";" ] [ modifies-clause ]
                   "ensures" term
                   [ ";" aborts-clause ] ;      (* omitted: uninterpreted *)
@@ -148,6 +151,13 @@ data-invariant  = "spec" ident spec-binder* "where"
                   (* struct or enum type; `this` is the value, `.field` is
                      `this.field`; patterns of an enum with an invariant
                      bind its proof with a trailing `_` *)
+global-invariant = "spec" "global" "where"
+                  "invariant" invariant-pred { ";" "invariant" invariant-pred } ;
+invariant-pred  = "(" "all" ident ":" term ")"          (* regular *)
+                | "update" "(" "all" ident ":" term ")" ; (* update *)
+                  (* `term` ranges over the address `ident`, using `R[a]` and
+                     `exists<R>(a)`; the `update` form may also use `old(R[a])`.
+                     Semantics under Specifications. *)
 verify-decl     = "verify" ident [ "by" tactic-seq ] ;
                                                 (* tactic-seq: Lean tactics *)
 
@@ -257,9 +267,11 @@ never abort. `<<<` and `>>>` shift by a `U8` amount, abort when the amount
 reaches the width's bit count, and `<<<` truncates shifted-out bits.
 `(x.cast : T)` is Move's `(x as T)`: it converts between integer widths and
 aborts when the value does not fit the target — widening never aborts. In
-specifications, `x.toNat` is the mathematical value; the abort conditions
-follow the same shapes (`aborts_if ¬x.toNat + y.toNat < U64.size`,
-`aborts_if ¬amount.toNat < 64`, `aborts_if ¬x.toNat < U8.size`).
+specifications, integers compare as their unbounded value directly — `0 < v`,
+`old(R[a]).value ≤ R[a].value`, no `.toNat`.  `x.toNat` (the mathematical
+value) is written only where wrapping and unbounded arithmetic genuinely
+differ, i.e. an overflow check on a sum (`aborts_if ¬x.toNat + y.toNat <
+U64.size`, `aborts_if ¬amount.toNat < 64`).
 
 **Borrows.** One scoped parser covers reference types and Move 2 places; a
 type-directed elaborator classifies each operand, so `Balance[addr]` and
@@ -471,6 +483,17 @@ for structural-comparison laws. As in `fun` signatures, `{T}` may omit the
 `: Type` ascription. The `attribute` production is also the designated
 syntax for specification pragmas (`name arg ...` instances); no pragma
 clause is defined yet.
+
+**Invariants.** `spec T where invariant P` certifies every *value* of a
+struct or enum type `T` at construction — `this` is the value, and a certified
+value carries its proof, so no obligation recurs except where a value is
+created. `spec global where invariant (all a: P)` instead certifies the
+resource *state*: a regular invariant is assumed at reads and asserted at each
+write; an `invariant update (all a: R)` relates a write's pre- and post-state
+(`old(R[a])` against `R[a]`) and is asserted at each write only. A global
+invariant may name several families and is registered under each, so a write
+to any of them re-checks it — and only the invariants naming a written family
+are checked there.
 
 The relational semantics proved against is generated from the retained `fun`
 body — see [`verification-design.md`](verification-design.md) for its

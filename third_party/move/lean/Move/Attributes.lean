@@ -103,28 +103,35 @@ private initialize moveDataInvariantExt :
       mkStateFromImportedEntries insertDataInvariant {} entries
   }
 
-private def insertGlobalInvariant (map : NameMap Name) (entry : Name × Name) :
-    NameMap Name :=
-  map.insert entry.1 entry.2
+private def insertGlobalInvariant (map : NameMap (Array (Bool × Name × List Name)))
+    (entry : Name × Bool × Name × List Name) :
+    NameMap (Array (Bool × Name × List Name)) :=
+  map.insert entry.1 ((map.find? entry.1 |>.getD #[]).push entry.2)
 
 private initialize moveGlobalInvariantExt :
-    SimplePersistentEnvExtension (Name × Name) (NameMap Name) ←
+    SimplePersistentEnvExtension (Name × Bool × Name × List Name)
+      (NameMap (Array (Bool × Name × List Name))) ←
   registerSimplePersistentEnvExtension {
     addEntryFn := insertGlobalInvariant
     addImportedFn := fun entries =>
       mkStateFromImportedEntries insertGlobalInvariant {} entries
   }
 
-/-- Record that a resource family carries a global invariant, whose body (a
-predicate over one stored value) is the named declaration.  The store-level
-invariant is `Move.Semantics.forallStored body`. -/
+/-- Record that a resource family carries a global invariant.  `isUpdate`
+distinguishes a regular invariant (a state predicate `body : State → Prop`)
+from an `update` invariant (a relation `body : State → State → Prop` between
+the pre- and post-state).  `mentioned` is every family the invariant names —
+the invariant is registered under each, and `mentioned` lets a verifier bring
+all their stores into scope even when the function touches only some. -/
 def registerGlobalInvariant (env : Environment) (family : Name)
-    (body : Name) : Environment :=
-  moveGlobalInvariantExt.addEntry env (family, body)
+    (isUpdate : Bool) (body : Name) (mentioned : List Name) : Environment :=
+  moveGlobalInvariantExt.addEntry env (family, isUpdate, body, mentioned)
 
-/-- The global-invariant body a resource family declares, if any. -/
-def globalInvariant? (env : Environment) (family : Name) : Option Name :=
-  (moveGlobalInvariantExt.getState env).find? family
+/-- The global invariants a resource family declares, each with its `isUpdate`
+flag, body declaration, and the families it mentions. -/
+def globalInvariants (env : Environment) (family : Name) :
+    Array (Bool × Name × List Name) :=
+  (moveGlobalInvariantExt.getState env).find? family |>.getD #[]
 
 /-- Record that values of a Move type certify a data invariant. -/
 def registerDataInvariant (env : Environment) (type : Name)

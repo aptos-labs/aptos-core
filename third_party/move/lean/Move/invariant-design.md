@@ -303,35 +303,48 @@ re-establishes the invariant), plus compiler erasure and execution;
 
 # Global invariants
 
-Status: design proposal, not implemented
+Status: implemented for structs, enums, and resources, including the global
+storage primitives `moveTo`/`moveFrom`/`exists_`
 
 A global invariant constrains the whole global resource state — a condition
-over the resources stored in memory, possibly quantified over addresses and
-spanning several resource families.  It is the Move Prover's `invariant`
-module member.  The canonical example: a `Counter` at any address is never
-zero.
+over the resources stored in memory, quantified over addresses and possibly
+relating *several* resource families.  It is the Move Prover's `invariant`
+module member.
 
 ```lean
 struct Counter where
   value : U64
   deriving Key
 
-spec module where
-  invariant ∀ addr, exists<Counter>(addr) → 0 < Counter[addr].value.toNat
+spec global where
+  -- Regular: a state predicate, assumed at reads, asserted at each write.
+  invariant (all a: 0 < Counter[a].value.toNat);
+  -- Update: a pre/post relation, asserted at each write (never assumed).
+  invariant update (all a: old(Counter[a]).value ≤ Counter[a].value)
 ```
 
-The `∀ addr … exists<R>(addr) → …` shape and the `R[addr].field` places are
-the resource surface already used in effectful contracts; `exists<R>(addr)`
-is `store.contains addr` and `R[addr].field` is `(store.get addr).field`.
-Type parameters are written as on any `spec`: `spec module {T} where invariant
-∀ addr, exists<Counter T>(addr) → …`.  Several `invariant` clauses conjoin,
-as elsewhere.
+Two forms (matching the Move Prover, `documentation/book/src/spec-lang.md`):
+
+- **Regular** `invariant (all a: P)` is a state predicate `State → Prop`,
+  assumed on entry and re-established at each write.  *No `this`, no `old`* —
+  it ranges over addresses with the resource surface `Counter[a]`,
+  `exists<R>(a)`.
+- **Update** `invariant update (all a: R)` is a relation `State → State →
+  Prop` between the pre- and post-state of a change, asserted at each write
+  only.  `old(R[a])` is the pre-state; bare `R[a]` the post-state.
+
+Both are general predicates over `get`/`contains` of **any** families named,
+so cross-resource invariants like `all a: exists<Debit>(a) ↔ exists<Credit>(a)`
+are expressible — not restricted to one family.  A value-accessed family
+`R[a].field` carries an implicit `exists<R>(a)` guard (absent addresses are
+unconstrained); families named only through `exists<R>` add no guard.  Several
+`invariant` clauses conjoin.
 
 Unlike a data invariant, a global invariant has no single value to attach a
-proof to — the "value" is the abstract global state, threaded through the
-`Spec`'s `State` and observed through the typed `ResourceStore` instances a
-function already quantifies over.  So the proof cannot ride in a field; the
-obligation is emitted at the state transitions instead.
+proof to — the "value" is the abstract global state.  So the proof cannot ride
+in a field; the obligation is emitted at the state transitions instead, and an
+invariant is registered under **every** family it names, so a write to any of
+them re-checks it (and only those) — exactly the Move Prover's rule.
 
 ## Semantics: certified state, checked at the change
 
@@ -395,9 +408,34 @@ the invariant mentions.  So the write of `&mut R[addr].field` becomes
 withBorrowMutFocusSpec … (write-back) >>= fun _ => certifyState Inv >>= …
 ```
 
-and `moveTo`/`moveFrom` are wrapped the same way.  This lands the obligation
-at the update point (not the function end) and re-supplies the invariant to
-the rest of the body.
+and `moveTo`/`moveFrom` are wrapped the same way — each is followed by a
+`certifyState (forallStored body)` over the family it publishes to or removes
+from.  This lands the obligation at the update point (not the function end)
+and re-supplies the invariant to the rest of the body.
+
+The write-back obligation `forallStored body (insert s a v)` — and its `erase`
+counterpart — is discharged automatically.  Two `iff` rewrites,
+`forallStored_insert_iff` and `forallStored_erase_iff`, split it into the
+changed value's `body v` (a real obligation: the published/updated value must
+satisfy the invariant) and the untouched frame (`∀ other ≠ a, …`), the latter
+closed from the entry certificate.  The generated per-family predicate
+`GlobalInvariant_<R>` is tagged `@[grind]` so the finisher can unfold it after
+`forallStored_get` supplies a framed value, needing no bespoke tactic.
+
+## Global storage primitives in the source semantics
+
+`exists_ R addr`, `moveFrom R addr`, and `moveTo signer value` translate to the
+relational `Resource.containsSpec` / `moveFromSpec` / `moveToSpec` over the
+same `ResourceStore.descriptor` a `&mut R[addr]` borrow uses.  `moveTo`
+publishes at the signer's address: `Signer.address : Signer → Address`
+(uninterpreted, Move's `signer::address_of`) is the bridge from the opaque
+signer to the store key, so `moveTo account v` becomes `moveToSpec descriptor
+(Signer.address account) v`.  A `moveTo`/`moveFrom` on a family carrying a
+global invariant re-certifies the state immediately afterward; `exists_` is a
+read and re-certifies nothing.  The families a function touches — for the
+descriptor bindings, the entry certificate, and the frame — are inferred from
+these primitives as well as from borrows (`exists_`/`moveFrom` name the family
+directly; `moveTo` through the published value's ascription).
 
 Function entry conjoins `Inv initial` into the generated `requires`.  It is an
 *implicit* precondition, never written by the user: at a call site the caller
@@ -413,12 +451,36 @@ The Move Prover re-checks an invariant at an instruction only if that
 instruction touches a resource the invariant mentions.  A global invariant
 declares its families by the `exists<R>`/`R[addr]` occurrences in its
 predicate — the same inference the `modifies` frame already performs — and a
-write to family `S` carries the `certifyState` obligation only for invariants
-that mention `S`.  The re-establishment proof is then modular in the way the
-`modifies` machinery already supports: after `insert` at address `a`, the
-`ResourceStore.lookup_insert_ne` / `lookup_erase_ne` frame laws give `Inv` at
-every other address from the assumption, leaving only the changed value's
-body to prove.
+write to family `S` carries the `certifyState`/`certifyUpdate` obligation only
+for invariants that mention `S`.
+
+### Discharge: folded predicate + reestablishment lemmas
+
+The obligation is `Inv (insert s w v)` — a `∀ address` predicate.  Handing that
+to the shared `simp_all`/`grind` finisher makes it explode (it churns on the
+unbounded quantifier), so each invariant is generated as three declarations:
+
+- `Inv_at (state) (a) : Prop` — the per-address body `guard → P`, `@[grind]`;
+- `Inv (state) : Prop := ∀ a, Inv_at state a` — `@[irreducible]`, so the
+  finisher never expands the quantifier;
+- one `@[grind ←]` **reestablishment lemma** per named family and write shape
+  (`insert`/`erase`): `entry → (Inv_at s w → Inv_at (post) w) → Inv (post)`,
+  proved once by `intro a; by_cases a = w; [changed; frame]`.  The `a ≠ w`
+  frame comes from the entry invariant via `lookup_insert_other` and the
+  cross-store `IndependentResourceStores` laws; the changed address `w` gets
+  the pre-state invariant threaded in (`Inv_at s w → Inv_at (post) w`).
+
+`grind` closes `Inv (insert …)` by applying the reestablishment lemma (the
+invariant stays opaque — no quantifier blow-up), leaving only the changed
+value's small obligation.  This is "evaluated exactly after a change at `R[w]`,
+everything else is unchanged and holds from the pre-state" made mechanical: the
+single new obligation is at `w`.  Update invariants are identical but framed by
+reflexivity (`Inv_at pre pre a` for `a ≠ w`) instead of an entry assumption.
+
+The verifier's resource set is closed under invariant mentions, so a function
+that writes only `S` but whose invariant relates `S` and `T` still brings
+`T`'s store into scope; and `IndependentResourceStores` is supplied in both
+directions since a write may frame the other family either way.
 
 ## Relation to data invariants, `modifies`, and the trust base
 
@@ -460,17 +522,25 @@ Deliberately out of scope for the first step (the Move Prover features):
   invariant while publishing several resources;
 - **isolated** invariants.
 
+## Resolved questions
+
+1. Surface keyword: shipped as `spec global where invariant R: P`, one clause
+   per family with `this` bound to a stored value — parallel to the
+   data-invariant surface `spec T where invariant P` rather than a
+   distinguished `module` subject with an explicit `∀ addr` quantifier. The
+   per-family form keeps each clause's `this` a single value and makes the
+   implicit `forallStored` quantifier uniform with data invariants.
+2. Entry conjoins `Inv initial` into the generated `requires`, so a caller
+   discharges it from its own copy — modular composition through the existing
+   contract structure.
+3. `moveTo`/`moveFrom`/`exists_` are part of the generated source semantics
+   (see above); a global invariant over a published or removed family is
+   re-certified at those transitions.
+
 ## Open questions
 
-1. Surface keyword: `spec module where invariant P` (a distinguished `module`
-   subject) versus attaching the invariant to a resource, `spec Counter where
-   global invariant P`.  The former matches the Move "module member" reading
-   and the cross-resource case; the latter reads oddly for an invariant over
-   several families.  Proposed: `spec module where …`.
-2. Whether entry should conjoin `Inv initial` into `requires` (caller
-   discharges it, as above) or be a free assumption with a matching obligation
-   proved at every call site.  The two are equivalent; `requires` fits the
-   existing contract structure and is proposed.
-3. `moveTo`/`moveFrom` (global publish/remove) are not yet part of the
-   automatically generated source semantics; a global invariant over a family
-   that is published or removed needs those transitions first.
+1. State-parametric key naming for `moveTo`: the modified address is
+   `Signer.address account`, which the `modifies` clause must name as
+   `Counter[account.address]`.  This is explicit but slightly indirect; a
+   sugar that infers the signer's address for a `moveTo`-only function could
+   remove it.

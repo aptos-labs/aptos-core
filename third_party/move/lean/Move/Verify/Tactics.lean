@@ -116,6 +116,9 @@ attribute [move_data]
   Move.Vector.toList
   Move.U64.size
 
+-- Global-invariant re-establishment is discharged by the generated
+-- `@[grind]` reestablishment lemmas, not by unfolding the quantifier here.
+
 attribute [move_spec]
   Id.run
   Bind.bind

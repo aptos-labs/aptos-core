@@ -49,7 +49,7 @@
      [{"call": [[5], "read_ref", [4]]},
       {"call": [[6], "sub", [5, 1]]},
       {"call": [[], "write_ref", [4, 6]]}]},
-    {"term": {"abort": 9}, "instrs": [{"load": [9, {"u64": "1"}]}]}],
+    {"term": {"abort": 9}, "instrs": [{"load": [9, {"num": "1"}]}]}],
    "acquires": [1]},
   {"visibility": "public",
    "type_parameters": [],
@@ -79,6 +79,6 @@
       {"call": [[3], {"borrow_field": 0}, [2]]},
       {"call": [[4], {"borrow_field": 0}, [3]]},
       {"call": [[5], "read_ref", [4]]},
-      {"call": [[6], "add", [5, 1]]},
+      {"call": [[6], {"add": "u64"}, [5, 1]]},
       {"call": [[], "write_ref", [4, 6]]}]}],
    "acquires": [1]}]}

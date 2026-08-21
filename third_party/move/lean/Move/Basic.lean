@@ -25,13 +25,18 @@ declarations pass through Lean's compiler; the Move backend supplies the real
 structure Address where
   private mk ::
   private dummy : Nat
-  deriving Inhabited
+  deriving Inhabited, DecidableEq
 
 /-- A Move signer value. -/
 structure Signer where
   private mk ::
   private dummy : Nat
   deriving Inhabited
+
+/-- The account address a signer authorizes, Move's `signer::address_of`.  It is
+uninterpreted: source semantics know only that a signer determines one address,
+which is where `moveTo` publishes. -/
+opaque Signer.address : Signer → Address
 
 /-- Type-level names for Move's integer widths.  The Lean compiler's
 intermediate representation erases value indices from types, so `UInt` is
@@ -447,6 +452,21 @@ axiom less_eq_true_iff (a b : UInt W) : less a b = true ↔ a.toNat < b.toNat
 the hypothesis of a dependent `if h : a < b` at a creation site. -/
 @[simp] theorem lt_iff_toNat_lt (a b : UInt W) : a < b ↔ a.toNat < b.toNat :=
   less_eq_true_iff a b
+
+/-- `≤` mirrors `<`: its decision procedure is the named `UInt.lessEq`
+primitive, lowered to the integer `≤`.  Specifications compare integers as
+their unbounded value, so no `.toNat` is written — the normalization lemmas
+below reduce `<`/`≤` to `Nat` for both `simp` and `grind`. -/
+instance : LE (UInt W) := ⟨fun a b => lessEq a b = true⟩
+instance (a b : UInt W) : Decidable (a ≤ b) :=
+  inferInstanceAs (Decidable (lessEq a b = true))
+
+/-- Trust base: the `≤` primitive is numeric (companion to
+`less_eq_true_iff`). -/
+axiom lessEq_eq_true_iff (a b : UInt W) : lessEq a b = true ↔ a.toNat ≤ b.toNat
+
+@[simp] theorem le_iff_toNat_le (a b : UInt W) : a ≤ b ↔ a.toNat ≤ b.toNat :=
+  lessEq_eq_true_iff a b
 
 end UInt
 

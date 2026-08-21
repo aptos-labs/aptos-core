@@ -237,6 +237,11 @@ as an ordinary, predeclared `f.sourceSpec` helper. -/
 def resultTypeOf (function : Syntax) : CommandElabM (TSyntax `term) := do
   actionResultType (← declarationFor function)
 
+/-- Whether a Move source function is effectful — its result is an `Action`, so
+its contract observes global state rather than being a pure value predicate. -/
+def isEffectfulFunction (function : Syntax) : CommandElabM Bool := do
+  return (findTypeApplication? ``Move.Action (← declarationFor function).resultType).isSome
+
 private def sourceBody (declaration : Declaration) : CommandElabM (TSyntax `term) := do
   if declaration.value.isOfKind ``Lean.Parser.Term.paren then
     pure ⟨declaration.value[1]⟩
@@ -280,9 +285,46 @@ private def isResourceIdentifier (resource : TSyntax `ident) : CommandElabM Bool
   pure <| Move.moveKeyAttr.hasTag env current ||
     Move.moveKeyAttr.hasTag env resource.getId
 
+/-- The leading type constructor of a (possibly parenthesized, applied, or
+ascribed) type expression: `Vault` from `(Vault T)`, `Counter` from
+`({ … } : Counter)`. -/
+private partial def typeHead? (stx : Syntax) : Option (TSyntax `ident) :=
+  if stx.isIdent then some ⟨stx⟩
+  else if stx.isOfKind ``Lean.Parser.Term.paren then
+    stx.getArgs[1]? |>.bind typeHead?
+  else if stx.isOfKind ``Lean.Parser.Term.app then
+    stx.getArgs[0]? |>.bind typeHead?
+  else if stx.isOfKind ``Lean.Parser.Term.typeAscription then
+    -- `(expr : type)` — the type is the fourth child, wrapped in a `null` node.
+    (stx.getArgs[3]?.bind (·.getArgs[0]?)) |>.bind typeHead?
+  else if stx.isOfKind nullKind then
+    stx.getArgs[0]? |>.bind typeHead?
+  else none
+
+/-- The resource family named by a global-storage primitive application
+(`exists_`/`moveFrom` name it directly; `moveTo` names it through the published
+value's ascription), if `stx` is such an application. -/
+private def globalPrimitiveResource? (stx : Syntax) :
+    CommandElabM (Option (TSyntax `ident)) := do
+  unless stx.isOfKind ``Lean.Parser.Term.app do return none
+  let head := stx[0]
+  unless head.isIdent do return none
+  let some name ← (try pure (some (← resolveGlobalConstNoOverload head))
+      catch _ => pure none) | return none
+  let arguments := stx[1].getArgs
+  if name == ``Move.exists_ || name == ``Move.moveFrom then
+    return arguments[0]?.bind typeHead?
+  else if name == ``Move.moveTo then
+    return arguments[1]?.bind typeHead?
+  else
+    return none
+
 private partial def collectResources (stx : Syntax)
     (resources : Array (TSyntax `ident) := #[]) : CommandElabM (Array (TSyntax `ident)) := do
   let mut resources := resources
+  if let some resource ← globalPrimitiveResource? stx then
+    if ← isResourceIdentifier resource then
+      resources ← pushResource resources resource
   if stx.isOfKind ``Move.borrowTerm || stx.isOfKind ``Move.borrowMutTerm then
     if let some place := stx[1]? then
       let (root, _) := splitFieldPath ⟨place⟩
@@ -461,8 +503,7 @@ private def unsupportedSourceOperation (name : Name) : Bool :=
   name == ``Move.borrowField || name == ``Move.borrowFieldMut ||
   name == ``Move.borrowElem || name == ``Move.borrowElemMut ||
   name == ``Move.freeze || name == ``Move.read || name == ``Move.readImm ||
-  name == ``Move.write || name == ``Move.exists_ || name == ``Move.moveFrom ||
-  name == ``Move.moveTo || name == ``Move.assert || name == ``Move.abort ||
+  name == ``Move.write || name == ``Move.assert || name == ``Move.abort ||
   name == ``Move.Vector.get || name == ``Move.Vector.set
 
 private def unsupportedSourceOperation? (term : TSyntax `term) :
@@ -747,6 +788,73 @@ private def pureMoveCall? (term : TSyntax `term) : CommandElabM (Option Name) :=
     return none
   return some functionName
 
+/-- Source semantics for the built-in global-storage primitives.  `exists_`
+becomes `containsSpec`; `moveFrom`/`moveTo` become `moveFromSpec`/`moveToSpec`,
+and — since they change the resource state — re-certify any global invariant on
+the family immediately afterward, exactly as a `&mut` write does. -/
+private def globalPrimitiveSpec?
+    (translateArgument : TSyntax `term → CommandElabM (TSyntax `term))
+    (context : TranslationContext) (term : TSyntax `term) :
+    CommandElabM (Option (TSyntax `term)) := do
+  let some (head, arguments) := application? term | return none
+  unless head.raw.isIdent do return none
+  let some name ← (try pure (some (← resolveGlobalConstNoOverload head.raw))
+      catch _ => pure none) | return none
+  let some resource ← globalPrimitiveResource? term
+    | return none
+  let descriptor ← resourceFor context.resources resource
+  let resourceName ← canonicalResourceName resource
+  let invariants := Move.globalInvariants (← getEnv) resourceName
+  -- Re-establish the family's global invariants at this state change: an
+  -- `update` invariant wraps the op (relating pre/post); a regular invariant
+  -- is asserted after it, then the op's own result is returned.
+  let recertify (result : TSyntax `term) (core : TSyntax `term) :
+      CommandElabM (TSyntax `term) := do
+    let mut wrapped := core
+    for (isUpdate, body, _) in invariants do
+      if isUpdate then
+        let bodyId := mkIdentFrom head body
+        wrapped ← `(Move.Semantics.Spec.certifyUpdate $bodyId $wrapped)
+    let regulars := invariants.filterMap fun (u, b, _) => if u then none else some b
+    if regulars.isEmpty then
+      return wrapped
+    let mut tail ← `(Move.Semantics.Spec.pure $result)
+    for body in regulars.reverse do
+      let bodyId := mkIdentFrom head body
+      tail ← `(Move.Semantics.Spec.bind
+        (Move.Semantics.Spec.certifyState $bodyId)
+        (fun _moveSpecCertify => $tail))
+    `(Move.Semantics.Spec.bind $wrapped (fun $result => $tail))
+  if name == ``Move.exists_ then
+    let some addr := arguments[1]? | return none
+    let addrSpec ← translateArgument addr
+    let key := mkIdentFrom addr `_moveSpecKey
+    return some (← `(Move.Semantics.Spec.bind $addrSpec (fun $key =>
+      Move.Semantics.Resource.containsSpec $descriptor $key)))
+  else if name == ``Move.moveFrom then
+    let some addr := arguments[1]? | return none
+    let addrSpec ← translateArgument addr
+    let key := mkIdentFrom addr `_moveSpecKey
+    let removed := mkIdentFrom addr `_moveSpecRemoved
+    let core ← `(Move.Semantics.Resource.moveFromSpec $descriptor $key)
+    let body ← recertify removed core
+    return some (← `(Move.Semantics.Spec.bind $addrSpec (fun $key => $body)))
+  else if name == ``Move.moveTo then
+    let some signer := arguments[0]? | return none
+    let some value := arguments[1]? | return none
+    let signerSpec ← translateArgument signer
+    let valueSpec ← translateArgument value
+    let signerName := mkIdentFrom signer `_moveSpecSigner
+    let valueName := mkIdentFrom value `_moveSpecPublished
+    let unitName := mkIdentFrom term `_moveSpecMoveToResult
+    let core ← `(Move.Semantics.Resource.moveToSpec $descriptor
+      (Move.Signer.address $signerName) $valueName)
+    let body ← recertify unitName core
+    return some (← `(Move.Semantics.Spec.bind $signerSpec (fun $signerName =>
+      Move.Semantics.Spec.bind $valueSpec (fun $valueName => $body))))
+  else
+    return none
+
 /-- Translate an expression in value position. Arithmetic is sequenced
 relationally so overflow, underflow, and division by zero remain observable. -/
 private partial def expressionSpec (context : TranslationContext)
@@ -802,7 +910,9 @@ private partial def expressionSpec (context : TranslationContext)
         ``(Move.Semantics.Spec.pure
           $(← rewritePure context.mutation? term))
   | _ =>
-      if let some call ← effectfulCallSpec? (expressionSpec context) context term then
+      if let some call ← globalPrimitiveSpec? (expressionSpec context) context term then
+        pure call
+      else if let some call ← effectfulCallSpec? (expressionSpec context) context term then
         pure call
       else if let some functionName ← pureMoveCall? term then
         throwErrorAt term
@@ -1142,11 +1252,35 @@ private partial def translateDo (context : TranslationContext)
                   (fun $owner => $focused)
                   (fun $owner $replacement => $updated)
                   (fun $name => $nested))
+        -- Global invariants re-certify the store at this write: an `update`
+        -- invariant wraps the write (relating pre/post state); a regular
+        -- invariant is asserted immediately after it.
+        let invariants := Move.globalInvariants (← getEnv) resourceName
+        let mut borrow := borrow
+        for (isUpdate, body, _) in invariants do
+          if isUpdate then
+            let bodyId := mkIdentFrom place body
+            borrow ← `(Move.Semantics.Spec.certifyUpdate $bodyId $borrow)
+        let regulars := invariants.filterMap fun (u, b, _) => if u then none else some b
+        let assertGlobal (cont : TSyntax `term) : CommandElabM (TSyntax `term) := do
+          let mut tail := cont
+          for body in regulars.reverse do
+            let bodyId := mkIdentFrom place body
+            tail ← `(Move.Semantics.Spec.bind
+              (Move.Semantics.Spec.certifyState $bodyId)
+              (fun _moveSpecCertify => $tail))
+          pure tail
         if continuation.isEmpty then
-          pure borrow
+          if regulars.isEmpty then pure borrow
+          else
+            let tail ← assertGlobal
+              (← `(Move.Semantics.Spec.pure _moveSpecBorrowResult))
+            `(Move.Semantics.Spec.bind $borrow
+                (fun _moveSpecBorrowResult => $tail))
         else
           let after ← translateDo context continuation
-          `(Move.Semantics.Spec.bind $borrow (fun _moveSpecBorrowResult => $after))
+          let tail ← assertGlobal after
+          `(Move.Semantics.Spec.bind $borrow (fun _moveSpecBorrowResult => $tail))
   | `(doElem| let $name:ident ← & $place:term) =>
       let nested ← translateRest rest
       if let some (vector, index, fields) ←
@@ -1424,11 +1558,37 @@ def isRecursive (function : Syntax) : CommandElabM Bool := do
   let fullName := (← getCurrNamespace) ++ function.getId
   pure (containsFunctionCall fullName function.getId body.raw)
 
-/-- Resource families actually borrowed by an effectful source function. -/
+/-- Resource families an effectful source function must bring into scope: those
+it borrows or publishes/removes, closed under global invariants.  A write to a
+family re-checks every invariant naming it, and that obligation refers to every
+family the invariant mentions — so those families' stores must be in scope even
+when the function never touches them directly. -/
 def inferredResources (function : Syntax) : CommandElabM (Array (TSyntax `ident)) := do
   let declaration ← declarationFor function
   let body ← sourceBody declaration
-  collectResources body.raw
+  let touched ← collectResources body.raw
+  let env ← getEnv
+  -- Close the touched families under global-invariant mentions, at the level
+  -- of canonical names (an added ident re-canonicalizes to the same name, so
+  -- the fixed point terminates).
+  let touchedNames ← touched.mapM canonicalResourceName
+  -- Bounded fixed point over invariant mentions, deduplicating by string to
+  -- avoid `Name` representation pitfalls.  The mention lists are already
+  -- complete per invariant, so a handful of passes reach closure.
+  let has (arr : Array Name) (n : Name) : Bool := arr.any (·.toString == n.toString)
+  let mut all := touchedNames
+  for _ in [0:8] do
+    let previous := all
+    for family in previous do
+      for (_, _, mentioned) in Move.globalInvariants env family do
+        for m in mentioned do
+          unless has all m do all := all.push m
+    if all.size == previous.size then break
+  let mut idents := touched
+  for m in all do
+    unless has touchedNames m do
+      idents := idents.push (mkIdentFrom function m)
+  return idents
 
 /-- Translate against the abstract compositional resource-store interface. -/
 def translateWithStores (function : Syntax) (world : TSyntax `ident)
@@ -1748,24 +1908,131 @@ scoped syntax (name := dataInvariantSpec)
   "spec " ident moveSpecBinder* " where "
     "invariant " term moveExtraInvariant* : command
 
-/-- Further clauses of a global-invariant spec; each names a resource family
-and a body over one stored value (`this`, `.field`). -/
-declare_syntax_cat moveExtraGlobalInvariant
-scoped syntax ";" "invariant " ident ": " term : moveExtraGlobalInvariant
+/-- A global-invariant predicate, quantified over an address.  A *regular*
+invariant `(all a: … R[a] …)` constrains the current state; an *update*
+invariant `update (all a: … old(R[a]) … R[a] …)` relates the pre- and
+post-state of a change.  The `exists<R>(a)` guard is implicit: the address
+ranges over the stored resources, so absent addresses are unconstrained. -/
+declare_syntax_cat moveGlobalInvariant
+scoped syntax (name := globalInvariantRegular)
+  "(" &"all" ident ": " term ")" : moveGlobalInvariant
+scoped syntax (name := globalInvariantUpdate)
+  &"update" "(" &"all" ident ": " term ")" : moveGlobalInvariant
 
-/-- A global invariant: every stored value of the named resource family
-satisfies the body, and it is re-established at each state change.  Clauses
-read like data invariants but name their family (`this` is a stored value):
+/-- Further clauses of a global-invariant spec. -/
+declare_syntax_cat moveExtraGlobalInvariant
+scoped syntax ";" "invariant " moveGlobalInvariant : moveExtraGlobalInvariant
+
+/-- A global invariant over the resource state, re-established at each change
+(not at function end).  A regular invariant is assumed at reads and asserted
+at writes; an `update` invariant is asserted at each write only:
 
 ```lean
 spec global where
-  invariant Counter: 0 < this.value.toNat
+  invariant (all a: 0 < Counter[a].value.toNat);
+  invariant update (all a: old(Counter[a]).value ≤ Counter[a].value)
 ```
 
 Consumed by the enclosing `move_module`. -/
 scoped syntax (name := globalInvariantSpec) (priority := high)
   "spec " &"global" " where "
-    "invariant " ident ": " term moveExtraGlobalInvariant* : command
+    "invariant " moveGlobalInvariant moveExtraGlobalInvariant* : command
+
+/-- Whether `name` occurs as an identifier anywhere in `stx`. -/
+partial def occursIdentifier (name : Name) (stx : Syntax) : Bool :=
+  (stx.isIdent && stx.getId == name) ||
+    stx.getArgs.any (occursIdentifier name)
+
+/-- Whether an `old(…)` pre-state observation occurs anywhere in `stx`. -/
+partial def occursOld (stx : Syntax) : Bool :=
+  stx.getKind == ``oldResourceTerm || stx.getArgs.any occursOld
+
+/-- Rewrite the resource places of a global-invariant body over the bound
+address `addr` into a state predicate: `R[addr]` becomes `get (Value := R)
+state addr` and `exists<R>(addr)` becomes `contains (Value := R) state addr`,
+where `state` is the post-state (`old(…)` selects the pre-state).  Returns the
+rewritten body, the families accessed *by value* with their `old`-ness (needing
+an existence guard), and every family the body mentions. -/
+partial def rewriteStatePlaces (addr : Name) (preState postState addrIdent : Syntax)
+    (inOld : Bool) (body : Syntax) :
+    MacroM (Syntax × Array (Syntax × Bool) × Array Syntax) := do
+  let state := if inOld then preState else postState
+  let stateT : TSyntax `term := ⟨state⟩
+  let addrT : TSyntax `term := ⟨addrIdent⟩
+  if body.getKind == ``oldResourceTerm && body.getNumArgs == 3 then
+    rewriteStatePlaces addr preState postState addrIdent true body[1]
+  else if body.getKind == `«term__[_]» && body.getNumArgs == 4 &&
+      body[0].isIdent && body[2].isIdent && body[2].getId == addr then
+    let famT : TSyntax `term := ⟨body[0]⟩
+    let repl ← `(Move.Semantics.ResourceStore.get (Value := $famT) $stateT $addrT)
+    return (repl.raw, #[(body[0], inOld)], #[body[0]])
+  else if body.getKind == ``resourceExistsTerm && body.getNumArgs == 5 &&
+      body[3].isIdent && body[3].getId == addr then
+    let famT : TSyntax `term := ⟨body[1]⟩
+    let repl ← `(Move.Semantics.ResourceStore.contains (Value := $famT) $stateT $addrT)
+    return (repl.raw, #[], #[body[1]])
+  else
+    let mut valueAccess : Array (Syntax × Bool) := #[]
+    let mut allFamilies : Array Syntax := #[]
+    let mut args : Array Syntax := #[]
+    for child in body.getArgs do
+      let (child', va, fs) ← rewriteStatePlaces addr preState postState addrIdent inOld child
+      args := args.push child'; valueAccess := valueAccess ++ va; allFamilies := allFamilies ++ fs
+    return (body.setArgs args, valueAccess, allFamilies)
+
+/-- Desugar one global-invariant clause into `(isUpdate, families, addr,
+atBody)`.  `atBody` is the *per-address* predicate `guard → body` over the
+fixed binders `_moveSpecState` (regular) or `_moveSpecPre`/`_moveSpecPost`
+(update) and the address `addr`; the full invariant is `∀ addr, atBody`.
+Factoring out `atBody` lets the generated reestablishment lemmas name the
+changed address's obligation without unfolding the whole quantifier.  The guard
+requires existence of each value-accessed family at `addr`.  `families` is
+every family the clause mentions — the invariant is registered under each. -/
+def elabGlobalInvariantClause (clause : Syntax) :
+    MacroM (Bool × Array (TSyntax `ident) × TSyntax `ident × TSyntax `term) := do
+  let isUpdate := clause.isOfKind ``globalInvariantUpdate
+  let offset := if isUpdate then 1 else 0
+  let addr := clause[offset + 2]
+  let bodyStx := clause[offset + 4]
+  unless addr.isIdent do
+    Macro.throwErrorAt clause "a global invariant must bind an address, `all a: …`"
+  unless isUpdate do
+    if occursOld bodyStx then
+      Macro.throwErrorAt clause
+        "a regular global invariant may not use `old`; write `invariant update (…)`"
+  let addrIdent := mkIdentFrom bodyStx `_moveSpecAddr
+  let preState := mkIdentFrom bodyStx `_moveSpecPre
+  let postState := mkIdentFrom bodyStx (if isUpdate then `_moveSpecPost else `_moveSpecState)
+  let (rewritten, valueAccess, allFamilies) ←
+    rewriteStatePlaces addr.getId preState.raw postState.raw addrIdent.raw false bodyStx
+  let mut families : Array (TSyntax `ident) := #[]
+  for f in allFamilies do
+    unless families.any (·.getId == f.getId) do families := families.push ⟨f⟩
+  if families.isEmpty then
+    Macro.throwErrorAt clause
+      "a global invariant must reference a stored resource `R[a]` or `exists<R>(a)`"
+  if occursIdentifier addr.getId rewritten then
+    Macro.throwErrorAt addr
+      "the quantified address may appear only inside resource places `R[a]`"
+  -- Existence guards for value-accessed families (deduplicated by family and
+  -- `old`-ness), so `R[a].field` constrains only addresses where `R` exists.
+  let mut guards : Array (TSyntax `term) := #[]
+  let mut seen : Array (Syntax × Bool) := #[]
+  for (fam, fromOld) in valueAccess do
+    unless seen.any (fun (f, o) => f.getId == fam.getId && o == fromOld) do
+      seen := seen.push (fam, fromOld)
+      let famT : TSyntax `term := ⟨fam⟩
+      let stateT : TSyntax `term := ⟨(if fromOld then preState else postState).raw⟩
+      let addrT : TSyntax `term := ⟨addrIdent.raw⟩
+      guards := guards.push
+        (← `(Move.Semantics.ResourceStore.contains (Value := $famT) $stateT $addrT))
+  let bodyTerm : TSyntax `term := ⟨rewritten⟩
+  let guarded ← if h : guards.size = 0 then pure bodyTerm else do
+    let mut conjunction := guards[guards.size - 1]!
+    for i in [1:guards.size] do
+      conjunction ← `($(guards[guards.size - 1 - i]!) ∧ $conjunction)
+    `($conjunction → $bodyTerm)
+  return (isUpdate, families, addrIdent, guarded)
 
 @[macro globalInvariantSpec] def expandGlobalInvariantSpec : Macro := fun stx =>
   Macro.throwErrorAt stx
@@ -1955,20 +2222,29 @@ partial def bindInvariantValue (this : TSyntax `ident) (condition : Syntax) :
   else
     condition.setArgs (condition.getArgs.map (bindInvariantValue this))
 
-/-- A declarative contract for a pure Move source function. The result binder
-denotes the result of applying the named function to the contract arguments. -/
-scoped macro "spec " function:ident binder:moveSpecBinder* " where "
-    "ensures " ensures:term : command => do
+/-- A contract stating only a postcondition.  For a *pure* function it is a
+value predicate over the function applied to its arguments.  For an *effectful*
+function it routes through the effectful path (trivial precondition and abort
+behavior) so resource observations — `R[a]`, `exists<R>`, `old` — in the
+postcondition are interpreted against global state. -/
+scoped syntax (name := ensuresOnlySpec) "spec " ident moveSpecBinder* " where "
+    "ensures " term : command
+
+/-- Build the pure value contract `def f.contract : Prop := ∀ args, ensures`. -/
+private def pureEnsuresContract (function : TSyntax `ident)
+    (binders : Array (TSyntax `moveSpecBinder)) (postcondition : TSyntax `term) :
+    MacroM (TSyntax `command) := do
   let contractName := associatedName function `contract
-  let parameters ← unpackSpecParameters binder
+  let parameters ← unpackSpecParameters binders
   let application ← applyArguments function parameters.arguments
-  let result := findResult? ensures.raw |>.getD (mkIdentFrom ensures `result)
-  let ensures : TSyntax `term := ⟨bindResult ensures.raw result⟩
+  let result := findResult? postcondition.raw |>.getD (mkIdentFrom postcondition `result)
+  let ensured : TSyntax `term := ⟨bindResult postcondition.raw result⟩
   let result : TSyntax `ident := ⟨result⟩
-  let body ← `((fun $result => $ensures) $application)
+  let body ← `((fun $result => $ensured) $application)
   let contract ← quantifyArguments parameters.arguments parameters.types body
   let contract ← quantifyContext parameters.context contract
-  `(def $contractName : Prop := $contract)
+  let command : TSyntax `command ← `(def $contractName : Prop := $contract)
+  return command
 
 /-- One global location a specification is allowed to change: a resource
 family, optionally narrowed to one address. -/
@@ -2126,17 +2402,40 @@ scoped macro "spec " function:ident binder:moveSpecBinder* " where "
       ensures $postcondition;
       aborts_if $condition)
 
-@[command_elab inferredEffectfulSourceSpec]
-private def elabInferredEffectfulSourceSpec : CommandElab := fun stx => do
-  let function : TSyntax `ident := ⟨stx[1]⟩
-  let binders : Array (TSyntax `moveSpecBinder) := stx[2].getArgs.map (⟨·⟩)
-  let precondition : TSyntax `term := ⟨stx[5]⟩
-  let modifiesClause? : Option Syntax :=
-    if stx[7].getNumArgs == 1 then some stx[7][0] else none
-  let postcondition : TSyntax `term := ⟨stx[9]⟩
-  let abortCondition : TSyntax `term := ⟨stx[12]⟩
-  let mayAbortCondition? : Option (TSyntax `term) :=
-    if stx[13].getNumArgs == 3 then some ⟨stx[13][2]⟩ else none
+/-- The registered global-invariant body for each resource family that has
+one, among the families a function uses. -/
+private def globalInvariantsFor (resourceTypes : Array (TSyntax `ident)) :
+    CommandElabM (Array (TSyntax `ident × TSyntax `ident)) := do
+  let env ← getEnv
+  let mut result := #[]
+  for family in resourceTypes do
+    let familyName ← Move.Verify.Source.canonicalResourceName family
+    -- Only regular invariants are assumed on entry; `update` invariants
+    -- constrain transitions and are asserted at writes only.
+    for (isUpdate, body, _) in Move.globalInvariants env familyName do
+      unless isUpdate do
+        result := result.push (family, mkIdentFrom family body)
+  return result
+
+/-- Conjoin each regular global invariant `Inv initial` into the entry
+precondition: the invariant is assumed on entry (it holds because every prior
+write re-established it) and re-established at each write. -/
+private def assumeGlobalInvariants (initial : TSyntax `term)
+    (invariants : Array (TSyntax `ident × TSyntax `ident))
+    (precondition : TSyntax `term) : CommandElabM (TSyntax `term) := do
+  let mut condition := precondition
+  for (_, body) in invariants do
+    condition ← `($condition ∧ $body $initial)
+  return condition
+
+/-- Build `def f.contract : Prop := …Satisfies…` for an effectful function from
+its declarative clauses.  Shared by the surface elaborator and the ensures-only
+routing (which supplies a trivial precondition and abort behavior). -/
+def buildEffectfulContract (function : TSyntax `ident)
+    (binders : Array (TSyntax `moveSpecBinder))
+    (precondition : TSyntax `term) (modifiesClause? : Option Syntax)
+    (postcondition abortCondition : TSyntax `term)
+    (mayAbortCondition? : Option (TSyntax `term)) : CommandElabM Unit := do
   let parameters ← liftMacroM <| unpackSpecParameters binders
   let arguments := parameters.arguments
   let argsType ← liftMacroM <| argumentType parameters.types
@@ -2164,14 +2463,16 @@ private def elabInferredEffectfulSourceSpec : CommandElab := fun stx => do
           parameters.mutableParameter?
       pure (some (body, recursive, recursiveName))
   let contractName := associatedName function `contract
-  let initial := mkIdentFrom precondition `initial
-  let final := mkIdentFrom postcondition `final
+  let initial := mkIdentFrom precondition `_moveSpecInitial
+  let final := mkIdentFrom postcondition `_moveSpecFinal
   let result := mkIdentFrom postcondition `result
   let abortCode := mkIdentFrom abortCondition `abortCode
   let initialTerm : TSyntax `term := ⟨initial.raw⟩
   let finalTerm : TSyntax `term := ⟨final.raw⟩
+  let globalInvariants ← globalInvariantsFor resourceTypes
   let precondition ← Move.Verify.Source.rewriteClause
     resourceTypes initialTerm initialTerm precondition
+  let precondition ← assumeGlobalInvariants initialTerm globalInvariants precondition
   let output := mkIdentFrom postcondition `_moveSpecOutput
   let outputTerm : TSyntax `term := ⟨output.raw⟩
   let mut postconditionRaw := postcondition.raw
@@ -2241,8 +2542,13 @@ private def elabInferredEffectfulSourceSpec : CommandElab := fun stx => do
   let mut resourcePairs : Array (TSyntax `ident × TSyntax `ident) := #[]
   for leftIndex in [:resourceTypes.size] do
     for rightIndex in [leftIndex + 1:resourceTypes.size] do
+      -- Both directions: independence is symmetric, and a global-invariant
+      -- reestablishment lemma frames the *other* family across the written
+      -- one, needing whichever direction the write happens to take.
       resourcePairs := resourcePairs.push
         (resourceTypes[leftIndex]!, resourceTypes[rightIndex]!)
+      resourcePairs := resourcePairs.push
+        (resourceTypes[rightIndex]!, resourceTypes[leftIndex]!)
   for ((left, right), index) in resourcePairs.zipIdx.reverse do
     let independenceName := mkIdentFrom left
       (Name.mkSimple s!"_moveSpecIndependent{index}")
@@ -2258,6 +2564,28 @@ private def elabInferredEffectfulSourceSpec : CommandElab := fun stx => do
   contractBody ← liftMacroM <| quantifyContext parameters.context contractBody
   let contractCommand ← `(def $contractName : Prop := $contractBody)
   elabCommand contractCommand
+
+@[command_elab inferredEffectfulSourceSpec]
+private def elabInferredEffectfulSourceSpec : CommandElab := fun stx => do
+  let modifiesClause? : Option Syntax :=
+    if stx[7].getNumArgs == 1 then some stx[7][0] else none
+  let mayAbortCondition? : Option (TSyntax `term) :=
+    if stx[13].getNumArgs == 3 then some ⟨stx[13][2]⟩ else none
+  buildEffectfulContract ⟨stx[1]⟩ (stx[2].getArgs.map (⟨·⟩)) ⟨stx[5]⟩
+    modifiesClause? ⟨stx[9]⟩ ⟨stx[12]⟩ mayAbortCondition?
+
+@[command_elab ensuresOnlySpec]
+private def elabEnsuresOnlySpec : CommandElab := fun stx => do
+  let function : TSyntax `ident := ⟨stx[1]⟩
+  let postcondition : TSyntax `term := ⟨stx[5]⟩
+  let binders : Array (TSyntax `moveSpecBinder) := stx[2].getArgs.map (⟨·⟩)
+  if ← Move.Verify.Source.isEffectfulFunction function.raw then
+    -- Effectful: a trivial precondition and uninterpreted aborts, routed so
+    -- the postcondition observes global state.
+    buildEffectfulContract function binders (← `(True)) none postcondition
+      (← `(True)) (some (← `(False)))
+  else
+    elabCommand (← liftMacroM (pureEnsuresContract function binders postcondition))
 
 @[command_elab effectfulSourceSpec]
 private def elabEffectfulSourceSpec : CommandElab := fun stx => do
@@ -2293,8 +2621,8 @@ private def elabEffectfulSourceSpec : CommandElab := fun stx => do
     (if recursive then some recursiveTerm else none)
   let sourceSpecName := associatedName function `sourceSpec
   let contractName := associatedName function `contract
-  let initial := mkIdentFrom precondition `initial
-  let final := mkIdentFrom postcondition `final
+  let initial := mkIdentFrom precondition `_moveSpecInitial
+  let final := mkIdentFrom postcondition `_moveSpecFinal
   let result := mkIdentFrom postcondition `result
   let abortCode := mkIdentFrom abortCondition `abortCode
   let initialTerm : TSyntax `term := ⟨initial.raw⟩
@@ -2534,7 +2862,10 @@ private def elabAutomaticSourceVerify : CommandElab := fun stx => do
         Move.UInt.toNat_ofNat_u128, Move.UInt.toNat_ofNat_u256,
         Move.UInt.toNat_zero, Move.UInt.toNat_one,
         Move.UInt.numeral_eq_ofNat, Move.UInt.toNat_cast,
-        Move.UInt.toNat_lt])
+        Move.UInt.toNat_lt,
+        Move.Semantics.ResourceStore.get, Move.Semantics.ResourceStore.contains,
+        Move.Semantics.ResourceStore.get_insert_same,
+        Move.UInt.lt_iff_toNat_lt, Move.UInt.le_iff_toNat_le])
     elabCommand command
     return
   let sourceSpecTerm ← parseTerm sourceSpecName
@@ -2586,7 +2917,10 @@ private def elabAutomaticSourceVerify : CommandElab := fun stx => do
           Move.UInt.toNat_ofNat_u128, Move.UInt.toNat_ofNat_u256,
           Move.UInt.toNat_zero, Move.UInt.toNat_one,
           Move.UInt.numeral_eq_ofNat, Move.UInt.toNat_cast,
-          Move.UInt.toNat_lt, Nat.shiftRight_le])
+          Move.UInt.toNat_lt, Nat.shiftRight_le,
+          Move.Semantics.ResourceStore.get, Move.Semantics.ResourceStore.contains,
+          Move.Semantics.ResourceStore.get_insert_same,
+          Move.UInt.lt_iff_toNat_lt, Move.UInt.le_iff_toNat_le])
   elabCommand command
 
 end Move.Spec

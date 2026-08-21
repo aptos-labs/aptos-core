@@ -68,7 +68,7 @@ scoped syntax (name := registerMoveInvariant)
 /-- Internal command: persist that a resource family carries a global
 invariant with the named body predicate. -/
 scoped syntax (name := registerMoveGlobalInvariant)
-  "#register_move_global_invariant " ident ident : command
+  "#register_move_global_invariant " (&"update")? ident ident ident* : command
 
 /-- Internal command emitted by `move_module` to persist the user-provided
 source attributes of one declaration. -/
@@ -640,20 +640,138 @@ private def desugarModuleItem (invariants : Array (Name × Array Syntax))
     -- Consumed by the type it names.
     return #[]
   if stx.isOfKind ``Move.Spec.globalInvariantSpec then do
-    -- `spec global where invariant R: P; …`: one body predicate per family,
-    -- registered so the source translator asserts it at each write to R.
-    let clauses := #[(stx[4], stx[6])] ++ stx[7].getArgs.map fun c => (c[2], c[4])
+    -- `spec global where invariant (all a: P); …`: each clause becomes a state
+    -- predicate `∀ a, guard → body` over `get`/`contains` of the families it
+    -- names, registered under EACH of them so a write to any re-checks it.  A
+    -- regular invariant is a `State → Prop`; an `update` invariant a relation
+    -- `State → State → Prop` between the pre- and post-state.
+    let clauses := #[stx[4]] ++ stx[5].getArgs.map (·[2])
     let mut commands : Array Syntax := #[]
-    for (familyStx, bodyStx) in clauses do
-      let family : TSyntax `ident := ⟨familyStx⟩
-      let this := mkIdentFrom bodyStx `this
-      let body : TSyntax `term := ⟨Move.Spec.bindInvariantValue this bodyStx⟩
-      let bodyName := mkIdentFrom family
-        (Name.mkSimple s!"GlobalInvariant_{family.getId.getString!}")
-      let bodyCommand ← `(@[move_invariant_norm] def $bodyName
-        ($this : $family) : Prop := $body)
-      let registration ← `(#register_move_global_invariant $family $bodyName)
-      commands := commands ++ #[bodyCommand.raw, registration.raw]
+    for (clause, index) in clauses.zipIdx do
+      let (isUpdate, families, addr, atBody) ← Move.Spec.elabGlobalInvariantClause clause
+      let stateType := mkIdentFrom clause `_moveSpecS
+      let state := mkIdentFrom clause `_moveSpecState
+      let pre := mkIdentFrom clause `_moveSpecPre
+      let post := mkIdentFrom clause `_moveSpecPost
+      -- `{S} [ResourceStore S R]*` shared by every generated declaration.
+      let mut storeBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) :=
+        #[← `(bracketedBinder| {$stateType : Type})]
+      for family in families do
+        storeBinders := storeBinders.push
+          (← `(bracketedBinder| [Move.Semantics.ResourceStore $stateType $family]))
+      -- The state binders and arguments the invariant quantifies over.
+      let stateBinder : TSyntax ``Lean.Parser.Term.bracketedBinder ←
+        if isUpdate then `(bracketedBinder| ($pre $post : $stateType))
+        else `(bracketedBinder| ($state : $stateType))
+      let stateArgs : Array (TSyntax `term) :=
+        if isUpdate then #[pre, post] else #[state]
+      let suffix := if index == 0 then "" else s!"_{index}"
+      let base := if isUpdate then "GlobalUpdate" else "GlobalInvariant"
+      let firstFamily := families[0]!
+      let name := mkIdentFrom firstFamily
+        (Name.mkSimple s!"{base}_{firstFamily.getId.getString!}{suffix}")
+      let atName := mkIdentFrom firstFamily
+        (Name.mkSimple s!"{base}_{firstFamily.getId.getString!}{suffix}_at")
+      -- Per-address predicate `guard → body`, and the invariant as its `∀`.
+      -- The invariant is `irreducible` so the shared finisher never expands the
+      -- quantifier (which would make `grind`/`simp` explode); the only way to
+      -- discharge it is the `@[grind]` reestablishment lemmas below, which open
+      -- it explicitly.
+      let atCommand ← `(@[grind] def $atName
+        $storeBinders* $stateBinder ($addr : Move.Address) : Prop := $atBody)
+      let invCommand ← `(@[irreducible] def $name $storeBinders* $stateBinder : Prop :=
+        ∀ $addr : Move.Address, $atName $stateArgs* $addr)
+      commands := commands ++ #[atCommand.raw, invCommand.raw]
+      -- A reestablishment lemma per family and per write shape (insert/erase):
+      -- the invariant survives a change at `w` given its address-`w`
+      -- obligation, framing every other address from the entry certificate
+      -- (regular) or reflexivity (update).
+      let s := mkIdentFrom clause `_moveSpecReS
+      let w := mkIdentFrom clause `_moveSpecReW
+      let v := mkIdentFrom clause `_moveSpecReV
+      let a := mkIdentFrom clause `_moveSpecReA
+      let h := mkIdentFrom clause `_moveSpecReH
+      let hyp := mkIdentFrom clause `_moveSpecReHyp
+      let framed := mkIdentFrom clause `_moveSpecReFramed
+      let changed := mkIdentFrom clause `_moveSpecReChanged
+      for family in families do
+        -- Independence of every *other* named family from the written one, so
+        -- their stored values frame across this write.
+        let mut indepBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) := #[]
+        for other in families do
+          unless other.getId == family.getId do
+            indepBinders := indepBinders.push
+              (← `(bracketedBinder|
+                [Move.Semantics.IndependentResourceStores $stateType $family $other]))
+        for isErase in #[false, true] do
+          let verb := if isErase then "erase" else "insert"
+          let lemmaName := mkIdentFrom family (Name.mkSimple
+            s!"{base}_{firstFamily.getId.getString!}{suffix}_{verb}_{family.getId.getString!}")
+          let changedState : TSyntax `term ←
+            if isErase then
+              `(Move.Semantics.ResourceStore.erase (State := $stateType)
+                (Value := $family) $s $w)
+            else
+              `(Move.Semantics.ResourceStore.insert (State := $stateType)
+                (Value := $family) $s $w $v)
+          let frameLemma ← if isErase then
+              `(Lean.Parser.Tactic.simpLemma|
+                Move.Semantics.ResourceStore.lookup_erase_other _ _ _ $h)
+            else
+              `(Lean.Parser.Tactic.simpLemma|
+                Move.Semantics.ResourceStore.lookup_insert_other _ _ _ _ $h)
+          let indepLemma ← if isErase then
+              `(Lean.Parser.Tactic.simpLemma|
+                Move.Semantics.IndependentResourceStores.lookup_right_after_left_erase)
+            else
+              `(Lean.Parser.Tactic.simpLemma|
+                Move.Semantics.IndependentResourceStores.lookup_right_after_left_insert)
+          let valueBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) ←
+            if isErase then pure #[]
+            else do pure #[← `(bracketedBinder| ($v : $family))]
+          -- Regular: the entry invariant frames untouched addresses and is
+          -- threaded into the changed address's obligation (`K_at s w →
+          -- K_at (post) w`).  Update: reflexivity frames, and the changed
+          -- obligation is the raw relation at `w` (no entry).
+          let hypType : TSyntax `term ←
+            if isUpdate then `(∀ $a : Move.Address, $atName $s $s $a)
+            else `($name $s)
+          let changedType : TSyntax `term ←
+            if isUpdate then `($atName $s $changedState $w)
+            else `($atName $s $w → $atName $changedState $w)
+          let changedExact : TSyntax `term ←
+            if isUpdate then `($changed) else `($changed ($hyp $w))
+          let conclusionArgs : Array (TSyntax `term) :=
+            if isUpdate then #[s, changedState] else #[changedState]
+          let framedFrom : TSyntax `term ← `($hyp $a)
+          -- Unfold the (irreducible) invariant to expose its `∀`.  Regular:
+          -- also in the entry hypothesis so it can be instantiated at an
+          -- address.  Update: the hypothesis is already the reflexivity `∀`.
+          let unfoldTac : TSyntax `tactic ←
+            if isUpdate then `(tactic| unfold $name:ident)
+            else `(tactic| unfold $name:ident at $hyp:ident ⊢)
+          let lemmaCommand ← `(@[grind ←] theorem $lemmaName
+              $storeBinders* $indepBinders* ($s : $stateType) ($w : Move.Address)
+              $valueBinders* ($hyp : $hypType)
+              ($changed : $changedType) :
+              $name $conclusionArgs* := by
+            $unfoldTac:tactic
+            intro $a:ident
+            by_cases $h:ident : $a = $w <;>
+              first
+                | (subst $a:ident; exact $changedExact)
+                | (have $framed:ident := $framedFrom;
+                   simp only [$atName:ident, Move.Semantics.ResourceStore.contains,
+                     Move.Semantics.ResourceStore.get, $frameLemma:simpLemma,
+                     $indepLemma:simpLemma] at $framed:ident ⊢;
+                   exact $framed))
+          commands := commands.push lemmaCommand.raw
+      for family in families do
+        let registration ← if isUpdate then
+            `(#register_move_global_invariant update $family $name $families*)
+          else
+            `(#register_move_global_invariant $family $name $families*)
+        commands := commands.push registration.raw
     return commands
   if stx.isOfKind ``moveStructItem then
     let (wellKnown, user) ← splitAttributeInstances stx[1]
@@ -768,9 +886,12 @@ def elabRegisterMoveInvariant : CommandElab := fun stx => do
 
 @[command_elab registerMoveGlobalInvariant]
 def elabRegisterMoveGlobalInvariant : CommandElab := fun stx => do
-  let family ← resolveGlobalConstNoOverload stx[1]
-  let bodyName ← resolveGlobalConstNoOverload stx[2]
-  modifyEnv fun env => Move.registerGlobalInvariant env family bodyName
+  let isUpdate := !stx[1].getArgs.isEmpty
+  let family ← resolveGlobalConstNoOverload stx[2]
+  let bodyName ← resolveGlobalConstNoOverload stx[3]
+  let mentioned ← stx[4].getArgs.toList.mapM resolveGlobalConstNoOverload
+  modifyEnv fun env =>
+    Move.registerGlobalInvariant env family isUpdate bodyName mentioned
 
 @[command_elab registerMoveAttributes]
 def elabRegisterMoveAttributes : CommandElab := fun stx => do

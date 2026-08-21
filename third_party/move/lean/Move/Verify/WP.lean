@@ -53,6 +53,31 @@ this point, and the continuation may then assume it. -/
     rintro result final ⟨_, rfl, rfl⟩
     exact normal holds
 
+/-- Certifying a state update: the relation between the pre-state and the
+post-state of `op` is conjoined onto the post, so it is asserted exactly where
+`op`'s result lands (and never assumed on entry). -/
+@[simp, wp_norm] theorem wp_certifyUpdate (relation : State → State → Prop)
+    (op : Spec State Result) (ensures : Result → State → Prop)
+    (aborts : Nat → Prop) (initial : State) :
+    wp (Spec.certifyUpdate relation op) ensures aborts initial ↔
+      wp op (fun result final => relation initial final ∧ ensures result final)
+        aborts initial := by
+  simp only [wp, Spec.certifyUpdate_ok, Spec.certifyUpdate_aborts,
+    Spec.certifyUpdate_undefined]
+  constructor
+  · rintro ⟨hok, habt, hundef⟩
+    have hrel : ∀ result final, op.ok initial result final → relation initial final :=
+      fun result final hopok => Classical.byContradiction fun hcontra =>
+        hundef (Or.inr ⟨result, final, hopok, hcontra⟩)
+    exact ⟨fun result final hopok =>
+      ⟨hrel result final hopok, hok result final ⟨hopok, hrel result final hopok⟩⟩,
+      habt, fun h => hundef (Or.inl h)⟩
+  · rintro ⟨hok, habt, hundef⟩
+    refine ⟨fun result final h => (hok result final h.1).2, habt, ?_⟩
+    rintro (h | ⟨result, final, hopok, hnrel⟩)
+    · exact hundef h
+    · exact hnrel (hok result final hopok).1
+
 /-- A source conditional splits the obligation; the branch condition is
 what a proof case-splits on. -/
 @[wp_norm] theorem wp_ite (c : Prop) [Decidable c] (a b : Spec State Result)
