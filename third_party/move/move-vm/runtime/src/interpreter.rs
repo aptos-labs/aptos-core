@@ -124,13 +124,19 @@ macro_rules! set_err_info {
 /// It mimics execution on a single thread, with an call stack and an operand stack.
 pub(crate) struct Interpreter;
 
-pub(crate) trait InterpreterDebugInterface {
+pub trait InterpreterDebugInterface {
     fn get_stack_frames(&self, count: usize) -> ExecutionState;
+    fn get_stack_depth(&self) -> usize;
     fn debug_print_stack_trace(
         &self,
         buf: &mut String,
         runtime_environment: &RuntimeEnvironment,
     ) -> PartialVMResult<()>;
+    fn get_frame_locals(&self, depth: usize) -> Option<(&LoadedFunction, &Locals)>;
+    fn load_struct_type(
+        &self,
+        idx: &move_vm_types::loaded_data::struct_name_indexing::StructNameIndex,
+    ) -> Option<std::sync::Arc<move_vm_types::loaded_data::runtime_types::StructType>>;
 }
 
 /// `InterpreterImpl` instances can execute Move functions.
@@ -1702,7 +1708,6 @@ where
         err
     }
 
-    #[allow(dead_code)]
     fn debug_print_frame<B: Write>(
         &self,
         buf: &mut B,
@@ -1803,7 +1808,7 @@ where
         internal_state.push_str(
             format!(
                 "*frame #{}: {} [pc = {}]:\n",
-                self.call_stack.0.len(),
+                self.get_stack_depth(),
                 current_frame.function.name_as_pretty_string(),
                 current_frame.pc,
             )
@@ -1864,7 +1869,6 @@ impl<LoaderImpl> InterpreterDebugInterface for InterpreterImpl<'_, LoaderImpl>
 where
     LoaderImpl: Loader,
 {
-    #[allow(dead_code)]
     #[cold]
     fn debug_print_stack_trace(
         &self,
@@ -1906,6 +1910,31 @@ where
             })
             .collect();
         ExecutionState::new(stack_trace)
+    }
+
+    fn get_stack_depth(&self) -> usize {
+        self.call_stack.0.len()
+    }
+
+    fn get_frame_locals(&self, depth: usize) -> Option<(&LoadedFunction, &Locals)> {
+        let len = self.call_stack.0.len();
+        if depth >= len {
+            return None;
+        }
+        let frame = &self.call_stack.0[len - 1 - depth];
+        Some((&frame.function, &frame.locals))
+    }
+
+    fn load_struct_type(
+        &self,
+        idx: &move_vm_types::loaded_data::struct_name_indexing::StructNameIndex,
+    ) -> Option<std::sync::Arc<move_vm_types::loaded_data::runtime_types::StructType>> {
+        use crate::module_traversal::{TraversalContext, TraversalStorage};
+        let storage = TraversalStorage::new();
+        let mut ctx = TraversalContext::new(&storage);
+        self.loader
+            .load_struct_definition(&mut move_vm_types::gas::UnmeteredGasMeter, &mut ctx, idx)
+            .ok()
     }
 }
 
@@ -2123,7 +2152,7 @@ impl Frame {
             };
             if is_tracing_for!(TraceCategory::VMError) {
                 let mut str = String::new();
-                let abort_idx = interpreter.call_stack.0.len();
+                let abort_idx = interpreter.get_stack_depth();
                 if let Err(print_err) = interpreter
                     .debug_print_stack_trace(&mut str, interpreter.loader.runtime_environment())
                 {
