@@ -35,9 +35,11 @@ The first proof-facing semantic slice is implemented:
 - `Move.Verify.Borrow` supplies derived prophecy rules for reads, writes, and
   vector mutation through borrows;
 - `Move.Verify.Tactics` provides the proof tactics (`contract_intro`,
-  `checked_cases`, `abort_clause`, `spec_norm`, `move_cases`, `wp_call`,
-  `u64_omega`; well-definedness is discharged structurally by
-  `spec_defined`) and the shared
+  `move_step`, `move_hyp`, `checked_cases`, `abort_clause`, `spec_norm`,
+  `move_cases`, `wp_call`, `u64_omega`; well-definedness is discharged
+  structurally by `spec_defined`).  `verify` proofs are wrapped in an inert
+  `move_bench` that, under `MOVE_PROOF_BENCH`, records deterministic
+  per-proof heartbeats for `scripts/bench-proofs.sh`.  All share the
   `move_norm`/`wp_norm`/`move_spec` simp inventories used by both manual
   proofs and the automatic `verify`;
 - `Move.Verify.Syntax` provides function-associated `spec` and `verify`
@@ -542,11 +544,12 @@ scope with a `MutRef current final`, and reconciles the scope's final current
 with that value. User proofs should normally see the derived read, write, and
 borrow lemmas rather than this primitive rule.
 
-The implemented `verify f` command unfolds the generated source semantics
-once, before the normal and abort obligations are split apart — unfolding
-each half separately repeats the whole traversal and dominates verification
-time — then applies the standard rules through the shared `move_spec`
-inventory,
+The implemented `verify f` command opens the contract with `contract_intro`
+into one weakest-precondition goal and executes the body symbolically by the
+`wp_norm` rules (`simp only`, linear in the body, no existentials, a
+prophecy eliminated as soon as its reconciliation equation appears), then
+finishes the arithmetic and data obligations with the shared `move_spec`
+and `move_data` inventories,
 simplifies typed resource lookup and prophecy equalities, and leaves
 domain-specific arithmetic or data-structure obligations to ordinary Lean
 tactics. `Move.Verify.satisfies_fix` — with its wp form `satisfies_fix_of_wp`,

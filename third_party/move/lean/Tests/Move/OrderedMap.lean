@@ -567,7 +567,7 @@ move_module OrderedMap where
   /-! ### Direct proofs -/
 
   verify empty by
-    simp [empty.contract, empty, Model.SortedEntries]
+    simp [empty.contract, empty]
 
   /-! ### Search proofs
 
@@ -648,29 +648,17 @@ move_module OrderedMap where
     dsimp only
     wp_call (lowerBound.verified _) using permitted
     · rintro index middle ⟨⟨rfl, -⟩, rfl⟩
-      by_cases inBounds : Move.Verify.Source.logicalLT
-        (U64.ofNat (Model.lowerBoundList map.entries.toList key))
-        (Move.Vector.length map.entries)
-      · rw [if_pos inBounds]
-        have bounded : map.entries.toList.length < 18446744073709551616 := by
-          have := map.entries.toList_length_lt
-          simp only [move_norm, Nat.reducePow] at this
-          exact this
-        have targetLe := Model.Search.lowerBoundList_le map.entries.toList key
-        simp only [Move.Verify.Source.logicalLT_uint, Move.UInt.toNat_ofNat,
-          Move.Vector.length_toNat] at inBounds
+      have bounded : map.entries.toList.length < 18446744073709551616 := by
+        have := map.entries.toList_length_lt
+        simp only [move_norm, Nat.reducePow] at this
+        exact this
+      have targetLe := Model.Search.lowerBoundList_le map.entries.toList key
+      move_step inBounds
+      · -- In bounds: the entry at the lower bound decides membership.
         spec_norm at inBounds
-        obtain ⟨entry, atTarget⟩ :
-            ∃ entry, map.entries.toList[Model.lowerBoundList
-              map.entries.toList key]? = some entry :=
-          ⟨_, List.getElem?_eq_getElem inBounds⟩
-        rw [Move.Semantics.Vector.borrowElemSpec_eq_pure
-            (by
-            simp only [move_norm, Nat.reducePow]
-            rw [Nat.mod_eq_of_lt (by omega)]
-            exact atTarget),
-          Move.Semantics.Spec.pure_bind, Move.Verify.wp_pure]
-        refine ⟨?_, rfl⟩
+        move_step entry atTarget
+        spec_norm at atTarget
+        move_step
         show (Move.Verify.Source.logicalBEq entry.key key = true) ↔
           Model.Contains map key
         rw [Move.Verify.Source.logicalBEq_move,
@@ -683,16 +671,9 @@ move_module OrderedMap where
           rw [atTarget] at atCandidate
           cases atCandidate
           exact same
-      · rw [if_neg inBounds, Move.Verify.wp_pure]
-        have bounded : map.entries.toList.length < 18446744073709551616 := by
-          have := map.entries.toList_length_lt
-          simp only [move_norm, Nat.reducePow] at this
-          exact this
-        have targetLe := Model.Search.lowerBoundList_le map.entries.toList key
-        simp only [Move.Verify.Source.logicalLT_uint, Move.UInt.toNat_ofNat,
-          Move.Vector.length_toNat] at inBounds
+      · -- Out of bounds: no entry can match.
         spec_norm at inBounds
-        refine ⟨?_, rfl⟩
+        move_step
         show (false = true) ↔ Model.Contains map key
         simp only [Bool.false_eq_true, false_iff]
         intro present
@@ -707,37 +688,26 @@ move_module OrderedMap where
     dsimp only
     wp_call (lowerBound.verified _) using permitted
     · rintro index middle ⟨⟨rfl, -⟩, rfl⟩
-      by_cases inBounds : Move.Verify.Source.logicalLT
-        (U64.ofNat (Model.lowerBoundList map.entries.toList key))
-        (Move.Vector.length map.entries)
-      · rw [if_pos inBounds]
-        have bounded : map.entries.toList.length < 18446744073709551616 := by
-          have := map.entries.toList_length_lt
-          simp only [move_norm, Nat.reducePow] at this
-          exact this
-        have targetLe := Model.Search.lowerBoundList_le map.entries.toList key
-        simp only [Move.Verify.Source.logicalLT_uint, Move.UInt.toNat_ofNat,
-          Move.Vector.length_toNat] at inBounds
-        spec_norm at inBounds
-        obtain ⟨entry, atTarget⟩ :
-            ∃ entry, map.entries.toList[Model.lowerBoundList
-              map.entries.toList key]? = some entry :=
-          ⟨_, List.getElem?_eq_getElem inBounds⟩
-        rw [Move.Semantics.Vector.borrowElemSpec_eq_pure
-            (by
-            simp only [move_norm, Nat.reducePow]
-            rw [Nat.mod_eq_of_lt (by omega)]
-            exact atTarget),
-          Move.Semantics.Spec.pure_bind]
-        by_cases equal : Move.Verify.Source.logicalBEq entry.key key = true
-        · rw [if_pos equal]
-          simp only [Move.Semantics.Spec.pure_bind, Move.Verify.wp_pure]
+      have bounded : map.entries.toList.length < 18446744073709551616 := by
+        have := map.entries.toList_length_lt
+        simp only [move_norm, Nat.reducePow] at this
+        exact this
+      have targetLe := Model.Search.lowerBoundList_le map.entries.toList key
+      move_step inBounds
+      · spec_norm at inBounds
+        move_step entry atTarget
+        spec_norm at atTarget
+        move_step equal
+        · -- The key matches: the entry is borrowed again for its value.
+          move_step value atValue
+          spec_norm at atValue
+          rw [atTarget] at atValue
+          cases atValue
+          move_step
           have same := (Move.Compare.equal_eq_true_iff entry.key key).mp
             (by rwa [Move.Verify.Source.logicalBEq_move] at equal)
-          exact ⟨fun _ => ⟨entry, List.mem_of_getElem? atTarget, same, rfl⟩,
-            trivial⟩
-        · rw [if_neg equal]
-          simp only [Move.Verify.wp_abort]
+          exact fun _ => ⟨entry, List.mem_of_getElem? atTarget, same, rfl⟩
+        · -- Another key at the lower bound: the key is absent.
           abort_clause
           intro present
           obtain ⟨candidate, atCandidate, same⟩ :=
@@ -748,17 +718,8 @@ move_module OrderedMap where
           exact equal (by
             rw [Move.Verify.Source.logicalBEq_move]
             exact (Move.Compare.equal_eq_true_iff entry.key key).mpr same)
-      · rw [if_neg inBounds]
-        have bounded : map.entries.toList.length < 18446744073709551616 := by
-          have := map.entries.toList_length_lt
-          simp only [move_norm, Nat.reducePow] at this
-          exact this
-        have targetLe := Model.Search.lowerBoundList_le map.entries.toList key
-        simp only [Move.Verify.Source.logicalLT_uint, Move.UInt.toNat_ofNat,
-          Move.Vector.length_toNat] at inBounds
-        spec_norm at inBounds
-        simp only [Move.Verify.wp_abort]
-        refine ⟨?_, trivial⟩
+      · spec_norm at inBounds
+        abort_clause
         intro present
         obtain ⟨entry, atTarget, _⟩ :=
           (Model.Search.contains_iff_lowerBound _ _ map.invariant).mp present

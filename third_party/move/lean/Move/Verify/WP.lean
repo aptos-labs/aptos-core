@@ -38,6 +38,22 @@ no-overflow hypothesis, and the arithmetic abort otherwise. -/
     · rintro code ⟨rfl, overflow⟩
       exact abnormal overflow
 
+/-- A source conditional splits the obligation; the branch condition is
+what a proof case-splits on. -/
+@[wp_norm] theorem wp_ite (c : Prop) [Decidable c] (a b : Spec State Result)
+    (ensures : Result → State → Prop) (aborts : Nat → Prop) (initial : State) :
+    wp (if c then a else b) ensures aborts initial ↔
+      if c then wp a ensures aborts initial else wp b ensures aborts initial := by
+  split <;> rfl
+
+@[wp_norm] theorem wp_dite (c : Prop) [Decidable c] (a : c → Spec State Result)
+    (b : ¬c → Spec State Result)
+    (ensures : Result → State → Prop) (aborts : Nat → Prop) (initial : State) :
+    wp (if h : c then a h else b h) ensures aborts initial ↔
+      if h : c then wp (a h) ensures aborts initial
+      else wp (b h) ensures aborts initial := by
+  split <;> rfl
+
 /-- Creating a certified value: the invariant is the obligation, and the
 continuation may use it. -/
 @[simp, wp_norm] theorem wp_certified {Invariant : Prop}

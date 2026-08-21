@@ -21,9 +21,12 @@ sets registered in `Move.Verify.SimpAttrs`:
   `*_eq_pure` equations whose side conditions a proof context can discharge.
 - `wp_norm` (populated at the rule definitions in `Move.Verify.WP` and
   `Move.Verify.Borrow`) rewrites weakest-precondition obligations.
-- `move_spec` unfolds the raw relational semantics; it is the lemma
-  inventory of the automatic `verify f` command, and user proofs or
-  project-specific summaries can extend it with `@[move_spec]`.
+- `move_data` unfolds the data level shared by both proof styles —
+  references, stores, vectors, and the monad shells;
+- `move_spec` unfolds the raw relational semantics through projection
+  lemmas; together with `move_data` it is the brute-force inventory behind
+  `simp [move_spec, move_data]`, and user proofs or project-specific
+  summaries can extend it with `@[move_spec]`.
 -/
 
 attribute [move_norm]
@@ -96,6 +99,23 @@ attribute [move_norm]
   Move.Semantics.Vector.borrowElemSpec_eq_pure
   Move.Verify.withBorrowElemMutSpec_write_eq_pure
 
+attribute [move_data]
+  Id.run
+  Bind.bind
+  Pure.pure
+  Move.Semantics.ResourceStore.contains
+  Move.Semantics.ResourceStore.get
+  Move.Semantics.ResourceStore.descriptor
+  Move.Semantics.Mutation.read
+  Move.Semantics.Mutation.write
+  Move.Vector.empty
+  Move.Vector.push
+  Move.Vector.set
+  Move.Vector.length
+  Move.Vector.ofList
+  Move.Vector.toList
+  Move.U64.size
+
 attribute [move_spec]
   Id.run
   Bind.bind
@@ -103,6 +123,15 @@ attribute [move_spec]
   Move.Semantics.ResourceStore.contains
   Move.Semantics.ResourceStore.get
   Move.Semantics.ResourceStore.descriptor
+  Move.Semantics.Mutation.read
+  Move.Semantics.Mutation.write
+  Move.Vector.empty
+  Move.Vector.push
+  Move.Vector.set
+  Move.Vector.length
+  Move.Vector.ofList
+  Move.Vector.toList
+  Move.U64.size
   Move.Semantics.Resource.withBorrowMutFocusSpec
   Move.Semantics.Resource.withBorrowMutSpec_ok
   Move.Semantics.Resource.withBorrowMutSpec_aborts
@@ -131,14 +160,6 @@ attribute [move_spec]
   Move.Semantics.Spec.undefined_dite
   Move.Semantics.Spec.pure_undefined
   Move.Semantics.Spec.abort_undefined
-  Move.Semantics.Mutation.read
-  Move.Semantics.Mutation.write
-  Move.Vector.empty
-  Move.Vector.push
-  Move.Vector.set
-  Move.Vector.length
-  Move.Vector.ofList
-  Move.Vector.toList
   Move.Semantics.Checked.addSpec
   Move.Semantics.Checked.subSpec
   Move.Semantics.Checked.mulSpec
@@ -147,7 +168,6 @@ attribute [move_spec]
   Move.Semantics.Checked.shlSpec
   Move.Semantics.Checked.shrSpec
   Move.Semantics.Checked.castSpec
-  Move.U64.size
 
 namespace Move.Verify
 
@@ -242,60 +262,6 @@ macro_rules
           | (apply Move.UInt.ext <;> spec_norm <;> omega)
           | (apply Move.UInt.ext <;> uint_bounds <;> omega))
 
-private partial def introUntilSatisfies : TacticM Unit := withMainContext do
-  let target ← instantiateMVars (← getMainTarget)
-  if target.getAppFn.constName? == some ``Move.Verify.Satisfies then
-    return
-  match target with
-  | .forallE .. =>
-      let goal ← getMainGoal
-      let (_, next) ← goal.intro1P
-      replaceMainGoal [next]
-      introUntilSatisfies
-  | _ =>
-      throwError
-        "expected generated contract context followed by `Move.Verify.Satisfies`, got {target}"
-
-private def introNamed (name : Name) : TacticM Unit := withMainContext do
-  let goal ← getMainGoal
-  let (_, next) ← goal.intro name
-  replaceMainGoal [next]
-
-private def hasLastName (name : Name) (suffix : String) : Bool :=
-  match name with
-  | .str _ last => last == suffix
-  | _ => false
-
-private partial def hasFixHead : Expr → Bool
-  | .lam _ _ body _ => hasFixHead body
-  | .letE _ _ _ body _ => hasFixHead body
-  | expression =>
-      expression.getAppFn.constName? == some ``Move.Semantics.Spec.fix
-
-private def targetUsesFix : TacticM Bool := withMainContext do
-  let target ← instantiateMVars (← getMainTarget)
-  unless target.getAppFn.constName? == some ``Move.Verify.Satisfies do
-    throwError "expected a `Move.Verify.Satisfies` goal, got {target}"
-  let arguments := target.getAppArgs
-  if h : 2 ≤ arguments.size then
-    let function := arguments[arguments.size - 2]'(by omega)
-    return hasFixHead function
-  return false
-
-/-- Normalize the semantic `¬ mayAbort → ...` guard on the postcondition into
-one negated hypothesis per declared abort condition — and none at all when no
-abort condition is declared or it is `False`. `contract_intro` applies this
-automatically; use it directly after a manual
-`satisfies_of_wp`/`satisfies_fix_of_wp`. -/
-syntax "abort_norm" : tactic
-macro_rules
-  | `(tactic| abort_norm) =>
-    `(tactic|
-      try simp only [false_and, and_false, exists_false, exists_const,
-        not_false_eq_true, true_implies, not_true_eq_false, false_implies,
-        implies_true, exists_and_left, exists_eq, exists_eq', and_true,
-        not_or, exists_or, and_imp])
-
 /-- Discharge the arithmetic side of an abort obligation, or refute a branch
 that no declared clause admits. -/
 syntax "abort_arith" : tactic
@@ -305,10 +271,13 @@ macro_rules
         | assumption
         | omega
         | (spec_norm; omega)
-        | (uint_bounds; simp only [move_norm, Nat.reducePow, Nat.reduceMod] at *
+        | (uint_bounds; simp only [move_norm, Nat.reducePow, Nat.reduceMod,
+             List.getElem?_eq_none_iff] at *
            omega)
-        | (simp only [move_norm, Nat.reducePow, Nat.reduceMod] at *; omega)
-        | (simp_all [move_norm, Nat.reducePow, Nat.reduceMod]; omega))
+        | (simp only [move_norm, Nat.reducePow, Nat.reduceMod,
+            List.getElem?_eq_none_iff] at *; omega)
+        | (simp_all [move_norm, Nat.reducePow, Nat.reduceMod,
+            List.getElem?_eq_none_iff]; omega))
 
 /-- Prove the abort code of the clause under consideration. Selecting the
 matching clause is what makes the surrounding search deterministic. -/
@@ -360,64 +329,89 @@ private def elabCheckedCases : Tactic := fun stx => withMainContext do
       setGoals (success :: (← getGoals) ++ rest)
   | _ => pure ()
 
-/-- Open the generated contract at the current goal and switch to weakest-
-precondition reasoning. The source function is recovered from a goal of the
-form `f.contract`. Nonrecursive functions use `satisfies_of_wp`; recursive
-functions unfold `f.sourceSpec`, use `satisfies_fix_of_wp`, and expose
-`recursive` and `recursiveVerified`. In both cases the authored source body is
-unfolded and the remaining binders are named `args`, `initial`, and
-`permitted`. -/
-syntax (name := contractIntro) "contract_intro" : tactic
+/-- Normalize a branch hypothesis produced by splitting a source conditional:
+the sealed comparison markers become facts about integer values, and numerals
+reduce. -/
+syntax "move_hyp " ident : tactic
+macro_rules
+  | `(tactic| move_hyp $h:ident) =>
+      `(tactic| try simp only [Move.Verify.Source.logicalLT_uint,
+          Move.Verify.Source.logicalLE_uint, Move.Verify.Source.logicalLT_move,
+          Move.Verify.Source.logicalBEq_move, Move.UInt.lt_iff_toNat_lt,
+          Move.UInt.toNat_ofNat, Move.UInt.toNat_ofNat_numeral,
+          Move.UInt.toNat_zero, Move.UInt.toNat_one, Move.Vector.length_toNat,
+          move_norm, Nat.reducePow, Nat.reduceMod, Nat.zero_mod,
+          Bool.not_eq_true, not_lt, not_le] at $h:ident)
 
-private def normalizeMayAbort : TacticM Unit := do
-  evalTactic (← `(tactic| abort_norm))
+/-- One symbolic step of a manual proof, chosen by the shape of the goal:
 
-@[tactic contractIntro]
-private def elabContractIntro : Tactic := fun stx => withMainContext do
-  let target ← instantiateMVars (← getMainTarget)
-  let some contractName := target.getAppFn.constName?
-    | throwErrorAt stx
-        "`contract_intro` must start on a generated goal of the form `f.contract`"
-  let .str functionName "contract" := contractName
-    | throwErrorAt stx
-        "`contract_intro` expected a generated `f.contract` goal, got `{contractName}`"
-  let sourceSpecName := functionName ++ `sourceSpec
-  let bodySpecName := functionName ++ `bodySpec
-  let env ← getEnv
-  unless env.contains sourceSpecName do
-    throwErrorAt stx
-      "`contract_intro` supports effectful source contracts, but `{sourceSpecName}` is not defined"
-  if let some info := env.find? sourceSpecName then
-    if let some value := info.value? (allowOpaque := true) then
-      for dependency in value.getUsedConstants do
-        if hasLastName dependency "mutualSourceSpec" then
-          throwErrorAt stx
-            "`contract_intro` does not yet open mutually recursive contract families; use `satisfies_fixFamily` explicitly"
-  let contract := mkIdentFrom stx contractName
-  let sourceSpec := mkIdentFrom stx sourceSpecName
-  evalTactic (← `(tactic| unfold $contract))
-  introUntilSatisfies
-  withMainContext do
-    evalTactic (← `(tactic| unfold $sourceSpec))
-    evalTactic (← `(tactic|
-      try simp only [Move.Semantics.Spec.pure_bind]))
-    if ← targetUsesFix then
-      let bodySpec := mkIdentFrom stx bodySpecName
-      evalTactic (← `(tactic| apply Move.Verify.satisfies_fix_of_wp))
-      introNamed `recursive
-      introNamed `recursiveVerified
-      introNamed `args
-      introNamed `initial
-      introNamed `permitted
-      if env.contains bodySpecName then
-        evalTactic (← `(tactic| unfold $bodySpec))
-      normalizeMayAbort
+- a source conditional at the head is split, its branch hypothesis named by
+  the first identifier given (default `h`) and normalized with `move_hyp`;
+- a checked operation is split into its success branch (its binders named
+  by the identifiers given) and its abort branch, which is discharged
+  against the declared abort clauses and otherwise left as the last goal;
+- a recursive call is stepped through with the contract being established,
+  leaving its precondition and the postcondition weakening;
+- otherwise the pure plumbing a weakest-precondition rule leaves behind —
+  `¬mayAbort` guards, a trivial frame, reconciliation equations — is cleared.
+
+Each step rewrites only the leading construct, so the proof keeps the shape
+of the source. -/
+syntax (name := moveStep) "move_step" (ppSpace colGt ident)* : tactic
+
+@[tactic moveStep]
+private def elabMoveStep : Tactic := fun stx => withMainContext do
+  let names : Array (TSyntax `ident) := stx[1].getArgs.map (⟨·⟩)
+  let firstName : TSyntax `ident := names.getD 0 (mkIdent `h)
+  -- Expose the leading construct.
+  evalTactic (← `(tactic| try simp only [wp_norm, Move.Semantics.Spec.pure_bind,
+    Move.Semantics.Spec.bind_pure, Move.Semantics.Spec.abort_bind,
+    Move.Semantics.Spec.fix_const, Move.Semantics.Mutation.read,
+    Move.Semantics.Mutation.write, Move.Semantics.Mutation.current_write,
+    Move.Semantics.Mutation.read_mk, Move.Semantics.Mutation.read_write,
+    Move.Verify.forall_imp_eq_left, Move.Verify.forall_imp_eq_right,
+    Move.Verify.forall_imp_imp_eq_left, forall_eq, forall_eq']))
+  let target := (← instantiateMVars (← getMainTarget)).consumeMData
+  let head := target.getAppFn
+  if head.isConstOf ``ite || head.isConstOf ``dite then
+    -- A source conditional: split, name, normalize.
+    evalTactic (← `(tactic| split <;> rename_i $firstName:ident <;>
+      move_hyp $firstName:ident))
+  else if head.isConstOf ``And &&
+      !(target.appArg!.isConstOf ``True || target.appArg!.isAppOf ``Eq) then
+    -- A two-branch rule: success (named binders) and abort (discharged).
+    evalTactic (← `(tactic| refine ⟨?_, ?_⟩))
+    match ← getGoals with
+    | success :: abortObligation :: rest =>
+        setGoals [abortObligation]
+        evalTactic (← `(tactic| try abort_clause))
+        let remaining ← getGoals
+        setGoals [success]
+        evalTactic (← `(tactic| intros))
+        for name in names.reverse do
+          evalTactic (← `(tactic| try rename_i $name:ident))
+        let successGoals ← getGoals
+        setGoals (successGoals ++ remaining ++ rest)
+    | _ => pure ()
+  else if head.isConstOf ``Move.Verify.wp then
+    -- A recursive call: use the contract being established.
+    let action := target.getArg! 2
+    if action.getAppFn.isFVar then
+      evalTactic (← `(tactic| refine Move.Verify.wp_mono
+        (Move.Verify.wp_of_satisfies recursiveVerified ?_) ?_ ?_))
     else
-      evalTactic (← `(tactic| apply Move.Verify.satisfies_of_wp))
-      introNamed `args
-      introNamed `initial
-      introNamed `permitted
-      normalizeMayAbort
+      throwError "move_step: no rule for the leading operation{indentExpr action}"
+  else
+    -- Plumbing left by a rule: guards, frames, reconciliation.
+    evalTactic (← `(tactic| first
+      | simp only [false_and, and_false, exists_false, exists_const,
+          not_false_eq_true, true_implies, not_true_eq_false, false_implies,
+          implies_true, exists_and_left, exists_eq, exists_eq', and_true,
+          true_and, not_or, exists_or, and_imp, eq_self_iff_true, and_self,
+          Classical.not_not]
+      | rfl
+      | trivial
+      | fail "move_step: no step applies to this goal"))
 
 /-- Step through a bound call using its established contract. This leaves the
 normal-postcondition weakening and abort forwarding obligations as the two

@@ -2314,13 +2314,157 @@ private def elabEffectfulSourceSpec : CommandElab := fun stx => do
   let contractCommand ← `(def $contractName : Prop := $contractBody)
   elabCommand contractCommand
 
+private partial def introUntilSatisfies : Lean.Elab.Tactic.TacticM Unit := Lean.Elab.Tactic.withMainContext do
+  let target ← instantiateMVars (← Lean.Elab.Tactic.getMainTarget)
+  if target.getAppFn.constName? == some ``Move.Verify.Satisfies then
+    return
+  match target with
+  | .forallE .. =>
+      let goal ← Lean.Elab.Tactic.getMainGoal
+      let (_, next) ← goal.intro1P
+      Lean.Elab.Tactic.replaceMainGoal [next]
+      introUntilSatisfies
+  | _ =>
+      throwError
+        "expected generated contract context followed by `Move.Verify.Satisfies`, got {target}"
+
+private def introNamed (name : Name) : Lean.Elab.Tactic.TacticM Unit := Lean.Elab.Tactic.withMainContext do
+  let goal ← Lean.Elab.Tactic.getMainGoal
+  let (_, next) ← goal.intro name
+  Lean.Elab.Tactic.replaceMainGoal [next]
+
+private def hasLastName (name : Name) (suffix : String) : Bool :=
+  match name with
+  | .str _ last => last == suffix
+  | _ => false
+
+/-- Whether a source semantics *is* a fixed point — `Spec.fix body`, possibly
+eta-expanded over the function's argument — as opposed to a function whose
+body merely contains a loop (`fun n => Spec.fix loop ()`), which opens with
+the ordinary rule and meets the loop as a `wp (fix …)` sub-goal. -/
+private partial def hasFixHead : Expr → Bool
+  | .lam _ _ body _ =>
+      body.getAppFn.constName? == some ``Move.Semantics.Spec.fix &&
+        body.getAppNumArgs == 5 && body.appArg! == .bvar 0
+  | .letE _ _ _ body _ => hasFixHead body
+  | expression =>
+      expression.getAppFn.constName? == some ``Move.Semantics.Spec.fix &&
+        expression.getAppNumArgs == 4
+
+private def targetUsesFix : Lean.Elab.Tactic.TacticM Bool := Lean.Elab.Tactic.withMainContext do
+  let target ← instantiateMVars (← Lean.Elab.Tactic.getMainTarget)
+  unless target.getAppFn.constName? == some ``Move.Verify.Satisfies do
+    throwError "expected a `Move.Verify.Satisfies` goal, got {target}"
+  let arguments := target.getAppArgs
+  if h : 2 ≤ arguments.size then
+    let function := arguments[arguments.size - 2]'(by omega)
+    return hasFixHead function
+  return false
+
+/-- Normalize the semantic `¬ mayAbort → ...` guard on the postcondition into
+one negated hypothesis per declared abort condition — and none at all when no
+abort condition is declared or it is `False`. `contract_intro` applies this
+automatically; use it directly after a manual
+`satisfies_of_wp`/`satisfies_fix_of_wp`. -/
+syntax "abort_norm" : tactic
+macro_rules
+  | `(tactic| abort_norm) =>
+    `(tactic|
+      try simp only [false_and, and_false, exists_false, exists_const,
+        not_false_eq_true, true_implies, not_true_eq_false, false_implies,
+        implies_true, exists_and_left, exists_eq, exists_eq', and_true,
+        not_or, exists_or, and_imp])
+
+/-- Open the generated contract at the current goal and switch to weakest-
+precondition reasoning. The source function is recovered from a goal of the
+form `f.contract`. Nonrecursive functions use `satisfies_of_wp`; recursive
+functions unfold `f.sourceSpec`, use `satisfies_fix_of_wp`, and expose
+`recursive` and `recursiveVerified`. In both cases the authored source body is
+unfolded and the remaining binders are named `args`, `initial`, and
+`permitted`. -/
+syntax (name := contractIntro) "contract_intro" : tactic
+
+private def normalizeMayAbort : Lean.Elab.Tactic.TacticM Unit := do
+  Lean.Elab.Tactic.evalTactic (← `(tactic| abort_norm))
+
+@[tactic contractIntro]
+private def elabContractIntro : Lean.Elab.Tactic.Tactic := fun stx => Lean.Elab.Tactic.withMainContext do
+  let target ← instantiateMVars (← Lean.Elab.Tactic.getMainTarget)
+  let some contractName := target.getAppFn.constName?
+    | throwErrorAt stx
+        "`contract_intro` must start on a generated goal of the form `f.contract`"
+  let .str functionName "contract" := contractName
+    | throwErrorAt stx
+        "`contract_intro` expected a generated `f.contract` goal, got `{contractName}`"
+  let sourceSpecName := functionName ++ `sourceSpec
+  let bodySpecName := functionName ++ `bodySpec
+  let env ← getEnv
+  unless env.contains sourceSpecName do
+    throwErrorAt stx
+      "`contract_intro` supports effectful source contracts, but `{sourceSpecName}` is not defined"
+  if let some info := env.find? sourceSpecName then
+    if let some value := info.value? (allowOpaque := true) then
+      for dependency in value.getUsedConstants do
+        if hasLastName dependency "mutualSourceSpec" then
+          throwErrorAt stx
+            "`contract_intro` does not yet open mutually recursive contract families; use `satisfies_fixFamily` explicitly"
+  let contract := mkIdentFrom stx contractName
+  let sourceSpec := mkIdentFrom stx sourceSpecName
+  Lean.Elab.Tactic.evalTactic (← `(tactic| unfold $contract))
+  introUntilSatisfies
+  Lean.Elab.Tactic.withMainContext do
+    Lean.Elab.Tactic.evalTactic (← `(tactic| unfold $sourceSpec))
+    Lean.Elab.Tactic.evalTactic (← `(tactic|
+      try simp only [Move.Semantics.Spec.pure_bind]))
+    if ← targetUsesFix then
+      let bodySpec := mkIdentFrom stx bodySpecName
+      Lean.Elab.Tactic.evalTactic (← `(tactic| apply Move.Verify.satisfies_fix_of_wp))
+      introNamed `recursive
+      introNamed `recursiveVerified
+      introNamed `args
+      introNamed `initial
+      introNamed `permitted
+      if env.contains bodySpecName then
+        Lean.Elab.Tactic.evalTactic (← `(tactic| unfold $bodySpec))
+      normalizeMayAbort
+    else
+      Lean.Elab.Tactic.evalTactic (← `(tactic| apply Move.Verify.satisfies_of_wp))
+      introNamed `args
+      introNamed `initial
+      introNamed `permitted
+      normalizeMayAbort
+
+/-- Wrap a proof to record its cost when benchmarking.  With the environment
+variable `MOVE_PROOF_BENCH` unset it is exactly the wrapped tactics, so it is
+free to leave in every generated proof; when set it logs a parseable line
+
+    ‖MOVE_BENCH‖\t<name>\t<heartbeats>\t<elapsed-ms>
+
+per verified function.  Heartbeats are deterministic — independent of the
+machine, load, and the `aptos` CLI the test suite otherwise spends its wall
+time in — so summing them over the suite benchmarks proof work directly. -/
+scoped syntax (name := moveBench) "move_bench " tacticSeq : tactic
+
+@[tactic moveBench]
+private def elabMoveBench : Lean.Elab.Tactic.Tactic := fun stx => do
+  let proof := stx[1]
+  match ← IO.getEnv "MOVE_PROOF_BENCH" with
+  | none => Lean.Elab.Tactic.evalTactic proof
+  | some _ =>
+      let name := (← Lean.Elab.Term.getDeclName?).getD `_
+      let name := name.replacePrefix (`_root_) Name.anonymous
+      let start ← IO.monoNanosNow
+      let (_, heartbeats) ← Lean.withHeartbeats (Lean.Elab.Tactic.evalTactic proof)
+      let elapsed := (← IO.monoNanosNow) - start
+      Lean.logInfo m!"‖MOVE_BENCH‖\t{name}\t{heartbeats}\t{elapsed / 1000000}"
+
 /-- Prove the contract associated with the named source function with an
 explicit tactic proof. Requiring `by` keeps the command unambiguous when the
 next Move declaration starts with the term-level keyword `fun`. -/
 scoped macro "verify " function:ident " by " proof:tacticSeq : command => do
   let contractName := associatedName function `contract
   let verifiedName := associatedName function `verified
-  `(theorem $verifiedName : $contractName := by $proof)
+  `(theorem $verifiedName : $contractName := by move_bench $proof)
 
 /-- Symbolically execute the supported effectful source fragment and discharge
 its declarative contract using the typed store laws and arithmetic solver. -/
@@ -2356,6 +2500,7 @@ private def elabAutomaticSourceVerify : CommandElab := fun stx => do
               `(Lean.Parser.Tactic.simpLemma| $dependencyTerm:term)
             unfoldLemmas := unfoldLemmas.push dependencyLemma
     let command ← `(theorem $verifiedName : $contractName := by
+      move_bench
       unfold $contractName
       simp_all [$unfoldLemmas,*, move_spec, move_invariant_norm, move_norm,
         Nat.reducePow, Nat.reduceMod, Move.UInt.numeral_eq_ofNat, and_assoc,
@@ -2385,45 +2530,40 @@ private def elabAutomaticSourceVerify : CommandElab := fun stx => do
           let dependencyLemma ←
             `(Lean.Parser.Tactic.simpLemma| $dependencyTerm:term)
           sourceUnfoldLemmas := sourceUnfoldLemmas.push dependencyLemma
+  -- Callees are inlined: their `sourceSpec`s are unfolded into the caller's
+  -- body before symbolic execution (the function's own `sourceSpec` and
+  -- `bodySpec` are already opened by `contract_intro`).
+  let calleeUnfoldLemmas := sourceUnfoldLemmas.filter fun lemma =>
+    lemma.raw.getId != sourceSpecName &&
+      lemma.raw.getId != functionName ++ `bodySpec
   let command ← `(set_option maxHeartbeats 400000 in
     theorem $verifiedName : $contractName := by
-      unfold $contractName Move.Verify.Satisfies
-      intros
-      -- Peel off well-definedness first: it is structural, and keeping it
-      -- out of the unfolding saves a copy of the whole body there.
-      rw [← and_assoc]
-      refine ⟨?main, ?wellDefined⟩
-      case wellDefined =>
-        simp only [$sourceUnfoldLemmas,*]
-        spec_defined
-        all_goals
-          simp_all (config := { maxSteps := 1000000 })
-            [$sourceUnfoldLemmas,*, move_spec, move_invariant_norm, move_norm,
-              Nat.reducePow, Nat.reduceMod, Move.UInt.numeral_eq_ofNat,
-              and_assoc, exists_const] <;>
-          (try uint_bounds) <;>
-          grind [Move.UInt.toNat_ofNat_u8, Move.UInt.toNat_ofNat_u16,
-            Move.UInt.toNat_ofNat_u32, Move.UInt.toNat_ofNat_u64,
-            Move.UInt.toNat_ofNat_u128, Move.UInt.toNat_ofNat_u256,
-            Move.UInt.toNat_zero, Move.UInt.toNat_one,
-            Move.UInt.numeral_eq_ofNat, Move.UInt.toNat_cast,
-            Move.UInt.toNat_lt]
-      -- Unfold the source semantics once, before the two remaining
-      -- obligations are split apart, so the traversal is not repeated.
-      simp only [$sourceUnfoldLemmas,*, move_spec]
-      refine ⟨?_, ?_⟩ <;> intros
+      move_bench
+      -- Open the contract into one weakest-precondition goal, then execute
+      -- the body symbolically by the wp rules: linear in the body, no
+      -- existentials, well-definedness discharged per primitive, the only
+      -- residue being a created value's data invariant.
+      contract_intro
+      try simp only [$calleeUnfoldLemmas,*, wp_norm, move_norm, move_data,
+        Nat.reducePow, Nat.reduceMod, and_imp, forall_eq, forall_eq',
+        Move.Verify.forall_imp_eq_left, Move.Verify.forall_imp_eq_right,
+        Move.Verify.forall_imp_imp_eq_left, Classical.not_not,
+        exists_eq_left, exists_eq_left', exists_eq_right, exists_and_left,
+        exists_and_right, and_true, true_and, true_implies, implies_true,
+        and_self, Prod.mk.injEq, not_false_eq_true, not_true_eq_false,
+        ite_true, ite_false, dite_true, dite_false]
       all_goals
         simp_all (config := { maxSteps := 1000000 })
-          [$sourceUnfoldLemmas,*, move_spec, move_invariant_norm, move_norm,
-            Nat.reducePow, Nat.reduceMod, Move.UInt.numeral_eq_ofNat,
+          [$calleeUnfoldLemmas,*, move_spec, move_data, move_invariant_norm,
+            move_norm, Nat.reducePow, Nat.reduceMod, Move.UInt.numeral_eq_ofNat,
             and_assoc, exists_const] <;>
         (try uint_bounds) <;>
         grind [Move.UInt.toNat_ofNat_u8, Move.UInt.toNat_ofNat_u16,
-        Move.UInt.toNat_ofNat_u32, Move.UInt.toNat_ofNat_u64,
-        Move.UInt.toNat_ofNat_u128, Move.UInt.toNat_ofNat_u256,
-        Move.UInt.toNat_zero, Move.UInt.toNat_one,
-        Move.UInt.numeral_eq_ofNat, Move.UInt.toNat_cast,
-        Move.UInt.toNat_lt])
+          Move.UInt.toNat_ofNat_u32, Move.UInt.toNat_ofNat_u64,
+          Move.UInt.toNat_ofNat_u128, Move.UInt.toNat_ofNat_u256,
+          Move.UInt.toNat_zero, Move.UInt.toNat_one,
+          Move.UInt.numeral_eq_ofNat, Move.UInt.toNat_cast,
+          Move.UInt.toNat_lt, Nat.shiftRight_le])
   elabCommand command
 
 end Move.Spec

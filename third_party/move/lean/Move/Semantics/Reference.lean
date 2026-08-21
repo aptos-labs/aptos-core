@@ -45,6 +45,12 @@ def Finished (reference : Mutation α) : Prop :=
 @[simp] theorem read_write (reference : Mutation α) (value : α) :
     (reference.write value).read = value := rfl
 
+@[simp] theorem current_write (reference : Mutation α) (value : α) :
+    (reference.write value).current = value := rfl
+
+@[simp] theorem read_mk (current prophecy : α) :
+    (Mutation.read { current := current, prophecy := prophecy }) = current := rfl
+
 @[simp] theorem prophecy_write (reference : Mutation α) (value : α) :
     (reference.write value).prophecy = reference.prophecy := rfl
 

@@ -56,6 +56,23 @@ def Satisfies (function : Args → Spec State Result)
         contract.aborts args initial code) ∧
       ¬(function args).undefined initial
 
+/-! A prophecy is eliminated the moment its reconciliation equation appears:
+`∀ future, … → value = future → P future` is `… → P value`.  Lean's
+`forall_eq` handles the bare shape; these handle the equation under the
+hypotheses a weakest-precondition rule puts in front of it. -/
+
+@[simp] theorem forall_imp_eq_left {α : Sort u} {A : Prop} {b : α}
+    {P : α → Prop} : (∀ x, A → b = x → P x) ↔ (A → P b) :=
+  ⟨fun h a => h b a rfl, fun h x a e => e ▸ h a⟩
+
+@[simp] theorem forall_imp_eq_right {α : Sort u} {A : Prop} {b : α}
+    {P : α → Prop} : (∀ x, A → x = b → P x) ↔ (A → P b) :=
+  ⟨fun h a => h b a rfl, fun h x a e => e ▸ h a⟩
+
+@[simp] theorem forall_imp_imp_eq_left {α : Sort u} {A B : Prop} {b : α}
+    {P : α → Prop} : (∀ x, A → B → b = x → P x) ↔ (A → B → P b) :=
+  ⟨fun h a c => h b a c rfl, fun h x a c e => e ▸ h a c⟩
+
 /-- Weakest precondition of the relational verification semantics.  Besides
 the normal and abort outcomes it demands well-definedness: a program point
 that owes a proof the language never checks at run time — re-establishing a
