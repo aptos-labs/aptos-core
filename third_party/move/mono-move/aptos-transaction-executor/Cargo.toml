@@ -33,6 +33,7 @@ triomphe = { workspace = true }
 
 [dev-dependencies]
 aptos-cached-packages = { workspace = true }
+aptos-crypto = { workspace = true }
 aptos-language-e2e-tests = { workspace = true }
 aptos-transaction-simulation = { workspace = true }
 mono-move-aptos-state-view-providers = { workspace = true }

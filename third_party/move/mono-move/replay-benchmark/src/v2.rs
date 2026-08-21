@@ -47,9 +47,10 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun
     .without_metering();
 
     let aux_info = AuxiliaryInfo::new(input.aux_info, None);
+    let txn = input.txn.to_transaction();
     let execute_once = || -> Result<TransactionOutput> {
         executor
-            .execute_user_transaction(&input.txn, &aux_info)
+            .execute_transaction(&txn, &aux_info)
             .materialize(
                 &guard,
                 &data_provider,

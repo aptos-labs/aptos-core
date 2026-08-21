@@ -185,3 +185,48 @@ pub(crate) fn invariant_violation(err: anyhow::Error) -> VMInternalError {
         RuntimeInvariantViolation::Unreachable(err.to_string()),
     ))
 }
+
+/// Like `call_function`, but system code never consumes the transaction's gas
+/// budget, including its module loads.
+pub(crate) fn call_system_function_unmetered(
+    guard: &ExecutionGuard<'_>,
+    interp: &mut InterpreterContext<'_>,
+    address: &AccountAddress,
+    module_name: &IdentStr,
+    function_name: &IdentStr,
+    ty_args: InternedTypeList,
+    signer_bufs: &[[u8; AccountAddress::LENGTH]],
+    args: &[Vec<u8>],
+) -> Result<RuntimeStatus, VMInternalError> {
+    interp.unmetered(|interp| {
+        call_function(
+            guard,
+            interp,
+            address,
+            module_name,
+            function_name,
+            ty_args,
+            signer_bufs,
+            args,
+        )
+    })
+}
+
+/// Reduces a completed call to success or the abort it ended in.
+pub(crate) fn into_result(
+    status: RuntimeStatus,
+) -> Result<(), crate::errors::MoveExecutionFailure> {
+    use crate::errors::MoveExecutionFailure;
+    match status {
+        RuntimeStatus::Success => Ok(()),
+        RuntimeStatus::Aborted {
+            code,
+            message,
+            location,
+        } => Err(MoveExecutionFailure::Abort {
+            code,
+            message,
+            location,
+        }),
+    }
+}

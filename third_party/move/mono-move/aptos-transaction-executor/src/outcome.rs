@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    errors::{DiscardReason, ExecutionStatus, MaterializationError},
+    errors::{DiscardReason, ExecutionStatus, MaterializationError, SystemTxnFailure},
     materialize,
     providers::AptosDataProvider,
 };
@@ -19,6 +19,9 @@ use mono_move_runtime::SessionEffects;
 pub enum TxnOutcome {
     /// Rejected without side effects.
     Discarded(DiscardReason),
+    /// A system transaction failed unexpectedly: there is no per-transaction
+    /// output, and the whole block must be aborted.
+    UnexpectedSystemTransactionFailure(SystemTxnFailure),
     /// Executed: the fee is charged and the side effects are real, whether or
     /// not the payload succeeded.
     Executed {
@@ -53,6 +56,14 @@ impl TxnOutcome {
                 materialize::discard_to_vm_status(reason).status_code(),
                 auxiliary_data,
             )),
+            // A fatally failed system transaction has no output; the block
+            // coordinator aborts the block instead.
+            TxnOutcome::UnexpectedSystemTransactionFailure(failure) => {
+                Err(MaterializationError::new(vec![format!(
+                    "system transaction failed in {}: {:?}",
+                    failure.call, failure.failure
+                )]))
+            },
             TxnOutcome::Executed {
                 status: execution_status,
                 fee_statement,

@@ -6,7 +6,8 @@
 //! TODO(completeness): currently this uses the legacy VM types (e.g. `AptosGasParameters`),
 //! but eventually should switch to a new on-chain config format.
 
-use crate::{errors::PreExecutionCheckFailure, metadata::TxnMetadata};
+use super::metadata::TxnMetadata;
+use crate::errors::PreExecutionCheckFailure;
 use aptos_gas_algebra::{FeePerGasUnit, Gas, GasExpression, InternalGas, NumBytes};
 use aptos_gas_schedule::{
     gas_params::txn::{KEYLESS_BASE_COST, SLH_DSA_SHA2_128S_BASE_COST},

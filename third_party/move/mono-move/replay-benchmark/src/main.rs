@@ -5,7 +5,7 @@
 //!
 //! - `capture` fetches transactions from chain into a self-contained dump (the transaction plus a
 //!   read-set with the full module dependency closure).
-//! - `bench` replays each entry-function transaction in a dump — the full transaction, gas-free —
+//! - `bench` replays each supported transaction in a dump — the full transaction, gas-free —
 //!   on both the legacy AptosVM (V1) and the MonoMove-backed transaction executor (V2), comparing
 //!   execution time (primary) and outputs (strictly).
 
@@ -181,11 +181,11 @@ fn bench(args: BenchArgs) -> Result<()> {
         inputs.truncate(limit);
     }
     if inputs.is_empty() {
-        anyhow::bail!("No entry-function transactions found in the provided files");
+        anyhow::bail!("No replayable transactions found in the provided files");
     }
 
     println!(
-        "Benchmarking {} entry-function transaction(s): warmup={}, samples={}\n",
+        "Benchmarking {} transaction(s): warmup={}, samples={}\n",
         inputs.len(),
         timing.warmup,
         timing.samples
