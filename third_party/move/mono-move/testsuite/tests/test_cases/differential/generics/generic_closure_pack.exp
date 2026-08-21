@@ -4,20 +4,20 @@
 fun call_identity(r0): u64 {
   slots: params(1), locals(1), temps(1)
     r0: u64
-    r1: |u64|u64
+    r1: |u64|u64 has drop
     r2: u64
   code:
   L0:
     0: r1 := pack_closure identity<u64>, 0, [] @0
-    1: [r2] := call_closure [|u64|u64], [r0, r1] @4
+    1: [r2] := call_closure [|u64|u64 has drop], [r0, r1] @4
     2: ret [r2] @5
 }
 
 fun call_pick(r0): u64 {
   slots: params(1), locals(2), temps(3), transfer(1)
     r0: u64
-    r1: |u64, bool|u64
-    r2: |u64, bool|u64
+    r1: |u64, bool|u64 has drop
+    r2: |u64, bool|u64 has drop
     r3: u64
     r4: bool
     r5: u64
@@ -27,11 +27,11 @@ fun call_pick(r0): u64 {
     1: [r2] := call make_pick<u64>, [r0] @4
     2: r3 := add r0, #1 @8
     3: r4 := ld_true @9
-    4: [r3] := call_closure [|u64, bool|u64], [r3, r4, r1] @11
+    4: [r3] := call_closure [|u64, bool|u64 has drop], [r3, r4, r1] @11
     5: r3 := mul r3, #1000 @13
     6: r5 := add r0, #1 @16
     7: r4 := ld_false @17
-    8: [r5] := call_closure [|u64, bool|u64], [r5, r4, r2] @19
+    8: [r5] := call_closure [|u64, bool|u64 has drop], [r5, r4, r2] @19
     9: r5 := add r3, r5 @20
     10: ret [r5] @21
 }
@@ -47,7 +47,7 @@ fun identity(r0): _0 {
 fun make_pick(r0): |_0, bool|_0 {
   slots: params(1), locals(0), temps(1)
     r0: _0
-    r1: |_0, _0, bool|_0
+    r1: |_0, bool|_0 has drop
   code:
   L0:
     0: r1 := pack_closure pick<_0>, 1, [r0] @1

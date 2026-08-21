@@ -70,7 +70,7 @@ fun run(r0): u64 {
   slots: params(1), locals(2), temps(2)
     r0: bool
     r1: vector<u64>
-    r2: |u64|u64
+    r2: |u64|u64 has drop
     r3: &mut vector<u64>
     r4: u64
   code:
@@ -84,7 +84,7 @@ fun run(r0): u64 {
     6: vec_push_back u64, r3, r4 @7
     7: r2 := pack_closure combine, 11, [r0, r1] @10
     8: r4 := ld_u64 100 @12
-    9: [r4] := call_closure [|u64|u64], [r4, r2] @14
+    9: [r4] := call_closure [|u64|u64 has drop], [r4, r2] @14
     10: ret [r4] @15
 }
 === micro-ops ===

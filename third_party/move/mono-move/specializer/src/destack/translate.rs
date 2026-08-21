@@ -59,7 +59,7 @@ pub fn translate_module(module: PreparedModule, interner: &impl Interner) -> VMR
                 .collect::<Vec<_>>();
 
             // Pass: Bytecode -> Intra-Block SSA -> Fusion
-            let converter = SsaConverter::new(local_types, interner);
+            let converter = SsaConverter::new(local_types, &handle.type_parameters, interner);
             let (ssa, witness) = converter.convert_function(&module, &code.code)?;
             let ssa = ssa.with_fusion_passes()?.with_test_utils_passes(&module)?;
 

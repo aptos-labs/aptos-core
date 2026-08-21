@@ -9,7 +9,7 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Result};
 use mono_move_core::{
-    native::{NativeExtensions, NativeName},
+    native::{NativeExtensions, NativeName, NoNatives},
     types::EMPTY_TYPE_LIST,
     Function, GasMeter, Interner, NoResourceProvider,
 };
@@ -27,6 +27,7 @@ use mono_move_runtime::{
 use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, vm_status::AbortLocation,
 };
+use specializer::ModuleIR;
 
 /// Gas budget for engine runs. Effectively unbounded.
 const GAS_BUDGET: u64 = u64::MAX;
@@ -217,6 +218,37 @@ pub fn with_mono_function<'guard, 'ctx, R>(
         gc_count: 0,
     };
     Ok(body(&mut runner))
+}
+
+/// Compile `source`, load `0x1::module_name`, and hand its IR to `body`
+/// alongside the live execution guard.
+///
+/// `R` must not contain an `InternedType`: those are arena pointers that
+/// dangle once the guard is dropped.
+pub fn with_loaded_module<R>(
+    source: &str,
+    module_name: &IdentStr,
+    body: impl FnOnce(&ExecutionGuard, &ModuleIR) -> R,
+) -> Result<R> {
+    let modules = compile(source, SourceKind::Move)?;
+    let ctx = GlobalContext::with_num_execution_workers(1);
+    let guard = ctx
+        .try_execution_context(0)
+        .ok_or_else(|| anyhow!("failed to acquire execution guard 0"))?;
+    let mut module_provider = InMemoryModuleProvider::new();
+    module_provider.add_modules(&modules);
+
+    let loader = Loader::new_with_policy(
+        &guard,
+        &module_provider,
+        LoadingPolicy::Lazy(LoweringPolicy::Eager),
+        &NoNatives,
+    );
+    let mut read_set = ModuleReadSet::new();
+    let mut gas_meter = GasMeter::with_max_budget();
+    let id = guard.intern_address_name(&AccountAddress::ONE, module_name);
+    let module_ir = loader.load_module(&mut read_set, &mut gas_meter, id)?.ir();
+    Ok(body(&guard, module_ir))
 }
 
 /// Compile/assemble `source`, build a fresh [`GlobalContext`] + module

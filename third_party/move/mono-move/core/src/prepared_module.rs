@@ -62,6 +62,15 @@ pub struct PreparedModule {
     ///
     /// Indexed by [`StructHandleIndex`].
     nominal_types: Vec<InternedType>,
+    /// Interned identity -> the [`StructHandle`] declaring it, for every
+    /// nominal this module can name, local or imported.
+    ///
+    /// We just need an index: the handle already lives in [`Self::module`] and
+    /// carries both the declared abilities and the phantom markers. A module may
+    /// declare an imported nominal with fewer of each than its definition, and
+    /// that narrower declaration governs the module's own code, so it is the
+    /// right basis for checking it.
+    nominal_handles: UnorderedMap<(InternedModuleId, InternedIdentifier), StructHandleIndex>,
     /// Maps struct or enum name to its local [`StructDefinitionIndex`].
     nominal_definitions: UnorderedMap<InternedIdentifier, StructDefinitionIndex>,
     /// Interned struct or enum field types from compiled module. Only for
@@ -208,6 +217,19 @@ impl PreparedModule {
             FieldTypes::Enum(variants) => Some(variants[variant_idx as usize].as_slice()),
             FieldTypes::Struct(..) => None,
         }
+    }
+
+    /// The [`StructHandle`] by which this module declares a nominal type,
+    /// carrying its abilities and type-parameter metadata. Resolves local and
+    /// imported nominals alike; returns [`None`] for a nominal this module
+    /// cannot name.
+    pub fn nominal_handle(
+        &self,
+        module_id: InternedModuleId,
+        name: InternedIdentifier,
+    ) -> Option<&StructHandle> {
+        let idx = self.nominal_handles.get(&(module_id, name))?;
+        Some(self.module.struct_handle_at(*idx))
     }
 
     /// Looks up a struct or enum definition by its interned name, and returns
@@ -416,22 +438,29 @@ impl PreparedModule {
         // index, to intern_sig_token. That way, we could avoid re-interning the nominal in the
         // Struct case, or the module_id + struct_name in the StructInstantiation case. It saves
         // a few hashmap lookups per struct reference, which may add up across the signature.
-        let nominal_types = module
-            .struct_handles
-            .iter()
-            .map(|handle| {
-                let (module_id, name) = intern_struct_handle(handle, &module, interner);
-                let ty_args = if handle.type_parameters.is_empty() {
-                    EMPTY_TYPE_LIST
-                } else {
-                    let params = (0..handle.type_parameters.len())
-                        .map(|idx| interner.type_param_of(idx as u16))
-                        .collect::<Vec<_>>();
-                    interner.type_list_of(&params)
-                };
-                interner.nominal_of(module_id, name, ty_args)
-            })
-            .collect();
+        let mut nominal_types = Vec::with_capacity(module.struct_handles.len());
+        let mut nominal_handles = UnorderedMap::with_capacity(module.struct_handles.len());
+        for (handle_idx, handle) in module.struct_handles.iter().enumerate() {
+            let (module_id, name) = intern_struct_handle(handle, &module, interner);
+            let ty_args = if handle.type_parameters.is_empty() {
+                EMPTY_TYPE_LIST
+            } else {
+                let params = (0..handle.type_parameters.len())
+                    .map(|idx| interner.type_param_of(idx as u16))
+                    .collect::<Vec<_>>();
+                interner.type_list_of(&params)
+            };
+            nominal_types.push(interner.nominal_of(module_id, name, ty_args));
+
+            // Uniqueness is a trusted bytecode-verification result.
+            // Debug-asserted rather than re-checked.
+            let previous =
+                nominal_handles.insert((module_id, name), StructHandleIndex(handle_idx as u16));
+            debug_assert!(
+                previous.is_none(),
+                "duplicate struct handle for one (module, name)"
+            );
+        }
 
         let mut nominal_definitions = UnorderedMap::with_capacity(module.struct_defs().len());
         let field_types = module
@@ -508,6 +537,7 @@ impl PreparedModule {
             id,
             signatures,
             nominal_types,
+            nominal_handles,
             nominal_definitions,
             field_types,
             constant_types,

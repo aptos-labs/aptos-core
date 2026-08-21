@@ -32,7 +32,7 @@ fun g(r0, r1, r2): u64 {
 
 fun caller(): u64 {
   slots: params(0), locals(1), temps(3), transfer(3)
-    r0: |u64, u64|u64
+    r0: |u64, u64|u64 has drop
     r1: u64
     r2: u64
     r3: u64
@@ -41,7 +41,7 @@ fun caller(): u64 {
     0: r1 := ld_u64 7 @0
     1: r0 := pack_closure g, 10, [r1] @1
     2: [r1, r2, r3] := call three_rets, [] @3
-    3: [r2] := call_closure [|u64, u64|u64], [r1, r2, r0] @6
+    3: [r2] := call_closure [|u64, u64|u64 has drop], [r1, r2, r0] @6
     4: ret [r2] @7
 }
 === micro-ops ===

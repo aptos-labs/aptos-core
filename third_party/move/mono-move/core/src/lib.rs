@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+pub mod abilities;
 pub mod align;
 mod error;
 mod function;
@@ -57,7 +58,7 @@ pub use storage::{
     nominal_tag, ModuleProvider, NoModuleProvider, NoResourceProvider, ResourceProvider,
     ResourceProviderError, StorageRead,
 };
-pub use types::{convert_mut_to_immut_ref, strip_ref};
+pub use types::{convert_mut_to_immut_ref, is_assignable, strip_ref};
 pub use value_layout::{
     reserved_layout_id, reserved_layouts, FieldValueLayout, LayoutFlags, LayoutId, LayoutKind,
     LayoutProvider, ValueLayout, ValueLayoutTable,
