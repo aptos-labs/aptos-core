@@ -3,9 +3,9 @@
 
 //! Routes pairings and G1 MSMs through the blst library (hand-tuned ADX
 //! assembly), which is substantially faster than arkworks' pure-Rust
-//! arithmetic. Conversions go through canonical big-endian coordinate bytes,
-//! so results are bit-identical to the arkworks equivalents (the two
-//! libraries use the same Fq12 tower construction).
+//! arithmetic. Both libraries represent Fq identically (Montgomery form, six
+//! little-endian limbs) and build the same Fq12 tower, so conversions are limb
+//! moves and results are bit-identical to the arkworks equivalents.
 //!
 //! BLS12-381 only; if `crate::group` is switched to another curve this module
 //! must be disabled.
@@ -16,27 +16,32 @@ use crate::{
 };
 use ark_bls12_381::{Fq, Fq12, Fq2, Fq6, G2Affine};
 use ark_ec::{AffineRepr, CurveGroup as _};
-use ark_ff::{BigInteger, PrimeField, Zero};
+use ark_ff::{BigInt, BigInteger, PrimeField, Zero};
 use blst::{
-    blst_bendian_from_fp, blst_final_exp, blst_fp, blst_fp12, blst_fp12_mul, blst_fp6,
-    blst_fp_from_bendian, blst_miller_loop, blst_miller_loop_lines, blst_p1, blst_p1_add_or_double,
-    blst_p1_affine, blst_p1_cneg, blst_p1_from_affine, blst_p1_is_equal, blst_p1_is_inf,
-    blst_p1_mult, blst_p1_serialize, blst_p2_affine, blst_precompute_lines,
+    blst_final_exp, blst_fp, blst_fp12, blst_fp12_mul, blst_fp6, blst_miller_loop,
+    blst_miller_loop_lines, blst_p1, blst_p1_add_or_double, blst_p1_affine, blst_p1_cneg,
+    blst_p1_from_affine, blst_p1_is_equal, blst_p1_is_inf, blst_p1_mult, blst_p1_serialize,
+    blst_p2_affine, blst_precompute_lines,
 };
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator as _};
 use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
 
+// Both libraries hold an Fq as six little-endian 64-bit limbs in Montgomery
+// form against the same modulus and the same R = 2^384, so the two
+// representations are bit-identical and converting is a move, not arithmetic.
+//
+// The obvious spelling -- serialize to big-endian bytes and call
+// `blst_fp_from_bendian` / `blst_bendian_from_fp` -- costs a byte swap plus a
+// full Montgomery round trip in each direction, on 24 limbs per Fq12, on every
+// pairing. `test_fq_conversion_matches_bendian` pins the equivalence.
 fn fq_to_blst_fp(x: &Fq) -> blst_fp {
-    let bytes = x.into_bigint().to_bytes_be();
-    let mut fp = blst_fp::default();
-    unsafe { blst_fp_from_bendian(&mut fp, bytes.as_ptr()) };
-    fp
+    blst_fp { l: x.0 .0 }
 }
 
 fn blst_fp_to_fq(fp: &blst_fp) -> Fq {
-    let mut bytes = [0u8; 48];
-    unsafe { blst_bendian_from_fp(bytes.as_mut_ptr(), fp) };
-    Fq::from_be_bytes_mod_order(&bytes)
+    // Already Montgomery-form and reduced, which is exactly `new_unchecked`'s
+    // contract; `Fp::new` would multiply by R^2 and give a different element.
+    Fq::new_unchecked(BigInt(fp.l))
 }
 
 fn g1_to_blst_affine(p: &G1Affine) -> blst_p1_affine {
@@ -381,6 +386,38 @@ mod tests {
     use crate::group::PairingSetting;
     use ark_ec::{pairing::Pairing as _, CurveGroup, VariableBaseMSM};
     use ark_std::{rand::thread_rng, UniformRand};
+
+    /// The limb-move conversions must agree with the big-endian-bytes spelling
+    /// they replaced. If a future arkworks or blst release changes either
+    /// internal representation, this is what catches it.
+    #[test]
+    fn test_fq_conversion_matches_bendian() {
+        use ark_ff::{BigInteger as _, PrimeField as _};
+
+        let via_bendian_to_blst = |x: &Fq| {
+            let bytes = x.into_bigint().to_bytes_be();
+            let mut fp = blst_fp::default();
+            unsafe { blst::blst_fp_from_bendian(&mut fp, bytes.as_ptr()) };
+            fp
+        };
+        let via_bendian_to_ark = |fp: &blst_fp| {
+            let mut bytes = [0u8; 48];
+            unsafe { blst::blst_bendian_from_fp(bytes.as_mut_ptr(), fp) };
+            Fq::from_be_bytes_mod_order(&bytes)
+        };
+
+        let mut rng = thread_rng();
+        // Include the edge cases a random sample will never produce.
+        let mut xs = vec![Fq::zero(), Fq::from(1u64), -Fq::from(1u64)];
+        xs.extend((0..64).map(|_| Fq::rand(&mut rng)));
+
+        for x in xs {
+            let fp = fq_to_blst_fp(&x);
+            assert_eq!(fp.l, via_bendian_to_blst(&x).l, "ark -> blst for {x}");
+            assert_eq!(blst_fp_to_fq(&fp), via_bendian_to_ark(&fp), "blst -> ark");
+            assert_eq!(blst_fp_to_fq(&fp), x, "round trip");
+        }
+    }
 
     #[test]
     fn test_pairing_matches_ark() {
