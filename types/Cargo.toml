@@ -29,6 +29,7 @@ fuzzing = [
 [dependencies]
 anyhow = { workspace = true }
 aptos-batch-encryption = { workspace = true }
+aptos-bcs-utils = { workspace = true }
 aptos-bitvec = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }

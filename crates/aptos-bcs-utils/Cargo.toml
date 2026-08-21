@@ -15,3 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 hex = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+bcs = { workspace = true }
