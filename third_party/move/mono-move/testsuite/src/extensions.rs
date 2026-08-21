@@ -8,7 +8,8 @@ use aptos_types::transaction::user_transaction_context::{
 };
 use mono_move_core::native::NativeExtensions;
 use mono_move_natives::{
-    EventStore, ObjectContextExtension, StorageUsageAtEpochBoundary, TransactionContextExtension,
+    EventStore, ObjectContextExtension, RistrettoPointStore, StorageUsageAtEpochBoundary,
+    TransactionContextExtension,
 };
 use move_core_types::account_address::AccountAddress;
 
@@ -40,6 +41,7 @@ pub(crate) fn seed_extensions(user_transaction_context: bool) -> NativeExtension
         TEST_STATE_BYTES,
     ));
     extensions.add(EventStore::new());
+    extensions.add(RistrettoPointStore::new());
     extensions
 }
 

@@ -331,21 +331,32 @@ impl<'a, V> Vector<'a, V> {
     // TODO(completeness): Other vector APIs, added on-demand.
 }
 
+impl<'a, V: VMValue<'a>> Vector<'a, V> {
+    /// Reads element `i` by value, using `V`'s in-frame representation. Any heap
+    /// pointer the element carries is rooted for the rest of the native call, so
+    /// the result survives GC. The caller must ensure `i < len()`.
+    #[inline]
+    pub fn get_element(&self, i: u64) -> V {
+        // SAFETY: element `i` (within bounds) lives at `VEC_DATA_OFFSET + i *
+        // FRAME_SLOT_SIZE` in the vector object; `read_from_frame` reads it and
+        // roots any heap pointer it carries.
+        unsafe {
+            V::read_from_frame(
+                self.handle.pool(),
+                self.ptr(),
+                VEC_DATA_OFFSET + i as usize * <V as VMValue<'a>>::FRAME_SLOT_SIZE,
+            )
+        }
+    }
+}
+
 impl<'a, V> Vector<'a, Vector<'a, V>> {
     /// Returns element `i` of a `vector<vector<V>>` -- the inner `vector<V>` --
-    /// as a handle rooted for the rest of the native call.
-    ///
-    /// Each element of a nested vector is an 8-byte heap pointer to the inner
-    /// vector object, so this reads that pointer and roots it, mirroring
-    /// [`Ref::borrow`]. The caller must ensure `i < len()`.
+    /// as a handle rooted for the rest of the native call. The caller must
+    /// ensure `i < len()`.
     #[inline]
     pub fn get(&self, i: u64) -> Vector<'a, V> {
-        // SAFETY: element `i` (within bounds) of a `vector<vector<V>>` is an
-        // 8-byte heap pointer to the inner vector object.
-        let inner_ptr = unsafe { read_ptr(self.ptr(), VEC_DATA_OFFSET + i as usize * 8) };
-        // Root the inner vector so it survives GC for the rest of the call,
-        // even if the outer slot is later overwritten.
-        Vector::from_handle(unsafe { self.handle.pool().root_object(inner_ptr) })
+        self.get_element(i)
     }
 }
 
