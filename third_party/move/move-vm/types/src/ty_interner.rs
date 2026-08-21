@@ -56,6 +56,7 @@ enum TypeRepr {
     },
 }
 
+#[derive(Clone)]
 struct InternMap<T, I> {
     interned: HashMap<T, I>,
     data: Vec<T>,
@@ -170,6 +171,12 @@ pub struct InternedTypePool {
     ty_vec_interner: TypeVecInterner,
 }
 
+#[cfg(fuzzing)]
+pub struct InternedTypePoolSnapshot {
+    ty_interner: InternMap<TypeRepr, TypeId>,
+    ty_vec_interner: InternMap<Arc<[TypeId]>, TypeVecId>,
+}
+
 impl InternedTypePool {
     /// Creates a new interning context. Context is warmed-up with common types.
     #[allow(clippy::new_without_default)]
@@ -199,6 +206,20 @@ impl InternedTypePool {
     pub fn flush(&self) {
         self.flush_impl();
         self.warmup();
+    }
+
+    #[cfg(fuzzing)]
+    pub fn snapshot_for_fuzzing(&self) -> InternedTypePoolSnapshot {
+        InternedTypePoolSnapshot {
+            ty_interner: self.ty_interner.inner.read().clone(),
+            ty_vec_interner: self.ty_vec_interner.inner.read().clone(),
+        }
+    }
+
+    #[cfg(fuzzing)]
+    pub fn restore_for_fuzzing(&self, snapshot: InternedTypePoolSnapshot) {
+        *self.ty_interner.inner.write() = snapshot.ty_interner;
+        *self.ty_vec_interner.inner.write() = snapshot.ty_vec_interner;
     }
 
     /// Flushes all cached data without warming up the cache.

@@ -46,6 +46,9 @@ once_cell = { workspace = true }
 proptest = { workspace = true }
 rand = { workspace = true }
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }
+
 [[bench]]
 name = "drop_bench"
 harness = false
