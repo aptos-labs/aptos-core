@@ -5,6 +5,7 @@ mod account_abstraction_test;
 mod accounts_test;
 mod blocks_test;
 mod converter_test;
+mod epochs_test;
 mod event_v2_translation_test;
 mod events_test;
 mod function_value_test;

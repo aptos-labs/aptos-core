@@ -10,6 +10,7 @@ mod bcs_payload;
 mod blocks;
 mod check_size;
 pub mod context;
+mod epochs;
 mod error_converter;
 mod events;
 mod failpoint;
@@ -38,6 +39,9 @@ pub enum ApiTags {
 
     /// Access to events
     Events,
+
+    /// Access to epoch version ranges
+    Epochs,
 
     /// Experimental APIs, no guarantees
     Experimental,

@@ -7,6 +7,7 @@ use crate::{
     blocks::BlocksApi,
     check_size::PostSizeLimit,
     context::Context,
+    epochs::EpochsApi,
     error_converter::{convert_error, panic_handler},
     events::EventsApi,
     headers_sanity_check::HeadersSanityCheck,
@@ -114,6 +115,7 @@ pub fn get_api_service(
         AccountsApi,
         BasicApi,
         BlocksApi,
+        EpochsApi,
         EventsApi,
         IndexApi,
         StateApi,
@@ -131,6 +133,9 @@ pub fn get_api_service(
             context: context.clone(),
         },
         BlocksApi {
+            context: context.clone(),
+        },
+        EpochsApi {
             context: context.clone(),
         },
         EventsApi {
