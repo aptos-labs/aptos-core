@@ -28,11 +28,6 @@ on:
         type: string
         description: GCS bucket for worker shards; required for ranges over 10,000 transactions.
         default: aptos-framework-usage-reports
-      REPORT_BUCKET:
-        required: false
-        type: string
-        description: Public GCS bucket for the rendered HTML report.
-        default: aptos-framework-usage-reports
       DRY_RUN:
         required: false
         type: boolean
@@ -60,5 +55,6 @@ jobs:
       END_TIME: ${{ inputs.END_TIME }}
       FRAMEWORK_USAGE: true
       RESULTS_BUCKET: ${{ inputs.RESULTS_BUCKET }}
-      REPORT_BUCKET: ${{ inputs.REPORT_BUCKET }}
+      REPORT_REPOSITORY: aptos-labs/aptos-core-private
+      REPORT_BRANCH: gh-pages
       DRY_RUN: ${{ inputs.DRY_RUN || false }}
