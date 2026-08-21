@@ -46,6 +46,7 @@ code { font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
 .module-summary { margin-left:auto; color:var(--muted); font-size:12px; font-weight:400; }
 .table-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
 .table-heading h2 { margin:0; }
+.table-heading .meta { margin:3px 0 0; }
 .module-control { border:1px solid #bdc7d0; border-radius:6px; padding:6px 9px; background:white; color:var(--ink); cursor:pointer; font:inherit; font-size:12px; }
 .module-control:disabled { cursor:default; opacity:.55; }
 .badge { display:inline-block; border-radius:999px; padding:2px 7px; font-size:11px; font-weight:650; white-space:nowrap; }
@@ -86,8 +87,7 @@ button.link { border:0; background:none; color:var(--accent); padding:0; cursor:
     <div class="paths table-wrap" id="detail-paths"></div>
   </section>
   <section class="panel">
-    <h2>Active entry-function callers</h2>
-    <p class="meta">Observed entry functions that invoked framework code, grouped by their module address.</p>
+    <div class="table-heading"><div><h2>Active entry-function callers</h2><p class="meta">Observed entry functions that invoked framework code, grouped by their module address.</p></div><button class="module-control" id="toggle-entrypoint-callers" type="button">Expand all entrypoints</button></div>
     <div class="table-wrap"><table><thead><tr><th>Module address</th><th class="function-column">Entry function</th><th>Outcome</th><th class="number">Transactions</th><th class="number">Framework invocations</th><th>Observed versions</th></tr></thead><tbody id="active-entry-function-callers"></tbody></table></div>
   </section>
   <section class="panel">
@@ -144,8 +144,12 @@ for (const f of all) {
   if (!modules.has(id)) modules.set(id, {id, displayId:moduleName(f.module_id), functions:[]});
   modules.get(id).functions.push(f);
 }
-const collapsedModules = new Set();
+// Every expandable group starts collapsed: the report's first view should surface the
+// least-observed modules and their aggregate evidence without overwhelming the reader.
+const collapsedModules = new Set(modules.keys());
+const expandedEntrypointAddresses = new Set();
 let visibleModuleIds = [];
+let visibleEntrypointAddresses = [];
 
 function evidence(f, threshold) {
   if (f.invocations === 0 && external(f)) return {rank:0, cls:"unused-external", text:"Unobserved external"};
@@ -190,15 +194,29 @@ function renderActiveEntryFunctionCallers() {
     if (!groups.has(caller.address)) groups.set(caller.address, []);
     groups.get(caller.address).push(caller);
   }
-  const rows = [...groups].sort(([left], [right]) => left.localeCompare(right)).map(([address, callers]) => {
+  const sections = [...groups].map(([address, callers]) => ({
+    address,
+    callers,
+    invocationCount: callers.reduce((total, caller) => total + caller.framework_invocation_count, 0)
+  })).sort((left, right) => right.invocationCount - left.invocationCount || left.address.localeCompare(right.address));
+  visibleEntrypointAddresses = sections.map(section => section.address);
+  const toggle = document.getElementById("toggle-entrypoint-callers");
+  const allExpanded = visibleEntrypointAddresses.length > 0 && visibleEntrypointAddresses.every(address => expandedEntrypointAddresses.has(address));
+  toggle.textContent = allExpanded ? "Collapse all entrypoints" : "Expand all entrypoints";
+  toggle.disabled = visibleEntrypointAddresses.length === 0;
+  const rows = sections.map(({address, callers, invocationCount}) => {
     callers.sort((left, right) => right.transaction_count - left.transaction_count || right.framework_invocation_count - left.framework_invocation_count || functionName(left.entry_function).localeCompare(functionName(right.entry_function)));
-    const transactionCount = callers.reduce((total, caller) => total + caller.transaction_count, 0);
-    const invocationCount = callers.reduce((total, caller) => total + caller.framework_invocation_count, 0);
-    const header = `<tr class="module-row"><td colspan="6"><code title="${esc(address)}">${esc(shortAddress(address))}</code><span class="module-summary">${nf.format(callers.length)} active entry function${callers.length === 1 ? "" : "s"} · ${nf.format(transactionCount)} transaction${transactionCount === 1 ? "" : "s"} · ${nf.format(invocationCount)} framework invocations</span></td></tr>`;
+    const expanded = expandedEntrypointAddresses.has(address);
+    const header = `<tr class="module-row"><td colspan="6"><button class="module-toggle" data-entrypoint-address="${esc(address)}" aria-expanded="${expanded}"><span class="module-chevron">${expanded?"▾":"▸"}</span><code title="${esc(address)}">${esc(shortAddress(address))}</code><span class="module-summary">${nf.format(invocationCount)} framework call${invocationCount === 1 ? "" : "s"}</span></button></td></tr>`;
     const callerRows = callers.map(caller => `<tr><td></td><td class="function-column"><code title="${esc(functionName(caller.entry_function))}">${esc(functionName(caller.entry_function))}</code></td><td>${esc(caller.outcome)}</td><td class="number">${nf.format(caller.transaction_count)}</td><td class="number">${nf.format(caller.framework_invocation_count)}</td><td>${nf.format(caller.first_version)}–${nf.format(caller.last_version)}</td></tr>`).join("");
-    return header + callerRows;
+    return header + (expanded ? callerRows : "");
   });
   document.getElementById("active-entry-function-callers").innerHTML = rows.length ? rows.join("") : `<tr><td colspan="6" class="empty">No module entry functions invoked framework code in this replay range.</td></tr>`;
+  for (const button of document.querySelectorAll("button[data-entrypoint-address]")) button.addEventListener("click", () => {
+    const address = button.dataset.entrypointAddress;
+    if (expandedEntrypointAddresses.has(address)) expandedEntrypointAddresses.delete(address); else expandedEntrypointAddresses.add(address);
+    renderActiveEntryFunctionCallers();
+  });
 }
 
 function renderFunctions() {
@@ -224,7 +242,21 @@ function renderFunctions() {
     if (!grouped.has(moduleId)) grouped.set(moduleId, []);
     grouped.get(moduleId).push(f);
   }
-  const groups = [...grouped].sort(([left], [right]) => modules.get(left).displayId.localeCompare(modules.get(right).displayId));
+  const moduleEvidence = module => ({
+    // Modules without any public, friend, or entry function cannot be invoked directly
+    // by an external contract. Keep those least directly observable modules first.
+    unobservable: !module.functions.some(external),
+    unobservedFunctions: module.functions.filter(f => f.invocations === 0).length,
+    observedInvocations: module.functions.reduce((total, f) => total + f.invocations, 0)
+  });
+  const groups = [...grouped].sort(([left], [right]) => {
+    const leftModule = modules.get(left), rightModule = modules.get(right);
+    const leftEvidence = moduleEvidence(leftModule), rightEvidence = moduleEvidence(rightModule);
+    return Number(rightEvidence.unobservable) - Number(leftEvidence.unobservable)
+      || rightEvidence.unobservedFunctions - leftEvidence.unobservedFunctions
+      || leftEvidence.observedInvocations - rightEvidence.observedInvocations
+      || leftModule.displayId.localeCompare(rightModule.displayId);
+  });
   visibleModuleIds = groups.map(([moduleId]) => moduleId);
   const toggle = document.getElementById("toggle-modules");
   const allCollapsed = visibleModuleIds.length > 0 && visibleModuleIds.every(moduleId => collapsedModules.has(moduleId));
@@ -243,7 +275,9 @@ function renderFunctions() {
     const invocations = module.functions.reduce((total, f) => total + f.invocations, 0);
     const collapsed = collapsedModules.has(moduleId);
     const summary = `${nf.format(observed)} of ${nf.format(module.functions.length)} functions observed · ${nf.format(candidates)} candidates · ${nf.format(invocations)} invocations`;
-    const moduleStatus = observed === 0 ? `<span class="badge unused-external">Entire module unobserved</span>` : "";
+    const moduleStatus = !module.functions.some(external)
+      ? `<span class="badge unused-internal">No externally callable functions</span>`
+      : observed === 0 ? `<span class="badge unused-external">Entire module unobserved</span>` : "";
     const header = `<tr class="module-row"><td colspan="8"><button class="module-toggle" data-module="${esc(moduleId)}" aria-expanded="${!collapsed}"><span class="module-chevron">${collapsed?"▸":"▾"}</span><code title="${esc(module.id)}">${esc(module.displayId)}</code>${moduleStatus}<span class="module-summary">${esc(summary)}</span></button></td></tr>`;
     return header + (collapsed ? "" : visibleFunctions.map(functionRow).join(""));
   }).join("") : `<tr><td colspan="8" class="empty">No functions match these filters.</td></tr>`;
@@ -272,6 +306,13 @@ function renderDetails(f) {
 }
 
 for (const id of ["search","class-filter","visibility","threshold"]) document.getElementById(id).addEventListener(id==="search"||id==="threshold"?"input":"change",renderFunctions);
+document.getElementById("toggle-entrypoint-callers").addEventListener("click", () => {
+  const expand = visibleEntrypointAddresses.length > 0 && visibleEntrypointAddresses.every(address => expandedEntrypointAddresses.has(address));
+  for (const address of visibleEntrypointAddresses) {
+    if (expand) expandedEntrypointAddresses.delete(address); else expandedEntrypointAddresses.add(address);
+  }
+  renderActiveEntryFunctionCallers();
+});
 document.getElementById("toggle-modules").addEventListener("click", () => {
   const expand = visibleModuleIds.length > 0 && visibleModuleIds.every(moduleId => collapsedModules.has(moduleId));
   for (const moduleId of visibleModuleIds) {
