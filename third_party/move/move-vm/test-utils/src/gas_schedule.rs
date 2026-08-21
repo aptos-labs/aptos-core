@@ -32,6 +32,7 @@ use move_core_types::{
 };
 use move_vm_types::{
     gas::{DependencyGasMeter, DependencyKind, GasMeter, NativeGasMeter, SimpleInstruction},
+    values::Value,
     views::{TypeView, ValueView},
 };
 use once_cell::sync::Lazy;
@@ -218,6 +219,14 @@ impl NativeGasMeter for GasStatus {
     }
 
     fn use_heap_memory_in_native_context(&mut self, _amount: u64) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    fn charge_closure_materialization(
+        &mut self,
+        _num_bytes: NumBytes,
+        _values: &[Value],
+    ) -> PartialVMResult<()> {
         Ok(())
     }
 }

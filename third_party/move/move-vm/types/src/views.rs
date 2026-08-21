@@ -144,6 +144,15 @@ pub trait ValueView {
                 Ok(true)
             }
 
+            fn visit_closure_captured_serialized_args(
+                &mut self,
+                _depth: u64,
+                num_bytes: usize,
+            ) -> PartialVMResult<()> {
+                self.0 += (num_bytes as u64).into();
+                Ok(())
+            }
+
             fn visit_vec(&mut self, _depth: u64, _len: usize) -> PartialVMResult<bool> {
                 self.0 += LEGACY_STRUCT_SIZE;
                 Ok(true)
@@ -238,6 +247,11 @@ pub trait ValueVisitor {
     fn visit_address(&mut self, depth: u64, val: &AccountAddress) -> PartialVMResult<()>;
     fn visit_struct(&mut self, depth: u64, len: usize) -> PartialVMResult<bool>;
     fn visit_closure(&mut self, depth: u64, len: usize) -> PartialVMResult<bool>;
+    fn visit_closure_captured_serialized_args(
+        &mut self,
+        depth: u64,
+        num_bytes: usize,
+    ) -> PartialVMResult<()>;
     fn visit_vec(&mut self, depth: u64, len: usize) -> PartialVMResult<bool>;
     fn visit_ref(&mut self, depth: u64, is_global: bool) -> PartialVMResult<bool>;
 

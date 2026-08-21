@@ -29,6 +29,7 @@ mod fee_payer;
 mod friends;
 mod function_caches;
 mod function_value_depth;
+mod function_value_format_v2;
 mod function_value_layout_dag;
 mod function_value_serialization_restriction;
 mod function_values;

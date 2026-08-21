@@ -27,6 +27,7 @@ use move_core_types::{
 };
 use move_vm_types::{
     gas::{DependencyGasMeter, DependencyKind, GasMeter, NativeGasMeter, SimpleInstruction},
+    values::Value,
     views::{TypeView, ValueView},
 };
 
@@ -220,6 +221,19 @@ where
             .expect("Native function must have recorded the frame")
             .native_gas += cost;
 
+        res
+    }
+
+    fn charge_closure_materialization(
+        &mut self,
+        num_bytes: NumBytes,
+        values: &[Value],
+    ) -> PartialVMResult<()> {
+        // TODO:
+        //   Because this can be called in both native and not native contexts
+        //   there is actually no way to know and increase native gas usage...
+        let (_cost, res) =
+            self.delegate_charge(|base| base.charge_closure_materialization(num_bytes, values));
         res
     }
 }

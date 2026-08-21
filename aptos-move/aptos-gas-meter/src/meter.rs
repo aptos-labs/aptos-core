@@ -26,6 +26,7 @@ use move_core_types::{
 };
 use move_vm_types::{
     gas::{DependencyGasMeter, DependencyKind, GasMeter, NativeGasMeter, SimpleInstruction},
+    values::Value,
     views::{TypeView, ValueView},
 };
 
@@ -91,6 +92,16 @@ where
     #[inline]
     fn use_heap_memory_in_native_context(&mut self, _amount: u64) -> PartialVMResult<()> {
         Ok(())
+    }
+
+    #[inline]
+    fn charge_closure_materialization(
+        &mut self,
+        num_bytes: NumBytes,
+        _values: &[Value],
+    ) -> PartialVMResult<()> {
+        let cost = MATERIALIZE_CLOSURE_BASE + MATERIALIZE_CLOSURE_PER_BYTE * num_bytes;
+        self.algebra.charge_execution(cost)
     }
 }
 

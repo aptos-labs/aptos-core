@@ -311,6 +311,7 @@ pub fn aptos_prod_vm_config(
         include_closure_mask_in_cmp: gas_feature_version >= RELEASE_V1_45,
         revalidate_resolved_closures: timed_features
             .is_enabled(TimedFeatureFlag::RevalidateResolvedClosures),
+        enable_function_data_format_v2: features.is_function_data_format_v2_enabled(),
     };
 
     // Note: if max_value_nest_depth changed, make sure the constant is in-sync. Do not remove this

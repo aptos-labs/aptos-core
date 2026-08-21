@@ -5,7 +5,7 @@
 
 use crate::{
     delayed_values::error::code_invariant_error,
-    values::{Closure, Container, Value},
+    values::{Closure, ClosureCapturedArgs, Container, Value},
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::vm_status::StatusCode;
@@ -70,9 +70,17 @@ fn find_identifiers_in_value_impl(
             },
         },
 
-        Value::ClosureValue(Closure(_, captured)) => {
-            for val in captured.iter() {
-                find_identifiers_in_value_impl(val, identifiers)?;
+        Value::ClosureValue(Closure(_, captured_args)) => {
+            match &*captured_args.borrow() {
+                // Serialized captured arguments cannot contain delayed field ids:
+                // capturing delayed fields is rejected when a closure is packed, and
+                // decoding never runs with a delayed fields extension.
+                ClosureCapturedArgs::Serialized(_) => {},
+                ClosureCapturedArgs::Deserialized(captured) => {
+                    for val in captured.iter() {
+                        find_identifiers_in_value_impl(val, identifiers)?;
+                    }
+                },
             }
         },
 
