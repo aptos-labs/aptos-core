@@ -207,7 +207,7 @@ function renderActiveEntryFunctionCallers() {
   const rows = sections.map(({address, callers, invocationCount}) => {
     callers.sort((left, right) => right.transaction_count - left.transaction_count || right.framework_invocation_count - left.framework_invocation_count || functionName(left.entry_function).localeCompare(functionName(right.entry_function)));
     const expanded = expandedEntrypointAddresses.has(address);
-    const header = `<tr class="module-row"><td colspan="6"><button class="module-toggle" data-entrypoint-address="${esc(address)}" aria-expanded="${expanded}"><span class="module-chevron">${expanded?"▾":"▸"}</span><code title="${esc(address)}">${esc(shortAddress(address))}</code><span class="module-summary">${nf.format(invocationCount)} framework call${invocationCount === 1 ? "" : "s"}</span></button></td></tr>`;
+    const header = `<tr class="module-row"><td colspan="6"><button class="module-toggle" data-entrypoint-address="${esc(address)}" aria-expanded="${expanded}"><span class="module-chevron">${expanded?"▾":"▸"}</span><code>${esc(address)}</code><span class="module-summary">${nf.format(invocationCount)} framework call${invocationCount === 1 ? "" : "s"}</span></button></td></tr>`;
     const callerRows = callers.map(caller => `<tr><td></td><td class="function-column"><code title="${esc(functionName(caller.entry_function))}">${esc(functionName(caller.entry_function))}</code></td><td>${esc(caller.outcome)}</td><td class="number">${nf.format(caller.transaction_count)}</td><td class="number">${nf.format(caller.framework_invocation_count)}</td><td>${nf.format(caller.first_version)}–${nf.format(caller.last_version)}</td></tr>`).join("");
     return header + (expanded ? callerRows : "");
   });
