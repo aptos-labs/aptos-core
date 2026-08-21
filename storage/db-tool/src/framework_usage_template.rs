@@ -243,18 +243,17 @@ function renderFunctions() {
     grouped.get(moduleId).push(f);
   }
   const moduleEvidence = module => ({
-    // Modules without any public, friend, or entry function cannot be invoked directly
-    // by an external contract. Keep those least directly observable modules first.
-    unobservable: !module.functions.some(external),
     unobservedFunctions: module.functions.filter(f => f.invocations === 0).length,
-    observedInvocations: module.functions.reduce((total, f) => total + f.invocations, 0)
+    invocationCount: module.functions.reduce((total, f) => total + f.invocations, 0)
   });
   const groups = [...grouped].sort(([left], [right]) => {
     const leftModule = modules.get(left), rightModule = modules.get(right);
     const leftEvidence = moduleEvidence(leftModule), rightEvidence = moduleEvidence(rightModule);
-    return Number(rightEvidence.unobservable) - Number(leftEvidence.unobservable)
+    // First surface whole modules with no calls, then the least-called modules.
+    // More unobserved functions only breaks ties between equally called modules.
+    return Number(rightEvidence.invocationCount === 0) - Number(leftEvidence.invocationCount === 0)
+      || leftEvidence.invocationCount - rightEvidence.invocationCount
       || rightEvidence.unobservedFunctions - leftEvidence.unobservedFunctions
-      || leftEvidence.observedInvocations - rightEvidence.observedInvocations
       || leftModule.displayId.localeCompare(rightModule.displayId);
   });
   visibleModuleIds = groups.map(([moduleId]) => moduleId);
