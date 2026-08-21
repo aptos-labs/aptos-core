@@ -369,6 +369,8 @@ fn classify_runtime_error(err: &RuntimeError) -> TestResult {
         | RuntimeError::AbortMessageTooLong { .. }
         | RuntimeError::StateKeyTypeTooDeep => TestResult::RuntimeFailure(err.to_string()),
 
+        RuntimeError::Unsupported(_) => TestResult::Unsupported(err.to_string()),
+
         // Genuine problems: infrastructure failure, or a VM bug.
         RuntimeError::InvariantViolation(_) | RuntimeError::ResourceProvider(_) => {
             TestResult::Error(err.to_string())

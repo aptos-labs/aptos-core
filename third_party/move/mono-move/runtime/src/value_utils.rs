@@ -192,10 +192,8 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
             unsafe { serialize_impl(layouts, obj_ptr.add(ENUM_DATA_OFFSET), variant_layout, out)? };
             Ok(())
         },
-        LayoutKind::Function => {
-            // TODO(completeness): function values are not yet supported.
-            todo!("function values are not yet supported");
-        },
+        // TODO(completeness): function values are not yet supported.
+        LayoutKind::Function => Err(VMInternalError::new(function_values_unsupported())),
         LayoutKind::Ref => Err(VMInternalError::new(unreachable(
             "References cannot be serialized",
         ))),
@@ -355,10 +353,8 @@ unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
                 )
             }
         },
-        LayoutKind::Function => {
-            // TODO(completeness): function values are not yet supported.
-            todo!("function values are not yet supported");
-        },
+        // TODO(completeness): function values are not yet supported.
+        LayoutKind::Function => Err(VMInternalError::new(function_values_unsupported())),
         LayoutKind::Ref => Err(VMInternalError::new(unreachable(
             "Equality runs on pointee types only",
         ))),
@@ -558,10 +554,8 @@ unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
                 )
             }
         },
-        LayoutKind::Function => {
-            // TODO(completeness): function values are not yet supported.
-            todo!("function values are not yet supported");
-        },
+        // TODO(completeness): function values are not yet supported.
+        LayoutKind::Function => Err(VMInternalError::new(function_values_unsupported())),
         LayoutKind::Ref => Err(VMInternalError::new(unreachable(
             "Comparison runs on pointee types only",
         ))),
@@ -804,10 +798,8 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
             unsafe { write_ptr(dst, 0usize, obj_ptr) };
             Ok(())
         },
-        LayoutKind::Function => {
-            // TODO(completeness): function values are not yet supported.
-            todo!("function values are not yet supported");
-        },
+        // TODO(completeness): function values are not yet supported.
+        LayoutKind::Function => Err(function_values_unsupported().into()),
         LayoutKind::Ref => Err(unreachable("References cannot be deserialized").into()),
     }
 }
@@ -911,6 +903,13 @@ fn layout_not_found() -> RuntimeError {
 /// An invariant violation for an unreachable state.
 fn unreachable(message: &str) -> RuntimeError {
     RuntimeError::InvariantViolation(RuntimeInvariantViolation::Unreachable(message.to_string()))
+}
+
+/// Function values are a valid Move feature that the value walks do not support
+/// yet. Surfaced as an error (never a panic) so callers can classify it as an
+/// unsupported construct instead of aborting.
+fn function_values_unsupported() -> RuntimeError {
+    RuntimeError::Unsupported("function values are not yet supported")
 }
 
 /// Invariant violation when an enum tag does not name a variant, whether read
