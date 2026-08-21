@@ -16,13 +16,13 @@
 
 use aptos_language_e2e_tests::{account::AccountData, executor::FakeExecutor};
 use aptos_types::{
-    on_chain_config::{Features, OnChainConfig},
     state_store::StateView,
     transaction::{
         AuxiliaryInfo, ExecutionStatus, PersistedAuxiliaryInfo, SignedTransaction,
         TransactionAuxiliaryData, TransactionOutput, TransactionStatus,
     },
 };
+use aptos_vm_environment::environment::AptosEnvironment;
 use mono_move_aptos_state_view_providers::{StateViewModuleProvider, StateViewResourceProvider};
 use mono_move_aptos_transaction_executor::{production_natives, AptosTransactionExecutor};
 use mono_move_global_context::GlobalContext;
@@ -46,17 +46,14 @@ fn execute_v2<S: StateView>(state: &S, txn: &SignedTransaction) -> TransactionOu
     let natives = production_natives(&guard);
     let module_provider = StateViewModuleProvider::new(state);
     let data_provider = StateViewResourceProvider::new(&guard, state);
-    let features = Features::fetch_config(state)
-        .ok()
-        .flatten()
-        .unwrap_or_default();
+    let env = AptosEnvironment::new(state);
     let usage = state.get_usage().expect("usage is readable");
     let executor = AptosTransactionExecutor::new(
         &guard,
         &natives,
         &module_provider,
         &data_provider,
-        &features,
+        &env,
         usage,
     );
     executor
@@ -64,7 +61,7 @@ fn execute_v2<S: StateView>(state: &S, txn: &SignedTransaction) -> TransactionOu
         .materialize(
             &guard,
             &data_provider,
-            &features,
+            env.features(),
             TransactionAuxiliaryData::default(),
         )
         .expect("the transaction output materializes")
@@ -376,6 +373,74 @@ fn extra_signers_rejected_like_v1() {
 
     // Write sets are not compared: the gas divergence leaves v1 with fee
     // writes v2 lacks.
+}
+
+/// Transactions violating each pre-execution gas bound are discarded with the
+/// same status code as V1, before touching any state.
+#[test]
+fn gas_checks_discard_like_v1() {
+    let (fx, alice, bob) = setup();
+
+    let transfer = |price: u64, max_gas: u64| {
+        alice
+            .account()
+            .transaction()
+            .payload(aptos_cached_packages::aptos_stdlib::aptos_account_transfer(
+                *bob.address(),
+                1_000,
+            ))
+            .sequence_number(10)
+            .gas_unit_price(price)
+            .max_gas_amount(max_gas)
+            .sign()
+    };
+    let oversized = alice
+        .account()
+        .transaction()
+        .payload(
+            aptos_cached_packages::aptos_stdlib::aptos_account_batch_transfer(
+                vec![*bob.address(); 3_000],
+                vec![1; 3_000],
+            ),
+        )
+        .sequence_number(10)
+        .gas_unit_price(100)
+        .max_gas_amount(1_000_000)
+        .sign();
+
+    let cases = [
+        (oversized, StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE),
+        (
+            transfer(100, 100_000_000),
+            StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND,
+        ),
+        (
+            transfer(100, 10),
+            StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS,
+        ),
+        (
+            transfer(0, 1_000_000),
+            StatusCode::GAS_UNIT_PRICE_BELOW_MIN_BOUND,
+        ),
+        (
+            transfer(u64::MAX, 1_000_000),
+            StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND,
+        ),
+    ];
+    for (txn, expected) in cases {
+        let v1_status = fx.execute_transaction(txn.clone()).status().clone();
+        assert_eq!(
+            v1_status,
+            TransactionStatus::Discard(expected),
+            "v1 did not discard with {expected:?}"
+        );
+        let v2_output = execute_v2(fx.get_state_view(), &txn);
+        assert_eq!(
+            v2_output.status(),
+            &v1_status,
+            "v2 discard differs from v1 for {expected:?}"
+        );
+    }
 }
 
 /// Two dependent transfers executed sequentially, each transaction's outputs

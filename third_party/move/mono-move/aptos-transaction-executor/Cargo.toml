@@ -14,7 +14,10 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-gas-algebra = { workspace = true }
+aptos-gas-schedule = { workspace = true }
 aptos-types = { workspace = true }
+aptos-vm-environment = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 mono-move-core = { workspace = true }

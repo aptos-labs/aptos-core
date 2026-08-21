@@ -7,14 +7,15 @@ use crate::{
     metadata::TxnMetadata,
     natives::transaction_extensions,
     outcome::TxnOutcome,
+    pre_execution_checks::PreExecutionChecker,
     sys_calls::{run_epilogue, run_prologue, TxnSigners},
 };
 use aptos_types::{
     fee_statement::FeeStatement,
-    on_chain_config::Features,
     state_store::state_storage_usage::StateStorageUsage,
     transaction::{AuxiliaryInfo, EntryFunction, SignedTransaction, TransactionExecutableRef},
 };
+use aptos_vm_environment::environment::AptosEnvironment;
 use mono_move_core::{
     intern_type_tag, storage::module_provider::ModuleProvider, types::InternedTypeList, GasMeter,
     Interner, ResourceProvider,
@@ -34,14 +35,11 @@ pub struct AptosTransactionExecutor<'a> {
     natives: &'a ProductionNativeRegistry,
     module_provider: &'a dyn ModuleProvider,
     data_provider: &'a dyn ResourceProvider,
-    // TODO(completeness): Consider growing these into the full `AptosEnvironment` supplied by
-    // the coordinator.
-    // Should however rethink whether we can simply reuse the existing `AptosEnvironment` struct.
+    /// The on-chain configs (features, gas schedule) at the current state.
     //
-    // Nothing reads the features yet -- gas configuration and the pre-execution
-    // checks will -- but the coordinator already supplies them.
-    #[allow(dead_code)]
-    features: &'a Features,
+    // TODO(cleanup): reusing the legacy VM's environment type is transitional;
+    // revisit once the executor grows its own config surface.
+    env: &'a AptosEnvironment,
     /// State storage usage at the current epoch's beginning.
     usage: StateStorageUsage,
     /// If set, the payload runs unmetered and the epilogue charges a zero
@@ -58,7 +56,7 @@ impl<'a> AptosTransactionExecutor<'a> {
         natives: &'a ProductionNativeRegistry,
         module_provider: &'a dyn ModuleProvider,
         data_provider: &'a dyn ResourceProvider,
-        features: &'a Features,
+        env: &'a AptosEnvironment,
         usage: StateStorageUsage,
     ) -> Self {
         Self {
@@ -66,7 +64,7 @@ impl<'a> AptosTransactionExecutor<'a> {
             natives,
             module_provider,
             data_provider,
-            features,
+            env,
             usage,
             unmetered: false,
         }
@@ -106,12 +104,13 @@ impl<'a> AptosTransactionExecutor<'a> {
 
         // ======================== Pre-execution checks ========================
         // Reject what this executor cannot execute, before touching any state.
-        //
-        // TODO(metering, security): gas checks (`check_gas`): txn size bounds,
-        // gas price bounds, intrinsic gas coverage. Without them a transaction
-        // outside the configured bounds -- including a zero gas price -- buys a
-        // full `max_gas_amount` budget for free.
         let txn_data = TxnMetadata::new(txn, aux_info);
+        let gas_params = self.env.gas_params().as_ref().map_err(|e| {
+            DiscardReason::InvariantViolation(format!("the gas schedule is unavailable: {e}"))
+        })?;
+        PreExecutionChecker::new(gas_params, self.env.gas_feature_version(), &txn_data)
+            .run_checks()
+            .map_err(DiscardReason::PreExecutionCheck)?;
 
         let entry = match txn.payload().executable_ref() {
             Ok(TransactionExecutableRef::EntryFunction(entry)) => entry,
