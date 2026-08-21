@@ -267,6 +267,27 @@ theorem certified_defined_iff {Invariant : Prop} (build : Invariant → α)
     ¬(certified build : Spec σ α).undefined state ↔ Invariant := by
   simp only [certified, Classical.not_not]
 
+/-- Assert a predicate over the current global state and hand it to the
+continuation.  This certifies the state at the point a global invariant must
+hold: `undefined` where the predicate fails makes it a positive obligation
+(checked here, at the update, not at the function end), and the `ok` relation
+carries the predicate forward so downstream reads may assume it.  It is the
+state-level analogue of `certified` for values. -/
+def certifyState (invariant : State → Prop) : Spec State Unit where
+  ok := fun initial result final => invariant initial ∧ result = () ∧ final = initial
+  aborts := fun _ _ => False
+  undefined := fun initial => ¬ invariant initial
+
+@[simp] theorem certifyState_ok (invariant : State → Prop) :
+    (certifyState invariant).ok initial result final ↔
+      invariant initial ∧ result = () ∧ final = initial := Iff.rfl
+
+@[simp] theorem certifyState_aborts (invariant : State → Prop) :
+    ¬(certifyState invariant).aborts initial code := fun h => h
+
+@[simp] theorem certifyState_undefined (invariant : State → Prop) :
+    (certifyState invariant).undefined initial ↔ ¬ invariant initial := Iff.rfl
+
 /-- Embed a deterministic helper computation into the authoritative
 relational semantics. This is useful for tests, not required for deployment. -/
 def ofTxn (action : Txn σ α) : Spec σ α where

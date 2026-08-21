@@ -38,6 +38,21 @@ no-overflow hypothesis, and the arithmetic abort otherwise. -/
     · rintro code ⟨rfl, overflow⟩
       exact abnormal overflow
 
+/-- Certifying the global state: the invariant is the obligation asserted at
+this point, and the continuation may then assume it. -/
+@[simp, wp_norm] theorem wp_certifyState (invariant : State → Prop)
+    (ensures : Unit → State → Prop) (aborts : Nat → Prop) (initial : State) :
+    wp (Spec.certifyState invariant) ensures aborts initial ↔
+      invariant initial ∧ (invariant initial → ensures () initial) := by
+  constructor
+  · rintro ⟨normal, -, defined⟩
+    have holds : invariant initial := Classical.byContradiction defined
+    exact ⟨holds, fun _ => normal () initial ⟨holds, rfl, rfl⟩⟩
+  · rintro ⟨holds, normal⟩
+    refine ⟨?_, fun _ absurd => absurd.elim, fun contra => contra holds⟩
+    rintro result final ⟨_, rfl, rfl⟩
+    exact normal holds
+
 /-- A source conditional splits the obligation; the branch condition is
 what a proof case-splits on. -/
 @[wp_norm] theorem wp_ite (c : Prop) [Decidable c] (a b : Spec State Result)

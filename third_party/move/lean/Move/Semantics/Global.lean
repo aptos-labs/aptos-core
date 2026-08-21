@@ -106,6 +106,46 @@ def get [Inhabited Value] [store : ResourceStore State Value]
     store.lookup (store.erase state written) query = store.lookup state query :=
   store.lookup_erase_ne state written query distinct
 
+/-- The "for every stored value, `body`" shape of a global invariant over one
+resource family: it is the certificate the global state carries, exactly as a
+certified struct carries its field invariant.  A write must re-establish it
+(`forallStored_insert`/`_erase`), leaving only the changed value's `body`; a
+read may assume it (`forallStored_get`). -/
+def forallStored [ResourceStore State Value] (body : Value → Prop)
+    (state : State) : Prop :=
+  ∀ address value, ResourceStore.lookup state address = some value → body value
+
+theorem forallStored_get [ResourceStore State Value] {body : Value → Prop}
+    {state : State} (invariant : forallStored body state)
+    {address : Move.Address} {value : Value}
+    (present : ResourceStore.lookup state address = some value) : body value :=
+  invariant address value present
+
+theorem forallStored_insert [store : ResourceStore State Value]
+    {body : Value → Prop} {state : State} {address : Move.Address} {value : Value}
+    (invariant : forallStored body state) (changed : body value) :
+    forallStored body (store.insert state address value) := by
+  intro queryAddress queryValue present
+  by_cases hit : queryAddress = address
+  · subst hit
+    rw [store.lookup_insert_eq] at present
+    cases present
+    exact changed
+  · rw [ResourceStore.lookup_insert_other _ _ _ _ hit] at present
+    exact invariant queryAddress queryValue present
+
+theorem forallStored_erase [store : ResourceStore State Value]
+    {body : Value → Prop} {state : State} {address : Move.Address}
+    (invariant : forallStored body state) :
+    forallStored body (store.erase state address) := by
+  intro queryAddress queryValue present
+  by_cases hit : queryAddress = address
+  · subst hit
+    rw [store.lookup_erase_eq] at present
+    exact absurd present (by simp)
+  · rw [ResourceStore.lookup_erase_other _ _ _ hit] at present
+    exact invariant queryAddress queryValue present
+
 @[grind =, simp] theorem lookup_insert_same [store : ResourceStore State Value]
     (state : State) (address : Move.Address) (value : Value) :
     store.lookup (store.insert state address value) address = some value :=
