@@ -302,7 +302,9 @@ impl ExtractEd25519PublicKey for PublicKeyInputOptions {
             Ok(public_key)
         } else {
             Err(CliError::CommandArgumentError(
-                "One of ['--public-key', '--public-key-file', '--profile'] must be used"
+                "No public key found. Provide one with `--public-key <hex>` or \
+                 `--public-key-file <path>`, or select a configured profile with \
+                 `--profile <name>` (run `aptos init` to create one)."
                     .to_string(),
             ))
         }
@@ -465,7 +467,10 @@ impl PrivateKeyInputOptions {
             }
         } else {
             Err(CliError::CommandArgumentError(
-                "One of ['--private-key', '--private-key-file'], or ['public_key'] must present in profile".to_string(),
+                "No signing key or public key found. Provide `--private-key <hex>` or \
+                 `--private-key-file <path>`, or run `aptos init` to configure a profile \
+                 (optionally selected with `--profile <name>`)."
+                    .to_string(),
             ))
         }
     }
@@ -503,7 +508,10 @@ impl PrivateKeyInputOptions {
             }
         } else {
             Err(CliError::CommandArgumentError(
-                "One of ['--private-key', '--private-key-file'], or ['public_key'] must present in profile".to_string(),
+                "No signing key or public key found. Provide `--private-key <hex>` or \
+                 `--private-key-file <path>`, or run `aptos init` to configure a profile \
+                 (optionally selected with `--profile <name>`)."
+                    .to_string(),
             ))
         }
     }
@@ -543,7 +551,10 @@ impl PrivateKeyInputOptions {
             }
         } else {
             Err(CliError::CommandArgumentError(
-                "One of ['--private-key', '--private-key-file'] must be used".to_string(),
+                "No signing key found. Provide one with `--private-key <hex>` or \
+                 `--private-key-file <path>`, or run `aptos init` to configure a profile \
+                 and pass `--profile <name>`."
+                    .to_string(),
             ))
         }
     }
@@ -565,7 +576,10 @@ impl PrivateKeyInputOptions {
             Ok(private_key)
         } else {
             Err(CliError::CommandArgumentError(
-                "One of ['--private-key', '--private-key-file'] must be used".to_string(),
+                "No signing key found. Provide one with `--private-key <hex>` or \
+                 `--private-key-file <path>`, or run `aptos init` to configure a profile \
+                 and pass `--profile <name>`."
+                    .to_string(),
             ))
         }
     }
@@ -633,7 +647,10 @@ impl ExtractEd25519PublicKey for PrivateKeyInputOptions {
             Ok(public_key)
         } else {
             Err(CliError::CommandArgumentError(
-                "Unable to extract public key from Private Key input nor Profile".to_string(),
+                "Unable to determine a public key. Provide `--private-key <hex>` or \
+                 `--private-key-file <path>`, or configure a profile with `aptos init` \
+                 and select it with `--profile <name>`."
+                    .to_string(),
             ))
         }
     }
@@ -801,7 +818,10 @@ pub fn load_account_arg(str: &str) -> Result<AccountAddress, CliError> {
         Ok(account_address_from_public_key(&public_key))
     } else {
         Err(CliError::CommandArgumentError(
-            "'--account' or '--profile' after using aptos init must be provided".to_string(),
+            "No account address found. Provide `--account <address>`, or run `aptos init` \
+             and pass `--profile <name>` (a profile name may also be used in place of the \
+             address)."
+                .to_string(),
         ))
     }
 }

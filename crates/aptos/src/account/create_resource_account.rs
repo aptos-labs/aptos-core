@@ -21,6 +21,12 @@ use std::str::FromStr;
 /// This will create a resource account which can be used as an autonomous account
 /// not controlled directly by one account.
 #[derive(Debug, Parser)]
+#[clap(after_help = "Examples:
+  # Create a resource account using a seed, paying with the default profile
+  $ aptos account create-resource-account --seed 0x1234
+
+  # Create a resource account non-interactively (for scripts/agents)
+  $ aptos account create-resource-account --seed 0x1234 --assume-yes")]
 pub struct CreateResourceAccount {
     /// Optional Resource Account authentication key.
     #[clap(long, value_parser = AuthenticationKey::from_str)]

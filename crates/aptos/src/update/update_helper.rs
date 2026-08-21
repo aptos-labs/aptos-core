@@ -10,6 +10,25 @@ use aptos_build_info::BUILD_OS;
 use self_update::{backends::github::Update, update::ReleaseUpdate};
 use std::path::PathBuf;
 
+/// Guards binary-replacing update commands against silent execution in
+/// non-interactive sessions.
+///
+/// The underlying `self_update` prompt reads stdin directly and treats an empty
+/// read (e.g. closed stdin or `/dev/null`) as approval. That means in a
+/// non-interactive session (`APTOS_NON_INTERACTIVE` set, or stdin is not a TTY)
+/// an update could download and replace a binary without any explicit
+/// confirmation. Require `--assume-yes` to proceed in that case.
+pub fn ensure_update_confirmable(assume_yes: bool) -> Result<()> {
+    if !assume_yes && crate::common::utils::is_non_interactive() {
+        bail!(
+            "Refusing to download and replace a binary in a non-interactive session without \
+             explicit confirmation (the update prompt cannot be answered safely here). \
+             Re-run with `--assume-yes` to proceed."
+        );
+    }
+    Ok(())
+}
+
 #[cfg(target_arch = "x86_64")]
 pub fn get_arch() -> &'static str {
     "x86_64"
@@ -36,6 +55,8 @@ pub fn build_updater(
     windows_name: &str,
     assume_yes: bool,
 ) -> Result<Box<dyn ReleaseUpdate>> {
+    ensure_update_confirmable(assume_yes)?;
+
     // Determine the target we should download based on how the CLI itself was built.
     let arch_str = get_arch();
     let build_info = cli_build_information();

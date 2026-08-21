@@ -12,8 +12,8 @@ use crate::{
             DEFAULT_PROFILE,
         },
         utils::{
-            explorer_account_link, fund_account, prompt_yes_with_override, read_line,
-            strip_private_key_prefix,
+            explorer_account_link, fund_account, is_non_interactive, prompt_yes_with_override,
+            read_line, strip_private_key_prefix,
         },
     },
 };
@@ -103,6 +103,13 @@ impl CliCommand<()> for InitTool {
         let network = if let Some(network) = self.network {
             eprintln!("Configuring for network {:?}", network);
             network
+        } else if is_non_interactive() {
+            return Err(CliError::CommandArgumentError(
+                "No network specified and cannot prompt in a non-interactive session. \
+                 Pass `--network <devnet|testnet|mainnet|local|custom>` (use `--network custom` \
+                 together with `--rest-url`/`--faucet-url` for a custom endpoint)."
+                    .to_string(),
+            ));
         } else {
             eprintln!(
                 "Choose network from [devnet, testnet, mainnet, local, custom | defaults to devnet]"
@@ -167,6 +174,14 @@ impl CliCommand<()> for InitTool {
         {
             Some(deri_path)
         } else if self.ledger {
+            if is_non_interactive() {
+                return Err(CliError::CommandArgumentError(
+                    "Selecting a ledger account requires an interactive prompt, which is not \
+                     available in a non-interactive session. Pass `--derivation-index <n>` or \
+                     `--derivation-path <path>` to choose the account up front."
+                        .to_string(),
+                ));
+            }
             // Fetch the top 5 (index 0-4) accounts from Ledger
             let account_map = aptos_ledger::fetch_batch_accounts(Some(0..5))?;
             eprintln!(
@@ -211,6 +226,20 @@ impl CliCommand<()> for InitTool {
             {
                 eprintln!("Using command line argument for private key");
                 key
+            } else if is_non_interactive() {
+                // We cannot prompt for a key, so fall back to the documented default
+                // behavior without touching stdin: keep an existing key if present,
+                // otherwise generate a fresh one. Pass `--private-key`/
+                // `--private-key-file` to provide a specific key explicitly.
+                if let Some(key) = profile_config.private_key {
+                    eprintln!("No private key provided; keeping the existing key...");
+                    key
+                } else {
+                    eprintln!("No private key provided; generating a new key...");
+                    self.rng_args
+                        .key_generator()?
+                        .generate_ed25519_private_key()
+                }
             } else {
                 eprintln!("Enter your private key as a hex literal (0x...) [Current: {} | No input: Generate new key (or keep one if present)]", profile_config.private_key.as_ref().map(|_| "Redacted").unwrap_or("None"));
                 let input = read_line("Private key")?;
@@ -348,7 +377,7 @@ impl CliCommand<()> for InitTool {
                     eprintln!("The account has not been funded on chain yet. To fund the account and get APT on testnet you must visit {}", mint_site_url);
                     // We don't use `prompt_yes_with_override` here because we only want to
                     // automatically open the minting site if they're in an interactive setting.
-                    if !self.prompt_options.assume_yes {
+                    if !self.prompt_options.assume_yes && !is_non_interactive() {
                         eprint!("Press [Enter] to go there now > ");
                         read_line("Confirmation")?;
                         open::that(&mint_site_url).map_err(|err| {
@@ -379,6 +408,17 @@ impl InitTool {
         let rest_url = if let Some(ref rest_url) = self.rest_url {
             eprintln!("Using command line argument for rest URL {}", rest_url);
             Some(rest_url.to_string())
+        } else if is_non_interactive() {
+            // Fail fast rather than silently reusing the profile's previously stored
+            // endpoint. In a non-interactive session the target chain must come from
+            // caller-supplied input, not hidden on-disk state, so a stale config
+            // cannot redirect initialization/lookup/funding at a different network.
+            return Err(CliError::CommandArgumentError(
+                "`--network custom` requires a REST endpoint in a non-interactive session. \
+                 Pass `--rest-url <url>` (it is not inferred from any previously stored \
+                 profile value)."
+                    .to_string(),
+            ));
         } else {
             let current = profile_config.rest_url.as_deref();
             eprintln!(
@@ -412,6 +452,14 @@ impl InitTool {
         } else if let Some(ref faucet_url) = self.faucet_options.faucet_url {
             eprintln!("Using command line argument for faucet URL {}", faucet_url);
             Some(faucet_url.to_string())
+        } else if is_non_interactive() {
+            // Do not reuse a previously stored faucet from on-disk state, which could
+            // point follow-on funding at a stale faucet. Skip the faucet unless one is
+            // explicitly provided via `--faucet-url`.
+            eprintln!(
+                "No faucet url given; skipping faucet (pass `--faucet-url <url>` to set one)..."
+            );
+            None
         } else {
             let current = profile_config.faucet_url.as_deref();
             eprintln!(

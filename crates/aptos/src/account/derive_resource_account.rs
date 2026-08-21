@@ -12,6 +12,9 @@ use clap::Parser;
 /// This will not create a resource account, but instead give the deterministic address given
 /// a source address and seed.
 #[derive(Debug, Parser)]
+#[clap(after_help = "Examples:
+  # Derive the resource account address for a source address and seed
+  $ aptos account derive-resource-account-address --address 0xc0ffee --seed 0x1234")]
 pub struct DeriveResourceAccount {
     /// Address of the creator's account
     #[clap(long, alias = "account", value_parser = crate::common::types::load_account_arg)]
