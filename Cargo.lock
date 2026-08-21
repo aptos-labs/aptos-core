@@ -12922,6 +12922,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-cached-packages",
+ "aptos-crypto",
  "aptos-gas-algebra",
  "aptos-gas-schedule",
  "aptos-language-e2e-tests",

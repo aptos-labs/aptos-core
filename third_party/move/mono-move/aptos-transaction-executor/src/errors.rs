@@ -46,6 +46,17 @@ pub enum DiscardReason {
     InvariantViolation(String),
 }
 
+/// A system transaction failed. System code is expected to always succeed, and
+/// if it fails, it means there is a bug in the executor or the framework.
+///
+/// When this happens, the block executor has no choice but to abort the whole block.
+#[derive(Debug)]
+pub struct SystemTxnFailure {
+    /// The framework call that failed.
+    pub call: &'static str,
+    pub failure: MoveExecutionFailure,
+}
+
 /// The pre-execution bound a transaction violated. Sizes are in bytes, gas in
 /// gas units, prices in octas per gas unit.
 #[derive(Debug, Error)]

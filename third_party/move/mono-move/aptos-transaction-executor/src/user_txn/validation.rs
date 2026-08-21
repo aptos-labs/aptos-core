@@ -1,23 +1,22 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Unmetered calls into framework system functions with Rust-built arguments.
-//! Today: the transaction prologue and epilogue
-//! (`0x1::transaction_validation`); the block prologue and epilogue will live
-//! here too. Only the versioned validation path is supported; the many legacy
-//! prologue/epilogue variants are intentionally not ported.
+//! Unmetered calls into the transaction prologue and epilogue
+//! (`0x1::transaction_validation`), with Rust-built arguments. Only the
+//! versioned validation path is supported; the many legacy prologue/epilogue
+//! variants are intentionally not ported.
 
+use super::metadata::TxnMetadata;
 use crate::{
-    calls::{call_function, invariant_violation},
+    calls::{call_system_function_unmetered, into_result, invariant_violation},
     errors::MoveExecutionFailure,
-    metadata::TxnMetadata,
 };
 use anyhow::anyhow;
 use aptos_types::{
     fee_statement::FeeStatement,
     transaction::{EpilogueArgs, PrologueArgs},
 };
-use mono_move_core::{types::InternedTypeList, Interner, VMInternalError};
+use mono_move_core::{Interner, VMInternalError};
 use mono_move_global_context::ExecutionGuard;
 use mono_move_runtime::{InterpreterContext, RuntimeStatus};
 use move_core_types::{account_address::AccountAddress, ident_str, identifier::IdentStr};
@@ -47,32 +46,6 @@ impl TxnSigners {
     pub(crate) fn as_slice(&self) -> &[[u8; AccountAddress::LENGTH]] {
         &self.0
     }
-}
-
-/// Like `call_function`, but system code never consumes the transaction's gas
-/// budget, including its module loads.
-fn call_system_function_unmetered(
-    guard: &ExecutionGuard<'_>,
-    interp: &mut InterpreterContext<'_>,
-    address: &AccountAddress,
-    module_name: &IdentStr,
-    function_name: &IdentStr,
-    ty_args: InternedTypeList,
-    signer_bufs: &[[u8; AccountAddress::LENGTH]],
-    args: &[Vec<u8>],
-) -> Result<RuntimeStatus, VMInternalError> {
-    interp.unmetered(|interp| {
-        call_function(
-            guard,
-            interp,
-            address,
-            module_name,
-            function_name,
-            ty_args,
-            signer_bufs,
-            args,
-        )
-    })
 }
 
 /// Calls `0x1::transaction_validation::<function>(signers…, args)`.
@@ -121,19 +94,7 @@ pub(crate) fn run_prologue(
     let status =
         call_validation_function_unmetered(guard, interp, VERSIONED_PROLOGUE, signers, &args)
             .map_err(MoveExecutionFailure::RuntimeError)?;
-
-    match status {
-        RuntimeStatus::Success => Ok(()),
-        RuntimeStatus::Aborted {
-            code,
-            message,
-            location,
-        } => Err(MoveExecutionFailure::Abort {
-            code,
-            message,
-            location,
-        }),
-    }
+    into_result(status)
 }
 
 pub(crate) fn run_epilogue(
@@ -155,17 +116,5 @@ pub(crate) fn run_epilogue(
     let status =
         call_validation_function_unmetered(guard, interp, VERSIONED_EPILOGUE, signers, &args)
             .map_err(MoveExecutionFailure::RuntimeError)?;
-
-    match status {
-        RuntimeStatus::Success => Ok(()),
-        RuntimeStatus::Aborted {
-            code,
-            message,
-            location,
-        } => Err(MoveExecutionFailure::Abort {
-            code,
-            message,
-            location,
-        }),
-    }
+    into_result(status)
 }

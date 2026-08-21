@@ -18,13 +18,15 @@ use aptos_language_e2e_tests::{account::AccountData, executor::FakeExecutor};
 use aptos_types::{
     state_store::StateView,
     transaction::{
-        AuxiliaryInfo, ExecutionStatus, PersistedAuxiliaryInfo, SignedTransaction,
+        AuxiliaryInfo, ExecutionStatus, PersistedAuxiliaryInfo, SignedTransaction, Transaction,
         TransactionAuxiliaryData, TransactionOutput, TransactionStatus,
     },
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use mono_move_aptos_state_view_providers::{StateViewModuleProvider, StateViewResourceProvider};
-use mono_move_aptos_transaction_executor::{production_natives, AptosTransactionExecutor};
+use mono_move_aptos_transaction_executor::{
+    production_natives, AptosTransactionExecutor, TxnOutcome,
+};
 use mono_move_global_context::GlobalContext;
 use move_core_types::vm_status::StatusCode;
 use std::collections::BTreeMap;
@@ -36,9 +38,47 @@ const GAS_DEPENDENT_EVENTS: &[&str] = &[
     "0x1::coin::CoinWithdraw",
 ];
 
-/// Runs one transaction through the MonoMove executor against `state`,
+/// Runs one user transaction through the MonoMove executor against `state`,
 /// materialized into the legacy output formats.
 fn execute_v2<S: StateView>(state: &S, txn: &SignedTransaction) -> TransactionOutput {
+    execute_v2_with(state, |executor| {
+        executor.execute_transaction(
+            &Transaction::UserTransaction(txn.clone()),
+            &AuxiliaryInfo::new(PersistedAuxiliaryInfo::None, None),
+        )
+    })
+}
+
+/// Runs one block-metadata transaction through the MonoMove executor against
+/// `state`, materialized into the legacy output formats.
+fn execute_v2_block_metadata<S: StateView>(
+    state: &S,
+    block_metadata: &aptos_types::block_metadata::BlockMetadata,
+) -> TransactionOutput {
+    execute_v2_with(state, |executor| {
+        executor.execute_transaction(
+            &Transaction::BlockMetadata(block_metadata.clone()),
+            &first_txn_aux_info(),
+        )
+    })
+}
+
+/// What V1's block path supplies for a block's first transaction.
+fn first_txn_aux_info() -> AuxiliaryInfo {
+    AuxiliaryInfo::new(
+        PersistedAuxiliaryInfo::V1 {
+            transaction_index: 0,
+        },
+        None,
+    )
+}
+
+/// Builds the executor against `state`, runs one transaction through it, and
+/// materializes the outcome.
+fn execute_v2_with<S: StateView>(
+    state: &S,
+    run: impl FnOnce(&AptosTransactionExecutor) -> TxnOutcome,
+) -> TransactionOutput {
     let global_ctx = GlobalContext::with_num_execution_workers(1);
     let guard = global_ctx
         .try_execution_context(0)
@@ -56,8 +96,7 @@ fn execute_v2<S: StateView>(state: &S, txn: &SignedTransaction) -> TransactionOu
         &env,
         usage,
     );
-    executor
-        .execute_user_transaction(txn, &AuxiliaryInfo::new(PersistedAuxiliaryInfo::None, None))
+    run(&executor)
         .materialize(
             &guard,
             &data_provider,
@@ -441,6 +480,139 @@ fn gas_checks_discard_like_v1() {
             "v2 discard differs from v1 for {expected:?}"
         );
     }
+}
+
+/// A block-metadata transaction produces byte-identical outputs on both VMs:
+/// the block prologue runs unmetered on both, so nothing is gas-masked.
+#[test]
+fn block_metadata_matches_v1() {
+    use aptos_types::{
+        block_metadata::BlockMetadata,
+        on_chain_config::{OnChainConfig, ValidatorSet},
+    };
+
+    let (mut fx, _alice, _bob) = setup();
+    let validator_set = ValidatorSet::fetch_config(fx.get_state_view())
+        .expect("the validator set is readable")
+        .expect("genesis has a validator set");
+    let proposer = *validator_set
+        .payload()
+        .next()
+        .expect("genesis has a validator")
+        .account_address();
+    let block_metadata = BlockMetadata::new(
+        aptos_crypto::HashValue::sha3_256_of(b"mono-move block"),
+        1,
+        1,
+        proposer,
+        vec![],
+        vec![],
+        fx.get_block_time() + 100,
+    );
+
+    let v1_outputs = fx
+        .execute_transaction_block(vec![Transaction::BlockMetadata(block_metadata.clone())])
+        .expect("v1 executes the block");
+    let v1_output = &v1_outputs[0];
+    assert_eq!(
+        v1_output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::Success),
+        "v1 rejected the block metadata: {:?}",
+        v1_output.status()
+    );
+
+    let v2_output = execute_v2_block_metadata(fx.get_state_view(), &block_metadata);
+    compare_system_outputs(v1_output, &v2_output);
+}
+
+/// A V3 extended block-metadata transaction produces byte-identical outputs
+/// on both VMs. The randomness seed exercises the option-argument encoding;
+/// the decryption payload stays absent, as on a chain without pending
+/// encrypted transactions.
+#[test]
+fn block_metadata_ext_v3_matches_v1() {
+    use aptos_types::{
+        block_metadata_ext::BlockMetadataExt,
+        on_chain_config::{OnChainConfig, ValidatorSet},
+        randomness::{RandMetadata, Randomness},
+    };
+
+    let (mut fx, _alice, _bob) = setup();
+    let validator_set = ValidatorSet::fetch_config(fx.get_state_view())
+        .expect("the validator set is readable")
+        .expect("genesis has a validator set");
+    let proposer = *validator_set
+        .payload()
+        .next()
+        .expect("genesis has a validator")
+        .account_address();
+    let block_metadata_ext = BlockMetadataExt::new_v3(
+        aptos_crypto::HashValue::sha3_256_of(b"mono-move ext block"),
+        1,
+        1,
+        proposer,
+        vec![],
+        vec![],
+        fx.get_block_time() + 100,
+        Some(Randomness::new(
+            RandMetadata { epoch: 1, round: 1 },
+            vec![7u8; 32],
+        )),
+        None,
+    );
+
+    let v1_outputs = fx
+        .execute_transaction_block(vec![Transaction::BlockMetadataExt(
+            block_metadata_ext.clone(),
+        )])
+        .expect("v1 executes the block");
+    let v1_output = &v1_outputs[0];
+    assert_eq!(
+        v1_output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::Success),
+        "v1 rejected the ext block metadata: {:?}",
+        v1_output.status()
+    );
+
+    let v2_output = execute_v2_with(fx.get_state_view(), |executor| {
+        executor.execute_transaction(
+            &Transaction::BlockMetadataExt(block_metadata_ext.clone()),
+            &first_txn_aux_info(),
+        )
+    });
+    compare_system_outputs(v1_output, &v2_output);
+}
+
+/// Both system-transaction outputs must be fee-free and match byte-for-byte,
+/// except state-value metadata (slot deposits, creation time), which V2 does
+/// not stamp yet.
+fn compare_system_outputs(v1_output: &TransactionOutput, v2_output: &TransactionOutput) {
+    assert_eq!(v2_output.status(), v1_output.status());
+    assert_eq!(v1_output.gas_used(), 0);
+    assert_eq!(v2_output.gas_used(), 0);
+
+    let v1_writes: BTreeMap<_, _> = v1_output.write_set().write_op_iter().collect();
+    let v2_writes: BTreeMap<_, _> = v2_output.write_set().write_op_iter().collect();
+    assert_eq!(
+        v1_writes.keys().collect::<Vec<_>>(),
+        v2_writes.keys().collect::<Vec<_>>(),
+        "the two VMs wrote different sets of state keys"
+    );
+    for (key, v1_op) in &v1_writes {
+        use aptos_types::write_set::TransactionWrite;
+        let v2_op = &v2_writes[*key];
+        assert_eq!(
+            v1_op.write_op_kind(),
+            v2_op.write_op_kind(),
+            "write kinds differ for {key:?}"
+        );
+        assert_eq!(
+            v1_op.bytes(),
+            v2_op.bytes(),
+            "write bytes differ for {key:?}"
+        );
+    }
+    assert_eq!(v1_output.events(), v2_output.events(), "events differ");
 }
 
 /// Two dependent transfers executed sequentially, each transaction's outputs
