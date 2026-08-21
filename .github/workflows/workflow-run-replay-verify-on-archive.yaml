@@ -247,17 +247,33 @@ jobs:
           poetry run python main.py "${ARGS[@]}"
         timeout-minutes: 420 # 7 hours
 
-      - name: Upload framework usage report
+      - name: Verify private framework usage Pages site
         if: ${{ inputs.DRY_RUN == false && inputs.FRAMEWORK_USAGE }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # pin@v4.6.2
-        with:
-          name: framework-usage-${{ inputs.NETWORK }}-${{ github.run_id }}
-          path: framework-usage-results/
-          if-no-files-found: error
+        env:
+          GH_TOKEN: ${{ secrets.APTOS_BOT_PAT }}
+          REPORT_REPOSITORY: ${{ inputs.REPORT_REPOSITORY }}
+          REPORT_BRANCH: ${{ inputs.REPORT_BRANCH }}
+        run: |
+          REPOSITORY_PRIVATE="$(gh api "repos/${REPORT_REPOSITORY}" --jq '.private')"
+          PAGES_PUBLIC="$(gh api "repos/${REPORT_REPOSITORY}/pages" --jq '.public')"
+          PAGES_BRANCH="$(gh api "repos/${REPORT_REPOSITORY}/pages" --jq '.source.branch')"
+
+          if [ "$REPOSITORY_PRIVATE" != "true" ]; then
+            echo "::error::Refusing to publish framework usage data to a public repository."
+            exit 1
+          fi
+          if [ "$PAGES_PUBLIC" != "false" ]; then
+            echo "::error::Refusing to publish framework usage data to a public Pages site."
+            exit 1
+          fi
+          if [ "$PAGES_BRANCH" != "$REPORT_BRANCH" ]; then
+            echo "::error::Pages publishes from '${PAGES_BRANCH}', not the configured '${REPORT_BRANCH}' branch."
+            exit 1
+          fi
 
       - name: Checkout private framework usage Pages site
         if: ${{ inputs.DRY_RUN == false && inputs.FRAMEWORK_USAGE }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # pin@v4.4.0
         with:
           repository: ${{ inputs.REPORT_REPOSITORY }}
           ref: ${{ inputs.REPORT_BRANCH }}
