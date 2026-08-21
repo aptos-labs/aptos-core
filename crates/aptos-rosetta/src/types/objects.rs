@@ -117,11 +117,17 @@ pub struct Amount {
 }
 
 impl Amount {
-    pub fn suggested_gas_fee(gas_unit_price: u64, max_gas_amount: u64) -> Amount {
-        Amount {
-            value: (gas_unit_price * max_gas_amount).to_string(),
+    pub fn suggested_gas_fee(gas_unit_price: u64, max_gas_amount: u64) -> ApiResult<Amount> {
+        let value = gas_unit_price.checked_mul(max_gas_amount).ok_or_else(|| {
+            ApiError::InvalidInput(Some(format!(
+                "Suggested fee overflowed for gas unit price {} and max gas amount {}",
+                gas_unit_price, max_gas_amount
+            )))
+        })?;
+        Ok(Amount {
+            value: value.to_string(),
             currency: native_coin(),
-        }
+        })
     }
 
     pub fn value(&self) -> ApiResult<i128> {
@@ -1029,7 +1035,8 @@ impl Transaction {
             ));
         }
 
-        // TODO: Handle storage gas refund (though nothing currently in Rosetta refunds)
+        // TODO: Storage fee refunds are already parsed above via FeeStatement events.
+        // This leftover note previously claimed they were not handled.
 
         Ok(Transaction {
             transaction_identifier: (&txn_info).into(),
