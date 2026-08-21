@@ -8885,6 +8885,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptos-vm-environment",
+ "aptos-vm-logging",
  "aptos-vm-types",
  "bcs 0.1.4",
  "claims",
