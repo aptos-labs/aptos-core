@@ -587,7 +587,7 @@ impl Features {
     }
 
     pub fn is_closure_bcs_serialization_disabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::DISABLE_CLOSURE_BCS_SERIALIZATION)
+        true
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {
