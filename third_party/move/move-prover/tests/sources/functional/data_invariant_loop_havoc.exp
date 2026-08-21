@@ -1,0 +1,33 @@
+Move prover returns: exiting with verification errors
+error: data invariant does not hold
+  ┌─ tests/sources/functional/data_invariant_loop_havoc.move:7:9
+  │
+7 │         invariant x > 0;
+  │         ^^^^^^^^^^^^^^^^
+  │
+  =     at tests/sources/functional/data_invariant_loop_havoc.move:14: bad_loop
+  =         r = <redacted>
+  =     at tests/sources/functional/data_invariant_loop_havoc.move:15: bad_loop
+  =         i = <redacted>
+  =     at tests/sources/functional/data_invariant_loop_havoc.move:16: bad_loop
+  =     enter loop, variable(s) r, i havocked and reassigned
+  =         r = <redacted>
+  =         i = <redacted>
+  =     at tests/sources/functional/data_invariant_loop_havoc.move:16: bad_loop
+  =     at tests/sources/functional/data_invariant_loop_havoc.move:14: bad_loop
+  =         r = <redacted>
+  =     at tests/sources/functional/data_invariant_loop_havoc.move:7
+
+error: data invariant does not hold
+  ┌─ tests/sources/functional/data_invariant_loop_havoc.move:7:9
+  │
+7 │         invariant x > 0;
+  │         ^^^^^^^^^^^^^^^^
+  │
+  =     at tests/sources/functional/data_invariant_loop_havoc.move:10: bad_straight
+  =         r = <redacted>
+  =     at tests/sources/functional/data_invariant_loop_havoc.move:11: bad_straight
+  =         r = <redacted>
+  =     at tests/sources/functional/data_invariant_loop_havoc.move:10: bad_straight
+  =         r = <redacted>
+  =     at tests/sources/functional/data_invariant_loop_havoc.move:7
