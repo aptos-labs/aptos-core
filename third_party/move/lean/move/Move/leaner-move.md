@@ -283,7 +283,11 @@ spec-term       = "result" | "initial" | "final" | "abortCode" | "this"
 
 compile-directive = "#export_leaner" string [ selection ]
                 | "def" ident ":" "MModule" ":="
-                  "module%" string [ selection ]
+                  "lowerToIR" "``" ident
+                | "def" ident ":" "MModule" ":="
+                  "module%" string selection
+                | "def" ident ":" "MModule" ":="
+                  "module_from_context%" string
                 | "#emit_leaner_xir" ident ;
 selection       = "structs" "[" [ ident { "," ident } ] "]"
                   "functions" "[" [ ident { "," ident } ] "]" ;
@@ -364,10 +368,12 @@ theorem importedMathContract : Math.identity.contract := Math.identity.verified
 
 **Compilation directives.** `#export_leaner "M"` compiles the attributed
 declarations and marks the deployable module of a `.lean` compiler input;
-`module` implies it. `module% "M"` elaborates the compiled module as
-a Lean `MModule` value for interpreter tests and transformations, with an
-explicit `structs [...] functions [...]` selection form; `#emit_leaner_xir m`
-marks an existing `MModule` value as the deployable module. Compiling a
+`module` implies it. `lowerToIR ``Namespace` elaborates the registered Move
+namespace as a Lean `MModule` value for interpreter tests and transformations;
+its registered identity supplies the output address and name. `module% "M"
+structs [...] functions [...]` remains the explicit-selection form, while
+`module_from_context% "M"` preserves the older current-namespace behavior.
+`#emit_leaner_xir m` marks an existing `MModule` value as the deployable module. Compiling a
 `.lean` source runs Lean elaboration including metaprograms — treat such
 sources as trusted build inputs.
 
@@ -882,7 +888,7 @@ module M where
   /-! ## Model -/          -- namespace Model: specification vocabulary
   /-! ## Functions -/      -- fun declarations with their `spec` beside them
   /-! ## Proofs -/         -- Model lemmas, then `verify` commands
-  /-! ## Tests -/          -- `module%`, `#test`, `#guard`
+  /-! ## Tests -/          -- `lowerToIR`, `#test`, `#guard`
 ```
 
 A `spec` is written directly under the `fun` it constrains, so the contract is
@@ -1513,7 +1519,7 @@ For tests and transformations the compiled module is available as a Lean
 value, and the modeled IR interpreter runs its functions:
 
 ```lean
-def compiled : MModule := module% "AccountTest"
+def compiled : MModule := lowerToIR ``Tests.MovePrograms.Account
 
 private def balanceId := compiled.resourceId "Balance"
 private def memory (addr value : Nat) : MoveModel.IR.IMem :=

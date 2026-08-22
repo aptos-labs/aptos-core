@@ -197,7 +197,7 @@ module Generics where
 
   /-! ## Tests -/
 
-  def compiled : MModule := module% "Generics"
+  def compiled : MModule := lowerToIR ``Tests.MovePrograms.Generics
 
 namespace Generics
 

@@ -13,7 +13,7 @@ import MoveModel.Frontend.XIR.Json
 explicit author action; ordinary declaration elaboration performs no writes.
 
 `#export_leaner "Module"` is the source-facing compiler directive. It combines
-`module%` with the compiler-owned XIR handoff, so deployable sources do
+`module_from_context%` with the compiler-owned XIR handoff, so deployable sources do
 not need to name an intermediate `MModule` value. The directive records the
 request and performs compilation at end of input, after all declarations have
 been elaborated.
@@ -36,8 +36,8 @@ syntax (name := emitLeanerXIR)
 
 /-- Compiles the attributed declarations in the current namespace and marks
 the resulting module as this `.lean` compiler input's deployable module. The
-optional selection has the same meaning as the corresponding `module%`
-form. -/
+optional selection has the same meaning as `module_from_context%` and
+`module%` respectively. -/
 syntax (name := exportLeaner)
   "#export_leaner " str
     (" structs " "[" ident,* "]" " functions " "[" ident,* "]")? : command
@@ -1109,7 +1109,7 @@ private unsafe def elabExportLeanerUnsafe (stx : Syntax) : CommandElabM Unit := 
   let moduleTerm ← liftTermElabM do
     let moduleName : TSyntax `str := ⟨stx[1]⟩
     if stx[2].isNone then
-      `(module% $moduleName)
+      `(module_from_context% $moduleName)
     else
       let selection := stx[2]
       let structIdents : Array (TSyntax `ident) :=

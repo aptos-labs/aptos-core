@@ -1016,7 +1016,7 @@ module OrderedMap where
     let value ← *valueRef
     pure (first + last + value)
 
-  def compiled : MModule := module% "OrderedMapTest"
+  def compiled : MModule := lowerToIR ``Tests.MovePrograms.OrderedMap
 
   private def run := Tests.run compiled
 

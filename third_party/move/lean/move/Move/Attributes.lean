@@ -196,6 +196,13 @@ def registerModuleNamespace (env : Environment) (leanNamespace : Name)
     (module : ModuleRef) : Environment :=
   moveModuleExt.addEntry env { leanNamespace, module }
 
+/-- Look up the Move identity registered for exactly `leanNamespace`.
+
+Unlike `moduleForDeclaration?`, this does not search enclosing namespaces: a
+Move module namespace is itself the object being named. -/
+def moduleForNamespace? (env : Environment) (leanNamespace : Name) : Option ModuleRef :=
+  (moveModuleExt.getState env).find? (·.leanNamespace == leanNamespace) |>.map (·.module)
+
 /-- Find the most closely enclosing registered Move module for a Lean
 declaration. Longest-prefix selection also makes nested ordinary Lean
 namespaces inside a `module` behave as expected. -/

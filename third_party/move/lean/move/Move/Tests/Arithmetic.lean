@@ -128,7 +128,9 @@ module Arithmetic where
 
   /-! ## Tests -/
 
-  def compiled : MModule := module% "ArithmeticTest"
+  def compiled : MModule := lowerToIR ``Tests.MovePrograms.Arithmetic
+
+  #guard compiled.name == "Arithmetic"
 
   private def counterId := compiled.resourceId "Counter"
   private def memory (addr value : Nat) : MoveModel.IR.IMem :=

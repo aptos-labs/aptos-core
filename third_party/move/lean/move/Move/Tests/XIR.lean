@@ -11,8 +11,15 @@ namespace Tests.MovePrograms.XIR
 
 open MoveModel.Frontend.XIR
 open Tests.MovePrograms.Account
+open scoped Move.Compiler
 
 /-! ## Tests -/
+
+private def explicitAccount : MModule :=
+  lowerToIR ``Tests.MovePrograms.Account
+
+#guard explicitAccount.name == "Account"
+#test explicitAccount.encodeJson.toOption = compiled.encodeJson.toOption
 
 private def roundTrip : Except String String := do
   let encoded ← compiled.encodeJson
@@ -28,7 +35,7 @@ private def enumRoundTrip : Except String String := do
 
 #test enumRoundTrip.toOption = Tests.MovePrograms.Enums.compiled.encodeJson.toOption
 
-#guard compiled.name == "AccountTest"
+#guard compiled.name == "Account"
 #guard compiled.address == 0
 #guard compiled.structMeta.length == 2
 #guard match compiled.structMeta[1]? with

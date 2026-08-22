@@ -242,7 +242,7 @@ module VectorOperations where
 
   /-! ## Tests -/
 
-  def compiled : MModule := module% "VectorOperationsTest"
+  def compiled : MModule := lowerToIR ``Tests.MovePrograms.VectorOperations
 
   private def run := Tests.run compiled
 

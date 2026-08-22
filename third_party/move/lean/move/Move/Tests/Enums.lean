@@ -62,7 +62,7 @@ module Enums where
 
   /-! ## Tests -/
 
-  def compiled : MModule := module% "EnumsTest"
+  def compiled : MModule := lowerToIR ``Tests.MovePrograms.Enums
 
   private def run := Tests.run compiled
 

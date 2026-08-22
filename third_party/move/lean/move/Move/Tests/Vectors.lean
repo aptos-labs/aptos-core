@@ -90,7 +90,7 @@ module Vectors where
 
   /-! ## Tests -/
 
-  def compiled : MModule := module% "VectorsTest"
+  def compiled : MModule := lowerToIR ``Tests.MovePrograms.Vectors
 
   private def run := Tests.run compiled
 

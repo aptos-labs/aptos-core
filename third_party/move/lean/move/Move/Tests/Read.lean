@@ -70,7 +70,7 @@ module Read where
 
   /-! ## Tests -/
 
-  def compiled : MModule := module% "ReadTest"
+  def compiled : MModule := lowerToIR ``Tests.MovePrograms.Read
 
   private def readingId := compiled.resourceId "Reading"
   private def memory (addr value : Nat) : MoveModel.IR.IMem :=

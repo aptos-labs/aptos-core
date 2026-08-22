@@ -47,7 +47,7 @@ module ResourceComposition where
 
   /-! ## Tests -/
 
-  def compiled : MModule := module% "ResourceCompositionTest"
+  def compiled : MModule := lowerToIR ``Tests.MovePrograms.ResourceComposition
 
   private def debitId := compiled.resourceId "Debit"
   private def creditId := compiled.resourceId "Credit"

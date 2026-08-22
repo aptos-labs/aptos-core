@@ -205,7 +205,7 @@ module Calls where
 
   /-! ## Tests -/
 
-  def compiled : MModule := module% "CallsTest"
+  def compiled : MModule := lowerToIR ``Tests.MovePrograms.Calls
 
   private def counterId := compiled.resourceId "Counter"
   private def memory (addr value : Nat) : MoveModel.IR.IMem :=

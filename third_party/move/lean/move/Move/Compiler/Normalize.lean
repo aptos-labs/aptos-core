@@ -1730,7 +1730,8 @@ private def validateAbilities (structs : Array LIR.StructDecl) : Except String U
         validateFieldAbility structs decl .key .store field
 
 /-- Compile selected attributed Lean declarations to Leaner's named LIR. -/
-def compileModule (moduleName : String) (structNames funNames : Array Name) : CoreM LIR.Module := do
+def compileModule (outputModule : Move.ModuleRef) (structNames funNames : Array Name) :
+    CoreM LIR.Module := do
   -- Compile the selected declarations as one request.  This also avoids
   -- duplicating Lean's impure code-generation index bookkeeping when several
   -- bodies are extracted while elaborating one module.
@@ -1742,9 +1743,7 @@ def compileModule (moduleName : String) (structNames funNames : Array Name) : Co
     Lean.compileDecls missing
   let env ← getEnv
   let representative? := funNames[0]? <|> structNames[0]?
-  let module := representative?.bind (Move.moduleForDeclaration? env) |>.getD {
-    name := moduleName
-  }
+  let module := representative?.bind (Move.moduleForDeclaration? env) |>.getD outputModule
   let mut signatures : FunSignatures := []
   for name in funNames do
     unless Move.isMoveFunction env name do
@@ -1788,7 +1787,7 @@ def compileModule (moduleName : String) (structNames funNames : Array Name) : Co
         }
   return {
     address := module.address
-    name := moduleName
+    name := outputModule.name
     structs := structs
     functions := functions
     externalFuns := externalFuns

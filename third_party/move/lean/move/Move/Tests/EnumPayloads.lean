@@ -152,7 +152,7 @@ module EnumPayloads where
 
   /-! ## Tests -/
 
-  def compiled : MModule := module% "EnumPayloadsTest"
+  def compiled : MModule := lowerToIR ``Tests.MovePrograms.EnumPayloads
 
   private def run := Tests.run compiled
 

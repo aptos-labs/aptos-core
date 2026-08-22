@@ -326,7 +326,7 @@ module Loops where
 
   /-! ## Tests -/
 
-  def compiled : MModule := module% "LoopsTest"
+  def compiled : MModule := lowerToIR ``Tests.MovePrograms.Loops
 
   private def counterId := compiled.resourceId "Counter"
   private def memory (addr value : Nat) : MoveModel.IR.IMem :=

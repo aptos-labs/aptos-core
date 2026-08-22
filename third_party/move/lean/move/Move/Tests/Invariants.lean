@@ -147,7 +147,7 @@ module Invariants where
 
   /-! ## Tests -/
 
-  def compiled : MModule := module% "InvariantsTest"
+  def compiled : MModule := lowerToIR ``Tests.MovePrograms.Invariants
 
   -- The certifying field is a proof, so Move never sees it.
   #guard (compiled.structs.find? (·.name == "Percent")).map

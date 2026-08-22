@@ -849,7 +849,7 @@ module Quicksort where
 
   /-! ## Tests -/
 
-  def compiled : MModule := module% "QuicksortTest"
+  def compiled : MModule := lowerToIR ``Tests.MovePrograms.Quicksort
 
   private def run := Tests.run compiled
 

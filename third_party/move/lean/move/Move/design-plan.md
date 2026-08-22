@@ -594,7 +594,7 @@ table indices and byte offsets need not match.
 - Add `MoveModel.Frontend.XIR.MModule` and metadata records.
 - Implement checked `MModule.ofIR`.
 - Add convenience projections to the semantic `Program`.
-- Change `module%` to use LIR-to-IR-to-XIR.
+- Add `lowerToIR` using LIR-to-IR-to-XIR.
 - Add round-trip and malformed-finite-IR tests.
 
 ### Milestone 3: JSON contract — implemented

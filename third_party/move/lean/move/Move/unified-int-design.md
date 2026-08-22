@@ -155,7 +155,7 @@ parameters as one tuple — that alone replaced six per-width grind lemmas.)
 
 What remains is **~10–15% slower**.  Wall clock is only trustworthy on the two
 CLI-free files (`CrossInv` 1.02×, `GlobalInv` 1.09×), because every file with a
-`module%` shells out to `aptos move exchange` and the two trees
+compiler lowering shells out to `aptos move exchange` and the two trees
 necessarily use different binaries — the exchange call alone measured 7 ms with
 the pre-existing binary against 139 ms with a freshly built debug one, which
 swamps the signal.  The profiler counters exclude that I/O, and over eight files

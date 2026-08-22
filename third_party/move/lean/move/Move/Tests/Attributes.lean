@@ -38,7 +38,7 @@ module Attributes where
   -- leave no user metadata behind.
   @[move_public] fun compatPublic (x : U64) : U64 := x
 
-  def compiled : MModule := module% "AttributesTest"
+  def compiled : MModule := lowerToIR ``Tests.MovePrograms.Attributes
 
 namespace Attributes
 

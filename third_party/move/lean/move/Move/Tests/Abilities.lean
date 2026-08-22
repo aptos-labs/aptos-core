@@ -42,7 +42,7 @@ module Abilities where
 
   /-! ## Tests -/
 
-  def compiled : MModule := module% "AbilitiesTest"
+  def compiled : MModule := lowerToIR ``Tests.MovePrograms.Abilities
 
 namespace Abilities
 

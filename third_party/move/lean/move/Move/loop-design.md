@@ -207,7 +207,7 @@ headers, not a new IR construct.
 ## Verification: inline fixed points
 
 The source-specification translator (in `Move/Verify/Syntax.lean`) runs when
-`spec` builds `sourceSpec`; it does not run during `module%`. It does
+`spec` builds `sourceSpec`; it does not run during `lowerToIR`. It does
 not extract helper declarations: each source `loop` / `while` becomes an
 inline fixed point in the generated relation,
 

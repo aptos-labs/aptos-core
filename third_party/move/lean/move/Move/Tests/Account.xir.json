@@ -9,7 +9,7 @@
    "fields": [{"ty": {"struct": 0}, "name": "balance"}],
    "abilities": ["key"]}],
  "schema": "move-xir-module",
- "module": {"name": "AccountTest", "dialect": "stackless", "address": "0x0"},
+ "module": {"name": "Account", "dialect": "stackless", "address": "0x0"},
  "functions":
  [{"visibility": "public",
    "type_parameters": [],

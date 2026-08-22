@@ -80,7 +80,7 @@ module EnumPatterns where
 
   /-! ## Tests -/
 
-  def compiled : MModule := module% "EnumPatternsTest"
+  def compiled : MModule := lowerToIR ``Tests.MovePrograms.EnumPatterns
 
   private def run := Tests.run compiled
 

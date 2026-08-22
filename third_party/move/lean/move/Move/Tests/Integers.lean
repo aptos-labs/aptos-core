@@ -91,7 +91,7 @@ module Integers where
 
   /-! ## Tests -/
 
-  def compiled : MModule := module% "IntegersTest"
+  def compiled : MModule := lowerToIR ``Tests.MovePrograms.Integers
 
   private def run := Tests.run compiled
 

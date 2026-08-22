@@ -64,7 +64,7 @@ module Account where
 
   /-! ## Tests -/
 
-  def compiled : MModule := module% "AccountTest"
+  def compiled : MModule := lowerToIR ``Tests.MovePrograms.Account
 
   private def balanceId := compiled.resourceId "Balance"
   private def memory (addr value : Nat) : MoveModel.IR.IMem :=
