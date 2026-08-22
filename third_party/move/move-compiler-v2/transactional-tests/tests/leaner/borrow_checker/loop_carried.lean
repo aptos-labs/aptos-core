@@ -5,7 +5,7 @@ import Move
 open Move
 open scoped Move Move.Spec
 
-module LeanerBorrowPermissiveLoop where
+module LeanerBorrowLoop where
 
   /-- One activated handle remains the unique mutation lineage across every
   loop iteration.  Leaner's loop fixpoint accepts it. -/
@@ -22,4 +22,4 @@ module LeanerBorrowPermissiveLoop where
   spec run where
     ensures True
 
---# run 0x0::LeanerBorrowPermissiveLoop::run
+--# run 0x0::LeanerBorrowLoop::run

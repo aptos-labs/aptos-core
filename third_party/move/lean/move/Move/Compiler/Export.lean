@@ -367,6 +367,55 @@ private def mkSourceDoSeq (elems : Array Syntax) : Syntax :=
   mkNode ``Lean.Parser.Term.doSeqIndent #[mkNullNode <|
     elems.map fun elem => mkNullNode #[elem, mkNullNode]]
 
+/-- The user-facing name introduced by an ordinary `let`/`let ←` element.
+Patterns can introduce several names; until XIR has structured-pattern name
+metadata, retain the first one rather than inventing an internal LCNF name. -/
+private partial def firstSourceIdent? (stx : Syntax) : Option Ident :=
+  if stx.isIdent then some ⟨stx⟩
+  else stx.getArgs.findSome? firstSourceIdent?
+
+private def sourceBindingName (stx : Syntax) : String :=
+  if (stx.isOfKind ``Lean.Parser.Term.doLet ||
+      stx.isOfKind ``Lean.Parser.Term.doLetArrow) && stx.getNumArgs > 3 then
+    match firstSourceIdent? stx[3] with
+    | some ident =>
+        let name := ident.getId.toString
+        if name == "_" then "" else name
+    | none => ""
+  else
+    ""
+
+private partial def wrapLetInitializer (declaration wrapped : Syntax) : Option Syntax :=
+  if (declaration.isOfKind ``Lean.Parser.Term.letIdDecl ||
+      declaration.isOfKind ``Lean.Parser.Term.letPatDecl) &&
+      declaration.getNumArgs > 0 then
+    let rhsIndex := declaration.getNumArgs - 1
+    some (declaration.setArg rhsIndex wrapped)
+  else if declaration.getNumArgs == 1 then
+    (wrapLetInitializer declaration[0] wrapped).map (declaration.setArg 0)
+  else
+    none
+
+/-- Wrap a pure `let` initializer in an opaque compiler marker. Besides
+retaining its authored name, this prevents Lean's value CSE from merging two
+distinct mutable source bindings which happen to have equal initial values. -/
+private def instrumentNamedValue (stx : Syntax) (start stop : Nat)
+    (localName : String) : MacroM Syntax := do
+  unless stx.isOfKind ``Lean.Parser.Term.doLet && !localName.isEmpty &&
+      stx.getNumArgs > 3 do
+    return stx
+  let declaration := stx[3]
+  let core := if declaration.getNumArgs == 1 then declaration[0] else declaration
+  unless core.getNumArgs > 0 do return stx
+  let rhs : TSyntax `term := ⟨core[core.getNumArgs - 1]⟩
+  let startTerm : TSyntax `term := quote start
+  let stopTerm : TSyntax `term := quote stop
+  let localNameTerm : TSyntax `term := quote localName
+  let wrapped ← `(Move.sourceNamedValue
+    $startTerm $stopTerm $localNameTerm $rhs)
+  let some declaration := wrapLetInitializer declaration wrapped.raw | return stx
+  return stx.setArg 3 declaration
+
 /-- Insert compiler-only markers before every authored `do` element. This is
 done only to the executable declaration; `move_source` above retains the
 original syntax used by source verification. -/
@@ -375,15 +424,18 @@ private partial def instrumentSourceSpans (isAction : Bool)
   if isDoSeqSyntax stx then
     let mut result := #[]
     for elem in Lean.Parser.Term.getDoElems ⟨stx⟩ do
-      let rewritten ← instrumentSourceSpans isAction elem.raw
+      let mut rewritten ← instrumentSourceSpans isAction elem.raw
       if let some start := elem.raw.getPos? then
         if let some stop := elem.raw.getTailPos? then
+          let localName := sourceBindingName elem.raw
+          rewritten ← instrumentNamedValue rewritten start.byteIdx stop.byteIdx localName
           let startTerm : TSyntax `term := quote start.byteIdx
           let stopTerm : TSyntax `term := quote stop.byteIdx
+          let localNameTerm : TSyntax `term := quote localName
           let marker ← if isAction then
-            `(doElem| let _ ← Move.sourceSpanMarkerAction $startTerm $stopTerm)
+            `(doElem| let _ ← (Move.sourceSpanMarkerAction $startTerm $stopTerm $localNameTerm))
           else
-            `(doElem| let _ ← Move.sourceSpanMarkerId $startTerm $stopTerm)
+            `(doElem| let _ ← (Move.sourceSpanMarkerId $startTerm $stopTerm $localNameTerm))
           result := result.push marker.raw
       result := result.push rewritten
     return mkSourceDoSeq result

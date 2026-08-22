@@ -1,0 +1,13 @@
+processed 2 tasks
+task 0 lines 1-23:  publish [import Move]
+warning: This assignment/binding to the left-hand-side variable `l10` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_l10`), or renaming to `_`
+   ┌─ TEMPFILE:12:5
+   │  
+12 │ ╭     while count < 3 do
+13 │ │       writer := *writer + 2
+14 │ │       count := count + 1
+   │ ╰────────────────────────^
+
+
+task 1 lines 25-25:  run 0x0::LeanerBorrowLoop::run
+return values: 6

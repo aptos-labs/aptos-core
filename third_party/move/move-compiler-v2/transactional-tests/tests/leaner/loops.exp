@@ -1,16 +1,11 @@
 processed 7 tasks
 task 0 lines 1-49:  publish [import Move]
-warning: This assignment/binding to the left-hand-side variable `l7` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_l7`), or renaming to `_`
-   ┌─ TEMPFILE:1:1
+warning: This assignment/binding to the left-hand-side variable `l9` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_l9`), or renaming to `_`
+   ┌─ TEMPFILE:18:5
    │  
- 1 │ ╭ 
- 2 │ │ import Move
- 3 │ │ open scoped Move
- 4 │ │ module LeanerLoops where
-   · │
-38 │ │     n
-39 │ │ /-! ## Tests -/
-   │ ╰───────────────^
+18 │ ╭     let mut n := n
+19 │ │     let mut acc := acc
+   │ ╰──────────────────────^
 
 
 task 1 lines 51-51:  run 0x0::LeanerLoops::count_down --args 5u64

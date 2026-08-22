@@ -591,6 +591,7 @@ private structure BuildState where
   projections : List (FVarId × Nat) := []
   descriptors : List (FVarId × Nat) := []
   natLiterals : List (FVarId × Nat) := []
+  strLiterals : List (FVarId × String) := []
   returnAliases : List (FVarId × Option FVarId) := []
   returnValues : List (FVarId × Array FVarId) := []
   joins : List (FVarId × (String × Array FVarId)) := []
@@ -610,8 +611,22 @@ private structure BuildState where
   nextBlock : Nat := 0
   nextTemp : Nat := 0
   currentSpan : Option MoveModel.IR.SourceSpan := none
+  currentSourceName : Option String := none
+  sourceLocalStart : Nat := 0
 
 private abbrev BuildM := StateT BuildState CoreM
+
+/-- Assign an authored binding name to the last runtime local produced by its
+statement. Intermediate LCNF values remain unnamed, and a binding optimized
+to an existing value does not incorrectly rename that older local. -/
+private def finishSourceBinding : BuildM Unit := do
+  let state ← get
+  let some sourceName := state.currentSourceName | return
+  unless state.sourceLocalStart < state.locals.size do return
+  let index := state.locals.size - 1
+  let some decl := state.locals[index]? | return
+  modify fun s => { s with
+    locals := s.locals.set! index { decl with sourceName := some sourceName } }
 
 private def addLocal (env : Environment) (id : FVarId) (type : Expr) : BuildM Unit := do
   let state ← get
@@ -633,6 +648,31 @@ private def addLocalTy (id : FVarId) (ty : LIR.Ty) : BuildM Unit := do
   modify fun s => { s with
     locals := s.locals.push { name := localName id, ty := ty }
     localIds := id :: s.localIds }
+
+private def setLocalSourceName (id : FVarId) (sourceName : String) : BuildM Unit := do
+  let name := localName id
+  let state ← get
+  let some index := state.locals.findIdx? (·.name == name) | return
+  let some decl := state.locals[index]? | return
+  modify fun s => { s with
+    locals := s.locals.set! index { decl with sourceName := some sourceName } }
+
+/-- `sourceNamedValue` is transparent for compiler-only values which flatten
+to several Move locals (or no Move local). Preserve the normalizer's transient
+representation under the marker result so subsequent tuple elimination and
+effect sequencing see the original value. -/
+private def aliasTransientValue (target source : FVarId) : BuildM Unit := do
+  let state ← get
+  if let some value := assocFind? source state.pending then
+    modify fun s => { s with pending := (target, value) :: s.pending }
+  if let some value := assocFind? source state.products then
+    modify fun s => { s with products := (target, value) :: s.products }
+  if let some value := assocFind? source state.tupleLocals then
+    modify fun s => { s with tupleLocals := (target, value) :: s.tupleLocals }
+  if let some value := assocFind? source state.returnAliases then
+    modify fun s => { s with returnAliases := (target, value) :: s.returnAliases }
+  if let some value := assocFind? source state.returnValues then
+    modify fun s => { s with returnValues := (target, value) :: s.returnValues }
 
 private def translateTypeArgs (env : Environment) (types : Array Expr)
     (count : Nat) : BuildM (Array LIR.Ty) := do
@@ -791,6 +831,10 @@ private def emitBlock (name : String) (instrs : Array LIR.Instr)
   let instrs := instrs.map (·.withSpan span)
   modify fun s => { s with
     blocks := s.blocks.push { name, instrs, term, termSpan := span } }
+
+private def locateCurrent (instrs : Array LIR.Instr) : BuildM (Array LIR.Instr) := do
+  let span := (← get).currentSpan
+  return instrs.map (·.withSpan span)
 
 private def srcName (id : FVarId) : Local := localName id
 
@@ -968,9 +1012,36 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
   | .lit (.nat n) =>
       modify fun s => { s with natLiterals := (decl.fvarId, n) :: s.natLiterals }
       return instrs
+  | .lit (.str value) =>
+      modify fun s => { s with strLiterals := (decl.fvarId, value) :: s.strLiterals }
+      return instrs
   | .const fn _ args _ =>
       let vars := fvarArgs args
       let types := typeArgs args
+      if Move.isSourceNamedValue fn then
+        let mut literals := #[]
+        for id in vars do
+          if let some n := assocFind? id (← get).natLiterals then
+            literals := literals.push n
+        let some start := literals[0]?
+          | throwError "named source value is missing its start offset"
+        let some stop := literals[1]?
+          | throwError "named source value is missing its end offset"
+        let strLiterals := (← get).strLiterals
+        let some sourceName := vars.findSome? fun id => assocFind? id strLiterals
+          | throwError "named source value is missing its local name"
+        let some source := vars.back?
+          | throwError "named source value is missing its wrapped value"
+        unless start ≤ stop do
+          throwError "named source value has a reversed range"
+        if (← localTy? source).isSome then
+          addLocal (← getEnv) decl.fvarId decl.type
+          setLocalSourceName decl.fvarId sourceName
+          let span : MoveModel.IR.SourceSpan := { start, «end» := stop }
+          let instr : LIR.Instr := .assign (srcName decl.fvarId) (srcName source)
+          return instrs.push (instr.withSpan (some span))
+        aliasTransientValue decl.fvarId source
+        return instrs
       if Move.isSourceSpanMarker fn then
         let mut literals := #[]
         for id in vars do
@@ -982,9 +1053,15 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
           | throwError "source span marker is missing its end offset"
         unless start ≤ stop do
           throwError "source span marker has a reversed range"
+        let strLiterals := (← get).strLiterals
+        let sourceName := vars.findSome? fun id => assocFind? id strLiterals
+        finishSourceBinding
         let previous := (← get).currentSpan
         modify fun s => { s with
           currentSpan := some { start, «end» := stop }
+          currentSourceName := sourceName.bind fun name =>
+            if name.isEmpty then none else some name
+          sourceLocalStart := s.locals.size
           sourceMarkerResults := decl.fvarId :: s.sourceMarkerResults }
         return instrs.map (·.withSpan previous)
       -- `Int.ofNat n` / `Nat.cast n` is the carrier of a non-negative integer
@@ -1674,11 +1751,13 @@ private partial def walk (env : Environment) (signatures : FunSignatures) (self 
                     walk env signatures self signature tailNext
                       (← loopExit label) exitInstrs
               | none =>
+                  let nextInstrs ← recognizeLet signatures decl instrs
                   walk env signatures self signature next blockName
-                    (← recognizeLet signatures decl instrs)
+                    (← locateCurrent nextInstrs)
           | _ =>
+              let nextInstrs ← recognizeLet signatures decl instrs
               walk env signatures self signature next blockName
-                (← recognizeLet signatures decl instrs)
+                (← locateCurrent nextInstrs)
   | .fun decl next _ =>
       if let some field := projectionIndex? decl.value then
         modify fun s => { s with projections := (decl.fvarId, field) :: s.projections }
@@ -1773,6 +1852,7 @@ private partial def walk (env : Environment) (signatures : FunSignatures) (self 
               let results ← freshResultLocals resultTys
               let nextInstrs := instrs.push
                 (.call (results.map (·.1)) op (srcs.map srcName))
+              let nextInstrs ← locateCurrent nextInstrs
               if effectful then
                 let some valueParam := params[0]?
                   | throwError "effect result product has no value field"
@@ -1780,8 +1860,9 @@ private partial def walk (env : Environment) (signatures : FunSignatures) (self 
                   tupleLocals := (valueParam.fvarId, results) :: s.tupleLocals }
                 walk env signatures self signature body blockName nextInstrs
               else
+                let bound ← bindTupleParams env params results nextInstrs
                 walk env signatures self signature body blockName
-                  (← bindTupleParams env params results nextInstrs)
+                  (← locateCurrent bound)
           | _ => throwError "multiple-return call did not normalize to a `Prod.mk` case"
       | some (.call pending) =>
           let some alt := cases.alts[0]? | throwError "effect result has no product case"
@@ -1796,7 +1877,8 @@ private partial def walk (env : Environment) (signatures : FunSignatures) (self 
                     dsts := #[srcName valueParam.fvarId]
                 | none => pure ()
               nextInstrs := nextInstrs.push (.call dsts pending.op (pending.srcs.map srcName))
-              walk env signatures self signature body blockName nextInstrs
+              walk env signatures self signature body blockName
+                (← locateCurrent nextInstrs)
           | _ => throwError "Move effect did not normalize to a `Prod.mk` case"
       | some pending@(.vectorInsert ..) | some pending@(.vectorRemove ..) |
         some pending@(.vectorPop ..) | some pending@(.vectorMut ..) =>
@@ -1811,15 +1893,17 @@ private partial def walk (env : Environment) (signatures : FunSignatures) (self 
                     dsts := #[srcName valueParam.fvarId]
                 | none => pure ()
               let nextInstrs ← materializePending pending dsts instrs
-              walk env signatures self signature body blockName nextInstrs
+              walk env signatures self signature body blockName
+                (← locateCurrent nextInstrs)
           | _ => throwError "Move effect did not normalize to a `Prod.mk` case"
       | none =>
           if let some sources := assocFind? cases.discr (← get).tupleLocals then
             let some alt := cases.alts[0]? | throwError "tuple value has no product case"
             match alt with
             | .alt ``Prod.mk params body _ =>
+                let bound ← bindTupleParams env params sources instrs
                 walk env signatures self signature body blockName
-                  (← bindTupleParams env params sources instrs)
+                  (← locateCurrent bound)
                 return
             | _ => throwError "tuple value did not normalize to a `Prod.mk` case"
           if let some _ := assocFind? cases.discr (← get).products then
@@ -1832,8 +1916,9 @@ private partial def walk (env : Environment) (signatures : FunSignatures) (self 
             let some alt := cases.alts[0]? | throwError "tuple value has no product case"
             match alt with
             | .alt ``Prod.mk params body _ =>
+                let bound ← bindTupleParams env params sources instrs
                 walk env signatures self signature body blockName
-                  (← bindTupleParams env params sources instrs)
+                  (← locateCurrent bound)
                 return
             | _ => throwError "tuple value did not normalize to a `Prod.mk` case"
           if cases.typeName == ``Unit || cases.typeName == ``PUnit then
@@ -1914,9 +1999,10 @@ private partial def walk (env : Environment) (signatures : FunSignatures) (self 
                   | some _ =>
                       addLocal env param.fvarId param.type
                       dsts := dsts.push (srcName param.fvarId)
+                let nextInstrs := instrs.push
+                  (.call dsts (.unpack structName structTypeArgs) #[srcName cases.discr])
                 walk env signatures self signature body blockName
-                  (instrs.push (.call dsts (.unpack structName structTypeArgs)
-                    #[srcName cases.discr]))
+                  (← locateCurrent nextInstrs)
                 return
             | _ => throwError "unsupported Move structure destructuring alternative"
           let thenName ← freshBlock "then"
@@ -1985,7 +2071,13 @@ private def compileFun (env : Environment) (signatures : FunSignatures)
     | .error message => throwError message
     | .ok none => pure ()
     | .ok (some ty) =>
-      params := params.push { name := localName param.fvarId, ty := ty }
+      let sourceName := param.binderName.toString
+      params := params.push {
+        name := localName param.fvarId
+        ty := ty
+        sourceName := if sourceName.isEmpty || sourceName == "_" then none
+          else some sourceName
+      }
       paramIds := param.fvarId :: paramIds
   if moveNativeAttr.hasTag env name then
     return {
@@ -2008,7 +2100,9 @@ private def compileFun (env : Environment) (signatures : FunSignatures)
   let (_, initial) ← (collectLoopMarkerInputs code).run initial
   let (_, initial) ← (collectLoopStates name code).run initial
   let (_, initial) ← (collectJoinParams env code).run initial
-  let (_, state) ← (walk env signatures name signature code "entry" #[]).run initial
+  let (_, state) ← (do
+    walk env signatures name signature code "entry" #[]
+    finishSourceBinding).run initial
   let blocks := reversePostorder state.blocks "entry"
   return {
     leanName := name

@@ -55,6 +55,7 @@ inductive Visibility where
 structure LocalDecl where
   name : String
   ty : Ty
+  sourceName : Option String := none
   deriving BEq, Repr
 
 inductive Oper where
@@ -413,6 +414,7 @@ private def lowerFun (structNames : Array (Name × String))
     isEntry := isEntry
     acquires := acquires
     attributes := funDecl.attributes
+    localNames := allLocals.toList.map (·.sourceName)
     sourceMap := if funDecl.native then none else some {
       span := funDecl.blocks.foldl (init := none) fun outer block =>
         let spans := block.instrs.foldl (init := outer) fun current instr =>

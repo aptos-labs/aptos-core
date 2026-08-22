@@ -50,15 +50,25 @@ forge CFG control by calling the normalizer protocol directly. -/
 LCNF; normalization consumes it and attaches the half-open byte range to the
 instructions produced by the following authored `do` element. -/
 @[never_extract, noinline] partial def sourceSpanMarkerAction
-    (start stop : Nat) : Action Unit :=
-  sourceSpanMarkerAction start stop
+    (start stop : Nat) (localName : String) : Action Unit :=
+  sourceSpanMarkerAction start stop localName
 
 @[never_extract, noinline] partial def sourceSpanMarkerId
-    (start stop : Nat) : Id Unit :=
-  sourceSpanMarkerId start stop
+    (start stop : Nat) (localName : String) : Id Unit :=
+  sourceSpanMarkerId start stop localName
+
+@[never_extract, noinline] def sourceNamedValue
+    {α : Type} (_start _stop : Nat) (_localName : String) (value : α) : α :=
+  value
+
+@[simp] theorem sourceNamedValue_eq
+    {α : Type} (start stop : Nat) (localName : String) (value : α) :
+    sourceNamedValue start stop localName value = value := rfl
 
 def isSourceSpanMarker (name : Name) : Bool :=
   name == ``sourceSpanMarkerAction || name == ``sourceSpanMarkerId
+
+def isSourceNamedValue (name : Name) : Bool := name == ``sourceNamedValue
 
 @[never_extract, noinline] private partial def loopEnter
     {σ : Type} [Inhabited σ] (label nonce arity token : Nat)

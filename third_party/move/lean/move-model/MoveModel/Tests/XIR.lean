@@ -25,8 +25,8 @@ private def fixture : MModule where
     fields := [("value", .u64)] }]
   funs := [{
     name := "deposit"
-    params := 0
-    locals := []
+    params := 1
+    locals := [.u64]
     returns := []
     blocks := [{ instrs := [], term := .ret [] }]
     loops := []
@@ -47,6 +47,7 @@ private def fixture : MModule where
     visibility := .public_
     isEntry := true
     acquires := []
+    localNames := [some "amount"]
     sourceMap := some {
       span := some { start := 10, «end» := 30 }
       blocks := [{ instrs := [], term := some { start := 20, «end» := 26 } }]

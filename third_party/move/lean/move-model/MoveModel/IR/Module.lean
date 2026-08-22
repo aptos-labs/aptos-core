@@ -96,6 +96,8 @@ structure FunMeta where
   isEntry : Bool
   acquires : List ResourceId
   attributes : List Attribute := []
+  /-- User-facing local names aligned with the function's local indices. -/
+  localNames : List (Option String) := []
   sourceMap : Option FunSourceMap := none
   deriving BEq, Repr
 

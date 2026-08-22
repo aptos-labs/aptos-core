@@ -85,8 +85,8 @@ private def source : Module where
   structMeta := fun r => if r = 0 then
     some ⟨"R", [], none, { key := true }, []⟩ else none
   funMeta := fun f => if f = 0 then
-    some ⟨"generic", .public_, false, [], [], none⟩
-    else if f = 1 then some ⟨"concrete", .public_, false, [], [], none⟩
+    some ⟨"generic", .public_, false, [], [], [], none⟩
+    else if f = 1 then some ⟨"concrete", .public_, false, [], [], [], none⟩
     else none
 
 private def result := source.monomorphizeForVerification

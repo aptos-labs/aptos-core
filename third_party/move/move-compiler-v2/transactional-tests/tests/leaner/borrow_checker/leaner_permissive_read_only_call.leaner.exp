@@ -1,7 +1,7 @@
 processed 2 tasks
 task 0 lines 1-27:  publish [import Move]
 Error: compilation errors:
- error: cannot transfer mutable local `l2` since it is borrowed
+ error: cannot transfer mutable local `second` since it is borrowed
    ┌─ TEMPFILE:18:5
    │
 16 │     let first ← &mut owner

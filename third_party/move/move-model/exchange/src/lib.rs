@@ -82,8 +82,9 @@ pub const FORMAT_VERSION: u64 = 10;
 pub const XIR_SCHEMA: &str = "move-xir-module";
 /// Current version of the deployable XIR module wrapper. Version 3 adds the
 /// `is_native` function flag and permits bodyless native declarations;
-/// version 4 transports source spans for declarations and stackless code.
-pub const XIR_VERSION: u64 = 4;
+/// version 4 transports source spans for declarations and stackless code;
+/// version 5 adds user-facing local names.
+pub const XIR_VERSION: u64 = 5;
 
 /// Index of a local of a function (a `LocalIndex` in move-model terms).
 /// Parameters come first.
@@ -176,7 +177,7 @@ impl XirModule {
         if self.schema != XIR_SCHEMA {
             return Err(format!("unsupported XIR schema `{}`", self.schema));
         }
-        if self.version != 3 && self.version != XIR_VERSION {
+        if self.version != 3 && self.version != 4 && self.version != XIR_VERSION {
             return Err(format!("unsupported XIR version {}", self.version));
         }
         Ok(())
@@ -226,6 +227,10 @@ pub struct XirFunction {
     pub acquires: Vec<ResourceId>,
     pub params: usize,
     pub locals: Vec<Type>,
+    /// User-facing names aligned with `locals`. Missing entries are
+    /// compiler-generated and receive a stable fallback name in consumers.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub local_names: Vec<Option<String>>,
     pub returns: Vec<Type>,
     pub blocks: Vec<Block>,
     pub entry: BlockId,

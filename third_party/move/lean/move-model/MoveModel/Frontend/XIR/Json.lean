@@ -318,9 +318,17 @@ private def sourceMapFields : Option FunSourceMap → List (String × Json)
       ("blocks", arr (sourceMap.blocks.map encodeBlockSourceMap))
     ])]
 
+private def localNameFields (localNames : List (Option String)) : List (String × Json) :=
+  if localNames.isEmpty then []
+  else [("local_names", arr <| localNames.map fun
+    | some name => .str name
+    | none => .null)]
+
 private def encodeFun (decl : MFun) (info : FunMeta) : JsonResult Json := do
   unless decl.name = info.name do
     throw s!"function body `{decl.name}` does not match metadata `{info.name}`"
+  unless info.localNames.isEmpty || info.localNames.length = decl.locals.length do
+    throw s!"function `{decl.name}` has {info.localNames.length} local names, but {decl.locals.length} locals"
   return Json.mkObj <| [
     ("name", .str decl.name),
     ("type_parameters", encodeTypeParams decl.typeParams),
@@ -335,7 +343,8 @@ private def encodeFun (decl : MFun) (info : FunMeta) : JsonResult Json := do
     ("entry", nat decl.entry),
     ("loops", arr (← decl.loops.mapM encodeLoop)),
     ("spec", ← encodeContract decl.spec)
-  ] ++ attributeFields info.attributes ++ sourceMapFields info.sourceMap
+  ] ++ attributeFields info.attributes ++ localNameFields info.localNames ++
+    sourceMapFields info.sourceMap
 
 private def encodeDialect : Dialect → String
   | .stackless => "stackless"
@@ -368,7 +377,7 @@ def MModule.toJson (module : MModule) : JsonResult Json := do
     encodeFun decl info
   let fields := [
     ("schema", .str "move-xir-module"),
-    ("version", nat 4),
+    ("version", nat 5),
     ("module", Json.mkObj [
       ("address", .str (encodeAddress module.address)),
       ("name", .str module.name),
@@ -486,6 +495,14 @@ private def decodeSourceMap (json : Json) : JsonResult (Option FunSourceMap) := 
     blocks
   }
 
+private def decodeLocalNames (json : Json) : JsonResult (List (Option String)) := do
+  let namesJson ← match json.getObjVal? "local_names" with
+    | .ok value => value.getArr?
+    | .error _ => return []
+  namesJson.toList.mapM fun
+    | .null => pure none
+    | value => return some (← value.getStr?)
+
 /-- Decode schema-versioned deployable XIR JSON.  The body decoder is shared
 with the established exchange-v5 format, while module metadata is checked
 separately. -/
@@ -494,7 +511,7 @@ def decodeMModule (text : String) : JsonResult MModule := do
   let schema ← (← json.getObjVal? "schema").getStr?
   unless schema = "move-xir-module" do throw s!"unsupported XIR schema `{schema}`"
   let version ← (← json.getObjVal? "version").getNat?
-  unless version = 3 || version = 4 do
+  unless version = 3 || version = 4 || version = 5 do
     throw s!"unsupported XIR schema version {version}"
   let moduleJson ← json.getObjVal? "module"
   let address ← decodeAddress (← (← moduleJson.getObjVal? "address").getStr?)
@@ -541,6 +558,7 @@ def decodeMModule (text : String) : JsonResult MModule := do
       isEntry := ← (← functionJson.getObjVal? "is_entry").getBool?
       acquires := ← decodeNatArray (← functionJson.getObjVal? "acquires")
       attributes := ← decodeAttributes functionJson
+      localNames := ← decodeLocalNames functionJson
       sourceMap := ← decodeSourceMap functionJson
     } : FunMeta)
   let externalFuns ← externalFunsJson.toList.mapM fun functionJson => do

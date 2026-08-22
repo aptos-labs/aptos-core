@@ -46,7 +46,7 @@ Error: Function execution failed with VMError: {
     sub_status: Some(1),
     location: 0x0::LeanerVectorOperations,
     indices: [],
-    offsets: [(FunctionDefinitionIndex(0), 9)],
+    offsets: [(FunctionDefinitionIndex(0), 11)],
 }
 task 16 lines 133-133:  run 0x0::LeanerVectorOperations::insert_out_of_bounds
 Error: Function execution failed with VMError: {
@@ -54,7 +54,7 @@ Error: Function execution failed with VMError: {
     sub_status: Some(131072),
     location: 0x0::LeanerVectorOperations,
     indices: [],
-    offsets: [(FunctionDefinitionIndex(6), 21)],
+    offsets: [(FunctionDefinitionIndex(6), 23)],
 }
 task 17 lines 135-135:  run 0x0::LeanerVectorOperations::remove_out_of_bounds
 Error: Function execution failed with VMError: {
@@ -62,5 +62,5 @@ Error: Function execution failed with VMError: {
     sub_status: Some(131072),
     location: 0x0::LeanerVectorOperations,
     indices: [],
-    offsets: [(FunctionDefinitionIndex(13), 19)],
+    offsets: [(FunctionDefinitionIndex(13), 21)],
 }

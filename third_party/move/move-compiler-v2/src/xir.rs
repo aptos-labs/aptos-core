@@ -218,6 +218,20 @@ fn validate(module: &XirModule) -> Result<()> {
             "too many locals in `{}`",
             decl.name
         );
+        ensure!(
+            decl.local_names.is_empty() || decl.local_names.len() == decl.locals.len(),
+            "function `{}` has {} local names; expected {}",
+            decl.name,
+            decl.local_names.len(),
+            decl.locals.len()
+        );
+        for name in decl.local_names.iter().flatten() {
+            ensure!(
+                !name.is_empty(),
+                "function `{}` has an empty local name",
+                decl.name
+            );
+        }
         for ty in decl.locals.iter().chain(&decl.returns) {
             validate_type_parameters(
                 ty,
@@ -468,8 +482,14 @@ fn import_source(
             .take(decl.params)
             .enumerate()
             .map(|(index, ty)| {
+                let name = decl
+                    .local_names
+                    .get(index)
+                    .and_then(Option::as_deref)
+                    .map(String::from)
+                    .unwrap_or_else(|| format!("p{index}"));
                 Parameter(
-                    env.symbol_pool().make(&format!("p{index}")),
+                    env.symbol_pool().make(&name),
                     ty.clone(),
                     function_loc.clone(),
                 )
@@ -855,8 +875,26 @@ fn translate_function(
         .iter()
         .map(|id| struct_at(struct_ids, *id, &decl.name))
         .collect::<Result<Vec<_>>>()?;
+    let mut used_local_names = BTreeSet::new();
     let local_names = (0..translator.local_types.len())
-        .map(|index| (index, env.symbol_pool().make(&format!("l{index}"))))
+        .map(|index| {
+            let preferred = decl
+                .local_names
+                .get(index)
+                .and_then(Option::as_deref)
+                .map(String::from)
+                .unwrap_or_else(|| format!("l{index}"));
+            let mut unique = preferred.clone();
+            if !used_local_names.insert(unique.clone()) {
+                unique = format!("{preferred}${index}");
+                let mut discriminator = 0;
+                while !used_local_names.insert(unique.clone()) {
+                    discriminator += 1;
+                    unique = format!("{preferred}${index}${discriminator}");
+                }
+            }
+            (index, env.symbol_pool().make(&unique))
+        })
         .collect::<BTreeMap<_, _>>();
     let name_to_index = local_names
         .iter()
@@ -2263,6 +2301,9 @@ mod tests {
         let mut module = account_module();
         module.version = move_model_exchange::XIR_VERSION;
         let function = &mut module.functions[0];
+        function.local_names = (0..function.locals.len())
+            .map(|index| (index == 0).then(|| "owner".to_owned()))
+            .collect();
         function.source_map = Some(move_model_exchange::XirFunctionSourceMap {
             span: Some(XirSourceSpan { start: 1, end: 90 }),
             blocks: function
@@ -2291,6 +2332,13 @@ mod tests {
         let function = module_env.get_functions().next().unwrap();
         assert_eq!(function.get_loc().span(), Span::new(1, 90));
         let target = targets.get_target(&function, &FunctionVariant::Baseline);
+        assert_eq!(
+            target
+                .get_local_name(0)
+                .display(target.symbol_pool())
+                .to_string(),
+            "owner"
+        );
         let code = target.get_bytecode();
         assert_eq!(
             target.get_bytecode_loc(code[0].get_attr_id()).span(),
@@ -2345,6 +2393,18 @@ mod tests {
         .err()
         .expect("out-of-bounds source map should be rejected");
         assert!(error.to_string().contains("outside the source text"));
+
+        let mut module = account_module();
+        module.version = move_model_exchange::XIR_VERSION;
+        module.functions[0].local_names = vec![Some("owner".to_owned())];
+        let error = parse_source(
+            PathBuf::from("misaligned-local-names.xir.json"),
+            "source".to_owned(),
+            &serde_json::to_string(&module).unwrap(),
+        )
+        .err()
+        .expect("misaligned local names should be rejected");
+        assert!(error.to_string().contains("local names; expected"));
     }
 
     #[test]
