@@ -7,8 +7,8 @@ use super::super::{
 };
 use crate::{
     errors::MissingEvalProofError,
-    group::{Fr, G1Affine, G2Affine, G2Prepared, PairingOutput, PairingSetting},
-    shared::{digest::EvalProof, encryption_key::EncryptionKey, ids::Id},
+    group::{Fr, G1Affine, G2Affine, PairingOutput, PairingSetting},
+    shared::{blst_ops, digest::EvalProof, encryption_key::EncryptionKey, ids::Id},
     traits::Plaintext,
 };
 use anyhow::Result;
@@ -48,13 +48,67 @@ pub struct BIBECiphertext {
     symmetric_ciphertext: SymmetricCiphertext,
 }
 
+/// The G2 ciphertext component `decrypt()` pairs against, carried together with
+/// its blst Miller-loop lines.
+///
+/// `prepare()` runs before the threshold key exists and `decrypt()` runs once
+/// everyone is waiting, so the G2-side line computation belongs on this side of
+/// the split. Only the affine point goes on the wire -- the lines are rebuilt on
+/// deserialization -- so the format is unchanged and the precompute lands in
+/// whoever decodes the ciphertext rather than in `decrypt()`.
+#[derive(Clone)]
+pub struct PreparedG2 {
+    point: G2Affine,
+    lines: blst_ops::G2Lines,
+}
+
+impl PreparedG2 {
+    pub(crate) fn new(point: G2Affine) -> Self {
+        Self {
+            lines: blst_ops::G2Lines::new(&point),
+            point,
+        }
+    }
+
+    /// Equivalent to `blst_ops::pairing(p, self.point)`, minus the G2-side work.
+    pub(crate) fn pairing(&self, p: &G1Affine) -> PairingOutput {
+        self.lines.pairing(p)
+    }
+}
+
+// The lines are a pure function of the point, so identity and display follow it.
+impl PartialEq for PreparedG2 {
+    fn eq(&self, other: &Self) -> bool {
+        self.point == other.point
+    }
+}
+
+impl Eq for PreparedG2 {}
+
+impl std::fmt::Debug for PreparedG2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.point.fmt(f)
+    }
+}
+
+impl Serialize for PreparedG2 {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> std::result::Result<S::Ok, S::Error> {
+        ark_se(&self.point, s)
+    }
+}
+
+impl<'de> Deserialize<'de> for PreparedG2 {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> std::result::Result<Self, D::Error> {
+        Ok(Self::new(ark_de(d)?))
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct PreparedBIBECiphertext {
     pub id: Id,
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub(crate) pairing_output: PairingOutput,
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    pub(crate) ct_g2: G2Prepared,
+    pub(crate) ct_g2: PreparedG2,
     pub(crate) padded_key: OneTimePaddedKey,
     pub(crate) symmetric_ciphertext: SymmetricCiphertext,
 }
@@ -100,7 +154,7 @@ impl InnerCiphertext for BIBECiphertext {
         digest: &Digest,
         eval_proof: &EvalProof,
     ) -> PreparedBIBECiphertext {
-        let pairing_output = PairingSetting::multi_pairing([digest.as_g1(), **eval_proof], [
+        let pairing_output = blst_ops::multi_pairing(&[digest.as_g1(), **eval_proof], &[
             self.ct_g2[0],
             self.ct_g2[1],
         ]);
@@ -108,7 +162,7 @@ impl InnerCiphertext for BIBECiphertext {
         PreparedBIBECiphertext {
             id: self.id,
             pairing_output,
-            ct_g2: self.ct_g2[2].into(),
+            ct_g2: PreparedG2::new(self.ct_g2[2]),
             padded_key: self.padded_key.clone(),
             symmetric_ciphertext: self.symmetric_ciphertext.clone(),
         }
@@ -163,7 +217,7 @@ impl BIBECTEncrypt for EncryptionKey {
 
 impl<P: Plaintext> BIBECTDecrypt<P> for BIBEDecryptionKey {
     fn bibe_decrypt(&self, ct: &PreparedBIBECiphertext) -> Result<P> {
-        let otp_source_1 = PairingSetting::pairing(self.signature_g1, ct.ct_g2.clone());
+        let otp_source_1 = ct.ct_g2.pairing(&self.signature_g1);
         let otp_source_gt = otp_source_1 + ct.pairing_output;
 
         let mut otp_source_bytes = Vec::new();
