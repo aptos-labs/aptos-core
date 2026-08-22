@@ -1,0 +1,26 @@
+processed 2 tasks
+task 0 lines 1-27:  publish [import Move]
+Error: compilation errors:
+ error: cannot transfer mutable local `l2` since it is borrowed
+   ┌─ TEMPFILE:1:1
+   │    
+ 1 │ ╭ ╭ 
+ 2 │ │ │ import Move
+ 3 │ │ │ open Move
+ 4 │ │ │ open scoped Move Move.Spec
+   · │ │
+19 │ │ │   spec run where
+20 │ │ │     ensures True
+   │ ╰─│────────────────^ transfer attempted here
+   │   ╰────────────────' previously mutably borrowed here
+
+
+exiting with Leaner stackless-bytecode checks failed
+task 1 lines 29-29:  run 0x0::LeanerBorrowPermissiveCall::run
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

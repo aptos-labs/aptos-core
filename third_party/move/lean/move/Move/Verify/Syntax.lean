@@ -700,6 +700,11 @@ private structure TranslationContext where
   /-- Outstanding owner mutations below the active focused mutation. They let
   a nested loan focus a disjoint sibling field of an ancestor owner. -/
   mutationAncestors : List (TSyntax `ident × Option Name) := []
+  /-- Source owners whose current value is held by a live mutation handle.
+  This also permits a checked same-place handle to focus the current mutation
+  without opening an unrelated owner prophecy. -/
+  mutationOwnerAliases : List
+    (Name × TSyntax `ident × Option Name) := []
   /-- Other live focused mutations surrounding the active one. Their values
   remain readable while a disjoint sibling loan is active. -/
   mutationRefs : List (TSyntax `ident) := []
@@ -3297,7 +3302,14 @@ private partial def translateDo (context : TranslationContext)
     let bodyIndex := if sourceLabel?.isSome then 2 else 1
     let body : TSyntax ``Lean.Parser.Term.doSeq := ⟨first.raw[bodyIndex]!⟩
     let body ← Lean.Elab.Command.liftCoreM <| Move.freshenLoopLocals body
-    let assigned := Move.loopAssignedIdents body
+    -- `reference := value` writes through an existing mutation; it does not
+    -- rebind the reference.  The surface loop-assignment collector cannot
+    -- distinguish that notation from an ordinary local reassignment, so do
+    -- not carry live mutation handles as loop-state values.
+    let liveMutationNames := (liveMutations context).map (·.getId)
+    let assigned := Move.loopAssignedIdents body |>.filter fun name =>
+      !liveMutationNames.any fun mutation =>
+        mutation.getString! == name.getId.getString!
     let state := freshLoopStateIdents first.raw assigned
     let pack ← packLoopState assigned
     let recName := mkIdentFrom first `_moveSpecLoop
@@ -3362,15 +3374,16 @@ private partial def translateDo (context : TranslationContext)
         let some (owner, fields) ← localPlace? context.resources place
           | throwErrorAt place
               "a nested mutable borrow must select a field of the live mutable reference"
-        unless !fields.isEmpty do
-          throwErrorAt place
-            "a nested mutable borrow must select a field of the live mutable reference"
         let parentFrame? :=
           if owner.getId == parent.getId then
             some (parent, context.mutationType?)
+          else if let some frame := context.mutationAncestors.find? fun (ancestor, _) =>
+              ancestor.getId == owner.getId then
+            some frame
           else
-            context.mutationAncestors.find? fun (ancestor, _) =>
-              ancestor.getId == owner.getId
+            context.mutationOwnerAliases.find? (fun (sourceOwner, _, _) =>
+              sourceOwner == owner.getId) |>.map fun (_, mutation, type?) =>
+                (mutation, type?)
         let some (parent, parentType?) := parentFrame?
           | throwErrorAt place
               "a nested mutable borrow must select a field of the live mutable reference or a retained ancestor"
@@ -3387,6 +3400,8 @@ private partial def translateDo (context : TranslationContext)
               mutation? := some name
               mutationType? := childType?
               mutationAncestors := (parent, parentType?) :: context.mutationAncestors
+              mutationOwnerAliases :=
+                (owner.getId, name, childType?) :: context.mutationOwnerAliases
               mutationRefs := context.mutation?.toList ++ context.mutationRefs
               mutationLoans := (owner.getId, fieldNames) :: context.mutationLoans }
           loanBody
@@ -3432,7 +3447,12 @@ private partial def translateDo (context : TranslationContext)
             let $localIdent := Move.Semantics.Mutation.read $name)
           pure (loanBody ++ #[refresh] ++ continuation)
         let nested ← translateDo
-          { context with mutation? := some name, mutationType? := none } scopedRest
+          { context with
+              mutation? := some name
+              mutationType? := none
+              mutationOwnerAliases :=
+                (localIdent.getId, name, none) :: context.mutationOwnerAliases }
+          scopedRest
         let borrow ← `(Move.Semantics.withMutation $localIdent (fun $name => $nested))
         let output := mkIdentFrom place `_moveSpecLocalOutput
         `(Move.Semantics.Spec.bind $borrow
@@ -3588,7 +3608,13 @@ private partial def translateDo (context : TranslationContext)
   | `(doElem| while $condition:doIfCond do $body:doSeq) =>
       let (binder?, condition) ← plainCondition condition
       let body ← Lean.Elab.Command.liftCoreM <| Move.freshenLoopLocals body
-      let assigned := Move.loopAssignedIdents body
+      -- Writes through live mutable references use assignment notation but do
+      -- not rebind those references.  Only ordinary locals belong in the
+      -- loop's explicit fixed-point state.
+      let liveMutationNames := (liveMutations context).map (·.getId)
+      let assigned := Move.loopAssignedIdents body |>.filter fun name =>
+        !liveMutationNames.any fun mutation =>
+          mutation.getString! == name.getId.getString!
       let state := freshLoopStateIdents first.raw assigned
       let condition : TSyntax `term := ⟨replaceLoopState assigned state condition.raw⟩
       let pack ← packLoopState assigned

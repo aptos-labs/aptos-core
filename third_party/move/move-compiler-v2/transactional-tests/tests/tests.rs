@@ -85,6 +85,21 @@ const TEST_CONFIGS: &[TestConfig] = &[
         exclude: COMMON_EXCLUSIONS,
         cross_compile: false,
     },
+    // Let Leaner-permissive borrow programs reach the production bytecode
+    // verifier even when compiler-v2's stricter reference checker reports the
+    // same program under the ordinary configurations.
+    TestConfig {
+        name: "no-reference-safety",
+        runner: |p| run(p, get_config_by_name("no-reference-safety")),
+        experiments: &[
+            (Experiment::REFERENCE_SAFETY_V3, false),
+            (Experiment::REFERENCE_SAFETY, false),
+        ],
+        language_version: LanguageVersion::latest(),
+        include: &["/leaner/borrow_checker/leaner_permissive_"],
+        exclude: &[],
+        cross_compile: false,
+    },
     // Test enabling inlining optimization, across package inlining, and extra optimizations.
     TestConfig {
         name: "opt-extra",
@@ -199,6 +214,7 @@ const SEPARATE_BASELINE: &[&str] = &[
     "leaner/loops.lean",
     "leaner/vector_operations.lean",
     "leaner/ordered_map.lean",
+    "/leaner/borrow_checker/leaner_permissive_",
     "control_flow/abort_complex.move",
     "control_flow/abort_invalid.move",
     "control_flow/abort_vector.move",

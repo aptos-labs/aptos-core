@@ -1,0 +1,17 @@
+processed 2 tasks
+task 0 lines 1-21:  publish [import Move]
+warning: This assignment/binding to the left-hand-side variable `l2` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_l2`), or renaming to `_`
+   ┌─ TEMPFILE:1:1
+   │  
+ 1 │ ╭ 
+ 2 │ │ import Move
+ 3 │ │ open Move
+ 4 │ │ open scoped Move Move.Spec
+   · │
+15 │ │   spec run where
+16 │ │     ensures True
+   │ ╰────────────────^
+
+
+task 1 lines 23-23:  run 0x0::LeanerBorrowPermissiveUnused::run
+return values: 5

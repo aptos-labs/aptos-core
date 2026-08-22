@@ -34,6 +34,7 @@ Compilation is deferred until end of input so the entire block is included.
 | `reject_recursive_enum.lean` | Recursive enum declarations are rejected explicitly |
 | `reject_empty_enum.lean` | Empty enum declarations are rejected before XIR emission |
 | `references.lean` | Private resource functions, immutable/mutable nested field borrows, reads, writes, propagated `acquires`, and missing-global failures |
+| `borrow_checker/` | Poison-aware source acceptance/rejection, exact Leaner diagnostics, compiler-v2 comparison failures, production-verifier comparison failures, and successful VM executions |
 | `reject_unselected_call.lean` | A Move-attributed helper must be selected in the same module request |
 | `reject_ordinary_call.lean` | Calls to arbitrary Lean functions are rejected at the source boundary |
 | `reject_recursive_type.lean` | Recursive data types are rejected while recursive functions remain supported |
