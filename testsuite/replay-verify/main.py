@@ -1768,8 +1768,14 @@ def merge_framework_usage_reports(
     assert reference is not None
     assert start_timestamp_usecs is not None
     assert end_timestamp_usecs is not None
+    report_generated_at_utc = (
+        datetime.datetime.now(datetime.timezone.utc)
+        .isoformat(timespec="seconds")
+        .replace("+00:00", "Z")
+    )
     merged = {
         "schema_version": reference["schema_version"],
+        "report_generated_at_utc": report_generated_at_utc,
         "network": network,
         "start_version": expected_start,
         "end_version": expected_end,

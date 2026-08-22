@@ -182,7 +182,8 @@ function renderCards() {
     ["All unobserved", nf.format(unused), ""]
   ];
   document.getElementById("cards").innerHTML = values.map(([label,value,cls]) => `<div class="card"><span class="label">${esc(label)}</span><span class="value ${cls}">${esc(value)}</span></div>`).join("");
-  document.getElementById("subtitle").textContent = `Replay ${nf.format(report.start_version)}–${nf.format(report.end_version)} · schema ${report.schema_version} · build ${report.git_sha || "unknown"}`;
+  const recordedAt = report.report_generated_at_utc ? new Date(report.report_generated_at_utc).toISOString() : "recording date unavailable";
+  document.getElementById("subtitle").textContent = `Recorded ${recordedAt} · Replay ${nf.format(report.start_version)}–${nf.format(report.end_version)} · schema ${report.schema_version} · build ${report.git_sha || "unknown"}`;
   const truncationNotices = [];
   if (report.usage_detail_truncated) {
     const rowLimit = report.merged_usage_detail_row_limit ?? report.usage_detail_row_limit;

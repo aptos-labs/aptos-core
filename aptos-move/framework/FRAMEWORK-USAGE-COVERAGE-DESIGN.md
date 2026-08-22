@@ -453,6 +453,9 @@ job summary links directly to both reports and shows its resolved UTC time
 range, ledger-version range, and processed transaction count. Access to the
 rendered report follows the private repository's GitHub access controls. The
 repository and branch are fixed in the workflow rather than dispatch inputs.
+Each publication also updates stable `framework-usage/<network>/index.html` and
+`framework-usage/<network>/framework-usage.json` URLs. The merged JSON records
+its UTC generation timestamp, which the HTML displays in its header.
 
 The result bucket should have a lifecycle policy. CI cleanup always removes
 pods and temporary PVCs, and final reports remain available through the private
