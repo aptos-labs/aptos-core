@@ -1,8 +1,17 @@
 processed 1 task
 task 0 lines 1-22:  publish [import Move]
 Error: compilation errors:
- 
-Leaner elaboration failed for `TEMPFILE`:
-TEMPFILE:14:32: error: recursive Move enum `LeanerTxnRejectRecursiveEnum.Chain` is not supported by the prototype
-TEMPFILE:14:32: error: cannot evaluate code because 'sorryAx' uses 'sorry' and/or contains errors
+ error: cannot evaluate code because 'sorryAx' uses 'sorry' and/or contains errors
+   ┌─ TEMPFILE:14:33
+   │
+14 │ end LeanerTxnRejectRecursiveEnum
+   │                                 ^
 
+error: recursive Move enum `LeanerTxnRejectRecursiveEnum.Chain` is not supported by the prototype
+   ┌─ TEMPFILE:14:33
+   │
+14 │ end LeanerTxnRejectRecursiveEnum
+   │                                 ^
+
+
+exiting with Leaner elaboration errors

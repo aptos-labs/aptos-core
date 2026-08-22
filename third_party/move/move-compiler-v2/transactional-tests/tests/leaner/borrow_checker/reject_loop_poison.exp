@@ -1,8 +1,11 @@
 processed 1 task
 task 0 lines 1-22:  publish [import Move]
 Error: compilation errors:
- 
-Leaner elaboration failed for `TEMPFILE`:
-TEMPFILE:14:4: error: borrow safety error `poisoned`: reference was poisoned by an overlapping write (conflicts with `selected`)
-wrote Leaner XIR
+ error: borrow safety error `poisoned`: reference was poisoned by an overlapping write (conflicts with `selected`)
+   ┌─ TEMPFILE:14:5
+   │
+14 │     let result ← *poisoned
+   │     ^^^^^^^^^^^^^^^^^^^^^^
 
+
+exiting with Leaner elaboration errors

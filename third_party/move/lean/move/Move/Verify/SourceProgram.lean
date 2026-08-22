@@ -17,6 +17,11 @@ their backedge is explicit so each analysis can validate a post-fixpoint.
 
 namespace Move.Verify.Source
 
+/--
+An opaque analysis-site identifier, not a source coordinate. The retained-source
+extractor maps each point to its original `Syntax`, which carries the complete
+source range used for diagnostics.
+-/
 abbrev Point := Nat
 
 inductive Control (Event : Type) where

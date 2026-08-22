@@ -1,9 +1,18 @@
 processed 1 task
 task 0 lines 1-14:  publish [import Move]
 Error: compilation errors:
- 
-Leaner elaboration failed for `TEMPFILE`:
-TEMPFILE:9:25: error: while compiling Move function `LeanerRejectOrdinaryCall.caller`:
-unsupported call `LeanerRejectOrdinaryCall.ordinary_helper` while compiling Move function
-TEMPFILE:9:25: error: cannot evaluate code because 'sorryAx' uses 'sorry' and/or contains errors
+ error: cannot evaluate code because 'sorryAx' uses 'sorry' and/or contains errors
+  ┌─ TEMPFILE:9:26
+  │
+9 │     ordinary_helper value
+  │                          ^
 
+error: while compiling Move function `LeanerRejectOrdinaryCall.caller`:
+unsupported call `LeanerRejectOrdinaryCall.ordinary_helper` while compiling Move function
+  ┌─ TEMPFILE:9:26
+  │
+9 │     ordinary_helper value
+  │                          ^
+
+
+exiting with Leaner elaboration errors

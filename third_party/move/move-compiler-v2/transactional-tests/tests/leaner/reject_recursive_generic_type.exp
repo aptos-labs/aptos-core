@@ -1,8 +1,17 @@
 processed 1 task
 task 0 lines 1-28:  publish [import Move]
 Error: compilation errors:
- 
-Leaner elaboration failed for `TEMPFILE`:
-TEMPFILE:19:39: error: recursive Move type `LeanerTxnRejectRecursiveGenericType.Left` is not supported by the prototype
-TEMPFILE:19:39: error: cannot evaluate code because 'sorryAx' uses 'sorry' and/or contains errors
+ error: cannot evaluate code because 'sorryAx' uses 'sorry' and/or contains errors
+   ┌─ TEMPFILE:19:40
+   │
+19 │ end LeanerTxnRejectRecursiveGenericType
+   │                                        ^
 
+error: recursive Move type `LeanerTxnRejectRecursiveGenericType.Left` is not supported by the prototype
+   ┌─ TEMPFILE:19:40
+   │
+19 │ end LeanerTxnRejectRecursiveGenericType
+   │                                        ^
+
+
+exiting with Leaner elaboration errors

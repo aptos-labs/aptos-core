@@ -10,12 +10,17 @@
 pub(crate) use crate::xir::import_sources;
 use crate::{xir::XirSource, Options};
 use anyhow::{bail, Context, Result};
-use move_command_line_common::files::{extension_equals, find_filenames, LEAN_EXTENSION};
+use codespan::Span;
+use codespan_reporting::diagnostic::Severity;
+use move_command_line_common::files::{extension_equals, find_filenames, FileHash, LEAN_EXTENSION};
+use move_model::model::{GlobalEnv, Loc};
+use serde_json::Value;
 use std::{
     collections::BTreeMap,
     fs,
     path::{Path, PathBuf},
     process::Command,
+    rc::Rc,
     sync::{Condvar, Mutex},
 };
 
@@ -28,6 +33,37 @@ static ACTIVE_LEAN_ELABORATIONS: Mutex<usize> = Mutex::new(0);
 static LEAN_ELABORATION_AVAILABLE: Condvar = Condvar::new();
 
 struct LeanElaborationPermit;
+
+/// A position emitted by `lean --json`.
+///
+/// Lean line numbers are one-based while columns are zero-based Unicode scalar
+/// offsets. Move diagnostics use zero-based UTF-8 byte offsets, so positions
+/// are translated against the exact source passed to Lean.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct LeanPosition {
+    line: usize,
+    column: usize,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+struct LeanDiagnostic {
+    message: String,
+    severity: Severity,
+    start: usize,
+    end: usize,
+}
+
+struct SourceDiagnostics {
+    path: PathBuf,
+    text: String,
+    is_target: bool,
+    diagnostics: Vec<LeanDiagnostic>,
+}
+
+pub(crate) struct LeanElaboration {
+    pub(crate) modules: Vec<XirSource>,
+    source_diagnostics: Vec<SourceDiagnostics>,
+}
 
 impl LeanElaborationPermit {
     fn acquire() -> Self {
@@ -53,6 +89,80 @@ impl Drop for LeanElaborationPermit {
         drop(active);
         LEAN_ELABORATION_AVAILABLE.notify_one();
     }
+}
+
+fn parse_position(value: &Value) -> Option<LeanPosition> {
+    Some(LeanPosition {
+        line: value.get("line")?.as_u64()?.try_into().ok()?,
+        column: value.get("column")?.as_u64()?.try_into().ok()?,
+    })
+}
+
+fn position_to_byte_offset(source: &str, position: LeanPosition) -> Option<usize> {
+    let line = position.line.checked_sub(1)?;
+    let line_start = if line == 0 {
+        0
+    } else {
+        source
+            .match_indices('\n')
+            .nth(line - 1)
+            .map(|(offset, _)| offset + 1)?
+    };
+    let line_text = source[line_start..]
+        .split_once('\n')
+        .map_or_else(|| &source[line_start..], |(line_text, _)| line_text);
+    let column_offset = if position.column == line_text.chars().count() {
+        line_text.len()
+    } else {
+        line_text
+            .char_indices()
+            .nth(position.column)
+            .map(|(offset, _)| offset)?
+    };
+    Some(line_start + column_offset)
+}
+
+fn parse_lean_diagnostics(source: &str, output: &[u8]) -> Vec<LeanDiagnostic> {
+    String::from_utf8_lossy(output)
+        .lines()
+        .filter_map(|line| {
+            let value: Value = serde_json::from_str(line).ok()?;
+            let severity = match value.get("severity")?.as_str()? {
+                "error" => Severity::Error,
+                "warning" => Severity::Warning,
+                // Information messages such as `wrote Leaner XIR` are process
+                // progress, not compiler diagnostics.
+                _ => return None,
+            };
+            let start_position = parse_position(value.get("pos")?)?;
+            let mut end_position = value
+                .get("endPos")
+                .and_then(parse_position)
+                .unwrap_or(start_position);
+            // Match Lean's language-server range policy. Unless explicitly
+            // requested otherwise, a multi-line syntax node highlights only
+            // its first line.
+            if !value
+                .get("keepFullRange")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+                && end_position.line > start_position.line
+            {
+                end_position = LeanPosition {
+                    line: start_position.line + 1,
+                    column: 0,
+                };
+            }
+            let start = position_to_byte_offset(source, start_position)?;
+            let end = position_to_byte_offset(source, end_position)?;
+            Some(LeanDiagnostic {
+                message: value.get("data")?.as_str()?.to_owned(),
+                severity,
+                start,
+                end: end.max(start),
+            })
+        })
+        .collect()
 }
 
 pub(crate) struct LeanSource {
@@ -111,16 +221,31 @@ fn extract_from(
     Ok(())
 }
 
-pub(crate) fn elaborate_sources(sources: &[LeanSource]) -> Result<Vec<XirSource>> {
-    sources
-        .iter()
-        .map(|source| elaborate_source(&source.path, source.is_target))
-        .collect()
+pub(crate) fn elaborate_sources(sources: &[LeanSource]) -> Result<LeanElaboration> {
+    let mut modules = vec![];
+    let mut source_diagnostics = vec![];
+    for source in sources {
+        let (module, diagnostics) = elaborate_source(&source.path, source.is_target)?;
+        if let Some(module) = module {
+            modules.push(module);
+        }
+        if !diagnostics.diagnostics.is_empty() {
+            source_diagnostics.push(diagnostics);
+        }
+    }
+    Ok(LeanElaboration {
+        modules,
+        source_diagnostics,
+    })
 }
 
-fn elaborate_source(source: &str, is_target: bool) -> Result<XirSource> {
+fn elaborate_source(
+    source: &str,
+    is_target: bool,
+) -> Result<(Option<XirSource>, SourceDiagnostics)> {
     let source_path = fs::canonicalize(source)
         .with_context(|| format!("unable to resolve Lean source `{source}`"))?;
+    let source_text = fs::read_to_string(&source_path)?;
     // Keep the output path in a private, randomly named directory. The Lean
     // exporter requires that its output does not already exist, and a unique
     // directory prevents another local user from replacing the emitted XIR
@@ -135,7 +260,7 @@ fn elaborate_source(source: &str, is_target: bool) -> Result<XirSource> {
         .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/move"));
     let _elaboration_permit = LeanElaborationPermit::acquire();
     let output = Command::new("lake")
-        .args(["env", "lean"])
+        .args(["env", "lean", "--json"])
         .arg(&source_path)
         .current_dir(&leaner_root)
         .env("LEANER_XIR_OUTPUT", &xir_path)
@@ -146,13 +271,26 @@ fn elaborate_source(source: &str, is_target: bool) -> Result<XirSource> {
                 source_path.display()
             )
         })?;
+    let diagnostics = SourceDiagnostics {
+        path: source_path.clone(),
+        text: source_text.clone(),
+        is_target,
+        diagnostics: parse_lean_diagnostics(&source_text, &output.stdout),
+    };
     if !output.status.success() {
+        if diagnostics
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.severity == Severity::Error)
+        {
+            return Ok((None, diagnostics));
+        }
         bail!(
-            "Leaner elaboration failed for `{}`:\n{}{}",
+            "Leaner elaboration failed for `{}` without a structured error diagnostic:\n{}{}",
             source_path.display(),
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
-        )
+        );
     }
     let json = fs::read_to_string(&xir_path).with_context(|| {
         format!(
@@ -160,8 +298,30 @@ fn elaborate_source(source: &str, is_target: bool) -> Result<XirSource> {
             source_path.display()
         )
     });
-    let text = fs::read_to_string(&source_path)?;
-    crate::xir::parse_source_with_target(source_path, text, &json?, is_target)
+    let module = crate::xir::parse_source_with_target(source_path, source_text, &json?, is_target)?;
+    Ok((Some(module), diagnostics))
+}
+
+pub(crate) fn add_diagnostics(env: &mut GlobalEnv, elaboration: &LeanElaboration) {
+    for source in &elaboration.source_diagnostics {
+        let file_id = env.add_source(
+            FileHash::new(&source.text),
+            Rc::new(BTreeMap::new()),
+            &source.path.to_string_lossy(),
+            &source.text,
+            source.is_target,
+            source.is_target,
+        );
+        for diagnostic in &source.diagnostics {
+            let start = u32::try_from(diagnostic.start).unwrap_or(u32::MAX);
+            let end = u32::try_from(diagnostic.end).unwrap_or(u32::MAX);
+            env.diag(
+                diagnostic.severity,
+                &Loc::new(file_id, Span::new(start, end)),
+                &diagnostic.message,
+            );
+        }
+    }
 }
 
 #[cfg(test)]
@@ -175,6 +335,36 @@ mod tests {
             .arg("--version")
             .output()
             .is_ok_and(|output| output.status.success())
+    }
+
+    #[test]
+    fn converts_lean_character_positions_to_byte_offsets() {
+        let source = "first\n    let result ← *poisoned\n";
+        assert_eq!(
+            position_to_byte_offset(source, LeanPosition { line: 2, column: 4 }),
+            Some(10)
+        );
+        assert_eq!(
+            position_to_byte_offset(source, LeanPosition {
+                line: 2,
+                column: 26
+            }),
+            Some(34)
+        );
+    }
+
+    #[test]
+    fn parses_lean_json_diagnostics_with_source_ranges() {
+        let source = "fun run := do\n  let result ← *poisoned\n";
+        let output = br#"{"data":"borrow safety error","endPos":{"column":24,"line":2},"keepFullRange":false,"pos":{"column":2,"line":2},"severity":"error"}"#;
+        assert_eq!(parse_lean_diagnostics(source, output), vec![
+            LeanDiagnostic {
+                message: "borrow safety error".to_owned(),
+                severity: Severity::Error,
+                start: 16,
+                end: 40,
+            }
+        ]);
     }
 
     #[test]

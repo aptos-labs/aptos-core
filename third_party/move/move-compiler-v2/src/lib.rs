@@ -99,11 +99,13 @@ where
     // Leaner sources elaborate to versioned XIR in a child Lean process. Keep
     // them out of the Move parser; they join the model after AST transforms.
     let leaner_sources = leaner::extract_sources(&mut options)?;
-    let move_modules = leaner::elaborate_sources(&leaner_sources)?;
+    let leaner_elaboration = leaner::elaborate_sources(&leaner_sources)?;
 
     // Run context check.
     let mut env = run_checker(options.clone())?;
     check_errors(&env, emitter, "context checking errors")?;
+    leaner::add_diagnostics(&mut env, &leaner_elaboration);
+    check_errors(&env, emitter, "Leaner elaboration errors")?;
 
     // Run a AST pipeline of checks and (non-optimization) transforms.
     env_check_and_transform_pipeline(&options).run(&mut env);
@@ -143,9 +145,9 @@ where
     // XIR already is stackless, so import it after all Move-AST transforms.
     // Check it in a separate holder: the regenerated Move targets have already
     // passed this pipeline, and rerunning it would duplicate their diagnostics.
-    if !move_modules.is_empty() {
+    if !leaner_elaboration.modules.is_empty() {
         let mut xir_targets = FunctionTargetsHolder::default();
-        leaner::import_sources(&mut env, &move_modules, &mut xir_targets)?;
+        leaner::import_sources(&mut env, &leaner_elaboration.modules, &mut xir_targets)?;
         run_stackless_bytecode_pipeline(
             &env,
             stackless_bytecode_check_pipeline(&options),

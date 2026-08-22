@@ -1,5 +1,15 @@
 processed 2 tasks
 task 0 lines 1-23:  publish [import Move]
+warning: Variable name `writer` is not explicitly referenced.
+
+The binding can be removed (if unused) or named `_` (if used implicitly).
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+   ┌─ TEMPFILE:13:7
+   │
+13 │       writer := *writer + 2
+   │       ^^^^^^
+
 warning: This assignment/binding to the left-hand-side variable `l10` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_l10`), or renaming to `_`
    ┌─ TEMPFILE:12:5
    │  
