@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    network::{ConsensusMessageSource, NetworkReceivers, NetworkSender},
+    network::{NetworkReceivers, NetworkSender},
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     test_utils::{self, consensus_runtime, placeholder_ledger_info, timed_block_on},
 };
@@ -30,7 +30,7 @@ use aptos_network::{
     },
     ProtocolId,
 };
-use aptos_types::{block_info::BlockInfo, epoch_change::EpochChangeProof, PeerId};
+use aptos_types::{block_info::BlockInfo, PeerId};
 use futures::{channel::mpsc, SinkExt, StreamExt};
 use std::{
     collections::{HashMap, HashSet},
@@ -688,8 +688,6 @@ mod tests {
             test_utils::placeholder_sync_info(),
         );
         let previous_qc = certificate_for_genesis();
-        let epoch_change_proof =
-            EpochChangeProof::new(vec![previous_qc.ledger_info().clone()], false);
         let proposal = ProposalMsg::new(
             Block::new_proposal(
                 Payload::empty(false),
@@ -714,8 +712,7 @@ mod tests {
                 .wait_for_messages(3, NetworkPlayground::take_all)
                 .await;
             for r in receivers.iter_mut().take(5).skip(2) {
-                let (_, msg, source) = r.consensus_messages.next().await.unwrap();
-                assert_eq!(source, ConsensusMessageSource::Network);
+                let (_, msg) = r.consensus_messages.next().await.unwrap();
                 match msg {
                     ConsensusMsg::VoteMsg(v) => assert_eq!(*v, vote_msg),
                     _ => panic!("unexpected messages"),
@@ -725,30 +722,12 @@ mod tests {
             playground
                 .wait_for_messages(4, NetworkPlayground::take_all)
                 .await;
-            for (index, r) in receivers.iter_mut().take(num_nodes - 1).enumerate() {
-                let (_, msg, source) = r.consensus_messages.next().await.unwrap();
-                assert_eq!(
-                    source,
-                    if index == 0 {
-                        ConsensusMessageSource::SelfMessage
-                    } else {
-                        ConsensusMessageSource::Network
-                    }
-                );
+            for r in receivers.iter_mut().take(num_nodes - 1) {
+                let (_, msg) = r.consensus_messages.next().await.unwrap();
                 match msg {
                     ConsensusMsg::ProposalMsg(p) => assert_eq!(*p, proposal),
                     _ => panic!("unexpected messages"),
                 }
-            }
-            nodes[0].send_epoch_change(epoch_change_proof.clone()).await;
-            let (peer, msg, source) = receivers[0].consensus_messages.next().await.unwrap();
-            assert_eq!(peer, peers[0]);
-            assert_eq!(source, ConsensusMessageSource::SelfMessage);
-            match msg {
-                ConsensusMsg::EpochChangeProof(proof) => {
-                    assert_eq!(*proof, epoch_change_proof)
-                },
-                _ => panic!("unexpected message"),
             }
         });
     }

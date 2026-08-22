@@ -30,10 +30,9 @@ use crate::{
     metrics_safety_rules::MetricsSafetyRules,
     monitor,
     network::{
-        ConsensusMessageSource, DeprecatedIncomingBlockRetrievalRequest,
-        IncomingBatchRetrievalRequest, IncomingBlockRetrievalRequest, IncomingDAGRequest,
-        IncomingRandGenRequest, IncomingRpcRequest, IncomingSecretShareRequest, NetworkReceivers,
-        NetworkSender,
+        DeprecatedIncomingBlockRetrievalRequest, IncomingBatchRetrievalRequest,
+        IncomingBlockRetrievalRequest, IncomingDAGRequest, IncomingRandGenRequest,
+        IncomingRpcRequest, IncomingSecretShareRequest, NetworkReceivers, NetworkSender,
     },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     payload_client::{
@@ -1655,7 +1654,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         &mut self,
         peer_id: AccountAddress,
         consensus_msg: ConsensusMsg,
-        source: ConsensusMessageSource,
     ) -> anyhow::Result<()> {
         fail_point!("consensus::process::any", |_| {
             Err(anyhow::anyhow!("Injected error in process_message"))
@@ -1686,7 +1684,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             );
         }
         // we can't verify signatures from a different epoch
-        let maybe_unverified_event = self.check_epoch(peer_id, consensus_msg, source).await?;
+        let maybe_unverified_event = self.check_epoch(peer_id, consensus_msg).await?;
 
         if let Some(unverified_event) = maybe_unverified_event {
             // filter out quorum store messages if quorum store has not been enabled
@@ -1763,7 +1761,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         &mut self,
         peer_id: AccountAddress,
         msg: ConsensusMsg,
-        source: ConsensusMessageSource,
     ) -> anyhow::Result<Option<UnverifiedEvent>> {
         match msg {
             ConsensusMsg::ProposalMsg(_)
@@ -1804,7 +1801,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     // epoch's reconfiguration block. Let the round manager process that certificate
                     // through the normal local commit path. Persistence will send the proof back to
                     // us from self, and only then do we initiate the epoch transition.
-                    let forward_to_round_manager = source == ConsensusMessageSource::Network
+                    let forward_to_round_manager = peer_id != self.author
                         && proof.ledger_info_with_sigs.len() == 1
                         && !self.recovery_mode;
                     if forward_to_round_manager {
@@ -2112,15 +2109,15 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         self.await_reconfig_notification().await;
         loop {
             tokio::select! {
-                (peer, msg, source) = network_receivers.consensus_messages.select_next_some() => {
+                (peer, msg) = network_receivers.consensus_messages.select_next_some() => {
                     monitor!("epoch_manager_process_consensus_messages",
-                    if let Err(e) = self.process_message(peer, msg, source).await {
+                    if let Err(e) = self.process_message(peer, msg).await {
                         error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                     });
                 },
                 (peer, msg) = network_receivers.quorum_store_messages.select_next_some() => {
                     monitor!("epoch_manager_process_quorum_store_messages",
-                    if let Err(e) = self.process_message(peer, msg, ConsensusMessageSource::Network).await {
+                    if let Err(e) = self.process_message(peer, msg).await {
                         error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                     });
                 },
