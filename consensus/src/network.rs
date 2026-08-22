@@ -187,12 +187,22 @@ impl IncomingRpcRequest {
 
 /// Just a convenience struct to keep all the network proxy receiving queues in one place.
 /// Will be returned by the NetworkTask upon startup.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum ConsensusMessageSource {
+    Network,
+    SelfMessage,
+}
+
+pub type ConsensusMessageKey = (
+    AccountAddress,
+    Discriminant<ConsensusMsg>,
+    ConsensusMessageSource,
+);
+pub type IncomingConsensusMessage = (AccountAddress, ConsensusMsg, ConsensusMessageSource);
+
 pub struct NetworkReceivers {
     /// Provide a LIFO buffer for each (Author, MessageType) key
-    pub consensus_messages: aptos_channel::Receiver<
-        (AccountAddress, Discriminant<ConsensusMsg>),
-        (AccountAddress, ConsensusMsg),
-    >,
+    pub consensus_messages: aptos_channel::Receiver<ConsensusMessageKey, IncomingConsensusMessage>,
     pub quorum_store_messages: aptos_channel::Receiver<
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
@@ -732,10 +742,7 @@ impl ProofNotifier for NetworkSender {
 }
 
 pub struct NetworkTask {
-    consensus_messages_tx: aptos_channel::Sender<
-        (AccountAddress, Discriminant<ConsensusMsg>),
-        (AccountAddress, ConsensusMsg),
-    >,
+    consensus_messages_tx: aptos_channel::Sender<ConsensusMessageKey, IncomingConsensusMessage>,
     quorum_store_messages_tx: aptos_channel::Sender<
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
@@ -744,7 +751,8 @@ pub struct NetworkTask {
         (AccountAddress, Discriminant<IncomingRpcRequest>),
         (AccountAddress, IncomingRpcRequest),
     >,
-    all_events: Box<dyn Stream<Item = Event<ConsensusMsg>> + Send + Unpin>,
+    all_events:
+        Box<dyn Stream<Item = (ConsensusMessageSource, Event<ConsensusMsg>)> + Send + Unpin>,
 }
 
 impl NetworkTask {
@@ -777,8 +785,11 @@ impl NetworkTask {
 
         // Collect all the network events into a single stream
         let network_events: Vec<_> = network_and_events.into_values().collect();
-        let network_events = select_all(network_events).fuse();
-        let all_events = Box::new(select(network_events, self_receiver));
+        let network_events = select_all(network_events)
+            .map(|event| (ConsensusMessageSource::Network, event))
+            .fuse();
+        let self_events = self_receiver.map(|event| (ConsensusMessageSource::SelfMessage, event));
+        let all_events = Box::new(select(network_events, self_events));
 
         (
             NetworkTask {
@@ -811,8 +822,25 @@ impl NetworkTask {
         }
     }
 
+    fn push_consensus_msg(
+        peer_id: AccountAddress,
+        msg: ConsensusMsg,
+        source: ConsensusMessageSource,
+        tx: &aptos_channel::Sender<ConsensusMessageKey, IncomingConsensusMessage>,
+    ) {
+        if let Err(e) = tx.push(
+            (peer_id, discriminant(&msg), source),
+            (peer_id, msg, source),
+        ) {
+            warn!(
+                remote_peer = peer_id,
+                error = ?e, "Error pushing consensus msg",
+            );
+        }
+    }
+
     pub async fn start(mut self) {
-        while let Some(message) = self.all_events.next().await {
+        while let Some((source, message)) = self.all_events.next().await {
             monitor!("network_main_loop", match message {
                 Event::Message(peer_id, msg) => {
                     counters::CONSENSUS_RECEIVED_MSGS
@@ -899,7 +927,12 @@ impl NetworkTask {
                                     block_round = proposal.round(),
                                 );
                             }
-                            Self::push_msg(peer_id, consensus_msg, &self.consensus_messages_tx);
+                            Self::push_consensus_msg(
+                                peer_id,
+                                consensus_msg,
+                                source,
+                                &self.consensus_messages_tx,
+                            );
                         },
                         // TODO: get rid of the rpc dummy value
                         ConsensusMsg::RandGenMessage(req) => {
