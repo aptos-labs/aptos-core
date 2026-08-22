@@ -23,18 +23,32 @@ module Arithmetic where
     aborts_if ¬left.toNat + right.toNat < U64.size
       with Semantics.Checked.arithmeticAbortCode
 
-  fun explicit_add (left right : U64) : Action U64 :=
-    pure (Move.UInt.add left right)
+  fun subtract_values (left right : U64) : Action U64 :=
+    pure (left - right)
 
-  spec explicit_add (left : U64) (right : U64) where
+  spec subtract_values (left : U64) (right : U64) where
     ensures True;
-    aborts_if ¬left.toNat + right.toNat < U64.size
+    aborts_if left.toNat < right.toNat with Semantics.Checked.arithmeticAbortCode
+
+  fun multiply_values (left right : U64) : Action U64 :=
+    pure (left * right)
+
+  spec multiply_values (left : U64) (right : U64) where
+    ensures True;
+    aborts_if ¬left.toNat * right.toNat < U64.size
       with Semantics.Checked.arithmeticAbortCode
 
-  fun explicit_div (left right : U64) : Action U64 :=
-    pure (Move.UInt.div left right)
+  fun divide_values (left right : U64) : Action U64 :=
+    pure (left / right)
 
-  spec explicit_div (left : U64) (right : U64) where
+  spec divide_values (left : U64) (right : U64) where
+    ensures True;
+    aborts_if right.toNat = 0 with Semantics.Checked.arithmeticAbortCode
+
+  fun modulo_values (left right : U64) : Action U64 :=
+    pure (left % right)
+
+  spec modulo_values (left : U64) (right : U64) where
     ensures True;
     aborts_if right.toNat = 0 with Semantics.Checked.arithmeticAbortCode
 
@@ -107,9 +121,13 @@ module Arithmetic where
 
   verify add_values
 
-  verify explicit_add
+  verify subtract_values
 
-  verify explicit_div
+  verify multiply_values
+
+  verify divide_values
+
+  verify modulo_values
 
   verify at_most
 
@@ -137,11 +155,27 @@ module Arithmetic where
   private def run := Tests.run compiled
 
   #test run "add_values" [] [.u64 6, .u64 7] = Tests.okU64 13
+  #test run "add_values" [] [.u64 0, .u64 0] = Tests.okU64 0
+  #test run "add_values" [] [.u64 18446744073709551615, .u64 0]
+    = Tests.okU64 18446744073709551615
   #test run "add_values" [] [.u64 18446744073709551615, .u64 1] = Tests.aborted 0
-  #test run "explicit_add" [] [.u64 6, .u64 7] = Tests.okU64 13
-  #test run "explicit_add" [] [.u64 18446744073709551615, .u64 1] = Tests.aborted 0
-  #test run "explicit_div" [] [.u64 17, .u64 5] = Tests.okU64 3
-  #test run "explicit_div" [] [.u64 17, .u64 0] = Tests.aborted 0
+  #test run "subtract_values" [] [.u64 17, .u64 5] = Tests.okU64 12
+  #test run "subtract_values" [] [.u64 0, .u64 0] = Tests.okU64 0
+  #test run "subtract_values" [] [.u64 5, .u64 17] = Tests.aborted 0
+  #test run "multiply_values" [] [.u64 6, .u64 7] = Tests.okU64 42
+  #test run "multiply_values" [] [.u64 18446744073709551615, .u64 1]
+    = Tests.okU64 18446744073709551615
+  #test run "multiply_values" [] [.u64 0, .u64 18446744073709551615] = Tests.okU64 0
+  #test run "multiply_values" [] [.u64 18446744073709551615, .u64 2] = Tests.aborted 0
+  #test run "divide_values" [] [.u64 17, .u64 5] = Tests.okU64 3
+  #test run "divide_values" [] [.u64 0, .u64 7] = Tests.okU64 0
+  #test run "divide_values" [] [.u64 18446744073709551615, .u64 1]
+    = Tests.okU64 18446744073709551615
+  #test run "divide_values" [] [.u64 17, .u64 0] = Tests.aborted 0
+  #test run "modulo_values" [] [.u64 17, .u64 5] = Tests.okU64 2
+  #test run "modulo_values" [] [.u64 17, .u64 20] = Tests.okU64 17
+  #test run "modulo_values" [] [.u64 18446744073709551615, .u64 2] = Tests.okU64 1
+  #test run "modulo_values" [] [.u64 17, .u64 0] = Tests.aborted 0
   #test run "at_most" [] [.u64 2, .u64 2] = Tests.okU64 1
   #test run "at_most" [] [.u64 3, .u64 2] = Tests.okU64 0
   #test run "exceeds" [] [.u64 3, .u64 2] = Tests.okU64 1
@@ -154,10 +188,18 @@ module Arithmetic where
   #test run "is_less" [] [.u64 2, .u64 2] = Tests.okBool false
   #test run "multiply" (memory 2 6) [.address 2, .u64 7]
     = Tests.okRet (memory 2 42) []
+  #test run "multiply" (memory 2 18446744073709551615) [.address 2, .u64 1]
+    = Tests.okRet (memory 2 18446744073709551615) []
+  #test run "multiply" (memory 2 18446744073709551615) [.address 2, .u64 0]
+    = Tests.okRet (memory 2 0) []
   #test run "multiply" (memory 2 18446744073709551615) [.address 2, .u64 2]
     = Tests.abortedIn (memory 2 18446744073709551615) 0
   #test run "divide" (memory 2 17) [.address 2, .u64 5]
     = Tests.okRet (memory 2 3) []
+  #test run "divide" (memory 2 0) [.address 2, .u64 7]
+    = Tests.okRet (memory 2 0) []
+  #test run "divide" (memory 2 18446744073709551615) [.address 2, .u64 1]
+    = Tests.okRet (memory 2 18446744073709551615) []
   #test run "divide" (memory 2 17) [.address 2, .u64 0]
     = Tests.abortedIn (memory 2 17) 0
   #test run "divide" [] [.address 2, .u64 1] = Tests.aborted 0
