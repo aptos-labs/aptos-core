@@ -55,7 +55,7 @@ fun shadowed_mutable_reference : Action U64 := do
   pure output
 
 /--
-error: automatic source specifications do not support shadowing a live mutable reference
+error: automatic source specifications do not support shadowing a mutable-reference local
 -/
 #guard_msgs in
 spec shadowed_mutable_reference where
@@ -71,7 +71,7 @@ fun shadowed_reference_initializer : Action U64 := do
   pure output
 
 /--
-error: automatic source specifications do not support shadowing a live mutable reference
+error: automatic source specifications do not support shadowing a mutable-reference local
 -/
 #guard_msgs in
 spec shadowed_reference_initializer where

@@ -1523,8 +1523,7 @@ private partial def firstDoIdentifier? (stx : Syntax) : Option Name :=
   if stx.isIdent then some stx.getId
   else stx.getArgs.findSome? firstDoIdentifier?
 
-private def doElementBinds (name : Name) (element : Lean.DoElem) : Bool :=
-  let stx := element.raw
+private def doSyntaxBinds (name : Name) (stx : Syntax) : Bool :=
   if !(stx.isOfKind ``Lean.Parser.Term.doLet ||
       stx.isOfKind ``Lean.Parser.Term.doLetArrow) || stx.getNumArgs ≤ 3 then
     false
@@ -1536,40 +1535,18 @@ private def doElementBinds (name : Name) (element : Lean.DoElem) : Bool :=
     else
       firstDoIdentifier? declaration == some name
 
-/-- A binding's initializer is evaluated before it shadows the preceding
-local.  Inspect only that initializer, not the declaration as a whole (which
-would count the new binder itself as a use). -/
-private def doBindingUses (name : Name) (element : Lean.DoElem) : Bool :=
-  let stx := element.raw
-  if !(stx.isOfKind ``Lean.Parser.Term.doLet ||
-      stx.isOfKind ``Lean.Parser.Term.doLetArrow) || stx.getNumArgs ≤ 3 then
-    false
-  else
-    let declaration := stx[3]
-    let declaration :=
-      if declaration.getNumArgs == 1 then declaration[0]! else declaration
-    declaration.getNumArgs > 0 &&
-      containsIdentifier name declaration[declaration.getNumArgs - 1]!
+private partial def containsDoBinding (name : Name) (stx : Syntax) : Bool :=
+  doSyntaxBinds name stx || stx.getArgs.any (containsDoBinding name)
 
-/-- A re-binding of a live mutable-reference name cannot be represented by
-the current source-spec prophecy encoding.  In particular, textual-use
-tracking would otherwise mistake uses of the new local for uses of the old
-loan and refresh the owner from the wrong value.  Refuse that source form
-until the encoding carries alpha-renamed local identities. -/
+/-- Reusing a mutable-reference name cannot be represented by the current
+source-spec prophecy encoding.  Retained syntax has no alpha-renamed local
+identity, so textual use tracking could otherwise mistake a later binding or
+its initializer for the original loan. Refuse every later same-named `do`
+binder (including a nested or pattern binder) until the encoding carries
+alpha-renamed local identities. -/
 private def mutableBorrowShadowing? (name : Name) (elements : Array Lean.DoElem) :
     Option Lean.DoElem :=
-  let rec go (used : Bool) : List Lean.DoElem → Option Lean.DoElem
-    | [] => none
-    | element :: rest =>
-        if doElementBinds name element then
-          -- The initializer still sees the old binding.  Once this new
-          -- binding is in scope, the old reference is no longer visible, so
-          -- an unused rebind ends the scan rather than contaminating a later
-          -- same-named local.
-          if used || doBindingUses name element then some element else none
-        else
-          go (used || containsIdentifier name element.raw) rest
-  go false elements.toList
+  elements.find? (containsDoBinding name ·.raw)
 
 private partial def closeBorrowScope (elements : Array Lean.DoElem)
     (size : Nat) : Nat :=
@@ -1592,7 +1569,7 @@ private def mutableBorrowScope (name : Name) (elements : Array Lean.DoElem) :
     CommandElabM (Array Lean.DoElem × Array Lean.DoElem) := do
   if let some shadow := mutableBorrowShadowing? name elements then
     throwErrorAt shadow
-      "automatic source specifications do not support shadowing a live mutable reference"
+      "automatic source specifications do not support shadowing a mutable-reference local"
   let lastUse := elements.zipIdx.foldl (init := none) fun result (element, index) =>
     if containsIdentifier name element.raw then some index else result
   let size := closeBorrowScope elements (lastUse.map (· + 1) |>.getD 0)
