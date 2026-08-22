@@ -122,6 +122,62 @@ fn position_to_byte_offset(source: &str, position: LeanPosition) -> Option<usize
     Some(line_start + column_offset)
 }
 
+fn source_mentions_name(source: &str, name: &str) -> bool {
+    source
+        .split(|character: char| {
+            !(character.is_alphanumeric() || character == '_' || character == '\'')
+        })
+        .any(|word| word == name)
+}
+
+fn is_internal_lean_name(name: &str) -> bool {
+    if name == "sorryAx" || name.starts_with("Lean.Name.anonymous.") {
+        return true;
+    }
+    let final_component = name.rsplit('.').next().unwrap_or(name);
+    final_component.starts_with("_move")
+        || final_component.starts_with("_leaner")
+        || final_component.starts_with('$')
+}
+
+/// Remove implementation-generated identifiers from diagnostics at the
+/// common Leaner boundary. User-authored identifiers with the same spelling
+/// remain printable when they occur in the source.
+fn sanitize_lean_diagnostic_message(source: &str, message: &str) -> String {
+    let message = message.replace("'sorryAx'", "an unresolved expression");
+    let mut sanitized = String::with_capacity(message.len());
+    let mut remaining = message.as_str();
+    while let Some(open) = remaining.find('`') {
+        sanitized.push_str(&remaining[..open]);
+        let after_open = &remaining[open + 1..];
+        let Some(close) = after_open.find('`') else {
+            sanitized.push_str(&remaining[open..]);
+            return sanitized;
+        };
+        let name = &after_open[..close];
+        let after_name = &after_open[close + 1..];
+        if is_internal_lean_name(name) && !source_mentions_name(source, name) {
+            const CONFLICT_PREFIX: &str = " (conflicts with ";
+            if sanitized.ends_with(CONFLICT_PREFIX) && after_name.starts_with(')') {
+                sanitized.truncate(sanitized.len() - CONFLICT_PREFIX.len());
+                remaining = &after_name[1..];
+            } else {
+                if sanitized.ends_with(' ') {
+                    sanitized.pop();
+                }
+                remaining = after_name;
+            }
+        } else {
+            sanitized.push('`');
+            sanitized.push_str(name);
+            sanitized.push('`');
+            remaining = after_name;
+        }
+    }
+    sanitized.push_str(remaining);
+    sanitized
+}
+
 fn parse_lean_diagnostics(source: &str, output: &[u8]) -> Vec<LeanDiagnostic> {
     String::from_utf8_lossy(output)
         .lines()
@@ -156,7 +212,7 @@ fn parse_lean_diagnostics(source: &str, output: &[u8]) -> Vec<LeanDiagnostic> {
             let start = position_to_byte_offset(source, start_position)?;
             let end = position_to_byte_offset(source, end_position)?;
             Some(LeanDiagnostic {
-                message: value.get("data")?.as_str()?.to_owned(),
+                message: sanitize_lean_diagnostic_message(source, value.get("data")?.as_str()?),
                 severity,
                 start,
                 end: end.max(start),
@@ -365,6 +421,52 @@ mod tests {
                 end: 40,
             }
         ]);
+    }
+
+    #[test]
+    fn lean_diagnostics_hide_internal_names() {
+        assert_eq!(
+            sanitize_lean_diagnostic_message(
+                "fun run (address : Address) := &Counter[address].value",
+                "borrow safety error `_moveBorrowReturn0`: a returned reference must derive"
+            ),
+            "borrow safety error: a returned reference must derive"
+        );
+        assert_eq!(
+            sanitize_lean_diagnostic_message(
+                "fun run := pure 0",
+                "borrow safety error `victim`: poisoned (conflicts with `_moveBorrowReturn1`)"
+            ),
+            "borrow safety error `victim`: poisoned"
+        );
+        assert_eq!(
+            sanitize_lean_diagnostic_message(
+                "fun run (_moveUser : U64) := _moveUser",
+                "invalid local `_moveUser`"
+            ),
+            "invalid local `_moveUser`"
+        );
+        assert_eq!(
+            sanitize_lean_diagnostic_message(
+                "fun run (_moveUser' : U64) := _moveUser'",
+                "invalid local `_moveUser'`"
+            ),
+            "invalid local `_moveUser'`"
+        );
+        assert_eq!(
+            sanitize_lean_diagnostic_message(
+                "fun run := pure 0",
+                "invalid local `Move.Generated._leanerVectorRef0`"
+            ),
+            "invalid local"
+        );
+        assert_eq!(
+            sanitize_lean_diagnostic_message(
+                "fun run := pure 0",
+                "cannot evaluate code because 'sorryAx' uses 'sorry' and/or contains errors"
+            ),
+            "cannot evaluate code because an unresolved expression uses 'sorry' and/or contains errors"
+        );
     }
 
     #[test]

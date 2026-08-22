@@ -876,7 +876,11 @@ fn translate_function(
         .map(|id| struct_at(struct_ids, *id, &decl.name))
         .collect::<Result<Vec<_>>>()?;
     let mut used_local_names = BTreeSet::new();
-    let local_names = (0..translator.local_types.len())
+    // Every local needs a stable unique name for internal lookup, but only
+    // source-provided names may be shown in diagnostics. In particular, do not
+    // put generated `_lN` names in `FunctionData::local_names`: compiler-v2
+    // deliberately treats absence from that map as an anonymous value.
+    let all_local_names = (0..translator.local_types.len())
         .map(|index| {
             let preferred = decl
                 .local_names
@@ -899,9 +903,18 @@ fn translate_function(
             (index, env.symbol_pool().make(&unique))
         })
         .collect::<BTreeMap<_, _>>();
-    let name_to_index = local_names
+    let name_to_index = all_local_names
         .iter()
         .map(|(index, name)| (*name, *index))
+        .collect();
+    let local_names = decl
+        .local_names
+        .iter()
+        .enumerate()
+        .filter_map(|(index, name)| {
+            name.as_deref()
+                .map(|name| (index, env.symbol_pool().make(name)))
+        })
         .collect();
     Ok(TargetFunctionData::new(
         &func_env,
@@ -2355,13 +2368,12 @@ mod tests {
                 .to_string(),
             "owner"
         );
-        assert_eq!(
-            target
-                .get_local_name(1)
-                .display(target.symbol_pool())
-                .to_string(),
-            "_l1"
-        );
+        assert_eq!(target.get_local_name_opt(0).as_deref(), Some("owner"));
+        assert_eq!(target.get_local_name_opt(1), None);
+        assert_eq!(target.get_local_name_for_error_message(0), "local `owner`");
+        assert_eq!(target.get_local_name_for_error_message(1), "value");
+        let internal_name = target.symbol_pool().make("_l1");
+        assert_eq!(target.get_local_index(internal_name), Some(1));
         let code = target.get_bytecode();
         assert_eq!(
             target.get_bytecode_loc(code[0].get_attr_id()).span(),

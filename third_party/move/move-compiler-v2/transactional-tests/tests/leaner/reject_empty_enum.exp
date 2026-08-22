@@ -7,7 +7,7 @@ Error: compilation errors:
 12 │ end LeanerTxnRejectEmptyEnum
    │                             ^
 
-error: cannot evaluate code because 'sorryAx' uses 'sorry' and/or contains errors
+error: cannot evaluate code because an unresolved expression uses 'sorry' and/or contains errors
    ┌─ TEMPFILE:12:29
    │
 12 │ end LeanerTxnRejectEmptyEnum

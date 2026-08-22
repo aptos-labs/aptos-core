@@ -8,7 +8,7 @@ Error: compilation errors:
 8 │ │ inductive Indexed : Bool → Type where
   │ ╰^
 
-error: cannot evaluate code because 'sorryAx' uses 'sorry' and/or contains errors
+error: cannot evaluate code because an unresolved expression uses 'sorry' and/or contains errors
    ┌─ TEMPFILE:14:31
    │
 14 │ end LeanerTxnRejectIndexedEnum

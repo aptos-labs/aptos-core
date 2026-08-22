@@ -1,7 +1,7 @@
 processed 1 task
 task 0 lines 1-22:  publish [import Move]
 Error: compilation errors:
- error: cannot evaluate code because 'sorryAx' uses 'sorry' and/or contains errors
+ error: cannot evaluate code because an unresolved expression uses 'sorry' and/or contains errors
    ┌─ TEMPFILE:14:33
    │
 14 │ end LeanerTxnRejectRecursiveEnum
