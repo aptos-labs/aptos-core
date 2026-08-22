@@ -310,6 +310,14 @@ first_version: u64
 last_version: u64
 ```
 
+Per-function totals are complete. Caller identities are transaction-controlled,
+so detailed immediate-call paths use a global row limit. Root entry attribution
+is collected separately with a row limit per callee; this prevents high-cardinality
+traffic to one popular function from hiding which entry function reached an
+otherwise rare framework function. Reports expose both limits and all dropped
+counts. The HTML distinguishes an unobserved function from an observed function
+whose detailed attribution was truncated.
+
 Type arguments are not part of the key. They would create high cardinality and
 are not needed to decide whether a generic function is used.
 
@@ -321,7 +329,8 @@ Each shard contains:
 - ledger timestamps for the first and last version in the range
 - the target module list and complete function inventory
 - processed ledger transaction and user-transaction usage record counts
-- exact per-function and per-call-path aggregates
+- exact per-function aggregates, bounded per-function root-entry attribution,
+  and bounded immediate-call-path aggregates
 
 Each shard is named deterministically by its exact range. Retrying a range
 overwrites its previous object, preventing retry double-counting.
@@ -433,8 +442,9 @@ The merge step rejects:
 The final private report contains:
 
 - `framework-usage.html`: self-contained interactive deprecation evidence view
-- `framework-usage.json`: complete per-function and immediate/root caller
-  aggregates plus run metadata; this is the canonical machine-readable report
+- `framework-usage.json`: complete per-function totals, bounded root-entry and
+  immediate-caller aggregates, truncation metadata, and run metadata; this is
+  the canonical machine-readable report
 
 The workflow publishes both the self-contained HTML and merged JSON under a
 path unique to the workflow run and retry attempt on the private GitHub Pages

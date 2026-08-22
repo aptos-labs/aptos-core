@@ -1534,6 +1534,55 @@ def merge_usage_rows(
     return dropped_invocation_count, dropped_transaction_count
 
 
+def merge_usage_rows_per_group(
+    aggregate_rows: dict[str, dict],
+    rows: list[dict],
+    group_field: str,
+    max_rows_per_group: int,
+) -> tuple[int, int]:
+    rows_per_group = Counter(
+        json.dumps(row[group_field], sort_keys=True, separators=(",", ":"))
+        for row in aggregate_rows.values()
+    )
+    count_fields = {
+        "invocation_count",
+        "transaction_count",
+        "first_version",
+        "last_version",
+    }
+    dropped_invocation_count = 0
+    dropped_transaction_count = 0
+    for row in rows:
+        key = {name: value for name, value in row.items() if name not in count_fields}
+        encoded_key = json.dumps(key, sort_keys=True, separators=(",", ":"))
+        if encoded_key not in aggregate_rows:
+            encoded_group = json.dumps(
+                row[group_field], sort_keys=True, separators=(",", ":")
+            )
+            if rows_per_group[encoded_group] >= max_rows_per_group:
+                dropped_invocation_count += row["invocation_count"]
+                dropped_transaction_count += row["transaction_count"]
+                continue
+            rows_per_group[encoded_group] += 1
+            aggregate_rows[encoded_key] = {
+                **key,
+                "invocation_count": 0,
+                "transaction_count": 0,
+                "first_version": row["first_version"],
+                "last_version": row["last_version"],
+            }
+        aggregate = aggregate_rows[encoded_key]
+        aggregate["invocation_count"] += row["invocation_count"]
+        aggregate["transaction_count"] += row["transaction_count"]
+        aggregate["first_version"] = min(
+            aggregate["first_version"], row["first_version"]
+        )
+        aggregate["last_version"] = max(
+            aggregate["last_version"], row["last_version"]
+        )
+    return dropped_invocation_count, dropped_transaction_count
+
+
 def shard_start_version(source: str) -> int:
     file_name = os.path.basename(source)
     try:
@@ -1612,10 +1661,14 @@ def merge_framework_usage_reports(
     usage_detail_truncated = False
     dropped_usage_invocation_count = 0
     dropped_usage_transaction_count = 0
+    root_function_usage_truncated = False
+    dropped_root_function_usage_invocation_count = 0
+    dropped_root_function_usage_transaction_count = 0
     active_entry_function_callers_truncated = False
     dropped_active_entry_function_framework_invocation_count = 0
     dropped_active_entry_function_transaction_count = 0
     function_usage: dict[str, dict] = {}
+    root_function_usage: dict[str, dict] = {}
     usage: dict[str, dict] = {}
     active_entry_function_callers: dict[str, dict] = {}
     for shard_source in sources:
@@ -1635,6 +1688,7 @@ def merge_framework_usage_reports(
                 "target_modules",
                 "functions",
                 "usage_detail_row_limit",
+                "root_function_row_limit_per_function",
                 "active_entry_function_caller_row_limit",
             ):
                 if report[field] != reference[field]:
@@ -1663,6 +1717,13 @@ def merge_framework_usage_reports(
         usage_detail_truncated |= report["usage_detail_truncated"]
         dropped_usage_invocation_count += report["dropped_usage_invocation_count"]
         dropped_usage_transaction_count += report["dropped_usage_transaction_count"]
+        root_function_usage_truncated |= report["root_function_usage_truncated"]
+        dropped_root_function_usage_invocation_count += report[
+            "dropped_root_function_usage_invocation_count"
+        ]
+        dropped_root_function_usage_transaction_count += report[
+            "dropped_root_function_usage_transaction_count"
+        ]
         active_entry_function_callers_truncated |= report[
             "active_entry_function_callers_truncated"
         ]
@@ -1673,6 +1734,15 @@ def merge_framework_usage_reports(
             "dropped_active_entry_function_transaction_count"
         ]
         merge_usage_rows(function_usage, report["function_usage"])
+        dropped_invocations, dropped_transactions = merge_usage_rows_per_group(
+            root_function_usage,
+            report["root_function_usage"],
+            group_field="callee",
+            max_rows_per_group=reference["root_function_row_limit_per_function"],
+        )
+        dropped_root_function_usage_invocation_count += dropped_invocations
+        dropped_root_function_usage_transaction_count += dropped_transactions
+        root_function_usage_truncated |= dropped_invocations > 0
         dropped_invocations, dropped_transactions = merge_usage_rows(
             usage,
             report["usage"],
@@ -1714,6 +1784,16 @@ def merge_framework_usage_reports(
         "usage_detail_truncated": usage_detail_truncated,
         "dropped_usage_invocation_count": dropped_usage_invocation_count,
         "dropped_usage_transaction_count": dropped_usage_transaction_count,
+        "root_function_row_limit_per_function": reference[
+            "root_function_row_limit_per_function"
+        ],
+        "root_function_usage_truncated": root_function_usage_truncated,
+        "dropped_root_function_usage_invocation_count": (
+            dropped_root_function_usage_invocation_count
+        ),
+        "dropped_root_function_usage_transaction_count": (
+            dropped_root_function_usage_transaction_count
+        ),
         "active_entry_function_caller_row_limit": reference[
             "active_entry_function_caller_row_limit"
         ],
@@ -1733,6 +1813,9 @@ def merge_framework_usage_reports(
         "gcs_prefix": f"gs://{bucket_name}/{prefix}/" if bucket_name else None,
         "functions": reference["functions"],
         "function_usage": [function_usage[key] for key in sorted(function_usage)],
+        "root_function_usage": [
+            root_function_usage[key] for key in sorted(root_function_usage)
+        ],
         "usage": [usage[key] for key in sorted(usage)],
         "active_entry_function_callers": [
             active_entry_function_callers[key]
