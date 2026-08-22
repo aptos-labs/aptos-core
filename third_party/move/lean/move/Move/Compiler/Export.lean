@@ -453,7 +453,7 @@ macro_rules
         pure modifiers
       else
         prependDeclarationAttribute `move_fun modifiers
-      let (modifiers, sourceRegistration?) ← match value with
+      let modifiers ← match value with
         | `(declVal| := $body:term) =>
             let (_, type?) := Lean.Elab.expandOptDeclSig signature.raw
             match type? with
@@ -463,22 +463,16 @@ macro_rules
                 let sourceOffset : TSyntax `num := ⟨Syntax.mkNumLit <| toString <|
                   body.raw.getPos?.map (·.byteIdx) |>.getD 0⟩
                 let encodedBody : TSyntax `str := ⟨Syntax.mkStrLit sourceBody⟩
-                let sourceAttributeName :=
-                  mkIdent Move.Verify.Source.retainedMoveSourceAttributeName
                 let sourceAttribute ← `(Lean.Parser.Term.attrInstance|
-                  $sourceAttributeName:ident)
+                  move_source ($resultType, $sourceOffset, $encodedBody))
                 let existing : TSyntax ``Lean.Parser.Term.attributes :=
                   ⟨modifiers.raw[1][0]⟩
                 let `(attributes|@[$attrs,*]) := existing
                   | Macro.throwErrorAt existing.raw "invalid declaration attributes"
                 let attributes ← `(attributes|@[$sourceAttribute, $attrs,*])
-                let modifiers := ⟨modifiers.raw.setArg 1 (mkNullNode #[attributes.raw])⟩
-                let name : TSyntax `ident := ⟨declName.raw⟩
-                let registration ← `(command| #register_retained_move_source $name
-                  ($resultType, $sourceOffset, $encodedBody))
-                pure (modifiers, some registration)
-            | none => pure (modifiers, none)
-        | _ => pure (modifiers, none)
+                pure ⟨modifiers.raw.setArg 1 (mkNullNode #[attributes.raw])⟩
+            | none => pure modifiers
+        | _ => pure modifiers
       let value ← match value with
         | `(declVal| := $body:term) =>
             match body with
@@ -503,11 +497,8 @@ macro_rules
                   `(declVal| := Id.run do $seq)
             | _ => pure value
         | _ => pure value
-      let declaration ← `($modifiers:declModifiers def $declName:declId
+      `($modifiers:declModifiers def $declName:declId
         $signature:optDeclSig $value:declVal)
-      match sourceRegistration? with
-      | some registration => pure <| mkNullNode #[registration.raw, declaration.raw]
-      | none => pure declaration
 
 private partial def expandLeanerCommandAliases (stx : Syntax) : Syntax :=
   if stx.isOfKind ``Lean.Parser.Command.declaration then

@@ -291,54 +291,8 @@ private initialize declarations :
         (fun map (name, declaration) => map.insert name declaration) {} entries
   }
 
-/-- Compiler-macro payloads awaiting attachment to the following generated
-declaration.  The public command which fills this table is harmless on its
-own; only the private handoff attribute below can consume an entry. -/
-private structure RetainedSourcePayload where
-  resultType : Syntax
-  offset : Nat
-  source : String
-
-private initialize retainedSourcePayloads :
-    SimplePersistentEnvExtension (Name × RetainedSourcePayload)
-      (NameMap RetainedSourcePayload) ←
-  registerSimplePersistentEnvExtension {
-    addEntryFn := fun map (name, payload) => map.insert name payload
-    addImportedFn := fun entries =>
-      mkStateFromImportedEntries
-        (fun map (name, payload) => map.insert name payload) {} entries
-  }
-
-/- Parse the former public spelling so users receive the diagnostic registered
-below instead of a parser error.  The actual compiler handoff uses the private
-attribute name and the generic attribute parser. -/
 syntax (name := move_source)
   "move_source" "(" term ", " num ", " str ")" : attr
-
-/-- Internal command emitted by the `fun` macro before the declaration whose
-source it records.  The private attribute is the capability which binds this
-payload to that declaration. -/
-syntax (name := registerRetainedMoveSource)
-  "#register_retained_move_source " ident " (" term ", " num ", " str ")" : command
-
-@[command_elab registerRetainedMoveSource] def elabRegisterRetainedMoveSource : CommandElab := fun stx => do
-  let `(command| #register_retained_move_source $name:ident
-      ($resultType:term, $offset:num, $encoded:str)) := stx
-    | throwErrorAt stx "invalid retained Move source"
-  let some offset := offset.raw.isNatLit?
-    | throwErrorAt offset "expected retained Move source offset"
-  let some source := encoded.raw.isStrLit?
-    | throwErrorAt encoded "expected encoded Move source"
-  let name := (← getCurrNamespace) ++ name.getId
-  modifyEnv fun env => retainedSourcePayloads.addEntry env
-    (name, { resultType := resultType.raw, offset, source })
-
-/-- The private attribute used by the `fun` macro to hand its retained body to
-source-specification generation.  It is deliberately not a user-facing
-attribute: accepting an authored retained body would let `verify` reason about
-different code from the declaration that the compiler lowers. -/
-def retainedMoveSourceAttributeName : Name :=
-  Lean.mkPrivateNameCore `Move.Verify.Syntax `Move.Verify.Source.move_source
 
 /-- Replace the source preceding a retained body with byte-for-byte whitespace.
 Parsing the padded body then recreates its original raw positions without
@@ -350,28 +304,26 @@ private def retainedSourcePrefix (source : String) (length : Nat) : String :=
   String.fromUTF8! ⟨whitespace⟩
 
 initialize moveSourceAttr : Unit ← Lean.registerBuiltinAttribute {
-  name := retainedMoveSourceAttributeName
+  name := Name.mkSimple "move_source"
   descr := "retained Move source for relational specification generation"
   add := fun declarationName stx _ => do
-    let some payload := retainedSourcePayloads.getState (← getEnv) |>.find? declarationName
-      | throwErrorAt stx "missing compiler-generated retained Move source"
+    match stx.getHeadInfo with
+    | .synthetic .. => pure ()
+    | _ => throwErrorAt stx "`move_source` is compiler-internal; use `fun` to retain a source body"
+    let `(attr| move_source ($resultType:term, $offset:num, $encoded:str)) := stx
+      | throwErrorAt stx "invalid retained Move source"
+    let some offset := offset.raw.isNatLit?
+      | throwErrorAt offset "expected retained Move source offset"
+    let some source := encoded.raw.isStrLit?
+      | throwErrorAt encoded "expected encoded Move source"
     let fileMap ← getFileMap
-    let input := retainedSourcePrefix fileMap.source payload.offset ++ payload.source
+    let input := retainedSourcePrefix fileMap.source offset ++ source
     let value ← match Lean.Parser.runParserCategory (← getEnv) `term input (← getFileName) with
       | .ok value => pure value
-      | .error message => throwErrorAt stx
-          "failed to restore retained Move source: {message}\n{payload.source}"
-    let declaration := { resultType := payload.resultType, value }
+      | .error message => throwErrorAt encoded
+          "failed to restore retained Move source: {message}\n{source}"
+    let declaration := { resultType := resultType.raw, value }
     modifyEnv fun env => declarations.addEntry env (declarationName, declaration)
-}
-
-/-- `move_source` used to be the macro handoff attribute.  Keep the public
-spelling only to explain that it cannot be authored directly. -/
-initialize rejectedMoveSourceAttr : Unit ← Lean.registerBuiltinAttribute {
-  name := `move_source
-  descr := "reserved compiler-internal attribute"
-  add := fun _ stx _ =>
-    throwErrorAt stx "`move_source` is compiler-internal; use `fun` to retain a source body"
 }
 
 private def declarationFor (function : Syntax) : CommandElabM Declaration := do
