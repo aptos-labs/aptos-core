@@ -275,9 +275,14 @@ function renderFunctions() {
     const invocations = module.functions.reduce((total, f) => total + f.invocations, 0);
     const collapsed = collapsedModules.has(moduleId);
     const summary = `${nf.format(observed)} of ${nf.format(module.functions.length)} functions observed · ${nf.format(candidates)} candidates · ${nf.format(invocations)} invocations`;
-    const moduleStatus = !module.functions.some(external)
-      ? `<span class="badge unused-internal">No externally callable functions</span>`
-      : observed === 0 ? `<span class="badge unused-external">Entire module unobserved</span>` : "";
+    const statuses = [];
+    if (!module.functions.some(external)) statuses.push(`<span class="badge unused-internal">No externally callable functions</span>`);
+    if (observed === 0) {
+      statuses.push(`<span class="badge unused-external">Entire module unobserved</span>`);
+    } else if (module.functions.every(f => f.invocations === 0 || f.transactions <= threshold)) {
+      statuses.push(`<span class="badge rare-external">Rarely observed</span>`);
+    }
+    const moduleStatus = statuses.join("");
     const header = `<tr class="module-row"><td colspan="8"><button class="module-toggle" data-module="${esc(moduleId)}" aria-expanded="${!collapsed}"><span class="module-chevron">${collapsed?"▸":"▾"}</span><code title="${esc(module.id)}">${esc(module.displayId)}</code>${moduleStatus}<span class="module-summary">${esc(summary)}</span></button></td></tr>`;
     return header + (collapsed ? "" : visibleFunctions.map(functionRow).join(""));
   }).join("") : `<tr><td colspan="8" class="empty">No functions match these filters.</td></tr>`;
