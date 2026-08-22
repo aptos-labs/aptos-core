@@ -3,6 +3,6 @@ task 0 lines 1-16:  publish [import Move]
 Error: compilation errors:
  
 Leaner elaboration failed for `TEMPFILE`:
-TEMPFILE:5:12: error: borrow safety error `result`: a returned reference must derive from a reference parameter
+TEMPFILE:9:4: error: borrow safety error `result`: a returned reference must derive from a reference parameter
 wrote Leaner XIR
 

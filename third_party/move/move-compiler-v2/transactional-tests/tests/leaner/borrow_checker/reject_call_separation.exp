@@ -3,6 +3,6 @@ task 0 lines 1-25:  publish [import Move]
 Error: compilation errors:
  
 Leaner elaboration failed for `TEMPFILE`:
-TEMPFILE:6:10: error: borrow safety error `writer`: call summary is incompatible with its reference argument (conflicts with `reader`)
+TEMPFILE:16:4: error: borrow safety error `writer`: call summary is incompatible with its reference argument (conflicts with `reader`)
 wrote Leaner XIR
 

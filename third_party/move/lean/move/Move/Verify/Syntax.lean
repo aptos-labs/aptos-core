@@ -292,17 +292,30 @@ private initialize declarations :
   }
 
 syntax (name := move_source)
-  "move_source" "(" term ", " str ")" : attr
+  "move_source" "(" term ", " num ", " str ")" : attr
+
+/-- Replace the source preceding a retained body with byte-for-byte whitespace.
+Parsing the padded body then recreates its original raw positions without
+allowing preceding declarations to become part of the retained term. -/
+private def retainedSourcePrefix (source : String) (length : Nat) : String :=
+  let bytes := source.toUTF8.extract 0 length
+  let whitespace := bytes.data.map fun byte =>
+    if byte == 9 || byte == 10 || byte == 13 then byte else 32
+  String.fromUTF8! ⟨whitespace⟩
 
 initialize moveSourceAttr : Unit ← Lean.registerBuiltinAttribute {
   name := Name.mkSimple "move_source"
   descr := "retained Move source for relational specification generation"
   add := fun declarationName stx _ => do
-    let `(attr| move_source ($resultType:term, $encoded:str)) := stx
+    let `(attr| move_source ($resultType:term, $offset:num, $encoded:str)) := stx
       | throwErrorAt stx "invalid retained Move source"
+    let some offset := offset.raw.isNatLit?
+      | throwErrorAt offset "expected retained Move source offset"
     let some source := encoded.raw.isStrLit?
       | throwErrorAt encoded "expected encoded Move source"
-    let value ← match Lean.Parser.runParserCategory (← getEnv) `term source with
+    let fileMap ← getFileMap
+    let input := retainedSourcePrefix fileMap.source offset ++ source
+    let value ← match Lean.Parser.runParserCategory (← getEnv) `term input (← getFileName) with
       | .ok value => pure value
       | .error message => throwErrorAt encoded
           "failed to restore retained Move source: {message}\n{source}"

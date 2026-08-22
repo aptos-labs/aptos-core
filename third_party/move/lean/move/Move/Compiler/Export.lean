@@ -265,16 +265,6 @@ private partial def expandLeanerAttributeAliases (stx : Syntax) : Syntax :=
   else
     stx.modifyArgs (·.map expandLeanerAttributeAliases)
 
-private def normalizeRetainedBody (source : String) : String :=
-  let indentation := if source.startsWith "do" then 2 else 4
-  let removeIndent (line : String) :=
-    if indentation == 2 && line.startsWith "  " then (line.drop 2).toString
-    else if indentation == 4 && line.startsWith "    " then (line.drop 4).toString
-    else line
-  match source.splitOn "\n" with
-  | [] => source
-  | first :: rest => String.intercalate "\n" (first :: rest.map removeIndent)
-
 /-- Move type parameters are always inhabited.  Lean needs the corresponding
 instance for the opaque implementations of operations such as vector indexing
 and abort, but source authors should not have to repeat this compiler detail
@@ -388,12 +378,11 @@ macro_rules
             | some resultType =>
                 let resultType : TSyntax `term := ⟨resultType⟩
                 let sourceBody := body.raw.reprint.getD body.raw.prettyPrint.pretty
-                let prettyBody := normalizeRetainedBody sourceBody
-                let encodedBody := Syntax.mkStrLit <|
-                  "(\n  " ++ prettyBody.replace "\n" "\n  " ++ "\n)\n"
-                let encodedBody : TSyntax `str := ⟨encodedBody⟩
+                let sourceOffset : TSyntax `num := ⟨Syntax.mkNumLit <| toString <|
+                  body.raw.getPos?.map (·.byteIdx) |>.getD 0⟩
+                let encodedBody : TSyntax `str := ⟨Syntax.mkStrLit sourceBody⟩
                 let sourceAttribute ← `(Lean.Parser.Term.attrInstance|
-                  move_source ($resultType, $encodedBody))
+                  move_source ($resultType, $sourceOffset, $encodedBody))
                 let existing : TSyntax ``Lean.Parser.Term.attributes :=
                   ⟨modifiers.raw[1][0]⟩
                 let `(attributes|@[$attrs,*]) := existing

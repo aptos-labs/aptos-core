@@ -3,6 +3,6 @@ task 0 lines 1-19:  publish [import Move]
 Error: compilation errors:
  
 Leaner elaboration failed for `TEMPFILE`:
-TEMPFILE:7:21: error: borrow safety error `second`: reference was poisoned by an overlapping write (conflicts with `first`)
+TEMPFILE:11:4: error: borrow safety error `second`: reference was poisoned by an overlapping write (conflicts with `first`)
 wrote Leaner XIR
 

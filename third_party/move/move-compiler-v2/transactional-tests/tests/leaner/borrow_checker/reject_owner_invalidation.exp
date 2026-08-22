@@ -3,6 +3,6 @@ task 0 lines 1-18:  publish [import Move]
 Error: compilation errors:
  
 Leaner elaboration failed for `TEMPFILE`:
-TEMPFILE:5:21: error: borrow safety error: cannot move or overwrite an owner while a reference into it is live (conflicts with `observation`)
+TEMPFILE:9:4: error: borrow safety error: cannot move or overwrite an owner while a reference into it is live (conflicts with `observation`)
 wrote Leaner XIR
 

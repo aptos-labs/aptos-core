@@ -3,6 +3,6 @@ task 0 lines 1-19:  publish [import Move]
 Error: compilation errors:
  
 Leaner elaboration failed for `TEMPFILE`:
-TEMPFILE:6:6: error: borrow safety error `writer`: cannot activate a mutable reference while an immutable reference is live in the same tree (conflicts with `observation`)
+TEMPFILE:10:4: error: borrow safety error `writer`: cannot activate a mutable reference while an immutable reference is live in the same tree (conflicts with `observation`)
 wrote Leaner XIR
 
