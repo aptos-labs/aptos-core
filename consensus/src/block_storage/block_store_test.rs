@@ -490,3 +490,31 @@ async fn test_need_sync_for_ledger_info() {
         .need_sync_for_ledger_info(&not_too_far)
         .is_none());
 }
+
+#[tokio::test]
+async fn test_can_forward_commit_proof() {
+    let mut inserter = TreeInserter::default();
+    let block_store = inserter.block_store();
+    let genesis = block_store.ordered_root();
+    let ordered_block = inserter
+        .insert_block_with_qc(certificate_for_genesis(), &genesis, 1)
+        .await;
+    let unordered_block = inserter
+        .insert_block(&ordered_block, 2, Some(ordered_block.block_info().clone()))
+        .await;
+
+    assert_eq!(block_store.commit_root().round(), 0);
+    assert_eq!(block_store.ordered_root().round(), 1);
+
+    let ordered_commit_proof = inserter
+        .create_qc_for_block(&unordered_block, Some(ordered_block.block_info().clone()))
+        .ledger_info()
+        .clone();
+    assert!(block_store.can_forward_commit_proof(&ordered_commit_proof));
+
+    let unordered_commit_proof = inserter
+        .create_qc_for_block(&unordered_block, Some(unordered_block.block_info().clone()))
+        .ledger_info()
+        .clone();
+    assert!(!block_store.can_forward_commit_proof(&unordered_commit_proof));
+}
