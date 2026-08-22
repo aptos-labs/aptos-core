@@ -305,10 +305,10 @@ containing the inner.
 | `break@n` / `continue@n` with no active `loop@n` | `` unknown loop label `n` `` |
 | nested `loop@n` while `n` is active | `` duplicate active loop label `n` `` |
 | hand-written loop marker | `` unregistered compiler loop marker `` |
-| `return` inside a loop at `spec` | `` `return` inside `loop` / `while` is not yet supported for `verify` `` |
 | `break` / `continue` targeting a Lean `for` | left to Lean |
 
-`return` inside a loop compiles; only its verification is rejected.
+`return` inside a loop compiles and verifies: the loop's fixed point exits
+with the returned value (`ControlForms.return_in_loop`).
 
 ## Implementation map
 

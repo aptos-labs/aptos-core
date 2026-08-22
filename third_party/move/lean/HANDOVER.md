@@ -1,7 +1,8 @@
 # Handover — Leaner Move
 
-Branch `wrwg/leaner`, worktree `dev1`.  Base commit `84ac57b862`; the test
-migration below is uncommitted.
+Branch `wrwg/leaner`, worktree `dev1`.  Last commit `5c26924660` (IR
+verification examples moved into the `move-model` test suite); everything
+below it is **uncommitted**.
 
 ## Layout (done, verified)
 
@@ -14,56 +15,80 @@ scripts/  design/  README.md
 ```
 
 Naming follows the Lean convention: packages and executables lowercase,
-libraries and module components PascalCase.  A package is the
-distribution/dependency unit; a library is a build target inside it, and its
-name need not match the namespace it owns.
-
-Tests are split per library — `Move.Tests.*` and `MoveModel.Tests.*` — with
-aggregate roots `move/Move/Tests.lean` and `move-model/MoveModel/Tests.lean`.
-Lake needs a root module per test library; `globs` does not work (tried three
-spellings).  The shared helper is `MoveModel.Tests.Common`, imported across the
-package boundary by the Move tests.
+libraries and module components PascalCase.  Tests are split per library —
+`Move.Tests.*` and `MoveModel.Tests.*` — with aggregate roots
+`move/Move/Tests.lean` and `move-model/MoveModel/Tests.lean` (Lake needs a
+root module per test library; `globs` does not work).  The shared helper is
+`MoveModel.Tests.Common`.
 
 Verify (all with `ulimit -n 65535`):
 
 ```bash
-cd move        && lake test    # 80 jobs
-cd move-model  && lake test    # 53 jobs, no warnings
-cargo test -p move-compiler-v2-transactional-tests -- leaner   # 104
-cargo test -p move-compiler-v2 --lib leaner                    # 5
+cd move        && lake test    # 85 jobs
+cd move-model  && lake test    # 53 jobs
+cargo test -p move-compiler-v2-transactional-tests -- leaner
+cargo test -p move-compiler-v2 --lib leaner
 ```
 
-## IR-level verification examples (done)
+## Source-verification roadmap (this round, uncommitted)
 
-`MoveModel.Examples` no longer exists.  Its eight files — all 26 IR-level
-verification theorems — live in `move-model/MoveModel/Tests/Prover/`
-(`Account`, `Adequacy`, `BorrowAccount`, `CountDown`, `CrossCall`,
-`ElimSource`, `MasmSource`, `MoveSource`), namespaced `Tests.Prover.*`, and
-are part of `lake test`; the `Examples` `lean_lib` is gone from
-`move-model/lakefile.toml`, and the library root `MoveModel.lean` no longer
-imports examples.  Being in the suite is what stops the rot: they broke
-unnoticed under commit `5636dfc1e0` (integer unification) precisely because
-`Examples` was in neither `defaultTargets` nor `lake test`.
+`Move/project-plan.md` now lists as implemented — and `Move/leaner-move.md`
+documents — what was the roadmap: direct global borrows and borrows chained
+through references; callees with a `&mut` parameter (incl. recursive); pure
+callees without a `spec` (semantics generated on demand, persisted across
+modules); effects hoisted out of value positions; the explicit core primitives
+desugared to their surface forms; dependent/pattern `if`, `if`/`else` with a
+continuation, `match` statements, `return` in loops; and **generic global
+storage** (`existsAt (Vault T) a`, `&mut (Vault U64)[a].f`, spec forms
+`existsAt<Vault T>(a)`, `(Vault T)[a].f`, `modifies (Vault T)[a]`).
 
-The repairs needed for the unified integer model:
+Design points worth knowing (all in `move/Move/Verify/Syntax.lean`):
 
-* `Value.u64 n` is an abbreviation for `.int ↑n`, so `case u64 k` becomes
-  `case right.int i`; checked arithmetic guards on the unbounded `Int`, so
-  range facts must be stated in `Int` **in the goal's spelling**
-  (`(U64_SIZE : Int)`, not the literal) or the guard `if` never reduces.
-* `ElimSource.bump_verified` hit `(kernel) deep recursion detected`.  The
-  cause was not term size or `maxRecDepth` (neither that, `--tstack`, nor
-  `ulimit -s` change anything): obtaining the argument as `Value.u64 n` via
-  `isValid_u64_iff` leaves the abbreviation inside every symbolic-execution
-  term, and each rfl-style unfold simp performs (`Oper.sem`, `NumType.checked`,
-  `u64_size`) makes the kernel re-derive the definitional step through that
-  abbreviation.  The proof now destructures with `isValid_uint_iff`
-  (`Value.int i`, bounds in `Int`), which is the native view of the unified
-  model; the stepping structure is unchanged and elaborates in ~2 s.
-* The per-step stepping proofs keep one uniform simp list per step under
-  `linter.unusedSimpArgs false` (as `Account`/`BorrowAccount`/`CrossCall`
-  already did); the remaining unused-argument warnings in the moved files and
-  two in the library (`ValueTyping`, `Sim`) were removed, so `lake test` is
-  warning-free.
+* Resource families are `Family {term, head, key, concrete}`.  Store binders
+  are **per head**, universally quantified for a generic head
+  (`[∀ {T : Type}, ResourceStore S (Vault T)]`), so a callee's `Vault T` at
+  the callee's own `T` needs no syntactic instantiation at the caller;
+  independence is assumed only between distinct heads; frames range over the
+  concrete instantiations the body and the spec clauses name
+  (`addMentionedFamilies`).
+* A contract applies `f.sourceSpec` to the spec's type parameters **by name**
+  (`applyTypeParameters`, one application node — nested named-argument
+  applications fail) so a type parameter no argument determines
+  (`has_generic {T}`) is instantiated; call sites pass source named type
+  arguments (`has_generic (T := U64) a`) through.
+* The `module` elaborator (`move/Move/Compiler/Export.lean`) elaborates items
+  one by one and flushes messages/info trees/snapshot tasks per item, so
+  `#guard_msgs` inside a `module` works.
+* `baseIdent` (`move/Move/Syntax.lean`) gives the base of a dotted place
+  `counter.value` an identifier with its original source span: the
+  unused-variable linter counts only original syntax as a use.
 
-Nothing is open.
+New tests: `Move/Tests/{GlobalBorrows,Callees,ControlForms,CorePrimitives,
+GenericStorage}.lean` (registered in `Move/Tests.lean`); a new rejection
+fixture in `Move/Tests/LowLevel/Rejections.lean` (a clause naming a family
+the function does not touch).
+
+`Move/project-plan.md` also gained a **Move language coverage** section —
+the Move-book features Leaner source cannot express at all (function values
+and lambdas, inline/native functions, tuples, `for`, `assert!`, positional
+structs and `..`/struct patterns, `match` guards and literal/range patterns,
+address/byte-string literals, most `vector` operations, MSL) — with its own
+priority list (function values first).  While surveying it, `<=`, Bool-valued
+comparisons (`a < b` as a value), `>`, `>=` turned out not to compile
+(`Decidable.decide` / `MoveInt.instDecidableLe` were unrecognized in
+`Move/Compiler/Normalize.lean`) although the reference claimed them; both are
+now lowered (`decide` is the identity on the Boolean the comparison produced),
+and the translator maps `>`/`>=`/`!=` to the sealed markers like `<`/`==`
+(`Move/Tests/Arithmetic.lean` covers the spellings).
+
+Still open (see the plan's roadmap): tuple-valued functions, mutually
+recursive callees/contract families, generic global invariants, sibling
+nested mutable borrows, effects in conditional positions; callers of a
+recursive callee are proved by hand (`Callees.drain` shows the pattern for a
+recursive `&mut` callee; a caller of a recursive pure callee is not
+discharged automatically).
+
+## IR-level verification examples (done, committed)
+
+`MoveModel.Examples` no longer exists; its eight files live in
+`move-model/MoveModel/Tests/Prover/` and are part of `lake test`.

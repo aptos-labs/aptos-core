@@ -138,103 +138,26 @@ module SourceVerificationRejection where
     value : U64
     deriving Key
 
-  fun unmodeled_move_from (address : Address) : Action Vault :=
-    moveFrom Vault address
+  fun unmodeled_receiver_get (values : Move.Vector U64) (index : U64) : Action U64 :=
+    pure (values.get index)
 
   /--
-  error: automatic source specifications do not yet model `Move.moveFrom`; provide an explicit `sourceSpec` or omit `verify`
+  error: automatic source specifications require fully qualified `Move.Vector.get`, `Move.Vector.set`, `Move.Vector.insert`, or `Move.Vector.remove`
   -/
   #guard_msgs in
-  spec unmodeled_move_from (address : Address) where
+  spec unmodeled_receiver_get (values : Move.Vector U64) (index : U64) where
     ensures True;
     aborts_if False
 
-  fun unmodeled_vector_get (values : Move.Vector U64) (index : U64) : Action U64 :=
-    pure (Move.Vector.get values index)
+  fun short_circuit_arithmetic (value : U64) : Action U64 := do
+    if value == 0 && value + 1 == 2 then pure value else pure 0
 
   /--
-  error: automatic source specifications do not yet model `Move.Vector.get`; provide an explicit `sourceSpec` or omit `verify`
+  error: automatic source specifications cannot sequence this operation here, where its evaluation is conditional; bind it to a local first
   -/
   #guard_msgs in
-  spec unmodeled_vector_get (values : Move.Vector U64) (index : U64) where
+  spec short_circuit_arithmetic (value : U64) where
     ensures True;
-    aborts_if False
-
-  fun arithmetic_condition (value : U64) : Action U64 := do
-    if value + 1 < 2 then
-      pure value
-    else
-      pure 0
-
-  /--
-  error: automatic source specifications do not yet support arithmetic in this context; bind it to a local first
-  -/
-  #guard_msgs in
-  spec arithmetic_condition (value : U64) where
-    ensures True;
-    aborts_if False
-
-  fun explicit_arithmetic_condition (value : U64) : Action U64 := do
-    if Move.UInt.add value 1 < 2 then pure value else pure 0
-
-  /--
-  error: automatic source specifications do not yet support arithmetic in this context; bind it to a local first
-  -/
-  #guard_msgs in
-  spec explicit_arithmetic_condition (value : U64) where
-    ensures True;
-    aborts_if False
-
-  fun plus_one (value : U64) : U64 := value + 1
-
-  fun pure_predicate (value : U64) : Bool := value == 0
-
-  fun helper_condition (value : U64) : Action U64 := do
-    if pure_predicate value then pure 1 else pure 2
-
-  /--
-  error: automatic source specifications do not yet model pure Move callee `Tests.MovePrograms.Calls.Rejection.SourceVerificationRejection.pure_predicate`; inline it or omit `verify`
-  -/
-  #guard_msgs in
-  spec helper_condition (value : U64) where
-    ensures True;
-    aborts_if False
-
-  namespace OpenedHelpers
-
-    fun opened_predicate (value : U64) : Bool := value == 0
-
-    fun opened_overwrite (slot : &mut U64) : Action Unit := do
-      slot := 7
-
-    spec opened_overwrite (slot : &mut U64) where
-      ensures slot = 7;
-      aborts_if False
-
-  end OpenedHelpers
-
-  open OpenedHelpers
-
-  fun opened_helper_condition (value : U64) : Action U64 := do
-    if opened_predicate value then pure 1 else pure 2
-
-  /--
-  error: automatic source specifications do not yet model pure Move callee `Tests.MovePrograms.Calls.Rejection.SourceVerificationRejection.OpenedHelpers.opened_predicate`; inline it or omit `verify`
-  -/
-  #guard_msgs in
-  spec opened_helper_condition (value : U64) where
-    ensures True;
-    aborts_if False
-
-  fun calls_opened_overwrite (slot : &mut U64) : Action Unit := do
-    opened_overwrite slot
-
-  /--
-  error: automatic source specifications do not yet model calls to effectful Move callee `Tests.MovePrograms.Calls.Rejection.SourceVerificationRejection.OpenedHelpers.opened_overwrite` with a mutable-reference parameter
-  -/
-  #guard_msgs in
-  spec calls_opened_overwrite (slot : &mut U64) where
-    ensures slot = 7;
     aborts_if False
 
   namespace Vector
@@ -244,19 +167,6 @@ module SourceVerificationRejection where
       abort value
 
   end Vector
-
-  fun calls_shadowed_vector_insert : Action Unit := do
-    let values : Move.Vector U64 := vector![1]
-    let slot ← &mut values
-    Vector.insert slot 0 7
-
-  /--
-  error: effectful Move callee `Tests.MovePrograms.Calls.Rejection.SourceVerificationRejection.Vector.insert` has no source specification; declare its `spec` before specifying this caller
-  -/
-  #guard_msgs in
-  spec calls_shadowed_vector_insert where
-    ensures True;
-    aborts_if False
 
   fun calls_receiver_style_vector_insert : Action Unit := do
     let values : Move.Vector U64 := vector![1]
@@ -271,37 +181,38 @@ module SourceVerificationRejection where
     ensures True;
     aborts_if False
 
-  fun overwrite (slot : &mut U64) (replacement : U64) : Action Unit := do
-    slot := replacement
+  @[move_struct]
+  structure Other where
+    value : U64
+    deriving Key
 
-  spec overwrite (slot : &mut U64) (replacement : U64) where
-    ensures slot = replacement;
-    aborts_if False
-
-  verify overwrite by
-    contract_intro
-    simp [wp_norm, Move.Verify.assignSpecBody,
-      Move.Semantics.Mutation.write]
-
-  fun calls_overwrite (slot : &mut U64) : Action Unit := do
-    overwrite slot 9
+  fun touches_vault (addr : Address) : Action Bool :=
+    existsAt Vault addr
 
   /--
-  error: automatic source specifications do not yet model calls to effectful Move callee `Tests.MovePrograms.Calls.Rejection.SourceVerificationRejection.overwrite` with a mutable-reference parameter
+  error: resource `Other` is not used by the specified function
   -/
   #guard_msgs in
-  spec calls_overwrite (slot : &mut U64) where
-    ensures slot = 9;
+  spec touches_vault (addr : Address) where
+    ensures existsAt<Other>(addr);
     aborts_if False
 
-  fun calls_pure_helper (value : U64) : Action U64 :=
-    pure (plus_one value)
+  mutual
+    partial fun ping (value : U64) : U64 :=
+      if value < 1 then 0 else pong (value - 1)
+
+    partial fun pong (value : U64) : U64 :=
+      if value < 1 then 1 else ping (value - 1)
+  end
+
+  fun calls_mutual (value : U64) : Action U64 :=
+    pure (ping value)
 
   /--
-  error: automatic source specifications do not yet model pure Move callee `Tests.MovePrograms.Calls.Rejection.SourceVerificationRejection.plus_one`; inline it or omit `verify`
+  error: mutually recursive Move functions are not yet supported by automatic source specifications (`Tests.MovePrograms.Calls.Rejection.SourceVerificationRejection.ping`)
   -/
   #guard_msgs in
-  spec calls_pure_helper (value : U64) where
+  spec calls_mutual (value : U64) where
     ensures True;
     aborts_if False
 

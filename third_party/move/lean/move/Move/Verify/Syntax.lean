@@ -29,7 +29,7 @@ scoped syntax (name := oldResourceTerm) "old(" term ")" : term
 /-- Test whether a typed resource exists at an address in the clause's
 current state. -/
 scoped syntax (name := resourceExistsTerm)
-  "existsAt<" ident ">(" term ")" : term
+  "existsAt<" term ">(" term ")" : term
 
 /-- Values accepted after `with` in an `aborts_if` clause. Move source abort
 constants are `U64`, while the relational core stores codes as `Nat`. -/
@@ -252,8 +252,16 @@ private structure Declaration where
   value : Syntax
   deriving Inhabited
 
-private initialize declarations : EnvExtension (NameMap Declaration) ←
-  registerEnvExtension (pure {})
+/-- Retained declarations, persisted so that an imported module's functions
+keep their source for callers in other modules. -/
+private initialize declarations :
+    SimplePersistentEnvExtension (Name × Declaration) (NameMap Declaration) ←
+  registerSimplePersistentEnvExtension {
+    addEntryFn := fun map (name, declaration) => map.insert name declaration
+    addImportedFn := fun entries =>
+      mkStateFromImportedEntries
+        (fun map (name, declaration) => map.insert name declaration) {} entries
+  }
 
 syntax (name := move_source)
   "move_source" "(" term ", " str ")" : attr
@@ -271,8 +279,7 @@ initialize moveSourceAttr : Unit ← Lean.registerBuiltinAttribute {
       | .error message => throwErrorAt encoded
           "failed to restore retained Move source: {message}\n{source}"
     let declaration := { resultType := resultType.raw, value }
-    modifyEnv fun env => declarations.modifyState env
-      (·.insert declarationName declaration)
+    modifyEnv fun env => declarations.addEntry env (declarationName, declaration)
 }
 
 private def declarationFor (function : Syntax) : CommandElabM Declaration := do
@@ -314,12 +321,6 @@ its contract observes global state rather than being a pure value predicate. -/
 def isEffectfulFunction (function : Syntax) : CommandElabM Bool := do
   return (findTypeApplication? ``Move.Action (← declarationFor function).resultType).isSome
 
-private def sourceBody (declaration : Declaration) : CommandElabM (TSyntax `term) := do
-  if declaration.value.isOfKind ``Lean.Parser.Term.paren then
-    pure ⟨declaration.value[1]⟩
-  else
-    pure ⟨declaration.value⟩
-
 private def fieldParts : Name → List String
   | .anonymous => []
   | .str base part => fieldParts base ++ [part]
@@ -343,19 +344,112 @@ def canonicalResourceName (resource : TSyntax `ident) : CommandElabM Name := do
   catch _ =>
     pure ((← getCurrNamespace) ++ resource.getId)
 
-private def pushResource (resources : Array (TSyntax `ident))
-    (resource : TSyntax `ident) : CommandElabM (Array (TSyntax `ident)) := do
-  let resourceName ← canonicalResourceName resource
-  for existing in resources do
-    if resourceName == (← canonicalResourceName existing) then
-      return resources
-  return resources.push resource
-
 private def isResourceIdentifier (resource : TSyntax `ident) : CommandElabM Bool := do
   let env ← getEnv
   let current := (← getCurrNamespace) ++ resource.getId
   pure <| Move.moveKeyAttr.hasTag env current ||
     Move.moveKeyAttr.hasTag env resource.getId
+
+/-- A resource family as source names it: a `Key` type applied to its type
+arguments (`Vault T`), or a bare resource type (`Counter`).  Two mentions
+denote the same family when the head type and the arguments, as written,
+agree.  Families with the same head may still coincide at different
+arguments (`Vault T` and `Vault U` when `T = U`), so only families with
+distinct heads are ever assumed independent. -/
+structure Family where
+  /-- The family's type, as a term: the descriptor's `Value`. -/
+  term : TSyntax `term
+  /-- The canonical name of the head resource type. -/
+  head : Name
+  /-- The identity: head and arguments as written. -/
+  key : String
+  /-- Whether `term` names the family in the current scope.  A generic family
+  of a callee (`Vault T` at the callee's own `T`) is known to the caller only
+  by its head: the head's store is in scope, but no concrete instantiation is
+  named, so frames do not mention it. -/
+  concrete : Bool := true
+  deriving Inhabited
+
+/-- The distinct heads of some families, in order of first mention. -/
+def distinctHeads (families : Array Family) : Array Name :=
+  families.foldl (init := #[]) fun heads family =>
+    if heads.contains family.head then heads else heads.push family.head
+
+/-- Fresh names for the type parameters of a resource head, one per
+parameter; a resource's parameters are types. -/
+def headParameters (head : Name) : CommandElabM (Array (TSyntax `ident)) := do
+  let info ← getConstInfo head
+  liftTermElabM <| Lean.Meta.forallTelescope info.type fun parameters _ => do
+    let mut names := #[]
+    for parameter in parameters do
+      let type ← Lean.Meta.whnf (← Lean.Meta.inferType parameter)
+      unless type == Lean.mkSort Lean.Level.one do
+        throwError "resource `{head}` has a parameter that is not a `Type`; automatic source specifications support only type parameters"
+      names := names.push (mkIdent (Name.mkSimple s!"_moveSpecT{names.size}"))
+    return names
+
+/-- A resource head applied to parameters. -/
+def appliedHead (head : Name) (parameters : Array (TSyntax `ident)) :
+    CommandElabM (TSyntax `term) :=
+  if parameters.isEmpty then pure ⟨mkIdent head⟩
+  else `($(mkIdent head) $parameters*)
+
+/-- Quantify a proposition over type parameters, `∀ {T₀ … : Type}, body`. -/
+def forallTypes (parameters : Array (TSyntax `ident)) (body : TSyntax `term) :
+    CommandElabM (TSyntax `term) :=
+  parameters.foldrM (init := body) fun parameter body => `(∀ {$parameter : Type}, $body)
+
+/-- The store instance of a head: for a generic head, one store for every
+instantiation — each instantiation is its own family, as in Move. -/
+def storeType (world : TSyntax `term) (head : Name) : CommandElabM (TSyntax `term) := do
+  let parameters ← headParameters head
+  forallTypes parameters
+    (← `(Move.Semantics.ResourceStore $world $(← appliedHead head parameters)))
+
+/-- Independence of two heads' stores, at every instantiation of each. -/
+def independenceType (world : TSyntax `term) (left right : Name) :
+    CommandElabM (TSyntax `term) := do
+  let leftParameters ← headParameters left
+  let rightParameters ← (← headParameters right).mapM fun parameter =>
+    pure (mkIdent (parameter.getId.appendAfter "'"))
+  forallTypes (leftParameters ++ rightParameters)
+    (← `(Move.Semantics.IndependentResourceStores $world
+      $(← appliedHead left leftParameters) $(← appliedHead right rightParameters)))
+
+/-- Whether a type term names only global constants, so it denotes the same
+family in every scope. -/
+private partial def closedType (stx : Syntax) : CommandElabM Bool := do
+  if stx.isIdent then
+    return ← try
+        let names ← resolveGlobalConst stx
+        pure !names.isEmpty
+      catch _ => pure false
+  stx.getArgs.allM closedType
+
+/-- The family named by a resource type term, if its head is a resource. -/
+partial def familyOfTerm? (type : Syntax) : CommandElabM (Option Family) := do
+  let type := if type.isOfKind ``Lean.Parser.Term.paren then type[1] else type
+  if type.isOfKind ``Lean.Parser.Term.paren then return ← familyOfTerm? type
+  let (headIdent, arguments) ←
+    if type.isIdent then
+      pure (type, #[])
+    else if type.isOfKind ``Lean.Parser.Term.app && type.getNumArgs == 2 && type[0].isIdent then
+      pure (type[0], type[1].getArgs)
+    else
+      return none
+  let headIdent : TSyntax `ident := ⟨headIdent⟩
+  unless ← isResourceIdentifier headIdent do return none
+  let head ← canonicalResourceName headIdent
+  let key := arguments.foldl (init := head.toString) fun key argument =>
+    key ++ " " ++ toString argument.prettyPrint
+  return some { term := ⟨type⟩, head, key }
+
+/-- The family of a bare resource type named canonically. -/
+def familyOfName (ref : Syntax) (name : Name) : Family :=
+  { term := ⟨mkIdentFrom ref name⟩, head := name, key := name.toString }
+
+private def pushResource (resources : Array Family) (family : Family) : Array Family :=
+  if resources.any (·.key == family.key) then resources else resources.push family
 
 /-- The leading type constructor of a (possibly parenthesized, applied, or
 ascribed) type expression: `Vault` from `(Vault T)`, `Counter` from
@@ -373,11 +467,19 @@ private partial def typeHead? (stx : Syntax) : Option (TSyntax `ident) :=
     stx.getArgs[0]? |>.bind typeHead?
   else none
 
+/-- The type term an argument names: itself, or the ascribed type of
+`({ … } : T)`. -/
+private def namedType? (stx : Syntax) : Option Syntax :=
+  if stx.isOfKind ``Lean.Parser.Term.typeAscription then
+    stx.getArgs[3]?.bind (·.getArgs[0]?)
+  else
+    some stx
+
 /-- The resource family named by a global-storage primitive application
 (`existsAt`/`moveFrom` name it directly; `moveTo` names it through the published
 value's ascription), if `stx` is such an application. -/
 private def globalPrimitiveResource? (stx : Syntax) :
-    CommandElabM (Option (TSyntax `ident)) := do
+    CommandElabM (Option Family) := do
   unless stx.isOfKind ``Lean.Parser.Term.app do return none
   let head := stx[0]
   unless head.isIdent do return none
@@ -385,45 +487,55 @@ private def globalPrimitiveResource? (stx : Syntax) :
       catch _ => pure none) | return none
   let arguments := stx[1].getArgs
   if name == ``Move.existsAt || name == ``Move.moveFrom then
-    return arguments[0]?.bind typeHead?
+    let some type := arguments[0]? | return none
+    familyOfTerm? type
   else if name == ``Move.moveTo then
-    return arguments[1]?.bind typeHead?
+    let some value := arguments[1]? | return none
+    let some type := namedType? value | return none
+    familyOfTerm? type
   else
     return none
 
+/-- The family and key of a global place root `R[key]` / `(R T)[key]`. -/
+private def rootFamily? (root : TSyntax `term) :
+    CommandElabM (Option (Family × TSyntax `term)) := do
+  let (typeStx, key) ← match root with
+    | `($resource:ident[$key:term]) => pure (resource.raw, key)
+    | `(getElem $resource:ident $key:term $_:term) => pure (resource.raw, key)
+    | _ =>
+        if root.raw.getKind == `«term__[_]» && root.raw.getNumArgs == 4 then
+          pure (root.raw[0], (⟨root.raw[2]⟩ : TSyntax `term))
+        else
+          return none
+  let some family ← familyOfTerm? typeStx | return none
+  return some (family, key)
+
 private partial def collectResources (stx : Syntax)
-    (resources : Array (TSyntax `ident) := #[]) : CommandElabM (Array (TSyntax `ident)) := do
+    (resources : Array Family := #[]) : CommandElabM (Array Family) := do
   let mut resources := resources
-  if let some resource ← globalPrimitiveResource? stx then
-    if ← isResourceIdentifier resource then
-      resources ← pushResource resources resource
+  if let some family ← globalPrimitiveResource? stx then
+    resources := pushResource resources family
   if stx.isOfKind ``Move.borrowTerm || stx.isOfKind ``Move.borrowMutTerm then
     if let some place := stx[1]? then
       let (root, _) := splitFieldPath ⟨place⟩
-      match root with
-      | `($resource:ident[$_:term]) =>
-          if ← isResourceIdentifier resource then
-            resources ← pushResource resources resource
-      | _ => pure ()
+      if let some (family, _) ← rootFamily? root then
+        resources := pushResource resources family
   else if stx.isOfKind ``Move.borrowIndexTerm ||
       stx.isOfKind ``Move.borrowMutIndexTerm then
     if let some candidate := stx[1]? then
-      if candidate.isIdent then
-        let resource : TSyntax `ident := ⟨candidate⟩
-        if ← isResourceIdentifier resource then
-          resources ← pushResource resources resource
+      if let some family ← familyOfTerm? candidate then
+        resources := pushResource resources family
   for child in stx.getArgs do
     resources ← collectResources child resources
   pure resources
 
 private def globalPlace (place : TSyntax `term) :
-    CommandElabM (TSyntax `ident × TSyntax `term × Array (TSyntax `ident)) := do
+    CommandElabM (Family × TSyntax `term × Array (TSyntax `ident)) := do
   let (root, fields) := splitFieldPath place
-  match root with
-  | `($resource:ident[$key:term]) => pure (resource, key, fields)
-  | `(getElem $resource:ident $key:term $_:term) => pure (resource, key, fields)
-  | _ => throwErrorAt place
-      "automatic source specifications currently expect a global place `Resource[key]`"
+  let some (family, key) ← rootFamily? root
+    | throwErrorAt place
+        "automatic source specifications currently expect a global place `Resource[key]`"
+  pure (family, key, fields)
 
 private def projectPath (owner : TSyntax `term)
     (fields : Array (TSyntax `ident)) : CommandElabM (TSyntax `term) := do
@@ -470,8 +582,9 @@ private def rebuildOwner (owner newValue : TSyntax `term)
     (fields : List (TSyntax `ident)) (certified? : Option (Name × Name)) :
     CommandElabM (Option (TSyntax `term)) := do
   let some (typeName, invariantName) := certified? | return none
-  let field :: rest := fields
-    | throwError "a mutable borrow into `{typeName}` must select a field"
+  -- Replacing the whole value installs a value that already carries its
+  -- certificate, so only a field write-back re-creates the owner.
+  let field :: rest := fields | return none
   let env ← getEnv
   let some info := getStructureInfo? env typeName | return none
   let dataFields := info.fieldNames.filter (· != `invariant)
@@ -489,22 +602,23 @@ private def rebuildOwner (owner newValue : TSyntax `term)
     (Invariant := $(mkIdent invariantName) $rawValue) $built))
 
 private structure ResourceBinding where
-  typeName : Name
-  descriptor : TSyntax `term
+  head : Name
+  /-- The descriptor of an instantiation of the head. -/
+  descriptorFor : Family → CommandElabM (TSyntax `term)
 
 private def resourceFor (resources : Array ResourceBinding)
-    (resource : TSyntax `ident) : CommandElabM (TSyntax `term) := do
-  let wanted ← canonicalResourceName resource
-  let some binding := resources.find? fun binding =>
-      binding.typeName == wanted
-    | throwErrorAt resource
-        "no resource descriptor was supplied for `{resource.getId}`"
-  pure binding.descriptor
+    (family : Family) : CommandElabM (TSyntax `term) := do
+  let some binding := resources.find? fun binding => binding.head == family.head
+    | throwErrorAt family.term
+        "no resource descriptor was supplied for `{family.term}`"
+  binding.descriptorFor family
 
+/-- Whether an identifier names a resource family in scope (of any
+instantiation). -/
 private def hasResource (resources : Array ResourceBinding)
     (candidate : TSyntax `ident) : CommandElabM Bool := do
   let candidate ← canonicalResourceName candidate
-  return resources.any fun binding => binding.typeName == candidate
+  return resources.any fun binding => binding.head == candidate
 
 private def localVectorPlace? (contextResources : Array ResourceBinding)
     (place : TSyntax `term) :
@@ -547,10 +661,42 @@ private structure TranslationContext where
   functionName : Name
   recursiveSpec? : Option (TSyntax `term) := none
   mutation? : Option (TSyntax `ident) := none
-  /-- The type and data invariant of the mutable parameter's referent, when it
-  certifies one.  Rebuilding it after a field mutation is a creation site. -/
-  certifiedOwner? : Option (Name × Name) := none
+  /-- The type of the active mutation's referent, when source translation can
+  name it: the resource of a global borrow, the declared referent of the
+  mutable parameter, or the field reached from either.  A certified referent is
+  re-created when a nested loan dies, which is a creation site of its data
+  invariant. -/
+  mutationType? : Option Name := none
   loops : List VerificationLoopFrame := []
+
+/-- The data invariant certified by the active mutation's referent, if its
+type is known and declares one. -/
+private def certifiedMutation? (context : TranslationContext) :
+    CommandElabM (Option (Name × Name)) := do
+  let some typeName := context.mutationType? | return none
+  return (Move.dataInvariant? (← getEnv) typeName).map (typeName, ·)
+
+/-- The type of a structure field, named by its projection's codomain, when the
+owner type and field are known. -/
+private def fieldTypeName? (typeName : Name) (field : Name) :
+    CommandElabM (Option Name) := do
+  let projection := typeName ++ field
+  unless (← getEnv).contains projection do return none
+  liftTermElabM do
+    let projectionFn ← Lean.Meta.mkConstWithFreshMVarLevels projection
+    Lean.Meta.forallTelescopeReducing (← Lean.Meta.inferType projectionFn)
+      fun _ body => do
+        return (← Lean.Meta.whnfR body).getAppFn.constName?
+
+/-- The type reached from `typeName` along a field path, when every step is
+known. -/
+private def pathTypeName? (typeName? : Option Name) (fields : List Name) :
+    CommandElabM (Option Name) := do
+  let mut current := typeName?
+  for field in fields do
+    let some typeName := current | return none
+    current ← fieldTypeName? typeName field
+  return current
 
 private def mutationValue (context : TranslationContext)
     (owner : TSyntax `ident) : CommandElabM (TSyntax `term) := do
@@ -566,6 +712,117 @@ private def application? (term : TSyntax `term) :
     some (⟨term.raw[0]⟩, arguments)
   else
     none
+
+/-- The constants an application's head identifier may resolve to, with the
+arguments.  A primitive such as `read` shares its short name with unrelated
+declarations, so overload resolution is left to the elaboration that follows
+the desugaring; the candidates are enough to recognize the primitive. -/
+private def primitiveApplication? (term : Syntax) :
+    CommandElabM (Option (List Name × Array Syntax)) := do
+  unless term.isOfKind ``Lean.Parser.Term.app && term.getNumArgs == 2 do return none
+  let head := term[0]
+  unless head.isIdent do return none
+  let candidates ← try resolveGlobalConst head catch _ => pure []
+  if candidates.isEmpty then return none
+  return some (candidates, term[1].getArgs)
+
+/-- The field named by a `fieldOfProjection` argument: `fun owner => owner.f`
+or the projection `T.f` itself. -/
+private def projectedField? (descriptor : Syntax) : Option Name := do
+  let descriptor := if descriptor.isOfKind ``Lean.Parser.Term.paren then descriptor[1] else descriptor
+  guard (descriptor.isOfKind ``Lean.Parser.Term.app && descriptor.getNumArgs == 2)
+  guard (descriptor[0].isIdent && descriptor[0].getId.getString! == "fieldOfProjection")
+  let some projection := descriptor[1].getArgs[0]? | none
+  let projection := if projection.isOfKind ``Lean.Parser.Term.paren then projection[1] else projection
+  if projection.isOfKind ``Lean.Parser.Term.fun then
+    -- `fun owner => owner.f`: the body is a projection of the bound owner.
+    let body := projection[1][3]
+    if body.isOfKind ``Lean.Parser.Term.proj && body[2].isIdent then
+      return body[2].getId
+    if body.isIdent then
+      match body.getId with
+      | .str _ field => return Name.mkSimple field
+      | _ => none
+    none
+  else if projection.isIdent then
+    match projection.getId with
+    | .str _ field => return Name.mkSimple field
+    | _ => none
+  else none
+
+/-- A place `owner[index]` as the surface borrow parsers produce it. -/
+private def indexPlace (owner index : Syntax) : Syntax :=
+  mkNode `«term__[_]» #[owner, mkAtom "[", index, mkAtom "]"]
+
+/-- A borrow term `&place` / `&mut place` as the surface parser produces it. -/
+private def borrowSyntax (mutable : Bool) (place : Syntax) : Syntax :=
+  if mutable then mkNode ``Move.borrowMutTerm #[mkAtom "&mut ", place]
+  else mkNode ``Move.borrowTerm #[mkAtom "&", place]
+
+/-- The surface borrow for an explicitly spelled borrow primitive, if the
+application is one: `borrowLocal x` is `&x`, `borrowGlobalMut R a` is
+`&mut R[a]`, `borrowField r (fieldOfProjection (fun o => o.f))` is `&r.f`,
+`borrowElemMut r i` is `&mut r[i]`. -/
+private def desugarBorrowPrimitive? (term : Syntax) : CommandElabM (Option Syntax) := do
+  let some (candidates, arguments) ← primitiveApplication? term | return none
+  let is (name : Name) : Bool := candidates.contains name
+  let mutable := is ``Move.borrowLocalMut || is ``Move.borrowGlobalMut ||
+    is ``Move.borrowFieldMut || is ``Move.borrowElemMut
+  if is ``Move.borrowLocal || is ``Move.borrowLocalMut then
+    let some place := arguments[0]? | return none
+    return some (borrowSyntax mutable place)
+  if is ``Move.borrowGlobal || is ``Move.borrowGlobalMut then
+    let some resource := arguments[0]? | return none
+    let some address := arguments[1]? | return none
+    return some (borrowSyntax mutable (indexPlace resource address))
+  if is ``Move.borrowField || is ``Move.borrowFieldMut then
+    let some reference := arguments[0]? | return none
+    let some descriptor := arguments[1]? | return none
+    unless reference.isIdent do return none
+    let some field := projectedField? descriptor | return none
+    return some (borrowSyntax mutable (mkIdentFrom reference (reference.getId ++ field)))
+  if is ``Move.borrowElem || is ``Move.borrowElemMut then
+    let some reference := arguments[0]? | return none
+    let some index := arguments[1]? | return none
+    return some (borrowSyntax mutable (indexPlace reference index))
+  return none
+
+/-- Rewrite explicitly spelled core primitives to the surface forms the
+translator models: `read r` / `readImm r` / `freeze r` read the reference
+(`*r`), `write r v` assigns through it (`r := v`), the borrow primitives are
+their `&` / `&mut` places, and `Move.abort c` is `abort c`.  The surface
+forms and the primitives lower to the same Move operations, so their
+semantics is the same; this keeps one translation for both spellings. -/
+private partial def desugarPrimitives (stx : Syntax) : CommandElabM Syntax := do
+  -- `write r v` as a statement
+  if stx.isOfKind ``Lean.Parser.Term.doExpr then
+    if let some (candidates, arguments) ← primitiveApplication? stx[0] then
+      if candidates.contains ``Move.write then
+        if let (some reference, some value) := (arguments[0]?, arguments[1]?) then
+          if reference.isIdent then
+            let value ← desugarPrimitives value
+            let reassign ← `(doElem| $(⟨reference⟩):ident := $(⟨value⟩))
+            return reassign.raw
+  -- borrows, reads, and `Move.abort c`, wherever they appear
+  if let some borrow ← desugarBorrowPrimitive? stx then
+    return borrow
+  if let some (candidates, arguments) ← primitiveApplication? stx then
+    if candidates.contains ``Move.read || candidates.contains ``Move.readImm ||
+        candidates.contains ``Move.freeze then
+      if let some reference := arguments[0]? then
+        return mkNode ``Move.derefTerm #[mkAtom "*", reference]
+    if candidates.contains ``Move.abort then
+      if let some code := arguments[0]? then
+        let code ← desugarPrimitives code
+        return mkNode ``Move.abortTerm #[mkAtom "abort ", code]
+  return stx.setArgs (← stx.getArgs.mapM desugarPrimitives)
+
+private def sourceBody (declaration : Declaration) : CommandElabM (TSyntax `term) := do
+  let body := if declaration.value.isOfKind ``Lean.Parser.Term.paren then
+      declaration.value[1]
+    else
+      declaration.value
+  return ⟨← desugarPrimitives body⟩
 
 /-- Core primitives whose executable Move behavior is not yet represented by
 the automatically generated source semantics. -/
@@ -587,6 +844,30 @@ private def unsupportedSourceOperation? (term : TSyntax `term) :
     catch _ => pure none
   return name.filter unsupportedSourceOperation
 
+/-- Receiver notation for a checked vector operation (`values.get i`,
+`r.insert i e`): the raw source does not retain what it resolves to, so it
+is not assumed to be the native operation — `Spec.pure` would give it Lean's
+total semantics instead of Move's abort. -/
+private def receiverStyleVectorOperation? (term : Syntax) : CommandElabM Bool := do
+  unless term.isOfKind ``Lean.Parser.Term.app && term.getNumArgs == 2 do return false
+  let head := term[0]
+  let field? : Option Name :=
+    if head.isOfKind ``Lean.Parser.Term.proj && head.getNumArgs == 3 && head[2].isIdent then
+      some head[2].getId
+    else if head.isIdent then
+      match head.getId with
+      | .str base field => if base.isAnonymous then none else some (Name.mkSimple field)
+      | _ => none
+    else none
+  let some field := field? | return false
+  unless field == `get || field == `set || field == `insert || field == `remove do
+    return false
+  -- A globally resolvable head (`Move.Vector.get`) is not receiver notation.
+  if head.isIdent then
+    let resolved ← try resolveGlobalConst head catch _ => pure []
+    if !resolved.isEmpty then return false
+  return true
+
 /-- Refuse source fragments for which `Spec.pure` would erase an executable
 Move effect or abort. -/
 private partial def ensureSupportedSourceTerm (term : TSyntax `term) :
@@ -594,6 +875,9 @@ private partial def ensureSupportedSourceTerm (term : TSyntax `term) :
   if let some operation ← unsupportedSourceOperation? term then
     throwErrorAt term
       "automatic source specifications do not yet model `{operation}`; provide an explicit `sourceSpec` or omit `verify`"
+  if ← receiverStyleVectorOperation? term.raw then
+    throwErrorAt term
+      "automatic source specifications require fully qualified `Move.Vector.get`, `Move.Vector.set`, `Move.Vector.insert`, or `Move.Vector.remove`"
   for child in term.raw.getArgs do
     ensureSupportedSourceTerm ⟨child⟩
 
@@ -611,6 +895,26 @@ private partial def containsArithmetic (term : Syntax) : Bool :=
     | _ => false)) ||
   term.getArgs.any containsArithmetic
 
+/-- The checked relational operation behind an explicitly spelled integer
+operation: the shared `MoveInt` marker or its `UInt`/`SInt` view
+abbreviation — one map, since the markers are shared by both signednesses. -/
+private def checkedOperationSpec? (functionName : Name) : Option Name :=
+  match functionName with
+  | .str prefix_ operation =>
+      if prefix_ == ``Move.MoveInt || prefix_ == ``Move.UInt || prefix_ == ``Move.SInt then
+        match operation with
+        | "add" => some ``Move.Semantics.Checked.addSpec
+        | "sub" => some ``Move.Semantics.Checked.subSpec
+        | "mul" => some ``Move.Semantics.Checked.mulSpec
+        | "div" => some ``Move.Semantics.Checked.divSpec
+        | "mod" => some ``Move.Semantics.Checked.modSpec
+        | "shl" => some ``Move.Semantics.Checked.shlSpec
+        | "shr" => some ``Move.Semantics.Checked.shrSpec
+        | "cast" => some ``Move.Semantics.Checked.castSpec
+        | _ => none
+      else none
+  | _ => none
+
 private def checkedArithmeticCall? (term : TSyntax `term) :
     CommandElabM (Option (Name × TSyntax `term × TSyntax `term)) := do
   let some (head, arguments) := application? term | return none
@@ -618,17 +922,7 @@ private def checkedArithmeticCall? (term : TSyntax `term) :
   let functionName ← try
       pure (some (← resolveGlobalConstNoOverload head.raw))
     catch _ => pure none
-  let operation? := functionName.bind fun functionName =>
-    -- one map: the operation markers are shared by both signednesses
-    if functionName == ``Move.MoveInt.add then some ``Move.Semantics.Checked.addSpec
-    else if functionName == ``Move.MoveInt.sub then some ``Move.Semantics.Checked.subSpec
-    else if functionName == ``Move.MoveInt.mul then some ``Move.Semantics.Checked.mulSpec
-    else if functionName == ``Move.MoveInt.div then some ``Move.Semantics.Checked.divSpec
-    else if functionName == ``Move.MoveInt.mod then some ``Move.Semantics.Checked.modSpec
-    else if functionName == ``Move.MoveInt.shl then some ``Move.Semantics.Checked.shlSpec
-    else if functionName == ``Move.MoveInt.shr then some ``Move.Semantics.Checked.shrSpec
-    else if functionName == ``Move.MoveInt.cast then some ``Move.Semantics.Checked.castSpec
-    else none
+  let operation? := functionName.bind checkedOperationSpec?
   return operation?.map (·, arguments[0]!, arguments[1]!)
 
 private partial def containsCheckedArithmeticCall (term : Syntax) :
@@ -706,8 +1000,16 @@ private partial def rewritePure (mutation? : Option (TSyntax `ident))
       `(logicalLT $(← rewritePure mutation? lhs) $(← rewritePure mutation? rhs))
   | `($lhs:term <= $rhs:term) =>
       `(logicalLE $(← rewritePure mutation? lhs) $(← rewritePure mutation? rhs))
+  -- `>`, `>=`, `!=` are the flipped and negated comparisons: the same sealed
+  -- markers, so no instance of the host's is consulted.
+  | `($lhs:term > $rhs:term) =>
+      `(logicalLT $(← rewritePure mutation? rhs) $(← rewritePure mutation? lhs))
+  | `($lhs:term >= $rhs:term) =>
+      `(logicalLE $(← rewritePure mutation? rhs) $(← rewritePure mutation? lhs))
   | `($lhs:term == $rhs:term) =>
       `(logicalBEq $(← rewritePure mutation? lhs) $(← rewritePure mutation? rhs))
+  | `($lhs:term != $rhs:term) =>
+      `(!logicalBEq $(← rewritePure mutation? lhs) $(← rewritePure mutation? rhs))
   | _ => pure term
 
 private inductive VectorMutationCall where
@@ -734,8 +1036,8 @@ private def nativeVectorMutationCall? (functionName : Name)
 
 /-- Receiver notation does not retain which declaration it resolves to in the
 raw source syntax used for automatic specifications. Reject it rather than
-assuming that a field named `insert` or `remove` is a native vector operation.
-Use the fully qualified `Move.Vector` operation instead. -/
+assuming that a field named `insert`, `remove`, `get`, or `set` is a native
+vector operation. Use the fully qualified `Move.Vector` operation instead. -/
 private def receiverStyleVectorMutation? (term : TSyntax `term) : Bool :=
   match application? term with
   | none => false
@@ -744,11 +1046,13 @@ private def receiverStyleVectorMutation? (term : TSyntax `term) : Bool :=
         let projection := head.raw.getArgs
         match projection[2]? with
         | some field => field.isIdent &&
-            (field.getId == `insert || field.getId == `remove)
+            (field.getId == `insert || field.getId == `remove ||
+              field.getId == `get || field.getId == `set)
         | none => false
       else if head.raw.isIdent then
         match head.raw.getId with
-        | Name.str _ field => field == "insert" || field == "remove"
+        | Name.str _ field => field == "insert" || field == "remove" ||
+            field == "get" || field == "set"
         | _ => false
       else
         false
@@ -789,77 +1093,23 @@ private def resolveMoveFunction? (identifier : TSyntax `ident) :
     return some functionName
   return none
 
-private def hasExplicitMutableParameter (functionName : Name) :
-    CommandElabM Bool :=
+/-- The positions, among a Move function's explicit parameters, that take a
+mutable reference. -/
+private def mutableParameterPositions (functionName : Name) :
+    CommandElabM (Array Nat) :=
   liftTermElabM do
     let function ← Lean.Meta.mkConstWithFreshMVarLevels functionName
     let (parameters, binderInfos, _) ←
       Lean.Meta.forallMetaTelescope (← Lean.Meta.inferType function)
+    let mut positions := #[]
+    let mut position := 0
     for (parameter, binderInfo) in parameters.zip binderInfos do
       if binderInfo.isExplicit then
         let parameterType ← Lean.Meta.whnf (← Lean.Meta.inferType parameter)
         if parameterType.isAppOfArity ``Move.MutRef 1 then
-          return true
-    return false
-
-private def effectfulCallSpec?
-    (translateArgument : TSyntax `term → CommandElabM (TSyntax `term))
-    (context : TranslationContext)
-    (term : TSyntax `term) : CommandElabM (Option (TSyntax `term)) := do
-  let (head, arguments, markedContinue) ← match term with
-    | `(continue $head:term $arguments:term*) =>
-        pure (head, arguments, true)
-    | _ =>
-        let some (head, arguments) := application? term | return none
-        pure (head, arguments, false)
-  unless head.raw.isIdent do return none
-  let identifier : TSyntax `ident := ⟨head.raw⟩
-  let some functionName ← resolveMoveFunction? identifier | return none
-  let some declaration := declarations.getState (← getEnv) |>.find? functionName
-    | return none
-  unless (findTypeApplication? ``Move.Action declaration.resultType).isSome do
-    return none
-  if ← hasExplicitMutableParameter functionName then
-    throwErrorAt term
-      "automatic source specifications do not yet model calls to effectful Move callee `{functionName}` with a mutable-reference parameter"
-  let mut valueNames : Array (TSyntax `term) := #[]
-  let mut argumentSpecs : Array (TSyntax `term × TSyntax `ident) := #[]
-  for (argument, index) in arguments.zipIdx do
-    let valueName := mkIdentFrom argument (Name.mkSimple s!"_moveSpecCallArg{index}")
-    valueNames := valueNames.push ⟨valueName.raw⟩
-    argumentSpecs := argumentSpecs.push (← translateArgument argument, valueName)
-  let packed ← packCallArguments term.raw valueNames
-  let mut call ← if functionName == context.functionName then
-    let some recursiveSpec := context.recursiveSpec?
-      | throwErrorAt term
-          "recursive Move call requires generated fixed-point source semantics"
-    `($recursiveSpec $packed)
-  else do
-    if markedContinue then
-      throwErrorAt term "`continue` must target the current recursive Move function"
-    let sourceSpecName := functionName ++ `sourceSpec
-    unless (← getEnv).contains sourceSpecName do
-      throwErrorAt term
-        "effectful Move callee `{functionName}` has no source specification; declare its `spec` before specifying this caller"
-    let sourceSpec := mkIdentFrom head sourceSpecName
-    `($sourceSpec $packed)
-  for (argumentSpec, valueName) in argumentSpecs.reverse do
-    call ← `(Move.Semantics.Spec.bind $argumentSpec fun $valueName => $call)
-  return some call
-
-/-- A pure Move helper has executable behavior but no relational summary yet.
-It must not fall through to `Spec.pure`, which would incorrectly make its
-aborts invisible to an automatically generated caller specification. -/
-private def pureMoveCall? (term : TSyntax `term) : CommandElabM (Option Name) := do
-  let some (head, _) := application? term | return none
-  unless head.raw.isIdent do return none
-  let identifier : TSyntax `ident := ⟨head.raw⟩
-  let some functionName ← resolveMoveFunction? identifier | return none
-  let some declaration := declarations.getState (← getEnv) |>.find? functionName
-    | return none
-  if (findTypeApplication? ``Move.Action declaration.resultType).isSome then
-    return none
-  return some functionName
+          positions := positions.push position
+        position := position + 1
+    return positions
 
 /-- Source semantics for the built-in global-storage primitives.  `existsAt`
 becomes `containsSpec`; `moveFrom`/`moveTo` become `moveFromSpec`/`moveToSpec`,
@@ -876,7 +1126,7 @@ private def globalPrimitiveSpec?
   let some resource ← globalPrimitiveResource? term
     | return none
   let descriptor ← resourceFor context.resources resource
-  let resourceName ← canonicalResourceName resource
+  let resourceName := resource.head
   let invariants := Move.globalInvariants (← getEnv) resourceName
   -- Re-establish the family's global invariants at this state change: an
   -- `update` invariant wraps the op (relating pre/post); a regular invariant
@@ -927,71 +1177,6 @@ private def globalPrimitiveSpec?
       Move.Semantics.Spec.bind $valueSpec (fun $valueName => $body))))
   else
     return none
-
-/-- Translate an expression in value position. Arithmetic is sequenced
-relationally so overflow, underflow, and division by zero remain observable. -/
-private partial def expressionSpec (context : TranslationContext)
-    (term : TSyntax `term) :
-    CommandElabM (TSyntax `term) := do
-  let binary (operation : Name) (lhs rhs : TSyntax `term) := do
-    let lhsSpec ← expressionSpec context lhs
-    let rhsSpec ← expressionSpec context rhs
-    let op := mkIdentFrom term operation
-    `(Move.Semantics.Spec.bind $lhsSpec fun _moveSpecLhs =>
-        Move.Semantics.Spec.bind $rhsSpec fun _moveSpecRhs =>
-          $op _moveSpecLhs _moveSpecRhs)
-  -- `*` is both Lean's multiplication token and Move's prefix dereference
-  -- token. Before term elaboration, `lhs * rhs` is therefore represented as
-  -- a `choice` between the infix parse and application to `*rhs`. Source
-  -- verification works on retained pre-elaboration syntax, so select the
-  -- ordinary three-child infix alternative explicitly.
-  if term.raw.isOfKind `choice then
-    if let some multiplication := term.raw.getArgs.find? fun alternative =>
-        alternative.getNumArgs == 3 && alternative[1].isAtom &&
-          alternative[1].getAtomVal == "*" then
-      let lhs : TSyntax `term := ⟨multiplication[0]⟩
-      let rhs : TSyntax `term := ⟨multiplication[2]⟩
-      return ← binary ``Move.Semantics.Checked.mulSpec lhs rhs
-  if let some (operation, lhs, rhs) ← checkedArithmeticCall? term then
-    return ← binary operation lhs rhs
-  match term with
-  | `(($value:term)) => expressionSpec context value
-  | `($lhs:term + $rhs:term) => binary ``Move.Semantics.Checked.addSpec lhs rhs
-  | `($lhs:term - $rhs:term) => binary ``Move.Semantics.Checked.subSpec lhs rhs
-  | `($lhs:term * $rhs:term) => binary ``Move.Semantics.Checked.mulSpec lhs rhs
-  | `($lhs:term / $rhs:term) => binary ``Move.Semantics.Checked.divSpec lhs rhs
-  | `($lhs:term % $rhs:term) => binary ``Move.Semantics.Checked.modSpec lhs rhs
-  | `($lhs:term <<< $rhs:term) =>
-      binary ``Move.Semantics.Checked.shlSpec lhs rhs
-  | `($lhs:term >>> $rhs:term) =>
-      binary ``Move.Semantics.Checked.shrSpec lhs rhs
-  | `(($value:term : $type:term)) =>
-      -- An ascribed integer cast, Move's `(x as T)`. The ascription
-      -- supplies the target width of the checked cast.
-      if value.raw.isIdent then
-        match value.raw.getId with
-        | .str base "cast" =>
-            let operand : TSyntax `term :=
-              ⟨mkIdentFrom value.raw base⟩
-            let operand ← rewritePure context.mutation? operand
-            ``((Move.Semantics.Checked.castSpec $operand :
-                Move.Semantics.Spec _ $type))
-        | _ =>
-            ``(Move.Semantics.Spec.pure
-              $(← rewritePure context.mutation? term))
-      else
-        ``(Move.Semantics.Spec.pure
-          $(← rewritePure context.mutation? term))
-  | _ =>
-      if let some call ← globalPrimitiveSpec? (expressionSpec context) context term then
-        pure call
-      else if let some call ← effectfulCallSpec? (expressionSpec context) context term then
-        pure call
-      else if let some functionName ← pureMoveCall? term then
-        throwErrorAt term
-          "automatic source specifications do not yet model pure Move callee `{functionName}`; inline it or omit `verify`"
-      else
-        `(Move.Semantics.Spec.pure $(← rewritePure context.mutation? term))
 
 private def finish (context : TranslationContext) (valueSpec : TSyntax `term) :
     CommandElabM (TSyntax `term) := do
@@ -1093,8 +1278,7 @@ private def emptyFinish (context : TranslationContext) : CommandElabM (TSyntax `
   if !context.loops.isEmpty then
     loopContinueSpec context none Syntax.missing
   else
-    let unit ← `(term| ())
-    finish context (← expressionSpec context unit)
+    finish context (← `(Move.Semantics.Spec.pure ()))
 
 private partial def unpackLoopState (ids : List (TSyntax `ident)) (packed : TSyntax `term)
     (body : TSyntax `term) : CommandElabM (TSyntax `term) := do
@@ -1106,11 +1290,20 @@ private partial def unpackLoopState (ids : List (TSyntax `ident)) (packed : TSyn
       let nested ← unpackLoopState rest ⟨tail.raw⟩ body
       `(let ($id, $tail) := $packed; $nested)
 
+/-- Whether a bound value is a mutable borrow, whose reference keeps the
+enclosing loan it reborrows from open for as long as it is used. -/
+private def isMutableBorrow (value : TSyntax `term) : Bool :=
+  value.raw.isOfKind ``Move.borrowMutTerm || value.raw.isOfKind ``Move.borrowMutIndexTerm
+
+/-- The local a statement binds, and whether every use of it — rather than only
+a projection out of it — extends the loan it was bound in: a reassignable
+local does, and so does a nested mutable borrow, whose lifetime lies within
+its parent's. -/
 private def boundIdentifier? (element : Lean.DoElem) : Option (Name × Bool) :=
   match element with
   | `(doElem| let mut $name:ident ← $_value:term) => some (name.getId, true)
   | `(doElem| let mut $name:ident := $_value:term) => some (name.getId, true)
-  | `(doElem| let $name:ident ← $_value:term) => some (name.getId, false)
+  | `(doElem| let $name:ident ← $value:term) => some (name.getId, isMutableBorrow value)
   | `(doElem| let $name:ident := $_value:term) => some (name.getId, false)
   | `(doElem| let $name:ident : $_type:term := $_value:term) =>
       some (name.getId, false)
@@ -1140,7 +1333,807 @@ private def mutableBorrowScope (name : Name) (elements : Array Lean.DoElem) :
   let size := closeBorrowScope elements (lastUse.map (· + 1) |>.getD 0)
   (elements.extract 0 size, elements.extract size elements.size)
 
+/-- `Move.Vector.get` / `Move.Vector.set`: checked element access whose abort
+the relational semantics sequences. -/
+private inductive VectorAccessCall where
+  | get (values index : TSyntax `term)
+  | set (values index value : TSyntax `term)
+
+private def vectorAccessCall? (term : TSyntax `term) :
+    CommandElabM (Option VectorAccessCall) := do
+  let some (head, arguments) := application? term | return none
+  unless head.raw.isIdent do return none
+  let some name ← (try pure (some (← resolveGlobalConstNoOverload head.raw))
+      catch _ => pure none) | return none
+  if name == ``Move.Vector.get then
+    if h : arguments.size = 2 then
+      return some (.get arguments[0] arguments[1])
+  else if name == ``Move.Vector.set then
+    if h : arguments.size = 3 then
+      return some (.set arguments[0] arguments[1] arguments[2])
+  return none
+
+/-- A call to a Move function with retained source, including a
+`continue`-marked self-call. -/
+private def moveFunctionCall? (term : Syntax) : CommandElabM Bool := do
+  let head := if term.isOfKind ``Lean.Parser.Term.app && term.getNumArgs == 2 then some term[0]
+    else if term.isOfKind ``Move.continueCallTerm && term.getNumArgs > 1 then some term[1]
+    else none
+  let some head := head | return false
+  unless head.isIdent do return false
+  let some functionName ← resolveMoveFunction? ⟨head⟩ | return false
+  return (declarations.getState (← getEnv)).contains functionName
+
+/-- Whether a term is an operation the relational semantics sequences — a
+checked arithmetic operation, cast, or vector access, or a Move call — and
+so cannot stay inside a pure position. -/
+private def effectfulNode? (term : Syntax) : CommandElabM Bool := do
+  if term.isOfKind `choice then
+    -- `lhs * rhs` is parsed as a choice between multiplication and an
+    -- application to a dereference; the infix alternative decides.
+    return term.getArgs.any fun alternative =>
+      alternative.getNumArgs == 3 && alternative[1].isAtom &&
+        alternative[1].getAtomVal == "*"
+  if term.getNumArgs == 3 && term[1].isAtom &&
+      (term[1].getAtomVal == "+" || term[1].getAtomVal == "-" ||
+        term[1].getAtomVal == "*" || term[1].getAtomVal == "/" ||
+        term[1].getAtomVal == "%" || term[1].getAtomVal == "<<<" ||
+        term[1].getAtomVal == ">>>") then
+    return true
+  if (← checkedArithmeticCall? ⟨term⟩).isSome then return true
+  if term.isOfKind ``Lean.Parser.Term.typeAscription && term.getNumArgs > 1 then
+    -- `(x.cast : T)`, Move's `as`
+    let value := term[1]
+    if value.isIdent then
+      if let .str _ "cast" := value.getId then return true
+  if (← vectorAccessCall? ⟨term⟩).isSome then return true
+  if ← moveFunctionCall? term then return true
+  return false
+
+/-- Hoist the sequenced operations out of a pure position: each maximal
+effectful subterm is replaced by a fresh local, and the bindings are returned
+in evaluation order — left to right, as Move evaluates.  A position whose
+evaluation is conditional — the right operand of a short-circuit operator, a
+conditional branch, a `match` arm, a binder body — cannot be sequenced before
+the term, so an effect there is rejected rather than evaluated eagerly. -/
+private partial def hoistEffects (term : Syntax) (start : Nat) :
+    CommandElabM (Array (TSyntax `ident × TSyntax `term) × Syntax) := do
+  let (bindings, residual) ← go term #[] false
+  return (bindings, residual)
+where
+  go (stx : Syntax) (bindings : Array (TSyntax `ident × TSyntax `term))
+      (conditional : Bool) :
+      CommandElabM (Array (TSyntax `ident × TSyntax `term) × Syntax) := do
+    if ← effectfulNode? stx then
+      if conditional then
+        throwErrorAt stx
+          "automatic source specifications cannot sequence this operation here, where its evaluation is conditional; bind it to a local first"
+      let hoisted := mkIdentFrom stx (Name.mkSimple s!"_moveSpecHoisted{start + bindings.size}")
+      return (bindings.push (hoisted, ⟨stx⟩), hoisted.raw)
+    let kind := stx.getKind
+    -- Binder bodies and conditional positions: descend only to reject.
+    if kind == ``Lean.Parser.Term.fun then
+      let (bindings, _) ← go stx[1] bindings true
+      return (bindings, stx)
+    if (kind == `«term_&&_» || kind == `«term_||_») && stx.getNumArgs == 3 then
+      let (bindings, lhs) ← go stx[0] bindings conditional
+      let (bindings, _) ← go stx[2] bindings true
+      return (bindings, stx.setArg 0 lhs)
+    if kind == ``Lean.Parser.Term.matchAlts || kind == ``Lean.Parser.Term.matchAlt then
+      let (bindings, _) ← descend stx bindings true
+      return (bindings, stx)
+    if kind == `termIfThenElse || kind == `termDepIfThenElse then
+      -- condition first, then the branches are conditional
+      let mut bindings := bindings
+      let mut args := stx.getArgs
+      for i in [0:args.size] do
+        let conditionalHere := conditional || i > (if kind == `termIfThenElse then 1 else 3)
+        let (more, child) ← go args[i]! bindings conditionalHere
+        bindings := more
+        args := args.set! i child
+      return (bindings, stx.setArgs args)
+    descend stx bindings conditional
+  descend (stx : Syntax) (bindings : Array (TSyntax `ident × TSyntax `term))
+      (conditional : Bool) :
+      CommandElabM (Array (TSyntax `ident × TSyntax `term) × Syntax) := do
+    let mut bindings := bindings
+    let mut args := stx.getArgs
+    for i in [0:args.size] do
+      let (more, child) ← go args[i]! bindings conditional
+      bindings := more
+      args := args.set! i child
+    return (bindings, stx.setArgs args)
+
+/-- The pieces of a function's signature that shape its relational
+semantics: generic context, the explicit parameters with their logical
+types (a reference parameter contributes its referent), and the
+mutable-reference parameter. -/
+structure SourceSignature where
+  context : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) := #[]
+  arguments : Array (TSyntax `ident) := #[]
+  types : Array (TSyntax `term) := #[]
+  mutableParameter? : Option (TSyntax `ident × TSyntax `term) := none
+
+/-- The source signature of a Move function, from its elaborated type: what a
+`spec` command's binders state, derived when a callee has no `spec` yet. -/
+private def signatureOf (functionName : Name) : CommandElabM SourceSignature :=
+  liftTermElabM do
+    let info ← getConstInfo functionName
+    Lean.Meta.forallTelescope info.type fun parameters _ => do
+      let delab (type : Lean.Expr) : Lean.Elab.TermElabM (TSyntax `term) :=
+        withOptions (fun options => options.setBool `pp.fullNames true) do
+          Lean.PrettyPrinter.delab type
+      let mut signature : SourceSignature := {}
+      for parameter in parameters do
+        let declaration ← parameter.fvarId!.getDecl
+        let name := declaration.userName
+        let type ← instantiateMVars declaration.type
+        let ident := mkIdent name
+        match declaration.binderInfo with
+        | .default =>
+            if type.isAppOfArity ``Move.MutRef 1 then
+              let referent ← delab type.appArg!
+              signature := { signature with
+                arguments := signature.arguments.push ident
+                types := signature.types.push referent
+                mutableParameter? := some (ident, referent) }
+            else if type.isAppOfArity ``Move.Ref 1 &&
+                !type.appArg!.isConstOf ``Move.Signer then
+              -- An immutable reference is the observed value; a signer
+              -- reference stays one, as `moveTo` addresses it.
+              signature := { signature with
+                arguments := signature.arguments.push ident
+                types := signature.types.push (← delab type.appArg!) }
+            else
+              signature := { signature with
+                arguments := signature.arguments.push ident
+                types := signature.types.push (← delab type) }
+        | .instImplicit =>
+            let typeStx ← delab type
+            let binder ← `(bracketedBinder| [$typeStx])
+            signature := { signature with context := signature.context.push binder }
+        | _ =>
+            let typeStx ← delab type
+            let binder ← `(bracketedBinder| {$ident : $typeStx})
+            signature := { signature with context := signature.context.push binder }
+      return signature
+
+/-- Functions whose relational semantics is being generated, to cut mutual
+recursion between on-demand generations. -/
+private initialize generationInProgress : IO.Ref NameSet ← IO.mkRef {}
+
+private partial def containsFunctionCall
+    (fullName shortName : Name) (stx : Syntax) : Bool :=
+  let direct := stx.isOfKind ``Lean.Parser.Term.app && stx.getNumArgs > 0 &&
+    stx[0].isIdent &&
+      (stx[0].getId == fullName || stx[0].getId == shortName)
+  let marked := stx.isOfKind ``Move.continueCallTerm && stx.getNumArgs > 1 &&
+    stx[1].isIdent &&
+      (stx[1].getId == fullName || stx[1].getId == shortName)
+  direct || marked || stx.getArgs.any (containsFunctionCall fullName shortName)
+
+/-- Whether the retained body directly refers to its own Move declaration.
+Move has no first-class functions, so such an occurrence is a recursive call. -/
+def isRecursive (function : Syntax) : CommandElabM Bool := do
+  let declaration ← declarationFor function
+  let body ← sourceBody declaration
+  let fullName := (← getCurrNamespace) ++ function.getId
+  pure (containsFunctionCall fullName function.getId body.raw)
+
+/-- The Move callees a body names: functions with retained source. -/
+private partial def collectCallees (stx : Syntax) (callees : Array Name := #[]) :
+    CommandElabM (Array Name) := do
+  let mut callees := callees
+  if stx.isOfKind ``Lean.Parser.Term.app && stx.getNumArgs > 0 && stx[0].isIdent then
+    if let some callee ← resolveMoveFunction? ⟨stx[0]⟩ then
+      if (declarations.getState (← getEnv)).contains callee && !callees.contains callee then
+        callees := callees.push callee
+  if stx.isOfKind ``Move.continueCallTerm && stx.getNumArgs > 1 && stx[1].isIdent then
+    if let some callee ← resolveMoveFunction? ⟨stx[1]⟩ then
+      if (declarations.getState (← getEnv)).contains callee && !callees.contains callee then
+        callees := callees.push callee
+  for child in stx.getArgs do
+    callees ← collectCallees child callees
+  pure callees
+
+/-- The resource families a body touches, including — transitively — those
+its Move callees touch: a callee's `sourceSpec` needs its families' stores,
+and the caller's semantics applies it. -/
+private partial def collectResourcesTransitively (body : Syntax)
+    (visited : Array Name := #[]) (resources : Array Family := #[]) :
+    CommandElabM (Array Family) := do
+  let mut resources ← collectResources body resources
+  let mut visited := visited
+  for callee in ← collectCallees body do
+    if visited.contains callee then continue
+    visited := visited.push callee
+    let some calleeDeclaration := declarations.getState (← getEnv) |>.find? callee
+      | continue
+    let calleeBody ← sourceBody calleeDeclaration
+    -- A callee family named by global constants alone is the same family
+    -- here; one at the callee's own type parameters (`Vault T`) is known
+    -- only by its head.
+    let calleeResources ← collectResourcesTransitively calleeBody.raw visited #[]
+    for family in calleeResources do
+      if family.concrete && (← closedType family.term) then
+        resources := pushResource resources family
+      else
+        resources := pushResource resources {
+          term := ⟨mkIdentFrom body family.head⟩
+          head := family.head
+          key := family.head.toString ++ " …"
+          concrete := false }
+  pure resources
+
+/-- Resource families an effectful source function must bring into scope: those
+it borrows or publishes/removes, closed under global invariants.  A write to a
+family re-checks every invariant naming it, and that obligation refers to every
+family the invariant mentions — so those families' stores must be in scope even
+when the function never touches them directly. -/
+def inferredResources (function : Syntax) : CommandElabM (Array Family) := do
+  let declaration ← declarationFor function
+  let body ← sourceBody declaration
+  let touched ← collectResourcesTransitively body.raw
+  let env ← getEnv
+  -- Close the touched families under global-invariant mentions, at the level
+  -- of canonical head names.  Bounded fixed point, deduplicating by string to
+  -- avoid `Name` representation pitfalls; the mention lists are already
+  -- complete per invariant, so a handful of passes reach closure.
+  let touchedNames := touched.map (·.head)
+  let has (arr : Array Name) (n : Name) : Bool := arr.any (·.toString == n.toString)
+  let mut all := touchedNames
+  for _ in [0:8] do
+    let previous := all
+    for family in previous do
+      for (_, _, mentioned) in Move.globalInvariants env family do
+        for m in mentioned do
+          unless has all m do all := all.push m
+    if all.size == previous.size then break
+  let mut families := touched
+  for m in all do
+    unless has touchedNames m do
+      families := pushResource families (familyOfName function m)
+  return families
+
+private def argumentType (types : Array (TSyntax `term)) : MacroM (TSyntax `term) := do
+  match types.size with
+  | 0 => `(Unit)
+  | 1 => pure types[0]!
+  | _ =>
+      let reversed := types.toList.reverse
+      let result := reversed.head!
+      reversed.tail.foldlM (init := result) fun result type => `($type × $result)
+
+private def argumentProjection (base : TSyntax `term) (index count : Nat) :
+    MacroM (TSyntax `term) := do
+  let mut projection := base
+  for _ in [:index] do
+    projection ← `($projection.2)
+  if index + 1 < count then `($projection.1) else pure projection
+
+private def unpackArguments (arguments : Array (TSyntax `ident))
+    (body : TSyntax `term) : MacroM (TSyntax `term) := do
+  match arguments.size with
+  | 0 => `(fun _moveSpecArgs => $body)
+  | 1 => `(fun $(arguments[0]!) => $body)
+  | _ =>
+      let args := mkIdentFrom arguments[0]! `_moveSpecArgs
+      let argsTerm : TSyntax `term := ⟨args.raw⟩
+      let mut result := body
+      for index in (List.range arguments.size).reverse do
+        let argument := arguments[index]!
+        let projection ← argumentProjection argsTerm index arguments.size
+        result ← `(let $argument := $projection; $result)
+      `(fun $args => $result)
+
 mutual
+/-- Translate pure positions that may embed sequenced operations.  The
+effectful subterms of `terms` are hoisted into bindings, in evaluation order,
+and `build` receives the residual pure terms (rewritten for the active
+mutation); the bindings are sequenced in front of what it builds. -/
+private partial def withHoisted (context : TranslationContext)
+    (terms : Array (TSyntax `term))
+    (build : Array (TSyntax `term) → CommandElabM (TSyntax `term)) :
+    CommandElabM (TSyntax `term) := do
+  let mut bindings : Array (TSyntax `ident × TSyntax `term) := #[]
+  let mut residuals : Array (TSyntax `term) := #[]
+  for term in terms do
+    let (more, residual) ← hoistEffects term.raw bindings.size
+    bindings := bindings ++ more
+    residuals := residuals.push (← rewritePure context.mutation? ⟨residual⟩)
+  let mut result ← build residuals
+  for (hoisted, operation) in bindings.reverse do
+    result ← `(Move.Semantics.Spec.bind $(← expressionSpec context operation)
+        (fun $hoisted => $result))
+  pure result
+
+/-- The relational semantics of a call to a Move function, and whether the
+call passes a mutable reference.  The callee's semantics is its `sourceSpec`
+— generated on demand from its retained source when it has no `spec` yet — or
+the fixed point's recursive argument for a self-call.  A mutable-reference
+argument must be the live reference of an enclosing borrow or the mutable
+parameter; the callee receives its current value and — its `sourceSpec`
+returning the pair of its result and the final referent — the statement
+translating the call writes that final value back into the reference.  This
+is the prophecy-passing summary of `verification-design.md`: the caller
+suspends its owner with the callee's final value and resumes with it. -/
+private partial def moveCallSpec? (context : TranslationContext)
+    (term : TSyntax `term) : CommandElabM (Option (TSyntax `term × Bool)) := do
+  let (head, arguments, markedContinue) ← match term with
+    | `(continue $head:term $arguments:term*) =>
+        pure (head, arguments, true)
+    | _ =>
+        let some (head, arguments) := application? term | return none
+        pure (head, arguments, false)
+  unless head.raw.isIdent do return none
+  let identifier : TSyntax `ident := ⟨head.raw⟩
+  let some functionName ← resolveMoveFunction? identifier | return none
+  unless (declarations.getState (← getEnv)).contains functionName do
+    throwErrorAt term
+      "Move callee `{functionName}` has no retained source; declare it with `fun` so its semantics can be generated"
+  -- Named arguments instantiate type parameters (`has_generic (T := U64) a`);
+  -- the callee's semantics takes them under the same names.
+  let isNamed (argument : TSyntax `term) :=
+    argument.raw.isOfKind ``Lean.Parser.Term.namedArgument
+  let namedArguments := arguments.filter isNamed
+  let arguments := arguments.filter (!isNamed ·)
+  let mutablePositions ← mutableParameterPositions functionName
+  let mut valueNames : Array (TSyntax `term) := #[]
+  let mut argumentSpecs : Array (TSyntax `term × TSyntax `ident) := #[]
+  let mut passesMutable := false
+  for (argument, index) in arguments.zipIdx do
+    let valueName := mkIdentFrom argument (Name.mkSimple s!"_moveSpecCallArg{index}")
+    valueNames := valueNames.push ⟨valueName.raw⟩
+    if mutablePositions.contains index then
+      let some mutation := context.mutation?
+        | throwErrorAt argument
+            "a mutable-reference argument must be a live mutable reference: bind the place with `let r ← &mut …` first"
+      unless argument.raw.isIdent && argument.raw.getId == mutation.getId do
+        throwErrorAt argument
+          "a mutable-reference argument must be the live mutable reference `{mutation.getId}`"
+      if passesMutable then
+        throwErrorAt argument
+          "a call may pass the live mutable reference `{mutation.getId}` only once"
+      passesMutable := true
+      let current ← `(Move.Semantics.Spec.pure (Move.Semantics.Mutation.read $mutation))
+      argumentSpecs := argumentSpecs.push (current, valueName)
+    else
+      argumentSpecs := argumentSpecs.push (← expressionSpec context argument, valueName)
+  let packed ← packCallArguments term.raw valueNames
+  let mut call ← if functionName == context.functionName then
+    let some recursiveSpec := context.recursiveSpec?
+      | throwErrorAt term
+          "recursive Move call requires generated fixed-point source semantics"
+    `($recursiveSpec $packed)
+  else do
+    if markedContinue then
+      throwErrorAt term "`continue` must target the current recursive Move function"
+    ensureSourceSpec functionName term
+    let sourceSpec := mkIdentFrom head (functionName ++ `sourceSpec)
+    `($sourceSpec $namedArguments* $packed)
+  for (argumentSpec, valueName) in argumentSpecs.reverse do
+    call ← `(Move.Semantics.Spec.bind $argumentSpec fun $valueName => $call)
+  return some (call, passesMutable)
+
+/-- Translate an expression in value position. Arithmetic is sequenced
+relationally so overflow, underflow, and division by zero remain observable;
+every other sequenced operation embedded in the expression — a cast, a
+checked vector access, a Move call — is hoisted in front of it in evaluation
+order.  A source conditional or `match` in value position translates branch
+by branch. -/
+private partial def expressionSpec (context : TranslationContext)
+    (term : TSyntax `term) :
+    CommandElabM (TSyntax `term) := do
+  let binary (operation : Name) (lhs rhs : TSyntax `term) := do
+    let lhsSpec ← expressionSpec context lhs
+    let rhsSpec ← expressionSpec context rhs
+    let op := mkIdentFrom term operation
+    `(Move.Semantics.Spec.bind $lhsSpec fun _moveSpecLhs =>
+        Move.Semantics.Spec.bind $rhsSpec fun _moveSpecRhs =>
+          $op _moveSpecLhs _moveSpecRhs)
+  -- `*` is both Lean's multiplication token and Move's prefix dereference
+  -- token. Before term elaboration, `lhs * rhs` is therefore represented as
+  -- a `choice` between the infix parse and application to `*rhs`. Source
+  -- verification works on retained pre-elaboration syntax, so select the
+  -- ordinary three-child infix alternative explicitly.
+  if term.raw.isOfKind `choice then
+    if let some multiplication := term.raw.getArgs.find? fun alternative =>
+        alternative.getNumArgs == 3 && alternative[1].isAtom &&
+          alternative[1].getAtomVal == "*" then
+      let lhs : TSyntax `term := ⟨multiplication[0]⟩
+      let rhs : TSyntax `term := ⟨multiplication[2]⟩
+      return ← binary ``Move.Semantics.Checked.mulSpec lhs rhs
+  if let some (operation, lhs, rhs) ← checkedArithmeticCall? term then
+    return ← binary operation lhs rhs
+  match term with
+  | `(($value:term)) => expressionSpec context value
+  | `($lhs:term + $rhs:term) => binary ``Move.Semantics.Checked.addSpec lhs rhs
+  | `($lhs:term - $rhs:term) => binary ``Move.Semantics.Checked.subSpec lhs rhs
+  | `($lhs:term * $rhs:term) => binary ``Move.Semantics.Checked.mulSpec lhs rhs
+  | `($lhs:term / $rhs:term) => binary ``Move.Semantics.Checked.divSpec lhs rhs
+  | `($lhs:term % $rhs:term) => binary ``Move.Semantics.Checked.modSpec lhs rhs
+  | `($lhs:term <<< $rhs:term) =>
+      binary ``Move.Semantics.Checked.shlSpec lhs rhs
+  | `($lhs:term >>> $rhs:term) =>
+      binary ``Move.Semantics.Checked.shrSpec lhs rhs
+  | `(($value:term : $type:term)) =>
+      -- An ascribed integer cast, Move's `(x as T)`. The ascription
+      -- supplies the target width of the checked cast.
+      if value.raw.isIdent then
+        match value.raw.getId with
+        | .str base "cast" =>
+            let operand : TSyntax `term :=
+              ⟨mkIdentFrom value.raw base⟩
+            let operand ← rewritePure context.mutation? operand
+            ``((Move.Semantics.Checked.castSpec $operand :
+                Move.Semantics.Spec _ $type))
+        | _ =>
+            withHoisted context #[term] fun residuals =>
+              ``(Move.Semantics.Spec.pure $(residuals[0]!))
+      else
+        withHoisted context #[term] fun residuals =>
+          ``(Move.Semantics.Spec.pure $(residuals[0]!))
+  | `(if $condition:term then $thenBranch:term else $elseBranch:term) =>
+      withHoisted context #[condition] fun residuals => do
+        let thenSpec ← expressionSpec context thenBranch
+        let elseSpec ← expressionSpec context elseBranch
+        `(if $(residuals[0]!) then $thenSpec else $elseSpec)
+  | `(if $binder:ident : $condition:term then $thenBranch:term else $elseBranch:term) =>
+      withHoisted context #[condition] fun residuals => do
+        let thenSpec ← expressionSpec context thenBranch
+        let elseSpec ← expressionSpec context elseBranch
+        `(if $binder:ident : $(residuals[0]!) then $thenSpec else $elseSpec)
+  | `(match $discriminant:term with $alternatives:matchAlt*) =>
+      withHoisted context #[discriminant] fun residuals => do
+        let mut arms : Array (TSyntax ``Lean.Parser.Term.matchAlt) := #[]
+        for alternative in alternatives do
+          match alternative with
+          | `(Lean.Parser.Term.matchAltExpr| | $patterns,* => $rhs:term) =>
+              let armSpec ← expressionSpec context rhs
+              arms := arms.push (← `(Lean.Parser.Term.matchAltExpr| | $patterns,* => $armSpec))
+          | _ => throwErrorAt alternative "unsupported `match` alternative in automatic source specification"
+        `(match $(residuals[0]!):term with $arms:matchAlt*)
+  | _ =>
+      if let some call ← globalPrimitiveSpec? (expressionSpec context) context term then
+        pure call
+      else if let some access ← vectorAccessCall? term then
+        match access with
+        | .get values index =>
+            let valuesSpec ← expressionSpec context values
+            let indexSpec ← expressionSpec context index
+            `(Move.Semantics.Spec.bind $valuesSpec fun _moveSpecValues =>
+                Move.Semantics.Spec.bind $indexSpec fun _moveSpecIndex =>
+                  Move.Semantics.Vector.borrowElemSpec _moveSpecValues _moveSpecIndex)
+        | .set values index value =>
+            let valuesSpec ← expressionSpec context values
+            let indexSpec ← expressionSpec context index
+            let valueSpec ← expressionSpec context value
+            `(Move.Semantics.Spec.bind $valuesSpec fun _moveSpecValues =>
+                Move.Semantics.Spec.bind $indexSpec fun _moveSpecIndex =>
+                  Move.Semantics.Spec.bind $valueSpec fun _moveSpecElement =>
+                    Move.Semantics.Vector.setSpec _moveSpecValues _moveSpecIndex
+                      _moveSpecElement)
+      else if let some (call, passesMutable) ← moveCallSpec? context term then
+        if passesMutable then
+          throwErrorAt term
+            "a call passing a mutable reference must be a `do` statement or bound with `let`"
+        pure call
+      else
+        withHoisted context #[term] fun residuals =>
+          `(Move.Semantics.Spec.pure $(residuals[0]!))
+
+/-- Define `f.sourceSpec` — and `f.bodySpec` for a recursive `f` — from the
+retained body of `function`, a short name in the current namespace, with
+the source signature stating its generic context and logical parameter types.
+The semantics is state-polymorphic: it quantifies over an abstract state and
+one typed store per resource family the body (transitively) touches. -/
+private partial def generateSourceSpec (function : TSyntax `ident)
+    (signature : SourceSignature) : CommandElabM Unit := do
+  let world := mkIdentFrom function `_moveSpecState
+  let resourceTypes ← inferredResources function.raw
+  let sourceSpecName := mkIdentFrom function (function.getId ++ `sourceSpec)
+  let bodySpecName := mkIdentFrom function (function.getId ++ `bodySpec)
+  let argsType ← liftMacroM <| argumentType signature.types
+  let resultType ← resultTypeOf function.raw
+  let sourceResultType ← match signature.mutableParameter? with
+    | none => pure resultType
+    | some (_, referent) => `($resultType × $referent)
+  let recursive ← isRecursive function.raw
+  let recursiveName := mkIdentFrom function `_moveSpecRecursive
+  let recursiveTerm : TSyntax `term := ⟨recursiveName.raw⟩
+  let (body, _) ← translateWithStores function.raw world resourceTypes
+    (if recursive then some recursiveTerm else none)
+    signature.mutableParameter?
+  let sourceLambda ← liftMacroM <| unpackArguments signature.arguments body
+  let worldBinder ← `(bracketedBinder| {$world : Type})
+  let mut storeBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) := #[]
+  for (head, index) in (distinctHeads resourceTypes).zipIdx do
+    let storeName := mkIdentFrom function
+      (Name.mkSimple s!"_moveSpecStore{index}")
+    let storeBinder ← `(bracketedBinder|
+      [$storeName : $(← storeType ⟨world⟩ head)])
+    storeBinders := storeBinders.push storeBinder
+  if recursive then
+    let recursiveBinder ← `(bracketedBinder|
+      ($recursiveName : $argsType → Move.Semantics.Spec $world $sourceResultType))
+    let bodyCommand ← `(noncomputable def $bodySpecName $signature.context* $worldBinder
+        $storeBinders* $recursiveBinder :
+        $argsType → Move.Semantics.Spec $world $sourceResultType := $sourceLambda)
+    elabCommand bodyCommand
+    let sourceCommand ← `(noncomputable def $sourceSpecName $signature.context* $worldBinder
+        $storeBinders* : $argsType → Move.Semantics.Spec $world $sourceResultType :=
+        Move.Semantics.Spec.fix $bodySpecName)
+    elabCommand sourceCommand
+  else
+    let sourceCommand ← `(noncomputable def $sourceSpecName $signature.context* $worldBinder
+        $storeBinders* : $argsType → Move.Semantics.Spec $world $sourceResultType :=
+        $sourceLambda)
+    elabCommand sourceCommand
+
+/-- Make sure a Move callee has its relational semantics `f.sourceSpec`,
+generating it from the retained source and the elaborated signature when no
+`spec` has.  Generation happens in the callee's namespace, so the body's
+names resolve as they did at its declaration, and only for callees of the
+current module: an imported module's functions get theirs from their own
+`spec`, where the declaration belongs. -/
+private partial def ensureSourceSpec (functionName : Name) (ref : Syntax) :
+    CommandElabM Unit := do
+  let env ← getEnv
+  if env.contains (functionName ++ `sourceSpec) then return
+  unless (declarations.getState env).contains functionName do
+    throwErrorAt ref
+      "Move callee `{functionName}` has no retained source; declare it with `fun` so its semantics can be generated"
+  if (env.getModuleIdxFor? functionName).isSome then
+    throwErrorAt ref
+      "imported Move callee `{functionName}` has no source specification; declare its `spec` in its module"
+  if (← generationInProgress.get).contains functionName then
+    throwErrorAt ref
+      "mutually recursive Move functions are not yet supported by automatic source specifications (`{functionName}`)"
+  generationInProgress.modify (·.insert functionName)
+  try
+    let signature ← signatureOf functionName
+    let .str namespace_ shortName := functionName
+      | throwErrorAt ref "cannot generate a source specification for `{functionName}`"
+    let function := mkIdentFrom ref (Name.mkSimple shortName)
+    withScope (fun scope => { scope with currNamespace := namespace_ }) do
+      generateSourceSpec function signature
+  finally
+    generationInProgress.modify (·.erase functionName)
+
+private partial def translate (function world : Syntax) (resources : Array ResourceBinding)
+    (recursiveSpec? : Option (TSyntax `term) := none)
+    (mutableParameter? : Option (TSyntax `ident × TSyntax `term) := none) :
+    CommandElabM (TSyntax `term × TSyntax `term) := do
+  let declaration ← declarationFor function
+  let resultType ← actionResultType declaration
+  let body ← sourceBody declaration
+  let functionName := (← getCurrNamespace) ++ function.getId
+  let mutationType? ← match mutableParameter? with
+    | none => pure none
+    | some (_, referent) => referentTypeName? referent
+  let spec ← translateTerm {
+    world := ⟨world⟩
+    resources
+    functionName
+    recursiveSpec?
+    mutation? := mutableParameter?.map (·.1)
+    mutationType?
+  } body
+  match mutableParameter? with
+  | none => pure (spec, resultType)
+  | some (parameter, referent) =>
+      let wrapped ← `(Move.Semantics.withMutation $parameter
+        (fun $parameter => $spec))
+      pure (wrapped, ← `($resultType × $referent))
+
+/-- Translate against the abstract compositional resource-store interface. -/
+private partial def translateWithStores (function : Syntax) (world : TSyntax `ident)
+    (families : Array Family)
+    (recursiveSpec? : Option (TSyntax `term) := none)
+    (mutableParameter? : Option (TSyntax `ident × TSyntax `term) := none) :
+    CommandElabM (TSyntax `term × TSyntax `term) := do
+  let mut resources : Array ResourceBinding := #[]
+  for head in distinctHeads families do
+    resources := resources.push {
+      head
+      descriptorFor := fun family => `(Move.Semantics.ResourceStore.descriptor
+        (State := $world) (Value := $(family.term))) }
+  translate function world.raw resources recursiveSpec? mutableParameter?
+
+/-- A mutable borrow of a global resource at `key`, focused through `fields`
+— none for the whole resource.  The resource is checked out by ownership for
+the loan's lifetime, the focus is a prophecy mutation, and the reconciled
+focus is written back when the loan dies; a certified resource is re-created
+there, which is where its data invariant is owed.  The family's global
+invariants are re-certified at the write. -/
+private partial def globalMutableBorrow (context : TranslationContext)
+    (name : TSyntax `ident) (place : Syntax) (family : Family)
+    (key : TSyntax `term) (fields : Array (TSyntax `ident))
+    (rest : Array Lean.DoElem) : CommandElabM (TSyntax `term) := do
+  let (loanBody, continuation) := mutableBorrowScope name.getId rest
+  let descriptor ← resourceFor context.resources family
+  let resourceName := family.head
+  let referentType? ← pathTypeName? (some resourceName)
+    (fields.toList.map (·.getId))
+  let nested ← translateDo
+    { context with mutation? := some name, mutationType? := referentType? }
+    loanBody
+  let owner := mkIdentFrom place `_moveSpecOwner
+  let replacement := mkIdentFrom place `_moveSpecReplacement
+  let ownerTerm : TSyntax `term := ⟨owner.raw⟩
+  let replacementTerm : TSyntax `term := ⟨replacement.raw⟩
+  let focused ← projectPath ownerTerm fields
+  let certified? := (Move.dataInvariant? (← getEnv) resourceName).map
+    (resourceName, ·)
+  let borrow ← match ← rebuildOwner ownerTerm replacementTerm fields.toList
+      certified? with
+    | some creation =>
+        -- A certified resource is re-created when the loan dies: its
+        -- data invariant is owed there, and the stored value stays
+        -- certified.
+        let output := mkIdentFrom place `_moveSpecFocusOutput
+        let rebuilt := mkIdentFrom place `_moveSpecRebuilt
+        `(Move.Semantics.Resource.withBorrowMutSpec $descriptor $key
+            (fun $owner =>
+              Move.Semantics.Spec.bind
+                (Move.Semantics.withMutation $focused (fun $name => $nested))
+                (fun $output =>
+                  let $replacement := $output.2
+                  Move.Semantics.Spec.bind $creation
+                    (fun $rebuilt =>
+                      Move.Semantics.Spec.pure ($output.1, $rebuilt)))))
+    | none =>
+        let updated ← updatePath ownerTerm replacementTerm fields.toList
+        `(Move.Semantics.Resource.withBorrowMutFocusSpec $descriptor $key
+            (fun $owner => $focused)
+            (fun $owner $replacement => $updated)
+            (fun $name => $nested))
+  -- Global invariants re-certify the store at this write: an `update`
+  -- invariant wraps the write (relating pre/post state); a regular
+  -- invariant is asserted immediately after it.
+  let invariants := Move.globalInvariants (← getEnv) resourceName
+  let mut borrow := borrow
+  for (isUpdate, body, _) in invariants do
+    if isUpdate then
+      let bodyId := mkIdentFrom place body
+      borrow ← `(Move.Semantics.Spec.certifyUpdate $bodyId $borrow)
+  let regulars := invariants.filterMap fun (u, b, _) => if u then none else some b
+  let assertGlobal (cont : TSyntax `term) : CommandElabM (TSyntax `term) := do
+    let mut tail := cont
+    for body in regulars.reverse do
+      let bodyId := mkIdentFrom place body
+      tail ← `(Move.Semantics.Spec.bind
+        (Move.Semantics.Spec.certifyState $bodyId)
+        (fun _moveSpecCertify => $tail))
+    pure tail
+  if continuation.isEmpty then
+    if regulars.isEmpty then pure borrow
+    else
+      let tail ← assertGlobal
+        (← `(Move.Semantics.Spec.pure _moveSpecBorrowResult))
+      `(Move.Semantics.Spec.bind $borrow
+          (fun _moveSpecBorrowResult => $tail))
+  else
+    let after ← translateDo context continuation
+    let tail ← assertGlobal after
+    `(Move.Semantics.Spec.bind $borrow (fun _moveSpecBorrowResult => $tail))
+
+/-- An immutable borrow of a global resource, focused through `fields`: the
+observed value itself, after immutable-reference erasure. -/
+private partial def globalImmutableBorrow (context : TranslationContext)
+    (name : TSyntax `ident) (place : Syntax) (family : Family)
+    (key : TSyntax `term) (fields : Array (TSyntax `ident))
+    (rest : Array Lean.DoElem) : CommandElabM (TSyntax `term) := do
+  let nested ← if rest.isEmpty then emptyFinish context else translateDo context rest
+  let descriptor ← resourceFor context.resources family
+  let owner := mkIdentFrom place `_moveSpecOwner
+  let ownerTerm : TSyntax `term := ⟨owner.raw⟩
+  let focused ← projectPath ownerTerm fields
+  `(Move.Semantics.Spec.bind
+      (Move.Semantics.Resource.borrowSpec $descriptor $key)
+      (fun $owner => let $name := $focused; $nested))
+
+/-- A mutable borrow of an element of a local vector, or of the active vector
+mutation, focused through `fields` — none for the element itself.  The
+element is checked out through the checked `withBorrowElemMutSpec`; a field
+path focuses it through a nested prophecy mutation whose reconciled value is
+written back into the element before the element is written back into the
+vector. -/
+private partial def elementMutableBorrow (context : TranslationContext)
+    (name : TSyntax `ident) (place : Syntax) (vector : TSyntax `ident)
+    (index : TSyntax `term) (fields : Array (TSyntax `ident))
+    (rest : Array Lean.DoElem) : CommandElabM (TSyntax `term) := do
+  let ownerIsMutation := context.mutation?.any (·.getId == vector.getId)
+  let (loanBody, continuation) := mutableBorrowScope name.getId rest
+  withHoisted context #[index] fun residuals => do
+  let index := residuals[0]!
+  let nested ← translateDo
+    { context with mutation? := some name, mutationType? := none } loanBody
+  let body ← if fields.isEmpty then
+      `(fun $name => $nested)
+    else
+      let element := mkIdentFrom place `_moveSpecElement
+      let elementValue ← `(Move.Semantics.Mutation.read $element)
+      let focused ← projectPath elementValue fields
+      let fieldOutput := mkIdentFrom place `_moveSpecFieldOutput
+      let fieldOutputTerm : TSyntax `term := ⟨fieldOutput.raw⟩
+      let updated ← updatePath elementValue (← `($fieldOutputTerm.2)) fields.toList
+      `(fun $element =>
+          Move.Semantics.Spec.bind
+            (Move.Semantics.withMutation $focused (fun $name => $nested))
+            (fun $fieldOutput =>
+              Move.Semantics.Spec.pure
+                ($fieldOutputTerm.1,
+                  Move.Semantics.Mutation.write $element $updated)))
+  let output := mkIdentFrom place `_moveSpecVectorOutput
+  let outputTerm : TSyntax `term := ⟨output.raw⟩
+  if ownerIsMutation then
+    -- The vector is the active mutation: its current value is checked out
+    -- and the updated vector is written back into it.
+    let current ← `(Move.Semantics.Mutation.read $vector)
+    let borrow ← `(Move.Semantics.Vector.withBorrowElemMutSpec $current $index $body)
+    let after ← if continuation.isEmpty then
+        finish context (← `(Move.Semantics.Spec.pure $outputTerm.1))
+      else
+        translateDo context continuation
+    `(Move.Semantics.Spec.bind $borrow (fun $output =>
+        let $vector := Move.Semantics.Mutation.write $vector $outputTerm.2
+        $after))
+  else
+    let borrow ← `(Move.Semantics.Vector.withBorrowElemMutSpec $vector $index $body)
+    let after ← if continuation.isEmpty then
+        finish context (← `(Move.Semantics.Spec.pure $outputTerm.1))
+      else
+        let continuationSpec ← translateDo context continuation
+        `(let $vector := $outputTerm.2; $continuationSpec)
+    `(Move.Semantics.Spec.bind $borrow (fun $output => $after))
+
+/-- The relational semantics of a call that passes the live mutable
+reference, when `term` is one; the caller resumes the reference with the
+callee's final referent. -/
+private partial def mutableCallSpec? (context : TranslationContext)
+    (term : TSyntax `term) : CommandElabM (Option (TSyntax `term)) := do
+  match ← moveCallSpec? context term with
+  | some (call, true) => return some call
+  | _ => return none
+
+/-- Sequence a call passing the live mutable reference before `continuation`:
+the reference resumes with the callee's final referent, and the call's value
+is bound to `name?` when given. -/
+private partial def bindMutableCall (context : TranslationContext)
+    (call : TSyntax `term) (name? : Option (TSyntax `ident))
+    (continuation : TSyntax `term) : CommandElabM (TSyntax `term) := do
+  let some mutation := context.mutation?
+    | throwError "a call passing a mutable reference needs a live mutable reference"
+  let output := mkIdentFrom call `_moveSpecCallOutput
+  let outputTerm : TSyntax `term := ⟨output.raw⟩
+  match name? with
+  | some name =>
+      `(Move.Semantics.Spec.bind $call (fun $output =>
+          let $name := $outputTerm.1
+          let $mutation := Move.Semantics.Mutation.write $mutation $outputTerm.2
+          $continuation))
+  | none =>
+      `(Move.Semantics.Spec.bind $call (fun $output =>
+          let $mutation := Move.Semantics.Mutation.write $mutation $outputTerm.2
+          $continuation))
+
+/-- A `do`-level `match`: each arm continues with the statements after the
+match, as the then-branch of a statement `if` does. -/
+private partial def matchSpec (context : TranslationContext)
+    (discriminant : TSyntax `term) (alternatives : Array Syntax)
+    (rest : Array Lean.DoElem) : CommandElabM (TSyntax `term) := do
+  withHoisted context #[discriminant] fun residuals => do
+    let mut arms : Array (TSyntax ``Lean.Parser.Term.matchAlt) := #[]
+    for alternative in alternatives do
+      -- `| pats => doSeq`: the patterns are a comma-separated group at index 1
+      -- and the right-hand side a `doSeq` at index 3.
+      let patterns : TSyntaxArray `term := alternative[1].getSepArgs.map (⟨·⟩)
+      let body : TSyntax ``Lean.Parser.Term.doSeq := ⟨alternative[3]⟩
+      let armSpec ← translateDo context (Lean.Parser.Term.getDoElems body ++ rest)
+      arms := arms.push (← `(Lean.Parser.Term.matchAltExpr| | $patterns,* => $armSpec))
+    `(match $(residuals[0]!):term with $arms:matchAlt*)
+
 private partial def translateDo (context : TranslationContext)
     (elements : Array Lean.DoElem) :
     CommandElabM (TSyntax `term) := do
@@ -1164,6 +2157,35 @@ private partial def translateDo (context : TranslationContext)
         let nested ← translateRest rest
         return ← `(Move.Semantics.Spec.bind $rhsSpec fun $name => $nested)
     | _ => throwErrorAt first "unsupported assignment in automatic source specification"
+  if first.raw.isOfKind ``Lean.Parser.Term.doReassignArrow then
+    -- `x ← e` on an already bound local: a bind, like `let x ← e`.
+    let declaration := first.raw[0]
+    unless declaration.isOfKind ``Lean.Parser.Term.doIdDecl do
+      throwErrorAt first "unsupported assignment in automatic source specification"
+    let name : TSyntax `ident := ⟨declaration[0]⟩
+    let value : TSyntax `term := ⟨declaration[3]⟩
+    if let some mutation := context.mutation? then
+      if mutation.getId == name.getId then
+        throwErrorAt first "a mutable reference cannot be rebound; write through it with `:=`"
+    if let some call ← mutableCallSpec? context value then
+      return ← bindMutableCall context call (some name) (← translateRest rest)
+    let valueSpec ← expressionSpec context value
+    let nested ← translateRest rest
+    return ← `(Move.Semantics.Spec.bind $valueSpec (fun $name => $nested))
+  if first.raw.isOfKind ``Lean.Parser.Term.doMatch then
+    -- `match e with | pat => …`: one discriminant, no motive or generalizing
+    -- clause.
+    unless first.raw[1].isNone && first.raw[2].isNone && first.raw[3].isNone do
+      throwErrorAt first "`match` with a motive or generalizing clause is not supported by source specification generation"
+    let discriminants := first.raw[4].getSepArgs
+    unless discriminants.size == 1 do
+      throwErrorAt first "`match` on several discriminants is not supported by source specification generation"
+    let discriminant := discriminants[0]!
+    -- `matchDiscr` is an optional `h :` annotation followed by the term.
+    unless discriminant[0].isNone do
+      throwErrorAt first "a named `match` discriminant is not supported by source specification generation"
+    let alternatives := first.raw[6][0].getArgs
+    return ← matchSpec context ⟨discriminant[1]⟩ alternatives rest
   if first.raw.isOfKind ``Move.moveLoopDo ||
       first.raw.isOfKind ``Move.moveLoopLabeledDo then
     let sourceLabel? :=
@@ -1177,9 +2199,6 @@ private partial def translateDo (context : TranslationContext)
     let bodyIndex := if sourceLabel?.isSome then 2 else 1
     let body : TSyntax ``Lean.Parser.Term.doSeq := ⟨first.raw[bodyIndex]!⟩
     let body ← Lean.Elab.Command.liftCoreM <| Move.freshenLoopLocals body
-    if containsReturn body.raw then
-      throwErrorAt first
-        "`return` inside `loop` / `while` is not yet supported for `verify`"
     let assigned := Move.loopAssignedIdents body
     let state := freshLoopStateIdents first.raw assigned
     let pack ← packLoopState assigned
@@ -1203,38 +2222,46 @@ private partial def translateDo (context : TranslationContext)
         (fun $recName $stateName => $unpacked) $pack)
   match first with
   | `(doElem| let $name:ident ← &mut $vector:ident[$index:term]) =>
-      unless context.mutation?.isNone do
-        throwErrorAt first "nested mutable borrows are not yet supported by source specification generation"
-      if ← hasResource context.resources vector then
-        throwErrorAt first "direct mutable global borrows are not yet supported by source specification generation"
-      let (loanBody, continuation) := mutableBorrowScope name.getId rest
-      let nested ← translateDo { context with mutation? := some name } loanBody
-      let borrow ← `(Move.Semantics.Vector.withBorrowElemMutSpec $vector $index
-        (fun $name => $nested))
-      let output := mkIdentFrom first `_moveSpecVectorOutput
-      let after ← if continuation.isEmpty then
-        `(Move.Semantics.Spec.pure $output.1)
+      if let some family ← familyOfTerm? vector then
+        -- `&mut R[key]`: the whole resource.
+        globalMutableBorrow context name first.raw family index #[] rest
+      else if context.mutation?.any (·.getId == vector.getId) then
+        -- An element of the active vector mutation.
+        elementMutableBorrow context name first.raw vector index #[] rest
       else
-        let continuationSpec ← translateDo context continuation
-        `(let $vector := $output.2; $continuationSpec)
-      `(Move.Semantics.Spec.bind $borrow (fun $output => $after))
+        unless context.mutation?.isNone do
+          throwErrorAt first "nested mutable borrows are not yet supported by source specification generation"
+        elementMutableBorrow context name first.raw vector index #[] rest
   | `(doElem| let $name:ident ← & $vector:ident[$index:term]) =>
-      if ← hasResource context.resources vector then
-        throwErrorAt first "direct immutable global borrows are not yet supported by source specification generation"
-      let nested ← translateRest rest
-      `(Move.Semantics.Spec.bind
-          (Move.Semantics.Vector.borrowElemSpec $vector $index)
-          (fun $name => $nested))
+      if let some family ← familyOfTerm? vector then
+        globalImmutableBorrow context name first.raw family index #[] rest
+      else
+        withHoisted context #[index] fun residuals => do
+          let nested ← translateRest rest
+          let owner ← mutationValue context vector
+          `(Move.Semantics.Spec.bind
+              (Move.Semantics.Vector.borrowElemSpec $owner $(residuals[0]!))
+              (fun $name => $nested))
   | `(doElem| let $name:ident ← &mut $place:term) =>
-      let (loanBody, continuation) := mutableBorrowScope name.getId rest
-      let nested ← translateDo { context with mutation? := some name } loanBody
-      if let some parent := context.mutation? then
+      if let some (vector, index, fields) ←
+          localVectorPlace? context.resources place then
+        if let some mutation := context.mutation? then
+          unless mutation.getId == vector.getId do
+            throwErrorAt first "nested mutable borrows are not yet supported by source specification generation"
+        elementMutableBorrow context name first.raw vector index fields rest
+      else if let some parent := context.mutation? then
+        let (loanBody, continuation) := mutableBorrowScope name.getId rest
         let some (owner, fields) ← localPlace? context.resources place
           | throwErrorAt place
-              "a nested mutable borrow must select a field of the active mutable parameter"
+              "a nested mutable borrow must select a field of the live mutable reference"
         unless owner.getId == parent.getId && !fields.isEmpty do
           throwErrorAt place
-            "a nested mutable borrow must select a field of the active mutable parameter"
+            "a nested mutable borrow must select a field of the live mutable reference"
+        let childType? ← pathTypeName? context.mutationType?
+          (fields.toList.map (·.getId))
+        let nested ← translateDo
+          { context with mutation? := some name, mutationType? := childType? }
+          loanBody
         let parentValue ← `(Move.Semantics.Mutation.read $parent)
         let focused ← projectPath parentValue fields
         let output := mkIdentFrom place `_moveSpecFieldOutput
@@ -1248,7 +2275,7 @@ private partial def translateDo (context : TranslationContext)
         -- Re-creating a certified owner is a creation site: its data
         -- invariant is owed here, when the loan dies, and nowhere else.
         match ← rebuildOwner parentValue finalField fields.toList
-            context.certifiedOwner? with
+            (← certifiedMutation? context) with
         | some creation =>
             let rebuilt := mkIdentFrom place `_moveSpecRebuilt
             `(Move.Semantics.Spec.bind $borrow (fun $output =>
@@ -1261,6 +2288,7 @@ private partial def translateDo (context : TranslationContext)
                 let $parent := Move.Semantics.Mutation.write $parent $updated
                 $after))
       else if place.raw.isIdent && !(← hasResource context.resources ⟨place.raw⟩) then
+        let (loanBody, continuation) := mutableBorrowScope name.getId rest
         let localIdent : TSyntax `ident := ⟨place.raw⟩
         -- Keep values produced in the loan body in lexical scope, but refresh
         -- the owner from the prophecy before translating code after the
@@ -1272,117 +2300,43 @@ private partial def translateDo (context : TranslationContext)
           let refresh ← `(doElem|
             let $localIdent := Move.Semantics.Mutation.read $name)
           pure (loanBody ++ #[refresh] ++ continuation)
-        let nested ← translateDo { context with mutation? := some name } scopedRest
+        let nested ← translateDo
+          { context with mutation? := some name, mutationType? := none } scopedRest
         let borrow ← `(Move.Semantics.withMutation $localIdent (fun $name => $nested))
         let output := mkIdentFrom place `_moveSpecLocalOutput
         `(Move.Semantics.Spec.bind $borrow
             (fun $output => Move.Semantics.Spec.pure $output.1))
-      else if let some (vector, index, fields) ←
-          localVectorPlace? context.resources place then
-        unless fields.isEmpty do
-          throwErrorAt place
-            "mutable vector-element field borrows are not yet supported by source specification generation"
-        let borrow ← `(Move.Semantics.Vector.withBorrowElemMutSpec $vector $index
-          (fun $name => $nested))
-        let output := mkIdentFrom place `_moveSpecVectorOutput
-        let after ← if continuation.isEmpty then
-          `(Move.Semantics.Spec.pure $output.1)
-        else
-          let continuationSpec ← translateDo context continuation
-          `(let $vector := $output.2; $continuationSpec)
-        `(Move.Semantics.Spec.bind $borrow (fun $output => $after))
       else
-        let (resourceType, key, fields) ← globalPlace place
-        let descriptor ← resourceFor context.resources resourceType
-        let owner := mkIdentFrom place `_moveSpecOwner
-        let replacement := mkIdentFrom place `_moveSpecReplacement
-        let ownerTerm : TSyntax `term := ⟨owner.raw⟩
-        let replacementTerm : TSyntax `term := ⟨replacement.raw⟩
-        let focused ← projectPath ownerTerm fields
-        let resourceName ← Move.Verify.Source.canonicalResourceName resourceType
-        let certified? := (Move.dataInvariant? (← getEnv) resourceName).map
-          (resourceName, ·)
-        let borrow ← match ← rebuildOwner ownerTerm replacementTerm fields.toList
-            certified? with
-          | some creation =>
-              -- A certified resource is re-created when the loan dies: its
-              -- data invariant is owed there, and the stored value stays
-              -- certified.
-              let output := mkIdentFrom place `_moveSpecFocusOutput
-              let rebuilt := mkIdentFrom place `_moveSpecRebuilt
-              `(Move.Semantics.Resource.withBorrowMutSpec $descriptor $key
-                  (fun $owner =>
-                    Move.Semantics.Spec.bind
-                      (Move.Semantics.withMutation $focused (fun $name => $nested))
-                      (fun $output =>
-                        let $replacement := $output.2
-                        Move.Semantics.Spec.bind $creation
-                          (fun $rebuilt =>
-                            Move.Semantics.Spec.pure ($output.1, $rebuilt)))))
-          | none =>
-              let updated ← updatePath ownerTerm replacementTerm fields.toList
-              `(Move.Semantics.Resource.withBorrowMutFocusSpec $descriptor $key
-                  (fun $owner => $focused)
-                  (fun $owner $replacement => $updated)
-                  (fun $name => $nested))
-        -- Global invariants re-certify the store at this write: an `update`
-        -- invariant wraps the write (relating pre/post state); a regular
-        -- invariant is asserted immediately after it.
-        let invariants := Move.globalInvariants (← getEnv) resourceName
-        let mut borrow := borrow
-        for (isUpdate, body, _) in invariants do
-          if isUpdate then
-            let bodyId := mkIdentFrom place body
-            borrow ← `(Move.Semantics.Spec.certifyUpdate $bodyId $borrow)
-        let regulars := invariants.filterMap fun (u, b, _) => if u then none else some b
-        let assertGlobal (cont : TSyntax `term) : CommandElabM (TSyntax `term) := do
-          let mut tail := cont
-          for body in regulars.reverse do
-            let bodyId := mkIdentFrom place body
-            tail ← `(Move.Semantics.Spec.bind
-              (Move.Semantics.Spec.certifyState $bodyId)
-              (fun _moveSpecCertify => $tail))
-          pure tail
-        if continuation.isEmpty then
-          if regulars.isEmpty then pure borrow
-          else
-            let tail ← assertGlobal
-              (← `(Move.Semantics.Spec.pure _moveSpecBorrowResult))
-            `(Move.Semantics.Spec.bind $borrow
-                (fun _moveSpecBorrowResult => $tail))
-        else
-          let after ← translateDo context continuation
-          let tail ← assertGlobal after
-          `(Move.Semantics.Spec.bind $borrow (fun _moveSpecBorrowResult => $tail))
+        let (family, key, fields) ← globalPlace place
+        globalMutableBorrow context name first.raw family key fields rest
   | `(doElem| let $name:ident ← & $place:term) =>
-      let nested ← translateRest rest
       if let some (vector, index, fields) ←
           localVectorPlace? context.resources place then
-        let element := mkIdentFrom place `_moveSpecVectorElement
-        let elementTerm : TSyntax `term := ⟨element.raw⟩
-        let focused ← projectPath elementTerm fields
-        `(Move.Semantics.Spec.bind
-            (Move.Semantics.Vector.borrowElemSpec $vector $index)
-            (fun $element => let $name := $focused; $nested))
+        withHoisted context #[index] fun residuals => do
+          let nested ← translateRest rest
+          let owner ← mutationValue context vector
+          let element := mkIdentFrom place `_moveSpecVectorElement
+          let elementTerm : TSyntax `term := ⟨element.raw⟩
+          let focused ← projectPath elementTerm fields
+          `(Move.Semantics.Spec.bind
+              (Move.Semantics.Vector.borrowElemSpec $owner $(residuals[0]!))
+              (fun $element => let $name := $focused; $nested))
       else if let some (owner, fields) ←
           localPlace? context.resources place then
+        let nested ← translateRest rest
         let ownerTerm ← mutationValue context owner
         let focused ← projectPath ownerTerm fields
         `(let $name := $focused; $nested)
       else
-        let (resourceType, key, fields) ← globalPlace place
-        let descriptor ← resourceFor context.resources resourceType
-        let owner := mkIdentFrom place `_moveSpecOwner
-        let ownerTerm : TSyntax `term := ⟨owner.raw⟩
-        let focused ← projectPath ownerTerm fields
-        `(Move.Semantics.Spec.bind
-            (Move.Semantics.Resource.borrowSpec $descriptor $key)
-            (fun $owner => let $name := $focused; $nested))
+        let (family, key, fields) ← globalPlace place
+        globalImmutableBorrow context name first.raw family key fields rest
   | `(doElem| let $name:ident ← * $reference:term) =>
       let nested ← translateRest rest
       `(let $name := $(← rewritePure context.mutation? (← `(* $reference))); $nested)
   | `(doElem| let $name:ident ← $value:term) =>
-      if let some call ← vectorMutationCall? value then
+      if let some call ← mutableCallSpec? context value then
+        bindMutableCall context call (some name) (← translateRest rest)
+      else if let some call ← vectorMutationCall? value then
         let some mutation := context.mutation?
           | throwErrorAt value
               "`vector::insert` and `vector::remove` require a live mutable vector borrow"
@@ -1392,24 +2346,23 @@ private partial def translateDo (context : TranslationContext)
         | .insert reference index inserted =>
             unless reference.raw.isIdent && reference.raw.getId == mutation.getId do
               throwErrorAt reference "vector insert must use the currently borrowed vector"
-            let index ← rewritePure context.mutation? index
-            let inserted ← rewritePure context.mutation? inserted
-            `(Move.Semantics.Spec.bind
-                (Move.Semantics.Vector.insertSpec $mutation $index $inserted)
-                (fun $output =>
-                  let $name := $output.1
-                  let $mutation := $output.2
-                  $nested))
+            withHoisted context #[index, inserted] fun residuals =>
+              `(Move.Semantics.Spec.bind
+                  (Move.Semantics.Vector.insertSpec $mutation $(residuals[0]!) $(residuals[1]!))
+                  (fun $output =>
+                    let $name := $output.1
+                    let $mutation := $output.2
+                    $nested))
         | .remove reference index =>
             unless reference.raw.isIdent && reference.raw.getId == mutation.getId do
               throwErrorAt reference "vector remove must use the currently borrowed vector"
-            let index ← rewritePure context.mutation? index
-            `(Move.Semantics.Spec.bind
-                (Move.Semantics.Vector.removeSpec $mutation $index)
-                (fun $output =>
-                  let $name := $output.1
-                  let $mutation := $output.2
-                  $nested))
+            withHoisted context #[index] fun residuals =>
+              `(Move.Semantics.Spec.bind
+                  (Move.Semantics.Vector.removeSpec $mutation $(residuals[0]!))
+                  (fun $output =>
+                    let $name := $output.1
+                    let $mutation := $output.2
+                    $nested))
       else
         if receiverStyleVectorMutation? value then
           throwErrorAt value
@@ -1421,29 +2374,48 @@ private partial def translateDo (context : TranslationContext)
       let valueSpec ← expressionSpec context value
       let nested ← translateRest rest
       `(Move.Semantics.Spec.bind $valueSpec (fun $name => $nested))
-  | `(doElem| let $name:ident : $_type:term := $value:term) =>
+  | `(doElem| let $name:ident : $type:term := $value:term) =>
+      -- The ascription directs the value's elaboration (a structure literal
+      -- or numeral has no other source of its type).
       let valueSpec ← expressionSpec context value
       let nested ← translateRest rest
-      `(Move.Semantics.Spec.bind $valueSpec (fun $name => $nested))
+      `(Move.Semantics.Spec.bind $valueSpec (fun ($name : $type) => $nested))
+  | `(doElem| let $name:ident : $type:term ← $value:term) =>
+      if let some call ← mutableCallSpec? context value then
+        bindMutableCall context call (some name) (← translateRest rest)
+      else
+        let valueSpec ← expressionSpec context value
+        let nested ← translateRest rest
+        `(Move.Semantics.Spec.bind $valueSpec (fun ($name : $type) => $nested))
   | `(doElem| let mut $name:ident := $value:term) =>
       let valueSpec ← expressionSpec context value
       let nested ← translateRest rest
       `(Move.Semantics.Spec.bind $valueSpec (fun $name => $nested))
-  | `(doElem| let mut $name:ident : $_type:term := $value:term) =>
+  | `(doElem| let mut $name:ident : $type:term := $value:term) =>
       let valueSpec ← expressionSpec context value
       let nested ← translateRest rest
-      `(Move.Semantics.Spec.bind $valueSpec (fun $name => $nested))
+      `(Move.Semantics.Spec.bind $valueSpec (fun ($name : $type) => $nested))
+  | `(doElem| let mut $name:ident : $type:term ← $value:term) =>
+      if let some call ← mutableCallSpec? context value then
+        bindMutableCall context call (some name) (← translateRest rest)
+      else
+        let valueSpec ← expressionSpec context value
+        let nested ← translateRest rest
+        `(Move.Semantics.Spec.bind $valueSpec (fun ($name : $type) => $nested))
   | `(doElem| let mut $name:ident ← * $reference:term) =>
       let nested ← translateRest rest
       `(let $name := $(← rewritePure context.mutation? (← `(* $reference))); $nested)
   | `(doElem| let mut $name:ident ← $value:term) =>
-      let valueSpec ← expressionSpec context value
-      let nested ← translateRest rest
-      `(Move.Semantics.Spec.bind $valueSpec (fun $name => $nested))
+      if let some call ← mutableCallSpec? context value then
+        bindMutableCall context call (some name) (← translateRest rest)
+      else
+        let valueSpec ← expressionSpec context value
+        let nested ← translateRest rest
+        `(Move.Semantics.Spec.bind $valueSpec (fun $name => $nested))
   | `(doElem| return $value:term) =>
-      if !context.loops.isEmpty then
-        throwErrorAt first
-          "`return` inside `loop` / `while` is not yet supported for `verify`"
+      -- `return` ends the function: inside a loop too, since the loop's
+      -- fixed point already produces the function's result (its `break`
+      -- continuation is the rest of the function).
       translateTerm context value
   | `(doElem| break@$sourceLabel:ident) =>
       loopBreakSpec context (some sourceLabel.getId) first.raw
@@ -1454,15 +2426,13 @@ private partial def translateDo (context : TranslationContext)
   | `(doElem| continue) =>
       loopContinueSpec context none first.raw
   | `(doElem| while $condition:doIfCond do $body:doSeq) =>
-      if containsReturn body.raw then
-        throwErrorAt first
-          "`return` inside `loop` / `while` is not yet supported for `verify`"
-      let condition ← conditionTerm condition
+      let (binder?, condition) ← plainCondition condition
+      if binder?.isSome then
+        throwErrorAt first "a dependent `while` condition is not supported by source specification generation"
       let body ← Lean.Elab.Command.liftCoreM <| Move.freshenLoopLocals body
       let assigned := Move.loopAssignedIdents body
       let state := freshLoopStateIdents first.raw assigned
       let condition : TSyntax `term := ⟨replaceLoopState assigned state condition.raw⟩
-      let condition ← rewritePure context.mutation? condition
       let pack ← packLoopState assigned
       let recName := mkIdentFrom first `_moveSpecLoop
       let recTerm : TSyntax `term := ⟨recName.raw⟩
@@ -1480,42 +2450,48 @@ private partial def translateDo (context : TranslationContext)
       let bodySpec ← translateDo
         { context with loops := frame :: context.loops }
         bodyElements
-      let step ← `(if $condition then $bodySpec else $after)
+      let step ← withHoisted context #[condition] fun residuals =>
+        `(if $(residuals[0]!) then $bodySpec else $after)
       let stateName := mkIdentFrom first `_moveSpecLoopState
       let stateTerm : TSyntax `term := ⟨stateName.raw⟩
       let unpacked ← unpackLoopState state stateTerm step
       `(Move.Semantics.Spec.fix
           (fun $recName $stateName => $unpacked) $pack)
   | `(doElem| if $condition:doIfCond then $thenBranch:doSeq) =>
-      let condition ← conditionTerm condition
-      let condition ← rewritePure context.mutation? condition
-      let thenSpec ← translateDo context
-        (Lean.Parser.Term.getDoElems thenBranch ++ rest)
-      let elseSpec ← translateRest rest
-      `(if $condition then $thenSpec else $elseSpec)
+      conditionalSpec context condition
+        (Lean.Parser.Term.getDoElems thenBranch ++ rest) rest
   | `(doElem| if $condition:doIfCond then $thenBranch:doSeq else $elseBranch:doSeq) =>
-      unless rest.isEmpty do
-        throwErrorAt first "an `if` with `else` must be in tail position for source specification generation"
-      let condition ← conditionTerm condition
-      let condition ← rewritePure context.mutation? condition
-      let thenSpec ← translateDo context (Lean.Parser.Term.getDoElems thenBranch)
-      let elseSpec ← translateDo context (Lean.Parser.Term.getDoElems elseBranch)
-      `(if $condition then $thenSpec else $elseSpec)
+      -- Both branches continue with the statements after the conditional.
+      conditionalSpec context condition
+        (Lean.Parser.Term.getDoElems thenBranch ++ rest)
+        (Lean.Parser.Term.getDoElems elseBranch ++ rest)
   | `(doElem| $value:term) =>
-      if let some (.insert reference index inserted) ← vectorMutationCall? value then
+      if let some call ← mutableCallSpec? context value then
+        if rest.isEmpty then
+          -- The call's value is the statement's value.
+          let output := mkIdentFrom value `_moveSpecCallValue
+          let outputTerm : TSyntax `term := ⟨output.raw⟩
+          let some mutation := context.mutation?
+            | throwErrorAt value "a call passing a mutable reference needs a live mutable reference"
+          let after ← finish context (← `(Move.Semantics.Spec.pure $outputTerm.1))
+          `(Move.Semantics.Spec.bind $call (fun $output =>
+              let $mutation := Move.Semantics.Mutation.write $mutation $outputTerm.2
+              $after))
+        else
+          bindMutableCall context call none (← translateRest rest)
+      else if let some (.insert reference index inserted) ← vectorMutationCall? value then
         let some mutation := context.mutation?
           | throwErrorAt value "`vector::insert` requires a live mutable vector borrow"
         unless reference.raw.isIdent && reference.raw.getId == mutation.getId do
           throwErrorAt reference "vector insert must use the currently borrowed vector"
         let output := mkIdentFrom value `_moveSpecVectorMutationOutput
-        let index ← rewritePure context.mutation? index
-        let inserted ← rewritePure context.mutation? inserted
         let nested ← translateRest rest
-        `(Move.Semantics.Spec.bind
-            (Move.Semantics.Vector.insertSpec $mutation $index $inserted)
-            (fun $output =>
-              let $mutation := $output.2
-              $nested))
+        withHoisted context #[index, inserted] fun residuals =>
+          `(Move.Semantics.Spec.bind
+              (Move.Semantics.Vector.insertSpec $mutation $(residuals[0]!) $(residuals[1]!))
+              (fun $output =>
+                let $mutation := $output.2
+                $nested))
       else if receiverStyleVectorMutation? value then
         throwErrorAt value
           "automatic source specifications require fully qualified `Move.Vector.insert` or `Move.Vector.remove`"
@@ -1530,6 +2506,37 @@ private partial def translateDo (context : TranslationContext)
   | _ => throwErrorAt first
       "unsupported `do` statement in automatic source specification: {first.raw}"
 
+/-- A statement conditional, with the statements each branch continues
+into.  A plain condition is a source `if`; a dependent condition `h : c`
+keeps the branch hypothesis in scope (a `dite`); a pattern condition
+`let pat := e` is a match with a wildcard fall-through arm. -/
+private partial def conditionalSpec (context : TranslationContext)
+    (condition : TSyntax ``Lean.Parser.Term.doIfCond)
+    (thenElements elseElements : Array Lean.DoElem) :
+    CommandElabM (TSyntax `term) := do
+  let translateBranch (elements : Array Lean.DoElem) :=
+    if elements.isEmpty then emptyFinish context else translateDo context elements
+  if condition.raw.isOfKind ``Lean.Parser.Term.doIfLet then
+    -- `if let pat := e then … else …`; `doIfLetPure` holds the scrutinee.
+    let pattern : TSyntax `term := ⟨condition.raw[1]⟩
+    let binding := condition.raw[2]
+    unless binding.isOfKind ``Lean.Parser.Term.doIfLetPure do
+      throwErrorAt condition "`if let pat ← e` is not supported by source specification generation; bind `e` with `let` first"
+    return ← withHoisted context #[⟨binding[1]⟩] fun residuals => do
+      let thenSpec ← translateBranch thenElements
+      let elseSpec ← translateBranch elseElements
+      `(match $(residuals[0]!):term with
+        | $pattern:term => $thenSpec
+        | _ => $elseSpec)
+  let (binder?, condition) ← plainCondition condition
+  withHoisted context #[condition] fun residuals => do
+    let condition := residuals[0]!
+    let thenSpec ← translateBranch thenElements
+    let elseSpec ← translateBranch elseElements
+    match binder? with
+    | some binder => `(if $binder:ident : $condition then $thenSpec else $elseSpec)
+    | none => `(if $condition then $thenSpec else $elseSpec)
+
 private partial def translateTerm (context : TranslationContext)
     (term : TSyntax `term) : CommandElabM (TSyntax `term) := do
   match term with
@@ -1538,21 +2545,23 @@ private partial def translateTerm (context : TranslationContext)
   | `(& $place:term) =>
       if let some (vector, index, fields) ←
           localVectorPlace? context.resources place then
-        let element := mkIdentFrom place `_moveSpecVectorElement
-        let elementTerm : TSyntax `term := ⟨element.raw⟩
-        let focused ← projectPath elementTerm fields
-        let result ← finish context (← `(Move.Semantics.Spec.pure $focused))
-        `(Move.Semantics.Spec.bind
-            (Move.Semantics.Vector.borrowElemSpec $vector $index)
-            (fun $element => $result))
+        withHoisted context #[index] fun residuals => do
+          let owner ← mutationValue context vector
+          let element := mkIdentFrom place `_moveSpecVectorElement
+          let elementTerm : TSyntax `term := ⟨element.raw⟩
+          let focused ← projectPath elementTerm fields
+          let result ← finish context (← `(Move.Semantics.Spec.pure $focused))
+          `(Move.Semantics.Spec.bind
+              (Move.Semantics.Vector.borrowElemSpec $owner $(residuals[0]!))
+              (fun $element => $result))
       else if let some (owner, fields) ←
           localPlace? context.resources place then
         let ownerTerm ← mutationValue context owner
         let focused ← projectPath ownerTerm fields
         finish context (← `(Move.Semantics.Spec.pure $focused))
       else
-        let (resourceType, key, fields) ← globalPlace place
-        let descriptor ← resourceFor context.resources resourceType
+        let (family, key, fields) ← globalPlace place
+        let descriptor ← resourceFor context.resources family
         let owner := mkIdentFrom place `_moveSpecOwner
         let ownerTerm : TSyntax `term := ⟨owner.raw⟩
         let focused ← projectPath ownerTerm fields
@@ -1567,6 +2576,15 @@ private partial def translateTerm (context : TranslationContext)
             (Move.Spec.abortCodeOf _moveSpecAbortCode))
   | `(pure $value:term) => finish context (← expressionSpec context value)
   | _ =>
+      if let some call ← mutableCallSpec? context term then
+        let output := mkIdentFrom term `_moveSpecCallValue
+        let outputTerm : TSyntax `term := ⟨output.raw⟩
+        let some mutation := context.mutation?
+          | throwErrorAt term "a call passing a mutable reference needs a live mutable reference"
+        let after ← finish context (← `(Move.Semantics.Spec.pure $outputTerm.1))
+        return ← `(Move.Semantics.Spec.bind $call (fun $output =>
+            let $mutation := Move.Semantics.Mutation.write $mutation $outputTerm.2
+            $after))
       let valueSpec ← expressionSpec context term
       match context.mutation? with
       | none => pure valueSpec
@@ -1574,134 +2592,62 @@ private partial def translateTerm (context : TranslationContext)
           `(Move.Semantics.Spec.bind $valueSpec fun _moveSpecResult =>
               Move.Semantics.Spec.pure (_moveSpecResult, $mutation))
 
-private partial def conditionTerm (condition : TSyntax ``Lean.Parser.Term.doIfCond) :
-    CommandElabM (TSyntax `term) := do
+/-- A plain or dependent `if`/`while` condition: the optional hypothesis
+binder and the condition term. -/
+private partial def plainCondition (condition : TSyntax ``Lean.Parser.Term.doIfCond) :
+    CommandElabM (Option (TSyntax `ident) × TSyntax `term) := do
   match condition with
-  | `(doIfCond| $term:term) => pure term
-  | `(doIfCond| $_:ident : $term:term) => pure term
+  | `(doIfCond| $term:term) => pure (none, term)
+  | `(doIfCond| $binder:ident : $term:term) => pure (some binder, term)
   | _ => throwErrorAt condition
-      "dependent and pattern `if` conditions are not yet supported by source specification generation"
+      "this `if` condition is not supported by source specification generation"
 end
 
-def translate (function world : Syntax) (resources : Array ResourceBinding)
-    (recursiveSpec? : Option (TSyntax `term) := none)
-    (mutableParameter? : Option (TSyntax `ident × TSyntax `term) := none) :
-    CommandElabM (TSyntax `term × TSyntax `term) := do
-  let declaration ← declarationFor function
-  let resultType ← actionResultType declaration
-  let body ← sourceBody declaration
-  let functionName := (← getCurrNamespace) ++ function.getId
-  let certifiedOwner? ← match mutableParameter? with
-    | none => pure none
-    | some (_, referent) => do
-        match ← referentTypeName? referent with
-        | none => pure none
-        | some typeName =>
-            pure ((Move.dataInvariant? (← getEnv) typeName).map (typeName, ·))
-  let spec ← translateTerm {
-    world := ⟨world⟩
-    resources
-    functionName
-    recursiveSpec?
-    mutation? := mutableParameter?.map (·.1)
-    certifiedOwner?
-  } body
-  match mutableParameter? with
-  | none => pure (spec, resultType)
-  | some (parameter, referent) =>
-      let wrapped ← `(Move.Semantics.withMutation $parameter
-        (fun $parameter => $spec))
-      pure (wrapped, ← `($resultType × $referent))
 
-private partial def containsFunctionCall
-    (fullName shortName : Name) (stx : Syntax) : Bool :=
-  let direct := stx.isOfKind ``Lean.Parser.Term.app && stx.getNumArgs > 0 &&
-    stx[0].isIdent &&
-      (stx[0].getId == fullName || stx[0].getId == shortName)
-  let marked := stx.isOfKind ``Move.continueCallTerm && stx.getNumArgs > 1 &&
-    stx[1].isIdent &&
-      (stx[1].getId == fullName || stx[1].getId == shortName)
-  direct || marked || stx.getArgs.any (containsFunctionCall fullName shortName)
+/-- Whether a family's head is in scope: every instantiation of a head the
+function touches has its store in scope. -/
+private def knownResource (resources : Array Family) (candidate : Family) : Bool :=
+  resources.any (·.head == candidate.head)
 
-/-- Whether the retained body directly refers to its own Move declaration.
-Move has no first-class functions, so such an occurrence is a recursive call. -/
-def isRecursive (function : Syntax) : CommandElabM Bool := do
-  let declaration ← declarationFor function
-  let body ← sourceBody declaration
-  let fullName := (← getCurrNamespace) ++ function.getId
-  pure (containsFunctionCall fullName function.getId body.raw)
+/-- Add the concrete families a specification clause names (`existsAt<R>(…)`,
+global places `R[…]`, `modifies` targets) whose heads are in scope, so that
+frames mention them: a caller reaching a generic family only through a callee
+names the instantiation in its clauses. -/
+partial def addMentionedFamilies (clause : Syntax) (resources : Array Family) :
+    CommandElabM (Array Family) := do
+  let mut resources := resources
+  let candidate? ←
+    if clause.isOfKind ``Move.Spec.resourceExistsTerm then
+      familyOfTerm? clause[1]
+    else if clause.getKind == `«term__[_]» then
+      pure ((← rootFamily? ⟨clause⟩).map (·.1))
+    else if clause.isOfKind `Move.Spec.modifiesAddress ||
+        clause.isOfKind `Move.Spec.modifiesFamily then
+      familyOfTerm? clause[0]
+    else if clause.isOfKind `Move.Spec.modifiesGenericAddress ||
+        clause.isOfKind `Move.Spec.modifiesGenericFamily then
+      familyOfTerm? clause[1]
+    else
+      pure none
+  if let some candidate := candidate? then
+    if knownResource resources candidate then
+      resources := pushResource resources candidate
+  for child in clause.getArgs do
+    resources ← addMentionedFamilies child resources
+  return resources
 
-/-- Resource families an effectful source function must bring into scope: those
-it borrows or publishes/removes, closed under global invariants.  A write to a
-family re-checks every invariant naming it, and that obligation refers to every
-family the invariant mentions — so those families' stores must be in scope even
-when the function never touches them directly. -/
-def inferredResources (function : Syntax) : CommandElabM (Array (TSyntax `ident)) := do
-  let declaration ← declarationFor function
-  let body ← sourceBody declaration
-  let touched ← collectResources body.raw
-  let env ← getEnv
-  -- Close the touched families under global-invariant mentions, at the level
-  -- of canonical names (an added ident re-canonicalizes to the same name, so
-  -- the fixed point terminates).
-  let touchedNames ← touched.mapM canonicalResourceName
-  -- Bounded fixed point over invariant mentions, deduplicating by string to
-  -- avoid `Name` representation pitfalls.  The mention lists are already
-  -- complete per invariant, so a handful of passes reach closure.
-  let has (arr : Array Name) (n : Name) : Bool := arr.any (·.toString == n.toString)
-  let mut all := touchedNames
-  for _ in [0:8] do
-    let previous := all
-    for family in previous do
-      for (_, _, mentioned) in Move.globalInvariants env family do
-        for m in mentioned do
-          unless has all m do all := all.push m
-    if all.size == previous.size then break
-  let mut idents := touched
-  for m in all do
-    unless has touchedNames m do
-      idents := idents.push (mkIdentFrom function m)
-  return idents
-
-/-- Translate against the abstract compositional resource-store interface. -/
-def translateWithStores (function : Syntax) (world : TSyntax `ident)
-    (resourceTypes : Array (TSyntax `ident))
-    (recursiveSpec? : Option (TSyntax `term) := none)
-    (mutableParameter? : Option (TSyntax `ident × TSyntax `term) := none) :
-    CommandElabM (TSyntax `term × TSyntax `term) := do
-  let mut resources := #[]
-  for resourceType in resourceTypes do
-    let descriptor ← `(Move.Semantics.ResourceStore.descriptor
-      (State := $world) (Value := $resourceType))
-    resources := resources.push {
-      typeName := ← canonicalResourceName resourceType
-      descriptor := descriptor
-    }
-  translate function world.raw resources recursiveSpec? mutableParameter?
-
-private def knownResource (resources : Array (TSyntax `ident))
-    (candidate : TSyntax `ident) : CommandElabM Bool := do
-  let candidate ← canonicalResourceName candidate
-  for resource in resources do
-    if candidate == (← canonicalResourceName resource) then
-      return true
-  return false
-
-private def rewriteGlobalPlace (resources : Array (TSyntax `ident))
+private def rewriteGlobalPlace (resources : Array Family)
     (state place : TSyntax `term) : CommandElabM (Option (TSyntax `term)) := do
   let (root, fields) := splitFieldPath place
-  let rootInfo : Option (TSyntax `ident × TSyntax `term) := match root with
-    | `($resourceType:ident[$key:term]) => some (resourceType, key)
-    | _ => none
-  let some (resourceType, key) := rootInfo | return none
-  unless ← knownResource resources resourceType do return none
+  let some (family, key) ← rootFamily? root | return none
+  unless knownResource resources family do return none
   let owner ← `(Move.Semantics.ResourceStore.get
-    (Value := $resourceType) $state $key)
+    (Value := $(family.term)) $state $key)
   return some (← projectPath owner fields)
 
 /-- Rewrite global-place observations in a contract clause. Bare places refer
 to `current`; `old(place)` refers to `previous`. -/
-partial def rewriteClause (resources : Array (TSyntax `ident))
+partial def rewriteClause (resources : Array Family)
     (current previous : TSyntax `term) (clause : TSyntax `term) :
     CommandElabM (TSyntax `term) := do
   match clause with
@@ -1709,12 +2655,14 @@ partial def rewriteClause (resources : Array (TSyntax `ident))
       let some rewritten ← rewriteGlobalPlace resources previous place
         | throwErrorAt place "`old` expects a global resource place"
       pure rewritten
-  | `(existsAt<$resourceType:ident>($address:term)) =>
-      unless ← knownResource resources resourceType do
+  | `(existsAt<$resourceType:term>($address:term)) =>
+      let some family ← familyOfTerm? resourceType.raw
+        | throwErrorAt resourceType "`existsAt<…>` expects a resource type"
+      unless knownResource resources family do
         throwErrorAt resourceType
-          "resource `{resourceType.getId}` is not used by the specified function"
+          "resource `{resourceType}` is not used by the specified function"
       `(Move.Semantics.ResourceStore.contains
-        (Value := $resourceType) $current $address)
+        (Value := $(family.term)) $current $address)
   | _ =>
       if let some rewritten ← rewriteGlobalPlace resources current clause then
         return rewritten
@@ -1810,6 +2758,25 @@ private def quantifyContext
     (body : TSyntax `term) : MacroM (TSyntax `term) :=
   binders.foldrM (init := body) fun binder body => `(∀ $binder, $body)
 
+/-- Apply a function's relational semantics to the type parameters of its
+specification context by name: a parameter no argument determines (the `T`
+of a body `existsAt (Vault T) a`) would otherwise be left to inference. -/
+private def applyTypeParameters (function : TSyntax `term)
+    (binders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder)) :
+    MacroM (TSyntax `term) := do
+  -- One application node: named arguments resolve against the head's
+  -- binders, and a nested application would already have instantiated the
+  -- remaining implicit ones.
+  let mut namedArguments : Array (TSyntax `term) := #[]
+  for binder in binders do
+    match binder with
+    | `(bracketedBinder| {$name:ident : $_}) =>
+        let argument ← `(Lean.Parser.Term.namedArgument| ($name := $name))
+        namedArguments := namedArguments.push ⟨argument.raw⟩
+    | _ => pure ()
+  if namedArguments.isEmpty then return function
+  `($function $namedArguments*)
+
 private partial def findResult? (stx : Syntax) : Option Syntax :=
   if stx.isIdent && stx.getId == `result then
     some stx
@@ -1859,37 +2826,6 @@ private partial def rewriteMutablePost (parameter : TSyntax `ident)
   let args ← stx.getArgs.mapM (rewriteMutablePost parameter finalValue)
   pure (stx.setArgs args)
 
-private def argumentType (types : Array (TSyntax `term)) : MacroM (TSyntax `term) := do
-  match types.size with
-  | 0 => `(Unit)
-  | 1 => pure types[0]!
-  | _ =>
-      let reversed := types.toList.reverse
-      let result := reversed.head!
-      reversed.tail.foldlM (init := result) fun result type => `($type × $result)
-
-private def argumentProjection (base : TSyntax `term) (index count : Nat) :
-    MacroM (TSyntax `term) := do
-  let mut projection := base
-  for _ in [:index] do
-    projection ← `($projection.2)
-  if index + 1 < count then `($projection.1) else pure projection
-
-private def unpackArguments (arguments : Array (TSyntax `ident))
-    (body : TSyntax `term) : MacroM (TSyntax `term) := do
-  match arguments.size with
-  | 0 => `(fun _moveSpecArgs => $body)
-  | 1 => `(fun $(arguments[0]!) => $body)
-  | _ =>
-      let args := mkIdentFrom arguments[0]! `_moveSpecArgs
-      let argsTerm : TSyntax `term := ⟨args.raw⟩
-      let mut result := body
-      for index in (List.range arguments.size).reverse do
-        let argument := arguments[index]!
-        let projection ← argumentProjection argsTerm index arguments.size
-        result ← `(let $argument := $projection; $result)
-      `(fun $args => $result)
-
 private def clauseLambda (arguments : Array (TSyntax `ident))
     (extra : Array (Name × TSyntax `ident)) (clause : TSyntax `term) :
     MacroM (TSyntax `term) := do
@@ -1898,22 +2834,28 @@ private def clauseLambda (arguments : Array (TSyntax `ident))
   let mut body : TSyntax `term := ⟨rewritten⟩
   for (_, binder) in extra.reverse do
     body ← `(fun $binder => $body)
-  unpackArguments arguments body
+  Move.Verify.Source.unpackArguments arguments body
 
 /-- The frame condition of a specification: every resource family the
 function uses is unchanged except at the addresses the `modifies` clause
 lists.  Without a clause no global memory changes at all, which the abstract
 state expresses directly. -/
-private def frameCondition (resourceTypes : Array (TSyntax `ident))
+private def frameCondition (resourceTypes : Array Move.Verify.Source.Family)
     (world initial final : TSyntax `term)
     (clause? : Option Syntax) : CommandElabM (Option (TSyntax `term)) := do
   let some clause := clause?
     | return some (← `($final = $initial))
-  let mut targets : Array (Name × Array (TSyntax `term)) := #[]
+  let mut targets : Array (String × Array (TSyntax `term)) := #[]
   for target in clause[1].getSepArgs do
-    let family ← Move.Verify.Source.canonicalResourceName ⟨target[0]⟩
-    let address? : Option (TSyntax `term) :=
-      if target.getNumArgs == 4 then some ⟨target[2]⟩ else none
+    let (typeStx, address?) : Syntax × Option (TSyntax `term) :=
+      -- The target kinds are declared below, with the `spec` syntax.
+      if target.isOfKind `Move.Spec.modifiesAddress then (target[0], some ⟨target[2]⟩)
+      else if target.isOfKind `Move.Spec.modifiesFamily then (target[0], none)
+      else if target.isOfKind `Move.Spec.modifiesGenericAddress then (target[1], some ⟨target[4]⟩)
+      else (target[1], none)
+    let some family ← Move.Verify.Source.familyOfTerm? typeStx
+      | throwErrorAt target "`modifies` expects a resource family"
+    let family := family.key
     match targets.findIdx? (·.1 == family) with
     | some index =>
         let (name, addresses) := targets[index]!
@@ -1925,12 +2867,12 @@ private def frameCondition (resourceTypes : Array (TSyntax `ident))
     | none =>
         targets := targets.push (family, address?.toArray)
   let mut conjuncts : Array (TSyntax `term) := #[]
-  for resourceType in resourceTypes do
-    let family ← Move.Verify.Source.canonicalResourceName resourceType
-    let addresses? := (targets.find? (·.1 == family)).map (·.2)
+  for family in resourceTypes.filter (·.concrete) do
+    let addresses? := (targets.find? (·.1 == family.key)).map (·.2)
     if let some addresses := addresses? then
       if addresses.isEmpty then
         continue
+    let resourceType := family.term
     let address := mkIdentFrom resourceType `_moveSpecAddress
     let addressTerm : TSyntax `term := ⟨address.raw⟩
     let mut body ←
@@ -2322,8 +3264,11 @@ private def pureEnsuresContract (function : TSyntax `ident)
 /-- One global location a specification is allowed to change: a resource
 family, optionally narrowed to one address. -/
 declare_syntax_cat moveModifiesTarget
-scoped syntax ident "[" term "]" : moveModifiesTarget
-scoped syntax ident : moveModifiesTarget
+scoped syntax (name := modifiesAddress) ident "[" term "]" : moveModifiesTarget
+scoped syntax (name := modifiesFamily) ident : moveModifiesTarget
+/-- A generic family, written with its type arguments: `(Vault T)[addr]`. -/
+scoped syntax (name := modifiesGenericAddress) "(" term ")" "[" term "]" : moveModifiesTarget
+scoped syntax (name := modifiesGenericFamily) "(" term ")" : moveModifiesTarget
 
 /-- The global memory a function may change.  Everything else is unchanged,
 so contracts never state a frame condition explicitly.  An omitted clause
@@ -2477,27 +3422,26 @@ scoped macro "spec " function:ident binder:moveSpecBinder* " where "
 
 /-- The registered global-invariant body for each resource family that has
 one, among the families a function uses. -/
-private def globalInvariantsFor (resourceTypes : Array (TSyntax `ident)) :
-    CommandElabM (Array (TSyntax `ident × TSyntax `ident)) := do
+private def globalInvariantsFor (resourceTypes : Array Move.Verify.Source.Family) :
+    CommandElabM (Array (TSyntax `ident)) := do
   let env ← getEnv
   let mut result := #[]
   for family in resourceTypes do
-    let familyName ← Move.Verify.Source.canonicalResourceName family
     -- Only regular invariants are assumed on entry; `update` invariants
     -- constrain transitions and are asserted at writes only.
-    for (isUpdate, body, _) in Move.globalInvariants env familyName do
+    for (isUpdate, body, _) in Move.globalInvariants env family.head do
       unless isUpdate do
-        result := result.push (family, mkIdentFrom family body)
+        result := result.push (mkIdentFrom family.term body)
   return result
 
 /-- Conjoin each regular global invariant `Inv initial` into the entry
 precondition: the invariant is assumed on entry (it holds because every prior
 write re-established it) and re-established at each write. -/
 private def assumeGlobalInvariants (initial : TSyntax `term)
-    (invariants : Array (TSyntax `ident × TSyntax `ident))
+    (invariants : Array (TSyntax `ident))
     (precondition : TSyntax `term) : CommandElabM (TSyntax `term) := do
   let mut condition := precondition
-  for (_, body) in invariants do
+  for body in invariants do
     condition ← `($condition ∧ $body $initial)
   return condition
 
@@ -2511,9 +3455,12 @@ def buildEffectfulContract (function : TSyntax `ident)
     (mayAbortCondition? : Option (TSyntax `term)) : CommandElabM Unit := do
   let parameters ← liftMacroM <| unpackSpecParameters binders
   let arguments := parameters.arguments
-  let argsType ← liftMacroM <| argumentType parameters.types
+  let argsType ← liftMacroM <| Move.Verify.Source.argumentType parameters.types
   let world := mkIdentFrom function `_moveSpecState
-  let resourceTypes ← Move.Verify.Source.inferredResources function.raw
+  let mut resourceTypes ← Move.Verify.Source.inferredResources function.raw
+  for clause in #[precondition.raw, postcondition.raw, abortCondition.raw] ++
+      (mayAbortCondition?.map (·.raw)).toArray ++ modifiesClause?.toArray do
+    resourceTypes ← Move.Verify.Source.addMentionedFamilies clause resourceTypes
   let sourceSpecName := associatedName function `sourceSpec
   let sourceSpecFullName := (← getCurrNamespace) ++ sourceSpecName.getId
   let hasSourceSpec := (← getEnv).contains sourceSpecFullName
@@ -2521,20 +3468,12 @@ def buildEffectfulContract (function : TSyntax `ident)
   let sourceResultType ← match parameters.mutableParameter? with
     | none => pure resultType
     | some (_, referent) => `($resultType × $referent)
-  let generated? ← if hasSourceSpec then
-      pure none
-    else do
-      let recursive ← Move.Verify.Source.isRecursive function.raw
-      if recursive && parameters.mutableParameter?.isSome then
-        throwErrorAt function
-          "recursive source contracts with mutable-reference parameters are not yet supported"
-      let recursiveName := mkIdentFrom function `_moveSpecRecursive
-      let recursiveTerm : TSyntax `term := ⟨recursiveName.raw⟩
-      let (body, _) ←
-        Move.Verify.Source.translateWithStores function.raw world resourceTypes
-          (if recursive then some recursiveTerm else none)
-          parameters.mutableParameter?
-      pure (some (body, recursive, recursiveName))
+  unless hasSourceSpec do
+    Move.Verify.Source.generateSourceSpec function {
+      context := parameters.context
+      arguments
+      types := parameters.types
+      mutableParameter? := parameters.mutableParameter? }
   let contractName := associatedName function `contract
   let initial := mkIdentFrom precondition `_moveSpecInitial
   let final := mkIdentFrom postcondition `_moveSpecFinal
@@ -2582,57 +3521,32 @@ def buildEffectfulContract (function : TSyntax `ident)
     | none => `(fun _moveSpecArgs _moveSpecInitial _moveSpecFinal => True)
     | some frame => clauseLambda arguments
         #[( `initial, initial), (`final, final)] frame
-  let worldBinder ← `(bracketedBinder| {$world : Type})
-  let mut storeBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) := #[]
-  for (resourceType, index) in resourceTypes.zipIdx do
-    let storeName := mkIdentFrom resourceType
-      (Name.mkSimple s!"_moveSpecStore{index}")
-    let storeBinder ← `(bracketedBinder|
-      [$storeName : Move.Semantics.ResourceStore $world $resourceType])
-    storeBinders := storeBinders.push storeBinder
-  if let some (body, recursive, recursiveName) := generated? then
-    let sourceLambda ← liftMacroM <| unpackArguments arguments body
-    if recursive then
-      let bodySpecName := associatedName function `bodySpec
-      let recursiveBinder ← `(bracketedBinder|
-        ($recursiveName : $argsType → Move.Semantics.Spec $world $resultType))
-      let bodyCommand ← `(noncomputable def $bodySpecName $parameters.context* $worldBinder
-          $storeBinders* $recursiveBinder :
-          $argsType → Move.Semantics.Spec $world $sourceResultType := $sourceLambda)
-      elabCommand bodyCommand
-      let sourceCommand ← `(noncomputable def $sourceSpecName $parameters.context* $worldBinder
-          $storeBinders* : $argsType → Move.Semantics.Spec $world $sourceResultType :=
-          Move.Semantics.Spec.fix $bodySpecName)
-      elabCommand sourceCommand
-    else
-      let sourceCommand ← `(noncomputable def $sourceSpecName $parameters.context* $worldBinder
-          $storeBinders* : $argsType → Move.Semantics.Spec $world $sourceResultType :=
-          $sourceLambda)
-      elabCommand sourceCommand
   let contractRecord ← `(@Move.Verify.Contract.mk $world $argsType $sourceResultType
     $requiresLambda $ensuresLambda $abortsLambda $mayAbortLambda $frameLambda)
-  let mut contractBody ← `(Move.Verify.Satisfies $sourceSpecName $contractRecord)
-  let mut resourcePairs : Array (TSyntax `ident × TSyntax `ident) := #[]
-  for leftIndex in [:resourceTypes.size] do
-    for rightIndex in [leftIndex + 1:resourceTypes.size] do
-      -- Both directions: independence is symmetric, and a global-invariant
-      -- reestablishment lemma frames the *other* family across the written
-      -- one, needing whichever direction the write happens to take.
-      resourcePairs := resourcePairs.push
-        (resourceTypes[leftIndex]!, resourceTypes[rightIndex]!)
-      resourcePairs := resourcePairs.push
-        (resourceTypes[rightIndex]!, resourceTypes[leftIndex]!)
+  let sourceSpecApplied ← liftMacroM <| applyTypeParameters sourceSpecName parameters.context
+  let mut contractBody ← `(Move.Verify.Satisfies $sourceSpecApplied $contractRecord)
+  let heads := Move.Verify.Source.distinctHeads resourceTypes
+  let mut resourcePairs : Array (Name × Name) := #[]
+  for leftIndex in [:heads.size] do
+    for rightIndex in [leftIndex + 1:heads.size] do
+      -- Distinct heads are independent at every instantiation; two
+      -- instantiations of one head may coincide, so nothing is assumed about
+      -- them.  Both directions: independence is symmetric, and a
+      -- global-invariant reestablishment lemma frames the *other* family
+      -- across the written one, needing whichever direction the write
+      -- happens to take.
+      resourcePairs := resourcePairs.push (heads[leftIndex]!, heads[rightIndex]!)
+      resourcePairs := resourcePairs.push (heads[rightIndex]!, heads[leftIndex]!)
   for ((left, right), index) in resourcePairs.zipIdx.reverse do
-    let independenceName := mkIdentFrom left
+    let independenceName := mkIdentFrom function
       (Name.mkSimple s!"_moveSpecIndependent{index}")
     contractBody ← `(∀ [$independenceName :
-      Move.Semantics.IndependentResourceStores $world $left $right],
-      $contractBody)
-  for (resourceType, index) in resourceTypes.zipIdx.reverse do
-    let storeName := mkIdentFrom resourceType
+      $(← Move.Verify.Source.independenceType ⟨world⟩ left right)], $contractBody)
+  for (head, index) in heads.zipIdx.reverse do
+    let storeName := mkIdentFrom function
       (Name.mkSimple s!"_moveSpecStore{index}")
-    contractBody ← `(∀ [$storeName : Move.Semantics.ResourceStore
-      $world $resourceType], $contractBody)
+    contractBody ← `(∀ [$storeName : $(← Move.Verify.Source.storeType ⟨world⟩ head)],
+      $contractBody)
   contractBody ← `(∀ ($world : Type), $contractBody)
   contractBody ← liftMacroM <| quantifyContext parameters.context contractBody
   let contractCommand ← `(def $contractName : Prop := $contractBody)
@@ -2659,6 +3573,13 @@ private def elabEnsuresOnlySpec : CommandElab := fun stx => do
       (← `(True)) (some (← `(False)))
   else
     elabCommand (← liftMacroM (pureEnsuresContract function binders postcondition))
+    -- A pure function's relational semantics serves its callers' automatic
+    -- specifications.  Its generation is best-effort here: the value contract
+    -- above does not depend on it, and a caller that needs it reports the
+    -- unsupported form.
+    try
+      Move.Verify.Source.ensureSourceSpec ((← getCurrNamespace) ++ function.getId) function
+    catch _ => pure ()
 
 @[command_elab effectfulSourceSpec]
 private def elabEffectfulSourceSpec : CommandElab := fun stx => do
@@ -2667,16 +3588,15 @@ private def elabEffectfulSourceSpec : CommandElab := fun stx => do
   let world : TSyntax `term := ⟨stx[4]⟩
   let resourceSyntax := stx[7].getSepArgs
   let mut resources := #[]
-  let mut resourceTypes : Array (TSyntax `ident) := #[]
+  let mut resourceTypes : Array Move.Verify.Source.Family := #[]
   for resource in resourceSyntax do
     let resource : TSyntax `moveSpecResource := ⟨resource⟩
     let `(moveSpecResource| $typeName:ident => $descriptor:term) := resource
       | throwErrorAt resource "invalid resource descriptor"
-    resourceTypes := resourceTypes.push typeName
-    resources := resources.push {
-      typeName := ← Move.Verify.Source.canonicalResourceName typeName
-      descriptor := descriptor
-    }
+    let some family ← Move.Verify.Source.familyOfTerm? typeName.raw
+      | throwErrorAt typeName "expected a resource type"
+    resourceTypes := resourceTypes.push family
+    resources := resources.push { head := family.head, descriptorFor := fun _ => pure descriptor }
   let precondition : TSyntax `term := ⟨stx[11]⟩
   let modifiesClause? : Option Syntax :=
     if stx[13].getNumArgs == 1 then some stx[13][0] else none
@@ -2686,7 +3606,7 @@ private def elabEffectfulSourceSpec : CommandElab := fun stx => do
     if stx[19].getNumArgs == 3 then some ⟨stx[19][2]⟩ else none
   let parameters ← liftMacroM <| unpackSpecParameters binders
   let arguments := parameters.arguments
-  let argsType ← liftMacroM <| argumentType parameters.types
+  let argsType ← liftMacroM <| Move.Verify.Source.argumentType parameters.types
   let recursive ← Move.Verify.Source.isRecursive function.raw
   let recursiveName := mkIdentFrom function `_moveSpecRecursive
   let recursiveTerm : TSyntax `term := ⟨recursiveName.raw⟩
@@ -2714,7 +3634,7 @@ private def elabEffectfulSourceSpec : CommandElab := fun stx => do
     | none => `(fun _moveSpecArgs _moveSpecInitial _moveSpecFinal => True)
     | some frame => clauseLambda arguments
         #[( `initial, initial), (`final, final)] frame
-  let sourceLambda ← liftMacroM <| unpackArguments arguments body
+  let sourceLambda ← liftMacroM <| Move.Verify.Source.unpackArguments arguments body
   if recursive then
     let bodySpecName := associatedName function `bodySpec
     let recursiveBinder ← `(bracketedBinder|
@@ -2730,7 +3650,8 @@ private def elabEffectfulSourceSpec : CommandElab := fun stx => do
     let sourceCommand ← `(noncomputable def $sourceSpecName $parameters.context* : $argsType →
         Move.Semantics.Spec $world $resultType := $sourceLambda)
     elabCommand sourceCommand
-  let contractBody ← `(Move.Verify.Satisfies $sourceSpecName
+  let sourceSpecApplied ← liftMacroM <| applyTypeParameters sourceSpecName parameters.context
+  let contractBody ← `(Move.Verify.Satisfies $sourceSpecApplied
       (@Move.Verify.Contract.mk $world $argsType $resultType
         $requiresLambda $ensuresLambda $abortsLambda $mayAbortLambda
         $frameLambda))
@@ -2908,7 +3829,15 @@ private def elabAutomaticSourceVerify : CommandElab := fun stx => do
   let sourceSpecName := functionName ++ `sourceSpec
   let contractName := associatedName function `contract
   let verifiedName := associatedName function `verified
-  unless (← getEnv).contains sourceSpecName do
+  -- A pure value contract reduces the function; a relational one opens the
+  -- generated `Satisfies`.  The contract's own shape decides: a pure function
+  -- may well have a `sourceSpec` too, generated for its callers.
+  let relational := match (← getEnv).find? (functionName ++ `contract) with
+    | some info => match info.value? (allowOpaque := true) with
+      | some value => value.getUsedConstants.contains ``Move.Verify.Satisfies
+      | none => false
+    | none => false
+  unless relational do
     let functionTerm ← parseTerm functionName
     let functionLemma ←
       `(Lean.Parser.Tactic.simpLemma| $functionTerm:term)

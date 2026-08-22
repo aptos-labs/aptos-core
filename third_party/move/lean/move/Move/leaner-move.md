@@ -248,7 +248,8 @@ spec-clauses    = "ensures" term                (* only a postcondition *)
                   "ensures" term
                   [ ";" aborts-clause ] ;       (* omitted: uninterpreted *)
 modifies-clause = "modifies" modifies-target { "," modifies-target } ";" ;
-modifies-target = ident [ "[" expr "]" ] ;      (* family, or one address *)
+modifies-target = family [ "[" expr "]" ] ;     (* family, or one address *)
+family          = ident | "(" ident { type-atom } ")" ;   (* `(Vault T)` *)
 aborts-clause   = "aborts_if" term "with" term
                   { ";" "aborts_if" term "with" term }
                 | "aborts_if" term ;            (* any code *)
@@ -275,8 +276,8 @@ verify-decl     = "verify" ident [ "by" tactic-seq ] ;
 
 spec-term       = "result" | "initial" | "final" | "abortCode" | "this"
                 | "old(" term ")"
-                | "existsAt<" ident ">(" term ")"
-                | ident "[" term "]" { "." ident } ;   (* global place *)
+                | "existsAt<" type ">(" term ")"
+                | family "[" term "]" { "." ident } ;  (* global place *)
 
 (* ---- compilation directives ---- *)
 
@@ -553,9 +554,11 @@ def E_TOO_SMALL : U64 := 7
 division or remainder by zero abort the transaction with the VM's arithmetic
 failure code. Both operands of a binary operation have one width.
 
-`<` and `<=` compare integers numerically. On any other Move-representable
-type, `<` and `==` denote Move's built-in structural comparison and equality
-(`std::cmp` lexicographic order); no user-supplied ordering is consulted.
+`<`, `<=`, `>`, `>=`, `==`, and `!=` compare integers numerically, in
+conditions and in value position (`left < right` as a `Bool`). On any other
+Move-representable type, `<` and `==` denote Move's built-in structural
+comparison and equality (`std::cmp` lexicographic order); no user-supplied
+ordering is consulted. `!` negates a `Bool`.
 `&&` and `||` are lowered through branches.
 
 `&&&`, `|||`, and `^^^` are the width-preserving bitwise operations; they
@@ -661,6 +664,9 @@ fun remove (addr : Address) : Action U64 := do
   let counter ← moveFrom Counter addr
   pure counter.value
 ```
+
+A generic resource family is named at its instantiation: `existsAt (Vault T)
+addr`, `moveTo signer ({ value } : Vault T)`, `&mut (Vault U64)[addr].value`.
 
 `acquires` metadata is not written by the author: Leaner seeds each function
 with the resources of its global borrows and `moveFrom` uses and computes
@@ -973,7 +979,8 @@ spec narrow (value : U64) where
 | `result` | the returned value |
 | `old(place)` | the place observed in the pre-state |
 | `R[addr]`, `R[addr].f.g` | a global place in the post-state (in `ensures`) |
-| `existsAt<R>(addr)` | whether resource `R` is published at `addr` |
+| `(R T)[addr]`, `(R T)[addr].f` | the same for a generic family at an instantiation |
+| `existsAt<R>(addr)`, `existsAt<R T>(addr)` | whether resource `R` (at `T`) is published at `addr` |
 | `x.toNat` | the mathematical value of an unsigned integer |
 | `x.toInt` | the mathematical value of a signed integer |
 | `v.toList` | the logical contents of a `Vector` |
@@ -1120,6 +1127,7 @@ a declared abort may happen.
 | `modifies R[addr];` | every other address of `R`, and every other family the function uses, is unchanged |
 | `modifies R;` | family `R` is unconstrained; the others are still framed |
 | `modifies R[a], S[a];` | both narrowed families, the rest framed |
+| `modifies (R T)[addr];` | a generic family at an instantiation, like `R[addr]`; an instantiation neither the body nor the clauses name is left unconstrained |
 
 ```lean
 spec shift (addr : Address) (amount : U64) where
@@ -1184,7 +1192,16 @@ spec add {K} {V} [Move.Compare.Total K]
     with Move.Semantics.Vector.indexOutOfBounds
 ```
 
-A contract currently supports at most one mutable-reference parameter.
+A contract currently supports at most one mutable-reference parameter. A
+callee with a `&mut` parameter is called with the caller's live mutable
+reference, and the callee's final referent is written back to the place the
+caller borrowed:
+
+```lean
+entry fun bump_counter (addr : Address) : Action Unit := do
+  let value ← &mut Counter[addr].value
+  bump value
+```
 
 ### Data invariants
 
@@ -1440,11 +1457,16 @@ recursive binary search against a `Model.Search.Window` invariant; and
 
 ### Calls
 
-A call to an `Action` callee is verified from the callee's contract, which
-must be declared before the caller's `spec`. In an automatic proof the
-callee's `sourceSpec` is unfolded into the caller; in a manual proof,
-`wp_call` steps through it and leaves the postcondition weakening and abort
-forwarding as the two goals:
+A call to a Move callee is verified from the callee's relational semantics,
+`f.sourceSpec`, which is generated from its retained `fun` body — by its own
+`spec`, or on demand for a callee (pure or effectful) that has none. In an
+automatic proof the callee's `sourceSpec` is unfolded into the caller; a
+callee with a `&mut` parameter is called with the caller's live mutable
+reference (`bump value` after `let value ← &mut Counter[addr].value`) and its
+final referent is written back. A recursive callee's semantics is a fixed
+point the automatic proof does not unfold, so its callers are proved by hand
+from the callee's verified contract: `wp_call` steps through it and leaves the
+postcondition weakening and abort forwarding as the two goals:
 
 ```lean
 verify contains by
@@ -1466,19 +1488,15 @@ executed; it simply has no `spec`/`verify` yet. The current boundary:
 
 | Rejected at `spec` | Workaround |
 |---|---|
-| a call to a *pure* Move helper from an `Action` body | inline it, or omit `verify` |
-| a call to an effectful callee with a `&mut` parameter | omit `verify` |
-| a call to an effectful callee with no `spec` | declare the callee's `spec` first |
-| `Move.Vector.get`, `Move.Vector.set` | use an element borrow |
-| receiver-style `r.insert i e` / `r.remove i` | write `Move.Vector.insert` / `Move.Vector.remove` |
-| arithmetic in an `if` condition | bind it to a local first |
-| a core reference or vector primitive named in a value position (`read`, `write`, `borrowLocal`, `freeze`, ...) | use the surface syntax (`*r`, `r := e`, `&x`) |
-| `&mut R[addr]` / `&R[addr]` without a field path | borrow a field: `&mut R[addr].field` |
-| a nested mutable borrow that is not a field of the active mutable parameter | restructure the borrow |
-| a mutable vector-element *field* borrow | borrow the element, then the field separately |
-| `return` inside `loop` / `while` | restructure the loop |
-| a dependent or pattern `if` condition | use a plain condition (a dependent `if` at a pure creation site is unaffected) |
-| a recursive contract with a `&mut` parameter | not yet supported |
+| a call to a callee that is not a `fun` (no retained source) | declare the callee with `fun` |
+| a call to a mutually recursive callee | not yet supported |
+| receiver-style `values.get i` / `r.insert i e` / `r.remove i` | write `Move.Vector.get` / `Move.Vector.insert` / `Move.Vector.remove` |
+| an effect (arithmetic, a cast, a checked vector access, a call) in a conditional position — the right operand of `&&`/`||`, a branch of a value `if`, a `match` arm, a `fun` body | bind it to a local first |
+| a core primitive in a form the surface cannot express (`borrowField` with a computed descriptor, `assert`) | use the surface syntax (`&r.f`, `abort c`) |
+| a second `&mut` borrow from a live mutable reference that is not a field or element of it | restructure the borrow |
+| `if let pat ← e`; a dependent `while` condition | bind `e` with `let` first; use a plain condition |
+| `match` with a motive or `generalizing` clause, several discriminants, or a named discriminant | restructure the `match` |
+| a clause naming a resource family the function does not touch | name only families the function uses |
 | more than one `&mut` parameter | not yet supported |
 | a mutually recursive family, under `contract_intro` | use `satisfies_fixFamily` explicitly |
 

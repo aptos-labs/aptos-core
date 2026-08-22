@@ -312,6 +312,18 @@ private def elabFieldBorrow (mutable : Bool) (refStx : Term)
   let result ← mkAppM primitive #[refExpr, descriptor]
   ensureHasType expectedType? result
 
+/-- The base of a dotted place `counter.value` as an identifier spanning its
+own characters of the original source.  A synthesized identifier would carry
+synthetic source info, which the unused-variable linter does not count as a
+use of `counter`; the source span also gives hovers the right target. -/
+private def baseIdent (place : Syntax) (baseName : Name) : Ident :=
+  match place.getHeadInfo with
+  | .original leading pos _ _ =>
+      let text := baseName.toString
+      let endPos : String.Pos.Raw := ⟨pos.byteIdx + text.utf8ByteSize⟩
+      ⟨Syntax.ident (.original leading pos "".toRawSubstring endPos) text.toRawSubstring baseName []⟩
+  | _ => mkIdentFrom place baseName
+
 private def fieldParts : Name → List String
   | .anonymous => []
   | .str baseName part => fieldParts baseName ++ [part]
@@ -444,7 +456,7 @@ private partial def elabBorrow (mutable : Bool) (place : Term)
       if place.raw.isIdent then
         match place.raw.getId with
         | .str baseName fieldName =>
-            let ref := mkIdentFrom place baseName
+            let ref := baseIdent place baseName
             let field := mkIdentFrom place (Name.mkSimple fieldName)
             return ← elabFieldBorrow mutable ref field expectedType?
         | _ => pure ()

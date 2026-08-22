@@ -933,7 +933,10 @@ private def desugarModuleItem (invariants : Array (Name × Array Syntax))
     return withAttributeRegistration declaration stx[4] user
   return #[stx]
 
-@[macro moveModuleCommand] def expandMoveModuleCommand : Macro := fun stx => do
+/-- Expand a `module` to its command sequence: the namespace, identity and
+export registration, the Move scope, the desugared items, and the closing
+`end`. -/
+def expandMoveModuleCommand : Macro := fun stx => do
   unless stx.isOfKind ``moveModuleCommand do Macro.throwUnsupported
   let moduleName : TSyntax `ident := ⟨stx[1]⟩
   let exportName : TSyntax `str := ⟨Syntax.mkStrLit moduleName.getId.toString⟩
@@ -972,6 +975,35 @@ private def desugarModuleItem (invariants : Array (Name × Array Syntax))
     #[namespaceCommand.raw, identityCommand.raw, exportCommand.raw,
       openLeanerCommand.raw, openLeanerScopeCommand.raw] ++
       body ++ #[endCommand.raw]
+
+/-- Elaborate a `module` item by item.  The items are not handed to the
+elaborator as one expanded sequence because an item that re-enters the
+top-level elaborator itself — `#guard_msgs` does, to capture the messages
+of the command it guards — resets the per-command message log, info trees,
+and pending snapshot tasks, which would silently drop everything earlier
+items produced (their errors included) and attribute earlier items' pending
+proofs to the guard.  Flushing those three after every item keeps each item's
+output, and keeps a guard's view limited to its own command. -/
+@[command_elab moveModuleCommand] def elabMoveModuleCommand : CommandElab := fun stx => do
+  let expanded ← liftMacroM (expandMoveModuleCommand stx)
+  withMacroExpansion stx expanded do
+    let mut messages : MessageLog := {}
+    let mut trees : PersistentArray InfoTree := {}
+    let mut snapshotTasks : Array (Language.SnapshotTask Language.SnapshotTree) := #[]
+    for command in expanded.getArgs do
+      elabCommand command
+      let state ← get
+      messages := messages ++ state.messages
+      trees := trees ++ state.infoState.trees
+      snapshotTasks := snapshotTasks ++ state.snapshotTasks
+      modify fun state => { state with
+        messages := {}
+        infoState := { state.infoState with trees := {} }
+        snapshotTasks := #[] }
+    modify fun state => { state with
+      messages := messages ++ state.messages
+      infoState := { state.infoState with trees := trees ++ state.infoState.trees }
+      snapshotTasks := snapshotTasks ++ state.snapshotTasks }
 
 @[command_elab registerMoveModuleIdentity]
 def elabRegisterMoveModuleIdentity : CommandElab := fun stx => do

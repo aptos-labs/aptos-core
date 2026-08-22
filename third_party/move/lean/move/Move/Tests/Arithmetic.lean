@@ -68,6 +68,42 @@ module Arithmetic where
       Counter[addr].value = old(Counter[addr].value) / divisor;
     aborts_if divisor.toNat = 0 with Semantics.Checked.arithmeticAbortCode
 
+  -- Comparison spellings: `<=`, `>`, `>=`, `!=`, and a comparison in value
+  -- position (`a < b` as a `Bool`) all lower to the width-agnostic `lt` /
+  -- `le` / `eq` instructions.
+  fun at_most (left right : U64) : Action U64 := do
+    if left <= right then pure 1 else pure 0
+
+  spec at_most (left : U64) (right : U64) where
+    ensures result = if left.toNat ≤ right.toNat then 1 else 0;
+    aborts_if False
+
+  fun exceeds (left right : U64) : Action U64 := do
+    if left > right then pure 1 else pure 0
+
+  spec exceeds (left : U64) (right : U64) where
+    ensures result = if right.toNat < left.toNat then 1 else 0;
+    aborts_if False
+
+  fun at_least (left right : U64) : Action U64 := do
+    if left >= right then pure 1 else pure 0
+
+  spec at_least (left : U64) (right : U64) where
+    ensures result = if right.toNat ≤ left.toNat then 1 else 0;
+    aborts_if False
+
+  fun differs (left right : U64) : Action U64 := do
+    if left != right then pure 1 else pure 0
+
+  spec differs (left : U64) (right : U64) where
+    ensures result = if left.toNat = right.toNat then 0 else 1;
+    aborts_if False
+
+  fun is_less (left right : U64) : Bool := left < right
+
+  spec is_less (left : U64) (right : U64) where
+    ensures result = true ↔ left.toNat < right.toNat
+
   /-! ## Proofs -/
 
   verify add_values
@@ -75,6 +111,16 @@ module Arithmetic where
   verify explicit_add
 
   verify explicit_div
+
+  verify at_most
+
+  verify exceeds
+
+  verify at_least
+
+  verify differs
+
+  verify is_less
 
   verify multiply
 
@@ -95,6 +141,16 @@ module Arithmetic where
   #test run "explicit_add" [] [.u64 18446744073709551615, .u64 1] = Tests.aborted 0
   #test run "explicit_div" [] [.u64 17, .u64 5] = Tests.okU64 3
   #test run "explicit_div" [] [.u64 17, .u64 0] = Tests.aborted 0
+  #test run "at_most" [] [.u64 2, .u64 2] = Tests.okU64 1
+  #test run "at_most" [] [.u64 3, .u64 2] = Tests.okU64 0
+  #test run "exceeds" [] [.u64 3, .u64 2] = Tests.okU64 1
+  #test run "exceeds" [] [.u64 2, .u64 2] = Tests.okU64 0
+  #test run "at_least" [] [.u64 2, .u64 2] = Tests.okU64 1
+  #test run "at_least" [] [.u64 1, .u64 2] = Tests.okU64 0
+  #test run "differs" [] [.u64 1, .u64 2] = Tests.okU64 1
+  #test run "differs" [] [.u64 2, .u64 2] = Tests.okU64 0
+  #test run "is_less" [] [.u64 1, .u64 2] = Tests.okBool true
+  #test run "is_less" [] [.u64 2, .u64 2] = Tests.okBool false
   #test run "multiply" (memory 2 6) [.address 2, .u64 7]
     = Tests.okRet (memory 2 42) []
   #test run "multiply" (memory 2 18446744073709551615) [.address 2, .u64 2]

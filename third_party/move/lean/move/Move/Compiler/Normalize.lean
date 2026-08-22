@@ -1059,6 +1059,7 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
         else if fn == ``MoveInt.lessEq then some (fun _ => .le)
         else if fn == ``MoveInt.equal then some (fun _ => .eq)
         else if fn == ``MoveInt.instDecidableLt then some (fun _ => .lt)
+        else if fn == ``MoveInt.instDecidableLe then some (fun _ => .le)
         else none
       if let some mkOp := intBinary? then
         let some lhs := vars[vars.size - 2]?
@@ -1080,6 +1081,14 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
         let some rhs := vars[1]? | throwError "binary operation is missing its right operand"
         addLocalTy decl.fvarId .bool
         return instrs.push (.call #[localName decl.fvarId] op #[srcName lhs, srcName rhs])
+      -- A `Decidable p` is represented by the Boolean the comparison produced
+      -- (`a < b` in value position is `decide (a < b)`); `decide` is the
+      -- identity on it.
+      if fn == ``Decidable.decide then
+        let some decidable := vars[vars.size - 1]?
+          | throwError "`decide` is missing its instance"
+        addLocalTy decl.fvarId .bool
+        return instrs.push (.assign (localName decl.fvarId) (srcName decidable))
       if fn == ``MoveInt.cast then
         let some operand := vars[vars.size - 1]?
           | throwError "integer cast is missing its operand"
