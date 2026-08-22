@@ -51,6 +51,14 @@ between its Lean namespace and on-chain Move identity. -/
 syntax (name := registerMoveModuleIdentity)
   "#register_module_identity " str str : command
 
+def moveAddressSpec := num <|> ident
+
+syntax (name := registerMoveModuleIdentityAt)
+  "#register_module_identity_at " term ", " str : command
+
+syntax (name := registerMoveFriend)
+  "#register_move_friend " term "::" ident : command
+
 /-- One attribute or pragma instance: a head name applied to arguments. -/
 def moveAttributeInstance := leading_parser
   Lean.Parser.ident >>
@@ -59,7 +67,7 @@ def moveAttributeInstance := leading_parser
 /-- A source attribute list, written before the leading keyword of a
 `struct`, `enum`, or `fun` declaration inside a `module`. -/
 def moveAttributes := leading_parser
-  "@[" >>
+  ("@[" <|> "#[") >>
     Lean.Parser.withoutPosition
       (Lean.Parser.sepBy1 moveAttributeInstance ", ") >>
     "]"
@@ -143,6 +151,14 @@ def moveStructItem := leading_parser
   " where " >> Lean.Parser.Command.structFields >>
   Lean.Parser.Command.optDeriving
 
+/-- A positional Move structure. Generated Lean fields use stable numeric
+names (`_0`, `_1`, …), while bytecode field metadata is positional anyway. -/
+def movePositionalStructItem := leading_parser
+  Lean.Parser.atomic (moveItemPrefix >> "struct " >>
+    Lean.Parser.Command.declId >> "(") >>
+  Lean.Parser.sepBy1 Lean.Parser.termParser ", " >> ")" >>
+  moveAbilities >> Lean.Parser.Command.optDeriving
+
 /-- `enum Name ... where` declares a Move enum; the expander rewrites it to
 `@[move_enum] inductive`. -/
 def moveEnumItem := leading_parser
@@ -171,6 +187,37 @@ def moveFriendFunItem := leading_parser
     (Lean.Parser.Command.optDeclSig >> Lean.Parser.Command.declVal) >>
   Lean.Parser.Command.optDefDeriving
 
+/-- `package fun` is source-level package visibility.  As in the Move
+compiler, the emitted bytecode visibility is `friend`; the distinct tag is
+retained so tooling can recover the authored visibility. -/
+def movePackageFunItem := leading_parser
+  Lean.Parser.atomic
+    (moveItemPrefix >> Lean.Parser.nonReservedSymbol "package " >> "fun ") >>
+  Lean.Parser.Command.declId >>
+  Lean.Parser.ppIndent
+    (Lean.Parser.Command.optDeclSig >> Lean.Parser.Command.declVal) >>
+  Lean.Parser.Command.optDefDeriving
+
+/-- `inline fun` is a compile-time-only helper.  Its body is forced through
+Lean's inliner and the declaration itself is not selected for Move output. -/
+def moveInlineFunItem := leading_parser
+  Lean.Parser.atomic
+    (moveItemPrefix >> Lean.Parser.nonReservedSymbol "inline " >> "fun ") >>
+  Lean.Parser.Command.declId >>
+  Lean.Parser.ppIndent
+    (Lean.Parser.Command.optDeclSig >> Lean.Parser.Command.declVal) >>
+  Lean.Parser.Command.optDefDeriving
+
+/-- A bodyless native declaration. Its implementation is supplied by the VM. -/
+def moveNativeFunItem := leading_parser
+  Lean.Parser.atomic
+    (moveItemPrefix >> Lean.Parser.nonReservedSymbol "native " >> "fun ") >>
+  Lean.Parser.Command.declId >> Lean.Parser.Command.optDeclSig
+
+/-- An explicit friend module at a literal or named address. -/
+def moveFriendDeclItem := leading_parser
+  Lean.Parser.atomic ("friend " >> moveAddressSpec >> "::") >> ident >> ";"
+
 /-- A plain `fun` carrying a source attribute list. Attribute-less `fun`
 declarations keep parsing through the global `moveFunctionCommand`. -/
 def moveFunItem := leading_parser
@@ -191,17 +238,21 @@ because a subsequent command-level `fun` is also valid as the start of a Lean
 term. -/
 @[command_parser] def moveModuleCommand := leading_parser
   Lean.Parser.withPosition
-    ("module " >> ident >> " where" >>
+    ("module " >> ident >>
+      Lean.Parser.optional (" at " >> moveAddressSpec) >> " where" >>
       Lean.Parser.many1 (Lean.Parser.ppLine >> Lean.Parser.checkColGt >>
         Lean.Parser.withPosition
-          (moveStructItem <|> moveEnumItem <|> moveEntryFunItem <|>
-            moveFriendFunItem <|> moveFunItem <|> Lean.Parser.commandParser)))
+          (Lean.Parser.atomic moveStructItem <|>
+            Lean.Parser.atomic movePositionalStructItem <|> moveEnumItem <|> moveEntryFunItem <|>
+            moveFriendFunItem <|> movePackageFunItem <|> moveInlineFunItem <|>
+            moveNativeFunItem <|> moveFriendDeclItem <|> moveFunItem <|>
+            Lean.Parser.commandParser)))
 
 private partial def hasMoveDeclarationAttribute (stx : Syntax) : Bool :=
   if stx.isIdent then
     let name := stx.getId
     name == `move_fun || name == `move_public || name == `move_friend ||
-      name == `move_entry
+      name == `move_package || name == `move_entry || name == `move_inline
   else
     stx.getArgs.any hasMoveDeclarationAttribute
 
@@ -405,8 +456,8 @@ private partial def preserveLeanHelperBoundaries (stx : Syntax) : MacroM Syntax 
 source attribute list, mapped to their tag-attribute spelling. -/
 private def wellKnownAttribute? (name : Name) : Option Name :=
   match name with
-  | `move_fun | `move_public | `move_friend | `move_entry
-  | `move_struct | `move_enum | `move_native => some name
+  | `move_fun | `move_public | `move_friend | `move_package | `move_entry
+  | `move_struct | `move_enum | `move_native | `move_inline => some name
   | `entry => some `move_entry
   | _ => none
 
@@ -715,11 +766,32 @@ private def typeParamBoundCommands (declId signature : Syntax) :
     #[mkAtom "#register_type_param_bounds ", target.raw,
       mkNullNode (groups.map id)]]
 
+private def desugarPositionalStruct (stx : Syntax) : MacroM (Array Syntax) := do
+  let (wellKnown, user) ← splitAttributeInstances stx[1]
+  let modifiers ← prependDeclarationAttributes (#[`move_struct] ++ wellKnown)
+    (← applyDocComment stx[0] ⟨stx[2]⟩)
+  let types : Array (TSyntax `term) := stx[6].getSepArgs.map (⟨·⟩)
+  let mut fields : Array (TSyntax ``Lean.Parser.Command.structSimpleBinder) := #[]
+  for (type, index) in types.zipIdx do
+    let field := mkIdentFrom type (Name.mkSimple s!"_{index}")
+    fields := fields.push
+      (← `(Lean.Parser.Command.structSimpleBinder| $field:ident : $type:term))
+  let declared : TSyntax ``Lean.Parser.Command.declId := ⟨stx[4]⟩
+  let declaration ← `($modifiers:declModifiers structure $declared:declId where
+    $fields:structSimpleBinder*)
+  return withAttributeRegistration declaration.raw stx[4] user ++
+    (← abilityCommands stx[4] stx[8])
+
 /-- Rewrite one module-scoped keyword item to its attributed core
 declaration, followed by a registration command when the item carries
 user-provided attributes. Ordinary commands pass through unchanged. -/
 private def desugarModuleItem (invariants : Array (Name × Array Syntax))
     (stx : Syntax) : MacroM (Array Syntax) := do
+  if stx.isOfKind ``moveFriendDeclItem then
+    let address : TSyntax `term := ⟨stx[1]⟩
+    let moduleName : TSyntax `ident := ⟨stx[3]⟩
+    return #[mkNode ``registerMoveFriend #[
+      mkAtom "#register_move_friend ", address.raw, mkAtom "::", moduleName.raw]]
   if stx.isOfKind ``Move.Spec.dataInvariantSpec then
     -- Consumed by the type it names.
     return #[]
@@ -857,6 +929,8 @@ private def desugarModuleItem (invariants : Array (Name × Array Syntax))
             `(#register_move_global_invariant $family $name $families*)
         commands := commands.push registration.raw
     return commands
+  if stx.isOfKind ``movePositionalStructItem then
+    return ← desugarPositionalStruct stx
   if stx.isOfKind ``moveStructItem then
     let (wellKnown, user) ← splitAttributeInstances stx[1]
     let modifiers ← prependDeclarationAttributes (#[`move_struct] ++ wellKnown)
@@ -919,14 +993,30 @@ private def desugarModuleItem (invariants : Array (Name × Array Syntax))
     return preface ++ withAttributeRegistration declaration stx[4] user ++
       postface ++ (← abilityCommands stx[4] stx[6]) ++
       (← typeParamBoundCommands stx[4] stx[5])
-  if stx.isOfKind ``moveEntryFunItem || stx.isOfKind ``moveFriendFunItem then
+  if stx.isOfKind ``moveEntryFunItem || stx.isOfKind ``moveFriendFunItem ||
+      stx.isOfKind ``movePackageFunItem || stx.isOfKind ``moveInlineFunItem then
     let attributeName :=
-      if stx.isOfKind ``moveEntryFunItem then `move_entry else `move_friend
+      if stx.isOfKind ``moveEntryFunItem then `move_entry
+      else if stx.isOfKind ``moveFriendFunItem then `move_friend
+      else if stx.isOfKind ``movePackageFunItem then `move_package
+      else `move_inline
     let (wellKnown, user) ← splitAttributeInstances stx[1]
-    let modifiers ← prependDeclarationAttributes (#[attributeName] ++ wellKnown)
+    let internal := if stx.isOfKind ``moveInlineFunItem then
+        #[attributeName, `always_inline]
+      else #[attributeName]
+    let modifiers ← prependDeclarationAttributes (internal ++ wellKnown)
       (← applyDocComment stx[0] ⟨stx[2]⟩)
     let declaration := mkNode ``moveFunctionCommand
       #[modifiers.raw, mkAtomFrom stx[4] "fun ", stx[5], stx[6], stx[7], stx[8]]
+    return withAttributeRegistration declaration stx[5] user
+  if stx.isOfKind ``moveNativeFunItem then
+    let (wellKnown, user) ← splitAttributeInstances stx[1]
+    let modifiers ← prependDeclarationAttributes (#[`move_native] ++ wellKnown)
+      (← applyDocComment stx[0] ⟨stx[2]⟩)
+    let body ← `(Lean.Parser.Command.declVal| := Move.nativeUnavailable)
+    let declaration := mkNode ``moveFunctionCommand
+      #[modifiers.raw, mkAtomFrom stx[4] "fun ", stx[5], stx[6], body.raw,
+        mkNullNode]
     return withAttributeRegistration declaration stx[5] user
   if stx.isOfKind ``moveFunItem then
     let (wellKnown, user) ← splitAttributeInstances stx[1]
@@ -946,12 +1036,16 @@ def expandMoveModuleCommand : Macro := fun stx => do
   let exportName : TSyntax `str := ⟨Syntax.mkStrLit moduleName.getId.toString⟩
   let exportCommand ← `(#export_leaner $exportName)
   let namespaceCommand ← `(namespace $moduleName)
-  let address : TSyntax `str := ⟨Syntax.mkStrLit "0x0"⟩
-  let identityCommand ← `(#register_module_identity $address $exportName)
+  let identityCommand ← if stx[2].getArgs.isEmpty then
+      let address : TSyntax `str := ⟨Syntax.mkStrLit "0x0"⟩
+      `(#register_module_identity $address $exportName)
+    else
+      let addressSpec : TSyntax `term := ⟨stx[2][1]⟩
+      `(#register_module_identity_at $addressSpec, $exportName)
   let openLeanerCommand ← `(open Move)
   let openLeanerScopeCommand ← `(open scoped Move)
   let endCommand ← `(end $moduleName)
-  let invariants := stx[3].getArgs.filterMap fun item =>
+  let invariants := stx[4].getArgs.filterMap fun item =>
     if item.isOfKind ``Move.Spec.dataInvariantSpec then
       let extras := item[6].getArgs.map fun clause => clause[2]
       some (item[1].getId, #[item[5]] ++ extras)
@@ -962,7 +1056,7 @@ def expandMoveModuleCommand : Macro := fun stx => do
   -- dropped without a word.  That silence is how an `invariant update` clause
   -- that failed to parse as a global invariant — and so fell back to this
   -- shape — disabled a whole `spec module` block unnoticed.
-  let declaredTypes := stx[3].getArgs.filterMap fun item =>
+  let declaredTypes := stx[4].getArgs.filterMap fun item =>
     if item.isOfKind ``moveStructItem || item.isOfKind ``moveEnumItem then
       some item[4][0].getId
     else
@@ -971,7 +1065,7 @@ def expandMoveModuleCommand : Macro := fun stx => do
     unless declaredTypes.contains named do
       Macro.throwError
         s!"`spec {named} where invariant …` names no `struct` or `enum` declared in this module"
-  let body ← stx[3].getArgs.foldlM (init := #[]) fun result item => do
+  let body ← stx[4].getArgs.foldlM (init := #[]) fun result item => do
     (← desugarModuleItem invariants item).foldlM (init := result) fun result command => do
       let command := expandLeanerCommandAliases command
       return result.push (← preserveLeanHelperBoundaries command)
@@ -1017,6 +1111,71 @@ def elabRegisterMoveModuleIdentity : CommandElab := fun stx => do
     | throwErrorAt stx[2] "expected a module name string"
   let leanNamespace ← getCurrNamespace
   modifyEnv fun env => Move.registerModuleNamespace env leanNamespace { address, name }
+
+@[command_elab registerMoveModuleIdentityAt]
+def elabRegisterMoveModuleIdentityAt : CommandElab := fun stx => do
+  let spec := stx[1]
+  let some name := stx[3].isStrLit?
+    | throwErrorAt stx[3] "expected a module name string"
+  let env ← getEnv
+  let (value, alias?) ← if let some value := spec.isNatLit? then
+      pure (value, none)
+    else if spec.isIdent then
+      let declarationAlias? ← try
+          pure (Move.addressAliasByDeclaration? env
+            (← resolveGlobalConstNoOverload spec))
+        catch _ => pure none
+      let some alias := Move.addressAliasBySource? env spec.getId <|>
+          declarationAlias?
+        | throwErrorAt spec "unknown Move address alias `{spec.getId}`"
+      pure (alias.value, some alias.sourceName)
+    else
+      throwErrorAt spec "expected a literal address or registered alias"
+  unless value < Move.addressLimit do
+    throwErrorAt spec "module address does not fit in 256 bits"
+  let leanNamespace ← getCurrNamespace
+  let address := Move.encodeAddress value
+  modifyEnv fun env => Move.registerModuleNamespace env leanNamespace {
+    address
+    addressAlias := alias?
+    name
+  }
+
+@[command_elab registerMoveFriend]
+def elabRegisterMoveFriend : CommandElab := fun stx => do
+  let spec := stx[1]
+  let moduleName := stx[3].getId.toString
+  let env ← getEnv
+  let (value, alias?) ← if let some value := spec.isNatLit? then
+      pure (value, none)
+    else if spec.isIdent then
+      let declarationAlias? ← try
+          pure (Move.addressAliasByDeclaration? env
+            (← resolveGlobalConstNoOverload spec))
+        catch _ => pure none
+      let some alias := Move.addressAliasBySource? env spec.getId <|>
+          declarationAlias?
+        | throwErrorAt spec "unknown Move address alias `{spec.getId}`"
+      pure (alias.value, some alias.sourceName)
+    else
+      throwErrorAt spec "expected a literal address or registered alias"
+  unless value < Move.addressLimit do
+    throwErrorAt spec "friend module address does not fit in 256 bits"
+  let leanNamespace ← getCurrNamespace
+  let some owner := Move.moduleForNamespace? env leanNamespace
+    | throwErrorAt stx "friend declaration is not enclosed by a Move module"
+  let friendRef : Move.ModuleRef := {
+    address := Move.encodeAddress value
+    addressAlias := alias?
+    name := moduleName
+  }
+  if friendRef.address != owner.address then
+    throwErrorAt spec "a Move friend module must be declared at the same address"
+  if friendRef.address == owner.address && friendRef.name == owner.name then
+    throwErrorAt stx[3] "a Move module cannot declare itself as a friend"
+  if (Move.moduleFriends env leanNamespace).contains friendRef then
+    throwErrorAt stx "duplicate Move friend declaration"
+  modifyEnv fun env => Move.registerModuleFriend env leanNamespace friendRef
 
 @[command_elab registerMoveInvariant]
 def elabRegisterMoveInvariant : CommandElab := fun stx => do

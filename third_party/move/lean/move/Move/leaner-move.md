@@ -536,22 +536,26 @@ values are rejected.
 | `0`, `1`, `42`, ... | integer literal; the width comes from the expected type (`(1 : U8)`, `(5 : I32)`) |
 | `-5` | signed negation, on `I8` ... `I256` |
 | `true`, `false` | `Bool` literals |
+| `@0x1` | 256-bit account-address literal |
+| `b"Move"`, `x"DEAD"` | ASCII or hexadecimal `Vector U8` literal |
 | `vector![a, b, c]` | vector value; expands to `Vector.push` chains from `Vector.empty` |
 | `{ f := e, g := e' }` | struct value; `{ key, value }` abbreviates `key := key, value := value` |
 | `.ctor e ...` / `T.ctor e ...` | enum value |
 | `()` | the `Unit` value |
 
 Numeric literal instances are compiler-recognized primitives; their Lean
-definitions are not a competing wrapping semantics. There are no source-level
-`Address` or `Signer` literals: both arrive as function arguments. Where the
-expected type is not evident, ascribe it: `({ value := 1 } : Box U64)`,
+definitions are not a competing wrapping semantics. Signers arrive as
+function arguments; literal addresses are written `@0x…`. Where the expected
+type is not evident, ascribe it: `({ value := 1 } : Box U64)`,
 `(vector![10, 30] : Vector U64)`.
 
-A named constant is a module-level Lean `def` of a literal, referenced by name
-inside Move functions:
+A named integer constant is a module-level Lean `def` of a compile-time
+expression, referenced by name inside Move functions. Arithmetic, bit
+operations, shifts, negation, and casts are evaluated with checked Move
+constant semantics:
 
 ```lean
-def E_TOO_SMALL : U64 := 7
+def E_TOO_SMALL : U64 := 1 + 2 * 3
 ```
 
 ## Expressions and statements
@@ -629,10 +633,11 @@ conversion is inserted implicitly where `&T` is expected.
 
 ### Vectors
 
-`Move.Vector.empty`, `push`, `length`, `get`, `set`, `insert`, `remove`, and
-element borrows lower to native Move vector operations. Receiver notation
+`Move.Vector.empty`, `singleton`, `push`, `popBack`, `length`, `isEmpty`,
+`get`, `set`, `insert`, `remove`, and element borrows lower to native Move
+vector operations. Receiver notation
 (`v.length`, `v.push e`, `r.insert i e`, `r.remove i`) is available;
-`insert`/`remove` mutate through a `&mut Vector T`. Element access is
+`insert`/`remove`/`popBack` mutate through a `&mut Vector T`. Element access is
 bounds-checked: element borrows abort with the VM execution-failure code,
 `insert`/`remove` with the standard vector `indexOutOfBounds` code.
 
@@ -1499,11 +1504,9 @@ executed; it simply has no `spec`/`verify` yet. The current boundary:
 | a call to a callee that is not a `fun` (no retained source) | declare the callee with `fun` |
 | a call to a mutually recursive callee | not yet supported |
 | receiver-style `values.get i` / `r.insert i e` / `r.remove i` | write `Move.Vector.get` / `Move.Vector.insert` / `Move.Vector.remove` |
-| an effect (arithmetic, a cast, a checked vector access, a call) in a conditional position — the right operand of `&&`/`||`, a branch of a value `if`, a `match` arm, a `fun` body | bind it to a local first |
 | a core primitive in a form the surface cannot express (`borrowField` with a computed descriptor, `assert`) | use the surface syntax (`&r.f`, `abort c`) |
-| a second `&mut` borrow from a live mutable reference that is not a field or element of it | restructure the borrow |
-| `if let pat ← e`; a dependent `while` condition | bind `e` with `let` first; use a plain condition |
-| `match` with a motive or `generalizing` clause, several discriminants, or a named discriminant | restructure the `match` |
+| an overlapping sibling mutable borrow of the same field path | borrow disjoint fields or close the first loan |
+| a Lean-only `match` motive or `generalizing` clause | use Move's ordinary match form |
 | a clause naming a resource family the function does not touch | name only families the function uses |
 | more than one `&mut` parameter | not yet supported |
 | a mutually recursive family, under `contract_intro` | use `satisfies_fixFamily` explicitly |

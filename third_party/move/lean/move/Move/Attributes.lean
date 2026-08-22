@@ -171,6 +171,7 @@ def dataInvariant? (env : Environment) (type : Name) : Option Name :=
 Lean module retains the Move identity needed by cross-module lowering. -/
 structure ModuleRef where
   address : String := "0x0"
+  addressAlias : Option Name := none
   name : String
   deriving Inhabited, BEq, Repr
 
@@ -220,6 +221,47 @@ def moduleForDeclaration? (env : Environment) (declaration : Name) : Option Modu
     else
       best
   best.map (·.2)
+
+private structure FriendRegistration where
+  leanNamespace : Name
+  friend : ModuleRef
+  deriving Inhabited
+
+private def addFriendRegistration (entries : List FriendRegistration)
+    (entry : FriendRegistration) : List FriendRegistration :=
+  entry :: entries.filter fun old =>
+    old.leanNamespace != entry.leanNamespace || old.friend != entry.friend
+
+private initialize moveFriendModuleExt :
+    SimplePersistentEnvExtension FriendRegistration (List FriendRegistration) ←
+  registerSimplePersistentEnvExtension {
+    addEntryFn := addFriendRegistration
+    addImportedFn := fun entries =>
+      mkStateFromImportedEntries addFriendRegistration [] entries
+  }
+
+/-- Register a module in the current Move module's explicit friend list. -/
+def registerModuleFriend (env : Environment) (leanNamespace : Name)
+    (friend : ModuleRef) : Environment :=
+  moveFriendModuleExt.addEntry env { leanNamespace, friend }
+
+/-- Explicit friends authored by a Move module namespace. -/
+def moduleFriends (env : Environment) (leanNamespace : Name) : List ModuleRef :=
+  (moveFriendModuleExt.getState env).filterMap fun entry =>
+    if entry.leanNamespace == leanNamespace then some entry.friend else none
+
+/-- Friend list of the most closely enclosing Move module. -/
+def moduleFriendsForDeclaration (env : Environment) (declaration : Name) :
+    List ModuleRef :=
+  let best := (moveModuleExt.getState env).foldl (init := none) fun best registration =>
+    if registration.leanNamespace.isPrefixOf declaration then
+      match best with
+      | none => some registration.leanNamespace
+      | some old =>
+          if old.toString.length < registration.leanNamespace.toString.length then
+            some registration.leanNamespace else best
+    else best
+  best.map (moduleFriends env) |>.getD []
 
 /-- Move's `copy` ability, used as a `deriving` marker. -/
 class Copy (T : Type u) : Prop where
@@ -277,10 +319,18 @@ initialize moveEntryAttr : Lean.TagAttribute ←
 initialize moveNativeAttr : Lean.TagAttribute ←
   Lean.registerTagAttribute `move_native "Move native function declaration"
 
+initialize moveInlineAttr : Lean.TagAttribute ←
+  Lean.registerTagAttribute `move_inline "Move inline function declaration"
+
+initialize movePackageAttr : Lean.TagAttribute ←
+  Lean.registerTagAttribute `move_package
+    "package-visible Move function" preserveMoveCall
+
 /-- Whether a declaration is a Move function of any visibility. -/
 def isMoveFunction (env : Environment) (name : Name) : Bool :=
   moveFunAttr.hasTag env name || movePublicAttr.hasTag env name ||
-    moveFriendAttr.hasTag env name || moveEntryAttr.hasTag env name
+    moveFriendAttr.hasTag env name || movePackageAttr.hasTag env name ||
+    moveEntryAttr.hasTag env name || moveNativeAttr.hasTag env name
 
 private def deriveAbility (tag : Lean.TagAttribute) : Lean.Elab.DerivingHandler :=
   fun typeNames => do

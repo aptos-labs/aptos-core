@@ -428,6 +428,82 @@ def interpOp (current : FrameId) (deref : RefTarget → Option Value) (op : Oper
       | some v => pure (.ok [.vector (es.take i ++ es.drop (i + 1)), v] m)
       | none => pure .abort
     | _ => throw (.stuck "ill-typed operands")
+  | .vecSwap =>
+    match vs with
+    | [.vector es, .u64 i, .u64 j] =>
+      match es[i]?, es[j]? with
+      | some vi, some vj => pure (.ok [.vector ((es.set i vj).set j vi)] m)
+      | _, _ => pure .abort
+    | _ => throw (.stuck "ill-typed operands")
+  | .vecSwapRemove =>
+    match vs with
+    | [.vector es, .u64 i] =>
+      match es[i]?, es.getLast? with
+      | some removed, some last => pure (.ok [.vector (es.set i last).dropLast, removed] m)
+      | _, _ => pure .abort
+    | _ => throw (.stuck "ill-typed operands")
+  | .vecAppend =>
+    match vs with
+    | [.vector lhs, .vector rhs] =>
+      if lhs.length + rhs.length < U64_SIZE then pure (.ok [.vector (lhs ++ rhs)] m)
+      else pure .abort
+    | _ => throw (.stuck "ill-typed operands")
+  | .vecReverse =>
+    match vs with
+    | [.vector es] => pure (.ok [.vector es.reverse] m)
+    | _ => throw (.stuck "ill-typed operands")
+  | .vecReverseSlice =>
+    match vs with
+    | [.vector es, .u64 left, .u64 right] =>
+      if left ≤ right && right ≤ es.length then
+        pure (.ok [.vector (es.take left ++ ((es.drop left).take (right - left)).reverse ++
+          es.drop right)] m)
+      else pure .abort
+    | _ => throw (.stuck "ill-typed operands")
+  | .vecContains =>
+    match vs with
+    | [.vector es, v] => pure (.ok [.bool (es.any (· == v))] m)
+    | _ => throw (.stuck "ill-typed operands")
+  | .vecIndexOf =>
+    match vs with
+    | [.vector es, v] =>
+      let i := es.findIdx (· == v)
+      pure (.ok [.bool (i < es.length), .u64 (if i < es.length then i else 0)] m)
+    | _ => throw (.stuck "ill-typed operands")
+  | .vecTrim =>
+    match vs with
+    | [.vector es, .u64 newLen] =>
+      if newLen ≤ es.length then
+        pure (.ok [.vector (es.take newLen), .vector (es.drop newLen)] m)
+      else pure .abort
+    | _ => throw (.stuck "ill-typed operands")
+  | .vecTrimReverse =>
+    match vs with
+    | [.vector es, .u64 newLen] =>
+      if newLen ≤ es.length then
+        pure (.ok [.vector (es.take newLen), .vector (es.drop newLen).reverse] m)
+      else pure .abort
+    | _ => throw (.stuck "ill-typed operands")
+  | .vecRotate =>
+    match vs with
+    | [.vector es, .u64 rot] =>
+      if rot ≤ es.length then
+        pure (.ok [.vector (es.drop rot ++ es.take rot), .u64 (es.length - rot)] m)
+      else pure .abort
+    | _ => throw (.stuck "ill-typed operands")
+  | .vecRotateSlice =>
+    match vs with
+    | [.vector es, .u64 left, .u64 rot, .u64 right] =>
+      if left ≤ rot && rot ≤ right && right ≤ es.length then
+        pure (.ok [.vector (es.take left ++ (es.drop rot).take (right - rot) ++
+          (es.drop left).take (rot - left) ++ es.drop right),
+          .u64 (left + (right - rot))] m)
+      else pure .abort
+    | _ => throw (.stuck "ill-typed operands")
+  | .vecDestroyEmpty =>
+    match vs with
+    | [.vector es] => if es.isEmpty then pure (.ok [] m) else pure .abort
+    | _ => throw (.stuck "ill-typed operands")
   | .mkMutLoc x =>
     match vs with
     | [v] =>
@@ -543,7 +619,9 @@ def interpFun (P : Program) : Nat → FunId → IMem → List Value →
     match P.funs f with
     | none => throw (.stuck s!"undeclared function {f}")
     | some d =>
-        if args.length = d.numParams then
+        if d.native then
+          throw (.stuck s!"native function {f} has no registered interpreter implementation")
+        else if args.length = d.numParams then
           interpBlock P d.body fuel d.body.entry (IState.initial args m)
         else throw (.stuck "function argument arity mismatch")
 
@@ -643,7 +721,7 @@ def interpInstrs (P : Program) : Nat → List Instr → IState →
           if n < es.length then
             interpInstrs P fuel rest
               (s.writeLocal dst (.ref ⟨rt.root, rt.path ++ [n]⟩))
-          else pure (.abort s.memory runtimeAbortCode)
+          else pure (.abort s.memory Oper.borrowVecElem.abortCode)
         | some _ => throw (.stuck "vector element borrow of a non-vector")
         | none => throw (.stuck "read through a dangling reference")
       | _, _ =>
@@ -690,7 +768,9 @@ def interpInstrs (P : Program) : Nat → List Instr → IState →
         match P.funs f with
         | none => throw (.stuck s!"undeclared function {f}")
         | some d =>
-          if args.length ≠ d.numParams then
+          if d.native then
+            throw (.stuck s!"native function {f} has no registered interpreter implementation")
+          else if args.length ≠ d.numParams then
             throw (.stuck "arity mismatch in call arguments")
           else
           match ← interpBlock P d.body fuel d.body.entry (s.enterCall args) with
@@ -707,7 +787,9 @@ def interpInstrs (P : Program) : Nat → List Instr → IState →
         match P.funs f with
         | none => throw (.stuck s!"undeclared function {f}")
         | some d =>
-          if typeArgs.length ≠ d.typeParams.length then
+          if d.native then
+            throw (.stuck s!"native function {f} has no registered interpreter implementation")
+          else if typeArgs.length ≠ d.typeParams.length then
             throw (.stuck "arity mismatch in call type arguments")
           else if args.length ≠ d.numParams then
             throw (.stuck "arity mismatch in call arguments")

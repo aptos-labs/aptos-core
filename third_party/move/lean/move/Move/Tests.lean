@@ -3,6 +3,7 @@
 
 import Move.Tests.Abilities
 import Move.Tests.Account
+import Move.Tests.Addresses
 import Move.Tests.Arithmetic
 import Move.Tests.Attributes
 import Move.Tests.Callees
@@ -19,7 +20,9 @@ import Move.Tests.Generics
 import Move.Tests.GlobalBorrows
 import Move.Tests.GlobalInv
 import Move.Tests.Integers
+import Move.Tests.InlinePackage
 import Move.Tests.Invariants
+import Move.Tests.Literals
 import Move.Tests.Loops
 import Move.Tests.LowLevel.ModuleVerification
 import Move.Tests.LowLevel.MultipleModules
@@ -29,10 +32,12 @@ import Move.Tests.ModelDomain
 import Move.Tests.Modules.Math
 import Move.Tests.MultipleModules
 import Move.Tests.OrderedMap
+import Move.Tests.PositionalStructs
 import Move.Tests.Quicksort
 import Move.Tests.Read
 import Move.Tests.ResourceComposition
 import Move.Tests.Signed
+import Move.Tests.Tuples
 import Move.Tests.VectorOperations
 import Move.Tests.Vectors
 

@@ -362,7 +362,7 @@ signed view (whose native domain already is `Int`). -/
     (initial : State) :
     wp (Vector.borrowElemSpec (σ := State) values index) ensures aborts initial ↔
       (∀ value, values.toList[index.toNat]? = some value → ensures value initial) ∧
-      (values.toList[index.toNat]? = none → aborts Resource.executionFailure) := by
+      (values.toList[index.toNat]? = none → aborts Vector.indexOutOfBounds) := by
   rw [wp_total_iff (by simp [Vector.borrowElemSpec])]
   constructor
   · rintro ⟨normal, abnormal⟩
@@ -372,9 +372,9 @@ signed view (whose native domain already is `Int`). -/
       change values.toList[index.toNat]? = some value ∧ initial = initial
       exact ⟨present, rfl⟩
     · intro missing
-      apply abnormal Resource.executionFailure
+      apply abnormal Vector.indexOutOfBounds
       change values.toList[index.toNat]? = none ∧
-        Resource.executionFailure = Resource.executionFailure
+        Vector.indexOutOfBounds = Vector.indexOutOfBounds
       exact ⟨missing, rfl⟩
   · rintro ⟨normal, abnormal⟩
     constructor
@@ -392,7 +392,7 @@ signed view (whose native domain already is `Int`). -/
     wp (Vector.setSpec (σ := State) values index value) ensures aborts initial ↔
       ((∃ old, values.toList[index.toNat]? = some old) →
         ensures (Move.Vector.set values index value) initial) ∧
-      (values.toList[index.toNat]? = none → aborts Resource.executionFailure) := by
+      (values.toList[index.toNat]? = none → aborts Vector.indexOutOfBounds) := by
   rw [wp_total_iff (by simp [Vector.setSpec])]
   constructor
   · rintro ⟨normal, abnormal⟩
@@ -404,9 +404,9 @@ signed view (whose native domain already is `Int`). -/
         initial = initial
       exact ⟨present, rfl, rfl⟩
     · intro missing
-      apply abnormal Resource.executionFailure
+      apply abnormal Vector.indexOutOfBounds
       change values.toList[index.toNat]? = none ∧
-        Resource.executionFailure = Resource.executionFailure
+        Vector.indexOutOfBounds = Vector.indexOutOfBounds
       exact ⟨missing, rfl⟩
   · rintro ⟨normal, abnormal⟩
     constructor
@@ -461,7 +461,7 @@ relational representation. -/
     (initial : State) :
     wp (Vector.withBorrowElemMutSpec values index body) ensures aborts initial ↔
       match values.toList[index.toNat]? with
-      | none => aborts Resource.executionFailure
+      | none => aborts Vector.indexOutOfBounds
       | some value =>
           wp (withMutation value body)
             (fun output final =>
@@ -537,6 +537,240 @@ relational representation. -/
   | some removed =>
       simp only [Vector.removeSpec, Mutation.read, present]
       exact wp_pure _ _ _ _
+
+@[simp, wp_norm] theorem wp_popBackSpec (reference : Mutation (Move.Vector α))
+    (ensures : (α × Mutation (Move.Vector α)) → State → Prop)
+    (aborts : Nat → Prop) (initial : State) :
+    wp (Vector.popBackSpec reference) ensures aborts initial ↔
+      match reference.current.toList.getLast? with
+      | none => aborts Vector.indexOutOfBounds
+      | some removed =>
+          ensures
+            (removed, reference.write (Move.Vector.ofList
+              reference.current.toList.dropLast (by
+                have bounded := reference.current.toList_length_lt
+                simpa only [List.length_dropLast] using
+                  Nat.lt_of_le_of_lt
+                    (Nat.sub_le reference.current.toList.length 1) bounded)))
+            initial := by
+  cases present : reference.current.toList.getLast? with
+  | none =>
+      simp only [Vector.popBackSpec, Mutation.read, present]
+      exact wp_abort _ _ _ _
+  | some removed =>
+      simp only [Vector.popBackSpec, Mutation.read, present]
+      exact wp_pure _ _ _ _
+
+@[simp, wp_norm] theorem wp_swapSpec (reference : Mutation (Move.Vector α))
+    (i j : Move.U64)
+    (ensures : (Unit × Mutation (Move.Vector α)) → State → Prop)
+    (aborts : Nat → Prop) (initial : State) :
+    wp (Vector.swapSpec reference i j) ensures aborts initial ↔
+      match reference.current.toList[i.toNat]?,
+          reference.current.toList[j.toNat]? with
+      | some vi, some vj =>
+          ensures ((), reference.write (Move.Vector.set
+            (Move.Vector.set reference.current i vj) j vi)) initial
+      | _, _ => aborts Vector.indexOutOfBounds := by
+  cases first : reference.current.toList[i.toNat]? <;>
+    cases second : reference.current.toList[j.toNat]?
+  <;> simp only [Vector.swapSpec, Mutation.read, first, second, wp_pure, wp_abort]
+
+@[simp, wp_norm] theorem wp_swapRemoveSpec
+    (reference : Mutation (Move.Vector α)) (index : Move.U64)
+    (ensures : (α × Mutation (Move.Vector α)) → State → Prop)
+    (aborts : Nat → Prop) (initial : State) :
+    wp (Vector.swapRemoveSpec reference index) ensures aborts initial ↔
+      match reference.current.toList[index.toNat]?,
+          reference.current.toList.getLast? with
+      | some removed, some last =>
+          ensures
+            (removed, reference.write (Move.Vector.ofList
+              (reference.current.toList.set index.toNat last).dropLast
+              (by
+                change (reference.current.toList.set index.toNat last).dropLast.length <
+                  Move.U64.size
+                simp only [List.length_dropLast, List.length_set]
+                exact Nat.lt_of_le_of_lt (Nat.sub_le _ _)
+                  reference.current.toList_length_lt)))
+            initial
+      | _, _ => aborts Vector.indexOutOfBounds := by
+  cases present : reference.current.toList[index.toNat]? <;>
+    cases last : reference.current.toList.getLast?
+  <;> simp only [Vector.swapRemoveSpec, Mutation.read, present, last,
+    wp_pure, wp_abort]
+
+@[simp, wp_norm] theorem wp_appendSpec (reference : Mutation (Move.Vector α))
+    (other : Move.Vector α)
+    (ensures : (Unit × Mutation (Move.Vector α)) → State → Prop)
+    (aborts : Nat → Prop) (initial : State) :
+    wp (Vector.appendSpec reference other) ensures aborts initial ↔
+      if room : reference.current.toList.length + other.toList.length <
+          Move.U64.size then
+        ensures
+          ((), reference.write (Move.Vector.ofList
+            (reference.current.toList ++ other.toList) (by simpa using room)))
+          initial
+      else aborts Vector.indexOutOfBounds := by
+  by_cases room : reference.current.toList.length + other.toList.length <
+      Move.U64.size
+  · simp only [Vector.appendSpec, Mutation.read]
+    rw [dif_pos room, dif_pos room]
+    exact wp_pure _ _ _ _
+  · simp only [Vector.appendSpec, Mutation.read]
+    rw [dif_neg room, dif_neg room]
+    exact wp_abort _ _ _ _
+
+@[simp, wp_norm] theorem wp_reverseSpec (reference : Mutation (Move.Vector α))
+    (ensures : (Unit × Mutation (Move.Vector α)) → State → Prop)
+    (aborts : Nat → Prop) (initial : State) :
+    wp (Vector.reverseSpec reference) ensures aborts initial ↔
+      ensures
+        ((), reference.write (Move.Vector.ofList reference.current.toList.reverse
+          (by simpa using reference.current.toList_length_lt))) initial := by
+  simp only [Vector.reverseSpec, Mutation.read]
+  exact wp_pure _ _ _ _
+
+@[simp, wp_norm] theorem wp_reverseSliceSpec
+    (reference : Mutation (Move.Vector α)) (left right : Move.U64)
+    (ensures : (Unit × Mutation (Move.Vector α)) → State → Prop)
+    (aborts : Nat → Prop) (initial : State) :
+    wp (Vector.reverseSliceSpec reference left right) ensures aborts initial ↔
+      if range : left.toNat ≤ right.toNat ∧
+          right.toNat ≤ reference.current.toList.length then
+        ensures
+          ((), reference.write (Move.Vector.ofList
+            (reference.current.toList.take left.toNat ++
+              ((reference.current.toList.drop left.toNat).take
+                (right.toNat - left.toNat)).reverse ++
+              reference.current.toList.drop right.toNat)
+            (by
+              simp only [List.length_append, List.length_take,
+                List.length_reverse, List.length_drop]
+              rw [Nat.min_eq_left (Nat.le_trans range.1 range.2)]
+              rw [Nat.min_eq_left (by omega : right.toNat - left.toNat ≤
+                reference.current.toList.length - left.toNat)]
+              have bounded := reference.current.toList_length_lt
+              change reference.current.toList.length <
+                MoveModel.IR.IntWidth.size .w64 at bounded
+              omega))) initial
+      else aborts 0x20001 := by
+  by_cases range : left.toNat ≤ right.toNat ∧
+      right.toNat ≤ reference.current.toList.length
+  · simp only [Vector.reverseSliceSpec, Mutation.read]
+    rw [dif_pos range, dif_pos range]
+    exact wp_pure _ _ _ _
+  · simp only [Vector.reverseSliceSpec, Mutation.read]
+    rw [dif_neg range, dif_neg range]
+    exact wp_abort _ _ _ _
+
+@[simp, wp_norm] theorem wp_trimSpec (reference : Mutation (Move.Vector α))
+    (newLen : Move.U64)
+    (ensures : (Move.Vector α × Mutation (Move.Vector α)) → State → Prop)
+    (aborts : Nat → Prop) (initial : State) :
+    wp (Vector.trimSpec reference newLen) ensures aborts initial ↔
+      if bound : newLen.toNat ≤ reference.current.toList.length then
+        ensures
+          (Move.Vector.ofList (reference.current.toList.drop newLen.toNat) (by
+              simp only [List.length_drop]
+              exact Nat.lt_of_le_of_lt (Nat.sub_le _ _)
+                reference.current.toList_length_lt),
+            reference.write (Move.Vector.ofList
+              (reference.current.toList.take newLen.toNat)
+              (Nat.lt_of_le_of_lt (List.length_take_le ..) newLen.toNat_lt)))
+          initial
+      else aborts Vector.indexOutOfBounds := by
+  by_cases bound : newLen.toNat ≤ reference.current.toList.length
+  · simp only [Vector.trimSpec, Mutation.read]
+    rw [dif_pos bound, dif_pos bound]
+    exact wp_pure _ _ _ _
+  · simp only [Vector.trimSpec, Mutation.read]
+    rw [dif_neg bound, dif_neg bound]
+    exact wp_abort _ _ _ _
+
+@[simp, wp_norm] theorem wp_trimReverseSpec
+    (reference : Mutation (Move.Vector α)) (newLen : Move.U64)
+    (ensures : (Move.Vector α × Mutation (Move.Vector α)) → State → Prop)
+    (aborts : Nat → Prop) (initial : State) :
+    wp (Vector.trimReverseSpec reference newLen) ensures aborts initial ↔
+      if bound : newLen.toNat ≤ reference.current.toList.length then
+        ensures
+          (Move.Vector.ofList (reference.current.toList.drop newLen.toNat).reverse
+              (by
+                simp only [List.length_reverse]
+                simp only [List.length_drop]
+                exact Nat.lt_of_le_of_lt (Nat.sub_le _ _)
+                  reference.current.toList_length_lt),
+            reference.write (Move.Vector.ofList
+              (reference.current.toList.take newLen.toNat)
+              (Nat.lt_of_le_of_lt (List.length_take_le ..) newLen.toNat_lt)))
+          initial
+      else aborts Vector.indexOutOfBounds := by
+  by_cases bound : newLen.toNat ≤ reference.current.toList.length
+  · simp only [Vector.trimReverseSpec, Mutation.read]
+    rw [dif_pos bound, dif_pos bound]
+    exact wp_pure _ _ _ _
+  · simp only [Vector.trimReverseSpec, Mutation.read]
+    rw [dif_neg bound, dif_neg bound]
+    exact wp_abort _ _ _ _
+
+@[simp, wp_norm] theorem wp_rotateSliceSpec
+    (reference : Mutation (Move.Vector α)) (left rot right : Move.U64)
+    (ensures : (Move.U64 × Mutation (Move.Vector α)) → State → Prop)
+    (aborts : Nat → Prop) (initial : State) :
+    wp (Vector.rotateSliceSpec reference left rot right) ensures aborts initial ↔
+      if range : (left.toNat ≤ rot.toNat ∧ rot.toNat ≤ right.toNat) ∧
+          right.toNat ≤ reference.current.toList.length then
+        ensures
+          (Move.U64.ofNat (left.toNat + (right.toNat - rot.toNat)),
+            reference.write (Move.Vector.ofList
+              (Vector.rotateSliceValues reference.current.toList
+                left.toNat rot.toNat right.toNat)
+              (by
+                simp only [Vector.rotateSliceValues, List.length_append,
+                  List.length_take, List.length_drop]
+                rw [Nat.min_eq_left (by omega : left.toNat ≤
+                  reference.current.toList.length)]
+                rw [Nat.min_eq_left (by omega : right.toNat - rot.toNat ≤
+                  reference.current.toList.length - rot.toNat)]
+                rw [Nat.min_eq_left (by omega : rot.toNat - left.toNat ≤
+                  reference.current.toList.length - left.toNat)]
+                have bounded := reference.current.toList_length_lt
+                change reference.current.toList.length <
+                  MoveModel.IR.IntWidth.size .w64 at bounded
+                omega))) initial
+      else aborts 0x20001 := by
+  by_cases range : (left.toNat ≤ rot.toNat ∧ rot.toNat ≤ right.toNat) ∧
+      right.toNat ≤ reference.current.toList.length
+  · simp only [Vector.rotateSliceSpec, Mutation.read]
+    rw [dif_pos range, dif_pos range]
+    exact wp_pure _ _ _ _
+  · simp only [Vector.rotateSliceSpec, Mutation.read]
+    rw [dif_neg range, dif_neg range]
+    exact wp_abort _ _ _ _
+
+@[simp, wp_norm] theorem wp_rotateSpec
+    (reference : Mutation (Move.Vector α)) (rot : Move.U64)
+    (ensures : (Move.U64 × Mutation (Move.Vector α)) → State → Prop)
+    (aborts : Nat → Prop) (initial : State) :
+    wp (Vector.rotateSpec reference rot) ensures aborts initial ↔
+      wp (Vector.rotateSliceSpec reference 0 rot
+        (Move.Vector.length reference.current)) ensures aborts initial := by
+  rfl
+
+@[simp, wp_norm] theorem wp_destroyEmptySpec (values : Move.Vector α)
+    (ensures : Unit → State → Prop) (aborts : Nat → Prop)
+    (initial : State) :
+    wp (Vector.destroyEmptySpec values) ensures aborts initial ↔
+      if values.toList.isEmpty then ensures () initial
+      else aborts Vector.indexOutOfBounds := by
+  by_cases empty : values.toList.isEmpty
+  · simp only [Vector.destroyEmptySpec]
+    rw [if_pos empty, if_pos empty]
+    exact wp_pure _ _ _ _
+  · simp only [Vector.destroyEmptySpec]
+    rw [if_neg empty, if_neg empty]
+    exact wp_abort _ _ _ _
 
 @[simp, wp_norm] theorem wp_containsSpec (resource : Resource World Key Value)
     (key : Key) (ensures : Bool → World → Prop) (aborts : Nat → Prop)

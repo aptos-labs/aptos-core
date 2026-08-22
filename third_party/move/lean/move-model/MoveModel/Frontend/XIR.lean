@@ -56,6 +56,7 @@ structure MFun where
   entry : BlockId := 0
   loops : List MLoop
   spec : MContract
+  native : Bool := false
 
 /-- A struct declaration: name and fields with their types.  The names are
 documentation; resource ids and field offsets are positional. -/
@@ -80,6 +81,7 @@ structure MModule extends MProgram where
   structMeta : List StructMeta
   funMeta : List FunMeta
   externalFuns : List ExternalFunRef := []
+  friends : List ExternalModuleRef := []
 
 /-- Conjunction of a clause list (empty = `true`). -/
 def andAll : List SpecExp → SpecExp
@@ -114,6 +116,7 @@ def MFun.toFunDecl (f : MFun) : FunDecl where
   body := { blocks := fun b => f.blocks[b]?, entry := f.entry, size := f.blocks.length }
   loopSpecs := fun b => (f.loops.find? (fun l => l.header = b)).map MLoop.toLoopSpec
   contract := f.spec.toContract
+  native := f.native
 
 def MStruct.toStructDecl (s : MStruct) : StructDecl where
   typeParams := s.typeParams
@@ -152,6 +155,7 @@ def MModule.toModule (m : MModule) : Module where
   structMeta := fun r => m.structMeta[r]?
   funMeta := fun f => m.funMeta[f]?
   externalFuns := m.externalFuns
+  friends := m.friends
   dialect := m.dialect
 
 /-- Resolve a function name in a deployable XIR module. -/

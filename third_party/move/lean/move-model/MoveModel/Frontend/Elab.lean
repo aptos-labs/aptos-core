@@ -60,6 +60,7 @@ deriving instance ToExpr for MoveModel.IR.Attribute
 deriving instance ToExpr for StructMeta
 deriving instance ToExpr for FunMeta
 deriving instance ToExpr for ExternalFunRef
+deriving instance ToExpr for ExternalModuleRef
 deriving instance ToExpr for MLoop
 deriving instance ToExpr for MContract
 deriving instance ToExpr for MFun

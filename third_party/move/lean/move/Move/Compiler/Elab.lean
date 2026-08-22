@@ -45,6 +45,7 @@ deriving instance ToExpr for MoveModel.IR.Attribute
 deriving instance ToExpr for StructMeta
 deriving instance ToExpr for FunMeta
 deriving instance ToExpr for ExternalFunRef
+deriving instance ToExpr for ExternalModuleRef
 
 private def materialize (kind : String) (count : Nat) (get : Nat → Option α) :
     TermElabM (List α) :=
@@ -72,7 +73,8 @@ private def quoteFunDecl (funDecl : MoveModel.IR.FunDecl) : TermElabM Expr := do
     toExpr funDecl.returns,
     toExpr blocks,
     toExpr funDecl.body.entry,
-    toExpr funDecl.contract]
+    toExpr funDecl.contract,
+    toExpr funDecl.native]
 
 private def quoteModule (module : MoveModel.IR.Module) : TermElabM Expr := do
   let structs ← materialize "struct declaration" module.numStructs module.program.structs
@@ -89,7 +91,8 @@ private def quoteModule (module : MoveModel.IR.Module) : TermElabM Expr := do
     toExpr structMeta,
     toExpr funMeta,
     toExpr module.externalFuns,
-    toExpr module.dialect]
+    toExpr module.dialect,
+    toExpr module.friends]
 
 private def resolveNames (idents : Array Syntax) : TermElabM (Array Name) :=
   idents.mapM resolveGlobalConstNoOverload
@@ -121,7 +124,8 @@ private def taggedNamesInNamespace (ns : Name) (attrs : Array TagAttribute) :
 private def discoverModuleDecls (ns : Name) : TermElabM (Array Name × Array Name) := do
   let structs ← taggedNamesInNamespace ns #[moveStructAttr, moveEnumAttr]
   let functions ← taggedNamesInNamespace ns
-    #[moveFunAttr, movePublicAttr, moveFriendAttr, moveEntryAttr]
+    #[moveFunAttr, movePublicAttr, moveFriendAttr, movePackageAttr, moveEntryAttr,
+      moveNativeAttr]
   return (structs, functions)
 
 scoped syntax (name := moveModuleTerm)

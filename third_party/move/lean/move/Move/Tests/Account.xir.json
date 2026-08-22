@@ -33,6 +33,7 @@
     "u64",
     "bool",
     "u64"],
+   "is_native": false,
    "is_entry": true,
    "entry": 0,
    "blocks":
@@ -70,6 +71,7 @@
     {"mut_ref": "u64"},
     "u64",
     "u64"],
+   "is_native": false,
    "is_entry": true,
    "entry": 0,
    "blocks":

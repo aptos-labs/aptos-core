@@ -226,21 +226,28 @@ private def functionContext (env : Environment) (decl : Decl .pure) :
     (binderCount - 1 - position, ty)
   pure ({ bvars := bvars, fvars := fvars }, typeParams)
 
+private partial def returnTypes (env : Environment) (ctx : TyContext)
+    (type : Expr) : Except String (Array LIR.Ty) := do
+  if type.isAppOfArity ``Prod 2 then
+    let args := type.getAppArgs
+    return (← returnTypes env ctx args[0]!) ++ (← returnTypes env ctx args[1]!)
+  match translateTyWith env ctx type with
+  | .ok (some ty) => return #[ty]
+  | .ok none => return #[]
+  | .error message => throw message
+
+/-- Move multiple returns are represented by transient Lean products.  The
+outer product of `StateM World` is the sequencing implementation of
+`Action`, while products inside its value are flattened to the IR return
+array just like a pure product-valued function. -/
 private def functionShape (env : Environment) (ctx : TyContext)
     (type : Expr) : Except String (Bool × Array LIR.Ty) := do
   let type := resultType type
   if type.isAppOfArity ``Prod 2 then
     let args := type.getAppArgs
-    unless args[1]!.isConstOf ``World do
-      throw s!"product-valued Move functions are not supported: `{type}`"
-    match translateTyWith env ctx args[0]! with
-    | .ok (some ty) => return (true, #[ty])
-    | .ok none => return (true, #[])
-    | .error message => throw message
-  match translateTyWith env ctx type with
-  | .ok (some ty) => return (false, #[ty])
-  | .ok none => return (false, #[])
-  | .error message => throw message
+    if args[1]!.isConstOf ``World then
+      return (true, ← returnTypes env ctx args[0]!)
+  return (false, ← returnTypes env ctx type)
 
 private def signatureOf (env : Environment) (decl : Decl .pure) : Except String FunSignature := do
   let (ctx, typeParams) ← functionContext env decl
@@ -447,8 +454,8 @@ private def structConstructor? (env : Environment) (name : Name) : Option (Name 
       else none
   | _ => none
 
-private partial def uintConstant? (name : Name) :
-    CoreM (Option (MoveModel.IR.IntWidth × Nat)) := do
+private partial def intConstant? (name : Name) :
+    CoreM (Option (MoveModel.IR.NumType × Int)) := do
   let decl ← match (← Lean.Compiler.LCNF.getBaseDecl? name) with
     | some decl => pure decl
     | none =>
@@ -456,44 +463,107 @@ private partial def uintConstant? (name : Name) :
         let some decl ← Lean.Compiler.LCNF.getBaseDecl? name | return none
         pure decl
   let .code code := decl.value | return none
-  let rec scan (nats : List (FVarId × Nat))
-      (results : List (FVarId × (MoveModel.IR.IntWidth × Nat))) :
-      Code .pure → Option (MoveModel.IR.IntWidth × Nat)
+  let rec scan (nats : List (FVarId × Nat)) (ints : List (FVarId × Int))
+      (results : List (FVarId × (MoveModel.IR.NumType × Int))) :
+      Code .pure → CoreM (Option (MoveModel.IR.NumType × Int))
     | .let letDecl next =>
         match letDecl.value with
-        | .lit (.nat n) => scan ((letDecl.fvarId, n) :: nats) results next
+        | .lit (.nat n) =>
+            scan ((letDecl.fvarId, n) :: nats) ((letDecl.fvarId, n) :: ints) results next
         | .const fn _ args _ =>
             -- `Int.ofNat` carries a non-negative literal into `MoveInt.ofInt`.
             if fn == ``Int.ofNat || fn == ``NatCast.natCast || fn == ``Nat.cast then
               match (fvarArgs args).back? with
               | some natArg =>
                   match assocFind? natArg nats with
-                  | some n => scan ((letDecl.fvarId, n) :: nats) results next
-                  | none => scan nats results next
-              | none => scan nats results next
+                  | some n => scan nats ((letDecl.fvarId, n) :: ints) results next
+                  | none => scan nats ints results next
+              | none => scan nats ints results next
             else if fn == ``UInt.ofNat then
               match (typeArgs args)[0]?, (fvarArgs args).back? with
               | some tag, some natArg =>
                   match widthOfExpr? tag, assocFind? natArg nats with
                   | some w, some n =>
-                      scan nats ((letDecl.fvarId, (w, n)) :: results) next
-                  | _, _ => none
-              | _, _ => none
+                      let nt : MoveModel.IR.NumType := ⟨w, false⟩
+                      scan nats ints ((letDecl.fvarId, (nt, n)) :: results) next
+                  | _, _ => pure none
+              | _, _ => pure none
             else if fn == ``MoveInt.ofInt then
-              -- the width tag is the second type argument (sign, then width)
-              match (typeArgs args)[1]?, (fvarArgs args).back? with
-              | some tag, some intArg =>
-                  match widthOfExpr? tag, assocFind? intArg nats with
-                  | some w, some n =>
-                      scan nats ((letDecl.fvarId, (w, n)) :: results) next
-                  | _, _ => none
-              | _, _ => none
+              match (typeArgs args)[0]?, (typeArgs args)[1]?, (fvarArgs args).back? with
+              | some signTag, some widthTag, some intArg =>
+                  match signOfExpr? signTag, widthOfExpr? widthTag, assocFind? intArg ints with
+                  | some signed, some width, some value => do
+                      let nt : MoveModel.IR.NumType := ⟨width, signed⟩
+                      unless nt.lo ≤ value ∧ value < nt.hi do
+                        throwError "integer constant `{name}` contains an out-of-range literal `{value}`"
+                      scan nats ints ((letDecl.fvarId, (nt, value)) :: results) next
+                  | _, _, _ => pure none
+              | _, _, _ => pure none
+            else if fn == ``MoveInt.neg then
+              match (fvarArgs args).back? >>= fun arg => assocFind? arg results with
+              | some (nt, value) => do
+                  let result := -value
+                  unless nt.lo ≤ result ∧ result < nt.hi do
+                    throwError "integer constant `{name}` overflows in negation"
+                  scan nats ints ((letDecl.fvarId, (nt, result)) :: results) next
+              | none => pure none
+            else if fn == ``MoveInt.cast then
+              match (typeArgs args)[2]?, (typeArgs args)[3]?, (fvarArgs args).back? with
+              | some signTag, some widthTag, some source =>
+                  match signOfExpr? signTag, widthOfExpr? widthTag, assocFind? source results with
+                  | some signed, some width, some (_, value) => do
+                      let nt : MoveModel.IR.NumType := ⟨width, signed⟩
+                      unless nt.lo ≤ value ∧ value < nt.hi do
+                        throwError "integer constant `{name}` contains a cast whose result is out of range"
+                      scan nats ints ((letDecl.fvarId, (nt, value)) :: results) next
+                  | _, _, _ => pure none
+              | _, _, _ => pure none
+            else if fn == ``MoveInt.add || fn == ``MoveInt.sub || fn == ``MoveInt.mul ||
+                fn == ``MoveInt.div || fn == ``MoveInt.mod || fn == ``MoveInt.land ||
+                fn == ``MoveInt.lor || fn == ``MoveInt.lxor || fn == ``MoveInt.shl ||
+                fn == ``MoveInt.shr then do
+              let runtimeArgs := fvarArgs args
+              match runtimeArgs[runtimeArgs.size - 2]?, runtimeArgs.back? with
+              | some leftId, some rightId =>
+                  match assocFind? leftId results, assocFind? rightId results with
+                  | some (nt, left), some (rightNt, right) =>
+                      unless (fn == ``MoveInt.shl || fn == ``MoveInt.shr || nt == rightNt) do
+                        throwError "integer constant `{name}` combines operands of different types"
+                      let result ←
+                        if fn == ``MoveInt.add then pure (left + right)
+                        else if fn == ``MoveInt.sub then pure (left - right)
+                        else if fn == ``MoveInt.mul then pure (left * right)
+                        else if fn == ``MoveInt.div then
+                          if right == 0 then throwError "integer constant `{name}` divides by zero"
+                          else pure (left.tdiv right)
+                        else if fn == ``MoveInt.mod then
+                          if right == 0 then throwError "integer constant `{name}` takes a remainder by zero"
+                          else pure (left.tmod right)
+                        else if fn == ``MoveInt.land then
+                          pure (nt.fromBits ((nt.toBits left).toNat &&& (nt.toBits right).toNat))
+                        else if fn == ``MoveInt.lor then
+                          pure (nt.fromBits ((nt.toBits left).toNat ||| (nt.toBits right).toNat))
+                        else if fn == ``MoveInt.lxor then
+                          pure (nt.fromBits ((nt.toBits left).toNat ^^^ (nt.toBits right).toNat))
+                        else do
+                          let amount := right.toNat
+                          unless amount < nt.width.bits do
+                            throwError "integer constant `{name}` shifts by at least its integer width"
+                          if fn == ``MoveInt.shl then
+                            pure (nt.fromBits (((nt.toBits left).toNat <<< amount) % nt.size))
+                          else
+                            pure (left.fdiv (2 ^ amount))
+                      unless nt.lo ≤ result ∧ result < nt.hi do
+                        throwError "integer constant `{name}` overflows"
+                      scan nats ints ((letDecl.fvarId, (nt, result)) :: results) next
+                  | _, _ => pure none
+              | _, _ => pure none
             else
-              scan nats results next
-        | _ => scan nats results next
-    | .return result => assocFind? result results
-    | _ => none
-  return scan [] [] code
+              scan nats ints results next
+        | _ => scan nats ints results next
+    | .return result => pure (assocFind? result results)
+    | _ => pure none
+  scan [] [] [] code
 
 private structure PendingCall where
   op : LIR.Oper
@@ -502,9 +572,14 @@ private structure PendingCall where
 
 private inductive Pending where
   | call (call : PendingCall)
+  | multiCall (op : LIR.Oper) (srcs : Array FVarId)
+      (resultTys : Array LIR.Ty) (effectful : Bool)
   | abort (code : FVarId)
   | vectorInsert (reference index value : FVarId) (elemTy : LIR.Ty)
   | vectorRemove (reference index : FVarId) (elemTy : LIR.Ty)
+  | vectorPop (reference : FVarId) (elemTy : LIR.Ty)
+  | vectorMut (reference : FVarId) (args : Array FVarId) (elemTy : LIR.Ty)
+      (op : LIR.Oper) (resultTys : Array LIR.Ty)
 
 private structure BuildState where
   module : Move.ModuleRef
@@ -517,6 +592,7 @@ private structure BuildState where
   descriptors : List (FVarId × Nat) := []
   natLiterals : List (FVarId × Nat) := []
   returnAliases : List (FVarId × Option FVarId) := []
+  returnValues : List (FVarId × Array FVarId) := []
   joins : List (FVarId × (String × Array FVarId)) := []
   loopHeaders : List (Nat × String) := []
   loopExits : List (Nat × String) := []
@@ -525,6 +601,7 @@ private structure BuildState where
   loopTails : List (Nat × (Array FVarId × Code .pure)) := []
   usedLoopMarkers : List (Name × Nat × Nat) := []
   products : List (FVarId × Array FVarId) := []
+  tupleLocals : List (FVarId × Array (String × LIR.Ty)) := []
   loopLiveResults : List FVarId := []
   blocks : Array LIR.Block := #[]
   calls : Array Name := #[]
@@ -578,6 +655,51 @@ private def localTy? (id : FVarId) : BuildM (Option LIR.Ty) := do
   let name := localName id
   pure <| (state.loopParams ++ state.locals).find? (·.name == name) |>.map (·.ty)
 
+/-- Runtime leaves of a transient product value.  Products never become Move
+locals; only their recursively flattened components do. -/
+private partial def flattenProductValue (id : FVarId) : BuildM (Array FVarId) := do
+  if let some fields := assocFind? id (← get).products then
+    let mut result := #[]
+    for field in fields do
+      result := result ++ (← flattenProductValue field)
+    return result
+  if (← localTy? id).isSome then return #[id]
+  return #[]
+
+private def currentReturnTypes (env : Environment) (type : Expr) :
+    BuildM (Array LIR.Ty) := do
+  match returnTypes env (← get).tyContext type with
+  | .ok types => return types
+  | .error message => throwError message
+
+/-- Bind the constructor parameters of one transient product case to a flat
+array of Move locals.  A nested product parameter retains its slice for the
+next `cases`; leaf parameters become ordinary LIR locals. -/
+private def bindTupleParams (env : Environment)
+    (params : Array (Param .pure)) (sources : Array (String × LIR.Ty))
+    (instrs : Array LIR.Instr) : BuildM (Array LIR.Instr) := do
+  let mut offset := 0
+  let mut nextInstrs := instrs
+  for param in params do
+    let types ← currentReturnTypes env param.type
+    unless offset + types.size ≤ sources.size do
+      throwError "tuple pattern has more runtime fields than its value"
+    let fields := sources.extract offset (offset + types.size)
+    offset := offset + types.size
+    if types.size == 1 then
+      let some source := fields[0]? | unreachable!
+      let some expected := types[0]? | unreachable!
+      unless source.2 == expected do
+        throwError "tuple pattern field type does not match its returned value"
+      addLocal env param.fvarId param.type
+      nextInstrs := nextInstrs.push (.assign (localName param.fvarId) source.1)
+    else if types.size > 1 then
+      modify fun s => { s with
+        tupleLocals := (param.fvarId, fields) :: s.tupleLocals }
+  unless offset == sources.size do
+    throwError "tuple pattern binds {offset} runtime fields; value has {sources.size}"
+  return nextInstrs
+
 private def addAcquire (name : Name) : BuildM Unit :=
   modify fun s => if s.acquires.any (· == name) then s else { s with acquires := s.acquires.push name }
 
@@ -597,6 +719,10 @@ private def freshTemp (ty : LIR.Ty) : BuildM String := do
     nextTemp := s.nextTemp + 1 }
   return name
 
+private def freshResultLocals (types : Array LIR.Ty) :
+    BuildM (Array (String × LIR.Ty)) := do
+  types.mapM fun type => return (← freshTemp type, type)
+
 /-- Materialize a pending effect once LCNF exposes the `StateM` result.
 Vector insertion/removal retain Move's native reference API at source level,
 but are normalized to value operations bracketed by `read_ref`/`write_ref`.
@@ -609,6 +735,10 @@ private def materializePending (pending : Pending) (dsts : Array String)
   match pending with
   | .call call =>
       return instrs.push (.call dsts call.op (call.srcs.map localName))
+  | .multiCall op srcs resultTys _ =>
+      unless dsts.size == resultTys.size do
+        throwError "multiple-return call produced {dsts.size} destinations; expected {resultTys.size}"
+      return instrs.push (.call dsts op (srcs.map localName))
   | .abort _ => throwError "internal: attempted to materialize an abort as a call"
   | .vectorInsert reference index value elemTy =>
       unless dsts.isEmpty do
@@ -631,6 +761,26 @@ private def materializePending (pending : Pending) (dsts : Array String)
         |>.push (.call #[old] .readRef #[localName reference])
         |>.push (.call #[updated, dsts[0]!] .vecRemove
           #[old, localName index])
+        |>.push (.call #[] .writeRef #[localName reference, updated])
+  | .vectorPop reference elemTy =>
+      unless dsts.size == 1 do
+        throwError "vector pop_back must produce exactly one removed element"
+      let vectorTy := LIR.Ty.vector elemTy
+      let old ← freshTemp vectorTy
+      let updated ← freshTemp vectorTy
+      return instrs
+        |>.push (.call #[old] .readRef #[localName reference])
+        |>.push (.call #[updated, dsts[0]!] .vecPop #[old])
+        |>.push (.call #[] .writeRef #[localName reference, updated])
+  | .vectorMut reference args elemTy op resultTys =>
+      unless dsts.size == resultTys.size do
+        throwError "vector operation produced {dsts.size} values; expected {resultTys.size}"
+      let vectorTy := LIR.Ty.vector elemTy
+      let old ← freshTemp vectorTy
+      let updated ← freshTemp vectorTy
+      return instrs
+        |>.push (.call #[old] .readRef #[localName reference])
+        |>.push (.call (#[updated] ++ dsts) op (#[old] ++ args.map localName))
         |>.push (.call #[] .writeRef #[localName reference, updated])
 
 private def emitBlock (name : String) (instrs : Array LIR.Instr)
@@ -1007,17 +1157,106 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
         modify fun s => { s with pending :=
           (decl.fvarId, .vectorRemove reference index elemTy) :: s.pending }
         return instrs
+      if fn == ``Move.Vector.popBack || fn == ``Move.MutRef.popBack then
+        let some reference := beforeWorld? vars
+          | throwError "vector pop_back is missing its mutable reference"
+        let some elemType := types[0]?
+          | throwError "vector pop_back is missing its element type"
+        let some elemTy ← translateCurrentTy (← getEnv) elemType
+          | throwError "vector element has compiler-erased type"
+        modify fun s => { s with pending :=
+          (decl.fvarId, .vectorPop reference elemTy) :: s.pending }
+        return instrs
+      if fn == ``Move.Vector.swap || fn == ``Move.MutRef.swap then
+        let some reference := vars[vars.size - 4]? | throwError "vector swap is missing its reference"
+        let some i := vars[vars.size - 3]? | throwError "vector swap is missing its first index"
+        let some j := beforeWorld? vars | throwError "vector swap is missing its second index"
+        let some elemType := types[0]? | throwError "vector swap is missing its element type"
+        let some elemTy ← translateCurrentTy (← getEnv) elemType | throwError "vector element has compiler-erased type"
+        modify fun s => { s with pending := (decl.fvarId,
+          .vectorMut reference #[i, j] elemTy .vecSwap #[]) :: s.pending }
+        return instrs
+      if fn == ``Move.Vector.swapRemove || fn == ``Move.MutRef.swapRemove then
+        let some reference := vars[vars.size - 3]? | throwError "vector swap_remove is missing its reference"
+        let some i := beforeWorld? vars | throwError "vector swap_remove is missing its index"
+        let some elemType := types[0]? | throwError "vector swap_remove is missing its element type"
+        let some elemTy ← translateCurrentTy (← getEnv) elemType | throwError "vector element has compiler-erased type"
+        modify fun s => { s with pending := (decl.fvarId,
+          .vectorMut reference #[i] elemTy .vecSwapRemove #[elemTy]) :: s.pending }
+        return instrs
+      if fn == ``Move.Vector.append || fn == ``Move.MutRef.append then
+        let some reference := vars[vars.size - 3]? | throwError "vector append is missing its reference"
+        let some other := beforeWorld? vars | throwError "vector append is missing its source vector"
+        let some elemType := types[0]? | throwError "vector append is missing its element type"
+        let some elemTy ← translateCurrentTy (← getEnv) elemType | throwError "vector element has compiler-erased type"
+        modify fun s => { s with pending := (decl.fvarId,
+          .vectorMut reference #[other] elemTy .vecAppend #[]) :: s.pending }
+        return instrs
+      if fn == ``Move.Vector.reverse || fn == ``Move.MutRef.reverse then
+        let some reference := beforeWorld? vars | throwError "vector reverse is missing its reference"
+        let some elemType := types[0]? | throwError "vector reverse is missing its element type"
+        let some elemTy ← translateCurrentTy (← getEnv) elemType | throwError "vector element has compiler-erased type"
+        modify fun s => { s with pending := (decl.fvarId,
+          .vectorMut reference #[] elemTy .vecReverse #[]) :: s.pending }
+        return instrs
+      if fn == ``Move.Vector.reverseSlice || fn == ``Move.MutRef.reverseSlice then
+        let some reference := vars[vars.size - 4]? | throwError "vector reverse_slice is missing its reference"
+        let some left := vars[vars.size - 3]? | throwError "vector reverse_slice is missing its left bound"
+        let some right := beforeWorld? vars | throwError "vector reverse_slice is missing its right bound"
+        let some elemType := types[0]? | throwError "vector reverse_slice is missing its element type"
+        let some elemTy ← translateCurrentTy (← getEnv) elemType | throwError "vector element has compiler-erased type"
+        modify fun s => { s with pending := (decl.fvarId,
+          .vectorMut reference #[left, right] elemTy .vecReverseSlice #[]) :: s.pending }
+        return instrs
+      if fn == ``Move.Vector.trim || fn == ``Move.MutRef.trim ||
+          fn == ``Move.Vector.trimReverse || fn == ``Move.MutRef.trimReverse then
+        let some reference := vars[vars.size - 3]? | throwError "vector trim is missing its reference"
+        let some newLen := beforeWorld? vars | throwError "vector trim is missing its new length"
+        let some elemType := types[0]? | throwError "vector trim is missing its element type"
+        let some elemTy ← translateCurrentTy (← getEnv) elemType | throwError "vector element has compiler-erased type"
+        let op := if fn == ``Move.Vector.trim || fn == ``Move.MutRef.trim then .vecTrim else .vecTrimReverse
+        modify fun s => { s with pending := (decl.fvarId,
+          .vectorMut reference #[newLen] elemTy op #[.vector elemTy]) :: s.pending }
+        return instrs
+      if fn == ``Move.Vector.rotate || fn == ``Move.MutRef.rotate then
+        let some reference := vars[vars.size - 3]? | throwError "vector rotate is missing its reference"
+        let some rot := beforeWorld? vars | throwError "vector rotate is missing its rotation"
+        let some elemType := types[0]? | throwError "vector rotate is missing its element type"
+        let some elemTy ← translateCurrentTy (← getEnv) elemType | throwError "vector element has compiler-erased type"
+        modify fun s => { s with pending := (decl.fvarId,
+          .vectorMut reference #[rot] elemTy .vecRotate #[.u64]) :: s.pending }
+        return instrs
+      if fn == ``Move.Vector.rotateSlice || fn == ``Move.MutRef.rotateSlice then
+        let some reference := vars[vars.size - 5]? | throwError "vector rotate_slice is missing its reference"
+        let some left := vars[vars.size - 4]? | throwError "vector rotate_slice is missing its left bound"
+        let some rot := vars[vars.size - 3]? | throwError "vector rotate_slice is missing its rotation"
+        let some right := beforeWorld? vars | throwError "vector rotate_slice is missing its right bound"
+        let some elemType := types[0]? | throwError "vector rotate_slice is missing its element type"
+        let some elemTy ← translateCurrentTy (← getEnv) elemType | throwError "vector element has compiler-erased type"
+        modify fun s => { s with pending := (decl.fvarId,
+          .vectorMut reference #[left, rot, right] elemTy .vecRotateSlice #[.u64]) :: s.pending }
+        return instrs
+      if fn == ``Move.Vector.destroyEmpty then
+        let some vector := beforeWorld? vars | throwError "destroy_empty is missing its vector"
+        modify fun s => { s with pending := (decl.fvarId, .call {
+          op := .vecDestroyEmpty, srcs := #[vector], resultTy := none }) :: s.pending }
+        return instrs
       if fn == ``Prod.mk then
         modify fun s => { s with products := (decl.fvarId, vars) :: s.products }
-        let some returnedType := types[0]? | throwError "product constructor is missing its first type"
-        match ← translateCurrentTy (← getEnv) returnedType with
-        | none =>
-            modify fun s => { s with returnAliases := (decl.fvarId, none) :: s.returnAliases }
-        | some _ =>
-            let some value := beforeWorld? vars
-              | throwError "effect result is missing its returned value"
+        let some tailType := types[1]? | throwError "product constructor is missing its second type"
+        if tailType.isConstOf ``World then
+          let some value := vars[0]?
+            | throwError "effect result is missing its returned value"
+          let values ← flattenProductValue value
+          if values.isEmpty then
             modify fun s => { s with
-              returnAliases := (decl.fvarId, some value) :: s.returnAliases }
+              returnAliases := (decl.fvarId, none) :: s.returnAliases }
+          else if values.size == 1 then
+            modify fun s => { s with
+              returnAliases := (decl.fvarId, values[0]?) :: s.returnAliases }
+          else
+            modify fun s => { s with
+              returnValues := (decl.fvarId, values) :: s.returnValues }
         return instrs
       -- Integer operations carry their width as the leading width-tag type
       -- argument; the `Width` instance is erased and the value operands are
@@ -1121,15 +1360,32 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
       if fn == ``Bool.true || fn == ``Bool.false then
         addLocalTy decl.fvarId .bool
         return instrs.push (.loadBool (localName decl.fvarId) (fn == ``Bool.true))
-      if let some (w, n) ← uintConstant? fn then
-        addLocalTy decl.fvarId (.uint w)
-        return instrs.push (.loadInt ⟨w, false⟩ (localName decl.fvarId) (n : Int))
+      if fn == ``Move.Address.ofNat then
+        let some source := vars.back?
+          | throwError "address literal is missing its value"
+        let some value := assocFind? source (← get).natLiterals
+          | throwError "address literal is not statically known"
+        addLocalTy decl.fvarId .address
+        return instrs.push (.loadAddress (localName decl.fvarId) value)
+      if let some alias := Move.addressAliasByDeclaration? (← getEnv) fn then
+        addLocalTy decl.fvarId .address
+        return instrs.push (.loadAddress (localName decl.fvarId) alias.value)
+      if let some (nt, value) ← intConstant? fn then
+        addLocalTy decl.fvarId (.int nt)
+        return instrs.push (.loadInt nt (localName decl.fvarId) value)
       if fn == ``Move.Vector.empty then
         let some elemType := types[0]? | throwError "empty vector is missing its element type"
         let some elemTy ← translateCurrentTy (← getEnv) elemType
           | throwError "vector element has compiler-erased type"
         addLocalTy decl.fvarId (.vector elemTy)
         return instrs.push (.call #[srcName decl.fvarId] .vecPack #[])
+      if fn == ``Move.Vector.singleton then
+        let some value := vars.back? | throwError "singleton vector is missing its element"
+        let some elemType := types[0]? | throwError "singleton vector is missing its element type"
+        let some elemTy ← translateCurrentTy (← getEnv) elemType
+          | throwError "vector element has compiler-erased type"
+        addLocalTy decl.fvarId (.vector elemTy)
+        return instrs.push (.call #[srcName decl.fvarId] .vecPack #[srcName value])
       if fn == ``Move.Vector.push then
         let some vector := vars[0]? | throwError "vector push is missing its vector"
         let some value := vars[1]? | throwError "vector push is missing its value"
@@ -1142,6 +1398,40 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
         let some vector := vars[0]? | throwError "vector length is missing its vector"
         addLocalTy decl.fvarId .u64
         return instrs.push (.call #[srcName decl.fvarId] .vecLen #[srcName vector])
+      if fn == ``Move.Vector.isEmpty then
+        let some vector := vars[0]? | throwError "vector emptiness test is missing its vector"
+        let length ← freshTemp .u64
+        let zero ← freshTemp .u64
+        addLocalTy decl.fvarId .bool
+        return instrs
+          |>.push (.call #[length] .vecLen #[srcName vector])
+          |>.push (.loadInt .u64 zero 0)
+          |>.push (.call #[srcName decl.fvarId] .eq #[length, zero])
+      if fn == ``Move.Vector.contains then
+        let some reference := vars[0]? | throwError "vector contains is missing its vector reference"
+        let some valueRef := vars[1]? | throwError "vector contains is missing its value reference"
+        let some elemType := types[0]? | throwError "vector contains is missing its element type"
+        let some elemTy ← translateCurrentTy (← getEnv) elemType | throwError "vector element has compiler-erased type"
+        let vector ← freshTemp (.vector elemTy)
+        let value ← freshTemp elemTy
+        addLocalTy decl.fvarId .bool
+        return instrs
+          |>.push (.call #[vector] .readRef #[srcName reference])
+          |>.push (.call #[value] .readRef #[srcName valueRef])
+          |>.push (.call #[srcName decl.fvarId] .vecContains #[vector, value])
+      if fn == ``Move.Vector.indexOf then
+        let some reference := vars[0]? | throwError "vector index_of is missing its vector reference"
+        let some valueRef := vars[1]? | throwError "vector index_of is missing its value reference"
+        let some elemType := types[0]? | throwError "vector index_of is missing its element type"
+        let some elemTy ← translateCurrentTy (← getEnv) elemType | throwError "vector element has compiler-erased type"
+        let vector ← freshTemp (.vector elemTy)
+        let value ← freshTemp elemTy
+        let results ← freshResultLocals #[.bool, .u64]
+        modify fun s => { s with tupleLocals := (decl.fvarId, results) :: s.tupleLocals }
+        return instrs
+          |>.push (.call #[vector] .readRef #[srcName reference])
+          |>.push (.call #[value] .readRef #[srcName valueRef])
+          |>.push (.call (results.map (·.1)) .vecIndexOf #[vector, value])
       if fn == ``Move.Ref.length || fn == ``Move.MutRef.length then
         let some reference := vars[0]? | throwError "vector length is missing its reference"
         let some elemType := types[0]? | throwError "vector length is missing its element type"
@@ -1208,11 +1498,19 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
         let returns := signature.returns.map (·.instantiate callTypeArgs)
         addCall fn
         if signature.isEffectful then
-          modify fun s => { s with pending := (decl.fvarId, .call {
-            op := .function fn callTypeArgs
-            srcs := callVars
-            resultTy := returns[0]?
-          }) :: s.pending }
+          if returns.size ≤ 1 then
+            modify fun s => { s with pending := (decl.fvarId, .call {
+              op := .function fn callTypeArgs
+              srcs := callVars
+              resultTy := returns[0]?
+            }) :: s.pending }
+          else
+            modify fun s => { s with pending := (decl.fvarId, .multiCall
+              (.function fn callTypeArgs) callVars returns true) :: s.pending }
+          return instrs
+        if returns.size > 1 then
+          modify fun s => { s with pending := (decl.fvarId, .multiCall
+            (.function fn callTypeArgs) callVars returns false) :: s.pending }
           return instrs
         match returns[0]? with
         | some ty =>
@@ -1381,12 +1679,21 @@ private partial def walk (env : Environment) (signatures : FunSignatures) (self 
         | throwError "jump to unknown LCNF join point"
       emitJoinJump blockName instrs destination params args
   | .return result =>
-      match assocFind? result (← get).returnAliases with
+      if let some values := assocFind? result (← get).returnValues then
+        emitBlock blockName instrs (.ret (values.map srcName))
+      else if let some fields := assocFind? result (← get).tupleLocals then
+        emitBlock blockName instrs (.ret (fields.map (·.1)))
+      else match assocFind? result (← get).returnAliases with
       | some (some value) => emitBlock blockName instrs (.ret #[srcName value])
       | some none => emitBlock blockName instrs (.ret #[])
       | none =>
           match assocFind? result (← get).pending with
           | some (.abort code) => emitBlock blockName instrs (.abort (srcName code))
+          | some (.multiCall op srcs resultTys _) =>
+              let results ← freshResultLocals resultTys
+              let names := results.map (·.1)
+              emitBlock blockName
+                (instrs.push (.call names op (srcs.map srcName))) (.ret names)
           | some (.call pending) =>
               match pending.resultTy with
               | some ty =>
@@ -1406,8 +1713,21 @@ private partial def walk (env : Environment) (signatures : FunSignatures) (self 
               emitBlock blockName
                 (← materializePending pending #[srcName result] instrs)
                 (.ret #[srcName result])
+          | some pending@(.vectorPop ..) =>
+              let .vectorPop _ elemTy := pending | unreachable!
+              addLocalTy result elemTy
+              emitBlock blockName
+                (← materializePending pending #[srcName result] instrs)
+                (.ret #[srcName result])
+          | some pending@(.vectorMut _ _ _ _ resultTys) =>
+              let results ← freshResultLocals resultTys
+              let names := results.map (·.1)
+              emitBlock blockName (← materializePending pending names instrs) (.ret names)
           | none =>
-              let returns := if (← get).localIds.any (· == result) then #[srcName result] else #[]
+              let returns ← if let some _ := assocFind? result (← get).products then
+                  pure ((← flattenProductValue result).map srcName)
+                else
+                  pure <| if (← get).localIds.any (· == result) then #[srcName result] else #[]
               emitBlock blockName instrs (.ret returns)
   | .cases cases =>
       if (← get).loopLiveResults.contains cases.discr then
@@ -1416,6 +1736,23 @@ private partial def walk (env : Environment) (signatures : FunSignatures) (self 
         walk env signatures self signature body blockName instrs
       else match assocFind? cases.discr (← get).pending with
       | some (.abort code) => emitBlock blockName instrs (.abort (srcName code))
+      | some (.multiCall op srcs resultTys effectful) =>
+          let some alt := cases.alts[0]? | throwError "multiple-return call has no product case"
+          match alt with
+          | .alt ``Prod.mk params body _ =>
+              let results ← freshResultLocals resultTys
+              let nextInstrs := instrs.push
+                (.call (results.map (·.1)) op (srcs.map srcName))
+              if effectful then
+                let some valueParam := params[0]?
+                  | throwError "effect result product has no value field"
+                modify fun s => { s with
+                  tupleLocals := (valueParam.fvarId, results) :: s.tupleLocals }
+                walk env signatures self signature body blockName nextInstrs
+              else
+                walk env signatures self signature body blockName
+                  (← bindTupleParams env params results nextInstrs)
+          | _ => throwError "multiple-return call did not normalize to a `Prod.mk` case"
       | some (.call pending) =>
           let some alt := cases.alts[0]? | throwError "effect result has no product case"
           match alt with
@@ -1431,7 +1768,8 @@ private partial def walk (env : Environment) (signatures : FunSignatures) (self 
               nextInstrs := nextInstrs.push (.call dsts pending.op (pending.srcs.map srcName))
               walk env signatures self signature body blockName nextInstrs
           | _ => throwError "Move effect did not normalize to a `Prod.mk` case"
-      | some pending@(.vectorInsert ..) | some pending@(.vectorRemove ..) =>
+      | some pending@(.vectorInsert ..) | some pending@(.vectorRemove ..) |
+        some pending@(.vectorPop ..) | some pending@(.vectorMut ..) =>
           let some alt := cases.alts[0]? | throwError "effect result has no product case"
           match alt with
           | .alt ``Prod.mk params body _ =>
@@ -1446,6 +1784,28 @@ private partial def walk (env : Environment) (signatures : FunSignatures) (self 
               walk env signatures self signature body blockName nextInstrs
           | _ => throwError "Move effect did not normalize to a `Prod.mk` case"
       | none =>
+          if let some sources := assocFind? cases.discr (← get).tupleLocals then
+            let some alt := cases.alts[0]? | throwError "tuple value has no product case"
+            match alt with
+            | .alt ``Prod.mk params body _ =>
+                walk env signatures self signature body blockName
+                  (← bindTupleParams env params sources instrs)
+                return
+            | _ => throwError "tuple value did not normalize to a `Prod.mk` case"
+          if let some _ := assocFind? cases.discr (← get).products then
+            let values ← flattenProductValue cases.discr
+            let mut sources := #[]
+            for value in values do
+              let some type ← localTy? value
+                | throwError "tuple component has no Move runtime type"
+              sources := sources.push (srcName value, type)
+            let some alt := cases.alts[0]? | throwError "tuple value has no product case"
+            match alt with
+            | .alt ``Prod.mk params body _ =>
+                walk env signatures self signature body blockName
+                  (← bindTupleParams env params sources instrs)
+                return
+            | _ => throwError "tuple value did not normalize to a `Prod.mk` case"
           if cases.typeName == ``Unit || cases.typeName == ``PUnit then
             let some alt := cases.alts[0]?
               | throwError "unit case has no alternative"
@@ -1548,7 +1908,7 @@ private partial def walk (env : Environment) (signatures : FunSignatures) (self 
 private def visibility (env : Environment) (name : Name) : LIR.Visibility :=
   if moveEntryAttr.hasTag env name then .entry
   else if movePublicAttr.hasTag env name then .public_
-  else if moveFriendAttr.hasTag env name then .friend_
+  else if moveFriendAttr.hasTag env name || movePackageAttr.hasTag env name then .friend_
   else .private_
 
 private def lirSuccessors : LIR.Terminator → Array String
@@ -1595,8 +1955,23 @@ private def compileFun (env : Environment) (signatures : FunSignatures)
     | .error message => throwError message
     | .ok none => pure ()
     | .ok (some ty) =>
-        params := params.push { name := localName param.fvarId, ty := ty }
-        paramIds := param.fvarId :: paramIds
+      params := params.push { name := localName param.fvarId, ty := ty }
+      paramIds := param.fvarId :: paramIds
+  if moveNativeAttr.hasTag env name then
+    return {
+      leanName := name
+      moveName := name.getString!
+      typeParams := signature.typeParams
+      visibility := visibility env name
+      params := params
+      returns := signature.returns
+      locals := #[]
+      blocks := #[]
+      calls := #[]
+      acquires := #[]
+      attributes := Move.userAttributes env name
+      native := true
+    }
   let initial : BuildState := {
     module, tyContext, localIds := paramIds, loopParams := params
   }
@@ -1779,6 +2154,13 @@ def compileModule (outputModule : Move.ModuleRef) (structNames funNames : Array 
           | throwError "called Move function `{callee}` has no enclosing module identity"
         if owner == module then
           throwError "callee `{callee}` is not selected in this `module%`"
+        if movePackageAttr.hasTag env callee && owner.address != module.address then
+          throwError "package-visible Move function `{callee}` cannot be called across package addresses"
+        if moveFriendAttr.hasTag env callee then
+          let trusted := Move.moduleFriendsForDeclaration env callee
+          unless trusted.any fun friend =>
+              friend.address == module.address && friend.name == module.name do
+            throwError "Move function `{callee}` is friend-visible, but module `{module.name}` is not in its friend list"
         externalFuns := externalFuns.push {
           leanName := callee
           address := owner.address
@@ -1791,6 +2173,11 @@ def compileModule (outputModule : Move.ModuleRef) (structNames funNames : Array 
     structs := structs
     functions := functions
     externalFuns := externalFuns
+    friends := representative?.map (Move.moduleFriendsForDeclaration env) |>.getD []
+      |>.toArray.map fun friend => {
+        address := friend.address
+        moduleName := friend.name
+      }
   }
 
 end Move.Compiler

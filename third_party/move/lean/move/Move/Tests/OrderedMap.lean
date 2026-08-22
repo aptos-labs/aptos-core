@@ -165,7 +165,7 @@ module OrderedMap where
     ensures ∃ entry, map.entries.toList[index.toNat]? = some entry ∧
       result = entry.key;
     aborts_if map.entries.toList[index.toNat]? = none
-      with Semantics.Resource.executionFailure
+      with Move.Semantics.Vector.indexOutOfBounds
 
   public fun contains {K V} (map : &Map K V) (key : &K) : Action Bool := do
     let index ← lower_bound map key

@@ -116,6 +116,18 @@ inductive Oper where
   | vecPop
   | vecInsert
   | vecRemove
+  | vecSwap
+  | vecSwapRemove
+  | vecAppend
+  | vecReverse
+  | vecReverseSlice
+  | vecContains
+  | vecIndexOf
+  | vecTrim
+  | vecTrimReverse
+  | vecRotate
+  | vecRotateSlice
+  | vecDestroyEmpty
   -- the mutation algebra (`Mvp::*` of TACAS'22 §3.1, `$Mutation` of the
   -- Boogie prelude): residues of the full reference elimination, never
   -- produced by frontends
@@ -289,6 +301,8 @@ structure FunDecl where
   body : Cfg
   loopSpecs : BlockId → Option LoopSpec
   contract : Contract
+  /-- Bodyless declaration dispatched by the hosting VM. -/
+  native : Bool := false
 
 /-- Construct an executable declaration from the finite lists produced by a
 compiler. The semantic IR deliberately uses partial maps; this constructor
@@ -296,7 +310,7 @@ keeps that representation at the boundary instead of introducing an exchange
 format merely to quote a compiled declaration into Lean. -/
 def FunDecl.ofLists (typeParams : List TypeParamDecl) (numParams : Nat)
     (locals : List Ty) (returns : List Ty) (blocks : List Block)
-    (entry : BlockId) (contract : Contract) : FunDecl where
+    (entry : BlockId) (contract : Contract) (native : Bool := false) : FunDecl where
   typeParams := typeParams
   numParams := numParams
   numLocals := locals.length
@@ -307,6 +321,7 @@ def FunDecl.ofLists (typeParams : List TypeParamDecl) (numParams : Nat)
   -- introduced by the prover pipeline, whose input is already semantic IR.
   loopSpecs := fun _ => none
   contract := contract
+  native := native
 
 /-- Materialize a declaration's finite local map in index order. -/
 def FunDecl.localsList (d : FunDecl) : List Ty :=
@@ -327,6 +342,7 @@ def FunDecl.instantiate (args : List Ty) (d : FunDecl) : FunDecl where
   body := d.body.instantiate args
   loopSpecs := fun block => (d.loopSpecs block).map (LoopSpec.instantiate args)
   contract := d.contract.instantiate args
+  native := d.native
 
 /-- A program: partial maps from function ids to function declarations and
 from resource ids to struct declarations. -/

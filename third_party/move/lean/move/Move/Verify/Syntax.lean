@@ -9,6 +9,11 @@ import Move.Semantics.Vector
 import Move.Verify.Compare
 import Move.Verify.Contract
 
+-- The mutually recursive source translator is intentionally syntax-directed
+-- and large; compiling its generated decision tree exceeds Lean's default
+-- budget as the supported source surface grows.
+set_option maxHeartbeats 400000
+
 /-!
 # Declarative source contracts
 
@@ -38,6 +43,8 @@ class AbortCodeValue (Code : Type) where
 
 instance : AbortCodeValue Nat := ⟨id⟩
 instance : AbortCodeValue Move.U64 := ⟨Move.MoveInt.toNat⟩
+instance {T : Type} : AbortCodeValue (Move.Vector T) :=
+  ⟨fun _ => Move.unspecifiedAbortCode.toNat⟩
 
 def abortCodeOf [AbortCodeValue Code] (code : Code) : Nat :=
   AbortCodeValue.toNat code
@@ -116,6 +123,26 @@ theorem logicalBEq_move [Move.Compare.Total T] (left right : T) :
     logicalBEq left right = Move.Compare.equal left right := rfl
 
 attribute [simp] logicalBEq_move
+
+/-- Logical interpretation of `vector::contains`, using Move's sealed
+structural equality rather than a caller-selected Lean `BEq` instance. -/
+def vectorContains (values : Move.Vector T) (value : T) : Bool :=
+  values.toList.any (fun element => logicalBEq element value)
+
+/-- First structural-equality match, or the list length when absent. The
+propositional branch makes the sealed equality laws available to proof
+simplification while retaining `List.findIdx` behavior. -/
+def vectorFindIndex (value : T) : List T → Nat
+  | [] => 0
+  | head :: tail =>
+      if logicalBEq head value = true then 0 else 1 + vectorFindIndex value tail
+
+/-- Logical interpretation of `vector::index_of`. Move returns index zero
+when no element matches, alongside a false presence flag. -/
+def vectorIndexOf (values : Move.Vector T) (value : T) : Bool × Move.U64 :=
+  let index := vectorFindIndex value values.toList
+  let found := decide (index < values.toList.length)
+  (found, Move.U64.ofNat (if found then index else 0))
 
 private def lastString? : Name → Option String
   | .str _ suffix => some suffix
@@ -667,6 +694,15 @@ private structure TranslationContext where
   re-created when a nested loan dies, which is a creation site of its data
   invariant. -/
   mutationType? : Option Name := none
+  /-- Outstanding owner mutations below the active focused mutation. They let
+  a nested loan focus a disjoint sibling field of an ancestor owner. -/
+  mutationAncestors : List (TSyntax `ident × Option Name) := []
+  /-- Other live focused mutations surrounding the active one. Their values
+  remain readable while a disjoint sibling loan is active. -/
+  mutationRefs : List (TSyntax `ident) := []
+  /-- Field paths currently checked out from each owner. Only paths with
+  distinct first fields can be borrowed as siblings. -/
+  mutationLoans : List (Name × List Name) := []
   loops : List VerificationLoopFrame := []
 
 /-- The data invariant certified by the active mutation's referent, if its
@@ -703,7 +739,18 @@ private def mutationValue (context : TranslationContext)
   if let some mutation := context.mutation? then
     if mutation.getId == owner.getId then
       return ← `(Move.Semantics.Mutation.read $owner)
+  if context.mutationRefs.any (·.getId == owner.getId) then
+    return ← `(Move.Semantics.Mutation.read $owner)
   pure ⟨owner.raw⟩
+
+private def dereferenceValue (context : TranslationContext)
+    (reference : TSyntax `term) : CommandElabM (TSyntax `term) := do
+  if reference.raw.isIdent then
+    let name := reference.raw.getId
+    if context.mutation?.any (·.getId == name) ||
+        context.mutationRefs.any (·.getId == name) then
+      return ← `(Move.Semantics.Mutation.read $reference)
+  pure reference
 
 private def application? (term : TSyntax `term) :
     Option (TSyntax `term × Array (TSyntax `term)) :=
@@ -765,23 +812,23 @@ application is one: `borrowLocal x` is `&x`, `borrowGlobalMut R a` is
 `borrowElemMut r i` is `&mut r[i]`. -/
 private def desugarBorrowPrimitive? (term : Syntax) : CommandElabM (Option Syntax) := do
   let some (candidates, arguments) ← primitiveApplication? term | return none
-  let is (name : Name) : Bool := candidates.contains name
-  let mutable := is ``Move.borrowLocalMut || is ``Move.borrowGlobalMut ||
-    is ``Move.borrowFieldMut || is ``Move.borrowElemMut
-  if is ``Move.borrowLocal || is ``Move.borrowLocalMut then
+  let candidateHas (name : Name) : Bool := candidates.contains name
+  let mutable := candidateHas ``Move.borrowLocalMut || candidateHas ``Move.borrowGlobalMut ||
+    candidateHas ``Move.borrowFieldMut || candidateHas ``Move.borrowElemMut
+  if candidateHas ``Move.borrowLocal || candidateHas ``Move.borrowLocalMut then
     let some place := arguments[0]? | return none
     return some (borrowSyntax mutable place)
-  if is ``Move.borrowGlobal || is ``Move.borrowGlobalMut then
+  if candidateHas ``Move.borrowGlobal || candidateHas ``Move.borrowGlobalMut then
     let some resource := arguments[0]? | return none
     let some address := arguments[1]? | return none
     return some (borrowSyntax mutable (indexPlace resource address))
-  if is ``Move.borrowField || is ``Move.borrowFieldMut then
+  if candidateHas ``Move.borrowField || candidateHas ``Move.borrowFieldMut then
     let some reference := arguments[0]? | return none
     let some descriptor := arguments[1]? | return none
     unless reference.isIdent do return none
     let some field := projectedField? descriptor | return none
     return some (borrowSyntax mutable (mkIdentFrom reference (reference.getId ++ field)))
-  if is ``Move.borrowElem || is ``Move.borrowElemMut then
+  if candidateHas ``Move.borrowElem || candidateHas ``Move.borrowElemMut then
     let some reference := arguments[0]? | return none
     let some index := arguments[1]? | return none
     return some (borrowSyntax mutable (indexPlace reference index))
@@ -815,6 +862,11 @@ private partial def desugarPrimitives (stx : Syntax) : CommandElabM Syntax := do
       if let some code := arguments[0]? then
         let code ← desugarPrimitives code
         return mkNode ``Move.abortTerm #[mkAtom "abort ", code]
+    if candidates.contains ``Move.assert then
+      if let (some condition, some code) := (arguments[0]?, arguments[1]?) then
+        let condition : TSyntax `term := ⟨← desugarPrimitives condition⟩
+        let code : TSyntax `term := ⟨← desugarPrimitives code⟩
+        return (← `(do if $condition then pure () else abort $code)).raw
   return stx.setArgs (← stx.getArgs.mapM desugarPrimitives)
 
 private def sourceBody (declaration : Declaration) : CommandElabM (TSyntax `term) := do
@@ -867,6 +919,21 @@ private def receiverStyleVectorOperation? (term : Syntax) : CommandElabM Bool :=
     let resolved ← try resolveGlobalConst head catch _ => pure []
     if !resolved.isEmpty then return false
   return true
+
+/-- Split field notation before elaboration has resolved it.  Lean retains
+`values.get i` either as a projection node or as the dotted identifier
+`values.get`; in both cases the receiver is still recoverable from syntax. -/
+private def receiverApplication? (term : TSyntax `term) :
+    Option (TSyntax `term × Name × Array (TSyntax `term)) := do
+  let (head, arguments) := (application? term).getD (term, #[])
+  if head.raw.isOfKind ``Lean.Parser.Term.proj && head.raw.getNumArgs == 3 &&
+      head.raw[2].isIdent then
+    return (⟨head.raw[0]⟩, head.raw[2].getId, arguments)
+  if head.raw.isIdent then
+    if let .str receiver field := head.raw.getId then
+      unless receiver.isAnonymous do
+        return (⟨mkIdentFrom head.raw receiver⟩, Name.mkSimple field, arguments)
+  none
 
 /-- Refuse source fragments for which `Spec.pure` would erase an executable
 Move effect or abort. -/
@@ -962,12 +1029,37 @@ private partial def nestedPureMoveCall? (term : Syntax) :
       return some functionName
   return none
 
+private inductive VectorSearchCall where
+  | contains (values value : TSyntax `term)
+  | indexOf (values value : TSyntax `term)
+
+private def vectorSearchCall? (term : TSyntax `term) :
+    CommandElabM (Option VectorSearchCall) := do
+  let some (head, arguments) := application? term | return none
+  unless head.raw.isIdent && arguments.size == 2 do return none
+  let functionName? ← try
+      pure (some (← resolveGlobalConstNoOverload head.raw))
+    catch _ => pure none
+  if functionName? == some ``Move.Vector.contains then
+    return some (.contains arguments[0]! arguments[1]!)
+  if functionName? == some ``Move.Vector.indexOf then
+    return some (.indexOf arguments[0]! arguments[1]!)
+  return none
+
 private partial def rewritePure (mutation? : Option (TSyntax `ident))
     (term : TSyntax `term) : CommandElabM (TSyntax `term) := do
   ensureSupportedSourceTerm term
   if containsArithmetic term.raw || (← containsCheckedArithmeticCall term.raw) then
     throwErrorAt term
       "automatic source specifications do not yet support arithmetic in this context; bind it to a local first"
+  if let some search ← vectorSearchCall? term then
+    match search with
+    | .contains values value =>
+        return ← `(vectorContains $(← rewritePure mutation? values)
+          $(← rewritePure mutation? value))
+    | .indexOf values value =>
+        return ← `(vectorIndexOf $(← rewritePure mutation? values)
+          $(← rewritePure mutation? value))
   if let some functionName ← nestedPureMoveCall? term.raw then
     throwErrorAt term
       "automatic source specifications do not yet model pure Move callee `{functionName}`; inline it or omit `verify`"
@@ -1015,6 +1107,16 @@ private partial def rewritePure (mutation? : Option (TSyntax `ident))
 private inductive VectorMutationCall where
   | insert (reference index value : TSyntax `term)
   | remove (reference index : TSyntax `term)
+  | popBack (reference : TSyntax `term)
+  | swap (reference i j : TSyntax `term)
+  | swapRemove (reference i : TSyntax `term)
+  | append (reference other : TSyntax `term)
+  | reverse (reference : TSyntax `term)
+  | reverseSlice (reference left right : TSyntax `term)
+  | trim (reference newLen : TSyntax `term)
+  | trimReverse (reference newLen : TSyntax `term)
+  | rotate (reference rot : TSyntax `term)
+  | rotateSlice (reference left rot right : TSyntax `term)
 
 private def nativeVectorMutationCall? (functionName : Name)
     (reference : TSyntax `term) (arguments : Array (TSyntax `term)) :
@@ -1031,6 +1133,28 @@ private def nativeVectorMutationCall? (functionName : Name)
       some (.remove reference arguments[0]!)
     else
       none
+  else if functionName == ``Move.Vector.popBack ||
+      functionName == ``Move.MutRef.popBack then
+    if arguments.isEmpty then some (.popBack reference) else none
+  else if functionName == ``Move.Vector.swap || functionName == ``Move.MutRef.swap then
+    if arguments.size == 2 then some (.swap reference arguments[0]! arguments[1]!) else none
+  else if functionName == ``Move.Vector.swapRemove || functionName == ``Move.MutRef.swapRemove then
+    if arguments.size == 1 then some (.swapRemove reference arguments[0]!) else none
+  else if functionName == ``Move.Vector.append || functionName == ``Move.MutRef.append then
+    if arguments.size == 1 then some (.append reference arguments[0]!) else none
+  else if functionName == ``Move.Vector.reverse || functionName == ``Move.MutRef.reverse then
+    if arguments.isEmpty then some (.reverse reference) else none
+  else if functionName == ``Move.Vector.reverseSlice || functionName == ``Move.MutRef.reverseSlice then
+    if arguments.size == 2 then some (.reverseSlice reference arguments[0]! arguments[1]!) else none
+  else if functionName == ``Move.Vector.trim || functionName == ``Move.MutRef.trim then
+    if arguments.size == 1 then some (.trim reference arguments[0]!) else none
+  else if functionName == ``Move.Vector.trimReverse || functionName == ``Move.MutRef.trimReverse then
+    if arguments.size == 1 then some (.trimReverse reference arguments[0]!) else none
+  else if functionName == ``Move.Vector.rotate || functionName == ``Move.MutRef.rotate then
+    if arguments.size == 1 then some (.rotate reference arguments[0]!) else none
+  else if functionName == ``Move.Vector.rotateSlice || functionName == ``Move.MutRef.rotateSlice then
+    if arguments.size == 3 then
+      some (.rotateSlice reference arguments[0]! arguments[1]! arguments[2]!) else none
   else
     none
 
@@ -1046,12 +1170,12 @@ private def receiverStyleVectorMutation? (term : TSyntax `term) : Bool :=
         let projection := head.raw.getArgs
         match projection[2]? with
         | some field => field.isIdent &&
-            (field.getId == `insert || field.getId == `remove ||
+            (field.getId == `insert || field.getId == `remove || field.getId == `popBack ||
               field.getId == `get || field.getId == `set)
         | none => false
       else if head.raw.isIdent then
         match head.raw.getId with
-        | Name.str _ field => field == "insert" || field == "remove" ||
+        | Name.str _ field => field == "insert" || field == "remove" || field == "popBack" ||
             field == "get" || field == "set"
         | _ => false
       else
@@ -1060,17 +1184,55 @@ private def receiverStyleVectorMutation? (term : TSyntax `term) : Bool :=
 private def vectorMutationCall? (term : TSyntax `term) :
     CommandElabM (Option VectorMutationCall) :=
   do
-    let some (head, arguments) := application? term | return none
-    if head.raw.isIdent then
-      let resolved? ← try
-          pure (some (← resolveGlobalConstNoOverload head.raw))
-        catch _ => pure none
-      if let some functionName := resolved? then
-        if (← getEnv).contains functionName then
-          let some reference := arguments[0]? | return none
-          return nativeVectorMutationCall? functionName reference
-            (arguments.extract 1 arguments.size)
+    if let some (head, arguments) := application? term then
+      if head.raw.isIdent then
+        let resolved? ← try
+            pure (some (← resolveGlobalConstNoOverload head.raw))
+          catch _ => pure none
+        if let some functionName := resolved? then
+          if (← getEnv).contains functionName then
+            if let some reference := arguments[0]? then
+              if let some call := nativeVectorMutationCall? functionName reference
+                  (arguments.extract 1 arguments.size) then
+                return some call
+    if let some (reference, field, arguments) := receiverApplication? term then
+      if field == `insert && arguments.size == 2 then
+        return some (.insert reference arguments[0]! arguments[1]!)
+      if field == `remove && arguments.size == 1 then
+        return some (.remove reference arguments[0]!)
+      if field == `popBack && arguments.isEmpty then
+        return some (.popBack reference)
+      if field == `swap && arguments.size == 2 then
+        return some (.swap reference arguments[0]! arguments[1]!)
+      if field == `swapRemove && arguments.size == 1 then
+        return some (.swapRemove reference arguments[0]!)
+      if field == `append && arguments.size == 1 then
+        return some (.append reference arguments[0]!)
+      if field == `reverse && arguments.isEmpty then return some (.reverse reference)
+      if field == `reverseSlice && arguments.size == 2 then
+        return some (.reverseSlice reference arguments[0]! arguments[1]!)
+      if field == `trim && arguments.size == 1 then return some (.trim reference arguments[0]!)
+      if field == `trimReverse && arguments.size == 1 then
+        return some (.trimReverse reference arguments[0]!)
+      if field == `rotate && arguments.size == 1 then return some (.rotate reference arguments[0]!)
+      if field == `rotateSlice && arguments.size == 3 then
+        return some (.rotateSlice reference arguments[0]! arguments[1]! arguments[2]!)
     return none
+
+/-- `destroy_empty` consumes a vector value rather than a mutable reference,
+so it participates in ordinary expression sequencing instead of the mutable
+vector-call path above. -/
+private def vectorDestroyArgument? (term : TSyntax `term) :
+    CommandElabM (Option (TSyntax `term)) := do
+  let some (head, arguments) := application? term | return none
+  unless head.raw.isIdent && arguments.size == 1 do return none
+  let functionName? ← try
+      pure (some (← resolveGlobalConstNoOverload head.raw))
+    catch _ => pure none
+  return if functionName? == some ``Move.Vector.destroyEmpty then
+    arguments[0]?
+  else
+    none
 
 private def packCallArguments (_anchor : Syntax)
     (arguments : Array (TSyntax `term)) : CommandElabM (TSyntax `term) := do
@@ -1290,23 +1452,19 @@ private partial def unpackLoopState (ids : List (TSyntax `ident)) (packed : TSyn
       let nested ← unpackLoopState rest ⟨tail.raw⟩ body
       `(let ($id, $tail) := $packed; $nested)
 
-/-- Whether a bound value is a mutable borrow, whose reference keeps the
-enclosing loan it reborrows from open for as long as it is used. -/
-private def isMutableBorrow (value : TSyntax `term) : Bool :=
-  value.raw.isOfKind ``Move.borrowMutTerm || value.raw.isOfKind ``Move.borrowMutIndexTerm
-
 /-- The local a statement binds, and whether every use of it — rather than only
-a projection out of it — extends the loan it was bound in: a reassignable
-local does, and so does a nested mutable borrow, whose lifetime lies within
-its parent's. -/
+a projection out of it — extends the loan it was bound in. Generated loan
+bodies are lexical expressions, so every later use must remain inside them;
+this is conservative relative to Move's NLL but preserves owned values bound
+while a loan is live. -/
 private def boundIdentifier? (element : Lean.DoElem) : Option (Name × Bool) :=
   match element with
   | `(doElem| let mut $name:ident ← $_value:term) => some (name.getId, true)
   | `(doElem| let mut $name:ident := $_value:term) => some (name.getId, true)
-  | `(doElem| let $name:ident ← $value:term) => some (name.getId, isMutableBorrow value)
-  | `(doElem| let $name:ident := $_value:term) => some (name.getId, false)
+  | `(doElem| let $name:ident ← $_value:term) => some (name.getId, true)
+  | `(doElem| let $name:ident := $_value:term) => some (name.getId, true)
   | `(doElem| let $name:ident : $_type:term := $_value:term) =>
-      some (name.getId, false)
+      some (name.getId, true)
   | _ => none
 
 private partial def closeBorrowScope (elements : Array Lean.DoElem)
@@ -1342,15 +1500,20 @@ private inductive VectorAccessCall where
 private def vectorAccessCall? (term : TSyntax `term) :
     CommandElabM (Option VectorAccessCall) := do
   let some (head, arguments) := application? term | return none
-  unless head.raw.isIdent do return none
-  let some name ← (try pure (some (← resolveGlobalConstNoOverload head.raw))
-      catch _ => pure none) | return none
-  if name == ``Move.Vector.get then
-    if h : arguments.size = 2 then
-      return some (.get arguments[0] arguments[1])
-  else if name == ``Move.Vector.set then
-    if h : arguments.size = 3 then
-      return some (.set arguments[0] arguments[1] arguments[2])
+  if head.raw.isIdent then
+    if let some name ← (try pure (some (← resolveGlobalConstNoOverload head.raw))
+        catch _ => pure none) then
+      if name == ``Move.Vector.get then
+        if h : arguments.size = 2 then
+          return some (.get arguments[0] arguments[1])
+      else if name == ``Move.Vector.set then
+        if h : arguments.size = 3 then
+          return some (.set arguments[0] arguments[1] arguments[2])
+  if let some (values, field, arguments) := receiverApplication? term then
+    if field == `get && arguments.size == 1 then
+      return some (.get values arguments[0]!)
+    if field == `set && arguments.size == 2 then
+      return some (.set values arguments[0]! arguments[1]!)
   return none
 
 /-- A call to a Move function with retained source, including a
@@ -1390,12 +1553,11 @@ private def effectfulNode? (term : Syntax) : CommandElabM Bool := do
   if ← moveFunctionCall? term then return true
   return false
 
-/-- Hoist the sequenced operations out of a pure position: each maximal
+/-- Hoist the sequenced operations out of an eager pure position: each maximal
 effectful subterm is replaced by a fresh local, and the bindings are returned
-in evaluation order — left to right, as Move evaluates.  A position whose
-evaluation is conditional — the right operand of a short-circuit operator, a
-conditional branch, a `match` arm, a binder body — cannot be sequenced before
-the term, so an effect there is rejected rather than evaluated eagerly. -/
+in Move's left-to-right evaluation order. Conditional forms are hoisted as a
+whole and translated compositionally by `expressionSpec`, so effects in a
+branch remain conditional rather than being moved in front of the branch. -/
 private partial def hoistEffects (term : Syntax) (start : Nat) :
     CommandElabM (Array (TSyntax `ident × TSyntax `term) × Syntax) := do
   let (bindings, residual) ← go term #[] false
@@ -1405,9 +1567,6 @@ where
       (conditional : Bool) :
       CommandElabM (Array (TSyntax `ident × TSyntax `term) × Syntax) := do
     if ← effectfulNode? stx then
-      if conditional then
-        throwErrorAt stx
-          "automatic source specifications cannot sequence this operation here, where its evaluation is conditional; bind it to a local first"
       let hoisted := mkIdentFrom stx (Name.mkSimple s!"_moveSpecHoisted{start + bindings.size}")
       return (bindings.push (hoisted, ⟨stx⟩), hoisted.raw)
     let kind := stx.getKind
@@ -1416,22 +1575,16 @@ where
       let (bindings, _) ← go stx[1] bindings true
       return (bindings, stx)
     if (kind == `«term_&&_» || kind == `«term_||_») && stx.getNumArgs == 3 then
-      let (bindings, lhs) ← go stx[0] bindings conditional
-      let (bindings, _) ← go stx[2] bindings true
-      return (bindings, stx.setArg 0 lhs)
+      let hoisted := mkIdentFrom stx (Name.mkSimple s!"_moveSpecHoisted{start + bindings.size}")
+      return (bindings.push (hoisted, ⟨stx⟩), hoisted.raw)
+    if kind == ``Lean.Parser.Term.match then
+      let hoisted := mkIdentFrom stx (Name.mkSimple s!"_moveSpecHoisted{start + bindings.size}")
+      return (bindings.push (hoisted, ⟨stx⟩), hoisted.raw)
     if kind == ``Lean.Parser.Term.matchAlts || kind == ``Lean.Parser.Term.matchAlt then
-      let (bindings, _) ← descend stx bindings true
       return (bindings, stx)
     if kind == `termIfThenElse || kind == `termDepIfThenElse then
-      -- condition first, then the branches are conditional
-      let mut bindings := bindings
-      let mut args := stx.getArgs
-      for i in [0:args.size] do
-        let conditionalHere := conditional || i > (if kind == `termIfThenElse then 1 else 3)
-        let (more, child) ← go args[i]! bindings conditionalHere
-        bindings := more
-        args := args.set! i child
-      return (bindings, stx.setArgs args)
+      let hoisted := mkIdentFrom stx (Name.mkSimple s!"_moveSpecHoisted{start + bindings.size}")
+      return (bindings.push (hoisted, ⟨stx⟩), hoisted.raw)
     descend stx bindings conditional
   descend (stx : Syntax) (bindings : Array (TSyntax `ident × TSyntax `term))
       (conditional : Bool) :
@@ -1724,6 +1877,23 @@ by branch. -/
 private partial def expressionSpec (context : TranslationContext)
     (term : TSyntax `term) :
     CommandElabM (TSyntax `term) := do
+  if term.raw.isOfKind ``Move.movePrimitiveMatch then
+    let expanded ← liftMacroM <| Move.expandPrimitiveMatchSyntax term.raw
+      ⟨term.raw[1]⟩
+      (term.raw[3].getArgs.map fun alternative => ⟨alternative⟩)
+    let `(let $value:ident := $discriminant:term; $body:term) := expanded
+      | throwErrorAt term "failed to expand primitive Move match"
+    let discriminantSpec ← expressionSpec context discriminant
+    let rec translateBody (body : TSyntax `term) : CommandElabM (TSyntax `term) := do
+      match body with
+      | `(if $condition:term then $thenBranch:term else $elseBranch:term) =>
+          let condition ← rewritePure context.mutation? condition
+          let thenSpec ← expressionSpec context thenBranch
+          let elseSpec ← translateBody elseBranch
+          `(if $condition then $thenSpec else $elseSpec)
+      | _ => expressionSpec context body
+    let bodySpec ← translateBody body
+    return ← `(Move.Semantics.Spec.bind $discriminantSpec fun $value => $bodySpec)
   let binary (operation : Name) (lhs rhs : TSyntax `term) := do
     let lhsSpec ← expressionSpec context lhs
     let rhsSpec ← expressionSpec context rhs
@@ -1756,6 +1926,18 @@ private partial def expressionSpec (context : TranslationContext)
       binary ``Move.Semantics.Checked.shlSpec lhs rhs
   | `($lhs:term >>> $rhs:term) =>
       binary ``Move.Semantics.Checked.shrSpec lhs rhs
+  | `($lhs:term && $rhs:term) =>
+      let lhsSpec ← expressionSpec context lhs
+      let rhsSpec ← expressionSpec context rhs
+      `(Move.Semantics.Spec.bind ($lhsSpec : Move.Semantics.Spec _ Bool)
+          fun (_moveSpecLhs : Bool) =>
+          if _moveSpecLhs then $rhsSpec else Move.Semantics.Spec.pure false)
+  | `($lhs:term || $rhs:term) =>
+      let lhsSpec ← expressionSpec context lhs
+      let rhsSpec ← expressionSpec context rhs
+      `(Move.Semantics.Spec.bind ($lhsSpec : Move.Semantics.Spec _ Bool)
+          fun (_moveSpecLhs : Bool) =>
+          if _moveSpecLhs then Move.Semantics.Spec.pure true else $rhsSpec)
   | `(($value:term : $type:term)) =>
       -- An ascribed integer cast, Move's `(x as T)`. The ascription
       -- supplies the target width of the checked cast.
@@ -1774,25 +1956,28 @@ private partial def expressionSpec (context : TranslationContext)
         withHoisted context #[term] fun residuals =>
           ``(Move.Semantics.Spec.pure $(residuals[0]!))
   | `(if $condition:term then $thenBranch:term else $elseBranch:term) =>
-      withHoisted context #[condition] fun residuals => do
-        let thenSpec ← expressionSpec context thenBranch
-        let elseSpec ← expressionSpec context elseBranch
-        `(if $(residuals[0]!) then $thenSpec else $elseSpec)
+      let conditionSpec ← expressionSpec context condition
+      let thenSpec ← expressionSpec context thenBranch
+      let elseSpec ← expressionSpec context elseBranch
+      `(Move.Semantics.Spec.bind $conditionSpec fun _moveSpecCondition =>
+          if _moveSpecCondition then $thenSpec else $elseSpec)
   | `(if $binder:ident : $condition:term then $thenBranch:term else $elseBranch:term) =>
-      withHoisted context #[condition] fun residuals => do
-        let thenSpec ← expressionSpec context thenBranch
-        let elseSpec ← expressionSpec context elseBranch
-        `(if $binder:ident : $(residuals[0]!) then $thenSpec else $elseSpec)
+      let conditionSpec ← expressionSpec context condition
+      let thenSpec ← expressionSpec context thenBranch
+      let elseSpec ← expressionSpec context elseBranch
+      `(Move.Semantics.Spec.bind $conditionSpec fun _moveSpecCondition =>
+          if $binder:ident : _moveSpecCondition then $thenSpec else $elseSpec)
   | `(match $discriminant:term with $alternatives:matchAlt*) =>
-      withHoisted context #[discriminant] fun residuals => do
-        let mut arms : Array (TSyntax ``Lean.Parser.Term.matchAlt) := #[]
-        for alternative in alternatives do
-          match alternative with
-          | `(Lean.Parser.Term.matchAltExpr| | $patterns,* => $rhs:term) =>
-              let armSpec ← expressionSpec context rhs
-              arms := arms.push (← `(Lean.Parser.Term.matchAltExpr| | $patterns,* => $armSpec))
-          | _ => throwErrorAt alternative "unsupported `match` alternative in automatic source specification"
-        `(match $(residuals[0]!):term with $arms:matchAlt*)
+      let discriminantSpec ← expressionSpec context discriminant
+      let mut arms : Array (TSyntax ``Lean.Parser.Term.matchAlt) := #[]
+      for alternative in alternatives do
+        match alternative with
+        | `(Lean.Parser.Term.matchAltExpr| | $patterns,* => $rhs:term) =>
+            let armSpec ← expressionSpec context rhs
+            arms := arms.push (← `(Lean.Parser.Term.matchAltExpr| | $patterns,* => $armSpec))
+        | _ => throwErrorAt alternative "unsupported `match` alternative in automatic source specification"
+      `(Move.Semantics.Spec.bind $discriminantSpec fun _moveSpecDiscriminant =>
+          match _moveSpecDiscriminant with $arms:matchAlt*)
   | _ =>
       if let some call ← globalPrimitiveSpec? (expressionSpec context) context term then
         pure call
@@ -1811,8 +1996,12 @@ private partial def expressionSpec (context : TranslationContext)
             `(Move.Semantics.Spec.bind $valuesSpec fun _moveSpecValues =>
                 Move.Semantics.Spec.bind $indexSpec fun _moveSpecIndex =>
                   Move.Semantics.Spec.bind $valueSpec fun _moveSpecElement =>
-                    Move.Semantics.Vector.setSpec _moveSpecValues _moveSpecIndex
+                  Move.Semantics.Vector.setSpec _moveSpecValues _moveSpecIndex
                       _moveSpecElement)
+      else if let some values ← vectorDestroyArgument? term then
+        let valuesSpec ← expressionSpec context values
+        `(Move.Semantics.Spec.bind $valuesSpec fun _moveSpecValues =>
+            Move.Semantics.Vector.destroyEmptySpec _moveSpecValues)
       else if let some (call, passesMutable) ← moveCallSpec? context term then
         if passesMutable then
           throwErrorAt term
@@ -2118,21 +2307,77 @@ private partial def bindMutableCall (context : TranslationContext)
           let $mutation := Move.Semantics.Mutation.write $mutation $outputTerm.2
           $continuation))
 
+private partial def vectorMutationSpec (context : TranslationContext)
+    (mutation : TSyntax `ident) (call : VectorMutationCall) :
+    CommandElabM (TSyntax `term) := do
+  let check (reference : TSyntax `term) :=
+    unless reference.raw.isIdent && reference.raw.getId == mutation.getId do
+      throwErrorAt reference "vector operation must use the currently borrowed vector"
+  match call with
+  | .insert reference index value =>
+      check reference
+      withHoisted context #[index, value] fun args =>
+        `(Move.Semantics.Vector.insertSpec $mutation $(args[0]!) $(args[1]!))
+  | .remove reference index =>
+      check reference
+      withHoisted context #[index] fun args =>
+        `(Move.Semantics.Vector.removeSpec $mutation $(args[0]!))
+  | .popBack reference => check reference; `(Move.Semantics.Vector.popBackSpec $mutation)
+  | .swap reference i j =>
+      check reference
+      withHoisted context #[i, j] fun args =>
+        `(Move.Semantics.Vector.swapSpec $mutation $(args[0]!) $(args[1]!))
+  | .swapRemove reference i =>
+      check reference
+      withHoisted context #[i] fun args =>
+        `(Move.Semantics.Vector.swapRemoveSpec $mutation $(args[0]!))
+  | .append reference other =>
+      check reference
+      withHoisted context #[other] fun args =>
+        `(Move.Semantics.Vector.appendSpec $mutation $(args[0]!))
+  | .reverse reference => check reference; `(Move.Semantics.Vector.reverseSpec $mutation)
+  | .reverseSlice reference left right =>
+      check reference
+      withHoisted context #[left, right] fun args =>
+        `(Move.Semantics.Vector.reverseSliceSpec $mutation $(args[0]!) $(args[1]!))
+  | .trim reference newLen =>
+      check reference
+      withHoisted context #[newLen] fun args =>
+        `(Move.Semantics.Vector.trimSpec $mutation $(args[0]!))
+  | .trimReverse reference newLen =>
+      check reference
+      withHoisted context #[newLen] fun args =>
+        `(Move.Semantics.Vector.trimReverseSpec $mutation $(args[0]!))
+  | .rotate reference rot =>
+      check reference
+      withHoisted context #[rot] fun args =>
+        `(Move.Semantics.Vector.rotateSpec $mutation $(args[0]!))
+  | .rotateSlice reference left rot right =>
+      check reference
+      withHoisted context #[left, rot, right] fun args =>
+        `(Move.Semantics.Vector.rotateSliceSpec $mutation $(args[0]!) $(args[1]!) $(args[2]!))
+
 /-- A `do`-level `match`: each arm continues with the statements after the
 match, as the then-branch of a statement `if` does. -/
 private partial def matchSpec (context : TranslationContext)
-    (discriminant : TSyntax `term) (alternatives : Array Syntax)
+    (discriminants : Array (TSyntax `term)) (alternatives : Array Syntax)
     (rest : Array Lean.DoElem) : CommandElabM (TSyntax `term) := do
-  withHoisted context #[discriminant] fun residuals => do
+  withHoisted context discriminants fun residuals => do
     let mut arms : Array (TSyntax ``Lean.Parser.Term.matchAlt) := #[]
     for alternative in alternatives do
-      -- `| pats => doSeq`: the patterns are a comma-separated group at index 1
-      -- and the right-hand side a `doSeq` at index 3.
-      let patterns : TSyntaxArray `term := alternative[1].getSepArgs.map (⟨·⟩)
-      let body : TSyntax ``Lean.Parser.Term.doSeq := ⟨alternative[3]⟩
+      let `(Lean.Parser.Term.matchAltExpr| | $patterns,* => $body) := alternative
+        | throwErrorAt alternative
+            "unsupported `match` alternative in automatic source specification"
+      let body : TSyntax ``Lean.Parser.Term.doSeq := ⟨body.raw⟩
       let armSpec ← translateDo context (Lean.Parser.Term.getDoElems body ++ rest)
-      arms := arms.push (← `(Lean.Parser.Term.matchAltExpr| | $patterns,* => $armSpec))
-    `(match $(residuals[0]!):term with $arms:matchAlt*)
+      arms := arms.push
+        (← `(Lean.Parser.Term.matchAltExpr| | $patterns,* => $armSpec))
+    if residuals.size == 1 then
+      `(match $(residuals[0]!):term with $arms:matchAlt*)
+    else if residuals.size == 2 then
+      `(match $(residuals[0]!):term, $(residuals[1]!):term with $arms:matchAlt*)
+    else
+      throwError "automatic source specifications support at most two match discriminants"
 
 private partial def translateDo (context : TranslationContext)
     (elements : Array Lean.DoElem) :
@@ -2142,6 +2387,44 @@ private partial def translateDo (context : TranslationContext)
   if elements.isEmpty then return ← emptyFinish context
   let first : Lean.DoElem := elements[0]!
   let rest := elements.extract 1 elements.size
+  let kind := first.raw.getKind
+  if kind == ``Move.moveNamedStructLet then
+    let fields : TSyntaxArray `term := first.raw[3].getSepArgs.map (⟨·⟩)
+    let value : TSyntax `term := ⟨first.raw[6]⟩
+    let expanded ← `(doElem| let ⟨$fields:term,*⟩ := $value)
+    return ← translateDo context (#[expanded] ++ rest)
+  if kind == ``Move.movePositionalStructLet then
+    let fields : TSyntaxArray `term := first.raw[3].getSepArgs.map (⟨·⟩)
+    let value : TSyntax `term := ⟨first.raw[6]⟩
+    let expanded ← `(doElem| let ⟨$fields:term,*⟩ := $value)
+    return ← translateDo context (#[expanded] ++ rest)
+  if kind == ``Move.moveForRange then
+    let index : TSyntax `ident := ⟨first.raw[2]⟩
+    let lower : TSyntax `term := ⟨first.raw[4]⟩
+    let upper : TSyntax `term := ⟨first.raw[6]⟩
+    let body : TSyntax ``Lean.Parser.Term.doSeq := ⟨first.raw[9]⟩
+    let counter := mkIdentFrom index `_moveSpecForIndex
+    let bodyElems := Lean.Parser.Term.getDoElems body |>.map (fun element => element.raw)
+    let bindIndex := (← `(doElem| let $index := $counter)).raw
+    let increment := (← `(doElem| $counter:ident := $counter + 1)).raw
+    let loopBody := Move.mkDoSeq ((#[bindIndex] ++ bodyElems).push increment)
+    let initialElement ← `(doElem| let mut $counter := $lower)
+    let loopElement ← `(doElem| while $counter < $upper do $loopBody)
+    return ← translateDo context (#[initialElement, loopElement] ++ rest)
+  if kind == ``Move.moveAddAssign || kind == ``Move.moveSubAssign ||
+      kind == ``Move.moveMulAssign || kind == ``Move.moveDivAssign ||
+      kind == ``Move.moveModAssign then
+    let name : TSyntax `ident := ⟨first.raw[0]⟩
+    let rhs : TSyntax `term := ⟨first.raw[2]⟩
+    let lhs : TSyntax `term := ⟨name.raw⟩
+    let value ←
+      if kind == ``Move.moveAddAssign then `($lhs + $rhs)
+      else if kind == ``Move.moveSubAssign then `($lhs - $rhs)
+      else if kind == ``Move.moveMulAssign then `($lhs * $rhs)
+      else if kind == ``Move.moveDivAssign then `($lhs / $rhs)
+      else `($lhs % $rhs)
+    let assignment ← `(doElem| $name:ident := $value)
+    return ← translateDo context (#[assignment] ++ rest)
   if first.raw.isOfKind ``Lean.Parser.Term.doReassign then
     let assignment : TSyntax ``Lean.Parser.Term.doReassign := ⟨first.raw⟩
     match assignment with
@@ -2173,19 +2456,13 @@ private partial def translateDo (context : TranslationContext)
     let nested ← translateRest rest
     return ← `(Move.Semantics.Spec.bind $valueSpec (fun $name => $nested))
   if first.raw.isOfKind ``Lean.Parser.Term.doMatch then
-    -- `match e with | pat => …`: one discriminant, no motive or generalizing
-    -- clause.
-    unless first.raw[1].isNone && first.raw[2].isNone && first.raw[3].isNone do
-      throwErrorAt first "`match` with a motive or generalizing clause is not supported by source specification generation"
+    -- `match e, f with | p, q => …`. Motives/generalization remain Lean's
+    -- own elaboration concern; source translation preserves ordinary arms.
     let discriminants := first.raw[4].getSepArgs
-    unless discriminants.size == 1 do
-      throwErrorAt first "`match` on several discriminants is not supported by source specification generation"
-    let discriminant := discriminants[0]!
-    -- `matchDiscr` is an optional `h :` annotation followed by the term.
-    unless discriminant[0].isNone do
-      throwErrorAt first "a named `match` discriminant is not supported by source specification generation"
+    let terms : Array (TSyntax `term) := discriminants.map fun discriminant =>
+      ⟨discriminant[1]⟩
     let alternatives := first.raw[6][0].getArgs
-    return ← matchSpec context ⟨discriminant[1]⟩ alternatives rest
+    return ← matchSpec context terms alternatives rest
   if first.raw.isOfKind ``Move.moveLoopDo ||
       first.raw.isOfKind ``Move.moveLoopLabeledDo then
     let sourceLabel? :=
@@ -2254,13 +2531,33 @@ private partial def translateDo (context : TranslationContext)
         let some (owner, fields) ← localPlace? context.resources place
           | throwErrorAt place
               "a nested mutable borrow must select a field of the live mutable reference"
-        unless owner.getId == parent.getId && !fields.isEmpty do
+        unless !fields.isEmpty do
           throwErrorAt place
             "a nested mutable borrow must select a field of the live mutable reference"
-        let childType? ← pathTypeName? context.mutationType?
+        let parentFrame? :=
+          if owner.getId == parent.getId then
+            some (parent, context.mutationType?)
+          else
+            context.mutationAncestors.find? fun (ancestor, _) =>
+              ancestor.getId == owner.getId
+        let some (parent, parentType?) := parentFrame?
+          | throwErrorAt place
+              "a nested mutable borrow must select a field of the live mutable reference or a retained ancestor"
+        let fieldNames := fields.toList.map (·.getId)
+        if context.mutationLoans.any fun (loanOwner, loanPath) =>
+            loanOwner == owner.getId && !loanPath.isEmpty &&
+              loanPath.head? == fieldNames.head? then
+          throwErrorAt place
+            "overlapping nested mutable borrows are not supported; sibling borrows must select distinct fields"
+        let childType? ← pathTypeName? parentType?
           (fields.toList.map (·.getId))
         let nested ← translateDo
-          { context with mutation? := some name, mutationType? := childType? }
+          { context with
+              mutation? := some name
+              mutationType? := childType?
+              mutationAncestors := (parent, parentType?) :: context.mutationAncestors
+              mutationRefs := context.mutation?.toList ++ context.mutationRefs
+              mutationLoans := (owner.getId, fieldNames) :: context.mutationLoans }
           loanBody
         let parentValue ← `(Move.Semantics.Mutation.read $parent)
         let focused ← projectPath parentValue fields
@@ -2274,8 +2571,11 @@ private partial def translateDo (context : TranslationContext)
           translateDo context continuation
         -- Re-creating a certified owner is a creation site: its data
         -- invariant is owed here, when the loan dies, and nowhere else.
-        match ← rebuildOwner parentValue finalField fields.toList
-            (← certifiedMutation? context) with
+        let certified? ← match parentType? with
+          | none => pure none
+          | some typeName =>
+              pure <| (Move.dataInvariant? (← getEnv) typeName).map (typeName, ·)
+        match ← rebuildOwner parentValue finalField fields.toList certified? with
         | some creation =>
             let rebuilt := mkIdentFrom place `_moveSpecRebuilt
             `(Move.Semantics.Spec.bind $borrow (fun $output =>
@@ -2332,7 +2632,7 @@ private partial def translateDo (context : TranslationContext)
         globalImmutableBorrow context name first.raw family key fields rest
   | `(doElem| let $name:ident ← * $reference:term) =>
       let nested ← translateRest rest
-      `(let $name := $(← rewritePure context.mutation? (← `(* $reference))); $nested)
+      `(let $name := $(← dereferenceValue context reference); $nested)
   | `(doElem| let $name:ident ← $value:term) =>
       if let some call ← mutableCallSpec? context value then
         bindMutableCall context call (some name) (← translateRest rest)
@@ -2363,6 +2663,21 @@ private partial def translateDo (context : TranslationContext)
                     let $name := $output.1
                     let $mutation := $output.2
                     $nested))
+        | .popBack reference =>
+            unless reference.raw.isIdent && reference.raw.getId == mutation.getId do
+              throwErrorAt reference "vector pop_back must use the currently borrowed vector"
+            `(Move.Semantics.Spec.bind
+                (Move.Semantics.Vector.popBackSpec $mutation)
+                (fun $output =>
+                  let $name := $output.1
+                  let $mutation := $output.2
+                  $nested))
+        | call =>
+            let operation ← vectorMutationSpec context mutation call
+            `(Move.Semantics.Spec.bind $operation (fun $output =>
+                let $name := $output.1
+                let $mutation := $output.2
+                $nested))
       else
         if receiverStyleVectorMutation? value then
           throwErrorAt value
@@ -2404,7 +2719,7 @@ private partial def translateDo (context : TranslationContext)
         `(Move.Semantics.Spec.bind $valueSpec (fun ($name : $type) => $nested))
   | `(doElem| let mut $name:ident ← * $reference:term) =>
       let nested ← translateRest rest
-      `(let $name := $(← rewritePure context.mutation? (← `(* $reference))); $nested)
+      `(let $name := $(← dereferenceValue context reference); $nested)
   | `(doElem| let mut $name:ident ← $value:term) =>
       if let some call ← mutableCallSpec? context value then
         bindMutableCall context call (some name) (← translateRest rest)
@@ -2412,6 +2727,20 @@ private partial def translateDo (context : TranslationContext)
         let valueSpec ← expressionSpec context value
         let nested ← translateRest rest
         `(Move.Semantics.Spec.bind $valueSpec (fun $name => $nested))
+  | `(doElem| let $pattern:term := $value:term) =>
+      let valueSpec ← expressionSpec context value
+      let nested ← translateRest rest
+      let packed := mkIdentFrom pattern `_moveSpecTuple
+      let packedTerm : TSyntax `term := ⟨packed.raw⟩
+      let matched ← `(match $packedTerm:term with | $pattern:term => $nested)
+      `(Move.Semantics.Spec.bind $valueSpec (fun $packed => $matched))
+  | `(doElem| let $pattern:term ← $value:term) =>
+      let valueSpec ← expressionSpec context value
+      let nested ← translateRest rest
+      let packed := mkIdentFrom pattern `_moveSpecTuple
+      let packedTerm : TSyntax `term := ⟨packed.raw⟩
+      let matched ← `(match $packedTerm:term with | $pattern:term => $nested)
+      `(Move.Semantics.Spec.bind $valueSpec (fun $packed => $matched))
   | `(doElem| return $value:term) =>
       -- `return` ends the function: inside a loop too, since the loop's
       -- fixed point already produces the function's result (its `break`
@@ -2427,8 +2756,6 @@ private partial def translateDo (context : TranslationContext)
       loopContinueSpec context none first.raw
   | `(doElem| while $condition:doIfCond do $body:doSeq) =>
       let (binder?, condition) ← plainCondition condition
-      if binder?.isSome then
-        throwErrorAt first "a dependent `while` condition is not supported by source specification generation"
       let body ← Lean.Elab.Command.liftCoreM <| Move.freshenLoopLocals body
       let assigned := Move.loopAssignedIdents body
       let state := freshLoopStateIdents first.raw assigned
@@ -2451,7 +2778,10 @@ private partial def translateDo (context : TranslationContext)
         { context with loops := frame :: context.loops }
         bodyElements
       let step ← withHoisted context #[condition] fun residuals =>
-        `(if $(residuals[0]!) then $bodySpec else $after)
+        match binder? with
+        | some binder =>
+            `(if $binder:ident : $(residuals[0]!) then $bodySpec else $after)
+        | none => `(if $(residuals[0]!) then $bodySpec else $after)
       let stateName := mkIdentFrom first `_moveSpecLoopState
       let stateTerm : TSyntax `term := ⟨stateName.raw⟩
       let unpacked ← unpackLoopState state stateTerm step
@@ -2466,7 +2796,11 @@ private partial def translateDo (context : TranslationContext)
         (Lean.Parser.Term.getDoElems thenBranch ++ rest)
         (Lean.Parser.Term.getDoElems elseBranch ++ rest)
   | `(doElem| $value:term) =>
-      if let some call ← mutableCallSpec? context value then
+      if value.raw.isOfKind ``Lean.Parser.Term.do then
+        let effect ← translateTerm { context with mutation? := none, mutationType? := none } value
+        let nested ← translateRest rest
+        `(Move.Semantics.Spec.bind $effect (fun _moveSpecIgnored => $nested))
+      else if let some call ← mutableCallSpec? context value then
         if rest.isEmpty then
           -- The call's value is the statement's value.
           let output := mkIdentFrom value `_moveSpecCallValue
@@ -2479,19 +2813,47 @@ private partial def translateDo (context : TranslationContext)
               $after))
         else
           bindMutableCall context call none (← translateRest rest)
-      else if let some (.insert reference index inserted) ← vectorMutationCall? value then
+      else if let some vectorCall ← vectorMutationCall? value then
         let some mutation := context.mutation?
-          | throwErrorAt value "`vector::insert` requires a live mutable vector borrow"
-        unless reference.raw.isIdent && reference.raw.getId == mutation.getId do
-          throwErrorAt reference "vector insert must use the currently borrowed vector"
+          | throwErrorAt value "a mutating vector operation requires a live mutable vector borrow"
         let output := mkIdentFrom value `_moveSpecVectorMutationOutput
-        let nested ← translateRest rest
-        withHoisted context #[index, inserted] fun residuals =>
-          `(Move.Semantics.Spec.bind
-              (Move.Semantics.Vector.insertSpec $mutation $(residuals[0]!) $(residuals[1]!))
-              (fun $output =>
+        let outputTerm : TSyntax `term := ⟨output.raw⟩
+        let continuation ← if rest.isEmpty then
+          finish context (← `(Move.Semantics.Spec.pure $outputTerm.1))
+        else
+          translateRest rest
+        match vectorCall with
+        | .insert reference index inserted =>
+            unless reference.raw.isIdent && reference.raw.getId == mutation.getId do
+              throwErrorAt reference "vector insert must use the currently borrowed vector"
+            withHoisted context #[index, inserted] fun residuals =>
+              `(Move.Semantics.Spec.bind
+                  (Move.Semantics.Vector.insertSpec $mutation $(residuals[0]!) $(residuals[1]!))
+                  (fun $output =>
+                    let $mutation := $output.2
+                    $continuation))
+        | .remove reference index =>
+            unless reference.raw.isIdent && reference.raw.getId == mutation.getId do
+              throwErrorAt reference "vector remove must use the currently borrowed vector"
+            withHoisted context #[index] fun residuals =>
+              `(Move.Semantics.Spec.bind
+                  (Move.Semantics.Vector.removeSpec $mutation $(residuals[0]!))
+                  (fun $output =>
+                    let $mutation := $output.2
+                    $continuation))
+        | .popBack reference =>
+            unless reference.raw.isIdent && reference.raw.getId == mutation.getId do
+              throwErrorAt reference "vector pop_back must use the currently borrowed vector"
+            `(Move.Semantics.Spec.bind
+                (Move.Semantics.Vector.popBackSpec $mutation)
+                (fun $output =>
+                  let $mutation := $output.2
+                  $continuation))
+        | call =>
+            let operation ← vectorMutationSpec context mutation call
+            `(Move.Semantics.Spec.bind $operation (fun $output =>
                 let $mutation := $output.2
-                $nested))
+                $continuation))
       else if receiverStyleVectorMutation? value then
         throwErrorAt value
           "automatic source specifications require fully qualified `Move.Vector.insert` or `Move.Vector.remove`"
@@ -2517,17 +2879,20 @@ private partial def conditionalSpec (context : TranslationContext)
   let translateBranch (elements : Array Lean.DoElem) :=
     if elements.isEmpty then emptyFinish context else translateDo context elements
   if condition.raw.isOfKind ``Lean.Parser.Term.doIfLet then
-    -- `if let pat := e then … else …`; `doIfLetPure` holds the scrutinee.
+    -- Both `if let pat := e` and `if let pat ← e` sequence the scrutinee;
+    -- the latter may abort before either branch is selected.
     let pattern : TSyntax `term := ⟨condition.raw[1]⟩
     let binding := condition.raw[2]
-    unless binding.isOfKind ``Lean.Parser.Term.doIfLetPure do
-      throwErrorAt condition "`if let pat ← e` is not supported by source specification generation; bind `e` with `let` first"
-    return ← withHoisted context #[⟨binding[1]⟩] fun residuals => do
-      let thenSpec ← translateBranch thenElements
-      let elseSpec ← translateBranch elseElements
-      `(match $(residuals[0]!):term with
-        | $pattern:term => $thenSpec
-        | _ => $elseSpec)
+    let scrutinee : TSyntax `term := ⟨binding[1]⟩
+    let scrutineeSpec ← expressionSpec context scrutinee
+    let thenSpec ← translateBranch thenElements
+    let elseSpec ← translateBranch elseElements
+    let value := mkIdentFrom pattern `_moveSpecIfLetValue
+    let valueTerm : TSyntax `term := ⟨value.raw⟩
+    let selected ← `(match $valueTerm:term with
+      | $pattern:term => $thenSpec
+      | _ => $elseSpec)
+    return ← `(Move.Semantics.Spec.bind $scrutineeSpec (fun $value => $selected))
   let (binder?, condition) ← plainCondition condition
   withHoisted context #[condition] fun residuals => do
     let condition := residuals[0]!
@@ -3093,6 +3458,23 @@ private def totalPrimitiveLemma : Name → Option Name
       some ``Move.Semantics.Vector.insertSpec_undefined
   | ``Move.Semantics.Vector.removeSpec =>
       some ``Move.Semantics.Vector.removeSpec_undefined
+  | ``Move.Semantics.Vector.popBackSpec =>
+      some ``Move.Semantics.Vector.popBackSpec_undefined
+  | ``Move.Semantics.Vector.swapSpec => some ``Move.Semantics.Vector.swapSpec_undefined
+  | ``Move.Semantics.Vector.swapRemoveSpec =>
+      some ``Move.Semantics.Vector.swapRemoveSpec_undefined
+  | ``Move.Semantics.Vector.appendSpec => some ``Move.Semantics.Vector.appendSpec_undefined
+  | ``Move.Semantics.Vector.reverseSpec => some ``Move.Semantics.Vector.reverseSpec_undefined
+  | ``Move.Semantics.Vector.reverseSliceSpec =>
+      some ``Move.Semantics.Vector.reverseSliceSpec_undefined
+  | ``Move.Semantics.Vector.trimSpec => some ``Move.Semantics.Vector.trimSpec_undefined
+  | ``Move.Semantics.Vector.trimReverseSpec =>
+      some ``Move.Semantics.Vector.trimReverseSpec_undefined
+  | ``Move.Semantics.Vector.rotateSpec => some ``Move.Semantics.Vector.rotateSpec_undefined
+  | ``Move.Semantics.Vector.rotateSliceSpec =>
+      some ``Move.Semantics.Vector.rotateSliceSpec_undefined
+  | ``Move.Semantics.Vector.destroyEmptySpec =>
+      some ``Move.Semantics.Vector.destroyEmptySpec_undefined
   | _ => none
 
 /-- The computation a well-definedness goal `¬ X.undefined s` is about. -/
@@ -3892,7 +4274,7 @@ private def elabAutomaticSourceVerify : CommandElab := fun stx => do
   let calleeUnfoldLemmas := sourceUnfoldLemmas.filter fun lemma =>
     lemma.raw.getId != sourceSpecName &&
       lemma.raw.getId != functionName ++ `bodySpec
-  let command ← `(set_option maxHeartbeats 400000 in
+  let command ← `(set_option maxHeartbeats 800000 in
     theorem $verifiedName : $contractName := by
       move_bench
       -- Open the contract into one weakest-precondition goal, then execute

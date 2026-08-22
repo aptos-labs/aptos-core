@@ -52,7 +52,7 @@ private def run := Tests.runXIR imported
 #test run "constant_sum" [] [] = Tests.okU64 15
 #test run "make_pair" [] [.u64 7, .u64 9]
   = Tests.okVals [.vector [.u64 7, .u64 9]]
-#test run "pop_empty" [] [.u64 1] = Tests.aborted 0
-#test run "borrow_out_of_bounds" [] [.u64 1] = Tests.aborted 0
+#test run "pop_empty" [] [.u64 1] = Tests.aborted 0x20000
+#test run "borrow_out_of_bounds" [] [.u64 1] = Tests.aborted 0x20000
 
 end Tests.Frontend.Vectors

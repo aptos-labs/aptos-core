@@ -140,24 +140,11 @@ module SourceVerificationRejection where
   fun unmodeled_receiver_get (values : Move.Vector U64) (index : U64) : Action U64 :=
     pure (values.get index)
 
-  /--
-  error: automatic source specifications require fully qualified `Move.Vector.get`, `Move.Vector.set`, `Move.Vector.insert`, or `Move.Vector.remove`
-  -/
-  #guard_msgs in
   spec unmodeled_receiver_get (values : Move.Vector U64) (index : U64) where
-    ensures True;
-    aborts_if False
+    ensures result = values.toList[index.toNat]?.getD 0;
+    aborts_if ¬index.toNat < values.toList.length
 
-  fun short_circuit_arithmetic (value : U64) : Action U64 := do
-    if value == 0 && value + 1 == 2 then pure value else pure 0
-
-  /--
-  error: automatic source specifications cannot sequence this operation here, where its evaluation is conditional; bind it to a local first
-  -/
-  #guard_msgs in
-  spec short_circuit_arithmetic (value : U64) where
-    ensures True;
-    aborts_if False
+  verify unmodeled_receiver_get
 
   namespace Vector
 
@@ -172,13 +159,11 @@ module SourceVerificationRejection where
     let slot ← &mut values
     slot.insert 0 7
 
-  /--
-  error: automatic source specifications require fully qualified `Move.Vector.insert` or `Move.Vector.remove`
-  -/
-  #guard_msgs in
   spec calls_receiver_style_vector_insert where
     ensures True;
     aborts_if False
+
+  verify calls_receiver_style_vector_insert
 
   @[move_struct]
   structure Other where

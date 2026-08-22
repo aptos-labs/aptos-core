@@ -75,6 +75,27 @@ module GlobalBorrows where
 
   verify bump_first
 
+  -- Disjoint fields of one live mutable reference may be borrowed together.
+  -- Reading the first after the second is created keeps both loans live.
+  fun read_siblings (pair : &mut Pair) : Action U64 := do
+    let left ← &mut pair.left
+    let right ← &mut pair.right
+    let rightValue ← *right
+    let leftValue ← *left
+    pure (leftValue + rightValue)
+
+  spec read_siblings (pair : &mut Pair) where
+    ensures result = pair.left + pair.right;
+    aborts_if ¬pair.left.toNat + pair.right.toNat < U64.size
+      with Semantics.Checked.arithmeticAbortCode
+
+  verify read_siblings
+
+  fun run_read_siblings : Action U64 := do
+    let pair : Pair := { left := 4, right := 7 }
+    let pairRef ← &mut pair
+    read_siblings pairRef
+
   -- An element-field borrow of a local vector, then a read of the element.
   fun bump_left : Action U64 := do
     let pairs : Vector Pair := vector![{ left := 1, right := 2 }]
@@ -102,4 +123,5 @@ module GlobalBorrows where
   #test run "replace" (memory 7 1) [.address 7, .u64 5] = Tests.okRet (memory 7 5) []
   #test run "read_whole" (memory 7 9) [.address 7] = Tests.okRet (memory 7 9) [.u64 9]
   #test run "bump_through" (memory 7 9) [.address 7] = Tests.okRet (memory 7 10) []
+  #test run "run_read_siblings" [] [] = Tests.okU64 11
   #test run "bump_left" [] [] = Tests.okU64 6

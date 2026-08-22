@@ -27,17 +27,24 @@ structure Address where
   private dummy : Nat
   deriving Inhabited, DecidableEq
 
-/-- A Move signer value. -/
+namespace Address
+
+/-- Compiler-recognized account-address literal.  The backend checks the
+payload fits Move's 256-bit address domain. -/
+@[noinline] def ofNat (value : Nat) : Address := ⟨value⟩
+
+end Address
+
+/-- Move's `@0x1` address-literal spelling. -/
+scoped macro:max (name := addressLiteral) (priority := high) "@" value:num : term =>
+  `(Address.ofNat $value)
+
+/-- A Move signer value. The account address is represented explicitly so
+source verification and `moveTo` share exactly the same publication address. -/
 structure Signer where
   private mk ::
-  private dummy : Nat
+  address : Address
   deriving Inhabited
-
-/-- The account address a signer authorizes, Move's `signer::address_of`.  It is
-uninterpreted: source semantics know only that a signer determines one address,
-which is where `moveTo` publishes. -/
-opaque Signer.address : Signer → Address
-
 
 /-- Type-level names for Move's integer widths.  The Lean compiler's
 intermediate representation erases value indices from types, so `UInt` is
@@ -224,7 +231,7 @@ namespace Ref
 /-- `signer::address_of` on the reference Move actually passes.  A signer is
 only ever used through `&signer`, so this is the spelling contracts see, and
 dot notation (`account.address`) resolves to it. -/
-opaque address : Ref Signer → Address
+def address (signer : Ref Signer) : Address := signer.value.address
 
 instance [Inhabited α] : Inhabited (Ref α) := ⟨default⟩
 
@@ -1159,6 +1166,9 @@ namespace Vector
 @[noinline] def empty : Vector α :=
   ⟨[], MoveModel.IR.IntWidth.size_pos _⟩
 
+@[noinline] def singleton (value : α) : Vector α :=
+  ⟨[value], by simpa using MoveModel.IR.IntWidth.one_lt_size .w64⟩
+
 /-- Push is total on the certified type: at the (unreachable without an
 abort) maximum length it leaves the vector unchanged, agreeing with the
 checked semantics on every non-aborting execution. -/
@@ -1170,6 +1180,8 @@ checked semantics on every non-aborting execution. -/
       values
 @[noinline] def length : Vector α → U64 :=
   fun values => UInt.ofNat values.elems.length
+@[noinline] def isEmpty : Vector α → Bool :=
+  fun values => values.elems.isEmpty
 @[noinline] def get [Inhabited α] : Vector α → U64 → α :=
   fun values index => values.elems[index.toNat]?.getD Inhabited.default
 @[noinline] def set : Vector α → U64 → α → Vector α :=
@@ -1215,6 +1227,12 @@ theorem toList_length_lt (values : Vector α) :
     (⟨values, bounded⟩ : Vector α).toList = values := rfl
 
 @[simp] theorem toList_empty : (empty : Vector α).toList = [] := rfl
+
+@[simp] theorem toList_singleton (value : α) :
+    (singleton value).toList = [value] := rfl
+
+@[simp] theorem isEmpty_eq (values : Vector α) :
+    isEmpty values = values.toList.isEmpty := rfl
 
 @[simp] theorem toList_push (values : Vector α) (value : α)
     (grows : values.toList.length + 1 < U64.size) :

@@ -110,6 +110,18 @@ private def encodeOper : Oper → JsonResult Json
   | .vecGet => pure (.str "vec_get") | .vecSet => pure (.str "vec_set")
   | .vecPush => pure (.str "vec_push") | .vecPop => pure (.str "vec_pop")
   | .vecInsert => pure (.str "vec_insert") | .vecRemove => pure (.str "vec_remove")
+  | .vecSwap => pure (.str "vec_swap")
+  | .vecSwapRemove => pure (.str "vec_swap_remove")
+  | .vecAppend => pure (.str "vec_append")
+  | .vecReverse => pure (.str "vec_reverse")
+  | .vecReverseSlice => pure (.str "vec_reverse_slice")
+  | .vecContains => pure (.str "vec_contains")
+  | .vecIndexOf => pure (.str "vec_index_of")
+  | .vecTrim => pure (.str "vec_trim")
+  | .vecTrimReverse => pure (.str "vec_trim_reverse")
+  | .vecRotate => pure (.str "vec_rotate")
+  | .vecRotateSlice => pure (.str "vec_rotate_slice")
+  | .vecDestroyEmpty => pure (.str "vec_destroy_empty")
   | .getGlobal r => pure (tag "get_global" (nat r))
   | .getGlobalInst r args =>
       pure (tupleTag "get_global_inst" [nat r, arr (args.map encodeTy)])
@@ -296,6 +308,7 @@ private def encodeFun (decl : MFun) (info : FunMeta) : JsonResult Json := do
     ("type_parameters", encodeTypeParams decl.typeParams),
     ("visibility", .str (encodeVisibility info.visibility)),
     ("is_entry", .bool info.isEntry),
+    ("is_native", .bool decl.native),
     ("acquires", encodeNats info.acquires),
     ("params", nat decl.params),
     ("locals", arr (decl.locals.map encodeTy)),
@@ -315,6 +328,12 @@ private def encodeExternalFun (reference : ExternalFunRef) : Json :=
     ("address", .str (encodeAddress reference.address)),
     ("module", .str reference.moduleName),
     ("function", .str reference.functionName)
+  ]
+
+private def encodeFriend (reference : ExternalModuleRef) : Json :=
+  Json.mkObj [
+    ("address", .str (encodeAddress reference.address)),
+    ("module", .str reference.moduleName)
   ]
 
 /-- Encode a deployable XIR module as schema-versioned JSON. -/
@@ -340,8 +359,10 @@ def MModule.toJson (module : MModule) : JsonResult Json := do
     ("structs", arr structs),
     ("functions", arr functions)
   ]
-  return Json.mkObj <| if module.externalFuns.isEmpty then fields else
+  let fields := if module.externalFuns.isEmpty then fields else
     fields ++ [("external_functions", arr (module.externalFuns.map encodeExternalFun))]
+  return Json.mkObj <| if module.friends.isEmpty then fields else
+    fields ++ [("friends", arr (module.friends.map encodeFriend))]
 
 /-- Pretty, deterministic JSON text for a deployable XIR module. -/
 def MModule.encodeJson (module : MModule) : JsonResult String :=
@@ -439,6 +460,9 @@ def decodeMModule (text : String) : JsonResult MModule := do
   let externalFunsJson ← match json.getObjVal? "external_functions" with
     | .ok value => value.getArr?
     | .error _ => pure #[]
+  let friendsJson ← match json.getObjVal? "friends" with
+    | .ok value => value.getArr?
+    | .error _ => pure #[]
   let legacy := Json.mkObj [
     ("version", nat 10),
     ("structs", .arr structsJson),
@@ -479,10 +503,20 @@ def decodeMModule (text : String) : JsonResult MModule := do
       moduleName := ← (← functionJson.getObjVal? "module").getStr?
       functionName := ← (← functionJson.getObjVal? "function").getStr?
     } : ExternalFunRef)
+  let friends ← friendsJson.toList.mapM fun friendJson => do
+    return ({
+      address := ← decodeAddress (← (← friendJson.getObjVal? "address").getStr?)
+      moduleName := ← (← friendJson.getObjVal? "module").getStr?
+    } : ExternalModuleRef)
   let entries ← functionsJson.toList.mapM fun functionJson => do
     (← functionJson.getObjVal? "entry").getNat?
   unless body.funs.length = entries.length do throw "function entry metadata length mismatch"
-  let funs := (body.funs.zip entries).map fun (decl, entry) => { decl with entry := entry }
+  let natives ← functionsJson.toList.mapM fun functionJson =>
+    match functionJson.getObjVal? "is_native" with
+    | .ok value => value.getBool?
+    | .error _ => pure false
+  let funs := ((body.funs.zip entries).zip natives).map fun ((decl, entry), native) =>
+    { decl with entry := entry, native := native }
   return {
     structs := body.structs
     funs := funs
@@ -492,6 +526,7 @@ def decodeMModule (text : String) : JsonResult MModule := do
     structMeta := structMeta
     funMeta := funMeta
     externalFuns := externalFuns
+    friends := friends
   }
 
 end MoveModel.Frontend.XIR

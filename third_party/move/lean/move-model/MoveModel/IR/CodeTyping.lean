@@ -5,6 +5,8 @@ import MoveModel.IR.Syntax
 import MoveModel.IR.Semantics
 import MoveModel.IR.Util
 
+set_option maxHeartbeats 0
+
 /-!
 # Source Code Typing and Preservation
 
@@ -158,6 +160,26 @@ inductive WfOp (Δ : StructDecls) : Oper → List Ty → List Ty → Prop where
       WfOp Δ .vecInsert [.vector t, .u64, t] [.vector t]
   | vecRemove (t : Ty) :
       WfOp Δ .vecRemove [.vector t, .u64] [.vector t, t]
+  | vecSwap (t : Ty) :
+      WfOp Δ .vecSwap [.vector t, .u64, .u64] [.vector t]
+  | vecSwapRemove (t : Ty) :
+      WfOp Δ .vecSwapRemove [.vector t, .u64] [.vector t, t]
+  | vecAppend (t : Ty) :
+      WfOp Δ .vecAppend [.vector t, .vector t] [.vector t]
+  | vecReverse (t : Ty) : WfOp Δ .vecReverse [.vector t] [.vector t]
+  | vecReverseSlice (t : Ty) :
+      WfOp Δ .vecReverseSlice [.vector t, .u64, .u64] [.vector t]
+  | vecContains (t : Ty) : WfOp Δ .vecContains [.vector t, t] [.bool]
+  | vecIndexOf (t : Ty) : WfOp Δ .vecIndexOf [.vector t, t] [.bool, .u64]
+  | vecTrim (t : Ty) :
+      WfOp Δ .vecTrim [.vector t, .u64] [.vector t, .vector t]
+  | vecTrimReverse (t : Ty) :
+      WfOp Δ .vecTrimReverse [.vector t, .u64] [.vector t, .vector t]
+  | vecRotate (t : Ty) :
+      WfOp Δ .vecRotate [.vector t, .u64] [.vector t, .u64]
+  | vecRotateSlice (t : Ty) :
+      WfOp Δ .vecRotateSlice [.vector t, .u64, .u64, .u64] [.vector t, .u64]
+  | vecDestroyEmpty (t : Ty) : WfOp Δ .vecDestroyEmpty [.vector t] []
   | mkMutLoc (x : LocalIndex) (t : Ty) :
       WfOp Δ (.mkMutLoc x) [t] [.mutRef t]
   | mkMutGlobal {r : ResourceId} {sd : StructDecl} :
@@ -204,7 +226,9 @@ def Oper.isRefOp : Oper → Bool
   | .testVariant _ | .testVariantInst _ _
   | .getField _ | .getFieldInst _ _ | .updateField _
   | .vecPack | .vecLen | .vecGet | .vecSet | .vecPush | .vecPop
-  | .vecInsert | .vecRemove
+  | .vecInsert | .vecRemove | .vecSwap | .vecSwapRemove | .vecAppend
+  | .vecReverse | .vecReverseSlice | .vecContains | .vecIndexOf
+  | .vecTrim | .vecTrimReverse | .vecRotate | .vecRotateSlice | .vecDestroyEmpty
   | .mkMutLoc _ | .mkMutGlobal _ | .childMutField _ | .childMutIndex
   | .getMut | .setMut | .isParent _ | .mutPathIndex _
   | .isMutLoc _ | .isMutGlobal _ | .mutAddr
@@ -636,9 +660,7 @@ theorem TypedMemory.memRemove {Δ : StructDecls} {m : Memory}
 
 /-! ## Semantic preservation of the operations -/
 
-/-- **Operation preservation**: a well-typed operation applied to
-well-typed operands over well-typed memory yields well-typed results and
-well-typed memory. -/
+set_option maxHeartbeats 0 in
 theorem WfOp.sem_preserves {Δ : StructDecls} {op : Oper}
     {ots rts : List Ty} {vs rets : List Value} {m m' : Memory}
     {current : FrameId} {deref : RefTarget → Option Value}
@@ -1149,6 +1171,235 @@ theorem WfOp.sem_preserves {Δ : StructDecls} {op : Oper}
         · exact hes w (List.take_subset _ _ hw)
         · exact hes w (List.drop_subset _ _ hw)
       · exact List.mem_of_getElem? hremoved
+    next => cases hsem
+  | vecSwap =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl with | cons hv₃ htl =>
+    cases htl
+    rw [isValid_vector_iff] at hv₁
+    obtain ⟨es, rfl, hlen, hes⟩ := hv₁
+    rw [isValid_u64_iff] at hv₂ hv₃
+    obtain ⟨i, rfl, hi⟩ := hv₂
+    obtain ⟨j, rfl, hj⟩ := hv₃
+    rw [Oper.sem_vecSwap] at hsem
+    split at hsem
+    next =>
+      rename_i _ _ vi vj hvi hvj
+      have hviValid := hes vi (List.mem_of_getElem? hvi)
+      have hvjValid := hes vj (List.mem_of_getElem? hvj)
+      cases hsem
+      refine ⟨.cons (.vector (by simpa using hlen) ?_) .nil, hm⟩
+      intro w hw
+      rcases List.mem_or_eq_of_mem_set hw with hw | rfl
+      · rcases List.mem_or_eq_of_mem_set hw with hw | rfl
+        · exact hes w hw
+        · exact hvjValid
+      · exact hviValid
+    next => cases hsem
+  | vecSwapRemove =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    rw [isValid_vector_iff] at hv₁
+    obtain ⟨es, rfl, hlen, hes⟩ := hv₁
+    rw [isValid_u64_iff] at hv₂
+    obtain ⟨i, rfl, hi⟩ := hv₂
+    rw [Oper.sem_vecSwapRemove] at hsem
+    split at hsem
+    next =>
+      rename_i _ _ removed last hremoved hlast
+      have hlastValid := hes last
+        (List.mem_of_getElem? (List.getLast?_eq_getElem? ▸ hlast))
+      cases hsem
+      refine ⟨.cons (.vector ?_ ?_) (.cons (hes removed
+        (List.mem_of_getElem? hremoved)) .nil), hm⟩
+      · simp only [List.length_dropLast]
+        exact Nat.lt_of_le_of_lt (Nat.sub_le _ _) (by simpa using hlen)
+      · intro w hw
+        have hw' := List.dropLast_subset _ hw
+        rcases List.mem_or_eq_of_mem_set hw' with hw' | rfl
+        · exact hes w hw'
+        · exact hlastValid
+    next => cases hsem
+  | vecAppend =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    rw [isValid_vector_iff] at hv₁ hv₂
+    obtain ⟨lhs, rfl, hlhs, hvlhs⟩ := hv₁
+    obtain ⟨rhs, rfl, hrhs, hvrhs⟩ := hv₂
+    rw [Oper.sem_vecAppend] at hsem
+    split at hsem
+    next hroom =>
+      cases hsem
+      refine ⟨.cons (.vector (by simpa using hroom) ?_) .nil, hm⟩
+      intro w hw
+      rcases List.mem_append.mp hw with hw | hw
+      · exact hvlhs w hw
+      · exact hvrhs w hw
+    next => cases hsem
+  | vecReverse =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl
+    rw [isValid_vector_iff] at hv₁
+    obtain ⟨es, rfl, hlen, hes⟩ := hv₁
+    rw [Oper.sem_vecReverse] at hsem
+    cases hsem
+    refine ⟨.cons (.vector (by simpa) ?_) .nil, hm⟩
+    intro w hw
+    exact hes w (List.mem_reverse.mp hw)
+  | vecReverseSlice =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl with | cons hv₃ htl =>
+    cases htl
+    rw [isValid_vector_iff] at hv₁
+    obtain ⟨es, rfl, hlen, hes⟩ := hv₁
+    rw [isValid_u64_iff] at hv₂ hv₃
+    obtain ⟨left, rfl, hleft⟩ := hv₂
+    obtain ⟨right, rfl, hright⟩ := hv₃
+    rw [Oper.sem_vecReverseSlice] at hsem
+    split at hsem
+    next hrange =>
+      cases hsem
+      refine ⟨.cons (.vector ?_ ?_) .nil, hm⟩
+      · have hrange' : _ := hrange
+        simp only [Bool.and_eq_true, decide_eq_true_eq] at hrange'
+        simp [List.length_append]
+        omega
+      · intro w hw
+        rcases List.mem_append.mp hw with hw | hw
+        · rcases List.mem_append.mp hw with hw | hw
+          · exact hes w (List.take_subset _ _ hw)
+          · exact hes w (List.drop_subset _ _
+              (List.take_subset _ _ (List.mem_reverse.mp hw)))
+        · exact hes w (List.drop_subset _ _ hw)
+    next => cases hsem
+  | vecContains =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    rw [isValid_vector_iff] at hv₁
+    obtain ⟨es, rfl, hlen, hes⟩ := hv₁
+    rw [Oper.sem_vecContains] at hsem
+    cases hsem
+    exact ⟨.cons (.bool _) .nil, hm⟩
+  | vecIndexOf =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    rw [isValid_vector_iff] at hv₁
+    obtain ⟨es, rfl, hlen, hes⟩ := hv₁
+    rw [Oper.sem_vecIndexOf] at hsem
+    cases hsem
+    refine ⟨.cons (.bool _) (.cons ?_ .nil), hm⟩
+    split
+    · exact .u64 (Nat.lt_trans (by assumption) hlen)
+    · exact .u64 (by simp [U64_SIZE])
+  | vecTrim =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    rw [isValid_vector_iff] at hv₁
+    obtain ⟨es, rfl, hlen, hes⟩ := hv₁
+    rw [isValid_u64_iff] at hv₂
+    obtain ⟨newLen, rfl, hnewLen⟩ := hv₂
+    rw [Oper.sem_vecTrim] at hsem
+    split at hsem
+    next =>
+      cases hsem
+      exact ⟨.cons (.vector (Nat.lt_of_le_of_lt (List.length_take_le ..) hnewLen)
+          (fun w hw => hes w (List.take_subset _ _ hw)))
+        (.cons (.vector (by simp only [List.length_drop]; omega)
+          (fun w hw => hes w (List.drop_subset _ _ hw))) .nil), hm⟩
+    next => cases hsem
+  | vecTrimReverse =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    rw [isValid_vector_iff] at hv₁
+    obtain ⟨es, rfl, hlen, hes⟩ := hv₁
+    rw [isValid_u64_iff] at hv₂
+    obtain ⟨newLen, rfl, hnewLen⟩ := hv₂
+    rw [Oper.sem_vecTrimReverse] at hsem
+    split at hsem
+    next =>
+      cases hsem
+      refine ⟨.cons (.vector (Nat.lt_of_le_of_lt (List.length_take_le ..) hnewLen)
+          (fun w hw => hes w (List.take_subset _ _ hw)))
+        (.cons (.vector ?_ ?_) .nil), hm⟩
+      · simp only [List.length_reverse, List.length_drop]
+        omega
+      · intro w hw
+        exact hes w (List.drop_subset _ _ (List.mem_reverse.mp hw))
+    next => cases hsem
+  | vecRotate =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl
+    rw [isValid_vector_iff] at hv₁
+    obtain ⟨es, rfl, hlen, hes⟩ := hv₁
+    rw [isValid_u64_iff] at hv₂
+    obtain ⟨rot, rfl, hrotBound⟩ := hv₂
+    rw [Oper.sem_vecRotate] at hsem
+    split at hsem
+    next hrot =>
+      cases hsem
+      refine ⟨.cons (.vector ?_ ?_) (.cons ?_ .nil), hm⟩
+      · simp only [List.length_append, List.length_drop, List.length_take]
+        rw [Nat.min_eq_left hrot]
+        omega
+      · intro w hw
+        rcases List.mem_append.mp hw with hw | hw
+        · exact hes w (List.drop_subset _ _ hw)
+        · exact hes w (List.take_subset _ _ hw)
+      · exact .u64 (by omega)
+    next => cases hsem
+  | vecRotateSlice =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl with | cons hv₂ htl =>
+    cases htl with | cons hv₃ htl =>
+    cases htl with | cons hv₄ htl =>
+    cases htl
+    rw [isValid_vector_iff] at hv₁
+    obtain ⟨es, rfl, hlen, hes⟩ := hv₁
+    rw [isValid_u64_iff] at hv₂ hv₃ hv₄
+    obtain ⟨left, rfl, hleft⟩ := hv₂
+    obtain ⟨rot, rfl, hrot⟩ := hv₃
+    obtain ⟨right, rfl, hright⟩ := hv₄
+    rw [Oper.sem_vecRotateSlice] at hsem
+    by_cases hrange : (left ≤ rot ∧ rot ≤ right) ∧ right ≤ es.length
+    · have hsem' : some (OpOutcome.ok
+          [.vector (es.take left ++ (es.drop rot).take (right - rot) ++
+            (es.drop left).take (rot - left) ++ es.drop right),
+            .u64 (left + (right - rot))] m) = some (OpOutcome.ok rets m') := by
+          simpa [hrange] using hsem
+      cases hsem'
+      refine ⟨.cons (.vector ?_ ?_) (.cons ?_ .nil), hm⟩
+      · simp only [List.length_append, List.length_take, List.length_drop]
+        rw [Nat.min_eq_left (by omega : left ≤ es.length)]
+        rw [Nat.min_eq_left (by omega : right - rot ≤ es.length - rot)]
+        rw [Nat.min_eq_left (by omega : rot - left ≤ es.length - left)]
+        omega
+      · intro w hw
+        rcases List.mem_append.mp hw with hw | hw
+        · rcases List.mem_append.mp hw with hw | hw
+          · rcases List.mem_append.mp hw with hw | hw
+            · exact hes w (List.take_subset _ _ hw)
+            · exact hes w (List.drop_subset _ _ (List.take_subset _ _ hw))
+          · exact hes w (List.drop_subset _ _ (List.take_subset _ _ hw))
+        · exact hes w (List.drop_subset _ _ hw)
+      · exact .u64 (by omega)
+    · simp [hrange] at hsem
+  | vecDestroyEmpty =>
+    cases hvs with | cons hv₁ htl =>
+    cases htl
+    rw [isValid_vector_iff] at hv₁
+    obtain ⟨es, rfl, hlen, hes⟩ := hv₁
+    rw [Oper.sem_vecDestroyEmpty] at hsem
+    split at hsem
+    next => cases hsem; exact ⟨.nil, hm⟩
     next => cases hsem
   | mkMutLoc x t =>
     cases hvs with | @cons _ v _ _ hv₁ htl =>

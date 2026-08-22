@@ -84,14 +84,14 @@ private def get : FunDecl :=
     [.call [2] .vecGet [0, 1]] [2]
 
 #test run1 get [vecU64 [10, 20, 30], .u64 1] = okU64 20
-#test run1 get [vecU64 [10], .u64 1] = aborted 0
+#test run1 get [vecU64 [10], .u64 1] = aborted 0x20000
 
 private def set : FunDecl :=
   fn 3 [.vector .u64, .u64, .u64, .vector .u64] [.vector .u64]
     [.call [3] .vecSet [0, 1, 2]] [3]
 
 #test run1 set [vecU64 [1, 2], .u64 0, .u64 9] = okVals [vecU64 [9, 2]]
-#test run1 set [vecU64 [1, 2], .u64 2, .u64 9] = aborted 0
+#test run1 set [vecU64 [1, 2], .u64 2, .u64 9] = aborted 0x20000
 
 /-! ## `vec_push` and `vec_pop` (abort on the empty vector) -/
 
@@ -107,7 +107,7 @@ private def pop : FunDecl :=
     [.call [1, 2] .vecPop [0]] [1, 2]
 
 #test run1 pop [vecU64 [1, 2, 3]] = okVals [vecU64 [1, 2], .u64 3]
-#test run1 pop [.vector []] = aborted 0
+#test run1 pop [.vector []] = aborted 0x20000
 
 /-! ## Indexed insertion and stable removal -/
 
@@ -170,7 +170,7 @@ private def readElem : FunDecl :=
      .call [4] .readRef [3]] [4]
 
 #test run1 readElem [vecU64 [10, 20, 30], .u64 2] = okU64 30
-#test run1 readElem [vecU64 [10], .u64 5] = aborted 0
+#test run1 readElem [vecU64 [10], .u64 5] = aborted 0x20000
 
 private def writeElem : FunDecl :=
   fn 3 [.vector .u64, .u64, .u64, .mutRef (.vector .u64), .mutRef .u64]

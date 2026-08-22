@@ -434,6 +434,42 @@ theorem compileInstr_skips (P : Program) (i : Instr) :
     | vecRemove => intro c hc
                    simp only [compileInstr, List.mem_singleton] at hc
                    subst hc; exact skipCmd_onOk _
+    | vecSwap => intro c hc
+                 simp only [compileInstr, List.mem_singleton] at hc
+                 subst hc; exact skipCmd_onOk _
+    | vecSwapRemove => intro c hc
+                       simp only [compileInstr, List.mem_singleton] at hc
+                       subst hc; exact skipCmd_onOk _
+    | vecAppend => intro c hc
+                   simp only [compileInstr, List.mem_singleton] at hc
+                   subst hc; exact skipCmd_onOk _
+    | vecReverse => intro c hc
+                    simp only [compileInstr, List.mem_singleton] at hc
+                    subst hc; exact skipCmd_onOk _
+    | vecReverseSlice => intro c hc
+                         simp only [compileInstr, List.mem_singleton] at hc
+                         subst hc; exact skipCmd_onOk _
+    | vecContains => intro c hc
+                     simp only [compileInstr, List.mem_singleton] at hc
+                     subst hc; exact skipCmd_onOk _
+    | vecIndexOf => intro c hc
+                    simp only [compileInstr, List.mem_singleton] at hc
+                    subst hc; exact skipCmd_onOk _
+    | vecTrim => intro c hc
+                 simp only [compileInstr, List.mem_singleton] at hc
+                 subst hc; exact skipCmd_onOk _
+    | vecTrimReverse => intro c hc
+                        simp only [compileInstr, List.mem_singleton] at hc
+                        subst hc; exact skipCmd_onOk _
+    | vecRotate => intro c hc
+                   simp only [compileInstr, List.mem_singleton] at hc
+                   subst hc; exact skipCmd_onOk _
+    | vecRotateSlice => intro c hc
+                        simp only [compileInstr, List.mem_singleton] at hc
+                        subst hc; exact skipCmd_onOk _
+    | vecDestroyEmpty => intro c hc
+                         simp only [compileInstr, List.mem_singleton] at hc
+                         subst hc; exact skipCmd_onOk _
     | mkMutLoc x => intro c hc
                     simp only [compileInstr, List.mem_singleton] at hc
                     subst hc; exact skipCmd_onOk _

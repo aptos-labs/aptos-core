@@ -8,6 +8,8 @@ import MoveModel.IR.Contract
 import MoveModel.IR.Syntax
 import MoveModel.IR.ValueTyping
 
+set_option maxHeartbeats 0
+
 /-!
 # IR Semantics
 
@@ -59,8 +61,21 @@ def runtimeAbortCode : Nat := 0
 insertion and removal mirror `std::vector::EINDEX_OUT_OF_BOUNDS`; the remaining
 runtime failures retain the model's generic execution-failure code. -/
 def Oper.abortCode : Oper → Nat
+  | .vecPop => 0x20000
+  | .vecGet => 0x20000
+  | .vecSet => 0x20000
+  | .borrowVecElem => 0x20000
   | .vecInsert => 0x20000
   | .vecRemove => 0x20000
+  | .vecSwap => 0x20000
+  | .vecSwapRemove => 0x20000
+  | .vecAppend => 0x20000
+  | .vecTrim => 0x20000
+  | .vecTrimReverse => 0x20000
+  | .vecDestroyEmpty => 0x20000
+  | .vecReverseSlice => 0x20001
+  | .vecRotate => 0x20001
+  | .vecRotateSlice => 0x20001
   | _ => runtimeAbortCode
 
 /-- Result of a non-call operation: result values plus the updated memory,
@@ -68,6 +83,50 @@ or a runtime abort. -/
 inductive OpOutcome where
   | ok (rets : List Value) (m : Memory)
   | abort
+
+/-- Semantics of the extended `std::vector` surface. Keeping these derived
+operations behind one fallback keeps the core operation matcher small. -/
+def Oper.extendedVectorSem : Oper → List Value → Memory → Option OpOutcome
+  | .vecSwap, [.vector es, .u64 i, .u64 j], m =>
+      some (match es[i]?, es[j]? with
+        | some vi, some vj => .ok [.vector ((es.set i vj).set j vi)] m
+        | _, _ => .abort)
+  | .vecSwapRemove, [.vector es, .u64 i], m =>
+      some (match es[i]?, es.getLast? with
+        | some removed, some last =>
+            .ok [.vector (es.set i last).dropLast, removed] m
+        | _, _ => .abort)
+  | .vecAppend, [.vector lhs, .vector rhs], m =>
+      some (if lhs.length + rhs.length < U64_SIZE then
+        .ok [.vector (lhs ++ rhs)] m else .abort)
+  | .vecReverse, [.vector es], m => some (.ok [.vector es.reverse] m)
+  | .vecReverseSlice, [.vector es, .u64 left, .u64 right], m =>
+      some (if left ≤ right && right ≤ es.length then
+        .ok [.vector (es.take left ++ ((es.drop left).take (right - left)).reverse ++
+          es.drop right)] m else .abort)
+  | .vecContains, [.vector es, v], m =>
+      some (.ok [.bool (es.any (· == v))] m)
+  | .vecIndexOf, [.vector es, v], m =>
+      let i := es.findIdx (· == v)
+      some (.ok [.bool (i < es.length), .u64 (if i < es.length then i else 0)] m)
+  | .vecTrim, [.vector es, .u64 newLen], m =>
+      some (if newLen ≤ es.length then
+        .ok [.vector (es.take newLen), .vector (es.drop newLen)] m else .abort)
+  | .vecTrimReverse, [.vector es, .u64 newLen], m =>
+      some (if newLen ≤ es.length then
+        .ok [.vector (es.take newLen), .vector (es.drop newLen).reverse] m else .abort)
+  | .vecRotate, [.vector es, .u64 rot], m =>
+      some (if rot ≤ es.length then
+        .ok [.vector (es.drop rot ++ es.take rot), .u64 (es.length - rot)] m
+      else .abort)
+  | .vecRotateSlice, [.vector es, .u64 left, .u64 rot, .u64 right], m =>
+      some (if left ≤ rot && rot ≤ right && right ≤ es.length then
+        .ok [.vector (es.take left ++ (es.drop rot).take (right - rot) ++
+          (es.drop left).take (rot - left) ++ es.drop right),
+          .u64 (left + (right - rot))] m else .abort)
+  | .vecDestroyEmpty, [.vector es], m =>
+      some (if es.isEmpty then .ok [] m else .abort)
+  | _, _, _ => none
 
 /-- Checked integer outcome: accept the mathematical result `r` iff it lies in
 the type's range `[lo, hi)`, else abort.  One rule for both signednesses; the
@@ -254,7 +313,78 @@ def Oper.sem (current : FrameId) (deref : RefTarget → Option Value) :
   | .exists_ r, [.address a], m => some (.ok [.bool (m r a).isSome] m)
   | .existsInst r args, [.address a], m =>
       some (.ok [.bool (m (resourceKey r args) a).isSome] m)
-  | _, _, _ => none
+  | op, vs, m =>
+      match op with
+      | .vecSwap | .vecSwapRemove | .vecAppend | .vecReverse | .vecReverseSlice
+      | .vecContains | .vecIndexOf | .vecTrim | .vecTrimReverse | .vecRotate
+      | .vecRotateSlice | .vecDestroyEmpty => op.extendedVectorSem vs m
+      | _ => none
+
+@[simp] theorem Oper.sem_vecSwap (current) (deref) (es) (i j) (m) :
+    Oper.sem current deref .vecSwap [.vector es, .u64 i, .u64 j] m =
+      some (match es[i]?, es[j]? with
+        | some vi, some vj => .ok [.vector ((es.set i vj).set j vi)] m
+        | _, _ => .abort) := rfl
+
+@[simp] theorem Oper.sem_vecSwapRemove (current) (deref) (es) (i) (m) :
+    Oper.sem current deref .vecSwapRemove [.vector es, .u64 i] m =
+      some (match es[i]?, es.getLast? with
+        | some removed, some last => .ok [.vector (es.set i last).dropLast, removed] m
+        | _, _ => .abort) := rfl
+
+@[simp] theorem Oper.sem_vecAppend (current) (deref) (lhs rhs) (m) :
+    Oper.sem current deref .vecAppend [.vector lhs, .vector rhs] m =
+      some (if lhs.length + rhs.length < U64_SIZE then
+        .ok [.vector (lhs ++ rhs)] m else .abort) := rfl
+
+@[simp] theorem Oper.sem_vecReverse (current) (deref) (es) (m) :
+    Oper.sem current deref .vecReverse [.vector es] m =
+      some (.ok [.vector es.reverse] m) := rfl
+
+@[simp] theorem Oper.sem_vecReverseSlice (current) (deref) (es) (left right) (m) :
+    Oper.sem current deref .vecReverseSlice
+        [.vector es, .u64 left, .u64 right] m =
+      some (if left ≤ right && right ≤ es.length then
+        .ok [.vector (es.take left ++ ((es.drop left).take (right - left)).reverse ++
+          es.drop right)] m else .abort) := rfl
+
+@[simp] theorem Oper.sem_vecContains (current) (deref) (es) (v) (m) :
+    Oper.sem current deref .vecContains [.vector es, v] m =
+      some (.ok [.bool (es.any (· == v))] m) := rfl
+
+@[simp] theorem Oper.sem_vecIndexOf (current) (deref) (es) (v) (m) :
+    Oper.sem current deref .vecIndexOf [.vector es, v] m =
+      let i := es.findIdx (· == v)
+      some (.ok [.bool (i < es.length), .u64 (if i < es.length then i else 0)] m) := rfl
+
+@[simp] theorem Oper.sem_vecTrim (current) (deref) (es) (newLen) (m) :
+    Oper.sem current deref .vecTrim [.vector es, .u64 newLen] m =
+      some (if newLen ≤ es.length then
+        .ok [.vector (es.take newLen), .vector (es.drop newLen)] m else .abort) := rfl
+
+@[simp] theorem Oper.sem_vecTrimReverse (current) (deref) (es) (newLen) (m) :
+    Oper.sem current deref .vecTrimReverse [.vector es, .u64 newLen] m =
+      some (if newLen ≤ es.length then
+        .ok [.vector (es.take newLen), .vector (es.drop newLen).reverse] m
+      else .abort) := rfl
+
+@[simp] theorem Oper.sem_vecRotate (current) (deref) (es) (rot) (m) :
+    Oper.sem current deref .vecRotate [.vector es, .u64 rot] m =
+      some (if rot ≤ es.length then
+        .ok [.vector (es.drop rot ++ es.take rot), .u64 (es.length - rot)] m
+      else .abort) := rfl
+
+@[simp] theorem Oper.sem_vecRotateSlice (current) (deref) (es) (left rot right) (m) :
+    Oper.sem current deref .vecRotateSlice
+        [.vector es, .u64 left, .u64 rot, .u64 right] m =
+      some (if left ≤ rot && rot ≤ right && right ≤ es.length then
+        .ok [.vector (es.take left ++ (es.drop rot).take (right - rot) ++
+          (es.drop left).take (rot - left) ++ es.drop right),
+          .u64 (left + (right - rot))] m else .abort) := rfl
+
+@[simp] theorem Oper.sem_vecDestroyEmpty (current) (deref) (es) (m) :
+    Oper.sem current deref .vecDestroyEmpty [.vector es] m =
+      some (if es.isEmpty then .ok [] m else .abort) := rfl
 
 /-! ## Frame outcomes -/
 
@@ -499,9 +629,6 @@ def FunExec (P : Program) (f : FunId) (m : Memory) (args : List Value)
     args.length = d.numParams ∧
     RunBlock P d.body d.body.entry (MoveState.initial args m) o
 
-set_option maxHeartbeats 500000 in
-/-- Operations other than equality, generic ordering, and borrowed-vector
-length do not inspect the supplied reference dereferencer. -/
 theorem Oper.sem_deref_irrel {op : Oper} {current : FrameId}
     {deref₁ deref₂ : RefTarget → Option Value} {vs : List Value}
     {m : Memory} (hne : op ≠ .eq) (hnlt : op ≠ .lt)

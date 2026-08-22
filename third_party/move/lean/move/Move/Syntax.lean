@@ -5,6 +5,7 @@ import Lean
 import Lean.Elab.Do.InferControlInfo
 import Move.Action
 import Move.Attributes
+import Move.ConventionalAddresses
 
 /-!
 # Leaner surface syntax
@@ -21,6 +22,26 @@ first-order markers that Normalize lowers to internal CFG headers.
 namespace Move
 
 open Lean Meta Elab Term
+
+/-- Move's variant test, `value is Enum.Variant`. The constructor arity is
+read from the elaborated enum, so nullary and payload variants share one
+surface. -/
+scoped syntax:50 (name := moveIsVariant) term:51 " is " ident : term
+
+@[term_elab moveIsVariant]
+private def elabMoveIsVariant : TermElab := fun stx expectedType? => do
+  let value : TSyntax `term := ⟨stx[0]⟩
+  let variant : TSyntax `ident := ⟨stx[2]⟩
+  let constructor ← resolveGlobalConstNoOverload variant
+  let some (.ctorInfo ctor) := (← getEnv).find? constructor
+    | throwErrorAt variant "`{constructor}` is not an enum variant"
+  unless moveEnumAttr.hasTag (← getEnv) ctor.induct do
+    throwErrorAt variant "`{constructor}` is not a Move enum variant"
+  let mut pattern : TSyntax `term := ⟨mkIdentFrom variant constructor⟩
+  for _ in [0:ctor.numFields] do
+    pattern ← `($pattern _)
+  let expanded ← `(match $value:term with | $pattern:term => true | _ => false)
+  elabTerm expanded expectedType?
 
 /-! Compiler-only loop markers. They are private so authored Leaner cannot
 forge CFG control by calling the normalizer protocol directly. -/
@@ -100,13 +121,177 @@ scoped syntax:max (name := borrowMutIndexTerm) (priority := high)
   "&mut " ident "[" term "]" : term
 scoped syntax:max (name := derefTerm) "*" term:max : term
 scoped syntax:max (name := vectorLiteralTerm) "vector![" term,* "]" : term
+scoped syntax:max (name := byteStringLiteral) ident noWs str : term
+scoped syntax:max (name := typedIntegerLiteral) num noWs ident : term
+
+declare_syntax_cat movePrimitiveMatchPattern
+syntax (name := moveMatchLiteralPattern) num : movePrimitiveMatchPattern
+syntax (name := moveMatchByteStringPattern)
+  ident noWs str : movePrimitiveMatchPattern
+syntax (name := moveMatchHalfOpenPattern)
+  num ".." num : movePrimitiveMatchPattern
+syntax (name := moveMatchClosedPattern)
+  num "..=" num : movePrimitiveMatchPattern
+syntax (name := moveMatchUpperOpenPattern)
+  ".." num : movePrimitiveMatchPattern
+syntax (name := moveMatchUpperClosedPattern)
+  "..=" num : movePrimitiveMatchPattern
+syntax (name := moveMatchLowerPattern)
+  num ".." : movePrimitiveMatchPattern
+syntax (name := moveMatchWildcardPattern) "_" : movePrimitiveMatchPattern
+
+declare_syntax_cat movePrimitiveMatchAlt
+syntax (name := movePrimitiveMatchAlternative)
+  "| " movePrimitiveMatchPattern (" if " term)? " => " term : movePrimitiveMatchAlt
+
+/-- Primitive Move matches lower to typed comparisons before Lean exposes the
+representation of `MoveInt`. The discriminant is evaluated exactly once. -/
+scoped syntax (name := movePrimitiveMatch) (priority := high)
+  "match " term " with " movePrimitiveMatchAlt+ : term
+syntax (name := movePrimitiveMatchElab)
+  "__movePrimitiveMatch " term " with " movePrimitiveMatchAlt+ : term
+scoped macro:max (name := moveAssert) "assert!(" condition:term ", " code:term ")" : term =>
+  `(Move.assert $condition $code)
+scoped macro:max (name := moveAssertEq)
+    "assert_eq!(" left:term ", " right:term ", " code:term ")" : term =>
+  `(Move.assert (Move.Compare.equal $left $right) $code)
+scoped macro:max (name := moveAssertNe)
+    "assert_ne!(" left:term ", " right:term ", " code:term ")" : term =>
+  `(Move.assert (!Move.Compare.equal $left $right) $code)
 syntax:max (name := abortTerm) "abort " term:max : term
+scoped syntax (name := moveAddAssign) ident " += " term : doElem
+scoped syntax (name := moveSubAssign) ident " -= " term : doElem
+scoped syntax (name := moveMulAssign) ident " *= " term : doElem
+scoped syntax (name := moveDivAssign) ident " /= " term : doElem
+scoped syntax (name := moveModAssign) ident " %= " term : doElem
+scoped syntax (name := moveNamedStructLet) (priority := high)
+  "let " ident "{" ident,* "}" " := " term : doElem
+scoped syntax (name := movePositionalStructLet) (priority := high)
+  "let " ident "(" ident,* ")" " := " term : doElem
+scoped macro_rules (kind := moveNamedStructLet)
+  | `(doElem| let $_type:ident { $fields:ident,* } := $value:term) =>
+      `(doElem| let ⟨$fields:ident,*⟩ := $value)
+scoped macro_rules (kind := movePositionalStructLet)
+  | `(doElem| let $_type:ident ( $fields:ident,* ) := $value:term) =>
+      `(doElem| let ⟨$fields:ident,*⟩ := $value)
+scoped syntax (name := moveForRange)
+  "for" "(" ident "in" term "to" term ")" "do" doSeq : doElem
+
+scoped macro_rules (kind := typedIntegerLiteral)
+  | stx => do
+      let value : TSyntax `num := ⟨stx[0]⟩
+      let suffix : Ident := ⟨stx[1]⟩
+      let typeName ← match suffix.getId.toString with
+        | "u8" => `(Move.U8) | "u16" => `(Move.U16)
+        | "u32" => `(Move.U32) | "u64" => `(Move.U64)
+        | "u128" => `(Move.U128) | "u256" => `(Move.U256)
+        | "i8" => `(Move.I8) | "i16" => `(Move.I16)
+        | "i32" => `(Move.I32) | "i64" => `(Move.I64)
+        | "i128" => `(Move.I128) | "i256" => `(Move.I256)
+        | _ => do
+          Macro.throwErrorAt suffix.raw
+            "expected a Move integer suffix (`u8`..`u256` or `i8`..`i256`)"
+      `(($value : $typeName))
+
+private def primitivePatternCondition (value : TSyntax `term)
+    (pattern : TSyntax `movePrimitiveMatchPattern) :
+    MacroM (Option (TSyntax `term)) := do
+  if pattern.raw.isOfKind ``Move.moveMatchByteStringPattern then
+    let literal : TSyntax `term :=
+      ⟨Syntax.node .none ``Move.byteStringLiteral
+        #[pattern.raw[0], pattern.raw[1]]⟩
+    return some (← `(($value == $literal) = true))
+  match pattern with
+  | `(movePrimitiveMatchPattern| $literal:num) =>
+      return some (← `(($value == $literal) = true))
+  | `(movePrimitiveMatchPattern| $lower:num .. $upper:num) =>
+      return some (← `($lower <= $value ∧ $value < $upper))
+  | `(movePrimitiveMatchPattern| $lower:num ..= $upper:num) =>
+      return some (← `($lower <= $value ∧ $value <= $upper))
+  | `(movePrimitiveMatchPattern| .. $upper:num) =>
+      return some (← `($value < $upper))
+  | `(movePrimitiveMatchPattern| ..= $upper:num) =>
+      return some (← `($value <= $upper))
+  | `(movePrimitiveMatchPattern| $lower:num ..) =>
+      return some (← `($lower <= $value))
+  | `(movePrimitiveMatchPattern| _) => return none
+  | _ => Macro.throwUnsupported
+
+private def primitiveMatchBody (reference : Syntax) (value : TSyntax `term)
+    (alternatives : Array (TSyntax `movePrimitiveMatchAlt)) : MacroM (TSyntax `term) := do
+  let mut result? : Option (TSyntax `term) := none
+  for alternative in alternatives.reverse do
+    let `(movePrimitiveMatchAlt|
+        | $pattern:movePrimitiveMatchPattern $[if $guard:term]? => $rhs:term) := alternative
+      | Macro.throwUnsupported
+    let condition? ← primitivePatternCondition value pattern
+    match condition?, guard, result? with
+    | none, none, none => result? := some rhs
+    | none, none, some _ =>
+        Macro.throwErrorAt alternative "a wildcard match alternative must be last"
+    | none, some guard, some fallback =>
+        result? := some (← `(if $guard = true then $rhs else $fallback))
+    | none, some _, none =>
+        Macro.throwErrorAt alternative
+          "a guarded wildcard match requires a following fallback alternative"
+    | some condition, guard, some fallback =>
+        let condition ← match guard with
+          | none => pure condition
+          | some guard => `($condition ∧ $guard = true)
+        result? := some (← `(if $condition then $rhs else $fallback))
+    | some _, _, none =>
+        Macro.throwErrorAt alternative
+          "a primitive match must end with a wildcard fallback alternative"
+  let some result := result?
+    | Macro.throwErrorAt reference "a primitive match requires at least one alternative"
+  pure result
+
+def expandPrimitiveMatchSyntax (reference : Syntax) (discriminant : TSyntax `term)
+    (alternatives : Array (TSyntax `movePrimitiveMatchAlt)) : MacroM Syntax := do
+  let value := mkIdentFrom reference `_moveMatchValue
+  let valueTerm : TSyntax `term := ⟨value.raw⟩
+  let result ← primitiveMatchBody reference valueTerm alternatives
+  `(let $value := $discriminant; $result)
+
+scoped macro_rules (kind := movePrimitiveMatch)
+  | stx => do
+      let discriminant : TSyntax `term := ⟨stx[1]⟩
+      let alternatives : Array (TSyntax `movePrimitiveMatchAlt) :=
+        stx[3].getArgs.map fun alternative => ⟨alternative⟩
+      `(__movePrimitiveMatch $discriminant with $alternatives*)
+
+@[term_elab movePrimitiveMatchElab]
+def elabPrimitiveMatch : TermElab := fun stx expectedType? => do
+  let discriminant : TSyntax `term := ⟨stx[1]⟩
+  let alternatives : Array (TSyntax `movePrimitiveMatchAlt) :=
+    stx[3].getArgs.map fun alternative => ⟨alternative⟩
+  let discriminantExpr ← elabTerm discriminant none
+  let discriminantType ← whnf (← inferType discriminantExpr)
+  if discriminantType.isAppOfArity ``Ref 1 ||
+      discriminantType.isAppOfArity ``MutRef 1 then
+    -- Reading a Move reference is represented as an `Action` in Leaner even
+    -- though it cannot abort. Keep that sequencing visible to the compiler;
+    -- source verification receives the referent value as its logical
+    -- parameter and expands the retained syntax through the pure path below.
+    let value := mkIdentFrom stx `_moveMatchValue
+    let valueTerm : TSyntax `term := ⟨value.raw⟩
+    let body ← liftMacroM <| primitiveMatchBody stx valueTerm alternatives
+    elabTerm (← `(do
+      let $value ← *$discriminant
+      pure $body)) expectedType?
+  else
+    let expanded ← liftMacroM <|
+      expandPrimitiveMatchSyntax stx discriminant alternatives
+    elabTerm (⟨expanded⟩ : Term) expectedType?
+
 /-- Tail self-call. The callee and arguments must stay on the same line so a
 bare `continue` (or `if c then continue`) is not parsed as `continue <next
 stmt>` across a newline. -/
 syntax:max (name := continueCallTerm)
   withPosition("continue " lineEq term:max (lineEq term:max)*) : term
 syntax (name := moveWhileInternal) "__moveWhile " term " do " doSeq : doElem
+syntax (name := moveWhileDependentInternal)
+  "__moveWhile " ident " : " term " do " doSeq : doElem
 syntax (name := moveLoopDo) "loop " doSeq : doElem
 syntax (name := moveLoopLabeledDo) "loop@" ident ppSpace doSeq : doElem
 syntax (name := moveLoopNestedDo) "__moveLoopNested " ident ppSpace doSeq : doElem
@@ -117,6 +302,46 @@ syntax (name := moveContinueLabeledDo) "continue@" ident : doElem
 syntax (name := moveBreakInternal) "__moveBreak" : doElem
 syntax (name := moveContinueInternal) "__moveContinue" : doElem
 
+private def byteTerms (values : Array Nat) : Array (TSyntax `term) :=
+  values.map fun value => ⟨Syntax.mkNumLit (toString value)⟩
+
+private def hexDigitValue? : Char → Option Nat
+  | '0' => some 0 | '1' => some 1 | '2' => some 2 | '3' => some 3
+  | '4' => some 4 | '5' => some 5 | '6' => some 6 | '7' => some 7
+  | '8' => some 8 | '9' => some 9
+  | 'a' | 'A' => some 10 | 'b' | 'B' => some 11 | 'c' | 'C' => some 12
+  | 'd' | 'D' => some 13 | 'e' | 'E' => some 14 | 'f' | 'F' => some 15
+  | _ => none
+
+private def hexBytes? : List Char → Option (List Nat)
+  | [] => some []
+  | high :: low :: rest => do
+      let high ← hexDigitValue? high
+      let low ← hexDigitValue? low
+      return (high * 16 + low) :: (← hexBytes? rest)
+  | _ => none
+
+scoped macro_rules (kind := byteStringLiteral)
+  | stx => do
+      let leader : Ident := ⟨stx[0]⟩
+      let value : TSyntax `str := ⟨stx[1]⟩
+      if leader.getId == `b then
+        let bytes := value.getString.toUTF8.data.map (UInt8.toNat)
+        unless bytes.all (· < 128) do
+          Macro.throwErrorAt value "Move byte strings accept only ASCII characters"
+        let elements := byteTerms bytes
+        `(vector![$elements,*])
+      else if leader.getId == `x then
+        let digits := value.getString.toList
+        unless digits.length % 2 == 0 do
+          Macro.throwErrorAt value "Move hex strings require an even number of hexadecimal digits"
+        let some bytes := hexBytes? digits
+          | Macro.throwErrorAt value "Move hex string contains a non-hexadecimal digit"
+        let elements := byteTerms bytes.toArray
+        `(vector![$elements,*])
+      else
+        Macro.throwErrorAt leader "expected `b` or `x` before a Move byte string"
+
 /-! Loop state is the set of reassigned bindings that were visible when the
 loop was entered. `ControlInfo.reassigns` is intentionally textual, so it
 cannot distinguish an entry binding from a same-named local declared in the
@@ -125,7 +350,10 @@ verification agree on binding identity. -/
 
 private def loopReassignedIdent? (stx : Syntax) : Option Ident :=
   let isReassignment := stx.isOfKind ``Lean.Parser.Term.doReassign ||
-    stx.isOfKind ``Lean.Parser.Term.doReassignArrow
+    stx.isOfKind ``Lean.Parser.Term.doReassignArrow ||
+    stx.isOfKind ``moveAddAssign || stx.isOfKind ``moveSubAssign ||
+    stx.isOfKind ``moveMulAssign || stx.isOfKind ``moveDivAssign ||
+    stx.isOfKind ``moveModAssign
   if !isReassignment || stx.getNumArgs == 0 then
     none
   else
@@ -256,8 +484,13 @@ def freshenLoopLocals (body : TSyntax ``Lean.Parser.Term.doSeq) :
     CoreM (TSyntax ``Lean.Parser.Term.doSeq) :=
   freshenLoopSeq [] body
 
-macro_rules
-  | `(abort $code:term) => `(Move.abort $code)
+macro_rules (kind := abortTerm)
+  | stx => do
+      let diagnostic : TSyntax `term := ⟨stx[1]⟩
+      if diagnostic.raw.isOfKind ``byteStringLiteral then
+        `(Move.abortMessage ($diagnostic : Move.Vector Move.U8))
+      else
+        `(Move.abort $diagnostic)
 
 macro_rules
   | `(vector![$values:term,*]) => do
@@ -524,6 +757,75 @@ def elabMoveReassign : DoElab := fun stx cont => do
         throwUnsupportedSyntax
   | _ => throwUnsupportedSyntax
 
+open Lean.Elab.Do Lean.Parser.Term in
+private def elabMoveCompoundAssign (operation : Name) : DoElab := fun stx cont => do
+  let x : Ident := ⟨stx.raw[0]⟩
+  let rhs : TSyntax `term := ⟨stx.raw[2]⟩
+  let decl ← getLocalDeclFromUserName x.getId
+  let type ← whnf decl.type
+  let combine (left : TSyntax `term) : TermElabM (TSyntax `term) :=
+    if operation == `add then `($left + $rhs)
+    else if operation == `sub then `($left - $rhs)
+    else if operation == `mul then `($left * $rhs)
+    else if operation == `div then `($left / $rhs)
+    else `($left % $rhs)
+  if type.isAppOfArity ``MutRef 1 then
+    let old := mkIdentFrom rhs `_leanerOld
+    let value ← combine ⟨old.raw⟩
+    elabDoElems1
+      #[(← `(doElem| let $old ← read $x)),
+        (← `(doElem| write $x $value))] cont
+  else if type.isAppOfArity ``Ref 1 then
+    throwErrorAt x "cannot write through immutable reference `{x.getId}`"
+  else
+    let value ← combine ⟨x.raw⟩
+    elabDoElem (← `(doElem| $x:ident := $value)) cont
+
+open Lean.Elab.Do in
+@[doElem_elab moveAddAssign]
+def elabMoveAddAssign : DoElab := elabMoveCompoundAssign `add
+
+open Lean.Elab.Do in
+@[doElem_elab moveSubAssign]
+def elabMoveSubAssign : DoElab := elabMoveCompoundAssign `sub
+
+open Lean.Elab.Do in
+@[doElem_elab moveMulAssign]
+def elabMoveMulAssign : DoElab := elabMoveCompoundAssign `mul
+
+open Lean.Elab.Do in
+@[doElem_elab moveDivAssign]
+def elabMoveDivAssign : DoElab := elabMoveCompoundAssign `div
+
+open Lean.Elab.Do in
+@[doElem_elab moveModAssign]
+def elabMoveModAssign : DoElab := elabMoveCompoundAssign `mod
+
+open Lean.Elab.Do in
+private def controlInfoMoveCompound : ControlInfoHandler := fun stx => do
+  let name : Ident := ⟨stx.raw[0]⟩
+  return { reassigns := NameSet.empty.insert name.getId }
+
+open Lean.Elab.Do in
+@[doElem_control_info moveAddAssign]
+def controlInfoMoveAddAssign : ControlInfoHandler := controlInfoMoveCompound
+
+open Lean.Elab.Do in
+@[doElem_control_info moveSubAssign]
+def controlInfoMoveSubAssign : ControlInfoHandler := controlInfoMoveCompound
+
+open Lean.Elab.Do in
+@[doElem_control_info moveMulAssign]
+def controlInfoMoveMulAssign : ControlInfoHandler := controlInfoMoveCompound
+
+open Lean.Elab.Do in
+@[doElem_control_info moveDivAssign]
+def controlInfoMoveDivAssign : ControlInfoHandler := controlInfoMoveCompound
+
+open Lean.Elab.Do in
+@[doElem_control_info moveModAssign]
+def controlInfoMoveModAssign : ControlInfoHandler := controlInfoMoveCompound
+
 private structure LoopFrame where
   label : Nat
   sourceLabel? : Option Name
@@ -657,7 +959,8 @@ private partial def rewriteLoopControls (frame : LoopFrame)
       (← stx.getArgs.mapM (rewriteLoopControls frame false))
     return rewritten.setKind ``moveLoopLabeledNestedDo |>.setArgs
       #[rewritten[0], rewritten[1], frame.token.raw, rewritten[2]]
-  else if kind == ``moveWhileInternal || kind == ``Lean.Parser.Term.doWhile then
+  else if kind == ``moveWhileInternal || kind == ``moveWhileDependentInternal ||
+      kind == ``Lean.Parser.Term.doWhile then
     return stx.setArgs (← stx.getArgs.mapM (rewriteLoopControls frame false))
   else if rewriteBare && kind == ``Lean.Parser.Term.doBreak then
     return (← loopExitDoElem ``loopBreak frame).raw
@@ -673,9 +976,26 @@ private partial def rewriteLoopControls (frame : LoopFrame)
     return stx.setArgs (← stx.getArgs.mapM (rewriteLoopControls frame rewriteBare))
 
 open Lean.Parser.Term in
-private def mkDoSeq (elems : Array Syntax) : TSyntax ``doSeq :=
+def mkDoSeq (elems : Array Syntax) : TSyntax ``doSeq :=
   let items := elems.map fun elem => mkNode ``doSeqItem #[elem, mkNullNode]
   ⟨mkNode ``doSeqIndent #[mkNullNode items]⟩
+
+/- Half-open Move range loop.  A private mutable counter drives the existing
+`while` lowering while the authored index is rebound immutably each turn. -/
+open Lean.Elab.Do Lean.Parser.Term in
+@[doElem_elab moveForRange]
+def elabMoveForRange : DoElab := fun stx cont => do
+  let index : Ident := ⟨stx.raw[2]⟩
+  let lower : TSyntax `term := ⟨stx.raw[4]⟩
+  let upper : TSyntax `term := ⟨stx.raw[6]⟩
+  let body : TSyntax ``doSeq := ⟨stx.raw[9]⟩
+  let counter := mkIdentFrom index (← mkFreshUserName `_moveForIndex)
+  let bodyElems := getDoElems body |>.map (fun element => element.raw)
+  let bindIndex := (← `(doElem| let $index := $counter)).raw
+  let increment := (← `(doElem| $counter:ident := $counter + 1)).raw
+  let loopBody := mkDoSeq ((#[bindIndex] ++ bodyElems).push increment)
+  elabDoElems1 #[(← `(doElem| let mut $counter := $lower)),
+    (← `(doElem| while $counter < $upper do $loopBody))] cont
 
 open Lean.Parser.Term in
 @[macro Lean.Parser.Term.doWhile]
@@ -684,19 +1004,30 @@ def expandMoveWhile : Macro := fun stx =>
   | `(doElem| while $cond:doIfCond do $body:doSeq) =>
       match cond with
       | `(doIfCond| $term:term) =>
-          let rewritten : TSyntax `doElem :=
-            ⟨mkNode ``moveWhileInternal
-              #[mkAtom "__moveWhile ", term.raw, mkAtom "do ", body.raw]⟩
+          let rewritten : TSyntax `doElem := ⟨mkNode ``moveWhileInternal
+            #[mkAtom "__moveWhile ", term.raw, mkAtom "do ", body.raw]⟩
+          pure rewritten
+      | `(doIfCond| $binder:ident : $term:term) =>
+          let rewritten : TSyntax `doElem := ⟨mkNode ``moveWhileDependentInternal
+            #[mkAtom "__moveWhile ", binder.raw, mkAtom " : ", term.raw,
+              mkAtom "do ", body.raw]⟩
           pure rewritten
       | _ => Macro.throwErrorAt cond "unsupported `while` condition"
   | _ => Macro.throwUnsupported
 
 open Lean.Elab.Do Lean.Parser.Term in
-@[doElem_elab moveWhileInternal]
-def elabMoveWhile : DoElab := fun stx cont => do
-  unless stx.raw.isOfKind ``moveWhileInternal do throwUnsupportedSyntax
-  let cond : TSyntax `term := ⟨stx.raw[1]!⟩
-  let body : TSyntax ``doSeq := ⟨stx.raw[3]!⟩
+private def elabMoveWhileCore : DoElab := fun stx cont => do
+  let (cond, body) ←
+    if stx.raw.isOfKind ``moveWhileInternal then
+      let term : TSyntax `term := ⟨stx.raw[1]!⟩
+      pure (← `(doIfCond| $term:term), (⟨stx.raw[3]!⟩ : TSyntax ``doSeq))
+    else if stx.raw.isOfKind ``moveWhileDependentInternal then
+      let binder : TSyntax `ident := ⟨stx.raw[1]!⟩
+      let term : TSyntax `term := ⟨stx.raw[3]!⟩
+      pure (← `(doIfCond| $binder:ident : $term:term),
+        (⟨stx.raw[5]!⟩ : TSyntax ``doSeq))
+    else
+      throwUnsupportedSyntax
   let body ← freshenLoopLocals body
   let info ← InferControlInfo.ofSeq body
   let frame ← pushLoopFrame cond.raw none none (outerControlTokens info)
@@ -713,22 +1044,39 @@ def elabMoveWhile : DoElab := fun stx cont => do
     let elseSeq := mkDoSeq #[breakElem.raw]
     elabDoElems1 #[
       enterElem,
-      (← `(doElem| if $cond then $thenSeq else $elseSeq)),
+      (← `(doElem| if $cond:doIfCond then $thenSeq else $elseSeq)),
       liveElem
     ] cont
   finally
     popLoopLabel
 
 open Lean.Elab.Do in
-@[doElem_control_info moveWhileInternal]
-def controlInfoMoveWhile : ControlInfoHandler := fun stx => do
-  let body : TSyntax ``Lean.Parser.Term.doSeq := ⟨stx.raw[3]!⟩
+@[doElem_elab moveWhileInternal]
+def elabMoveWhile : DoElab := elabMoveWhileCore
+
+open Lean.Elab.Do in
+@[doElem_elab moveWhileDependentInternal]
+def elabMoveWhileDependent : DoElab := elabMoveWhileCore
+
+open Lean.Elab.Do in
+private def controlInfoMoveWhileCore : ControlInfoHandler := fun stx => do
+  let body : TSyntax ``Lean.Parser.Term.doSeq :=
+    if stx.raw.isOfKind ``moveWhileInternal then ⟨stx.raw[3]!⟩
+    else ⟨stx.raw[5]!⟩
   let info := scopeLoopControlInfo body (← InferControlInfo.ofSeq body)
   return { info with
     numRegularExits := 1
     continues := false
     breaks := false
     noFallthrough := false }
+
+open Lean.Elab.Do in
+@[doElem_control_info moveWhileInternal]
+def controlInfoMoveWhile : ControlInfoHandler := controlInfoMoveWhileCore
+
+open Lean.Elab.Do in
+@[doElem_control_info moveWhileDependentInternal]
+def controlInfoMoveWhileDependent : ControlInfoHandler := controlInfoMoveWhileCore
 
 open Lean.Elab.Do in
 @[doElem_control_info moveLoopDo]

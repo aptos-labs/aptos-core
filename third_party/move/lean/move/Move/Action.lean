@@ -75,7 +75,21 @@ abbrev Action (α : Type) := StateM World α
 @[noinline] opaque abort {α : Type} [Inhabited α] : U64 → Action α := fun _code world =>
   ((Inhabited.default : α), world)
 
-def assert (condition : Bool) (code : U64) : Action Unit := do
+/-- Move 2.4's well-known code for an abort carrying a diagnostic message. -/
+def unspecifiedAbortCode : U64 := U64.ofNat 0xCA26CBD9BE0B0000
+
+/-- Abort carrying a byte message. The backend's current outcome model records
+the standard code; byte-message transport can be added without changing the
+source or verification semantics. -/
+@[always_inline] def abortMessage {Result : Type} [Inhabited Result]
+    (_message : Move.Vector U8) : Action Result :=
+  abort unspecifiedAbortCode
+
+/-- Elaboration-only body used for a bodyless `native fun` declaration. -/
+@[noinline] opaque nativeUnavailable {Result : Type} [Inhabited Result] : Result :=
+  default
+
+@[always_inline] def assert (condition : Bool) (code : U64) : Action Unit := do
   if condition then
     pure ()
   else
@@ -95,6 +109,48 @@ This mirrors Move's `vector::remove` and aborts when `index >= length`. -/
     (self : MutRef (Move.Vector α)) (index : U64) : Action α :=
   fun world => (default, world)
 
+/-- Remove and return the final element, aborting when the vector is empty. -/
+@[noinline] opaque popBack {α : Type} [Inhabited α]
+    (self : MutRef (Move.Vector α)) : Action α :=
+  fun world => (default, world)
+
+@[noinline] opaque swap {α : Type} (self : MutRef (Move.Vector α))
+    (i j : U64) : Action Unit := fun world => ((), world)
+
+@[noinline] opaque swapRemove {α : Type} [Inhabited α]
+    (self : MutRef (Move.Vector α)) (i : U64) : Action α :=
+  fun world => (default, world)
+
+@[noinline] opaque append {α : Type} (self : MutRef (Move.Vector α))
+    (other : Move.Vector α) : Action Unit := fun world => ((), world)
+
+@[noinline] opaque reverse {α : Type} (self : MutRef (Move.Vector α)) :
+    Action Unit := fun world => ((), world)
+
+@[noinline] opaque reverseSlice {α : Type} (self : MutRef (Move.Vector α))
+    (left right : U64) : Action Unit := fun world => ((), world)
+
+@[noinline] opaque trim {α : Type} (self : MutRef (Move.Vector α))
+    (newLen : U64) : Action (Move.Vector α) := fun world => (Move.Vector.empty, world)
+
+@[noinline] opaque trimReverse {α : Type} (self : MutRef (Move.Vector α))
+    (newLen : U64) : Action (Move.Vector α) := fun world => (Move.Vector.empty, world)
+
+@[noinline] opaque rotate {α : Type} (self : MutRef (Move.Vector α))
+    (rot : U64) : Action U64 := fun world => (0, world)
+
+@[noinline] opaque rotateSlice {α : Type} (self : MutRef (Move.Vector α))
+    (left rot right : U64) : Action U64 := fun world => (0, world)
+
+@[noinline] opaque destroyEmpty {α : Type} (self : Move.Vector α) :
+    Action Unit := fun world => ((), world)
+
+@[noinline] opaque contains {α : Type} (self : Ref (Move.Vector α))
+    (value : Ref α) : Bool := false
+
+@[noinline] opaque indexOf {α : Type} (self : Ref (Move.Vector α))
+    (value : Ref α) : Bool × U64 := (false, 0)
+
 end Vector
 
 namespace MutRef
@@ -109,6 +165,39 @@ namespace MutRef
 @[noinline] def remove {α : Type} [Inhabited α]
     (self : MutRef (Move.Vector α)) (index : U64) : Action α :=
   Move.Vector.remove self index
+
+/-- Receiver-style spelling of Move's `vector::pop_back`. -/
+@[noinline] def popBack {α : Type} [Inhabited α]
+    (self : MutRef (Move.Vector α)) : Action α :=
+  Move.Vector.popBack self
+
+@[noinline] def swap {α : Type} (self : MutRef (Move.Vector α)) (i j : U64) :
+    Action Unit := Move.Vector.swap self i j
+
+@[noinline] def swapRemove {α : Type} [Inhabited α]
+    (self : MutRef (Move.Vector α)) (i : U64) : Action α :=
+  Move.Vector.swapRemove self i
+
+@[noinline] def append {α : Type} (self : MutRef (Move.Vector α))
+    (other : Move.Vector α) : Action Unit := Move.Vector.append self other
+
+@[noinline] def reverse {α : Type} (self : MutRef (Move.Vector α)) : Action Unit :=
+  Move.Vector.reverse self
+
+@[noinline] def reverseSlice {α : Type} (self : MutRef (Move.Vector α))
+    (left right : U64) : Action Unit := Move.Vector.reverseSlice self left right
+
+@[noinline] def trim {α : Type} (self : MutRef (Move.Vector α))
+    (newLen : U64) : Action (Move.Vector α) := Move.Vector.trim self newLen
+
+@[noinline] def trimReverse {α : Type} (self : MutRef (Move.Vector α))
+    (newLen : U64) : Action (Move.Vector α) := Move.Vector.trimReverse self newLen
+
+@[noinline] def rotate {α : Type} (self : MutRef (Move.Vector α))
+    (rot : U64) : Action U64 := Move.Vector.rotate self rot
+
+@[noinline] def rotateSlice {α : Type} (self : MutRef (Move.Vector α))
+    (left rot right : U64) : Action U64 := Move.Vector.rotateSlice self left rot right
 
 end MutRef
 

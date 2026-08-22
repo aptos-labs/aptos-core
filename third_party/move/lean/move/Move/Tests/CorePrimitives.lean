@@ -63,7 +63,7 @@ module CorePrimitives where
 
   spec vector_get (index : U64) where
     ensures result = (vector![10, 20, 30] : Vector U64).toList[index.toNat]?.getD 0;
-    aborts_if 3 ≤ index.toNat with Semantics.Resource.executionFailure
+    aborts_if 3 ≤ index.toNat with Semantics.Vector.indexOutOfBounds
 
   verify vector_get
 
@@ -73,7 +73,7 @@ module CorePrimitives where
 
   spec vector_set (index : U64) where
     ensures result.toList = [10, 20, 30].set index.toNat 7;
-    aborts_if 3 ≤ index.toNat with Semantics.Resource.executionFailure
+    aborts_if 3 ≤ index.toNat with Semantics.Vector.indexOutOfBounds
 
   verify vector_set
 

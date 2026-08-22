@@ -2,6 +2,8 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import Move.Basic
+import Move.Addresses
+import Move.ConventionalAddresses
 import Move.Action
 import Move.Attributes
 import Move.Syntax

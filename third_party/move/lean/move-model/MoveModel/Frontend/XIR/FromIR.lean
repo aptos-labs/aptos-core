@@ -59,7 +59,7 @@ private def funToXIR (i : FunId) (decl : MoveModel.IR.FunDecl)
   for b in List.range decl.body.size do
     if (decl.loopSpecs b).isSome then
       throw s!"function {i} has loop metadata; executable IR-to-XIR loop materialization is not yet supported"
-  unless decl.body.entry < decl.body.size do
+  unless decl.native || decl.body.entry < decl.body.size do
     throw s!"function {i} entry block {decl.body.entry} is outside its block range"
   unless decl.numParams ≤ decl.numLocals do
     throw s!"function {i} has {decl.numParams} parameters but only {decl.numLocals} locals"
@@ -73,6 +73,7 @@ private def funToXIR (i : FunId) (decl : MoveModel.IR.FunDecl)
     entry := decl.body.entry
     loops := []
     spec := contractToXIR decl.contract
+    native := decl.native
   }
 
 /-- Materialize a finite semantic module into the exchange representation.
@@ -95,6 +96,7 @@ def MModule.ofIR (module : MoveModel.IR.Module) : Except String MModule := do
     structMeta := structMeta
     funMeta := funMeta
     externalFuns := module.externalFuns
+    friends := module.friends
   }
 
 end MoveModel.Frontend.XIR

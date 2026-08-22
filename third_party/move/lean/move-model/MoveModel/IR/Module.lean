@@ -24,6 +24,12 @@ structure ExternalFunRef where
   functionName : String
   deriving BEq, Repr
 
+/-- An explicitly trusted module from this module's friend list. -/
+structure ExternalModuleRef where
+  address : Address
+  moduleName : String
+  deriving BEq, Repr
+
 /-- File-format visibility.  Entry status is represented independently. -/
 inductive Visibility where
   | private_
@@ -83,6 +89,7 @@ structure Module where
   structMeta : ResourceId → Option StructMeta
   funMeta : FunId → Option FunMeta
   externalFuns : List ExternalFunRef := []
+  friends : List ExternalModuleRef := []
   dialect : Dialect := .stackless
 
 /-- Construct finite semantic IR directly from compiler-produced lists.
@@ -92,7 +99,8 @@ def Module.ofLists (address : Address) (name : String)
     (structs : List StructDecl) (funs : List FunDecl)
     (structMeta : List StructMeta) (funMeta : List FunMeta)
     (externalFuns : List ExternalFunRef := [])
-    (dialect : Dialect := .stackless) : Module where
+    (dialect : Dialect := .stackless)
+    (friends : List ExternalModuleRef := []) : Module where
   address := address
   name := name
   program := {
@@ -104,6 +112,7 @@ def Module.ofLists (address : Address) (name : String)
   structMeta := fun r => structMeta[r]?
   funMeta := fun f => funMeta[f]?
   externalFuns := externalFuns
+  friends := friends
   dialect := dialect
 
 /-- The positional identifier of a named function, or `numFuns` when absent.

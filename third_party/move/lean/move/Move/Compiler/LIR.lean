@@ -69,6 +69,9 @@ inductive Oper where
   | lt | le | eq
   | vecPack | vecLen | vecGet | vecSet | vecPush | vecPop
   | vecInsert | vecRemove
+  | vecSwap | vecSwapRemove | vecAppend | vecReverse | vecReverseSlice
+  | vecContains | vecIndexOf | vecTrim | vecTrimReverse | vecRotate
+  | vecRotateSlice | vecDestroyEmpty
   | pack (structName : Name) (typeArgs : Array Ty)
   | unpack (structName : Name) (typeArgs : Array Ty)
   | packVariant (enumName : Name) (variant : Nat) (typeArgs : Array Ty)
@@ -89,6 +92,7 @@ inductive Oper where
 inductive Instr where
   | loadBool (dst : String) (value : Bool)
   | loadInt (nt : MoveModel.IR.NumType) (dst : String) (value : Int)
+  | loadAddress (dst : String) (value : Nat)
   | assign (dst src : String)
   | call (dsts : Array String) (op : Oper) (srcs : Array String)
   deriving BEq, Repr
@@ -140,6 +144,7 @@ structure FunDecl where
   calls : Array Name
   acquires : Array Name
   attributes : List MoveModel.IR.Attribute := []
+  native : Bool := false
   deriving BEq, Repr
 
 /-- A callable function owned by another Move module. `leanName` resolves the
@@ -151,12 +156,18 @@ structure ExternalFunRef where
   functionName : String
   deriving BEq, Repr
 
+structure ExternalModuleRef where
+  address : String
+  moduleName : String
+  deriving BEq, Repr
+
 structure Module where
   address : String := "0x0"
   name : String
   structs : Array StructDecl
   functions : Array FunDecl
   externalFuns : Array ExternalFunRef := #[]
+  friends : Array ExternalModuleRef := #[]
   deriving BEq, Repr
 
 private def lookup (kind name : String) (names : Array String) : Except String Nat := do
@@ -238,6 +249,13 @@ private def lowerOper (structNames : Array (Name × String))
   | .vecGet => pure .vecGet | .vecSet => pure .vecSet
   | .vecPush => pure .vecPush | .vecPop => pure .vecPop
   | .vecInsert => pure .vecInsert | .vecRemove => pure .vecRemove
+  | .vecSwap => pure .vecSwap | .vecSwapRemove => pure .vecSwapRemove
+  | .vecAppend => pure .vecAppend | .vecReverse => pure .vecReverse
+  | .vecReverseSlice => pure .vecReverseSlice
+  | .vecContains => pure .vecContains | .vecIndexOf => pure .vecIndexOf
+  | .vecTrim => pure .vecTrim | .vecTrimReverse => pure .vecTrimReverse
+  | .vecRotate => pure .vecRotate | .vecRotateSlice => pure .vecRotateSlice
+  | .vecDestroyEmpty => pure .vecDestroyEmpty
   | .pack _ args =>
       if args.isEmpty then pure .pack
       else return .packInst (← args.toList.mapM (lowerTy structNames))
@@ -322,6 +340,10 @@ private def lowerFun (structNames : Array (Name × String))
           unless nt.lo ≤ value ∧ value < nt.hi do
             throw s!"integer literal `{value}` does not fit the type"
           instrs := instrs ++ [.load (← localId dst) (.int value)]
+      | .loadAddress dst value =>
+          unless value < 2 ^ 256 do
+            throw s!"address literal `{value}` does not fit in 256 bits"
+          instrs := instrs ++ [.load (← localId dst) (.address value)]
       | .assign dst src =>
           instrs := instrs ++ [.assign (← localId dst) (← localId src)]
       | .call dsts op srcs =>
@@ -335,7 +357,7 @@ private def lowerFun (structNames : Array (Name × String))
       | .ret srcs => pure (.ret (← srcs.toList.mapM localId))
       | .abort code => pure (.abort (← localId code))
     blocks := blocks.push { instrs := instrs, term := term }
-  let entry ← block "entry"
+  let entry ← if funDecl.native then pure 0 else block "entry"
   let locals ← allLocals.toList.mapM fun localDecl => lowerTy structNames localDecl.ty
   let returns ← funDecl.returns.toList.mapM (lowerTy structNames)
   let acquires ← funDecl.acquires.toList.mapM fun name => do
@@ -361,6 +383,7 @@ private def lowerFun (structNames : Array (Name × String))
       ensures := .value (.bool true)
       modifies := []
     }
+    native := funDecl.native
   }
   let info : MoveModel.IR.FunMeta := {
     name := funDecl.moveName
@@ -423,6 +446,11 @@ def Module.toIR (module : Module) : Except String MoveModel.IR.Module := do
         address := ← parseAddress reference.address
         moduleName := reference.moduleName
         functionName := reference.functionName
+      }
+    friends := ← module.friends.toList.mapM fun reference => do
+      return {
+        address := ← parseAddress reference.address
+        moduleName := reference.moduleName
       }
     dialect := .stackless
   }
