@@ -87,7 +87,9 @@ button.link { border:0; background:none; color:var(--accent); padding:0; cursor:
   <section class="panel" id="details" role="dialog" aria-labelledby="detail-title" hidden>
     <div class="detail-header"><h2 id="detail-title"></h2><button class="detail-close" id="detail-close" type="button" aria-label="Close function details">×</button></div>
     <div class="detail-grid" id="detail-summary"></div>
-    <h2>Observed call paths</h2>
+    <h2>Calling entry functions</h2>
+    <div class="paths table-wrap" id="detail-roots"></div>
+    <h2>Immediate call paths</h2>
     <div class="paths table-wrap" id="detail-paths"></div>
   </section>
   <section class="panel">
@@ -125,7 +127,7 @@ const functions = new Map();
 for (const f of report.functions) {
   const id = `${rawModuleName(f.module_id)}::${f.function_name}`;
   const displayId = `${moduleName(f.module_id)}::${f.function_name}`;
-  functions.set(id, {...f, id, displayId, invocations:0, transactions:0, successful:0, first:null, last:null, paths:[], callers:new Set()});
+  functions.set(id, {...f, id, displayId, invocations:0, transactions:0, successful:0, first:null, last:null, roots:[], paths:[], callers:new Set()});
 }
 for (const u of report.function_usage) {
   const f = functions.get(keyOf(u.callee));
@@ -135,6 +137,10 @@ for (const u of report.function_usage) {
   if (u.outcome === "success") f.successful += u.invocation_count;
   f.first = f.first === null ? u.first_version : Math.min(f.first, u.first_version);
   f.last = f.last === null ? u.last_version : Math.max(f.last, u.last_version);
+}
+for (const r of report.root_function_usage ?? []) {
+  const f = functions.get(keyOf(r.callee));
+  if (f) f.roots.push(r);
 }
 for (const p of report.usage) {
   const f = functions.get(keyOf(p.callee));
@@ -181,6 +187,9 @@ function renderCards() {
   if (report.usage_detail_truncated) {
     const rowLimit = report.merged_usage_detail_row_limit ?? report.usage_detail_row_limit;
     truncationNotices.push(`Call-path detail is partial: it is capped at ${nf.format(rowLimit)} rows; ${nf.format(report.dropped_usage_invocation_count)} invocation${report.dropped_usage_invocation_count === 1 ? " was" : "s were"} omitted across ${nf.format(report.dropped_usage_transaction_count)} transaction${report.dropped_usage_transaction_count === 1 ? "" : "s"}. Per-function totals remain complete.`);
+  }
+  if (report.root_function_usage_truncated) {
+    truncationNotices.push(`Calling-entry attribution is partial for functions with more than ${nf.format(report.root_function_row_limit_per_function)} distinct entry/outcome combinations; ${nf.format(report.dropped_root_function_usage_invocation_count)} invocation${report.dropped_root_function_usage_invocation_count === 1 ? " was" : "s were"} omitted across ${nf.format(report.dropped_root_function_usage_transaction_count)} transaction${report.dropped_root_function_usage_transaction_count === 1 ? "" : "s"}.`);
   }
   if (report.active_entry_function_callers_truncated) {
     const rowLimit = report.merged_active_entry_function_caller_row_limit ?? report.active_entry_function_caller_row_limit;
@@ -331,11 +340,23 @@ function renderDetails(f, anchor) {
     ["Visibility",`${f.visibility}${f.is_entry?" · entry":""}${f.is_native?" · native":""}`],
     ["Transactions",nf.format(f.transactions)],
     ["Invocations",nf.format(f.invocations)],
-    ["Immediate caller addresses",nf.format(f.callers.size)]
+    ["Retained calling entries",nf.format(new Set(f.roots.map(r=>rawFunctionName(r.root_function))).size)],
+    ["Retained immediate caller addresses",nf.format(f.callers.size)]
   ];
   document.getElementById("detail-summary").innerHTML=summary.map(([label,value])=>`<div><span class="meta">${esc(label)}</span><span class="value">${esc(value)}</span></div>`).join("");
+  const roots=[...f.roots].sort((a,b)=>b.invocation_count-a.invocation_count || functionName(a.root_function).localeCompare(functionName(b.root_function)));
+  let missingRoots;
+  if (f.invocations === 0) {
+    missingRoots="No calls to this function were observed in the replay range.";
+  } else if ((report.schema_version ?? 0) < 5) {
+    missingRoots="Calling-entry attribution was not retained by this report version. Run the updated workflow to collect it.";
+  } else {
+    missingRoots="Calling-entry attribution was not retained for this function because its per-function limit was reached.";
+  }
+  document.getElementById("detail-roots").innerHTML=roots.length?`<table><thead><tr><th>Entry function</th><th>Outcome</th><th class="number">Transactions</th><th class="number">Invocations</th><th>Versions</th></tr></thead><tbody>${roots.map(r=>`<tr><td><code title="${esc(rawFunctionName(r.root_function))}">${esc(r.root_function ? functionName(r.root_function) : "<unknown entry>")}</code></td><td>${esc(r.outcome)}</td><td class="number">${nf.format(r.transaction_count)}</td><td class="number">${nf.format(r.invocation_count)}</td><td>${nf.format(r.first_version)}–${nf.format(r.last_version)}</td></tr>`).join("")}</tbody></table>`:`<div class="empty">${esc(missingRoots)}</div>`;
   const paths=[...f.paths].sort((a,b)=>b.invocation_count-a.invocation_count);
-  document.getElementById("detail-paths").innerHTML=paths.length?`<table><thead><tr><th>Immediate caller</th><th>Root payload</th><th>Kind</th><th>Outcome</th><th class="number">Transactions</th><th class="number">Invocations</th><th>Versions</th></tr></thead><tbody>${paths.map(p=>`<tr><td><code>${esc(functionName(p.caller))}</code></td><td><code>${esc(functionName(p.root_function))}</code></td><td>${esc(p.call_kind)}</td><td>${esc(p.outcome)}</td><td class="number">${nf.format(p.transaction_count)}</td><td class="number">${nf.format(p.invocation_count)}</td><td>${nf.format(p.first_version)}–${nf.format(p.last_version)}</td></tr>`).join("")}</tbody></table>`:`<div class="empty">No calls to this function were observed in the replay range.</div>`;
+  const missingPaths=f.invocations === 0 ? "No calls to this function were observed in the replay range." : report.usage_detail_truncated ? "Immediate call-path detail was not retained for this function because the report reached its global detail limit." : "Immediate call-path detail is unavailable for this observed function.";
+  document.getElementById("detail-paths").innerHTML=paths.length?`<table><thead><tr><th>Immediate caller</th><th>Root payload</th><th>Kind</th><th>Outcome</th><th class="number">Transactions</th><th class="number">Invocations</th><th>Versions</th></tr></thead><tbody>${paths.map(p=>`<tr><td><code>${esc(functionName(p.caller))}</code></td><td><code>${esc(functionName(p.root_function))}</code></td><td>${esc(p.call_kind)}</td><td>${esc(p.outcome)}</td><td class="number">${nf.format(p.transaction_count)}</td><td class="number">${nf.format(p.invocation_count)}</td><td>${nf.format(p.first_version)}–${nf.format(p.last_version)}</td></tr>`).join("")}</tbody></table>`:`<div class="empty">${esc(missingPaths)}</div>`;
   positionDetails(anchor);
 }
 

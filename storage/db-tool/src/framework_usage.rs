@@ -20,12 +20,17 @@ use std::{
 };
 use tempfile::NamedTempFile;
 
-const SCHEMA_VERSION: u64 = 4;
+const SCHEMA_VERSION: u64 = 5;
 
 // Caller and root-function identities originate in replayed transactions. Keep the detailed
 // call-path map bounded so a stream of uniquely addressed wrapper modules cannot exhaust a
 // replay worker. Per-function totals are collected independently and remain complete.
 const MAX_USAGE_DETAIL_ROWS: usize = 100_000;
+
+// Preserve the originating transaction entry function independently for every framework
+// function. A per-callee limit prevents a popular function with many distinct wrappers from
+// consuming the attribution budget needed by rare functions.
+const MAX_ROOT_FUNCTION_ROWS_PER_FUNCTION: usize = 32;
 
 // Root entry functions are also transaction-controlled identities. Keep a separate, smaller
 // budget for the active-caller summary so it cannot reintroduce the unbounded growth avoided
@@ -99,6 +104,12 @@ struct FunctionUsageKey {
 }
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+struct RootFunctionUsageKey {
+    root_function: Option<FunctionId>,
+    outcome: TransactionOutcome,
+}
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 struct ActiveEntryFunctionCallerKey {
     address: AccountAddress,
     entry_function: FunctionId,
@@ -154,12 +165,17 @@ struct FrameworkUsageReport {
     usage_detail_truncated: bool,
     dropped_usage_invocation_count: u64,
     dropped_usage_transaction_count: u64,
+    root_function_row_limit_per_function: usize,
+    root_function_usage_truncated: bool,
+    dropped_root_function_usage_invocation_count: u64,
+    dropped_root_function_usage_transaction_count: u64,
     active_entry_function_caller_row_limit: usize,
     active_entry_function_callers_truncated: bool,
     dropped_active_entry_function_framework_invocation_count: u64,
     dropped_active_entry_function_transaction_count: u64,
     functions: Vec<FunctionInventoryRow>,
     function_usage: Vec<FunctionUsageRow>,
+    root_function_usage: Vec<RootFunctionUsageRow>,
     usage: Vec<UsageRow>,
     active_entry_function_callers: Vec<ActiveEntryFunctionCallerRow>,
 }
@@ -168,6 +184,15 @@ struct FrameworkUsageReport {
 struct FunctionUsageRow {
     #[serde(flatten)]
     key: FunctionUsageKey,
+    #[serde(flatten)]
+    counts: UsageCounts,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct RootFunctionUsageRow {
+    callee: FunctionId,
+    #[serde(flatten)]
+    key: RootFunctionUsageKey,
     #[serde(flatten)]
     counts: UsageCounts,
 }
@@ -184,12 +209,15 @@ struct ActiveEntryFunctionCallerRow {
 struct CollectorState {
     pending: HashMap<HashValue, TransactionFunctionUsage>,
     function_usage: BTreeMap<FunctionUsageKey, UsageCounts>,
+    root_function_usage: BTreeMap<FunctionId, BTreeMap<RootFunctionUsageKey, UsageCounts>>,
     usage: BTreeMap<UsageKey, UsageCounts>,
     active_entry_function_callers:
         BTreeMap<ActiveEntryFunctionCallerKey, ActiveEntryFunctionCallerCounts>,
     transaction_usage_records: u64,
     dropped_usage_invocation_count: u64,
     dropped_usage_transaction_count: u64,
+    dropped_root_function_usage_invocation_count: u64,
+    dropped_root_function_usage_transaction_count: u64,
     dropped_active_entry_function_framework_invocation_count: u64,
     dropped_active_entry_function_transaction_count: u64,
     ledger_timestamps: Option<(u64, u64)>,
@@ -201,6 +229,7 @@ pub(crate) struct FrameworkUsageCollector {
     target_modules: BTreeSet<ModuleId>,
     inventory: Vec<FunctionInventoryRow>,
     usage_detail_row_limit: usize,
+    root_function_row_limit_per_function: usize,
     active_entry_function_caller_row_limit: usize,
     state: Mutex<CollectorState>,
 }
@@ -246,6 +275,7 @@ impl FrameworkUsageCollector {
             target_modules,
             inventory,
             usage_detail_row_limit,
+            root_function_row_limit_per_function: MAX_ROOT_FUNCTION_ROWS_PER_FUNCTION,
             active_entry_function_caller_row_limit: MAX_ACTIVE_ENTRY_FUNCTION_CALLER_ROWS,
             state: Mutex::new(CollectorState::default()),
         }
@@ -316,7 +346,10 @@ impl FrameworkUsageCollector {
         }
         let mut per_transaction = BTreeMap::<UsageKey, u64>::new();
         let mut per_function = BTreeMap::<FunctionUsageKey, u64>::new();
+        let mut per_root_function =
+            BTreeMap::<FunctionId, BTreeMap<RootFunctionUsageKey, u64>>::new();
         let mut usage_detail_truncated = false;
+        let mut root_function_usage_truncated = false;
         for call in transaction.calls {
             let function_key = FunctionUsageKey {
                 callee: call.callee.clone(),
@@ -326,6 +359,29 @@ impl FrameworkUsageCollector {
             *function_count = function_count
                 .checked_add(1)
                 .context("per-transaction function invocation count overflow")?;
+
+            let root_key = RootFunctionUsageKey {
+                root_function: root_function.clone(),
+                outcome: outcome.clone(),
+            };
+            let retained_roots = state.root_function_usage.get(&call.callee);
+            let pending_roots = per_root_function.entry(call.callee.clone()).or_default();
+            if retained_roots.is_some_and(|roots| roots.contains_key(&root_key))
+                || pending_roots.contains_key(&root_key)
+                || retained_roots.map_or(0, BTreeMap::len) + pending_roots.len()
+                    < self.root_function_row_limit_per_function
+            {
+                let count = pending_roots.entry(root_key).or_default();
+                *count = count
+                    .checked_add(1)
+                    .context("per-transaction root function invocation count overflow")?;
+            } else {
+                state.dropped_root_function_usage_invocation_count = state
+                    .dropped_root_function_usage_invocation_count
+                    .checked_add(1)
+                    .context("dropped root function usage invocation count overflow")?;
+                root_function_usage_truncated = true;
+            }
 
             let key = UsageKey {
                 callee: call.callee,
@@ -358,8 +414,15 @@ impl FrameworkUsageCollector {
                 .checked_add(1)
                 .context("dropped usage transaction count overflow")?;
         }
+        if root_function_usage_truncated {
+            state.dropped_root_function_usage_transaction_count = state
+                .dropped_root_function_usage_transaction_count
+                .checked_add(1)
+                .context("dropped root function usage transaction count overflow")?;
+        }
 
         merge_usage_counts(&mut state.function_usage, per_function, version)?;
+        merge_nested_usage_counts(&mut state.root_function_usage, per_root_function, version)?;
         merge_usage_counts(&mut state.usage, per_transaction, version)?;
         Ok(())
     }
@@ -411,6 +474,12 @@ impl FrameworkUsageCollector {
             usage_detail_truncated: state.dropped_usage_invocation_count > 0,
             dropped_usage_invocation_count: state.dropped_usage_invocation_count,
             dropped_usage_transaction_count: state.dropped_usage_transaction_count,
+            root_function_row_limit_per_function: self.root_function_row_limit_per_function,
+            root_function_usage_truncated: state.dropped_root_function_usage_invocation_count > 0,
+            dropped_root_function_usage_invocation_count: state
+                .dropped_root_function_usage_invocation_count,
+            dropped_root_function_usage_transaction_count: state
+                .dropped_root_function_usage_transaction_count,
             active_entry_function_caller_row_limit: self.active_entry_function_caller_row_limit,
             active_entry_function_callers_truncated: state
                 .dropped_active_entry_function_transaction_count
@@ -426,6 +495,17 @@ impl FrameworkUsageCollector {
                 .map(|(key, counts)| FunctionUsageRow {
                     key: key.clone(),
                     counts: counts.clone(),
+                })
+                .collect(),
+            root_function_usage: state
+                .root_function_usage
+                .iter()
+                .flat_map(|(callee, roots)| {
+                    roots.iter().map(|(key, counts)| RootFunctionUsageRow {
+                        callee: callee.clone(),
+                        key: key.clone(),
+                        counts: counts.clone(),
+                    })
                 })
                 .collect(),
             usage: state
@@ -507,6 +587,17 @@ fn merge_usage_counts<K: Ord>(
             .context("transaction count overflow")?;
         counts.first_version = counts.first_version.min(version);
         counts.last_version = counts.last_version.max(version);
+    }
+    Ok(())
+}
+
+fn merge_nested_usage_counts<OuterKey: Ord, InnerKey: Ord>(
+    aggregate: &mut BTreeMap<OuterKey, BTreeMap<InnerKey, UsageCounts>>,
+    transaction: BTreeMap<OuterKey, BTreeMap<InnerKey, u64>>,
+    version: Version,
+) -> Result<()> {
+    for (outer_key, counts) in transaction {
+        merge_usage_counts(aggregate.entry(outer_key).or_default(), counts, version)?;
     }
     Ok(())
 }
@@ -602,6 +693,16 @@ mod tests {
         let call_path_counts = state.usage.values().next().unwrap();
         assert_eq!(call_path_counts.invocation_count, 2);
         assert_eq!(call_path_counts.transaction_count, 1);
+        let root_function_counts = state
+            .root_function_usage
+            .values()
+            .next()
+            .unwrap()
+            .values()
+            .next()
+            .unwrap();
+        assert_eq!(root_function_counts.invocation_count, 2);
+        assert_eq!(root_function_counts.transaction_count, 1);
         let active_entry_function_counts =
             state.active_entry_function_callers.values().next().unwrap();
         assert_eq!(active_entry_function_counts.framework_invocation_count, 2);
@@ -623,6 +724,16 @@ mod tests {
         assert_eq!(report["usage_detail_truncated"], false);
         assert_eq!(report["dropped_usage_invocation_count"], 0);
         assert_eq!(report["dropped_usage_transaction_count"], 0);
+        assert_eq!(
+            report["root_function_row_limit_per_function"],
+            MAX_ROOT_FUNCTION_ROWS_PER_FUNCTION
+        );
+        assert_eq!(report["root_function_usage_truncated"], false);
+        assert_eq!(
+            report["root_function_usage"][0]["root_function"]["function_name"],
+            "entry"
+        );
+        assert_eq!(report["root_function_usage"][0]["invocation_count"], 2);
         assert_eq!(
             report["active_entry_function_caller_row_limit"],
             MAX_ACTIVE_ENTRY_FUNCTION_CALLER_ROWS
@@ -690,6 +801,63 @@ mod tests {
         assert_eq!(call_path_counts.transaction_count, 2);
         assert_eq!(state.dropped_usage_invocation_count, 1);
         assert_eq!(state.dropped_usage_transaction_count, 1);
+        let root_function_counts = state
+            .root_function_usage
+            .values()
+            .next()
+            .unwrap()
+            .values()
+            .next()
+            .unwrap();
+        assert_eq!(root_function_counts.invocation_count, 3);
+        assert_eq!(root_function_counts.transaction_count, 3);
+        assert_eq!(state.dropped_root_function_usage_invocation_count, 0);
+    }
+
+    #[test]
+    fn applies_root_function_limit_independently_per_callee() {
+        let mut collector = FrameworkUsageCollector::new(10, 20);
+        collector.root_function_row_limit_per_function = 1;
+        let module_id = collector.target_modules.iter().next().unwrap().clone();
+        let first_callee = FunctionId {
+            module_id: Some(module_id.clone()),
+            function_name: "first_target".to_owned(),
+        };
+        let second_callee = FunctionId {
+            module_id: Some(module_id.clone()),
+            function_name: "second_target".to_owned(),
+        };
+        let record = |transaction_hash, version, callee: FunctionId, root_name: &str| {
+            collector.record_transaction(TransactionFunctionUsage {
+                transaction_hash,
+                sender: AccountAddress::ONE,
+                multisig_address: None,
+                root_function: Some(FunctionId {
+                    module_id: Some(module_id.clone()),
+                    function_name: root_name.to_owned(),
+                }),
+                status: TransactionStatus::Keep(ExecutionStatus::Success),
+                calls: vec![aptos_vm::function_usage::FunctionCall {
+                    caller: None,
+                    callee,
+                    kind: UsageCallKind::Call,
+                }],
+            });
+            collector.assign_version(transaction_hash, version).unwrap();
+        };
+
+        record(HashValue::zero(), 10, first_callee.clone(), "first_root");
+        record(HashValue::from_u64(1), 11, first_callee, "dropped_root");
+        record(HashValue::from_u64(2), 12, second_callee, "second_root");
+
+        let state = collector.lock_state();
+        assert_eq!(state.root_function_usage.len(), 2);
+        assert!(state
+            .root_function_usage
+            .values()
+            .all(|roots| roots.len() == 1));
+        assert_eq!(state.dropped_root_function_usage_invocation_count, 1);
+        assert_eq!(state.dropped_root_function_usage_transaction_count, 1);
     }
 
     #[test]
