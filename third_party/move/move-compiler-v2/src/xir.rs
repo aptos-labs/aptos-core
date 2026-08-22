@@ -1181,9 +1181,12 @@ impl FunctionTranslator<'_> {
                     )
                 })
             },
-            Oper::VecSet | Oper::VecPush | Oper::VecPop | Oper::VecInsert | Oper::VecRemove => {
-                self.translate_functional_vector_update(dsts, oper, srcs)
-            },
+            Oper::VecSet
+            | Oper::VecPush
+            | Oper::VecPop
+            | Oper::VecInsert
+            | Oper::VecRemove
+            | Oper::VecSwap => self.translate_functional_vector_update(dsts, oper, srcs),
             Oper::BorrowVecElem => {
                 arity(dsts, srcs, 1, 2, oper)?;
                 let element = self.vector_element_type(self.local(srcs[0])?)?;
@@ -1809,6 +1812,10 @@ impl FunctionTranslator<'_> {
                 arity(dsts, srcs, 2, 2, oper)?;
                 (dsts[0], Some(dsts[1]))
             },
+            Oper::VecSwap => {
+                arity(dsts, srcs, 1, 3, oper)?;
+                (dsts[0], None)
+            },
             _ => unreachable!(),
         };
         let element = self.vector_element_type(self.local(srcs[0])?)?;
@@ -2043,6 +2050,12 @@ impl FunctionTranslator<'_> {
                         vec![vector_ref],
                         None,
                     )
+                })
+            },
+            Oper::VecSwap => {
+                let swap = self.vector_function("swap", element)?;
+                self.emit(|attr| {
+                    Bytecode::Call(attr, vec![], swap, vec![vector_ref, srcs[1], srcs[2]], None)
                 })
             },
             _ => unreachable!(),

@@ -672,6 +672,9 @@ pub enum Oper {
     /// `"vec_remove"` — remove at an index, returning
     /// (updated vector, removed element).
     VecRemove,
+    /// `"vec_swap"` — exchange two indexed elements, returning the updated
+    /// vector.
+    VecSwap,
     /// `{"get_global": resource}` — read a resource from global memory.
     GetGlobal(ResourceId),
     GetGlobalInst(ResourceId, Vec<Type>),
@@ -1109,6 +1112,10 @@ mod tests {
         assert_eq!(
             serde_json::to_value(Oper::VecRemove).unwrap(),
             json!("vec_remove")
+        );
+        assert_eq!(
+            serde_json::to_value(Oper::VecSwap).unwrap(),
+            json!("vec_swap")
         );
         assert_eq!(
             serde_json::to_value(Oper::BorrowVecElem).unwrap(),
