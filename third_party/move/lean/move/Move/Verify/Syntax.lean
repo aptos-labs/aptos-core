@@ -1536,6 +1536,21 @@ private def doElementBinds (name : Name) (element : Lean.DoElem) : Bool :=
     else
       firstDoIdentifier? declaration == some name
 
+/-- A binding's initializer is evaluated before it shadows the preceding
+local.  Inspect only that initializer, not the declaration as a whole (which
+would count the new binder itself as a use). -/
+private def doBindingUses (name : Name) (element : Lean.DoElem) : Bool :=
+  let stx := element.raw
+  if !(stx.isOfKind ``Lean.Parser.Term.doLet ||
+      stx.isOfKind ``Lean.Parser.Term.doLetArrow) || stx.getNumArgs ≤ 3 then
+    false
+  else
+    let declaration := stx[3]
+    let declaration :=
+      if declaration.getNumArgs == 1 then declaration[0]! else declaration
+    declaration.getNumArgs > 0 &&
+      containsIdentifier name declaration[declaration.getNumArgs - 1]!
+
 /-- A re-binding of a live mutable-reference name cannot be represented by
 the current source-spec prophecy encoding.  In particular, textual-use
 tracking would otherwise mistake uses of the new local for uses of the old
@@ -1543,14 +1558,18 @@ loan and refresh the owner from the wrong value.  Refuse that source form
 until the encoding carries alpha-renamed local identities. -/
 private def mutableBorrowShadowing? (name : Name) (elements : Array Lean.DoElem) :
     Option Lean.DoElem :=
-  let (_, shadow?) := elements.foldl (init := (false, none)) fun state element =>
-    let (used, shadow?) := state
-    if shadow?.isSome then state
-    else if doElementBinds name element then
-      (used, if used then some element else none)
-    else
-      (used || containsIdentifier name element.raw, none)
-  shadow?
+  let rec go (used : Bool) : List Lean.DoElem → Option Lean.DoElem
+    | [] => none
+    | element :: rest =>
+        if doElementBinds name element then
+          -- The initializer still sees the old binding.  Once this new
+          -- binding is in scope, the old reference is no longer visible, so
+          -- an unused rebind ends the scan rather than contaminating a later
+          -- same-named local.
+          if used || doBindingUses name element then some element else none
+        else
+          go (used || containsIdentifier name element.raw) rest
+  go false elements.toList
 
 private partial def closeBorrowScope (elements : Array Lean.DoElem)
     (size : Nat) : Nat :=

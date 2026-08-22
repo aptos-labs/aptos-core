@@ -61,4 +61,20 @@ error: automatic source specifications do not support shadowing a live mutable r
 spec shadowed_mutable_reference where
   ensures result = 2
 
+/-- The initializer of a shadowing binding is still in the old reference's
+scope, so it must be rejected as well. -/
+fun shadowed_reference_initializer : Action U64 := do
+  let mut owner : U64 := 0
+  let valueRef ← &mut owner
+  let valueRef ← *valueRef
+  let output := valueRef
+  pure output
+
+/--
+error: automatic source specifications do not support shadowing a live mutable reference
+-/
+#guard_msgs in
+spec shadowed_reference_initializer where
+  ensures result = 0
+
 end Move.Tests.Negative.Borrows
