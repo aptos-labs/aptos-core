@@ -102,10 +102,6 @@ cd move-model && APTOS_CLI=<path-to-aptos> lake test
 cd move       && APTOS_CLI=<path-to-aptos> lake test
 ```
 
-`lake test` limits the number of concurrent Lean test compilations to avoid
-exhausting file descriptors when many metaprogramming-heavy test modules need
-to be rebuilt together.
-
 Proof cost is tracked with `scripts/bench-proofs.sh`; the encoding's cost
 analysis is in
 [`performance-analysis.md`](move/Move/performance-analysis.md).

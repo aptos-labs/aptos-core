@@ -2,7 +2,7 @@
 # engine, and lowering to XIR.
 name = "move"
 defaultTargets = ["Move"]
-testDriver = "moveTests"
+testDriver = "MoveTests"
 
 [[require]]
 name = "move-model"
@@ -16,9 +16,3 @@ name = "Move"
 [[lean_lib]]
 name = "MoveTests"
 roots = ["Move.Tests"]
-
-# See the note in the move-model package: the driver bounds the nested build's
-# scheduler so a clean test build cannot exhaust host file descriptors.
-[[lean_exe]]
-name = "moveTests"
-root = "TestDriver"

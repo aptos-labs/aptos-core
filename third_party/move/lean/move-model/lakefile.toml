@@ -2,7 +2,7 @@
 # stages, and the masm/Move-source frontend.  Depends on nothing in `Move`.
 name = "move-model"
 defaultTargets = ["MoveModel"]
-testDriver = "moveModelTests"
+testDriver = "MoveModelTests"
 
 [[lean_lib]]
 name = "MoveModel"
@@ -13,11 +13,3 @@ name = "MoveModel"
 [[lean_lib]]
 name = "MoveModelTests"
 roots = ["MoveModel.Tests"]
-
-# Lake schedules independent Lean compiler processes eagerly.  The test suite
-# imports enough of the Lean metaprogramming stack that an unconstrained clean
-# build can exhaust host file descriptors.  The driver gives the nested build
-# a small, deterministic scheduler limit.
-[[lean_exe]]
-name = "moveModelTests"
-root = "TestDriver"
