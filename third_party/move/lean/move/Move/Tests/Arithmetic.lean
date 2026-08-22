@@ -19,38 +19,38 @@ module Arithmetic where
     pure (left + right)
 
   spec add_values (left : U64) (right : U64) where
-    ensures result.toNat = left.toNat + right.toNat;
-    aborts_if ¬left.toNat + right.toNat < U64.size
+    ensures ((result)^) = ((left)^) + ((right)^);
+    aborts_if ¬((left)^) + ((right)^) < U64.size
       with Semantics.Checked.arithmeticAbortCode
 
   fun subtract_values (left right : U64) : Action U64 :=
     pure (left - right)
 
   spec subtract_values (left : U64) (right : U64) where
-    ensures result.toNat = left.toNat - right.toNat;
-    aborts_if left.toNat < right.toNat with Semantics.Checked.arithmeticAbortCode
+    ensures result↑ = left↑ - right↑;
+    aborts_if left↑ < right↑ with Semantics.Checked.arithmeticAbortCode
 
   fun multiply_values (left right : U64) : Action U64 :=
     pure (left * right)
 
   spec multiply_values (left : U64) (right : U64) where
-    ensures result.toNat = left.toNat * right.toNat;
-    aborts_if ¬left.toNat * right.toNat < U64.size
+    ensures ((result)^) = ((left)^) * ((right)^);
+    aborts_if ¬((left)^) * ((right)^) < U64.size
       with Semantics.Checked.arithmeticAbortCode
 
   fun divide_values (left right : U64) : Action U64 :=
     pure (left / right)
 
   spec divide_values (left : U64) (right : U64) where
-    ensures result.toNat = left.toNat / right.toNat;
-    aborts_if right.toNat = 0 with Semantics.Checked.arithmeticAbortCode
+    ensures result↑ = left↑ / right↑;
+    aborts_if right↑ = 0 with Semantics.Checked.arithmeticAbortCode
 
   fun modulo_values (left right : U64) : Action U64 :=
     pure (left % right)
 
   spec modulo_values (left : U64) (right : U64) where
-    ensures result.toNat = left.toNat % right.toNat;
-    aborts_if right.toNat = 0 with Semantics.Checked.arithmeticAbortCode
+    ensures ((result)^) = ((left)^) % ((right)^);
+    aborts_if ((right)^) = 0 with Semantics.Checked.arithmeticAbortCode
 
   struct Counter has Key where
     value : U64
@@ -64,9 +64,9 @@ module Arithmetic where
     requires existsAt<Counter>(addr);
     modifies Counter[addr];
     ensures
-      Counter[addr].value.toNat = old(Counter[addr].value).toNat * factor.toNat;
+      ((Counter[addr].value)^) = ((old(Counter[addr].value))^) * ((factor)^);
     aborts_if
-      ¬old(Counter[addr].value).toNat * factor.toNat < U64.size
+      ¬((old(Counter[addr].value))^) * ((factor)^) < U64.size
       with Semantics.Checked.arithmeticAbortCode
 
   entry fun divide (addr : Address) (divisor : U64) : Action Unit := do
@@ -78,8 +78,8 @@ module Arithmetic where
     requires existsAt<Counter>(addr);
     modifies Counter[addr];
     ensures
-      Counter[addr].value.toNat = old(Counter[addr].value).toNat / divisor.toNat;
-    aborts_if divisor.toNat = 0 with Semantics.Checked.arithmeticAbortCode
+      Counter[addr].value↑ = old(Counter[addr].value)↑ / divisor↑;
+    aborts_if divisor↑ = 0 with Semantics.Checked.arithmeticAbortCode
 
   -- Comparison spellings: `<=`, `>`, `>=`, `!=`, and a comparison in value
   -- position (`a < b` as a `Bool`) all lower to the width-agnostic `lt` /

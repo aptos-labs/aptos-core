@@ -25,6 +25,7 @@ import Move.Tests.LowLevel.ModuleVerification
 import Move.Tests.LowLevel.MultipleModules
 import Move.Tests.LowLevel.Rejections
 import Move.Tests.LowLevel.SourceVerification
+import Move.Tests.ModelDomain
 import Move.Tests.Modules.Math
 import Move.Tests.MultipleModules
 import Move.Tests.OrderedMap

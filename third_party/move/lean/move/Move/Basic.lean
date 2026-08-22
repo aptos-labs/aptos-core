@@ -134,6 +134,29 @@ abbrev I64 := SInt W64
 abbrev I128 := SInt W128
 abbrev I256 := SInt W256
 
+/-- The logical domain in which a Move source value is specified.  Types whose
+host representation is already their logical domain use the identity instance;
+integers, vectors, and references refine that default below. -/
+class ModelDomain (α : Type u) (β : outParam (Type v)) where
+  project : α → β
+
+/-- Project a Move source value into its logical specification domain. -/
+def model (value : α) [ModelDomain α β] : β :=
+  ModelDomain.project value
+
+/-- Source values without a more specific model retain their host domain.  This
+covers booleans, addresses, signers, and user-defined Move structures; a user
+can provide a higher-priority instance when a structure has its own model. -/
+instance (priority := low) : ModelDomain α α where
+  project := id
+
+/-- ASCII and Unicode postfix spellings for projecting into the model domain.
+`value^` is convenient in ASCII-only source (write `((value)^)` when followed
+by another operator, to disambiguate Lean's infix exponentiation); `value↑` is
+its Unicode alias. -/
+scoped macro:max value:term:max noWs "^" : term => `(model $value)
+scoped macro:max value:term:max noWs "↑" : term => `(model $value)
+
 /-- A homogeneous Move vector: a list of elements certified to fit Move's
 `u64` length domain, as every runtime vector does by construction. The
 certificate is carried by the type, like the integer subtype bound; the
@@ -217,6 +240,14 @@ namespace MutRef
 instance [Inhabited α] : Inhabited (MutRef α) := ⟨default⟩
 
 end MutRef
+
+/-- References are specified by the logical value they observe. -/
+instance [ModelDomain α β] : ModelDomain (Ref α) β where
+  project ref := model ref.get
+
+/-- Mutable references expose their current logical value in specifications. -/
+instance [ModelDomain α β] : ModelDomain (MutRef α) β where
+  project ref := model ref.get
 
 /-- Implicitly view a mutable Move reference as immutable.  Lean inserts this
 coercion at Move call sites; the compiler lowers the marker to `freeze_ref`.
@@ -444,6 +475,18 @@ theorem le_iff_toInt_le (a b : MoveInt S W) : a ≤ b ↔ a.toInt ≤ b.toInt :=
   lessEq_eq_true_iff a b
 
 end MoveInt
+
+/-- Unsigned Move integers are specified as natural numbers. -/
+instance [Width W] : ModelDomain (UInt W) Nat where
+  project := MoveInt.toNat
+
+@[simp] theorem model_uint [Width W] (value : UInt W) : model value = value.toNat := rfl
+
+/-- Signed Move integers are specified as mathematical integers. -/
+instance [Width W] : ModelDomain (SInt W) Int where
+  project := MoveInt.toInt
+
+@[simp] theorem model_sint [Width W] (value : SInt W) : model value = value.toInt := rfl
 
 /-- Resolve the width of each tag for specification normalization, in both
 the `widthOf` and the raw instance-projection spelling. -/
@@ -1138,6 +1181,13 @@ instance : Inhabited (Vector α) := ⟨empty⟩
 /-- Logical contents of a source vector. This is a specification accessor and
 is never selected for Move lowering. -/
 def toList (values : Vector α) : List α := values.elems
+
+/-- Vectors are specified as lists of their elements' logical domains. -/
+instance [ModelDomain α β] : ModelDomain (Vector α) (List β) where
+  project values := values.toList.map (fun value => model value)
+
+@[simp] theorem model_vector [ModelDomain α β] (values : Vector α) :
+    model values = values.toList.map (fun value => model value) := rfl
 
 /-- Construct a logical source vector from a list.  This is a verification
 helper, not a compiler primitive; deployable source builds vectors with the
