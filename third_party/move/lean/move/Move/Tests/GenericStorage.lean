@@ -64,6 +64,12 @@ module GenericStorage where
 
   verify take_generic
 
+  -- A global invariant may name a concrete instantiation of a generic
+  -- resource family. It is registered by the `Vault` head while retaining
+  -- `U64` in its store and reestablishment obligations.
+  spec module where
+    invariant ∀ a, (Vault U64)[a].value = (Vault U64)[a].value
+
   -- A global field borrow at a concrete instantiation.
   entry fun bump_vault (address : Address) : Action Unit := do
     let value ← &mut (Vault U64)[address].value

@@ -188,6 +188,38 @@ theorem satisfies_fix
   · rintro ⟨fuel, obligation⟩
     exact (approximates fuel args initial permitted).2.2 obligation
 
+/-- Fixed-point induction for a heterogeneous mutually recursive SCC.  The
+recursive hypothesis supplies every member's contract, so calls across the
+family are justified at the same finite approximation. -/
+theorem satisfies_fixFamily
+    (body : Spec.Family State Index Args Result →
+      Spec.Family State Index Args Result)
+    (contracts : (index : Index) → Contract State (Args index) (Result index))
+    (step : ∀ recursive,
+      (∀ index, Satisfies (recursive index) (contracts index)) →
+      ∀ index, Satisfies (body recursive index) (contracts index)) :
+    ∀ index, Satisfies (Spec.fixFamily body index) (contracts index) := by
+  have approximates : ∀ fuel index,
+      Satisfies (Spec.fixFamilyApprox body fuel index) (contracts index) := by
+    intro fuel
+    induction fuel with
+    | zero =>
+        intro index
+        exact satisfies_bottom (contracts index)
+    | succ fuel induction =>
+        simpa [Spec.fixFamilyApprox] using
+          step (Spec.fixFamilyApprox body fuel) induction
+  intro index args initial permitted
+  refine ⟨?_, ?_, ?_⟩
+  · intro result final execution
+    obtain ⟨fuel, execution⟩ := execution
+    exact (approximates fuel index args initial permitted).1 result final execution
+  · intro code execution
+    obtain ⟨fuel, execution⟩ := execution
+    exact (approximates fuel index args initial permitted).2.1 code execution
+  · rintro ⟨fuel, obligation⟩
+    exact (approximates fuel index args initial permitted).2.2 obligation
+
 /-- Use an already established contract as the weakest-precondition fact for
 one concrete call. This avoids manually projecting normal and abort halves.
 The callee's postcondition speaks only where its declared aborts are ruled
@@ -252,6 +284,27 @@ theorem satisfies_fix_of_wp
   intro recursive recursiveVerified
   exact satisfies_of_wp (body recursive) contract
     (step recursive recursiveVerified)
+
+/-- The weakest-precondition form of mutual fixed-point induction. -/
+theorem satisfies_fixFamily_of_wp
+    (body : Spec.Family State Index Args Result →
+      Spec.Family State Index Args Result)
+    (contracts : (index : Index) → Contract State (Args index) (Result index))
+    (step : ∀ recursive,
+      (∀ index, Satisfies (recursive index) (contracts index)) →
+      ∀ index args initial, (contracts index).requires args initial →
+        wp (body recursive index args)
+          (fun result final =>
+            (¬(contracts index).mayAbort args initial →
+              (contracts index).ensures args initial result final) ∧
+            (contracts index).frame args initial final)
+          ((contracts index).aborts args initial)
+          initial) :
+    ∀ index, Satisfies (Spec.fixFamily body index) (contracts index) := by
+  apply satisfies_fixFamily body contracts
+  intro recursive recursiveVerified index
+  exact satisfies_of_wp (body recursive index) (contracts index)
+    (step recursive recursiveVerified index)
 
 /-- Deterministic helper WP, used only to embed test computations into the
 authoritative relational semantics. -/

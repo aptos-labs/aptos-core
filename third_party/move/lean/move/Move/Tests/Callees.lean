@@ -15,6 +15,10 @@ module Callees where
   struct Counter has Key where
     value : U64
 
+  struct PairValues has Copy, Drop, Store where
+    left : U64
+    right : U64
+
   /-! ## Callees with a mutable-reference parameter -/
 
   fun bump (slot : &mut U64) : Action Unit := do
@@ -66,6 +70,28 @@ module Callees where
 
   verify take_and_bump
 
+  -- Multiple mutable parameters have independent prophecies.  The callee's
+  -- source semantics returns both final referents in declaration order, and
+  -- a caller writes both values back before continuing.
+  fun set_pair (left : &mut U64) (right : &mut U64) : Action Unit := do
+    left := 10
+    right := 20
+
+  spec set_pair (left : &mut U64) (right : &mut U64) where
+    ensures left = 10 ∧ right = 20;
+    aborts_if False
+
+  verify set_pair
+
+  fun forward_set_pair (left : &mut U64) (right : &mut U64) : Action Unit := do
+    set_pair left right
+
+  spec forward_set_pair (left : &mut U64) (right : &mut U64) where
+    ensures left = 10 ∧ right = 20;
+    aborts_if False
+
+  verify forward_set_pair
+
   -- A recursive callee with a mutable-reference parameter: the fixed point
   -- carries the reference's value through each call.
   partial fun drain (slot : &mut U64) : Action Unit := do
@@ -96,6 +122,111 @@ module Callees where
         exact ⟨by rw [← hfuture]; exact hvalue, hfinal⟩
       · intro code h
         exact h
+
+  -- Once a recursive callee is verified, automatic caller verification uses
+  -- that contract without unfolding the callee's fixed point.
+  fun call_drain (slot : &mut U64) : Action Unit := do
+    drain slot
+
+  spec call_drain (slot : &mut U64) where
+    ensures slot = 0;
+    aborts_if False
+
+  verify call_drain
+
+  /-! ## Mutually recursive effectful callees -/
+
+  mutual
+    partial fun mutual_ping (value : U64) : Action U64 := do
+      if value == 0 then return 0
+      mutual_pong (value - 1)
+
+    partial fun mutual_pong (value : U64) : Action U64 := do
+      if value == 0 then return 1
+      mutual_ping (value - 1)
+  end
+
+  spec mutual_ping (value : U64) where
+    ensures True;
+    aborts_if False
+
+  spec mutual_pong (value : U64) where
+    ensures True;
+    aborts_if False
+
+  verify mutual_ping by
+    contract_intro
+    all_goals
+      rw [Move.Verify.wp_ite]
+      split <;> simp [wp_norm, move_norm]
+    all_goals
+      rename_i hzero
+      constructor
+      · intro _
+        first
+        | simpa [mutual_pingMutualArgs, mutual_pingMutualResult,
+            mutual_ping.contractSpec, mutual_pong.contractSpec] using
+            (Move.Verify.wp_of_satisfies
+              (recursiveVerified mutual_pingMutualIndex.member0)
+              (by simp [mutual_ping.contractSpec, mutual_pong.contractSpec])
+              (by simp [mutual_ping.contractSpec, mutual_pong.contractSpec]))
+        | simpa [mutual_pingMutualArgs, mutual_pingMutualResult,
+            mutual_ping.contractSpec, mutual_pong.contractSpec] using
+            (Move.Verify.wp_of_satisfies
+              (recursiveVerified mutual_pingMutualIndex.member1)
+              (by simp [mutual_ping.contractSpec, mutual_pong.contractSpec])
+              (by simp [mutual_ping.contractSpec, mutual_pong.contractSpec]))
+      · rw [Move.Verify.Source.logicalBEq_uint] at hzero
+        simpa using hzero
+
+  verify mutual_pong by
+    contract_intro
+    all_goals
+      rw [Move.Verify.wp_ite]
+      split <;> simp [wp_norm, move_norm]
+    all_goals
+      rename_i hzero
+      constructor
+      · intro _
+        first
+        | simpa [mutual_pingMutualArgs, mutual_pingMutualResult,
+            mutual_ping.contractSpec, mutual_pong.contractSpec] using
+            (Move.Verify.wp_of_satisfies
+              (recursiveVerified mutual_pingMutualIndex.member0)
+              (by simp [mutual_ping.contractSpec, mutual_pong.contractSpec])
+              (by simp [mutual_ping.contractSpec, mutual_pong.contractSpec]))
+        | simpa [mutual_pingMutualArgs, mutual_pingMutualResult,
+            mutual_ping.contractSpec, mutual_pong.contractSpec] using
+            (Move.Verify.wp_of_satisfies
+              (recursiveVerified mutual_pingMutualIndex.member1)
+              (by simp [mutual_ping.contractSpec, mutual_pong.contractSpec])
+              (by simp [mutual_ping.contractSpec, mutual_pong.contractSpec]))
+      · rw [Move.Verify.Source.logicalBEq_uint] at hzero
+        simpa using hzero
+
+  -- The family index is dependent: members may have different arguments and
+  -- results. Merely declaring both contracts typechecks the heterogeneous
+  -- projections generated from the shared fixed point.
+  mutual
+    partial fun heterogeneous_flag (value : U64) : Action Bool := do
+      if value == 0 then return true
+      let _ ← heterogeneous_count false
+      return false
+
+    partial fun heterogeneous_count (flag : Bool) : Action U64 := do
+      if flag then
+        let _ ← heterogeneous_flag 0
+        return 1
+      return 0
+  end
+
+  spec heterogeneous_flag (value : U64) where
+    ensures True;
+    aborts_if False
+
+  spec heterogeneous_count (flag : Bool) where
+    ensures True;
+    aborts_if False
 
   /-! ## Pure callees -/
 
@@ -144,6 +275,16 @@ module Callees where
   fun calls_recursive (value : U64) : Action U64 :=
     pure (sum_down value)
 
+  fun run_set_pair : Action U64 := do
+    let pair : PairValues := { left := 1, right := 2 }
+    let pairRef ← &mut pair
+    let left ← &mut pairRef.left
+    let right ← &mut pairRef.right
+    set_pair left right
+    let leftValue ← *left
+    let rightValue ← *right
+    pure (leftValue + rightValue)
+
   /-! ## Tests -/
 
   def compiled : MoveModel.IR.Module := lowerToIR ``Callees
@@ -159,3 +300,6 @@ module Callees where
   #test run "helper_condition" [] [.u64 3] = Tests.okU64 2
   #test run "embedded_helper" [] [.u64 3] = Tests.okU64 5
   #test run "calls_recursive" [] [.u64 3] = Tests.okU64 6
+  #test run "run_set_pair" [] [] = Tests.okU64 30
+  #test run "mutual_ping" [] [.u64 4] = Tests.okU64 0
+  #test run "mutual_pong" [] [.u64 4] = Tests.okU64 1

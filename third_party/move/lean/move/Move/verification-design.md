@@ -761,9 +761,9 @@ theorem.
 - Interpret direct self-recursion by existential finite unfolding and expose
   fixed-point induction through `Move.Verify.satisfies_fix`. Ordinary calls
   and explicit `continue` calls share this semantics.
-- Extend the fixed-point construction from one function to mutually recursive
-  strongly connected components and add loop-invariant automation. This item
-  remains open.
+- Mutually recursive strongly connected components use one heterogeneous
+  `Spec.fixFamily`; `contract_intro` exposes the family-wide induction step.
+  General loop-invariant inference remains future work.
 
 ### 7. Compiler correctness — not implemented
 

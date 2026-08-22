@@ -785,6 +785,16 @@ private def desugarPositionalStruct (stx : Syntax) : MacroM (Array Syntax) := do
 /-- Rewrite one module-scoped keyword item to its attributed core
 declaration, followed by a registration command when the item carries
 user-provided attributes. Ordinary commands pass through unchanged. -/
+private partial def globalInvariantFamilyHead
+    (family : TSyntax `term) : MacroM (TSyntax `ident) := do
+  let stx := family.raw
+  if stx.isIdent then return ⟨stx⟩
+  if stx.isOfKind ``Lean.Parser.Term.paren && stx.getNumArgs > 1 then
+    return ← globalInvariantFamilyHead ⟨stx[1]⟩
+  if stx.isOfKind ``Lean.Parser.Term.app && stx.getNumArgs == 2 then
+    return ← globalInvariantFamilyHead ⟨stx[0]⟩
+  Macro.throwErrorAt family "a global invariant resource family must have a named type head"
+
 private def desugarModuleItem (invariants : Array (Name × Array Syntax))
     (stx : Syntax) : MacroM (Array Syntax) := do
   if stx.isOfKind ``moveFriendDeclItem then
@@ -805,6 +815,7 @@ private def desugarModuleItem (invariants : Array (Name × Array Syntax))
     let mut commands : Array Syntax := #[]
     for (clause, index) in clauses.zipIdx do
       let (isUpdate, families, addr, atBody) ← Move.Spec.elabGlobalInvariantClause clause
+      let familyHeads ← families.mapM globalInvariantFamilyHead
       let stateType := mkIdentFrom clause `_moveSpecS
       let state := mkIdentFrom clause `_moveSpecState
       let pre := mkIdentFrom clause `_moveSpecPre
@@ -824,10 +835,11 @@ private def desugarModuleItem (invariants : Array (Name × Array Syntax))
       let suffix := if index == 0 then "" else s!"_{index}"
       let base := if isUpdate then "GlobalUpdate" else "GlobalInvariant"
       let firstFamily := families[0]!
+      let firstHead := familyHeads[0]!
       let name := mkIdentFrom firstFamily
-        (Name.mkSimple s!"{base}_{firstFamily.getId.getString!}{suffix}")
+        (Name.mkSimple s!"{base}_{firstHead.getId.getString!}{suffix}")
       let atName := mkIdentFrom firstFamily
-        (Name.mkSimple s!"{base}_{firstFamily.getId.getString!}{suffix}_at")
+        (Name.mkSimple s!"{base}_{firstHead.getId.getString!}{suffix}_at")
       -- Per-address predicate `guard → body`, and the invariant as its `∀`.
       -- The invariant is `irreducible` so the shared finisher never expands the
       -- quantifier (which would make `grind`/`simp` explode); the only way to
@@ -850,19 +862,19 @@ private def desugarModuleItem (invariants : Array (Name × Array Syntax))
       let hyp := mkIdentFrom clause `_moveSpecReHyp
       let framed := mkIdentFrom clause `_moveSpecReFramed
       let changed := mkIdentFrom clause `_moveSpecReChanged
-      for family in families do
+      for (family, familyHead) in families.zip familyHeads do
         -- Independence of every *other* named family from the written one, so
         -- their stored values frame across this write.
         let mut indepBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) := #[]
-        for other in families do
-          unless other.getId == family.getId do
+        for (other, otherHead) in families.zip familyHeads do
+          unless otherHead.getId == familyHead.getId do
             indepBinders := indepBinders.push
               (← `(bracketedBinder|
                 [Move.Semantics.IndependentResourceStores $stateType $family $other]))
         for isErase in #[false, true] do
           let verb := if isErase then "erase" else "insert"
           let lemmaName := mkIdentFrom family (Name.mkSimple
-            s!"{base}_{firstFamily.getId.getString!}{suffix}_{verb}_{family.getId.getString!}")
+            s!"{base}_{firstHead.getId.getString!}{suffix}_{verb}_{familyHead.getId.getString!}")
           let changedState : TSyntax `term ←
             if isErase then
               `(Move.Semantics.ResourceStore.erase (State := $stateType)
@@ -922,11 +934,11 @@ private def desugarModuleItem (invariants : Array (Name × Array Syntax))
                      $indepLemma:simpLemma] at $framed:ident ⊢;
                    exact $framed))
           commands := commands.push lemmaCommand.raw
-      for family in families do
+      for familyHead in familyHeads do
         let registration ← if isUpdate then
-            `(#register_move_global_invariant update $family $name $families*)
+            `(#register_move_global_invariant update $familyHead $name $familyHeads*)
           else
-            `(#register_move_global_invariant $family $name $families*)
+            `(#register_move_global_invariant $familyHead $name $familyHeads*)
         commands := commands.push registration.raw
     return commands
   if stx.isOfKind ``movePositionalStructItem then

@@ -183,19 +183,15 @@ module SourceVerificationRejection where
 
   mutual
     partial fun ping (value : U64) : U64 :=
-      if value < 1 then 0 else pong (value - 1)
+      if value == 0 then 0 else pong (value - 1)
 
     partial fun pong (value : U64) : U64 :=
-      if value < 1 then 1 else ping (value - 1)
+      if value == 0 then 1 else ping (value - 1)
   end
 
   fun calls_mutual (value : U64) : Action U64 :=
     pure (ping value)
 
-  /--
-  error: mutually recursive Move functions are not yet supported by automatic source specifications (`Tests.MovePrograms.Calls.Rejection.SourceVerificationRejection.ping`)
-  -/
-  #guard_msgs in
   spec calls_mutual (value : U64) where
     ensures True;
     aborts_if False

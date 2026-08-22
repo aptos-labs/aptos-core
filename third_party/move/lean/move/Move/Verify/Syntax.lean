@@ -687,6 +687,8 @@ private structure TranslationContext where
   resources : Array ResourceBinding
   functionName : Name
   recursiveSpec? : Option (TSyntax `term) := none
+  /-- Recursive entry points for every member of the current mutual SCC. -/
+  recursiveSpecs : Array (Name × TSyntax `term) := #[]
   mutation? : Option (TSyntax `ident) := none
   /-- The type of the active mutation's referent, when source translation can
   name it: the resource of a global borrow, the declared referent of the
@@ -700,6 +702,10 @@ private structure TranslationContext where
   /-- Other live focused mutations surrounding the active one. Their values
   remain readable while a disjoint sibling loan is active. -/
   mutationRefs : List (TSyntax `ident) := []
+  /-- The mutable parameters opened at the function boundary, in source
+  order.  A nested field loan temporarily replaces `mutation?`, but the
+  function result must still return every root mutation. -/
+  rootMutations : Array (TSyntax `ident) := #[]
   /-- Field paths currently checked out from each owner. Only paths with
   distinct first fields can be borrowed as siblings. -/
   mutationLoans : List (Name × List Name) := []
@@ -742,6 +748,16 @@ private def mutationValue (context : TranslationContext)
   if context.mutationRefs.any (·.getId == owner.getId) then
     return ← `(Move.Semantics.Mutation.read $owner)
   pure ⟨owner.raw⟩
+
+private def liveMutations (context : TranslationContext) : List (TSyntax `ident) :=
+  context.mutation?.toList ++ context.mutationRefs
+
+private def liveMutation? (context : TranslationContext)
+    (term : TSyntax `term) : Option (TSyntax `ident) :=
+  if term.raw.isIdent then
+    liveMutations context |>.find? (·.getId == term.raw.getId)
+  else
+    none
 
 private def dereferenceValue (context : TranslationContext)
     (reference : TSyntax `term) : CommandElabM (TSyntax `term) := do
@@ -1046,7 +1062,7 @@ private def vectorSearchCall? (term : TSyntax `term) :
     return some (.indexOf arguments[0]! arguments[1]!)
   return none
 
-private partial def rewritePure (mutation? : Option (TSyntax `ident))
+private partial def rewritePure (mutations : List (TSyntax `ident))
     (term : TSyntax `term) : CommandElabM (TSyntax `term) := do
   ensureSupportedSourceTerm term
   if containsArithmetic term.raw || (← containsCheckedArithmeticCall term.raw) then
@@ -1055,11 +1071,11 @@ private partial def rewritePure (mutation? : Option (TSyntax `ident))
   if let some search ← vectorSearchCall? term then
     match search with
     | .contains values value =>
-        return ← `(vectorContains $(← rewritePure mutation? values)
-          $(← rewritePure mutation? value))
+        return ← `(vectorContains $(← rewritePure mutations values)
+          $(← rewritePure mutations value))
     | .indexOf values value =>
-        return ← `(vectorIndexOf $(← rewritePure mutation? values)
-          $(← rewritePure mutation? value))
+        return ← `(vectorIndexOf $(← rewritePure mutations values)
+          $(← rewritePure mutations value))
   if let some functionName ← nestedPureMoveCall? term.raw then
     throwErrorAt term
       "automatic source specifications do not yet model pure Move callee `{functionName}`; inline it or omit `verify`"
@@ -1070,38 +1086,33 @@ private partial def rewritePure (mutation? : Option (TSyntax `ident))
         let owner := mkIdentFrom value (Name.mkSimple parts.head!)
         let fields := parts.tail.toArray.map fun field =>
           mkIdentFrom value (Name.mkSimple field)
-        let ownerTerm ← if let some mutation := mutation? then
-          if mutation.getId == owner.getId then
-            `(Move.Semantics.Mutation.read $owner)
-          else
-            pure ⟨owner.raw⟩
-        else
-          pure ⟨owner.raw⟩
+        let ownerTerm ← if mutations.any (·.getId == owner.getId) then
+          `(Move.Semantics.Mutation.read $owner)
+        else pure ⟨owner.raw⟩
         return ← projectPath ownerTerm fields
-      if let some mutation := mutation? then
-        if value.getId == mutation.getId then
-          return ← `(Move.Semantics.Mutation.read $value)
+      if mutations.any (·.getId == value.getId) then
+        return ← `(Move.Semantics.Mutation.read $value)
       pure term
   | `(* $reference:term) =>
-      if let some mutation := mutation? then
-        if reference.raw.isIdent && reference.raw.getId == mutation.getId then
-          return ← `(Move.Semantics.Mutation.read $reference)
-      rewritePure mutation? reference
-  | `(($value:term)) => `(($(← rewritePure mutation? value)))
+      if reference.raw.isIdent &&
+          mutations.any (·.getId == reference.raw.getId) then
+        return ← `(Move.Semantics.Mutation.read $reference)
+      rewritePure mutations reference
+  | `(($value:term)) => `(($(← rewritePure mutations value)))
   | `($lhs:term < $rhs:term) =>
-      `(logicalLT $(← rewritePure mutation? lhs) $(← rewritePure mutation? rhs))
+      `(logicalLT $(← rewritePure mutations lhs) $(← rewritePure mutations rhs))
   | `($lhs:term <= $rhs:term) =>
-      `(logicalLE $(← rewritePure mutation? lhs) $(← rewritePure mutation? rhs))
+      `(logicalLE $(← rewritePure mutations lhs) $(← rewritePure mutations rhs))
   -- `>`, `>=`, `!=` are the flipped and negated comparisons: the same sealed
   -- markers, so no instance of the host's is consulted.
   | `($lhs:term > $rhs:term) =>
-      `(logicalLT $(← rewritePure mutation? rhs) $(← rewritePure mutation? lhs))
+      `(logicalLT $(← rewritePure mutations rhs) $(← rewritePure mutations lhs))
   | `($lhs:term >= $rhs:term) =>
-      `(logicalLE $(← rewritePure mutation? rhs) $(← rewritePure mutation? lhs))
+      `(logicalLE $(← rewritePure mutations rhs) $(← rewritePure mutations lhs))
   | `($lhs:term == $rhs:term) =>
-      `(logicalBEq $(← rewritePure mutation? lhs) $(← rewritePure mutation? rhs))
+      `(logicalBEq $(← rewritePure mutations lhs) $(← rewritePure mutations rhs))
   | `($lhs:term != $rhs:term) =>
-      `(!logicalBEq $(← rewritePure mutation? lhs) $(← rewritePure mutation? rhs))
+      `(!logicalBEq $(← rewritePure mutations lhs) $(← rewritePure mutations rhs))
   | _ => pure term
 
 private inductive VectorMutationCall where
@@ -1345,8 +1356,20 @@ private def finish (context : TranslationContext) (valueSpec : TSyntax `term) :
   match context.mutation? with
   | none => pure valueSpec
   | some mutation =>
+      let finalMutations ←
+        if context.rootMutations.any (·.getId == mutation.getId) then
+          match context.rootMutations.size with
+          | 1 => pure (⟨context.rootMutations[0]!.raw⟩ : TSyntax `term)
+          | 2 =>
+              let first : TSyntax `term := ⟨context.rootMutations[0]!.raw⟩
+              let second : TSyntax `term := ⟨context.rootMutations[1]!.raw⟩
+              `(($first, $second))
+          | _ => throwError
+              "automatic source specifications support at most two mutable-reference parameters"
+        else
+          pure ⟨mutation.raw⟩
       `(Move.Semantics.Spec.bind $valueSpec fun _moveSpecValue =>
-          Move.Semantics.Spec.pure (_moveSpecValue, $mutation))
+          Move.Semantics.Spec.pure (_moveSpecValue, $finalMutations))
 
 private partial def packLoopState (ids : List (TSyntax `ident)) :
     CommandElabM (TSyntax `term) := do
@@ -1605,7 +1628,7 @@ structure SourceSignature where
   context : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) := #[]
   arguments : Array (TSyntax `ident) := #[]
   types : Array (TSyntax `term) := #[]
-  mutableParameter? : Option (TSyntax `ident × TSyntax `term) := none
+  mutableParameters : Array (TSyntax `ident × TSyntax `term) := #[]
 
 /-- The source signature of a Move function, from its elaborated type: what a
 `spec` command's binders state, derived when a callee has no `spec` yet. -/
@@ -1629,7 +1652,7 @@ private def signatureOf (functionName : Name) : CommandElabM SourceSignature :=
               signature := { signature with
                 arguments := signature.arguments.push ident
                 types := signature.types.push referent
-                mutableParameter? := some (ident, referent) }
+                mutableParameters := signature.mutableParameters.push (ident, referent) }
             else if type.isAppOfArity ``Move.Ref 1 &&
                 !type.appArg!.isConstOf ``Move.Signer then
               -- An immutable reference is the observed value; a signer
@@ -1757,6 +1780,16 @@ private def argumentType (types : Array (TSyntax `term)) : MacroM (TSyntax `term
       let result := reversed.head!
       reversed.tail.foldlM (init := result) fun result type => `($type × $result)
 
+private def sourceResultType (resultType : TSyntax `term)
+    (mutableParameters : Array (TSyntax `ident × TSyntax `term)) :
+    MacroM (TSyntax `term) := do
+  if mutableParameters.isEmpty then return resultType
+  if mutableParameters.size > 2 then
+    Macro.throwError
+      "automatic source specifications support at most two mutable-reference parameters"
+  let referents ← argumentType (mutableParameters.map (·.2))
+  `($resultType × $referents)
+
 private def argumentProjection (base : TSyntax `term) (index count : Nat) :
     MacroM (TSyntax `term) := do
   let mut projection := base
@@ -1779,6 +1812,26 @@ private def unpackArguments (arguments : Array (TSyntax `ident))
         result ← `(let $argument := $projection; $result)
       `(fun $args => $result)
 
+private structure MutualFamilyInfo where
+  anchor : Name
+  indexType : Name
+  argsFamily : Name
+  resultFamily : Name
+  body : Name
+  source : Name
+  members : Array Name
+  constructors : Array Name
+  deriving Inhabited
+
+private initialize mutualFamilies :
+    SimplePersistentEnvExtension (Name × MutualFamilyInfo) (NameMap MutualFamilyInfo) ←
+  registerSimplePersistentEnvExtension {
+    addEntryFn := fun map (name, info) => map.insert name info
+    addImportedFn := fun entries =>
+      mkStateFromImportedEntries
+        (fun map (name, info) => map.insert name info) {} entries
+  }
+
 mutual
 /-- Translate pure positions that may embed sequenced operations.  The
 effectful subterms of `terms` are hoisted into bindings, in evaluation order,
@@ -1793,7 +1846,7 @@ private partial def withHoisted (context : TranslationContext)
   for term in terms do
     let (more, residual) ← hoistEffects term.raw bindings.size
     bindings := bindings ++ more
-    residuals := residuals.push (← rewritePure context.mutation? ⟨residual⟩)
+    residuals := residuals.push (← rewritePure (liveMutations context) ⟨residual⟩)
   let mut result ← build residuals
   for (hoisted, operation) in bindings.reverse do
     result ← `(Move.Semantics.Spec.bind $(← expressionSpec context operation)
@@ -1811,7 +1864,8 @@ translating the call writes that final value back into the reference.  This
 is the prophecy-passing summary of `verification-design.md`: the caller
 suspends its owner with the callee's final value and resumes with it. -/
 private partial def moveCallSpec? (context : TranslationContext)
-    (term : TSyntax `term) : CommandElabM (Option (TSyntax `term × Bool)) := do
+    (term : TSyntax `term) :
+    CommandElabM (Option (TSyntax `term × Array (TSyntax `ident))) := do
   let (head, arguments, markedContinue) ← match term with
     | `(continue $head:term $arguments:term*) =>
         pure (head, arguments, true)
@@ -1833,30 +1887,27 @@ private partial def moveCallSpec? (context : TranslationContext)
   let mutablePositions ← mutableParameterPositions functionName
   let mut valueNames : Array (TSyntax `term) := #[]
   let mut argumentSpecs : Array (TSyntax `term × TSyntax `ident) := #[]
-  let mut passesMutable := false
+  let mut passedMutations : Array (TSyntax `ident) := #[]
   for (argument, index) in arguments.zipIdx do
     let valueName := mkIdentFrom argument (Name.mkSimple s!"_moveSpecCallArg{index}")
     valueNames := valueNames.push ⟨valueName.raw⟩
     if mutablePositions.contains index then
-      let some mutation := context.mutation?
+      let some mutation := liveMutation? context argument
         | throwErrorAt argument
             "a mutable-reference argument must be a live mutable reference: bind the place with `let r ← &mut …` first"
-      unless argument.raw.isIdent && argument.raw.getId == mutation.getId do
-        throwErrorAt argument
-          "a mutable-reference argument must be the live mutable reference `{mutation.getId}`"
-      if passesMutable then
+      if passedMutations.any (·.getId == mutation.getId) then
         throwErrorAt argument
           "a call may pass the live mutable reference `{mutation.getId}` only once"
-      passesMutable := true
+      passedMutations := passedMutations.push mutation
       let current ← `(Move.Semantics.Spec.pure (Move.Semantics.Mutation.read $mutation))
       argumentSpecs := argumentSpecs.push (current, valueName)
     else
       argumentSpecs := argumentSpecs.push (← expressionSpec context argument, valueName)
   let packed ← packCallArguments term.raw valueNames
-  let mut call ← if functionName == context.functionName then
-    let some recursiveSpec := context.recursiveSpec?
-      | throwErrorAt term
-          "recursive Move call requires generated fixed-point source semantics"
+  let recursiveSpec? := match context.recursiveSpecs.find? (·.1 == functionName) with
+    | some (_, recursiveSpec) => some recursiveSpec
+    | none => if functionName == context.functionName then context.recursiveSpec? else none
+  let mut call ← if let some recursiveSpec := recursiveSpec? then
     `($recursiveSpec $packed)
   else do
     if markedContinue then
@@ -1866,7 +1917,7 @@ private partial def moveCallSpec? (context : TranslationContext)
     `($sourceSpec $namedArguments* $packed)
   for (argumentSpec, valueName) in argumentSpecs.reverse do
     call ← `(Move.Semantics.Spec.bind $argumentSpec fun $valueName => $call)
-  return some (call, passesMutable)
+  return some (call, passedMutations)
 
 /-- Translate an expression in value position. Arithmetic is sequenced
 relationally so overflow, underflow, and division by zero remain observable;
@@ -1887,7 +1938,7 @@ private partial def expressionSpec (context : TranslationContext)
     let rec translateBody (body : TSyntax `term) : CommandElabM (TSyntax `term) := do
       match body with
       | `(if $condition:term then $thenBranch:term else $elseBranch:term) =>
-          let condition ← rewritePure context.mutation? condition
+          let condition ← rewritePure (liveMutations context) condition
           let thenSpec ← expressionSpec context thenBranch
           let elseSpec ← translateBody elseBranch
           `(if $condition then $thenSpec else $elseSpec)
@@ -1946,7 +1997,7 @@ private partial def expressionSpec (context : TranslationContext)
         | .str base "cast" =>
             let operand : TSyntax `term :=
               ⟨mkIdentFrom value.raw base⟩
-            let operand ← rewritePure context.mutation? operand
+            let operand ← rewritePure (liveMutations context) operand
             ``((Move.Semantics.Checked.castSpec $operand :
                 Move.Semantics.Spec _ $type))
         | _ =>
@@ -2002,8 +2053,8 @@ private partial def expressionSpec (context : TranslationContext)
         let valuesSpec ← expressionSpec context values
         `(Move.Semantics.Spec.bind $valuesSpec fun _moveSpecValues =>
             Move.Semantics.Vector.destroyEmptySpec _moveSpecValues)
-      else if let some (call, passesMutable) ← moveCallSpec? context term then
-        if passesMutable then
+      else if let some (call, passedMutations) ← moveCallSpec? context term then
+        if !passedMutations.isEmpty then
           throwErrorAt term
             "a call passing a mutable reference must be a `do` statement or bound with `let`"
         pure call
@@ -2024,15 +2075,14 @@ private partial def generateSourceSpec (function : TSyntax `ident)
   let bodySpecName := mkIdentFrom function (function.getId ++ `bodySpec)
   let argsType ← liftMacroM <| argumentType signature.types
   let resultType ← resultTypeOf function.raw
-  let sourceResultType ← match signature.mutableParameter? with
-    | none => pure resultType
-    | some (_, referent) => `($resultType × $referent)
+  let sourceResultType ← liftMacroM <|
+    sourceResultType resultType signature.mutableParameters
   let recursive ← isRecursive function.raw
   let recursiveName := mkIdentFrom function `_moveSpecRecursive
   let recursiveTerm : TSyntax `term := ⟨recursiveName.raw⟩
   let (body, _) ← translateWithStores function.raw world resourceTypes
     (if recursive then some recursiveTerm else none)
-    signature.mutableParameter?
+    signature.mutableParameters
   let sourceLambda ← liftMacroM <| unpackArguments signature.arguments body
   let worldBinder ← `(bracketedBinder| {$world : Type})
   let mut storeBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) := #[]
@@ -2059,6 +2109,148 @@ private partial def generateSourceSpec (function : TSyntax `ident)
         $sourceLambda)
     elabCommand sourceCommand
 
+private partial def calleesOf (functionName : Name) : CommandElabM (Array Name) := do
+  let some declaration := declarations.getState (← getEnv) |>.find? functionName
+    | return #[]
+  let body ← sourceBody declaration
+  let namespace_ := functionName.getPrefix
+  withScope (fun scope => { scope with currNamespace := namespace_ }) do
+    collectCallees body.raw
+
+private partial def reachableFrom (start : Name) : CommandElabM (Array Name) := do
+  let rec visit (pending visited : Array Name) : CommandElabM (Array Name) := do
+    let some current := pending[0]? | return visited
+    let pending := pending.extract 1 pending.size
+    if visited.contains current then return ← visit pending visited
+    let visited := visited.push current
+    let callees ← calleesOf current
+    visit (pending ++ callees) visited
+  visit #[start] #[]
+
+/-- The strongly connected component containing `functionName`, computed
+from retained Move call syntax. -/
+private partial def recursiveComponent (functionName : Name) : CommandElabM (Array Name) := do
+  let forward ← reachableFrom functionName
+  let mut component := #[]
+  for candidate in forward do
+    if (← reachableFrom candidate).contains functionName then
+      component := component.push candidate
+  pure component
+
+/-- Generate one dependent `Spec.fixFamily` for a mutually recursive SCC and
+thin `f.sourceSpec` projections for each member. -/
+private partial def generateMutualSourceSpecs (members : Array Name)
+    (ref : Syntax) : CommandElabM Unit := do
+  let some anchor := members[0]? | return
+  let namespace_ := anchor.getPrefix
+  unless members.all (·.getPrefix == namespace_) do
+    throwErrorAt ref "mutually recursive Move functions must belong to one module"
+  withScope (fun scope => { scope with currNamespace := namespace_ }) do
+    let mut signatures : Array SourceSignature := #[]
+    for member in members do signatures := signatures.push (← signatureOf member)
+    let some firstSignature := signatures[0]? | return
+    let commonContext := firstSignature.context
+    unless signatures.all (·.context.map (·.raw) == commonContext.map (·.raw)) do
+      throwErrorAt ref
+        "mutually recursive generic functions must use the same type context"
+    let anchorShort := anchor.getString!
+    let indexIdent := mkIdentFrom ref (Name.mkSimple s!"{anchorShort}MutualIndex")
+    let argsIdent := mkIdentFrom ref (Name.mkSimple s!"{anchorShort}MutualArgs")
+    let resultIdent := mkIdentFrom ref (Name.mkSimple s!"{anchorShort}MutualResult")
+    let bodyIdent := mkIdentFrom ref (Name.mkSimple s!"{anchorShort}MutualBody")
+    let sourceIdent := mkIdentFrom ref (Name.mkSimple s!"{anchorShort}MutualSourceSpec")
+    let constructors := members.mapIdx fun index _ =>
+      mkIdentFrom ref (Name.mkSimple s!"member{index}")
+    let ctorDecls ← constructors.mapM fun constructor =>
+      `(Parser.Command.ctor| | $constructor:ident)
+    elabCommand (← `(inductive $indexIdent where $ctorDecls*))
+    let constructorTerms := constructors.map fun constructor =>
+      mkIdentFrom ref (indexIdent.getId ++ constructor.getId)
+    let mut argumentTypes : Array (TSyntax `term) := #[]
+    let mut resultTypes : Array (TSyntax `term) := #[]
+    for (signature, member) in signatures.zip members do
+      let argumentType ← liftMacroM <| argumentType signature.types
+      let short := mkIdentFrom ref (Name.mkSimple member.getString!)
+      let resultType ← resultTypeOf short.raw
+      let resultType ← liftMacroM <| sourceResultType resultType signature.mutableParameters
+      argumentTypes := argumentTypes.push argumentType
+      resultTypes := resultTypes.push resultType
+    let recursor := mkIdentFrom ref (indexIdent.getId ++ `rec)
+    let indexArg := mkIdentFrom ref `_moveSpecMutualIndex
+    let typeMotive ← `(fun (_ : $indexIdent) => Type)
+    let mut argumentFamily ← `(@$recursor:ident $typeMotive)
+    let mut resultFamily ← `(@$recursor:ident $typeMotive)
+    for argumentType in argumentTypes do argumentFamily ← `($argumentFamily $argumentType)
+    for resultType in resultTypes do resultFamily ← `($resultFamily $resultType)
+    argumentFamily ← `($argumentFamily $indexArg)
+    resultFamily ← `($resultFamily $indexArg)
+    elabCommand (← `(def $argsIdent $commonContext* ($indexArg : $indexIdent) : Type :=
+      $argumentFamily))
+    elabCommand (← `(def $resultIdent $commonContext* ($indexArg : $indexIdent) : Type :=
+      $resultFamily))
+    let world := mkIdentFrom ref `_moveSpecState
+    let resourceTypes ← inferredResources (mkIdentFrom ref
+      (Name.mkSimple anchor.getString!)).raw
+    let worldBinder ← `(bracketedBinder| {$world : Type})
+    let mut storeBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) := #[]
+    for (head, index) in (distinctHeads resourceTypes).zipIdx do
+      let storeName := mkIdentFrom ref (Name.mkSimple s!"_moveSpecStore{index}")
+      storeBinders := storeBinders.push (← `(bracketedBinder|
+        [$storeName : $(← storeType ⟨world⟩ head)]))
+    let recursive := mkIdentFrom ref `_moveSpecMutualRecursive
+    let familyType ← `(@Move.Semantics.Spec.Family $world $indexIdent
+      $argsIdent $resultIdent)
+    let mut recursiveSpecs : Array (Name × TSyntax `term) := #[]
+    for ((member, constructor), argumentType) in
+        members.zip constructorTerms |>.zip argumentTypes do
+      let recursiveArgs := mkIdentFrom ref `_moveSpecMutualArgs
+      let entry ← `(fun ($recursiveArgs : $argumentType) =>
+        $recursive $constructor $recursiveArgs)
+      recursiveSpecs := recursiveSpecs.push (member, entry)
+    let bodyArg := mkIdentFrom ref `_moveSpecMutualBodyArgs
+    let mut bodyBranches : Array (TSyntax `term) := #[]
+    for (((member, signature), argumentType), resultType) in
+        members.zip signatures |>.zip argumentTypes |>.zip resultTypes do
+      let short := mkIdentFrom ref (Name.mkSimple member.getString!)
+      let (translated, _) ← translateWithStores short.raw world resourceTypes none
+        signature.mutableParameters recursiveSpecs
+      let sourceLambda ← liftMacroM <| unpackArguments signature.arguments translated
+      let branch ← `(($sourceLambda : $argumentType →
+        Move.Semantics.Spec $world $resultType))
+      bodyBranches := bodyBranches.push branch
+    let bodyIndex := mkIdentFrom ref `_moveSpecMutualBodyIndex
+    let bodyMotive ← `(fun ($bodyIndex : $indexIdent) =>
+      $argsIdent $bodyIndex → Move.Semantics.Spec $world ($resultIdent $bodyIndex))
+    let mut bodyFamily ← `(@$recursor:ident $bodyMotive)
+    for branch in bodyBranches do bodyFamily ← `($bodyFamily $branch)
+    bodyFamily ← `($bodyFamily $bodyIndex)
+    bodyFamily ← `($bodyFamily $bodyArg)
+    let recursiveBinder ← `(bracketedBinder| ($recursive : $familyType))
+    elabCommand (← `(noncomputable def $bodyIdent $commonContext* $worldBinder
+      $storeBinders* $recursiveBinder : $familyType :=
+      fun $bodyIndex $bodyArg => $bodyFamily))
+    elabCommand (← `(noncomputable def $sourceIdent $commonContext* $worldBinder
+      $storeBinders* : $familyType := Move.Semantics.Spec.fixFamily $bodyIdent))
+    for ((((member, signature), constructor), argumentType), resultType) in
+        members.zip signatures |>.zip constructorTerms |>.zip argumentTypes |>.zip resultTypes do
+      let memberSource := mkIdentFrom ref
+        (Name.mkSimple member.getString! ++ `sourceSpec)
+      let memberArgs := mkIdentFrom ref `_moveSpecArgs
+      elabCommand (← `(noncomputable def $memberSource $signature.context* $worldBinder
+        $storeBinders* : $argumentType → Move.Semantics.Spec $world $resultType :=
+        fun $memberArgs => $sourceIdent $constructor $memberArgs))
+    let info : MutualFamilyInfo := {
+      anchor
+      indexType := namespace_ ++ indexIdent.getId
+      argsFamily := namespace_ ++ argsIdent.getId
+      resultFamily := namespace_ ++ resultIdent.getId
+      body := namespace_ ++ bodyIdent.getId
+      source := namespace_ ++ sourceIdent.getId
+      members
+      constructors := constructorTerms.map fun constructor =>
+        namespace_ ++ constructor.getId }
+    modifyEnv fun env => members.foldl (fun env member =>
+      mutualFamilies.addEntry env (member, info)) env
 /-- Make sure a Move callee has its relational semantics `f.sourceSpec`,
 generating it from the retained source and the elaborated signature when no
 `spec` has.  Generation happens in the callee's namespace, so the body's
@@ -2075,9 +2267,22 @@ private partial def ensureSourceSpec (functionName : Name) (ref : Syntax) :
   if (env.getModuleIdxFor? functionName).isSome then
     throwErrorAt ref
       "imported Move callee `{functionName}` has no source specification; declare its `spec` in its module"
+  let component ← recursiveComponent functionName
+  if component.size > 1 then
+    if component.any (← generationInProgress.get).contains then
+      throwErrorAt ref
+        "recursive source-specification generation re-entered mutual component containing `{functionName}`"
+    generationInProgress.modify fun active =>
+      component.foldl (fun active member => active.insert member) active
+    try
+      generateMutualSourceSpecs component ref
+    finally
+      generationInProgress.modify fun active =>
+        component.foldl (fun active member => active.erase member) active
+    return
   if (← generationInProgress.get).contains functionName then
     throwErrorAt ref
-      "mutually recursive Move functions are not yet supported by automatic source specifications (`{functionName}`)"
+      "recursive source-specification generation re-entered `{functionName}`"
   generationInProgress.modify (·.insert functionName)
   try
     let signature ← signatureOf functionName
@@ -2091,35 +2296,58 @@ private partial def ensureSourceSpec (functionName : Name) (ref : Syntax) :
 
 private partial def translate (function world : Syntax) (resources : Array ResourceBinding)
     (recursiveSpec? : Option (TSyntax `term) := none)
-    (mutableParameter? : Option (TSyntax `ident × TSyntax `term) := none) :
+    (mutableParameters : Array (TSyntax `ident × TSyntax `term) := #[])
+    (recursiveSpecs : Array (Name × TSyntax `term) := #[]) :
     CommandElabM (TSyntax `term × TSyntax `term) := do
   let declaration ← declarationFor function
   let resultType ← actionResultType declaration
   let body ← sourceBody declaration
   let functionName := (← getCurrNamespace) ++ function.getId
-  let mutationType? ← match mutableParameter? with
-    | none => pure none
-    | some (_, referent) => referentTypeName? referent
+  if mutableParameters.size > 2 then
+    throwErrorAt function
+      "automatic source specifications support at most two mutable-reference parameters"
+  let mutationTypes ← mutableParameters.mapM fun (_, referent) =>
+    referentTypeName? referent
+  let mutation? := mutableParameters[0]?.map (·.1)
+  let mutationType? := mutationTypes[0]?.join
+  let mutationRefs := mutableParameters.extract 1 mutableParameters.size |>.map (·.1) |>.toList
+  let mutationAncestors := (mutableParameters.extract 1 mutableParameters.size).zip
+    (mutationTypes.extract 1 mutationTypes.size) |>.map
+      (fun ((parameter, _), type?) => (parameter, type?)) |>.toList
   let spec ← translateTerm {
     world := ⟨world⟩
     resources
     functionName
     recursiveSpec?
-    mutation? := mutableParameter?.map (·.1)
+    recursiveSpecs
+    mutation?
     mutationType?
+    mutationAncestors
+    mutationRefs
+    rootMutations := mutableParameters.map (·.1)
   } body
-  match mutableParameter? with
-  | none => pure (spec, resultType)
-  | some (parameter, referent) =>
+  match mutableParameters.size with
+  | 0 => pure (spec, resultType)
+  | 1 =>
+      let (parameter, referent) := mutableParameters[0]!
       let wrapped ← `(Move.Semantics.withMutation $parameter
         (fun $parameter => $spec))
       pure (wrapped, ← `($resultType × $referent))
+  | 2 =>
+      let (first, firstType) := mutableParameters[0]!
+      let (second, secondType) := mutableParameters[1]!
+      let wrapped ← `(Move.Semantics.withMutations2 $first $second
+        (fun $first $second => $spec))
+      pure (wrapped, ← `($resultType × ($firstType × $secondType)))
+  | _ => throwErrorAt function
+      "automatic source specifications support at most two mutable-reference parameters"
 
 /-- Translate against the abstract compositional resource-store interface. -/
 private partial def translateWithStores (function : Syntax) (world : TSyntax `ident)
     (families : Array Family)
     (recursiveSpec? : Option (TSyntax `term) := none)
-    (mutableParameter? : Option (TSyntax `ident × TSyntax `term) := none) :
+    (mutableParameters : Array (TSyntax `ident × TSyntax `term) := #[])
+    (recursiveSpecs : Array (Name × TSyntax `term) := #[]) :
     CommandElabM (TSyntax `term × TSyntax `term) := do
   let mut resources : Array ResourceBinding := #[]
   for head in distinctHeads families do
@@ -2127,7 +2355,7 @@ private partial def translateWithStores (function : Syntax) (world : TSyntax `id
       head
       descriptorFor := fun family => `(Move.Semantics.ResourceStore.descriptor
         (State := $world) (Value := $(family.term))) }
-  translate function world.raw resources recursiveSpec? mutableParameter?
+  translate function world.raw resources recursiveSpec? mutableParameters recursiveSpecs
 
 /-- A mutable borrow of a global resource at `key`, focused through `fields`
 — none for the whole resource.  The resource is checked out by ownership for
@@ -2281,31 +2509,42 @@ private partial def elementMutableBorrow (context : TranslationContext)
 reference, when `term` is one; the caller resumes the reference with the
 callee's final referent. -/
 private partial def mutableCallSpec? (context : TranslationContext)
-    (term : TSyntax `term) : CommandElabM (Option (TSyntax `term)) := do
+    (term : TSyntax `term) :
+    CommandElabM (Option (TSyntax `term × Array (TSyntax `ident))) := do
   match ← moveCallSpec? context term with
-  | some (call, true) => return some call
+  | some (call, mutations) =>
+      if mutations.isEmpty then return none
+      return some (call, mutations)
   | _ => return none
+
+private partial def writeMutableCallOutputs (mutations : Array (TSyntax `ident))
+    (output : TSyntax `term) (continuation : TSyntax `term) :
+    CommandElabM (TSyntax `term) := do
+  let mut result := continuation
+  for (mutation, index) in mutations.zipIdx.reverse do
+    let finalValue ← if mutations.size == 1 then
+      `($output.2)
+    else
+      liftMacroM <| argumentProjection (← `($output.2)) index mutations.size
+    result ← `(let $mutation := Move.Semantics.Mutation.write $mutation $finalValue
+      $result)
+  pure result
 
 /-- Sequence a call passing the live mutable reference before `continuation`:
 the reference resumes with the callee's final referent, and the call's value
 is bound to `name?` when given. -/
-private partial def bindMutableCall (context : TranslationContext)
-    (call : TSyntax `term) (name? : Option (TSyntax `ident))
+private partial def bindMutableCall
+    (call : TSyntax `term) (mutations : Array (TSyntax `ident))
+    (name? : Option (TSyntax `ident))
     (continuation : TSyntax `term) : CommandElabM (TSyntax `term) := do
-  let some mutation := context.mutation?
-    | throwError "a call passing a mutable reference needs a live mutable reference"
   let output := mkIdentFrom call `_moveSpecCallOutput
   let outputTerm : TSyntax `term := ⟨output.raw⟩
+  let continuation ← match name? with
+    | some name => `(let $name := $outputTerm.1; $continuation)
+    | none => pure continuation
+  let continuation ← writeMutableCallOutputs mutations outputTerm continuation
   match name? with
-  | some name =>
-      `(Move.Semantics.Spec.bind $call (fun $output =>
-          let $name := $outputTerm.1
-          let $mutation := Move.Semantics.Mutation.write $mutation $outputTerm.2
-          $continuation))
-  | none =>
-      `(Move.Semantics.Spec.bind $call (fun $output =>
-          let $mutation := Move.Semantics.Mutation.write $mutation $outputTerm.2
-          $continuation))
+  | some _ | none => `(Move.Semantics.Spec.bind $call (fun $output => $continuation))
 
 private partial def vectorMutationSpec (context : TranslationContext)
     (mutation : TSyntax `ident) (call : VectorMutationCall) :
@@ -2429,13 +2668,12 @@ private partial def translateDo (context : TranslationContext)
     let assignment : TSyntax ``Lean.Parser.Term.doReassign := ⟨first.raw⟩
     match assignment with
     | `(doReassign| $name:ident $[: $_]? :=%$_ $rhs:term) =>
-        if let some mutation := context.mutation? then
-          if mutation.getId == name.getId then
-            let rhsSpec ← expressionSpec context rhs
-            let nested ← translateRest rest
-            return ← `(Move.Semantics.Spec.bind $rhsSpec fun _moveSpecValue =>
-                let $name := Move.Semantics.Mutation.write $name _moveSpecValue
-                $nested)
+        if (liveMutations context).any (·.getId == name.getId) then
+          let rhsSpec ← expressionSpec context rhs
+          let nested ← translateRest rest
+          return ← `(Move.Semantics.Spec.bind $rhsSpec fun _moveSpecValue =>
+              let $name := Move.Semantics.Mutation.write $name _moveSpecValue
+              $nested)
         let rhsSpec ← expressionSpec context rhs
         let nested ← translateRest rest
         return ← `(Move.Semantics.Spec.bind $rhsSpec fun $name => $nested)
@@ -2447,11 +2685,10 @@ private partial def translateDo (context : TranslationContext)
       throwErrorAt first "unsupported assignment in automatic source specification"
     let name : TSyntax `ident := ⟨declaration[0]⟩
     let value : TSyntax `term := ⟨declaration[3]⟩
-    if let some mutation := context.mutation? then
-      if mutation.getId == name.getId then
-        throwErrorAt first "a mutable reference cannot be rebound; write through it with `:=`"
-    if let some call ← mutableCallSpec? context value then
-      return ← bindMutableCall context call (some name) (← translateRest rest)
+    if (liveMutations context).any (·.getId == name.getId) then
+      throwErrorAt first "a mutable reference cannot be rebound; write through it with `:=`"
+    if let some (call, mutations) ← mutableCallSpec? context value then
+      return ← bindMutableCall call mutations (some name) (← translateRest rest)
     let valueSpec ← expressionSpec context value
     let nested ← translateRest rest
     return ← `(Move.Semantics.Spec.bind $valueSpec (fun $name => $nested))
@@ -2634,8 +2871,8 @@ private partial def translateDo (context : TranslationContext)
       let nested ← translateRest rest
       `(let $name := $(← dereferenceValue context reference); $nested)
   | `(doElem| let $name:ident ← $value:term) =>
-      if let some call ← mutableCallSpec? context value then
-        bindMutableCall context call (some name) (← translateRest rest)
+      if let some (call, mutations) ← mutableCallSpec? context value then
+        bindMutableCall call mutations (some name) (← translateRest rest)
       else if let some call ← vectorMutationCall? value then
         let some mutation := context.mutation?
           | throwErrorAt value
@@ -2696,8 +2933,8 @@ private partial def translateDo (context : TranslationContext)
       let nested ← translateRest rest
       `(Move.Semantics.Spec.bind $valueSpec (fun ($name : $type) => $nested))
   | `(doElem| let $name:ident : $type:term ← $value:term) =>
-      if let some call ← mutableCallSpec? context value then
-        bindMutableCall context call (some name) (← translateRest rest)
+      if let some (call, mutations) ← mutableCallSpec? context value then
+        bindMutableCall call mutations (some name) (← translateRest rest)
       else
         let valueSpec ← expressionSpec context value
         let nested ← translateRest rest
@@ -2711,8 +2948,8 @@ private partial def translateDo (context : TranslationContext)
       let nested ← translateRest rest
       `(Move.Semantics.Spec.bind $valueSpec (fun ($name : $type) => $nested))
   | `(doElem| let mut $name:ident : $type:term ← $value:term) =>
-      if let some call ← mutableCallSpec? context value then
-        bindMutableCall context call (some name) (← translateRest rest)
+      if let some (call, mutations) ← mutableCallSpec? context value then
+        bindMutableCall call mutations (some name) (← translateRest rest)
       else
         let valueSpec ← expressionSpec context value
         let nested ← translateRest rest
@@ -2721,8 +2958,8 @@ private partial def translateDo (context : TranslationContext)
       let nested ← translateRest rest
       `(let $name := $(← dereferenceValue context reference); $nested)
   | `(doElem| let mut $name:ident ← $value:term) =>
-      if let some call ← mutableCallSpec? context value then
-        bindMutableCall context call (some name) (← translateRest rest)
+      if let some (call, mutations) ← mutableCallSpec? context value then
+        bindMutableCall call mutations (some name) (← translateRest rest)
       else
         let valueSpec ← expressionSpec context value
         let nested ← translateRest rest
@@ -2800,19 +3037,16 @@ private partial def translateDo (context : TranslationContext)
         let effect ← translateTerm { context with mutation? := none, mutationType? := none } value
         let nested ← translateRest rest
         `(Move.Semantics.Spec.bind $effect (fun _moveSpecIgnored => $nested))
-      else if let some call ← mutableCallSpec? context value then
+      else if let some (call, mutations) ← mutableCallSpec? context value then
         if rest.isEmpty then
           -- The call's value is the statement's value.
           let output := mkIdentFrom value `_moveSpecCallValue
           let outputTerm : TSyntax `term := ⟨output.raw⟩
-          let some mutation := context.mutation?
-            | throwErrorAt value "a call passing a mutable reference needs a live mutable reference"
           let after ← finish context (← `(Move.Semantics.Spec.pure $outputTerm.1))
-          `(Move.Semantics.Spec.bind $call (fun $output =>
-              let $mutation := Move.Semantics.Mutation.write $mutation $outputTerm.2
-              $after))
+          let after ← writeMutableCallOutputs mutations outputTerm after
+          `(Move.Semantics.Spec.bind $call (fun $output => $after))
         else
-          bindMutableCall context call none (← translateRest rest)
+          bindMutableCall call mutations none (← translateRest rest)
       else if let some vectorCall ← vectorMutationCall? value then
         let some mutation := context.mutation?
           | throwErrorAt value "a mutating vector operation requires a live mutable vector borrow"
@@ -2941,21 +3175,14 @@ private partial def translateTerm (context : TranslationContext)
             (Move.Spec.abortCodeOf _moveSpecAbortCode))
   | `(pure $value:term) => finish context (← expressionSpec context value)
   | _ =>
-      if let some call ← mutableCallSpec? context term then
+      if let some (call, mutations) ← mutableCallSpec? context term then
         let output := mkIdentFrom term `_moveSpecCallValue
         let outputTerm : TSyntax `term := ⟨output.raw⟩
-        let some mutation := context.mutation?
-          | throwErrorAt term "a call passing a mutable reference needs a live mutable reference"
         let after ← finish context (← `(Move.Semantics.Spec.pure $outputTerm.1))
-        return ← `(Move.Semantics.Spec.bind $call (fun $output =>
-            let $mutation := Move.Semantics.Mutation.write $mutation $outputTerm.2
-            $after))
+        let after ← writeMutableCallOutputs mutations outputTerm after
+        return ← `(Move.Semantics.Spec.bind $call (fun $output => $after))
       let valueSpec ← expressionSpec context term
-      match context.mutation? with
-      | none => pure valueSpec
-      | some mutation =>
-          `(Move.Semantics.Spec.bind $valueSpec fun _moveSpecResult =>
-              Move.Semantics.Spec.pure (_moveSpecResult, $mutation))
+      finish context valueSpec
 
 /-- A plain or dependent `if`/`while` condition: the optional hypothesis
 binder and the condition term. -/
@@ -3047,6 +3274,17 @@ private def nameSuffix? : Name → Option String
   | .str _ suffix => some suffix
   | _ => none
 
+private def isRecursiveSourceSpec (env : Environment) (name : Name) : Bool :=
+  nameSuffix? name == some "sourceSpec" &&
+    match env.find? name with
+    | some info => match info.value? (allowOpaque := true) with
+      | some value =>
+          let constants := value.getUsedConstants
+          constants.contains ``Move.Semantics.Spec.fix ||
+            constants.contains ``Move.Semantics.Spec.fixFamily
+      | none => false
+    | none => false
+
 declare_syntax_cat moveSpecBinder
 syntax "(" ident " : " term ")" : moveSpecBinder
 syntax "{" ident " : " term "}" : moveSpecBinder
@@ -3073,7 +3311,7 @@ private structure SpecParameters where
   arguments : Array (TSyntax `ident) := #[]
   types : Array (TSyntax `term) := #[]
   context : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) := #[]
-  mutableParameter? : Option (TSyntax `ident × TSyntax `term) := none
+  mutableParameters : Array (TSyntax `ident × TSyntax `term) := #[]
 
 private partial def mutableReferent? (type : TSyntax `term) : Option (TSyntax `term) :=
   match type with
@@ -3091,17 +3329,17 @@ private def unpackSpecParameters
     match binder with
     | `(moveSpecBinder|($argument:ident : $type:term)) =>
         let mut logicalType := type
-        let mut mutableParameter? := result.mutableParameter?
+        let mut mutableParameters := result.mutableParameters
         if let some referent := mutableReferent? type then
-          if mutableParameter?.isSome then
-            Macro.throwErrorAt binder
-              "source contracts currently support at most one mutable-reference parameter"
           logicalType := referent
-          mutableParameter? := some (argument, referent)
+          mutableParameters := mutableParameters.push (argument, referent)
+          if mutableParameters.size > 2 then
+            Macro.throwErrorAt binder
+              "source contracts support at most two mutable-reference parameters"
         result := { result with
           arguments := result.arguments.push argument
           types := result.types.push logicalType
-          mutableParameter? }
+          mutableParameters }
     | `(moveSpecBinder|{$typeName:ident : $type:term}) =>
         let typeBinder ← `(bracketedBinder| {$typeName : $type})
         let inhabitedBinder ← `(bracketedBinder| [Inhabited $typeName])
@@ -3342,7 +3580,7 @@ partial def rewriteStatePlaces (addr : Name) (preState postState addrIdent : Syn
   if body.getKind == ``oldResourceTerm && body.getNumArgs == 3 then
     rewriteStatePlaces addr preState postState addrIdent true body[1]
   else if body.getKind == `«term__[_]» && body.getNumArgs == 4 &&
-      body[0].isIdent && body[2].isIdent && body[2].getId == addr then
+      body[2].isIdent && body[2].getId == addr then
     let famT : TSyntax `term := ⟨body[0]⟩
     let repl ← `(Move.Semantics.ResourceStore.get (Value := $famT) $stateT $addrT)
     return (repl.raw, #[(body[0], inOld)], #[body[0]])
@@ -3369,7 +3607,7 @@ changed address's obligation without unfolding the whole quantifier.  The guard
 requires existence of each value-accessed family at `addr`.  `families` is
 every family the clause mentions — the invariant is registered under each. -/
 def elabGlobalInvariantClause (clause : Syntax) :
-    MacroM (Bool × Array (TSyntax `ident) × TSyntax `ident × TSyntax `term) := do
+    MacroM (Bool × Array (TSyntax `term) × TSyntax `ident × TSyntax `term) := do
   let isUpdate := clause.isOfKind ``globalInvariantUpdate
   let offset := if isUpdate then 1 else 0
   let addr := clause[offset + 1]
@@ -3385,9 +3623,9 @@ def elabGlobalInvariantClause (clause : Syntax) :
   let postState := mkIdentFrom bodyStx (if isUpdate then `_moveSpecPost else `_moveSpecState)
   let (rewritten, valueAccess, allFamilies) ←
     rewriteStatePlaces addr.getId preState.raw postState.raw addrIdent.raw false bodyStx
-  let mut families : Array (TSyntax `ident) := #[]
+  let mut families : Array (TSyntax `term) := #[]
   for f in allFamilies do
-    unless families.any (·.getId == f.getId) do families := families.push ⟨f⟩
+    unless families.any (·.raw == f) do families := families.push ⟨f⟩
   if families.isEmpty then
     Macro.throwErrorAt clause
       "a global invariant must reference a stored resource `R[a]` or `existsAt<R>(a)`"
@@ -3399,7 +3637,7 @@ def elabGlobalInvariantClause (clause : Syntax) :
   let mut guards : Array (TSyntax `term) := #[]
   let mut seen : Array (Syntax × Bool) := #[]
   for (fam, fromOld) in valueAccess do
-    unless seen.any (fun (f, o) => f.getId == fam.getId && o == fromOld) do
+    unless seen.any (fun (f, o) => f == fam && o == fromOld) do
       seen := seen.push (fam, fromOld)
       let famT : TSyntax `term := ⟨fam⟩
       let stateT : TSyntax `term := ⟨(if fromOld then preState else postState).raw⟩
@@ -3847,15 +4085,10 @@ def buildEffectfulContract (function : TSyntax `ident)
   let sourceSpecFullName := (← getCurrNamespace) ++ sourceSpecName.getId
   let hasSourceSpec := (← getEnv).contains sourceSpecFullName
   let resultType ← Move.Verify.Source.resultTypeOf function.raw
-  let sourceResultType ← match parameters.mutableParameter? with
-    | none => pure resultType
-    | some (_, referent) => `($resultType × $referent)
+  let sourceResultType ← liftMacroM <|
+    Move.Verify.Source.sourceResultType resultType parameters.mutableParameters
   unless hasSourceSpec do
-    Move.Verify.Source.generateSourceSpec function {
-      context := parameters.context
-      arguments
-      types := parameters.types
-      mutableParameter? := parameters.mutableParameter? }
+    Move.Verify.Source.ensureSourceSpec sourceSpecFullName.getPrefix function
   let contractName := associatedName function `contract
   let initial := mkIdentFrom precondition `_moveSpecInitial
   let final := mkIdentFrom postcondition `_moveSpecFinal
@@ -3870,12 +4103,17 @@ def buildEffectfulContract (function : TSyntax `ident)
   let output := mkIdentFrom postcondition `_moveSpecOutput
   let outputTerm : TSyntax `term := ⟨output.raw⟩
   let mut postconditionRaw := postcondition.raw
-  if let some (parameter, _) := parameters.mutableParameter? then
+  if !parameters.mutableParameters.isEmpty then
     let resultValue ← `($outputTerm.1)
     postconditionRaw := bindImplicit `result postconditionRaw resultValue.raw
-    let finalReferent ← `($outputTerm.2)
-    postconditionRaw ← liftMacroM <|
-      rewriteMutablePost parameter finalReferent postconditionRaw
+    for ((parameter, _), index) in parameters.mutableParameters.zipIdx do
+      let finalReferent ← if parameters.mutableParameters.size == 1 then
+        `($outputTerm.2)
+      else
+        liftMacroM <| Move.Verify.Source.argumentProjection
+          (← `($outputTerm.2)) index parameters.mutableParameters.size
+      postconditionRaw ← liftMacroM <|
+        rewriteMutablePost parameter finalReferent postconditionRaw
   let postcondition ← Move.Verify.Source.rewriteClause
     resourceTypes finalTerm initialTerm ⟨postconditionRaw⟩
   let frame? ← frameCondition resourceTypes ⟨world.raw⟩ initialTerm finalTerm
@@ -3884,10 +4122,10 @@ def buildEffectfulContract (function : TSyntax `ident)
     resourceTypes initialTerm initialTerm abortCondition
   let requiresLambda ← liftMacroM <| clauseLambda arguments
     #[( `initial, initial)] precondition
-  let ensuresLambda ← liftMacroM <| match parameters.mutableParameter? with
-    | none => clauseLambda arguments
+  let ensuresLambda ← liftMacroM <| if parameters.mutableParameters.isEmpty then
+      clauseLambda arguments
         #[( `initial, initial), (`result, result), (`final, final)] postcondition
-    | some _ => clauseLambda arguments
+    else clauseLambda arguments
         #[( `initial, initial), (`_moveSpecOutput, output), (`final, final)] postcondition
   let abortsLambda ← liftMacroM <| clauseLambda arguments
     #[( `initial, initial), (`abortCode, abortCode)] abortCondition
@@ -3919,6 +4157,25 @@ def buildEffectfulContract (function : TSyntax `ident)
       -- happens to take.
       resourcePairs := resourcePairs.push (heads[leftIndex]!, heads[rightIndex]!)
       resourcePairs := resourcePairs.push (heads[rightIndex]!, heads[leftIndex]!)
+  let functionFullName := (← getCurrNamespace) ++ function.getId
+  if (Move.Verify.Source.mutualFamilies.getState (← getEnv)).contains functionFullName then
+    let contractSpecName := associatedName function `contractSpec
+    let worldBinder ← `(bracketedBinder| {$world : Type})
+    let mut instanceBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) := #[]
+    for (head, index) in heads.zipIdx do
+      let storeName := mkIdentFrom function
+        (Name.mkSimple s!"_moveSpecStore{index}")
+      instanceBinders := instanceBinders.push (← `(bracketedBinder|
+        [$storeName : $(← Move.Verify.Source.storeType ⟨world⟩ head)]))
+    for ((left, right), index) in resourcePairs.zipIdx do
+      let independenceName := mkIdentFrom function
+        (Name.mkSimple s!"_moveSpecIndependent{index}")
+      instanceBinders := instanceBinders.push (← `(bracketedBinder|
+        [$independenceName :
+          $(← Move.Verify.Source.independenceType ⟨world⟩ left right)]))
+    elabCommand (← `(def $contractSpecName $parameters.context* $worldBinder
+      $instanceBinders* : Move.Verify.Contract $world $argsType $sourceResultType :=
+      $contractRecord))
   for ((left, right), index) in resourcePairs.zipIdx.reverse do
     let independenceName := mkIdentFrom function
       (Name.mkSimple s!"_moveSpecIndependent{index}")
@@ -4114,6 +4371,45 @@ syntax (name := contractIntro) "contract_intro" : tactic
 private def normalizeMayAbort : Lean.Elab.Tactic.TacticM Unit := do
   Lean.Elab.Tactic.evalTactic (← `(tactic| abort_norm))
 
+/-- Discharge a concrete `wp (callee.sourceSpec args) …` goal from the
+callee's generated `callee.verified` theorem.  Automatic verification keeps
+verified recursive callees opaque and invokes this bridge instead of trying
+to unfold their fixed point in the caller. -/
+syntax (name := verifiedCall) "verified_call" : tactic
+
+@[tactic verifiedCall]
+private def elabVerifiedCall : Lean.Elab.Tactic.Tactic := fun stx =>
+    Lean.Elab.Tactic.withMainContext do
+  -- Mutable-reference calls are guarded by one prophecy quantifier (and
+  -- potentially reconciliation hypotheses) before the callee's `wp` is
+  -- exposed. Introduce those binders just as the ordinary wp simplifier does.
+  Lean.Elab.Tactic.evalTactic (← `(tactic| intros))
+  let target ← instantiateMVars (← Lean.Elab.Tactic.getMainTarget)
+  unless target.getAppFn.constName? == some ``Move.Verify.wp do
+    throwErrorAt stx "`verified_call` expects a weakest-precondition goal"
+  let action := target.getArg! 2
+  let some sourceSpecName := action.getAppFn.constName?
+    | throwErrorAt stx "the action is not a named source specification"
+  let .str functionName "sourceSpec" := sourceSpecName
+    | throwErrorAt stx "the action is not a generated `sourceSpec`"
+  let verifiedName := functionName ++ `verified
+  let contractName := functionName ++ `contract
+  unless (← getEnv).contains verifiedName do
+    throwErrorAt stx "`{verifiedName}` is not available"
+  unless (← getEnv).contains contractName do
+    throwErrorAt stx "`{contractName}` is not available"
+  let sourceSpec := mkIdentFrom stx sourceSpecName
+  let contract := mkIdentFrom stx contractName
+  let verified := mkIdentFrom stx verifiedName
+  Lean.Elab.Tactic.evalTactic (← `(tactic| refine Move.Verify.wp_mono
+    (Move.Verify.wp_of_satisfies
+      (show Move.Verify.Satisfies $sourceSpec _ from
+        (by
+          have established : $contract := $verified
+          unfold $contract at established
+          exact established _))
+      ?_ (noAbort := ?_)) ?_ ?_))
+
 @[tactic contractIntro]
 private def elabContractIntro : Lean.Elab.Tactic.Tactic := fun stx => Lean.Elab.Tactic.withMainContext do
   let target ← instantiateMVars (← Lean.Elab.Tactic.getMainTarget)
@@ -4129,12 +4425,7 @@ private def elabContractIntro : Lean.Elab.Tactic.Tactic := fun stx => Lean.Elab.
   unless env.contains sourceSpecName do
     throwErrorAt stx
       "`contract_intro` supports effectful source contracts, but `{sourceSpecName}` is not defined"
-  if let some info := env.find? sourceSpecName then
-    if let some value := info.value? (allowOpaque := true) then
-      for dependency in value.getUsedConstants do
-        if hasLastName dependency "mutualSourceSpec" then
-          throwErrorAt stx
-            "`contract_intro` does not yet open mutually recursive contract families; use `satisfies_fixFamily` explicitly"
+  let mutualInfo? := Move.Verify.Source.mutualFamilies.getState env |>.find? functionName
   let contract := mkIdentFrom stx contractName
   let sourceSpec := mkIdentFrom stx sourceSpecName
   Lean.Elab.Tactic.evalTactic (← `(tactic| unfold $contract))
@@ -4143,7 +4434,55 @@ private def elabContractIntro : Lean.Elab.Tactic.Tactic := fun stx => Lean.Elab.
     Lean.Elab.Tactic.evalTactic (← `(tactic| unfold $sourceSpec))
     Lean.Elab.Tactic.evalTactic (← `(tactic|
       try simp only [Move.Semantics.Spec.pure_bind]))
-    if ← targetUsesFix then
+    if let some mutualInfo := mutualInfo? then
+      let mutualSource := mkIdentFrom stx mutualInfo.source
+      Lean.Elab.Tactic.evalTactic (← `(tactic| unfold $mutualSource))
+      let indexType := mkIdentFrom stx mutualInfo.indexType
+      let argsFamily := mkIdentFrom stx mutualInfo.argsFamily
+      let resultFamily := mkIdentFrom stx mutualInfo.resultFamily
+      let recursor := mkIdentFrom stx (mutualInfo.indexType ++ `rec)
+      let familyIndex := mkIdentFrom stx `_moveSpecContractIndex
+      let motive ← `(fun ($familyIndex : $indexType) =>
+        Move.Verify.Contract _ ($argsFamily $familyIndex) ($resultFamily $familyIndex))
+      let mut contracts ← `(@$recursor:ident $motive)
+      let mut contractSpecs : Array (TSyntax `ident) := #[]
+      for member in mutualInfo.members do
+        let contractSpec := mkIdentFrom stx (member ++ `contractSpec)
+        unless env.contains (member ++ `contractSpec) do
+          throwErrorAt stx
+            "mutual contract `{member ++ `contractSpec}` is not defined; declare every member's `spec` before verifying the family"
+        contractSpecs := contractSpecs.push contractSpec
+        contracts ← `($contracts $contractSpec)
+      let body := mkIdentFrom stx mutualInfo.body
+      let some memberIndex := mutualInfo.members.findIdx? (· == functionName)
+        | throwErrorAt stx "current function is missing from its mutual component"
+      let constructor := mkIdentFrom stx mutualInfo.constructors[memberIndex]!
+      Lean.Elab.Tactic.evalTactic (← `(tactic| change Move.Verify.Satisfies
+        (Move.Semantics.Spec.fixFamily $body $constructor) ($contracts $constructor)))
+      Lean.Elab.Tactic.evalTactic (← `(tactic|
+        apply Move.Verify.satisfies_fixFamily_of_wp $body $contracts))
+      introNamed `recursive
+      introNamed `recursiveVerified
+      introNamed `index
+      let indexLocal := mkIdent `index
+      Lean.Elab.Tactic.evalTactic (← `(tactic| cases $indexLocal:ident))
+      let branchGoals ← Lean.Elab.Tactic.getGoals
+      let mut remaining : List MVarId := []
+      for goal in branchGoals do
+        Lean.Elab.Tactic.setGoals [goal]
+        Lean.Elab.Tactic.withMainContext do
+          Lean.Elab.Tactic.evalTactic (← `(tactic| unfold $body))
+          Lean.Elab.Tactic.evalTactic (← `(tactic| unfold $argsFamily $resultFamily))
+          for contractSpec in contractSpecs do
+            try Lean.Elab.Tactic.evalTactic (← `(tactic| unfold $contractSpec))
+            catch _ => pure ()
+          introNamed `args
+          introNamed `initial
+          introNamed `permitted
+          normalizeMayAbort
+        remaining := remaining ++ (← Lean.Elab.Tactic.getGoals)
+      Lean.Elab.Tactic.setGoals remaining
+    else if ← targetUsesFix then
       let bodySpec := mkIdentFrom stx bodySpecName
       Lean.Elab.Tactic.evalTactic (← `(tactic| apply Move.Verify.satisfies_fix_of_wp))
       introNamed `recursive
@@ -4260,7 +4599,12 @@ private def elabAutomaticSourceVerify : CommandElab := fun stx => do
   if let some info := env.find? sourceSpecName then
     if let some value := info.value? (allowOpaque := true) then
       for dependency in value.getUsedConstants do
-          if dependency != sourceSpecName &&
+          let verifiedSource := match dependency with
+            | .str callee "sourceSpec" =>
+                env.contains (callee ++ `verified) &&
+                  isRecursiveSourceSpec env dependency
+            | _ => false
+          if dependency != sourceSpecName && !verifiedSource &&
               (Move.isMoveFunction env dependency ||
                 nameSuffix? dependency == some "sourceSpec" ||
                 nameSuffix? dependency == some "bodySpec") then
@@ -4272,8 +4616,12 @@ private def elabAutomaticSourceVerify : CommandElab := fun stx => do
   -- body before symbolic execution (the function's own `sourceSpec` and
   -- `bodySpec` are already opened by `contract_intro`).
   let calleeUnfoldLemmas := sourceUnfoldLemmas.filter fun lemma =>
-    lemma.raw.getId != sourceSpecName &&
-      lemma.raw.getId != functionName ++ `bodySpec
+    let name := lemma.raw.getId
+    let verifiedCallee := match name with
+      | .str callee "sourceSpec" =>
+          env.contains (callee ++ `verified) && isRecursiveSourceSpec env name
+      | _ => false
+    name != sourceSpecName && name != functionName ++ `bodySpec && !verifiedCallee
   let command ← `(set_option maxHeartbeats 800000 in
     theorem $verifiedName : $contractName := by
       move_bench
@@ -4289,6 +4637,7 @@ private def elabAutomaticSourceVerify : CommandElab := fun stx => do
         exists_and_right, and_true, true_and, true_implies, implies_true,
         and_self, Prod.mk.injEq, not_false_eq_true, not_true_eq_false,
         ite_true, ite_false, dite_true, dite_false]
+      all_goals try verified_call
       all_goals
         simp_all (config := { maxSteps := 1000000 })
           [$calleeUnfoldLemmas,*, move_spec, move_data, move_invariant_norm,

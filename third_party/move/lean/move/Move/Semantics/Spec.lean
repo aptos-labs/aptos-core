@@ -87,6 +87,32 @@ def fix (body : (Args → Spec σ Result) → Args → Spec σ Result) :
     ∃ fuel, (fixApprox body fuel args).undefined initial
 }
 
+/-- One heterogeneous family of mutually recursive source functions.  The
+index selects both the argument and result type, so an SCC is not forced to
+give every member the same signature. -/
+abbrev Family (σ : Type) (Index : Type) (Args Result : Index → Type) :=
+  (index : Index) → Args index → Spec σ (Result index)
+
+/-- The finite approximants of a mutually recursive family advance every
+member in lockstep. -/
+def fixFamilyApprox
+    (body : Family σ Index Args Result → Family σ Index Args Result) :
+    Nat → Family σ Index Args Result
+  | 0, _, _ => bottom
+  | fuel + 1, index, args => body (fixFamilyApprox body fuel) index args
+
+/-- Least finite-unfolding semantics of a mutually recursive SCC. -/
+def fixFamily
+    (body : Family σ Index Args Result → Family σ Index Args Result) :
+    Family σ Index Args Result := fun index args => {
+  ok := fun initial result final =>
+    ∃ fuel, (fixFamilyApprox body fuel index args).ok initial result final
+  aborts := fun initial code =>
+    ∃ fuel, (fixFamilyApprox body fuel index args).aborts initial code
+  undefined := fun initial =>
+    ∃ fuel, (fixFamilyApprox body fuel index args).undefined initial
+}
+
 instance : Monad (Spec σ) where
   pure := pure
   bind := bind

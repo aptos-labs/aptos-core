@@ -455,6 +455,46 @@ relational representation. -/
     · rintro ⟨future, obligation⟩
       exact (bodyWP future).2.2 obligation
 
+@[wp_norm] theorem wp_withMutations2 (first : α) (second : β)
+    (body : Mutation α → Mutation β →
+      Spec State (γ × (Mutation α × Mutation β)))
+    (ensures : (γ × (α × β)) → State → Prop)
+    (aborts : Nat → Prop) (initial : State) :
+    wp (withMutations2 first second body) ensures aborts initial ↔
+      ∀ firstFuture secondFuture,
+        wp (body { current := first, prophecy := firstFuture }
+          { current := second, prophecy := secondFuture })
+          (fun output final =>
+            output.2.1.current = firstFuture →
+            output.2.2.current = secondFuture →
+            ensures (output.1, (firstFuture, secondFuture)) final)
+          aborts initial := by
+  constructor
+  · rintro ⟨normal, abnormal, defined⟩ firstFuture secondFuture
+    refine ⟨?_, ?_, ?_⟩
+    · intro output final execution firstCurrent secondCurrent
+      apply normal (output.1, (firstFuture, secondFuture)) final
+      exact ⟨firstFuture, secondFuture, output.2.1, output.2.2,
+        execution, firstCurrent, secondCurrent, rfl⟩
+    · intro code execution
+      exact abnormal code ⟨firstFuture, secondFuture, execution⟩
+    · intro obligation
+      exact defined ⟨firstFuture, secondFuture, obligation⟩
+  · intro bodyWP
+    refine ⟨?_, ?_, ?_⟩
+    · rintro ⟨result, finalFirst, finalSecond⟩ final
+        ⟨firstFuture, secondFuture, firstReference, secondReference,
+          execution, firstCurrent, secondCurrent, finals⟩
+      change (finalFirst, finalSecond) = (firstFuture, secondFuture) at finals
+      cases finals
+      exact (bodyWP finalFirst finalSecond).1
+        (result, (firstReference, secondReference)) final execution
+        firstCurrent secondCurrent
+    · rintro code ⟨firstFuture, secondFuture, execution⟩
+      exact (bodyWP firstFuture secondFuture).2.1 code execution
+    · rintro ⟨firstFuture, secondFuture, obligation⟩
+      exact (bodyWP firstFuture secondFuture).2.2 obligation
+
 @[simp, wp_norm] theorem wp_withBorrowElemMutSpec (values : Move.Vector α)
     (index : Move.U64) (body : Mutation α → Spec State (β × Mutation α))
     (ensures : (β × Move.Vector α) → State → Prop) (aborts : Nat → Prop)

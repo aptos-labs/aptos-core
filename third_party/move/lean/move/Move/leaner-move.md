@@ -1205,10 +1205,10 @@ spec add {K} {V} [Move.Compare.Total K]
     with Move.Semantics.Vector.indexOutOfBounds
 ```
 
-A contract currently supports at most one mutable-reference parameter. A
-callee with a `&mut` parameter is called with the caller's live mutable
-reference, and the callee's final referent is written back to the place the
-caller borrowed:
+A contract supports two simultaneous mutable-reference parameters, each with
+an independent prophecy. A callee with `&mut` parameters is called with the
+caller's live mutable references, and every final referent is written back to
+the place the caller borrowed:
 
 ```lean
 entry fun bump_counter (addr : Address) : Action Unit := do
@@ -1476,10 +1476,12 @@ A call to a Move callee is verified from the callee's relational semantics,
 automatic proof the callee's `sourceSpec` is unfolded into the caller; a
 callee with a `&mut` parameter is called with the caller's live mutable
 reference (`bump value` after `let value ← &mut Counter[addr].value`) and its
-final referent is written back. A recursive callee's semantics is a fixed
-point the automatic proof does not unfold, so its callers are proved by hand
-from the callee's verified contract: `wp_call` steps through it and leaves the
-postcondition weakening and abort forwarding as the two goals:
+final referent is written back. Calls with two mutable parameters carry two
+independent prophecies and write both final referents back in declaration
+order. A verified recursive callee stays opaque in automatic caller proofs:
+`verified_call` applies its contract and leaves only the local precondition,
+abort exclusion, and weakening obligations. The explicit `wp_call` form is
+also available when those obligations need a hand-written proof:
 
 ```lean
 verify contains by
@@ -1502,14 +1504,15 @@ executed; it simply has no `spec`/`verify` yet. The current boundary:
 | Rejected at `spec` | Workaround |
 |---|---|
 | a call to a callee that is not a `fun` (no retained source) | declare the callee with `fun` |
-| a call to a mutually recursive callee | not yet supported |
 | receiver-style `values.get i` / `r.insert i e` / `r.remove i` | write `Move.Vector.get` / `Move.Vector.insert` / `Move.Vector.remove` |
 | a core primitive in a form the surface cannot express (`borrowField` with a computed descriptor, `assert`) | use the surface syntax (`&r.f`, `abort c`) |
 | an overlapping sibling mutable borrow of the same field path | borrow disjoint fields or close the first loan |
 | a Lean-only `match` motive or `generalizing` clause | use Move's ordinary match form |
 | a clause naming a resource family the function does not touch | name only families the function uses |
-| more than one `&mut` parameter | not yet supported |
-| a mutually recursive family, under `contract_intro` | use `satisfies_fixFamily` explicitly |
+
+Mutually recursive functions are represented by one heterogeneous
+`Spec.fixFamily`. Their generated member projections have ordinary
+`sourceSpec`s, and `contract_intro` opens the family-wide induction step.
 
 ## Compiling and testing
 

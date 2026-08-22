@@ -38,13 +38,20 @@ so its abort stays observable; the explicitly spelled core primitives
 `Move.abort`, `Move.Vector.get`/`set`), desugared to the surface forms they
 lower to and given the same semantics.
 
-**Calls.** Effectful callees with a mutable-reference parameter (the caller's
-live `&mut` is passed and its final value written back), including recursive
-ones; pure callees without a `spec` — their relational semantics is generated
-on demand from retained source and persisted across modules; a callee's
-`sourceSpec` no longer has to be declared before the caller's `verify`; named
-type arguments at a call (`has_generic (T := U64) a`) instantiate the callee's
-semantics.
+**Calls.** Effectful callees with one or two mutable-reference parameters (the
+caller's live `&mut`s are passed and their final values written back in source
+order), including recursive ones; callers reuse an already verified recursive
+callee's contract instead of unfolding its fixed point. Pure callees without a
+`spec` have relational semantics generated on demand from retained source and
+persisted across modules; a callee's `sourceSpec` no longer has to be declared
+before the caller's `verify`; named type arguments at a call
+(`has_generic (T := U64) a`) instantiate the callee's semantics.
+
+**Recursion.** A mutually recursive strongly connected component is translated
+to one heterogeneous `Spec.fixFamily`: each member retains its own argument and
+result type. `contract_intro` opens the whole contract family and supplies the
+family-wide recursive hypothesis, while each member still receives its normal
+`f.sourceSpec`, `f.contractSpec`, and `f.verified` declarations.
 
 **Generic global storage.** `existsAt (Vault T) a`, generic `moveTo`/`moveFrom`,
 `&mut (Vault U64)[a].f`; in contracts `existsAt<Vault T>(a)`, `(Vault T)[a].f`,
@@ -53,6 +60,10 @@ semantics.
 family without spelling the instantiation, and a type parameter no argument
 determines is passed to the semantics by name; distinct heads are independent,
 two instantiations of one head are not assumed to be.
+
+Global invariants may constrain a concrete instantiation of a generic family,
+for example `(Vault U64)[a].value`; registration is keyed by the generic head
+so mutations of that instantiation discover and re-establish the invariant.
 
 ## Move language coverage
 
@@ -110,16 +121,6 @@ language feature tracked here.
 
 ### Calls
 
-- **Mutually recursive callees.**
-  - *"mutually recursive Move functions are not yet supported by automatic
-    source specifications (`{f}`)"*
-- **Callers of a recursive callee** are not discharged automatically: the
-  callee's semantics is a fixed point, which the automatic proof does not
-  unfold.  Such a caller is proved by hand from the callee's verified contract
-  (`wp_of_satisfies` / `wp_call`).  No diagnostic; the automatic proof fails.
-- **More than one `&mut` parameter.**
-  - *"source contracts currently support at most one mutable-reference
-    parameter"*
 - A callee must be a `fun` (retained source); a Lean `def` has no semantics to
   generate.
   - *"Move callee `{f}` has no retained source; declare it with `fun` …"*
@@ -129,12 +130,6 @@ language feature tracked here.
 - Recursive and indexed structs/enums are not Move types; they are rejected at
   the compilation boundary by design, not a verification gap.
 
-### Recursion
-
-- **Mutually-recursive contract families:** `contract_intro` cannot open them;
-  `satisfies_fixFamily` must be applied by hand.
-  - *"`contract_intro` does not yet open mutually recursive contract families …"*
-
 ### Known modeling gaps (no diagnostic; behavioral)
 
 - **Generic families are framed per named instantiation.** The frame of a
@@ -142,8 +137,6 @@ language feature tracked here.
   (`Vault T`, `Vault U64`); an instantiation nobody names is left
   unconstrained, and two instantiations of one head are never assumed
   independent (conservative: `Vault T` and `Vault U` may coincide).
-- **Generic global invariants.** `spec module where invariant` names families
-  by bare identifier; a generic family cannot yet carry a global invariant.
 - **Update global invariants** must be reflexive at unchanged addresses (a
   `≤`-style relation verifies; `<` cannot). This is faithful to the Move
   Prover's "checked at every update over all addresses" reading, not a gap.
@@ -157,8 +150,6 @@ still be rejected:
 - *"unsupported effectful statement in automatic source specification: …"*
 - *"unsupported `do` statement in automatic source specification: …"*
 
-## Suggested priority (verification)
-
-1. Mutually recursive callees and contract families.
-2. Multiple mutable-reference parameters.
-3. Generic global invariants.
+The planned verification gaps from the previous roadmap are implemented. The
+remaining entries above are explicit design boundaries or conservative
+modeling choices, rather than silently missing source semantics.

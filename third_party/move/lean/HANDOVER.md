@@ -81,12 +81,11 @@ now lowered (`decide` is the identity on the Boolean the comparison produced),
 and the translator maps `>`/`>=`/`!=` to the sealed markers like `<`/`==`
 (`Move/Tests/Arithmetic.lean` covers the spellings).
 
-Still open (see the plan's roadmap): tuple-valued functions, mutually
-recursive callees/contract families, generic global invariants, sibling
-nested mutable borrows, effects in conditional positions; callers of a
-recursive callee are proved by hand (`Callees.drain` shows the pattern for a
-recursive `&mut` callee; a caller of a recursive pure callee is not
-discharged automatically).
+The remaining verification-roadmap items were completed afterward: mutually
+recursive SCCs and their contract families, two simultaneous mutable-reference
+parameters, concrete generic-family global invariants, and automatic reuse of
+a verified recursive callee's contract. See `Move/project-plan.md` for the
+current boundaries.
 
 ## IR-level verification examples (done, committed)
 

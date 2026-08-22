@@ -112,6 +112,30 @@ def withMutation (initial : α)
     ∃ (future : α),
       (body { current := initial, prophecy := future }).undefined initialState
 
+/-- Two independent mutable parameters opened together. The result retains
+the parameter order, while each mutation has its own prophecy. -/
+def withMutations2 (first : α) (second : β)
+    (body : Mutation α → Mutation β →
+      Spec σ (γ × (Mutation α × Mutation β))) :
+    Spec σ (γ × (α × β)) where
+  ok := fun initialState output finalState =>
+    ∃ (firstFuture : α) (secondFuture : β)
+      (firstReference : Mutation α) (secondReference : Mutation β),
+      (body { current := first, prophecy := firstFuture }
+        { current := second, prophecy := secondFuture }).ok initialState
+          (output.1, (firstReference, secondReference)) finalState ∧
+      firstReference.current = firstFuture ∧
+      secondReference.current = secondFuture ∧
+      output.2 = (firstFuture, secondFuture)
+  aborts := fun initialState code =>
+    ∃ (firstFuture : α) (secondFuture : β),
+      (body { current := first, prophecy := firstFuture }
+        { current := second, prophecy := secondFuture }).aborts initialState code
+  undefined := fun initialState =>
+    ∃ (firstFuture : α) (secondFuture : β),
+      (body { current := first, prophecy := firstFuture }
+        { current := second, prophecy := secondFuture }).undefined initialState
+
 @[simp] theorem withMutation_ok (initial : α)
     (body : Mutation α → Spec σ (β × Mutation α)) :
     (withMutation initial body).ok state output finalState ↔
