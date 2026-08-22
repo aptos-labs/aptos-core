@@ -100,7 +100,7 @@ The implementation rejects:
 - duplicate alias declarations;
 - conflicting module registrations for one Lean namespace.
 
-Lean-side coverage lives in `Move/Tests/Addresses.lean` and its module fixtures.
+Lean-side coverage lives in `Move/Tests/Language/Addresses.lean` and its module fixtures.
 It checks literal and aliased identities, imported aliases, cross-module
 reference addresses, resource access at literal addresses, runtime address
 equality, the bound, and unknown-alias diagnostics.

@@ -242,7 +242,7 @@ global wildcard to serve one local need is never the right trade.
 **Removing the spec definitions from `move_spec` was tried, and reverted.**
 The reasoning looked sound — they hand a proof the neutral `Int` form around
 every per-view rule, the same shape as the `bind` entry in
-`performance-analysis.md`.  Measurement disagreed: `Tests/Move/Vectors`
+`performance-analysis.md`.  Measurement disagreed: `Tests/Language/Vectors`
 went 7.99M → 10.31M heartbeats with them removed, because proofs that
 legitimately work at the relational level then have to re-derive what the
 definition gave them directly.  They are back.  The `bind` analogy does not

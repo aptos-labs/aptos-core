@@ -182,7 +182,7 @@ mod tests {
         let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/move");
         let mut options = Options {
             sources: vec![lean_root
-                .join("Move/Tests/Account.lean")
+                .join("Move/Tests/Verification/Account.lean")
                 .to_string_lossy()
                 .into_owned()],
             ..Default::default()
@@ -198,11 +198,11 @@ mod tests {
         let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/move");
         let mut options = Options {
             sources: vec![lean_root
-                .join("Move/Tests/Account.lean")
+                .join("Move/Tests/Verification/Account.lean")
                 .to_string_lossy()
                 .into_owned()],
             sources_deps: vec![lean_root
-                .join("Move/Tests/../Tests/Account.lean")
+                .join("Move/Tests/Verification/../Verification/Account.lean")
                 .to_string_lossy()
                 .into_owned()],
             ..Default::default()
@@ -221,7 +221,7 @@ mod tests {
         let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/move");
         let options = Options {
             sources: vec![lean_root
-                .join("Move/Tests/Account.lean")
+                .join("Move/Tests/Verification/Account.lean")
                 .to_string_lossy()
                 .into_owned()],
             ..Default::default()
@@ -250,8 +250,8 @@ mod tests {
         // Move dependencies, not filesystem or command-line order.
         let options = Options {
             sources: [
-                lean_root.join("Move/Tests/MultipleModules.lean"),
-                lean_root.join("Move/Tests/Modules/Math.lean"),
+                lean_root.join("Move/Tests/Compiler/MultipleModules.lean"),
+                lean_root.join("Move/Tests/Compiler/Fixtures/Modules/Math.lean"),
             ]
             .map(|path| path.to_string_lossy().into_owned())
             .to_vec(),
@@ -306,11 +306,11 @@ mod tests {
         let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/move");
         let options = Options {
             sources: vec![lean_root
-                .join("Move/Tests/MultipleModules.lean")
+                .join("Move/Tests/Compiler/MultipleModules.lean")
                 .to_string_lossy()
                 .into_owned()],
             sources_deps: vec![lean_root
-                .join("Move/Tests/Modules/Math.lean")
+                .join("Move/Tests/Compiler/Fixtures/Modules/Math.lean")
                 .to_string_lossy()
                 .into_owned()],
             ..Default::default()

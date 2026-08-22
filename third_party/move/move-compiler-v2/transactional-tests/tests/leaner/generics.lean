@@ -83,12 +83,14 @@ module LeanerGenerics where
   @[move_public]
   fun take_u64 (address : Address) : Action U64 := do
     let vault ← moveFrom (Vault U64) address
-    pure vault.value
+    let Vault { value } := vault
+    pure value
 
   @[move_public]
   fun take_bool (address : Address) : Action Bool := do
     let vault ← moveFrom (Vault Bool) address
-    pure vault.value
+    let Vault { value } := vault
+    pure value
 
   @[move_public]
   fun has_u64 (address : Address) : Action Bool := contains (T := U64) address

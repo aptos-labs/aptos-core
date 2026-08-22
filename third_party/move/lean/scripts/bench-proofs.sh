@@ -13,12 +13,51 @@ set -euo pipefail
 cd "$(dirname "$0")/../move"
 TOP="${1:-15}"
 RAW="$(mktemp)"
-trap 'rm -f "$RAW"' EXIT
+trap 'rm -f "$RAW" "$RAW.parsed"' EXIT
+
+# Lake retains file descriptors for materialized build jobs. Match Lean CI so
+# the benchmark does not fail partway through a large suite.
+if ! ulimit -S -n 1048576; then
+  echo "failed to raise the file-descriptor limit to 1048576" >&2
+  exit 1
+fi
+
+run_lake() {
+  local label="$1"
+  shift
+  echo "benchmarking $label ..." >&2
+  if ! MOVE_PROOF_BENCH=1 lake "$@" >> "$RAW" 2>&1; then
+    echo "benchmark build failed while building $label" >&2
+    tail -40 "$RAW" >&2
+    return 1
+  fi
+}
 
 # Force re-elaboration of every test file (oleans are cached otherwise).
 rm -rf .lake/build/lib/lean/Move/Tests
-echo "building suite with proof benchmarking on ..." >&2
-MOVE_PROOF_BENCH=1 lake test > "$RAW" 2>&1 || true
+
+# Building the test aggregate lets Lake elaborate every test file in parallel.
+# That can exhaust other process resources; historically, ignoring such a
+# `lake test` failure produced a plausible-looking partial benchmark.
+# Build each root import first so the final aggregate only has to replay them.
+run_lake "Move" build Move
+test_count=0
+while IFS= read -r target; do
+  run_lake "$target" build "$target"
+  ((test_count += 1))
+done < <(sed -n 's/^import \(Move\.Tests\..*\)$/\1/p' Move/Tests.lean)
+
+if ((test_count == 0)); then
+  echo "no test targets found in Move/Tests.lean" >&2
+  exit 1
+fi
+run_lake "Move.Tests" test
+
+if ! grep -aqF '‖MOVE_BENCH‖' "$RAW"; then
+  echo "no benchmark lines found" >&2
+  tail -5 "$RAW" >&2
+  exit 1
+fi
 
 grep -aF '‖MOVE_BENCH‖' "$RAW" \
   | sed 's/.*‖MOVE_BENCH‖//' \
@@ -40,9 +79,3 @@ echo ""
 echo "top ${TOP} by heartbeats:"
 sort -t$'\t' -k2 -rn "$RAW.parsed" | head -n "$TOP" \
   | awk -F'\t' '{printf "  %10d hb  %6d ms  %s\n", $2, $3, $1}'
-
-if ! grep -aqF '‖MOVE_BENCH‖' "$RAW"; then
-  echo "no benchmark lines found — did the build fail?" >&2
-  tail -5 "$RAW" >&2
-fi
-rm -f "$RAW.parsed"

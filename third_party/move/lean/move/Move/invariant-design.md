@@ -110,7 +110,7 @@ explicit rather than heuristically padded, and forgetting it reports
 "cannot establish the data invariant of this value here (if this is a
 pattern of a certified enum, bind the proof with a trailing `_`)". It applies
 only to enums that declare an invariant, and the proof is in scope in each
-arm — `firstPart` in `Tests/Move/Invariants.lean` uses it.
+arm — `firstPart` in `Tests/Verification/Invariants.lean` uses it.
 
 Two consequences of stating the condition over the twin:
 
@@ -219,7 +219,7 @@ is in the frontend:
 
 ## What it buys, on the motivating example
 
-`Tests/Move/OrderedMap.lean` threads well-formedness by hand through five
+`Tests/Verification/OrderedMap.lean` threads well-formedness by hand through five
 contracts:
 
 ```lean
@@ -284,11 +284,11 @@ update, which Lean rejects for a certified inner type).
 - `move_invariant`, layered cheapest-first (`trivial`, `rfl`, `decide`,
   `assumption`) before any simp, and unfolding only `move_invariant_norm`.
 
-`Tests/Move/Invariants.lean` covers structs, a two-clause invariant, a
+`Tests/Verification/Invariants.lean` covers structs, a two-clause invariant, a
 certified enum (construction under a dependent `if`, a `match` with the proof
 in scope), and a certified resource (a mutable field borrow whose write-back
 re-establishes the invariant), plus compiler erasure and execution;
-`Tests/Move/OrderedMap.lean` is the real conversion.
+`Tests/Verification/OrderedMap.lean` is the real conversion.
 
 ## Resolved questions
 

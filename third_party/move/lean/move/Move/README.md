@@ -293,7 +293,7 @@ partial fun countdown (remaining accumulator : U64) : U64 :=
 
 Recursive source semantics is the least finite-unfolding relation, so
 `verify` proofs are partial correctness with `Move.Verify.satisfies_fix` as
-the induction rule. `Tests/Move/Quicksort.lean` verifies a generic in-place
+the induction rule. `Tests/Verification/Quicksort.lean` verifies a generic in-place
 quicksort against the semantics derived from its authored body.
 
 ## Generics
@@ -349,7 +349,7 @@ Importing another Lean-authored module is an ordinary Lean `import`; its
 public functions, specs, and theorems are all available:
 
 ```lean
-import Move.Tests.Modules.Math
+import Move.Tests.Compiler.Fixtures.Modules.Math
 
 module Client where
   fun imported_identity (value : U64) : U64 :=
@@ -357,9 +357,9 @@ module Client where
 ```
 
 The minimal example is
-[`Tests/Move/MultipleModules.lean`](Tests/MultipleModules.lean) with
+[`Tests/Compiler/MultipleModules.lean`](Tests/Compiler/MultipleModules.lean) with
 its dependency
-[`Tests/Move/Modules/Math.lean`](Tests/Modules/Math.lean).
+[`Tests/Compiler/Fixtures/Modules/Math.lean`](Tests/Compiler/Fixtures/Modules/Math.lean).
 
 ## Compiling `.lean` sources
 

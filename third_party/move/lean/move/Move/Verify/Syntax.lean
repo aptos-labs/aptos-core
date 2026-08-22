@@ -4536,6 +4536,16 @@ scoped macro "verify " function:ident " by " proof:tacticSeq : command => do
 its declarative contract using the typed store laws and arithmetic solver. -/
 scoped syntax (name := automaticSourceVerify) "verify " ident : command
 
+/-- End an automatic verification attempt with a concise, source-oriented
+diagnostic instead of exposing the automation tactic's internal search state. -/
+scoped syntax (name := reportVerificationFailure)
+  "report_verification_failure " ident : tactic
+
+@[tactic reportVerificationFailure]
+private def elabReportVerificationFailure : Lean.Elab.Tactic.Tactic := fun stx => do
+  throwErrorAt stx[1]
+    "verification failed for `{stx[1].getId}`: the implementation does not prove its contract; use `verify {stx[1].getId} by` to inspect and prove the remaining obligation"
+
 @[command_elab automaticSourceVerify]
 private def elabAutomaticSourceVerify : CommandElab := fun stx => do
   let function : TSyntax `ident := ⟨stx[1]⟩
@@ -4550,6 +4560,7 @@ private def elabAutomaticSourceVerify : CommandElab := fun stx => do
   let sourceSpecName := functionName ++ `sourceSpec
   let contractName := associatedName function `contract
   let verifiedName := associatedName function `verified
+  let qualifiedFunction := mkIdent functionName
   -- A pure value contract reduces the function; a relational one opens the
   -- generated `Satisfies`.  The contract's own shape decides: a pure function
   -- may well have a `sourceSpec` too, generated for its callers.
@@ -4580,7 +4591,7 @@ private def elabAutomaticSourceVerify : CommandElab := fun stx => do
         Nat.reducePow, Nat.reduceMod, Move.UInt.numeral_eq_ofNat, and_assoc,
         exists_const] <;>
       (try uint_bounds) <;>
-      grind [Move.UInt.toNat_ofNat_u8, Move.UInt.toNat_ofNat_u16,
+      try (grind [Move.UInt.toNat_ofNat_u8, Move.UInt.toNat_ofNat_u16,
         Move.UInt.toNat_ofNat_u32, Move.UInt.toNat_ofNat_u64,
         Move.UInt.toNat_ofNat_u128, Move.UInt.toNat_ofNat_u256,
         Move.UInt.toNat_zero, Move.UInt.toNat_one,
@@ -4589,6 +4600,7 @@ private def elabAutomaticSourceVerify : CommandElab := fun stx => do
         Move.Semantics.ResourceStore.get, Move.Semantics.ResourceStore.contains,
         Move.Semantics.ResourceStore.get_insert_same,
         Move.UInt.lt_iff_toNat_lt, Move.UInt.le_iff_toNat_le])
+      all_goals report_verification_failure $qualifiedFunction)
     elabCommand command
     return
   let sourceSpecTerm ← parseTerm sourceSpecName
@@ -4644,7 +4656,7 @@ private def elabAutomaticSourceVerify : CommandElab := fun stx => do
             move_norm, Nat.reducePow, Nat.reduceMod,
             and_assoc, exists_const] <;>
         (try uint_bounds) <;>
-        grind [Move.UInt.toNat_ofNat_u8, Move.UInt.toNat_ofNat_u16,
+        try (grind [Move.UInt.toNat_ofNat_u8, Move.UInt.toNat_ofNat_u16,
           Move.UInt.toNat_ofNat_u32, Move.UInt.toNat_ofNat_u64,
           Move.UInt.toNat_ofNat_u128, Move.UInt.toNat_ofNat_u256,
           Move.UInt.toNat_zero, Move.UInt.toNat_one,
@@ -4653,6 +4665,7 @@ private def elabAutomaticSourceVerify : CommandElab := fun stx => do
           Move.Semantics.ResourceStore.get, Move.Semantics.ResourceStore.contains,
           Move.Semantics.ResourceStore.get_insert_same,
           Move.UInt.lt_iff_toNat_lt, Move.UInt.le_iff_toNat_le])
+      all_goals report_verification_failure $qualifiedFunction)
   elabCommand command
 
 end Move.Spec

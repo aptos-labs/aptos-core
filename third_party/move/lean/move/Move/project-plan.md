@@ -104,6 +104,28 @@ are Lean's binders).
 MSL is outside the current scope. Function values are the only deferred Move
 language feature tracked here.
 
+## Test and diagnostic coverage
+
+Tests are grouped by responsibility under `Move/Tests`: `Language` checks the
+accepted source surface, `Verification` checks contracts and proofs,
+`Compiler` checks XIR/export and compiler integration, and `Negative` pins
+expected failures. Negative tests use exact `#guard_msgs` assertions for
+surface, specification, lowering, and automatic-verification diagnostics.
+
+The missing accepted-program borrow certificate and its planned poison-aware
+static analysis are specified in
+[`borrow-checker-design.md`](borrow-checker-design.md).  The design deliberately
+does not duplicate compiler-v2: overlapping mutable handles may exist until a
+destructive use activates a prophecy, with later conflicting uses rejected by
+static poisoning.  Calls and recursion use checkable fixpoint summaries.
+
+Compiler-side XIR tests additionally reject malformed control-flow targets,
+local and type indices, return arity, operation arity, resource references,
+and address constants. Transactional `reject_*` tests check that these errors
+reach command-line users. Positive Leaner transactional baselines are scanned
+for compiler, bytecode-verifier, or linker failures so a broken fixture cannot
+be accepted as a successful regression baseline.
+
 ## Roadmap — verification, not yet implemented
 
 ### Function bodies the translator rejects

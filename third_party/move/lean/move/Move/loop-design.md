@@ -319,10 +319,10 @@ with the returned value (`ControlForms.return_in_loop`).
 | Internal headers, back edges, exit blocks | `Move/Compiler/Normalize.lean` |
 | Retained authored surface (`move_source`, no rewrite) | `Move/Compiler/Export.lean` |
 | Verification loop translation (inline `Spec.fix`) | `Move/Verify/Syntax.lean` (`translateDo`) |
-| Positive tests, CFG-shape checks, and proofs | [`Tests/Move/Loops.lean`](Tests/Loops.lean) |
-| Rejection fixtures | [`Tests/Move/LowLevel/Rejections.lean`](Tests/LowLevel/Rejections.lean) |
+| Positive tests, CFG-shape checks, and proofs | [`Tests/Language/Loops.lean`](Tests/Language/Loops.lean) |
+| Rejection fixtures | [`Tests/Negative/Surface.lean`](Tests/Negative/Surface.lean) |
 
-`Tests/Move/Loops.lean` pins the compile contract with CFG-shape checks: no
+`Tests/Language/Loops.lean` pins the compile contract with CFG-shape checks: no
 generated per-loop `FunDecl`, back edges to headers rather than calls, the
 `while` test on the header, two natural loops for sequential and nested
 loops, and a `ret` from inside the loop for `return`.

@@ -1,9 +1,9 @@
-# Plan: Simplifying the `Tests/Move` Verification Proofs
+# Plan: Simplifying the `Tests/Verification` Proofs
 
 Status: proposal (not started)
 
 This plan is based on a survey of all manual `verify … by` proofs and their
-supporting private theorems in `Tests/Move` (Quicksort, OrderedMap, Calls,
+supporting private theorems in `Tests/Verification` (Quicksort, OrderedMap, Calls,
 Loops, VectorOperations, Read, Generics, EnumPayloads, Vectors), together
 with the library surface they use (`Move/Verify/Contract.lean`,
 `Move/Verify/Borrow.lean`, `Move/Semantics/{Spec,Checked,Vector,Global,

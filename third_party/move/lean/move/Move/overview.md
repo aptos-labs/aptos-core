@@ -79,7 +79,7 @@ Lean's simplifier to evaluate each branch. Lean accepts the proof only because
 both resulting cases establish the contract. For larger examples the same
 interaction scales to helper lemmas, induction hypotheses, data-structure
 invariants, and arithmetic side conditions. The checked-in
-[ordered-map benchmark](Tests/OrderedMap.lean), for example, proves the
+[ordered-map benchmark](Tests/Verification/OrderedMap.lean), for example, proves the
 correctness of its recursive binary search against the authored function body.
 
 Proof declarations are not compiled into the Move module. They establish

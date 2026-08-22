@@ -6,11 +6,13 @@
 # A lemma with many tries and no successes is pure cost: its discrimination-tree
 # key matches terms it cannot rewrite, or a higher-priority lemma always wins.
 #
-# Usage:  scripts/simp-audit.sh [file ...]     (default: Move/Tests/*.lean)
+# Usage:  scripts/simp-audit.sh [file ...]     (default: Move/Tests/**/*.lean)
 set -uo pipefail
 cd "$(dirname "$0")/../move"
 FILES=("$@")
-if [ ${#FILES[@]} -eq 0 ]; then mapfile -t FILES < <(ls Move/Tests/*.lean); fi
+if [ ${#FILES[@]} -eq 0 ]; then
+  mapfile -t FILES < <(find Move/Tests -type f -name '*.lean' -print | sort)
+fi
 RAW="$(mktemp)"; trap 'rm -f "$RAW"' EXIT
 
 for f in "${FILES[@]}"; do

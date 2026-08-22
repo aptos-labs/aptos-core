@@ -13,6 +13,7 @@ use move_transactional_test_runner::{
     tasks::SyntaxChoice, vm_test_harness, vm_test_harness::TestRunConfig,
 };
 use std::{
+    fs,
     path::{Path, PathBuf},
     process::Command,
     string::ToString,
@@ -279,6 +280,45 @@ fn lake_available() -> bool {
         .is_ok_and(|output| output.status.success())
 }
 
+fn positive_leaner_baselines_are_clean() -> Result<(), String> {
+    const FAILURE_MARKERS: &[&str] = &[
+        "bug:",
+        "Error: compilation errors:",
+        "LINKER_ERROR",
+        "exiting with Leaner stackless-bytecode checks failed",
+        "exiting with bytecode verification errors",
+    ];
+    let mut failures = vec![];
+    for entry in WalkDir::new("tests/leaner")
+        .min_depth(1)
+        .max_depth(1)
+        .into_iter()
+        .flatten()
+    {
+        let path = entry.path();
+        let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        if !name.ends_with(".exp") || name.starts_with("reject_") {
+            continue;
+        }
+        let output = fs::read_to_string(path).map_err(|error| error.to_string())?;
+        for marker in FAILURE_MARKERS {
+            if output.contains(marker) {
+                failures.push(format!("{} contains `{marker}`", path.display()));
+            }
+        }
+    }
+    if failures.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "positive Leaner baselines must not record compilation or linker failures:\n{}",
+            failures.join("\n")
+        ))
+    }
+}
+
 fn main() {
     let has_lake = lake_available();
     let files = WalkDir::new("tests")
@@ -319,6 +359,9 @@ fn main() {
                 })
         })
         .collect_vec();
+    tests.push(Trial::test("leaner-positive-baselines-are-clean", || {
+        positive_leaner_baselines_are_clean().map_err(Into::into)
+    }));
     tests.sort_unstable_by(|a, b| a.name().cmp(b.name()));
     let args = Arguments::from_args();
     libtest_mimic::run(&args, tests).exit()

@@ -28,7 +28,7 @@ behind the specification layer is in
 
 ## A first module
 
-This is [`Tests/Move/Account.lean`](Tests/Account.lean) without its
+This is [`Tests/Verification/Account.lean`](Tests/Verification/Account.lean) without its
 test section — a resource, two entry functions, their contracts, and their
 proofs.
 
@@ -347,7 +347,7 @@ function, and both `.lean` modules must be compiler inputs. The import also
 makes the callee's specs and theorems available to proofs:
 
 ```lean
--- Tests/Move/Modules/Math.lean
+-- Tests/Compiler/Fixtures/Modules/Math.lean
 module Math where
   public fun identity {T} (value : T) : T := value
 
@@ -358,8 +358,8 @@ module Math where
 ```
 
 ```lean
--- Tests/Move/MultipleModules.lean
-import Move.Tests.Modules.Math
+-- Tests/Compiler/MultipleModules.lean
+import Move.Tests.Compiler.Fixtures.Modules.Math
 
 module Client where
   fun imported_identity (value : U64) : U64 :=
@@ -422,7 +422,7 @@ both signs. Signed literals are written `(5 : I32)` / `(-5 : I32)`; `-x` is
 negation.
 
 Each operator is also available under its primitive name (`Move.UInt.add`,
-`Move.SInt.div`, ...), which is the spelling `Tests/Move/Signed.lean` uses:
+`Move.SInt.div`, ...), which is the spelling `Tests/Language/Signed.lean` uses:
 
 ```lean
 fun add_values (left : I64) (right : I64) : Action I64 :=
@@ -1103,12 +1103,12 @@ Three conventions make this work in practice:
    `Move.Vector.toList` is the specification accessor that exposes a vector's
    contents; it is never compiled.
 3. **Supporting lemmas live in the same namespace, grouped by the operation
-   they serve.** In `Tests/Move/OrderedMap.lean` the proof library is
+   they serve.** In `Tests/Verification/OrderedMap.lean` the proof library is
    `Model.Search`, `Model.Insertion`, and `Model.Removal`, each documented with
    which verified function cites it. These are proved, not assumed: they are
    ordinary theorems, and the source proofs reference them by name.
 
-`Tests/Move/Quicksort.lean` uses the same convention with `Model.slice`,
+`Tests/Verification/Quicksort.lean` uses the same convention with `Model.slice`,
 `Model.Partitioned`, and `Model.Sorts` as the contract vocabulary of a generic
 in-place sort.
 
@@ -1477,10 +1477,10 @@ When it is not — a function with two sequential loops, or a loop carrying a
 stronger invariant than the postcondition — the loop's invariant is stated as
 a separate `Move.Verify.Satisfies` lemma about its fixed point, proved with
 `satisfies_fix_of_wp`, and cited through `wp_of_satisfies`.
-`Tests/Move/Loops.lean` shows both shapes (`upToThreeLoop`,
-`countToZeroLoop`, `drainLoop`); `Tests/Move/OrderedMap.lean` proves a
+`Tests/Language/Loops.lean` shows both shapes (`upToThreeLoop`,
+`countToZeroLoop`, `drainLoop`); `Tests/Verification/OrderedMap.lean` proves a
 recursive binary search against a `Model.Search.Window` invariant; and
-`Tests/Move/Quicksort.lean` verifies a generic in-place sort.
+`Tests/Verification/Quicksort.lean` verifies a generic in-place sort.
 
 ### Calls
 

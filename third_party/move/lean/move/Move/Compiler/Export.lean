@@ -1277,7 +1277,9 @@ private unsafe def elabEmitLeanerXIRUnsafe (moduleTerm : Syntax) :
     if ← (System.FilePath.mk path).pathExists then
       throwErrorAt moduleTerm "a `.lean` compiler input may contain only one Leaner export directive"
     IO.FS.writeFile path encoded
-    logInfo s!"wrote Leaner XIR to {path}"
+    -- Compiler-provided paths live in random private directories. Do not leak
+    -- that unstable implementation detail into diagnostics or test baselines.
+    logInfo "wrote Leaner XIR"
 
 @[implemented_by elabEmitLeanerXIRUnsafe]
 private opaque elabEmitLeanerXIR (moduleTerm : Syntax) : CommandElabM Unit

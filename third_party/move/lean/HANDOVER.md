@@ -65,7 +65,7 @@ Design points worth knowing (all in `move/Move/Verify/Syntax.lean`):
 
 New tests: `Move/Tests/{GlobalBorrows,Callees,ControlForms,CorePrimitives,
 GenericStorage}.lean` (registered in `Move/Tests.lean`); a new rejection
-fixture in `Move/Tests/LowLevel/Rejections.lean` (a clause naming a family
+fixture in `Move/Tests/Negative/Lowering.lean` (a clause naming a family
 the function does not touch).
 
 `Move/project-plan.md` also gained a **Move language coverage** section —
@@ -79,7 +79,7 @@ comparisons (`a < b` as a value), `>`, `>=` turned out not to compile
 `Move/Compiler/Normalize.lean`) although the reference claimed them; both are
 now lowered (`decide` is the identity on the Boolean the comparison produced),
 and the translator maps `>`/`>=`/`!=` to the sealed markers like `<`/`==`
-(`Move/Tests/Arithmetic.lean` covers the spellings).
+(`Move/Tests/Language/Arithmetic.lean` covers the spellings).
 
 The remaining verification-roadmap items were completed afterward: mutually
 recursive SCCs and their contract families, two simultaneous mutable-reference

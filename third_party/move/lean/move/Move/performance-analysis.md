@@ -1,6 +1,6 @@
 # Complexity of the verification encoding
 
-Status: current as of 2026-08-21.  Every optimization considered is listed
+Status: current as of 2026-08-22.  Every optimization considered is listed
 with an explicit verdict — done, rejected, or open — in the status table under
 *Optimization strategies*; the outcome of each is recorded under its heading,
 and the numbers behind the verdicts are under *Benchmarking proof cost*.
@@ -348,7 +348,7 @@ only masks two integers.  `Integers.masked` cost 1.99M heartbeats instead of
 The fix is to state the priority in the set that will be used —
 `attribute [move_norm high] …`, `@[simp high, wp_norm high]`.  With it, the
 first `simp only` phase closes those goals, the `Nat.*` bitwise lemmas come
-back out of the `grind` list, and `Tests/Move/Integers` drops to 0.80× of its
+back out of the `grind` list, and `Tests/Language/Integers` drops to 0.80× of its
 own pre-unification cost.
 
 Symptom to recognise: `simp only [<attr>]` leaves a goal that
@@ -363,7 +363,7 @@ Lean's `diagnostics` option makes `simp` report, per call, every theorem it
 never applied:
 
 ```
-scripts/simp-audit.sh [file ...]     # default: Tests/Move/*.lean
+scripts/simp-audit.sh [file ...]     # default: Move/Tests/**/*.lean
 ```
 
 It aggregates those counts across files and prints the theorems that never fire
@@ -487,7 +487,14 @@ by contrast, swings 2–4× per proof and is reported only as a hint.
 scripts/bench-proofs.sh [top-N]     # rebuilds the suite with benchmarking on
 ```
 
-Two current figures, and they are not interchangeable:
+The 2026-08-22 categorized-suite run covers **217 verified functions** at
+**226.6765M heartbeats** (11.738s aggregate proof wall on the measurement
+host). The largest proof remains `OrderedMap.lower_bound_loop` at 10.895M.
+The revision-comparison figures below use the older common-115 corpus and are
+retained as historical apples-to-apples measurements; they should not be
+compared directly with the expanded whole-suite total.
+
+Two historical comparison figures, and they are not interchangeable:
 
 - **whole suite, 121 verified functions: 111.4M heartbeats** (~6s of proof wall
   in total — the actual verification work is a small fraction of the ~40s suite

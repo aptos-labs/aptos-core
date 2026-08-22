@@ -999,24 +999,45 @@ impl FunctionTranslator<'_> {
             },
             Oper::VecGet => {
                 arity(dsts, srcs, 1, 2, oper)?;
-                let element = self.vector_element_type(self.local(srcs[0])?)?;
-                let vector_ref = self.fresh_local(Type::Reference(
-                    ReferenceKind::Immutable,
-                    Box::new(Type::Vector(Box::new(element.clone()))),
-                ));
+                let source_type = self.local(srcs[0])?.clone();
+                let element = self.vector_element_type(&source_type)?;
+                let vector_ref = match source_type {
+                    Type::Reference(ReferenceKind::Immutable, _) => srcs[0],
+                    Type::Reference(ReferenceKind::Mutable, referent) => {
+                        let reference =
+                            self.fresh_local(Type::Reference(ReferenceKind::Immutable, referent));
+                        self.emit(|attr| {
+                            Bytecode::Call(
+                                attr,
+                                vec![reference],
+                                StacklessOperation::FreezeRef(true),
+                                vec![srcs[0]],
+                                None,
+                            )
+                        })?;
+                        reference
+                    },
+                    vector_type => {
+                        let reference = self.fresh_local(Type::Reference(
+                            ReferenceKind::Immutable,
+                            Box::new(vector_type),
+                        ));
+                        self.emit(|attr| {
+                            Bytecode::Call(
+                                attr,
+                                vec![reference],
+                                StacklessOperation::BorrowLoc,
+                                vec![srcs[0]],
+                                None,
+                            )
+                        })?;
+                        reference
+                    },
+                };
                 let element_ref = self.fresh_local(Type::Reference(
                     ReferenceKind::Immutable,
                     Box::new(element.clone()),
                 ));
-                self.emit(|attr| {
-                    Bytecode::Call(
-                        attr,
-                        vec![vector_ref],
-                        StacklessOperation::BorrowLoc,
-                        vec![srcs[0]],
-                        None,
-                    )
-                })?;
                 let operation = self.vector_function("borrow", element)?;
                 self.emit(|attr| {
                     Bytecode::Call(
@@ -1169,19 +1190,39 @@ impl FunctionTranslator<'_> {
                     Oper::MoveToInst(_, args) => self.type_args(args)?,
                     _ => vec![],
                 };
-                let signer_ref = self.fresh_local(Type::Reference(
-                    ReferenceKind::Immutable,
-                    Box::new(Type::Primitive(PrimitiveType::Signer)),
-                ));
-                self.emit(|attr| {
-                    Bytecode::Call(
-                        attr,
-                        vec![signer_ref],
-                        StacklessOperation::BorrowLoc,
-                        vec![srcs[0]],
-                        None,
-                    )
-                })?;
+                let signer_ref = match self.local(srcs[0])?.clone() {
+                    Type::Reference(ReferenceKind::Immutable, _) => srcs[0],
+                    Type::Reference(ReferenceKind::Mutable, referent) => {
+                        let reference =
+                            self.fresh_local(Type::Reference(ReferenceKind::Immutable, referent));
+                        self.emit(|attr| {
+                            Bytecode::Call(
+                                attr,
+                                vec![reference],
+                                StacklessOperation::FreezeRef(true),
+                                vec![srcs[0]],
+                                None,
+                            )
+                        })?;
+                        reference
+                    },
+                    signer_type => {
+                        let reference = self.fresh_local(Type::Reference(
+                            ReferenceKind::Immutable,
+                            Box::new(signer_type),
+                        ));
+                        self.emit(|attr| {
+                            Bytecode::Call(
+                                attr,
+                                vec![reference],
+                                StacklessOperation::BorrowLoc,
+                                vec![srcs[0]],
+                                None,
+                            )
+                        })?;
+                        reference
+                    },
+                };
                 let module_id = self.module_id;
                 self.emit(|attr| {
                     Bytecode::Call(
@@ -2058,6 +2099,38 @@ mod tests {
         serde_json::from_str(&account_golden()).unwrap()
     }
 
+    fn import_and_verify(module: XirModule) {
+        let source = parse_source(
+            PathBuf::from("test.xir.json"),
+            String::new(),
+            &serde_json::to_string(&module).unwrap(),
+        )
+        .unwrap();
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        import_sources(&mut env, &[source], &mut targets).unwrap();
+        let options = Options::default();
+        env.set_extension(options.clone());
+        crate::run_stackless_bytecode_pipeline(
+            &env,
+            crate::stackless_bytecode_check_pipeline(&options),
+            &mut targets,
+        );
+        assert!(!env.has_errors());
+        crate::run_stackless_bytecode_pipeline(
+            &env,
+            crate::stackless_bytecode_optimization_pipeline(&options),
+            &mut targets,
+        );
+        assert!(!env.has_errors());
+        let units = crate::run_file_format_gen(&mut env, &targets);
+        assert!(!env.has_errors());
+        let legacy_move_compiler::compiled_unit::CompiledUnit::Module(module) = &units[0] else {
+            panic!("expected module")
+        };
+        move_bytecode_verifier::verify_module(&module.module).unwrap();
+    }
+
     #[test]
     fn account_golden_decodes() {
         let source = parse_source(
@@ -2172,6 +2245,21 @@ mod tests {
     }
 
     #[test]
+    fn move_to_accepts_an_existing_signer_reference() {
+        let mut module = account_module();
+        let function = &mut module.functions[0];
+        function.params = 2;
+        function.returns.clear();
+        function.locals = vec![Ty::Ref(Box::new(Ty::Signer)), Ty::Struct(1)];
+        function.acquires.clear();
+        function.blocks = vec![Block {
+            instrs: vec![Instr::Call(vec![], Oper::MoveTo(1), vec![0, 1])],
+            term: Term::Ret(vec![]),
+        }];
+        import_and_verify(module);
+    }
+
+    #[test]
     fn rejects_invalid_read_ref_arity() {
         let mut module = account_module();
         module.functions[0].blocks[0].instrs[0] = Instr::Call(vec![], Oper::ReadRef, vec![]);
@@ -2237,6 +2325,93 @@ mod tests {
         assert!(error
             .to_string()
             .contains("type parameter index 0 is out of range"));
+    }
+
+    #[test]
+    fn rejects_invalid_entry_and_branch_targets() {
+        let mut module = account_module();
+        module.functions[0].entry = 1;
+        let error = parse_source(
+            PathBuf::from("invalid-entry.xir.json"),
+            String::new(),
+            &serde_json::to_string(&module).unwrap(),
+        )
+        .err()
+        .expect("out-of-range entry block should be rejected");
+        assert!(error.to_string().contains("entry block is out of range"));
+
+        let mut module = account_module();
+        module.functions[0].blocks[0].term = Term::Jump(99);
+        let source = parse_source(
+            PathBuf::from("invalid-jump.xir.json"),
+            String::new(),
+            &serde_json::to_string(&module).unwrap(),
+        )
+        .unwrap();
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        let error = import_sources(&mut env, &[source], &mut targets).unwrap_err();
+        assert!(format!("{error:#}").contains("block 99 is out of range"));
+    }
+
+    #[test]
+    fn rejects_invalid_local_and_return_arity() {
+        let mut module = account_module();
+        module.functions[0].blocks[0].instrs[0] = Instr::Assign(0, 99);
+        let source = parse_source(
+            PathBuf::from("invalid-local.xir.json"),
+            String::new(),
+            &serde_json::to_string(&module).unwrap(),
+        )
+        .unwrap();
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        let error = import_sources(&mut env, &[source], &mut targets).unwrap_err();
+        assert!(format!("{error:#}").contains("local l99 is out of range"));
+
+        let mut module = account_module();
+        module.functions[0].blocks[0].term = Term::Ret(vec![0]);
+        let source = parse_source(
+            PathBuf::from("invalid-return.xir.json"),
+            String::new(),
+            &serde_json::to_string(&module).unwrap(),
+        )
+        .unwrap();
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        let error = import_sources(&mut env, &[source], &mut targets).unwrap_err();
+        assert!(format!("{error:#}").contains("return arity mismatch"));
+    }
+
+    #[test]
+    fn rejects_unknown_struct_and_invalid_address_constant() {
+        let mut module = account_module();
+        module.functions[0].blocks[0].instrs[0] = Instr::Call(vec![1], Oper::Exists(99), vec![0]);
+        let source = parse_source(
+            PathBuf::from("invalid-struct.xir.json"),
+            String::new(),
+            &serde_json::to_string(&module).unwrap(),
+        )
+        .unwrap();
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        let error = import_sources(&mut env, &[source], &mut targets).unwrap_err();
+        assert!(format!("{error:#}").contains("struct id 99 is out of range"));
+
+        let mut module = account_module();
+        module.functions[0].locals[0] = Ty::Address;
+        module.functions[0].blocks[0].instrs[0] =
+            Instr::Load(0, Constant::Address("not-an-address".to_string()));
+        let source = parse_source(
+            PathBuf::from("invalid-address.xir.json"),
+            String::new(),
+            &serde_json::to_string(&module).unwrap(),
+        )
+        .unwrap();
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        let error = import_sources(&mut env, &[source], &mut targets).unwrap_err();
+        assert!(format!("{error:#}").contains("invalid address constant `not-an-address`"));
     }
 
     #[test]
