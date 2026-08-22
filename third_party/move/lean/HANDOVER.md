@@ -21,7 +21,7 @@ libraries and module components PascalCase.  Tests are split per library —
 root module per test library; `globs` does not work).  The shared helper is
 `MoveModel.Tests.Common`.
 
-Verify (all with `ulimit -n 65535`):
+Verify (all with `ulimit -n 1048576`):
 
 ```bash
 cd move        && lake test    # 85 jobs
