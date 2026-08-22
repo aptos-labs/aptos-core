@@ -1511,6 +1511,47 @@ private def boundIdentifier? (element : Lean.DoElem) : Option (Name × Bool) :=
       some (name.getId, true)
   | _ => none
 
+/-- All identifiers introduced by a `do`-local declaration.  This deliberately
+handles patterns as well as the common single-identifier forms: the retained
+source used for a contract does not carry Lean's hygienic local identity, so a
+same-spelled binding must be treated as a possible shadowing declaration. -/
+private partial def doPatternIdentifiers (stx : Syntax) : List Name :=
+  if stx.isIdent then [stx.getId]
+  else stx.getArgs.toList.flatMap doPatternIdentifiers
+
+private partial def firstDoIdentifier? (stx : Syntax) : Option Name :=
+  if stx.isIdent then some stx.getId
+  else stx.getArgs.findSome? firstDoIdentifier?
+
+private def doElementBinds (name : Name) (element : Lean.DoElem) : Bool :=
+  let stx := element.raw
+  if !(stx.isOfKind ``Lean.Parser.Term.doLet ||
+      stx.isOfKind ``Lean.Parser.Term.doLetArrow) || stx.getNumArgs ≤ 3 then
+    false
+  else
+    let declaration := stx[3]
+    if declaration.isOfKind ``Lean.Parser.Term.letPatDecl ||
+        declaration.isOfKind ``Lean.Parser.Term.doPatDecl then
+      (doPatternIdentifiers declaration[0]!).any (· == name)
+    else
+      firstDoIdentifier? declaration == some name
+
+/-- A re-binding of a live mutable-reference name cannot be represented by
+the current source-spec prophecy encoding.  In particular, textual-use
+tracking would otherwise mistake uses of the new local for uses of the old
+loan and refresh the owner from the wrong value.  Refuse that source form
+until the encoding carries alpha-renamed local identities. -/
+private def mutableBorrowShadowing? (name : Name) (elements : Array Lean.DoElem) :
+    Option Lean.DoElem :=
+  let (_, shadow?) := elements.foldl (init := (false, none)) fun state element =>
+    let (used, shadow?) := state
+    if shadow?.isSome then state
+    else if doElementBinds name element then
+      (used, if used then some element else none)
+    else
+      (used || containsIdentifier name element.raw, none)
+  shadow?
+
 private partial def closeBorrowScope (elements : Array Lean.DoElem)
     (size : Nat) : Nat :=
   let extended := (elements.extract 0 size).foldl (init := size) fun result element =>
@@ -1529,11 +1570,14 @@ private partial def closeBorrowScope (elements : Array Lean.DoElem)
 reference local. The prefix is the loan body; the suffix executes after the
 loan has been reconciled. -/
 private def mutableBorrowScope (name : Name) (elements : Array Lean.DoElem) :
-    Array Lean.DoElem × Array Lean.DoElem :=
+    CommandElabM (Array Lean.DoElem × Array Lean.DoElem) := do
+  if let some shadow := mutableBorrowShadowing? name elements then
+    throwErrorAt shadow
+      "automatic source specifications do not support shadowing a live mutable reference"
   let lastUse := elements.zipIdx.foldl (init := none) fun result (element, index) =>
     if containsIdentifier name element.raw then some index else result
   let size := closeBorrowScope elements (lastUse.map (· + 1) |>.getD 0)
-  (elements.extract 0 size, elements.extract size elements.size)
+  pure (elements.extract 0 size, elements.extract size elements.size)
 
 /-- NLL for the borrow checker follows reference derivations, but not copied
 values.  The prophecy translator's `mutableBorrowScope` above intentionally
@@ -2969,7 +3013,7 @@ private partial def globalMutableBorrow (context : TranslationContext)
     (name : TSyntax `ident) (place : Syntax) (family : Family)
     (key : TSyntax `term) (fields : Array (TSyntax `ident))
     (rest : Array Lean.DoElem) : CommandElabM (TSyntax `term) := do
-  let (loanBody, continuation) := mutableBorrowScope name.getId rest
+  let (loanBody, continuation) ← mutableBorrowScope name.getId rest
   let descriptor ← resourceFor context.resources family
   let resourceName := family.head
   let referentType? ← pathTypeName? (some resourceName)
@@ -3063,7 +3107,7 @@ private partial def elementMutableBorrow (context : TranslationContext)
     (index : TSyntax `term) (fields : Array (TSyntax `ident))
     (rest : Array Lean.DoElem) : CommandElabM (TSyntax `term) := do
   let ownerIsMutation := context.mutation?.any (·.getId == vector.getId)
-  let (loanBody, continuation) := mutableBorrowScope name.getId rest
+  let (loanBody, continuation) ← mutableBorrowScope name.getId rest
   withHoisted context #[index] fun residuals => do
   let index := residuals[0]!
   let nested ← translateDo
@@ -3349,7 +3393,7 @@ private partial def translateDo (context : TranslationContext)
   -- owner's final value.
   match first with
   | `(doElem| let $name:ident ← &mut $_place:term) =>
-      let (loanBody, continuation) := mutableBorrowScope name.getId rest
+      let (loanBody, continuation) ← mutableBorrowScope name.getId rest
       if loanBody.isEmpty then
         return ← translateDo context continuation
   | _ => pure ()
@@ -3383,7 +3427,7 @@ private partial def translateDo (context : TranslationContext)
             throwErrorAt first "nested mutable borrows are not yet supported by source specification generation"
         elementMutableBorrow context name first.raw vector index fields rest
       else if let some parent := context.mutation? then
-        let (loanBody, continuation) := mutableBorrowScope name.getId rest
+        let (loanBody, continuation) ← mutableBorrowScope name.getId rest
         let some (owner, fields) ← localPlace? context.resources place
           | throwErrorAt place
               "a nested mutable borrow must select a field of the live mutable reference"
@@ -3447,7 +3491,7 @@ private partial def translateDo (context : TranslationContext)
                 let $parent := Move.Semantics.Mutation.write $parent $updated
                 $after))
       else if place.raw.isIdent && !(← hasResource context.resources ⟨place.raw⟩) then
-        let (loanBody, continuation) := mutableBorrowScope name.getId rest
+        let (loanBody, continuation) ← mutableBorrowScope name.getId rest
         let localIdent : TSyntax `ident := ⟨place.raw⟩
         -- Keep values produced in the loan body in lexical scope, but refresh
         -- the owner from the prophecy before translating code after the

@@ -43,4 +43,22 @@ error: borrow safety error `poisoned`: reference was poisoned by an overlapping 
 spec poisoned_use where
   ensures True
 
+/-- The source-spec encoding must not confuse a shadowing local with the
+still-live mutable reference.  Rejecting this unsupported form is sound: it
+prevents a later owner refresh from reading the shadow instead of the loan. -/
+fun shadowed_mutable_reference : Action U64 := do
+  let mut owner : U64 := 0
+  let valueRef ← &mut owner
+  valueRef := 1
+  let valueRef : U64 := 2
+  let output := valueRef
+  pure output
+
+/--
+error: automatic source specifications do not support shadowing a live mutable reference
+-/
+#guard_msgs in
+spec shadowed_mutable_reference where
+  ensures result = 2
+
 end Move.Tests.Negative.Borrows
