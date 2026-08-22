@@ -68,11 +68,19 @@ move_module SourceVerification where
   theorem increment_verified :
       Verify.Satisfies incrementSpec incrementContract := by
     intro value initial _
+    -- the checked specification states its side condition over `Int`; the
+    -- contract is written in the unsigned `toNat` view
+    have bridge : Semantics.Checked.inRange (Move.numTypeOf Move.Unsigned Move.W64)
+        (value.toInt + (1 : U64).toInt) ↔ value.toNat + 1 < U64.size := by
+      rw [Semantics.Checked.inRange_add, Move.UInt.toNat_one]
+      exact Iff.rfl
     refine ⟨?_, ?_, ?_⟩
-    · exact fun result final execution =>
-        ⟨fun _ => ⟨execution.1, execution.2.1⟩, execution.2.2⟩
+    · refine fun result final execution => ⟨fun _ => ⟨bridge.mp execution.1, ?_⟩, execution.2.2⟩
+      have hv := execution.2.1
+      rw [Move.UInt.ofInt_add, Move.UInt.toNat_one] at hv
+      exact hv
     · intro code execution
-      exact execution
+      exact ⟨execution.1, fun h => execution.2 (bridge.mpr h)⟩
     · simp [incrementSpec, Semantics.Checked.addSpec]
 
   /-- Mutable source syntax lowers normally; its proof semantics uses a

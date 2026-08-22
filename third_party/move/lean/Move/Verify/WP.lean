@@ -18,26 +18,25 @@ open Move.Semantics
 
 /-- Checked addition in one obligation: the normal continuation under the
 no-overflow hypothesis, and the arithmetic abort otherwise. -/
-@[simp, wp_norm] theorem wp_addSpec {W : Type} [Move.Width W] (lhs rhs : Move.UInt W)
-    (ensures : Move.UInt W → State → Prop) (aborts : Nat → Prop)
+@[simp, wp_norm] theorem wp_addSpec {S W : Type} [Move.Sign S] [Move.Width W]
+    (lhs rhs : Move.MoveInt S W)
+    (ensures : Move.MoveInt S W → State → Prop) (aborts : Nat → Prop)
     (initial : State) :
-    wp (Checked.addSpec lhs rhs : Spec State (Move.UInt W)) ensures aborts initial ↔
-      (lhs.toNat + rhs.toNat < (Move.widthOf W).size →
-        ensures (Move.UInt.ofNat (lhs.toNat + rhs.toNat)) initial) ∧
-      (¬lhs.toNat + rhs.toNat < (Move.widthOf W).size →
-        aborts Checked.arithmeticAbortCode) := by
+    wp (Checked.addSpec lhs rhs : Spec State (Move.MoveInt S W)) ensures aborts initial ↔
+      (Checked.inRange (Move.numTypeOf S W) (lhs.toInt + rhs.toInt) →
+        ensures (Move.MoveInt.ofInt (lhs.toInt + rhs.toInt)) initial) ∧
+      (¬ Checked.inRange (Move.numTypeOf S W) (lhs.toInt + rhs.toInt) → aborts Checked.arithmeticAbortCode) := by
   rw [wp_total_iff (by simp [Checked.addSpec])]
   constructor
   · rintro ⟨normal, abnormal⟩
-    exact ⟨fun safe => normal _ initial ⟨safe, rfl, rfl⟩,
-      fun overflow => abnormal _ ⟨rfl, overflow⟩⟩
+    exact ⟨fun h => normal _ initial ⟨h, rfl, rfl⟩,
+      fun h => abnormal _ ⟨rfl, h⟩⟩
   · rintro ⟨normal, abnormal⟩
     constructor
-    · rintro value final ⟨safe, rfl, rfl⟩
-      exact normal safe
-    · rintro code ⟨rfl, overflow⟩
-      exact abnormal overflow
-
+    · rintro value final ⟨hs, rfl, rfl⟩
+      exact normal hs
+    · rintro code ⟨rfl, h⟩
+      exact abnormal h
 /-- Certifying the global state: the invariant is the obligation asserted at
 this point, and the continuation may then assume it. -/
 @[simp, wp_norm] theorem wp_certifyState (invariant : State → Prop)
@@ -114,77 +113,75 @@ continuation may use it. -/
 
 /-- Checked subtraction in one obligation: the normal continuation under the
 no-underflow hypothesis, and the arithmetic abort otherwise. -/
-@[simp, wp_norm] theorem wp_subSpec {W : Type} [Move.Width W] (lhs rhs : Move.UInt W)
-    (ensures : Move.UInt W → State → Prop) (aborts : Nat → Prop)
+@[simp, wp_norm] theorem wp_subSpec {S W : Type} [Move.Sign S] [Move.Width W]
+    (lhs rhs : Move.MoveInt S W)
+    (ensures : Move.MoveInt S W → State → Prop) (aborts : Nat → Prop)
     (initial : State) :
-    wp (Checked.subSpec lhs rhs : Spec State (Move.UInt W)) ensures aborts initial ↔
-      (rhs.toNat ≤ lhs.toNat →
-        ensures (Move.UInt.ofNat (lhs.toNat - rhs.toNat)) initial) ∧
-      (¬rhs.toNat ≤ lhs.toNat → aborts Checked.arithmeticAbortCode) := by
+    wp (Checked.subSpec lhs rhs : Spec State (Move.MoveInt S W)) ensures aborts initial ↔
+      (Checked.inRange (Move.numTypeOf S W) (lhs.toInt - rhs.toInt) →
+        ensures (Move.MoveInt.ofInt (lhs.toInt - rhs.toInt)) initial) ∧
+      (¬ Checked.inRange (Move.numTypeOf S W) (lhs.toInt - rhs.toInt) → aborts Checked.arithmeticAbortCode) := by
   rw [wp_total_iff (by simp [Checked.subSpec])]
   constructor
   · rintro ⟨normal, abnormal⟩
-    exact ⟨fun safe => normal _ initial ⟨safe, rfl, rfl⟩,
-      fun underflow => abnormal _ ⟨rfl, underflow⟩⟩
+    exact ⟨fun h => normal _ initial ⟨h, rfl, rfl⟩,
+      fun h => abnormal _ ⟨rfl, h⟩⟩
   · rintro ⟨normal, abnormal⟩
     constructor
-    · rintro value final ⟨safe, rfl, rfl⟩
-      exact normal safe
-    · rintro code ⟨rfl, underflow⟩
-      exact abnormal underflow
-
+    · rintro value final ⟨hs, rfl, rfl⟩
+      exact normal hs
+    · rintro code ⟨rfl, h⟩
+      exact abnormal h
 /-- Checked multiplication in one obligation. -/
-@[simp, wp_norm] theorem wp_mulSpec {W : Type} [Move.Width W] (lhs rhs : Move.UInt W)
-    (ensures : Move.UInt W → State → Prop) (aborts : Nat → Prop)
+@[simp, wp_norm] theorem wp_mulSpec {S W : Type} [Move.Sign S] [Move.Width W]
+    (lhs rhs : Move.MoveInt S W)
+    (ensures : Move.MoveInt S W → State → Prop) (aborts : Nat → Prop)
     (initial : State) :
-    wp (Checked.mulSpec lhs rhs : Spec State (Move.UInt W)) ensures aborts initial ↔
-      (lhs.toNat * rhs.toNat < (Move.widthOf W).size →
-        ensures (Move.UInt.ofNat (lhs.toNat * rhs.toNat)) initial) ∧
-      (¬lhs.toNat * rhs.toNat < (Move.widthOf W).size →
-        aborts Checked.arithmeticAbortCode) := by
+    wp (Checked.mulSpec lhs rhs : Spec State (Move.MoveInt S W)) ensures aborts initial ↔
+      (Checked.inRange (Move.numTypeOf S W) (lhs.toInt * rhs.toInt) →
+        ensures (Move.MoveInt.ofInt (lhs.toInt * rhs.toInt)) initial) ∧
+      (¬ Checked.inRange (Move.numTypeOf S W) (lhs.toInt * rhs.toInt) → aborts Checked.arithmeticAbortCode) := by
   rw [wp_total_iff (by simp [Checked.mulSpec])]
   constructor
   · rintro ⟨normal, abnormal⟩
-    exact ⟨fun safe => normal _ initial ⟨safe, rfl, rfl⟩,
-      fun overflow => abnormal _ ⟨rfl, overflow⟩⟩
+    exact ⟨fun h => normal _ initial ⟨h, rfl, rfl⟩,
+      fun h => abnormal _ ⟨rfl, h⟩⟩
   · rintro ⟨normal, abnormal⟩
     constructor
-    · rintro value final ⟨safe, rfl, rfl⟩
-      exact normal safe
-    · rintro code ⟨rfl, overflow⟩
-      exact abnormal overflow
-
+    · rintro value final ⟨hs, rfl, rfl⟩
+      exact normal hs
+    · rintro code ⟨rfl, h⟩
+      exact abnormal h
 /-- Checked division in one obligation: the normal continuation under the
 nonzero-divisor hypothesis, and the arithmetic abort otherwise. -/
-@[simp, wp_norm] theorem wp_divSpec {W : Type} [Move.Width W] (lhs rhs : Move.UInt W)
-    (ensures : Move.UInt W → State → Prop) (aborts : Nat → Prop)
+@[simp, wp_norm] theorem wp_divSpec {S W : Type} [Move.Sign S] [Move.Width W]
+    (lhs rhs : Move.MoveInt S W)
+    (ensures : Move.MoveInt S W → State → Prop) (aborts : Nat → Prop)
     (initial : State) :
-    wp (Checked.divSpec lhs rhs : Spec State (Move.UInt W)) ensures aborts initial ↔
-      (rhs.toNat ≠ 0 →
-        ensures (Move.UInt.ofNat (lhs.toNat / rhs.toNat)) initial) ∧
-      (rhs.toNat = 0 → aborts Checked.arithmeticAbortCode) := by
+    wp (Checked.divSpec lhs rhs : Spec State (Move.MoveInt S W)) ensures aborts initial ↔
+      ((rhs.toInt ≠ 0 ∧ Checked.inRange (Move.numTypeOf S W) (lhs.toInt.tdiv rhs.toInt)) →
+        ensures (Move.MoveInt.ofInt (lhs.toInt.tdiv rhs.toInt)) initial) ∧
+      ((rhs.toInt = 0 ∨ ¬ Checked.inRange (Move.numTypeOf S W) (lhs.toInt.tdiv rhs.toInt)) → aborts Checked.arithmeticAbortCode) := by
   rw [wp_total_iff (by simp [Checked.divSpec])]
   constructor
   · rintro ⟨normal, abnormal⟩
-    exact ⟨fun nonzero => normal _ initial ⟨nonzero, rfl, rfl⟩,
-      fun zero => abnormal _ ⟨rfl, zero⟩⟩
+    exact ⟨fun h => normal _ initial ⟨h.1, h.2, rfl, rfl⟩,
+      fun h => abnormal _ ⟨rfl, h⟩⟩
   · rintro ⟨normal, abnormal⟩
     constructor
-    · rintro value final ⟨nonzero, rfl, rfl⟩
-      exact normal nonzero
-    · rintro code ⟨rfl, zero⟩
-      exact abnormal zero
-
-
+    · rintro value final ⟨hz, hs, rfl, rfl⟩
+      exact normal ⟨hz, hs⟩
+    · rintro code ⟨rfl, h⟩
+      exact abnormal h
 /-- Checked left shift in one obligation: the normal continuation under the
 in-range shift-amount hypothesis, and the arithmetic abort otherwise. -/
-@[simp, wp_norm] theorem wp_shlSpec {W : Type} [Move.Width W] (lhs : Move.UInt W)
+@[simp, wp_norm] theorem wp_shlSpec {S W : Type} [Move.Sign S] [Move.Width W] (lhs : Move.MoveInt S W)
     (amount : Move.UInt Move.W8)
-    (ensures : Move.UInt W → State → Prop) (aborts : Nat → Prop)
+    (ensures : Move.MoveInt S W → State → Prop) (aborts : Nat → Prop)
     (initial : State) :
-    wp (Checked.shlSpec lhs amount : Spec State (Move.UInt W))
+    wp (Checked.shlSpec lhs amount : Spec State (Move.MoveInt S W))
         ensures aborts initial ↔
-      (amount.toNat < (Move.widthOf W).bits → ensures (Move.UInt.shl lhs amount) initial) ∧
+      (amount.toNat < (Move.widthOf W).bits → ensures (Move.MoveInt.shl lhs amount) initial) ∧
       (¬amount.toNat < (Move.widthOf W).bits → aborts Checked.arithmeticAbortCode) := by
   rw [wp_total_iff (by simp [Checked.shlSpec])]
   constructor
@@ -199,13 +196,13 @@ in-range shift-amount hypothesis, and the arithmetic abort otherwise. -/
       exact abnormal overflow
 
 /-- Checked right shift in one obligation. -/
-@[simp, wp_norm] theorem wp_shrSpec {W : Type} [Move.Width W] (lhs : Move.UInt W)
+@[simp, wp_norm] theorem wp_shrSpec {S W : Type} [Move.Sign S] [Move.Width W] (lhs : Move.MoveInt S W)
     (amount : Move.UInt Move.W8)
-    (ensures : Move.UInt W → State → Prop) (aborts : Nat → Prop)
+    (ensures : Move.MoveInt S W → State → Prop) (aborts : Nat → Prop)
     (initial : State) :
-    wp (Checked.shrSpec lhs amount : Spec State (Move.UInt W))
+    wp (Checked.shrSpec lhs amount : Spec State (Move.MoveInt S W))
         ensures aborts initial ↔
-      (amount.toNat < (Move.widthOf W).bits → ensures (Move.UInt.shr lhs amount) initial) ∧
+      (amount.toNat < (Move.widthOf W).bits → ensures (Move.MoveInt.shr lhs amount) initial) ∧
       (¬amount.toNat < (Move.widthOf W).bits → aborts Checked.arithmeticAbortCode) := by
   rw [wp_total_iff (by simp [Checked.shrSpec])]
   constructor
@@ -221,15 +218,16 @@ in-range shift-amount hypothesis, and the arithmetic abort otherwise. -/
 
 /-- Checked integer cast in one obligation: the normal continuation under the
 fits-in-target hypothesis, and the arithmetic abort otherwise. -/
-@[simp, wp_norm] theorem wp_castSpec {W W' : Type} [Move.Width W]
-    [Move.Width W'] (value : Move.UInt W)
-    (ensures : Move.UInt W' → State → Prop) (aborts : Nat → Prop)
+@[simp, wp_norm] theorem wp_castSpec {S W S' W' : Type} [Move.Sign S]
+    [Move.Width W] [Move.Sign S'] [Move.Width W'] (value : Move.MoveInt S W)
+    (ensures : Move.MoveInt S' W' → State → Prop) (aborts : Nat → Prop)
     (initial : State) :
-    wp (Checked.castSpec value : Spec State (Move.UInt W'))
+    wp (Checked.castSpec value : Spec State (Move.MoveInt S' W'))
         ensures aborts initial ↔
-      (value.toNat < (Move.widthOf W').size →
-        ensures (Move.UInt.cast value) initial) ∧
-      (¬value.toNat < (Move.widthOf W').size → aborts Checked.arithmeticAbortCode) := by
+      (Checked.inRange (Move.numTypeOf S' W') value.toInt →
+        ensures (Move.MoveInt.cast value) initial) ∧
+      (¬ Checked.inRange (Move.numTypeOf S' W') value.toInt →
+        aborts Checked.arithmeticAbortCode) := by
   rw [wp_total_iff (by simp [Checked.castSpec])]
   constructor
   · rintro ⟨normal, abnormal⟩
@@ -243,24 +241,121 @@ fits-in-target hypothesis, and the arithmetic abort otherwise. -/
       exact abnormal overflow
 
 /-- Checked remainder in one obligation. -/
-@[simp, wp_norm] theorem wp_modSpec {W : Type} [Move.Width W] (lhs rhs : Move.UInt W)
+@[simp, wp_norm] theorem wp_modSpec {S W : Type} [Move.Sign S] [Move.Width W]
+    (lhs rhs : Move.MoveInt S W)
+    (ensures : Move.MoveInt S W → State → Prop) (aborts : Nat → Prop)
+    (initial : State) :
+    wp (Checked.modSpec lhs rhs : Spec State (Move.MoveInt S W)) ensures aborts initial ↔
+      (rhs.toInt ≠ 0 →
+        ensures (Move.MoveInt.ofInt (lhs.toInt.tmod rhs.toInt)) initial) ∧
+      (rhs.toInt = 0 → aborts Checked.arithmeticAbortCode) := by
+  rw [wp_total_iff (by simp [Checked.modSpec])]
+  constructor
+  · rintro ⟨normal, abnormal⟩
+    exact ⟨fun h => normal _ initial ⟨h, rfl, rfl⟩,
+      fun h => abnormal _ ⟨rfl, h⟩⟩
+  · rintro ⟨normal, abnormal⟩
+    constructor
+    · rintro value final ⟨hs, rfl, rfl⟩
+      exact normal hs
+    · rintro code ⟨rfl, h⟩
+      exact abnormal h
+
+/-! ## The unsigned view of the checked-arithmetic rules
+
+The generic rules above state every obligation in the neutral `Int` domain,
+because that is the domain the unified `Checked` specifications compute in.
+Unsigned source code, however, is specified in `Nat` — `toNat`, `ofNat`, and a
+`< size` bound.  Left to itself, every unsigned proof would first rewrite the
+generic obligation and then translate it back, paying a second normalization
+pass over the whole goal.
+
+These rules state the unsigned obligation *directly* in that view, so it is
+what the proof sees in the first place.  They are keyed on `MoveInt Unsigned W`,
+a constant head, so `simp`'s discrimination tree picks the view in one step;
+`simp high` puts them ahead of the generic rules, which then serve only the
+signed view (whose native domain already is `Int`). -/
+
+@[simp high, wp_norm high] theorem wp_addSpec_unsigned {W : Type} [Move.Width W]
+    (lhs rhs : Move.UInt W)
+    (ensures : Move.UInt W → State → Prop) (aborts : Nat → Prop)
+    (initial : State) :
+    wp (Checked.addSpec lhs rhs : Spec State (Move.UInt W)) ensures aborts initial ↔
+      (lhs.toNat + rhs.toNat < (Move.widthOf W).size →
+        ensures (Move.UInt.ofNat (lhs.toNat + rhs.toNat)) initial) ∧
+      (¬lhs.toNat + rhs.toNat < (Move.widthOf W).size →
+        aborts Checked.arithmeticAbortCode) := by
+  rw [wp_addSpec, Checked.inRange_add, Move.UInt.ofInt_add]
+
+@[simp high, wp_norm high] theorem wp_mulSpec_unsigned {W : Type} [Move.Width W]
+    (lhs rhs : Move.UInt W)
+    (ensures : Move.UInt W → State → Prop) (aborts : Nat → Prop)
+    (initial : State) :
+    wp (Checked.mulSpec lhs rhs : Spec State (Move.UInt W)) ensures aborts initial ↔
+      (lhs.toNat * rhs.toNat < (Move.widthOf W).size →
+        ensures (Move.UInt.ofNat (lhs.toNat * rhs.toNat)) initial) ∧
+      (¬lhs.toNat * rhs.toNat < (Move.widthOf W).size →
+        aborts Checked.arithmeticAbortCode) := by
+  rw [wp_mulSpec, Checked.inRange_mul, Move.UInt.ofInt_mul]
+
+@[simp high, wp_norm high] theorem wp_subSpec_unsigned {W : Type} [Move.Width W]
+    (lhs rhs : Move.UInt W)
+    (ensures : Move.UInt W → State → Prop) (aborts : Nat → Prop)
+    (initial : State) :
+    wp (Checked.subSpec lhs rhs : Spec State (Move.UInt W)) ensures aborts initial ↔
+      (rhs.toNat ≤ lhs.toNat →
+        ensures (Move.UInt.ofNat (lhs.toNat - rhs.toNat)) initial) ∧
+      (¬rhs.toNat ≤ lhs.toNat → aborts Checked.arithmeticAbortCode) := by
+  rw [wp_subSpec, Checked.inRange_sub]
+  refine and_congr ?_ Iff.rfl
+  constructor <;> intro h safe
+  · rw [← Move.UInt.ofInt_sub lhs rhs safe]; exact h safe
+  · rw [Move.UInt.ofInt_sub lhs rhs safe]; exact h safe
+
+@[simp high, wp_norm high] theorem wp_divSpec_unsigned {W : Type} [Move.Width W]
+    (lhs rhs : Move.UInt W)
+    (ensures : Move.UInt W → State → Prop) (aborts : Nat → Prop)
+    (initial : State) :
+    wp (Checked.divSpec lhs rhs : Spec State (Move.UInt W)) ensures aborts initial ↔
+      (rhs.toNat ≠ 0 →
+        ensures (Move.UInt.ofNat (lhs.toNat / rhs.toNat)) initial) ∧
+      (rhs.toNat = 0 → aborts Checked.arithmeticAbortCode) := by
+  have range := Checked.inRange_tdiv lhs rhs
+  rw [wp_divSpec, Move.UInt.ofInt_tdiv]
+  constructor
+  · rintro ⟨normal, abnormal⟩
+    refine ⟨fun nonzero => normal ⟨?_, range⟩, fun zero => abnormal (Or.inl ?_)⟩
+    · rw [Checked.toInt_ne_zero_iff]; exact nonzero
+    · rw [Checked.toInt_eq_zero_iff]; exact zero
+  · rintro ⟨normal, abnormal⟩
+    refine ⟨fun h => normal ?_, fun h => abnormal ?_⟩
+    · rw [← Checked.toInt_ne_zero_iff]; exact h.1
+    · rcases h with h | h
+      · rw [← Checked.toInt_eq_zero_iff]; exact h
+      · exact absurd range h
+
+@[simp high, wp_norm high] theorem wp_modSpec_unsigned {W : Type} [Move.Width W]
+    (lhs rhs : Move.UInt W)
     (ensures : Move.UInt W → State → Prop) (aborts : Nat → Prop)
     (initial : State) :
     wp (Checked.modSpec lhs rhs : Spec State (Move.UInt W)) ensures aborts initial ↔
       (rhs.toNat ≠ 0 →
         ensures (Move.UInt.ofNat (lhs.toNat % rhs.toNat)) initial) ∧
       (rhs.toNat = 0 → aborts Checked.arithmeticAbortCode) := by
-  rw [wp_total_iff (by simp [Checked.modSpec])]
-  constructor
-  · rintro ⟨normal, abnormal⟩
-    exact ⟨fun nonzero => normal _ initial ⟨nonzero, rfl, rfl⟩,
-      fun zero => abnormal _ ⟨rfl, zero⟩⟩
-  · rintro ⟨normal, abnormal⟩
-    constructor
-    · rintro value final ⟨nonzero, rfl, rfl⟩
-      exact normal nonzero
-    · rintro code ⟨rfl, zero⟩
-      exact abnormal zero
+  rw [wp_modSpec, Move.UInt.ofInt_tmod, Checked.toInt_ne_zero_iff,
+    Checked.toInt_eq_zero_iff]
+
+@[simp high, wp_norm high] theorem wp_castSpec_unsigned {W W' : Type} [Move.Width W]
+    [Move.Width W'] (value : Move.UInt W)
+    (ensures : Move.UInt W' → State → Prop) (aborts : Nat → Prop)
+    (initial : State) :
+    wp (Checked.castSpec value : Spec State (Move.UInt W'))
+        ensures aborts initial ↔
+      (value.toNat < (Move.widthOf W').size →
+        ensures (Move.MoveInt.cast value) initial) ∧
+      (¬value.toNat < (Move.widthOf W').size →
+        aborts Checked.arithmeticAbortCode) := by
+  rw [wp_castSpec, Checked.inRange_cast]
 
 @[simp, wp_norm] theorem wp_borrowElemSpec (values : Move.Vector α)
     (index : Move.U64) (ensures : α → State → Prop) (aborts : Nat → Prop)

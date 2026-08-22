@@ -84,10 +84,16 @@ index) **execute** (references are runtime values, `RefTarget`) but do
 prover, verification requires the bytecode-level *reference elimination*
 (`RefElim.lean`), which rewrites them into the value-level operations. -/
 inductive Oper where
-  | add (w : IntWidth) | sub | mul (w : IntWidth) | div | mod
-  | bitAnd | bitOr | bitXor
-  | shl (w : IntWidth) | shr (w : IntWidth)
-  | cast (target : IntWidth)
+  -- one integer-arithmetic family: each operation carries the operand's
+  -- `NumType` (width + signedness); signed and unsigned differ only in the
+  -- range checked/wrapped against.  Comparisons (`lt`/`le`/`eq`) are shared —
+  -- a value carries its mathematical magnitude, so ordering is correct for
+  -- both signs.
+  | add (nt : NumType) | sub (nt : NumType) | mul (nt : NumType)
+  | div (nt : NumType) | mod (nt : NumType)
+  | bitAnd (nt : NumType) | bitOr (nt : NumType) | bitXor (nt : NumType)
+  | shl (nt : NumType) | shr (nt : NumType)
+  | cast (target : NumType)
   | lt | le | eq | and | or | not
   | pack
   | packInst (args : List Ty)

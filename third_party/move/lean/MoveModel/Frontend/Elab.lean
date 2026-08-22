@@ -37,6 +37,7 @@ open Lean
 /-! ## Quotation: `ToExpr` instances for the first-order representation -/
 
 deriving instance ToExpr for IntWidth
+deriving instance ToExpr for NumType
 deriving instance ToExpr for Ty
 deriving instance ToExpr for TypeTagToken
 deriving instance ToExpr for ResourceKey

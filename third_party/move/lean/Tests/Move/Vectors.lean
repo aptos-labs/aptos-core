@@ -87,9 +87,6 @@ move_module Vectors where
     simp [move_spec, wp_norm, move_norm, Nat.reducePow,
       Move.Semantics.Mutation.read, Move.Semantics.Mutation.write,
       Move.Verify.wp, and_assoc]
-    rintro result final vector _ hresult rfl
-    subst hresult
-    exact ⟨rfl, rfl⟩
 
   /-! ## Tests -/
 

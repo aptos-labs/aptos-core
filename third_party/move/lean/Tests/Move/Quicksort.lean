@@ -774,7 +774,7 @@ move_module Quicksort where
     by_cases hrange : Move.Verify.Source.logicalLT low high
     · rw [if_pos hrange]
       rw [Move.Verify.Source.logicalLT_uint] at hrange
-      rw [Move.Semantics.Checked.subSpec_eq_pure
+      rw [Move.Semantics.Checked.subSpec_eq_pure_unsigned
           (by omega : low.toNat ≤ high.toNat),
         Move.Semantics.Spec.pure_bind]
       by_cases hspan : Move.Verify.Source.logicalLT 1
@@ -782,7 +782,7 @@ move_module Quicksort where
       · rw [if_pos hspan]
         rw [Move.Verify.Source.logicalLT_uint] at hspan
         spec_norm at hspan
-        rw [Move.Semantics.Checked.subSpec_eq_pure
+        rw [Move.Semantics.Checked.subSpec_eq_pure_unsigned
             (by omega : (1 : U64).toNat ≤ high.toNat),
           Move.Semantics.Spec.pure_bind, Move.Verify.wp_bind]
         refine Move.Verify.wp_mono

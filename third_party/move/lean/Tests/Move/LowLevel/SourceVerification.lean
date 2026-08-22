@@ -117,7 +117,12 @@ example : Satisfies addFiveSpec relationalAddContract := by
   · intro result final h
     rcases h with ⟨_, hresult, hfinal⟩
     exact ⟨fun _ => by
-        simpa [relationalAddContract, move_norm, Nat.reducePow, Nat.reduceMod]
+        -- this proof opens the relational spec on purpose, so it meets the
+        -- generic `ofInt` value; `ofInt_intLit` bridges it to the unsigned
+        -- view.  It is passed here rather than being a global `simp` lemma:
+        -- its `no_index` numeral key is a discrimination-tree wildcard.
+        simpa [relationalAddContract, move_norm, Move.UInt.ofInt_intLit,
+            Nat.reducePow, Nat.reduceMod]
           using hresult,
       hfinal⟩
   · intro code h

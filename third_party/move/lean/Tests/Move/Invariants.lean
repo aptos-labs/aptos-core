@@ -119,15 +119,13 @@ move_module Invariants where
   /-! ## Proofs -/
 
   verify span by
+    -- `data_invariants` supplies the value's own invariant, so the two
+    -- clauses need no prologue naming `Range.Invariant` here.
     contract_intro
-    -- The invariant speaks about the raw twin of the value; reduce its
-    -- projections before using the two clauses.
-    have certified := args.invariant
-    simp only [Range.Invariant] at certified
-    obtain ⟨ordered, bounded⟩ := certified
-    refine ⟨?_, ?_, ?_⟩ <;>
-      simp [Move.Semantics.Checked.subSpec, ordered, move_norm] <;>
-      omega
+    wp_norm
+    data_invariants
+    spec_norm at *
+    refine ⟨fun _ => ⟨?_, trivial⟩, fun below => ?_⟩ <;> omega
 
   verify firstPart by
     simp only [firstPart.contract]

@@ -54,6 +54,240 @@ theorem IntWidth.size_pos (w : IntWidth) : 0 < w.size :=
 theorem IntWidth.one_lt_size (w : IntWidth) : 1 < w.size :=
   Nat.one_lt_two_pow_iff.mpr (by cases w <;> simp [IntWidth.bits])
 
+/-- Half the value count, `2^(bits-1)`.  The signed range of the width is the
+two's-complement interval `-halfSize ≤ i < halfSize` (i.e. `-2^(bits-1)` up to
+`2^(bits-1) - 1`). -/
+def IntWidth.halfSize (w : IntWidth) : Nat := 2 ^ (w.bits - 1)
+
+/-- Every width admits signed values. -/
+theorem IntWidth.halfSize_pos (w : IntWidth) : 0 < w.halfSize :=
+  Nat.two_pow_pos _
+
+/-- Every width's signed range spans more than one value. -/
+theorem IntWidth.one_lt_halfSize (w : IntWidth) : 1 < w.halfSize := by
+  cases w <;> decide
+
+/-- Two halves make the whole: `2 * halfSize = size`. -/
+theorem IntWidth.two_mul_halfSize (w : IntWidth) : 2 * w.halfSize = w.size := by
+  cases w <;> decide
+
+/-- The signed upper bound is below the unsigned cardinality. -/
+theorem IntWidth.halfSize_lt_size (w : IntWidth) : w.halfSize < w.size := by
+  have := w.two_mul_halfSize; have := w.halfSize_pos; omega
+
+/-- The two's-complement bit pattern of a signed value `i ∈ [-halfSize, halfSize)`,
+returned as an unsigned magnitude in `[0, size)`. -/
+def IntWidth.toBits (w : IntWidth) (i : Int) : Int :=
+  if i < 0 then i + w.size else i
+
+/-- Interpret an unsigned bit pattern `u ∈ [0, size)` as the two's-complement
+signed value it denotes, in `[-halfSize, halfSize)` (`ofBits ∘ toBits = id`). -/
+def IntWidth.ofBits (w : IntWidth) (u : Int) : Int :=
+  if u < (w.halfSize : Int) then u else u - w.size
+
+/-- The cardinality is twice the half, over `Int`. -/
+theorem IntWidth.size_int (w : IntWidth) : (w.size : Int) = 2 * (w.halfSize : Int) := by
+  have := w.two_mul_halfSize; omega
+
+/-- The two's-complement bit pattern of an in-range signed value is a valid
+unsigned magnitude. -/
+theorem IntWidth.toBits_mem (w : IntWidth) {i : Int}
+    (hlo : -(w.halfSize : Int) ≤ i) (hhi : i < (w.halfSize : Int)) :
+    0 ≤ w.toBits i ∧ w.toBits i < (w.size : Int) := by
+  have hs := w.size_int; unfold IntWidth.toBits; split <;> omega
+
+/-- Reinterpreting a valid unsigned bit pattern lands in the signed range. -/
+theorem IntWidth.ofBits_mem (w : IntWidth) {u : Int}
+    (h0 : 0 ≤ u) (hlt : u < (w.size : Int)) :
+    -(w.halfSize : Int) ≤ w.ofBits u ∧ w.ofBits u < (w.halfSize : Int) := by
+  have hs := w.size_int; unfold IntWidth.ofBits; split <;> omega
+
+/-- Truncated remainder by an in-range nonzero divisor stays in the signed
+range (`|i.tmod j| < |j| ≤ halfSize`). -/
+theorem IntWidth.tmod_mem (w : IntWidth) {i j : Int}
+    (hjlo : -(w.halfSize : Int) ≤ j) (hjhi : j < (w.halfSize : Int)) (hj : j ≠ 0) :
+    -(w.halfSize : Int) ≤ i.tmod j ∧ i.tmod j < (w.halfSize : Int) := by
+  have hb : (i.tmod j).natAbs < j.natAbs := by
+    rw [Int.natAbs_tmod]; exact Nat.mod_lt _ (Int.natAbs_pos.mpr hj)
+  have hjn : j.natAbs ≤ w.halfSize := by omega
+  have hbound : (i.tmod j).natAbs < w.halfSize := Nat.lt_of_lt_of_le hb hjn
+  omega
+
+/-- Wrap an arbitrary integer into the width's two's-complement signed range —
+the signed analogue of `n % size` for unsigned literals and wrapping
+arithmetic. -/
+def IntWidth.wrapSigned (w : IntWidth) (n : Int) : Int :=
+  w.ofBits (n % (w.size : Int))
+
+/-- A wrapped value lies in the signed range. -/
+theorem IntWidth.wrapSigned_mem (w : IntWidth) (n : Int) :
+    -(w.halfSize : Int) ≤ w.wrapSigned n ∧ w.wrapSigned n < (w.halfSize : Int) := by
+  have hpos : (0 : Int) < (w.size : Int) := by exact_mod_cast w.size_pos
+  exact w.ofBits_mem (Int.emod_nonneg _ (by omega)) (Int.emod_lt_of_pos _ hpos)
+
+/-- Wrapping is the identity on values already in the signed range. -/
+theorem IntWidth.wrapSigned_of_mem (w : IntWidth) {n : Int}
+    (hlo : -(w.halfSize : Int) ≤ n) (hhi : n < (w.halfSize : Int)) :
+    w.wrapSigned n = n := by
+  have hs := w.size_int
+  have hpos : (0 : Int) < (w.size : Int) := by exact_mod_cast w.size_pos
+  unfold IntWidth.wrapSigned IntWidth.ofBits
+  by_cases h : 0 ≤ n
+  · have hmod : n % (w.size : Int) = n := Int.emod_eq_of_lt h (by omega)
+    rw [hmod]; simp [hhi]
+  · have hmod : n % (w.size : Int) = n + w.size := by
+      have hr := Int.add_emod_right n (w.size : Int)
+      rw [Int.emod_eq_of_lt (by omega) (by omega)] at hr
+      omega
+    rw [hmod]; simp only [if_neg (show ¬ n + (w.size : Int) < (w.halfSize : Int) by omega)]
+    omega
+
+/-- Arithmetic (floor) division of an in-range signed value by a positive
+divisor stays in the signed range. -/
+theorem IntWidth.fdiv_mem (w : IntWidth) {i : Int}
+    (hlo : -(w.halfSize : Int) ≤ i) (hhi : i < (w.halfSize : Int))
+    {d : Int} (hd : 1 ≤ d) :
+    -(w.halfSize : Int) ≤ i.fdiv d ∧ i.fdiv d < (w.halfSize : Int) := by
+  have hd0 : (0 : Int) < d := by omega
+  have hpos : (0 : Int) < (w.halfSize : Int) := by exact_mod_cast w.halfSize_pos
+  have hmul : (w.halfSize : Int) ≤ (w.halfSize : Int) * d := by
+    have hnn : 0 ≤ (w.halfSize : Int) * (d - 1) := Int.mul_nonneg (Int.le_of_lt hpos) (by omega)
+    rw [Int.mul_sub, Int.mul_one] at hnn; omega
+  have hfe : i.fdiv d = i / d := by rw [Int.fdiv_eq_ediv]; simp [Int.le_of_lt hd0]
+  rw [hfe]
+  refine ⟨?_, ?_⟩
+  · rw [Int.le_ediv_iff_mul_le hd0, Int.neg_mul]; omega
+  · rw [Int.ediv_lt_iff_lt_mul hd0]; omega
+
+/-- A Move integer type: a width together with a signedness.  A value of type
+`nt` is a mathematical integer confined to the range `[nt.lo, nt.hi)`; the two
+signedness cases differ only in those bounds. -/
+structure NumType where
+  width : IntWidth
+  signed : Bool
+  deriving BEq, DecidableEq, ReflBEq, LawfulBEq, Ord, Repr
+
+namespace NumType
+
+/-- Unsigned / signed numeric types at each width, as named constants. -/
+abbrev u8 : NumType := ⟨.w8, false⟩
+abbrev u16 : NumType := ⟨.w16, false⟩
+abbrev u32 : NumType := ⟨.w32, false⟩
+abbrev u64 : NumType := ⟨.w64, false⟩
+abbrev u128 : NumType := ⟨.w128, false⟩
+abbrev u256 : NumType := ⟨.w256, false⟩
+abbrev i8 : NumType := ⟨.w8, true⟩
+abbrev i16 : NumType := ⟨.w16, true⟩
+abbrev i32 : NumType := ⟨.w32, true⟩
+abbrev i64 : NumType := ⟨.w64, true⟩
+abbrev i128 : NumType := ⟨.w128, true⟩
+abbrev i256 : NumType := ⟨.w256, true⟩
+
+/-- Number of representable values (the modulus), `2 ^ bits`. -/
+abbrev size (nt : NumType) : Nat := nt.width.size
+
+/-- Inclusive lower bound: `0` when unsigned, `-2^(bits-1)` when signed. -/
+def lo (nt : NumType) : Int := if nt.signed then -(nt.width.halfSize : Int) else 0
+
+/-- Exclusive upper bound: `2^bits` when unsigned, `2^(bits-1)` when signed. -/
+def hi (nt : NumType) : Int :=
+  if nt.signed then (nt.width.halfSize : Int) else (nt.width.size : Int)
+
+@[simp] theorem lo_unsigned {nt : NumType} (h : nt.signed = false) : nt.lo = 0 := by
+  simp [lo, h]
+@[simp] theorem hi_unsigned {nt : NumType} (h : nt.signed = false) :
+    nt.hi = (nt.size : Int) := by simp [hi, h, size]
+@[simp] theorem lo_signed {nt : NumType} (h : nt.signed = true) :
+    nt.lo = -(nt.width.halfSize : Int) := by simp [lo, h]
+@[simp] theorem hi_signed {nt : NumType} (h : nt.signed = true) :
+    nt.hi = (nt.width.halfSize : Int) := by simp [hi, h]
+
+theorem size_pos (nt : NumType) : 0 < nt.size := nt.width.size_pos
+
+/-- The range has exactly `size` elements. -/
+theorem hi_eq_lo_add_size (nt : NumType) : nt.hi = nt.lo + (nt.size : Int) := by
+  have hs := nt.width.size_int; unfold lo hi; split <;> simp [size] <;> omega
+
+theorem lo_nonpos (nt : NumType) : nt.lo ≤ 0 := by
+  unfold lo; split
+  · have := nt.width.halfSize_pos; omega
+  · omega
+
+theorem pos_lt_hi (nt : NumType) : 0 < nt.hi := by
+  unfold hi; split
+  · have := nt.width.halfSize_pos; exact_mod_cast this
+  · have := nt.width.size_pos; exact_mod_cast this
+
+/-- Wrap an arbitrary integer into the range (two's-complement / modular). -/
+def wrap (nt : NumType) (n : Int) : Int := nt.lo + ((n - nt.lo) % (nt.size : Int))
+
+theorem wrap_mem (nt : NumType) (n : Int) : nt.lo ≤ nt.wrap n ∧ nt.wrap n < nt.hi := by
+  have hpos : (0 : Int) < (nt.size : Int) := by exact_mod_cast nt.size_pos
+  have h0 : 0 ≤ (n - nt.lo) % (nt.size : Int) := Int.emod_nonneg _ (by omega)
+  have h1 : (n - nt.lo) % (nt.size : Int) < (nt.size : Int) := Int.emod_lt_of_pos _ hpos
+  have := nt.hi_eq_lo_add_size; unfold wrap; omega
+
+theorem wrap_of_mem (nt : NumType) {n : Int} (hlo : nt.lo ≤ n) (hhi : n < nt.hi) :
+    nt.wrap n = n := by
+  have := nt.hi_eq_lo_add_size
+  have hmod : (n - nt.lo) % (nt.size : Int) = n - nt.lo :=
+    Int.emod_eq_of_lt (by omega) (by omega)
+  unfold wrap; omega
+
+/-- The two's-complement bit pattern, an unsigned magnitude in `[0, size)`. -/
+def toBits (nt : NumType) (v : Int) : Int := v % (nt.size : Int)
+
+/-- Interpret an unsigned bit pattern as the value in range it denotes. -/
+def fromBits (nt : NumType) (u : Int) : Int := if u < nt.hi then u else u - (nt.size : Int)
+
+theorem toBits_mem (nt : NumType) (v : Int) : 0 ≤ nt.toBits v ∧ nt.toBits v < (nt.size : Int) := by
+  have hpos : (0 : Int) < (nt.size : Int) := by exact_mod_cast nt.size_pos
+  exact ⟨Int.emod_nonneg _ (by omega), Int.emod_lt_of_pos _ hpos⟩
+
+theorem fromBits_mem (nt : NumType) {u : Int} (h0 : 0 ≤ u) (hlt : u < (nt.size : Int)) :
+    nt.lo ≤ nt.fromBits u ∧ nt.fromBits u < nt.hi := by
+  have := nt.hi_eq_lo_add_size; have := nt.lo_nonpos; have := nt.pos_lt_hi
+  unfold fromBits; split <;> omega
+
+/-- Truncated remainder by an in-range nonzero divisor stays in range. -/
+theorem tmod_mem (nt : NumType) {i j : Int}
+    (hilo : nt.lo ≤ i) (hjlo : nt.lo ≤ j) (hjhi : j < nt.hi) (hj : j ≠ 0) :
+    nt.lo ≤ i.tmod j ∧ i.tmod j < nt.hi := by
+  have habs : (i.tmod j).natAbs < j.natAbs := by
+    rw [Int.natAbs_tmod]; exact Nat.mod_lt _ (Int.natAbs_pos.mpr hj)
+  have := nt.hi_eq_lo_add_size; have := nt.lo_nonpos; have := nt.pos_lt_hi
+  by_cases hs : nt.signed
+  · -- signed: lo = -hi; |tmod| < |j| ≤ hi
+    simp only [lo_signed hs, hi_signed hs] at *; omega
+  · -- unsigned: lo = 0; tmod has the sign of i (≥ 0), and < j < hi
+    simp only [Bool.not_eq_true] at hs
+    have hnn : 0 ≤ i.tmod j := by
+      rw [lo_unsigned hs] at hilo; exact Int.tmod_nonneg _ hilo
+    simp only [lo_unsigned hs] at *; omega
+
+/-- Arithmetic (floor) division by a positive power of two stays in range. -/
+theorem fdiv_mem (nt : NumType) {i : Int} (hlo : nt.lo ≤ i) (hhi : i < nt.hi)
+    {d : Int} (hd : 1 ≤ d) : nt.lo ≤ i.fdiv d ∧ i.fdiv d < nt.hi := by
+  have hd0 : (0 : Int) < d := by omega
+  have hfe : i.fdiv d = i / d := by rw [Int.fdiv_eq_ediv]; simp [Int.le_of_lt hd0]
+  have := nt.lo_nonpos; have := nt.pos_lt_hi
+  have hlonp := nt.lo_nonpos
+  have hhipos := nt.pos_lt_hi
+  rw [hfe]
+  refine ⟨?_, ?_⟩
+  · rw [Int.le_ediv_iff_mul_le hd0]
+    -- `lo * d ≤ lo ≤ i` since `lo ≤ 0` and `d ≥ 1`
+    have hnn : 0 ≤ (-nt.lo) * (d - 1) := Int.mul_nonneg (by omega) (by omega)
+    rw [Int.neg_mul, Int.mul_sub, Int.mul_one] at hnn
+    omega
+  · rw [Int.ediv_lt_iff_lt_mul hd0]
+    -- `i < hi ≤ hi * d` since `hi > 0` and `d ≥ 1`
+    have hnn : 0 ≤ nt.hi * (d - 1) := Int.mul_nonneg (by omega) (by omega)
+    rw [Int.mul_sub, Int.mul_one] at hnn
+    omega
+
+end NumType
+
 /-- A resource declaration identifier, e.g. the declaration shared by all
 instantiations of `Coin<T>`. -/
 abbrev ResourceId := Nat
@@ -63,12 +297,16 @@ which contain other types record their arity, making the encoding structural
 and unambiguous.  It is deliberately separate from `Ty` to avoid an import
 cycle between values and declaration typing. -/
 inductive TypeTagToken where
-  | bool | uint (w : IntWidth) | address | signer
+  | bool | int (nt : NumType) | address | signer
   | typeParam (index : Nat)
   | struct (resource : ResourceId) (arity : Nat)
   | enum (resource : ResourceId) (arity : Nat)
   | vector | ref | mutRef
   deriving BEq, DecidableEq, ReflBEq, LawfulBEq, Ord, Repr
+
+/-- Unsigned / signed integer tags, abbreviating the unified `int` token. -/
+abbrev TypeTagToken.uint (w : IntWidth) : TypeTagToken := .int ⟨w, false⟩
+abbrev TypeTagToken.sint (w : IntWidth) : TypeTagToken := .int ⟨w, true⟩
 
 /-- The dominant integer width, abbreviated. -/
 abbrev TypeTagToken.u64 : TypeTagToken := .uint .w64
@@ -169,6 +407,11 @@ def U64_SIZE : Nat := 2 ^ 64
 
 /-- `U64_SIZE` is the size of the dominant width. -/
 theorem u64_size_eq : IntWidth.w64.size = U64_SIZE := rfl
+
+/-- The dominant unsigned type's range, in the `U64_SIZE` spelling proofs use. -/
+@[simp] theorem NumType.u64_size : NumType.u64.size = U64_SIZE := rfl
+@[simp] theorem NumType.u64_lo : NumType.u64.lo = 0 := rfl
+@[simp] theorem NumType.u64_hi : NumType.u64.hi = (U64_SIZE : Int) := rfl
 
 /-- IR runtime values.  `ref` values arise only from the borrow
 instructions (see `RefTarget`).  `mut` values are the *mutation* datum of

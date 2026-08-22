@@ -61,7 +61,7 @@ code execute (see `Semantics.lean`) and are verified after reference
 elimination (`RefElim.lean`). -/
 inductive Ty where
   | bool
-  | uint (w : IntWidth)
+  | int (nt : NumType)
   | address
   | signer
   | typeParam (index : Nat)
@@ -73,6 +73,12 @@ inductive Ty where
   | ref (t : Ty)
   | mutRef (t : Ty)
   deriving BEq, Repr
+
+/-- Unsigned / signed integer types, abbreviating the unified `int` type: a
+Move integer differs only in its range, so both are one constructor carrying a
+`NumType`. -/
+abbrev Ty.uint (w : IntWidth) : Ty := .int ⟨w, false⟩
+abbrev Ty.sint (w : IntWidth) : Ty := .int ⟨w, true⟩
 
 /-- The dominant integer width, abbreviated. -/
 abbrev Ty.u64 : Ty := .uint .w64
@@ -97,7 +103,7 @@ def Ty.instantiate (args : List Ty) : Ty → Ty
 /-- Reify a declared type as the runtime tag used in global resource keys. -/
 def Ty.toTag : Ty → TypeTag
   | .bool => [.bool]
-  | .uint w => [.uint w]
+  | .int nt => [.int nt]
   | .address => [.address]
   | .signer => [.signer]
   | .typeParam index => [.typeParam index]
@@ -132,8 +138,8 @@ mutual
 type `t`, relative to the struct declarations `Δ` (see module docs). -/
 inductive IsValid (Δ : StructDecls) : Ty → Value → Prop where
   | bool (b : Bool) : IsValid Δ .bool (.bool b)
-  | int {w : IntWidth} {i : Int} :
-      0 ≤ i → i < (w.size : Int) → IsValid Δ (.uint w) (.int i)
+  | intv {nt : NumType} {i : Int} :
+      nt.lo ≤ i → i < nt.hi → IsValid Δ (.int nt) (.int i)
   | address (a : Address) : IsValid Δ .address (.address a)
   | signer (a : Address) : IsValid Δ .signer (.address a)
   | typeParam {i : Nat} {v : Value} : v.refFree → IsValid Δ (.typeParam i) v
@@ -181,13 +187,35 @@ end
   · intro h; cases h with | bool b => exact ⟨b, rfl⟩
   · rintro ⟨b, rfl⟩; exact .bool b
 
-/-- Characterize values valid at a bounded integer type: the signed
-unbounded carrier constrained to the width's range (`$IsValid'uN'`). -/
+/-- Characterize values valid at an integer type: the unbounded carrier
+constrained to the type's range `[nt.lo, nt.hi)`. -/
+@[simp] theorem isValid_int_iff {Δ : StructDecls} {nt : NumType} {v : Value} :
+    IsValid Δ (.int nt) v ↔ ∃ i, v = .int i ∧ nt.lo ≤ i ∧ i < nt.hi := by
+  constructor
+  · intro h; cases h with | intv h0 h => exact ⟨_, rfl, h0, h⟩
+  · rintro ⟨i, rfl, h0, h⟩; exact .intv h0 h
+
+/-- The unsigned validity constructor, over the width's `[0, size)` range. -/
+theorem IsValid.uintv {Δ : StructDecls} {w : IntWidth} {i : Int}
+    (h0 : 0 ≤ i) (h : i < (w.size : Int)) : IsValid Δ (.uint w) (.int i) :=
+  .intv (by simpa [NumType.lo] using h0) (by simpa [NumType.hi, NumType.size] using h)
+
+/-- The signed validity constructor, over the width's two's-complement range. -/
+theorem IsValid.sintv {Δ : StructDecls} {w : IntWidth} {i : Int}
+    (h0 : -(w.halfSize : Int) ≤ i) (h : i < (w.halfSize : Int)) :
+    IsValid Δ (.sint w) (.int i) :=
+  .intv (by simpa [NumType.lo] using h0) (by simpa [NumType.hi] using h)
+
+/-- Characterize values valid at an unsigned integer type (`$IsValid'uN'`). -/
 @[simp] theorem isValid_uint_iff {Δ : StructDecls} {w : IntWidth} {v : Value} :
     IsValid Δ (.uint w) v ↔ ∃ i, v = .int i ∧ 0 ≤ i ∧ i < (w.size : Int) := by
-  constructor
-  · intro h; cases h with | int h0 h => exact ⟨_, rfl, h0, h⟩
-  · rintro ⟨i, rfl, h0, h⟩; exact .int h0 h
+  simp [Ty.uint, isValid_int_iff, NumType.lo, NumType.hi, NumType.size]
+
+/-- Characterize values valid at a signed integer type (`$IsValid'iN'`). -/
+@[simp] theorem isValid_sint_iff {Δ : StructDecls} {w : IntWidth} {v : Value} :
+    IsValid Δ (.sint w) v ↔
+      ∃ i, v = .int i ∧ -(w.halfSize : Int) ≤ i ∧ i < (w.halfSize : Int) := by
+  simp [Ty.sint, isValid_int_iff, NumType.lo, NumType.hi]
 
 /-- Characterize values valid at bounded `u64` type, with the natural-number
 view of the nonnegative carrier. -/
@@ -205,7 +233,7 @@ theorem isValid_u64_iff {Δ : StructDecls} {v : Value} :
 /-- The `u64` validity constructor, abbreviated at the dominant width. -/
 theorem IsValid.u64 {Δ : StructDecls} {n : Nat} (h : n < U64_SIZE) :
     IsValid Δ .u64 (.u64 n) :=
-  .int (by omega) (by rw [u64_size_eq]; exact_mod_cast h)
+  .uintv (by omega) (by rw [u64_size_eq]; exact_mod_cast h)
 
 /-- Characterize values valid at address type. -/
 @[simp] theorem isValid_address_iff {Δ : StructDecls} {v : Value} :

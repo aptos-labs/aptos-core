@@ -193,7 +193,7 @@ private def bumpField : FunDecl :=
      .call [4] (.borrowField 0) [3],
      .call [5] .readRef [4],
      .load 6 (.u64 1),
-     .call [7] (.add .w64) [5, 6],
+     .call [7] (.add .u64) [5, 6],
      .call [] .writeRef [4, 7]] [0]
 
 #test run1 bumpField [.vector [.struct [.u64 41]]]

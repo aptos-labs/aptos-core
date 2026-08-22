@@ -4453,7 +4453,7 @@ theorem elimImmInstr_readRef_inv {d : FunDecl} {st st' : ElimSt}
   | .ref u, h =>
       simp only [pure, Except.pure, Except.ok.injEq, Prod.mk.injEq] at h
       exact ⟨h.1.symm, Or.inl ⟨by simp [isImmLocal, hloc], h.2.symm⟩⟩
-  | .mutRef u, h | .uint _, h | .bool, h | .address, h | .signer, h
+  | .mutRef u, h | .uint _, h | .sint _, h | .bool, h | .address, h | .signer, h
   | .typeParam _, h | .struct _, h | .structInst _ _, h
   | .enum _, h | .enumInst _ _, h | .vector _, h =>
       simp only [pure, Except.pure, Except.ok.injEq, Prod.mk.injEq] at h
@@ -5145,7 +5145,8 @@ set_option maxHeartbeats 1000000 in
 /-- A semantically defined ordinary operation has admissible immutable-copy
 operands. Equality, ordering, and vector length observe through references;
 every other semantic clause either pattern-matches on non-reference values or
-explicitly rejects reference-bearing aggregate operands. -/
+explicitly rejects reference-bearing aggregate operands.  The signed operations
+delegate to `Oper.semSigned`, which likewise only accepts integer operands. -/
 theorem Oper.sem_immOperandsSafe {op : Oper} {current : FrameId}
     {deref : RefTarget → Option Value} {vs : List Value} {m : Memory}
     {out : OpOutcome} (hsem : op.sem current deref vs m = some out) :
@@ -5166,6 +5167,7 @@ theorem Oper.sem_immOperandsSafe {op : Oper} {current : FrameId}
                 exact fun rt => Value.refFree_ne_ref (by simp_all) rt
             | exact fun v hv rt => Value.refFree_ne_ref (by simp_all) rt
             | exact fun rt => Value.refFree_ne_ref (by simp_all) rt
+            | (split at hs <;> simp_all)
 
 /- Immutable-copy views are observationally indistinguishable to an ordinary
 well-typed operation: dereferencing observations see the same underlying

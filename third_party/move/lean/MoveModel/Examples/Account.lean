@@ -87,7 +87,7 @@ def withdrawBody : Cfg where
     if b = 0 then
       some ⟨[.call [2] (.getGlobal ACCOUNT) [0],
              .call [3] (.getField 0) [2],
-             .call [4] .sub [3, 1],
+             .call [4] (.sub .u64) [3, 1],
              .call [5] .pack [4],
              .call [] (.writeGlobal ACCOUNT) [0, 5]],
             .ret []⟩
@@ -230,8 +230,12 @@ theorem withdraw_verified : Verified prog 0 := by
       refine (wpCmds_onOk_step rfl).mpr ?_
       simp [initLocals, Oper.sem, MoveState.writeLocals,
         MoveState.writeLocal]
+      have hsub : (b : Int) - (amt : Int) < (U64_SIZE : Int) := by
+        have : (b : Int) < (U64_SIZE : Int) := by exact_mod_cast hb
+        have : (0 : Int) ≤ (amt : Int) := Int.natCast_nonneg _
+        omega
       refine (wpCmds_onOk_step rfl).mpr ?_
-      simp [initLocals, Oper.sem, MoveState.writeLocals, hge]
+      simp [initLocals, Oper.sem, MoveState.writeLocals, hge, hsub]
       refine (wpCmds_onOk_step rfl).mpr ?_
       simp [initLocals, Oper.sem, MoveState.writeLocals,
         MoveState.writeLocal]

@@ -19,6 +19,7 @@ import Tests.Move.Abilities
 import Tests.Move.Attributes
 import Tests.Move.Integers
 import Tests.Move.Arithmetic
+import Tests.Move.Signed
 import Tests.Move.ResourceComposition
 import Tests.Move.Calls
 import Tests.Move.Loops

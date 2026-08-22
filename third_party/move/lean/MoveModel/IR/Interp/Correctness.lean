@@ -318,13 +318,13 @@ theorem interpOp_sound {s : IState} {op : Oper}
   cases op <;> simp only [interpOp] at h <;>
     repeat first | split at h
   all_goals
-    try simp_all [pure, Except.pure, Oper.sem, IOpRes.denote, IState.denote,
-      IMem.denote]
+    try simp_all [pure, Except.pure, Oper.sem, NumType.checked, NumType.bitwise,
+      IOpRes.denote, IState.denote, IMem.denote]
   all_goals repeat first | split at h
   all_goals try simp only [Except.ok.injEq] at h
   all_goals try subst r
   all_goals
-    simp_all [IMem.denote_set, IMem.denote_remove]
+    simp_all [NumType.checked, NumType.bitwise, IMem.denote_set, IMem.denote_remove]
 
 /-- The one-source/one-destination fallback preserves instruction soundness. -/
 theorem interp_oneOne_fallback (P : Program) (fuel : Nat)

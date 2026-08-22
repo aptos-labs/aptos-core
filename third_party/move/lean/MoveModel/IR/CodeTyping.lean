@@ -72,20 +72,24 @@ theorem CodeTySubs.semantic { Δ : StructDecls } :
 /-- Operation typing: operand types and result types of the non-call,
 non-reference operations. -/
 inductive WfOp (Δ : StructDecls) : Oper → List Ty → List Ty → Prop where
-  | add (w : IntWidth) : WfOp Δ (.add w) [.uint w, .uint w] [.uint w]
-  | sub (w : IntWidth) : WfOp Δ .sub [.uint w, .uint w] [.uint w]
-  | mul (w : IntWidth) : WfOp Δ (.mul w) [.uint w, .uint w] [.uint w]
-  | div (w : IntWidth) : WfOp Δ .div [.uint w, .uint w] [.uint w]
-  | mod (w : IntWidth) : WfOp Δ .mod [.uint w, .uint w] [.uint w]
-  | bitAnd (w : IntWidth) : WfOp Δ .bitAnd [.uint w, .uint w] [.uint w]
-  | bitOr (w : IntWidth) : WfOp Δ .bitOr [.uint w, .uint w] [.uint w]
-  | bitXor (w : IntWidth) : WfOp Δ .bitXor [.uint w, .uint w] [.uint w]
-  | shl (w : IntWidth) : WfOp Δ (.shl w) [.uint w, .uint .w8] [.uint w]
-  | shr (w : IntWidth) : WfOp Δ (.shr w) [.uint w, .uint .w8] [.uint w]
-  | cast (w target : IntWidth) :
-      WfOp Δ (.cast target) [.uint w] [.uint target]
-  | lt (w : IntWidth) : WfOp Δ .lt [.uint w, .uint w] [.bool]
-  | le (w : IntWidth) : WfOp Δ .le [.uint w, .uint w] [.bool]
+  -- one rule per integer operation: operands and result share the operand's
+  -- `NumType`; shifts take a `u8` amount; `cast` maps any source `NumType` to
+  -- any target (cross-sign casts included — the checked semantics enforces the
+  -- target range).
+  | add (nt : NumType) : WfOp Δ (.add nt) [.int nt, .int nt] [.int nt]
+  | sub (nt : NumType) : WfOp Δ (.sub nt) [.int nt, .int nt] [.int nt]
+  | mul (nt : NumType) : WfOp Δ (.mul nt) [.int nt, .int nt] [.int nt]
+  | div (nt : NumType) : WfOp Δ (.div nt) [.int nt, .int nt] [.int nt]
+  | mod (nt : NumType) : WfOp Δ (.mod nt) [.int nt, .int nt] [.int nt]
+  | bitAnd (nt : NumType) : WfOp Δ (.bitAnd nt) [.int nt, .int nt] [.int nt]
+  | bitOr (nt : NumType) : WfOp Δ (.bitOr nt) [.int nt, .int nt] [.int nt]
+  | bitXor (nt : NumType) : WfOp Δ (.bitXor nt) [.int nt, .int nt] [.int nt]
+  | shl (nt : NumType) : WfOp Δ (.shl nt) [.int nt, .uint .w8] [.int nt]
+  | shr (nt : NumType) : WfOp Δ (.shr nt) [.int nt, .uint .w8] [.int nt]
+  | cast (src target : NumType) :
+      WfOp Δ (.cast target) [.int src] [.int target]
+  | lt (nt : NumType) : WfOp Δ .lt [.int nt, .int nt] [.bool]
+  | le (nt : NumType) : WfOp Δ .le [.int nt, .int nt] [.bool]
   | eq (t : Ty) : WfOp Δ .eq [t, t] [.bool]
   | and : WfOp Δ .and [.bool, .bool] [.bool]
   | or : WfOp Δ .or [.bool, .bool] [.bool]
@@ -191,8 +195,8 @@ def Oper.isRefOp : Oper → Bool
   | .borrowLoc | .borrowField _ | .borrowFieldInst _ _
   | .borrowGlobal _ | .borrowGlobalInst _ _ | .borrowVecElem
   | .readRef | .writeRef | .freezeRef => true
-  | .add _ | .sub | .mul _ | .div | .mod
-  | .bitAnd | .bitOr | .bitXor | .shl _ | .shr _ | .cast _
+  | .add _ | .sub _ | .mul _ | .div _ | .mod _
+  | .bitAnd _ | .bitOr _ | .bitXor _ | .shl _ | .shr _ | .cast _
   | .lt | .le | .eq | .and | .or | .not
   | .pack | .packInst _ | .unpack | .unpackInst _
   | .packVariant _ | .packVariantInst _ _
@@ -409,7 +413,7 @@ theorem TypedLocals.writeUInt {Δ : StructDecls}
   h.writeLocal fun t ht => by
     rw [hx] at ht
     cases ht
-    exact .int h0 hi
+    exact .uintv h0 hi
 
 /-- Writing an in-range `u64` to a local declared as `u64` preserves local
 typing. -/
@@ -644,168 +648,177 @@ theorem WfOp.sem_preserves {Δ : StructDecls} {op : Oper}
     (hsem : op.sem current deref vs m = some (.ok rets m')) :
     IsValidList Δ rts rets ∧ TypedMemory Δ m' := by
   cases hop with
-  | add w =>
+  -- one case per integer operation, over the operand's `NumType`; validity is
+  -- `IsValid.intv` and the semantics `NumType.checked`/`bitwise`, with
+  -- `tmod_mem`/`fdiv_mem`/`fromBits_mem` for the always-in-range results.
+  | add nt =>
     cases hvs with | cons hv₁ htl =>
     cases htl with | cons hv₂ htl =>
     cases htl
-    rw [isValid_uint_iff] at hv₁ hv₂
-    obtain ⟨i, rfl, h0i, hi⟩ := hv₁
-    obtain ⟨j, rfl, h0j, hj⟩ := hv₂
-    simp only [Oper.sem] at hsem
+    rw [isValid_int_iff] at hv₁ hv₂
+    obtain ⟨i, rfl, hloi, hhii⟩ := hv₁
+    obtain ⟨j, rfl, hloj, hhij⟩ := hv₂
+    simp only [Oper.sem, NumType.checked] at hsem
     split at hsem
-    next h => cases hsem; exact ⟨.cons (.int (by omega) h) .nil, hm⟩
+    next h => cases hsem; exact ⟨.cons (.intv h.1 h.2) .nil, hm⟩
     next => cases hsem
-  | sub w =>
+  | sub nt =>
     cases hvs with | cons hv₁ htl =>
     cases htl with | cons hv₂ htl =>
     cases htl
-    rw [isValid_uint_iff] at hv₁ hv₂
-    obtain ⟨i, rfl, h0i, hi⟩ := hv₁
-    obtain ⟨j, rfl, h0j, hj⟩ := hv₂
-    simp only [Oper.sem] at hsem
+    rw [isValid_int_iff] at hv₁ hv₂
+    obtain ⟨i, rfl, hloi, hhii⟩ := hv₁
+    obtain ⟨j, rfl, hloj, hhij⟩ := hv₂
+    simp only [Oper.sem, NumType.checked] at hsem
     split at hsem
-    next h =>
-      cases hsem
-      exact ⟨.cons (.int (by omega) (by omega)) .nil, hm⟩
+    next h => cases hsem; exact ⟨.cons (.intv h.1 h.2) .nil, hm⟩
     next => cases hsem
-  | mul w =>
+  | mul nt =>
     cases hvs with | cons hv₁ htl =>
     cases htl with | cons hv₂ htl =>
     cases htl
-    rw [isValid_uint_iff] at hv₁ hv₂
-    obtain ⟨i, rfl, h0i, hi⟩ := hv₁
-    obtain ⟨j, rfl, h0j, hj⟩ := hv₂
-    simp only [Oper.sem] at hsem
+    rw [isValid_int_iff] at hv₁ hv₂
+    obtain ⟨i, rfl, hloi, hhii⟩ := hv₁
+    obtain ⟨j, rfl, hloj, hhij⟩ := hv₂
+    simp only [Oper.sem, NumType.checked] at hsem
     split at hsem
-    next h => cases hsem; exact ⟨.cons (.int (Int.mul_nonneg h0i h0j) h) .nil, hm⟩
+    next h => cases hsem; exact ⟨.cons (.intv h.1 h.2) .nil, hm⟩
     next => cases hsem
-  | div w =>
+  | div nt =>
     cases hvs with | cons hv₁ htl =>
     cases htl with | cons hv₂ htl =>
     cases htl
-    rw [isValid_uint_iff] at hv₁ hv₂
-    obtain ⟨i, rfl, h0i, hi⟩ := hv₁
-    obtain ⟨j, rfl, h0j, hj⟩ := hv₂
-    simp only [Oper.sem] at hsem
+    rw [isValid_int_iff] at hv₁ hv₂
+    obtain ⟨i, rfl, hloi, hhii⟩ := hv₁
+    obtain ⟨j, rfl, hloj, hhij⟩ := hv₂
+    simp only [Oper.sem, NumType.checked] at hsem
     split at hsem
     next => cases hsem
     next =>
-      cases hsem
-      have hle : i / j ≤ i := Int.ediv_le_self j h0i
-      have h0 : 0 ≤ i / j := Int.ediv_nonneg h0i h0j
-      exact ⟨.cons (.int h0 (by omega)) .nil, hm⟩
-  | mod w =>
+      split at hsem
+      next h => cases hsem; exact ⟨.cons (.intv h.1 h.2) .nil, hm⟩
+      next => cases hsem
+  | mod nt =>
     cases hvs with | cons hv₁ htl =>
     cases htl with | cons hv₂ htl =>
     cases htl
-    rw [isValid_uint_iff] at hv₁ hv₂
-    obtain ⟨i, rfl, h0i, hi⟩ := hv₁
-    obtain ⟨j, rfl, h0j, hj⟩ := hv₂
+    rw [isValid_int_iff] at hv₁ hv₂
+    obtain ⟨i, rfl, hloi, hhii⟩ := hv₁
+    obtain ⟨j, rfl, hloj, hhij⟩ := hv₂
     simp only [Oper.sem] at hsem
     split at hsem
     next => cases hsem
     next hj0 =>
       cases hsem
-      have h0 : 0 ≤ i % j := Int.emod_nonneg i hj0
-      have hlt : i % j < j := Int.emod_lt_of_pos i (by omega)
-      exact ⟨.cons (.int h0 (by omega)) .nil, hm⟩
-  | bitAnd w =>
+      obtain ⟨hlo', hhi'⟩ := nt.tmod_mem hloi hloj hhij hj0
+      exact ⟨.cons (.intv hlo' hhi') .nil, hm⟩
+  | bitAnd nt =>
     cases hvs with | cons hv₁ htl =>
     cases htl with | cons hv₂ htl =>
     cases htl
-    rw [isValid_uint_iff] at hv₁ hv₂
-    obtain ⟨i, rfl, h0i, hi⟩ := hv₁
-    obtain ⟨j, rfl, h0j, hj⟩ := hv₂
-    simp only [Oper.sem] at hsem
+    rw [isValid_int_iff] at hv₁ hv₂
+    obtain ⟨i, rfl, hloi, hhii⟩ := hv₁
+    obtain ⟨j, rfl, hloj, hhij⟩ := hv₂
+    simp only [Oper.sem, NumType.bitwise] at hsem
     cases hsem
-    have hle : i.toNat &&& j.toNat ≤ i.toNat := Nat.and_le_left
-    exact ⟨.cons (.int (by omega) (by omega)) .nil, hm⟩
-  | bitOr w =>
+    have hi' : (nt.toBits i).toNat < nt.size := by have := nt.toBits_mem i; omega
+    have hb : (nt.toBits i).toNat &&& (nt.toBits j).toNat < nt.size :=
+      Nat.lt_of_le_of_lt Nat.and_le_left hi'
+    obtain ⟨hlo', hhi'⟩ := nt.fromBits_mem (Int.natCast_nonneg _) (by exact_mod_cast hb)
+    exact ⟨.cons (.intv hlo' hhi') .nil, hm⟩
+  | bitOr nt =>
     cases hvs with | cons hv₁ htl =>
     cases htl with | cons hv₂ htl =>
     cases htl
-    rw [isValid_uint_iff] at hv₁ hv₂
-    obtain ⟨i, rfl, h0i, hi⟩ := hv₁
-    obtain ⟨j, rfl, h0j, hj⟩ := hv₂
-    simp only [Oper.sem] at hsem
+    rw [isValid_int_iff] at hv₁ hv₂
+    obtain ⟨i, rfl, hloi, hhii⟩ := hv₁
+    obtain ⟨j, rfl, hloj, hhij⟩ := hv₂
+    simp only [Oper.sem, NumType.bitwise] at hsem
     cases hsem
-    have hlt : i.toNat ||| j.toNat < 2 ^ w.bits :=
-      Nat.or_lt_two_pow (by change _ < w.size; omega)
-        (by change _ < w.size; omega)
-    have hlt' : i.toNat ||| j.toNat < w.size := hlt
-    exact ⟨.cons (.int (by omega) (by omega)) .nil, hm⟩
-  | bitXor w =>
+    have hsz : nt.size = 2 ^ nt.width.bits := rfl
+    have hi' : (nt.toBits i).toNat < 2 ^ nt.width.bits := by have := nt.toBits_mem i; omega
+    have hj' : (nt.toBits j).toNat < 2 ^ nt.width.bits := by have := nt.toBits_mem j; omega
+    have hb : (nt.toBits i).toNat ||| (nt.toBits j).toNat < nt.size :=
+      Nat.or_lt_two_pow hi' hj'
+    obtain ⟨hlo', hhi'⟩ := nt.fromBits_mem (Int.natCast_nonneg _) (by exact_mod_cast hb)
+    exact ⟨.cons (.intv hlo' hhi') .nil, hm⟩
+  | bitXor nt =>
     cases hvs with | cons hv₁ htl =>
     cases htl with | cons hv₂ htl =>
     cases htl
-    rw [isValid_uint_iff] at hv₁ hv₂
-    obtain ⟨i, rfl, h0i, hi⟩ := hv₁
-    obtain ⟨j, rfl, h0j, hj⟩ := hv₂
-    simp only [Oper.sem] at hsem
+    rw [isValid_int_iff] at hv₁ hv₂
+    obtain ⟨i, rfl, hloi, hhii⟩ := hv₁
+    obtain ⟨j, rfl, hloj, hhij⟩ := hv₂
+    simp only [Oper.sem, NumType.bitwise] at hsem
     cases hsem
-    have hlt : i.toNat ^^^ j.toNat < 2 ^ w.bits :=
-      Nat.xor_lt_two_pow (by change _ < w.size; omega)
-        (by change _ < w.size; omega)
-    have hlt' : i.toNat ^^^ j.toNat < w.size := hlt
-    exact ⟨.cons (.int (by omega) (by omega)) .nil, hm⟩
-  | shl w =>
+    have hsz : nt.size = 2 ^ nt.width.bits := rfl
+    have hi' : (nt.toBits i).toNat < 2 ^ nt.width.bits := by have := nt.toBits_mem i; omega
+    have hj' : (nt.toBits j).toNat < 2 ^ nt.width.bits := by have := nt.toBits_mem j; omega
+    have hb : (nt.toBits i).toNat ^^^ (nt.toBits j).toNat < nt.size :=
+      Nat.xor_lt_two_pow hi' hj'
+    obtain ⟨hlo', hhi'⟩ := nt.fromBits_mem (Int.natCast_nonneg _) (by exact_mod_cast hb)
+    exact ⟨.cons (.intv hlo' hhi') .nil, hm⟩
+  | shl nt =>
     cases hvs with | cons hv₁ htl =>
     cases htl with | cons hv₂ htl =>
     cases htl
-    rw [isValid_uint_iff] at hv₁ hv₂
-    obtain ⟨i, rfl, h0i, hi⟩ := hv₁
+    rw [isValid_int_iff] at hv₁
+    rw [isValid_uint_iff] at hv₂
+    obtain ⟨i, rfl, hloi, hhii⟩ := hv₁
     obtain ⟨k, rfl, h0k, hk⟩ := hv₂
     simp only [Oper.sem] at hsem
     split at hsem
     next =>
       cases hsem
-      have hlt : (i.toNat <<< k.toNat) % w.size < w.size :=
-        Nat.mod_lt _ (Nat.two_pow_pos w.bits)
-      exact ⟨.cons (.int (Int.natCast_nonneg _) (by exact_mod_cast hlt)) .nil,
-        hm⟩
+      have hmod : ((nt.toBits i).toNat <<< k.toNat) % nt.size < nt.size :=
+        Nat.mod_lt _ nt.size_pos
+      obtain ⟨hlo', hhi'⟩ := nt.fromBits_mem (Int.natCast_nonneg _) (by exact_mod_cast hmod)
+      exact ⟨.cons (.intv hlo' hhi') .nil, hm⟩
     next => cases hsem
-  | shr w =>
+  | shr nt =>
     cases hvs with | cons hv₁ htl =>
     cases htl with | cons hv₂ htl =>
     cases htl
-    rw [isValid_uint_iff] at hv₁ hv₂
-    obtain ⟨i, rfl, h0i, hi⟩ := hv₁
+    rw [isValid_int_iff] at hv₁
+    rw [isValid_uint_iff] at hv₂
+    obtain ⟨i, rfl, hloi, hhii⟩ := hv₁
     obtain ⟨k, rfl, h0k, hk⟩ := hv₂
     simp only [Oper.sem] at hsem
     split at hsem
     next =>
       cases hsem
-      have hlt : i.toNat >>> k.toNat < w.size :=
-        Nat.lt_of_le_of_lt (Nat.shiftRight_le i.toNat k.toNat) (by omega)
-      exact ⟨.cons (.int (Int.natCast_nonneg _) (by exact_mod_cast hlt)) .nil,
-        hm⟩
+      have hd1 : (1 : Int) ≤ 2 ^ k.toNat := by
+        have hnat : 1 ≤ 2 ^ k.toNat := Nat.two_pow_pos k.toNat
+        exact_mod_cast hnat
+      obtain ⟨hlo', hhi'⟩ := nt.fdiv_mem hloi hhii hd1
+      exact ⟨.cons (.intv hlo' hhi') .nil, hm⟩
     next => cases hsem
-  | cast w target =>
+  | cast src target =>
     cases hvs with | cons hv₁ htl =>
     cases htl
-    rw [isValid_uint_iff] at hv₁
-    obtain ⟨i, rfl, h0i, hi⟩ := hv₁
-    simp only [Oper.sem] at hsem
+    rw [isValid_int_iff] at hv₁
+    obtain ⟨i, rfl, hloi, hhii⟩ := hv₁
+    simp only [Oper.sem, NumType.checked] at hsem
     split at hsem
-    next h => cases hsem; exact ⟨.cons (.int h0i h) .nil, hm⟩
+    next h => cases hsem; exact ⟨.cons (.intv h.1 h.2) .nil, hm⟩
     next => cases hsem
-  | lt w =>
+  | lt nt =>
     cases hvs with | cons hv₁ htl =>
     cases htl with | cons hv₂ htl =>
     cases htl
-    rw [isValid_uint_iff] at hv₁ hv₂
-    obtain ⟨i, rfl, h0i, hi⟩ := hv₁
-    obtain ⟨j, rfl, h0j, hj⟩ := hv₂
+    rw [isValid_int_iff] at hv₁ hv₂
+    obtain ⟨i, rfl, _, _⟩ := hv₁
+    obtain ⟨j, rfl, _, _⟩ := hv₂
     simp only [Oper.sem] at hsem
     cases hsem
     exact ⟨.cons (.bool _) .nil, hm⟩
-  | le w =>
+  | le nt =>
     cases hvs with | cons hv₁ htl =>
     cases htl with | cons hv₂ htl =>
     cases htl
-    rw [isValid_uint_iff] at hv₁ hv₂
-    obtain ⟨i, rfl, h0i, hi⟩ := hv₁
-    obtain ⟨j, rfl, h0j, hj⟩ := hv₂
+    rw [isValid_int_iff] at hv₁ hv₂
+    obtain ⟨i, rfl, _, _⟩ := hv₁
+    obtain ⟨j, rfl, _, _⟩ := hv₂
     simp only [Oper.sem] at hsem
     cases hsem
     exact ⟨.cons (.bool _) .nil, hm⟩

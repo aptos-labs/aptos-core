@@ -67,7 +67,7 @@ def incDecl : FunDecl where
     { blocks := (fun b =>
         if b = 0 then
           some ⟨[.call [1] .readRef [0], .load 2 (.u64 1),
-                 .call [3] (.add .w64) [1, 2], .call [] .writeRef [0, 3]], .ret []⟩
+                 .call [3] (.add .u64) [1, 2], .call [] .writeRef [0, 3]], .ret []⟩
         else none),
       entry := 0,
       size := 1 }
@@ -131,7 +131,7 @@ def incElim : FunDecl := { incDecl with
     { blocks := (fun b =>
         if b = 0 then
           some ⟨[.call [1] .getMut [0], .load 2 (.u64 1),
-                 .call [3] (.add .w64) [1, 2], .call [0] .setMut [0, 3]],
+                 .call [3] (.add .u64) [1, 2], .call [0] .setMut [0, 3]],
                 .ret [0]⟩
         else none),
       entry := 0,
@@ -212,8 +212,10 @@ theorem inc_verified : Verified elimProg 1 := by
     simp [initLocals, Oper.sem, MoveState.writeLocals, MoveState.writeLocal]
     refine (wpCmds_onOk_step rfl).mpr ?_
     simp [initLocals, Oper.sem, MoveState.writeLocals, MoveState.writeLocal]
+    have hadd : 0 ≤ k + 1 ∧ k + 1 < (U64_SIZE : Int) := by
+      rw [u64_size_eq] at hlt; omega
     refine (wpCmds_onOk_step rfl).mpr ?_
-    simp [initLocals, Oper.sem, MoveState.writeLocals, hlt]
+    simp [initLocals, Oper.sem, MoveState.writeLocals, hadd.1, hadd.2]
     refine (wpCmds_onOk_step rfl).mpr ?_
     simp [initLocals, Oper.sem, MoveState.writeLocals, MoveState.writeLocal]
     refine (wpCmds_onOk_step rfl).mpr ?_
@@ -225,12 +227,14 @@ theorem inc_verified : Verified elimProg 1 := by
         agreesOutside, Contract.footprint, incContract, hlt]
       rw [← u64_size_eq]; exact hlt
   · -- overflow: the bump aborts, as claimed by `aborts_if`
+    have hover : ¬(0 ≤ k + 1 ∧ k + 1 < (U64_SIZE : Int)) := by
+      rw [u64_size_eq] at hlt; omega
     refine (wpCmds_onOk_step rfl).mpr ?_
     simp [initLocals, Oper.sem, MoveState.writeLocals, MoveState.writeLocal]
     refine (wpCmds_onOk_step rfl).mpr ?_
     simp [initLocals, Oper.sem, MoveState.writeLocals, MoveState.writeLocal]
     refine (wpCmds_onOk_step rfl).mpr ?_
-    simp [initLocals, Oper.sem, MoveState.writeLocals, hlt, VState.doAbort]
+    simp [initLocals, Oper.sem, MoveState.writeLocals, hover, VState.doAbort]
     iterate 2 refine (wpCmds_onOk_skip rfl).mpr ?_
     refine ⟨fun _ => ?_, fun hclear => ?_⟩
     · simp [wpCmds, Holds, VState.preEnvOf, preEnv, initLocals,

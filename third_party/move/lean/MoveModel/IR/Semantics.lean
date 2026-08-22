@@ -69,6 +69,19 @@ inductive OpOutcome where
   | ok (rets : List Value) (m : Memory)
   | abort
 
+/-- Checked integer outcome: accept the mathematical result `r` iff it lies in
+the type's range `[lo, hi)`, else abort.  One rule for both signednesses; the
+bounds come from `nt`. -/
+@[simp] def NumType.checked (nt : NumType) (r : Int) (m : Memory) : OpOutcome :=
+  if nt.lo ≤ r ∧ r < nt.hi then .ok [.int r] m else .abort
+
+/-- Bitwise outcome: apply `f` to the operands' two's-complement bit patterns
+and reinterpret the result in range.  For unsigned types `toBits`/`fromBits`
+are the identity, recovering the plain `Nat` bit operation. -/
+@[simp] def NumType.bitwise (nt : NumType) (f : Nat → Nat → Nat) (i j : Int)
+    (m : Memory) : OpOutcome :=
+  .ok [.int (nt.fromBits (f (nt.toBits i).toNat (nt.toBits j).toNat))] m
+
 /-- Semantics of the non-call operations, as a deterministic partial
 function of the operand values and the current memory.  `none` = ill-typed
 (stuck); `some .abort` = runtime abort.  `function` calls and the
@@ -81,31 +94,29 @@ stored to global memory or packed into structs and vectors must be
 reference-free (`Value.refFree`), as in the Move VM. -/
 def Oper.sem (current : FrameId) (deref : RefTarget → Option Value) :
     Oper → List Value → Memory → Option OpOutcome
-  | .add w, [.int i, .int j], m =>
-      some (if i + j < (w.size : Int) then .ok [.int (i + j)] m else .abort)
-  | .sub, [.int i, .int j], m =>
-      some (if j ≤ i then .ok [.int (i - j)] m else .abort)
-  | .mul w, [.int i, .int j], m =>
-      some (if i * j < (w.size : Int) then .ok [.int (i * j)] m else .abort)
-  | .div, [.int i, .int j], m =>
-      some (if j = 0 then .abort else .ok [.int (i / j)] m)
-  | .mod, [.int i, .int j], m =>
-      some (if j = 0 then .abort else .ok [.int (i % j)] m)
-  | .bitAnd, [.int i, .int j], m =>
-      some (.ok [.int (i.toNat &&& j.toNat : Nat)] m)
-  | .bitOr, [.int i, .int j], m =>
-      some (.ok [.int (i.toNat ||| j.toNat : Nat)] m)
-  | .bitXor, [.int i, .int j], m =>
-      some (.ok [.int (i.toNat ^^^ j.toNat : Nat)] m)
-  | .shl w, [.int i, .int k], m =>
-      some (if k < (w.bits : Int) then
-        .ok [.int ((i.toNat <<< k.toNat) % w.size : Nat)] m
+  -- checked integer arithmetic: compute over `Int`, then confine to `nt`'s
+  -- range.  Division truncates toward zero (`tdiv`/`tmod`); `mod` never leaves
+  -- the range.  Bitwise/shift act on the two's-complement pattern; `shr` is
+  -- arithmetic (floor division by `2^k`).  Signed and unsigned share every
+  -- rule — only `nt.lo`/`nt.hi` differ.
+  | .add nt, [.int i, .int j], m => some (nt.checked (i + j) m)
+  | .sub nt, [.int i, .int j], m => some (nt.checked (i - j) m)
+  | .mul nt, [.int i, .int j], m => some (nt.checked (i * j) m)
+  | .div nt, [.int i, .int j], m =>
+      some (if j = 0 then .abort else nt.checked (i.tdiv j) m)
+  | .mod _, [.int i, .int j], m =>
+      some (if j = 0 then .abort else .ok [.int (i.tmod j)] m)
+  | .bitAnd nt, [.int i, .int j], m => some (nt.bitwise (· &&& ·) i j m)
+  | .bitOr nt, [.int i, .int j], m => some (nt.bitwise (· ||| ·) i j m)
+  | .bitXor nt, [.int i, .int j], m => some (nt.bitwise (· ^^^ ·) i j m)
+  | .shl nt, [.int i, .int k], m =>
+      some (if k < (nt.width.bits : Int) then
+        .ok [.int (nt.fromBits (((nt.toBits i).toNat <<< k.toNat) % nt.size : Nat))] m
       else .abort)
-  | .shr w, [.int i, .int k], m =>
-      some (if k < (w.bits : Int) then .ok [.int (i.toNat >>> k.toNat : Nat)] m
+  | .shr nt, [.int i, .int k], m =>
+      some (if k < (nt.width.bits : Int) then .ok [.int (i.fdiv (2 ^ k.toNat))] m
         else .abort)
-  | .cast target, [.int i], m =>
-      some (if i < (target.size : Int) then .ok [.int i] m else .abort)
+  | .cast target, [.int i], m => some (target.checked i m)
   | .lt, [v₁, v₂], m => do
       let a ← v₁.derefWith deref
       let b ← v₂.derefWith deref

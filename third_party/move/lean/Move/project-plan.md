@@ -9,7 +9,11 @@ site is greppable.
 
 ## Implemented (context)
 
-Struct/enum/resource declarations; integer widths `u8..u256`; vectors; checked
+Struct/enum/resource declarations; integers `u8..u256` and `i8..i256` as one
+model — a `NumType` (width + signedness) whose `lo`/`hi` bounds are the only
+difference, so there is one operation family, one checked semantics, one
+typing rule and one specification per operation (see
+[`unified-int-design.md`](unified-int-design.md)); vectors; checked
 arithmetic; `if`/`while`/`loop` with invariants; recursion via `Spec.fix`;
 data invariants (certified values); **global invariants** — regular and
 `update`, cross-resource, registered per referenced family, discharged by
@@ -30,9 +34,13 @@ observations (`R[a]`, `exists<R>`, `old`) in both **requires and ensures**.
 - **Nested mutable borrows** and **mutable vector-element field borrows.**
   - *"nested mutable borrows are not yet supported …"* /
     *"mutable vector-element field borrows are not yet supported …"*
-- **Statement `assert` / `abort`**, raw `write`, and `Vector.get` /
-  `Vector.set` (the `unsupportedSourceOperation` set).
-  - *"automatic source specifications do not yet model `{operation}`"*
+- **The explicitly spelled core primitives** — the `unsupportedSourceOperation`
+  set: `borrowLocal`/`borrowGlobal`/`borrowField`/`borrowElem` and their `Mut`
+  variants, `freeze`, `read`, `readImm`, `write`, `assert`, `abort`,
+  `Vector.get`, `Vector.set`.  The surface sugar (`&x`, `&mut R[a].f`, `*r`,
+  `r := v`) is modeled; writing the primitive itself is not.
+  - *"automatic source specifications do not yet model `{operation}`; provide
+    an explicit `sourceSpec` or omit `verify`"*
 - **Arithmetic in index/embedded position** — must be bound to a local first.
   - *"automatic source specifications do not yet support arithmetic in this
     context; bind it to a local first"*
@@ -53,8 +61,9 @@ observations (`R[a]`, `exists<R>`, `old`) in both **requires and ensures**.
 
 ### Types
 
-- **Recursive** structs/enums and **indexed** enums.
+- **Recursive** structs/enums and **indexed** structs/enums.
   - *"recursive Move type `{name}` is not supported by the prototype"* /
+    *"indexed Move structure `{name}` is not supported"* /
     *"indexed Move enum `{name}` is not supported by the prototype"*
 - **Product-/tuple-valued** Move functions.
 
@@ -79,6 +88,15 @@ observations (`R[a]`, `exists<R>`, `old`) in both **requires and ensures**.
 - **Update global invariants** must be reflexive at unchanged addresses (a
   `≤`-style relation verifies; `<` cannot). This is faithful to the Move
   Prover's "checked at every update over all addresses" reading, not a gap.
+
+### The list is not exhaustive
+
+Statement forms the translator does not recognize at all fall through to two
+catch-alls rather than to a named item above, so an unlisted construct may
+still be rejected:
+
+- *"unsupported effectful statement in automatic source specification: …"*
+- *"unsupported `do` statement in automatic source specification: …"*
 
 ## Suggested priority
 

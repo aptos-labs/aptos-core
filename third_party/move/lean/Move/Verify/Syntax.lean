@@ -37,7 +37,7 @@ class AbortCodeValue (Code : Type) where
   toNat : Code → Nat
 
 instance : AbortCodeValue Nat := ⟨id⟩
-instance : AbortCodeValue Move.U64 := ⟨Move.UInt.toNat⟩
+instance : AbortCodeValue Move.U64 := ⟨Move.MoveInt.toNat⟩
 
 def abortCodeOf [AbortCodeValue Code] (code : Code) : Nat :=
   AbortCodeValue.toNat code
@@ -126,6 +126,22 @@ private def sameLastName (left right : Name) : Bool :=
     | some left, some right => left == right
     | _, _ => false
 
+/-- Generated contracts package a function's parameters as one tuple, so the
+operands a certified fact is about are projections of a local rather than
+locals; expand a product-typed local into its components. -/
+private def components (fuel : Nat) (e : Lean.Expr) (ty : Lean.Expr) :
+    Lean.MetaM (Array (Lean.Expr × Lean.Expr)) := do
+  let ty ← Lean.Meta.whnfR ty
+  match fuel with
+  | 0 => return #[(e, ty)]
+  | fuel + 1 =>
+    if ty.isAppOfArity ``Prod 2 then
+      let args := ty.getAppArgs
+      let fst ← Lean.Meta.mkAppM ``Prod.fst #[e]
+      let snd ← Lean.Meta.mkAppM ``Prod.snd #[e]
+      return (← components fuel fst args[0]!) ++ (← components fuel snd args[1]!)
+    return #[(e, ty)]
+
 /-- Add the certified range facts for every integer- and vector-typed
 hypothesis (`x.toNat < 2^n`, `v.toList.length < 2^64`), making the
 representation bounds visible to `omega` and `grind`. -/
@@ -135,41 +151,97 @@ elab "uint_bounds" : tactic => do
     let ctx ← Lean.getLCtx
     for decl in ctx do
       if decl.isImplementationDetail then continue
-      let type ← Lean.Meta.whnfR (← Lean.instantiateMVars decl.type)
-      if type.isAppOf ``Move.Vector then
-        let bound ← Lean.Meta.mkAppM ``Move.Vector.toList_length_lt
-          #[decl.toExpr]
-        let lengthExpr ← Lean.Meta.mkAppM ``List.length
-          #[← Lean.Meta.mkAppM ``Move.Vector.toList #[decl.toExpr]]
-        let boundType ← Lean.Meta.mkAppM ``LT.lt
-          #[lengthExpr, Lean.mkNatLit (2 ^ 64)]
-        goal ← (← goal.assert (Lean.Name.mkSimple "vectorBound") boundType
-          bound).intro1P <&> (·.2)
-        continue
-      if type.isAppOf ``Move.UInt then
-        let bound ← Lean.Meta.mkAppM ``Move.UInt.toNat_lt #[decl.toExpr]
-        let boundType ← Lean.Meta.inferType bound
-        -- State the bound with the width as a numeral (accepted by defeq)
-        -- so `omega` connects it with numerically normalized goals.
-        let boundType ← do
-          let bits? : Option Nat :=
-            match type.getAppArgs[0]? with
-            | some (Lean.Expr.const tag _) =>
-                if tag == ``Move.W8 then some 8
-                else if tag == ``Move.W16 then some 16
-                else if tag == ``Move.W32 then some 32
-                else if tag == ``Move.W64 then some 64
-                else if tag == ``Move.W128 then some 128
-                else if tag == ``Move.W256 then some 256
-                else none
-            | _ => none
-          match bits? with
-          | some bits =>
-              let toNatExpr ← Lean.Meta.mkAppM ``Move.UInt.toNat #[decl.toExpr]
-              Lean.Meta.mkAppM ``LT.lt #[toNatExpr, Lean.mkNatLit (2 ^ bits)]
-          | none => pure boundType
-        goal ← (← goal.assert (Lean.Name.mkSimple "uintBound") boundType bound).intro1P
-          <&> (·.2)
+      let declType ← Lean.Meta.whnfR (← Lean.instantiateMVars decl.type)
+      for (target, targetType) in ← components 8 decl.toExpr declType do
+       let decl : Lean.Expr := target
+       let type := targetType
+       if type.isAppOf ``Move.Vector then
+         let bound ← Lean.Meta.mkAppM ``Move.Vector.toList_length_lt
+           #[decl]
+         let lengthExpr ← Lean.Meta.mkAppM ``List.length
+           #[← Lean.Meta.mkAppM ``Move.Vector.toList #[decl]]
+         let boundType ← Lean.Meta.mkAppM ``LT.lt
+           #[lengthExpr, Lean.mkNatLit (2 ^ 64)]
+         goal ← (← goal.assert (Lean.Name.mkSimple "vectorBound") boundType
+           bound).intro1P <&> (·.2)
+         continue
+       if type.isAppOf ``Move.MoveInt then
+         -- `MoveInt S W`: the sign tag is the first type argument, the width
+         -- tag the second.  Unsigned locals get the natural-number bound the
+         -- specification language uses; signed locals get both `Int` bounds.
+         let args := type.getAppArgs
+         let bits? : Option Nat :=
+           match args[1]? with
+           | some (Lean.Expr.const tag _) =>
+               if tag == ``Move.W8 then some 8
+               else if tag == ``Move.W16 then some 16
+               else if tag == ``Move.W32 then some 32
+               else if tag == ``Move.W64 then some 64
+               else if tag == ``Move.W128 then some 128
+               else if tag == ``Move.W256 then some 256
+               else none
+           | _ => none
+         let signed? : Option Bool :=
+           match args[0]? with
+           | some (Lean.Expr.const tag _) =>
+               if tag == ``Move.Unsigned then some false
+               else if tag == ``Move.Signed then some true
+               else none
+           | _ => none
+         match signed? with
+         | some false =>
+             let bound ← Lean.Meta.mkAppM ``Move.UInt.toNat_lt #[decl]
+             let boundType ← match bits? with
+               | some bits =>
+                   let toNatExpr ← Lean.Meta.mkAppM ``Move.MoveInt.toNat #[decl]
+                   Lean.Meta.mkAppM ``LT.lt #[toNatExpr, Lean.mkNatLit (2 ^ bits)]
+               | none => Lean.Meta.inferType bound
+             goal ← (← goal.assert (Lean.Name.mkSimple "uintBound") boundType bound).intro1P
+               <&> (·.2)
+             -- Only the natural-number bound.  The `Int` view of the same
+             -- fact was asserted here while the checked rules still spoke the
+             -- neutral `Int` form; now that they are per-view, adding it puts
+             -- `Int` atoms into otherwise pure-`Nat` goals and makes the
+             -- decision procedures reason over a mixed domain for nothing.
+         | some true =>
+             let lower ← Lean.Meta.mkAppM ``Move.SInt.neg_halfSize_le_toInt #[decl]
+             goal ← (← goal.assert (Lean.Name.mkSimple "sintLower")
+               (← Lean.Meta.inferType lower) lower).intro1P <&> (·.2)
+             let upper ← Lean.Meta.mkAppM ``Move.SInt.toInt_lt_halfSize #[decl]
+             goal ← (← goal.assert (Lean.Name.mkSimple "sintUpper")
+               (← Lean.Meta.inferType upper) upper).intro1P <&> (·.2)
+         | none => pure ()
+    Lean.Elab.Tactic.replaceMainGoal [goal]
+
+/-- Add the data invariant of every certified-typed hypothesis, which is what
+makes the invariant "available wherever the value is" without naming the type
+or its generated condition.
+
+Deliberately *not* folded into `uint_bounds`.  A width bound is one cheap
+atomic fact; a data invariant can be an arbitrarily large predicate — the
+ordered map's is a sortedness condition over the whole entry list — and
+asserting one into every context the automatic cascade normalizes costs far
+more than the proofs that want it save.  It is a tactic a proof asks for. -/
+elab "data_invariants" : tactic => do
+  Lean.Elab.Tactic.withMainContext do
+    let mut goal ← Lean.Elab.Tactic.getMainGoal
+    let ctx ← Lean.getLCtx
+    for decl in ctx do
+      if decl.isImplementationDetail then continue
+      let declType ← Lean.Meta.whnfR (← Lean.instantiateMVars decl.type)
+      for (target, targetType) in ← components 8 decl.toExpr declType do
+        let some typeName := targetType.getAppFn.constName? | continue
+        unless (Move.dataInvariant? (← Lean.getEnv) typeName).isSome do continue
+        try
+          let invariant ← Lean.Meta.mkAppM (typeName ++ `invariant) #[target]
+          -- Assert the condition with its generated name unfolded: this runs
+          -- after the cascade's normalization, so `move_invariant_norm` would
+          -- no longer see it.
+          let condition ← Lean.Meta.inferType invariant
+          let condition := (← Lean.Meta.unfoldDefinition? condition).getD condition
+          goal ← (← goal.assert (Lean.Name.mkSimple "dataInvariant")
+            condition invariant).intro1P <&> (·.2)
+        catch _ => pure ()
     Lean.Elab.Tactic.replaceMainGoal [goal]
 
 /-- Source retained by the `fun` command for later specification generation.
@@ -547,14 +619,15 @@ private def checkedArithmeticCall? (term : TSyntax `term) :
       pure (some (← resolveGlobalConstNoOverload head.raw))
     catch _ => pure none
   let operation? := functionName.bind fun functionName =>
-    if functionName == ``Move.UInt.add then some ``Move.Semantics.Checked.addSpec
-    else if functionName == ``Move.UInt.sub then some ``Move.Semantics.Checked.subSpec
-    else if functionName == ``Move.UInt.mul then some ``Move.Semantics.Checked.mulSpec
-    else if functionName == ``Move.UInt.div then some ``Move.Semantics.Checked.divSpec
-    else if functionName == ``Move.UInt.mod then some ``Move.Semantics.Checked.modSpec
-    else if functionName == ``Move.UInt.shl then some ``Move.Semantics.Checked.shlSpec
-    else if functionName == ``Move.UInt.shr then some ``Move.Semantics.Checked.shrSpec
-    else if functionName == ``Move.UInt.cast then some ``Move.Semantics.Checked.castSpec
+    -- one map: the operation markers are shared by both signednesses
+    if functionName == ``Move.MoveInt.add then some ``Move.Semantics.Checked.addSpec
+    else if functionName == ``Move.MoveInt.sub then some ``Move.Semantics.Checked.subSpec
+    else if functionName == ``Move.MoveInt.mul then some ``Move.Semantics.Checked.mulSpec
+    else if functionName == ``Move.MoveInt.div then some ``Move.Semantics.Checked.divSpec
+    else if functionName == ``Move.MoveInt.mod then some ``Move.Semantics.Checked.modSpec
+    else if functionName == ``Move.MoveInt.shl then some ``Move.Semantics.Checked.shlSpec
+    else if functionName == ``Move.MoveInt.shr then some ``Move.Semantics.Checked.shrSpec
+    else if functionName == ``Move.MoveInt.cast then some ``Move.Semantics.Checked.castSpec
     else none
   return operation?.map (·, arguments[0]!, arguments[1]!)
 
@@ -2861,7 +2934,7 @@ private def elabAutomaticSourceVerify : CommandElab := fun stx => do
         Move.UInt.toNat_ofNat_u32, Move.UInt.toNat_ofNat_u64,
         Move.UInt.toNat_ofNat_u128, Move.UInt.toNat_ofNat_u256,
         Move.UInt.toNat_zero, Move.UInt.toNat_one,
-        Move.UInt.numeral_eq_ofNat, Move.UInt.toNat_cast,
+        Move.UInt.toNat_cast,
         Move.UInt.toNat_lt,
         Move.Semantics.ResourceStore.get, Move.Semantics.ResourceStore.contains,
         Move.Semantics.ResourceStore.get_insert_same,
@@ -2900,8 +2973,7 @@ private def elabAutomaticSourceVerify : CommandElab := fun stx => do
       contract_intro
       try simp only [$calleeUnfoldLemmas,*, wp_norm, move_norm, move_data,
         Nat.reducePow, Nat.reduceMod, and_imp, forall_eq, forall_eq',
-        Move.Verify.forall_imp_eq_left, Move.Verify.forall_imp_eq_right,
-        Move.Verify.forall_imp_imp_eq_left, Classical.not_not,
+        Classical.not_not,
         exists_eq_left, exists_eq_left', exists_eq_right, exists_and_left,
         exists_and_right, and_true, true_and, true_implies, implies_true,
         and_self, Prod.mk.injEq, not_false_eq_true, not_true_eq_false,
@@ -2909,14 +2981,14 @@ private def elabAutomaticSourceVerify : CommandElab := fun stx => do
       all_goals
         simp_all (config := { maxSteps := 1000000 })
           [$calleeUnfoldLemmas,*, move_spec, move_data, move_invariant_norm,
-            move_norm, Nat.reducePow, Nat.reduceMod, Move.UInt.numeral_eq_ofNat,
+            move_norm, Nat.reducePow, Nat.reduceMod,
             and_assoc, exists_const] <;>
         (try uint_bounds) <;>
         grind [Move.UInt.toNat_ofNat_u8, Move.UInt.toNat_ofNat_u16,
           Move.UInt.toNat_ofNat_u32, Move.UInt.toNat_ofNat_u64,
           Move.UInt.toNat_ofNat_u128, Move.UInt.toNat_ofNat_u256,
           Move.UInt.toNat_zero, Move.UInt.toNat_one,
-          Move.UInt.numeral_eq_ofNat, Move.UInt.toNat_cast,
+          Move.UInt.toNat_cast,
           Move.UInt.toNat_lt, Nat.shiftRight_le,
           Move.Semantics.ResourceStore.get, Move.Semantics.ResourceStore.contains,
           Move.Semantics.ResourceStore.get_insert_same,

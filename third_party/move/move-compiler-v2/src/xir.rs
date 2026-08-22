@@ -211,6 +211,12 @@ fn validate_type_parameters(ty: &Ty, count: usize, owner: &str) -> Result<()> {
         | Ty::U64
         | Ty::U128
         | Ty::U256
+        | Ty::I8
+        | Ty::I16
+        | Ty::I32
+        | Ty::I64
+        | Ty::I128
+        | Ty::I256
         | Ty::Address
         | Ty::Signer
         | Ty::Struct(_)
@@ -555,6 +561,9 @@ fn model_type(ty: &Ty, module_id: ModuleId, structs: &[StructId]) -> Result<Type
         Ty::U64 => Type::Primitive(PrimitiveType::U64),
         Ty::U128 => Type::Primitive(PrimitiveType::U128),
         Ty::U256 => Type::Primitive(PrimitiveType::U256),
+        Ty::I8 | Ty::I16 | Ty::I32 | Ty::I64 | Ty::I128 | Ty::I256 => bail!(
+            "signed integer types are not representable in the move-model type system"
+        ),
         Ty::Address => Type::Primitive(PrimitiveType::Address),
         Ty::Signer => Type::Primitive(PrimitiveType::Signer),
         Ty::TypeParameter(index) => {
@@ -1223,13 +1232,13 @@ impl FunctionTranslator<'_> {
     fn operation(&self, dsts: &[usize], oper: &Oper, srcs: &[usize]) -> Result<StacklessOperation> {
         Ok(match oper {
             Oper::Add(_)
-            | Oper::Sub
+            | Oper::Sub(_)
             | Oper::Mul(_)
-            | Oper::Div
-            | Oper::Mod
-            | Oper::BitAnd
-            | Oper::BitOr
-            | Oper::BitXor
+            | Oper::Div(_)
+            | Oper::Mod(_)
+            | Oper::BitAnd(_)
+            | Oper::BitOr(_)
+            | Oper::BitXor(_)
             | Oper::Shl(_)
             | Oper::Shr(_)
             | Oper::Lt
@@ -1240,13 +1249,13 @@ impl FunctionTranslator<'_> {
                 arity(dsts, srcs, 1, 2, oper)?;
                 match oper {
                     Oper::Add(_) => StacklessOperation::Add,
-                    Oper::Sub => StacklessOperation::Sub,
+                    Oper::Sub(_) => StacklessOperation::Sub,
                     Oper::Mul(_) => StacklessOperation::Mul,
-                    Oper::Div => StacklessOperation::Div,
-                    Oper::Mod => StacklessOperation::Mod,
-                    Oper::BitAnd => StacklessOperation::BitAnd,
-                    Oper::BitOr => StacklessOperation::BitOr,
-                    Oper::BitXor => StacklessOperation::Xor,
+                    Oper::Div(_) => StacklessOperation::Div,
+                    Oper::Mod(_) => StacklessOperation::Mod,
+                    Oper::BitAnd(_) => StacklessOperation::BitAnd,
+                    Oper::BitOr(_) => StacklessOperation::BitOr,
+                    Oper::BitXor(_) => StacklessOperation::Xor,
                     Oper::Shl(_) => StacklessOperation::Shl,
                     Oper::Shr(_) => StacklessOperation::Shr,
                     Oper::Lt => StacklessOperation::Lt,
@@ -1266,6 +1275,10 @@ impl FunctionTranslator<'_> {
                     IntType::U64 => StacklessOperation::CastU64,
                     IntType::U128 => StacklessOperation::CastU128,
                     IntType::U256 => StacklessOperation::CastU256,
+                    IntType::I8 | IntType::I16 | IntType::I32 | IntType::I64
+                    | IntType::I128 | IntType::I256 => bail!(
+                        "signed integer casts are not representable in stackless bytecode"
+                    ),
                 }
             },
             Oper::Not => {

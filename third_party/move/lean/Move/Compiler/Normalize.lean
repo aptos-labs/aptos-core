@@ -55,6 +55,15 @@ private def widthOfExpr? (type : Expr) : Option MoveModel.IR.IntWidth :=
   | .const name _ => widthOfTagName? name
   | _ => none
 
+/-- Recognize a sign-tag type expression: the second half of a `NumType`. -/
+private def signOfExpr? (type : Expr) : Option Bool :=
+  match type with
+  | .const name _ =>
+      if name == ``Move.Unsigned then some false
+      else if name == ``Move.Signed then some true
+      else none
+  | _ => none
+
 private partial def translateTyWith (env : Environment) (ctx : TyContext)
     (type : Expr) : Except String (Option LIR.Ty) := do
   if let .bvar index := type then
@@ -73,13 +82,26 @@ private partial def translateTyWith (env : Environment) (ctx : TyContext)
   if type.isConstOf ``U64 then return some (.uint .w64)
   if type.isConstOf ``U128 then return some (.uint .w128)
   if type.isConstOf ``U256 then return some (.uint .w256)
-  if type.isAppOf ``Move.UInt then
-    let some tag := type.getAppArgs[0]?
+  if type.isConstOf ``I8 then return some (.sint .w8)
+  if type.isConstOf ``I16 then return some (.sint .w16)
+  if type.isConstOf ``I32 then return some (.sint .w32)
+  if type.isConstOf ``I64 then return some (.sint .w64)
+  if type.isConstOf ``I128 then return some (.sint .w128)
+  if type.isConstOf ``I256 then return some (.sint .w256)
+  -- The general form: `MoveInt S W`, carrying the sign tag then the width tag.
+  if type.isAppOf ``Move.MoveInt then
+    let args := type.getAppArgs
+    let some signTag := args[0]?
+      | throw s!"integer type `{type}` is missing its sign tag"
+    let some signed := signOfExpr? signTag
+      | throw s!"integer signedness of `{type}` is not statically known"
+    let some widthTag := args[1]?
       | throw s!"integer type `{type}` is missing its width tag"
-    let some w := widthOfExpr? tag
+    let some w := widthOfExpr? widthTag
       | throw s!"integer width of `{type}` is not statically known"
-    return some (.uint w)
+    return some (.int ⟨w, signed⟩)
   if type.isAppOf ``Move.Width then return none
+  if type.isAppOf ``Move.Sign then return none
   if type.isConstOf ``Address then return some .address
   if type.isConstOf ``Signer then return some .signer
   if type.isConstOf ``World || type.isConstOf ``PUnit || type.isConstOf ``Unit then
@@ -160,6 +182,12 @@ private def syntheticType (name : Name) : Option LIR.Ty :=
   | "U64" => some (.uint .w64)
   | "U128" => some (.uint .w128)
   | "U256" => some (.uint .w256)
+  | "I8" => some (.sint .w8)
+  | "I16" => some (.sint .w16)
+  | "I32" => some (.sint .w32)
+  | "I64" => some (.sint .w64)
+  | "I128" => some (.sint .w128)
+  | "I256" => some (.sint .w256)
   | "Address" => some .address
   | "Signer" => some .signer
   | _ => none
@@ -418,10 +446,27 @@ private partial def uintConstant? (name : Name) :
         match letDecl.value with
         | .lit (.nat n) => scan ((letDecl.fvarId, n) :: nats) results next
         | .const fn _ args _ =>
-            if fn == ``UInt.ofNat then
+            -- `Int.ofNat` carries a non-negative literal into `MoveInt.ofInt`.
+            if fn == ``Int.ofNat || fn == ``NatCast.natCast || fn == ``Nat.cast then
+              match (fvarArgs args).back? with
+              | some natArg =>
+                  match assocFind? natArg nats with
+                  | some n => scan ((letDecl.fvarId, n) :: nats) results next
+                  | none => scan nats results next
+              | none => scan nats results next
+            else if fn == ``UInt.ofNat then
               match (typeArgs args)[0]?, (fvarArgs args).back? with
               | some tag, some natArg =>
                   match widthOfExpr? tag, assocFind? natArg nats with
+                  | some w, some n =>
+                      scan nats ((letDecl.fvarId, (w, n)) :: results) next
+                  | _, _ => none
+              | _, _ => none
+            else if fn == ``MoveInt.ofInt then
+              -- the width tag is the second type argument (sign, then width)
+              match (typeArgs args)[1]?, (fvarArgs args).back? with
+              | some tag, some intArg =>
+                  match widthOfExpr? tag, assocFind? intArg nats with
                   | some w, some n =>
                       scan nats ((letDecl.fvarId, (w, n)) :: results) next
                   | _, _ => none
@@ -754,6 +799,18 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
   | .const fn _ args _ =>
       let vars := fvarArgs args
       let types := typeArgs args
+      -- `Int.ofNat n` / `Nat.cast n` is the carrier of a non-negative integer
+      -- literal; track its value like a natural literal so `MoveInt.ofInt` can
+      -- resolve it.
+      if fn == ``Int.ofNat || fn == ``NatCast.natCast || fn == ``Nat.cast then
+        match vars.back? with
+        | some natArg =>
+          match assocFind? natArg (← get).natLiterals with
+          | some n =>
+            modify fun s => { s with natLiterals := (decl.fvarId, n) :: s.natLiterals }
+          | none => pure ()
+        | none => pure ()
+        return instrs
       if fn == ``continueMarker then
         throwError "`continue` must mark a direct self-call in tail position"
       if Move.isLoopTokenLiveMarker fn then
@@ -955,30 +1012,45 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
         let some w := widthOfExpr? tag
           | throwError "integer width is not statically known"
         pure w
-      let uintBinary? : Option (MoveModel.IR.IntWidth → LIR.Oper) :=
-        if fn == ``UInt.add then some (.add ·)
-        else if fn == ``UInt.sub then some (fun _ => .sub)
-        else if fn == ``UInt.mul then some (.mul ·)
-        else if fn == ``UInt.div then some (fun _ => .div)
-        else if fn == ``UInt.mod then some (fun _ => .mod)
-        else if fn == ``UInt.land then some (fun _ => .bitAnd)
-        else if fn == ``UInt.lor then some (fun _ => .bitOr)
-        else if fn == ``UInt.lxor then some (fun _ => .bitXor)
-        else if fn == ``UInt.shl then some (.shl ·)
-        else if fn == ``UInt.shr then some (.shr ·)
-        else if fn == ``UInt.less then some (fun _ => .lt)
-        else if fn == ``UInt.lessEq then some (fun _ => .le)
-        else if fn == ``UInt.equal then some (fun _ => .eq)
-        else if fn == ``UInt.instDecidableLt then some (fun _ => .lt)
+      -- One recognizer for every integer operation: the marker name gives the
+      -- operation and the type arguments give the `NumType` (sign then width),
+      -- so signed and unsigned share one path.  Comparisons use the
+      -- width-agnostic `lt`/`le`/`eq` (correct on the mathematical value).
+      let numTypeOfArgs (signIndex widthIndex : Nat) :
+          BuildM MoveModel.IR.NumType := do
+        let some signTag := types[signIndex]?
+          | throwError "integer operation is missing its sign tag"
+        let some signed := signOfExpr? signTag
+          | throwError "integer signedness is not statically known"
+        let some widthTag := types[widthIndex]?
+          | throwError "integer operation is missing its width tag"
+        let some w := widthOfExpr? widthTag
+          | throwError "integer width is not statically known"
+        pure ⟨w, signed⟩
+      let intBinary? : Option (MoveModel.IR.NumType → LIR.Oper) :=
+        if fn == ``MoveInt.add then some (.add ·)
+        else if fn == ``MoveInt.sub then some (.sub ·)
+        else if fn == ``MoveInt.mul then some (.mul ·)
+        else if fn == ``MoveInt.div then some (.div ·)
+        else if fn == ``MoveInt.mod then some (.mod ·)
+        else if fn == ``MoveInt.land then some (.bitAnd ·)
+        else if fn == ``MoveInt.lor then some (.bitOr ·)
+        else if fn == ``MoveInt.lxor then some (.bitXor ·)
+        else if fn == ``MoveInt.shl then some (.shl ·)
+        else if fn == ``MoveInt.shr then some (.shr ·)
+        else if fn == ``MoveInt.less then some (fun _ => .lt)
+        else if fn == ``MoveInt.lessEq then some (fun _ => .le)
+        else if fn == ``MoveInt.equal then some (fun _ => .eq)
+        else if fn == ``MoveInt.instDecidableLt then some (fun _ => .lt)
         else none
-      if let some mkOp := uintBinary? then
+      if let some mkOp := intBinary? then
         let some lhs := vars[vars.size - 2]?
           | throwError "binary operation is missing its left operand"
         let some rhs := vars[vars.size - 1]?
           | throwError "binary operation is missing its right operand"
-        let w ← widthOfType 0
-        let op := mkOp w
-        let ty := if op matches .lt | .le | .eq then LIR.Ty.bool else .uint w
+        let nt ← numTypeOfArgs 0 1
+        let op := mkOp nt
+        let ty := if op matches .lt | .le | .eq then LIR.Ty.bool else .int nt
         addLocalTy decl.fvarId ty
         return instrs.push (.call #[localName decl.fvarId] op #[srcName lhs, srcName rhs])
       let generic? : Option LIR.Oper :=
@@ -991,27 +1063,41 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
         let some rhs := vars[1]? | throwError "binary operation is missing its right operand"
         addLocalTy decl.fvarId .bool
         return instrs.push (.call #[localName decl.fvarId] op #[srcName lhs, srcName rhs])
-      if fn == ``UInt.cast then
+      if fn == ``MoveInt.cast then
         let some operand := vars[vars.size - 1]?
           | throwError "integer cast is missing its operand"
-        let target ← widthOfType 1
-        addLocalTy decl.fvarId (.uint target)
+        let target ← numTypeOfArgs 2 3
+        addLocalTy decl.fvarId (.int target)
         return instrs.push
           (.call #[localName decl.fvarId] (.cast target) #[srcName operand])
-      if fn == ``UInt.ofNat then
+      -- Literals: `UInt.ofNat n` and `SInt.ofInt (Int.ofNat n)` (both
+      -- non-negative; negation is a separate `SInt.neg`).  The `Int.ofNat`
+      -- value is tracked as a natural literal by `recognizeLet`.
+      if fn == ``UInt.ofNat || fn == ``MoveInt.ofInt then
         let some source := vars[vars.size - 1]?
-          | throwError "integer literal is missing its natural value"
+          | throwError "integer literal is missing its value"
         let some n := assocFind? source (← get).natLiterals
           | throwError "integer literal is not statically known"
-        let w ← widthOfType 0
-        addLocalTy decl.fvarId (.uint w)
-        return instrs.push (.loadUInt w (localName decl.fvarId) n)
+        let nt ← if fn == ``UInt.ofNat then
+            pure (⟨← widthOfType 0, false⟩ : MoveModel.IR.NumType)
+          else numTypeOfArgs 0 1
+        addLocalTy decl.fvarId (.int nt)
+        return instrs.push (.loadInt nt (localName decl.fvarId) (n : Int))
+      -- Negation lowers to `0 - x` on the signed type.
+      if fn == ``MoveInt.neg then
+        let some operand := vars[vars.size - 1]?
+          | throwError "negation is missing its operand"
+        let nt ← numTypeOfArgs 0 1
+        let zero ← freshTemp (.int nt)
+        addLocalTy decl.fvarId (.int nt)
+        return (instrs.push (.loadInt nt zero 0)).push
+          (.call #[localName decl.fvarId] (.sub nt) #[zero, srcName operand])
       if fn == ``Bool.true || fn == ``Bool.false then
         addLocalTy decl.fvarId .bool
         return instrs.push (.loadBool (localName decl.fvarId) (fn == ``Bool.true))
       if let some (w, n) ← uintConstant? fn then
         addLocalTy decl.fvarId (.uint w)
-        return instrs.push (.loadUInt w (localName decl.fvarId) n)
+        return instrs.push (.loadInt ⟨w, false⟩ (localName decl.fvarId) (n : Int))
       if fn == ``Move.Vector.empty then
         let some elemType := types[0]? | throwError "empty vector is missing its element type"
         let some elemTy ← translateCurrentTy (← getEnv) elemType
@@ -1114,7 +1200,9 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
         throwError "callee `{fn}` is not selected in this `move_module%`"
       -- Type-class dictionaries and proof evidence are compiler-erased.
       if fn.toString.contains "instInhabited" then return instrs
-      if fn.toString.contains "instWidth" then return instrs
+      if fn.toString.contains "instWidth" || fn.toString.contains "instSign"
+          || fn.toString.contains "instNatCast" then
+        return instrs
       if fn == ``PUnit.unit || fn == ``Unit.unit then return instrs
       throwError "unsupported call `{fn}` while compiling Move function"
   | .proj owner field source =>
@@ -1569,7 +1657,7 @@ private def abilitySetHas : LIR.AbilitySet → RequiredAbility → Bool
 private partial def typeHasAbility (structs : Array LIR.StructDecl)
     (typeParams : Array LIR.TypeParamDecl) (fuel : Nat)
     (required : RequiredAbility) : LIR.Ty → Bool
-  | .bool | .uint _ | .address => required != .key
+  | .bool | .uint _ | .sint _ | .address => required != .key
   | .signer => required == .drop
   | .typeParam index =>
       typeParams[index]?.any fun param => abilitySetHas param.abilities required

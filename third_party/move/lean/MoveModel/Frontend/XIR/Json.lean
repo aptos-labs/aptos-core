@@ -36,9 +36,24 @@ private def widthName : IntWidth → String
   | .w128 => "u128"
   | .w256 => "u256"
 
+/-- Signed integer width names.  Signedness is carried by the `i`/`u` prefix of
+the width string (mirroring the exchange format's `IntType`), so signed
+operations reuse the same operation tags as their unsigned counterparts. -/
+private def signedWidthName : IntWidth → String
+  | .w8 => "i8"
+  | .w16 => "i16"
+  | .w32 => "i32"
+  | .w64 => "i64"
+  | .w128 => "i128"
+  | .w256 => "i256"
+
+/-- The width string of a numeric type: `uN` unsigned, `iN` signed. -/
+private def numName (nt : NumType) : String :=
+  if nt.signed then signedWidthName nt.width else widthName nt.width
+
 private partial def encodeTy : Ty → Json
   | .bool => .str "bool"
-  | .uint w => .str (widthName w)
+  | .int nt => .str (numName nt)
   | .address => .str "address"
   | .signer => .str "signer"
   | .typeParam i => tag "type_parameter" (nat i)
@@ -60,17 +75,17 @@ private def encodeValue : Value → JsonResult Json
   | .ref _ | .mut _ _ => throw "references are not valid XIR load constants"
 
 private def encodeOper : Oper → JsonResult Json
-  | .add w => pure (tag "add" (.str (widthName w)))
-  | .sub => pure (.str "sub")
-  | .mul w => pure (tag "mul" (.str (widthName w)))
-  | .div => pure (.str "div")
-  | .mod => pure (.str "mod")
-  | .bitAnd => pure (.str "bit_and")
-  | .bitOr => pure (.str "bit_or")
-  | .bitXor => pure (.str "bit_xor")
-  | .shl w => pure (tag "shl" (.str (widthName w)))
-  | .shr w => pure (tag "shr" (.str (widthName w)))
-  | .cast target => pure (tag "cast" (.str (widthName target)))
+  | .add nt => pure (tag "add" (.str (numName nt)))
+  | .sub nt => pure (tag "sub" (.str (numName nt)))
+  | .mul nt => pure (tag "mul" (.str (numName nt)))
+  | .div nt => pure (tag "div" (.str (numName nt)))
+  | .mod nt => pure (tag "mod" (.str (numName nt)))
+  | .bitAnd nt => pure (tag "bit_and" (.str (numName nt)))
+  | .bitOr nt => pure (tag "bit_or" (.str (numName nt)))
+  | .bitXor nt => pure (tag "bit_xor" (.str (numName nt)))
+  | .shl nt => pure (tag "shl" (.str (numName nt)))
+  | .shr nt => pure (tag "shr" (.str (numName nt)))
+  | .cast target => pure (tag "cast" (.str (numName target)))
   | .lt => pure (.str "lt")
   | .le => pure (.str "le") | .eq => pure (.str "eq")
   | .and => pure (.str "and") | .or => pure (.str "or")
@@ -425,7 +440,7 @@ def decodeMModule (text : String) : JsonResult MModule := do
     | .ok value => value.getArr?
     | .error _ => pure #[]
   let legacy := Json.mkObj [
-    ("version", nat 8),
+    ("version", nat 10),
     ("structs", .arr structsJson),
     ("funs", .arr functionsJson)
   ]

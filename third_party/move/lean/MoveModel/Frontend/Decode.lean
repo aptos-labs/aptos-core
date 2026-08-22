@@ -81,6 +81,12 @@ private partial def decodeTy (j : Json) : Dec Ty := do
   | "u64" => pure (.uint .w64)
   | "u128" => pure (.uint .w128)
   | "u256" => pure (.uint .w256)
+  | "i8" => pure (.sint .w8)
+  | "i16" => pure (.sint .w16)
+  | "i32" => pure (.sint .w32)
+  | "i64" => pure (.sint .w64)
+  | "i128" => pure (.sint .w128)
+  | "i256" => pure (.sint .w256)
   | "address" => pure .address
   | "signer" => pure .signer
   | "type_parameter" => pure (.typeParam (← decodeNat (← payload tag p)))
@@ -115,27 +121,35 @@ private partial def decodeValue (j : Json) : Dec Value := do
 private def decodeOper (j : Json) : Dec Oper := do
   let (tag, p) ← decodeTagged j
   let arg : Dec Nat := do decodeNat (← payload tag p)
-  let width : Dec IntWidth := do
+  -- Every integer operation carries its `NumType`, spelled as a width string
+  -- whose `u`/`i` prefix is the signedness.
+  let numType : Dec NumType := do
     match (← (← payload tag p).getStr?) with
-    | "u8" => pure .w8
-    | "u16" => pure .w16
-    | "u32" => pure .w32
-    | "u64" => pure .w64
-    | "u128" => pure .w128
-    | "u256" => pure .w256
+    | "u8" => pure ⟨.w8, false⟩
+    | "u16" => pure ⟨.w16, false⟩
+    | "u32" => pure ⟨.w32, false⟩
+    | "u64" => pure ⟨.w64, false⟩
+    | "u128" => pure ⟨.w128, false⟩
+    | "u256" => pure ⟨.w256, false⟩
+    | "i8" => pure ⟨.w8, true⟩
+    | "i16" => pure ⟨.w16, true⟩
+    | "i32" => pure ⟨.w32, true⟩
+    | "i64" => pure ⟨.w64, true⟩
+    | "i128" => pure ⟨.w128, true⟩
+    | "i256" => pure ⟨.w256, true⟩
     | other => throw s!"unknown integer width `{other}`"
   match tag with
-  | "add" => pure (.add (← width))
-  | "sub" => pure .sub
-  | "mul" => pure (.mul (← width))
-  | "div" => pure .div
-  | "mod" => pure .mod
-  | "bit_and" => pure .bitAnd
-  | "bit_or" => pure .bitOr
-  | "bit_xor" => pure .bitXor
-  | "shl" => pure (.shl (← width))
-  | "shr" => pure (.shr (← width))
-  | "cast" => pure (.cast (← width))
+  | "add" => pure (.add (← numType))
+  | "sub" => pure (.sub (← numType))
+  | "mul" => pure (.mul (← numType))
+  | "div" => pure (.div (← numType))
+  | "mod" => pure (.mod (← numType))
+  | "bit_and" => pure (.bitAnd (← numType))
+  | "bit_or" => pure (.bitOr (← numType))
+  | "bit_xor" => pure (.bitXor (← numType))
+  | "shl" => pure (.shl (← numType))
+  | "shr" => pure (.shr (← numType))
+  | "cast" => pure (.cast (← numType))
   | "lt" => pure .lt
   | "le" => pure .le
   | "eq" => pure .eq
@@ -388,7 +402,7 @@ private def decodeStruct (j : Json) : Dec MStruct := do
 def decodeMProgram (s : String) : Dec MProgram := do
   let j ← Json.parse s
   let version ← decodeNat (← j.getObjVal? "version")
-  if version ≠ 8 then
+  if version ≠ 10 then
     throw s!"unsupported exchange schema version {version}"
   pure {
     structs := ← (← (← j.getObjVal? "structs").getArr?).toList.mapM decodeStruct

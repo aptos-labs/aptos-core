@@ -1,8 +1,9 @@
 # Complexity of the verification encoding
 
-Status: analysis with measurements from 2026-08-20; strategies 1–5 below
-were then implemented (or, for 4, measured and rejected) — the outcome of
-each is recorded under its heading
+Status: current as of 2026-08-21.  Every optimization considered is listed
+with an explicit verdict — done, rejected, or open — in the status table under
+*Optimization strategies*; the outcome of each is recorded under its heading,
+and the numbers behind the verdicts are under *Benchmarking proof cost*.
 
 This note examines the relational semantics that `spec`/`verify` prove
 against, along two axes — how large proofs are and how long verification
@@ -157,8 +158,32 @@ a tactic should do.
 
 ## Optimization strategies
 
-Ordered by expected payoff over cost.  The first three attack the dominant
-costs identified above; the rest are smaller or speculative.
+Status of every optimization considered, so that a later reader can tell what
+was tried from what merely sounded good.  Detail follows in the numbered
+sections; the heartbeat numbers behind the verdicts are under *Benchmarking
+proof cost*.
+
+| # | strategy | status |
+|---|---|---|
+| 1 | Make the automatic `verify` wp-based | **done** |
+| 2 | Keep well-definedness structural everywhere | **done** (subsumed by 1) |
+| 3 | A `move_step` tactic for manual proofs | **done**; corpus conversion **open** |
+| 4 | Trim the simp sets to what fires | **partly done, partly rejected** |
+| 5 | Eliminate prophecies that do not escape | **done** — but not by the lemmas it added |
+| 6 | Cut the import floor | **open** — never attempted |
+| 7 | Abort-encoding / `Spec.Total` well-definedness | **rejected** (unsound / too weak) |
+| 8 | Per-view interface over the generic integer core | **done** |
+| 9 | Fix `@[simp high]` inside custom simp sets | **done** |
+| 10 | Remove lemmas the audit shows never fire | **done** |
+| 11 | Make the two spellings of a value share one key | **done** |
+| 12 | `data_invariants` as a tactic, not on the automatic path | **done** (folding it in: **rejected**) |
+| 13 | Reduce `MoveInt S W` proof-term size | **open** — the whole residual |
+| 14 | Stop `uint_bounds` re-scanning the context per call | **open** — unmeasured |
+
+1–7 were derived from the cost analysis above and are ordered by expected
+payoff over cost; 8–12 came out of the integer unification and were driven by
+per-proof heartbeat measurement rather than by inspection; 13–14 are what is
+left.
 
 ### 1. Make the automatic `verify` wp-based — done
 
@@ -229,7 +254,7 @@ inventory was split into `move_data` (data-level unfolds: references,
 stores, vectors, monad shells) and `move_spec` (relational projections plus
 `move_data`), so the wp phase can use the former alone.
 
-### 5. Eliminate prophecies that do not escape — done
+### 5. Eliminate prophecies that do not escape — done, by something else
 
 `wp_withMutation` quantifies over the future and the reconciliation
 equation then fixes it.  Rather than special rules per body shape, three
@@ -239,7 +264,13 @@ the hypotheses a rule puts in front of it — `forall_imp_eq_left`
 `Contract.lean` — and they are part of the wp phase.  On `Account.deposit`
 the post-wp goal has no `∀ future` left.
 
-### 6. Cut the import floor
+*Correction, from the audit below.*  The goal is met — no `∀ future` survives
+— but **not by these three lemmas**: across the corpus they were tried 1651
+times each and applied exactly zero times.  Something earlier in the wp phase
+already eliminates the quantifier.  They are out of the explicit list (still
+`@[simp]`, so a regression cannot hide) and the corpus got 4–8% cheaper.
+
+### 6. Cut the import floor — open
 
 ~1.3s and ~1.5 GB per file is the cost of `import Move`, which pulls in the
 whole `MoveModel` IR formalization (197 MB of `.olean`) although source
@@ -248,7 +279,7 @@ library so that tests `import Move.Verify` (and only the compiler-facing
 tests `import Move`) would lower every number in this note by a constant,
 and is the only lever on memory.
 
-### 7. Not recommended
+### 7. Not recommended — rejected
 
 - *Abort-encoding of well-definedness* (make a violated invariant an abort
   with a distinguished code).  Cheap, but unsound together with
@@ -256,6 +287,180 @@ and is the only lever on memory.
 - *Quantifying well-definedness over all states* (`Spec.Total` instead of
   the pointwise form).  It loses the reachability hypothesis and would make
   `OrderedMap.add`'s re-established invariant unprovable.
+
+### 8–12. The unification-era optimizations
+
+Each has its own section below with the measurements; in short:
+
+- **8, per-view interface** (`unified-int-design.md`): state every user-visible
+  obligation in the view's native domain (`Nat` unsigned, `Int` signed) while
+  keeping one generic core.  1.184× → 1.014×.  **Done.**
+- **9, `@[simp high]` in a custom set** — the priority does not carry; use
+  `attribute [move_norm high]`.  8× on one proof.  **Done.**
+- **10, audit-driven removals** — 88% of all simp tries in the corpus fail;
+  two inventories accounted for 6,739 wasted tries with zero successes.
+  1.014× → 0.922×.  **Done.**
+- **11, two spellings of one value** — numeral vs `UInt.ofNat`, and the
+  `U8.ofNat …` abbrevs.  **Done**; two orientations of the fix **rejected** by
+  measurement (see the section for why neither can be keyed).
+- **12, `data_invariants`** — the tactic is **done**; folding it into
+  `uint_bounds`, which is the obvious completion and reads better, is
+  **rejected**: +522K net across the suite.
+
+### 13. Reduce `MoveInt S W` proof-term size — open
+
+This is what the entire residual now is.  Nothing above baseline is worse than
+1.14×, and the largest absolute residues are hand-written loop proofs where no
+rewrite fails to fire — the cost is kernel-side, in proof terms that carry two
+class parameters and `numTypeOf S W` structure terms where `UInt W` carried
+one.  It showed up as a consistent +9–12% in the profiler's `type checking`
+when the unification landed.  Untried levers: making `numTypeOf` reduce to a
+literal `NumType` at each concrete width so the terms close up, or `@[irreducible]`
+on the parts of `MoveInt` the kernel need not see through.
+
+### 14. Stop `uint_bounds` re-scanning the context — open, unmeasured
+
+`spec_norm` runs `uint_bounds` and `u64_omega` runs it again inside a `first`
+combinator, so a proof like `OrderedMap.lowerBoundLoop` scans the whole local
+context and asserts bounds five or more times, each pass over a context the
+previous one grew.  Nobody has measured what that costs; it is listed so the
+next person does not have to rediscover it.
+
+## A custom simp-attribute does not inherit `@[simp high]`
+
+Worth its own heading because it is invisible and it cost 8× on one proof.
+
+A lemma declared `@[simp high]` and separately registered in one of the
+inventories (`attribute [move_norm] X`, or `@[simp high, wp_norm]`) is high
+priority **in `simp` only**.  Inside `simp only [move_norm]` it sits at default
+priority, so a more general lemma can beat it.
+
+`UInt.toNat_ofNat_land` collapses `(ofNat (a &&& b)).toNat` to `a &&& b`
+outright; the general `UInt.toNat_ofNat` rewrites it to `(a &&& b) % size`.
+The collapse lemma has carried `@[simp high]` since it was written, but in
+`move_norm` the general lemma won, so every bitwise proof was left with a
+`% size` residue — dischargeable only by arithmetic that does not model
+bitwise operations, which is why `Nat.and_le_left` had to be handed to `grind`
+and why `grind`'s AC/ring machinery showed up in the profile of a file that
+only masks two integers.  `Integers.masked` cost 1.99M heartbeats instead of
+247K.
+
+The fix is to state the priority in the set that will be used —
+`attribute [move_norm high] …`, `@[simp high, wp_norm high]`.  With it, the
+first `simp only` phase closes those goals, the `Nat.*` bitwise lemmas come
+back out of the `grind` list, and `Tests/Move/Integers` drops to 0.80× of its
+own pre-unification cost.
+
+Symptom to recognise: `simp only [<attr>]` leaves a goal that
+`simp only [<the one lemma>]` closes — and passing both explicitly makes the
+linter report the specific lemma as unused.
+
+## Auditing which lemmas actually fire
+
+`scripts/simp-audit.sh` answers "is this lemma earning its place?" directly.
+Lean's `diagnostics` option makes `simp` report, per call, every theorem it
+*tried* and how often it *succeeded*, flagging with ❌️ any that were tried and
+never applied:
+
+```
+scripts/simp-audit.sh [file ...]     # default: Tests/Move/*.lean
+```
+
+It aggregates those counts across files and prints the theorems that never fire
+(pure cost — their discrimination key matches terms they cannot rewrite, or a
+higher-priority lemma always wins) and the worst hit rates among those that do.
+
+Two things it found immediately, both in inventories that had been carried for
+a long time:
+
+- `UInt.numeral_eq_ofNat` — the wildcard-keyed lemma this note already flags —
+  was tried **1786 times with zero successes** across three files.  It is
+  genuinely load-bearing, but only in the *fallback* path for functions with no
+  `sourceSpec`; in the `wp`-based path it never fires.  Removing it from that
+  path alone moved `GlobalInv` 1.04× → 0.94×, `Account` 1.07× → 0.97×,
+  `Arithmetic` 1.01× → 0.93× and `Integers` 0.80× → 0.75× of pre-unification
+  cost.  Removing it from the fallback path too breaks four files — which is
+  exactly the distinction the audit makes visible and inspection does not.
+- The three prophecy-elimination lemmas of strategy 5
+  (`forall_imp_eq_left`, `forall_imp_eq_right`, `forall_imp_imp_eq_left`) were
+  tried **1651 times each — 4953 tries, 59% of all wasted work in the corpus —
+  and applied exactly zero times**.  They were carried in the explicit `wp`
+  list; whatever eliminates the prophecy quantifier today, it is not them.
+  Dropping them from that list (they remain `@[simp]`, so nothing can regress
+  silently) moved `Account` 0.97× → 0.92×, `VectorOperations` → 0.86×,
+  `GlobalInv` → 0.87×, `Vectors` → 0.93×.
+
+A caution about the tool itself: Lean prints *two* blocks per `simp` call, a
+"used theorems" summary and the "tried theorems" detail, and the first is a
+subset of the second.  Counting both inflates every try total and invents
+never-applied entries — the first version of this script did exactly that and
+reported `IntWidth.size` as dead when it fires constantly.  Only lines carrying
+❌️ or `succeeded:` are real.
+
+The lesson is that a lemma's presence in an inventory is not evidence that it
+is used, and "it is load-bearing" is not evidence that it is load-bearing *in
+every path that pays for it*.
+
+## Where two spellings of one value meet
+
+A recurring shape behind several of the measurements above: the *same value* is
+written two ways, so its discrimination-tree key splits and a lemma that should
+fire does not.  Three instances, all found by benchmarking a proof that looked
+like it should already be cheap.
+
+**Numerals versus `ofNat`.**  The unsigned view lemmas (`add_eq_ofNat` and
+friends) produce results as `Move.UInt.ofNat` of a natural-number expression;
+specifications are written with numerals.  When the expression evaluates to a
+literal the two meet, and every concrete postcondition — `ensures result = 27`
+— is left one defeq step short.  Neither orientation works as a simp lemma:
+
+- numeral-to-`ofNat` *must* key on `no_index (OfNat.ofNat n)`, because the
+  discrimination tree collapses numerals to literal keys, so a precisely keyed
+  pattern never matches at all (measured: a simproc keyed on the `MoveInt`
+  instance of `OfNat.ofNat` is never invoked);
+- `ofNat`-to-numeral read as a rewrite rule would also strip the `ofNat` shape
+  off the compound `ofNat (a.toNat + b.toNat)` results the collapse lemmas and
+  the `grind` patterns are keyed on.
+
+Restricting to *literal* arguments is the distinction a rewrite rule cannot
+make and a simproc can, so `uintOfNatLit` in `Move/Verify/Tactics.lean` does
+exactly that, keyed on the `UInt.ofNat` head constant.  It settles the
+canonical form — once the argument is a literal all the arithmetic is done, so
+the value is the numeral — and lets two hand proofs drop their closing steps:
+`VectorOperations.mutateAndRead` lost a six-lemma unfolding into raw `Int`
+modular arithmetic plus a `decide` (884K → 831K heartbeats) and
+`Vectors.removeMiddle` lost three trailing tactic lines (3.85M → 3.63M).
+
+There is no companion simproc for `toNat` of a numeral, and this is not an
+oversight: a probe simproc keyed on `MoveInt.toNat` fires for a variable
+argument and never for a numeral one, because the tree evaluates the ground
+term to a literal key.  `toNat_ofNat_numeral` therefore keeps its `no_index`
+key; it is a wildcard, but a load-bearing one, and five proofs break without
+it.
+
+**Width-directed spellings.**  `U8.ofNat … U256.ofNat` and `I8.ofInt …
+I256.ofInt` are named specification surface for the one `UInt.ofNat` /
+`SInt.ofInt`.  They are `abbrev`s, and simp's discrimination tree does *not*
+see through them, so which spelling a spec happened to use decided whether a
+view lemma fired.  They are now unfolded in `move_norm`, next to the `U8.size …
+U256.size` entries that were already there for the same reason.  Cost measured
+at 8 heartbeats on a file that does not use them.
+
+**A data invariant is not a width bound.**  `uint_bounds` asserts the certified
+facts of every integer- and vector-typed local.  Extending it to also assert the
+data invariant of every certified-typed local is the obvious completion — "the
+invariant is available wherever the value is" — and it works: `Invariants.span`
+drops its three-line prologue naming `Range.Invariant` and goes 590K → 305K,
+**0.63× of its pre-unification cost**, because the proof can then use the
+per-view `wp` rule instead of unfolding the raw relational `subSpec`.
+
+Measured across the suite, though, it is a net **+522K**: a width bound is one
+cheap atomic fact, while a data invariant can be an arbitrarily large predicate
+— the ordered map's is a sortedness condition over the whole entry list — and
+asserting one into every context the automatic cascade normalizes cost
+`OrderedMap` +801K against span's −285K.  So it lives in its own tactic,
+`data_invariants`, that a proof asks for.  The general principle survives; what
+does not survive measurement is putting it on the automatic path.
 
 ## Benchmarking proof cost
 
@@ -282,20 +487,82 @@ by contrast, swings 2–4× per proof and is reported only as a hint.
 scripts/bench-proofs.sh [top-N]     # rebuilds the suite with benchmarking on
 ```
 
-Whole-suite result (2026-08-21, after strategies 1–5): **110 verified
-functions, 99.7M heartbeats, 5.4s of proof wall in total** — i.e. the actual
-verification work is a small fraction of the ~40s suite wall, the rest being
-the CLI and scheduling.  The cost concentrates in the recursive and loop
-proofs and the ordered-map operations:
+Two current figures, and they are not interchangeable:
 
-| heartbeats | function |
-|---|---|
-| 10.7M | `OrderedMap.lowerBoundLoop` (recursive binary search) |
-| 6.8M | `ResourceComposition.shift` |
-| 5.7M | `OrderedMap.add` |
-| 5.3M | `OrderedMap.borrow` |
-| 4.9M | `Quicksort.partitionLoop` |
-| 3.8M | `Vectors.removeMiddle` |
+- **whole suite, 121 verified functions: 111.4M heartbeats** (~6s of proof wall
+  in total — the actual verification work is a small fraction of the ~40s suite
+  wall, the rest being the CLI and scheduling);
+- **the 115 functions that exist in every revision: 107.5M.**  The other six are
+  the new signed-integer proofs, which have no counterpart before the
+  unification, so only this subset can be compared against history.
+
+**Lower is faster** — a heartbeat is a unit of elaboration work.  The
+trajectory of the comparable subset, oldest first, so the *last* row is where
+the tree stands today:
+
+| revision | common-115 heartbeats | vs. pre-unification |
+|---|---|---|
+| **before this work** — separate `UInt`/`SInt` op families | **117.0M** | 1.000× |
+| after the integer unification, generic interface only | 138.6M | 1.184× |
+| + per-view (`Nat`) interface for unsigned proofs | 127.3M | 1.087× |
+| + attribute-priority fix (`move_norm high`) | 118.7M | 1.014× |
+| + never-applied-lemma removals (audit below) | 107.9M | 0.922× |
+| **now** — + the two-spellings fixes (section below) | **107.5M** | **0.918×** |
+
+So the unification cost 18.4% when it landed and is now 8.2% *below* where the
+tree started: **117.0M → 107.5M**, one generic core instead of two families,
+covering twelve integer types where there were six.  The cost still concentrates in the
+recursive and loop proofs and the ordered-map operations:
+
+| heartbeats | function | vs. pre-unification |
+|---|---|---|
+| 10.9M | `OrderedMap.lowerBoundLoop` (recursive binary search) | 1.02× |
+| 8.8M | `CrossInv.shift` | 0.86× |
+| 6.3M | `ResourceComposition.shift` | 0.87× |
+| 5.8M | `OrderedMap.add` | 1.00× |
+| 5.1M | `Quicksort.partitionLoop` | 1.04× |
+| 5.1M | `OrderedMap.borrow` | 0.95× |
+
+What is left above baseline is diffuse: no function is worse than 1.14×, the
+two largest absolute residues are `OrderedMap.lowerBoundLoop` (+213K) and
+`Quicksort.partitionLoop` (+177K), and both are hand-written loop proofs whose
+cost sits in larger `MoveInt S W` proof terms rather than in any rewrite that
+fails to fire.  That is the kernel-side price of the extra abstraction layer,
+recorded here as +9–12% in `type checking` when the unification landed; it is
+not something a simp lemma can recover (strategy 13).
+
+Per file, current against the pre-unification baseline — the unit of comparison
+a change is most likely to move:
+
+| file | pre-unification | now | ratio |
+|---|---|---|---|
+| `OrderedMap` | 28.59M | 28.39M | 0.99× |
+| `CrossInv` | 10.23M | 8.82M | 0.86× |
+| `VectorOperations` | 9.37M | 8.01M | 0.85× |
+| `Quicksort` | 8.41M | 8.58M | 1.02× |
+| `Vectors` | 7.85M | 7.10M | 0.90× |
+| `Arithmetic` | 7.27M | 6.34M | 0.87× |
+| `ResourceComposition` | 7.20M | 6.29M | 0.87× |
+| `Calls` | 6.64M | 5.68M | 0.86× |
+| `Account` | 6.49M | 5.98M | 0.92× |
+| `Integers` | 6.10M | 4.23M | 0.69× |
+| `GlobalInv` | 4.13M | 3.60M | 0.87× |
+| `Invariants` | 3.96M | 3.49M | 0.88× |
+| `Loops` | 3.67M | 3.51M | 0.95× |
+| `Generics` | 2.85M | 2.98M | 1.04× |
+| `EnumPayloads` | 1.90M | 2.02M | 1.06× |
+| `Read` | 1.15M | 1.16M | 1.01× |
+| `EnumPatterns` | 0.72M | 0.76M | 1.05× |
+| `Enums` | 0.35M | 0.39M | 1.12× |
+| `Modules` | 0.14M | 0.14M | 1.02× |
+| `SourceVerification` | 0.02M | 0.02M | 1.01× |
+| `Signed` (new) | — | 3.89M | — |
+
+Eight files are still above 1.00×, but they account for **+0.51M against
+−10.07M** everywhere else.  Six of the eight are the enum, generics, and module
+tests, where the per-view integer rules have almost nothing to do so the extra
+abstraction is paid without a matching saving; the exception that matters is
+`Quicksort` (+165K, all of it in `partitionLoop`), which is strategy 13.
 
 This is the reference point for future changes: re-run the script and diff
 the per-proof heartbeats.

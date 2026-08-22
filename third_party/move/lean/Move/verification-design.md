@@ -437,6 +437,16 @@ point the loan dies. This is why `Spec` carries well-definedness at all: a
 rule whose `ok` relation were merely empty on violation would make `wp` hold
 vacuously.
 
+Using the invariant is unobligated but not automatic. A proof that needs the
+condition as a *fact* — rather than as an argument to a model lemma, which is
+how most of them use it — calls `data_invariants`, which asserts the unfolded
+condition of every certified-typed local without naming the type or its
+generated predicate. This is deliberately a tactic rather than part of
+`uint_bounds`: a representation bound is one cheap atomic fact, while a data
+invariant can be an arbitrarily large predicate, and asserting one into every
+context the automatic cascade normalizes measured as a net loss across the
+suite (see `performance-analysis.md`).
+
 ## Checked Move operations
 
 Source operations must have Move behavior before direct proofs are useful.

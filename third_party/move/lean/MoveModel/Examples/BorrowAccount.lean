@@ -54,7 +54,7 @@ def borrowDecl : FunDecl where
           some ⟨[.call [2] (.borrowGlobal ACCOUNT) [0],
                  .call [3] (.borrowField 0) [2],
                  .call [4] .readRef [3],
-                 .call [5] .sub [4, 1],
+                 .call [5] (.sub .u64) [4, 1],
                  .call [] .writeRef [3, 5]],
                 .ret []⟩
         else none
@@ -87,7 +87,7 @@ def elimBlock : Block :=
   ⟨[.call [2] (.mkMutGlobal ACCOUNT) [0],
     .call [3] (.childMutField 0) [2],
     .call [4] .getMut [3],
-    .call [5] .sub [4, 1],
+    .call [5] (.sub .u64) [4, 1],
     .call [3] .setMut [3, 5],
     .call [6] .getMut [2],
     .call [7] (.getField 0) [6],
@@ -263,9 +263,13 @@ theorem borrow_withdraw_verified : Verified elimProg 0 := by
       refine (wpCmds_onOk_step rfl).mpr ?_
       simp [initLocals, Oper.sem, MoveState.writeLocals,
         MoveState.writeLocal]
+      have hsub : (b : Int) - (amt : Int) < (U64_SIZE : Int) := by
+        have : (b : Int) < (U64_SIZE : Int) := by exact_mod_cast hb
+        have : (0 : Int) ≤ (amt : Int) := Int.natCast_nonneg _
+        omega
       refine (wpCmds_onOk_step rfl).mpr ?_
       simp [initLocals, Oper.sem, MoveState.writeLocals,
-        hge]
+        hge, hsub]
       refine (wpCmds_onOk_step rfl).mpr ?_
       simp [initLocals, Oper.sem, MoveState.writeLocals,
         MoveState.writeLocal]

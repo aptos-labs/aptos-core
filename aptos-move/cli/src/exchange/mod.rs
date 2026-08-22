@@ -844,13 +844,13 @@ fn translate_call(
     };
     let instr = match op {
         Add => simple(exchange::Oper::Add(int_width(locals, dsts[0])?)),
-        Sub => simple(exchange::Oper::Sub),
+        Sub => simple(exchange::Oper::Sub(int_width(locals, dsts[0])?)),
         Mul => simple(exchange::Oper::Mul(int_width(locals, dsts[0])?)),
-        Div => simple(exchange::Oper::Div),
-        Mod => simple(exchange::Oper::Mod),
-        BitAnd => simple(exchange::Oper::BitAnd),
-        BitOr => simple(exchange::Oper::BitOr),
-        Xor => simple(exchange::Oper::BitXor),
+        Div => simple(exchange::Oper::Div(int_width(locals, dsts[0])?)),
+        Mod => simple(exchange::Oper::Mod(int_width(locals, dsts[0])?)),
+        BitAnd => simple(exchange::Oper::BitAnd(int_width(locals, dsts[0])?)),
+        BitOr => simple(exchange::Oper::BitOr(int_width(locals, dsts[0])?)),
+        Xor => simple(exchange::Oper::BitXor(int_width(locals, dsts[0])?)),
         Shl => simple(exchange::Oper::Shl(int_width(locals, dsts[0])?)),
         Shr => simple(exchange::Oper::Shr(int_width(locals, dsts[0])?)),
         CastU8 => simple(exchange::Oper::Cast(exchange::IntType::U8)),
@@ -1247,13 +1247,13 @@ fn collect_loops(
                                  by loop-target collection"
                             ),
                             Oper::Add(_)
-                            | Oper::Sub
+                            | Oper::Sub(_)
                             | Oper::Mul(_)
-                            | Oper::Div
-                            | Oper::Mod
-                            | Oper::BitAnd
-                            | Oper::BitOr
-                            | Oper::BitXor
+                            | Oper::Div(_)
+                            | Oper::Mod(_)
+                            | Oper::BitAnd(_)
+                            | Oper::BitOr(_)
+                            | Oper::BitXor(_)
                             | Oper::Shl(_)
                             | Oper::Shr(_)
                             | Oper::Cast(_)

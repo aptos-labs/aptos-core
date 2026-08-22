@@ -49,7 +49,7 @@ def countDownBody : Cfg where
     if b = 0 then
       some ⟨[.load 1 (.u64 0), .call [2] .lt [1, 0]], .branch 2 1 2⟩
     else if b = 1 then
-      some ⟨[.load 3 (.u64 1), .call [0] .sub [0, 3]], .jump 0⟩
+      some ⟨[.load 3 (.u64 1), .call [0] (.sub .u64) [0, 3]], .jump 0⟩
     else if b = 2 then
       some ⟨[], .ret [0]⟩
     else none
@@ -146,7 +146,10 @@ theorem count_down_verified : Verified prog 0 := by
       have hTL4 := hTL3.writeUInt (x := 0) (i := (k : Int) - 1) (w := .w64)
         (by simp [countDownDecl]) (by omega)
         (by rw [u64_size_eq]; omega)
-      simp [wpCmds, compileInstr, onOk, hab, hl0, hg2, hk1, hk1Int,
+      have hkSub : (k : Int) - 1 < (U64_SIZE : Int) := by
+        have : (k : Int) < (U64_SIZE : Int) := by exact_mod_cast hk
+        omega
+      simp [wpCmds, compileInstr, onOk, hab, hl0, hg2, hk1, hk1Int, hkSub,
         Oper.sem, MoveState.writeLocals, Holds,
         VState.curEnv, VState.doAbort]
       intro g' b' hedge hg'

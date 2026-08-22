@@ -20,7 +20,8 @@ abbrev AbilitySet := MoveModel.IR.AbilitySet
 abbrev TypeParamDecl := MoveModel.IR.TypeParamDecl
 
 inductive Ty where
-  | bool | uint (w : MoveModel.IR.IntWidth) | address | signer
+  | bool | int (nt : MoveModel.IR.NumType)
+  | address | signer
   | typeParam (index : Nat)
   | struct (name : Name)
   | structInst (name : Name) (args : Array Ty)
@@ -30,6 +31,10 @@ inductive Ty where
   | ref (elem : Ty)
   | mutRef (elem : Ty)
   deriving BEq, Repr
+
+/-- Unsigned / signed integer types, abbreviating the unified `int` type. -/
+abbrev Ty.uint (w : MoveModel.IR.IntWidth) : Ty := .int ⟨w, false⟩
+abbrev Ty.sint (w : MoveModel.IR.IntWidth) : Ty := .int ⟨w, true⟩
 
 /-- The dominant integer width, abbreviated. -/
 abbrev Ty.u64 : Ty := .uint .w64
@@ -53,11 +58,14 @@ structure LocalDecl where
   deriving BEq, Repr
 
 inductive Oper where
-  | add (w : MoveModel.IR.IntWidth) | sub
-  | mul (w : MoveModel.IR.IntWidth) | div | mod
-  | bitAnd | bitOr | bitXor
-  | shl (w : MoveModel.IR.IntWidth) | shr (w : MoveModel.IR.IntWidth)
-  | cast (target : MoveModel.IR.IntWidth)
+  -- one integer-operation family, over the operand's `NumType`
+  | add (nt : MoveModel.IR.NumType) | sub (nt : MoveModel.IR.NumType)
+  | mul (nt : MoveModel.IR.NumType) | div (nt : MoveModel.IR.NumType)
+  | mod (nt : MoveModel.IR.NumType)
+  | bitAnd (nt : MoveModel.IR.NumType) | bitOr (nt : MoveModel.IR.NumType)
+  | bitXor (nt : MoveModel.IR.NumType)
+  | shl (nt : MoveModel.IR.NumType) | shr (nt : MoveModel.IR.NumType)
+  | cast (target : MoveModel.IR.NumType)
   | lt | le | eq
   | vecPack | vecLen | vecGet | vecSet | vecPush | vecPop
   | vecInsert | vecRemove
@@ -80,7 +88,7 @@ inductive Oper where
 
 inductive Instr where
   | loadBool (dst : String) (value : Bool)
-  | loadUInt (w : MoveModel.IR.IntWidth) (dst : String) (value : Nat)
+  | loadInt (nt : MoveModel.IR.NumType) (dst : String) (value : Int)
   | assign (dst src : String)
   | call (dsts : Array String) (op : Oper) (srcs : Array String)
   deriving BEq, Repr
@@ -190,7 +198,7 @@ private def parseAddress (address : String) : Except String MoveModel.IR.Address
 private partial def lowerTy (structNames : Array (Name × String)) :
     Move.Compiler.LIR.Ty → Except String MoveModel.IR.Ty
   | .bool => pure .bool
-  | .uint w => pure (.uint w)
+  | .int nt => pure (.int nt)
   | .address => pure .address
   | .signer => pure .signer
   | .typeParam index => pure (.typeParam index)
@@ -219,10 +227,11 @@ private partial def lowerTy (structNames : Array (Name × String)) :
 private def lowerOper (structNames : Array (Name × String))
     (funNames : Array (Name × String)) (externalFunNames : Array Name) :
     Move.Compiler.LIR.Oper → Except String MoveModel.IR.Oper
-  | .add w => pure (.add w) | .sub => pure .sub
-  | .mul w => pure (.mul w) | .div => pure .div | .mod => pure .mod
-  | .bitAnd => pure .bitAnd | .bitOr => pure .bitOr | .bitXor => pure .bitXor
-  | .shl w => pure (.shl w) | .shr w => pure (.shr w)
+  | .add nt => pure (.add nt) | .sub nt => pure (.sub nt)
+  | .mul nt => pure (.mul nt) | .div nt => pure (.div nt) | .mod nt => pure (.mod nt)
+  | .bitAnd nt => pure (.bitAnd nt) | .bitOr nt => pure (.bitOr nt)
+  | .bitXor nt => pure (.bitXor nt)
+  | .shl nt => pure (.shl nt) | .shr nt => pure (.shr nt)
   | .cast target => pure (.cast target)
   | .lt => pure .lt | .le => pure .le | .eq => pure .eq
   | .vecPack => pure .vecPack | .vecLen => pure .vecLen
@@ -309,9 +318,9 @@ private def lowerFun (structNames : Array (Name × String))
       match instr with
       | .loadBool dst value =>
           instrs := instrs ++ [.load (← localId dst) (.bool value)]
-      | .loadUInt w dst value =>
-          unless value < w.size do
-            throw s!"integer literal `{value}` does not fit the width"
+      | .loadInt nt dst value =>
+          unless nt.lo ≤ value ∧ value < nt.hi do
+            throw s!"integer literal `{value}` does not fit the type"
           instrs := instrs ++ [.load (← localId dst) (.int value)]
       | .assign dst src =>
           instrs := instrs ++ [.assign (← localId dst) (← localId src)]

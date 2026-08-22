@@ -58,14 +58,25 @@
 //! arguments; version 8 adds the remaining integer widths (`u8` ... `u256`
 //! types, one `num` constant form, width annotations on the
 //! overflow-checked resp. truncating operations `add`, `mul`, `shl`, `shr`),
-//! the bitwise operations `bit_and`/`bit_or`/`bit_xor`, and `cast`.
+//! the bitwise operations `bit_and`/`bit_or`/`bit_xor`, and `cast`; version 9
+//! adds the signed integer types (`i8` ... `i256`, distinguished from the
+//! unsigned widths by their `i` prefix) and, through the width-annotated
+//! operations, signed `add`/`mul`/`shl`/`shr`/`cast` (carrying a signed
+//! `IntType`).  The signed `sub`/`div`/`mod`/bitwise operations, whose unsigned
+//! forms are deliberately width-free, are represented only by the reference
+//! (Lean) toolchain for now; the move-model producer emits neither, since Move
+//! source has no signed integer types; version 10 annotates *every* integer
+//! operation with its numeric type, including `sub`, `div`, `mod`, and the
+//! bitwise operations, which were previously bare — signed and unsigned share
+//! one operation family whose only difference is the range consulted, so the
+//! type is always carried.
 
 pub mod check;
 
 use serde::{Deserialize, Serialize};
 
 /// The current version of the exchange format.
-pub const FORMAT_VERSION: u64 = 8;
+pub const FORMAT_VERSION: u64 = 10;
 
 /// Schema identifier for a finite, deployable XIR module.
 pub const XIR_SCHEMA: &str = "move-xir-module";
@@ -270,6 +281,12 @@ pub enum IntType {
     U64,
     U128,
     U256,
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+    I256,
 }
 
 /// Line width for [`Module::to_pretty_json`]'s inlining decision.
@@ -415,6 +432,18 @@ pub enum Type {
     U128,
     /// `"u256"`
     U256,
+    /// `"i8"`
+    I8,
+    /// `"i16"`
+    I16,
+    /// `"i32"`
+    I32,
+    /// `"i64"`
+    I64,
+    /// `"i128"`
+    I128,
+    /// `"i256"`
+    I256,
     /// `"address"`
     Address,
     /// `"signer"` — signer values are addresses.
@@ -529,16 +558,23 @@ pub enum Instr {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Oper {
-    /// `{"add": width}` — the width bounds the overflow check.
+    /// `{"add": type}` — the numeric type bounds the overflow check.
     Add(IntType),
-    Sub,
-    /// `{"mul": width}` — the width bounds the overflow check.
+    /// `{"sub": type}` — the numeric type bounds the underflow resp.
+    /// overflow check.
+    Sub(IntType),
+    /// `{"mul": type}` — the numeric type bounds the overflow check.
     Mul(IntType),
-    Div,
-    Mod,
-    BitAnd,
-    BitOr,
-    BitXor,
+    /// `{"div": type}` — aborts on a zero divisor, and on the signed
+    /// `minInt / -1` overflow.
+    Div(IntType),
+    /// `{"mod": type}` — aborts on a zero divisor.
+    Mod(IntType),
+    /// `{"bit_and": type}` / `{"bit_or": type}` / `{"bit_xor": type}` — on
+    /// the numeric type's two's-complement bit pattern.
+    BitAnd(IntType),
+    BitOr(IntType),
+    BitXor(IntType),
     /// `{"shl": width}` — truncates to the width; aborts when the `u8`
     /// amount reaches the width's bit count.
     Shl(IntType),

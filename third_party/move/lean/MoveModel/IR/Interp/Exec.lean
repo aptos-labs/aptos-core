@@ -189,34 +189,35 @@ def interpOp (current : FrameId) (deref : RefTarget → Option Value) (op : Oper
     | [.int i, .int j] => f i j
     | _ => throw (.stuck "ill-typed operands")
   match op with
-  | .add w => arith2 fun i j =>
-      pure (if i + j < (w.size : Int) then .ok [.int (i + j)] m else .abort)
-  | .sub => arith2 fun i j =>
-      pure (if j ≤ i then .ok [.int (i - j)] m else .abort)
-  | .mul w => arith2 fun i j =>
-      pure (if i * j < (w.size : Int) then .ok [.int (i * j)] m else .abort)
-  | .div => arith2 fun i j =>
-      pure (if j = 0 then .abort else .ok [.int (i / j)] m)
-  | .mod => arith2 fun i j =>
-      pure (if j = 0 then .abort else .ok [.int (i % j)] m)
-  | .bitAnd => arith2 fun i j =>
-      pure (.ok [.int (i.toNat &&& j.toNat : Nat)] m)
-  | .bitOr => arith2 fun i j =>
-      pure (.ok [.int (i.toNat ||| j.toNat : Nat)] m)
-  | .bitXor => arith2 fun i j =>
-      pure (.ok [.int (i.toNat ^^^ j.toNat : Nat)] m)
-  | .shl w => arith2 fun i k =>
-      pure (if k < (w.bits : Int) then
-        .ok [.int ((i.toNat <<< k.toNat) % w.size : Nat)] m
+  | .add nt => arith2 fun i j =>
+      pure (if nt.lo ≤ i + j ∧ i + j < nt.hi then .ok [.int (i + j)] m else .abort)
+  | .sub nt => arith2 fun i j =>
+      pure (if nt.lo ≤ i - j ∧ i - j < nt.hi then .ok [.int (i - j)] m else .abort)
+  | .mul nt => arith2 fun i j =>
+      pure (if nt.lo ≤ i * j ∧ i * j < nt.hi then .ok [.int (i * j)] m else .abort)
+  | .div nt => arith2 fun i j =>
+      pure (if j = 0 then .abort
+        else if nt.lo ≤ i.tdiv j ∧ i.tdiv j < nt.hi then .ok [.int (i.tdiv j)] m
+          else .abort)
+  | .mod _ => arith2 fun i j =>
+      pure (if j = 0 then .abort else .ok [.int (i.tmod j)] m)
+  | .bitAnd nt => arith2 fun i j =>
+      pure (.ok [.int (nt.fromBits ((nt.toBits i).toNat &&& (nt.toBits j).toNat))] m)
+  | .bitOr nt => arith2 fun i j =>
+      pure (.ok [.int (nt.fromBits ((nt.toBits i).toNat ||| (nt.toBits j).toNat))] m)
+  | .bitXor nt => arith2 fun i j =>
+      pure (.ok [.int (nt.fromBits ((nt.toBits i).toNat ^^^ (nt.toBits j).toNat))] m)
+  | .shl nt => arith2 fun i k =>
+      pure (if k < (nt.width.bits : Int) then
+        .ok [.int (nt.fromBits (((nt.toBits i).toNat <<< k.toNat) % nt.size : Nat))] m
       else .abort)
-  | .shr w => arith2 fun i k =>
-      pure (if k < (w.bits : Int) then
-        .ok [.int (i.toNat >>> k.toNat : Nat)] m
-      else .abort)
+  | .shr nt => arith2 fun i k =>
+      pure (if k < (nt.width.bits : Int) then .ok [.int (i.fdiv (2 ^ k.toNat))] m
+        else .abort)
   | .cast target =>
     match vs with
     | [.int i] =>
-        pure (if i < (target.size : Int) then .ok [.int i] m else .abort)
+        pure (if target.lo ≤ i ∧ i < target.hi then .ok [.int i] m else .abort)
     | _ => throw (.stuck "ill-typed operands")
   | .lt =>
     match vs with

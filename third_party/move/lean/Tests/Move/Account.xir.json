@@ -47,7 +47,7 @@
     {"term": {"ret": []},
      "instrs":
      [{"call": [[5], "read_ref", [4]]},
-      {"call": [[6], "sub", [5, 1]]},
+      {"call": [[6], {"sub": "u64"}, [5, 1]]},
       {"call": [[], "write_ref", [4, 6]]}]},
     {"term": {"abort": 9}, "instrs": [{"load": [9, {"num": "1"}]}]}],
    "acquires": [1]},
