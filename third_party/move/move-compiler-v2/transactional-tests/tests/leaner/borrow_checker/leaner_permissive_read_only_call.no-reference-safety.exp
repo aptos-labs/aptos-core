@@ -1,27 +1,7 @@
 processed 2 tasks
 task 0 lines 1-27:  publish [import Move]
 Error: compilation errors:
- warning: Variable name `left` is not explicitly referenced.
-
-The binding can be removed (if unused) or named `_` (if used implicitly).
-
-Note: This linter can be disabled with `set_option linter.unusedVariables false`
-   ┌─ TEMPFILE:10:21
-   │
-10 │   spec observe_two (left : &mut U64) (right : &mut U64) where
-   │                     ^^^^
-
-warning: Variable name `right` is not explicitly referenced.
-
-The binding can be removed (if unused) or named `_` (if used implicitly).
-
-Note: This linter can be disabled with `set_option linter.unusedVariables false`
-   ┌─ TEMPFILE:10:39
-   │
-10 │   spec observe_two (left : &mut U64) (right : &mut U64) where
-   │                                       ^^^^^
-
-bug: bytecode verification failed with unexpected status code `CALL_BORROWED_MUTABLE_REFERENCE_ERROR`:
+ bug: bytecode verification failed with unexpected status code `CALL_BORROWED_MUTABLE_REFERENCE_ERROR`:
 Error message: none
    ┌─ TEMPFILE:18:5
    │

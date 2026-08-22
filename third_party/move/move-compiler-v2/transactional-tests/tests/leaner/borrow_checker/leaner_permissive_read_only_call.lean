@@ -12,7 +12,7 @@ module LeanerBorrowPermissiveCall where
     let rightValue ← *right
     pure (leftValue + rightValue)
 
-  spec observe_two (left : &mut U64) (right : &mut U64) where
+  spec observe_two (_left : &mut U64) (_right : &mut U64) where
     ensures True
 
   /-- The callee summary is read-only, so Leaner does not activate either

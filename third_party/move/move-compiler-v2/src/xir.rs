@@ -883,7 +883,10 @@ fn translate_function(
                 .get(index)
                 .and_then(Option::as_deref)
                 .map(String::from)
-                .unwrap_or_else(|| format!("l{index}"));
+                // Unnamed XIR locals are compiler-generated temporaries. Mark
+                // them as intentionally unused so diagnostics do not ask users
+                // to edit values which do not exist in their Lean source.
+                .unwrap_or_else(|| format!("_l{index}"));
             let mut unique = preferred.clone();
             if !used_local_names.insert(unique.clone()) {
                 unique = format!("{preferred}${index}");
@@ -2338,6 +2341,13 @@ mod tests {
                 .display(target.symbol_pool())
                 .to_string(),
             "owner"
+        );
+        assert_eq!(
+            target
+                .get_local_name(1)
+                .display(target.symbol_pool())
+                .to_string(),
+            "_l1"
         );
         let code = target.get_bytecode();
         assert_eq!(

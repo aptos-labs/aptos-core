@@ -1,18 +1,5 @@
 processed 13 tasks
 task 0 lines 1-90:  publish [import Move]
-warning: This assignment/binding to the left-hand-side variable `l2` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_l2`), or renaming to `_`
-   ┌─ TEMPFILE:1:1
-   │  
- 1 │ ╭ 
- 2 │ │ import Move
- 3 │ │ open scoped Move
- 4 │ │ module LeanerEnumPayloads where
-   · │
-63 │ │     score (Move.Vector.get values 0)
-64 │ │ /-! ## Tests -/
-   │ ╰───────────────^
-
-
 task 1 lines 92-92:  run 0x0::LeanerEnumPayloads::choose_and_score --args false 10u64
 return values: 11
 task 2 lines 94-94:  run 0x0::LeanerEnumPayloads::choose_and_score --args true 10u64
