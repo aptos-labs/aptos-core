@@ -282,11 +282,11 @@ spec-term       = "result" | "initial" | "final" | "abortCode" | "this"
 (* ---- compilation directives ---- *)
 
 compile-directive = "#export_leaner" string [ selection ]
-                | "def" ident ":" "MModule" ":="
+                | "def" ident ":" "MoveModel.IR.Module" ":="
                   "lowerToIR" "``" ident
-                | "def" ident ":" "MModule" ":="
+                | "def" ident ":" "MoveModel.IR.Module" ":="
                   "module%" string selection
-                | "def" ident ":" "MModule" ":="
+                | "def" ident ":" "MoveModel.IR.Module" ":="
                   "module_from_context%" string
                 | "#emit_leaner_xir" ident ;
 selection       = "structs" "[" [ ident { "," ident } ] "]"
@@ -369,11 +369,13 @@ theorem importedMathContract : Math.identity.contract := Math.identity.verified
 **Compilation directives.** `#export_leaner "M"` compiles the attributed
 declarations and marks the deployable module of a `.lean` compiler input;
 `module` implies it. `lowerToIR ``Namespace` elaborates the registered Move
-namespace as a Lean `MModule` value for interpreter tests and transformations;
-its registered identity supplies the output address and name. `module% "M"
+namespace as a semantic Lean `MoveModel.IR.Module` value for interpreter tests
+and transformations; its registered identity supplies the output address and
+name. `module% "M"
 structs [...] functions [...]` remains the explicit-selection form, while
 `module_from_context% "M"` preserves the older current-namespace behavior.
-`#emit_leaner_xir m` marks an existing `MModule` value as the deployable module. Compiling a
+`#emit_leaner_xir m` materializes an existing `MoveModel.IR.Module` at the
+deployable XIR boundary. Compiling a
 `.lean` source runs Lean elaboration including metaprograms — treat such
 sources as trusted build inputs.
 
@@ -1519,7 +1521,7 @@ For tests and transformations the compiled module is available as a Lean
 value, and the modeled IR interpreter runs its functions:
 
 ```lean
-def compiled : MModule := lowerToIR ``Tests.MovePrograms.Account
+def compiled : MoveModel.IR.Module := lowerToIR ``Tests.MovePrograms.Account
 
 private def balanceId := compiled.resourceId "Balance"
 private def memory (addr value : Nat) : MoveModel.IR.IMem :=

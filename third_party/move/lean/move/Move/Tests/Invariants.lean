@@ -11,7 +11,6 @@ value is created. -/
 namespace Tests.MovePrograms
 
 open Move
-open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
 module Invariants where
@@ -147,16 +146,16 @@ module Invariants where
 
   /-! ## Tests -/
 
-  def compiled : MModule := lowerToIR ``Tests.MovePrograms.Invariants
+  def compiled : MoveModel.IR.Module := lowerToIR ``Tests.MovePrograms.Invariants
 
   -- The certifying field is a proof, so Move never sees it.
-  #guard (compiled.structs.find? (·.name == "Percent")).map
-    (·.fields.map (·.1)) == some ["value"]
-  #guard (compiled.structs.find? (·.name == "Gauge")).map
-    (·.fields.map (·.1)) == some ["level"]
+  #guard (compiled.structMeta? "Percent").map
+    (·.fieldNames) == some ["value"]
+  #guard (compiled.structMeta? "Gauge").map
+    (·.fieldNames) == some ["level"]
   -- Enum variants carry only their data fields.
-  #guard (compiled.structs.find? (·.name == "Payment")).map
-    (·.variants.map (·.map fun variant => (variant.1, variant.2.map (·.1)))) ==
+  #guard (compiled.structMeta? "Payment").map
+    (·.variantNames) ==
     some (some [("None", []), ("Direct", ["amount"]), ("Split", ["left", "right"])])
 
   private def run := Tests.run compiled

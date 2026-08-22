@@ -23,6 +23,7 @@ import MoveModel.Tests.Prover.CrossCall
 import MoveModel.Tests.Prover.ElimSource
 import MoveModel.Tests.Prover.MasmSource
 import MoveModel.Tests.Prover.MoveSource
+import MoveModel.Tests.XIR
 
 /-! Aggregate root for the MoveModel regression suite: interpreter, IR,
 frontend, and prover tests.  Lake needs a root module per test library, so a

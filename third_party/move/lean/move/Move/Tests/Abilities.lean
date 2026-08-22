@@ -9,7 +9,6 @@ namespace Tests.MovePrograms
 
 open Move
 open MoveModel.IR
-open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler
 
 module Abilities where
@@ -42,12 +41,12 @@ module Abilities where
 
   /-! ## Tests -/
 
-  def compiled : MModule := lowerToIR ``Tests.MovePrograms.Abilities
+  def compiled : MoveModel.IR.Module := lowerToIR ``Tests.MovePrograms.Abilities
 
 namespace Abilities
 
 private def info (name : String) :=
-  compiled.structMeta.find? (fun candidate => candidate.name == name)
+  compiled.structMeta? name
 
 #guard (info "Plain").map (fun value => value.abilities) == some {}
 #guard (info "CopyDrop").map (fun value => value.abilities) ==
@@ -59,17 +58,17 @@ private def info (name : String) :=
 #guard (info "Droppable").map (fun value => value.abilities) ==
   some { drop := true }
 
-#guard match compiled.structs.find? (fun candidate => candidate.name == "GenericValue") with
+#guard match compiled.structDecl? "GenericValue" with
   | some value => value.typeParams ==
       [{ name := "T", abilities := { copy := true, drop := true, store := true } }]
   | none => false
 
-#guard match compiled.structs.find? (fun candidate => candidate.name == "GenericResource") with
+#guard match compiled.structDecl? "GenericResource" with
   | some value => value.typeParams ==
       [{ name := "T", abilities := { drop := true, store := true } }]
   | none => false
 
-#guard match compiled.structs.find? (fun candidate => candidate.name == "Phantom") with
+#guard match compiled.structDecl? "Phantom" with
   | some value => value.typeParams ==
       [{ name := "T", abilities := {}, phantom := true }]
   | none => false

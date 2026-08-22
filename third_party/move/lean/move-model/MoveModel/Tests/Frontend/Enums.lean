@@ -1,7 +1,7 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
-import MoveModel.Tests.Common
+import MoveModel.Tests.XIRCommon
 import MoveModel.Frontend.Elab
 
 /-! Move-source enums, including payloads and reference matching, imported
@@ -47,7 +47,7 @@ module 0x42::enums {
 }
 "
 
-private def run := Tests.run imported
+private def run := Tests.runXIR imported
 
 #test run "inspect" [] [.variant 0 []] = Tests.okU64 0
 #test run "inspect" [] [.variant 1 [.u64 9]] = Tests.okU64 9

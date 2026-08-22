@@ -10,7 +10,6 @@ import MoveModel.Tests.Common
 namespace Tests.MovePrograms
 
 open Move
-open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
 module ResourceComposition where
@@ -47,7 +46,7 @@ module ResourceComposition where
 
   /-! ## Tests -/
 
-  def compiled : MModule := lowerToIR ``Tests.MovePrograms.ResourceComposition
+  def compiled : MoveModel.IR.Module := lowerToIR ``Tests.MovePrograms.ResourceComposition
 
   private def debitId := compiled.resourceId "Debit"
   private def creditId := compiled.resourceId "Credit"
@@ -57,7 +56,5 @@ module ResourceComposition where
 
   #test Tests.run compiled "shift" (memory 3 10 4) [.address 3, .u64 3]
     = Tests.okRet (memory 3 7 7) []
-
-  #emit_leaner_xir compiled
 
 end Tests.MovePrograms

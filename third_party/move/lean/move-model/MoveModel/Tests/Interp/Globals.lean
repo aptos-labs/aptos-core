@@ -2,7 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import MoveModel.Frontend.Elab
-import MoveModel.Tests.Common
+import MoveModel.Tests.XIRCommon
 import MoveModel.IR.Interp.Exec
 
 /-!
@@ -47,7 +47,7 @@ def globals : Program := globalsM.toProgram
 #guard globalsM.resourceId "Flag" == 1
 
 def run (f : String) (mem : IMem) (args : List Value) : Outcome :=
-  Tests.run globalsM f mem args
+  Tests.runXIR globalsM f mem args
 
 /-! ## Publish (`move_to` through a `&signer`), and collision abort -/
 

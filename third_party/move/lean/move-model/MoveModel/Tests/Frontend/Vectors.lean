@@ -1,7 +1,7 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
-import MoveModel.Tests.Common
+import MoveModel.Tests.XIRCommon
 import MoveModel.Frontend.Elab
 
 /-! Move-source vectors imported through exchange XIR and executed by the
@@ -46,7 +46,7 @@ module 0x42::vectors {
 }
 "
 
-private def run := Tests.run imported
+private def run := Tests.runXIR imported
 
 #test run "exercise" [] [.u64 10] = Tests.okU64 67
 #test run "constant_sum" [] [] = Tests.okU64 15

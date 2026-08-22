@@ -2,7 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import MoveModel.Frontend.Elab
-import MoveModel.Tests.Common
+import MoveModel.Tests.XIRCommon
 import MoveModel.IR.Interp.Exec
 
 /-!
@@ -59,7 +59,7 @@ module 0x42::refs {
 def refs : Program := refsM.toProgram
 
 def run (f : String) (args : List Value) : Outcome :=
-  Tests.run refsM f [] args
+  Tests.runXIR refsM f [] args
 
 /-- A `Box { f: x, inner: Inner { v: y } }` value. -/
 def box (x y : Nat) : Value := .struct [.u64 x, .struct [.u64 y]]
@@ -97,7 +97,7 @@ module 0x42::refeq {
 }
 "
 
-#test Tests.run refEqM "ref_eq" [] [.u64 5, .u64 5] = okBool true
-#test Tests.run refEqM "ref_eq" [] [.u64 5, .u64 6] = okBool false
+#test Tests.runXIR refEqM "ref_eq" [] [.u64 5, .u64 5] = okBool true
+#test Tests.runXIR refEqM "ref_eq" [] [.u64 5, .u64 6] = okBool false
 
 end Tests.Interp.References

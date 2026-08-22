@@ -8,7 +8,6 @@ import MoveModel.IR.Mono.Transform
 namespace Tests.MovePrograms
 
 open Move
-open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
 module Generics where
@@ -197,11 +196,11 @@ module Generics where
 
   /-! ## Tests -/
 
-  def compiled : MModule := lowerToIR ``Tests.MovePrograms.Generics
+  def compiled : MoveModel.IR.Module := lowerToIR ``Tests.MovePrograms.Generics
 
 namespace Generics
 
-private def run := Tests.run compiled.toMProgram
+private def run := Tests.run compiled
 
 #test run "identity" [] [.u64 11] = Tests.okU64 11
 #test run "wrap" [] [.u64 12] = Tests.okVals [.struct [.u64 12]]
@@ -227,13 +226,13 @@ private def vaultKey (ty : MoveModel.IR.Ty) := MoveModel.IR.resourceKey vaultId 
 #guard vaultKey (.vector .u64) != vaultKey (.vector .bool)
 
 -- Reading existence and publishing do not acquire a resource; removal does.
-#guard match compiled.funMeta.find? (·.name == "has_generic") with
+#guard match compiled.funMeta? "has_generic" with
   | some info => info.acquires.isEmpty
   | none => false
-#guard match compiled.funMeta.find? (·.name == "publish_generic") with
+#guard match compiled.funMeta? "publish_generic" with
   | some info => info.acquires.isEmpty
   | none => false
-#guard match compiled.funMeta.find? (·.name == "take_vault") with
+#guard match compiled.funMeta? "take_vault" with
   | some info => info.acquires == [vaultId]
   | none => false
 
@@ -259,7 +258,7 @@ private def bothVaults (address value : Nat) (flag : Bool) : MoveModel.IR.IMem :
 #test run "take_bool_vault" (bothVaults 7 24 true) [.address 7] =
   Tests.okRet (vaultMemory 7 24) [.bool true]
 
-private def monoResult := compiled.toModule.monomorphizeForVerification
+private def monoResult := compiled.monomorphizeForVerification
 
 private def publishGenericId := compiled.funId "publish_generic"
 private def tagInteractionsId := compiled.funId "tag_interactions"

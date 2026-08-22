@@ -9,7 +9,6 @@ import MoveModel.Tests.Common
 namespace Tests.MovePrograms
 
 open Move
-open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
 module Enums where
@@ -62,7 +61,7 @@ module Enums where
 
   /-! ## Tests -/
 
-  def compiled : MModule := lowerToIR ``Tests.MovePrograms.Enums
+  def compiled : MoveModel.IR.Module := lowerToIR ``Tests.MovePrograms.Enums
 
   private def run := Tests.run compiled
 

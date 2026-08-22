@@ -3,7 +3,7 @@
 
 import Lean
 import MoveModel.IR.Interp.Exec
-import MoveModel.Frontend.XIR
+import MoveModel.IR.Module
 
 /-!
 # Test Infrastructure
@@ -67,11 +67,11 @@ def aborted (code : Nat) : Outcome := .ok (.abort [] code)
 /-- Abort with `code` and global memory `mem`. -/
 def abortedIn (mem : IMem) (code : Nat) : Outcome := .ok (.abort mem code)
 
-/-- Runs a function of a dumped module by name, with the suite's standard
-fuel.  Test files partially apply this to their module. -/
-def run (m : MoveModel.Frontend.XIR.MProgram) (f : String) (mem : IMem)
+/-- Runs a function of a semantic finite module by name, with the suite's
+standard fuel. Test files partially apply this to their module. -/
+def run (m : MoveModel.IR.Module) (f : String) (mem : IMem)
     (args : List Value) : Outcome :=
-  interpFun m.toProgram 1000 (m.funId f) mem args
+  interpFun m.program 1000 (m.funId f) mem args
 
 /-! ## Compact rendering of outcomes -/
 

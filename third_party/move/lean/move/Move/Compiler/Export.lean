@@ -4,17 +4,19 @@
 import Move.Compiler.Elab
 import Move.Verify.Syntax
 import MoveModel.Frontend.XIR.Json
+import MoveModel.Frontend.XIR.FromIR
 
 /-!
 # Move module export
 
 `#export_leaner_xir module to "path"` evaluates an already elaborated
-`MModule` and writes deterministic schema-versioned JSON.  The command is an
-explicit author action; ordinary declaration elaboration performs no writes.
+semantic `IR.Module`, materializes XIR only for the JSON boundary, and writes
+deterministic schema-versioned JSON. The command is an explicit author action;
+ordinary declaration elaboration performs no writes.
 
 `#export_leaner "Module"` is the source-facing compiler directive. It combines
-`module_from_context%` with the compiler-owned XIR handoff, so deployable sources do
-not need to name an intermediate `MModule` value. The directive records the
+`module_from_context%` with the compiler-owned export handoff, so deployable
+sources do not need to name an intermediate IR value. The directive records the
 request and performs compilation at end of input, after all declarations have
 been elaborated.
 -/
@@ -23,14 +25,16 @@ namespace Move.Compiler
 
 open Lean Elab Command Term
 open Lean.Parser.Term
+open MoveModel.IR
 open MoveModel.Frontend.XIR
 open scoped Move.Compiler
 
 syntax (name := exportLeanerXIR)
   "#export_leaner_xir " term " to " str : command
 
-/-- Low-level compatibility form which marks an existing `MModule` value as
-the deployable module in a `.lean` compiler input. -/
+/-- Marks an existing semantic `IR.Module` value as the deployable module in a
+`.lean` compiler input. XIR is materialized only while writing the exchange
+file. -/
 syntax (name := emitLeanerXIR)
   "#emit_leaner_xir " term : command
 
@@ -1068,10 +1072,13 @@ private initialize pendingExportExt : EnvExtension (Option PendingExport) ←
 private unsafe def elabExportLeanerXIRUnsafe (moduleTerm pathTerm : Syntax) :
     CommandElabM Unit := do
   let compiled ← liftTermElabM do
-    evalTerm MModule (mkConst ``MModule) moduleTerm
+    evalTerm MoveModel.IR.Module (mkConst ``MoveModel.IR.Module) moduleTerm
+  let xir ← match MModule.ofIR compiled with
+    | .ok xir => pure xir
+    | .error message => throwErrorAt moduleTerm message
   let some path := pathTerm.isStrLit?
     | throwErrorAt pathTerm "expected an output path string"
-  let encoded ← match compiled.encodeJson with
+  let encoded ← match xir.encodeJson with
     | .ok encoded => pure encoded
     | .error message => throwErrorAt moduleTerm message
   IO.FS.writeFile path encoded
@@ -1088,8 +1095,11 @@ def elabExportLeanerXIRCommand : CommandElab := fun stx =>
 private unsafe def elabEmitLeanerXIRUnsafe (moduleTerm : Syntax) :
     CommandElabM Unit := do
   let compiled ← liftTermElabM do
-    evalTerm MModule (mkConst ``MModule) moduleTerm
-  let encoded ← match compiled.encodeJson with
+    evalTerm MoveModel.IR.Module (mkConst ``MoveModel.IR.Module) moduleTerm
+  let xir ← match MModule.ofIR compiled with
+    | .ok xir => pure xir
+    | .error message => throwErrorAt moduleTerm message
+  let encoded ← match xir.encodeJson with
     | .ok encoded => pure encoded
     | .error message => throwErrorAt moduleTerm message
   if let some path ← IO.getEnv "LEANER_XIR_OUTPUT" then

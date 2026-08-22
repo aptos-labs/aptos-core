@@ -23,7 +23,6 @@ deliberately outside this benchmark.
 namespace Tests.MovePrograms
 
 open Move
-open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
 module OrderedMap where
@@ -1016,7 +1015,7 @@ module OrderedMap where
     let value ← *valueRef
     pure (first + last + value)
 
-  def compiled : MModule := lowerToIR ``Tests.MovePrograms.OrderedMap
+  def compiled : MoveModel.IR.Module := lowerToIR ``Tests.MovePrograms.OrderedMap
 
   private def run := Tests.run compiled
 
@@ -1032,7 +1031,7 @@ module OrderedMap where
   -- The `public fun` operations export public visibility.
   #guard ["empty", "length", "contains", "borrow", "add", "remove"].all
     fun name =>
-      match compiled.funMeta.find? (·.name == name) with
+      match compiled.funMeta? name with
       | some info => info.visibility == MoveModel.IR.Visibility.public_
       | none => false
 

@@ -2,7 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import MoveModel.Frontend.Elab
-import MoveModel.Tests.Common
+import MoveModel.Tests.XIRCommon
 import MoveModel.IR.Interp.Exec
 
 /-!
@@ -38,7 +38,7 @@ module 0x42::structs {
 def structs : Program := structsM.toProgram
 
 def run (f : String) (args : List Value) : Outcome :=
-  Tests.run structsM f [] args
+  Tests.runXIR structsM f [] args
 
 /-- A `Pair { a: x, b: Inner { v: y } }` value (fields in offset order). -/
 def pair (x y : Nat) : Value := .struct [.u64 x, .struct [.u64 y]]

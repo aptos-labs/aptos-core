@@ -2,7 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import MoveModel.Frontend.Elab
-import MoveModel.Tests.Common
+import MoveModel.Tests.XIRCommon
 import MoveModel.IR.Interp.Exec
 
 /-!
@@ -68,7 +68,7 @@ module 0x42::cross_call_refs {
 "
 
 def run (f : String) (mem : IMem) (args : List Value) : Tests.Outcome :=
-  Tests.run refsM f mem args
+  Tests.runXIR refsM f mem args
 
 /-! ## Borrows into caller locals -/
 

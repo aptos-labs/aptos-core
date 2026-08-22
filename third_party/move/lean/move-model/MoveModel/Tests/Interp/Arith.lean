@@ -2,7 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import MoveModel.Frontend.Elab
-import MoveModel.Tests.Common
+import MoveModel.Tests.XIRCommon
 import MoveModel.IR.Interp.Exec
 
 /-!
@@ -42,7 +42,7 @@ module 0x42::arith {
 def arith : Program := arithM.toProgram
 
 def run (f : String) (args : List Value) : Outcome :=
-  Tests.run arithM f [] args
+  Tests.runXIR arithM f [] args
 
 /-! ## Addition: result, and abort (code 0) on overflow -/
 

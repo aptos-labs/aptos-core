@@ -15,7 +15,6 @@ authored function bodies, and compiled execution tests.
 namespace Tests.MovePrograms
 
 open Move
-open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
 module Quicksort where
@@ -849,7 +848,7 @@ module Quicksort where
 
   /-! ## Tests -/
 
-  def compiled : MModule := lowerToIR ``Tests.MovePrograms.Quicksort
+  def compiled : MoveModel.IR.Module := lowerToIR ``Tests.MovePrograms.Quicksort
 
   private def run := Tests.run compiled
 

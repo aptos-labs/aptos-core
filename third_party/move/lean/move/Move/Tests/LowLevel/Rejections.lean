@@ -8,7 +8,6 @@ import Move
 namespace Tests.MovePrograms.Calls.Rejection
 
 open Move
-open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
 @[move_struct]
@@ -20,7 +19,7 @@ structure RecursiveType where
 error: recursive Move type `Tests.MovePrograms.Calls.Rejection.RecursiveType` is not supported by the prototype
 -/
 #guard_msgs in
-def rejectedRecursiveType : MModule :=
+def rejectedRecursiveType : MoveModel.IR.Module :=
   module% "RejectedRecursiveType" structs [RecursiveType] functions []
 
 @[move_fun]
@@ -35,7 +34,7 @@ error: while compiling Move function `Tests.MovePrograms.Calls.Rejection.callsOm
 Move function `Tests.MovePrograms.Calls.Rejection.omittedHelper` has no enclosing `module` identity
 -/
 #guard_msgs in
-def rejected : MModule :=
+def rejected : MoveModel.IR.Module :=
   module% "RejectedCalls" structs [] functions [callsOmittedHelper]
 
 @[noinline]
@@ -50,7 +49,7 @@ error: while compiling Move function `Tests.MovePrograms.Calls.Rejection.callsOr
 unsupported call `Tests.MovePrograms.Calls.Rejection.ordinaryHelper` while compiling Move function
 -/
 #guard_msgs in
-def rejectedOrdinary : MModule :=
+def rejectedOrdinary : MoveModel.IR.Module :=
   module% "RejectedOrdinaryCall" structs [] functions [callsOrdinaryHelper]
 
 @[move_fun]
@@ -62,7 +61,7 @@ error: while compiling Move function `Tests.MovePrograms.Calls.Rejection.nonTail
 `continue` must mark a direct self-call in tail position
 -/
 #guard_msgs in
-def rejectedNonTailContinue : MModule :=
+def rejectedNonTailContinue : MoveModel.IR.Module :=
   module% "RejectedNonTailContinue" structs [] functions [nonTailContinue]
 
 @[move_fun]
@@ -76,7 +75,7 @@ error: while compiling Move function `Tests.MovePrograms.Calls.Rejection.nonSelf
 `continue` in `Tests.MovePrograms.Calls.Rejection.nonSelfContinue` calls `Tests.MovePrograms.Calls.Rejection.continuedOther`; only a direct self-call can become a loop
 -/
 #guard_msgs in
-def rejectedNonSelfContinue : MModule :=
+def rejectedNonSelfContinue : MoveModel.IR.Module :=
   module% "RejectedNonSelfContinue" structs [] functions [continuedOther, nonSelfContinue]
 
 /--

@@ -2,22 +2,94 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import Move.Compiler.Normalize
-import MoveModel.Frontend.Elab
-import MoveModel.Frontend.XIR.FromIR
 
 /-!
 # Module elaboration
 
 `lowerToIR ``Namespace` performs compilation during elaboration through
-`Move.Compiler.LIR`, `MoveModel.IR`, and `MoveModel.Frontend.XIR`, then embeds
-the first-order `MModule` as an ordinary Lean value. The quoted namespace is a
-registered Move module identity, not a Lean value.
+`Move.Compiler.LIR` into `MoveModel.IR`, then embeds semantic IR directly as
+an ordinary Lean value. The quoted namespace is a registered Move module
+identity, not a Lean value.
 -/
 
 namespace Move.Compiler
 
-open Lean Elab Term
-open MoveModel.Frontend.XIR
+open Lean Meta Elab Term
+open MoveModel.IR
+
+/-! ## Quotation of finite semantic IR -/
+
+deriving instance ToExpr for IntWidth
+deriving instance ToExpr for NumType
+deriving instance ToExpr for Ty
+deriving instance ToExpr for TypeTagToken
+deriving instance ToExpr for ResourceKey
+deriving instance ToExpr for RefRoot
+deriving instance ToExpr for RefTarget
+deriving instance ToExpr for Value
+deriving instance ToExpr for QuantKind
+deriving instance ToExpr for SpecBinop
+deriving instance ToExpr for SpecExp
+deriving instance ToExpr for Oper
+deriving instance ToExpr for Instr
+deriving instance ToExpr for MoveModel.IR.Term
+deriving instance ToExpr for Block
+deriving instance ToExpr for AbilitySet
+deriving instance ToExpr for TypeParamDecl
+deriving instance ToExpr for MoveModel.IR.StructDecl
+deriving instance ToExpr for Contract
+deriving instance ToExpr for MoveModel.IR.Visibility
+deriving instance ToExpr for Dialect
+deriving instance ToExpr for AttributeArg
+deriving instance ToExpr for MoveModel.IR.Attribute
+deriving instance ToExpr for StructMeta
+deriving instance ToExpr for FunMeta
+deriving instance ToExpr for ExternalFunRef
+
+private def materialize (kind : String) (count : Nat) (get : Nat → Option α) :
+    TermElabM (List α) :=
+  (List.range count).mapM fun i =>
+    match get i with
+    | some value => pure value
+    | none => throwError "missing {kind} at in-range index {i}"
+
+private def mkListExpr (type : Expr) : List Expr → MetaM Expr
+  | [] => pure (mkApp (mkConst ``List.nil [0]) type)
+  | head :: tail => do
+    let tail ← mkListExpr type tail
+    mkAppM ``List.cons #[head, tail]
+
+private def quoteFunDecl (funDecl : MoveModel.IR.FunDecl) : TermElabM Expr := do
+  for block in List.range funDecl.body.size do
+    if (funDecl.loopSpecs block).isSome then
+      throwError "source compiler produced unsupported loop metadata at block {block}"
+  let locals ← materialize "local" funDecl.numLocals funDecl.locals
+  let blocks ← materialize "block" funDecl.body.size funDecl.body.blocks
+  mkAppM ``MoveModel.IR.FunDecl.ofLists #[
+    toExpr funDecl.typeParams,
+    toExpr funDecl.numParams,
+    toExpr locals,
+    toExpr funDecl.returns,
+    toExpr blocks,
+    toExpr funDecl.body.entry,
+    toExpr funDecl.contract]
+
+private def quoteModule (module : MoveModel.IR.Module) : TermElabM Expr := do
+  let structs ← materialize "struct declaration" module.numStructs module.program.structs
+  let funs ← materialize "function declaration" module.numFuns module.program.funs
+  let structMeta ← materialize "struct metadata" module.numStructs module.structMeta
+  let funMeta ← materialize "function metadata" module.numFuns module.funMeta
+  let funExprs ← funs.mapM quoteFunDecl
+  let funsExpr ← mkListExpr (mkConst ``MoveModel.IR.FunDecl) funExprs
+  mkAppM ``MoveModel.IR.Module.ofLists #[
+    toExpr module.address,
+    toExpr module.name,
+    toExpr structs,
+    funsExpr,
+    toExpr structMeta,
+    toExpr funMeta,
+    toExpr module.externalFuns,
+    toExpr module.dialect]
 
 private def resolveNames (idents : Array Syntax) : TermElabM (Array Name) :=
   idents.mapM resolveGlobalConstNoOverload
@@ -74,10 +146,7 @@ private def elaborateModule (module : Move.ModuleRef) (structNames funNames : Ar
   let ir ← match named.toIR with
     | .ok ir => pure ir
     | .error message => throwError message
-  let xir ← match MModule.ofIR ir with
-    | .ok xir => pure xir
-    | .error message => throwError message
-  ensureHasType expectedType? (toExpr xir)
+  ensureHasType expectedType? (← quoteModule ir)
 
 @[term_elab moveModuleTerm]
 def elabMoveModule : TermElab := fun stx expectedType? => do

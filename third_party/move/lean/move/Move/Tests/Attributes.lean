@@ -11,7 +11,6 @@ names keep desugaring to the persistent tag attributes. -/
 namespace Tests.MovePrograms
 
 open Move
-open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler
 
 module Attributes where
@@ -38,17 +37,17 @@ module Attributes where
   -- leave no user metadata behind.
   @[move_public] fun compatPublic (x : U64) : U64 := x
 
-  def compiled : MModule := lowerToIR ``Tests.MovePrograms.Attributes
+  def compiled : MoveModel.IR.Module := lowerToIR ``Tests.MovePrograms.Attributes
 
 namespace Attributes
 
 open MoveModel.IR
 
 private def structAttributes (name : String) :=
-  (compiled.structMeta.find? (·.name == name)).map (·.attributes)
+  (compiled.structMeta? name).map (·.attributes)
 
 private def funMeta (name : String) :=
-  compiled.funMeta.find? (·.name == name)
+  compiled.funMeta? name
 
 #guard structAttributes "Registry" ==
   some [{ name := "resource_group", args := [.name "scope" [.name "global" []]] }]
@@ -65,17 +64,6 @@ private def funMeta (name : String) :=
 #guard (funMeta "compatPublic").map
     (fun info => (info.visibility, info.attributes)) ==
   some (.public_, [])
-
--- Attributes survive the deployable XIR JSON exchange in both directions.
-#guard
-  match compiled.encodeJson with
-  | .error _ => false
-  | .ok text =>
-      match MoveModel.Frontend.XIR.decodeMModule text with
-      | .error _ => false
-      | .ok decoded =>
-          decoded.structMeta == compiled.structMeta &&
-          decoded.funMeta == compiled.funMeta
 
 end Attributes
 

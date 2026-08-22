@@ -11,7 +11,6 @@ aborting operations. -/
 namespace Tests.MovePrograms
 
 open Move
-open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
 module Integers where
@@ -91,7 +90,7 @@ module Integers where
 
   /-! ## Tests -/
 
-  def compiled : MModule := lowerToIR ``Tests.MovePrograms.Integers
+  def compiled : MoveModel.IR.Module := lowerToIR ``Tests.MovePrograms.Integers
 
   private def run := Tests.run compiled
 
@@ -116,11 +115,11 @@ namespace Integers
 open MoveModel.IR
 
 -- The declared signatures carry the exact widths.
-#guard (compiled.funs.find? (·.name == "small_sum")).map (·.returns) ==
+#guard (compiled.funDecl? "small_sum").map (·.returns) ==
   some [.uint .w8]
-#guard (compiled.funs.find? (·.name == "widen")).map (·.returns) ==
+#guard (compiled.funDecl? "widen").map (·.returns) ==
   some [.uint .w256]
-#guard (compiled.funs.find? (·.name == "shifted")).map (·.locals.take 2) ==
+#guard (compiled.funDecl? "shifted").map (fun decl => decl.localsList.take 2) ==
   some [.uint .w64, .uint .w8]
 
 end Integers

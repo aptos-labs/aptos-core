@@ -9,7 +9,6 @@ import MoveModel.Tests.Common
 namespace Tests.MovePrograms
 
 open Move
-open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
 module Arithmetic where
@@ -128,7 +127,7 @@ module Arithmetic where
 
   /-! ## Tests -/
 
-  def compiled : MModule := lowerToIR ``Tests.MovePrograms.Arithmetic
+  def compiled : MoveModel.IR.Module := lowerToIR ``Tests.MovePrograms.Arithmetic
 
   #guard compiled.name == "Arithmetic"
 
@@ -162,7 +161,5 @@ module Arithmetic where
   #test run "divide" (memory 2 17) [.address 2, .u64 0]
     = Tests.abortedIn (memory 2 17) 0
   #test run "divide" [] [.address 2, .u64 1] = Tests.aborted 0
-
-  #emit_leaner_xir compiled
 
 end Tests.MovePrograms

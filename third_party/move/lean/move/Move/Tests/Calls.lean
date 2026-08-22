@@ -9,7 +9,6 @@ import MoveModel.Tests.Common
 namespace Tests.MovePrograms
 
 open Move
-open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
 module Calls where
@@ -205,7 +204,7 @@ module Calls where
 
   /-! ## Tests -/
 
-  def compiled : MModule := lowerToIR ``Tests.MovePrograms.Calls
+  def compiled : MoveModel.IR.Module := lowerToIR ``Tests.MovePrograms.Calls
 
   private def counterId := compiled.resourceId "Counter"
   private def memory (addr value : Nat) : MoveModel.IR.IMem :=
@@ -218,14 +217,14 @@ module Calls where
 
   private def hasSelfCall (name : String) : Bool :=
     let id := compiled.funId name
-    match compiled.funs[id]? with
-    | some decl => decl.blocks.any fun block => block.instrs.any (invokes id)
+    match compiled.program.funs id with
+    | some decl => decl.blocksList.any fun block => block.instrs.any (invokes id)
     | none => false
 
   private def hasEntryBackEdge (name : String) : Bool :=
     let id := compiled.funId name
-    match compiled.funs[id]? with
-    | some decl => decl.blocks.any fun block => block.term == .jump decl.entry
+    match compiled.program.funs id with
+    | some decl => decl.blocksList.any fun block => block.term == .jump decl.body.entry
     | none => false
 
   #test run "pure_caller" [] [.u64 7] = Tests.okU64 14
@@ -266,18 +265,16 @@ module Calls where
   #test run "forwarded_read" [] [.address 3] = Tests.aborted 0
 
   -- The visibility keywords map onto the exported function metadata.
-  #guard match compiled.funMeta.find? (·.name == "add_to") with
+  #guard match compiled.funMeta? "add_to" with
     | some info => info.visibility == MoveModel.IR.Visibility.friend &&
         !info.isEntry
     | none => false
-  #guard match compiled.funMeta.find? (·.name == "add_twice") with
+  #guard match compiled.funMeta? "add_twice" with
     | some info => info.visibility == MoveModel.IR.Visibility.public_ &&
         info.isEntry
     | none => false
-  #guard match compiled.funMeta.find? (·.name == "twice") with
+  #guard match compiled.funMeta? "twice" with
     | some info => info.visibility == MoveModel.IR.Visibility.private_
     | none => false
-
-  #emit_leaner_xir compiled
 
 end Tests.MovePrograms

@@ -2,7 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import MoveModel.Frontend.Elab
-import MoveModel.Tests.Common
+import MoveModel.Tests.XIRCommon
 import MoveModel.IR.Interp.Exec
 
 /-!
@@ -40,7 +40,7 @@ module 0x42::control {
 def control : Program := controlM.toProgram
 
 def run (f : String) (args : List Value) : Outcome :=
-  Tests.run controlM f [] args
+  Tests.runXIR controlM f [] args
 
 /-! ## `while` loop -/
 

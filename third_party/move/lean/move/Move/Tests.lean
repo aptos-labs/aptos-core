@@ -34,7 +34,6 @@ import Move.Tests.ResourceComposition
 import Move.Tests.Signed
 import Move.Tests.VectorOperations
 import Move.Tests.Vectors
-import Move.Tests.XIR
 
 /-! Aggregate root for the Leaner Move regression suite: source verification
 and compiler lowering.  Lake needs a root module per test library, so a new

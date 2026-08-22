@@ -290,6 +290,32 @@ structure FunDecl where
   loopSpecs : BlockId → Option LoopSpec
   contract : Contract
 
+/-- Construct an executable declaration from the finite lists produced by a
+compiler. The semantic IR deliberately uses partial maps; this constructor
+keeps that representation at the boundary instead of introducing an exchange
+format merely to quote a compiled declaration into Lean. -/
+def FunDecl.ofLists (typeParams : List TypeParamDecl) (numParams : Nat)
+    (locals : List Ty) (returns : List Ty) (blocks : List Block)
+    (entry : BlockId) (contract : Contract) : FunDecl where
+  typeParams := typeParams
+  numParams := numParams
+  numLocals := locals.length
+  locals := fun i => locals[i]?
+  returns := returns
+  body := { blocks := fun b => blocks[b]?, entry := entry, size := blocks.length }
+  -- Source lowering currently has no proof-loop metadata. That metadata is
+  -- introduced by the prover pipeline, whose input is already semantic IR.
+  loopSpecs := fun _ => none
+  contract := contract
+
+/-- Materialize a declaration's finite local map in index order. -/
+def FunDecl.localsList (d : FunDecl) : List Ty :=
+  (List.range d.numLocals).filterMap d.locals
+
+/-- Materialize a declaration's finite CFG in block-index order. -/
+def FunDecl.blocksList (d : FunDecl) : List Block :=
+  (List.range d.body.size).filterMap d.body.blocks
+
 /-- The monomorphic proof/execution view of a generic declaration at one type
 instantiation.  Numeric layout and parameter counts are unchanged. -/
 def FunDecl.instantiate (args : List Ty) (d : FunDecl) : FunDecl where

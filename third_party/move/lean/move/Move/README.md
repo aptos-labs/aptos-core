@@ -374,16 +374,17 @@ For tests and transformations the compiled module is available as a Lean
 value:
 
 ```lean
-def compiled : MModule := lowerToIR ``Tests.MovePrograms.Account
+def compiled : MoveModel.IR.Module := lowerToIR ``Tests.MovePrograms.Account
 
 #test run "deposit" (memory 7 10) [.address 7, .u64 5]
   = Tests.okRet (memory 7 15) []
 ```
 
-`lowerToIR` derives the output address and canonical module name from the
-registered Move namespace. `module% "M" structs [...] functions [...]` remains
-the low-level escape hatch for an explicit selection; the old implicit form is
-available as `module_from_context% "M"`.
+`lowerToIR` directly embeds semantic IR and derives its address and canonical
+module name from the registered Move namespace. `module% "M" structs [...]
+functions [...]` remains the low-level escape hatch for an explicit selection;
+the old implicit form is available as `module_from_context% "M"`. XIR is
+materialized only by an explicit export command.
 
 **Trusted build inputs.** Compiling a `.lean` source runs Lean elaboration,
 including its macros and metaprograms. Treat direct sources and package

@@ -113,7 +113,7 @@ module SourceVerification where
 
   /-- This proof-only value also checks that ordinary `def` declarations are
   not selected as Move functions by the enclosing `module`. -/
-  def compiledForTest : MoveModel.Frontend.XIR.MModule :=
+  def compiledForTest : MoveModel.IR.Module :=
     lowerToIR ``SourceVerification
 
   #test Tests.run compiledForTest "choose" []

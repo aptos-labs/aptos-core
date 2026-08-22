@@ -9,7 +9,6 @@ import MoveModel.Tests.Common
 namespace Tests.MovePrograms
 
 open Move
-open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
 module Account where
@@ -64,7 +63,7 @@ module Account where
 
   /-! ## Tests -/
 
-  def compiled : MModule := lowerToIR ``Tests.MovePrograms.Account
+  def compiled : MoveModel.IR.Module := lowerToIR ``Tests.MovePrograms.Account
 
   private def balanceId := compiled.resourceId "Balance"
   private def memory (addr value : Nat) : MoveModel.IR.IMem :=

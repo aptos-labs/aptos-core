@@ -92,10 +92,10 @@ Move.Compiler.LIR.Module
     | name resolution and semantic lowering
     v
 MoveModel.IR.Module
-    | \
-    |  +---------------------------> interpreter, prover, ref elimination
+    |  \
+    |   +--------------------------> interpreter, prover, ref elimination
     |
-    | finite materialization
+    | explicit export only: finite materialization
     v
 MoveModel.Frontend.XIR.MModule
     |
@@ -406,14 +406,14 @@ Golden files use:
 ```
 
 Compiler inputs use `#export_leaner "Module"`, which combines automatic
-attribute discovery, `MModule` construction, and the compiler handoff in one
-source-facing directive. The request is registered where it appears and is
+attribute discovery, semantic `IR.Module` construction, and the compiler
+handoff in one source-facing directive. The request is registered where it appears and is
 processed at end of input, allowing it to live immediately after imports and
 before namespaces or opens. An optional `structs [...] functions [...]` suffix
 selects declarations explicitly. The lower-level `#emit_leaner_xir compiled`
-form remains available when Lean code also needs the `MModule` value. Both only
-write when compiler v2 supplies its private `LEANER_XIR_OUTPUT`; ordinary Lean
-builds just validate the module.
+form materializes the existing `IR.Module` only when an exchange file is
+requested. Both only write when compiler v2 supplies its private
+`LEANER_XIR_OUTPUT`; ordinary Lean builds just validate the module.
 
 The preferred authoring form is `module Module where ...`. This macro
 creates the same-named Lean namespace, opens the `Move` API and syntax, and
@@ -547,11 +547,11 @@ checker is not a substitute for passing the production verifier.
 
 ### Lean tests
 
-- Source-level `spec`/`verify` tests which do not depend on XIR generation.
+- Source-level `spec`/`verify` tests which execute semantic IR directly.
 - LIR-to-IR expected-shape tests.
 - IR interpreter execution for Arithmetic, Account, Read, and Calls.
-- IR-to-XIR materialization tests.
-- XIR JSON encode/decode round trips.
+- IR-to-XIR materialization and XIR JSON tests at the explicit export/import
+  boundaries.
 - Golden JSON files for representative modules.
 - Negative tests for unresolved names, invalid addresses, malformed finite IR,
   unsupported operations, and recursive structures.
@@ -594,7 +594,7 @@ table indices and byte offsets need not match.
 - Add `MoveModel.Frontend.XIR.MModule` and metadata records.
 - Implement checked `MModule.ofIR`.
 - Add convenience projections to the semantic `Program`.
-- Add `lowerToIR` using LIR-to-IR-to-XIR.
+- Add `lowerToIR` using direct LIR-to-IR quotation.
 - Add round-trip and malformed-finite-IR tests.
 
 ### Milestone 3: JSON contract — implemented

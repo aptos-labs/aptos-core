@@ -13,7 +13,6 @@ overflows at `minInt / -1`. -/
 namespace Tests.MovePrograms
 
 open Move
-open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
 module Signed where

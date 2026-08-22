@@ -10,7 +10,6 @@ as in-function CFG loops and verified from retained source. -/
 namespace Tests.MovePrograms
 
 open Move
-open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
 module Loops where
@@ -326,22 +325,22 @@ module Loops where
 
   /-! ## Tests -/
 
-  def compiled : MModule := lowerToIR ``Tests.MovePrograms.Loops
+  def compiled : MoveModel.IR.Module := lowerToIR ``Tests.MovePrograms.Loops
 
   private def counterId := compiled.resourceId "Counter"
   private def memory (addr value : Nat) : MoveModel.IR.IMem :=
     [(counterId, addr, .struct [.u64 value])]
   private def run := Tests.run compiled
 
-  private def fun? (name : String) : Option MFun :=
-    compiled.funs.find? (·.name == name)
+  private def fun? (name : String) : Option MoveModel.IR.FunDecl :=
+    compiled.funDecl? name
 
   private def hasFunction (name : String) : Bool :=
     (fun? name).isSome
 
   private def hasDottedHelper (namePrefix : String) : Bool :=
-    compiled.funs.any fun decl =>
-      decl.name.startsWith (namePrefix ++ ".")
+    (List.range compiled.numFuns).any fun id =>
+      (compiled.funMeta id).any fun info => info.name.startsWith (namePrefix ++ ".")
 
   private def invokes (callee : MoveModel.IR.FunId) : MoveModel.IR.Instr → Bool
     | .call _ (.function target) _ => target == callee
@@ -349,8 +348,8 @@ module Loops where
 
   private def hasSelfCall (name : String) : Bool :=
     let id := compiled.funId name
-    match compiled.funs[id]? with
-    | some decl => decl.blocks.any fun block => block.instrs.any (invokes id)
+    match compiled.program.funs id with
+    | some decl => decl.blocksList.any fun block => block.instrs.any (invokes id)
     | none => false
 
   private def termSuccs : MoveModel.IR.Term → List Nat
@@ -359,8 +358,8 @@ module Loops where
     | .ret _ => []
     | .abort _ => []
 
-  private def backEdgeTargets (decl : MFun) : List Nat :=
-    decl.blocks.zipIdx.foldl (init := []) fun acc (block, index) =>
+  private def backEdgeTargets (decl : MoveModel.IR.FunDecl) : List Nat :=
+    decl.blocksList.zipIdx.foldl (init := []) fun acc (block, index) =>
       (termSuccs block.term).foldl (init := acc) fun acc target =>
         if target ≤ index && !acc.contains target then acc ++ [target] else acc
 
@@ -377,8 +376,8 @@ module Loops where
   private def hasEntryBackEdge (name : String) : Bool :=
     match fun? name with
     | some decl =>
-        decl.blocks.any fun block =>
-          (termSuccs block.term).contains decl.entry
+        decl.blocksList.any fun block =>
+          (termSuccs block.term).contains decl.body.entry
     | none => false
 
   private def hasLt : MoveModel.IR.Instr → Bool
@@ -389,7 +388,7 @@ module Loops where
     match fun? name with
     | some decl =>
         (backEdgeTargets decl).any fun header =>
-          match decl.blocks[header]? with
+          match decl.body.blocks header with
           | some block =>
               block.instrs.any hasLt ||
                 (match block.term with
@@ -401,7 +400,7 @@ module Loops where
   private def retCount (name : String) : Nat :=
     match fun? name with
     | some decl =>
-        decl.blocks.foldl (init := 0) fun n block =>
+        decl.blocksList.foldl (init := 0) fun n block =>
           match block.term with
           | .ret _ => n + 1
           | _ => n
@@ -446,7 +445,5 @@ module Loops where
   #test hasEntryBackEdge "countdown_tail" = true
   #test hasSelfCall "countdown_tail" = false
   #test (1 < retCount "return_in_loop") = true
-
-  #emit_leaner_xir compiled
 
 end Tests.MovePrograms

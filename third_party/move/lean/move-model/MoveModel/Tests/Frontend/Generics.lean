@@ -1,7 +1,7 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
-import MoveModel.Tests.Common
+import MoveModel.Tests.XIRCommon
 import MoveModel.Frontend.Elab
 
 /-! True Move generics imported through exchange XIR.  The declarations retain
@@ -102,7 +102,7 @@ module 0x42::generics {
 }
 "
 
-private def run := Tests.run imported
+private def run := Tests.runXIR imported
 
 #test run "round_trip" [] [.u64 41] = Tests.okU64 41
 #test run "choose_u64" [] [.u64 3, .u64 8, .bool true] = Tests.okU64 3

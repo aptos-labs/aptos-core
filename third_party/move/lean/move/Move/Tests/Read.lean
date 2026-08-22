@@ -9,7 +9,6 @@ import MoveModel.Tests.Common
 namespace Tests.MovePrograms
 
 open Move
-open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
 module Read where
@@ -70,7 +69,7 @@ module Read where
 
   /-! ## Tests -/
 
-  def compiled : MModule := lowerToIR ``Tests.MovePrograms.Read
+  def compiled : MoveModel.IR.Module := lowerToIR ``Tests.MovePrograms.Read
 
   private def readingId := compiled.resourceId "Reading"
   private def memory (addr value : Nat) : MoveModel.IR.IMem :=

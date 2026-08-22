@@ -9,7 +9,6 @@ import MoveModel.Tests.Common
 namespace Tests.MovePrograms
 
 open Move
-open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
 module Vectors where
@@ -90,7 +89,7 @@ module Vectors where
 
   /-! ## Tests -/
 
-  def compiled : MModule := lowerToIR ``Tests.MovePrograms.Vectors
+  def compiled : MoveModel.IR.Module := lowerToIR ``Tests.MovePrograms.Vectors
 
   private def run := Tests.run compiled
 

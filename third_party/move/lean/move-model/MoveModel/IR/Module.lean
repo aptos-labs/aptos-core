@@ -85,6 +85,52 @@ structure Module where
   externalFuns : List ExternalFunRef := []
   dialect : Dialect := .stackless
 
+/-- Construct finite semantic IR directly from compiler-produced lists.
+This is intentionally an IR constructor, rather than an XIR conversion: the
+lists only close over the partial maps required by the semantic model. -/
+def Module.ofLists (address : Address) (name : String)
+    (structs : List StructDecl) (funs : List FunDecl)
+    (structMeta : List StructMeta) (funMeta : List FunMeta)
+    (externalFuns : List ExternalFunRef := [])
+    (dialect : Dialect := .stackless) : Module where
+  address := address
+  name := name
+  program := {
+    structs := fun r => structs[r]?
+    funs := fun f => funs[f]?
+  }
+  numStructs := structs.length
+  numFuns := funs.length
+  structMeta := fun r => structMeta[r]?
+  funMeta := fun f => funMeta[f]?
+  externalFuns := externalFuns
+  dialect := dialect
+
+/-- The positional identifier of a named function, or `numFuns` when absent.
+The sentinel is outside the declared bounds and therefore has no declaration. -/
+def Module.funId (m : Module) (name : String) : FunId :=
+  (List.range m.numFuns).findIdx fun i => (m.funMeta i).any (·.name == name)
+
+/-- The positional identifier of a named struct, or `numStructs` when absent. -/
+def Module.resourceId (m : Module) (name : String) : ResourceId :=
+  (List.range m.numStructs).findIdx fun i => (m.structMeta i).any (·.name == name)
+
+/-- Look up a function declaration through its source-level name. -/
+def Module.funDecl? (m : Module) (name : String) : Option FunDecl :=
+  m.program.funs (m.funId name)
+
+/-- Look up function metadata through its source-level name. -/
+def Module.funMeta? (m : Module) (name : String) : Option FunMeta :=
+  m.funMeta (m.funId name)
+
+/-- Look up a struct declaration through its source-level name. -/
+def Module.structDecl? (m : Module) (name : String) : Option StructDecl :=
+  m.program.structs (m.resourceId name)
+
+/-- Look up struct metadata through its source-level name. -/
+def Module.structMeta? (m : Module) (name : String) : Option StructMeta :=
+  m.structMeta (m.resourceId name)
+
 /-- Apply a semantic program transformation while retaining module metadata. -/
 def Module.mapProgram (m : Module) (f : Program → Program) : Module :=
   { m with program := f m.program }
