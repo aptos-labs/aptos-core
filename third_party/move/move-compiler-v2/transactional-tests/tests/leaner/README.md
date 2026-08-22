@@ -2,7 +2,9 @@
 
 Each `.lean` file is compiled through XIR, loaded into the Move model as
 stackless bytecode, processed by compiler v2, emitted as Move bytecode, and run
-by the production VM harness.
+by the production VM harness. The dedicated `leaner` test configuration runs
+this pipeline once with compiler-v2's default experiments; Leaner sources are
+excluded from the generic optimization configuration matrix.
 
 Transactional commands use the Lean-comment-compatible `--#` prefix. The local
 Lake wrapper depends on the main Lean project, so these files also elaborate in

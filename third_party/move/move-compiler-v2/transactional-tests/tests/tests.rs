@@ -38,6 +38,7 @@ struct TestConfig {
 
 /// Set of exclusions that apply when using `include: &[]` in TestConfig.
 const COMMON_EXCLUSIONS: &[&str] = &[
+    "/leaner/",
     "/operator_eval/",
     "/no-recursive-check/",
     "/no-access-check/",
@@ -85,9 +86,21 @@ const TEST_CONFIGS: &[TestConfig] = &[
         exclude: COMMON_EXCLUSIONS,
         cross_compile: false,
     },
+    // Lean-authored programs have their own front end and only need one
+    // default compiler-v2 configuration. Keep them out of the generic
+    // optimization matrix above.
+    TestConfig {
+        name: "leaner",
+        runner: |p| run(p, get_config_by_name("leaner")),
+        experiments: &[],
+        language_version: LanguageVersion::latest(),
+        include: &["/leaner/"],
+        exclude: &[],
+        cross_compile: false,
+    },
     // Let Leaner-permissive borrow programs reach the production bytecode
     // verifier even when compiler-v2's stricter reference checker reports the
-    // same program under the ordinary configurations.
+    // same program under the dedicated Leaner configuration.
     TestConfig {
         name: "no-reference-safety",
         runner: |p| run(p, get_config_by_name("no-reference-safety")),
@@ -208,12 +221,8 @@ const TEST_CONFIGS: &[TestConfig] = &[
 // `test.move`.  If there is such an entry, then each config "foo" will have a
 /// separate baseline output file `test.foo.exp`.
 const SEPARATE_BASELINE: &[&str] = &[
-    // Offsets are different depending on optimizations
-    "leaner/arithmetic.lean",
-    "leaner/control_flow.lean",
-    "leaner/loops.lean",
-    "leaner/vector_operations.lean",
-    "leaner/ordered_map.lean",
+    // These have both the ordinary Leaner result and the comparison result
+    // with compiler-v2 reference safety disabled.
     "/leaner/borrow_checker/leaner_permissive_",
     "control_flow/abort_complex.move",
     "control_flow/abort_invalid.move",

@@ -27,12 +27,12 @@ whose publish step is rejected cannot also contain an executable module.
 Execution successes and downstream compiler errors therefore appear in
 separate `.exp` files in this directory.
 
-The ordinary compiler configurations retain compiler-v2 reference-safety
-diagnostics.  A `no-reference-safety` comparison configuration suppresses only
+The dedicated `leaner` configuration retains compiler-v2 reference-safety
+diagnostics. A `no-reference-safety` comparison configuration suppresses only
 that compiler diagnostic for `leaner_permissive_*`, allowing the same XIR to
-continue to bytecode generation and the production verifier.  Its distinct
-`.no-reference-safety.exp` baseline records the verifier or VM outcome; it is
-not an acceptance mode used outside these comparison tests.
+continue to bytecode generation and the production verifier. Their distinct
+`.leaner.exp` and `.no-reference-safety.exp` baselines record the two outcomes;
+the latter is not an acceptance mode used outside these comparison tests.
 
 Current deliberate differences are:
 
