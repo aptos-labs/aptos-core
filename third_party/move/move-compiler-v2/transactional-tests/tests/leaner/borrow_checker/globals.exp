@@ -1,0 +1,18 @@
+processed 7 tasks
+task 0 lines 1-47:  publish [import Move]
+task 1 lines 49-49:  run --args 5u64 --signers 0x42 -- 0x0::LeanerBorrowGlobals::publish
+task 2 lines 51-51:  run 0x0::LeanerBorrowGlobals::read_twice --args @0x42
+return values: 10
+task 3 lines 53-53:  run 0x0::LeanerBorrowGlobals::increment --args @0x42
+task 4 lines 55-55:  run 0x0::LeanerBorrowGlobals::read --args @0x42
+return values: 6
+task 5 lines 57-57:  run 0x0::LeanerBorrowGlobals::abort_after_write --args @0x42
+Error: Function execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(7),
+    location: 0x0::LeanerBorrowGlobals,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(1), 8)],
+}
+task 6 lines 59-59:  run 0x0::LeanerBorrowGlobals::read --args @0x42
+return values: 6

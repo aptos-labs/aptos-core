@@ -1,0 +1,6 @@
+processed 3 tasks
+task 0 lines 1-46:  publish [import Move]
+task 1 lines 48-48:  run 0x0::LeanerBorrowCalls::write_capable_call
+return values: 9
+task 2 lines 50-50:  run 0x0::LeanerBorrowCalls::separated_call
+return values: 7

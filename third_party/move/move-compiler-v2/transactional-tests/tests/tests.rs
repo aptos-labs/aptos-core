@@ -307,6 +307,7 @@ fn lake_available() -> bool {
 
 fn positive_leaner_baselines_are_clean() -> Result<(), String> {
     const FAILURE_MARKERS: &[&str] = &[
+        "warning:",
         "bug:",
         "Error: compilation errors:",
         "LINKER_ERROR",
@@ -316,7 +317,6 @@ fn positive_leaner_baselines_are_clean() -> Result<(), String> {
     let mut failures = vec![];
     for entry in WalkDir::new("tests/leaner")
         .min_depth(1)
-        .max_depth(1)
         .into_iter()
         .flatten()
     {
@@ -324,7 +324,11 @@ fn positive_leaner_baselines_are_clean() -> Result<(), String> {
         let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
             continue;
         };
-        if !name.ends_with(".exp") || name.starts_with("reject_") {
+        let is_negative = name.starts_with("reject_");
+        let is_differential = path
+            .to_string_lossy()
+            .contains("/borrow_checker/leaner_permissive_");
+        if !name.ends_with(".exp") || is_negative || is_differential {
             continue;
         }
         let output = fs::read_to_string(path).map_err(|error| error.to_string())?;

@@ -1,0 +1,11 @@
+processed 1 task
+task 0 lines 1-23:  publish [import Move]
+Error: compilation errors:
+ error: borrow safety error `poisoned`: reference was poisoned by an overlapping write (conflicts with `selected`)
+   ┌─ TEMPFILE:13:5
+   │
+13 │     let child ← &mut poisoned.value
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+
+exiting with Leaner elaboration errors

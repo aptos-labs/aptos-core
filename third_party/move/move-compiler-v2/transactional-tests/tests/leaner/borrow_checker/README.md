@@ -9,9 +9,11 @@ programs authored in Leaner:
 
 The files are grouped by expected boundary:
 
-- `accepted.lean` and `loop_carried.lean` are accepted by all three layers and
-  record successful VM executions. The latter also checks that distinct
-  mutable source bindings survive Lean normalization as distinct XIR locals.
+- positive files (without a `reject_` or `leaner_permissive_` prefix) are
+  accepted by all three layers and record successful VM executions, or an
+  intentional VM abort followed by a state check. `loop_carried.lean` also
+  checks that distinct mutable source bindings survive Lean normalization as
+  distinct XIR locals.
 - `leaner_permissive_*.lean` is accepted by Leaner's source checker but is
   expected to be rejected by a stricter downstream checker.  The expected
   output records exactly which downstream layer rejects it.
@@ -41,3 +43,18 @@ Current deliberate differences are:
 | --- | --- | --- |
 | `leaner_permissive_unused_handle.lean` | Rejects transfer while another mutable borrow is live | Verifier accepts after optimization removes the unused handle; VM returns `5` |
 | `leaner_permissive_read_only_call.lean` | Rejects transfer of the overlapping mutable argument | Verifier rejects with `CALL_BORROWED_MUTABLE_REFERENCE_ERROR` |
+
+## Coverage map
+
+| Policy surface | Positive transaction | Negative transaction |
+| --- | --- | --- |
+| mutable activation and use | `accepted`, `repeated_writes` | `reject_poisoned_use`, `reject_poisoned_write`, `reject_poisoned_return` |
+| reborrowing and lineage | `accepted` (`child_then_parent`) | `reject_parent_while_child`, `reject_poisoned_reborrow`, `reject_nested_poison` |
+| immutable references | `accepted` (`multiple_immutable`) | `reject_immutable_activation`, `reject_immutable_after_mutation` |
+| freezing | `freeze`, `vectors` | `reject_poisoned_freeze` |
+| call summaries and separation | `calls`, `leaner_permissive_read_only_call` | `reject_call_separation`, `reject_poisoned_call` |
+| returned-reference derivations | `returns` | `reject_local_return`, `reject_global_return` |
+| branches and loops | `loop_carried` | `reject_branch_poison`, `reject_loop_poison` |
+| globals and abort rollback | `globals` | `reject_global_owner_invalidation` |
+| vector alias abstraction and structural mutation | `vectors` | `reject_vector_alias`, `reject_vector_mutation`, `reject_vector_pop`, `reject_vector_swap` |
+| direct and mutual recursive summaries | `recursion` | bounded post-fixpoint failure is exercised at the policy level because valid source SCCs have a finite summary lattice |

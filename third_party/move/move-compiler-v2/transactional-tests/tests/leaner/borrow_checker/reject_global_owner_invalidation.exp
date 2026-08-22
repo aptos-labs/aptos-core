@@ -1,0 +1,11 @@
+processed 1 task
+task 0 lines 1-20:  publish [import Move]
+Error: compilation errors:
+ error: borrow safety error: cannot move or overwrite an owner while a reference into it is live (conflicts with `observation`)
+   ┌─ TEMPFILE:10:19
+   │
+10 │     let removed ← moveFrom Counter address
+   │                   ^^^^^^^^^^^^^^^^^^^^^^^^
+
+
+exiting with Leaner elaboration errors
