@@ -34,7 +34,7 @@ fun bump(x: u64): u64 {
 block using a command-by-command stepping proof.
 -/
 
-namespace MoveModel.Examples.ElimSource
+namespace Tests.Prover.ElimSource
 
 open MoveModel.Prover.Ivl
 open MoveModel.IR
@@ -86,9 +86,6 @@ module 0x42::bump {
 -- The stepping kit uses one uniform simp list per step.
 set_option linter.unusedSimpArgs false in
 set_option maxHeartbeats 8000000 in
--- the unified integer model puts checked arithmetic behind `NumType`, which
--- deepens the symbolic-execution terms this proof unfolds
-set_option maxRecDepth 100000 in
 /-- **The borrow-based `bump` verifies from Move source**, through
 `moveElim%`, against its genuine `spec` block. -/
 theorem bump_verified : Verified bump 0 := by
@@ -136,33 +133,32 @@ theorem bump_verified : Verified bump 0 := by
   simp only [typedEntry, TypedArgs] at htyped
   obtain ⟨⟨-, hvalid⟩, -⟩ := htyped
   have hv := hvalid 0 .u64 v rfl rfl
-  simp only [isValid_u64_iff] at hv
-  obtain ⟨n, rfl, hn⟩ := hv
+  -- The argument is an unbounded `Int` confined to the `u64` range, and the
+  -- proof keeps that view: every value the block computes is then a plain
+  -- `Value.int`, so no `Value.u64` abbreviation has to be unfolded inside the
+  -- symbolic-execution terms the kernel re-checks.
+  simp only [isValid_uint_iff, u64_size_eq] at hv
+  obtain ⟨i, rfl, hi0, -⟩ := hv
   -- `requires x < u64::MAX` gives the add its guard
   simp only [Holds, VState.preEnvOf, preEnv, evalSpec_lt_iff,
     evalSpec_loc_iff, evalSpec_value_iff, initLocals, Value.toSVal,
     SVal.int.injEq, exists_eq_left, SVal.bool.injEq,
     List.getElem?_cons_zero, Option.some.injEq, exists_eq_left',
     decide_eq_true_eq] at hreq
-  obtain ⟨i, j, rfl, rfl, hd⟩ := hreq
-  have hlt : n + 1 < U64_SIZE := by
-    -- the guard now compares the unbounded `Int` value; `omega` bridges the
-    -- cast that `exact_mod_cast` used to do on the `Nat` form
+  obtain ⟨i', j, hi', rfl, hd⟩ := hreq
+  subst i'
+  -- checked arithmetic guards on the unbounded value, so the range facts are
+  -- supplied in that form; the bound is spelled `U64_SIZE`, as in the goal
+  have hltI : i + 1 < (U64_SIZE : Int) := by
     have h := of_decide_eq_true hd.symm
     unfold U64_SIZE
     omega
-  -- checked arithmetic guards on the unbounded `Int` value now, so the range
-  -- fact has to be available in that form or the `if` never reduces.  The
-  -- bound is spelled as a literal: forcing `U64_SIZE = 2 ^ 64` open here makes
-  -- the proof term too big for the kernel.
-  have hltI : (n : Int) + 1 < 18446744073709551616 := by
-    have h := hlt; unfold U64_SIZE at h; omega
-  have hloI : (0 : Int) ≤ (n : Int) + 1 := by omega
+  have hloI : (0 : Int) ≤ i + 1 := by omega
   -- step the block: checkout, alias moves, read, bump, write, and the
   -- alias write-back cascade to the root
   iterate 8 (refine (wpCmds_onOk_step rfl).mpr ?_
              simp [initLocals, Oper.sem, MoveState.writeLocals,
-               hlt, hltI, hloI])
+               hltI, hloI])
   iterate 9 (refine (wpCmds_onOk_step rfl).mpr ?_
              simp [initLocals, Oper.sem, MoveState.writeLocals,
                MoveState.writeLocal, hltI, hloI])
@@ -173,4 +169,4 @@ theorem bump_verified : Verified bump 0 := by
       agreesOutside, Contract.footprint, MoveState.writeLocals,
       MoveState.writeLocal]
 
-end MoveModel.Examples.ElimSource
+end Tests.Prover.ElimSource

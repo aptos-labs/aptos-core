@@ -42,7 +42,7 @@ resource contains one `u64` field, matching the real prover's multisorted
 encoding.
 -/
 
-namespace MoveModel.Examples.Account
+namespace Tests.Prover.Account
 
 open MoveModel.Prover.Ivl
 open MoveModel.IR
@@ -253,4 +253,4 @@ theorem withdraw_verified : Verified prog 0 := by
         intro r a' hout hr ha'
         exact absurd ha' (hout hr.symm)
 
-end MoveModel.Examples.Account
+end Tests.Prover.Account

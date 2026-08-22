@@ -77,7 +77,6 @@ elaborator automatically prefers the nearest ancestor's `target/debug/aptos`.
 
 ```bash
 cargo build -p aptos
-APTOS_CLI=<path-to-aptos> lake build Examples
 APTOS_CLI=<path-to-aptos> lake test
 ```
 
@@ -128,6 +127,7 @@ Function and resource identifiers in `Program` are positional.  Retain an
 `MProgram.resourceId` when tests or examples should resolve declarations by
 name.
 
-Frontend-backed examples live under [`MoveModel/Examples`](../Examples/).
-Interpreter tests live under [`Tests`](../Tests); `Tests/Common.lean`
-provides the `#test` command and expected-outcome helpers.
+Frontend-backed verification examples live under
+[`Tests/Prover`](../Tests/Prover/) and interpreter tests under
+[`Tests/Interp`](../Tests/Interp/); `Tests/Common.lean` provides the `#test`
+command and expected-outcome helpers.

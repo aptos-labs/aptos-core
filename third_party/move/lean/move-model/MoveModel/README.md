@@ -20,7 +20,7 @@ verification.
 | [IR](IR/README.md) | Stackless IR syntax and specifications, relational semantics, interpreter, typing and checking certificates, reusable proof infrastructure, and reference elimination. |
 | [Prover](Prover/README.md) | State-polymorphic IVL, weakest preconditions, loop cutting, IR-to-IVL compilation, simulation, and end-to-end adequacy. |
 | [Frontend](Frontend/README.md) | Embedded masm and Move-source elaborators backed by `aptos move exchange`, including optional reference elimination. |
-| [`Examples`](Examples.lean) | Hand-written and frontend-backed execution and verification examples. |
+| [`Tests`](Tests.lean) | Interpreter, IR, frontend, and prover regressions, including hand-written and frontend-backed verification examples under [`Tests/Prover`](Tests/Prover/). |
 
 Each package README owns its architecture, module index, completeness status,
 and roadmap.

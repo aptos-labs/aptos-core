@@ -41,7 +41,7 @@ precondition rules out the abort branch of `callRel`, using `inc`'s
 `ensures`.
 -/
 
-namespace MoveModel.Examples.CrossCall
+namespace Tests.Prover.CrossCall
 
 open MoveModel.Prover.Ivl
 open MoveModel.IR
@@ -393,4 +393,4 @@ theorem bump_verified : Verified elimProg 0 := by
         intro r a'
         exact hmemEq r a'
 
-end MoveModel.Examples.CrossCall
+end Tests.Prover.CrossCall

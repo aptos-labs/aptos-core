@@ -988,8 +988,8 @@ theorem compile_sim_callOk (P : Program)
             · apply MoveState.writeLocals_locals_congr
               change s.locals = (m'.resume s.current).locals
               exact hcallerLocals.symm
-            · simp [writeLocals_memory, MoveState.setMemory,
-                FrameWorld.resume, MoveState.resumeFrame]
+            · simp [MoveState.setMemory, FrameWorld.resume,
+                MoveState.resumeFrame]
         have hTLbase :
             TypedLocals P.structs d.locals (m'.resume s.current).locals := by
           rw [hcallerLocals]

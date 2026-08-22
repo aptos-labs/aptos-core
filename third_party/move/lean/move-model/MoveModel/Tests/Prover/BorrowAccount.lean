@@ -5,7 +5,7 @@ import MoveModel.IR.RefElim.Transform
 import MoveModel.IR.Interp.Exec
 import MoveModel.Prover.Ivl.Wp
 import MoveModel.Prover.Translate.Compile
-import MoveModel.Examples.Account
+import MoveModel.Tests.Prover.Account
 
 /-!
 # The Account Example with References
@@ -30,15 +30,15 @@ compile to failing assertions.
 `refElimFun` rewrites the program into the value-level declaration
 `elimDecl`.  A `#guard` fixes the expected output and interpreter agreement.
 Finally, `borrow_withdraw_verified` proves the eliminated program against the
-same contract as the hand-eliminated `Examples.Account` version.
+same contract as the hand-eliminated `Tests.Prover.Account` version.
 -/
 
-namespace MoveModel.Examples.BorrowAccount
+namespace Tests.Prover.BorrowAccount
 
 open MoveModel.Prover.Ivl
 open MoveModel.IR
 open MoveModel.Prover.Translate
-open MoveModel.Examples.Account (ACCOUNT withdrawContract)
+open Tests.Prover.Account (ACCOUNT withdrawContract)
 
 /-- `withdraw` through a mutable borrow (see module docs). -/
 def borrowDecl : FunDecl where
@@ -142,7 +142,7 @@ def elimProg : Program where
 set_option linter.unusedSimpArgs false in
 set_option maxHeartbeats 8000000 in
 /-- **The eliminated `withdraw` verifies** against the same contract as the
-hand-eliminated `Examples.Account` version — borrow-based code becomes
+hand-eliminated `Tests.Prover.Account` version — borrow-based code becomes
 verifiable through `refElimFun`.  The proof *steps* the compiled block one
 command at a time (`wpCmds_onOk_step`/`wpCmds_onOk_skip`), which keeps the
 verification-condition terms small. -/
@@ -307,4 +307,4 @@ theorem borrow_withdraw_verified : Verified elimProg 0 := by
         intro r a' hout hr ha'
         exact absurd ha' (hout hr.symm)
 
-end MoveModel.Examples.BorrowAccount
+end Tests.Prover.BorrowAccount

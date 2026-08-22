@@ -209,7 +209,7 @@ theorem IsValid.sintv {Δ : StructDecls} {w : IntWidth} {i : Int}
 /-- Characterize values valid at an unsigned integer type (`$IsValid'uN'`). -/
 @[simp] theorem isValid_uint_iff {Δ : StructDecls} {w : IntWidth} {v : Value} :
     IsValid Δ (.uint w) v ↔ ∃ i, v = .int i ∧ 0 ≤ i ∧ i < (w.size : Int) := by
-  simp [Ty.uint, isValid_int_iff, NumType.lo, NumType.hi, NumType.size]
+  simp [Ty.uint, isValid_int_iff, NumType.lo, NumType.hi]
 
 /-- Characterize values valid at a signed integer type (`$IsValid'iN'`). -/
 @[simp] theorem isValid_sint_iff {Δ : StructDecls} {w : IntWidth} {v : Value} :

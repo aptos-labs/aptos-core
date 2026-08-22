@@ -36,10 +36,6 @@ import MoveModel.Frontend.XIR.FromIR
 import MoveModel.Frontend.XIR.Json
 import MoveModel.Frontend.Decode
 import MoveModel.Frontend.Elab
-import MoveModel.Examples.Account
-import MoveModel.Examples.BorrowAccount
-import MoveModel.Examples.CrossCall
-import MoveModel.Examples.CountDown
 
 /-!
 # MoveModel — semantic formalization of Move.

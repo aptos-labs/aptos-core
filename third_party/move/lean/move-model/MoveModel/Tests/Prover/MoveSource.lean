@@ -20,7 +20,7 @@ memory, `move_from`, `old(..)`, and the `modifies` frame.  Both examples run
 in the interpreter and verify with the Lean weakest-precondition calculus.
 -/
 
-namespace MoveModel.Examples.MoveSource
+namespace Tests.Prover.MoveSource
 
 open MoveModel.Prover.Ivl
 open MoveModel.IR
@@ -79,7 +79,7 @@ theorem count_down_verified : Verified countDown 0 := by
   intro m args current frames
   simp only [wpB, compileFun, compAnns, countDown, MProgram.toProgram,
     MFun.toFunDecl, MLoop.toLoopSpec, MContract.toContract, andAll, orAll,
-    compileBlock, termCmds, termGoto, retExitBlock, abortExitBlock, initVState, initVStateAt, MoveState.locals, setFrame, setFrame_same, wpBlock,
+    compileBlock, termCmds, termGoto, retExitBlock, abortExitBlock, initVStateAt, MoveState.locals, wpBlock,
     wpTerm, wpEdge, wpCmds, onOk, denoteLoopSpec, Option.elim, Option.map,
     List.mem_cons, List.not_mem_nil, or_false, List.find?,
     List.length_cons, List.length_nil,
@@ -157,7 +157,7 @@ theorem count_down_verified : Verified countDown 0 := by
       have hkSub : (k : Int) - 1 < (U64_SIZE : Int) := by
         have hkI : (k : Int) < (U64_SIZE : Int) := by exact_mod_cast hkValid
         omega
-      simp [wpCmds, compileInstr, onOk, hab, hl0, hg2, hk1, hk1', hkSub,
+      simp [wpCmds, compileInstr, onOk, hab, hl0, hg2, hk1', hkSub,
         Oper.sem, MoveState.writeLocals, Holds,
         VState.curEnv, VState.doAbort]
       intro g' b' hedge hg'
@@ -194,7 +194,7 @@ theorem take_verified : Verified take 0 := by
   intro m args current frames
   simp only [wpB, compileFun, compAnns, take, MProgram.toProgram,
     MFun.toFunDecl, MLoop.toLoopSpec, MContract.toContract, andAll, orAll,
-    compileBlock, termCmds, termGoto, retExitBlock, abortExitBlock, initVState, initVStateAt, MoveState.locals, setFrame, setFrame_same, wpBlock,
+    compileBlock, termCmds, termGoto, retExitBlock, abortExitBlock, initVStateAt, MoveState.locals, wpBlock,
     wpTerm, wpEdge, wpCmds, onOk, Option.elim, Option.map,
     List.mem_cons, List.not_mem_nil, or_false, List.find?,
     List.length_cons, List.length_nil,
@@ -255,4 +255,4 @@ theorem take_verified : Verified take 0 := by
       intro r a' hout hr ha'
       exact absurd ha' (hout hr.symm)
 
-end MoveModel.Examples.MoveSource
+end Tests.Prover.MoveSource

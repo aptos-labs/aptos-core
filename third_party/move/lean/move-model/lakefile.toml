@@ -7,13 +7,9 @@ testDriver = "moveModelTests"
 [[lean_lib]]
 name = "MoveModel"
 
-# Frontend-embedding examples (`masm%`/`move%`): elaborating them runs the
-# Aptos CLI (`aptos move exchange`), hence not a default target.
-[[lean_lib]]
-name = "Examples"
-roots = ["MoveModel.Examples"]
-
-# Interpreter, IR, and frontend regressions, in this library's own namespace.
+# Interpreter, IR, frontend, and prover regressions, in this library's own
+# namespace.  The frontend-embedding tests (`masm%`/`move%`) run the Aptos CLI
+# (`aptos move exchange`) at elaboration time, hence not a default target.
 [[lean_lib]]
 name = "MoveModelTests"
 roots = ["MoveModel.Tests"]

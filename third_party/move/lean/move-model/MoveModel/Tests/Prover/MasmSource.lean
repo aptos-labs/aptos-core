@@ -31,7 +31,7 @@ havoc.  These facts are enough to verify `count_down` without an explicit
 loop invariant.
 -/
 
-namespace MoveModel.Examples.MasmSource
+namespace Tests.Prover.MasmSource
 
 open MoveModel.Prover.Ivl
 open MoveModel.IR
@@ -72,7 +72,7 @@ theorem masm_count_down_verified : Verified countDown 0 := by
   simp only [wpB, compileFun, compAnns, countDown, MProgram.toProgram,
     MFun.toFunDecl, MLoop.toLoopSpec, MContract.toContract, andAll, orAll,
     denoteLoopSpec, compileBlock, termCmds, termGoto, compileInstr, retExitBlock,
-    abortExitBlock, initVState, initVStateAt, MoveState.locals, setFrame, setFrame_same, wpBlock, wpTerm, wpEdge, wpCmds, onOk,
+    abortExitBlock, initVStateAt, MoveState.locals, wpBlock, wpTerm, wpEdge, wpCmds, onOk,
     Option.elim, Option.map, List.map, List.flatten, List.append,
     List.cons_append, List.nil_append, List.mem_cons, List.not_mem_nil,
     or_false, List.find?, List.getElem?_cons_zero,
@@ -133,7 +133,7 @@ theorem masm_count_down_verified : Verified countDown 0 := by
       have hk1' : (1 : Int) ≤ (k : Int) := by exact_mod_cast hk1
       have hkSub : (k : Int) - 1 < (U64_SIZE : Int) := by
         have h := hk; omega
-      simp [wpCmds, compileInstr, onOk, hab, hl0, hg2, hk1, hk1', hkSub,
+      simp [wpCmds, compileInstr, onOk, hab, hl0, hg2, hk1', hkSub,
         Oper.sem, MoveState.writeLocals, Holds,
         VState.curEnv, VState.doAbort]
       intro g' b' hedge hg'
@@ -198,6 +198,9 @@ fun withdraw(s: &signer, addr: address, amount: u64) acquires Account
     [.address 3, .address 3, .u64 4]
   matches .ok (.abort _ 0)
 
+-- The stepping kit below uses one uniform simp list per step; the linter
+-- would have each list minimized per instruction, which hurts uniformity.
+set_option linter.unusedSimpArgs false in
 set_option maxHeartbeats 8000000 in
 /-- **`withdraw` verifies**: the verification condition of the program
 compiled from the embedded masm holds via the Lean WP calculus, for every
@@ -208,7 +211,7 @@ theorem masm_withdraw_verified : Verified account 0 := by
   simp only [wpB, compileFun, compAnns, account, MProgram.toProgram,
     MFun.toFunDecl, MLoop.toLoopSpec, MContract.toContract, andAll, orAll,
     compileBlock, termCmds, termGoto, retExitBlock,
-    abortExitBlock, initVState, initVStateAt, MoveState.locals, setFrame, setFrame_same, wpBlock, wpTerm, wpEdge, wpCmds, onOk,
+    abortExitBlock, initVStateAt, MoveState.locals, wpBlock, wpTerm, wpEdge, wpCmds, onOk,
     Option.elim, Option.map,
     List.mem_cons, List.not_mem_nil,
     or_false, List.find?, List.length_cons, List.length_nil,
@@ -344,7 +347,6 @@ theorem masm_withdraw_verified : Verified account 0 := by
           abortEnv, postEnv, initLocals, hpres, Oper.sem,
           SpecEnv.memAt, Contract.abortsFalse,
           hge, memWrite, memRemove, MoveState.writeLocals, agreesOutside, Contract.footprint]
-        refine ⟨by omega, ?_⟩
         intro r a' hout
         have hcond : ¬(r = { resource := 0 } ∧ a' = a) := fun ⟨hr, ha'⟩ =>
           hout hr.symm ha'
@@ -375,7 +377,7 @@ theorem masm_quant_id_verified : Verified quantId 0 := by
   intro m args current frames
   simp only [wpB, compileFun, compAnns, quantId, MProgram.toProgram,
     MFun.toFunDecl, MLoop.toLoopSpec, MContract.toContract, andAll, orAll,
-    compileBlock, termCmds, termGoto, retExitBlock, abortExitBlock, initVState, initVStateAt, MoveState.locals, setFrame, setFrame_same,
+    compileBlock, termCmds, termGoto, retExitBlock, abortExitBlock, initVStateAt, MoveState.locals,
     wpBlock, wpTerm, wpEdge, wpCmds, onOk, Option.elim, Option.map,
     List.mem_cons, List.not_mem_nil, or_false, List.find?,
     reduceIte, Nat.reduceAdd, Nat.reduceEqDiff]
@@ -405,7 +407,7 @@ theorem masm_quant_id_verified : Verified quantId 0 := by
     simp [wpCmds, Holds, VState.preEnvOf, VState.postEnvOf, preEnv,
       postEnv, initLocals, agreesOutside, Contract.footprint,
       Contract.abortsFalse, MoveState.writeLocal]
-    rintro v x rfl -
-    exact ⟨x, by simp, by omega⟩
+    rintro v x rfl hlo -
+    exact ⟨x, by simp, by simpa using hlo⟩
 
-end MoveModel.Examples.MasmSource
+end Tests.Prover.MasmSource

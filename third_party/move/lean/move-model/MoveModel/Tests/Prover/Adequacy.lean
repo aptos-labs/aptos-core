@@ -13,7 +13,7 @@ shows that the public adequacy theorem is applicable and not vacuous because
 of inconsistent hypotheses.
 -/
 
-namespace MoveModel.Examples.Adequacy
+namespace Tests.Prover.Adequacy
 
 open MoveModel.IR
 open MoveModel.Prover.Ivl
@@ -165,4 +165,4 @@ theorem id_satisfies_contract : SatisfiesContract prog 0 idDecl := by
       exact id_verified)
     0 idDecl (by simp [prog])
 
-end MoveModel.Examples.Adequacy
+end Tests.Prover.Adequacy

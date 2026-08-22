@@ -38,7 +38,7 @@ havoc therefore keeps `t0` defined and valid at type `u64`.  The guard gives
 invariant is needed.
 -/
 
-namespace MoveModel.Examples.CountDown
+namespace Tests.Prover.CountDown
 
 open MoveModel.Prover.Ivl
 open MoveModel.IR
@@ -89,7 +89,7 @@ theorem count_down_verified : Verified prog 0 := by
   intro m args current frames
   simp only [wpB, compileFun, compAnns, countDownDecl, countDownBody,
     countDownContract, countDownLoopSpec, compileBlock, termCmds, termGoto, compileInstr,
-    retExitBlock, abortExitBlock, initVState, initVStateAt, MoveState.locals, setFrame, setFrame_same, wpBlock, wpTerm, wpEdge,
+    retExitBlock, abortExitBlock, initVStateAt, MoveState.locals, wpBlock, wpTerm, wpEdge,
     wpCmds, onOk, denoteLoopSpec, Option.elim, Option.map, List.map,
     List.flatten, List.append, List.cons_append, List.nil_append,
     List.mem_cons, List.not_mem_nil, or_false, reduceIte, Nat.reduceAdd,
@@ -98,7 +98,7 @@ theorem count_down_verified : Verified prog 0 := by
   rcases hgt with rfl
   simp only [wpCmds, onOk, compileInstr, List.map, List.flatten,
     List.append, List.cons_append, List.nil_append, List.mem_cons,
-    List.not_mem_nil, or_false, List.length_cons, List.length_nil,
+    List.not_mem_nil, or_false,
     reduceIte, Nat.reduceSub, Nat.reduceLT, Nat.reduceEqDiff]
   -- Typing of the argument from the injected `WellFormed` assumption.
   simp only [typedEntry, TypedArgs] at htyped
@@ -126,7 +126,7 @@ theorem count_down_verified : Verified prog 0 := by
     obtain ⟨hab, hTL, hTM', -⟩ := hInv
     obtain ⟨val, hl0, hval⟩ :=
       htyv 0 .u64 trivial rfl ⟨.u64 n,
-        by simp [initVStateAt, MoveState.locals, initLocals], .u64 hn⟩
+        by simp [initLocals], .u64 hn⟩
     simp only [isValid_u64_iff] at hval
     obtain ⟨k, rfl, hk⟩ := hval
     intro gt2 hgt2 hg2
@@ -138,18 +138,18 @@ theorem count_down_verified : Verified prog 0 := by
       simp [hab, hl0, Oper.sem,         MoveState.writeLocals] at hg2
       have hk1 : 1 ≤ k := hg2
       have hk1Int : (1 : Int) ≤ (k : Int) := by omega
-      have hTL1 := hTL.writeU64 (x := 1) (n := 0) (by simp [countDownDecl])
+      have hTL1 := hTL.writeU64 (x := 1) (n := 0) (by simp)
         (by simp [U64_SIZE])
-      have hTL2 := hTL1.writeBool (x := 2) (b := true) (by simp [countDownDecl])
-      have hTL3 := hTL2.writeU64 (x := 3) (n := 1) (by simp [countDownDecl])
+      have hTL2 := hTL1.writeBool (x := 2) (b := true) (by simp)
+      have hTL3 := hTL2.writeU64 (x := 3) (n := 1) (by simp)
         (by simp [U64_SIZE])
       have hTL4 := hTL3.writeUInt (x := 0) (i := (k : Int) - 1) (w := .w64)
-        (by simp [countDownDecl]) (by omega)
+        (by simp) (by omega)
         (by rw [u64_size_eq]; omega)
       have hkSub : (k : Int) - 1 < (U64_SIZE : Int) := by
         have : (k : Int) < (U64_SIZE : Int) := by exact_mod_cast hk
         omega
-      simp [wpCmds, compileInstr, onOk, hab, hl0, hg2, hk1, hk1Int, hkSub,
+      simp [wpCmds, compileInstr, onOk, hab, hl0, hg2, hk1Int, hkSub,
         Oper.sem, MoveState.writeLocals, Holds,
         VState.curEnv, VState.doAbort]
       intro g' b' hedge hg'
@@ -177,4 +177,4 @@ theorem count_down_verified : Verified prog 0 := by
         intro r a'
         exact hmem r a' (fun h => h)
 
-end MoveModel.Examples.CountDown
+end Tests.Prover.CountDown
