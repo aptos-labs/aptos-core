@@ -35,15 +35,13 @@ import Move
 
 open scoped Move
 
-move_module Account where
+module Account where
 
-  struct BalanceValue where
+  struct BalanceValue has Copy, Drop, Store where
     value : U64
-    deriving Copy, Drop, Store
 
-  struct Balance where
+  struct Balance has Key where
     balance : BalanceValue
-    deriving Key
 
   entry fun deposit (addr : Address) (amount : U64) : Action Unit := do
     let value ← &mut Balance[addr].balance.value
@@ -57,9 +55,9 @@ move_module Account where
     value := *value - amount
 ```
 
-`move_module` creates the namespace, opens the Move API, and registers the
+`module` creates the namespace, opens the Move API, and registers the
 Move module; it compiles at end of input and performs no filesystem writes
-during an ordinary `lake build`. A resource is a `struct` deriving `Key`;
+during an ordinary `lake build`. A resource is a `struct` declaring `has Key`;
 `&mut Balance[addr].balance.value` chains a global borrow with two checked
 field borrows; `value := *value + amount` reads and writes through the
 reference in order.
@@ -82,21 +80,21 @@ and `choose.verified : choose.contract`:
 ```lean
 open scoped Move Move.Spec
 
-move_module Choices where
+module Choices where
   enum Choice where
-    | fallback
-    | chosen (value : U64)
+    | Fallback
+    | Chosen (value : U64)
 
   fun choose (fallback : U64) (choice : Choice) : U64 :=
     match choice with
-    | .fallback => fallback
-    | .chosen value => value
+    | .Fallback => fallback
+    | .Chosen value => value
 
   spec choose (fallback : U64) (choice : Choice) where
     ensures
       result = match choice with
-        | .fallback => fallback
-        | .chosen value => value
+        | .Fallback => fallback
+        | .Chosen value => value
 
   verify choose
 ```
@@ -116,7 +114,7 @@ to hold for every successful execution:
 
 ```lean
 spec deposit (addr : Address) (amount : U64) where
-  requires exists<Balance>(addr);
+  requires existsAt<Balance>(addr);
   modifies Balance[addr];
   ensures
     Balance[addr].balance.value =
@@ -181,24 +179,24 @@ its own variant, so patterns bind it with a trailing `_`:
 
 ```lean
 enum Payment where
-  | none
-  | direct (amount : U64)
+  | None
+  | Direct (amount : U64)
 
 spec Payment where
   invariant match this with
-    | .none => True
-    | .direct amount => 0 < amount.toNat
+    | .None => True
+    | .Direct amount => 0 < amount.toNat
 
-fun firstPart (payment : Payment) : U64 :=
+fun first_part (payment : Payment) : U64 :=
   match payment with
-  | .none _ => 0
-  | .direct amount _ => amount
+  | .None _ => 0
+  | .Direct amount _ => amount
 ```
 
-A literal like `{ value := 50 }` or `.direct 5` discharges its obligation
+A literal like `{ value := 50 }` or `.Direct 5` discharges its obligation
 during elaboration, so source carries no proof text and a violation is
 reported at the literal; creating a value under a condition uses the
-dependent `if h : 0 < amount then .direct amount else .none`, whose branch
+dependent `if h : 0 < amount then .Direct amount else .None`, whose branch
 hypothesis discharges it. Mutation is unconstrained while a borrow is live:
 the obligation lands where the value is rebuilt, when the loan dies — for a
 local value and for a resource behind `&mut R[addr].field` alike. The proof is
@@ -229,7 +227,7 @@ fun shifted (value : U64) (amount : U8) : U64 :=
 
 ```lean
 fun replace : Action U64 := do
-  let values : Move.Vector U64 := vector![10, 20, 30]
+  let values : Vector U64 := vector![10, 20, 30]
   let middle ← &mut values[1]
   middle := 42
   (*middle)
@@ -246,15 +244,15 @@ cursor arithmetic over indices provably cannot overflow.
 
 ```lean
 enum Op where
-  | idle
-  | transfer (amount : U64)
-  | split (left right : U64)
+  | Idle
+  | Transfer (amount : U64)
+  | Split (left right : U64)
 
 fun total (op : Op) : U64 :=
   match op with
-  | .idle => 0
-  | .transfer amount => amount
-  | .split left right => left + right
+  | .Idle => 0
+  | .Transfer amount => amount
+  | .Split left right => left + right
 ```
 
 ## Loops
@@ -263,13 +261,13 @@ fun total (op : Op) : U64 :=
 with labels for targeting an outer loop:
 
 ```lean
-fun countDown (n : U64) : U64 := do
+fun count_down (n : U64) : U64 := do
   let mut n := n
   while 0 < n do
     n := n - 1
   n
 
-fun labeledExit (n : U64) : U64 := do
+fun labeled_exit (n : U64) : U64 := do
   let mut n := n
   loop@outer
     loop
@@ -304,18 +302,17 @@ no monomorphization. Instantiation is inferred or written with named type
 arguments:
 
 ```lean
-struct Vault (T) where
+struct Vault (T) has Key where
   value : T
-  deriving Key
 
-fun publishGeneric {T} (signer : Signer) (value : T) : Action Unit :=
+fun publish_generic {T} (signer : &Signer) (value : T) : Action Unit :=
   moveTo signer ({ value } : Vault T)
 
-fun hasGeneric {T} (address : Address) : Action Bool :=
-  exists_ (Vault T) address
+fun has_generic {T} (address : Address) : Action Bool :=
+  existsAt (Vault T) address
 
-fun hasVault (address : Address) : Action Bool :=
-  hasGeneric (T := U64) address
+fun has_vault (address : Address) : Action Bool :=
+  has_generic (T := U64) address
 ```
 
 ## Visibility
@@ -326,7 +323,7 @@ A plain `fun` is private. `public fun` and `friend fun` declare `public` and
 ```lean
 public fun contains {K V} (map : &Map K V) (key : &K) : Action Bool := ...
 
-friend fun addTo (addr : Address) (amount : U64) : Action Unit := ...
+friend fun add_to (addr : Address) (amount : U64) : Action Unit := ...
 ```
 
 ## Attributes
@@ -338,9 +335,8 @@ compiled module:
 
 ```lean
 @[resource_group (scope global)]
-struct Registry where
+struct Registry has Key where
   value : U64
-  deriving Key
 
 @[randomness 7, lint.skip]
 entry fun act (addr : Address) : Action Unit := ...
@@ -354,8 +350,8 @@ public functions, specs, and theorems are all available:
 ```lean
 import Tests.Move.Modules.Math
 
-move_module Client where
-  fun importedIdentity (value : U64) : U64 :=
+module Client where
+  fun imported_identity (value : U64) : U64 :=
     Math.identity (Math.identity value)
 ```
 
@@ -376,7 +372,7 @@ For tests and transformations the compiled module is available as a Lean
 value:
 
 ```lean
-def compiled : MModule := move_module% "AccountTest"
+def compiled : MModule := module% "AccountTest"
 
 #test run "deposit" (memory 7 10) [.address 7, .u64 5]
   = Tests.okRet (memory 7 15) []
@@ -384,7 +380,7 @@ def compiled : MModule := move_module% "AccountTest"
 
 `#export_leaner "M"` is the lower-level header form, with an explicit
 `structs [...] functions [...]` selection escape hatch shared with
-`move_module%`.
+`module%`.
 
 **Trusted build inputs.** Compiling a `.lean` source runs Lean elaboration,
 including its macros and metaprograms. Treat direct sources and package

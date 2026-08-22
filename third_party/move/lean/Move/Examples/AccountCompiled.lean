@@ -16,7 +16,7 @@ private def immutableRefType (ref : &U64) : &U64 := ref
 private def mutableRefType (ref : &mut U64) : &mut U64 := ref
 
 def compiled : MModule :=
-  move_module% "Account" structs [BalanceValue, Balance] functions [deposit, withdraw]
+  module% "Account" structs [BalanceValue, Balance] functions [deposit, withdraw]
 
 def program : Program := compiled.toProgram
 

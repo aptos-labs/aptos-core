@@ -133,6 +133,30 @@ def globalInvariants (env : Environment) (family : Name) :
     Array (Bool × Name × List Name) :=
   (moveGlobalInvariantExt.getState env).find? family |>.getD #[]
 
+/-- Ability bounds declared on a Move type's parameters, as
+`struct Vault (T : Store, Copy) has Key where …`.  Move writes this
+`<T: store + copy>`; without it a parameter's bounds can only be inferred from
+the container's own abilities. -/
+private initialize moveTypeParamExt :
+    SimplePersistentEnvExtension (Name × Array (String × Array Name))
+      (NameMap (Array (String × Array Name))) ←
+  registerSimplePersistentEnvExtension {
+    addEntryFn := fun map entry => map.insert entry.1 entry.2
+    addImportedFn := fun entries =>
+      entries.foldl (init := {}) fun map chunk =>
+        chunk.foldl (init := map) fun map entry => map.insert entry.1 entry.2
+  }
+
+/-- Record the declared ability bounds of a Move type's parameters. -/
+def registerTypeParamBounds (env : Environment) (type : Name)
+    (bounds : Array (String × Array Name)) : Environment :=
+  moveTypeParamExt.addEntry env (type, bounds)
+
+/-- The ability bounds declared on a Move type's parameters, if any. -/
+def typeParamBounds? (env : Environment) (type : Name) :
+    Option (Array (String × Array Name)) :=
+  (moveTypeParamExt.getState env).find? type
+
 /-- Record that values of a Move type certify a data invariant. -/
 def registerDataInvariant (env : Environment) (type : Name)
     (invariant : Name) : Environment :=
@@ -143,7 +167,7 @@ def dataInvariant? (env : Environment) (type : Name) : Option Name :=
   (moveDataInvariantExt.getState env).find? type
 
 /-- The on-chain identity assigned to declarations enclosed by a
-`move_module`. This metadata is persisted in `.olean` files, so an imported
+`module`. This metadata is persisted in `.olean` files, so an imported
 Lean module retains the Move identity needed by cross-module lowering. -/
 structure ModuleRef where
   address : String := "0x0"
@@ -174,7 +198,7 @@ def registerModuleNamespace (env : Environment) (leanNamespace : Name)
 
 /-- Find the most closely enclosing registered Move module for a Lean
 declaration. Longest-prefix selection also makes nested ordinary Lean
-namespaces inside a `move_module` behave as expected. -/
+namespaces inside a `module` behave as expected. -/
 def moduleForDeclaration? (env : Environment) (declaration : Name) : Option ModuleRef :=
   let best : Option (Name × ModuleRef) :=
     (moveModuleExt.getState env).foldl (init := none) fun best registration =>

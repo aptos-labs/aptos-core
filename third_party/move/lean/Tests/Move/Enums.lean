@@ -12,62 +12,61 @@ open Move
 open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
-move_module Enums where
+module Enums where
 
-  enum Action where
-    | idle
-    | transfer (amount : U64)
-    | split (left right : U64)
-    deriving Copy, Drop, Store
+  enum Action has Copy, Drop, Store where
+    | Idle
+    | Transfer (amount : U64)
+    | Split (left right : U64)
 
   /-! ## Functions -/
 
-  fun makeTransfer (amount : U64) : Action := .transfer amount
+  fun make_transfer (amount : U64) : Action := .Transfer amount
 
-  spec makeTransfer (amount : U64) where
-    ensures result = .transfer amount
+  spec make_transfer (amount : U64) where
+    ensures result = .Transfer amount
 
   fun total (action : Action) : U64 :=
     match action with
-    | .idle => 0
-    | .transfer amount => amount
-    | .split left right => left + right
+    | .Idle => 0
+    | .Transfer amount => amount
+    | .Split left right => left + right
 
   spec total (action : Action) where
     ensures
       result =
         match action with
-        | .idle => 0
-        | .transfer amount => amount
-        | .split left right => left + right
+        | .Idle => 0
+        | .Transfer amount => amount
+        | .Split left right => left + right
 
   fun classify (action : Action) : U64 :=
     match action with
-    | .idle => 0
-    | .transfer _ => 1
-    | .split _ _ => 2
+    | .Idle => 0
+    | .Transfer _ => 1
+    | .Split _ _ => 2
 
   spec classify (action : Action) where
     ensures
       result =
         match action with
-        | .idle => 0
-        | .transfer _ => 1
-        | .split _ _ => 2
+        | .Idle => 0
+        | .Transfer _ => 1
+        | .Split _ _ => 2
 
   /-! ## Proofs -/
 
-  verify makeTransfer
+  verify make_transfer
   verify total
   verify classify
 
   /-! ## Tests -/
 
-  def compiled : MModule := move_module% "EnumsTest"
+  def compiled : MModule := module% "EnumsTest"
 
   private def run := Tests.run compiled
 
-  #test run "makeTransfer" [] [.u64 7] = Tests.okRet [] [.variant 1 [.u64 7]]
+  #test run "make_transfer" [] [.u64 7] = Tests.okRet [] [.variant 1 [.u64 7]]
   #test run "total" [] [.variant 0 []] = Tests.okRet [] [.u64 0]
   #test run "total" [] [.variant 1 [.u64 9]] = Tests.okRet [] [.u64 9]
   #test run "total" [] [.variant 2 [.u64 4, .u64 5]] = Tests.okRet [] [.u64 9]

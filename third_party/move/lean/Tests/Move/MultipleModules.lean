@@ -16,14 +16,14 @@ namespace Tests.MovePrograms.Modules
 open Move
 open scoped Move Move.Compiler Move.Spec
 
-move_module Client where
+module Client where
 
   /-! ## Functions -/
 
-  fun importedIdentity (value : U64) : U64 :=
+  fun imported_identity (value : U64) : U64 :=
     Math.identity (Math.identity value)
 
-  spec importedIdentity (value : U64) where
+  spec imported_identity (value : U64) where
     ensures result = value
 
 /-! ## Proofs -/
@@ -34,7 +34,7 @@ theorem importedMathContract : Math.identity.contract := Math.identity.verified
 
 namespace Client
 
-  verify importedIdentity
+  verify imported_identity
 
 end Client
 

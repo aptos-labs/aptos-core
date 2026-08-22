@@ -207,7 +207,7 @@ headers, not a new IR construct.
 ## Verification: inline fixed points
 
 The source-specification translator (in `Move/Verify/Syntax.lean`) runs when
-`spec` builds `sourceSpec`; it does not run during `move_module%`. It does
+`spec` builds `sourceSpec`; it does not run during `module%`. It does
 not extract helper declarations: each source `loop` / `while` becomes an
 inline fixed point in the generated relation,
 
@@ -260,7 +260,7 @@ inline `Spec.fix` *is* the verification semantics.
 Authored (retained in `move_source`, compiled as one function):
 
 ```lean
-fun countDown (n : U64) : U64 := do
+fun count_down (n : U64) : U64 := do
   let mut n := n
   while 0 < n do
     n := n - 1

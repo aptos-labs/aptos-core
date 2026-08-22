@@ -3,6 +3,6 @@ task 0 lines 1-20:  publish [import Move]
 Error: compilation errors:
  
 Leaner elaboration failed for `TEMPFILE`:
-TEMPFILE:12:34: error: while compiling the signature of `LeanerTxnRejectUnsupportedType.unsupported`: `Move.U8` is not a supported Move runtime type
+TEMPFILE:12:34: error: while compiling the signature of `LeanerTxnRejectUnsupportedType.unsupported`: `Nat` is not a supported Move runtime type
 TEMPFILE:12:34: error: cannot evaluate code because 'sorryAx' uses 'sorry' and/or contains errors
 

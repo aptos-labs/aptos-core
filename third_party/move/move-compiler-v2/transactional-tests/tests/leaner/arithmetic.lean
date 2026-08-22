@@ -2,20 +2,20 @@
 
 import Move
 
-move_module LeanerArithmetic where
+module LeanerArithmetic where
 
   /-! ## Functions -/
 
   fun calculate (left right : U64) : U64 :=
     ((left + right) * 3 - right) / 2 % 100
 
-  fun addOverflow (value : U64) : U64 :=
+  fun add_overflow (value : U64) : U64 :=
     value + 1
 
-  fun subtractUnderflow (value : U64) : U64 :=
+  fun subtract_underflow (value : U64) : U64 :=
     value - 1
 
-  fun divideByZero (value : U64) : U64 :=
+  fun divide_by_zero (value : U64) : U64 :=
     value / 0
 
 /-! ## Tests -/
@@ -24,8 +24,8 @@ move_module LeanerArithmetic where
 
 --# run 0x0::LeanerArithmetic::calculate --args 81u64 21u64
 
---# run 0x0::LeanerArithmetic::addOverflow --args 18446744073709551615u64
+--# run 0x0::LeanerArithmetic::add_overflow --args 18446744073709551615u64
 
---# run 0x0::LeanerArithmetic::subtractUnderflow --args 0u64
+--# run 0x0::LeanerArithmetic::subtract_underflow --args 0u64
 
---# run 0x0::LeanerArithmetic::divideByZero --args 9u64
+--# run 0x0::LeanerArithmetic::divide_by_zero --args 9u64

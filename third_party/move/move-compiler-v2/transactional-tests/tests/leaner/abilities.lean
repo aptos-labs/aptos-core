@@ -4,7 +4,7 @@ import Move
 
 open scoped Move
 
-move_module LeanerAbilities where
+module LeanerAbilities where
 
   /-! ## Functions -/
 

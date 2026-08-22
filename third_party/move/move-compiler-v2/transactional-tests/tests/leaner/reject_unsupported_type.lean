@@ -10,7 +10,7 @@ open scoped Move Move.Compiler
 /-! ## Functions -/
 
 @[move_fun]
-def unsupported (_value : U8) : U64 :=
+def unsupported (_value : Nat) : U64 :=
   1
 
 /-! ## Tests -/

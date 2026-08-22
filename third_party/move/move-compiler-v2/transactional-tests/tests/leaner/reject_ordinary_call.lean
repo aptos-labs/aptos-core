@@ -2,13 +2,13 @@
 
 import Move
 
-move_module LeanerRejectOrdinaryCall where
+module LeanerRejectOrdinaryCall where
 
   /-! ## Functions -/
 
   /-- Ordinary Lean helpers are available to proofs, but are not Move code. -/
-  def ordinaryHelper (value : U64) : U64 :=
+  def ordinary_helper (value : U64) : U64 :=
     value + value
 
   fun caller (value : U64) : U64 :=
-    ordinaryHelper value
+    ordinary_helper value

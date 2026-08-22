@@ -12,11 +12,11 @@ open Move
 open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
-move_module Vectors where
+module Vectors where
 
   /-! ## Functions -/
 
-  fun make : Move.Vector U64 := vector![10, 20, 30]
+  fun make : Vector U64 := vector![10, 20, 30]
 
   spec make where
     ensures result = vector![10, 20, 30]
@@ -45,20 +45,20 @@ move_module Vectors where
     ensures result = 42;
     aborts_if False
 
-  fun insertMiddle : Action U64 := do
-    let values : Move.Vector U64 := vector![10, 30]
+  fun insert_middle : Action U64 := do
+    let values : Vector U64 := vector![10, 30]
     let valuesRef ← &mut values
     Move.Vector.insert valuesRef 1 20
     let updated ← *valuesRef
     let middle ← &updated[1]
     (*middle)
 
-  spec insertMiddle where
+  spec insert_middle where
     ensures result = 20;
     aborts_if False
 
-  fun removeMiddle : Action U64 := do
-    let values : Move.Vector U64 := vector![10, 20, 30]
+  fun remove_middle : Action U64 := do
+    let values : Vector U64 := vector![10, 20, 30]
     let valuesRef ← &mut values
     let removed ← Move.Vector.remove valuesRef 1
     let updated ← *valuesRef
@@ -66,7 +66,7 @@ move_module Vectors where
     let shiftedValue ← *shifted
     pure (removed + shiftedValue)
 
-  spec removeMiddle where
+  spec remove_middle where
     ensures result = 50;
     aborts_if False
 
@@ -80,9 +80,9 @@ move_module Vectors where
 
   verify replace
 
-  verify insertMiddle
+  verify insert_middle
 
-  verify removeMiddle by
+  verify remove_middle by
     contract_intro
     simp [move_spec, wp_norm, move_norm, Nat.reducePow,
       Move.Semantics.Mutation.read, Move.Semantics.Mutation.write,
@@ -90,7 +90,7 @@ move_module Vectors where
 
   /-! ## Tests -/
 
-  def compiled : MModule := move_module% "VectorsTest"
+  def compiled : MModule := module% "VectorsTest"
 
   private def run := Tests.run compiled
 
@@ -98,7 +98,7 @@ move_module Vectors where
   #test run "length" [] [] = Tests.okRet [] [.u64 3]
   #test run "middle" [] [] = Tests.okRet [] [.u64 20]
   #test run "replace" [] [] = Tests.okRet [] [.u64 42]
-  #test run "insertMiddle" [] [] = Tests.okRet [] [.u64 20]
-  #test run "removeMiddle" [] [] = Tests.okRet [] [.u64 50]
+  #test run "insert_middle" [] [] = Tests.okRet [] [.u64 20]
+  #test run "remove_middle" [] [] = Tests.okRet [] [.u64 50]
 
 end Tests.MovePrograms

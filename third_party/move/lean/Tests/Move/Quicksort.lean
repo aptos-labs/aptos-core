@@ -18,12 +18,11 @@ open Move
 open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
-move_module Quicksort where
+module Quicksort where
 
-  struct PartitionResult (T) where
-    values : Move.Vector T
+  struct PartitionResult (T) has Copy, Drop, Store where
+    values : Vector T
     pivot : U64
-    deriving Copy, Drop, Store
 
   /-! ## Mathematical model
 
@@ -43,7 +42,7 @@ move_module Quicksort where
   def entry [Inhabited α] (values : List α) (index : Nat) : α :=
     values.getD index default
 
-  /-- Lomuto invariant on entry to `partitionLoop`: the write cursor does not
+  /-- Lomuto invariant on entry to `partition_loop`: the write cursor does not
   pass the scan cursor, the pivot sits in bounds past the scanned range, and
   everything already scanned but not stored compares not-less than the
   pivot. -/
@@ -53,7 +52,7 @@ move_module Quicksort where
     scan_le_pivot : scan ≤ pivotIndex
     pivot_lt_length : pivotIndex < inp.length
     scanned : ∀ i, store ≤ i → i < scan →
-      ¬Move.Compare.Less (entry inp i) (entry inp pivotIndex)
+      ¬Compare.Less (entry inp i) (entry inp pivotIndex)
 
   /-- Completed Lomuto partition of `[store, pivotIndex]`: the pivot value
   lands at `p`, strictly smaller elements fill `[store, p)`, not-smaller
@@ -67,9 +66,9 @@ move_module Quicksort where
     le_pivot : p ≤ pivotIndex
     entry_p : entry out p = entry inp pivotIndex
     lower : ∀ i, store ≤ i → i < p →
-      Move.Compare.Less (entry out i) (entry inp pivotIndex)
+      Compare.Less (entry out i) (entry inp pivotIndex)
     upper : ∀ i, p < i → i ≤ pivotIndex →
-      ¬Move.Compare.Less (entry out i) (entry inp pivotIndex)
+      ¬Compare.Less (entry out i) (entry inp pivotIndex)
     frame : ∀ i, i < store ∨ pivotIndex < i → entry out i = entry inp i
     perm : (slice out store (pivotIndex + 1)).Perm
       (slice inp store (pivotIndex + 1))
@@ -82,12 +81,12 @@ move_module Quicksort where
     frame : ∀ i, i < lo ∨ hi ≤ i → entry out i = entry inp i
     perm : (slice out lo hi).Perm (slice inp lo hi)
     sorted : (slice out lo hi).Pairwise
-      fun left right => ¬Move.Compare.Less right left
+      fun left right => ¬Compare.Less right left
 
-  def Sorted [Move.Compare.Lawful α] (values : Move.Vector α) : Prop :=
-    values.toList.Pairwise fun left right => ¬Move.Compare.Less right left
+  def Sorted [Compare.Lawful α] (values : Vector α) : Prop :=
+    values.toList.Pairwise fun left right => ¬Compare.Less right left
 
-  def Permutation (before after : Move.Vector α) : Prop :=
+  def Permutation (before after : Vector α) : Prop :=
     after.toList.Perm before.toList
 
   end Model
@@ -95,8 +94,8 @@ move_module Quicksort where
   /-! ## Functions -/
 
   /-- Lomuto partition of the half-open range ending at `pivotIndex`. -/
-  partial fun partitionLoop {T}
-      (values : Move.Vector T) (pivotIndex scan store : U64) :
+  partial fun partition_loop {T}
+      (values : Vector T) (pivotIndex scan store : U64) :
       Action (PartitionResult T) := do
     let pivotRef ← &values[pivotIndex]
     let pivot ← *pivotRef
@@ -111,9 +110,9 @@ move_module Quicksort where
           destination := candidate
           let source ← &mut values[scan]
           source := stored
-        partitionLoop values pivotIndex (scan + 1) (store + 1)
+        partition_loop values pivotIndex (scan + 1) (store + 1)
       else
-        partitionLoop values pivotIndex (scan + 1) store
+        partition_loop values pivotIndex (scan + 1) store
     else
       if store < pivotIndex then
         let storedRef ← &values[store]
@@ -124,8 +123,8 @@ move_module Quicksort where
         source := stored
       pure { values, pivot := store }
 
-  spec partitionLoop {T} [Move.Compare.Total T]
-      (values : Move.Vector T) (pivotIndex : U64) (scan : U64)
+  spec partition_loop {T} [Compare.Total T]
+      (values : Vector T) (pivotIndex : U64) (scan : U64)
       (store : U64) where
     requires Model.PartitionPre values.toList
       pivotIndex.toNat scan.toNat store.toNat;
@@ -133,36 +132,36 @@ move_module Quicksort where
       result.values.toList result.pivot.toNat;
     aborts_if False
 
-  partial fun quickSortRange {T}
-      (values : Move.Vector T) (low high : U64) :
-      Action (Move.Vector T) := do
+  partial fun quick_sort_range {T}
+      (values : Vector T) (low high : U64) :
+      Action (Vector T) := do
     if low < high then
       let span := high - low
       if 1 < span then
-        let partitioned ← partitionLoop values (high - 1) low low
-        let left ← quickSortRange partitioned.values low partitioned.pivot
-        quickSortRange left (partitioned.pivot + 1) high
+        let partitioned ← partition_loop values (high - 1) low low
+        let left ← quick_sort_range partitioned.values low partitioned.pivot
+        quick_sort_range left (partitioned.pivot + 1) high
       else
         pure values
     else
       pure values
 
-  spec quickSortRange {T} [Move.Compare.Total T]
-      (values : Move.Vector T) (low : U64) (high : U64) where
+  spec quick_sort_range {T} [Compare.Total T]
+      (values : Vector T) (low : U64) (high : U64) where
     requires high.toNat ≤ values.toList.length;
     ensures Model.Sorts values.toList low.toNat high.toNat result.toList;
     aborts_if False
 
   /-- Generic in-place sort using Move's built-in lexicographic comparison. -/
-  public fun quickSort {T}
-      (values : Move.Vector T) : Action (Move.Vector T) :=
-    quickSortRange values 0 values.length
+  public fun quick_sort {T}
+      (values : Vector T) : Action (Vector T) :=
+    quick_sort_range values 0 values.length
 
-  /- `Move.Vector` certifies Move's physical length bound by construction,
+  /- `Vector` certifies Move's physical length bound by construction,
   so the `u64` cursor arithmetic provably never overflows: sorting neither
   requires anything nor aborts. -/
-  spec quickSort {T} [Move.Compare.Total T]
-      (values : Move.Vector T) where
+  spec quick_sort {T} [Compare.Total T]
+      (values : Vector T) where
     ensures Model.Sorted result ∧ Model.Permutation values result;
     aborts_if False
 
@@ -343,7 +342,7 @@ move_module Quicksort where
 
   /-! ### Lomuto partition steps
 
-  One lemma per source branch of `partitionLoop`, phrased over lists. The
+  One lemma per source branch of `partition_loop`, phrased over lists. The
   `advance` lemmas transport the recursive call's pre- and postcondition
   across one scan step; the `final` lemmas discharge the terminating swap. -/
 
@@ -354,7 +353,7 @@ move_module Quicksort where
   theorem PartitionPre.advance_ge {inp : List T} {pivotIndex scan store : Nat}
       (pre : PartitionPre inp pivotIndex scan store)
       (scanLt : scan < pivotIndex)
-      (notLess : ¬Move.Compare.Less (entry inp scan) (entry inp pivotIndex)) :
+      (notLess : ¬Compare.Less (entry inp scan) (entry inp pivotIndex)) :
       PartitionPre inp pivotIndex (scan + 1) store where
     store_le_scan := by have := pre.store_le_scan; omega
     scan_le_pivot := by omega
@@ -399,7 +398,7 @@ move_module Quicksort where
   theorem Partitioned.advance_self {inp out : List T} {pivotIndex scan p : Nat}
       (pre : PartitionPre inp pivotIndex scan scan)
       (scanLt : scan < pivotIndex)
-      (less : Move.Compare.Less (entry inp scan) (entry inp pivotIndex))
+      (less : Compare.Less (entry inp scan) (entry inp pivotIndex))
       (next : Partitioned inp pivotIndex (scan + 1) out p) :
       Partitioned inp pivotIndex scan out p where
     length_eq := next.length_eq
@@ -431,7 +430,7 @@ move_module Quicksort where
       {pivotIndex scan store p : Nat}
       (pre : PartitionPre inp pivotIndex scan store)
       (scanLt : scan < pivotIndex) (storeLt : store < scan)
-      (less : Move.Compare.Less (entry inp scan) (entry inp pivotIndex))
+      (less : Compare.Less (entry inp scan) (entry inp pivotIndex))
       (next : Partitioned
         ((inp.set store (entry inp scan)).set scan (entry inp store))
         pivotIndex (store + 1) out p) :
@@ -548,7 +547,7 @@ move_module Quicksort where
               simp at short
               omega
 
-  theorem Sorts.compose [Move.Compare.Total T]
+  theorem Sorts.compose [Compare.Total T]
       {inp mid1 mid2 out : List T} {low high p : Nat}
       (bound : high ≤ inp.length)
       (span : low + 1 < high)
@@ -586,7 +585,7 @@ move_module Quicksort where
       rw [← slice_append pLow (by omega) (by omega : p ≤ mid1.length),
         slice_cons mid1AtP pHigh]
     have membersLeft : ∀ x ∈ slice out low p,
-        Move.Compare.Less x (entry inp (high - 1)) := by
+        Compare.Less x (entry inp (high - 1)) := by
       intro x member
       rw [eqLeft] at member
       have := sortLeft.perm.mem_iff.mp member
@@ -594,7 +593,7 @@ move_module Quicksort where
       rw [← entry_of_getElem? present]
       exact part.lower i lower upper
     have membersRight : ∀ y ∈ slice out (p + 1) high,
-        ¬Move.Compare.Less y (entry inp (high - 1)) := by
+        ¬Compare.Less y (entry inp (high - 1)) := by
       intro y member
       have := sortRight.perm.mem_iff.mp member
       rw [eqRightMid] at this
@@ -622,14 +621,14 @@ move_module Quicksort where
       · intro x xMember y yMember
         have lessX := membersLeft x xMember
         rcases List.mem_cons.mp yMember with rfl | yMember
-        · exact Move.Compare.Lawful.asymm lessX
+        · exact Compare.Lawful.asymm lessX
         · intro contra
-          exact membersRight y yMember (Move.Compare.Lawful.trans contra lessX)
+          exact membersRight y yMember (Compare.Lawful.trans contra lessX)
 
   /-- A sort of the whole index range sorts and permutes the whole list. -/
-  theorem Sorts.whole [Move.Compare.Lawful T] {inp out : List T}
+  theorem Sorts.whole [Compare.Lawful T] {inp out : List T}
       (h : Sorts inp 0 inp.length out) :
-      out.Pairwise (fun left right => ¬Move.Compare.Less right left) ∧
+      out.Pairwise (fun left right => ¬Compare.Less right left) ∧
         out.Perm inp := by
     have whole : ∀ (l : List T), l.length = inp.length →
         slice l 0 inp.length = l := by
@@ -647,7 +646,7 @@ move_module Quicksort where
 
   end Model
 
-  verify partitionLoop by
+  verify partition_loop by
     contract_intro
     obtain ⟨values, pivotIndex, scan, store⟩ := args
     replace permitted : Model.PartitionPre values.toList
@@ -765,7 +764,7 @@ move_module Quicksort where
         rw [storeEq]
         exact Model.Partitioned.final_self
 
-  verify quickSortRange by
+  verify quick_sort_range by
     contract_intro
     obtain ⟨values, low, high⟩ := args
     replace permitted : high.toNat ≤ values.toList.length := permitted
@@ -787,7 +786,7 @@ move_module Quicksort where
           Move.Semantics.Spec.pure_bind, Move.Verify.wp_bind]
         refine Move.Verify.wp_mono
           (Move.Verify.wp_of_satisfies
-            (partitionLoop.verified _moveSpecState) ?_) ?_ ?_
+            (partition_loop.verified _moveSpecState) ?_) ?_ ?_
         · exact ⟨Nat.le_refl _, by u64_omega, by u64_omega,
             fun i lower upper => absurd (Nat.lt_of_lt_of_le upper lower)
               (Nat.lt_irrefl i)⟩
@@ -832,11 +831,11 @@ move_module Quicksort where
       rw [Move.Verify.wp_pure]
       exact ⟨Model.Sorts.small (by omega), rfl⟩
 
-  verify quickSort by
+  verify quick_sort by
     contract_intro
     refine Move.Verify.wp_mono
       (Move.Verify.wp_of_satisfies
-        (quickSortRange.verified _moveSpecState) ?_) ?_ ?_
+        (quick_sort_range.verified _moveSpecState) ?_) ?_ ?_
     · show (Move.Vector.length args).toNat ≤ args.toList.length
       rw [Move.Vector.length_toNat]
       exact Nat.le_refl _
@@ -850,22 +849,22 @@ move_module Quicksort where
 
   /-! ## Tests -/
 
-  def compiled : MModule := move_module% "QuicksortTest"
+  def compiled : MModule := module% "QuicksortTest"
 
   private def run := Tests.run compiled
 
-  #test run "quickSort" [] [.vector [.u64 5, .u64 1, .u64 4, .u64 2, .u64 3]] =
+  #test run "quick_sort" [] [.vector [.u64 5, .u64 1, .u64 4, .u64 2, .u64 3]] =
     Tests.okRet [] [.vector [.u64 1, .u64 2, .u64 3, .u64 4, .u64 5]]
-  #test run "quickSort" [] [.vector []] = Tests.okRet [] [.vector []]
-  #test run "quickSort" [] [.vector [.bool true, .bool false, .bool true]] =
+  #test run "quick_sort" [] [.vector []] = Tests.okRet [] [.vector []]
+  #test run "quick_sort" [] [.vector [.bool true, .bool false, .bool true]] =
     Tests.okRet [] [.vector [.bool false, .bool true, .bool true]]
-  #test run "quickSort" [] [.vector
+  #test run "quick_sort" [] [.vector
       [.vector [.u64 1, .u64 3], .vector [.u64 1, .u64 2],
        .vector [.u64 0, .u64 9]]] =
     Tests.okRet [] [.vector
       [.vector [.u64 0, .u64 9], .vector [.u64 1, .u64 2],
        .vector [.u64 1, .u64 3]]]
-  #test run "quickSort" [] [.vector [.u64 2, .u64 1, .u64 2]] =
+  #test run "quick_sort" [] [.vector [.u64 2, .u64 1, .u64 2]] =
     Tests.okRet [] [.vector [.u64 1, .u64 2, .u64 2]]
 
 end Tests.MovePrograms

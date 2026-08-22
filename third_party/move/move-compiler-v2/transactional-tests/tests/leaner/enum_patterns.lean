@@ -2,7 +2,7 @@
 
 import Move
 
-move_module LeanerEnumPatterns where
+module LeanerEnumPatterns where
 
   @[move_enum]
   inductive Atom where
@@ -19,34 +19,34 @@ move_module LeanerEnumPatterns where
 
   /-! ## Functions -/
 
-  fun nestedTotal (envelope : Envelope) : U64 :=
+  fun nested_total (envelope : Envelope) : U64 :=
     match envelope with
     | .one (.number value) => value
     | .two (.number left) (.number right) => left + right
     | _ => 0
 
-  fun oneNumber (value : U64) : U64 :=
-    nestedTotal (.one (.number value))
+  fun one_number (value : U64) : U64 :=
+    nested_total (.one (.number value))
 
-  fun oneNone : U64 := nestedTotal (.one .none)
+  fun one_none : U64 := nested_total (.one .none)
 
-  fun twoNumbers (left right : U64) : U64 :=
-    nestedTotal (.two (.number left) (.number right))
+  fun two_numbers (left right : U64) : U64 :=
+    nested_total (.two (.number left) (.number right))
 
-  fun leftMissing (right : U64) : U64 :=
-    nestedTotal (.two .none (.number right))
+  fun left_missing (right : U64) : U64 :=
+    nested_total (.two .none (.number right))
 
-  fun rightMissing (left : U64) : U64 :=
-    nestedTotal (.two (.number left) .none)
+  fun right_missing (left : U64) : U64 :=
+    nested_total (.two (.number left) .none)
 
 /-! ## Tests -/
 
---# run 0x0::LeanerEnumPatterns::oneNumber --args 7u64
+--# run 0x0::LeanerEnumPatterns::one_number --args 7u64
 
---# run 0x0::LeanerEnumPatterns::oneNone
+--# run 0x0::LeanerEnumPatterns::one_none
 
---# run 0x0::LeanerEnumPatterns::twoNumbers --args 4u64 5u64
+--# run 0x0::LeanerEnumPatterns::two_numbers --args 4u64 5u64
 
---# run 0x0::LeanerEnumPatterns::leftMissing --args 5u64
+--# run 0x0::LeanerEnumPatterns::left_missing --args 5u64
 
---# run 0x0::LeanerEnumPatterns::rightMissing --args 4u64
+--# run 0x0::LeanerEnumPatterns::right_missing --args 4u64

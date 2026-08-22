@@ -5,17 +5,15 @@ open scoped Move Move.Compiler Move.Spec
 
 /-! A CROSS-RESOURCE global invariant relating two families. -/
 
-move_module CrossInv where
-  struct Debit where
+module CrossInv where
+  struct Debit has Key where
     value : U64
-    deriving Key
-  struct Credit where
+  struct Credit has Key where
     value : U64
-    deriving Key
 
   -- Debit never exceeds Credit at any address (relates two resources).
-  spec global where
-    invariant (all a: Debit[a].value.toNat ≤ Credit[a].value.toNat)
+  spec module where
+    invariant ∀ a, Debit[a].value.toNat ≤ Credit[a].value.toNat
 
   -- Shift shrinks Debit and grows Credit: maintains Debit ≤ Credit at each write.
   entry fun shift (addr : Address) (amount : U64) : Action Unit := do
@@ -25,7 +23,7 @@ move_module CrossInv where
     credit := *credit + amount
 
   spec shift (addr : Address) (amount : U64) where
-    requires exists<Debit>(addr) ∧ exists<Credit>(addr) ∧
+    requires existsAt<Debit>(addr) ∧ existsAt<Credit>(addr) ∧
       amount.toNat ≤ old(Debit[addr].value).toNat ∧
       old(Credit[addr].value).toNat + amount.toNat < U64.size;
     modifies Debit[addr], Credit[addr];

@@ -4,7 +4,7 @@ import Move
 
 open scoped Move
 
-move_module LeanerVectors where
+module LeanerVectors where
 
   /-! ## Functions -/
 
@@ -21,7 +21,7 @@ move_module LeanerVectors where
     let value ← &values[1]
     (*value)
 
-  fun borrowedMut : Action U64 := do
+  fun borrowed_mut : Action U64 := do
     let values : Move.Vector U64 := vector![10, 20, 30]
     let value ← &mut values[1]
     value := 42
@@ -37,4 +37,4 @@ move_module LeanerVectors where
 
 --# run 0x0::LeanerVectors::borrowed
 
---# run 0x0::LeanerVectors::borrowedMut
+--# run 0x0::LeanerVectors::borrowed_mut

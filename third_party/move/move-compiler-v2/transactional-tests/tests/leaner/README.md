@@ -8,7 +8,7 @@ Transactional commands use the Lean-comment-compatible `--#` prefix. The local
 Lake wrapper depends on the main Lean project, so these files also elaborate in
 the Lean language server without any preprocessing.
 
-Deployable sources can use `move_module Module where ...`, which combines the
+Deployable sources can use `module Module where ...`, which combines the
 namespace and export and treats ordinary `def`s as private Move functions.
 Compilation is deferred until end of input so the entire block is included.
 

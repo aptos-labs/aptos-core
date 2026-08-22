@@ -14,19 +14,17 @@ open Move
 open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler
 
-move_module Attributes where
+module Attributes where
 
   @[resource_group (scope global)]
-  struct Registry where
+  struct Registry has Key where
     value : U64
-    deriving Key
 
   /-- A doc comment combines with an attribute list. -/
   @[resource_group_member (Registry), custom_marker]
-  enum Mode where
-    | idle
-    | busy (level : U64)
-    deriving Drop
+  enum Mode has Drop where
+    | Idle
+    | Busy (level : U64)
 
   @[view]
   fun peek (x : U64) : U64 := x + 0
@@ -40,7 +38,7 @@ move_module Attributes where
   -- leave no user metadata behind.
   @[move_public] fun compatPublic (x : U64) : U64 := x
 
-  def compiled : MModule := move_module% "AttributesTest"
+  def compiled : MModule := module% "AttributesTest"
 
 namespace Attributes
 

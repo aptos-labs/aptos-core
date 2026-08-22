@@ -9,7 +9,7 @@ The core of Aptos `ordered_map`, represented as a sorted vector.  The generic
 implementation below is the same source shape as the Lean-side benchmark;
 the public concrete functions exercise it through compiler v2 and MoveVM.
 -/
-move_module LeanerOrderedMap where
+module LeanerOrderedMap where
 
   @[move_struct]
   structure Entry (K V : Type) where
@@ -37,32 +37,32 @@ move_module LeanerOrderedMap where
   fun empty {K V : Type} : Map K V :=
     { entries := Move.Vector.empty }
 
-  partial fun lowerBoundLoop {K V : Type} (entries : &Move.Vector (Entry K V))
+  partial fun lower_bound_loop {K V : Type} (entries : &Move.Vector (Entry K V))
       (key : &K) (low high : U64) : Action U64 := do
     if low < high then
       let middle := low + ((high - low) / 2)
       let entryKey ← &entries[middle].key
       if entryKey < key then
-        continue lowerBoundLoop entries key (middle + 1) high
+        continue lower_bound_loop entries key (middle + 1) high
       else
-        continue lowerBoundLoop entries key low middle
+        continue lower_bound_loop entries key low middle
     else
       pure low
 
-  fun lowerBound {K V : Type} (map : &Map K V) (key : &K) : Action U64 := do
+  fun lower_bound {K V : Type} (map : &Map K V) (key : &K) : Action U64 := do
     let entries ← &map.entries
-    lowerBoundLoop entries key 0 entries.length
+    lower_bound_loop entries key 0 entries.length
 
   fun length {K V : Type} (map : &Map K V) : Action U64 := do
     let entries ← &map.entries
     pure entries.length
 
-  fun borrowKeyAt {K V : Type} (map : &Map K V) (index : U64) : Action (&K) := do
+  fun borrow_key_at {K V : Type} (map : &Map K V) (index : U64) : Action (&K) := do
     let entries ← &map.entries
     &entries[index].key
 
   fun contains {K V : Type} (map : &Map K V) (key : &K) : Action Bool := do
-    let index ← lowerBound map key
+    let index ← lower_bound map key
     let entries ← &map.entries
     if index < entries.length then
       let entryKey ← &entries[index].key
@@ -71,7 +71,7 @@ move_module LeanerOrderedMap where
       pure false
 
   fun borrow {K V : Type} (map : &Map K V) (key : &K) : Action (&V) := do
-    let index ← lowerBound map key
+    let index ← lower_bound map key
     let entries ← &map.entries
     if index < entries.length then
       let entryKey ← &entries[index].key
@@ -82,12 +82,12 @@ move_module LeanerOrderedMap where
     else
       abort 2
 
-  fun getU64 {K : Type} (map : &Map K U64) (key : &K) : Action U64 := do
+  fun get_u64 {K : Type} (map : &Map K U64) (key : &K) : Action U64 := do
     let valueRef ← borrow map key
     (*valueRef)
 
-  fun existingIndex {K V : Type} (map : &Map K V) (key : &K) : Action U64 := do
-    let index ← lowerBound map key
+  fun existing_index {K V : Type} (map : &Map K V) (key : &K) : Action U64 := do
+    let index ← lower_bound map key
     let entries ← &map.entries
     if index < entries.length then
       let entryKey ← &entries[index].key
@@ -101,7 +101,7 @@ move_module LeanerOrderedMap where
   fun add {K V : Type} (map : &mut Map K V) (key : K) (value : V) :
       Action Unit := do
     let keyView ← &key
-    let index ← lowerBound map keyView
+    let index ← lower_bound map keyView
     let entryCount ← length map
     if index < entryCount then
       let entriesView ← &map.entries
@@ -112,66 +112,66 @@ move_module LeanerOrderedMap where
     entries.insert index { key, value }
 
   fun remove {K V : Type} (map : &mut Map K V) (key : &K) : Action V := do
-    let index ← existingIndex map key
+    let index ← existing_index map key
     let entries ← &mut map.entries
     let removed ← entries.remove index
     pure removed.value
 
-  fun populateThree (address : Address) : Action Unit := do
+  fun populate_three (address : Address) : Action Unit := do
     let mapRef ← &mut U64Store[address].map
     add mapRef 30 300
     add mapRef 10 100
     add mapRef 20 200
 
-  fun populateBooleans (address : Address) : Action Unit := do
+  fun populate_booleans (address : Address) : Action Unit := do
     let mapRef ← &mut BoolStore[address].map
     add mapRef true 10
     add mapRef false 20
 
   @[move_public]
-  fun publishEmpty (signer : Signer) : Action Unit :=
+  fun publish_empty (signer : &Signer) : Action Unit :=
     moveTo signer ({ map := empty } : U64Store)
 
   @[move_public]
-  fun publishThree (signer : Signer) (address : Address) : Action Unit := do
+  fun publish_three (signer : &Signer) (address : Address) : Action Unit := do
     moveTo signer ({ map := empty } : U64Store)
-    populateThree address
+    populate_three address
 
   @[move_public]
-  fun publishBooleans (signer : Signer) (address : Address) : Action Unit := do
+  fun publish_booleans (signer : &Signer) (address : Address) : Action Unit := do
     moveTo signer ({ map := empty } : BoolStore)
-    populateBooleans address
+    populate_booleans address
 
   @[move_public]
-  fun emptyLength (address : Address) : Action U64 := do
+  fun empty_length (address : Address) : Action U64 := do
     let mapRef ← &U64Store[address].map
     length mapRef
 
   @[move_public]
-  fun lookupThree (address : Address) (key : U64) : Action U64 := do
+  fun lookup_three (address : Address) (key : U64) : Action U64 := do
     let mapRef ← &U64Store[address].map
     let keyRef ← &key
-    getU64 mapRef keyRef
+    get_u64 mapRef keyRef
 
   @[move_public]
-  fun containsThree (address : Address) (key : U64) : Action Bool := do
+  fun contains_three (address : Address) (key : U64) : Action Bool := do
     let mapRef ← &U64Store[address].map
     let keyRef ← &key
     contains mapRef keyRef
 
   @[move_public]
-  fun insertionOrder (address : Address) : Action U64 := do
+  fun insertion_order (address : Address) : Action U64 := do
     let mapRef ← &U64Store[address].map
-    let firstRef ← borrowKeyAt mapRef 0
+    let firstRef ← borrow_key_at mapRef 0
     let first ← *firstRef
-    let secondRef ← borrowKeyAt mapRef 1
+    let secondRef ← borrow_key_at mapRef 1
     let second ← *secondRef
-    let thirdRef ← borrowKeyAt mapRef 2
+    let thirdRef ← borrow_key_at mapRef 2
     let third ← *thirdRef
     pure (first * 100 + second * 10 + third)
 
   @[move_public]
-  fun removeMiddle (address : Address) : Action U64 := do
+  fun remove_middle (address : Address) : Action U64 := do
     let mapRef ← &mut U64Store[address].map
     let key : U64 := 20
     let keyRef ← &key
@@ -181,7 +181,7 @@ move_module LeanerOrderedMap where
     if stillPresent then pure 0 else pure (removed + remaining)
 
   @[move_public]
-  fun removeEdges (address : Address) : Action U64 := do
+  fun remove_edges (address : Address) : Action U64 := do
     let mapRef ← &mut U64Store[address].map
     let firstKey : U64 := 10
     let firstKeyRef ← &firstKey
@@ -196,65 +196,65 @@ move_module LeanerOrderedMap where
     pure (first + middle + last)
 
   @[move_public]
-  fun boolKeys (address : Address) : Action U64 := do
+  fun bool_keys (address : Address) : Action U64 := do
     let mapRef ← &BoolStore[address].map
     let key : Bool := false
     let keyRef ← &key
-    getU64 mapRef keyRef
+    get_u64 mapRef keyRef
 
   @[move_public]
-  fun duplicateKey (address : Address) : Action Unit := do
+  fun duplicate_key (address : Address) : Action Unit := do
     let mapRef ← &mut U64Store[address].map
     add mapRef 10 999
 
   @[move_public]
-  fun missingRemove (address : Address) : Action U64 := do
+  fun missing_remove (address : Address) : Action U64 := do
     let mapRef ← &mut U64Store[address].map
     let key : U64 := 11
     let keyRef ← &key
     remove mapRef keyRef
 
   @[move_public]
-  fun missingLookup (address : Address) : Action U64 := do
+  fun missing_lookup (address : Address) : Action U64 := do
     let mapRef ← &U64Store[address].map
     let key : U64 := 11
     let keyRef ← &key
-    getU64 mapRef keyRef
+    get_u64 mapRef keyRef
 
 /-! ## Tests -/
 
---# run --signers 0x40 -- 0x0::LeanerOrderedMap::publishEmpty
+--# run --signers 0x40 -- 0x0::LeanerOrderedMap::publish_empty
 
---# run 0x0::LeanerOrderedMap::emptyLength --args @0x40
+--# run 0x0::LeanerOrderedMap::empty_length --args @0x40
 
---# run --args @0x41 --signers 0x41 -- 0x0::LeanerOrderedMap::publishThree
+--# run --args @0x41 --signers 0x41 -- 0x0::LeanerOrderedMap::publish_three
 
---# run 0x0::LeanerOrderedMap::lookupThree --args @0x41 10u64
+--# run 0x0::LeanerOrderedMap::lookup_three --args @0x41 10u64
 
---# run 0x0::LeanerOrderedMap::lookupThree --args @0x41 20u64
+--# run 0x0::LeanerOrderedMap::lookup_three --args @0x41 20u64
 
---# run 0x0::LeanerOrderedMap::lookupThree --args @0x41 30u64
+--# run 0x0::LeanerOrderedMap::lookup_three --args @0x41 30u64
 
---# run 0x0::LeanerOrderedMap::containsThree --args @0x41 20u64
+--# run 0x0::LeanerOrderedMap::contains_three --args @0x41 20u64
 
---# run 0x0::LeanerOrderedMap::containsThree --args @0x41 11u64
+--# run 0x0::LeanerOrderedMap::contains_three --args @0x41 11u64
 
---# run 0x0::LeanerOrderedMap::insertionOrder --args @0x41
+--# run 0x0::LeanerOrderedMap::insertion_order --args @0x41
 
---# run --args @0x42 --signers 0x42 -- 0x0::LeanerOrderedMap::publishThree
+--# run --args @0x42 --signers 0x42 -- 0x0::LeanerOrderedMap::publish_three
 
---# run 0x0::LeanerOrderedMap::removeMiddle --args @0x42
+--# run 0x0::LeanerOrderedMap::remove_middle --args @0x42
 
---# run --args @0x43 --signers 0x43 -- 0x0::LeanerOrderedMap::publishThree
+--# run --args @0x43 --signers 0x43 -- 0x0::LeanerOrderedMap::publish_three
 
---# run 0x0::LeanerOrderedMap::removeEdges --args @0x43
+--# run 0x0::LeanerOrderedMap::remove_edges --args @0x43
 
---# run --args @0x44 --signers 0x44 -- 0x0::LeanerOrderedMap::publishBooleans
+--# run --args @0x44 --signers 0x44 -- 0x0::LeanerOrderedMap::publish_booleans
 
---# run 0x0::LeanerOrderedMap::boolKeys --args @0x44
+--# run 0x0::LeanerOrderedMap::bool_keys --args @0x44
 
---# run 0x0::LeanerOrderedMap::duplicateKey --args @0x41
+--# run 0x0::LeanerOrderedMap::duplicate_key --args @0x41
 
---# run 0x0::LeanerOrderedMap::missingRemove --args @0x41
+--# run 0x0::LeanerOrderedMap::missing_remove --args @0x41
 
---# run 0x0::LeanerOrderedMap::missingLookup --args @0x41
+--# run 0x0::LeanerOrderedMap::missing_lookup --args @0x41

@@ -8,5 +8,5 @@ task 3 lines 36-36:  run 0x0::LeanerVectors::replaced
 return values: 42
 task 4 lines 38-38:  run 0x0::LeanerVectors::borrowed
 return values: 20
-task 5 lines 40-40:  run 0x0::LeanerVectors::borrowedMut
+task 5 lines 40-40:  run 0x0::LeanerVectors::borrowed_mut
 return values: 42

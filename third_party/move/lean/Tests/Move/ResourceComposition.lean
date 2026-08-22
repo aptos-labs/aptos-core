@@ -13,17 +13,15 @@ open Move
 open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
-move_module ResourceComposition where
+module ResourceComposition where
 
   /-! ## Functions -/
 
-  struct Debit where
+  struct Debit has Key where
     value : U64
-    deriving Key
 
-  struct Credit where
+  struct Credit has Key where
     value : U64
-    deriving Key
 
   fun shift (addr : Address) (amount : U64) : Action Unit := do
     let debit ← &mut Debit[addr].value
@@ -33,8 +31,8 @@ move_module ResourceComposition where
 
   spec shift (addr : Address) (amount : U64) where
     requires
-      exists<Debit>(addr) ∧
-      exists<Credit>(addr) ∧
+      existsAt<Debit>(addr) ∧
+      existsAt<Credit>(addr) ∧
       amount.toNat ≤ old(Debit[addr].value).toNat ∧
       old(Credit[addr].value).toNat + amount.toNat < U64.size;
     modifies Debit[addr], Credit[addr];
@@ -49,7 +47,7 @@ move_module ResourceComposition where
 
   /-! ## Tests -/
 
-  def compiled : MModule := move_module% "ResourceCompositionTest"
+  def compiled : MModule := module% "ResourceCompositionTest"
 
   private def debitId := compiled.resourceId "Debit"
   private def creditId := compiled.resourceId "Credit"

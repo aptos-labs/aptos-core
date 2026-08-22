@@ -78,7 +78,7 @@ def contains [store : ResourceStore State Value]
   (store.lookup state address).isSome
 
 /-- Typed observation used by global-place contract syntax. Contracts normally
-guard it with `exists<Resource>(address)`; the default only totalizes the term
+guard it with `existsAt<Resource>(address)`; the default only totalizes the term
 on states outside that precondition. -/
 def get [Inhabited Value] [store : ResourceStore State Value]
     (state : State) (address : Move.Address) : Value :=
@@ -111,6 +111,19 @@ def get [Inhabited Value] [store : ResourceStore State Value]
     (state : State) (address : Move.Address) (value : Value) :
     store.lookup (store.insert state address value) address = some value :=
   store.lookup_insert_eq state address value
+
+/-- The erased address is gone.  This completes the insert/erase × same/other
+family; without it a global invariant is not provably vacuous at an address a
+`moveFrom` just removed. -/
+@[grind =, simp] theorem lookup_erase_same [store : ResourceStore State Value]
+    (state : State) (address : Move.Address) :
+    store.lookup (store.erase state address) address = none :=
+  store.lookup_erase_eq state address
+
+@[grind, simp] theorem contains_erase_same [store : ResourceStore State Value]
+    (state : State) (address : Move.Address) :
+    ¬ contains (Value := Value) (store.erase state address) address := by
+  simp [contains, lookup_erase_same]
 
 @[simp] theorem get_insert_same [Inhabited Value]
     [store : ResourceStore State Value]

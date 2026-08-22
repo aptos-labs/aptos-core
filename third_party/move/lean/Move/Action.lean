@@ -63,13 +63,13 @@ abbrev Action (α : Type) := StateM World α
 @[noinline] opaque write {α : Type} : MutRef α → α → Action Unit := fun _ref _value world =>
   ((), world)
 
-@[noinline] opaque exists_ (_α : Type) (_addr : Address) : Action Bool := fun world =>
+@[noinline] opaque existsAt (_α : Type) (_addr : Address) : Action Bool := fun world =>
   (false, world)
 
 @[noinline] opaque moveFrom (α : Type) [Inhabited α] (_addr : Address) : Action α := fun world =>
   ((Inhabited.default : α), world)
 
-@[noinline] opaque moveTo {α : Type} : Signer → α → Action Unit := fun _signer _value world =>
+@[noinline] opaque moveTo {α : Type} : Ref Signer → α → Action Unit := fun _signer _value world =>
   ((), world)
 
 @[noinline] opaque abort {α : Type} [Inhabited α] : U64 → Action α := fun _code world =>

@@ -16,76 +16,76 @@ open Move
 open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
-move_module Signed where
+module Signed where
 
   /-! ## Pure arithmetic -/
 
-  fun addValues (left : I64) (right : I64) : Action I64 :=
+  fun add_values (left : I64) (right : I64) : Action I64 :=
     pure (Move.SInt.add left right)
 
-  spec addValues (left : I64) (right : I64) where
+  spec add_values (left : I64) (right : I64) where
     ensures result = Move.SInt.ofInt (left.toInt + right.toInt);
     aborts_if ¬ Move.Semantics.Checked.inRange (Move.numTypeOf Move.Signed W64)
         (left.toInt + right.toInt)
       with Semantics.Checked.arithmeticAbortCode
 
-  verify addValues
+  verify add_values
 
-  fun subValues (left : I32) (right : I32) : Action I32 :=
+  fun sub_values (left : I32) (right : I32) : Action I32 :=
     pure (Move.SInt.sub left right)
 
-  spec subValues (left : I32) (right : I32) where
+  spec sub_values (left : I32) (right : I32) where
     ensures result = Move.SInt.ofInt (left.toInt - right.toInt);
     aborts_if ¬ Move.Semantics.Checked.inRange (Move.numTypeOf Move.Signed W32)
         (left.toInt - right.toInt)
       with Semantics.Checked.arithmeticAbortCode
 
-  verify subValues
+  verify sub_values
 
-  fun mulValues (left : I16) (right : I16) : Action I16 :=
+  fun mul_values (left : I16) (right : I16) : Action I16 :=
     pure (Move.SInt.mul left right)
 
-  spec mulValues (left : I16) (right : I16) where
+  spec mul_values (left : I16) (right : I16) where
     ensures result = Move.SInt.ofInt (left.toInt * right.toInt);
     aborts_if ¬ Move.Semantics.Checked.inRange (Move.numTypeOf Move.Signed W16)
         (left.toInt * right.toInt)
       with Semantics.Checked.arithmeticAbortCode
 
-  verify mulValues
+  verify mul_values
 
   /-! Signed division truncates toward zero and aborts on a zero divisor or the
   `minInt / -1` overflow. -/
 
-  fun divValues (left : I32) (right : I32) : Action I32 :=
+  fun div_values (left : I32) (right : I32) : Action I32 :=
     pure (Move.SInt.div left right)
 
-  spec divValues (left : I32) (right : I32) where
+  spec div_values (left : I32) (right : I32) where
     ensures True;
     aborts_if (right.toInt = 0 ∨
         ¬ Move.Semantics.Checked.inRange (Move.numTypeOf Move.Signed W32) (left.toInt.tdiv right.toInt))
       with Semantics.Checked.arithmeticAbortCode
 
-  verify divValues
+  verify div_values
 
-  fun modValues (left : I32) (right : I32) : Action I32 :=
+  fun mod_values (left : I32) (right : I32) : Action I32 :=
     pure (Move.SInt.mod left right)
 
-  spec modValues (left : I32) (right : I32) where
+  spec mod_values (left : I32) (right : I32) where
     ensures result = Move.SInt.ofInt (left.toInt.tmod right.toInt);
     aborts_if right.toInt = 0 with Semantics.Checked.arithmeticAbortCode
 
-  verify modValues
+  verify mod_values
 
   /-! ## Literals, negation, comparison (these compile; markers are lowered to
   signed loads, `0 - x`, and the shared ordering primitive). -/
 
-  fun positiveLiteral : Action I8 :=
+  fun positive_literal : Action I8 :=
     pure (100 : I8)
 
-  fun negativeLiteral : Action I32 :=
+  fun negative_literal : Action I32 :=
     pure (-5 : I32)
 
-  fun negateValue (value : I64) : Action I64 :=
+  fun negate_value (value : I64) : Action I64 :=
     pure (-value)
 
   fun below (left : I32) (right : I32) : Action Bool :=
@@ -93,9 +93,8 @@ move_module Signed where
 
   /-! ## A signed resource -/
 
-  struct Balance where
+  struct Balance has Key where
     amount : I64
-    deriving Key
 
   entry fun credit (addr : Address) (delta : I64) : Action Unit := do
     let value ← &mut Balance[addr].amount
@@ -103,7 +102,7 @@ move_module Signed where
     value := Move.SInt.add current delta
 
   spec credit (addr : Address) (delta : I64) where
-    requires exists<Balance>(addr);
+    requires existsAt<Balance>(addr);
     modifies Balance[addr];
     ensures Balance[addr].amount =
       Move.SInt.ofInt (old(Balance[addr].amount).toInt + delta.toInt);

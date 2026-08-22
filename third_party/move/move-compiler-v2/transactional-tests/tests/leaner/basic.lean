@@ -4,7 +4,7 @@
 
 import Move
 
-move_module LeanerTxn where
+module LeanerTxn where
 
   /-! ## Functions -/
 

@@ -38,6 +38,7 @@ uninterpreted: source semantics know only that a signer determines one address,
 which is where `moveTo` publishes. -/
 opaque Signer.address : Signer → Address
 
+
 /-- Type-level names for Move's integer widths.  The Lean compiler's
 intermediate representation erases value indices from types, so `UInt` is
 indexed by a tag *type*; `Width` maps the tag back to the semantic width. -/
@@ -196,6 +197,11 @@ namespace Ref
 @[noinline] opaque default [Inhabited α] : Ref α := ⟨(Inhabited.default : α)⟩
 @[noinline] opaque ofValue (value : α) : Ref α := ⟨value⟩
 @[noinline] opaque get (r : Ref α) : α := r.value
+
+/-- `signer::address_of` on the reference Move actually passes.  A signer is
+only ever used through `&signer`, so this is the spelling contracts see, and
+dot notation (`account.address`) resolves to it. -/
+opaque address : Ref Signer → Address
 
 instance [Inhabited α] : Inhabited (Ref α) := ⟨default⟩
 

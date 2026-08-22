@@ -4,6 +4,6 @@ Error: compilation errors:
  
 Leaner elaboration failed for `TEMPFILE`:
 TEMPFILE:15:33: error: while compiling Move function `LeanerTxnRejectUnselectedCall.caller`:
-Move function `LeanerTxnRejectUnselectedCall.helper` has no enclosing `move_module` identity
+Move function `LeanerTxnRejectUnselectedCall.helper` has no enclosing `module` identity
 TEMPFILE:15:33: error: cannot evaluate code because 'sorryAx' uses 'sorry' and/or contains errors
 

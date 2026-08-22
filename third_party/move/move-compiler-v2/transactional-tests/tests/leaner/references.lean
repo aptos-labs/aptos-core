@@ -20,21 +20,21 @@ structure Balance where
 /-! ## Functions -/
 
 @[move_fun]
-def readBalance (addr : Address) : Action U64 := do
+def read_balance (addr : Address) : Action U64 := do
   let value ← &Balance[addr].balance.value
   (*value)
 
 @[move_fun]
-def addToBalance (addr : Address) (amount : U64) : Action Unit := do
+def add_to_balance (addr : Address) (amount : U64) : Action Unit := do
   let value ← &mut Balance[addr].balance.value
   value := *value + amount
 
 @[move_fun]
 def deposit (addr : Address) (amount : U64) : Action Unit := do
-  addToBalance addr amount
+  add_to_balance addr amount
 
 #export_leaner "LeanerReferences" structs [BalanceValue, Balance]
-  functions [readBalance, addToBalance, deposit]
+  functions [read_balance, add_to_balance, deposit]
 
 end LeanerTxnReferences
 
@@ -42,4 +42,4 @@ end LeanerTxnReferences
 
 --# run 0x0::LeanerReferences::deposit --args @0x42 5u64
 
---# run 0x0::LeanerReferences::readBalance --args @0x42
+--# run 0x0::LeanerReferences::read_balance --args @0x42

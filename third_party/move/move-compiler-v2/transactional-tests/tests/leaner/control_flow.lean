@@ -2,20 +2,20 @@
 
 import Move
 
-move_module LeanerControlFlow where
+module LeanerControlFlow where
 
   /-! ## Functions -/
 
   fun classify (value : U64) : U64 :=
     if value < 10 then
       1
-    else if U64.lessEq value 20 then
+    else if UInt.lessEq value 20 then
       2
     else
       3
 
   fun compare (left right : U64) : U64 :=
-    if U64.equal left right then
+    if UInt.equal left right then
       10
     else if left < right then
       20

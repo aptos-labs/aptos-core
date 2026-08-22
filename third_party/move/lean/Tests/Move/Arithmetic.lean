@@ -12,36 +12,35 @@ open Move
 open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
-move_module Arithmetic where
+module Arithmetic where
 
   /-! ## Functions -/
 
-  fun addValues (left right : U64) : Action U64 :=
+  fun add_values (left right : U64) : Action U64 :=
     pure (left + right)
 
-  spec addValues (left : U64) (right : U64) where
+  spec add_values (left : U64) (right : U64) where
     ensures True;
     aborts_if ¬left.toNat + right.toNat < U64.size
       with Semantics.Checked.arithmeticAbortCode
 
-  fun explicitAdd (left right : U64) : Action U64 :=
+  fun explicit_add (left right : U64) : Action U64 :=
     pure (Move.UInt.add left right)
 
-  spec explicitAdd (left : U64) (right : U64) where
+  spec explicit_add (left : U64) (right : U64) where
     ensures True;
     aborts_if ¬left.toNat + right.toNat < U64.size
       with Semantics.Checked.arithmeticAbortCode
 
-  fun explicitDiv (left right : U64) : Action U64 :=
+  fun explicit_div (left right : U64) : Action U64 :=
     pure (Move.UInt.div left right)
 
-  spec explicitDiv (left : U64) (right : U64) where
+  spec explicit_div (left : U64) (right : U64) where
     ensures True;
     aborts_if right.toNat = 0 with Semantics.Checked.arithmeticAbortCode
 
-  struct Counter where
+  struct Counter has Key where
     value : U64
-    deriving Key
 
   entry fun multiply (addr : Address) (factor : U64) : Action Unit := do
     let value ← &mut Counter[addr].value
@@ -49,7 +48,7 @@ move_module Arithmetic where
     value := old * factor
 
   spec multiply (addr : Address) (factor : U64) where
-    requires exists<Counter>(addr);
+    requires existsAt<Counter>(addr);
     modifies Counter[addr];
     ensures
       Counter[addr].value = old(Counter[addr].value) * factor;
@@ -63,7 +62,7 @@ move_module Arithmetic where
     value := old / divisor
 
   spec divide (addr : Address) (divisor : U64) where
-    requires exists<Counter>(addr);
+    requires existsAt<Counter>(addr);
     modifies Counter[addr];
     ensures
       Counter[addr].value = old(Counter[addr].value) / divisor;
@@ -71,11 +70,11 @@ move_module Arithmetic where
 
   /-! ## Proofs -/
 
-  verify addValues
+  verify add_values
 
-  verify explicitAdd
+  verify explicit_add
 
-  verify explicitDiv
+  verify explicit_div
 
   verify multiply
 
@@ -83,19 +82,19 @@ move_module Arithmetic where
 
   /-! ## Tests -/
 
-  def compiled : MModule := move_module% "ArithmeticTest"
+  def compiled : MModule := module% "ArithmeticTest"
 
   private def counterId := compiled.resourceId "Counter"
   private def memory (addr value : Nat) : MoveModel.IR.IMem :=
     [(counterId, addr, .struct [.u64 value])]
   private def run := Tests.run compiled
 
-  #test run "addValues" [] [.u64 6, .u64 7] = Tests.okU64 13
-  #test run "addValues" [] [.u64 18446744073709551615, .u64 1] = Tests.aborted 0
-  #test run "explicitAdd" [] [.u64 6, .u64 7] = Tests.okU64 13
-  #test run "explicitAdd" [] [.u64 18446744073709551615, .u64 1] = Tests.aborted 0
-  #test run "explicitDiv" [] [.u64 17, .u64 5] = Tests.okU64 3
-  #test run "explicitDiv" [] [.u64 17, .u64 0] = Tests.aborted 0
+  #test run "add_values" [] [.u64 6, .u64 7] = Tests.okU64 13
+  #test run "add_values" [] [.u64 18446744073709551615, .u64 1] = Tests.aborted 0
+  #test run "explicit_add" [] [.u64 6, .u64 7] = Tests.okU64 13
+  #test run "explicit_add" [] [.u64 18446744073709551615, .u64 1] = Tests.aborted 0
+  #test run "explicit_div" [] [.u64 17, .u64 5] = Tests.okU64 3
+  #test run "explicit_div" [] [.u64 17, .u64 0] = Tests.aborted 0
   #test run "multiply" (memory 2 6) [.address 2, .u64 7]
     = Tests.okRet (memory 2 42) []
   #test run "multiply" (memory 2 18446744073709551615) [.address 2, .u64 2]

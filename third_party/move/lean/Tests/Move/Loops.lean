@@ -13,32 +13,32 @@ open Move
 open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
-move_module Loops where
+module Loops where
 
   /-! ## Functions -/
 
-  fun countDown (n : U64) : U64 := do
+  fun count_down (n : U64) : U64 := do
     let mut n := n
     while 0 < n do
       n := n - 1
     n
 
-  spec countDown (n : U64) where
+  spec count_down (n : U64) where
     ensures result = 0;
     aborts_if False
 
-  fun countDownLoop (n : U64) : U64 := do
+  fun count_down_loop (n : U64) : U64 := do
     let mut n := n
     loop
       if n < 1 then break
       n := n - 1
     n
 
-  spec countDownLoop (n : U64) where
+  spec count_down_loop (n : U64) where
     ensures result = 0;
     aborts_if False
 
-  fun skipEvens (n acc : U64) : U64 := do
+  fun skip_evens (n acc : U64) : U64 := do
     let mut n := n
     let mut acc := acc
     while 0 < n do
@@ -47,7 +47,7 @@ move_module Loops where
       acc := acc + 1
     acc
 
-  fun twoPhases (n : U64) : U64 := do
+  fun two_phases (n : U64) : U64 := do
     let mut n := n
     while 0 < n do
       n := n - 1
@@ -55,7 +55,7 @@ move_module Loops where
       n := n + 1
     n
 
-  spec twoPhases (n : U64) where
+  spec two_phases (n : U64) where
     ensures result = 3;
     aborts_if False
 
@@ -67,7 +67,7 @@ move_module Loops where
       x := x - 1
     x
 
-  fun labeledExit (n : U64) : U64 := do
+  fun labeled_exit (n : U64) : U64 := do
     let mut n := n
     loop@outer
       loop
@@ -76,11 +76,11 @@ move_module Loops where
         break
     n
 
-  spec labeledExit (n : U64) where
+  spec labeled_exit (n : U64) where
     ensures result = 0;
     aborts_if False
 
-  fun labeledContinue (n : U64) : U64 := do
+  fun labeled_continue (n : U64) : U64 := do
     let mut n := n
     loop@outer
       loop
@@ -89,54 +89,53 @@ move_module Loops where
         continue@outer
     n
 
-  spec labeledContinue (n : U64) where
+  spec labeled_continue (n : U64) where
     ensures result = 0;
     aborts_if False
 
-  fun labeledProof : U64 := do
+  fun labeled_proof : U64 := do
     loop@outer
       loop
         break@outer
     7
 
-  spec labeledProof where
+  spec labeled_proof where
     ensures result = 7;
     aborts_if False
 
-  fun shadowedLoopState (n : U64) : U64 := do
+  fun shadowed_loop_state (n : U64) : U64 := do
     loop
       let mut n : U64 := 2
       n := 1
       break
     n
 
-  spec shadowedLoopState (n : U64) where
+  spec shadowed_loop_state (n : U64) where
     ensures result = n;
     aborts_if False
 
-  fun shadowedLoopArrow (n : U64) : Action U64 := do
+  fun shadowed_loop_arrow (n : U64) : Action U64 := do
     loop
       let mut n ← (pure 2 : Action U64)
       n := 1
       break
     pure n
 
-  spec shadowedLoopArrow (n : U64) where
+  spec shadowed_loop_arrow (n : U64) where
     ensures result = n;
     aborts_if False
 
   /-- Reassigning a loop-entry binding through `←` must carry that binding
   to the loop exit. -/
-  fun arrowReassignLoop (n : U64) : Action U64 := do
+  fun arrow_reassign_loop (n : U64) : Action U64 := do
     let mut n := n
     loop
       n ← pure 0
       break
     pure n
 
-  struct Counter where
+  struct Counter has Key where
     value : U64
-    deriving Key
 
   fun drain (addr : Address) : Action U64 := do
     let value ← &mut Counter[addr].value
@@ -147,7 +146,7 @@ move_module Loops where
     pure n
 
   spec drain (addr : Address) where
-    requires exists<Counter>(addr);
+    requires existsAt<Counter>(addr);
     modifies Counter[addr];
     ensures Counter[addr].value = 0;
     aborts_if False
@@ -160,20 +159,20 @@ move_module Loops where
     ensures result = if flag then 7 else 8;
     aborts_if False
 
-  fun returnInLoop (n : U64) : U64 := do
+  fun return_in_loop (n : U64) : U64 := do
     let mut n := n
     while 0 < n do
       if n == 3 then return 1
       n := n - 1
     n
 
-  partial fun countdownTail (value accumulator : U64) : U64 :=
+  partial fun countdown_tail (value accumulator : U64) : U64 :=
     if value < 1 then accumulator
-    else continue countdownTail (value - 1) (accumulator + 1)
+    else continue countdown_tail (value - 1) (accumulator + 1)
 
   /-! ## Proofs -/
 
-  verify countDown by
+  verify count_down by
     contract_intro
     move_cases hloop : Move.Verify.Source.logicalLT 0 args
     ·
@@ -184,7 +183,7 @@ move_module Loops where
       subst args
       simp [Move.Verify.wp, Move.Semantics.Spec.pure]
 
-  verify countDownLoop by
+  verify count_down_loop by
     contract_intro
     move_cases hloop : Move.Verify.Source.logicalLT args 1
     · have argsZero : args = 0 := Move.UInt.eq_zero_of_not_pos (by omega)
@@ -194,7 +193,7 @@ move_module Loops where
         Move.Semantics.Spec.pure_bind]
       exact Move.Verify.wp_of_satisfies recursiveVerified trivial
 
-  /-- The second `twoPhases` loop counts up to exactly three. -/
+  /-- The second `two_phases` loop counts up to exactly three. -/
   private theorem upToThreeLoop (State : Type) :
       Move.Verify.Satisfies
         (Move.Semantics.Spec.fix fun recursive n =>
@@ -221,7 +220,7 @@ move_module Loops where
       subst nEq
       simp [Move.Verify.wp, Move.Semantics.Spec.pure]
 
-  verify twoPhases by
+  verify two_phases by
     contract_intro
     by_cases hloop : Move.Verify.Source.logicalLT 0 args
     · rw [if_pos hloop]
@@ -265,19 +264,19 @@ move_module Loops where
         Move.Semantics.Spec.pure_bind]
       exact Move.Verify.wp_of_satisfies recursiveVerified trivial
 
-  verify labeledExit by
+  verify labeled_exit by
     contract_intro
     exact Move.Verify.wp_of_satisfies (countToZeroLoop _) trivial
 
-  verify labeledContinue by
+  verify labeled_continue by
     contract_intro
     exact Move.Verify.wp_of_satisfies (countToZeroLoop _) trivial
 
-  verify labeledProof
+  verify labeled_proof
 
-  verify shadowedLoopState
+  verify shadowed_loop_state
 
-  verify shadowedLoopArrow
+  verify shadowed_loop_arrow
 
   /-- The `drain` loop counts the borrowed value down to zero and writes the
   final value back through the loan. -/
@@ -327,7 +326,7 @@ move_module Loops where
 
   /-! ## Tests -/
 
-  def compiled : MModule := move_module% "LoopsTest"
+  def compiled : MModule := module% "LoopsTest"
 
   private def counterId := compiled.resourceId "Counter"
   private def memory (addr value : Nat) : MoveModel.IR.IMem :=
@@ -408,45 +407,45 @@ move_module Loops where
           | _ => n
     | none => 0
 
-  #test run "countDown" [] [.u64 5] = Tests.okU64 0
-  #test run "countDown" [] [.u64 0] = Tests.okU64 0
-  #test run "countDownLoop" [] [.u64 5] = Tests.okU64 0
-  #test run "skipEvens" [] [.u64 5, .u64 0] = Tests.okU64 2
-  #test run "twoPhases" [] [.u64 2] = Tests.okU64 3
+  #test run "count_down" [] [.u64 5] = Tests.okU64 0
+  #test run "count_down" [] [.u64 0] = Tests.okU64 0
+  #test run "count_down_loop" [] [.u64 5] = Tests.okU64 0
+  #test run "skip_evens" [] [.u64 5, .u64 0] = Tests.okU64 2
+  #test run "two_phases" [] [.u64 2] = Tests.okU64 3
   #test run "nested" [] [.u64 25] = Tests.okU64 0
-  #test run "labeledExit" [] [.u64 5] = Tests.okU64 0
-  #test run "labeledContinue" [] [.u64 5] = Tests.okU64 0
-  #test run "labeledProof" [] [] = Tests.okU64 7
-  #test run "shadowedLoopState" [] [.u64 7] = Tests.okU64 7
-  #test run "shadowedLoopArrow" [] [.u64 7] = Tests.okU64 7
-  #test run "arrowReassignLoop" [] [.u64 3] = Tests.okU64 0
+  #test run "labeled_exit" [] [.u64 5] = Tests.okU64 0
+  #test run "labeled_continue" [] [.u64 5] = Tests.okU64 0
+  #test run "labeled_proof" [] [] = Tests.okU64 7
+  #test run "shadowed_loop_state" [] [.u64 7] = Tests.okU64 7
+  #test run "shadowed_loop_arrow" [] [.u64 7] = Tests.okU64 7
+  #test run "arrow_reassign_loop" [] [.u64 3] = Tests.okU64 0
   #test run "drain" (memory 3 4) [.address 3]
     = Tests.okRet (memory 3 0) [.u64 0]
   #test run "early" [] [.bool true] = Tests.okU64 7
   #test run "early" [] [.bool false] = Tests.okU64 8
-  #test run "returnInLoop" [] [.u64 5] = Tests.okU64 1
-  #test run "returnInLoop" [] [.u64 2] = Tests.okU64 0
-  #test run "countdownTail" [] [.u64 100, .u64 40] = Tests.okU64 140
+  #test run "return_in_loop" [] [.u64 5] = Tests.okU64 1
+  #test run "return_in_loop" [] [.u64 2] = Tests.okU64 0
+  #test run "countdown_tail" [] [.u64 100, .u64 40] = Tests.okU64 140
 
-  #test hasFunction "countDown" = true
-  #test hasDottedHelper "countDown" = false
-  #test hasSelfCall "countDown" = false
-  #test hasBackEdge "countDown" = true
-  #test headerTestsLt "countDown" = true
-  #test hasSelfCall "countDownLoop" = false
-  #test hasBackEdge "countDownLoop" = true
-  #test hasSelfCall "twoPhases" = false
-  #test backEdgeCount "twoPhases" = 2
+  #test hasFunction "count_down" = true
+  #test hasDottedHelper "count_down" = false
+  #test hasSelfCall "count_down" = false
+  #test hasBackEdge "count_down" = true
+  #test headerTestsLt "count_down" = true
+  #test hasSelfCall "count_down_loop" = false
+  #test hasBackEdge "count_down_loop" = true
+  #test hasSelfCall "two_phases" = false
+  #test backEdgeCount "two_phases" = 2
   #test hasSelfCall "nested" = false
   #test backEdgeCount "nested" = 2
-  #test hasSelfCall "labeledExit" = false
-  #test hasBackEdge "labeledExit" = true
-  #test hasSelfCall "labeledContinue" = false
-  #test hasBackEdge "labeledContinue" = true
-  #test hasDottedHelper "labeledProof" = false
-  #test hasEntryBackEdge "countdownTail" = true
-  #test hasSelfCall "countdownTail" = false
-  #test (1 < retCount "returnInLoop") = true
+  #test hasSelfCall "labeled_exit" = false
+  #test hasBackEdge "labeled_exit" = true
+  #test hasSelfCall "labeled_continue" = false
+  #test hasBackEdge "labeled_continue" = true
+  #test hasDottedHelper "labeled_proof" = false
+  #test hasEntryBackEdge "countdown_tail" = true
+  #test hasSelfCall "countdown_tail" = false
+  #test (1 < retCount "return_in_loop") = true
 
   #emit_leaner_xir compiled
 

@@ -4,7 +4,7 @@ import Move
 
 open scoped Move
 
-move_module LeanerRejectInvalidAbility where
+module LeanerRejectInvalidAbility where
 
   /-! ## Functions -/
 

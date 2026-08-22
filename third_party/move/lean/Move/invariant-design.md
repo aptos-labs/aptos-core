@@ -27,10 +27,10 @@ returned. The only proof obligation is where a value is created.
 
 ```lean
 struct Map (K V) where
-  entries : Move.Vector (Entry K V)
+  entries : Vector (Entry K V)
 
 spec Map {K} {V} where
-  invariant Model.SortedEntries this.entries.toList
+  invariant Model.SortedEntries .entries.toList
 ```
 
 - Clauses read like the other spec blocks and may be repeated, separated by
@@ -41,18 +41,18 @@ spec Map {K} {V} where
 
   ```lean
   enum Payment where
-    | none
-    | direct (amount : U64)
-    | split (left right : U64)
+    | None
+    | Direct (amount : U64)
+    | Split (left right : U64)
 
   spec Payment where
     invariant match this with
-    | .none => True
-    | .direct amount => 0 < amount.toNat
-    | .split left right => 0 < left.toNat ∧ 0 < right.toNat
+    | .None => True
+    | .Direct amount => 0 < amount.toNat
+    | .Split left right => 0 < left.toNat ∧ 0 < right.toNat
   ```
 
-- The declaration may appear before or after the type; `move_module` has all
+- The declaration may appear before or after the type; `module` has all
   of its items in hand before elaborating them, so a pre-pass attaches the
   invariant to the type it names.
 
@@ -65,15 +65,15 @@ proof-free copy of the declaration, used only to state the condition.
 ```lean
 -- generated from `struct Map`
 structure Map.Raw (K V) where
-  entries : Move.Vector (Entry K V)
+  entries : Vector (Entry K V)
 
 -- generated from `spec Map where …`; `this` is the raw value
 def Map.Invariant {K V} (this : Map.Raw K V) : Prop :=
-  Model.SortedEntries this.entries.toList
+  Model.SortedEntries .entries.toList
 
 -- the type users write and the compiler sees
 structure Map (K V) where
-  entries : Move.Vector (Entry K V)
+  entries : Vector (Entry K V)
   invariant : Map.Invariant { entries := entries } := by move_invariant
 ```
 
@@ -87,24 +87,24 @@ in each constructor, so `match` still discriminates on the real value:
 
 ```lean
 inductive Payment.Raw where
-  | none
-  | direct (amount : U64)
-  | split (left right : U64)
+  | None
+  | Direct (amount : U64)
+  | Split (left right : U64)
 
 def Payment.Invariant (this : Payment.Raw) : Prop := match this with …
 
 inductive Payment where
-  | none (invariant : Payment.Invariant .none := by move_invariant)
-  | direct (amount : U64)
-      (invariant : Payment.Invariant (.direct amount) := by move_invariant)
-  | split (left right : U64)
-      (invariant : Payment.Invariant (.split left right) := by move_invariant)
+  | None (invariant : Payment.Invariant .None := by move_invariant)
+  | Direct (amount : U64)
+      (invariant : Payment.Invariant (.Direct amount) := by move_invariant)
+  | Split (left right : U64)
+      (invariant : Payment.Invariant (.Split left right) := by move_invariant)
 ```
 
 Each constructor's obligation reduces by iota to that variant's arm of the
 condition. Construction is unchanged in source — the default discharges the
-argument — but *patterns* bind the proof with a trailing `_`: `.direct
-amount` becomes `.direct amount _`. Lean runs a constructor's default tactic
+argument — but *patterns* bind the proof with a trailing `_`: `.Direct
+amount` becomes `.Direct amount _`. Lean runs a constructor's default tactic
 inside a pattern too, so the binder cannot be left implicit; the rule is
 explicit rather than heuristically padded, and forgetting it reports
 "cannot establish the data invariant of this value here (if this is a
@@ -115,7 +115,7 @@ arm — `firstPart` in `Tests/Move/Invariants.lean` uses it.
 Two consequences of stating the condition over the twin:
 
 - Predicates used in an invariant take the raw components, not the certified
-  type — `Model.SortedEntries this.entries.toList` rather than
+  type — `Model.SortedEntries .entries.toList` rather than
   `Model.Sorted this`. A definition like `Model.Sorted : Map K V → Prop`
   would be circular, and in `OrderedMap` it disappears.
 - The condition may only mention declarations that precede the type, so
@@ -145,8 +145,8 @@ run time, so the obligation belongs in the function's verification condition,
 at the point the loan dies — "not enforced during the mutation, enforced on
 the prophecy result".
 
-**Conditional creation in pure code.** `if h : 0 < amount then .direct
-amount else .none` — the dependent `if` puts the branch condition in scope,
+**Conditional creation in pure code.** `if h : 0 < amount then .Direct
+amount else .None` — the dependent `if` puts the branch condition in scope,
 and `move_invariant` discharges the creation from it. A plain `if` would not:
 there is nothing to prove the invariant from. The source `<` on integers is
 the compiler's `UInt.less` primitive; its numeric meaning is the trust-base
@@ -270,7 +270,7 @@ update, which Lean rejects for a certified inner type).
 
 ## What shipped
 
-- `spec T where <term>` inside a `move_module`, consumed by a pre-pass in the
+- `spec T where <term>` inside a `module`, consumed by a pre-pass in the
   module expander, so the declaration may precede or follow its type.
 - `T.Raw`, `T.Invariant` (tagged `@[move_invariant_norm]`, parameters
   implicit so it applies to a value directly), the certified structure with
@@ -304,7 +304,7 @@ re-establishes the invariant), plus compiler erasure and execution;
 # Global invariants
 
 Status: implemented for structs, enums, and resources, including the global
-storage primitives `moveTo`/`moveFrom`/`exists_`
+storage primitives `moveTo`/`moveFrom`/`existsAt`
 
 A global invariant constrains the whole global resource state — a condition
 over the resources stored in memory, quantified over addresses and possibly
@@ -312,32 +312,31 @@ relating *several* resource families.  It is the Move Prover's `invariant`
 module member.
 
 ```lean
-struct Counter where
+struct Counter has Key where
   value : U64
-  deriving Key
 
-spec global where
+spec module where
   -- Regular: a state predicate, assumed at reads, asserted at each write.
-  invariant (all a: 0 < Counter[a].value.toNat);
+  invariant ∀ a, 0 < Counter[a].value.toNat;
   -- Update: a pre/post relation, asserted at each write (never assumed).
-  invariant update (all a: old(Counter[a]).value ≤ Counter[a].value)
+  invariant update ∀ a, old(Counter[a]).value ≤ Counter[a].value
 ```
 
 Two forms (matching the Move Prover, `documentation/book/src/spec-lang.md`):
 
-- **Regular** `invariant (all a: P)` is a state predicate `State → Prop`,
+- **Regular** `invariant ∀ a, P` is a state predicate `State → Prop`,
   assumed on entry and re-established at each write.  *No `this`, no `old`* —
   it ranges over addresses with the resource surface `Counter[a]`,
-  `exists<R>(a)`.
-- **Update** `invariant update (all a: R)` is a relation `State → State →
+  `existsAt<R>(a)`.
+- **Update** `invariant update ∀ a, R` is a relation `State → State →
   Prop` between the pre- and post-state of a change, asserted at each write
   only.  `old(R[a])` is the pre-state; bare `R[a]` the post-state.
 
 Both are general predicates over `get`/`contains` of **any** families named,
-so cross-resource invariants like `all a: exists<Debit>(a) ↔ exists<Credit>(a)`
+so cross-resource invariants like `all a: existsAt<Debit>(a) ↔ existsAt<Credit>(a)`
 are expressible — not restricted to one family.  A value-accessed family
-`R[a].field` carries an implicit `exists<R>(a)` guard (absent addresses are
-unconstrained); families named only through `exists<R>` add no guard.  Several
+`R[a].field` carries an implicit `existsAt<R>(a)` guard (absent addresses are
+unconstrained); families named only through `existsAt<R>` add no guard.  Several
 `invariant` clauses conjoin.
 
 Unlike a data invariant, a global invariant has no single value to attach a
@@ -424,17 +423,17 @@ closed from the entry certificate.  The generated per-family predicate
 
 ## Global storage primitives in the source semantics
 
-`exists_ R addr`, `moveFrom R addr`, and `moveTo signer value` translate to the
+`existsAt R addr`, `moveFrom R addr`, and `moveTo signer value` translate to the
 relational `Resource.containsSpec` / `moveFromSpec` / `moveToSpec` over the
 same `ResourceStore.descriptor` a `&mut R[addr]` borrow uses.  `moveTo`
-publishes at the signer's address: `Signer.address : Signer → Address`
+publishes at the signer's address: `Ref.address : Ref Signer → Address`
 (uninterpreted, Move's `signer::address_of`) is the bridge from the opaque
 signer to the store key, so `moveTo account v` becomes `moveToSpec descriptor
 (Signer.address account) v`.  A `moveTo`/`moveFrom` on a family carrying a
-global invariant re-certifies the state immediately afterward; `exists_` is a
+global invariant re-certifies the state immediately afterward; `existsAt` is a
 read and re-certifies nothing.  The families a function touches — for the
 descriptor bindings, the entry certificate, and the frame — are inferred from
-these primitives as well as from borrows (`exists_`/`moveFrom` name the family
+these primitives as well as from borrows (`existsAt`/`moveFrom` name the family
 directly; `moveTo` through the published value's ascription).
 
 Function entry conjoins `Inv initial` into the generated `requires`.  It is an
@@ -449,7 +448,7 @@ it on entry and asserts it after each write.
 
 The Move Prover re-checks an invariant at an instruction only if that
 instruction touches a resource the invariant mentions.  A global invariant
-declares its families by the `exists<R>`/`R[addr]` occurrences in its
+declares its families by the `existsAt<R>`/`R[addr]` occurrences in its
 predicate — the same inference the `modifies` frame already performs — and a
 write to family `S` carries the `certifyState`/`certifyUpdate` obligation only
 for invariants that mention `S`.
@@ -508,7 +507,7 @@ In scope, matching the request:
 
 - **regular** global invariants only — assumed at reads, asserted at each
   update, checked at the point of change;
-- address-quantified `∀ addr, exists<R>(addr) → P` and cross-resource forms;
+- address-quantified `∀ addr, existsAt<R>(addr) → P` and cross-resource forms;
 - type-parametric invariants;
 - multiple `invariant` clauses (conjoined).
 
@@ -524,7 +523,7 @@ Deliberately out of scope for the first step (the Move Prover features):
 
 ## Resolved questions
 
-1. Surface keyword: shipped as `spec global where invariant R: P`, one clause
+1. Surface keyword: shipped as `spec module where invariant R: P`, one clause
    per family with `this` bound to a stored value — parallel to the
    data-invariant surface `spec T where invariant P` rather than a
    distinguished `module` subject with an explicit `∀ addr` quantifier. The
@@ -533,7 +532,7 @@ Deliberately out of scope for the first step (the Move Prover features):
 2. Entry conjoins `Inv initial` into the generated `requires`, so a caller
    discharges it from its own copy — modular composition through the existing
    contract structure.
-3. `moveTo`/`moveFrom`/`exists_` are part of the generated source semantics
+3. `moveTo`/`moveFrom`/`existsAt` are part of the generated source semantics
    (see above); a global invariant over a published or removed family is
    re-certified at those transitions.
 

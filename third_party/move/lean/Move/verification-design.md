@@ -47,7 +47,7 @@ The first proof-facing semantic slice is implemented:
   contracts retain the unexpanded `fun` body and generate `f.sourceSpec`,
   `f.contract`, and `f.verified` as Lean-only declarations;
 - effectful contracts infer their resource families from the body. Authors use
-  `exists<R>(addr)`, `old(R[addr].field)`, and post-state `R[addr].field`
+  `existsAt<R>(addr)`, `old(R[addr].field)`, and post-state `R[addr].field`
   directly; they do not define a `World` or resource descriptors. `verify f`
   performs the standard symbolic proof;
 - effectful source generation covers immutable and mutable local, vector, and
@@ -82,8 +82,8 @@ The pure source modules in `Tests.Move` use the declarative surface directly:
 spec choose (fallback : U64) (choice : Choice) where
   ensures
     result = match choice with
-      | .fallback => fallback
-      | .chosen value => value
+      | .Fallback => fallback
+      | .Chosen value => value
 
 verify choose
 ```
@@ -496,7 +496,7 @@ universally quantified rather than declared by the contract author:
 
 ```lean
 spec deposit (addr : Address) (amount : U64) where
-  requires exists<Balance>(addr);
+  requires existsAt<Balance>(addr);
   ensures
     Balance[addr].balance.value =
       old(Balance[addr].balance.value) + amount;
@@ -513,8 +513,8 @@ contract and theorem with the source function:
 ```lean
 spec classify (action : Action) where
   ensures result = match action with
-    | .idle => 0
-    | .transfer _ => 1
+    | .Idle => 0
+    | .Transfer _ => 1
 
 verify classify
 ```

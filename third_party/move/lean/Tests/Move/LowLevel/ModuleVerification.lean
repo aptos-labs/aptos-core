@@ -14,7 +14,7 @@ End-user declarative `Action` contracts live beside the actual programs in
 
 open scoped Move Move.Compiler Move.Spec
 
-move_module SourceVerification where
+module SourceVerification where
 
   @[move_enum]
   inductive Choice where
@@ -112,9 +112,9 @@ move_module SourceVerification where
     simp [replaceContract]
 
   /-- This proof-only value also checks that ordinary `def` declarations are
-  not selected as Move functions by the enclosing `move_module`. -/
+  not selected as Move functions by the enclosing `module`. -/
   def compiledForTest : MoveModel.Frontend.XIR.MModule :=
-    move_module% "SourceVerificationTest"
+    module% "SourceVerificationTest"
 
   #test Tests.run compiledForTest "choose" []
       [.u64 3, .variant 1 [.u64 9]] = Tests.okRet [] [.u64 9]

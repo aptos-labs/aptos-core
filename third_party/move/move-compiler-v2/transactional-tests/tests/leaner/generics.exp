@@ -7,9 +7,9 @@ Error: compilation errors:
  1 │ ╭ 
  2 │ │ import Move
  3 │ │ open scoped Move
- 4 │ │ move_module LeanerGenerics where
+ 4 │ │ module LeanerGenerics where
    · │
-70 │ │   fun hasBool (address : Address) : Action Bool := contains (T := Bool) address
+70 │ │   fun has_bool (address : Address) : Action Bool := contains (T := Bool) address
 71 │ │ /-! ## Tests -/
    │ ╰───────────────^ still borrowed but will be implicitly dropped later since it is no longer used
 
@@ -19,15 +19,15 @@ error: local `l1` of type `Vault<u64>` does not have the `drop` ability
  1 │ ╭ 
  2 │ │ import Move
  3 │ │ open scoped Move
- 4 │ │ move_module LeanerGenerics where
+ 4 │ │ module LeanerGenerics where
    · │
-70 │ │   fun hasBool (address : Address) : Action Bool := contains (T := Bool) address
+70 │ │   fun has_bool (address : Address) : Action Bool := contains (T := Bool) address
 71 │ │ /-! ## Tests -/
    │ ╰───────────────^ still borrowed but will be implicitly dropped later since it is no longer used
 
 
 exiting with Leaner stackless-bytecode checks failed
-task 1 lines 101-101:  run 0x0::LeanerGenerics::roundTrip --args 37u64
+task 1 lines 101-101:  run 0x0::LeanerGenerics::round_trip --args 37u64
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -35,7 +35,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-task 2 lines 103-103:  run 0x0::LeanerGenerics::enumRoundTrip --args 19u64
+task 2 lines 103-103:  run 0x0::LeanerGenerics::enum_round_trip --args 19u64
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -43,7 +43,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-task 3 lines 105-105:  run 0x0::LeanerGenerics::swapFirst --args 3u64 41u64
+task 3 lines 105-105:  run 0x0::LeanerGenerics::swap_first --args 3u64 41u64
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -51,7 +51,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-task 4 lines 107-107:  run 0x0::LeanerGenerics::genericVectorLength --args 23u64
+task 4 lines 107-107:  run 0x0::LeanerGenerics::generic_vector_length --args 23u64
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -59,7 +59,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-task 5 lines 109-109:  run 0x0::LeanerGenerics::equalU64 --args 17u64 17u64
+task 5 lines 109-109:  run 0x0::LeanerGenerics::equal_u64 --args 17u64 17u64
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -67,7 +67,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-task 6 lines 111-114:  run 0x0::LeanerGenerics::equalU64 --args 17u64 18u64 [-- The same generic resource at two instantiations must occupy distinct]
+task 6 lines 111-114:  run 0x0::LeanerGenerics::equal_u64 --args 17u64 18u64 [-- The same generic resource at two instantiations must occupy distinct]
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -75,7 +75,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-task 7 lines 115-115:  run --args 29u64 --signers 0x42 -- 0x0::LeanerGenerics::publishU64
+task 7 lines 115-115:  run --args 29u64 --signers 0x42 -- 0x0::LeanerGenerics::publish_u64
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -83,7 +83,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-task 8 lines 117-117:  run --args true --signers 0x42 -- 0x0::LeanerGenerics::publishBool
+task 8 lines 117-117:  run --args true --signers 0x42 -- 0x0::LeanerGenerics::publish_bool
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -91,7 +91,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-task 9 lines 119-119:  run 0x0::LeanerGenerics::hasU64 --args @0x42
+task 9 lines 119-119:  run 0x0::LeanerGenerics::has_u64 --args @0x42
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -99,7 +99,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-task 10 lines 121-121:  run 0x0::LeanerGenerics::hasBool --args @0x42
+task 10 lines 121-121:  run 0x0::LeanerGenerics::has_bool --args @0x42
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -107,7 +107,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-task 11 lines 123-123:  run 0x0::LeanerGenerics::takeU64 --args @0x42
+task 11 lines 123-123:  run 0x0::LeanerGenerics::take_u64 --args @0x42
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -115,7 +115,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-task 12 lines 125-125:  run 0x0::LeanerGenerics::takeBool --args @0x42
+task 12 lines 125-125:  run 0x0::LeanerGenerics::take_bool --args @0x42
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,

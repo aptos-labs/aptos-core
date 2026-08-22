@@ -12,7 +12,7 @@ open MoveModel.Frontend.XIR
 open scoped Move.Compiler
 
 def compiledForXirTest : MModule :=
-  move_module% "ClientTest" structs [] functions [importedIdentity]
+  module% "ClientTest" structs [] functions [imported_identity]
 
 #test compiledForXirTest.externalFuns.map (fun reference =>
     (reference.moduleName, reference.functionName)) = [("Math", "identity")]

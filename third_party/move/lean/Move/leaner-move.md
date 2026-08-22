@@ -38,15 +38,13 @@ import Move
 open Move
 open scoped Move Move.Spec
 
-move_module Account where
+module Account where
 
-  struct BalanceValue where
+  struct BalanceValue has Copy, Drop, Store where
     value : U64
-    deriving Copy, Drop, Store
 
-  struct Balance where
+  struct Balance has Key where
     balance : BalanceValue
-    deriving Key
 
   def E_INSUFFICIENT_BALANCE : U64 := 1
 
@@ -55,7 +53,7 @@ move_module Account where
     value := *value + amount
 
   spec deposit (addr : Address) (amount : U64) where
-    requires exists<Balance>(addr);
+    requires existsAt<Balance>(addr);
     modifies Balance[addr];
     ensures
       Balance[addr].balance.value =
@@ -72,7 +70,7 @@ move_module Account where
     value := *value - amount
 
   spec withdraw (addr : Address) (amount : U64) where
-    requires exists<Balance>(addr);
+    requires existsAt<Balance>(addr);
     modifies Balance[addr];
     ensures
       Balance[addr].balance.value =
@@ -88,9 +86,9 @@ move_module Account where
 
 Reading it construct by construct:
 
-- `move_module Account where` opens Lean namespace `Account`, opens the Move
+- `module Account where` opens Lean namespace `Account`, opens the Move
   API inside it, and registers the enclosed declarations as one Move module.
-- `struct Balance ... deriving Key` is a *resource*: a structure with Move's
+- `struct Balance ... has Key` is a *resource*: a structure with Move's
   `key` ability, so it can live in global storage under an address. Abilities
   are exactly what is derived — nothing is implicit.
 - `def E_INSUFFICIENT_BALANCE : U64 := 1` is a named constant. `def` is Lean's
@@ -121,8 +119,13 @@ command conventions. Where a production says "Lean expression grammar
 applies", the listed forms are the Move-recognized subset within Lean's
 precedence rules.
 
+Names follow Move, not Lean: types and enum variants are `PascalCase`,
+functions and fields are `snake_case`, and constants are `UPPER_SNAKE_CASE`.
+Variant casing is enforced — a lower-case `enum` variant is rejected with the
+PascalCase spelling it should have had.
+
 ```ebnf
-module          = "move_module" ident "where" { item } ;
+module          = "module" ident "where" { item } ;
 
 item            = struct-decl | enum-decl | fun-decl
                 | "mutual" { fun-decl } "end"
@@ -140,18 +143,20 @@ attr-arg        = ident | nat
 (* ---- data types ---- *)
 
 struct-decl     = [ doc-comment ] [ attributes ]
-                  "struct" ident { type-param } "where"
-                  { ident ":" type } [ deriving-abilities ] ;
+                  "struct" ident { type-param } [ abilities ] "where"
+                  { ident ":" type } [ lean-deriving ] ;
 
 enum-decl       = [ doc-comment ] [ attributes ]
-                  "enum" ident { type-param } "where"
-                  { "|" ident ( { "(" ident { ident } ":" type ")" }
-                              | ":" type { "→" type } ) }
-                  [ deriving-abilities ] ;
+                  "enum" ident { type-param } [ abilities ] "where"
+                  { "|" variant ( { "(" ident { ident } ":" type ")" }
+                                | ":" type { "→" type } ) }
+                  [ lean-deriving ] ;
 
-type-param      = "(" ident { ident } [ ":" "Type" ] ")" ;
-deriving-abilities = "deriving" ability { "," ability } ;
+type-param      = "(" ident { ident } [ ":" ability { "," ability } ] ")" ;
+abilities       = "has" ability { "," ability } ;
 ability         = "Copy" | "Drop" | "Store" | "Key" ;
+variant         = ident ;   (* PascalCase, as in Move *)
+lean-deriving   = "deriving" lean-class { "," lean-class } ;
 
 (* ---- functions ---- *)
 
@@ -169,7 +174,7 @@ body            = expr | do-block ;
 (* ---- types ---- *)
 
 type            = int-type | "Bool" | "Address" | "Signer" | "Unit"
-                | "Move.Vector" type-atom
+                | "Vector" type-atom
                 | ident { type-atom }           (* struct/enum instantiation *)
                 | "&" type | "&mut " type
                 | "(" type ")" ;
@@ -260,7 +265,7 @@ global-invariant = "spec" "global" "where"
 invariant-pred  = "(" "all" ident ":" term ")"            (* regular *)
                 | "update" "(" "all" ident ":" term ")" ; (* update *)
                   (* `term` ranges over the address `ident`, using `R[a]` and
-                     `exists<R>(a)`; the `update` form may also use
+                     `existsAt<R>(a)`; the `update` form may also use
                      `old(R[a])`. *)
 
 verify-decl     = "verify" ident [ "by" tactic-seq ] ;
@@ -270,14 +275,14 @@ verify-decl     = "verify" ident [ "by" tactic-seq ] ;
 
 spec-term       = "result" | "initial" | "final" | "abortCode" | "this"
                 | "old(" term ")"
-                | "exists<" ident ">(" term ")"
+                | "existsAt<" ident ">(" term ")"
                 | ident "[" term "]" { "." ident } ;   (* global place *)
 
 (* ---- compilation directives ---- *)
 
 compile-directive = "#export_leaner" string [ selection ]
                 | "def" ident ":" "MModule" ":="
-                  "move_module%" string [ selection ]
+                  "module%" string [ selection ]
                 | "#emit_leaner_xir" ident ;
 selection       = "structs" "[" [ ident { "," ident } ] "]"
                   "functions" "[" [ ident { "," ident } ] "]" ;
@@ -291,11 +296,11 @@ import Move
 open Move
 open scoped Move Move.Spec
 
-move_module Account where
+module Account where
   ...items...
 ```
 
-`move_module M where` creates Lean namespace `M`, opens the Move API inside
+`module M where` creates Lean namespace `M`, opens the Move API inside
 it, and registers the enclosed attributed declarations as one Move module
 named `M` (at the prototype's fixed address `0x0`). The borrow, deref, and
 vector syntax is scoped: open `scoped Move` before the module command, and
@@ -317,7 +322,7 @@ function.
 ```lean
 fun helper (x : U64) : U64 := x + x                    -- private
 public fun get (m : &Map K V) (k : &K) : Action (&V) := ...
-friend fun internalTransfer ... : Action Unit := ...   -- public(friend)
+friend fun internal_transfer ... : Action Unit := ...   -- public(friend)
 entry fun deposit (addr : Address) (amount : U64) : Action Unit := ...
 ```
 
@@ -331,7 +336,7 @@ makes the callee's specs and theorems available to proofs:
 
 ```lean
 -- Tests/Move/Modules/Math.lean
-move_module Math where
+module Math where
   public fun identity {T} (value : T) : T := value
 
   spec identity {T} [Inhabited T] (value : T) where
@@ -344,11 +349,11 @@ move_module Math where
 -- Tests/Move/MultipleModules.lean
 import Tests.Move.Modules.Math
 
-move_module Client where
-  fun importedIdentity (value : U64) : U64 :=
+module Client where
+  fun imported_identity (value : U64) : U64 :=
     Math.identity (Math.identity value)
 
-  spec importedIdentity (value : U64) where
+  spec imported_identity (value : U64) where
     ensures result = value
 
 /-- The imported contract and its kernel-checked proof are ordinary Lean
@@ -358,7 +363,7 @@ theorem importedMathContract : Math.identity.contract := Math.identity.verified
 
 **Compilation directives.** `#export_leaner "M"` compiles the attributed
 declarations and marks the deployable module of a `.lean` compiler input;
-`move_module` implies it. `move_module% "M"` elaborates the compiled module as
+`module` implies it. `module% "M"` elaborates the compiled module as
 a Lean `MModule` value for interpreter tests and transformations, with an
 explicit `structs [...] functions [...]` selection form; `#emit_leaner_xir m`
 marks an existing `MModule` value as the deployable module. Compiling a
@@ -374,7 +379,7 @@ sources as trusted build inputs.
 | `Bool` | Move boolean |
 | `Address` | account address |
 | `Signer` | transaction signer capability |
-| `Move.Vector T` | homogeneous growable vector, length certified within the `u64` domain |
+| `Vector T` | homogeneous growable vector, length certified within the `u64` domain |
 | `&T`, `&mut T` | immutable resp. mutable reference (parameter/result positions) |
 | `Action T` | a computation sequenced against the transaction (see [Effects](#effects-what-needs-action)) |
 
@@ -404,7 +409,7 @@ Each operator is also available under its primitive name (`Move.UInt.add`,
 `Move.SInt.div`, ...), which is the spelling `Tests/Move/Signed.lean` uses:
 
 ```lean
-fun addValues (left : I64) (right : I64) : Action I64 :=
+fun add_values (left : I64) (right : I64) : Action I64 :=
   pure (Move.SInt.add left right)       -- aborts outside [-2^63, 2^63)
 
 fun narrow (value : U64) : U8 :=
@@ -412,39 +417,40 @@ fun narrow (value : U64) : U8 :=
 ```
 
 `Address` and `Signer` are opaque; `Signer` values enter only as entry-function
-arguments. `Signer.address : Signer → Address` is Move's `signer::address_of`,
+arguments. A signer is passed by reference, as in Move: `Ref.address : Ref Signer → Address` is `signer::address_of`,
 uninterpreted except that a signer determines one address — which is where
 `moveTo` publishes.
 
 ### Structures
 
-`struct Name ... where ... deriving ...` declares a Move struct. Fields must be
+`struct Name ... has ... where ...` declares a Move struct. Fields must be
 Move-representable; recursive structures are rejected. Abilities are exactly
-the derived `Copy`, `Drop`, `Store`, `Key` markers — `struct` carries no
-implicit abilities. A *resource* is a structure deriving `Key`.
+the declared `Copy`, `Drop`, `Store`, `Key` markers — `struct` carries no
+implicit abilities. A *resource* is a structure declaring `has Key`.
 
 ```lean
-struct Plain where                       -- no abilities
+struct Plain where                        -- no abilities
   value : U64
 
-struct Entry (K V) where
+struct Entry (K V) has Copy, Drop, Store where
   key : K
   value : V
-  deriving Copy, Drop, Store
 
-struct Counter where                     -- a resource
+struct Counter has Key where              -- a resource
   value : U64
-  deriving Key
 
-struct Phantom (T) where                 -- no field uses `T`
-  deriving Copy, Drop, Store
+struct Vault (T : Store) has Key where    -- `T` bounded independently
+  value : T
+
+struct Phantom (T) has Copy, Drop where   -- no field uses `T`
 ```
 
-Generic ability constraints are inferred from non-phantom field usage:
-deriving `Copy, Drop, Store` bounds each used parameter by those abilities,
-deriving `Key` bounds used parameters by `Store`, and phantom parameters
-receive no bounds. Every Move structure implicitly derives Lean's `Inhabited`;
-this host detail is erased during lowering.
+A parameter may carry its own ability bounds, `(T : Store, Copy)` — Move's
+`<T: store + copy>`. A parameter *without* a declared bound is inferred from
+non-phantom field usage instead: `has Copy, Store` bounds each used parameter
+by those abilities, `has Key` bounds used parameters by `Store`, and phantom
+parameters receive no bounds. Every Move structure implicitly derives Lean's
+`Inhabited`; this host detail is erased during lowering.
 
 ### Enums
 
@@ -454,30 +460,28 @@ rejected; non-recursive generic enums are supported. Borrowing a field
 directly out of an enum variant is not supported.
 
 ```lean
-enum Op where
-  | idle
-  | transfer (amount : U64)
-  | split (left right : U64)
-  deriving Copy, Drop, Store
+enum Op has Copy, Drop, Store where
+  | Idle
+  | Transfer (amount : U64)
+  | Split (left right : U64)
 
-enum Positional where
-  | pair : U64 → U64 → Positional
-  deriving Copy, Drop, Store
+enum Positional has Copy, Drop, Store where
+  | Pair : U64 → U64 → Positional
 
 fun total (op : Op) : U64 :=
   match op with
-  | .idle => 0
-  | .transfer amount => amount
-  | .split left right => left + right
+  | .Idle => 0
+  | .Transfer amount => amount
+  | .Split left right => left + right
 ```
 
 Patterns may nest and use wildcards:
 
 ```lean
-fun nestedTotal (envelope : Envelope) : U64 :=
+fun nested_total (envelope : Envelope) : U64 :=
   match envelope with
-  | .one (.number value) => value
-  | .two (.number left) (.number right) => left + right
+  | .One (.Number value) => value
+  | .Two (.Number left) (.Number right) => left + right
   | _ => 0
 ```
 
@@ -499,14 +503,13 @@ generics — executable compilation does not monomorphize. Function type
 parameters currently receive the conservative `copy + drop + store` bound.
 
 ```lean
-struct Vault (T) where
+struct Vault (T) has Key where
   value : T
-  deriving Key
 
-fun publishGeneric {T} (signer : Signer) (value : T) : Action Unit :=
+fun publish_generic {T} (signer : &Signer) (value : T) : Action Unit :=
   moveTo signer ({ value } : Vault T)
 
-fun hasVault (address : Address) : Action Bool :=
+fun has_vault (address : Address) : Action Bool :=
   hasGeneric (T := U64) address           -- explicit instantiation
 ```
 
@@ -533,7 +536,7 @@ Numeric literal instances are compiler-recognized primitives; their Lean
 definitions are not a competing wrapping semantics. There are no source-level
 `Address` or `Signer` literals: both arrive as function arguments. Where the
 expected type is not evident, ascribe it: `({ value := 1 } : Box U64)`,
-`(vector![10, 30] : Move.Vector U64)`.
+`(vector![10, 30] : Vector U64)`.
 
 A named constant is a module-level Lean `def` of a literal, referenced by name
 inside Move functions:
@@ -589,7 +592,7 @@ elaborated owner type. Mutably borrowing through an immutable reference is an
 error; borrowing `&v[i]` through a `&mut` vector reference freezes first.
 
 ```lean
-fun readCounter (addr : Address) : Action U64 := do
+fun read_counter (addr : Address) : Action U64 := do
   let value ← &Counter[addr].value
   (*value)
 ```
@@ -618,19 +621,19 @@ conversion is inserted implicitly where `&T` is expected.
 `Move.Vector.empty`, `push`, `length`, `get`, `set`, `insert`, `remove`, and
 element borrows lower to native Move vector operations. Receiver notation
 (`v.length`, `v.push e`, `r.insert i e`, `r.remove i`) is available;
-`insert`/`remove` mutate through a `&mut Move.Vector T`. Element access is
+`insert`/`remove` mutate through a `&mut Vector T`. Element access is
 bounds-checked: element borrows abort with the VM execution-failure code,
 `insert`/`remove` with the standard vector `indexOutOfBounds` code.
 
 ```lean
 fun replace : Action U64 := do
-  let values : Move.Vector U64 := vector![10, 20, 30]
+  let values : Vector U64 := vector![10, 20, 30]
   let middle ← &mut values[1]
   middle := 42
   (*middle)
 
-fun insertMiddle : Action U64 := do
-  let values : Move.Vector U64 := vector![10, 30]
+fun insert_middle : Action U64 := do
+  let values : Vector U64 := vector![10, 30]
   let valuesRef ← &mut values
   Move.Vector.insert valuesRef 1 20
   let updated ← *valuesRef
@@ -644,15 +647,15 @@ provably cannot overflow.
 
 ### Global storage
 
-`exists_ R addr`, `moveTo signer value`, and `moveFrom R addr` are the storage
+`existsAt R addr`, `moveTo signer value`, and `moveFrom R addr` are the storage
 primitives beyond global borrows.
 
 ```lean
-entry fun publish (account : Signer) (amount : U64) : Action Unit :=
+entry fun publish (account : &Signer) (amount : U64) : Action Unit :=
   moveTo account ({ value := amount } : Counter)
 
-fun isPublished (addr : Address) : Action Bool :=
-  exists_ Counter addr
+fun is_published (addr : Address) : Action Bool :=
+  existsAt Counter addr
 
 fun remove (addr : Address) : Action U64 := do
   let counter ← moveFrom Counter addr
@@ -703,13 +706,13 @@ deployable and proof code is never blurred by inlining.
   semantics.
 
 ```lean
-fun countDown (n : U64) : U64 := do
+fun count_down (n : U64) : U64 := do
   let mut n := n
   while 0 < n do
     n := n - 1
   n
 
-fun labeledExit (n : U64) : U64 := do
+fun labeled_exit (n : U64) : U64 := do
   let mut n := n
   loop@outer
     loop
@@ -736,7 +739,7 @@ An operation needs `Action` when its position in the sequence is observable:
 
 | Category | Operations |
 |---|---|
-| Global storage | `exists_`, `moveTo`, `moveFrom`, `&R[a]`, `&mut R[a]` |
+| Global storage | `existsAt`, `moveTo`, `moveFrom`, `&R[a]`, `&mut R[a]` |
 | Reference operations | `&x`, `&mut x`, `&r.f`, `&v[i]`, `*r`, `r := e` through a `&mut`, `freeze` |
 | Vector mutation through a reference | `Move.Vector.insert`, `Move.Vector.remove` |
 | Explicit abort | `abort e` |
@@ -755,10 +758,10 @@ wrong:
   why a pure function may — and usually should — carry an `aborts_if` clause.
 
   ```lean
-  fun smallSum (left right : U8) : U8 :=       -- pure, yet it can abort
+  fun small_sum (left right : U8) : U8 :=       -- pure, yet it can abort
     left + right
 
-  spec smallSum (left : U8) (right : U8) where
+  spec small_sum (left : U8) (right : U8) where
     ensures True;
     aborts_if ¬left.toNat + right.toNat < U8.size
       with Semantics.Checked.arithmeticAbortCode
@@ -780,7 +783,7 @@ fun helper (x : U64) : U64 := x + x                    -- private, pure
 
 public fun get (m : &Map K V) (k : &K) : Action (&V) := ...   -- public
 
-friend fun internalTransfer ... : Action Unit := ...   -- public(friend)
+friend fun internal_transfer ... : Action Unit := ...   -- public(friend)
 
 entry fun deposit (addr : Address) (amount : U64) : Action Unit := ...
 
@@ -788,19 +791,19 @@ partial fun countdown (n acc : U64) : U64 :=           -- recursive
   if n < 1 then acc else continue countdown (n - 1) (acc + 1)
 
 mutual                                                 -- mutual recursion
-  partial fun evenFlag (value : U64) : U64 :=
-    if value < 1 then 1 else oddFlag (value - 1)
+  partial fun even_flag (value : U64) : U64 :=
+    if value < 1 then 1 else odd_flag (value - 1)
 
-  partial fun oddFlag (value : U64) : U64 :=
-    if value < 1 then 0 else evenFlag (value - 1)
+  partial fun odd_flag (value : U64) : U64 :=
+    if value < 1 then 0 else even_flag (value - 1)
 end
 ```
 
-`fun` occupies Lean command position inside a `move_module` and mirrors Lean's
+`fun` occupies Lean command position inside a `module` and mirrors Lean's
 `def` grammar. The visibility keywords expand to persistent internal metadata
 attributes (`@[move_fun]`, `@[move_public]`, `@[move_friend]`,
 `@[move_entry]`, `@[move_struct]`, `@[move_enum]`), which remain available as
-the low-level compatibility spelling outside `move_module`; `@[move_native]`
+the low-level compatibility spelling outside `module`; `@[move_native]`
 marks a declaration supplied by a Move dependency.
 
 Recursive functions are declared `partial`: Lean totality is not required, and
@@ -821,9 +824,8 @@ constants, or parenthesized instantiated types.
 
 ```lean
 @[resource_group (scope global)]
-struct Registry where
+struct Registry has Key where
   value : U64
-  deriving Key
 
 @[randomness 7, lint.skip]
 entry fun act (addr : Address) : Action Unit := ...
@@ -839,7 +841,7 @@ consumer.
 
 ## Lean on top of Move
 
-A `move_module` block accepts any Lean command, so the whole of Lean is
+A `module` block accepts any Lean command, so the whole of Lean is
 available *beside* the deployable program. This is the point of the embedding:
 a specification talks about a mathematical model, and the model is written in
 the same file, in the same language, as the contract it constrains.
@@ -869,12 +871,12 @@ the lemmas its proof needs.
 The checked-in modules follow one layout, which keeps a long file navigable:
 
 ```lean
-move_module M where
+module M where
   /-! ## Types -/          -- structs, enums, data invariants
   /-! ## Model -/          -- namespace Model: specification vocabulary
   /-! ## Functions -/      -- fun declarations with their `spec` beside them
   /-! ## Proofs -/         -- Model lemmas, then `verify` commands
-  /-! ## Tests -/          -- `move_module%`, `#test`, `#guard`
+  /-! ## Tests -/          -- `module%`, `#test`, `#guard`
 ```
 
 A `spec` is written directly under the `fun` it constrains, so the contract is
@@ -891,7 +893,7 @@ section, ordered by dependency, because a proof may cite the theorem another
 | `spec f` with `requires`/`modifies`/`aborts_if`, or on an `Action` function | `f.sourceSpec` (and `f.bodySpec` when recursive), `f.contract : Prop` |
 | `verify f` | `f.verified : f.contract` |
 | `struct T` with `spec T where invariant` | `T.Raw`, `T.Invariant`, and the `invariant` proof field of `T` |
-| `spec global where invariant` | `GlobalInvariant_<R>[_i]`, `..._at`, and one reestablishment lemma per family and write shape (`GlobalUpdate_...` for `update` clauses) |
+| `spec module where invariant` | `GlobalInvariant_<R>[_i]`, `..._at`, and one reestablishment lemma per family and write shape (`GlobalUpdate_...` for `update` clauses) |
 
 None of these is serialized into the compiled module.
 
@@ -908,19 +910,19 @@ its arguments, and `f.contract` is `∀ args, ensures`.
 
 ```lean
 enum Choice where
-  | fallback
-  | chosen (value : U64)
+  | Fallback
+  | Chosen (value : U64)
 
 fun choose (fallback : U64) (choice : Choice) : U64 :=
   match choice with
-  | .fallback => fallback
-  | .chosen value => value
+  | .Fallback => fallback
+  | .Chosen value => value
 
 spec choose (fallback : U64) (choice : Choice) where
   ensures
     result = match choice with
-      | .fallback => fallback
-      | .chosen value => value
+      | .Fallback => fallback
+      | .Chosen value => value
 
 verify choose
 ```
@@ -971,10 +973,10 @@ spec narrow (value : U64) where
 | `result` | the returned value |
 | `old(place)` | the place observed in the pre-state |
 | `R[addr]`, `R[addr].f.g` | a global place in the post-state (in `ensures`) |
-| `exists<R>(addr)` | whether resource `R` is published at `addr` |
+| `existsAt<R>(addr)` | whether resource `R` is published at `addr` |
 | `x.toNat` | the mathematical value of an unsigned integer |
 | `x.toInt` | the mathematical value of a signed integer |
-| `v.toList` | the logical contents of a `Move.Vector` |
+| `v.toList` | the logical contents of a `Vector` |
 | `U8.size` ... `U256.size` | the exclusive upper bound of a width |
 | `I8.halfSize` ... | half the value count of a signed width; the range is `[-halfSize, halfSize)` |
 | `initial`, `final`, `abortCode` | the implicit state and code binders |
@@ -986,6 +988,14 @@ wrapping and unbounded arithmetic genuinely differ, which in practice means an
 overflow condition: `aborts_if ¬x.toNat + y.toNat < U64.size`. Where the
 expected type of `result` is not determined by the clause, ascribe it:
 `ensures (result : U64).toNat ≤ 100`.
+
+The width-directed names are *literals and bounds only* — `U8.ofNat` …
+`U256.ofNat`, `U8.size` … `U256.size`, `I8.ofInt` …, `I8.halfSize` …  The named
+integer *operations* are width-generic and live on the view: `UInt.less`,
+`UInt.lessEq`, `UInt.equal`, `UInt.add` … and their `SInt` counterparts.  There
+is deliberately no `U64.lessEq`: one operation family is the whole point of the
+unified integer model, and a per-width alias would split its discrimination-tree
+key (see `unified-int-design.md`).
 
 Abort codes are `Nat` or `U64`; the named VM codes are
 `Semantics.Checked.arithmeticAbortCode` (overflow, underflow, division by
@@ -1002,12 +1012,11 @@ holding the mathematical vocabulary the specifications use, and the lemmas the
 proofs need. It is ordinary Lean and never compiled.
 
 ```lean
-move_module OrderedMap where
+module OrderedMap where
 
-  struct Entry (K V) where
+  struct Entry (K V) has Copy, Drop, Store where
     key : K
     value : V
-    deriving Copy, Drop, Store
 
   namespace Model
 
@@ -1019,12 +1028,11 @@ move_module OrderedMap where
 
   end Model
 
-  struct Map (K V) where
-    entries : Move.Vector (Entry K V)
-    deriving Copy, Drop, Store
+  struct Map (K V) has Copy, Drop, Store where
+    entries : Vector (Entry K V)
 
   spec Map {K} {V} where
-    invariant Model.SortedEntries this.entries.toList
+    invariant Model.SortedEntries .entries.toList
 
   namespace Model
 
@@ -1044,7 +1052,7 @@ move_module OrderedMap where
 ```
 
 Every contract in the module then reads as a statement about that model —
-`invariant Model.SortedEntries this.entries.toList` above, and below
+`invariant Model.SortedEntries .entries.toList` above, and below
 `ensures (result = true) ↔ Model.Contains map key` for `contains`,
 `ensures map.entries.toList = Model.add (old(map)) key value` for `add`.
 
@@ -1056,7 +1064,7 @@ Three conventions make this work in practice:
    *above* `struct Map`, and the rest of the model follows the type. Splitting
    `namespace Model` into several blocks is normal and cheap.
 2. **Model predicates speak about components, not about the certified type.**
-   `Model.SortedEntries this.entries.toList` rather than a `Model.Sorted map`:
+   `Model.SortedEntries .entries.toList` rather than a `Model.Sorted map`:
    a definition over `Map` would be circular with `Map`'s own invariant.
    `Move.Vector.toList` is the specification accessor that exposes a vector's
    contents; it is never compiled.
@@ -1115,7 +1123,7 @@ a declared abort may happen.
 
 ```lean
 spec shift (addr : Address) (amount : U64) where
-  requires exists<Debit>(addr) ∧ exists<Credit>(addr) ∧
+  requires existsAt<Debit>(addr) ∧ existsAt<Credit>(addr) ∧
     amount.toNat ≤ old(Debit[addr].value).toNat ∧
     old(Credit[addr].value).toNat + amount.toNat < U64.size;
   modifies Debit[addr], Credit[addr];
@@ -1142,12 +1150,12 @@ inherits), and where a declared abort *excuses* the postcondition.
   nothing is excused, so `ensures` must hold for every successful execution.
 
 ```lean
-fun incrementUnspecified (value : U64) : Action U64 := do
+fun increment_unspecified (value : U64) : Action U64 := do
   pure (value + 1)
 
 -- No abort clause: the postcondition still has to hold whenever the call
 -- succeeds, and the precondition is what makes that provable.
-spec incrementUnspecified (value : U64) where
+spec increment_unspecified (value : U64) where
   requires value.toNat + 1 < U64.size;
   ensures result = value + 1
 ```
@@ -1220,30 +1228,30 @@ of its own variant, so *patterns of a certified enum bind it with a trailing
 
 ```lean
 enum Payment where
-  | none
-  | direct (amount : U64)
-  | split (left right : U64)
+  | None
+  | Direct (amount : U64)
+  | Split (left right : U64)
 
 spec Payment where
   invariant match this with
-    | .none => True
-    | .direct amount => 0 < amount.toNat
-    | .split left right => 0 < left.toNat ∧ 0 < right.toNat
+    | .None => True
+    | .Direct amount => 0 < amount.toNat
+    | .Split left right => 0 < left.toNat ∧ 0 < right.toNat
 
-fun firstPart (payment : Payment) : U64 :=
+fun first_part (payment : Payment) : U64 :=
   match payment with
-  | .none _ => 0
-  | .direct amount _ => amount
-  | .split left _ _ => left
+  | .None _ => 0
+  | .Direct amount _ => amount
+  | .Split left _ _ => left
 ```
 
 The obligation lands only where a value is created, in one of three shapes:
 
 - **A literal** discharges it during elaboration, so the source carries no
   proof text and a violation is reported at the literal: `{ value := 50 }`,
-  `.direct 5`.
+  `.Direct 5`.
 - **A conditional creation** uses a dependent `if`, whose branch hypothesis
-  discharges it: `if h : 0 < amount then .direct amount else .none`. A plain
+  discharges it: `if h : 0 < amount then .Direct amount else .None`. A plain
   `if` would not — there would be nothing to prove the invariant from.
 - **A mutation** is unconstrained while the borrow is live; the obligation
   lands where the value is rebuilt, when the loan dies. This is the same for a
@@ -1253,21 +1261,20 @@ The proof field is erased before Move sees the type.
 
 ### Global invariants
 
-`spec global where invariant ...` constrains the *state* rather than a value:
+`spec module where invariant ...` constrains the *state* rather than a value:
 a condition over the resources in global memory, quantified over addresses and
 possibly relating several families. It is the Move Prover's module-level
 `invariant`.
 
 ```lean
-struct Counter where
+struct Counter has Key where
   value : U64
-  deriving Key
 
-spec global where
+spec module where
   -- Regular: a state predicate, assumed at reads, asserted at each write.
-  invariant (all a: 0 < Counter[a].value);
+  invariant ∀ a, 0 < Counter[a].value;
   -- Update: a pre/post relation, asserted at each write, never assumed.
-  invariant update (all a: old(Counter[a]).value ≤ Counter[a].value)
+  invariant update ∀ a, old(Counter[a]).value ≤ Counter[a].value
 ```
 
 - A **regular** invariant is assumed on entry (it holds because every prior
@@ -1276,29 +1283,29 @@ spec global where
 - An **update** invariant relates the pre- and post-state of a write:
   `old(R[a])` is the pre-state, bare `R[a]` the post-state. It is asserted at
   each write only.
-- A value-accessed family `R[a].field` carries an implicit `exists<R>(a)`
+- A value-accessed family `R[a].field` carries an implicit `existsAt<R>(a)`
   guard, so absent addresses are unconstrained; families named only through
-  `exists<R>(a)` add no guard.
+  `existsAt<R>(a)` add no guard.
 - An invariant is registered under **every** family it names, so a write to
   any of them re-checks it — and a write re-checks only the invariants naming
   the written family. Cross-resource invariants are therefore expressible:
 
 ```lean
-spec global where
-  invariant (all a: Debit[a].value.toNat ≤ Credit[a].value.toNat)
+spec module where
+  invariant ∀ a, Debit[a].value.toNat ≤ Credit[a].value.toNat
 ```
 
 The global-storage primitives participate: `moveTo` and `moveFrom` re-certify
 the state immediately afterwards, exactly as a `&mut` write does, while
-`exists_` is a read and re-certifies nothing. Publishing must therefore prove
+`existsAt` is a read and re-certifies nothing. Publishing must therefore prove
 the invariant of the new value, and the update invariant is vacuous at a
 freshly published address:
 
 ```lean
-entry fun publish (account : Signer) (amount : U64) : Action Unit :=
+entry fun publish (account : &Signer) (amount : U64) : Action Unit :=
   moveTo account ({ value := amount } : Counter)
 
-spec publish (account : Signer) (amount : U64) where
+spec publish (account : &Signer) (amount : U64) where
   requires 0 < amount.toNat;
   modifies Counter[account.address];
   ensures Counter[account.address].value = amount
@@ -1330,7 +1337,7 @@ This discharges most contracts whose remaining obligations are arithmetic:
 verify deposit
 verify withdraw
 verify shift
-verify setLevel
+verify set_level
 verify credit
 ```
 
@@ -1402,17 +1409,17 @@ provides it as `recursiveVerified` and the proof is one case split per loop
 exit:
 
 ```lean
-fun countDown (n : U64) : U64 := do
+fun count_down (n : U64) : U64 := do
   let mut n := n
   while 0 < n do
     n := n - 1
   n
 
-spec countDown (n : U64) where
+spec count_down (n : U64) where
   ensures result = 0;
   aborts_if False
 
-verify countDown by
+verify count_down by
   contract_intro
   move_cases hloop : Move.Verify.Source.logicalLT 0 args
   · rw [Move.Semantics.Checked.subSpec_one_eq_pure_of_pos hloop,
@@ -1487,7 +1494,7 @@ For tests and transformations the compiled module is available as a Lean
 value, and the modeled IR interpreter runs its functions:
 
 ```lean
-def compiled : MModule := move_module% "AccountTest"
+def compiled : MModule := module% "AccountTest"
 
 private def balanceId := compiled.resourceId "Balance"
 private def memory (addr value : Nat) : MoveModel.IR.IMem :=

@@ -29,7 +29,7 @@ scoped syntax (name := oldResourceTerm) "old(" term ")" : term
 /-- Test whether a typed resource exists at an address in the clause's
 current state. -/
 scoped syntax (name := resourceExistsTerm)
-  "exists<" ident ">(" term ")" : term
+  "existsAt<" ident ">(" term ")" : term
 
 /-- Values accepted after `with` in an `aborts_if` clause. Move source abort
 constants are `U64`, while the relational core stores codes as `Nat`. -/
@@ -374,7 +374,7 @@ private partial def typeHead? (stx : Syntax) : Option (TSyntax `ident) :=
   else none
 
 /-- The resource family named by a global-storage primitive application
-(`exists_`/`moveFrom` name it directly; `moveTo` names it through the published
+(`existsAt`/`moveFrom` name it directly; `moveTo` names it through the published
 value's ascription), if `stx` is such an application. -/
 private def globalPrimitiveResource? (stx : Syntax) :
     CommandElabM (Option (TSyntax `ident)) := do
@@ -384,7 +384,7 @@ private def globalPrimitiveResource? (stx : Syntax) :
   let some name ← (try pure (some (← resolveGlobalConstNoOverload head))
       catch _ => pure none) | return none
   let arguments := stx[1].getArgs
-  if name == ``Move.exists_ || name == ``Move.moveFrom then
+  if name == ``Move.existsAt || name == ``Move.moveFrom then
     return arguments[0]?.bind typeHead?
   else if name == ``Move.moveTo then
     return arguments[1]?.bind typeHead?
@@ -861,7 +861,7 @@ private def pureMoveCall? (term : TSyntax `term) : CommandElabM (Option Name) :=
     return none
   return some functionName
 
-/-- Source semantics for the built-in global-storage primitives.  `exists_`
+/-- Source semantics for the built-in global-storage primitives.  `existsAt`
 becomes `containsSpec`; `moveFrom`/`moveTo` become `moveFromSpec`/`moveToSpec`,
 and — since they change the resource state — re-certify any global invariant on
 the family immediately afterward, exactly as a `&mut` write does. -/
@@ -898,7 +898,7 @@ private def globalPrimitiveSpec?
         (Move.Semantics.Spec.certifyState $bodyId)
         (fun _moveSpecCertify => $tail))
     `(Move.Semantics.Spec.bind $wrapped (fun $result => $tail))
-  if name == ``Move.exists_ then
+  if name == ``Move.existsAt then
     let some addr := arguments[1]? | return none
     let addrSpec ← translateArgument addr
     let key := mkIdentFrom addr `_moveSpecKey
@@ -921,7 +921,7 @@ private def globalPrimitiveSpec?
     let valueName := mkIdentFrom value `_moveSpecPublished
     let unitName := mkIdentFrom term `_moveSpecMoveToResult
     let core ← `(Move.Semantics.Resource.moveToSpec $descriptor
-      (Move.Signer.address $signerName) $valueName)
+      (Move.Ref.address $signerName) $valueName)
     let body ← recertify unitName core
     return some (← `(Move.Semantics.Spec.bind $signerSpec (fun $signerName =>
       Move.Semantics.Spec.bind $valueSpec (fun $valueName => $body))))
@@ -1709,7 +1709,7 @@ partial def rewriteClause (resources : Array (TSyntax `ident))
       let some rewritten ← rewriteGlobalPlace resources previous place
         | throwErrorAt place "`old` expects a global resource place"
       pure rewritten
-  | `(exists<$resourceType:ident>($address:term)) =>
+  | `(existsAt<$resourceType:ident>($address:term)) =>
       unless ← knownResource resources resourceType do
         throwErrorAt resourceType
           "resource `{resourceType.getId}` is not used by the specified function"
@@ -1967,30 +1967,30 @@ scoped syntax ";" "invariant " term : moveExtraInvariant
 
 /-- A data invariant: every value of the named struct or enum satisfies the
 declared conditions, and carries their proof.  `this` denotes the value being
-constrained and a leading `.field` abbreviates `this.field`.  Clauses read
+constrained; a leading `.field` is the spelling to use, and `this` is only needed where the value as a whole is.  Clauses read
 like the other spec blocks and may be repeated:
 
 ```lean
 spec Map {K} {V} where
-  invariant Model.SortedEntries this.entries.toList
+  invariant Model.SortedEntries .entries.toList
 ```
 
-The declaration is consumed by the enclosing `move_module`, which attaches
+The declaration is consumed by the enclosing `module`, which attaches
 the invariant to the type it names. -/
 scoped syntax (name := dataInvariantSpec)
   "spec " ident moveSpecBinder* " where "
     "invariant " term moveExtraInvariant* : command
 
 /-- A global-invariant predicate, quantified over an address.  A *regular*
-invariant `(all a: … R[a] …)` constrains the current state; an *update*
-invariant `update (all a: … old(R[a]) … R[a] …)` relates the pre- and
-post-state of a change.  The `exists<R>(a)` guard is implicit: the address
+invariant `∀ a, … R[a] …` constrains the current state; an *update*
+invariant `update ∀ a, … old(R[a]) … R[a] …` relates the pre- and
+post-state of a change.  The `existsAt<R>(a)` guard is implicit: the address
 ranges over the stored resources, so absent addresses are unconstrained. -/
 declare_syntax_cat moveGlobalInvariant
 scoped syntax (name := globalInvariantRegular)
-  "(" &"all" ident ": " term ")" : moveGlobalInvariant
+  "∀ " ident ", " term : moveGlobalInvariant
 scoped syntax (name := globalInvariantUpdate)
-  &"update" "(" &"all" ident ": " term ")" : moveGlobalInvariant
+  "update " "∀ " ident ", " term : moveGlobalInvariant
 
 /-- Further clauses of a global-invariant spec. -/
 declare_syntax_cat moveExtraGlobalInvariant
@@ -2001,14 +2001,14 @@ scoped syntax ";" "invariant " moveGlobalInvariant : moveExtraGlobalInvariant
 at writes; an `update` invariant is asserted at each write only:
 
 ```lean
-spec global where
-  invariant (all a: 0 < Counter[a].value.toNat);
-  invariant update (all a: old(Counter[a]).value ≤ Counter[a].value)
+spec module where
+  invariant ∀ a, 0 < Counter[a].value.toNat;
+  invariant update ∀ a, old(Counter[a]).value ≤ Counter[a].value
 ```
 
-Consumed by the enclosing `move_module`. -/
+Consumed by the enclosing `module`. -/
 scoped syntax (name := globalInvariantSpec) (priority := high)
-  "spec " &"global" " where "
+  "spec " &"module" " where "
     "invariant " moveGlobalInvariant moveExtraGlobalInvariant* : command
 
 /-- Whether `name` occurs as an identifier anywhere in `stx`. -/
@@ -2022,7 +2022,7 @@ partial def occursOld (stx : Syntax) : Bool :=
 
 /-- Rewrite the resource places of a global-invariant body over the bound
 address `addr` into a state predicate: `R[addr]` becomes `get (Value := R)
-state addr` and `exists<R>(addr)` becomes `contains (Value := R) state addr`,
+state addr` and `existsAt<R>(addr)` becomes `contains (Value := R) state addr`,
 where `state` is the post-state (`old(…)` selects the pre-state).  Returns the
 rewritten body, the families accessed *by value* with their `old`-ness (needing
 an existence guard), and every family the body mentions. -/
@@ -2065,14 +2065,14 @@ def elabGlobalInvariantClause (clause : Syntax) :
     MacroM (Bool × Array (TSyntax `ident) × TSyntax `ident × TSyntax `term) := do
   let isUpdate := clause.isOfKind ``globalInvariantUpdate
   let offset := if isUpdate then 1 else 0
-  let addr := clause[offset + 2]
-  let bodyStx := clause[offset + 4]
+  let addr := clause[offset + 1]
+  let bodyStx := clause[offset + 3]
   unless addr.isIdent do
-    Macro.throwErrorAt clause "a global invariant must bind an address, `all a: …`"
+    Macro.throwErrorAt clause "a global invariant must bind an address, `∀ a, …`"
   unless isUpdate do
     if occursOld bodyStx then
       Macro.throwErrorAt clause
-        "a regular global invariant may not use `old`; write `invariant update (…)`"
+        "a regular global invariant may not use `old`; write `invariant update ∀ a, …`"
   let addrIdent := mkIdentFrom bodyStx `_moveSpecAddr
   let preState := mkIdentFrom bodyStx `_moveSpecPre
   let postState := mkIdentFrom bodyStx (if isUpdate then `_moveSpecPost else `_moveSpecState)
@@ -2083,7 +2083,7 @@ def elabGlobalInvariantClause (clause : Syntax) :
     unless families.any (·.getId == f.getId) do families := families.push ⟨f⟩
   if families.isEmpty then
     Macro.throwErrorAt clause
-      "a global invariant must reference a stored resource `R[a]` or `exists<R>(a)`"
+      "a global invariant must reference a stored resource `R[a]` or `existsAt<R>(a)`"
   if occursIdentifier addr.getId rewritten then
     Macro.throwErrorAt addr
       "the quantified address may appear only inside resource places `R[a]`"
@@ -2109,11 +2109,11 @@ def elabGlobalInvariantClause (clause : Syntax) :
 
 @[macro globalInvariantSpec] def expandGlobalInvariantSpec : Macro := fun stx =>
   Macro.throwErrorAt stx
-    "a global invariant must be declared inside a `move_module`"
+    "a global invariant must be declared inside a `module`"
 
 @[macro dataInvariantSpec] def expandDataInvariantSpec : Macro := fun stx =>
   Macro.throwErrorAt stx
-    ("a data invariant must be declared inside the `move_module` which " ++
+    ("a data invariant must be declared inside the `module` which " ++
       "declares its type")
 
 /-- Total primitives of the relational semantics, with the lemma that says
@@ -2298,7 +2298,7 @@ partial def bindInvariantValue (this : TSyntax `ident) (condition : Syntax) :
 /-- A contract stating only a postcondition.  For a *pure* function it is a
 value predicate over the function applied to its arguments.  For an *effectful*
 function it routes through the effectful path (trivial precondition and abort
-behavior) so resource observations — `R[a]`, `exists<R>`, `old` — in the
+behavior) so resource observations — `R[a]`, `existsAt<R>`, `old` — in the
 postcondition are interpreted against global state. -/
 scoped syntax (name := ensuresOnlySpec) "spec " ident moveSpecBinder* " where "
     "ensures " term : command

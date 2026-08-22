@@ -2,7 +2,7 @@
 
 import Move
 
-move_module LeanerRejectNonSelfContinue where
+module LeanerRejectNonSelfContinue where
 
   /-! ## Functions -/
 

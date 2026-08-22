@@ -55,19 +55,18 @@ import Move
 open Move
 open scoped Move Move.Spec
 
-move_module Approval where
+module Approval where
 
-  enum Decision where
-    | pending
-    | approved
-    | rejected
-    deriving Copy, Drop, Store
+  enum Decision has Copy, Drop, Store where
+    | Pending
+    | Approved
+    | Rejected
 
   fun finalize (accepted : Bool) : Decision :=
-    if accepted then .approved else .rejected
+    if accepted then .Approved else .Rejected
 
   spec finalize (accepted : Bool) where
-    ensures result ≠ .pending
+    ensures result ≠ .Pending
 
   -- AI-generated proof, checked by the Lean kernel.
   verify finalize by

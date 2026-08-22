@@ -12,17 +12,15 @@ open Move
 open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
-move_module Account where
+module Account where
 
   /-! ## Functions -/
 
-  struct BalanceValue where
+  struct BalanceValue has Copy, Drop, Store where
     value : U64
-    deriving Copy, Drop, Store
 
-  struct Balance where
+  struct Balance has Key where
     balance : BalanceValue
-    deriving Key
 
   def E_INSUFFICIENT_BALANCE : U64 := 1
 
@@ -31,7 +29,7 @@ move_module Account where
     value := *value + amount
 
   spec deposit (addr : Address) (amount : U64) where
-    requires exists<Balance>(addr);
+    requires existsAt<Balance>(addr);
     modifies Balance[addr];
     ensures
       Balance[addr].balance.value =
@@ -49,7 +47,7 @@ move_module Account where
 
   spec withdraw (addr : Address) (amount : U64) where
     requires
-      exists<Balance>(addr);
+      existsAt<Balance>(addr);
     modifies Balance[addr];
     ensures
       Balance[addr].balance.value =
@@ -66,7 +64,7 @@ move_module Account where
 
   /-! ## Tests -/
 
-  def compiled : MModule := move_module% "AccountTest"
+  def compiled : MModule := module% "AccountTest"
 
   private def balanceId := compiled.resourceId "Balance"
   private def memory (addr value : Nat) : MoveModel.IR.IMem :=

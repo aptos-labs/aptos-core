@@ -80,7 +80,7 @@ inductive Oper where
   | borrowField (field : Nat) (typeArgs : Array Ty)
   | borrowVecElem
   | readRef | writeRef | freezeRef
-  | exists_ (resource : Name) (typeArgs : Array Ty)
+  | existsAt (resource : Name) (typeArgs : Array Ty)
   | moveFrom (resource : Name) (typeArgs : Array Ty)
   | moveTo (resource : Name) (typeArgs : Array Ty)
   | function (name : Name) (typeArgs : Array Ty)
@@ -270,7 +270,7 @@ private def lowerOper (structNames : Array (Name × String))
   | .readRef => pure .readRef
   | .writeRef => pure .writeRef
   | .freezeRef => pure .freezeRef
-  | .exists_ name args => do
+  | .existsAt name args => do
       let i := structNames.findIdx (·.1 == name)
       if i < structNames.size then
         if args.isEmpty then return .exists_ i

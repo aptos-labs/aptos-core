@@ -272,14 +272,29 @@ private partial def tyUsesParam (index : Nat) : LIR.Ty → Bool
   | .vector elem | .ref elem | .mutRef elem => tyUsesParam index elem
   | _ => false
 
+/-- The bounds a `(T : Store, Copy)` group declares, as an `AbilitySet`. -/
+private def declaredBounds (declared : Array Name) : LIR.AbilitySet :=
+  { copy := declared.contains `Copy
+    drop := declared.contains `Drop
+    store := declared.contains `Store || declared.contains `Key
+    key := declared.contains `Key }
+
+/-- A parameter's ability bounds.  Declared bounds win; otherwise they are
+inferred from the container's own abilities, which is all Move can conclude
+when the source does not say. -/
 private def inferredTypeParams (names : Array Name) (abilities : LIR.AbilitySet)
-    (fieldTypes : Array LIR.Ty) : Array LIR.TypeParamDecl :=
+    (fieldTypes : Array LIR.Ty)
+    (bounds : Array (String × Array Name) := #[]) : Array LIR.TypeParamDecl :=
   names.mapIdx fun index name =>
     let phantom := !fieldTypes.any (tyUsesParam index)
-    let constraints := if phantom then {} else
-      { copy := abilities.copy
-        drop := abilities.drop
-        store := abilities.store || abilities.key }
+    let declared? := bounds.find? (·.1 == name.toString) |>.map (·.2)
+    let constraints := match declared? with
+      | some declared => declaredBounds declared
+      | none =>
+        if phantom then {} else
+          { copy := abilities.copy
+            drop := abilities.drop
+            store := abilities.store || abilities.key }
     { name := name.toString, abilities := constraints, phantom := phantom }
 
 private def declaredAbilities (env : Environment) (name : Name) : LIR.AbilitySet :=
@@ -318,6 +333,7 @@ private def compileStruct (env : Environment) (name : Name) : Except String LIR.
     leanName := name
     moveName := name.getString!
     typeParams := inferredTypeParams paramNames abilities (fields.map (·.ty))
+      ((Move.typeParamBounds? env name).getD #[])
     abilities := abilities
     fields := fields
     attributes := Move.userAttributes env name
@@ -367,6 +383,7 @@ private def compileEnum (env : Environment) (name : Name) : Except String LIR.St
     leanName := name
     moveName := name.getString!
     typeParams := inferredTypeParams paramNames abilities fieldTypes
+      ((Move.typeParamBounds? env name).getD #[])
     abilities := abilities
     fields := #[]
     variants := some variants
@@ -921,7 +938,7 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
         modify fun s => { s with pending :=
           (decl.fvarId, .call { op := .writeRef, srcs := #[ref, value], resultTy := none }) :: s.pending }
         return instrs
-      if fn == ``exists_ || fn == ``moveFrom then
+      if fn == ``existsAt || fn == ``moveFrom then
         let some ownerExpr := types[0]?
           | throwError "global operation is missing its resource type"
         let some owner := typeName? ownerExpr
@@ -935,8 +952,8 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
           | _ => #[]
         if fn == ``moveFrom then
           addAcquire owner
-        let resultTy := if fn == ``exists_ then some LIR.Ty.bool else some ownerTy
-        let op := if fn == ``exists_ then LIR.Oper.exists_ owner typeArgs
+        let resultTy := if fn == ``existsAt then some LIR.Ty.bool else some ownerTy
+        let op := if fn == ``existsAt then LIR.Oper.existsAt owner typeArgs
           else .moveFrom owner typeArgs
         modify fun s => { s with pending :=
           (decl.fvarId, .call { op, srcs := #[address], resultTy }) :: s.pending }
@@ -1154,7 +1171,7 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
               pure none
             else
               let some owner := Move.moduleForDeclaration? env fn
-                | throwError "Move function `{fn}` has no enclosing `move_module` identity"
+                | throwError "Move function `{fn}` has no enclosing `module` identity"
               if owner == (← get).module then
                 pure none
               else
@@ -1197,7 +1214,7 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
             modify fun s => { s with returnAliases := (decl.fvarId, none) :: s.returnAliases }
             return instrs.push (.call #[] (.function fn callTypeArgs) (callVars.map srcName))
       if Move.isMoveFunction (← getEnv) fn then
-        throwError "callee `{fn}` is not selected in this `move_module%`"
+        throwError "callee `{fn}` is not selected in this `module%`"
       -- Type-class dictionaries and proof evidence are compiler-erased.
       if fn.toString.contains "instInhabited" then return instrs
       if fn.toString.contains "instWidth" || fn.toString.contains "instSign"
@@ -1753,7 +1770,7 @@ def compileModule (moduleName : String) (structNames funNames : Array Name) : Co
         let some owner := Move.moduleForDeclaration? env callee
           | throwError "called Move function `{callee}` has no enclosing module identity"
         if owner == module then
-          throwError "callee `{callee}` is not selected in this `move_module%`"
+          throwError "callee `{callee}` is not selected in this `module%`"
         externalFuns := externalFuns.push {
           leanName := callee
           address := owner.address

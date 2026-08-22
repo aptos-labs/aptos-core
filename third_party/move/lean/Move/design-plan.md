@@ -177,8 +177,8 @@ structure AbilitySet where
 ```
 
 Move structures and enums declare exact abilities using Lean's deriving
-surface: `deriving Copy, Drop, Store, Key`. `struct` itself grants no
-abilities, and a resource is represented by `struct ... deriving Key`.
+surface: `has Copy, Drop, Store, Key`. `struct` itself grants no
+abilities, and a resource is represented by `struct ... has Key`.
 Lowering records these abilities in LIR, Move IR, and XIR; the production Move
 compiler validates that field types support them.
 
@@ -415,7 +415,7 @@ form remains available when Lean code also needs the `MModule` value. Both only
 write when compiler v2 supplies its private `LEANER_XIR_OUTPUT`; ordinary Lean
 builds just validate the module.
 
-The preferred authoring form is `move_module Module where ...`. This macro
+The preferred authoring form is `module Module where ...`. This macro
 creates the same-named Lean namespace, opens the `Move` API and syntax, and
 registers its export in one command. `struct` / `enum` / `fun` /
 `entry fun` / `friend fun` items expand to the persistent metadata
@@ -594,7 +594,7 @@ table indices and byte offsets need not match.
 - Add `MoveModel.Frontend.XIR.MModule` and metadata records.
 - Implement checked `MModule.ofIR`.
 - Add convenience projections to the semantic `Program`.
-- Change `move_module%` to use LIR-to-IR-to-XIR.
+- Change `module%` to use LIR-to-IR-to-XIR.
 - Add round-trip and malformed-finite-IR tests.
 
 ### Milestone 3: JSON contract — implemented

@@ -26,12 +26,11 @@ open Move
 open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
-move_module OrderedMap where
+module OrderedMap where
 
-  struct Entry (K V) where
+  struct Entry (K V) has Copy, Drop, Store where
     key : K
     value : V
-    deriving Copy, Drop, Store
 
   /-! The contracts use this small mathematical model. Proofs connecting it
   to binary search and vector updates are kept in the proof section below.
@@ -46,15 +45,14 @@ move_module OrderedMap where
 
   end Model
 
-  struct Map (K V) where
-    entries : Move.Vector (Entry K V)
-    deriving Copy, Drop, Store
+  struct Map (K V) has Copy, Drop, Store where
+    entries : Vector (Entry K V)
 
   -- Every map is sorted, and carries the proof.  Operations therefore need
   -- no well-formedness precondition, and re-establish sortedness only where
   -- a map is created.
   spec Map {K} {V} where
-    invariant Model.SortedEntries this.entries.toList
+    invariant Model.SortedEntries .entries.toList
 
   namespace Model
 
@@ -101,7 +99,7 @@ move_module OrderedMap where
 
   /-- Binary-search invariant: the mathematical lower bound remains inside
   `[low, high]`, and all indices fit in `U64`. -/
-  def Window (entries : Move.Vector (Entry K V)) (key : K)
+  def Window (entries : Vector (Entry K V)) (key : K)
       (low high : U64) : Prop :=
     SortedEntries entries.toList ∧
       low.toNat ≤ lowerBoundList entries.toList key ∧
@@ -121,30 +119,30 @@ move_module OrderedMap where
     ensures (result : Map K V).entries.toList = []
 
   /-- Index of the first entry whose key is not less than `key`. -/
-  partial fun lowerBoundLoop {K V} (entries : &Move.Vector (Entry K V))
+  partial fun lower_bound_loop {K V} (entries : &Vector (Entry K V))
       (key : &K) (low high : U64) : Action U64 := do
     if low < high then
       let middle := low + ((high - low) / 2)
       let entryKey ← &entries[middle].key
       if entryKey < key then
-        continue lowerBoundLoop entries key (middle + 1) high
+        continue lower_bound_loop entries key (middle + 1) high
       else
-        continue lowerBoundLoop entries key low middle
+        continue lower_bound_loop entries key low middle
     else
       pure low
 
-  spec lowerBoundLoop {K} {V} [Move.Compare.Total K]
-      (entries : Move.Vector (Entry K V)) (key : K) (low : U64) (high : U64) where
+  spec lower_bound_loop {K} {V} [Compare.Total K]
+      (entries : Vector (Entry K V)) (key : K) (low : U64) (high : U64) where
     requires Model.Search.Window entries key low high;
     ensures result = U64.ofNat
       (Model.lowerBoundList entries.toList key);
     aborts_if False
 
-  fun lowerBound {K V} (map : &Map K V) (key : &K) : Action U64 := do
+  fun lower_bound {K V} (map : &Map K V) (key : &K) : Action U64 := do
     let entries ← &map.entries
-    lowerBoundLoop entries key 0 entries.length
+    lower_bound_loop entries key 0 entries.length
 
-  spec lowerBound {K} {V} [Move.Compare.Total K]
+  spec lower_bound {K} {V} [Compare.Total K]
       (map : Map K V) (key : K) where
     ensures result = U64.ofNat
       (Model.lowerBoundList map.entries.toList key) ∧
@@ -160,18 +158,18 @@ move_module OrderedMap where
     aborts_if False
 
   /-- Borrow a key directly through the vector element and field places. -/
-  fun borrowKeyAt {K V} (map : &Map K V) (index : U64) : Action (&K) := do
+  fun borrow_key_at {K V} (map : &Map K V) (index : U64) : Action (&K) := do
     let entries ← &map.entries
     &entries[index].key
 
-  spec borrowKeyAt {K} {V} (map : Map K V) (index : U64) where
+  spec borrow_key_at {K} {V} (map : Map K V) (index : U64) where
     ensures ∃ entry, map.entries.toList[index.toNat]? = some entry ∧
       result = entry.key;
     aborts_if map.entries.toList[index.toNat]? = none
       with Semantics.Resource.executionFailure
 
   public fun contains {K V} (map : &Map K V) (key : &K) : Action Bool := do
-    let index ← lowerBound map key
+    let index ← lower_bound map key
     let entries ← &map.entries
     if index < entries.length then
       let entryKey ← &entries[index].key
@@ -179,14 +177,14 @@ move_module OrderedMap where
     else
       pure false
 
-  spec contains {K} {V} [Move.Compare.Total K]
+  spec contains {K} {V} [Compare.Total K]
       (map : Map K V) (key : K) where
     ensures (result = true) ↔ Model.Contains map key;
     aborts_if False
 
   /-- Borrow the value stored under `key`, aborting when the key is absent. -/
   public fun borrow {K V} (map : &Map K V) (key : &K) : Action (&V) := do
-    let index ← lowerBound map key
+    let index ← lower_bound map key
     let entries ← &map.entries
     if index < entries.length then
       let entryKey ← &entries[index].key
@@ -197,7 +195,7 @@ move_module OrderedMap where
     else
       abort 2
 
-  spec borrow {K} {V} [Move.Compare.Total K]
+  spec borrow {K} {V} [Compare.Total K]
       (map : Map K V) (key : K) where
     ensures Model.MapsTo map key result;
     aborts_if ¬Model.Contains map key with 2
@@ -206,7 +204,7 @@ move_module OrderedMap where
   public fun add {K V} (map : &mut Map K V) (key : K) (value : V) :
       Action Unit := do
     let keyView ← &key
-    let index ← lowerBound map keyView
+    let index ← lower_bound map keyView
     let entriesView ← &map.entries
     if index < entriesView.length then
       let entryKey ← &entriesView[index].key
@@ -215,7 +213,7 @@ move_module OrderedMap where
     let entries ← &mut map.entries
     Move.Vector.insert entries index { key, value }
 
-  spec add {K} {V} [Move.Compare.Total K]
+  spec add {K} {V} [Compare.Total K]
       (map : &mut Map K V) (key : K) (value : V) where
     ensures map.entries.toList = Model.add (old(map)) key value;
     aborts_if Model.Contains map key with 1;
@@ -224,7 +222,7 @@ move_module OrderedMap where
 
   /-- Remove an existing key.  Abort code 2 matches `EKEY_NOT_FOUND`. -/
   public fun remove {K V} (map : &mut Map K V) (key : &K) : Action V := do
-    let index ← lowerBound map key
+    let index ← lower_bound map key
     let entriesView ← &map.entries
     if index < entriesView.length then
       let entryKey ← &entriesView[index].key
@@ -237,7 +235,7 @@ move_module OrderedMap where
     else
       abort 2
 
-  spec remove {K} {V} [Move.Compare.Total K]
+  spec remove {K} {V} [Compare.Total K]
       (map : &mut Map K V) (key : K) where
     ensures Model.erase (old(map)).entries.toList key =
         some (map.entries.toList, result);
@@ -263,9 +261,9 @@ move_module OrderedMap where
 
   | Verified function | Mathematical facts it uses |
   |---|---|
-  | `lowerBoundLoop` | the two `Search` bound lemmas |
-  | `lowerBound` | `lowerBoundList_le` and `lowerBoundLoop.verified` |
-  | `contains`, `borrow` | `contains_iff_lowerBound` and `lowerBound.verified` |
+  | `lower_bound_loop` | the two `Search` bound lemmas |
+  | `lower_bound` | `lowerBoundList_le` and `lower_bound_loop.verified` |
+  | `contains`, `borrow` | `contains_iff_lowerBound` and `lower_bound.verified` |
   | `add` | search correctness, `insert_eq_take_lowerBound`, `add_sorted` |
   | `remove` | search correctness, `erase_eq_take_lowerBound`, `erase_sorted` |
 
@@ -308,7 +306,7 @@ move_module OrderedMap where
         · simp
 
   /-- List-level invariant preservation, lifted to maps by `add_sorted`. -/
-  theorem insert_sorted {K V : Type} [Move.Compare.Total K]
+  theorem insert_sorted {K V : Type} [Compare.Total K]
       (entries : List (Entry K V)) (key : K) (value : V)
       (sorted : SortedEntries entries)
       (fresh : ¬∃ entry ∈ entries, entry.key = key) :
@@ -332,7 +330,7 @@ move_module OrderedMap where
             exact fresh ⟨candidate, by simp [member], same⟩
         case isFalse notEntryLt =>
           have keyLt : key < entry.key := by
-            rcases @Move.Compare.Total.total K _ key entry.key with less | less | same
+            rcases @Compare.Total.total K _ key entry.key with less | less | same
             · exact less
             · exact (notEntryLt less).elim
             · exact (fresh ⟨entry, by simp, same.symm⟩).elim
@@ -342,11 +340,11 @@ move_module OrderedMap where
             simp only [List.mem_cons] at member
             rcases member with rfl | member
             · exact keyLt
-            · exact Move.Compare.Lawful.trans keyLt (sorted.1 candidate member)
+            · exact Compare.Lawful.trans keyLt (sorted.1 candidate member)
           · exact sorted
 
   /-- Final invariant theorem used by `add.verified`. -/
-  theorem add_sorted {K V : Type} [Move.Compare.Total K]
+  theorem add_sorted {K V : Type} [Compare.Total K]
       (map : Map K V) (key : K) (value : V)
       (sorted : SortedEntries map.entries.toList)
       (fresh : ¬Contains map key) :
@@ -415,7 +413,7 @@ move_module OrderedMap where
   /-- Removing the key found at its lower bound has the same list update as
   Move's checked `vector::remove`. This is the representation bridge in
   `remove.verified`. -/
-  theorem erase_eq_take_lowerBound {K V : Type} [Move.Compare.Total K]
+  theorem erase_eq_take_lowerBound {K V : Type} [Compare.Total K]
       (entries : List (Entry K V)) (key : K) (entry : Entry K V)
       (sorted : SortedEntries entries)
       (atTarget : entries[lowerBoundList entries key]? = some entry)
@@ -439,7 +437,7 @@ move_module OrderedMap where
           subst entry
           have notKeyLess : ¬key < head.key := by
             rw [same]
-            exact fun less => Move.Compare.Lawful.asymm less less
+            exact fun less => Compare.Lawful.asymm less less
           simp [erase, lowerBoundList, headLess, notKeyLess]
 
   end Removal
@@ -484,7 +482,7 @@ move_module OrderedMap where
 
   /-- Preserves the low side of `Window` in the right search branch. -/
   theorem index_lt_lowerBoundList_of_less {K V : Type}
-      [Move.Compare.Lawful K] (entries : List (Entry K V)) (key : K)
+      [Compare.Lawful K] (entries : List (Entry K V)) (key : K)
       (index : Nat) (entry : Entry K V)
       (sorted : SortedEntries entries)
       (atIndex : entries[index]? = some entry)
@@ -508,11 +506,11 @@ move_module OrderedMap where
                 (induction index sorted.2 atIndex)
             case isFalse notHeadLess =>
               have headEntry := sorted.1 entry (List.mem_of_getElem? atIndex)
-              exact (notHeadLess (Move.Compare.Lawful.trans headEntry less)).elim
+              exact (notHeadLess (Compare.Lawful.trans headEntry less)).elim
 
   /-- Converts the binary-search result into the abstract membership fact used
   by `contains`, `borrow`, `add`, and `remove`. -/
-  theorem contains_iff_lowerBound {K V : Type} [Move.Compare.Total K]
+  theorem contains_iff_lowerBound {K V : Type} [Compare.Total K]
       (entries : List (Entry K V)) (key : K)
       (sorted : SortedEntries entries) :
       (∃ entry ∈ entries, entry.key = key) ↔
@@ -528,7 +526,7 @@ move_module OrderedMap where
           have notSame : entry.key ≠ key := by
             intro same
             subst key
-            exact Move.Compare.Lawful.asymm entryLess entryLess
+            exact Compare.Lawful.asymm entryLess entryLess
           simpa [notSame] using induction sorted.2
         case isFalse notEntryLess =>
           have presentOnlyIfHead :
@@ -538,11 +536,11 @@ move_module OrderedMap where
             simp only [List.mem_cons] at membership
             rcases membership with rfl | membership
             · exact same
-            · rcases Move.Compare.Total.total key entry.key with
+            · rcases Compare.Total.total key entry.key with
                 keyLess | entryLess | equivalent
               · have entryCandidate := sorted.1 candidate membership
                 rw [same] at entryCandidate
-                exact (Move.Compare.Lawful.asymm keyLess entryCandidate).elim
+                exact (Compare.Lawful.asymm keyLess entryCandidate).elim
               · exact (notEntryLess entryLess).elim
               · exact equivalent.symm
           constructor
@@ -571,10 +569,10 @@ move_module OrderedMap where
 
   /-! ### Search proofs
 
-  `lowerBoundLoop.verified` establishes the loop invariant. The remaining
-  read-only proofs reuse it through `lowerBound.verified`. -/
+  `lower_bound_loop.verified` establishes the loop invariant. The remaining
+  read-only proofs reuse it through `lower_bound.verified`. -/
 
-  verify lowerBoundLoop by
+  verify lower_bound_loop by
     contract_intro
     obtain ⟨entries, key, low, high⟩ := args
     replace permitted : Model.Search.Window entries key low high := permitted
@@ -606,7 +604,7 @@ move_module OrderedMap where
       rw [Move.Verify.wp_pure]
       exact ⟨by u64_omega, rfl⟩
 
-  verify lowerBound by
+  verify lower_bound by
     contract_intro
     obtain ⟨map, key⟩ := args
     have lengthToNat : (Move.Vector.length map.entries).toNat =
@@ -619,7 +617,7 @@ move_module OrderedMap where
       · rw [lengthToNat]
         exact Nat.le_refl _
     refine Move.Verify.wp_mono
-      (Move.Verify.wp_of_satisfies (lowerBoundLoop.verified _) window) ?_ ?_
+      (Move.Verify.wp_of_satisfies (lower_bound_loop.verified _) window) ?_ ?_
     · rintro result final ⟨established, rfl⟩
       dsimp only at established
       obtain ⟨rfl, -⟩ := established
@@ -634,7 +632,7 @@ move_module OrderedMap where
     unfold length.contract length.sourceSpec Move.Verify.Satisfies
     simp [Move.Vector.length_toNat]
 
-  verify borrowKeyAt by
+  verify borrow_key_at by
     contract_intro
     obtain ⟨map, index⟩ := args
     rw [Move.Verify.wp_bind, Move.Verify.wp_borrowElemSpec]
@@ -646,7 +644,7 @@ move_module OrderedMap where
     contract_intro
     obtain ⟨map, key⟩ := args
     dsimp only
-    wp_call (lowerBound.verified _) using permitted
+    wp_call (lower_bound.verified _) using permitted
     · rintro index middle ⟨⟨rfl, -⟩, rfl⟩
       have bounded : map.entries.toList.length < 18446744073709551616 := by
         have := map.entries.toList_length_lt
@@ -662,7 +660,7 @@ move_module OrderedMap where
         show (Move.Verify.Source.logicalBEq entry.key key = true) ↔
           Model.Contains map key
         rw [Move.Verify.Source.logicalBEq_move,
-          Move.Compare.equal_eq_true_iff]
+          Compare.equal_eq_true_iff]
         show _ ↔ ∃ candidate ∈ map.entries.toList, candidate.key = key
         rw [Model.Search.contains_iff_lowerBound _ _ map.invariant]
         constructor
@@ -686,7 +684,7 @@ move_module OrderedMap where
     contract_intro
     obtain ⟨map, key⟩ := args
     dsimp only
-    wp_call (lowerBound.verified _) using permitted
+    wp_call (lower_bound.verified _) using permitted
     · rintro index middle ⟨⟨rfl, -⟩, rfl⟩
       have bounded : map.entries.toList.length < 18446744073709551616 := by
         have := map.entries.toList_length_lt
@@ -704,7 +702,7 @@ move_module OrderedMap where
           rw [atTarget] at atValue
           cases atValue
           move_step
-          have same := (Move.Compare.equal_eq_true_iff entry.key key).mp
+          have same := (Compare.equal_eq_true_iff entry.key key).mp
             (by rwa [Move.Verify.Source.logicalBEq_move] at equal)
           exact fun _ => ⟨entry, List.mem_of_getElem? atTarget, same, rfl⟩
         · -- Another key at the lower bound: the key is absent.
@@ -717,7 +715,7 @@ move_module OrderedMap where
           cases atCandidate
           exact equal (by
             rw [Move.Verify.Source.logicalBEq_move]
-            exact (Move.Compare.equal_eq_true_iff entry.key key).mpr same)
+            exact (Compare.equal_eq_true_iff entry.key key).mpr same)
       · spec_norm at inBounds
         abort_clause
         intro present
@@ -739,7 +737,7 @@ move_module OrderedMap where
     rw [Move.Verify.wp_withMutation]
     intro future
     simp only [Move.Semantics.Mutation.read]
-    wp_call (lowerBound.verified _) using trivial
+    wp_call (lower_bound.verified _) using trivial
     · rintro index middle ⟨⟨rfl, -⟩, rfl⟩
       have insertBound : Model.lowerBoundList map.entries.toList key ≤
           map.entries.toList.length := Model.Search.lowerBoundList_le _ _
@@ -770,7 +768,7 @@ move_module OrderedMap where
           simp only [Move.Verify.wp_abort]
           abort_clause
           exact ⟨entry, List.mem_of_getElem? atTarget,
-            (Move.Compare.equal_eq_true_iff entry.key key).mp
+            (Compare.equal_eq_true_iff entry.key key).mp
               (by rwa [Move.Verify.Source.logicalBEq_move] at equal)⟩
         · rw [if_neg equal]
           have fresh : ¬Model.Contains map key := by
@@ -782,7 +780,7 @@ move_module OrderedMap where
             cases atCandidate
             exact equal (by
               rw [Move.Verify.Source.logicalBEq_move]
-              exact (Move.Compare.equal_eq_true_iff entry.key key).mpr same)
+              exact (Compare.equal_eq_true_iff entry.key key).mpr same)
           checked_cases room
           simp only [Move.UInt.toNat_ofNat_of_lt
               (W := Move.W64)
@@ -846,7 +844,7 @@ move_module OrderedMap where
     rw [Move.Verify.wp_withMutation]
     intro future
     simp only [Move.Semantics.Mutation.read]
-    wp_call (lowerBound.verified _) using permitted
+    wp_call (lower_bound.verified _) using permitted
     · rintro index middle ⟨⟨rfl, -⟩, rfl⟩
       by_cases inBounds : Move.Verify.Source.logicalLT
         (U64.ofNat (Model.lowerBoundList map.entries.toList key))
@@ -872,7 +870,7 @@ move_module OrderedMap where
           Move.Semantics.Spec.pure_bind]
         by_cases equal : Move.Verify.Source.logicalBEq entry.key key = true
         · rw [if_pos equal]
-          have same := (Move.Compare.equal_eq_true_iff entry.key key).mp
+          have same := (Compare.equal_eq_true_iff entry.key key).mp
             (by rwa [Move.Verify.Source.logicalBEq_move] at equal)
           have erased := Model.Removal.erase_eq_take_lowerBound
             map.entries.toList key entry map.invariant atTarget same
@@ -906,7 +904,7 @@ move_module OrderedMap where
           cases atCandidate
           exact equal (by
             rw [Move.Verify.Source.logicalBEq_move]
-            exact (Move.Compare.equal_eq_true_iff entry.key key).mpr same)
+            exact (Compare.equal_eq_true_iff entry.key key).mpr same)
       · rw [if_neg inBounds]
         have bounded : map.entries.toList.length < 18446744073709551616 := by
           have := map.entries.toList_length_lt
@@ -929,7 +927,7 @@ move_module OrderedMap where
   /- Concrete scenarios keep the compiled tests readable while exercising
   generic bodies and type instantiation in the generated Move module. -/
 
-  fun lookupScenario : Action U64 := do
+  fun lookup_scenario : Action U64 := do
     let map : Map U64 U64 := empty
     let mapRef ← &mut map
     add mapRef 30 300
@@ -940,7 +938,7 @@ move_module OrderedMap where
     let valueRef ← borrow mapRef keyRef
     (*valueRef)
 
-  fun removeScenario : Action U64 := do
+  fun remove_scenario : Action U64 := do
     let map : Map U64 U64 := empty
     let mapRef ← &mut map
     add mapRef 30 300
@@ -952,14 +950,14 @@ move_module OrderedMap where
     let absent ← contains mapRef keyRef
     if absent then pure 0 else pure removed
 
-  fun duplicateScenario : Action U64 := do
+  fun duplicate_scenario : Action U64 := do
     let map : Map U64 U64 := empty
     let mapRef ← &mut map
     add mapRef 10 100
     add mapRef 10 999
     pure 0
 
-  fun missingScenario : Action U64 := do
+  fun missing_scenario : Action U64 := do
     let map : Map U64 U64 := empty
     let mapRef ← &mut map
     let key : U64 := 10
@@ -967,21 +965,21 @@ move_module OrderedMap where
     let _ ← remove mapRef keyRef
     pure 0
 
-  fun orderingScenario : Action U64 := do
+  fun ordering_scenario : Action U64 := do
     let map : Map U64 U64 := empty
     let mapRef ← &mut map
     add mapRef 3 30
     add mapRef 1 10
     add mapRef 2 20
-    let firstKeyRef ← borrowKeyAt mapRef 0
+    let firstKeyRef ← borrow_key_at mapRef 0
     let first ← *firstKeyRef
-    let secondKeyRef ← borrowKeyAt mapRef 1
+    let secondKeyRef ← borrow_key_at mapRef 1
     let second ← *secondKeyRef
-    let thirdKeyRef ← borrowKeyAt mapRef 2
+    let thirdKeyRef ← borrow_key_at mapRef 2
     let third ← *thirdKeyRef
     pure (first * 100 + second * 10 + third)
 
-  fun absentLookupScenario : Action U64 := do
+  fun absent_lookup_scenario : Action U64 := do
     let map : Map U64 U64 := empty
     let mapRef ← &mut map
     add mapRef 10 100
@@ -990,7 +988,7 @@ move_module OrderedMap where
     let present ← contains mapRef keyRef
     if present then pure 0 else pure 1
 
-  fun boolKeyScenario : Action U64 := do
+  fun bool_key_scenario : Action U64 := do
     let map : Map Bool U64 := empty
     let mapRef ← &mut map
     add mapRef true 10
@@ -1000,7 +998,7 @@ move_module OrderedMap where
     let valueRef ← borrow mapRef keyRef
     (*valueRef)
 
-  fun removeEdgesScenario : Action U64 := do
+  fun remove_edges_scenario : Action U64 := do
     let map : Map U64 U64 := empty
     let mapRef ← &mut map
     add mapRef 2 20
@@ -1018,18 +1016,18 @@ move_module OrderedMap where
     let value ← *valueRef
     pure (first + last + value)
 
-  def compiled : MModule := move_module% "OrderedMapTest"
+  def compiled : MModule := module% "OrderedMapTest"
 
   private def run := Tests.run compiled
 
-  #test run "lookupScenario" [] [] = Tests.okU64 200
-  #test run "removeScenario" [] [] = Tests.okU64 200
-  #test run "duplicateScenario" [] [] = Tests.aborted 1
-  #test run "missingScenario" [] [] = Tests.aborted 2
-  #test run "orderingScenario" [] [] = Tests.okU64 123
-  #test run "absentLookupScenario" [] [] = Tests.okU64 1
-  #test run "boolKeyScenario" [] [] = Tests.okU64 20
-  #test run "removeEdgesScenario" [] [] = Tests.okU64 60
+  #test run "lookup_scenario" [] [] = Tests.okU64 200
+  #test run "remove_scenario" [] [] = Tests.okU64 200
+  #test run "duplicate_scenario" [] [] = Tests.aborted 1
+  #test run "missing_scenario" [] [] = Tests.aborted 2
+  #test run "ordering_scenario" [] [] = Tests.okU64 123
+  #test run "absent_lookup_scenario" [] [] = Tests.okU64 1
+  #test run "bool_key_scenario" [] [] = Tests.okU64 20
+  #test run "remove_edges_scenario" [] [] = Tests.okU64 60
 
   -- The `public fun` operations export public visibility.
   #guard ["empty", "length", "contains", "borrow", "add", "remove"].all

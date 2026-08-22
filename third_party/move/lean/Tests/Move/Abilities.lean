@@ -12,44 +12,37 @@ open MoveModel.IR
 open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler
 
-move_module Abilities where
+module Abilities where
 
   /-! ## Functions -/
 
   struct Plain where
     value : U64
 
-  struct CopyDrop where
+  struct CopyDrop has Copy, Drop where
     value : U64
-    deriving Copy, Drop
 
-  struct Stored where
+  struct Stored has Store where
     value : U64
-    deriving Store
 
-  struct Resource where
+  struct Resource has Key where
     value : U64
-    deriving Key
 
-  struct GenericValue (T) where
+  struct GenericValue (T) has Copy, Drop, Store where
     value : T
-    deriving Copy, Drop, Store
 
-  struct GenericResource (T) where
+  struct GenericResource (T) has Key, Drop where
     value : T
-    deriving Key, Drop
 
-  struct Phantom (T) where
-    deriving Copy, Drop, Store
+  struct Phantom (T) has Copy, Drop, Store where
 
-  enum Droppable where
-    | first
-    | second (value : U64)
-    deriving Drop
+  enum Droppable has Drop where
+    | First
+    | Second (value : U64)
 
   /-! ## Tests -/
 
-  def compiled : MModule := move_module% "AbilitiesTest"
+  def compiled : MModule := module% "AbilitiesTest"
 
 namespace Abilities
 

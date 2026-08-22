@@ -12,11 +12,10 @@ open Move
 open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
-move_module Read where
+module Read where
 
-  struct Reading where
+  struct Reading has Key where
     value : U64
-    deriving Key
 
   def E_TOO_SMALL : U64 := 7
 
@@ -27,20 +26,20 @@ move_module Read where
     (*value)
 
   spec read (addr : Address) where
-    requires exists<Reading>(addr);
+    requires existsAt<Reading>(addr);
     ensures
       result = old(Reading[addr].value);
     aborts_if False
 
-  fun readAtLeast (addr : Address) (minimum : U64) : Action U64 := do
+  fun read_at_least (addr : Address) (minimum : U64) : Action U64 := do
     let value ← &Reading[addr].value
     let current ← *value
     if current < minimum then
       abort E_TOO_SMALL
     pure current
 
-  spec readAtLeast (addr : Address) (minimum : U64) where
-    requires exists<Reading>(addr);
+  spec read_at_least (addr : Address) (minimum : U64) where
+    requires existsAt<Reading>(addr);
     ensures
       result = old(Reading[addr].value) ∧
       minimum.toNat ≤ result.toNat;
@@ -56,7 +55,7 @@ move_module Read where
     rw [Move.Verify.wp_bind, Move.Verify.wp_borrowSpec]
     simp [Move.Semantics.ResourceStore.get, lookup]
 
-  verify readAtLeast by
+  verify read_at_least by
     contract_intro
     obtain ⟨addr, minimum⟩ := args
     rcases Option.isSome_iff_exists.mp permitted with ⟨reading, lookup⟩
@@ -71,7 +70,7 @@ move_module Read where
 
   /-! ## Tests -/
 
-  def compiled : MModule := move_module% "ReadTest"
+  def compiled : MModule := module% "ReadTest"
 
   private def readingId := compiled.resourceId "Reading"
   private def memory (addr value : Nat) : MoveModel.IR.IMem :=
@@ -81,9 +80,9 @@ move_module Read where
   #test run "read" (memory 4 99) [.address 4] =
     Tests.okRet (memory 4 99) [.u64 99]
   #test run "read" [] [.address 4] = Tests.aborted 0
-  #test run "readAtLeast" (memory 4 10) [.address 4, .u64 10] =
+  #test run "read_at_least" (memory 4 10) [.address 4, .u64 10] =
     Tests.okRet (memory 4 10) [.u64 10]
-  #test run "readAtLeast" (memory 4 9) [.address 4, .u64 10] =
+  #test run "read_at_least" (memory 4 9) [.address 4, .u64 10] =
     Tests.abortedIn (memory 4 9) 7
 
 end Tests.MovePrograms

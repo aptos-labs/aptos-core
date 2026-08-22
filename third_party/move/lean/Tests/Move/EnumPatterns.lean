@@ -12,84 +12,82 @@ open Move
 open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
-move_module EnumPatterns where
+module EnumPatterns where
 
-  enum Atom where
-    | none
-    | number (value : U64)
-    deriving Copy, Drop, Store
+  enum Atom has Copy, Drop, Store where
+    | None
+    | Number (value : U64)
 
-  enum Envelope where
-    | empty
-    | one (value : Atom)
-    | two (left right : Atom)
-    deriving Copy, Drop, Store
+  enum Envelope has Copy, Drop, Store where
+    | Empty
+    | One (value : Atom)
+    | Two (left right : Atom)
 
   /-! ## Functions -/
 
-  fun nestedTotal (envelope : Envelope) : U64 :=
+  fun nested_total (envelope : Envelope) : U64 :=
     match envelope with
-    | .one (.number value) => value
-    | .two (.number left) (.number right) => left + right
+    | .One (.Number value) => value
+    | .Two (.Number left) (.Number right) => left + right
     | _ => 0
 
-  spec nestedTotal (envelope : Envelope) where
+  spec nested_total (envelope : Envelope) where
     ensures
       result =
         match envelope with
-        | .one (.number value) => value
-        | .two (.number left) (.number right) => left + right
+        | .One (.Number value) => value
+        | .Two (.Number left) (.Number right) => left + right
         | _ => 0
 
-  fun oneNumber (value : U64) : U64 :=
-    nestedTotal (.one (.number value))
+  fun one_number (value : U64) : U64 :=
+    nested_total (.One (.Number value))
 
-  spec oneNumber (value : U64) where
+  spec one_number (value : U64) where
     ensures result = value
 
-  fun oneNone : U64 :=
-    nestedTotal (.one .none)
+  fun one_none : U64 :=
+    nested_total (.One .None)
 
-  spec oneNone where
+  spec one_none where
     ensures result = 0
 
-  fun twoNumbers (left right : U64) : U64 :=
-    nestedTotal (.two (.number left) (.number right))
+  fun two_numbers (left right : U64) : U64 :=
+    nested_total (.Two (.Number left) (.Number right))
 
-  spec twoNumbers (left : U64) (right : U64) where
+  spec two_numbers (left : U64) (right : U64) where
     ensures result = left + right
 
-  fun leftMissing (right : U64) : U64 :=
-    nestedTotal (.two .none (.number right))
+  fun left_missing (right : U64) : U64 :=
+    nested_total (.Two .None (.Number right))
 
-  spec leftMissing (right : U64) where
+  spec left_missing (right : U64) where
     ensures result = 0
 
-  fun rightMissing (left : U64) : U64 :=
-    nestedTotal (.two (.number left) .none)
+  fun right_missing (left : U64) : U64 :=
+    nested_total (.Two (.Number left) .None)
 
-  spec rightMissing (left : U64) where
+  spec right_missing (left : U64) where
     ensures result = 0
 
   /-! ## Proofs -/
 
-  verify nestedTotal
-  verify oneNumber
-  verify oneNone
-  verify twoNumbers
-  verify leftMissing
-  verify rightMissing
+  verify nested_total
+  verify one_number
+  verify one_none
+  verify two_numbers
+  verify left_missing
+  verify right_missing
 
   /-! ## Tests -/
 
-  def compiled : MModule := move_module% "EnumPatternsTest"
+  def compiled : MModule := module% "EnumPatternsTest"
 
   private def run := Tests.run compiled
 
-  #test run "oneNumber" [] [.u64 7] = Tests.okU64 7
-  #test run "oneNone" [] [] = Tests.okU64 0
-  #test run "twoNumbers" [] [.u64 4, .u64 5] = Tests.okU64 9
-  #test run "leftMissing" [] [.u64 5] = Tests.okU64 0
-  #test run "rightMissing" [] [.u64 4] = Tests.okU64 0
+  #test run "one_number" [] [.u64 7] = Tests.okU64 7
+  #test run "one_none" [] [] = Tests.okU64 0
+  #test run "two_numbers" [] [.u64 4, .u64 5] = Tests.okU64 9
+  #test run "left_missing" [] [.u64 5] = Tests.okU64 0
+  #test run "right_missing" [] [.u64 4] = Tests.okU64 0
 
 end Tests.MovePrograms

@@ -10,7 +10,7 @@ namespace Tests.MovePrograms.Modules
 open Move
 open scoped Move Move.Compiler Move.Spec
 
-move_module Math where
+module Math where
 
   public fun identity {T} (value : T) : T := value
 

@@ -18,9 +18,13 @@ arithmetic; `if`/`while`/`loop` with invariants; recursion via `Spec.fix`;
 data invariants (certified values); **global invariants** — regular and
 `update`, cross-resource, registered per referenced family, discharged by
 generated `@[grind]` reestablishment lemmas; the global-storage primitives
-`moveTo` / `moveFrom` / `exists_`; `modifies` framing; abort clauses; the
+`moveTo` / `moveFrom` / `existsAt`; `modifies` framing; abort clauses; the
 `requires` / `ensures` / `aborts` / `modifies` contract surface, with resource
-observations (`R[a]`, `exists<R>`, `old`) in both **requires and ensures**.
+observations (`R[a]`, `existsAt<R>`, `old`) in both **requires and ensures**;
+ability declarations `has Copy, Drop, Store, Key` on a `struct`/`enum`, and
+ability *bounds* on its parameters, `struct Vault (T : Store, Copy)` — Move's
+`<T: store + copy>`; a parameter without a bound is still inferred from the
+container's own abilities.
 
 ## Roadmap — not yet implemented
 
@@ -82,7 +86,7 @@ observations (`R[a]`, `exists<R>`, `old`) in both **requires and ensures**.
   verification, but `moveTo`'s frame location must be written
   `Counter[account.address]`, and `moveTo`'s resource type is read from the
   published value's ascription (`({ … } : Counter)`).
-- **Generic global-storage primitives** (`exists_ (Vault T) addr`, generic
+- **Generic global-storage primitives** (`existsAt (Vault T) addr`, generic
   `moveTo`/`moveFrom`) are not yet on the source-verify path — only concrete
   resource families.
 - **Update global invariants** must be reflexive at unchanged addresses (a

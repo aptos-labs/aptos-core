@@ -8,7 +8,7 @@ import MoveModel.Frontend.XIR.FromIR
 /-!
 # Module elaboration
 
-`move_module%` performs compilation during elaboration through
+`module%` performs compilation during elaboration through
 `Move.Compiler.LIR`, `MoveModel.IR`, and `MoveModel.Frontend.XIR`, then embeds the first-order
 `MModule` as an ordinary Lean value.
 -/
@@ -45,7 +45,7 @@ private def discoverModuleDecls : TermElabM (Array Name × Array Name) := do
   return (structs, functions)
 
 scoped syntax (name := moveModuleTerm)
-  "move_module%" str
+  "module%" str
     (" structs " "[" ident,* "]" " functions " "[" ident,* "]")? : term
 
 open scoped Move.Compiler

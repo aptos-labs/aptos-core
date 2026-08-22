@@ -14,22 +14,22 @@ open Move
 open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
-move_module Integers where
+module Integers where
 
   /-! ## Functions -/
 
-  fun smallSum (left right : U8) : U8 :=
+  fun small_sum (left right : U8) : U8 :=
     left + right
 
-  spec smallSum (left : U8) (right : U8) where
+  spec small_sum (left : U8) (right : U8) where
     ensures True;
     aborts_if ¬left.toNat + right.toNat < U8.size
       with Semantics.Checked.arithmeticAbortCode
 
-  fun wideProduct (left right : U128) : U128 :=
+  fun wide_product (left right : U128) : U128 :=
     left * right
 
-  spec wideProduct (left : U128) (right : U128) where
+  spec wide_product (left : U128) (right : U128) where
     ensures True;
     aborts_if ¬left.toNat * right.toNat < U128.size
       with Semantics.Checked.arithmeticAbortCode
@@ -75,9 +75,9 @@ move_module Integers where
 
   /-! ## Proofs -/
 
-  verify smallSum
+  verify small_sum
 
-  verify wideProduct
+  verify wide_product
 
   verify widen
 
@@ -91,13 +91,13 @@ move_module Integers where
 
   /-! ## Tests -/
 
-  def compiled : MModule := move_module% "IntegersTest"
+  def compiled : MModule := module% "IntegersTest"
 
   private def run := Tests.run compiled
 
-  #test run "smallSum" [] [.int 100, .int 55] = Tests.okRet [] [.int 155]
-  #test run "smallSum" [] [.int 200, .int 56] = Tests.aborted 0
-  #test run "wideProduct" [] [.int (2 ^ 100), .int 4] =
+  #test run "small_sum" [] [.int 100, .int 55] = Tests.okRet [] [.int 155]
+  #test run "small_sum" [] [.int 200, .int 56] = Tests.aborted 0
+  #test run "wide_product" [] [.int (2 ^ 100), .int 4] =
     Tests.okRet [] [.int (2 ^ 102)]
   #test run "narrow" [] [.int 255] = Tests.okRet [] [.int 255]
   #test run "narrow" [] [.int 256] = Tests.aborted 0
@@ -116,7 +116,7 @@ namespace Integers
 open MoveModel.IR
 
 -- The declared signatures carry the exact widths.
-#guard (compiled.funs.find? (·.name == "smallSum")).map (·.returns) ==
+#guard (compiled.funs.find? (·.name == "small_sum")).map (·.returns) ==
   some [.uint .w8]
 #guard (compiled.funs.find? (·.name == "widen")).map (·.returns) ==
   some [.uint .w256]
