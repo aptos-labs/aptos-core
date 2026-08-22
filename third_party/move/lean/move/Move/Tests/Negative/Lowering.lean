@@ -11,6 +11,14 @@ namespace Tests.MovePrograms.Calls.Rejection
 open Move
 open scoped Move Move.Compiler Move.Spec
 
+/--
+error: `move_source` is compiler-internal; use `fun` to retain a source body
+-/
+#guard_msgs in
+@[move_entry, move_source (Action U64, 0, "pure 0")]
+def rejectedAuthoredRetainedSource : Action U64 :=
+  pure 0
+
 @[move_struct]
 structure RecursiveType where
   next : RecursiveType
