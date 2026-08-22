@@ -12,6 +12,7 @@ import Move.Tests.Language.Abilities
 import Move.Tests.Language.Addresses
 import Move.Tests.Language.Arithmetic
 import Move.Tests.Language.Attributes
+import Move.Tests.Language.BorrowChecker
 import Move.Tests.Language.ControlForms
 import Move.Tests.Language.EnumPatterns
 import Move.Tests.Language.EnumPayloads
@@ -26,11 +27,14 @@ import Move.Tests.Language.Tuples
 import Move.Tests.Language.VectorOperations
 import Move.Tests.Language.Vectors
 import Move.Tests.Negative.Lowering
+import Move.Tests.Negative.Borrows
+import Move.Tests.Negative.BorrowGlobals
 import Move.Tests.Negative.Specifications
 import Move.Tests.Negative.Surface
 import Move.Tests.Negative.Verification
 import Move.Tests.Verification.Account
 import Move.Tests.Verification.Callees
+import Move.Tests.Verification.BorrowCertificates
 import Move.Tests.Verification.Calls
 import Move.Tests.Verification.CorePrimitives
 import Move.Tests.Verification.CrossInv

@@ -1,6 +1,13 @@
 # Poison-aware borrow checking and prophecy certificates
 
-Status: design proposal
+Status: first integrated implementation on `_leaner2`
+
+The executable source checker, summary fixpoints, compact certificates,
+generated `wellBorrowed` theorem, exact diagnostics, and retained-source tests
+described below are implemented in `Move/Verify/SourceProgram.lean`,
+`Move/Verify/BorrowChecker.lean`, and `Move/Verify/Syntax.lean`.  The final
+compiler-correctness transport to `MoveModel.IR` remains a separate project;
+the source certificate deliberately does not depend on that IR.
 
 ## Verdict
 
@@ -616,6 +623,50 @@ deliberately corrupted certificate fails before proof generation.
 - invalid activation/death ordering;
 - under-approximated recursive summary;
 - certificate generated for a different module/version.
+
+## Implementation status and runtime corpus
+
+The implementation keeps control topology generic (`Source.Control Event`) so
+future abstract interpretations can reuse the same structured branches and
+loops.  Borrow checking is an effect projection over that topology; loops are
+not rewritten to function recursion.  The analyzer computes loop
+post-fixpoints, recursive source functions compute monotone SCC summary
+post-fixpoints, and the certificate checker replays the result rather than
+trusting cached overlap decisions.
+
+Every generated source specification now has three named declarations:
+
+```text
+f.borrowProgram
+f.borrowCertificate
+f.wellBorrowed
+```
+
+Summaries carry parameter read/write effects, conditional separation
+requirements, and parameter-relative returned-reference paths, kinds, and
+activation phases.  Call sites instantiate all three.  Global invalidation is
+keyed conservatively by resource family, and vector elements use `anyIndex`.
+
+The Aptos Rust corpus under
+`move-vm/transactional-tests/tests/runtime_ref_checks` was used as the policy
+oracle and classified rather than copied blindly:
+
+| Classification | Representative Rust cases | Leaner policy |
+| --- | --- | --- |
+| Same acceptance | `multiple_immut_refs_allowed`, `freeze_ref_valid`, `global_multiple_immut_valid`, `return_derived_ref_valid`, `vector_push_back_valid` | Accepted |
+| Same eventual rejection, earlier static diagnostic | `poisoned_ref_after_write`, `freeze_ref_poisoned`, `st_loc_overwrite_poisons`, `move_from_poisons_refs`, `return_local_ref`, `return_global_ref` | Rejected at activation, owner invalidation, freeze, or return |
+| Same lazy poisoning shape | `nested_field_poison`, `deep_nested_refs`, `call_with_poisoned_ref`, `vector_multiple_elem_refs`, `vector_pop_back_poison`, `vector_swap_poison` | Competing handle is poisoned; later use is rejected |
+| Deliberately more permissive than the runtime lock | `call_with_overlapping_mut_refs`, `call_with_mut_and_immut_refs` | A proven read-only summary does not activate a mutable handle; write summaries impose separation |
+| Deliberately different lineage policy | `write_field_poisons_parent`, `reborrow_chains` | A child is part of its parent's prophecy lineage; the parent is suspended and becomes usable after child reconciliation |
+| Outside current language scope | closure cases and native functions returning undeclared references | Function values are deferred; native reference returns require a declared summary |
+
+Executable ports live in `Move/Tests/Language/BorrowChecker.lean`; integration
+and exact-diagnostic cases live under `Move/Tests/Verification` and
+`Move/Tests/Negative`.
+
+The proof API currently establishes safety with respect to the executable
+source-policy checker.  A future compiler-correctness theorem may transport
+this result to `MoveModel.IR`; it is not a premise of source verification.
 
 ## Risks and containment
 

@@ -112,12 +112,13 @@ accepted source surface, `Verification` checks contracts and proofs,
 expected failures. Negative tests use exact `#guard_msgs` assertions for
 surface, specification, lowering, and automatic-verification diagnostics.
 
-The missing accepted-program borrow certificate and its planned poison-aware
-static analysis are specified in
-[`borrow-checker-design.md`](borrow-checker-design.md).  The design deliberately
+Accepted programs now receive a retained-source, poison-aware borrow program,
+certificate, and `wellBorrowed` theorem as specified in
+[`borrow-checker-design.md`](borrow-checker-design.md).  The checker deliberately
 does not duplicate compiler-v2: overlapping mutable handles may exist until a
 destructive use activates a prophecy, with later conflicting uses rejected by
-static poisoning.  Calls and recursion use checkable fixpoint summaries.
+static poisoning. Calls, returned references, loops, and recursive SCCs use
+replayed fixpoint summaries.
 
 Compiler-side XIR tests additionally reject malformed control-flow targets,
 local and type indices, return arity, operation arity, resource references,

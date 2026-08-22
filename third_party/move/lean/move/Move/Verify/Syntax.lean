@@ -6,6 +6,7 @@ import Move.Attributes
 import Move.Syntax
 import Move.Semantics.Global
 import Move.Semantics.Vector
+import Move.Verify.BorrowChecker
 import Move.Verify.Compare
 import Move.Verify.Contract
 
@@ -856,14 +857,15 @@ translator models: `read r` / `readImm r` / `freeze r` read the reference
 their `&` / `&mut` places, and `Move.abort c` is `abort c`.  The surface
 forms and the primitives lower to the same Move operations, so their
 semantics is the same; this keeps one translation for both spellings. -/
-private partial def desugarPrimitives (stx : Syntax) : CommandElabM Syntax := do
+private partial def desugarPrimitives (stx : Syntax)
+    (preserveFreeze : Bool := false) : CommandElabM Syntax := do
   -- `write r v` as a statement
   if stx.isOfKind ``Lean.Parser.Term.doExpr then
     if let some (candidates, arguments) ← primitiveApplication? stx[0] then
       if candidates.contains ``Move.write then
         if let (some reference, some value) := (arguments[0]?, arguments[1]?) then
           if reference.isIdent then
-            let value ← desugarPrimitives value
+            let value ← desugarPrimitives value preserveFreeze
             let reassign ← `(doElem| $(⟨reference⟩):ident := $(⟨value⟩))
             return reassign.raw
   -- borrows, reads, and `Move.abort c`, wherever they appear
@@ -871,19 +873,20 @@ private partial def desugarPrimitives (stx : Syntax) : CommandElabM Syntax := do
     return borrow
   if let some (candidates, arguments) ← primitiveApplication? stx then
     if candidates.contains ``Move.read || candidates.contains ``Move.readImm ||
-        candidates.contains ``Move.freeze then
+        (candidates.contains ``Move.freeze && !preserveFreeze) then
       if let some reference := arguments[0]? then
         return mkNode ``Move.derefTerm #[mkAtom "*", reference]
     if candidates.contains ``Move.abort then
       if let some code := arguments[0]? then
-        let code ← desugarPrimitives code
+        let code ← desugarPrimitives code preserveFreeze
         return mkNode ``Move.abortTerm #[mkAtom "abort ", code]
     if candidates.contains ``Move.assert then
       if let (some condition, some code) := (arguments[0]?, arguments[1]?) then
-        let condition : TSyntax `term := ⟨← desugarPrimitives condition⟩
-        let code : TSyntax `term := ⟨← desugarPrimitives code⟩
+        let condition : TSyntax `term := ⟨← desugarPrimitives condition preserveFreeze⟩
+        let code : TSyntax `term := ⟨← desugarPrimitives code preserveFreeze⟩
         return (← `(do if $condition then pure () else abort $code)).raw
-  return stx.setArgs (← stx.getArgs.mapM desugarPrimitives)
+  return stx.setArgs (← stx.getArgs.mapM fun child =>
+    desugarPrimitives child preserveFreeze)
 
 private def sourceBody (declaration : Declaration) : CommandElabM (TSyntax `term) := do
   let body := if declaration.value.isOfKind ``Lean.Parser.Term.paren then
@@ -1514,6 +1517,40 @@ private def mutableBorrowScope (name : Name) (elements : Array Lean.DoElem) :
   let size := closeBorrowScope elements (lastUse.map (· + 1) |>.getD 0)
   (elements.extract 0 size, elements.extract size elements.size)
 
+/-- NLL for the borrow checker follows reference derivations, but not copied
+values.  The prophecy translator's `mutableBorrowScope` above intentionally
+keeps ordinary bound values in lexical scope; using it for safety analysis
+would incorrectly keep `let value ← *reference` alive until every use of
+`value`. -/
+private def sourceReferenceBoundIdentifier? (element : Lean.DoElem) : Option Name :=
+  match element with
+  | `(doElem| let $name:ident ← $value:term) =>
+      if value.raw.isOfKind ``Move.borrowTerm ||
+          value.raw.isOfKind ``Move.borrowMutTerm ||
+          value.raw.isOfKind ``Move.borrowIndexTerm ||
+          value.raw.isOfKind ``Move.borrowMutIndexTerm then
+        some name.getId
+      else none
+  | _ => none
+
+private partial def closeSourceBorrowScope (elements : Array Lean.DoElem)
+    (size : Nat) : Nat :=
+  let extended := (elements.extract 0 size).foldl (init := size) fun result element =>
+    match sourceReferenceBoundIdentifier? element with
+    | none => result
+    | some name =>
+        elements.zipIdx.foldl (init := result) fun result (candidate, index) =>
+          if containsIdentifier name candidate.raw then max result (index + 1)
+          else result
+  if extended = size then size else closeSourceBorrowScope elements extended
+
+private def sourceBorrowScope (name : Name) (elements : Array Lean.DoElem) :
+    Array Lean.DoElem × Array Lean.DoElem :=
+  let lastUse := elements.zipIdx.foldl (init := none) fun result (element, index) =>
+    if containsIdentifier name element.raw then some index else result
+  let size := closeSourceBorrowScope elements (lastUse.map (· + 1) |>.getD 0)
+  (elements.extract 0 size, elements.extract size elements.size)
+
 /-- `Move.Vector.get` / `Move.Vector.set`: checked element access whose abort
 the relational semantics sequences. -/
 private inductive VectorAccessCall where
@@ -1629,17 +1666,35 @@ structure SourceSignature where
   arguments : Array (TSyntax `ident) := #[]
   types : Array (TSyntax `term) := #[]
   mutableParameters : Array (TSyntax `ident × TSyntax `term) := #[]
+  /-- Reference parameters before reference erasure, with their explicit
+  argument positions.  The source borrow checker consumes this view. -/
+  referenceParameters : Array
+    (TSyntax `ident × Move.Verify.Borrow.RefKind × Nat) := #[]
+
+/-- Checked, parameter-relative summaries exported with retained declarations.
+Call-site borrow extraction instantiates these facts instead of inlining. -/
+private initialize borrowSummaries :
+    SimplePersistentEnvExtension
+      (Name × Move.Verify.Borrow.Summary)
+      (NameMap Move.Verify.Borrow.Summary) ←
+  registerSimplePersistentEnvExtension {
+    addEntryFn := fun summaries (name, summary) => summaries.insert name summary
+    addImportedFn := fun entries =>
+      mkStateFromImportedEntries
+        (fun summaries (name, summary) => summaries.insert name summary) {} entries
+  }
 
 /-- The source signature of a Move function, from its elaborated type: what a
 `spec` command's binders state, derived when a callee has no `spec` yet. -/
 private def signatureOf (functionName : Name) : CommandElabM SourceSignature :=
   liftTermElabM do
     let info ← getConstInfo functionName
-    Lean.Meta.forallTelescope info.type fun parameters _ => do
+    Lean.Meta.forallTelescope info.type fun parameters _resultType => do
       let delab (type : Lean.Expr) : Lean.Elab.TermElabM (TSyntax `term) :=
         withOptions (fun options => options.setBool `pp.fullNames true) do
           Lean.PrettyPrinter.delab type
       let mut signature : SourceSignature := {}
+      let mut explicitPosition := 0
       for parameter in parameters do
         let declaration ← parameter.fvarId!.getDecl
         let name := declaration.userName
@@ -1652,18 +1707,23 @@ private def signatureOf (functionName : Name) : CommandElabM SourceSignature :=
               signature := { signature with
                 arguments := signature.arguments.push ident
                 types := signature.types.push referent
-                mutableParameters := signature.mutableParameters.push (ident, referent) }
+                mutableParameters := signature.mutableParameters.push (ident, referent)
+                referenceParameters := signature.referenceParameters.push
+                  (ident, .mutable, explicitPosition) }
             else if type.isAppOfArity ``Move.Ref 1 &&
                 !type.appArg!.isConstOf ``Move.Signer then
               -- An immutable reference is the observed value; a signer
               -- reference stays one, as `moveTo` addresses it.
               signature := { signature with
                 arguments := signature.arguments.push ident
-                types := signature.types.push (← delab type.appArg!) }
+                types := signature.types.push (← delab type.appArg!)
+                referenceParameters := signature.referenceParameters.push
+                  (ident, .immutable, explicitPosition) }
             else
               signature := { signature with
                 arguments := signature.arguments.push ident
                 types := signature.types.push (← delab type) }
+            explicitPosition := explicitPosition + 1
         | .instImplicit =>
             let typeStx ← delab type
             let binder ← `(bracketedBinder| [$typeStx])
@@ -1673,6 +1733,520 @@ private def signatureOf (functionName : Name) : CommandElabM SourceSignature :=
             let binder ← `(bracketedBinder| {$ident : $typeStx})
             signature := { signature with context := signature.context.push binder }
       return signature
+
+private structure BorrowRefBinding where
+  name : Name
+  place : Move.Verify.Borrow.Place
+  kind : Move.Verify.Borrow.RefKind
+  isParameter : Bool := false
+
+private structure BorrowExtractionContext where
+  resources : Array ResourceBinding
+  references : List BorrowRefBinding := []
+
+private def BorrowExtractionContext.find? (context : BorrowExtractionContext)
+    (name : Name) : Option BorrowRefBinding :=
+  context.references.find? (·.name == name)
+
+private def borrowFieldSteps (fields : Array (TSyntax `ident)) :
+    Array Move.Verify.Borrow.Step :=
+  fields.map fun field => .field field.getId.toString
+
+private def borrowPlaceFromOwner (context : BorrowExtractionContext)
+    (owner : TSyntax `ident) (suffix : Array Move.Verify.Borrow.Step) :
+    Move.Verify.Borrow.Place × Option String :=
+  match context.find? owner.getId with
+  | some parent =>
+      ({ parent.place with path := parent.place.path ++ suffix },
+        some parent.name.toString)
+  | none =>
+      ({ root := .local owner.getId.toString, path := suffix }, none)
+
+/-- Resolve a retained-source place without compiler temporaries.  Global
+roots are resource families and vector indices use the conservative shared
+`anyIndex` step. -/
+private def sourceBorrowPlace (context : BorrowExtractionContext)
+    (place : TSyntax `term) :
+    CommandElabM (Move.Verify.Borrow.Place × Option String) := do
+  if let some (owner, _, fields) ← localVectorPlace? context.resources place then
+    return borrowPlaceFromOwner context owner
+      (#[.anyIndex] ++ borrowFieldSteps fields)
+  if let some (owner, fields) ← localPlace? context.resources place then
+    return borrowPlaceFromOwner context owner (borrowFieldSteps fields)
+  let (family, _, fields) ← globalPlace place
+  return ({ root := .global family.key, path := borrowFieldSteps fields }, none)
+
+private def vectorMutationReference : VectorMutationCall → TSyntax `term
+  | .insert reference _ _ | .remove reference _ | .popBack reference |
+    .swap reference _ _ | .swapRemove reference _ | .append reference _ |
+    .reverse reference | .reverseSlice reference _ _ | .trim reference _ |
+    .trimReverse reference _ | .rotate reference _ | .rotateSlice reference _ _ _ =>
+      reference
+
+private def sourceFreezeArgument? (term : TSyntax `term) :
+    CommandElabM (Option (TSyntax `ident)) := do
+  let some (candidates, arguments) ← primitiveApplication? term.raw | return none
+  unless candidates.contains ``Move.freeze do return none
+  let some reference := arguments[0]? | return none
+  if reference.isIdent then pure (some ⟨reference⟩) else pure none
+
+private partial def collectDerefReferences (context : BorrowExtractionContext)
+    (stx : Syntax) (found : Array String := #[]) : Array String :=
+  let found :=
+    if stx.isOfKind ``Move.derefTerm && stx.getNumArgs > 1 && stx[1].isIdent then
+      let name := stx[1].getId
+      if (context.find? name).isSome && !found.contains name.toString then
+        found.push name.toString
+      else found
+    else found
+  stx.getArgs.foldl (fun found child =>
+    collectDerefReferences context child found) found
+
+/-- Borrow effects of one expression.  Ordinary callees use their reference
+signature; mutable parameters conservatively write until SCC summary
+inference refines them below. -/
+private def sourceTermBorrowEvents (context : BorrowExtractionContext)
+    (term : TSyntax `term) (destination? : Option Name := none) :
+    CommandElabM (Array Move.Verify.Borrow.Event) := do
+  if let some family ← globalPrimitiveResource? term.raw then
+    if let some (head, _) := application? term then
+      if head.raw.isIdent then
+        let name? ← try
+          pure (some (← resolveGlobalConstNoOverload head.raw))
+        catch _ => pure none
+        if name? == some ``Move.moveFrom || name? == some ``Move.moveTo then
+          return #[.ownerWrite { root := .global family.key }]
+  if let some mutation ← vectorMutationCall? term then
+    let reference := vectorMutationReference mutation
+    if reference.raw.isIdent && (context.find? reference.raw.getId).isSome then
+      return #[.write reference.raw.getId.toString]
+  if let some (head, rawArguments) := application? term then
+    if head.raw.isIdent then
+      let identifier : TSyntax `ident := ⟨head.raw⟩
+      if let some functionName ← resolveMoveFunction? identifier then
+        if (declarations.getState (← getEnv)).contains functionName then
+          let signature ← signatureOf functionName
+          let arguments := rawArguments.filter fun argument =>
+            !argument.raw.isOfKind ``Lean.Parser.Term.namedArgument
+          let mut callArguments : Array Move.Verify.Borrow.CallArgument := #[]
+          let summary? := borrowSummaries.getState (← getEnv) |>.find? functionName
+          for ((_, kind, position), referenceIndex) in
+              signature.referenceParameters.zipIdx do
+            if let some argument := arguments[position]? then
+              if argument.raw.isIdent &&
+                  (context.find? argument.raw.getId).isSome then
+                let effect := summary?.bind (·.parameterEffects[referenceIndex]?) |>.getD
+                  (if kind == .mutable then .write else .read)
+                callArguments := callArguments.push {
+                  reference := argument.raw.getId.toString
+                  parameter := referenceIndex
+                  effect }
+          if !callArguments.isEmpty then
+            let results := match destination?, summary? with
+              | some destination, some summary =>
+                  summary.returns.map fun derivation => {
+                    destination := destination.toString, derivation }
+              | _, _ => #[]
+            return #[.call functionName.toString callArguments
+              (summary?.map (·.requiredSeparations) |>.getD #[]) results]
+  return (collectDerefReferences context term.raw).map .read
+
+/-- The caller-side identity and instantiated place of a single reference
+returned by an ordinary Move call.  The call event itself creates the slot;
+this binding lets extraction recognize later source uses of it. -/
+private def sourceCallResultBinding? (context : BorrowExtractionContext)
+    (destination : Name) (term : TSyntax `term) :
+    CommandElabM (Option BorrowRefBinding) := do
+  let events ← sourceTermBorrowEvents context term (some destination)
+  let some event := events[0]? | return none
+  let Move.Verify.Borrow.Event.call _ arguments _ results := event | return none
+  let some result := results.find? (·.destination == destination.toString)
+    | return none
+  let some argument := arguments.find? (·.parameter == result.derivation.parameter)
+    | return none
+  let some parent := context.references.find? (·.name.toString == argument.reference)
+    | return none
+  return some {
+    name := destination
+    place := { parent.place with path := parent.place.path ++ result.derivation.path }
+    kind := result.derivation.kind }
+
+private def sourcePureReference? (context : BorrowExtractionContext)
+    (term : TSyntax `term) : Option BorrowRefBinding := do
+  let (head, arguments) ← application? term
+  guard (head.raw.isIdent && head.raw.getId == `pure)
+  let argument ← arguments[0]?
+  guard argument.raw.isIdent
+  context.find? argument.raw.getId
+
+private def sourcePoint (sites : IO.Ref (Array Syntax)) (ref : Syntax) :
+    CommandElabM Nat := do
+  let current ← sites.get
+  sites.set (current.push ref)
+  pure current.size
+
+private def prependBorrowEvents (sites : IO.Ref (Array Syntax)) (ref : Syntax)
+    (events : Array Move.Verify.Borrow.Event)
+    (tail : Move.Verify.Borrow.Block) : CommandElabM Move.Verify.Borrow.Block := do
+  events.foldrM (init := tail) fun event tail => do
+    pure (.event (← sourcePoint sites ref) event tail)
+
+private def sourceReferenceUsed (name : Name) (elements : Array Lean.DoElem) : Bool :=
+  elements.any fun element => containsIdentifier name element.raw
+
+private partial def sourceBorrowBlock (sites : IO.Ref (Array Syntax))
+    (context : BorrowExtractionContext) (elements : Array Lean.DoElem)
+    (tail : Move.Verify.Borrow.Block := .done) :
+    CommandElabM Move.Verify.Borrow.Block := do
+  if elements.isEmpty then return tail
+  let first := elements[0]!
+  let rest := elements.extract 1 elements.size
+  let continuationBlock ← sourceBorrowBlock sites context rest tail
+  -- Source-edge liveness: a reference used only by an `if` condition dies on
+  -- both outgoing edges before either branch body.
+  let sourceBorrowBranch (branch following : Array Lean.DoElem) (ref : Syntax) := do
+    let live := context.references.filter fun binding =>
+      binding.isParameter || binding.kind == .mutable ||
+      sourceReferenceUsed binding.name branch ||
+        sourceReferenceUsed binding.name following
+    let branchContext := { context with references := live }
+    let mut block ← sourceBorrowBlock sites branchContext branch
+    for dead in context.references do
+      unless live.any (·.name == dead.name) do
+        block := .event (← sourcePoint sites ref) (.drop dead.name.toString) block
+    pure block
+  let kind := first.raw.getKind
+  if kind == ``Move.moveAddAssign || kind == ``Move.moveSubAssign ||
+      kind == ``Move.moveMulAssign || kind == ``Move.moveDivAssign ||
+      kind == ``Move.moveModAssign then
+    let name : TSyntax `ident := ⟨first.raw[0]⟩
+    if (context.find? name.getId).isSome then
+      return .event (← sourcePoint sites first.raw) (.write name.getId.toString) continuationBlock
+    return continuationBlock
+  if first.raw.isOfKind ``Lean.Parser.Term.doReassign then
+    let assignment : TSyntax ``Lean.Parser.Term.doReassign := ⟨first.raw⟩
+    match assignment with
+    | `(doReassign| $name:ident $[: $_]? :=%$_ $rhs:term) =>
+        let rhsEvents ← sourceTermBorrowEvents context rhs
+        let continuationBlock ← prependBorrowEvents sites rhs.raw rhsEvents continuationBlock
+        if (context.find? name.getId).isSome then
+          return .event (← sourcePoint sites first.raw) (.write name.getId.toString) continuationBlock
+        if context.references.any fun reference =>
+            reference.place.root == .local name.getId.toString then
+          return .event (← sourcePoint sites first.raw)
+            (.ownerWrite { root := .local name.getId.toString }) continuationBlock
+        return continuationBlock
+    | _ => return continuationBlock
+  if first.raw.isOfKind ``Lean.Parser.Term.doMatch then
+    let alternatives := first.raw[6][0].getArgs
+    let mut branches : Array Move.Verify.Borrow.Block := #[]
+    for alternative in alternatives do
+      let `(Lean.Parser.Term.matchAltExpr| | $_patterns,* => $body) := alternative
+        | continue
+      let body : TSyntax ``Lean.Parser.Term.doSeq := ⟨body.raw⟩
+      branches := branches.push (← sourceBorrowBranch
+        (Lean.Parser.Term.getDoElems body) rest alternative)
+    let combined := branches.foldr (init := (.done : Move.Verify.Borrow.Block))
+      fun branch alternative => .branch 0 branch alternative .done
+    return .branch (← sourcePoint sites first.raw) combined .done continuationBlock
+  if kind == ``Move.moveLoopDo || kind == ``Move.moveLoopLabeledDo then
+    let bodyIndex := if kind == ``Move.moveLoopLabeledDo then 2 else 1
+    let body : TSyntax ``Lean.Parser.Term.doSeq := ⟨first.raw[bodyIndex]!⟩
+    let bodyBlock ← sourceBorrowBlock sites context
+      (Lean.Parser.Term.getDoElems body)
+    return .loop (← sourcePoint sites first.raw) bodyBlock continuationBlock
+  match first with
+  | `(doElem| let $name:ident ← &mut $owner:ident[$index:term]) =>
+      let (loanBody, continuation) := sourceBorrowScope name.getId rest
+      let after ← sourceBorrowBlock sites context continuation tail
+      let drop := .event (← sourcePoint sites first.raw)
+        (.drop name.getId.toString) after
+      let placeTerm ← `($owner[$index])
+      let (place, parent?) ← sourceBorrowPlace context placeTerm
+      let nestedContext := { context with references := {
+        name := name.getId, place, kind := .mutable } :: context.references }
+      let body ← sourceBorrowBlock sites nestedContext loanBody drop
+      return .event (← sourcePoint sites first.raw)
+        (.borrowMut name.getId.toString place parent?) body
+  | `(doElem| let $name:ident ← & $owner:ident[$index:term]) =>
+      let (loanBody, continuation) := sourceBorrowScope name.getId rest
+      let after ← sourceBorrowBlock sites context continuation tail
+      let drop := .event (← sourcePoint sites first.raw)
+        (.drop name.getId.toString) after
+      let placeTerm ← `($owner[$index])
+      let (place, parent?) ← sourceBorrowPlace context placeTerm
+      let nestedContext := { context with references := {
+        name := name.getId, place, kind := .immutable } :: context.references }
+      let body ← sourceBorrowBlock sites nestedContext loanBody drop
+      return .event (← sourcePoint sites first.raw)
+        (.borrowImm name.getId.toString place parent?) body
+  | `(doElem| let $name:ident ← &mut $place:term) =>
+      let (loanBody, continuation) := sourceBorrowScope name.getId rest
+      let after ← sourceBorrowBlock sites context continuation tail
+      let drop := .event (← sourcePoint sites first.raw)
+        (.drop name.getId.toString) after
+      let (place, parent?) ← sourceBorrowPlace context place
+      let nestedContext := { context with references := {
+        name := name.getId, place, kind := .mutable } :: context.references }
+      let body ← sourceBorrowBlock sites nestedContext loanBody drop
+      return .event (← sourcePoint sites first.raw)
+        (.borrowMut name.getId.toString place parent?) body
+  | `(doElem| let $name:ident ← & $place:term) =>
+      let (loanBody, continuation) := sourceBorrowScope name.getId rest
+      let after ← sourceBorrowBlock sites context continuation tail
+      let drop := .event (← sourcePoint sites first.raw)
+        (.drop name.getId.toString) after
+      let (place, parent?) ← sourceBorrowPlace context place
+      let nestedContext := { context with references := {
+        name := name.getId, place, kind := .immutable } :: context.references }
+      let body ← sourceBorrowBlock sites nestedContext loanBody drop
+      return .event (← sourcePoint sites first.raw)
+        (.borrowImm name.getId.toString place parent?) body
+  | `(doElem| let $_name:ident ← * $reference:term) =>
+      if reference.raw.isIdent && (context.find? reference.raw.getId).isSome then
+        return .event (← sourcePoint sites first.raw)
+          (.read reference.raw.getId.toString) continuationBlock
+      return continuationBlock
+  | `(doElem| let $name:ident ← $value:term) =>
+      if let some source ← sourceFreezeArgument? value then
+        if let some sourceBinding := context.find? source.getId then
+          let (loanBody, continuation) := sourceBorrowScope name.getId rest
+          let withoutSource := context.references.filter (·.name != source.getId)
+          let afterContext := { context with references := withoutSource }
+          let after ← sourceBorrowBlock sites afterContext continuation tail
+          let drop := .event (← sourcePoint sites first.raw)
+            (.drop name.getId.toString) after
+          let nestedContext := { context with references := {
+            name := name.getId
+            place := sourceBinding.place
+            kind := .immutable } :: withoutSource }
+          let body ← sourceBorrowBlock sites nestedContext loanBody drop
+          return .event (← sourcePoint sites first.raw)
+            (.freeze source.getId.toString name.getId.toString) body
+      if let some returned ← sourceCallResultBinding? context name.getId value then
+        let (loanBody, continuation) := sourceBorrowScope name.getId rest
+        let after ← sourceBorrowBlock sites context continuation tail
+        let drop := .event (← sourcePoint sites first.raw)
+          (.drop name.getId.toString) after
+        let nestedContext := {
+          context with references := returned :: context.references }
+        let body ← sourceBorrowBlock sites nestedContext loanBody drop
+        return ← prependBorrowEvents sites value.raw
+          (← sourceTermBorrowEvents context value (some name.getId)) body
+      prependBorrowEvents sites value.raw (← sourceTermBorrowEvents context value)
+        continuationBlock
+  | `(doElem| let mut $_name:ident ← * $reference:term) =>
+      if reference.raw.isIdent && (context.find? reference.raw.getId).isSome then
+        return .event (← sourcePoint sites first.raw)
+          (.read reference.raw.getId.toString) continuationBlock
+      return continuationBlock
+  | `(doElem| while $_condition:doIfCond do $body:doSeq) =>
+      let bodyBlock ← sourceBorrowBlock sites context
+        (Lean.Parser.Term.getDoElems body)
+      return .loop (← sourcePoint sites first.raw) bodyBlock continuationBlock
+  | `(doElem| if $_condition:doIfCond then $thenBranch:doSeq) =>
+      let thenBlock ← sourceBorrowBranch
+        (Lean.Parser.Term.getDoElems thenBranch) rest first.raw
+      let elseBlock ← sourceBorrowBranch #[] rest first.raw
+      return .branch (← sourcePoint sites first.raw) thenBlock elseBlock continuationBlock
+  | `(doElem| if $_condition:doIfCond then $thenBranch:doSeq else $elseBranch:doSeq) =>
+      let thenBlock ← sourceBorrowBranch
+        (Lean.Parser.Term.getDoElems thenBranch) rest first.raw
+      let elseBlock ← sourceBorrowBranch
+        (Lean.Parser.Term.getDoElems elseBranch) rest first.raw
+      return .branch (← sourcePoint sites first.raw) thenBlock elseBlock continuationBlock
+  | `(doElem| return $value:term) =>
+      if let some reference := sourcePureReference? context value then
+        return .event (← sourcePoint sites value.raw)
+          (.returnRef reference.name.toString) .done
+      if value.raw.isIdent then
+        if let some reference := context.find? value.raw.getId then
+          return .event (← sourcePoint sites value.raw)
+            (.returnRef reference.name.toString) .done
+      match value with
+      | `(& $place:term) =>
+          let point ← sourcePoint sites value.raw
+          let name := s!"_moveBorrowReturn{point}"
+          let (place, parent?) ← sourceBorrowPlace context place
+          return .event point (.borrowImm name place parent?) <|
+            .event (← sourcePoint sites value.raw) (.returnRef name) .done
+      | `(&mut $place:term) =>
+          let point ← sourcePoint sites value.raw
+          let name := s!"_moveBorrowReturn{point}"
+          let (place, parent?) ← sourceBorrowPlace context place
+          return .event point (.borrowMut name place parent?) <|
+            .event (← sourcePoint sites value.raw) (.returnRef name) .done
+      | _ => pure ()
+      prependBorrowEvents sites value.raw (← sourceTermBorrowEvents context value) .done
+  | `(doElem| $value:term) =>
+      if value.raw.isOfKind ``Move.abortTerm then return .abort
+      if let some reference := sourcePureReference? context value then
+        return .event (← sourcePoint sites value.raw)
+          (.returnRef reference.name.toString) .done
+      if value.raw.isIdent then
+        if let some reference := context.find? value.raw.getId then
+          return .event (← sourcePoint sites value.raw)
+            (.returnRef reference.name.toString) .done
+      match value with
+      | `(& $place:term) =>
+          let point ← sourcePoint sites value.raw
+          let name := s!"_moveBorrowReturn{point}"
+          let (place, parent?) ← sourceBorrowPlace context place
+          return .event point (.borrowImm name place parent?) <|
+            .event (← sourcePoint sites value.raw) (.returnRef name) .done
+      | `(&mut $place:term) =>
+          let point ← sourcePoint sites value.raw
+          let name := s!"_moveBorrowReturn{point}"
+          let (place, parent?) ← sourceBorrowPlace context place
+          return .event point (.borrowMut name place parent?) <|
+            .event (← sourcePoint sites value.raw) (.returnRef name) .done
+      | _ => pure ()
+      prependBorrowEvents sites value.raw (← sourceTermBorrowEvents context value) continuationBlock
+  | `(doElem| let $_name:ident := $value:term)
+  | `(doElem| let mut $_name:ident ← $value:term)
+  | `(doElem| let mut $_name:ident := $value:term) =>
+      prependBorrowEvents sites value.raw (← sourceTermBorrowEvents context value) continuationBlock
+  | _ => pure continuationBlock
+
+private structure BuiltBorrowProgram where
+  program : Move.Verify.Borrow.Program
+  sites : Array Syntax
+
+private def buildBorrowProgram (function : TSyntax `ident)
+    (signature : SourceSignature) : CommandElabM BuiltBorrowProgram := do
+  let declaration ← declarationFor function
+  let sourceBodySyntax := if declaration.value.isOfKind ``Lean.Parser.Term.paren then
+      declaration.value[1] else declaration.value
+  let source : TSyntax `term := ⟨← desugarPrimitives sourceBodySyntax true⟩
+  let resources ← collectResources source.raw
+  let resourceBindings := (distinctHeads resources).map fun head => {
+    head
+    descriptorFor := fun _ => throwError "borrow extraction does not use store descriptors" }
+  let references := signature.referenceParameters.toList.mapIdx fun index (name, kind, _) => {
+    name := name.getId
+    place := { root := .parameter index }
+    kind
+    isParameter := true }
+  let context : BorrowExtractionContext := { resources := resourceBindings, references }
+  let sites ← IO.mkRef #[]
+  let body ← match source with
+    | `(do $sequence:doSeq) =>
+        sourceBorrowBlock sites context (Lean.Parser.Term.getDoElems sequence)
+    | _ => pure .done
+  let parameters := signature.referenceParameters.map fun (name, kind, _) => {
+    name := name.getId.toString, kind }
+  let parameterEffects := signature.referenceParameters.map fun (_, kind, _) =>
+    if kind == .immutable then .read else .ignore
+  pure {
+    program := {
+      declaration := ((← getCurrNamespace) ++ function.getId).toString
+      parameters
+      body
+      summary := { parameterEffects } }
+    sites := ← sites.get }
+
+private def borrowErrorMessage (error : Move.Verify.Borrow.BorrowError) : MessageData :=
+  let reference := error.reference?.map (s!" `{·}`") |>.getD ""
+  let conflict := error.conflicting?.map (s!" (conflicts with `{·}`)") |>.getD ""
+  m!"borrow safety error{reference}: {error.kind.message}{conflict}"
+
+private def emitBorrowCertificate (function : TSyntax `ident)
+    (built : BuiltBorrowProgram) : CommandElabM Unit := do
+  let programName := mkIdentFrom function (function.getId ++ `borrowProgram)
+  if (← getEnv).contains ((← getCurrNamespace) ++ programName.getId) then return
+  let firstAnalysis ← match Move.Verify.Borrow.analyze built.program with
+    | .ok analysis => pure analysis
+    | .error error =>
+        let site := built.sites[error.point]?.getD function.raw
+        throwErrorAt site (borrowErrorMessage error)
+  let summary : Move.Verify.Borrow.Summary := {
+    parameterEffects := firstAnalysis.finalState.parameterEffects
+    requiredSeparations := firstAnalysis.finalState.requiredSeparations
+    returns := firstAnalysis.finalState.returns }
+  let program := { built.program with summary }
+  let certificate ← match Move.Verify.Borrow.makeCertificate program with
+    | .ok certificate => pure certificate
+    | .error error =>
+        let site := built.sites[error.point]?.getD function.raw
+        throwErrorAt site (borrowErrorMessage error)
+  let programTerm ← liftTermElabM <|
+    Lean.PrettyPrinter.delab (Lean.toExpr program)
+  let certificateTerm ← liftTermElabM <|
+    Lean.PrettyPrinter.delab (Lean.toExpr certificate)
+  let certificateName := mkIdentFrom function (function.getId ++ `borrowCertificate)
+  let theoremName := mkIdentFrom function (function.getId ++ `wellBorrowed)
+  elabCommand (← `(def $programName : Move.Verify.Borrow.Program := $(⟨programTerm⟩)))
+  elabCommand (← `(def $certificateName : Move.Verify.Borrow.Certificate :=
+    $(⟨certificateTerm⟩)))
+  elabCommand (← `(theorem $theoremName :
+      Move.Verify.Borrow.WellBorrowed $programName := by
+    exact Move.Verify.Borrow.soundChecked (certificate := $certificateName) (by native_decide)))
+  let functionName := (← getCurrNamespace) ++ function.getId
+  modifyEnv fun env => borrowSummaries.addEntry env (functionName, summary)
+
+private def sourceEffectJoin : Move.Verify.Borrow.CallEffect →
+    Move.Verify.Borrow.CallEffect → Move.Verify.Borrow.CallEffect
+  | .write, _ | _, .write => .write
+  | .consume, _ | _, .consume => .consume
+  | .read, _ | _, .read => .read
+  | _, _ => .ignore
+
+private def sourceSummaryJoin (left right : Move.Verify.Borrow.Summary) :
+    Move.Verify.Borrow.Summary :=
+  let count := max left.parameterEffects.size right.parameterEffects.size
+  let effects := (List.range count).toArray.map fun index =>
+    sourceEffectJoin (left.parameterEffects[index]?.getD .ignore)
+      (right.parameterEffects[index]?.getD .ignore)
+  let separations := right.requiredSeparations.foldl
+    (fun accumulated requirement => if accumulated.contains requirement then
+      accumulated else accumulated.push requirement)
+    left.requiredSeparations
+  { parameterEffects := effects
+    requiredSeparations := separations
+    returns := right.returns.foldl
+      (fun accumulated returned => if accumulated.contains returned then
+        accumulated else accumulated.push returned)
+      left.returns }
+
+/-- Monotone call-summary iteration for a recursive component.  The final
+certificates replay calls using these summaries; reaching equality is checked
+by one final iteration rather than trusting an iteration counter. -/
+private def stabilizeBorrowSummaries
+    (functions : Array (TSyntax `ident × SourceSignature)) (ref : Syntax) :
+    CommandElabM Unit := do
+  for (function, signature) in functions do
+    let initial : Move.Verify.Borrow.Summary := {
+      parameterEffects := signature.referenceParameters.map fun (_, kind, _) =>
+        if kind == .immutable then .read else .ignore }
+    let name := (← getCurrNamespace) ++ function.getId
+    unless (borrowSummaries.getState (← getEnv)).contains name do
+      modifyEnv fun env => borrowSummaries.addEntry env (name, initial)
+  let fuel := Nat.mul (Nat.mul functions.size functions.size) 4 + 16
+  let mut stable := false
+  for _ in [0:fuel] do
+    let mut changed := false
+    for (function, signature) in functions do
+      let built ← buildBorrowProgram function signature
+      let analysis ← match Move.Verify.Borrow.analyze built.program with
+        | .ok analysis => pure analysis
+        | .error error =>
+            throwErrorAt (built.sites[error.point]?.getD ref)
+              (borrowErrorMessage error)
+      let inferred : Move.Verify.Borrow.Summary := {
+        parameterEffects := analysis.finalState.parameterEffects
+        requiredSeparations := analysis.finalState.requiredSeparations
+        returns := analysis.finalState.returns }
+      let name := (← getCurrNamespace) ++ function.getId
+      let old := borrowSummaries.getState (← getEnv) |>.find? name |>.getD {}
+      let joined := sourceSummaryJoin old inferred
+      if joined != old then
+        changed := true
+        modifyEnv fun env => borrowSummaries.addEntry env (name, joined)
+    if !changed then
+      stable := true
+      break
+  unless stable do
+    throwErrorAt ref "recursive borrow summaries did not reach a post-fixpoint"
 
 /-- Functions whose relational semantics is being generated, to cut mutual
 recursion between on-demand generations. -/
@@ -2069,6 +2643,10 @@ The semantics is state-polymorphic: it quantifies over an abstract state and
 one typed store per resource family the body (transitively) touches. -/
 private partial def generateSourceSpec (function : TSyntax `ident)
     (signature : SourceSignature) : CommandElabM Unit := do
+  if ← isRecursive function.raw then
+    stabilizeBorrowSummaries #[(function, signature)] function.raw
+  let borrowProgram ← buildBorrowProgram function signature
+  emitBorrowCertificate function borrowProgram
   let world := mkIdentFrom function `_moveSpecState
   let resourceTypes ← inferredResources function.raw
   let sourceSpecName := mkIdentFrom function (function.getId ++ `sourceSpec)
@@ -2148,6 +2726,12 @@ private partial def generateMutualSourceSpecs (members : Array Name)
   withScope (fun scope => { scope with currNamespace := namespace_ }) do
     let mut signatures : Array SourceSignature := #[]
     for member in members do signatures := signatures.push (← signatureOf member)
+    let summaryMembers := (members.zip signatures).map fun (member, signature) =>
+      (mkIdentFrom ref (Name.mkSimple member.getString!), signature)
+    stabilizeBorrowSummaries summaryMembers ref
+    for (member, signature) in members.zip signatures do
+      let short := mkIdentFrom ref (Name.mkSimple member.getString!)
+      emitBorrowCertificate short (← buildBorrowProgram short signature)
     let some firstSignature := signatures[0]? | return
     let commonContext := firstSignature.context
     unless signatures.all (·.context.map (·.raw) == commonContext.map (·.raw)) do
@@ -2734,6 +3318,16 @@ private partial def translateDo (context : TranslationContext)
     let unpacked ← unpackLoopState state stateTerm bodySpec
     return ← `(Move.Semantics.Spec.fix
         (fun $recName $stateName => $unpacked) $pack)
+  -- An unactivated mutable handle with no source use has no prophecy.  Erase
+  -- it before the eager `withMutation` cases below.  In particular, creating
+  -- overlapping handles and discarding all but one must not constrain the
+  -- owner's final value.
+  match first with
+  | `(doElem| let $name:ident ← &mut $_place:term) =>
+      let (loanBody, continuation) := mutableBorrowScope name.getId rest
+      if loanBody.isEmpty then
+        return ← translateDo context continuation
+  | _ => pure ()
   match first with
   | `(doElem| let $name:ident ← &mut $vector:ident[$index:term]) =>
       if let some family ← familyOfTerm? vector then

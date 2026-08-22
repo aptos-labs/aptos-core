@@ -16,6 +16,8 @@ import Move.Semantics.Global
 import Move.Verify.Contract
 import Move.Verify.WP
 import Move.Verify.Borrow
+import Move.Verify.SourceProgram
+import Move.Verify.BorrowChecker
 import Move.Verify.Compare
 import Move.Verify.Syntax
 import Move.Verify.Tactics

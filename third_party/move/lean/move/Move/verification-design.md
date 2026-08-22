@@ -743,13 +743,17 @@ theorem.
 - Prove rollback behavior with a live mutable loan.
 - Verify the account deposit and withdrawal examples directly.
 
-### 5. Borrow certificates and automation — partial
+### 5. Borrow certificates and automation — implemented for retained source
 
-- Reuse or factor the compiler's liveness and borrow-graph analysis.
-- Define a small `WellBorrowed` certificate checker.
-- Generate scoped semantic core from accepted surface declarations.
-- `Contract`, `Satisfies`, source semantics, and `verify` automation are
-  implemented; a shared accepted-program borrow certificate is not.
+- A generic retained-source control topology is shared with the poison-aware
+  borrow-effect projection.
+- A small `WellBorrowed` checker replays access-path transfers, loop facts,
+  call effects, separations, and returned-reference derivations.
+- Each generated source specification exports `borrowProgram`,
+  `borrowCertificate`, and `wellBorrowed` declarations before proof
+  generation.
+- Compiler-correctness transport of this source certificate to `MoveModel.IR`
+  remains phase 7, not part of the source proof's trusted premise.
 
 ### 6. Calls and loops — partial
 
@@ -823,16 +827,14 @@ The implementation is incomplete until the following properties are proved:
 - Lean source semantics is relational and used only for verification.
 - Execution is defined solely by compilation to IR and bytecode.
 - Loan scopes are generated from retained source sequencing, not user
-  annotations; integrating a checked borrow/liveness certificate is still
-  required for the full language.
+  annotations, and source proof generation is gated by a checked borrow
+  certificate.
 - Prophecies and reference identities are absent from user-facing contracts.
 - The source proof layer complements, rather than replaces, IR semantics and
   bytecode verification.
 
 ## Open design questions
 
-- Whether `WellBorrowed` initially rechecks LIR borrow graphs or has a smaller
-  source-specific certificate format.
 - How to extend automatic source semantics to the constructs still rejected
   at `spec`: the global publication/removal primitives, pure Move callees,
   and effectful callees with mutable-reference parameters.

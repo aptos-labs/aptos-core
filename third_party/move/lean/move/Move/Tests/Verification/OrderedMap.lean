@@ -168,6 +168,11 @@ module OrderedMap where
     aborts_if map.entries.toList[index.toNat]? = none
       with Move.Semantics.Vector.indexOutOfBounds
 
+  #guard borrow_key_at.borrowProgram.summary.returns.contains {
+    parameter := 0
+    path := #[.field "entries", .anyIndex, .field "key"]
+    kind := .immutable }
+
   public fun contains {K V} (map : &Map K V) (key : &K) : Action Bool := do
     let index ← lower_bound map key
     let entries ← &map.entries
@@ -199,6 +204,11 @@ module OrderedMap where
       (map : Map K V) (key : K) where
     ensures Model.MapsTo map key result;
     aborts_if ¬Model.Contains map key with 2
+
+  #guard borrow.borrowProgram.summary.returns.contains {
+    parameter := 0
+    path := #[.field "entries", .anyIndex, .field "value"]
+    kind := .immutable }
 
   /-- Add a fresh key.  Abort code 1 matches `EKEY_ALREADY_EXISTS`. -/
   public fun add {K V} (map : &mut Map K V) (key : K) (value : V) :
