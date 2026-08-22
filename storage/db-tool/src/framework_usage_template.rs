@@ -57,11 +57,15 @@ code { font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
 .meta { color:var(--muted); font-size:12px; }
 button.link { border:0; background:none; color:var(--accent); padding:0; cursor:pointer; font:inherit; text-decoration:underline; }
 #details[hidden] { display:none; }
+#details { position:fixed; z-index:20; width:min(920px,calc(100vw - 32px)); max-height:min(70vh,680px); overflow:auto; margin:0; padding:16px; border-color:#aebbc6; box-shadow:0 12px 35px #14202b33; }
+.detail-header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.detail-header h2 { margin:0; overflow-wrap:anywhere; }
+.detail-close { flex:0 0 auto; width:28px; height:28px; border:1px solid #bdc7d0; border-radius:6px; background:white; color:var(--muted); cursor:pointer; font:18px/1 ui-sans-serif,system-ui,sans-serif; }
 .detail-grid { display:grid; grid-template-columns:repeat(4,minmax(120px,1fr)); gap:8px 18px; margin-bottom:12px; }
 .detail-grid .value { display:block; font-weight:650; overflow-wrap:anywhere; }
 .paths { max-height:330px; overflow:auto; }
 .empty { padding:25px; text-align:center; color:var(--muted); }
-@media (max-width:900px) { main{padding:15px}.cards{grid-template-columns:repeat(2,1fr)}.controls{grid-template-columns:1fr 1fr}.detail-grid{grid-template-columns:1fr 1fr} }
+@media (max-width:900px) { main{padding:15px}.cards{grid-template-columns:repeat(2,1fr)}.controls{grid-template-columns:1fr 1fr}.detail-grid{grid-template-columns:1fr 1fr}#details{width:calc(100vw - 20px);max-height:calc(100vh - 20px)} }
 </style>
 </head>
 <body>
@@ -80,8 +84,8 @@ button.link { border:0; background:none; color:var(--accent); padding:0; cursor:
     </div>
     <div class="legend"><span><i class="dot" style="background:#c64a4a"></i>unobserved external</span><span><i class="dot" style="background:#d29a20"></i>rare external</span><span><i class="dot" style="background:#8c6bb1"></i>unobserved internal</span><span><i class="dot" style="background:#3a9665"></i>active</span></div>
   </section>
-  <section class="panel" id="details" hidden>
-    <h2 id="detail-title"></h2>
+  <section class="panel" id="details" role="dialog" aria-labelledby="detail-title" hidden>
+    <div class="detail-header"><h2 id="detail-title"></h2><button class="detail-close" id="detail-close" type="button" aria-label="Close function details">×</button></div>
     <div class="detail-grid" id="detail-summary"></div>
     <h2>Observed call paths</h2>
     <div class="paths table-wrap" id="detail-paths"></div>
@@ -221,6 +225,7 @@ function renderActiveEntryFunctionCallers() {
 }
 
 function renderFunctions() {
+  closeDetails();
   const threshold = Math.max(1, Number(document.getElementById("threshold").value) || 10);
   const query = document.getElementById("search").value.trim().toLowerCase();
   const classFilter = document.getElementById("class-filter").value;
@@ -291,11 +296,35 @@ function renderFunctions() {
     if (collapsedModules.has(moduleId)) collapsedModules.delete(moduleId); else collapsedModules.add(moduleId);
     renderFunctions();
   });
-  for (const button of document.querySelectorAll("button[data-function]")) button.addEventListener("click", () => renderDetails(functions.get(button.dataset.function)));
+  for (const button of document.querySelectorAll("button[data-function]")) button.addEventListener("click", () => renderDetails(functions.get(button.dataset.function), button));
 }
 
-function renderDetails(f) {
+let detailAnchor = null;
+function closeDetails() {
+  document.getElementById("details").hidden=true;
+  detailAnchor=null;
+}
+
+function positionDetails(anchor) {
   const details=document.getElementById("details");
+  if (details.hidden || !anchor?.isConnected) return closeDetails();
+  const margin=10, gap=8, anchorRect=anchor.getBoundingClientRect();
+  details.style.visibility="hidden";
+  details.style.left=`${margin}px`;
+  details.style.top=`${margin}px`;
+  const detailRect=details.getBoundingClientRect();
+  const left=Math.min(Math.max(margin,anchorRect.left),window.innerWidth-detailRect.width-margin);
+  const below=anchorRect.bottom+gap;
+  const above=anchorRect.top-detailRect.height-gap;
+  const top=below+detailRect.height<=window.innerHeight-margin ? below : Math.max(margin,above);
+  details.style.left=`${left}px`;
+  details.style.top=`${top}px`;
+  details.style.visibility="visible";
+}
+
+function renderDetails(f, anchor) {
+  const details=document.getElementById("details");
+  detailAnchor=anchor;
   details.hidden=false;
   document.getElementById("detail-title").innerHTML=`<code title="${esc(f.id)}">${esc(f.displayId)}</code>`;
   const summary=[
@@ -307,8 +336,19 @@ function renderDetails(f) {
   document.getElementById("detail-summary").innerHTML=summary.map(([label,value])=>`<div><span class="meta">${esc(label)}</span><span class="value">${esc(value)}</span></div>`).join("");
   const paths=[...f.paths].sort((a,b)=>b.invocation_count-a.invocation_count);
   document.getElementById("detail-paths").innerHTML=paths.length?`<table><thead><tr><th>Immediate caller</th><th>Root payload</th><th>Kind</th><th>Outcome</th><th class="number">Transactions</th><th class="number">Invocations</th><th>Versions</th></tr></thead><tbody>${paths.map(p=>`<tr><td><code>${esc(functionName(p.caller))}</code></td><td><code>${esc(functionName(p.root_function))}</code></td><td>${esc(p.call_kind)}</td><td>${esc(p.outcome)}</td><td class="number">${nf.format(p.transaction_count)}</td><td class="number">${nf.format(p.invocation_count)}</td><td>${nf.format(p.first_version)}–${nf.format(p.last_version)}</td></tr>`).join("")}</tbody></table>`:`<div class="empty">No calls to this function were observed in the replay range.</div>`;
-  details.scrollIntoView({behavior:"smooth",block:"start"});
+  positionDetails(anchor);
 }
+
+document.getElementById("detail-close").addEventListener("click",closeDetails);
+document.addEventListener("keydown",event=>{if(event.key==="Escape")closeDetails();});
+document.addEventListener("pointerdown",event=>{
+  const details=document.getElementById("details");
+  if (!details.hidden && !details.contains(event.target) && !event.target.closest("button[data-function]")) closeDetails();
+});
+document.addEventListener("scroll",event=>{
+  if (!document.getElementById("details").contains(event.target)) positionDetails(detailAnchor);
+},true);
+window.addEventListener("resize",()=>positionDetails(detailAnchor));
 
 for (const id of ["search","class-filter","visibility","threshold"]) document.getElementById(id).addEventListener(id==="search"||id==="threshold"?"input":"change",renderFunctions);
 document.getElementById("toggle-entrypoint-callers").addEventListener("click", () => {
