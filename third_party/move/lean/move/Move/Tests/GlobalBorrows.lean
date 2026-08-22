@@ -4,7 +4,6 @@
 import Move
 import MoveModel.Tests.Common
 open Move
-open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
 /-! Direct global borrows — `&mut R[a]` / `&R[a]` without a field path — and
@@ -93,7 +92,7 @@ module GlobalBorrows where
 
   /-! ## Tests -/
 
-  def compiled : MModule := module% "GlobalBorrows"
+  def compiled : MoveModel.IR.Module := lowerToIR ``GlobalBorrows
 
   private def counterId := compiled.resourceId "Counter"
   private def memory (addr value : Nat) : MoveModel.IR.IMem :=

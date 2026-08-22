@@ -4,7 +4,6 @@
 import Move
 import MoveModel.Tests.Common
 open Move
-open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
 /-! The explicitly spelled core primitives under `verify`: the borrow
@@ -80,7 +79,7 @@ module CorePrimitives where
 
   /-! ## Tests -/
 
-  def compiled : MModule := module% "CorePrimitives"
+  def compiled : MoveModel.IR.Module := lowerToIR ``CorePrimitives
 
   private def counterId := compiled.resourceId "Counter"
   private def memory (addr value : Nat) : MoveModel.IR.IMem :=

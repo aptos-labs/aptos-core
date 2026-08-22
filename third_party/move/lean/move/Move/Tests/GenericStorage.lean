@@ -4,7 +4,6 @@
 import Move
 import MoveModel.Tests.Common
 open Move
-open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
 /-! Generic global storage under `verify`: a resource family `Vault T` used
@@ -110,7 +109,7 @@ module GenericStorage where
 
   /-! ## Tests -/
 
-  def compiled : MModule := module% "GenericStorage"
+  def compiled : MoveModel.IR.Module := lowerToIR ``GenericStorage
 
   private def vaultId := compiled.resourceId "Vault"
   private def counterId := compiled.resourceId "Counter"

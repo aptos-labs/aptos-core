@@ -4,7 +4,6 @@
 import Move
 import MoveModel.Tests.Common
 open Move
-open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
 /-! Calls from verified bodies: effectful callees taking a mutable reference
@@ -147,7 +146,7 @@ module Callees where
 
   /-! ## Tests -/
 
-  def compiled : MModule := module% "Callees"
+  def compiled : MoveModel.IR.Module := lowerToIR ``Callees
 
   private def counterId := compiled.resourceId "Counter"
   private def memory (addr value : Nat) : MoveModel.IR.IMem :=

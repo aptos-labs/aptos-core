@@ -4,7 +4,6 @@
 import Move
 import MoveModel.Tests.Common
 open Move
-open MoveModel.Frontend.XIR
 open scoped Move Move.Compiler Move.Spec
 
 /-! Control and expression forms verified from retained source: `return`
@@ -122,7 +121,7 @@ module ControlForms where
 
   /-! ## Tests -/
 
-  def compiled : MModule := module% "ControlForms"
+  def compiled : MoveModel.IR.Module := lowerToIR ``ControlForms
 
   private def run := Tests.run compiled
 
