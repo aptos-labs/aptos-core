@@ -50,6 +50,21 @@ This regenerates `aptos-move/framework/cached-packages/src/head.mrb`, the binary
 ./scripts/dev_setup.sh -y           # Include Move Prover tools (z3, boogie)
 ```
 
+### Lean/Lake file descriptors
+Lake's parent process retains pipes, logs, and trace files for materialized
+build jobs.  Lean builds therefore need a sufficiently high `nofile` soft
+limit; the devcontainer template and Lean CI set it to `65536`.
+
+Agent shells are short-lived, so set the limit in the same command that runs
+Lake when the inherited limit is lower:
+
+```bash
+ulimit -S -n 65536 && lake test
+```
+
+If Lake reports `EMFILE`/"Too many open files", check and raise the limit
+first; do not default to serializing the build.
+
 ## Architecture Overview
 
 ### Core Transaction Flow
