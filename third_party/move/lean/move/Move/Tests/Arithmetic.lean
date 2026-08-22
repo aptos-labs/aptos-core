@@ -19,7 +19,7 @@ module Arithmetic where
     pure (left + right)
 
   spec add_values (left : U64) (right : U64) where
-    ensures True;
+    ensures result.toNat = left.toNat + right.toNat;
     aborts_if ¬left.toNat + right.toNat < U64.size
       with Semantics.Checked.arithmeticAbortCode
 
@@ -27,14 +27,14 @@ module Arithmetic where
     pure (left - right)
 
   spec subtract_values (left : U64) (right : U64) where
-    ensures True;
+    ensures result.toNat = left.toNat - right.toNat;
     aborts_if left.toNat < right.toNat with Semantics.Checked.arithmeticAbortCode
 
   fun multiply_values (left right : U64) : Action U64 :=
     pure (left * right)
 
   spec multiply_values (left : U64) (right : U64) where
-    ensures True;
+    ensures result.toNat = left.toNat * right.toNat;
     aborts_if ¬left.toNat * right.toNat < U64.size
       with Semantics.Checked.arithmeticAbortCode
 
@@ -42,14 +42,14 @@ module Arithmetic where
     pure (left / right)
 
   spec divide_values (left : U64) (right : U64) where
-    ensures True;
+    ensures result.toNat = left.toNat / right.toNat;
     aborts_if right.toNat = 0 with Semantics.Checked.arithmeticAbortCode
 
   fun modulo_values (left right : U64) : Action U64 :=
     pure (left % right)
 
   spec modulo_values (left : U64) (right : U64) where
-    ensures True;
+    ensures result.toNat = left.toNat % right.toNat;
     aborts_if right.toNat = 0 with Semantics.Checked.arithmeticAbortCode
 
   struct Counter has Key where
@@ -64,7 +64,7 @@ module Arithmetic where
     requires existsAt<Counter>(addr);
     modifies Counter[addr];
     ensures
-      Counter[addr].value = old(Counter[addr].value) * factor;
+      Counter[addr].value.toNat = old(Counter[addr].value).toNat * factor.toNat;
     aborts_if
       ¬old(Counter[addr].value).toNat * factor.toNat < U64.size
       with Semantics.Checked.arithmeticAbortCode
@@ -78,7 +78,7 @@ module Arithmetic where
     requires existsAt<Counter>(addr);
     modifies Counter[addr];
     ensures
-      Counter[addr].value = old(Counter[addr].value) / divisor;
+      Counter[addr].value.toNat = old(Counter[addr].value).toNat / divisor.toNat;
     aborts_if divisor.toNat = 0 with Semantics.Checked.arithmeticAbortCode
 
   -- Comparison spellings: `<=`, `>`, `>=`, `!=`, and a comparison in value
