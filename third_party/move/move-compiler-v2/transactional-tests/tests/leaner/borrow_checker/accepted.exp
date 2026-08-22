@@ -1,16 +1,10 @@
 processed 4 tasks
 task 0 lines 1-49:  publish [import Move]
 warning: This assignment/binding to the left-hand-side variable `l6` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_l6`), or renaming to `_`
-   ┌─ TEMPFILE:1:1
-   │  
- 1 │ ╭ 
- 2 │ │ import Move
- 3 │ │ open Move
- 4 │ │ open scoped Move Move.Spec
-   · │
-38 │ │   spec child_then_parent where
-39 │ │     ensures True
-   │ ╰────────────────^
+   ┌─ TEMPFILE:35:5
+   │
+35 │     let _childValue ← *child
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^
 
 
 task 1 lines 51-51:  run 0x0::LeanerBorrowAccepted::multiple_immutable

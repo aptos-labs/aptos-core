@@ -61,6 +61,25 @@ structure Attribute where
   args : List AttributeArg
   deriving BEq, Repr
 
+/-- A half-open UTF-8 byte range in the source file supplied alongside XIR. -/
+structure SourceSpan where
+  start : Nat
+  «end» : Nat
+  deriving BEq, Repr
+
+/-- Source ranges aligned with one semantic basic block. Missing ranges denote
+compiler-generated code and let consumers fall back to the enclosing function. -/
+structure BlockSourceMap where
+  instrs : List (Option SourceSpan)
+  term : Option SourceSpan
+  deriving BEq, Repr
+
+/-- Non-semantic source locations for a function and its CFG. -/
+structure FunSourceMap where
+  span : Option SourceSpan
+  blocks : List BlockSourceMap
+  deriving BEq, Repr
+
 /-- Non-semantic information for one positional struct declaration. -/
 structure StructMeta where
   name : String
@@ -77,6 +96,7 @@ structure FunMeta where
   isEntry : Bool
   acquires : List ResourceId
   attributes : List Attribute := []
+  sourceMap : Option FunSourceMap := none
   deriving BEq, Repr
 
 /-- A finite, deployable view of a semantic program. -/

@@ -1,4 +1,4 @@
-{"version": 3,
+{"version": 4,
  "structs":
  [{"type_parameters": [],
    "name": "BalanceValue",
@@ -18,6 +18,24 @@
     "modifies": [],
     "ensures": [{"value": {"bool": true}}],
     "aborts_if": []},
+   "source_map":
+   {"span": {"start": 1168, "end": 1275},
+    "blocks":
+    [{"term": {"start": 1191, "end": 1246},
+      "instrs":
+      [{"start": 1251, "end": 1275},
+       {"start": 1251, "end": 1275},
+       {"start": 1251, "end": 1275},
+       {"start": 1168, "end": 1186},
+       {"start": 1168, "end": 1186}]},
+     {"term": {"start": 1191, "end": 1246}, "instrs": []},
+     {"term": {"start": 1251, "end": 1275},
+      "instrs":
+      [{"start": 1251, "end": 1275},
+       {"start": 1251, "end": 1275},
+       {"start": 1251, "end": 1275}]},
+     {"term": {"start": 1218, "end": 1246},
+      "instrs": [{"start": 1218, "end": 1246}]}]},
    "returns": [],
    "params": 2,
    "name": "withdraw",
@@ -59,6 +77,17 @@
     "modifies": [],
     "ensures": [{"value": {"bool": true}}],
     "aborts_if": []},
+   "source_map":
+   {"span": {"start": 608, "end": 683},
+    "blocks":
+    [{"term": {"start": 659, "end": 683},
+      "instrs":
+      [{"start": 608, "end": 654},
+       {"start": 608, "end": 654},
+       {"start": 608, "end": 654},
+       {"start": 659, "end": 683},
+       {"start": 659, "end": 683},
+       {"start": 659, "end": 683}]}]},
    "returns": [],
    "params": 2,
    "name": "deposit",

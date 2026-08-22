@@ -46,6 +46,20 @@ private def elabMoveIsVariant : TermElab := fun stx expectedType? => do
 /-! Compiler-only loop markers. They are private so authored Leaner cannot
 forge CFG control by calling the normalizer protocol directly. -/
 
+/-- Compiler-only source marker. Its monadic dependency keeps the call in
+LCNF; normalization consumes it and attaches the half-open byte range to the
+instructions produced by the following authored `do` element. -/
+@[never_extract, noinline] partial def sourceSpanMarkerAction
+    (start stop : Nat) : Action Unit :=
+  sourceSpanMarkerAction start stop
+
+@[never_extract, noinline] partial def sourceSpanMarkerId
+    (start stop : Nat) : Id Unit :=
+  sourceSpanMarkerId start stop
+
+def isSourceSpanMarker (name : Name) : Bool :=
+  name == ``sourceSpanMarkerAction || name == ``sourceSpanMarkerId
+
 @[never_extract, noinline] private partial def loopEnter
     {σ : Type} [Inhabited σ] (label nonce arity token : Nat)
     (state : σ) : Nat :=

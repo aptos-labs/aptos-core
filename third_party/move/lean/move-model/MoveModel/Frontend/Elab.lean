@@ -57,6 +57,9 @@ deriving instance ToExpr for MoveModel.IR.Visibility
 deriving instance ToExpr for Dialect
 deriving instance ToExpr for AttributeArg
 deriving instance ToExpr for MoveModel.IR.Attribute
+deriving instance ToExpr for SourceSpan
+deriving instance ToExpr for BlockSourceMap
+deriving instance ToExpr for FunSourceMap
 deriving instance ToExpr for StructMeta
 deriving instance ToExpr for FunMeta
 deriving instance ToExpr for ExternalFunRef

@@ -359,6 +359,36 @@ private def dropPublicModifier
     TSyntax ``Lean.Parser.Command.declModifiers :=
   ⟨modifiers.raw.setArg 2 (mkNullNode)⟩
 
+private def isDoSeqSyntax (stx : Syntax) : Bool :=
+  stx.isOfKind ``Lean.Parser.Term.doSeqIndent ||
+    stx.isOfKind ``Lean.Parser.Term.doSeqBracketed
+
+private def mkSourceDoSeq (elems : Array Syntax) : Syntax :=
+  mkNode ``Lean.Parser.Term.doSeqIndent #[mkNullNode <|
+    elems.map fun elem => mkNullNode #[elem, mkNullNode]]
+
+/-- Insert compiler-only markers before every authored `do` element. This is
+done only to the executable declaration; `move_source` above retains the
+original syntax used by source verification. -/
+private partial def instrumentSourceSpans (isAction : Bool)
+    (stx : Syntax) : MacroM Syntax := do
+  if isDoSeqSyntax stx then
+    let mut result := #[]
+    for elem in Lean.Parser.Term.getDoElems ⟨stx⟩ do
+      let rewritten ← instrumentSourceSpans isAction elem.raw
+      if let some start := elem.raw.getPos? then
+        if let some stop := elem.raw.getTailPos? then
+          let startTerm : TSyntax `term := quote start.byteIdx
+          let stopTerm : TSyntax `term := quote stop.byteIdx
+          let marker ← if isAction then
+            `(doElem| let _ ← Move.sourceSpanMarkerAction $startTerm $stopTerm)
+          else
+            `(doElem| let _ ← Move.sourceSpanMarkerId $startTerm $stopTerm)
+          result := result.push marker.raw
+      result := result.push rewritten
+    return mkSourceDoSeq result
+  return stx.setArgs (← stx.getArgs.mapM (instrumentSourceSpans isAction))
+
 macro_rules
   | `($modifiers:declModifiers fun $declName:declId
         $signature:optDeclSig $value:declVal) => do
@@ -407,8 +437,10 @@ macro_rules
                         else none
                       identName == some `Action || identName == some ``Move.Action
                   | none => false
+                let seq : TSyntax ``Lean.Parser.Term.doSeq :=
+                  ⟨← instrumentSourceSpans isAction seq.raw⟩
                 if isAction = true then
-                  pure value
+                  `(declVal| := do $seq)
                 else
                   `(declVal| := Id.run do $seq)
             | _ => pure value

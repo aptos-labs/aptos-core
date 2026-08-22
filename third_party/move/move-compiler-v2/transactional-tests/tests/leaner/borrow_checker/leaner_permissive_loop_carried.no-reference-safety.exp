@@ -2,29 +2,21 @@ processed 2 tasks
 task 0 lines 1-23:  publish [import Move]
 Error: compilation errors:
  warning: This assignment/binding to the left-hand-side variable `l8` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_l8`), or renaming to `_`
-   ┌─ TEMPFILE:1:1
+   ┌─ TEMPFILE:12:5
    │  
- 1 │ ╭ 
- 2 │ │ import Move
- 3 │ │ open Move
- 4 │ │ open scoped Move Move.Spec
-   · │
-17 │ │   spec run where
-18 │ │     ensures True
-   │ ╰────────────────^
+12 │ ╭     while count < 3 do
+13 │ │       writer := *writer + 2
+14 │ │       count := count + 1
+   │ ╰────────────────────────^
 
 bug: bytecode verification failed with unexpected status code `COPYLOC_EXISTS_BORROW_ERROR`:
 Error message: none
-   ┌─ TEMPFILE:1:1
+   ┌─ TEMPFILE:12:5
    │  
- 1 │ ╭ 
- 2 │ │ import Move
- 3 │ │ open Move
- 4 │ │ open scoped Move Move.Spec
-   · │
-17 │ │   spec run where
-18 │ │     ensures True
-   │ ╰────────────────^
+12 │ ╭     while count < 3 do
+13 │ │       writer := *writer + 2
+14 │ │       count := count + 1
+   │ ╰────────────────────────^
    │  
    = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
 

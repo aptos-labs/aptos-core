@@ -46,7 +46,11 @@ private def fixture : MModule where
     name := "deposit"
     visibility := .public_
     isEntry := true
-    acquires := [] }]
+    acquires := []
+    sourceMap := some {
+      span := some { start := 10, «end» := 30 }
+      blocks := [{ instrs := [], term := some { start := 20, «end» := 26 } }]
+    } }]
 
 private def roundTrip : Except String String := do
   let encoded ← fixture.encodeJson

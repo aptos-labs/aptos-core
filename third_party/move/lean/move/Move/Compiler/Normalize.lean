@@ -603,11 +603,13 @@ private structure BuildState where
   products : List (FVarId × Array FVarId) := []
   tupleLocals : List (FVarId × Array (String × LIR.Ty)) := []
   loopLiveResults : List FVarId := []
+  sourceMarkerResults : List FVarId := []
   blocks : Array LIR.Block := #[]
   calls : Array Name := #[]
   acquires : Array Name := #[]
   nextBlock : Nat := 0
   nextTemp : Nat := 0
+  currentSpan : Option MoveModel.IR.SourceSpan := none
 
 private abbrev BuildM := StateT BuildState CoreM
 
@@ -784,8 +786,11 @@ private def materializePending (pending : Pending) (dsts : Array String)
         |>.push (.call #[] .writeRef #[localName reference, updated])
 
 private def emitBlock (name : String) (instrs : Array LIR.Instr)
-    (term : LIR.Terminator) : BuildM Unit :=
-  modify fun s => { s with blocks := s.blocks.push { name, instrs, term } }
+    (term : LIR.Terminator) : BuildM Unit := do
+  let span := (← get).currentSpan
+  let instrs := instrs.map (·.withSpan span)
+  modify fun s => { s with
+    blocks := s.blocks.push { name, instrs, term, termSpan := span } }
 
 private def srcName (id : FVarId) : Local := localName id
 
@@ -966,6 +971,22 @@ private def recognizeLet (signatures : FunSignatures) (decl : LetDecl .pure)
   | .const fn _ args _ =>
       let vars := fvarArgs args
       let types := typeArgs args
+      if Move.isSourceSpanMarker fn then
+        let mut literals := #[]
+        for id in vars do
+          if let some n := assocFind? id (← get).natLiterals then
+            literals := literals.push n
+        let some start := literals[0]?
+          | throwError "source span marker is missing its start offset"
+        let some stop := literals[1]?
+          | throwError "source span marker is missing its end offset"
+        unless start ≤ stop do
+          throwError "source span marker has a reversed range"
+        let previous := (← get).currentSpan
+        modify fun s => { s with
+          currentSpan := some { start, «end» := stop }
+          sourceMarkerResults := decl.fvarId :: s.sourceMarkerResults }
+        return instrs.map (·.withSpan previous)
       -- `Int.ofNat n` / `Nat.cast n` is the carrier of a non-negative integer
       -- literal; track its value like a natural literal so `MoveInt.ofInt` can
       -- resolve it.
@@ -1730,7 +1751,16 @@ private partial def walk (env : Environment) (signatures : FunSignatures) (self 
                   pure <| if (← get).localIds.any (· == result) then #[srcName result] else #[]
               emitBlock blockName instrs (.ret returns)
   | .cases cases =>
-      if (← get).loopLiveResults.contains cases.discr then
+      if (← get).sourceMarkerResults.contains cases.discr then
+        let some alt := cases.alts[0]?
+          | throwError "source span marker result has no product case"
+        match alt with
+        | .alt ``Prod.mk _ body _ =>
+            walk env signatures self signature body blockName instrs
+        | .alt ``Unit.unit _ body _ | .alt ``PUnit.unit _ body _ =>
+            walk env signatures self signature body blockName instrs
+        | _ => throwError "source span marker did not normalize to a product case"
+      else if (← get).loopLiveResults.contains cases.discr then
         let some body := trueAlternative? cases.alts
           | throwError "loop liveness test has no true branch"
         walk env signatures self signature body blockName instrs

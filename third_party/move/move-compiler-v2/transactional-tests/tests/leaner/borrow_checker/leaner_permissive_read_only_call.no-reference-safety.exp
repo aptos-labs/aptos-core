@@ -3,17 +3,11 @@ task 0 lines 1-27:  publish [import Move]
 Error: compilation errors:
  bug: bytecode verification failed with unexpected status code `CALL_BORROWED_MUTABLE_REFERENCE_ERROR`:
 Error message: none
-   ┌─ TEMPFILE:1:1
-   │  
- 1 │ ╭ 
- 2 │ │ import Move
- 3 │ │ open Move
- 4 │ │ open scoped Move Move.Spec
-   · │
-19 │ │   spec run where
-20 │ │     ensures True
-   │ ╰────────────────^
-   │  
+   ┌─ TEMPFILE:18:5
+   │
+18 │     observe_two first second
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
    = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
 
 

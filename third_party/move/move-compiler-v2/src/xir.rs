@@ -32,8 +32,8 @@ use move_model::{
 };
 use move_model_exchange::{
     Block, Instr, IntType, Oper, Term, Type as Ty, TypeParameter as TypeParameterDecl,
-    Value as Constant, XirDialect, XirFunction as FunctionDecl, XirModule, XirStruct as StructDecl,
-    XirVisibility,
+    Value as Constant, XirDialect, XirFunction as FunctionDecl, XirModule, XirSourceSpan,
+    XirStruct as StructDecl, XirVisibility,
 };
 use move_stackless_bytecode::{
     function_target::FunctionData as TargetFunctionData,
@@ -71,12 +71,72 @@ pub(crate) fn parse_source_with_target(
     let module: XirModule = serde_json::from_str(json)
         .with_context(|| format!("invalid XIR from `{}`", path.display()))?;
     validate(&module)?;
+    validate_source_maps(&module, &text)?;
     Ok(XirSource {
         path,
         text,
         module,
         is_target,
     })
+}
+
+fn validate_source_maps(module: &XirModule, source: &str) -> Result<()> {
+    let validate_span = |span: XirSourceSpan, owner: &str| -> Result<()> {
+        ensure!(
+            span.start <= span.end
+                && span.end as usize <= source.len()
+                && source.is_char_boundary(span.start as usize)
+                && source.is_char_boundary(span.end as usize),
+            "source span {}..{} is outside the source text in {owner}",
+            span.start,
+            span.end
+        );
+        Ok(())
+    };
+    for function in &module.functions {
+        let Some(source_map) = &function.source_map else {
+            continue;
+        };
+        if let Some(span) = source_map.span {
+            validate_span(span, &format!("function `{}`", function.name))?;
+        }
+        ensure!(
+            source_map.blocks.len() == function.blocks.len(),
+            "source map for function `{}` has {} blocks; expected {}",
+            function.name,
+            source_map.blocks.len(),
+            function.blocks.len()
+        );
+        for (block_id, (block_map, block)) in
+            source_map.blocks.iter().zip(&function.blocks).enumerate()
+        {
+            ensure!(
+                block_map.instrs.len() == block.instrs.len(),
+                "source map for function `{}`, block {block_id}, has {} instruction spans; expected {}",
+                function.name,
+                block_map.instrs.len(),
+                block.instrs.len()
+            );
+            for span in block_map.instrs.iter().flatten() {
+                validate_span(
+                    *span,
+                    &format!("function `{}`, block {block_id}", function.name),
+                )?;
+            }
+            if let Some(span) = block_map.term {
+                validate_span(
+                    span,
+                    &format!("function `{}`, block {block_id} terminator", function.name),
+                )?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn loc_for_span(fallback: &Loc, span: Option<XirSourceSpan>) -> Loc {
+    span.map(|span| Loc::new(fallback.file_id(), Span::new(span.start, span.end)))
+        .unwrap_or_else(|| fallback.clone())
 }
 
 fn validate(module: &XirModule) -> Result<()> {
@@ -397,6 +457,7 @@ fn import_source(
 
     let mut functions = vec![];
     for (decl, fun_id) in xir.functions.iter().zip(&function_ids) {
+        let function_loc = loc_for_span(&loc, decl.source_map.as_ref().and_then(|map| map.span));
         let local_types = decl
             .locals
             .iter()
@@ -410,7 +471,7 @@ fn import_source(
                 Parameter(
                     env.symbol_pool().make(&format!("p{index}")),
                     ty.clone(),
-                    loc.clone(),
+                    function_loc.clone(),
                 )
             })
             .collect();
@@ -428,7 +489,7 @@ fn import_source(
         let called = called_functions(env, xir, decl, module_id, &function_ids)?;
         functions.push(ModelXirFunctionData {
             name: fun_id.symbol(),
-            loc: loc.clone(),
+            loc: function_loc.clone(),
             visibility: move_visibility(&decl.visibility),
             is_native: decl.is_native,
             kind: if decl.is_entry {
@@ -436,7 +497,7 @@ fn import_source(
             } else {
                 FunctionKind::Regular
             },
-            type_parameters: model_type_parameters(env, &loc, &decl.type_parameters)?,
+            type_parameters: model_type_parameters(env, &function_loc, &decl.type_parameters)?,
             params,
             result_type: returns,
             acquired_structs: acquired,
@@ -721,6 +782,7 @@ fn translate_function(
         function_ids,
         decl,
         loc: func_env.get_loc(),
+        function_loc: func_env.get_loc(),
         code: vec![],
         locations: BTreeMap::new(),
         local_types: decl
@@ -733,9 +795,23 @@ fn translate_function(
     };
     translator.emit(|attr| Bytecode::Jump(attr, Label::new(decl.entry)))?;
     for (block_id, block) in decl.blocks.iter().enumerate() {
+        let block_source_map = decl
+            .source_map
+            .as_ref()
+            .and_then(|source_map| source_map.blocks.get(block_id));
+        let block_span = block_source_map
+            .and_then(|source_map| source_map.instrs.iter().flatten().next().copied())
+            .or_else(|| block_source_map.and_then(|source_map| source_map.term));
+        translator.set_source_span(block_span);
         translator.emit(|attr| Bytecode::Label(attr, Label::new(block_id)))?;
         let mut instruction_id = 0;
         while instruction_id < block.instrs.len() {
+            translator.set_source_span(
+                block_source_map
+                    .and_then(|source_map| source_map.instrs.get(instruction_id))
+                    .copied()
+                    .flatten(),
+            );
             if let Some(consumed) = translator
                 .translate_reference_vector_update(
                     block_id,
@@ -763,6 +839,7 @@ fn translate_function(
                 })?;
             instruction_id += 1;
         }
+        translator.set_source_span(block_source_map.and_then(|source_map| source_map.term));
         translator
             .translate_term(&block.term)
             .with_context(|| format!("function `{}`, block {block_id}", decl.name))?;
@@ -807,6 +884,7 @@ struct FunctionTranslator<'a> {
     function_ids: &'a [FunId],
     decl: &'a FunctionDecl,
     loc: Loc,
+    function_loc: Loc,
     code: Vec<Bytecode>,
     locations: BTreeMap<AttrId, Loc>,
     local_types: Vec<Type>,
@@ -815,6 +893,10 @@ struct FunctionTranslator<'a> {
 }
 
 impl FunctionTranslator<'_> {
+    fn set_source_span(&mut self, span: Option<XirSourceSpan>) {
+        self.loc = loc_for_span(&self.function_loc, span);
+    }
+
     fn emit(&mut self, make: impl FnOnce(AttrId) -> Bytecode) -> Result<()> {
         ensure!(self.next_attr <= u16::MAX as usize, "function is too large");
         let attr = AttrId::new(self.next_attr);
@@ -2174,6 +2256,95 @@ mod tests {
             panic!("expected module")
         };
         move_bytecode_verifier::verify_module(&module.module).unwrap();
+    }
+
+    #[test]
+    fn source_map_locations_reach_stackless_bytecode() {
+        let mut module = account_module();
+        module.version = move_model_exchange::XIR_VERSION;
+        let function = &mut module.functions[0];
+        function.source_map = Some(move_model_exchange::XirFunctionSourceMap {
+            span: Some(XirSourceSpan { start: 1, end: 90 }),
+            blocks: function
+                .blocks
+                .iter()
+                .map(|block| move_model_exchange::XirBlockSourceMap {
+                    instrs: block
+                        .instrs
+                        .iter()
+                        .map(|_| Some(XirSourceSpan { start: 10, end: 20 }))
+                        .collect(),
+                    term: Some(XirSourceSpan { start: 30, end: 40 }),
+                })
+                .collect(),
+        });
+        let source = parse_source(
+            PathBuf::from("located.xir.json"),
+            " ".repeat(100),
+            &serde_json::to_string(&module).unwrap(),
+        )
+        .unwrap();
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        import_sources(&mut env, &[source], &mut targets).unwrap();
+        let module_env = env.get_module(ModuleId::new(0));
+        let function = module_env.get_functions().next().unwrap();
+        assert_eq!(function.get_loc().span(), Span::new(1, 90));
+        let target = targets.get_target(&function, &FunctionVariant::Baseline);
+        let code = target.get_bytecode();
+        assert_eq!(
+            target.get_bytecode_loc(code[0].get_attr_id()).span(),
+            Span::new(1, 90)
+        );
+        assert_eq!(
+            target.get_bytecode_loc(code[1].get_attr_id()).span(),
+            Span::new(10, 20)
+        );
+        assert_eq!(
+            target.get_bytecode_loc(code[2].get_attr_id()).span(),
+            Span::new(10, 20)
+        );
+    }
+
+    #[test]
+    fn rejects_misaligned_or_out_of_bounds_source_maps() {
+        let mut module = account_module();
+        module.version = move_model_exchange::XIR_VERSION;
+        module.functions[0].source_map = Some(move_model_exchange::XirFunctionSourceMap {
+            span: None,
+            blocks: vec![],
+        });
+        let error = parse_source(
+            PathBuf::from("misaligned-source-map.xir.json"),
+            "source".to_owned(),
+            &serde_json::to_string(&module).unwrap(),
+        )
+        .err()
+        .expect("misaligned source map should be rejected");
+        assert!(error.to_string().contains("has 0 blocks; expected"));
+
+        let mut module = account_module();
+        module.version = move_model_exchange::XIR_VERSION;
+        let function = &mut module.functions[0];
+        function.source_map = Some(move_model_exchange::XirFunctionSourceMap {
+            span: Some(XirSourceSpan { start: 0, end: 7 }),
+            blocks: function
+                .blocks
+                .iter()
+                .map(|block| move_model_exchange::XirBlockSourceMap {
+                    instrs: vec![None; block.instrs.len()],
+                    term: None,
+                })
+                .collect(),
+        });
+        let error = parse_source(
+            PathBuf::from("out-of-bounds-source-map.xir.json"),
+            "source".to_owned(),
+            &serde_json::to_string(&module).unwrap(),
+        )
+        .err()
+        .expect("out-of-bounds source map should be rejected");
+        assert!(error.to_string().contains("outside the source text"));
     }
 
     #[test]

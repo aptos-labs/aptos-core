@@ -300,6 +300,24 @@ private def encodeVisibility : Visibility → String
   | .public_ => "public"
   | .friend => "friend"
 
+private def encodeSourceSpan (span : SourceSpan) : Json :=
+  Json.mkObj [("start", nat span.start), ("end", nat span.end)]
+
+private def encodeBlockSourceMap (sourceMap : BlockSourceMap) : Json :=
+  Json.mkObj [
+    ("instrs", arr <| sourceMap.instrs.map fun
+      | some span => encodeSourceSpan span
+      | none => .null),
+    ("term", sourceMap.term.map encodeSourceSpan |>.getD .null)
+  ]
+
+private def sourceMapFields : Option FunSourceMap → List (String × Json)
+  | none => []
+  | some sourceMap => [("source_map", Json.mkObj [
+      ("span", sourceMap.span.map encodeSourceSpan |>.getD .null),
+      ("blocks", arr (sourceMap.blocks.map encodeBlockSourceMap))
+    ])]
+
 private def encodeFun (decl : MFun) (info : FunMeta) : JsonResult Json := do
   unless decl.name = info.name do
     throw s!"function body `{decl.name}` does not match metadata `{info.name}`"
@@ -317,7 +335,7 @@ private def encodeFun (decl : MFun) (info : FunMeta) : JsonResult Json := do
     ("entry", nat decl.entry),
     ("loops", arr (← decl.loops.mapM encodeLoop)),
     ("spec", ← encodeContract decl.spec)
-  ] ++ attributeFields info.attributes
+  ] ++ attributeFields info.attributes ++ sourceMapFields info.sourceMap
 
 private def encodeDialect : Dialect → String
   | .stackless => "stackless"
@@ -350,7 +368,7 @@ def MModule.toJson (module : MModule) : JsonResult Json := do
     encodeFun decl info
   let fields := [
     ("schema", .str "move-xir-module"),
-    ("version", nat 3),
+    ("version", nat 4),
     ("module", Json.mkObj [
       ("address", .str (encodeAddress module.address)),
       ("name", .str module.name),
@@ -442,6 +460,32 @@ private def decodeAttributes (json : Json) : JsonResult (List Attribute) := do
   | .ok attributesJson => (← attributesJson.getArr?).toList.mapM decodeAttribute
   | .error _ => return []
 
+private def decodeSourceSpan (json : Json) : JsonResult SourceSpan := do
+  let start ← (← json.getObjVal? "start").getNat?
+  let stop ← (← json.getObjVal? "end").getNat?
+  unless start ≤ stop do throw "source span has a reversed range"
+  return { start, «end» := stop }
+
+private def decodeOptionalSourceSpan (json : Json) : JsonResult (Option SourceSpan) :=
+  match json with
+  | .null => pure none
+  | _ => return some (← decodeSourceSpan json)
+
+private def decodeSourceMap (json : Json) : JsonResult (Option FunSourceMap) := do
+  let sourceMap ← match json.getObjVal? "source_map" with
+    | .ok value => pure value
+    | .error _ => return none
+  let blocksJson ← (← sourceMap.getObjVal? "blocks").getArr?
+  let blocks ← blocksJson.toList.mapM fun blockJson => do
+    let instrsJson ← (← blockJson.getObjVal? "instrs").getArr?
+    let instrs ← instrsJson.toList.mapM decodeOptionalSourceSpan
+    let term ← decodeOptionalSourceSpan (← blockJson.getObjVal? "term")
+    return ({ instrs, term } : BlockSourceMap)
+  return some {
+    span := ← decodeOptionalSourceSpan (← sourceMap.getObjVal? "span")
+    blocks
+  }
+
 /-- Decode schema-versioned deployable XIR JSON.  The body decoder is shared
 with the established exchange-v5 format, while module metadata is checked
 separately. -/
@@ -450,7 +494,8 @@ def decodeMModule (text : String) : JsonResult MModule := do
   let schema ← (← json.getObjVal? "schema").getStr?
   unless schema = "move-xir-module" do throw s!"unsupported XIR schema `{schema}`"
   let version ← (← json.getObjVal? "version").getNat?
-  unless version = 3 do throw s!"unsupported XIR schema version {version}"
+  unless version = 3 || version = 4 do
+    throw s!"unsupported XIR schema version {version}"
   let moduleJson ← json.getObjVal? "module"
   let address ← decodeAddress (← (← moduleJson.getObjVal? "address").getStr?)
   let name ← (← moduleJson.getObjVal? "name").getStr?
@@ -496,6 +541,7 @@ def decodeMModule (text : String) : JsonResult MModule := do
       isEntry := ← (← functionJson.getObjVal? "is_entry").getBool?
       acquires := ← decodeNatArray (← functionJson.getObjVal? "acquires")
       attributes := ← decodeAttributes functionJson
+      sourceMap := ← decodeSourceMap functionJson
     } : FunMeta)
   let externalFuns ← externalFunsJson.toList.mapM fun functionJson => do
     return ({

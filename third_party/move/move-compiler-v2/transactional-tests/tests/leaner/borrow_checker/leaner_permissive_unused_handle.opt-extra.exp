@@ -2,30 +2,20 @@ processed 2 tasks
 task 0 lines 1-21:  publish [import Move]
 Error: compilation errors:
  warning: This assignment/binding to the left-hand-side variable `l2` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_l2`), or renaming to `_`
-   ┌─ TEMPFILE:1:1
-   │  
- 1 │ ╭ 
- 2 │ │ import Move
- 3 │ │ open Move
- 4 │ │ open scoped Move Move.Spec
-   · │
-15 │ │   spec run where
-16 │ │     ensures True
-   │ ╰────────────────^
+   ┌─ TEMPFILE:11:5
+   │
+11 │     let _competing ← &mut owner
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: cannot transfer mutable local `l2` since it is borrowed
-   ┌─ TEMPFILE:1:1
-   │      
- 1 │ ╭ ╭ ╭ 
- 2 │ │ │ │ import Move
- 3 │ │ │ │ open Move
- 4 │ │ │ │ open scoped Move Move.Spec
-   · │ │ │
-15 │ │ │ │   spec run where
-16 │ │ │ │     ensures True
-   │ ╰─│─│────────────────^ transfer attempted here
-   │   ╰─│────────────────' previously mutably borrowed here
-   │     ╰────────────────' conflicting reference `l1` used here
+   ┌─ TEMPFILE:11:5
+   │
+10 │     let selected ← &mut owner
+   │     ------------------------- previously mutably borrowed here
+11 │     let _competing ← &mut owner
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ transfer attempted here
+12 │     selected := 5
+   │     ------------- conflicting reference `l1` used here
 
 
 exiting with stackless-bytecode optimization errors

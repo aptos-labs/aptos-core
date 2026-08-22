@@ -2,17 +2,13 @@ processed 2 tasks
 task 0 lines 1-27:  publish [import Move]
 Error: compilation errors:
  error: cannot transfer mutable local `l2` since it is borrowed
-   ┌─ TEMPFILE:1:1
-   │    
- 1 │ ╭ ╭ 
- 2 │ │ │ import Move
- 3 │ │ │ open Move
- 4 │ │ │ open scoped Move Move.Spec
-   · │ │
-19 │ │ │   spec run where
-20 │ │ │     ensures True
-   │ ╰─│────────────────^ transfer attempted here
-   │   ╰────────────────' previously mutably borrowed here
+   ┌─ TEMPFILE:18:5
+   │
+16 │     let first ← &mut owner
+   │     ---------------------- previously mutably borrowed here
+17 │     let second ← &mut owner
+18 │     observe_two first second
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^ transfer attempted here
 
 
 exiting with Leaner stackless-bytecode checks failed

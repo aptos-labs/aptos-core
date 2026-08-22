@@ -81,8 +81,9 @@ pub const FORMAT_VERSION: u64 = 10;
 /// Schema identifier for a finite, deployable XIR module.
 pub const XIR_SCHEMA: &str = "move-xir-module";
 /// Current version of the deployable XIR module wrapper. Version 3 adds the
-/// `is_native` function flag and permits bodyless native declarations.
-pub const XIR_VERSION: u64 = 3;
+/// `is_native` function flag and permits bodyless native declarations;
+/// version 4 transports source spans for declarations and stackless code.
+pub const XIR_VERSION: u64 = 4;
 
 /// Index of a local of a function (a `LocalIndex` in move-model terms).
 /// Parameters come first.
@@ -175,7 +176,7 @@ impl XirModule {
         if self.schema != XIR_SCHEMA {
             return Err(format!("unsupported XIR schema `{}`", self.schema));
         }
-        if self.version != XIR_VERSION {
+        if self.version != 3 && self.version != XIR_VERSION {
             return Err(format!("unsupported XIR version {}", self.version));
         }
         Ok(())
@@ -232,6 +233,33 @@ pub struct XirFunction {
     pub spec: Contract,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub attributes: Vec<XirAttribute>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_map: Option<XirFunctionSourceMap>,
+}
+
+/// A half-open UTF-8 byte range in the source text supplied with XIR.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct XirSourceSpan {
+    pub start: u32,
+    pub end: u32,
+}
+
+/// Source locations aligned with one basic block's instructions and
+/// terminator. `None` identifies compiler-generated code.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct XirBlockSourceMap {
+    pub instrs: Vec<Option<XirSourceSpan>>,
+    pub term: Option<XirSourceSpan>,
+}
+
+/// Non-semantic source metadata for an XIR function and its CFG.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct XirFunctionSourceMap {
+    pub span: Option<XirSourceSpan>,
+    pub blocks: Vec<XirBlockSourceMap>,
 }
 
 /// A user-provided source attribute of a struct or function: a head name

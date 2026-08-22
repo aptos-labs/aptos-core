@@ -89,13 +89,34 @@ inductive Oper where
   | function (name : Name) (typeArgs : Array Ty)
   deriving BEq, Repr
 
-inductive Instr where
+inductive InstrKind where
   | loadBool (dst : String) (value : Bool)
   | loadInt (nt : MoveModel.IR.NumType) (dst : String) (value : Int)
   | loadAddress (dst : String) (value : Nat)
   | assign (dst src : String)
   | call (dsts : Array String) (op : Oper) (srcs : Array String)
   deriving BEq, Repr
+
+/-- A named instruction together with its authored source range, when any. -/
+structure Instr where
+  kind : InstrKind
+  span : Option MoveModel.IR.SourceSpan := none
+  deriving BEq, Repr
+
+namespace Instr
+
+def loadBool (dst : String) (value : Bool) : Instr := ⟨.loadBool dst value, none⟩
+def loadInt (nt : MoveModel.IR.NumType) (dst : String) (value : Int) : Instr :=
+  ⟨.loadInt nt dst value, none⟩
+def loadAddress (dst : String) (value : Nat) : Instr := ⟨.loadAddress dst value, none⟩
+def assign (dst src : String) : Instr := ⟨.assign dst src, none⟩
+def call (dsts : Array String) (op : Oper) (srcs : Array String) : Instr :=
+  ⟨.call dsts op srcs, none⟩
+
+def withSpan (instr : Instr) (span : Option MoveModel.IR.SourceSpan) : Instr :=
+  if instr.span.isSome then instr else { instr with span := span }
+
+end Instr
 
 inductive Terminator where
   | jump (block : String)
@@ -108,6 +129,7 @@ structure Block where
   name : String
   instrs : Array Instr
   term : Terminator
+  termSpan : Option MoveModel.IR.SourceSpan := none
   deriving BEq, Repr
 
 structure FieldDecl where
@@ -333,7 +355,7 @@ private def lowerFun (structNames : Array (Name × String))
   for sourceBlock in funDecl.blocks do
     let mut instrs := []
     for instr in sourceBlock.instrs do
-      match instr with
+      match instr.kind with
       | .loadBool dst value =>
           instrs := instrs ++ [.load (← localId dst) (.bool value)]
       | .loadInt nt dst value =>
@@ -391,6 +413,22 @@ private def lowerFun (structNames : Array (Name × String))
     isEntry := isEntry
     acquires := acquires
     attributes := funDecl.attributes
+    sourceMap := if funDecl.native then none else some {
+      span := funDecl.blocks.foldl (init := none) fun outer block =>
+        let spans := block.instrs.foldl (init := outer) fun current instr =>
+          match current, instr.span with
+          | none, span => span
+          | span, none => span
+          | some a, some b => some { start := min a.start b.start, «end» := max a.end b.end }
+        match spans, block.termSpan with
+        | none, span => span
+        | span, none => span
+        | some a, some b => some { start := min a.start b.start, «end» := max a.end b.end }
+      blocks := funDecl.blocks.toList.map fun block => {
+        instrs := block.instrs.toList.map (·.span)
+        term := block.termSpan
+      }
+    }
   }
   return (decl, info)
 
