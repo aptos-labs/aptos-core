@@ -257,18 +257,25 @@ function renderFunctions() {
     if (!grouped.has(moduleId)) grouped.set(moduleId, []);
     grouped.get(moduleId).push(f);
   }
-  const moduleEvidence = module => ({
-    unobservedFunctions: module.functions.filter(f => f.invocations === 0).length,
-    invocationCount: module.functions.reduce((total, f) => total + f.invocations, 0)
-  });
+  const moduleEvidence = module => {
+    const unobservedFunctions=module.functions.filter(f => f.invocations === 0).length;
+    const invocationCount=module.functions.reduce((total, f) => total + f.invocations, 0);
+    const rarelyObserved=invocationCount > 0 && module.functions.every(f => f.invocations === 0 || f.transactions <= threshold);
+    return {
+      rank:invocationCount === 0 ? 0 : rarelyObserved ? 1 : 2,
+      unobservedFunctions,
+      invocationCount,
+      rarelyObserved
+    };
+  };
   const groups = [...grouped].sort(([left], [right]) => {
     const leftModule = modules.get(left), rightModule = modules.get(right);
     const leftEvidence = moduleEvidence(leftModule), rightEvidence = moduleEvidence(rightModule);
-    // First surface whole modules with no calls, then the least-called modules.
-    // More unobserved functions only breaks ties between equally called modules.
-    return Number(rightEvidence.invocationCount === 0) - Number(leftEvidence.invocationCount === 0)
-      || leftEvidence.invocationCount - rightEvidence.invocationCount
+    // Keep unobserved, rare-only, and regularly observed modules in distinct tiers.
+    // Within a tier, surface the broadest deprecation candidates and least-used code first.
+    return leftEvidence.rank - rightEvidence.rank
       || rightEvidence.unobservedFunctions - leftEvidence.unobservedFunctions
+      || leftEvidence.invocationCount - rightEvidence.invocationCount
       || leftModule.displayId.localeCompare(rightModule.displayId);
   });
   visibleModuleIds = groups.map(([moduleId]) => moduleId);
@@ -293,7 +300,7 @@ function renderFunctions() {
     if (!module.functions.some(external)) statuses.push(`<span class="badge unused-internal">No externally callable functions</span>`);
     if (observed === 0) {
       statuses.push(`<span class="badge unused-external">Entire module unobserved</span>`);
-    } else if (module.functions.every(f => f.invocations === 0 || f.transactions <= threshold)) {
+    } else if (moduleEvidence(module).rarelyObserved) {
       statuses.push(`<span class="badge rare-external">Rarely observed</span>`);
     }
     const moduleStatus = statuses.join("");
