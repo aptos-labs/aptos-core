@@ -132,7 +132,7 @@ fn elaborate_source(source: &str, is_target: bool) -> Result<XirSource> {
     let xir_path = xir_dir.path().join("module.xir.json");
     let leaner_root = std::env::var_os("LEANER_ROOT")
         .map(PathBuf::from)
-        .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean"));
+        .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/move"));
     let _elaboration_permit = LeanElaborationPermit::acquire();
     let output = Command::new("lake")
         .args(["env", "lean"])
@@ -179,10 +179,10 @@ mod tests {
 
     #[test]
     fn extracts_lean_file() {
-        let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean");
+        let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/move");
         let mut options = Options {
             sources: vec![lean_root
-                .join("Tests/Move/Account.lean")
+                .join("Move/Tests/Account.lean")
                 .to_string_lossy()
                 .into_owned()],
             ..Default::default()
@@ -195,14 +195,14 @@ mod tests {
 
     #[test]
     fn deduplicates_equivalent_lean_paths() {
-        let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean");
+        let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/move");
         let mut options = Options {
             sources: vec![lean_root
-                .join("Tests/Move/Account.lean")
+                .join("Move/Tests/Account.lean")
                 .to_string_lossy()
                 .into_owned()],
             sources_deps: vec![lean_root
-                .join("Tests/Move/../Move/Account.lean")
+                .join("Move/Tests/../Tests/Account.lean")
                 .to_string_lossy()
                 .into_owned()],
             ..Default::default()
@@ -218,10 +218,10 @@ mod tests {
             eprintln!("skipping Leaner integration test: `lake` is unavailable");
             return;
         }
-        let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean");
+        let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/move");
         let options = Options {
             sources: vec![lean_root
-                .join("Tests/Move/Account.lean")
+                .join("Move/Tests/Account.lean")
                 .to_string_lossy()
                 .into_owned()],
             ..Default::default()
@@ -245,13 +245,13 @@ mod tests {
             eprintln!("skipping Leaner integration test: `lake` is unavailable");
             return;
         }
-        let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean");
+        let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/move");
         // Intentionally put the client first: XIR loading must use declared
         // Move dependencies, not filesystem or command-line order.
         let options = Options {
             sources: [
-                lean_root.join("Tests/Move/MultipleModules.lean"),
-                lean_root.join("Tests/Move/Modules/Math.lean"),
+                lean_root.join("Move/Tests/MultipleModules.lean"),
+                lean_root.join("Move/Tests/Modules/Math.lean"),
             ]
             .map(|path| path.to_string_lossy().into_owned())
             .to_vec(),
@@ -303,14 +303,14 @@ mod tests {
             eprintln!("skipping Leaner integration test: `lake` is unavailable");
             return;
         }
-        let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean");
+        let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/move");
         let options = Options {
             sources: vec![lean_root
-                .join("Tests/Move/MultipleModules.lean")
+                .join("Move/Tests/MultipleModules.lean")
                 .to_string_lossy()
                 .into_owned()],
             sources_deps: vec![lean_root
-                .join("Tests/Move/Modules/Math.lean")
+                .join("Move/Tests/Modules/Math.lean")
                 .to_string_lossy()
                 .into_owned()],
             ..Default::default()

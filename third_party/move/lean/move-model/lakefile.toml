@@ -1,0 +1,27 @@
+# A logical model of Move bytecode: stackless IR, execution semantics, prover
+# stages, and the masm/Move-source frontend.  Depends on nothing in `Move`.
+name = "move-model"
+defaultTargets = ["MoveModel"]
+testDriver = "moveModelTests"
+
+[[lean_lib]]
+name = "MoveModel"
+
+# Frontend-embedding examples (`masm%`/`move%`): elaborating them runs the
+# Aptos CLI (`aptos move exchange`), hence not a default target.
+[[lean_lib]]
+name = "Examples"
+roots = ["MoveModel.Examples"]
+
+# Interpreter, IR, and frontend regressions, in this library's own namespace.
+[[lean_lib]]
+name = "MoveModelTests"
+roots = ["MoveModel.Tests"]
+
+# Lake schedules independent Lean compiler processes eagerly.  The test suite
+# imports enough of the Lean metaprogramming stack that an unconstrained clean
+# build can exhaust host file descriptors.  The driver gives the nested build
+# a small, deterministic scheduler limit.
+[[lean_exe]]
+name = "moveModelTests"
+root = "TestDriver"

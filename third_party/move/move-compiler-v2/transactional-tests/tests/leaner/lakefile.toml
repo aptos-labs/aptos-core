@@ -2,8 +2,8 @@ name = "LeanerTransactionalTests"
 defaultTargets = ["LeanerTransactionalTests"]
 
 [[require]]
-name = "Move"
-path = "../../../../lean"
+name = "move"
+path = "../../../../lean/move"
 
 [[lean_lib]]
 name = "LeanerTransactionalTests"

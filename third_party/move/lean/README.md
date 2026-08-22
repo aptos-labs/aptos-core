@@ -47,17 +47,26 @@ compiler exchange format, not a proof artifact.
 
 ## Components
 
-| Package | Purpose |
-|---|---|
-| [Move](Move/README.md) | The Leaner Move source language: surface, source contracts, the `verify` proof engine, and lowering to XIR.  **Start here.** |
-| [MoveModel](MoveModel/README.md) | A logical model of Move bytecode: stackless IR, execution semantics, prover stages, and masm/Move source embedding.  The target the compiler lowers into, and usable on its own. |
-| [`Tests`](Tests) | Source-verification, interpreter, compiler-lowering, and reference-elimination regressions, including cross-module Lean-authored programs. |
+| Package | Library | Purpose |
+|---|---|---|
+| `move` | [`Move`](move/Move/README.md) | The Leaner Move source language: surface, source contracts, the `verify` proof engine, and lowering to XIR, with its regressions under `Move/Tests`.  **Start here.** |
+| `move-model` | [`MoveModel`](move-model/MoveModel/README.md) | A logical model of Move bytecode: stackless IR, execution semantics, prover stages, and masm/Move source embedding, with its regressions under `MoveModel/Tests`.  What `Move` compiles into, and usable on its own. |
 
-The language is defined in [`leaner-move.md`](Move/leaner-move.md), the
+Two Lake packages, each holding the library of the same name; `move` depends on
+`move-model`.  A downstream project requires whichever it needs:
+
+```toml
+[[require]]
+name = "move"
+path = "<checkout>/third_party/move/lean/move"
+```
+
+The language is defined in [`leaner-move.md`](move/Move/leaner-move.md), the
 verification design in
-[`verification-design.md`](Move/verification-design.md), and what the surface
-does *not* yet handle in [`project-plan.md`](Move/project-plan.md).  Each
-package README owns its architecture, module index, and roadmap.
+[`verification-design.md`](move/Move/verification-design.md), and what the
+surface does *not* yet handle in
+[`project-plan.md`](move/Move/project-plan.md).  Each library README owns its
+architecture, module index, and roadmap.
 
 ## Build and test
 
@@ -71,17 +80,18 @@ source "$HOME/.profile"
 ```
 
 ```bash
-lake build
+cd move-model && lake build     # the logical model
+cd move       && lake build     # Leaner Move (builds move-model first)
 ```
 
-The core library does not require the Aptos CLI.  Compilation-backed and
-frontend-backed examples and tests do: build `aptos` (the checkout-local debug
-binary is selected automatically), or select another binary with `APTOS_CLI`,
-then run:
+The core libraries do not require the Aptos CLI.  The regression suites do —
+they shell out to `aptos move exchange` — so build `aptos` (the checkout-local
+debug binary is selected automatically), or select another binary with
+`APTOS_CLI`, then run each package's suite:
 
 ```bash
-APTOS_CLI=<path-to-aptos> lake build Examples
-APTOS_CLI=<path-to-aptos> lake test
+cd move-model && APTOS_CLI=<path-to-aptos> lake test
+cd move       && APTOS_CLI=<path-to-aptos> lake test
 ```
 
 `lake test` limits the number of concurrent Lean test compilations to avoid
@@ -89,4 +99,5 @@ exhausting file descriptors when many metaprogramming-heavy test modules need
 to be rebuilt together.
 
 Proof cost is tracked with `scripts/bench-proofs.sh`; the encoding's cost
-analysis is in [`performance-analysis.md`](Move/performance-analysis.md).
+analysis is in
+[`performance-analysis.md`](move/Move/performance-analysis.md).

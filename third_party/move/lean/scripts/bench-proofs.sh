@@ -10,13 +10,13 @@
 #
 # Usage:  scripts/bench-proofs.sh [N]      # N = top slowest to list (default 15)
 set -euo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../move"
 TOP="${1:-15}"
 RAW="$(mktemp)"
 trap 'rm -f "$RAW"' EXIT
 
 # Force re-elaboration of every test file (oleans are cached otherwise).
-rm -rf .lake/build/lib/lean/Tests
+rm -rf .lake/build/lib/lean/Move/Tests
 echo "building suite with proof benchmarking on ..." >&2
 MOVE_PROOF_BENCH=1 lake test > "$RAW" 2>&1 || true
 
