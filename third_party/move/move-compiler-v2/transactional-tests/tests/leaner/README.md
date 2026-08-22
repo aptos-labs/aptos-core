@@ -17,6 +17,7 @@ Compilation is deferred until end of input so the entire block is included.
 | `basic.lean` | Private-function invocation, explicit abort, and `u64` arguments |
 | `abilities.lean` | Exact `Copy`, `Drop`, `Store`, and `Key` deriving for structures, enums, and generics |
 | `arithmetic.lean` | Returned `u64` values, locals, add/subtract/multiply/divide/modulo, and arithmetic failures |
+| `addresses.lean` | Registered address aliases, aliased module identities, literal address values, address equality, and calls at a non-zero module address |
 | `control_flow.lean` | Returned branch values, `<`, `<=`, equality, nested branches, join points, and tail recursion |
 | `calls.lean` | Returned values from pure/effectful calls, bound results, nested calls, direct recursion, and mutual recursion |
 | `tail_recursion.lean` | Stack-safe pure/effectful tail recursion, parallel loop-parameter updates, and preserved non-tail recursion |

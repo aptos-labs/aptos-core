@@ -80,8 +80,9 @@ pub const FORMAT_VERSION: u64 = 10;
 
 /// Schema identifier for a finite, deployable XIR module.
 pub const XIR_SCHEMA: &str = "move-xir-module";
-/// Current version of the deployable XIR module wrapper.
-pub const XIR_VERSION: u64 = 2;
+/// Current version of the deployable XIR module wrapper. Version 3 adds the
+/// `is_native` function flag and permits bodyless native declarations.
+pub const XIR_VERSION: u64 = 3;
 
 /// Index of a local of a function (a `LocalIndex` in move-model terms).
 /// Parameters come first.
@@ -219,6 +220,8 @@ pub struct XirFunction {
     pub type_parameters: Vec<TypeParameter>,
     pub visibility: XirVisibility,
     pub is_entry: bool,
+    #[serde(default)]
+    pub is_native: bool,
     pub acquires: Vec<ResourceId>,
     pub params: usize,
     pub locals: Vec<Type>,
@@ -893,10 +896,10 @@ mod tests {
                             Instr::Assign(4, 1),
                             Instr::Nop,
                             Instr::Call(vec![5], Oper::Add(IntType::U64), vec![1, 4]),
-                            Instr::Call(vec![6], Oper::Sub, vec![5, 1]),
+                            Instr::Call(vec![6], Oper::Sub(IntType::U64), vec![5, 1]),
                             Instr::Call(vec![7], Oper::Mul(IntType::U64), vec![6, 6]),
-                            Instr::Call(vec![7], Oper::Div, vec![7, 6]),
-                            Instr::Call(vec![7], Oper::Mod, vec![7, 6]),
+                            Instr::Call(vec![7], Oper::Div(IntType::U64), vec![7, 6]),
+                            Instr::Call(vec![7], Oper::Mod(IntType::U64), vec![7, 6]),
                             Instr::Call(vec![8], Oper::Lt, vec![6, 7]),
                             Instr::Call(vec![8], Oper::Le, vec![6, 7]),
                             Instr::Call(vec![8], Oper::Eq, vec![6, 7]),
@@ -1006,7 +1009,7 @@ mod tests {
         // array-wrapping, so an innocent-looking refactor of a variant
         // changes the format.
         let json = serde_json::to_value(full_module()).unwrap();
-        assert_eq!(json["version"], json!(8));
+        assert_eq!(json["version"], json!(10));
         assert_eq!(
             json["structs"][0]["fields"][0],
             json!({"name": "balance", "ty": "u64"})
@@ -1173,7 +1176,7 @@ mod tests {
         // Integer constants travel as opaque decimal strings; validation
         // against the local's width happens in the consumer.
         let module = serde_json::from_value::<Module>(json!({
-            "version": 8, "structs": [],
+            "version": 10, "structs": [],
             "funs": [{"name": "f", "params": 0,
                       "locals": ["u64"], "returns": [],
                       "blocks": [{"instrs": [{"load": [0, {"num": "5"}]}],

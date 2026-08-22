@@ -12,7 +12,7 @@ namespace Tests.MovePrograms.Modules
 open Move
 open scoped Move Move.Compiler Move.Spec
 
-/-- This package's named address, corresponding to a `Move.toml` `[addresses]`
+/- This package's named address, corresponding to a `Move.toml` `[addresses]`
 entry. -/
 address_alias registry_owner = 0x2
 

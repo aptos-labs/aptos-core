@@ -54,10 +54,18 @@ impl SpecSort {
     pub fn of(ty: &Type) -> SpecSort {
         match ty {
             Type::Bool => SpecSort::Bool,
-            Type::U8 | Type::U16 | Type::U32 | Type::U64 | Type::U128 | Type::U256
-            | Type::I8 | Type::I16 | Type::I32 | Type::I64 | Type::I128 | Type::I256 => {
-                SpecSort::Num
-            },
+            Type::U8
+            | Type::U16
+            | Type::U32
+            | Type::U64
+            | Type::U128
+            | Type::U256
+            | Type::I8
+            | Type::I16
+            | Type::I32
+            | Type::I64
+            | Type::I128
+            | Type::I256 => SpecSort::Num,
             Type::Address | Type::Signer => SpecSort::Address,
             Type::TypeParameter(i) => SpecSort::TypeParameter(*i),
             Type::Struct(r) => SpecSort::Struct(*r),

@@ -198,6 +198,11 @@ instance (priority := low) genericBEq {T : Type} : BEq T := ⟨equal⟩
 
 end Compare
 
+/-- Address equality in Move source is bytecode structural equality.  Give it
+an exact instance so Lean does not synthesize equality through `DecidableEq`,
+whose implementation is intentionally outside the Move source language. -/
+instance : BEq Address := Compare.genericBEq
+
 /-- An immutable Move reference.  Its payload is only a non-executable source
 model used to make the primitives compilable. -/
 structure Ref (α : Type) where

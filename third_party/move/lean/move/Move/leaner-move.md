@@ -125,7 +125,9 @@ Variant casing is enforced — a lower-case `enum` variant is rejected with the
 PascalCase spelling it should have had.
 
 ```ebnf
-module          = "module" ident "where" { item } ;
+address-alias   = "address_alias" ident "=" nat ;
+address-spec    = nat | ident ;
+module          = "module" ident [ "at" address-spec ] "where" { item } ;
 
 item            = struct-decl | enum-decl | fun-decl
                 | "mutual" { fun-decl } "end"
@@ -235,7 +237,7 @@ field-init      = ident ":=" expr | ident ;     (* shorthand for f := f *)
 enum-value      = "." ident { expr } | qualified-ident { expr } ;
 pattern         = "." ident { pattern-arg } | ident | "_" ;
 pattern-arg     = ident | "_" | "(" pattern ")" ;
-literal         = nat | "true" | "false" ;
+literal         = nat | "@" nat | "true" | "false" ;
 
 (* ---- specifications ---- *)
 
@@ -301,15 +303,20 @@ import Move
 open Move
 open scoped Move Move.Spec
 
-module Account where
+address_alias application = 0x42
+
+module Account at application where
   ...items...
 ```
 
-`module M where` creates Lean namespace `M`, opens the Move API inside
-it, and registers the enclosed attributed declarations as one Move module
-named `M` (at the prototype's fixed address `0x0`). The borrow, deref, and
-vector syntax is scoped: open `scoped Move` before the module command, and
-`scoped Move.Spec` as well if the module carries specifications.
+`module M at address where` creates Lean namespace `M`, opens the Move API
+inside it, and registers the enclosed attributed declarations as one Move
+module with that on-chain identity. The address is a numeral or a name declared
+with `address_alias`; omitting `at` preserves the compatibility default `0x0`.
+Alias registrations persist through imports, so cross-module calls retain the
+callee's address. The borrow, deref, address-literal, and vector syntax is
+scoped: open `scoped Move` before the module command, and `scoped Move.Spec` as
+well if the module carries specifications.
 
 Items are `struct` and `enum` declarations, `fun` declarations,
 specifications, and *any other Lean command* — `def`, `theorem`, `namespace`,
@@ -425,10 +432,12 @@ fun narrow (value : U64) : U8 :=
   (value.cast : U8)                     -- aborts when the value does not fit
 ```
 
-`Address` and `Signer` are opaque; `Signer` values enter only as entry-function
-arguments. A signer is passed by reference, as in Move: `Ref.address : Ref Signer → Address` is `signer::address_of`,
-uninterpreted except that a signer determines one address — which is where
-`moveTo` publishes.
+`Address` and `Signer` are opaque. Address values can be introduced only by a
+literal (`@0x1`) or a registered alias (`address_alias framework = 0x1`, then
+`@framework`); they cannot be computed from integers. `Signer` values enter
+only as entry-function arguments. A signer is passed by reference, as in Move:
+`Ref.address : Ref Signer → Address` is `signer::address_of`, uninterpreted
+except that a signer determines one address — which is where `moveTo` publishes.
 
 ### Structures
 
@@ -548,6 +557,11 @@ definitions are not a competing wrapping semantics. Signers arrive as
 function arguments; literal addresses are written `@0x…`. Where the expected
 type is not evident, ascribe it: `({ value := 1 } : Box U64)`,
 `(vector![10, 30] : Vector U64)`.
+
+Package-level named addresses use `address_alias name = 0x…`. The declaration
+can be used as `@name` in a function body and as `module M at name where` in a
+module identity. `Move.ConventionalAddresses`, imported by `Move`, registers
+the conventional Aptos framework names in the `Move` namespace.
 
 A named integer constant is a module-level Lean `def` of a compile-time
 expression, referenced by name inside Move functions. Arithmetic, bit

@@ -136,16 +136,18 @@ fn validate(module: &XirModule) -> Result<()> {
             "function `{}` has more parameters than locals",
             decl.name
         );
-        ensure!(
-            !decl.blocks.is_empty(),
-            "function `{}` has no blocks",
-            decl.name
-        );
-        ensure!(
-            decl.entry < decl.blocks.len(),
-            "entry block is out of range in `{}`",
-            decl.name
-        );
+        if !decl.is_native {
+            ensure!(
+                !decl.blocks.is_empty(),
+                "function `{}` has no blocks",
+                decl.name
+            );
+            ensure!(
+                decl.entry < decl.blocks.len(),
+                "entry block is out of range in `{}`",
+                decl.name
+            );
+        }
         ensure!(
             decl.blocks.len() <= u16::MAX as usize,
             "too many blocks in `{}`",
@@ -428,6 +430,7 @@ fn import_source(
             name: fun_id.symbol(),
             loc: loc.clone(),
             visibility: move_visibility(&decl.visibility),
+            is_native: decl.is_native,
             kind: if decl.is_entry {
                 FunctionKind::Entry
             } else {
@@ -561,9 +564,9 @@ fn model_type(ty: &Ty, module_id: ModuleId, structs: &[StructId]) -> Result<Type
         Ty::U64 => Type::Primitive(PrimitiveType::U64),
         Ty::U128 => Type::Primitive(PrimitiveType::U128),
         Ty::U256 => Type::Primitive(PrimitiveType::U256),
-        Ty::I8 | Ty::I16 | Ty::I32 | Ty::I64 | Ty::I128 | Ty::I256 => bail!(
-            "signed integer types are not representable in the move-model type system"
-        ),
+        Ty::I8 | Ty::I16 | Ty::I32 | Ty::I64 | Ty::I128 | Ty::I256 => {
+            bail!("signed integer types are not representable in the move-model type system")
+        },
         Ty::Address => Type::Primitive(PrimitiveType::Address),
         Ty::Signer => Type::Primitive(PrimitiveType::Signer),
         Ty::TypeParameter(index) => {
@@ -1275,10 +1278,14 @@ impl FunctionTranslator<'_> {
                     IntType::U64 => StacklessOperation::CastU64,
                     IntType::U128 => StacklessOperation::CastU128,
                     IntType::U256 => StacklessOperation::CastU256,
-                    IntType::I8 | IntType::I16 | IntType::I32 | IntType::I64
-                    | IntType::I128 | IntType::I256 => bail!(
-                        "signed integer casts are not representable in stackless bytecode"
-                    ),
+                    IntType::I8
+                    | IntType::I16
+                    | IntType::I32
+                    | IntType::I64
+                    | IntType::I128
+                    | IntType::I256 => {
+                        bail!("signed integer casts are not representable in stackless bytecode")
+                    },
                 }
             },
             Oper::Not => {
@@ -2094,6 +2101,30 @@ mod tests {
             panic!("expected module")
         };
         move_bytecode_verifier::verify_module(&module.module).unwrap();
+    }
+
+    #[test]
+    fn bodyless_native_function_loads_as_native() {
+        let mut module = account_module();
+        let function_name = module.functions[0].name.clone();
+        module.functions[0].is_native = true;
+        module.functions[0].blocks.clear();
+        module.functions[0].entry = 0;
+        let source = parse_source(
+            PathBuf::from("native.xir.json"),
+            String::new(),
+            &serde_json::to_string(&module).unwrap(),
+        )
+        .unwrap();
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        import_sources(&mut env, &[source], &mut targets).unwrap();
+        let function_symbol = env.symbol_pool().make(&function_name);
+        let function = env
+            .get_module(ModuleId::new(0))
+            .find_function(function_symbol)
+            .unwrap();
+        assert!(function.is_native());
     }
 
     #[test]

@@ -1,4 +1,4 @@
-{"version": 2,
+{"version": 3,
  "structs":
  [{"type_parameters": [],
    "name": "BalanceValue",
