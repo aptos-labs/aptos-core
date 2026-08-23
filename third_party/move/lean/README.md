@@ -84,15 +84,21 @@ cd move-model && lake build     # the logical model
 cd move       && lake build     # Leaner Move (builds move-model first)
 ```
 
-The core libraries do not require the Aptos CLI.  The regression suites do —
-they shell out to `aptos move exchange` — so build `aptos` (the checkout-local
-debug binary is selected automatically), or select another binary with
-`APTOS_CLI`, then run each package's suite:
+The core libraries do not require the Aptos CLI. The regression suites do
+require the exchange frontend. Build its lightweight single-file entrypoint and
+set `APTOS_MOVE_EXCHANGE` in your shell profile; this is **highly recommended**
+for normal Leaner development because it avoids rebuilding the full Aptos CLI
+and greatly improves edit/test turnaround. Then run each package's suite:
 
 ```bash
-cd move-model && APTOS_CLI=<path-to-aptos> lake test
-cd move       && APTOS_CLI=<path-to-aptos> lake test
+cargo build -p aptos-move-cli --bin aptos-move-exchange
+export APTOS_MOVE_EXCHANGE="$PWD/../../../target/debug/aptos-move-exchange"
+cd move-model && lake test
+cd move       && lake test
 ```
+
+`APTOS_CLI=<path-to-aptos>` remains supported for the full `aptos move
+exchange` command.
 
 Proof cost is tracked with `scripts/bench-proofs.sh`; the encoding's cost
 analysis is in

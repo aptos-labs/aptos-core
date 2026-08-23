@@ -4,13 +4,13 @@ task 2 lines 13-13:  view --address 0x1 --resource 0x42::N::R<u64>
 [No Resource Exists]
 task 3 lines 15-35:  publish [module 0x42::N {]
 warning: Unused value of parameter `p0`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p0`), or binding to `_`
-   ┌─ TEMPFILE2:21:25
+   ┌─ TEMPFILE1:21:25
    │
 21 │     public entry fun ex(p0: signer, p1: u64) {
    │                         ^^
 
 warning: Unused value of parameter `p1`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p1`), or binding to `_`
-   ┌─ TEMPFILE2:21:37
+   ┌─ TEMPFILE1:21:37
    │
 21 │     public entry fun ex(p0: signer, p1: u64) {
    │                                     ^^

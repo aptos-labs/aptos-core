@@ -52,8 +52,8 @@ jobs:
           lean --version
           lake --version
 
-      - name: Build the frontend CLI
-        run: cargo build --locked -p aptos --bin aptos
+      - name: Build the lightweight exchange frontend
+        run: cargo build --locked -p aptos-move-cli --bin aptos-move-exchange
 
       - name: Build MoveModel frontend
         working-directory: third_party/move/lean/move-model
@@ -70,7 +70,7 @@ jobs:
       - name: Test MoveModel
         working-directory: third_party/move/lean/move-model
         env:
-          APTOS_CLI: ${{ github.workspace }}/target/debug/aptos
+          APTOS_MOVE_EXCHANGE: ${{ github.workspace }}/target/debug/aptos-move-exchange
         run: |
           source "$HOME/.profile"
           lake test
@@ -78,7 +78,7 @@ jobs:
       - name: Test Leaner Move
         working-directory: third_party/move/lean/move
         env:
-          APTOS_CLI: ${{ github.workspace }}/target/debug/aptos
+          APTOS_MOVE_EXCHANGE: ${{ github.workspace }}/target/debug/aptos-move-exchange
         run: |
           source "$HOME/.profile"
           lake test

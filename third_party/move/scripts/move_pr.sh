@@ -33,8 +33,10 @@ Usage:
     move_pr <flags>
 Flags:
     -h   Print this help
-    -t   Run tests
-    -i   In addition to -t, run integration tests (Aptos framework and e2e tests)
+    -t   Run the selected Move tests and both Lean verification projects.
+         Lean tests build only aptos-move-exchange, never the full aptos CLI.
+    -i   In addition to -t, run the selected integration tests
+         (Aptos framework, e2e, and related Move tests).
     -c   Run xclippy and fmt +nightly
     -C   Like -c, but also rebuild cached framework packages
     -p   Rebuild cached framework packages only
@@ -53,9 +55,12 @@ EOF
       ;;
     t)
       TEST=1
+      LEAN_TEST=1
       ;;
     i)
+      TEST=1
       INTEGRATION_TEST=1
+      LEAN_TEST=1
       ;;
     c)
       CHECK=1
@@ -74,7 +79,10 @@ EOF
       GIT_CHECKS=1
       ;;
     a)
+      TEST=1
       INTEGRATION_TEST=1
+      LEAN_TEST=1
+      CHECK=1
       GEN_ARTIFACTS=1
       GIT_CHECKS=1
       BUILD_CACHED_PACKAGES=1
@@ -83,6 +91,7 @@ done
 
 if [ "$OPTIND" -eq 1 ]; then
   TEST=1
+  LEAN_TEST=1
   CHECK=1
   GIT_CHECKS=1
 fi
@@ -92,7 +101,8 @@ ARTIFACT_CRATE_PATHS="\
 "
 
 # This is a partial list of Move crates, to keep this script fast.
-# May be extended as needed but should be kept minimal.
+# It includes the compiler's exchange consumers and Move executor coverage so
+# changes to the frontend format are checked at their public boundaries.
 MOVE_CRATES="\
   -p move-stackless-bytecode\
   -p move-stdlib\
@@ -109,6 +119,7 @@ MOVE_CRATES="\
   -p move-vm-types\
   -p move-ast-generator-tests\
   -p move-model \
+  -p move-model-exchange \
   -p move-asm\
   -p move-docgen\
   -p move-prover-bytecode-pipeline \
@@ -116,6 +127,15 @@ MOVE_CRATES="\
   -p bytecode-verifier-transactional-tests \
   -p bytecode-verifier-tests \
   -p move-package-manifest \
+  -p aptos-move-cli \
+  -p mono-move-aptos-transaction-executor \
+"
+
+# These projects exercise the Lean-authored Move semantics, verifier, and XIR
+# frontend. The frontend tests use the lightweight locally built exchange binary.
+LEAN_TEST_PROJECTS="\
+  $MOVE_BASE/lean/move-model \
+  $MOVE_BASE/lean/move \
 "
 
 # This is a list of crates for integration testing.
@@ -193,6 +213,20 @@ if [ ! -z "$INTEGRATION_TEST" ]; then
     cargo nextest run $CARGO_NEXTEST_PARAMS \
        $MOVE_CRATES $MOVE_CRATES_INTEGRATION_TEST
   )
+fi
+
+if [ ! -z "$LEAN_TEST" ]; then
+  echo "*************** [move-pr] Running Lean verification tests"
+  (
+    cd $BASE
+    cargo build $CARGO_OP_PARAMS -p aptos-move-cli --bin aptos-move-exchange
+  )
+  for project in $LEAN_TEST_PROJECTS; do
+    (
+      cd "$project"
+      APTOS_MOVE_EXCHANGE="$BASE/target/$MOVE_PR_PROFILE/aptos-move-exchange" lake test
+    )
+  done
 fi
 
 if [ ! -z "$GIT_CHECKS" ]; then

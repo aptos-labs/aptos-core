@@ -20,9 +20,9 @@ Masm input goes through the real assembler.  Move input goes through compiler
 v2, including genuine `spec` blocks.  Compiler and frontend failures are
 reported at the source string.
 
-`APTOS_CLI` may name the CLI binary.  Otherwise the elaborators prefer a
-checkout-local `target/debug/aptos` found above the current directory, then
-fall back to `aptos` on `PATH`.
+`APTOS_MOVE_EXCHANGE` may name the lightweight, direct exchange frontend.
+For backward compatibility, `APTOS_CLI` may name the full Aptos CLI. Otherwise
+the elaborators use `aptos` on `PATH`.
 
 This is the only module of the library that imports `Lean`; the theory
 itself stays independent of the metaprogramming framework.
@@ -73,33 +73,23 @@ deriving instance ToExpr for MModule
 
 /-! ## Running the frontend -/
 
-private partial def findCheckoutFrontend (dir : System.FilePath) : IO (Option String) := do
-  let candidate := dir / "target" / "debug" / "aptos"
-  if ← candidate.pathExists then
-    return some candidate.toString
-  match dir.parent with
-  | some parent => findCheckoutFrontend parent
-  | none => return none
-
-/-- Locates the Aptos CLI binary: `APTOS_CLI` if set, a checkout-local debug
-binary if available, or finally `aptos` on `PATH`.
-
-Preferring the checkout binary keeps the exchange producer and Lean decoder on
-the same schema while developing inside the Aptos repository. -/
-def findFrontend : IO String := do
+/-- Locates the exchange frontend. `APTOS_MOVE_EXCHANGE` takes precedence and
+names a binary whose arguments are the exchange flags directly. `APTOS_CLI`
+selects the backward-compatible `aptos move exchange` frontend. -/
+def findFrontend : IO (String × Array String) := do
+  if let some p ← IO.getEnv "APTOS_MOVE_EXCHANGE" then
+    return (p, #[])
   if let some p ← IO.getEnv "APTOS_CLI" then
-    return p
-  if let some p ← findCheckoutFrontend (← IO.currentDir) then
-    return p
-  return "aptos"
+    return (p, #["move", "exchange"])
+  return ("aptos", #["move", "exchange"])
 
-/-- Runs `aptos move exchange` on the given source (`fileArg` is
-`--masm-file` or `--move-file`), returning its JSON dump.
+/-- Runs the exchange frontend on the given source (`fileArg` is `--masm-file`
+or `--move-file`), returning its JSON dump.
 
 Each elaboration uses fresh input and output paths and runs the CLI.  In
 particular, no previously written `/tmp` dump is trusted as proof input. -/
 def runFrontend (fileArg : String) (suffix input : String) : IO String := do
-  let exe ← findFrontend
+  let (exe, commandArgs) ← findFrontend
   IO.FS.withTempDir fun dir => do
     let file := dir / s!"input.{suffix}"
     let outFile := dir / "output.json"
@@ -107,10 +97,10 @@ def runFrontend (fileArg : String) (suffix input : String) : IO String := do
     let out ←
       IO.Process.output
         { cmd := exe,
-          args := #["move", "exchange", fileArg, file.toString,
+          args := commandArgs ++ #[fileArg, file.toString,
             "--out-file", outFile.toString] }
     if out.exitCode != 0 then
-      throw (IO.userError s!"`{exe} move exchange {fileArg}` failed:\n\
+      throw (IO.userError s!"exchange frontend `{exe}` failed:\n\
         {out.stderr}{out.stdout}")
     IO.FS.readFile outFile
 
@@ -125,8 +115,8 @@ def decodeFrontend (s : Syntax) (fileArg suffix : String) :
     try
       runFrontend fileArg suffix input
     catch e =>
-      throwErrorAt s "`aptos move exchange` failed (build the checkout-local \
-        `aptos`, set APTOS_CLI, or put a matching binary on PATH):\n{e.toMessageData}"
+      throwErrorAt s "Move exchange frontend failed (set APTOS_MOVE_EXCHANGE \
+        for the lightweight frontend, or set APTOS_CLI):\n{e.toMessageData}"
   match decodeMProgram (← run) with
   | .ok p => return p
   | .error e =>

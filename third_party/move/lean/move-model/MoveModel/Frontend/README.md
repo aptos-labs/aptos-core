@@ -70,15 +70,16 @@ resources, fields, results, and typed quantifiers.
 
 ## Setup
 
-Build the Aptos CLI.  When this project is used in the Aptos checkout, the
-elaborator automatically prefers the nearest ancestor's `target/debug/aptos`.
-`APTOS_CLI` can select another executable explicitly; otherwise `aptos` on
-`PATH` is the final fallback:
+Build the lightweight exchange frontend and select it explicitly with
+`APTOS_MOVE_EXCHANGE`:
 
 ```bash
-cargo build -p aptos
-APTOS_CLI=<path-to-aptos> lake test
+cargo build -p aptos-move-cli --bin aptos-move-exchange
+APTOS_MOVE_EXCHANGE=<path-to-aptos-move-exchange> lake test
 ```
+
+`APTOS_CLI=<path-to-aptos>` remains a backward-compatible fallback for the
+full `aptos move exchange` command.
 
 Frontend dumps are written to a private temporary directory and removed after
 elaboration.  Positioned assembler, compiler, verifier, and decoding errors

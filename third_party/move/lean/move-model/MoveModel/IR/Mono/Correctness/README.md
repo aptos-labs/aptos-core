@@ -264,7 +264,7 @@ Build the whole Lean model and its tests with:
 
 ```bash
 lake build
-APTOS_CLI=/path/to/aptos lake test
+APTOS_MOVE_EXCHANGE=/path/to/aptos-move-exchange lake test
 ```
 
 The correctness directory contains no admitted theorems: `sorry`, `admit`,

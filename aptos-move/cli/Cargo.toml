@@ -16,6 +16,10 @@ name = "move"
 path = "src/main.rs"
 required-features = ["binary"]
 
+[[bin]]
+name = "aptos-move-exchange"
+path = "src/bin/aptos-move-exchange.rs"
+
 [features]
 default = []
 binary = ["testing"]

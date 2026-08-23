@@ -14,6 +14,7 @@
 // covered by other tests, such as the e2e move tests. Note that the sender's
 // store is masked, so a wrong debit there is not caught.
 
+use aptos_gas_schedule::{InitialGasSchedule, TransactionGasParameters};
 use aptos_language_e2e_tests::{account::AccountData, executor::FakeExecutor};
 use aptos_types::{
     state_store::StateView,
@@ -419,6 +420,7 @@ fn extra_signers_rejected_like_v1() {
 #[test]
 fn gas_checks_discard_like_v1() {
     let (fx, alice, bob) = setup();
+    let max_gas = u64::from(TransactionGasParameters::initial().maximum_number_of_gas_units);
 
     let transfer = |price: u64, max_gas: u64| {
         alice
@@ -450,7 +452,7 @@ fn gas_checks_discard_like_v1() {
     let cases = [
         (oversized, StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE),
         (
-            transfer(100, 100_000_000),
+            transfer(100, max_gas + 1),
             StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND,
         ),
         (
