@@ -1,5 +1,5 @@
 {
-  "version": 7,
+  "version": 10,
   "structs": [
     {
       "name": "Choice",
@@ -59,7 +59,7 @@
             {"assign": [7, 1]},
             {"assign": [8, 0]},
             {"call": [[], {"unpack_variant": 0}, [8]]},
-            {"load": [9, {"u64": "0"}]}
+            {"load": [9, {"num": "0"}]}
           ],
           "term": {"ret": [9]}
         },
@@ -87,11 +87,11 @@
           "instrs": [
             {"assign": [17, 0]},
             {"call": [[18, 19], {"unpack_variant": 2}, [17]]},
-            {"call": [[20], "add", [18, 19]]}
+            {"call": [[20], {"add": "u64"}, [18, 19]]}
           ],
           "term": {"ret": [20]}
         },
-        {"instrs": [{"load": [21, {"u64": "14566554180833181697"}]}], "term": {"abort": 21}}
+        {"instrs": [{"load": [21, {"num": "14566554180833181697"}]}], "term": {"abort": 21}}
       ],
       "loops": [],
       "spec": {"requires": [], "aborts_if": [], "ensures": [], "modifies": []}

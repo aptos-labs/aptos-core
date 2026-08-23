@@ -1,0 +1,17 @@
+processed 1 task
+task 0 lines 1-20:  publish [import Move]
+Error: compilation errors:
+ error: cannot evaluate code because an unresolved expression uses 'sorry' and/or contains errors
+   ┌─ TEMPFILE:12:35
+   │
+12 │ end LeanerTxnRejectUnsupportedType
+   │                                   ^
+
+error: while compiling the signature of `LeanerTxnRejectUnsupportedType.unsupported`: `Nat` is not a supported Move runtime type
+   ┌─ TEMPFILE:12:35
+   │
+12 │ end LeanerTxnRejectUnsupportedType
+   │                                   ^
+
+
+exiting with Leaner elaboration errors

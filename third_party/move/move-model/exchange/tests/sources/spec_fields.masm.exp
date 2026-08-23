@@ -1,5 +1,5 @@
 {
-  "version": 7,
+  "version": 10,
   "structs": [
     {"name": "A", "fields": [{"name": "x", "ty": "u64"}]},
     {"name": "B", "fields": [{"name": "x", "ty": "u64"}, {"name": "y", "ty": "u64"}]}
@@ -10,7 +10,7 @@
       "params": 1,
       "locals": ["address", "u64"],
       "returns": ["u64"],
-      "blocks": [{"instrs": [{"load": [1, {"u64": "0"}]}], "term": {"ret": [1]}}],
+      "blocks": [{"instrs": [{"load": [1, {"num": "0"}]}], "term": {"ret": [1]}}],
       "loops": [],
       "spec": {
         "requires": [],

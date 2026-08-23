@@ -1,0 +1,11 @@
+processed 1 task
+task 0 lines 1-27:  publish [import Move]
+Error: compilation errors:
+ error: borrow safety error `field`: reference was poisoned by an overlapping write (conflicts with `whole`)
+   ┌─ TEMPFILE:17:5
+   │
+17 │     let result ← *field
+   │     ^^^^^^^^^^^^^^^^^^^
+
+
+exiting with Leaner elaboration errors

@@ -23,7 +23,7 @@
 //!   is a single-key object whose payload is the value itself
 //!   (`{"move_from": 0}`, `{"ret": [7]}`), and a tuple variant is a
 //!   single-key object with the argument list
-//!   (`{"load": [1, {"u64": "5"}]}`, `{"call": [[2], "eq", [0, 1]]}`).
+//!   (`{"load": [1, {"num": "5"}]}`, `{"call": [[2], "eq", [0, 1]]}`).
 //!   Note that the variant *arity* determines array-wrapping: changing a
 //!   newtype variant to a tuple variant changes the wire shape, which is
 //!   why the tests below pin exact wire fragments.
@@ -55,19 +55,36 @@
 //! `pack_variant`/`unpack_variant`/`test_variant` operations and vector
 //! load constants; version 7 preserves declaration type parameters, ability
 //! constraints, phantom markers, instantiated user types, and operation type
-//! arguments.
+//! arguments; version 8 adds the remaining integer widths (`u8` ... `u256`
+//! types, one `num` constant form, width annotations on the
+//! overflow-checked resp. truncating operations `add`, `mul`, `shl`, `shr`),
+//! the bitwise operations `bit_and`/`bit_or`/`bit_xor`, and `cast`; version 9
+//! adds the signed integer types (`i8` ... `i256`, distinguished from the
+//! unsigned widths by their `i` prefix) and, through the width-annotated
+//! operations, signed `add`/`mul`/`shl`/`shr`/`cast` (carrying a signed
+//! `IntType`).  The signed `sub`/`div`/`mod`/bitwise operations, whose unsigned
+//! forms are deliberately width-free, are represented only by the reference
+//! (Lean) toolchain for now; the move-model producer emits neither, since Move
+//! source has no signed integer types; version 10 annotates *every* integer
+//! operation with its numeric type, including `sub`, `div`, `mod`, and the
+//! bitwise operations, which were previously bare — signed and unsigned share
+//! one operation family whose only difference is the range consulted, so the
+//! type is always carried.
 
 pub mod check;
 
 use serde::{Deserialize, Serialize};
 
 /// The current version of the exchange format.
-pub const FORMAT_VERSION: u64 = 7;
+pub const FORMAT_VERSION: u64 = 10;
 
 /// Schema identifier for a finite, deployable XIR module.
 pub const XIR_SCHEMA: &str = "move-xir-module";
-/// Current version of the deployable XIR module wrapper.
-pub const XIR_VERSION: u64 = 2;
+/// Current version of the deployable XIR module wrapper. Version 3 adds the
+/// `is_native` function flag and permits bodyless native declarations;
+/// version 4 transports source spans for declarations and stackless code;
+/// version 5 adds user-facing local names.
+pub const XIR_VERSION: u64 = 5;
 
 /// Index of a local of a function (a `LocalIndex` in move-model terms).
 /// Parameters come first.
@@ -139,6 +156,19 @@ pub struct XirModule {
     pub module: XirModuleMetadata,
     pub structs: Vec<XirStruct>,
     pub functions: Vec<XirFunction>,
+    /// Public functions referenced in other modules. Function ids greater
+    /// than or equal to `functions.len()` index this table after subtracting
+    /// the local function count.
+    #[serde(default)]
+    pub external_functions: Vec<XirExternalFunction>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct XirExternalFunction {
+    pub address: String,
+    pub module: String,
+    pub function: String,
 }
 
 impl XirModule {
@@ -147,7 +177,7 @@ impl XirModule {
         if self.schema != XIR_SCHEMA {
             return Err(format!("unsupported XIR schema `{}`", self.schema));
         }
-        if self.version != XIR_VERSION {
+        if self.version != 3 && self.version != 4 && self.version != XIR_VERSION {
             return Err(format!("unsupported XIR version {}", self.version));
         }
         Ok(())
@@ -180,6 +210,8 @@ pub struct XirStruct {
     pub fields: Vec<Field>,
     #[serde(default)]
     pub variants: Option<Vec<Variant>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attributes: Vec<XirAttribute>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -190,14 +222,81 @@ pub struct XirFunction {
     pub type_parameters: Vec<TypeParameter>,
     pub visibility: XirVisibility,
     pub is_entry: bool,
+    #[serde(default)]
+    pub is_native: bool,
     pub acquires: Vec<ResourceId>,
     pub params: usize,
     pub locals: Vec<Type>,
+    /// User-facing names aligned with `locals`. Missing entries are
+    /// compiler-generated and receive a stable fallback name in consumers.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub local_names: Vec<Option<String>>,
     pub returns: Vec<Type>,
     pub blocks: Vec<Block>,
     pub entry: BlockId,
     pub loops: Vec<Loop>,
     pub spec: Contract,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attributes: Vec<XirAttribute>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_map: Option<XirFunctionSourceMap>,
+}
+
+/// A half-open UTF-8 byte range in the source text supplied with XIR.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct XirSourceSpan {
+    pub start: u32,
+    pub end: u32,
+}
+
+/// Source locations aligned with one basic block's instructions and
+/// terminator. `None` identifies compiler-generated code.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct XirBlockSourceMap {
+    pub instrs: Vec<Option<XirSourceSpan>>,
+    pub term: Option<XirSourceSpan>,
+}
+
+/// Non-semantic source metadata for an XIR function and its CFG.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct XirFunctionSourceMap {
+    pub span: Option<XirSourceSpan>,
+    pub blocks: Vec<XirBlockSourceMap>,
+}
+
+/// A user-provided source attribute of a struct or function: a head name
+/// applied to positional arguments. Well-known producer-internal markers are
+/// not represented here; visibility and entry status have dedicated fields.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct XirAttribute {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub args: Vec<XirAttributeArg>,
+}
+
+/// One positional attribute argument: a name path (optionally instantiated,
+/// so it can denote a constant, function, or type), a `u64` constant (a
+/// decimal string, per the format conventions), or a boolean constant.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum XirAttributeArg {
+    Name {
+        name: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        args: Vec<XirAttributeArg>,
+    },
+    Num {
+        #[serde(rename = "num")]
+        value: String,
+    },
+    Bool {
+        #[serde(rename = "bool")]
+        value: bool,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -206,6 +305,24 @@ pub enum XirVisibility {
     Private,
     Public,
     Friend,
+}
+
+/// A Move integer width, as carried by the width-annotated operations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IntType {
+    U8,
+    U16,
+    U32,
+    U64,
+    U128,
+    U256,
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+    I256,
 }
 
 /// Line width for [`Module::to_pretty_json`]'s inlining decision.
@@ -339,8 +456,30 @@ fn pretty_json(m: &Measured, indent: usize, out: &mut String) {
 pub enum Type {
     /// `"bool"`
     Bool,
+    /// `"u8"`
+    U8,
+    /// `"u16"`
+    U16,
+    /// `"u32"`
+    U32,
     /// `"u64"`
     U64,
+    /// `"u128"`
+    U128,
+    /// `"u256"`
+    U256,
+    /// `"i8"`
+    I8,
+    /// `"i16"`
+    I16,
+    /// `"i32"`
+    I32,
+    /// `"i64"`
+    I64,
+    /// `"i128"`
+    I128,
+    /// `"i256"`
+    I256,
     /// `"address"`
     Address,
     /// `"signer"` — signer values are addresses.
@@ -455,11 +594,32 @@ pub enum Instr {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Oper {
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Mod,
+    /// `{"add": type}` — the numeric type bounds the overflow check.
+    Add(IntType),
+    /// `{"sub": type}` — the numeric type bounds the underflow resp.
+    /// overflow check.
+    Sub(IntType),
+    /// `{"mul": type}` — the numeric type bounds the overflow check.
+    Mul(IntType),
+    /// `{"div": type}` — aborts on a zero divisor, and on the signed
+    /// `minInt / -1` overflow.
+    Div(IntType),
+    /// `{"mod": type}` — aborts on a zero divisor.
+    Mod(IntType),
+    /// `{"bit_and": type}` / `{"bit_or": type}` / `{"bit_xor": type}` — on
+    /// the numeric type's two's-complement bit pattern.
+    BitAnd(IntType),
+    BitOr(IntType),
+    BitXor(IntType),
+    /// `{"shl": width}` — truncates to the width; aborts when the `u8`
+    /// amount reaches the width's bit count.
+    Shl(IntType),
+    /// `{"shr": width}` — aborts when the `u8` amount reaches the width's
+    /// bit count.
+    Shr(IntType),
+    /// `{"cast": width}` — aborts when the operand exceeds the target
+    /// width's range.
+    Cast(IntType),
     Lt,
     Le,
     Eq,
@@ -507,6 +667,14 @@ pub enum Oper {
     /// `"vec_pop"` — remove the last element, returning
     /// (vector, element); aborts on the empty vector.
     VecPop,
+    /// `"vec_insert"` — insert at an index, returning the updated vector.
+    VecInsert,
+    /// `"vec_remove"` — remove at an index, returning
+    /// (updated vector, removed element).
+    VecRemove,
+    /// `"vec_swap"` — exchange two indexed elements, returning the updated
+    /// vector.
+    VecSwap,
     /// `{"get_global": resource}` — read a resource from global memory.
     GetGlobal(ResourceId),
     GetGlobalInst(ResourceId, Vec<Type>),
@@ -565,8 +733,10 @@ pub enum Term {
 pub enum Value {
     /// `{"bool": true}`
     Bool(bool),
-    /// `{"u64": "5"}` — decimal string, see the crate docs.
-    U64(#[serde(with = "u64_as_string")] u64),
+    /// `{"num": "5"}` — an integer constant of any width, as a decimal
+    /// string (see the crate docs); the local or declaration type supplies
+    /// the width.
+    Num(String),
     /// `{"address": "0x42"}` — `0x`-prefixed hex literal.
     Address(String),
     /// `{"vector": [values...]}` — a recursively encoded vector constant.
@@ -708,21 +878,6 @@ pub struct Loop {
     pub invariants: Vec<SpecExp>,
 }
 
-/// `u64` as a decimal string on the wire; see the crate docs.
-mod u64_as_string {
-    use serde::{de::Error, Deserialize, Deserializer, Serializer};
-
-    pub fn serialize<S: Serializer>(v: &u64, s: S) -> Result<S::Ok, S::Error> {
-        s.serialize_str(&v.to_string())
-    }
-
-    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<u64, D::Error> {
-        let s = String::deserialize(d)?;
-        s.parse()
-            .map_err(|e| D::Error::custom(format!("invalid u64 `{}`: {}", s, e)))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -771,16 +926,16 @@ mod tests {
                 blocks: vec![
                     Block {
                         instrs: vec![
-                            Instr::Load(1, Value::U64(u64::MAX)),
+                            Instr::Load(1, Value::Num(u64::MAX.to_string())),
                             Instr::Load(2, Value::Bool(true)),
                             Instr::Load(3, Value::Address("0x42".to_string())),
                             Instr::Assign(4, 1),
                             Instr::Nop,
-                            Instr::Call(vec![5], Oper::Add, vec![1, 4]),
-                            Instr::Call(vec![6], Oper::Sub, vec![5, 1]),
-                            Instr::Call(vec![7], Oper::Mul, vec![6, 6]),
-                            Instr::Call(vec![7], Oper::Div, vec![7, 6]),
-                            Instr::Call(vec![7], Oper::Mod, vec![7, 6]),
+                            Instr::Call(vec![5], Oper::Add(IntType::U64), vec![1, 4]),
+                            Instr::Call(vec![6], Oper::Sub(IntType::U64), vec![5, 1]),
+                            Instr::Call(vec![7], Oper::Mul(IntType::U64), vec![6, 6]),
+                            Instr::Call(vec![7], Oper::Div(IntType::U64), vec![7, 6]),
+                            Instr::Call(vec![7], Oper::Mod(IntType::U64), vec![7, 6]),
                             Instr::Call(vec![8], Oper::Lt, vec![6, 7]),
                             Instr::Call(vec![8], Oper::Le, vec![6, 7]),
                             Instr::Call(vec![8], Oper::Eq, vec![6, 7]),
@@ -826,7 +981,7 @@ mod tests {
                     invariants: vec![SpecExp::binop(
                         SpecBinOp::Le,
                         SpecExp::Local(1),
-                        SpecExp::Value(Value::U64(10)),
+                        SpecExp::Value(Value::Num("10".to_string())),
                     )],
                 }],
                 spec: Contract {
@@ -890,7 +1045,7 @@ mod tests {
         // array-wrapping, so an innocent-looking refactor of a variant
         // changes the format.
         let json = serde_json::to_value(full_module()).unwrap();
-        assert_eq!(json["version"], json!(7));
+        assert_eq!(json["version"], json!(10));
         assert_eq!(
             json["structs"][0]["fields"][0],
             json!({"name": "balance", "ty": "u64"})
@@ -903,12 +1058,12 @@ mod tests {
         let instrs = &json["funs"][0]["blocks"][0]["instrs"];
         assert_eq!(
             instrs[0],
-            json!({"load": [1, {"u64": "18446744073709551615"}]})
+            json!({"load": [1, {"num": "18446744073709551615"}]})
         );
         assert_eq!(instrs[2], json!({"load": [3, {"address": "0x42"}]}));
         assert_eq!(instrs[3], json!({"assign": [4, 1]}));
         assert_eq!(instrs[4], json!("nop"));
-        assert_eq!(instrs[5], json!({"call": [[5], "add", [1, 4]]}));
+        assert_eq!(instrs[5], json!({"call": [[5], {"add": "u64"}, [1, 4]]}));
         assert_eq!(instrs[18], json!({"call": [[11], {"get_field": 0}, [9]]}));
         assert_eq!(
             serde_json::to_value(Oper::UpdateField(1)).unwrap(),
@@ -949,6 +1104,18 @@ mod tests {
         assert_eq!(
             serde_json::to_value(Oper::VecPop).unwrap(),
             json!("vec_pop")
+        );
+        assert_eq!(
+            serde_json::to_value(Oper::VecInsert).unwrap(),
+            json!("vec_insert")
+        );
+        assert_eq!(
+            serde_json::to_value(Oper::VecRemove).unwrap(),
+            json!("vec_remove")
+        );
+        assert_eq!(
+            serde_json::to_value(Oper::VecSwap).unwrap(),
+            json!("vec_swap")
         );
         assert_eq!(
             serde_json::to_value(Oper::BorrowVecElem).unwrap(),
@@ -995,15 +1162,46 @@ mod tests {
         let lp = &json["funs"][0]["loops"][0];
         assert_eq!(
             lp["invariants"][0],
-            json!({"binop": ["le", {"local": 1}, {"value": {"u64": "10"}}]})
+            json!({"binop": ["le", {"local": 1}, {"value": {"num": "10"}}]})
         );
+    }
+
+    #[test]
+    fn attribute_wire_shape() {
+        // Pin the exact wire shape produced by the Leaner XIR exporter.
+        let json = json!({
+            "name": "resource_group",
+            "args": [
+                {"name": "scope", "args": [{"name": "global"}]},
+                {"num": "7"},
+                {"bool": true}
+            ]
+        });
+        let attribute: XirAttribute = serde_json::from_value(json.clone()).unwrap();
+        assert_eq!(attribute, XirAttribute {
+            name: "resource_group".to_string(),
+            args: vec![
+                XirAttributeArg::Name {
+                    name: "scope".to_string(),
+                    args: vec![XirAttributeArg::Name {
+                        name: "global".to_string(),
+                        args: vec![],
+                    }],
+                },
+                XirAttributeArg::Num {
+                    value: "7".to_string(),
+                },
+                XirAttributeArg::Bool { value: true },
+            ],
+        });
+        assert_eq!(serde_json::to_value(&attribute).unwrap(), json);
     }
 
     #[test]
     fn pretty_json_fill_layout() {
         let pretty = full_module().to_pretty_json();
         // Small subtrees are inlined; the document as a whole is broken.
-        assert!(pretty.contains(r#"{"call": [[5], "add", [1, 4]]}"#));
+        assert!(pretty.contains(r#"{"call": [[5], {"add": "u64"}, [1, 4]]}"#));
         assert!(pretty.contains("\"blocks\": [\n"));
         // The rendering is still valid JSON denoting the same module.
         let back: Module = serde_json::from_str(&pretty).unwrap();
@@ -1015,17 +1213,19 @@ mod tests {
         let mut module = full_module();
         module.version = 1;
         assert!(module.check_version().is_err());
-        let err = serde_json::from_value::<Module>(json!({
-            "version": 4, "structs": [],
+        // Integer constants travel as opaque decimal strings; validation
+        // against the local's width happens in the consumer.
+        let module = serde_json::from_value::<Module>(json!({
+            "version": 10, "structs": [],
             "funs": [{"name": "f", "params": 0,
                       "locals": ["u64"], "returns": [],
-                      "blocks": [{"instrs": [{"load": [0, {"u64": "not-a-number"}]}],
+                      "blocks": [{"instrs": [{"load": [0, {"num": "5"}]}],
                                   "term": {"ret": []}}],
                       "loops": [],
                       "spec": {"requires": [], "aborts_if": [], "ensures": [],
                                "modifies": []}}]
         }))
-        .unwrap_err();
-        assert!(err.to_string().contains("invalid u64"));
+        .unwrap();
+        assert!(module.check_version().is_ok());
     }
 }

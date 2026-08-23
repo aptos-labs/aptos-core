@@ -99,7 +99,9 @@ fn translate_exp(
 ) -> Result<exchange::SpecExp> {
     let label = in_old.then_some(0);
     match e {
-        SpecExp::Number(n) => Ok(exchange::SpecExp::Value(exchange::Value::U64(u64_of(n)?))),
+        SpecExp::Number(n) => Ok(exchange::SpecExp::Value(exchange::Value::Num(
+            u64_of(n)?.to_string(),
+        ))),
         SpecExp::Bool(b) => Ok(exchange::SpecExp::Value(exchange::Value::Bool(*b))),
         SpecExp::Ident(id) => {
             let name = id.as_str();

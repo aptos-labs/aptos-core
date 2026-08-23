@@ -1,0 +1,30 @@
+processed 6 tasks
+task 0 lines 1-21:  publish [import Move]
+task 1 lines 23-23:  run 0x0::LeanerArithmetic::calculate --args 8u64 2u64
+return values: 14
+task 2 lines 25-25:  run 0x0::LeanerArithmetic::calculate --args 81u64 21u64
+return values: 42
+task 3 lines 27-27:  run 0x0::LeanerArithmetic::add_overflow --args 18446744073709551615u64
+Error: Function execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: 0x0::LeanerArithmetic,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(3), 2)],
+}
+task 4 lines 29-29:  run 0x0::LeanerArithmetic::subtract_underflow --args 0u64
+Error: Function execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: 0x0::LeanerArithmetic,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(2), 2)],
+}
+task 5 lines 31-31:  run 0x0::LeanerArithmetic::divide_by_zero --args 9u64
+Error: Function execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: 0x0::LeanerArithmetic,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(1), 2)],
+}

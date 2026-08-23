@@ -1,0 +1,18 @@
+processed 1 task
+task 0 lines 1-13:  publish [import Move]
+Error: compilation errors:
+ error: cannot evaluate code because an unresolved expression uses 'sorry' and/or contains errors
+  ┌─ TEMPFILE:8:58
+  │
+8 │   fun invalid (value : U64) : U64 := continue twice value
+  │                                                          ^
+
+error: while compiling Move function `LeanerRejectNonSelfContinue.invalid`:
+`continue` in `LeanerRejectNonSelfContinue.invalid` calls `LeanerRejectNonSelfContinue.twice`; only a direct self-call can become a loop
+  ┌─ TEMPFILE:8:58
+  │
+8 │   fun invalid (value : U64) : U64 := continue twice value
+  │                                                          ^
+
+
+exiting with Leaner elaboration errors

@@ -1,0 +1,20 @@
+processed 10 tasks
+task 0 lines 1-34:  publish [import Move]
+task 1 lines 36-36:  run 0x0::LeanerControlFlow::classify --args 9u64
+return values: 1
+task 2 lines 38-38:  run 0x0::LeanerControlFlow::classify --args 10u64
+return values: 2
+task 3 lines 40-40:  run 0x0::LeanerControlFlow::classify --args 21u64
+return values: 3
+task 4 lines 42-42:  run 0x0::LeanerControlFlow::compare --args 7u64 7u64
+return values: 10
+task 5 lines 44-44:  run 0x0::LeanerControlFlow::compare --args 6u64 7u64
+return values: 20
+task 6 lines 46-46:  run 0x0::LeanerControlFlow::compare --args 8u64 7u64
+return values: 30
+task 7 lines 48-48:  run 0x0::LeanerControlFlow::choose --args true
+return values: 4
+task 8 lines 50-50:  run 0x0::LeanerControlFlow::choose --args false
+return values: 5
+task 9 lines 52-52:  run 0x0::LeanerControlFlow::countdown --args 5u64 40u64
+return values: 45

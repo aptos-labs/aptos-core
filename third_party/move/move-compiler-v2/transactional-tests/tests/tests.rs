@@ -13,7 +13,9 @@ use move_transactional_test_runner::{
     tasks::SyntaxChoice, vm_test_harness, vm_test_harness::TestRunConfig,
 };
 use std::{
+    fs,
     path::{Path, PathBuf},
+    process::Command,
     string::ToString,
 };
 use walkdir::WalkDir;
@@ -36,6 +38,7 @@ struct TestConfig {
 
 /// Set of exclusions that apply when using `include: &[]` in TestConfig.
 const COMMON_EXCLUSIONS: &[&str] = &[
+    "/leaner/",
     "/operator_eval/",
     "/no-recursive-check/",
     "/no-access-check/",
@@ -81,6 +84,33 @@ const TEST_CONFIGS: &[TestConfig] = &[
         language_version: LanguageVersion::latest(),
         include: &[], // all tests except those excluded below
         exclude: COMMON_EXCLUSIONS,
+        cross_compile: false,
+    },
+    // Lean-authored programs have their own front end and only need one
+    // default compiler-v2 configuration. Keep them out of the generic
+    // optimization matrix above.
+    TestConfig {
+        name: "leaner",
+        runner: |p| run(p, get_config_by_name("leaner")),
+        experiments: &[],
+        language_version: LanguageVersion::latest(),
+        include: &["/leaner/"],
+        exclude: &[],
+        cross_compile: false,
+    },
+    // Let Leaner-permissive borrow programs reach the production bytecode
+    // verifier even when compiler-v2's stricter reference checker reports the
+    // same program under the dedicated Leaner configuration.
+    TestConfig {
+        name: "no-reference-safety",
+        runner: |p| run(p, get_config_by_name("no-reference-safety")),
+        experiments: &[
+            (Experiment::REFERENCE_SAFETY_V3, false),
+            (Experiment::REFERENCE_SAFETY, false),
+        ],
+        language_version: LanguageVersion::latest(),
+        include: &["/leaner/borrow_checker/leaner_permissive_"],
+        exclude: &[],
         cross_compile: false,
     },
     // Test enabling inlining optimization, across package inlining, and extra optimizations.
@@ -191,7 +221,9 @@ const TEST_CONFIGS: &[TestConfig] = &[
 // `test.move`.  If there is such an entry, then each config "foo" will have a
 /// separate baseline output file `test.foo.exp`.
 const SEPARATE_BASELINE: &[&str] = &[
-    // Offsets are different depending on optimizations
+    // These have both the ordinary Leaner result and the comparison result
+    // with compiler-v2 reference safety disabled.
+    "/leaner/borrow_checker/leaner_permissive_",
     "control_flow/abort_complex.move",
     "control_flow/abort_invalid.move",
     "control_flow/abort_vector.move",
@@ -266,7 +298,58 @@ fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
     vm_test_harness::run_test_with_config_and_exp_suffix(vm_test_config, path, &exp_suffix)
 }
 
+fn lake_available() -> bool {
+    Command::new("lake")
+        .arg("--version")
+        .output()
+        .is_ok_and(|output| output.status.success())
+}
+
+fn positive_leaner_baselines_are_clean() -> Result<(), String> {
+    const FAILURE_MARKERS: &[&str] = &[
+        "warning:",
+        "bug:",
+        "Error: compilation errors:",
+        "LINKER_ERROR",
+        "exiting with Leaner stackless-bytecode checks failed",
+        "exiting with bytecode verification errors",
+    ];
+    let mut failures = vec![];
+    for entry in WalkDir::new("tests/leaner")
+        .min_depth(1)
+        .into_iter()
+        .flatten()
+    {
+        let path = entry.path();
+        let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        let is_negative = name.starts_with("reject_");
+        let is_differential = path
+            .to_string_lossy()
+            .contains("/borrow_checker/leaner_permissive_");
+        if !name.ends_with(".exp") || is_negative || is_differential {
+            continue;
+        }
+        let output = fs::read_to_string(path).map_err(|error| error.to_string())?;
+        for marker in FAILURE_MARKERS {
+            if output.contains(marker) {
+                failures.push(format!("{} contains `{marker}`", path.display()));
+            }
+        }
+    }
+    if failures.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "positive Leaner baselines must not record compilation or linker failures:\n{}",
+            failures.join("\n")
+        ))
+    }
+}
+
 fn main() {
+    let has_lake = lake_available();
     let files = WalkDir::new("tests")
         .follow_links(false)
         .min_depth(1)
@@ -274,7 +357,7 @@ fn main() {
         .flatten()
         .filter_map(|e| {
             let p = e.path().display().to_string();
-            if p.ends_with(".move") {
+            if p.ends_with(".move") || p.ends_with(".lean") {
                 Some(p)
             } else {
                 None
@@ -294,13 +377,20 @@ fn main() {
                 .map(|file| {
                     let prompt = format!("compiler-v2-txn[config={}]::{}", config.name, file);
                     let path = PathBuf::from(file);
+                    let requires_lean = path
+                        .extension()
+                        .is_some_and(|extension| extension == "lean");
                     let runner = config.runner;
                     Trial::test(prompt, move || {
                         runner(&path).map_err(|err| format!("{:?}", err).into())
                     })
+                    .with_ignored_flag(requires_lean && !has_lake)
                 })
         })
         .collect_vec();
+    tests.push(Trial::test("leaner-positive-baselines-are-clean", || {
+        positive_leaner_baselines_are_clean().map_err(Into::into)
+    }));
     tests.sort_unstable_by(|a, b| a.name().cmp(b.name()));
     let args = Arguments::from_args();
     libtest_mimic::run(&args, tests).exit()

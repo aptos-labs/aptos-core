@@ -14,6 +14,7 @@
 // covered by other tests, such as the e2e move tests. Note that the sender's
 // store is masked, so a wrong debit there is not caught.
 
+use aptos_gas_schedule::{InitialGasSchedule, TransactionGasParameters};
 use aptos_language_e2e_tests::{account::AccountData, executor::FakeExecutor};
 use aptos_types::{
     state_store::StateView,
@@ -414,11 +415,15 @@ fn extra_signers_rejected_like_v1() {
     // writes v2 lacks.
 }
 
-/// Transactions violating each pre-execution gas bound are discarded with the
-/// same status code as V1, before touching any state.
+/// Transactions violating the pre-execution gas bounds expressible by the
+/// fixture's gas schedule are discarded with the same status code as V1,
+/// before touching any state.
 #[test]
 fn gas_checks_discard_like_v1() {
     let (fx, alice, bob) = setup();
+    let gas_params = TransactionGasParameters::initial();
+    let max_gas = u64::from(gas_params.maximum_number_of_gas_units);
+    let below_min_price = u64::from(gas_params.min_price_per_gas_unit).checked_sub(1);
 
     let transfer = |price: u64, max_gas: u64| {
         alice
@@ -447,10 +452,10 @@ fn gas_checks_discard_like_v1() {
         .max_gas_amount(1_000_000)
         .sign();
 
-    let cases = [
+    let mut cases = vec![
         (oversized, StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE),
         (
-            transfer(100, 100_000_000),
+            transfer(100, max_gas + 1),
             StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND,
         ),
         (
@@ -458,14 +463,19 @@ fn gas_checks_discard_like_v1() {
             StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS,
         ),
         (
-            transfer(0, 1_000_000),
-            StatusCode::GAS_UNIT_PRICE_BELOW_MIN_BOUND,
-        ),
-        (
             transfer(u64::MAX, 1_000_000),
             StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND,
         ),
     ];
+    // The fixture's current minimum price is zero, for which no valid `u64`
+    // gas price can be below the bound. Keep the check active when the
+    // schedule raises that minimum.
+    if let Some(price) = below_min_price {
+        cases.push((
+            transfer(price, 1_000_000),
+            StatusCode::GAS_UNIT_PRICE_BELOW_MIN_BOUND,
+        ));
+    }
     for (txn, expected) in cases {
         let v1_status = fx.execute_transaction(txn.clone()).status().clone();
         assert_eq!(

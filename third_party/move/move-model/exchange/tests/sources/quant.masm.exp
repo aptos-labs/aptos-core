@@ -1,5 +1,5 @@
 {
-  "version": 7,
+  "version": 10,
   "structs": [],
   "funs": [
     {
@@ -19,7 +19,7 @@
               "all",
               "u64",
               {
-                "binop": ["lt", {"bvar": 0}, {"binop": ["add", {"bvar": 0}, {"value": {"u64": "1"}}]}]
+                "binop": ["lt", {"bvar": 0}, {"binop": ["add", {"bvar": 0}, {"value": {"num": "1"}}]}]
               }
             ]
           },
