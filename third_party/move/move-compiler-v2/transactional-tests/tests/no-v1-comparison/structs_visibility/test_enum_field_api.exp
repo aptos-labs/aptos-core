@@ -16,6 +16,7 @@ error: cannot perform borrow operation for field `x` for struct `0x42::m::Data4`
    │                 ^^^^^^^^^^^^
 
 
+exiting with assembling errors
 task 3 lines 95-95:  run 0x42::m2::test_v1
 Error: Function execution failed with VMError: {
     major_status: FUNCTION_RESOLUTION_FAILURE,

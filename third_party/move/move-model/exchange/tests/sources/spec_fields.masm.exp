@@ -1,5 +1,5 @@
 {
-  "version": 8,
+  "version": 10,
   "structs": [
     {"name": "A", "fields": [{"name": "x", "ty": "u64"}]},
     {"name": "B", "fields": [{"name": "x", "ty": "u64"}, {"name": "y", "ty": "u64"}]}

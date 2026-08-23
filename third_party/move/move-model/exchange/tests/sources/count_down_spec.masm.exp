@@ -1,5 +1,5 @@
 {
-  "version": 8,
+  "version": 10,
   "structs": [],
   "funs": [
     {
@@ -16,7 +16,7 @@
           "instrs": [
             {"assign": [4, 0]},
             {"load": [5, {"num": "1"}]},
-            {"call": [[6], "sub", [4, 5]]},
+            {"call": [[6], {"sub": "u64"}, [4, 5]]},
             {"assign": [0, 6]}
           ],
           "term": {"jump": 0}

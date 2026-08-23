@@ -1,5 +1,5 @@
 {
-  "version": 8,
+  "version": 10,
   "structs": [{"name": "Account", "fields": [{"name": "balance", "ty": "u64"}]}],
   "funs": [
     {
@@ -27,7 +27,7 @@
             {"call": [[5], {"move_from": 0}, [4]]},
             {"call": [[6], "unpack", [5]]},
             {"assign": [7, 2]},
-            {"call": [[8], "sub", [6, 7]]},
+            {"call": [[8], {"sub": "u64"}, [6, 7]]},
             {"call": [[9], "pack", [8]]},
             {"assign": [3, 9]},
             {"assign": [10, 0]},

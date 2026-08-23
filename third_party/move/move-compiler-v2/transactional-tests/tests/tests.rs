@@ -285,7 +285,7 @@ fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
         TestRunConfig::new(language_version, experiments).with_runtime_ref_checks();
     // For cross compilation, we need to always append the config name as a part of the
     // outcome file suffix, as optimizations affect the generated code.
-    if config.cross_compile && path.extension().is_some_and(|ext| ext == "move") {
+    if config.cross_compile {
         vm_test_config = vm_test_config.cross_compile_into(
             SyntaxChoice::Source,
             true,

@@ -74,14 +74,6 @@ Install the repository-pinned Lean toolchain with the standard development
 setup script. The script verifies the downloaded release archive and adds its
 tools to the shell profile.
 
-Lake's parent process keeps file descriptors for scheduled build jobs. The
-devcontainer and Lean CI set `nofile` to `1048576`; in another shell, raise the
-soft limit before running a parallel Lake build or test:
-
-```bash
-ulimit -S -n 1048576
-```
-
 ```bash
 scripts/dev_setup.sh -p -l
 source "$HOME/.profile"

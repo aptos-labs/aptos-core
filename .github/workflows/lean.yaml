@@ -58,14 +58,12 @@ jobs:
       - name: Build MoveModel frontend
         working-directory: third_party/move/lean/move-model
         run: |
-          ulimit -S -n 1048576 || ulimit -S -n "$(ulimit -H -n)"
           source "$HOME/.profile"
           lake build MoveModel.Frontend.Elab
 
       - name: Build Leaner Move
         working-directory: third_party/move/lean/move
         run: |
-          ulimit -S -n 1048576 || ulimit -S -n "$(ulimit -H -n)"
           source "$HOME/.profile"
           lake build
 
@@ -74,7 +72,6 @@ jobs:
         env:
           APTOS_CLI: ${{ github.workspace }}/target/debug/aptos
         run: |
-          ulimit -S -n 1048576 || ulimit -S -n "$(ulimit -H -n)"
           source "$HOME/.profile"
           lake test
 
@@ -83,7 +80,6 @@ jobs:
         env:
           APTOS_CLI: ${{ github.workspace }}/target/debug/aptos
         run: |
-          ulimit -S -n 1048576 || ulimit -S -n "$(ulimit -H -n)"
           source "$HOME/.profile"
           lake test
 

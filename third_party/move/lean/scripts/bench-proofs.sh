@@ -15,13 +15,6 @@ TOP="${1:-15}"
 RAW="$(mktemp)"
 trap 'rm -f "$RAW" "$RAW.parsed"' EXIT
 
-# Lake retains file descriptors for materialized build jobs. Match Lean CI so
-# the benchmark does not fail partway through a large suite.
-if ! ulimit -S -n 1048576; then
-  echo "failed to raise the file-descriptor limit to 1048576" >&2
-  exit 1
-fi
-
 run_lake() {
   local label="$1"
   shift
