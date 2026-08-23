@@ -8,7 +8,7 @@
 //! constructors used by the binary module loader.
 
 use crate::{
-    ast::{ModuleName, Spec},
+    ast::{Attribute, ModuleName, Spec},
     model::{
         FieldData, FieldId, FunId, FunctionData, FunctionKind, GlobalEnv, Loc, Parameter,
         QualifiedId, StructData, StructId, StructVariant, TypeParameter,
@@ -49,6 +49,7 @@ pub struct XirFunctionData {
     pub visibility: Visibility,
     pub is_native: bool,
     pub kind: FunctionKind,
+    pub attributes: Vec<Attribute>,
     pub type_parameters: Vec<TypeParameter>,
     pub params: Vec<Parameter>,
     pub result_type: Type,
@@ -129,7 +130,7 @@ impl GlobalEnv {
                             decl.visibility,
                             decl.is_native,
                             decl.kind,
-                            vec![],
+                            decl.attributes,
                             decl.type_parameters,
                             decl.params,
                             decl.result_type,

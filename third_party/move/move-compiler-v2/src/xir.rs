@@ -19,7 +19,7 @@ use move_core_types::{
     identifier::Identifier,
 };
 use move_model::{
-    ast::{Address, ModuleName},
+    ast::{Address, Attribute, ModuleName},
     model::{
         FieldData, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId, StructId,
         TypeParameter, TypeParameterKind,
@@ -517,6 +517,17 @@ fn import_source(
             } else {
                 FunctionKind::Regular
             },
+            attributes: decl
+                .attributes
+                .iter()
+                .map(|attribute| {
+                    Attribute::Apply(
+                        env.new_node(function_loc.clone(), Type::Tuple(vec![])),
+                        env.symbol_pool().make(&attribute.name),
+                        vec![],
+                    )
+                })
+                .collect(),
             type_parameters: model_type_parameters(env, &function_loc, &decl.type_parameters)?,
             params,
             result_type: returns,
