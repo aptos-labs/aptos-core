@@ -40,7 +40,6 @@ error: Invalid expression in `const`. Operator `%` result value out of range for
    │ ╰────────────────────^
 
 
-exiting with context checking errors
 task 2 lines 49-67:  publish [module 0xff::const_rem_0 {]
 Error: compilation errors:
  error: Invalid expression in `const`. Operator `%` result value out of range for `i8`
@@ -81,7 +80,6 @@ error: Invalid expression in `const`. Operator `%` result value out of range for
    │ ╰───────────────────^
 
 
-exiting with context checking errors
 task 3 lines 69-74:  run --verbose [script {]
 Error: Script execution failed with VMError: {
     message: Integer remainder by zero,

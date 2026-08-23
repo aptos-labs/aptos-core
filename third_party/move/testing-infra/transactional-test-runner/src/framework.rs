@@ -212,11 +212,17 @@ pub trait MoveTestAdapter<'a>: Sized {
                 start_line, command_lines_stop
             ),
         };
+        let source_path = data.path().to_str().unwrap().to_owned();
+        self.register_temp_filename(&data);
         let data = match syntax {
             SyntaxChoice::Source => temp_with_extension(data, MOVE_EXTENSION)?,
             SyntaxChoice::Leaner => temp_with_extension(data, LEAN_EXTENSION)?,
             SyntaxChoice::ASM => data,
         };
+        // Keep an extension-normalized compiler input associated with the
+        // original task file. This both redacts diagnostics on failures and
+        // preserves stable TEMPFILE numbering for cross-compiled sources.
+        self.register_temp_filename_alias(&data, &source_path);
         let data_path = data.path().to_str().unwrap();
         let run_config = self.run_config();
         let state = self.compiled_state();
@@ -253,6 +259,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                         self.known_attributes(),
                         run_config.language_version,
                         run_config.experiments,
+                        syntax == SyntaxChoice::Leaner,
                     )?
                 };
                 let (named_addr_opt, module) = match unit {
@@ -324,6 +331,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                         self.known_attributes(),
                         run_config.language_version,
                         run_config.experiments,
+                        false,
                     )?
                 };
                 match unit {
@@ -639,12 +647,22 @@ pub trait MoveTestAdapter<'a>: Sized {
             let compiled_state = self.compiled_state();
             let mapping = &mut compiled_state.temp_file_mapping;
             if !mapping.contains_key(data_path) {
-                let generic_name = match mapping.len() {
-                    0 => "TEMPFILE".to_string(),
-                    idx => format!("TEMPFILE{}", idx),
-                };
-                mapping.insert(data_path.to_owned(), generic_name);
+                mapping.insert(data_path.to_owned(), next_temp_filename(mapping));
             }
+        }
+    }
+
+    fn register_temp_filename_alias(&mut self, data: &NamedTempFile, alias: &str) {
+        let data_path = data.path().to_str().unwrap();
+        if data_path.is_empty() || data_path == alias {
+            return;
+        }
+        let compiled_state = self.compiled_state();
+        let mapping = &mut compiled_state.temp_file_mapping;
+        if let Some(alias_name) = mapping.get(alias).cloned() {
+            mapping.entry(data_path.to_owned()).or_insert(alias_name);
+        } else if !mapping.contains_key(data_path) {
+            mapping.insert(data_path.to_owned(), next_temp_filename(mapping));
         }
     }
 
@@ -850,6 +868,13 @@ impl<'a> CompiledState<'a> {
     }
 }
 
+fn next_temp_filename(mapping: &BTreeMap<String, String>) -> String {
+    match mapping.values().collect::<BTreeSet<_>>().len() {
+        0 => "TEMPFILE".to_string(),
+        idx => format!("TEMPFILE{idx}"),
+    }
+}
+
 fn temp_with_extension(data: NamedTempFile, extension: &str) -> Result<NamedTempFile> {
     if data.path().extension().and_then(|ext| ext.to_str()) == Some(extension) {
         return Ok(data);
@@ -868,6 +893,7 @@ fn compile_source_unit_v2(
     known_attributes: &BTreeSet<String>,
     language_version: LanguageVersion,
     experiments: Vec<(String, bool)>,
+    include_error_detail: bool,
 ) -> Result<(AnnotatedCompiledUnit, Option<GlobalEnv>, Option<String>)> {
     let all_deps = {
         // The v2 compiler does not really support precompiled programs, so we must include all the
@@ -909,8 +935,13 @@ fn compile_source_unit_v2(
         move_compiler_v2::run_move_compiler(emitter.as_mut(), options)
     };
     let error_str = String::from_utf8_lossy(&error_writer.into_inner()).to_string();
-    let (model, mut units) = result
-        .map_err(|error| anyhow::anyhow!("compilation errors:\n {}\n{error:#}", error_str))?;
+    let (model, mut units) = result.map_err(|error| {
+        if include_error_detail || error_str.is_empty() {
+            anyhow::anyhow!("compilation errors:\n {}\n{error:#}", error_str)
+        } else {
+            anyhow::anyhow!("compilation errors:\n {}", error_str)
+        }
+    })?;
     let unit = if units.len() != 1 {
         anyhow::bail!("expected either one script or one module")
     } else {
