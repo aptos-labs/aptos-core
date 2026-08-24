@@ -15,6 +15,9 @@ rust-version = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
 mono-move-core = { workspace = true }
+mono-move-loader = { workspace = true }
 mono-move-natives = { workspace = true }
 mono-move-runtime = { workspace = true }
+move-core-types = { workspace = true }
+move-vm-types = { workspace = true }
 thiserror = { workspace = true }

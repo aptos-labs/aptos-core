@@ -27,10 +27,12 @@ module 0x42::globals_fn {
 // RUN: execute 0x42::globals_fn::borrow_mut_missing --args 0x123
 // CHECK-V1-SUBSTR: MISSING_DATA
 // CHECK-V2-SUBSTR: BorrowGlobalMut: resource does not exist
+// CHECK-ERROR-PARITY
 
 // RUN: execute 0x42::globals_fn::take_then_borrow --args 0x7, 0x7
 // CHECK-V1-SUBSTR: MISSING_DATA
 // CHECK-V2-SUBSTR: BorrowGlobal: resource does not exist
+// CHECK-ERROR-PARITY
 
 // RUN: execute 0x42::globals_fn::two_keys --args 0x1, 0x2, 0x1, 0x2
 // CHECK: results: 100005

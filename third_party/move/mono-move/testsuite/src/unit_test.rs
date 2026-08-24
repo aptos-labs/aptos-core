@@ -13,7 +13,10 @@ use aptos_types::on_chain_config::{Features, OnChainConfig};
 use legacy_move_compiler::unit_test::{
     ExpectedFailure, ExpectedMoveError, NamedOrBytecodeModule, TestCase,
 };
-use mono_move_core::{types::EMPTY_TYPE_LIST, Function, GasMeter, Interner, VMInternalError};
+use mono_move_core::{
+    types::EMPTY_TYPE_LIST, ExecutionErrorKind, Function, GasMeter, Interner, IntoExecutionError,
+    VMInternalError,
+};
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoaderError, LoadingPolicy, LoweringPolicy, ModuleReadSet};
 use mono_move_runtime::{
@@ -337,44 +340,23 @@ fn classify_loader_error(err: &LoaderError) -> TestResult {
 }
 
 fn classify_runtime_error(err: &RuntimeError) -> TestResult {
-    match err {
+    // A feature mono-move lacks means the test cannot run, not that it failed.
+    // Matched on the variant because `kind()` reports it as an invariant violation.
+    if matches!(err, RuntimeError::Unsupported(_)) {
+        return TestResult::Unsupported(err.to_string());
+    }
+    match err.kind() {
         // The program failed at runtime: overflow, OOB, missing resource, a hit
         // limit, ... mono-move matches the existing VM's behaviour and limits,
         // so these are real failures a `#[expected_failure]` test may want.
-        RuntimeError::ArithmeticOverflow { .. }
-        | RuntimeError::ArithmeticUnderflow { .. }
-        | RuntimeError::DivisionByZero { .. }
-        | RuntimeError::ShiftAmountOutOfRange { .. }
-        | RuntimeError::ArithmeticUnderOverflow { .. }
-        | RuntimeError::DivisionByZeroOrOverflow { .. }
-        | RuntimeError::NegateMinOverflow { .. }
-        | RuntimeError::CastOutOfRange { .. }
-        | RuntimeError::PopFromEmptyVector
-        | RuntimeError::VecUnpackLengthMismatch { .. }
-        | RuntimeError::VectorIndexOutOfBounds { .. }
-        | RuntimeError::ResourceDoesNotExist { .. }
-        | RuntimeError::ResourceAlreadyExists { .. }
-        | RuntimeError::EnumVariantMismatch { .. }
-        | RuntimeError::InvalidAbortMessage
-        | RuntimeError::BCSEof
-        | RuntimeError::BCSInvalidUleb
-        | RuntimeError::BCSInvalidBool { .. }
-        | RuntimeError::BCSSequenceTooLong { .. }
-        | RuntimeError::BCSRemainingInput { .. }
-        | RuntimeError::BCSSignerNotDeserializable
-        | RuntimeError::StackOverflow
-        | RuntimeError::OutOfHeapMemory { .. }
-        | RuntimeError::AllocationTooLarge { .. }
-        | RuntimeError::VecAllocSizeOverflow
-        | RuntimeError::AbortMessageTooLong { .. }
-        | RuntimeError::StateKeyTypeTooDeep => TestResult::RuntimeFailure(err.to_string()),
-
-        RuntimeError::Unsupported(_) => TestResult::Unsupported(err.to_string()),
-
-        // Genuine problems: infrastructure failure, or a VM bug.
-        RuntimeError::InvariantViolation(_) | RuntimeError::ResourceProvider(_) => {
-            TestResult::Error(err.to_string())
+        ExecutionErrorKind::InvalidOperation | ExecutionErrorKind::RuntimeLimitExceeded => {
+            TestResult::RuntimeFailure(err.to_string())
         },
+        // Genuine problems: infrastructure failure, or a VM bug.
+        ExecutionErrorKind::InvariantViolation
+        | ExecutionErrorKind::OutOfGas
+        | ExecutionErrorKind::LinkingError
+        | ExecutionErrorKind::Placeholder => TestResult::Error(err.to_string()),
     }
 }
 

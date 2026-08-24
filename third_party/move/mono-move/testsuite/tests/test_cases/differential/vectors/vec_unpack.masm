@@ -76,14 +76,17 @@ fun pack2_unpack2_u8(): u8
 // RUN: execute 0x66::vec_unpack::unpack_too_many
 // CHECK-V1-SUBSTR: VECTOR_OPERATION_ERROR
 // CHECK-V2-SUBSTR: VecUnpack: expected 3 elements, vector has 2
+// CHECK-ERROR-PARITY
 
 // RUN: execute 0x66::vec_unpack::unpack_too_few
 // CHECK-V1-SUBSTR: VECTOR_OPERATION_ERROR
 // CHECK-V2-SUBSTR: VecUnpack: expected 2 elements, vector has 3
+// CHECK-ERROR-PARITY
 
 // RUN: execute 0x66::vec_unpack::unpack_empty_nonzero
 // CHECK-V1-SUBSTR: VECTOR_OPERATION_ERROR
 // CHECK-V2-SUBSTR: VecUnpack: expected 1 elements, vector has 0
+// CHECK-ERROR-PARITY
 
 // RUN: execute 0x66::vec_unpack::unpack_zero_on_empty
 // CHECK: results: 77

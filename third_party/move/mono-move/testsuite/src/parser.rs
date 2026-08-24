@@ -38,14 +38,14 @@
 //! abort).
 //!
 //! `--heap-size <n>` sets the MonoMove heap to `n` bytes (default otherwise).
-//! A small heap forces garbage collection under allocation pressure. The
-//! legacy VM has no heap-size knob and ignores it. Modifiers may appear in
+//! A small heap forces garbage collection under allocation pressure. The V1
+//! VM has no heap-size knob and ignores it. Modifiers may appear in
 //! any order.
 //!
 //! ## `// CHECK-GC-COUNT: <n>`
 //!
 //! Must follow an execute directive. Asserts the MonoMove VM ran exactly `n`
-//! garbage collections during that step. V2-only — the legacy VM has no GC.
+//! garbage collections during that step. V2-only — the V1 VM has no GC.
 //! Pair with `--heap-size` to drive collections deterministically.
 //!
 //! ## `// CHECK: <literal>`
@@ -56,9 +56,9 @@
 //!
 //! ## `// CHECK-V1: <literal>` / `// CHECK-V2: <literal>`
 //!
-//! Like `CHECK`, but applies to only the legacy Move VM (V1) or MonoMove
-//! VM (V2) respectively. Use these when the two VMs intentionally diverge
-//! (e.g., different error messages for aborts).
+//! Like `CHECK`, but applies to only the V1 VM or the MonoMove VM (V2)
+//! respectively. Use these when the two VMs intentionally diverge (e.g.,
+//! different error messages for aborts).
 //!
 //! ## `// CHECK-SUBSTR: <pattern>` / `// CHECK-V1-SUBSTR: <pattern>` / `// CHECK-V2-SUBSTR: <pattern>`
 //!
@@ -66,6 +66,21 @@
 //! appear as a substring of the actual output. Use this for abort
 //! messages whose exact form includes volatile bits like a function-def
 //! index or a code offset.
+//!
+//! ## `// CHECK-ERROR-PARITY`
+//!
+//! Must follow an execute directive, and takes no argument. Both VMs must fail
+//! with a VM error, and MonoMove's failure, mapped into V1 terms, must match the
+//! status code, sub-status, and message the V1 VM reported. The expected value
+//! comes from V1 at run time rather than a literal in the test.
+//!
+//! Move aborts are not covered: they carry no VM error to map, and both VMs
+//! already render them identically, so `CHECK:` compares them directly.
+//!
+//! This is the only directive that reads the mapped description instead of
+//! MonoMove's native error text, so it exercises the mapping. It fails
+//! if the error has no V1 equivalent, or if the mapping cannot reproduce V1's
+//! message or sub-status.
 //!
 //! Multiple check directives may follow a single execute step; each is
 //! verified independently.
@@ -91,14 +106,18 @@ pub enum MatchKind {
 /// A check directive attached to an execution step.
 #[derive(Debug)]
 pub enum Check {
-    /// Legacy Move VM should produce this output.
+    /// V1 VM should produce this output.
     V1(String, MatchKind),
     /// MonoMove VM should produce this output.
     V2(String, MatchKind),
     /// MonoMove VM must have run exactly this many garbage collections.
-    /// V2-only: the legacy VM has no GC. Pair with `--heap-size` to drive
+    /// V2-only: the V1 VM has no GC. Pair with `--heap-size` to drive
     /// collections deterministically.
     GcCount(usize),
+    /// Both VMs must fail with a VM error, and MonoMove's failure, mapped into
+    /// V1 terms, must match the status, sub-status, and message the V1 VM
+    /// reported. Move aborts are not covered.
+    ErrorParity,
 }
 
 /// A snapshot section requested via `// RUN: publish --print(...)`.
@@ -129,7 +148,7 @@ pub enum Step {
         args: Vec<String>,
         /// MonoMove heap size in bytes (`--heap-size`). `None` uses the
         /// default. A small heap forces GC under allocation pressure. Has no
-        /// effect on the legacy VM.
+        /// effect on the V1 VM.
         heap_size: Option<usize>,
         checks: Vec<Check>,
     },
@@ -193,6 +212,8 @@ pub fn parse(content: &str) -> anyhow::Result<Vec<Step>> {
             let pattern = pattern.trim().to_string();
             attach_check(&mut steps, Check::V1(pattern.clone(), MatchKind::Exact))?;
             attach_check(&mut steps, Check::V2(pattern, MatchKind::Exact))?;
+        } else if line.trim_end() == "// CHECK-ERROR-PARITY" {
+            attach_check(&mut steps, Check::ErrorParity)?;
         } else if let Some(count) = line.strip_prefix("// CHECK-GC-COUNT:") {
             let count = count.trim();
             let count = count

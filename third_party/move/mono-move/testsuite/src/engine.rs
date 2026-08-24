@@ -7,11 +7,11 @@ use crate::{
     compile::{compile, SourceKind},
     module_provider::InMemoryModuleProvider,
 };
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Error, Result};
 use mono_move_core::{
     native::{NativeExtensions, NoNatives},
     types::EMPTY_TYPE_LIST,
-    Function, GasMeter, NoResourceProvider,
+    Function, GasMeter, NoResourceProvider, VMInternalError,
 };
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
@@ -43,7 +43,7 @@ pub enum RunResult<R> {
         location: AbortLocation,
     },
     /// An internal VM error.
-    Error(String),
+    Error(VMInternalError),
 }
 
 /// A loaded entry function bound to a live [`InterpreterContext`], ready to be
@@ -76,7 +76,7 @@ impl<'guard> MonoRunner<'guard> {
         self.interp.reset(self.function, GAS_BUDGET);
         set_args(&mut self.interp);
         let result = match self.interp.run() {
-            Err(err) => RunResult::Error(format!("{}", err)),
+            Err(err) => RunResult::Error(err),
             Ok(RuntimeStatus::Success) => RunResult::Success(extract_returns(&self.interp)),
             Ok(RuntimeStatus::Aborted {
                 code,
@@ -173,7 +173,9 @@ pub fn with_mono_function<'guard, 'ctx, R>(
     let function =
         match loader.load_function(&mut read_set, &mut gas_meter, id, func, EMPTY_TYPE_LIST) {
             Ok(ptr) => unsafe { ptr.as_ref_unchecked() },
-            Err(err) => return Err(anyhow!("failed to load function: {}", err)),
+            // Attached as the source rather than formatted in, so callers can
+            // recover the typed error.
+            Err(err) => return Err(Error::new(err).context("failed to load function")),
         };
 
     let interp = match heap_size {

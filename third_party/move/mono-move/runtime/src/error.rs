@@ -4,8 +4,12 @@
 //! Interpreter-internal error types.
 
 use mono_move_core::{ExecutionErrorKind, IntTy, IntoExecutionError, ResourceProviderError};
-use move_core_types::{account_address::AccountAddress, vm_status::AbortLocation};
-use std::fmt;
+use move_core_types::{
+    account_address::AccountAddress,
+    int256::{I256, U256},
+    vm_status::AbortLocation,
+};
+use std::{fmt, str::Utf8Error};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -16,8 +20,11 @@ pub enum RuntimeError {
     #[error("{op}.{ty}: underflow")]
     ArithmeticUnderflow { op: ArithOp, ty: IntTy },
 
-    #[error("{op}.{ty}: division by zero")]
-    DivisionByZero { op: ArithOp, ty: IntTy },
+    #[error("{op}: division by zero")]
+    DivisionByZero { op: ArithOp },
+
+    #[error("{op}: MIN divided by -1 overflows")]
+    DivisionOverflow { op: ArithOp },
 
     #[error("{op}.{ty}: shift amount {shift_amount} >= bit width {bit_width}")]
     ShiftAmountOutOfRange {
@@ -30,14 +37,15 @@ pub enum RuntimeError {
     #[error("{op}: under/overflow")]
     ArithmeticUnderOverflow { op: ArithOp },
 
-    #[error("{op}: by zero or overflow")]
-    DivisionByZeroOrOverflow { op: ArithOp },
-
     #[error("Negate.{ty}: Negate of MIN overflows")]
     NegateMinOverflow { ty: IntTy },
 
-    #[error("Cast.{from}->{to}: value out of range for {to}")]
-    CastOutOfRange { from: IntTy, to: IntTy },
+    #[error("Cast.{from}->{to}: value {value} out of range for {to}")]
+    CastOutOfRange {
+        from: IntTy,
+        to: IntTy,
+        value: ReportedIntValue,
+    },
 
     #[error("VecPopBack on empty vector")]
     PopFromEmptyVector,
@@ -57,7 +65,7 @@ pub enum RuntimeError {
     #[error("MoveTo: resource already exists at {addr}")]
     ResourceAlreadyExists { addr: AccountAddress },
 
-    #[error("enum variant mismatch: runtime variant tag {tag} is not the expected variant (STRUCT_VARIANT_MISMATCH)")]
+    #[error("enum variant mismatch: runtime variant tag {tag} is not the expected variant")]
     EnumVariantMismatch { tag: u64 },
 
     #[error("stack overflow")]
@@ -73,8 +81,8 @@ pub enum RuntimeError {
     #[error("alloc_vec: size overflow")]
     VecAllocSizeOverflow,
 
-    #[error("AbortMsg: message is not valid UTF-8")]
-    InvalidAbortMessage,
+    #[error("AbortMsg: message is not valid UTF-8: {cause}")]
+    InvalidAbortMessage { cause: Utf8Error },
 
     #[error("AbortMsg: message size {len} exceeds maximum {max}")]
     AbortMessageTooLong { len: usize, max: usize },
@@ -110,6 +118,12 @@ pub enum RuntimeError {
     Unsupported(&'static str),
 }
 
+// `AllocationError` embeds a `RuntimeError` by value, so `AllocationResult<T>`
+// is at least this wide. Box any payload that would grow or over-align the
+// enum.
+const _: () = assert!(std::mem::size_of::<RuntimeError>() <= 48);
+const _: () = assert!(std::mem::align_of::<RuntimeError>() <= 8);
+
 impl IntoExecutionError for RuntimeError {
     fn kind(&self) -> ExecutionErrorKind {
         use RuntimeError::*;
@@ -117,15 +131,15 @@ impl IntoExecutionError for RuntimeError {
             ArithmeticOverflow { .. }
             | ArithmeticUnderflow { .. }
             | DivisionByZero { .. }
+            | DivisionOverflow { .. }
             | ShiftAmountOutOfRange { .. }
             | ArithmeticUnderOverflow { .. }
-            | DivisionByZeroOrOverflow { .. }
             | NegateMinOverflow { .. }
             | CastOutOfRange { .. }
             | PopFromEmptyVector
             | VecUnpackLengthMismatch { .. }
             | VectorIndexOutOfBounds { .. }
-            | InvalidAbortMessage
+            | InvalidAbortMessage { .. }
             | ResourceDoesNotExist { .. }
             | ResourceAlreadyExists { .. }
             | EnumVariantMismatch { .. } => ExecutionErrorKind::InvalidOperation,
@@ -151,6 +165,55 @@ impl IntoExecutionError for RuntimeError {
         }
     }
 }
+
+/// A Move integer value, widened to the signedness-appropriate 256-bit type.
+/// Both variants are needed: no one type spans `I256::MIN ..= U256::MAX`.
+///
+/// Built to report a faulting operand in a [`RuntimeError`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ReportedIntValue {
+    Unsigned(Box<U256>),
+    Signed(Box<I256>),
+}
+
+// Both variants box their payload so the enum stays pointer-sized and
+// pointer-aligned. The 256-bit types are 16-byte aligned, so an inline payload
+// would over-align every enum carrying one.
+const _: () = assert!(std::mem::size_of::<ReportedIntValue>() == 16);
+const _: () = assert!(std::mem::align_of::<ReportedIntValue>() == 8);
+
+impl fmt::Display for ReportedIntValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ReportedIntValue::Unsigned(value) => write!(f, "{value}"),
+            ReportedIntValue::Signed(value) => write!(f, "{value}"),
+        }
+    }
+}
+
+// Widens each Move integer type into [`ReportedIntValue`]. Unsigned types go through
+// `U256` and signed through `I256`: both directions are infallible, whereas
+// `U256: From<iN>` panics on negatives.
+macro_rules! impl_int_value_from {
+    ($($unsigned:ty),* ; $($signed:ty),*) => {
+        $(
+            impl From<$unsigned> for ReportedIntValue {
+                fn from(value: $unsigned) -> Self {
+                    ReportedIntValue::Unsigned(Box::new(U256::from(value)))
+                }
+            }
+        )*
+        $(
+            impl From<$signed> for ReportedIntValue {
+                fn from(value: $signed) -> Self {
+                    ReportedIntValue::Signed(Box::new(I256::from(value)))
+                }
+            }
+        )*
+    };
+}
+
+impl_int_value_from!(u8, u16, u32, u64, u128, U256; i8, i16, i32, i64, i128, I256);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Signedness {

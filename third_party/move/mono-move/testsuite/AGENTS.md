@@ -1,6 +1,6 @@
 # mono-move-testsuite
 
-End-to-end differential tests for the MonoMove VM: each Move source (or assembly) input runs on both the legacy MoveVM (v1) and MonoMove (v2), and their behavior is compared. Inputs may also pin specializer golden output (bytecode, stackless IR, micro-ops).
+End-to-end differential tests for the MonoMove VM: each Move source (or assembly) input runs on both the V1 VM and MonoMove (v2), and their behavior is compared. Inputs may also pin specializer golden output (bytecode, stackless IR, micro-ops).
 
 ## Framework
 
@@ -11,8 +11,9 @@ Tests use `datatest-stable` (a data-driven harness) over the cases under `tests/
 Each input drives the pipeline with `// RUN:` lines:
 
 - `// RUN: publish [--print(<sections>)]` — destack plus per-function micro-op lowering. `--print` renders specializer golden output into the `.exp`; sections are any of `bytecode`, `stackless`, `micro-ops`. A function that cannot be lowered at publish time renders `skipped (<reason>)`.
-- `// RUN: execute <addr>::<mod>::<fn> --args ... [--heap-size <n>]` paired with `// CHECK:` / `// CHECK-SUBSTR:` — runs the function on both the legacy MoveVM (v1) and mono-move (v2) and checks they agree (and match the expected output). `--heap-size <n>` sizes the v2 heap in bytes to force garbage collection under allocation pressure (v1 has no such knob and ignores it).
-- `// CHECK-GC-COUNT: <n>` — asserts mono-move (v2) ran exactly `n` garbage collections during the preceding `execute`. v2-only (the legacy VM has no GC); pair with `--heap-size` to drive collections deterministically.
+- `// RUN: execute <addr>::<mod>::<fn> --args ... [--heap-size <n>]` paired with `// CHECK:` / `// CHECK-SUBSTR:` — runs the function on both the V1 VM and mono-move (v2) and checks they agree (and match the expected output). `--heap-size <n>` sizes the v2 heap in bytes to force garbage collection under allocation pressure (v1 has no such knob and ignores it).
+- `// CHECK-GC-COUNT: <n>` — asserts mono-move (v2) ran exactly `n` garbage collections during the preceding `execute`. v2-only (the V1 VM has no GC); pair with `--heap-size` to drive collections deterministically.
+- `// CHECK-ERROR-PARITY` — asserts both VMs failed with a VM error and that v2's failure, mapped into v1 terms, matches the status code, sub-status, and message v1 reported. Takes no argument: the expected value is v1's actual output. Move aborts are not covered (they carry no VM error to map, and `CHECK:` already compares them).
 
 ## Baseline (Golden) Files
 

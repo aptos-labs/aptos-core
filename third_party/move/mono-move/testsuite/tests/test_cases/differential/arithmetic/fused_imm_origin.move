@@ -11,6 +11,7 @@ module 0x1::fused_imm_origin {
 // RUN: execute 0x1::fused_imm_origin::bump --args 18446744073709551615
 // CHECK-V1-SUBSTR: ARITHMETIC_ERROR
 // CHECK-V2-SUBSTR: overflow
+// CHECK-ERROR-PARITY
 
 // RUN: execute 0x1::fused_imm_origin::scale --args 7
 // CHECK: results: 21
@@ -19,3 +20,4 @@ module 0x1::fused_imm_origin {
 // RUN: execute 0x1::fused_imm_origin::scale --args 9223372036854775807
 // CHECK-V1-SUBSTR: ARITHMETIC_ERROR
 // CHECK-V2-SUBSTR: overflow
+// CHECK-ERROR-PARITY
