@@ -315,7 +315,7 @@ fn native_format_impl(
             let addr = if fix_enabled {
                 val.value_as::<Struct>()?
                     .unpack()?
-                    // The second field of a signer is always the master address regardless of which variants.
+                    // The signer's account address is at field 1, after the variant tag.
                     .nth(MASTER_ADDRESS_FIELD_OFFSET)
                     .ok_or_else(|| SafeNativeError::abort(EINVALID_FORMAT))?
                     .value_as::<AccountAddress>()?
