@@ -47,8 +47,6 @@ use url::Url;
 
 /// Voting period while the proposal goes through, in seconds.
 const FAST_RESOLUTION_SECS: u64 = 30;
-/// The regular test-network voting period, restored afterwards.
-const DEFAULT_RESOLUTION_SECS: u64 = 43200;
 
 /// Governance transactions can exceed the simulation-based gas estimate; use a
 /// fixed generous cap like the previous tooling did.
@@ -179,6 +177,11 @@ pub async fn run(
         println!("Minted {} octas to the validator.", MINT_AMOUNT);
     }
 
+    // Capture the network's real voting period so the restore below puts
+    // back what was actually configured, not an assumed default.
+    let original_voting_secs = get_voting_duration_secs(&client)
+        .await
+        .context("failed to read the current voting period")?;
     set_resolution_time(&client, &factory, &root, core_path, FAST_RESOLUTION_SECS).await?;
     let outcome = run_governance(
         &client,
@@ -189,9 +192,14 @@ pub async fn run(
         metadata_url,
     )
     .await;
-    let restore = set_resolution_time(&client, &factory, &root, core_path, DEFAULT_RESOLUTION_SECS)
+    let restore = set_resolution_time(&client, &factory, &root, core_path, original_voting_secs)
         .await
-        .context("failed to restore the voting period -- restore it manually");
+        .with_context(|| {
+            format!(
+                "failed to restore the voting period -- restore it to {}s manually",
+                original_voting_secs
+            )
+        });
 
     match (outcome, restore) {
         (Ok(proposal_id), Ok(())) => {
@@ -348,6 +356,26 @@ async fn submit(
     Ok(txn)
 }
 
+/// The network's currently configured governance voting period, in seconds.
+async fn get_voting_duration_secs(client: &Client) -> Result<u64> {
+    let request = ViewRequest {
+        function: "0x1::aptos_governance::get_voting_duration_secs"
+            .parse()
+            .map_err(|e| anyhow!("bad view function id: {:#}", e))?,
+        type_arguments: vec![],
+        arguments: vec![],
+    };
+    client
+        .view(&request, None)
+        .await
+        .context("failed to view the voting duration")?
+        .into_inner()
+        .first()
+        .and_then(|v| v.as_str())
+        .and_then(|v| v.parse::<u64>().ok())
+        .ok_or_else(|| anyhow!("unexpected voting duration view output"))
+}
+
 /// Set the governance voting period, signed by root. Test networks only: the
 /// script leans on `aptos_governance::get_signer_testnet_only`.
 async fn set_resolution_time(
@@ -415,7 +443,7 @@ async fn wait_for_voting_closed(client: &Client, proposal_id: u64) -> Result<()>
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
         if closed {
-            return Ok(());
+            break;
         }
         if start.elapsed() > VOTING_CLOSE_TIMEOUT {
             bail!(
@@ -427,6 +455,32 @@ async fn wait_for_voting_closed(client: &Client, proposal_id: u64) -> Result<()>
         }
         tokio::time::sleep(POLL_INTERVAL).await;
     }
+
+    // Voting can close in the very second the deciding vote lands (early
+    // resolution), and resolving asserts on-chain time is strictly past the
+    // last vote; wait for the on-chain clock to tick over.
+    let closed_at_secs = ledger_timestamp_secs(client).await?;
+    while ledger_timestamp_secs(client).await? <= closed_at_secs {
+        if start.elapsed() > VOTING_CLOSE_TIMEOUT {
+            bail!(
+                "the on-chain clock did not advance past the vote within {:?}",
+                VOTING_CLOSE_TIMEOUT
+            );
+        }
+        tokio::time::sleep(POLL_INTERVAL).await;
+    }
+    Ok(())
+}
+
+/// The latest on-chain timestamp, in seconds.
+async fn ledger_timestamp_secs(client: &Client) -> Result<u64> {
+    Ok(client
+        .get_ledger_information()
+        .await
+        .context("failed to read the ledger timestamp")?
+        .into_inner()
+        .timestamp_usecs
+        / 1_000_000)
 }
 
 /// Compile every script in the bundle (in execution order) and require each to
