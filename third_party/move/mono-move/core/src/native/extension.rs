@@ -5,7 +5,7 @@ use crate::{native::native_invariant_violation, VMResult};
 use fxhash::FxHashMap;
 use std::{
     any::{Any, TypeId},
-    cell::{RefCell, RefMut},
+    cell::{Ref, RefCell, RefMut},
 };
 
 /// An extensible state defined by a native function. Persisted throughout
@@ -68,9 +68,39 @@ impl NativeExtensions {
         );
     }
 
+    /// Gets immutable access to the extension of type `T`.
+    ///
+    /// Errors if `T` is not installed, or if it is mutably borrowed.
+    /// The returned borrow must be released before an operation that can
+    /// trigger GC, checkpointing, or rollback, because each requires mutable
+    /// access to every extension.
+    pub fn get<T: NativeExtension>(&self) -> VMResult<Ref<'_, T>> {
+        let cell = self.map.get(&TypeId::of::<T>()).ok_or_else(|| {
+            native_invariant_violation(format!(
+                "native extension {} not installed for this transaction",
+                std::any::type_name::<T>(),
+            ))
+        })?;
+        let guard = cell.try_borrow().map_err(|_| {
+            native_invariant_violation(format!(
+                "native extension {} is already mutably borrowed",
+                std::any::type_name::<T>(),
+            ))
+        })?;
+        Ok(Ref::map(guard, |ext| {
+            // Upcast `dyn NativeExtension` to `dyn Any`, then downcast to `T`.
+            let ext: &dyn Any = &**ext;
+            ext.downcast_ref::<T>()
+                .expect("TypeId key matches the stored extension type")
+        }))
+    }
+
     /// Gets a mutable access to the extension of type `T`.
     ///
     /// Errors if `T` is not installed, or if it is already borrowed.
+    /// The returned borrow must be released before an operation that can
+    /// trigger GC, checkpointing, or rollback, because each requires mutable
+    /// access to every extension.
     pub fn get_mut<T: NativeExtension>(&self) -> VMResult<RefMut<'_, T>> {
         let cell = self.map.get(&TypeId::of::<T>()).ok_or_else(|| {
             native_invariant_violation(format!(

@@ -10,4 +10,4 @@ pub mod error;
 pub mod events;
 
 pub use error::OutputError;
-pub use events::to_contract_events;
+pub use events::{to_contract_events, to_contract_events_from_store};
