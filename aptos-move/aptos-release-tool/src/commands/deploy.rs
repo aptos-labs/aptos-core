@@ -177,12 +177,17 @@ pub async fn run(
         println!("Minted {} octas to the validator.", MINT_AMOUNT);
     }
 
-    // Capture the network's real voting period so the restore below puts
-    // back what was actually configured, not an assumed default.
-    let original_voting_secs = get_voting_duration_secs(&client)
+    // Capture the network's governance config so the ceremony changes only
+    // the voting period and the restore puts back exactly what was
+    // configured, not assumed defaults.
+    let original_config = get_governance_config(&client)
         .await
-        .context("failed to read the current voting period")?;
-    set_resolution_time(&client, &factory, &root, core_path, FAST_RESOLUTION_SECS).await?;
+        .context("failed to read the current governance config")?;
+    set_governance_config(&client, &factory, &root, core_path, GovernanceConfig {
+        voting_duration_secs: FAST_RESOLUTION_SECS,
+        ..original_config
+    })
+    .await?;
     let outcome = run_governance(
         &client,
         &factory,
@@ -192,12 +197,15 @@ pub async fn run(
         metadata_url,
     )
     .await;
-    let restore = set_resolution_time(&client, &factory, &root, core_path, original_voting_secs)
+    let restore = set_governance_config(&client, &factory, &root, core_path, original_config)
         .await
         .with_context(|| {
             format!(
-                "failed to restore the voting period -- restore it to {}s manually",
-                original_voting_secs
+                "failed to restore the governance config -- restore it manually: \
+                 min voting threshold {}, required proposer stake {}, voting period {}s",
+                original_config.min_voting_threshold,
+                original_config.required_proposer_stake,
+                original_config.voting_duration_secs
             )
         });
 
@@ -356,36 +364,52 @@ async fn submit(
     Ok(txn)
 }
 
-/// The network's currently configured governance voting period, in seconds.
-async fn get_voting_duration_secs(client: &Client) -> Result<u64> {
-    let request = ViewRequest {
-        function: "0x1::aptos_governance::get_voting_duration_secs"
-            .parse()
-            .map_err(|e| anyhow!("bad view function id: {:#}", e))?,
-        type_arguments: vec![],
-        arguments: vec![],
-    };
-    client
-        .view(&request, None)
-        .await
-        .context("failed to view the voting duration")?
-        .into_inner()
-        .first()
-        .and_then(|v| v.as_str())
-        .and_then(|v| v.parse::<u64>().ok())
-        .ok_or_else(|| anyhow!("unexpected voting duration view output"))
+/// The on-chain governance config: everything the ceremony touches and must
+/// put back exactly.
+#[derive(Clone, Copy)]
+struct GovernanceConfig {
+    min_voting_threshold: u128,
+    required_proposer_stake: u64,
+    voting_duration_secs: u64,
 }
 
-/// Set the governance voting period, signed by root. Test networks only: the
+/// The network's currently configured governance config.
+async fn get_governance_config(client: &Client) -> Result<GovernanceConfig> {
+    let resource = client
+        .get_account_resource(
+            AccountAddress::ONE,
+            "0x1::aptos_governance::GovernanceConfig",
+        )
+        .await
+        .context("failed to read the governance config")?
+        .into_inner()
+        .ok_or_else(|| anyhow!("no governance config on chain"))?;
+    let field = |name: &str| {
+        resource.data[name]
+            .as_str()
+            .with_context(|| format!("unexpected governance config field: {}", name))
+    };
+    Ok(GovernanceConfig {
+        min_voting_threshold: field("min_voting_threshold")?.parse()?,
+        required_proposer_stake: field("required_proposer_stake")?.parse()?,
+        voting_duration_secs: field("voting_duration_secs")?.parse()?,
+    })
+}
+
+/// Set the governance config, signed by root. Test networks only: the
 /// script leans on `aptos_governance::get_signer_testnet_only`.
-async fn set_resolution_time(
+async fn set_governance_config(
     client: &Client,
     factory: &TransactionFactory,
     root: &LocalAccount,
     core_path: &Path,
-    seconds: u64,
+    config: GovernanceConfig,
 ) -> Result<()> {
-    println!("Setting the voting period to {}s...", seconds);
+    println!(
+        "Setting the governance config: min voting threshold {}, required proposer stake {}, \
+         voting period {}s...",
+        config.min_voting_threshold, config.required_proposer_stake, config.voting_duration_secs
+    );
     let source = format!(
         r#"
 script {{
@@ -393,11 +417,11 @@ script {{
 
     fun main(core_resources: &signer) {{
         let core_signer = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
-        aptos_governance::update_governance_config(&core_signer, 0, 0, {});
+        aptos_governance::update_governance_config(&core_signer, {}, {}, {});
     }}
 }}
 "#,
-        seconds
+        config.min_voting_threshold, config.required_proposer_stake, config.voting_duration_secs
     );
     let temp = aptos_temppath::TempPath::new();
     temp.create_as_file()?;
@@ -413,7 +437,7 @@ script {{
         TransactionPayload::Script(Script::new(blob, vec![], vec![])),
     )
     .await
-    .with_context(|| format!("failed to set the voting period to {}s", seconds))?;
+    .context("failed to set the governance config")?;
     Ok(())
 }
 
