@@ -7,11 +7,15 @@ use crate::{assert_success, tests::common, MoveHarness};
 use aptos_framework::BuildOptions;
 use aptos_language_e2e_tests::account::Account;
 use aptos_package_builder::PackageBuilder;
-use aptos_types::{account_address::AccountAddress, transaction::TransactionStatus};
+use aptos_types::{
+    account_address::AccountAddress, on_chain_config::FeatureFlag, transaction::TransactionStatus,
+};
 
 #[test]
 fn fv_in_table() {
-    let mut h = MoveHarness::new();
+    let mut h = MoveHarness::new_with_features(vec![], vec![
+        FeatureFlag::DISABLE_CLOSURE_BCS_SERIALIZATION,
+    ]);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0x99").unwrap());
 
     // Initial publish
@@ -159,7 +163,9 @@ fn fv_in_table() {
 
 #[test]
 fn fv_in_table_with_refs() {
-    let mut h = MoveHarness::new();
+    let mut h = MoveHarness::new_with_features(vec![], vec![
+        FeatureFlag::DISABLE_CLOSURE_BCS_SERIALIZATION,
+    ]);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0x99").unwrap());
 
     // Initial publish
@@ -264,7 +270,9 @@ fn fv_in_table_with_refs() {
 
 #[test]
 fn fv_in_table_with_captured_vars() {
-    let mut h = MoveHarness::new();
+    let mut h = MoveHarness::new_with_features(vec![], vec![
+        FeatureFlag::DISABLE_CLOSURE_BCS_SERIALIZATION,
+    ]);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0x99").unwrap());
 
     // Initial publish

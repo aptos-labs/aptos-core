@@ -289,6 +289,10 @@ mod indexed_ref_tests {
             unreachable!()
         }
 
+        fn captured_depth(&self) -> u16 {
+            unreachable!()
+        }
+
         fn cmp_dyn(&self, _other: &dyn AbstractFunction) -> PartialVMResult<Ordering> {
             unreachable!()
         }

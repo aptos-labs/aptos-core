@@ -43,11 +43,17 @@ fn native_from_bytes(
         UTIL_FROM_BYTES_BASE + UTIL_FROM_BYTES_PER_BYTE * NumBytes::new(bytes.len() as u64),
     )?;
 
+    // These are untrusted user bytes: function values in storage format V2 are only
+    // accepted once the format is enabled, so users cannot mint V2 data before that.
+    let v2_reads_allowed = context
+        .get_feature_flags()
+        .is_function_data_format_v2_enabled();
     let function_value_extension = context.function_value_extension();
     let max_value_nest_depth = context.max_value_nest_depth();
     let val = match ValueSerDeContext::new(max_value_nest_depth)
         .with_legacy_signer()
         .with_func_args_deserialization(&function_value_extension)
+        .with_function_values_v2_reads(v2_reads_allowed)
         .deserialize(&bytes, &layout)
     {
         Some(val) => val,

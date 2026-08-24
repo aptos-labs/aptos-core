@@ -19,6 +19,7 @@ use move_core_types::{
 };
 use move_vm_types::{
     gas::{DependencyGasMeter, DependencyKind, GasMeter, NativeGasMeter, SimpleInstruction},
+    values::Value,
     views::{TypeView, ValueView},
 };
 
@@ -168,6 +169,22 @@ where
     fn release_heap_memory(&mut self, amount: AbstractValueSize) {
         self.algebra.release_heap_memory(amount);
     }
+
+    fn abstract_values_heap_size_sum(
+        &self,
+        values: impl ExactSizeIterator<Item = impl ValueView>,
+    ) -> PartialVMResult<AbstractValueSize> {
+        values
+            .iter()
+            .try_fold(AbstractValueSize::zero(), |acc, val| {
+                let heap_size = self
+                    .vm_gas_params()
+                    .misc
+                    .abs_val
+                    .abstract_heap_size(val, self.feature_version())?;
+                Ok::<_, PartialVMError>(acc + heap_size)
+            })
+    }
 }
 
 // TODO: consider switching to a library like https://docs.rs/delegate/latest/delegate/.
@@ -219,6 +236,21 @@ where
     #[inline]
     fn use_heap_memory_in_native_context(&mut self, amount: u64) -> PartialVMResult<()> {
         self.use_heap_memory(amount.into())
+    }
+
+    #[inline]
+    fn charge_closure_materialization(
+        &mut self,
+        num_bytes: NumBytes,
+        values: &[Value],
+    ) -> PartialVMResult<()> {
+        // A compact serialized blob can be deserialized into a much larger
+        // value graph, so charge the heap-memory quota for the deserialized
+        // values.
+        let usage = self.abstract_values_heap_size_sum(values.iter())?;
+        self.use_heap_memory(usage)?;
+
+        self.base.charge_closure_materialization(num_bytes, values)
     }
 }
 
@@ -326,17 +358,8 @@ where
     ) -> PartialVMResult<()> {
         // TODO(Gas): https://github.com/aptos-labs/aptos-core/issues/5485
         if !self.should_leak_memory_for_native {
-            self.release_heap_memory(args.clone().try_fold(
-                AbstractValueSize::zero(),
-                |acc, val| {
-                    let heap_size = self
-                        .vm_gas_params()
-                        .misc
-                        .abs_val
-                        .abstract_heap_size(val, self.feature_version())?;
-                    Ok::<_, PartialVMError>(acc + heap_size)
-                },
-            )?);
+            let usage = self.abstract_values_heap_size_sum(args.clone())?;
+            self.release_heap_memory(usage);
         }
 
         self.base
@@ -360,15 +383,9 @@ where
         amount: InternalGas,
         ret_vals: Option<impl ExactSizeIterator<Item = impl ValueView> + Clone>,
     ) -> PartialVMResult<()> {
-        if let Some(mut ret_vals) = ret_vals.clone() {
-            self.use_heap_memory(ret_vals.try_fold(AbstractValueSize::zero(), |acc, val| {
-                let heap_size = self
-                    .vm_gas_params()
-                    .misc
-                    .abs_val
-                    .abstract_heap_size(val, self.feature_version())?;
-                Ok::<_, PartialVMError>(acc + heap_size)
-            })?)?;
+        if let Some(ret_vals) = ret_vals.clone() {
+            let usage = self.abstract_values_heap_size_sum(ret_vals)?;
+            self.use_heap_memory(usage)?;
         }
 
         self.base.charge_native_function(amount, ret_vals)
@@ -635,17 +652,8 @@ where
         &mut self,
         locals: impl Iterator<Item = impl ValueView> + Clone,
     ) -> PartialVMResult<()> {
-        self.release_heap_memory(locals.clone().try_fold(
-            AbstractValueSize::zero(),
-            |acc, val| {
-                let heap_size = self
-                    .vm_gas_params()
-                    .misc
-                    .abs_val
-                    .abstract_heap_size(val, self.feature_version())?;
-                Ok::<_, PartialVMError>(acc + heap_size)
-            },
-        )?);
+        let usage = self.abstract_values_heap_size_sum(locals.clone())?;
+        self.release_heap_memory(usage);
 
         self.base.charge_drop_frame(locals)
     }

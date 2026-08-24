@@ -1,17 +1,32 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+// `derive(Dearbitrary)` generates unused-variable and unused-assignment warnings for
+// the named-field `MoveClosureCapturedArgs::Serialized` variant that can only be
+// silenced at the module level (see the same allow in `value.rs`). The derive only
+// exists under `test`/`fuzzing`, so gate the allow to those configs and keep the
+// lints active for production builds of this module.
+#![cfg_attr(
+    any(test, feature = "fuzzing"),
+    allow(unused_variables, unused_assignments)
+)]
+
 use crate::{
     ability::AbilitySet,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
-    value::{MoveTypeLayout, MoveValue},
+    value::{MoveStruct, MoveStructLayout, MoveTypeLayout, MoveValue},
 };
+use anyhow::bail;
 use serde::{de::Error, ser::SerializeSeq, Deserialize, Serialize};
 use std::fmt;
 
 /// Version number for the serialization format of function data.
 pub const FUNCTION_DATA_SERIALIZATION_FORMAT_V1: u16 = 1;
+
+/// Version number for the V2 serialization format of function data. In V2, captured
+/// arguments are stored as a single opaque blob without layouts.
+pub const FUNCTION_DATA_SERIALIZATION_FORMAT_V2: u16 = 2;
 
 //===========================================================================================
 
@@ -244,10 +259,23 @@ pub struct MoveFunctionLayout(
     pub AbilitySet,
 );
 
-/// A closure (function value). The closure stores the name of the function and it's
-/// type instantiation, as well as the closure mask and the captured values together
-/// with their layout. The latter allows to deserialize closures context free (without
-/// needing to lookup information about the function and its dependencies).
+/// Captured arguments of a closure, in one of the two serialization formats.
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[cfg_attr(
+    any(test, feature = "fuzzing"),
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
+pub enum MoveClosureCapturedArgs {
+    /// Eagerly deserialized captured arguments and their layouts (used to
+    /// guide the deserialization).
+    Deserialized(Vec<(MoveTypeLayout, MoveValue)>),
+    /// Concatenated BCS of the captured values, with their cached nesting depth
+    /// (see `SerializedFunctionData::depth` on the VM side).
+    Serialized { depth: u16, blob: Vec<u8> },
+}
+
+/// A closure (function value). The closure stores the name of the function and its
+/// type instantiation, as well as the closure mask and the captured arguments.
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(
     any(test, feature = "fuzzing"),
@@ -258,7 +286,25 @@ pub struct MoveClosure {
     pub fun_id: Identifier,
     pub ty_args: Vec<TypeTag>,
     pub mask: ClosureMask,
-    pub captured: Vec<(MoveTypeLayout, MoveValue)>,
+    pub captured: MoveClosureCapturedArgs,
+}
+
+impl MoveClosure {
+    /// Decodes a V2 captured blob into values, given the layouts of the captured
+    /// arguments (derived from the function signature). Fails if the values do not
+    /// match the layouts or the blob has trailing bytes.
+    pub fn deserialize_captured(
+        blob: &[u8],
+        layouts: Vec<MoveTypeLayout>,
+    ) -> anyhow::Result<Vec<MoveValue>> {
+        // A concatenation of BCS values is exactly the BCS encoding of a struct with
+        // those field layouts.
+        let layout = MoveTypeLayout::new_struct(MoveStructLayout::Runtime(layouts));
+        match MoveValue::simple_deserialize(blob, &layout)? {
+            MoveValue::Struct(MoveStruct::Runtime(values)) => Ok(values),
+            _ => bail!("expected runtime struct when decoding captured arguments"),
+        }
+    }
 }
 
 pub(crate) struct ClosureVisitor;
@@ -275,27 +321,42 @@ impl<'d> serde::de::Visitor<'d> for ClosureVisitor {
         A: serde::de::SeqAccess<'d>,
     {
         let version = read_required_value::<_, u16>(&mut seq)?;
-        if version != FUNCTION_DATA_SERIALIZATION_FORMAT_V1 {
-            return Err(A::Error::custom(format!(
-                "unexpected function data version {}",
-                version
-            )));
-        }
         let module_id = read_required_value::<_, ModuleId>(&mut seq)?;
         let fun_id = read_required_value::<_, Identifier>(&mut seq)?;
         let ty_args = read_required_value::<_, Vec<TypeTag>>(&mut seq)?;
         let mask = read_required_value::<_, ClosureMask>(&mut seq)?;
-        let mut captured = vec![];
-        for _ in 0..mask.captured_count() {
-            let layout = read_required_value::<_, MoveTypeLayout>(&mut seq)?;
-            match seq.next_element_seed(&layout)? {
-                Some(v) => captured.push((layout, v)),
-                None => return Err(A::Error::invalid_length(captured.len(), &self)),
-            }
-        }
+        let num_captured = mask.captured_count() as usize;
+        let captured = match version {
+            FUNCTION_DATA_SERIALIZATION_FORMAT_V1 => {
+                let mut captured = vec![];
+                for _ in 0..num_captured {
+                    let layout = read_required_value::<_, MoveTypeLayout>(&mut seq)?;
+                    match seq.next_element_seed(&layout)? {
+                        Some(v) => captured.push((layout, v)),
+                        None => return Err(A::Error::invalid_length(captured.len(), &self)),
+                    }
+                }
+                MoveClosureCapturedArgs::Deserialized(captured)
+            },
+            FUNCTION_DATA_SERIALIZATION_FORMAT_V2 => {
+                let depth = read_required_value::<_, u16>(&mut seq)?;
+                let blob = read_required_value::<_, Vec<u8>>(&mut seq)?;
+                // Each captured value takes at least one byte.
+                if blob.len() < num_captured {
+                    return Err(A::Error::custom("captured blob is too short"));
+                }
+                MoveClosureCapturedArgs::Serialized { depth, blob }
+            },
+            _ => {
+                return Err(A::Error::custom(format!(
+                    "unexpected function data version {}",
+                    version
+                )))
+            },
+        };
         // If the sequence length is known, check whether there are no extra values
         if matches!(seq.size_hint(), Some(remaining) if remaining != 0) {
-            return Err(A::Error::invalid_length(captured.len(), &self));
+            return Err(A::Error::invalid_length(num_captured, &self));
         }
         Ok(MoveClosure {
             module_id,
@@ -327,32 +388,42 @@ impl serde::Serialize for MoveClosure {
             mask,
             captured,
         } = self;
-        let mut s = serializer.serialize_seq(Some(5 + captured.len() * 2))?;
-        s.serialize_element(&FUNCTION_DATA_SERIALIZATION_FORMAT_V1)?;
-        s.serialize_element(module_id)?;
-        s.serialize_element(fun_id)?;
-        s.serialize_element(ty_args)?;
-        s.serialize_element(mask)?;
-        for (l, v) in captured {
-            s.serialize_element(l)?;
-            s.serialize_element(v)?;
+        match captured {
+            MoveClosureCapturedArgs::Deserialized(captured) => {
+                let mut s = serializer.serialize_seq(Some(5 + captured.len() * 2))?;
+                s.serialize_element(&FUNCTION_DATA_SERIALIZATION_FORMAT_V1)?;
+                s.serialize_element(module_id)?;
+                s.serialize_element(fun_id)?;
+                s.serialize_element(ty_args)?;
+                s.serialize_element(mask)?;
+                for (l, v) in captured {
+                    s.serialize_element(l)?;
+                    s.serialize_element(v)?;
+                }
+                s.end()
+            },
+            MoveClosureCapturedArgs::Serialized { depth, blob } => {
+                let mut s = serializer.serialize_seq(Some(7))?;
+                s.serialize_element(&FUNCTION_DATA_SERIALIZATION_FORMAT_V2)?;
+                s.serialize_element(module_id)?;
+                s.serialize_element(fun_id)?;
+                s.serialize_element(ty_args)?;
+                s.serialize_element(mask)?;
+                s.serialize_element(depth)?;
+                s.serialize_element(blob)?;
+                s.end()
+            },
         }
-        s.end()
     }
 }
 
 #[cfg(test)]
 mod serialization_tests {
     use super::*;
-    use crate::{
-        account_address::AccountAddress,
-        ident_str,
-        value::{MoveStruct, MoveStructLayout},
-    };
+    use crate::{account_address::AccountAddress, ident_str};
 
-    #[test]
-    fn function_value_serialization_ok() {
-        let value = MoveValue::Closure(Box::new(MoveClosure {
+    fn make_closure(captured: MoveClosureCapturedArgs) -> MoveValue {
+        MoveValue::Closure(Box::new(MoveClosure {
             module_id: ModuleId {
                 address: AccountAddress::ONE,
                 name: ident_str!("mod").to_owned(),
@@ -360,33 +431,188 @@ mod serialization_tests {
             fun_id: ident_str!("func").to_owned(),
             ty_args: vec![TypeTag::Bool],
             mask: ClosureMask::new(0b111),
-            captured: vec![
-                (MoveTypeLayout::U64, MoveValue::U64(2066)),
-                (
-                    MoveTypeLayout::Vector(Box::new(MoveTypeLayout::Bool)),
-                    MoveValue::Vector(vec![MoveValue::Bool(false)]),
-                ),
-                (
-                    MoveTypeLayout::new_struct(MoveStructLayout::Runtime(vec![
-                        MoveTypeLayout::Bool,
-                        MoveTypeLayout::U8,
-                    ])),
-                    MoveValue::Struct(MoveStruct::Runtime(vec![
-                        MoveValue::Bool(false),
-                        MoveValue::U8(22),
-                    ])),
-                ),
-            ],
-        }));
+            captured,
+        }))
+    }
+
+    fn captured_pairs() -> Vec<(MoveTypeLayout, MoveValue)> {
+        vec![
+            (MoveTypeLayout::U64, MoveValue::U64(2066)),
+            (
+                MoveTypeLayout::Vector(Box::new(MoveTypeLayout::Bool)),
+                MoveValue::Vector(vec![MoveValue::Bool(false)]),
+            ),
+            (
+                MoveTypeLayout::new_struct(MoveStructLayout::Runtime(vec![
+                    MoveTypeLayout::Bool,
+                    MoveTypeLayout::U8,
+                ])),
+                MoveValue::Struct(MoveStruct::Runtime(vec![
+                    MoveValue::Bool(false),
+                    MoveValue::U8(22),
+                ])),
+            ),
+        ]
+    }
+
+    fn round_trip(value: &MoveValue) {
         let blob = value
             .simple_serialize()
             .expect("serialization must succeed");
-        eprintln!("{:?}", blob);
         assert_eq!(
             value,
-            MoveValue::simple_deserialize(&blob, &MoveTypeLayout::Function)
+            &MoveValue::simple_deserialize(&blob, &MoveTypeLayout::Function)
                 .expect("deserialization must succeed"),
             "deserialized value not equal to original one"
         );
+    }
+
+    #[test]
+    fn function_value_serialization_v1_ok() {
+        round_trip(&make_closure(MoveClosureCapturedArgs::Deserialized(
+            captured_pairs(),
+        )));
+    }
+
+    #[test]
+    fn function_value_serialization_v2_ok() {
+        // The blob is the concatenated BCS of the captured values.
+        let blob = captured_pairs()
+            .into_iter()
+            .flat_map(|(_, v)| v.simple_serialize().unwrap())
+            .collect::<Vec<u8>>();
+        round_trip(&make_closure(MoveClosureCapturedArgs::Serialized {
+            depth: 3,
+            blob,
+        }));
+    }
+
+    #[test]
+    fn function_value_v2_decode_captured() {
+        let (layouts, values): (Vec<_>, Vec<_>) = captured_pairs().into_iter().unzip();
+        let blob = values
+            .iter()
+            .flat_map(|v| v.simple_serialize().unwrap())
+            .collect::<Vec<u8>>();
+        let decoded = MoveClosure::deserialize_captured(&blob, layouts.clone())
+            .expect("decoding must succeed");
+        assert_eq!(decoded, values);
+
+        // Trailing bytes are rejected.
+        let mut with_trailing = blob.clone();
+        with_trailing.push(0);
+        MoveClosure::deserialize_captured(&with_trailing, layouts.clone())
+            .expect_err("trailing bytes must be rejected");
+
+        // Truncated blobs are rejected.
+        MoveClosure::deserialize_captured(&blob[..blob.len() - 1], layouts)
+            .expect_err("truncated blob must be rejected");
+    }
+
+    #[test]
+    fn function_value_serialization_bad_version() {
+        // A closure with version 3 in the version slot must be rejected.
+        let v2_bytes = make_closure(MoveClosureCapturedArgs::Serialized {
+            depth: 0,
+            blob: vec![1, 2, 3],
+        })
+        .simple_serialize()
+        .expect("serialization must succeed");
+        // The version u16 is serialized little-endian right after the seq length byte.
+        let mut bad = v2_bytes;
+        bad[1] = 3;
+        MoveValue::simple_deserialize(&bad, &MoveTypeLayout::Function)
+            .expect_err("unknown version must be rejected");
+    }
+
+    #[test]
+    fn function_value_serialization_v1_golden_bytes() {
+        // V1 byte stability: the encoding of decoded captured arguments must not
+        // change, since it is the on-chain format.
+        let value = MoveValue::Closure(Box::new(MoveClosure {
+            module_id: ModuleId {
+                address: AccountAddress::ONE,
+                name: ident_str!("m").to_owned(),
+            },
+            fun_id: ident_str!("f").to_owned(),
+            ty_args: vec![],
+            mask: ClosureMask::new(0b1),
+            captured: MoveClosureCapturedArgs::Deserialized(vec![(
+                MoveTypeLayout::U8,
+                MoveValue::U8(7),
+            )]),
+        }));
+        let blob = value.simple_serialize().expect("serialization succeeds");
+        let mut expected = vec![
+            7, // seq length: 5 + 2 * 1
+            1, 0, // version 1 (u16, little-endian)
+        ];
+        expected.extend(AccountAddress::ONE.to_vec()); // module address
+        expected.extend([
+            1, b'm', // module name
+            1, b'f', // function name
+            0,    // no type args
+            1, 0, 0, 0, 0, 0, 0, 0, // mask (u64, little-endian)
+            1, // layout: U8 (enum variant index)
+            7, // value
+        ]);
+        assert_eq!(blob, expected);
+    }
+
+    #[test]
+    fn function_value_serialization_v2_golden_bytes() {
+        // V2 byte stability: the cached depth is a u16 sitting between the mask and
+        // the captured blob.
+        let value = MoveValue::Closure(Box::new(MoveClosure {
+            module_id: ModuleId {
+                address: AccountAddress::ONE,
+                name: ident_str!("m").to_owned(),
+            },
+            fun_id: ident_str!("f").to_owned(),
+            ty_args: vec![],
+            mask: ClosureMask::new(0b1),
+            captured: MoveClosureCapturedArgs::Serialized {
+                depth: 5,
+                blob: vec![7],
+            },
+        }));
+        let blob = value.simple_serialize().expect("serialization succeeds");
+        let mut expected = vec![
+            7, // seq length: version, module_id, fun_id, ty_args, mask, depth, blob
+            2, 0, // version 2 (u16, little-endian)
+        ];
+        expected.extend(AccountAddress::ONE.to_vec()); // module address
+        expected.extend([
+            1, b'm', // module name
+            1, b'f', // function name
+            0,    // no type args
+            1, 0, 0, 0, 0, 0, 0, 0, // mask (u64, little-endian)
+            5, 0, // depth (u16, little-endian)
+            1, // blob length (one captured byte)
+            7, // blob byte
+        ]);
+        assert_eq!(blob, expected);
+    }
+
+    #[test]
+    fn function_value_serialization_v2_preserves_depth() {
+        // The cached depth survives a serialize/deserialize round-trip.
+        let value = make_closure(MoveClosureCapturedArgs::Serialized {
+            depth: 9,
+            blob: vec![1, 2, 3],
+        });
+        let blob = value.simple_serialize().expect("serialization succeeds");
+        let decoded = MoveValue::simple_deserialize(&blob, &MoveTypeLayout::Function)
+            .expect("deserialization succeeds");
+        match decoded {
+            MoveValue::Closure(c) => match c.captured {
+                MoveClosureCapturedArgs::Serialized { depth, blob } => {
+                    assert_eq!(depth, 9);
+                    assert_eq!(blob, vec![1, 2, 3]);
+                },
+                other => panic!("expected serialized captures, got {:?}", other),
+            },
+            other => panic!("expected a closure, got {:?}", other),
+        }
     }
 }

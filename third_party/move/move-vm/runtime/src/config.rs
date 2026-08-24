@@ -84,6 +84,9 @@ pub struct VMConfig {
     /// version (hash) of its defining module before use, and re-resolved if the
     /// module was republished since the resolution.
     pub revalidate_resolved_closures: bool,
+    /// When enabled, function values are serialized using storage format V2 (captured
+    /// arguments as a single blob, without layouts). V1 data remains readable.
+    pub enable_function_data_format_v2: bool,
 }
 
 impl Default for VMConfig {
@@ -118,6 +121,7 @@ impl Default for VMConfig {
             enable_public_struct_args: true,
             include_closure_mask_in_cmp: true,
             revalidate_resolved_closures: true,
+            enable_function_data_format_v2: true,
         }
     }
 }
