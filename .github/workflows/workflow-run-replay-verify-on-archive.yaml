@@ -151,7 +151,6 @@ jobs:
     timeout-minutes: 420 # 7 hours
     needs: build-images
     env:
-      FRAMEWORK_USAGE_BUCKET: aptos-framework-usage-reports
       REPORT_BRANCH: gh-pages
       REPORT_REPOSITORY: aptos-labs/aptos-core-private
     permissions:
@@ -202,21 +201,8 @@ jobs:
         shell: bash
         run: gcloud config set project aptos-devinfra-0
 
-      - name: Verify private framework usage shard bucket
-        if: ${{ inputs.DRY_RUN == false && inputs.FRAMEWORK_USAGE }}
-        run: |
-          PUBLIC_ACCESS_PREVENTION="$(gcloud storage buckets describe "gs://${FRAMEWORK_USAGE_BUCKET}" --format='value(public_access_prevention)')"
-          UNIFORM_BUCKET_ACCESS="$(gcloud storage buckets describe "gs://${FRAMEWORK_USAGE_BUCKET}" --format='value(uniform_bucket_level_access)')"
-          if [ "$PUBLIC_ACCESS_PREVENTION" != "enforced" ]; then
-            echo "::error::Framework usage shard bucket must enforce public access prevention."
-            exit 1
-          fi
-          if [ "$UNIFORM_BUCKET_ACCESS" != "true" ]; then
-            echo "::error::Framework usage shard bucket must use uniform bucket-level access."
-            exit 1
-          fi
-
       - uses: ./.github/actions/python-setup
+        id: replay-verify-python
         with:
           pyproject_directory: testsuite/replay-verify
 
@@ -251,7 +237,6 @@ jobs:
           fi
           if [ "$FRAMEWORK_USAGE" = "true" ]; then
             ARGS+=(--framework-usage-output-dir ../../framework-usage-results)
-            ARGS+=(--framework-usage-bucket "$FRAMEWORK_USAGE_BUCKET")
           fi
           ARGS+=(--image_profile performance)
           poetry run python main.py "${ARGS[@]}"
@@ -362,7 +347,7 @@ jobs:
           GOOGLE_CLOUD_PROJECT: aptos-devinfra-0
           NETWORK: ${{ inputs.NETWORK }}
           IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
-        if: ${{ always() && inputs.DRY_RUN == false }}
+        if: ${{ always() && inputs.DRY_RUN == false && steps.replay-verify-python.outcome == 'success' }}
         run: |
           cd testsuite/replay-verify
           ARGS=(--network "$NETWORK" --cleanup)
