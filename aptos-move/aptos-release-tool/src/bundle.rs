@@ -13,7 +13,8 @@
 //! ├── config.yaml            # the config used to generate the bundle
 //! ├── metadata.json          # the governance proposal's metadata
 //! ├── gas/{old,new}.json     # gas schedule snapshots
-//! ├── scripts/N-*.move       # the proposal's multi-step governance scripts
+//! ├── scripts/N-*.move       # the proposal's script sources, for auditing
+//! ├── bytecode/N-*.mv        # the compiled scripts actually deployed
 //! └── summary/*.md           # human-reviewable change summaries
 //! ```
 
@@ -37,8 +38,10 @@ pub const BUNDLE_TOML: &str = "bundle.toml";
 pub const CONFIG_YAML: &str = "config.yaml";
 /// Directory holding gas schedule snapshots.
 pub const GAS_DIR: &str = "gas";
-/// Directory holding the proposal's governance scripts.
+/// Directory holding the proposal's governance script sources (audit only).
 pub const SCRIPTS_DIR: &str = "scripts";
+/// Directory holding the compiled scripts, the artifacts actually deployed.
+pub const BYTECODE_DIR: &str = "bytecode";
 /// Directory holding human-reviewable summaries.
 pub const SUMMARY_DIR: &str = "summary";
 /// Governance proposal metadata file name (bundle top level).
@@ -246,6 +249,35 @@ pub fn verify_checksums(
     }
 
     Ok(errors)
+}
+
+/// The bundle's compiled scripts as `(file stem, bytecode)`, sorted by file
+/// name (which is zero-padded, so lexical order is step order).
+pub fn load_compiled_scripts(bundle_dir: &Path) -> Result<Vec<(String, Vec<u8>)>> {
+    let dir = bundle_dir.join(BYTECODE_DIR);
+    let mut paths: Vec<PathBuf> = fs::read_dir(&dir)
+        .with_context(|| format!("failed to read {}", dir.display()))?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().map(|x| x == "mv").unwrap_or(false))
+        .collect();
+    paths.sort();
+    if paths.is_empty() {
+        bail!("no compiled scripts found in {}", dir.display());
+    }
+
+    paths
+        .iter()
+        .map(|path| {
+            let name = path
+                .file_stem()
+                .with_context(|| format!("no file stem: {}", path.display()))?
+                .to_string_lossy()
+                .into_owned();
+            let blob =
+                fs::read(path).with_context(|| format!("failed to read {}", path.display()))?;
+            Ok((name, blob))
+        })
+        .collect()
 }
 
 /// Git revision and branch the bundle was generated from, read from the working
