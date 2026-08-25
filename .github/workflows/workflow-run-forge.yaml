@@ -155,14 +155,14 @@ jobs:
       id-token: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         if: ${{ !inputs.SKIP_JOB }}
         with:
           ref: ${{ inputs.GIT_SHA }}
           # get the last 10 commits if GIT_SHA is not specified
           fetch-depth: inputs.GIT_SHA != null && 0 || 10
 
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v6
         if: ${{ !inputs.SKIP_JOB }}
 
       - name: Install python deps

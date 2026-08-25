@@ -60,7 +60,7 @@ jobs:
       # this carefully.
       PROPTEST_CASES: ${{ github.event_name == 'pull_request' && '1' || '4' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # Deliberately NOT the shared rust-setup action: it installs the stable
       # toolchain named by rust-toolchain.toml, and Miri is nightly-only.

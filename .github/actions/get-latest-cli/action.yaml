@@ -10,7 +10,7 @@ runs:
   using: composite
   steps:
     - name: Setup python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v6
     - name: Get installation script
       shell: bash
       run: |

@@ -51,7 +51,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         if: ${{ !inputs.SKIP_JOB }}
         with:
           ref: ${{ env.GIT_SHA }}
@@ -66,7 +66,7 @@ jobs:
           AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         if: ${{ !inputs.SKIP_JOB }}
         with:
           node-version-file: .node-version
@@ -74,7 +74,7 @@ jobs:
 
       # Self hosted runners don't have pnpm preinstalled.
       # https://github.com/actions/setup-node/issues/182
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         if: ${{ !inputs.SKIP_JOB }}
 
       # When using high-perf-docker, the CI is actually run with two containers

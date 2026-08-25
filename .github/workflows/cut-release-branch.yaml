@@ -31,7 +31,7 @@ jobs:
   cut-release-branch:
     runs-on: 2cpu-gh-ubuntu24-x64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           token: ${{ secrets.CUT_RELEASE_BRANCH_CREDENTIALS }}
           fetch-depth: 0

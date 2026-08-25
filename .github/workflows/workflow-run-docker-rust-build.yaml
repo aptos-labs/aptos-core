@@ -104,7 +104,7 @@ jobs:
   rust-all:
     runs-on: runs-on,cpu=64,family=c7,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=co,disk=large
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ env.GIT_SHA }}
 
@@ -136,7 +136,7 @@ jobs:
 
       - name: Authenticate to Google Cloud
         id: auth
-        uses: "google-github-actions/auth@v2"
+        uses: "google-github-actions/auth@v3"
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}

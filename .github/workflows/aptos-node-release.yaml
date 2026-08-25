@@ -24,11 +24,11 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.branch }}
 
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v6
 
       - name: Bump aptos-node version
         uses: aptos-labs/aptos-core/.github/actions/release-aptos-node@main

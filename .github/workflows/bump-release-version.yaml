@@ -21,12 +21,12 @@ jobs:
     runs-on: 2cpu-gh-ubuntu24-x64
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.inputs.branch }}
 
       - name: Determine next version and update aptos-node/Cargo.toml
-        uses: actions/github-script@v6
+        uses: actions/github-script@v8
         id: determine-version
         with:
           script: |

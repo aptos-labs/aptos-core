@@ -102,7 +102,7 @@ jobs:
             "${{ inputs.release_version }}" \
             "${{ inputs.skip_checks }}"
       - name: Upload Binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: binary-builds-x86_64-unknown-linux-gnu
           path: |
@@ -126,7 +126,7 @@ jobs:
             "${{ inputs.release_version }}" \
             "${{ inputs.skip_checks }}"
       - name: Upload Binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: binary-builds-aarch64-unknown-linux-gnu
           path: |
@@ -150,7 +150,7 @@ jobs:
             "${{ inputs.release_version }}" \
             "${{ inputs.skip_checks }}"
       - name: Upload Binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: binary-builds-x86_64-apple-darwin
           path: |
@@ -174,7 +174,7 @@ jobs:
             "${{ inputs.release_version }}" \
             "${{ inputs.skip_checks }}"
       - name: Upload Binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: binary-builds-aarch64-apple-darwin
           path: |
@@ -205,7 +205,7 @@ jobs:
             -SkipChecks $${{ inputs.skip_checks }}
         shell: powershell
       - name: Upload Binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: binary-builds-x86_64-pc-windows-msvc
           path: |
@@ -227,7 +227,7 @@ jobs:
     if: ${{ inputs.dry_run == false }}
     steps:
       - name: Download prebuilt binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: binary-builds-*
           merge-multiple: true

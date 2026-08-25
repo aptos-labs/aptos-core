@@ -120,7 +120,7 @@ jobs:
     steps:
       - name: Compute matrix
         id: set-matrix
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           TEST_NAME: ${{ inputs.TEST_NAME }}
         with:
@@ -177,7 +177,7 @@ jobs:
       BRANCH: ${{ steps.determine-test-branch.outputs.BRANCH }}
       BRANCH_HASH: ${{ steps.hash-branch.outputs.BRANCH_HASH }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Determine branch based on cadence
         id: determine-test-branch
