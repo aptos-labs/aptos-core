@@ -13107,6 +13107,7 @@ dependencies = [
  "mono-move-global-context",
  "mono-move-loader",
  "mono-move-natives",
+ "mono-move-output",
  "mono-move-runtime",
  "move-asm",
  "move-binary-format",

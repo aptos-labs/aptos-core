@@ -28,7 +28,7 @@ use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
 use mono_move_natives::TransactionContextExtension;
 use mono_move_runtime::{InterpreterContext, RuntimeStatus};
 
-impl AptosTransactionExecutor<'_> {
+impl<'guard> AptosTransactionExecutor<'guard> {
     /// Executes one user transaction, returning its side effects unmaterialized (see [`TxnOutcome`]).
     /// `aux_info` carries the transaction's index in its block, which seeds
     /// `monotonically_increasing_number`.
@@ -38,7 +38,7 @@ impl AptosTransactionExecutor<'_> {
         &self,
         txn: &SignedTransaction,
         aux_info: &AuxiliaryInfo,
-    ) -> TxnOutcome {
+    ) -> TxnOutcome<'guard> {
         match self.execute_user_transaction_impl(txn, aux_info) {
             Ok(outcome) => outcome,
             Err(reason) => TxnOutcome::Discarded(reason),
@@ -50,7 +50,7 @@ impl AptosTransactionExecutor<'_> {
         &self,
         txn: &SignedTransaction,
         aux_info: &AuxiliaryInfo,
-    ) -> Result<TxnOutcome, DiscardReason> {
+    ) -> Result<TxnOutcome<'guard>, DiscardReason> {
         let guard = self.guard;
 
         // ======================== Pre-execution checks ========================

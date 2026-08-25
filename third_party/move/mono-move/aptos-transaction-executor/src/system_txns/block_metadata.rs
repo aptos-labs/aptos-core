@@ -25,14 +25,14 @@ const BLOCK_PROLOGUE_EXT: &IdentStr = ident_str!("block_prologue_ext");
 const BLOCK_PROLOGUE_EXT_V2: &IdentStr = ident_str!("block_prologue_ext_v2");
 const BLOCK_PROLOGUE_EXT_V3: &IdentStr = ident_str!("block_prologue_ext_v3");
 
-impl AptosTransactionExecutor<'_> {
+impl<'guard> AptosTransactionExecutor<'guard> {
     /// Executes a block-metadata (system) transaction. The auxiliary info is
     /// unused: system sessions carry no user transaction context.
     pub fn execute_block_metadata_transaction(
         &self,
         block_metadata: &BlockMetadata,
         _aux_info: &AuxiliaryInfo,
-    ) -> TxnOutcome {
+    ) -> TxnOutcome<'guard> {
         let txn_data = SystemTxnMetadata::for_block_metadata(block_metadata);
         let mut interp = self.system_session(&txn_data);
         match run_block_prologue(&mut interp, self.guard, block_metadata) {
@@ -51,7 +51,7 @@ impl AptosTransactionExecutor<'_> {
         &self,
         block_metadata_ext: &BlockMetadataExt,
         aux_info: &AuxiliaryInfo,
-    ) -> TxnOutcome {
+    ) -> TxnOutcome<'guard> {
         if let BlockMetadataExt::V0(block_metadata) = block_metadata_ext {
             return self.execute_block_metadata_transaction(block_metadata, aux_info);
         }

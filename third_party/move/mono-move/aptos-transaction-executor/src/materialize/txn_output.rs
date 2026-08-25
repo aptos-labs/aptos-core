@@ -13,7 +13,6 @@ use bytes::Bytes;
 use mono_move_core::{
     nominal_tag, storage::resource_provider::InMemoryStorageKey, types::InternedType,
 };
-use mono_move_global_context::ExecutionGuard;
 use mono_move_output::to_contract_events;
 use mono_move_runtime::{serialize, SessionEffects, WriteClass};
 use move_core_types::{language_storage::StructTag, vm_status::StatusCode};
@@ -27,17 +26,19 @@ use std::{
 
 /// Creates the output of an executed transaction from its effects.
 pub(crate) fn executed_output(
-    effects: &SessionEffects,
-    guard: &ExecutionGuard,
+    effects: &SessionEffects<'_>,
     provider: &dyn AptosDataProvider,
     gas_used: u64,
     status: TransactionStatus,
     auxiliary_data: TransactionAuxiliaryData,
 ) -> Result<TransactionOutput, MaterializationError> {
-    let write_set = drain_write_set(effects, guard, provider).map_err(MaterializationError::new)?;
-    // SAFETY: the effects' frozen heap (which event payloads point into) is
-    // live for the duration of output assembly.
-    let events = unsafe { to_contract_events(&effects.extensions, guard) }
+    if !effects.originates_from_provider(provider) {
+        return Err(MaterializationError::new(vec![
+            "materialization provider differs from execution provider".to_string(),
+        ]));
+    }
+    let write_set = drain_write_set(effects, provider).map_err(MaterializationError::new)?;
+    let events = to_contract_events(effects)
         .map_err(|e| MaterializationError::new(vec![format!("event finalization failed: {e}")]))?;
     Ok(TransactionOutput::new(
         write_set,
@@ -78,19 +79,20 @@ type MemberOp = Option<Bytes>;
 //
 // TODO(metering): writes are not charged IO gas or storage fees.
 fn drain_write_set(
-    effects: &SessionEffects,
-    guard: &ExecutionGuard<'_>,
+    effects: &SessionEffects<'_>,
     provider: &dyn AptosDataProvider,
 ) -> Result<WriteSet, Vec<String>> {
+    let layouts = effects.layout_provider();
     let mut writes: Vec<(StateKey, WriteOp)> = vec![];
     let mut group_ops: HashMap<StateKey, HashMap<InternedType, MemberOp>> = HashMap::new();
     let mut failures: Vec<String> = vec![];
 
     // SAFETY: written pointers refer to live values in the effects' frozen
-    // heap, and no GC runs during the drain.
+    // heap, the retained layout provider originates from the same execution,
+    // and no GC runs during the drain.
     let written_bytes = |ptr: NonNull<u8>, ty: InternedType| -> Result<Bytes, String> {
         // SAFETY: forwarded from this function's contract.
-        let blob = unsafe { serialize(guard, ptr.as_ptr(), ty) }
+        let blob = unsafe { serialize(layouts, ptr.as_ptr(), ty) }
             .map_err(|e| format!("failed to serialize written value: {e}"))?;
         Ok(Bytes::from(blob))
     };
@@ -137,7 +139,7 @@ fn drain_write_set(
     // TODO(correctness): consider sorting the keys first to ensure determinism. This
     // cannot currently be done because keys contain `InternedType`, which is
     // basically a pointer and does not implement `Ord`.
-    for (key, class, group) in effects.read_write_set.writes_unordered() {
+    for (key, class, group) in effects.read_write_set().writes_unordered() {
         // TODO(perf): currently we collect all errors and sort them to ensure determinism.
         // We should however revisit the design later and see if we want to switch to an alternative approach.
         //   - What if you want to fail fast on error?

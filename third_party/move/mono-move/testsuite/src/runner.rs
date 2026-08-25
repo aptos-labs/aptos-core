@@ -24,7 +24,6 @@ use aptos_framework_natives::{
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::{
     contract_event::ContractEvent,
-    event::EventKey,
     on_chain_config::{Features, TimedFeaturesBuilder},
     state_store::{
         errors::StateViewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
@@ -33,10 +32,10 @@ use aptos_types::{
 };
 use aptos_vm::natives::aptos_natives;
 use aptos_vm_types::resolver::StateStorageView;
-use mono_move_core::{native::NativeExtensions, types::type_to_string};
+use mono_move_core::native::NativeExtensions;
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
-use mono_move_natives::{EventKind, EventStore};
-use mono_move_runtime::serialize;
+use mono_move_natives::EventStore;
+use mono_move_output::to_contract_events_from_store;
 use move_binary_format::{errors::Location, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
@@ -130,9 +129,14 @@ fn render_execution_output(vals: &[String], events: &[String]) -> String {
 /// Renders the events emitted into the legacy VM's [`NativeEventContext`], in
 /// emission order, for cross-VM comparison.
 pub fn finalize_events_v1(extensions: &NativeContextExtensions) -> Vec<String> {
-    extensions
-        .get::<NativeEventContext>()
-        .events_iter()
+    render_contract_events(extensions.get::<NativeEventContext>().events_iter())
+}
+
+/// Renders materialized events into the normalized form used for cross-VM
+/// comparison.
+fn render_contract_events<'a>(events: impl IntoIterator<Item = &'a ContractEvent>) -> Vec<String> {
+    events
+        .into_iter()
         .map(|event| {
             let type_str = event.type_tag().to_canonical_string();
             match event {
@@ -154,40 +158,20 @@ pub fn finalize_events_v1(extensions: &NativeContextExtensions) -> Vec<String> {
 ///
 /// # Safety
 ///
-/// The VM heap must be live: each entry's `msg_data` embeds heap pointers that
-/// [`serialize`] dereferences.
+/// Every allocation reachable through the event data must remain live, and
+/// `layouts` must be the matching execution guard. No GC may run during
+/// serialization.
 pub unsafe fn finalize_events_v2(
     extensions: &NativeExtensions,
     layouts: &ExecutionGuard<'_>,
 ) -> Vec<String> {
     let store = extensions
-        .get_mut::<EventStore>()
+        .get::<EventStore>()
         .expect("event store installed");
-    store
-        .entries()
-        .iter()
-        .map(|entry| {
-            let type_str = type_to_string(entry.msg_ty);
-            // SAFETY: forwarded from this function's contract — the heap is live.
-            let blob = unsafe { serialize(layouts, entry.msg_data.as_ptr(), entry.msg_ty) }
-                .expect("event value serializes");
-            match &entry.kind {
-                EventKind::V2 => render_event(None, None, &type_str, &blob),
-                EventKind::V1 {
-                    guid,
-                    sequence_number,
-                } => {
-                    let key: EventKey = bcs::from_bytes(guid).expect("guid decodes to EventKey");
-                    render_event(
-                        Some(key.get_creator_address()),
-                        Some(*sequence_number),
-                        &type_str,
-                        &blob,
-                    )
-                },
-            }
-        })
-        .collect()
+    // SAFETY: forwarded from this function's contract.
+    let events = unsafe { to_contract_events_from_store(&store, layouts) }
+        .expect("events materialize into ContractEvents");
+    render_contract_events(&events)
 }
 
 /// Run all steps in a differential test, checking both VMs produce matching

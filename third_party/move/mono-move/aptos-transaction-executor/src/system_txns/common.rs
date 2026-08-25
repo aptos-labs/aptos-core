@@ -74,7 +74,7 @@ impl<'a> AptosTransactionExecutor<'a> {
 }
 
 /// The outcome of a completed system transaction: fee-free and successful.
-pub(super) fn system_txn_outcome(interp: InterpreterContext<'_>) -> TxnOutcome {
+pub(super) fn system_txn_outcome<'guard>(interp: InterpreterContext<'guard>) -> TxnOutcome<'guard> {
     TxnOutcome::Executed {
         status: ExecutionStatus::Success,
         fee_statement: FeeStatement::zero(),
