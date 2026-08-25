@@ -50,7 +50,10 @@ use aptos_transaction_generator_lib::{
     TransactionGeneratorCreator,
     TransactionType::{self, CoinTransfer},
 };
-use aptos_types::on_chain_config::{FeatureFlag, Features};
+use aptos_types::{
+    on_chain_config::{FeatureFlag, Features},
+    transaction::{Script, Transaction, TransactionArgument},
+};
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
 use aptos_vm_environment::prod_configs::{
     set_async_runtime_checks, set_layout_caches, set_paranoid_type_checks,
@@ -105,6 +108,27 @@ pub fn default_benchmark_features() -> Features {
     features.disable(FeatureFlag::CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION);
     features
 }
+
+/// Feature flags to toggle on-chain after the init/publish phase and before the
+/// measured run. Applied as a delta to the current on-chain `Features`, so a
+/// flag not listed here keeps its genesis value.
+#[derive(Clone, Default)]
+pub struct FeatureFlagOverrides {
+    pub enable: Vec<FeatureFlag>,
+    pub disable: Vec<FeatureFlag>,
+}
+
+impl FeatureFlagOverrides {
+    fn is_empty(&self) -> bool {
+        self.enable.is_empty() && self.disable.is_empty()
+    }
+}
+
+// Compiled from the adjacent `.move` source with `aptos move compile-script`
+// against the local framework. Regenerate when the source or the framework
+// signatures it calls change; the `apply_features_after_init` test fails if it
+// is stale.
+const TOGGLE_FEATURES_SCRIPT: &[u8] = include_bytes!("scripts/toggle_features_for_next_epoch.mv");
 
 pub fn init_db(config: &NodeConfig) -> DbReaderWriter {
     DbReaderWriter::new(
@@ -274,6 +298,66 @@ enum InitializedBenchmarkWorkload {
     },
 }
 
+/// Commits one block that runs the governance feature-toggle script, applying
+/// `overrides` to the on-chain `Features` and reconfiguring so the change takes
+/// effect for the next block. Runs under the legacy VM. The block executor
+/// rereads `Features` from committed state each block, so the measured run picks
+/// up the new flags. Panics if the flip transaction is not committed as a
+/// success.
+fn apply_features_after_init(
+    db: &DbReaderWriter,
+    root_account: &LocalAccount,
+    ts: &BenchmarkTimestamp,
+    overrides: &FeatureFlagOverrides,
+) {
+    assert!(
+        overrides
+            .enable
+            .iter()
+            .all(|f| !overrides.disable.contains(f)),
+        "a feature flag cannot be both enabled and disabled after init"
+    );
+
+    let enable = overrides
+        .enable
+        .iter()
+        .map(|f| *f as u64)
+        .collect::<Vec<u64>>();
+    let disable = overrides
+        .disable
+        .iter()
+        .map(|f| *f as u64)
+        .collect::<Vec<u64>>();
+
+    let script = Script::new(TOGGLE_FEATURES_SCRIPT.to_vec(), vec![], vec![
+        TransactionArgument::Serialized(bcs::to_bytes(&enable).unwrap()),
+        TransactionArgument::Serialized(bcs::to_bytes(&disable).unwrap()),
+    ]);
+
+    let txn_factory = TransactionGenerator::create_transaction_factory(ts);
+    let txn = Transaction::UserTransaction(
+        root_account.sign_with_transaction_builder(txn_factory.script(script)),
+    );
+
+    let version_before = db.reader.expect_synced_version();
+    let (pipeline, block_sender) = Pipeline::<AptosVMBlockExecutor>::new(
+        BlockExecutor::new(db.clone()),
+        version_before,
+        &PipelineConfig::default(),
+        None,
+        None,
+        None,
+    );
+    block_sender.send(vec![txn]).unwrap();
+    drop(block_sender);
+    pipeline.join();
+
+    assert!(
+        db.reader.expect_synced_version() > version_before,
+        "feature-toggle block did not commit"
+    );
+}
+
 /// Runs the benchmark with given parameters.
 #[allow(clippy::too_many_arguments)]
 pub fn run_benchmark<V>(
@@ -290,6 +374,7 @@ pub fn run_benchmark<V>(
     pipeline_config: PipelineConfig,
     init_features: Features,
     is_keyless: bool,
+    features_after_init: FeatureFlagOverrides,
 ) -> SingleRunResults
 where
     V: VMBlockExecutor + 'static,
@@ -304,7 +389,7 @@ where
     config.storage.dir = checkpoint_dir.as_ref().to_path_buf();
     storage_test_config.init_storage_config(&mut config);
     let db = init_db(&config);
-    let ts = Arc::new(BenchmarkTimestamp::from_db(&db));
+    let mut ts = Arc::new(BenchmarkTimestamp::from_db(&db));
     let root_account = TransactionGenerator::read_root_account(genesis_key, &db);
     let root_account = Arc::new(root_account);
 
@@ -392,6 +477,16 @@ where
             hotspot_probability,
         },
     };
+
+    // Flip requested feature flags after init/publish but before the measured
+    // run, so the flip is not counted in the measured transactions.
+    if !features_after_init.is_empty() {
+        apply_features_after_init(&db, &root_account, &ts, &features_after_init);
+        // The flip ends the epoch, so refresh the timestamp state to pick up the
+        // new epoch. Otherwise the measured run's BlockMetadata would carry the
+        // stale pre-flip epoch.
+        ts = Arc::new(BenchmarkTimestamp::from_db(&db));
+    }
 
     let start_version = db.reader.expect_synced_version();
 
@@ -774,12 +869,34 @@ pub fn run_single_with_default_params(
     use_blockstm_v2: bool,
     mode: SingleRunMode,
 ) -> SingleRunResults {
-    run_mix_with_default_params(
+    run_single_with_default_params_and_features(
+        transaction_type,
+        test_folder,
+        concurrency_level,
+        use_blockstm_v2,
+        mode,
+        FeatureFlagOverrides::default(),
+    )
+}
+
+/// Like [`run_single_with_default_params`], but also toggles `features_after_init`
+/// in the on-chain `Features` after the init/publish phase and before the
+/// measured run.
+pub fn run_single_with_default_params_and_features(
+    transaction_type: TransactionType,
+    test_folder: impl AsRef<Path>,
+    concurrency_level: usize,
+    use_blockstm_v2: bool,
+    mode: SingleRunMode,
+    features_after_init: FeatureFlagOverrides,
+) -> SingleRunResults {
+    run_mix_with_default_params_and_features(
         vec![(transaction_type, 1)],
         test_folder,
         concurrency_level,
         use_blockstm_v2,
         mode,
+        features_after_init,
     )
 }
 
@@ -795,6 +912,27 @@ pub fn run_mix_with_default_params(
     concurrency_level: usize,
     use_blockstm_v2: bool,
     mode: SingleRunMode,
+) -> SingleRunResults {
+    run_mix_with_default_params_and_features(
+        transaction_mix,
+        test_folder,
+        concurrency_level,
+        use_blockstm_v2,
+        mode,
+        FeatureFlagOverrides::default(),
+    )
+}
+
+/// Like [`run_mix_with_default_params`], but also toggles `features_after_init`
+/// in the on-chain `Features` after the init/publish phase and before the
+/// measured run.
+pub fn run_mix_with_default_params_and_features(
+    transaction_mix: Vec<(TransactionType, usize)>,
+    test_folder: impl AsRef<Path>,
+    concurrency_level: usize,
+    use_blockstm_v2: bool,
+    mode: SingleRunMode,
+    features_after_init: FeatureFlagOverrides,
 ) -> SingleRunResults {
     aptos_logger::Logger::new().init();
 
@@ -970,12 +1108,14 @@ pub fn run_mix_with_default_params(
         execute_pipeline_config,
         features,
         is_keyless,
+        features_after_init,
     )
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{
+        apply_features_after_init,
         db_generator::bootstrap_with_genesis,
         default_benchmark_features, init_db,
         native::{
@@ -991,20 +1131,21 @@ mod tests {
         run_single_with_default_params,
         transaction_executor::BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
         transaction_generator::{BenchmarkTimestamp, TransactionGenerator},
-        BenchmarkWorkload, StorageTestConfig,
+        BenchmarkWorkload, FeatureFlagOverrides, StorageTestConfig,
     };
     use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
     use aptos_crypto::HashValue;
     use aptos_executor::block_executor::BlockExecutor;
     use aptos_executor_types::BlockExecutorTrait;
     use aptos_sdk::{transaction_builder::aptos_stdlib, types::LocalAccount};
+    use aptos_storage_interface::state_store::state_view::db_state_view::LatestDbStateCheckpointView;
     use aptos_temppath::TempPath;
     use aptos_transaction_generator_lib::WorkflowProgress;
     use aptos_transaction_workloads_lib::args::TransactionTypeArg;
     use aptos_types::{
         access_path::Path,
         account_address::AccountAddress,
-        on_chain_config::{FeatureFlag, Features},
+        on_chain_config::{FeatureFlag, Features, OnChainConfig},
         state_store::state_key::inner::StateKeyInner,
         transaction::{
             signature_verified_transaction::into_signature_verified_block, Transaction,
@@ -1287,6 +1428,7 @@ mod tests {
             },
             features,
             false,
+            FeatureFlagOverrides::default(),
         );
     }
 
@@ -1411,5 +1553,51 @@ mod tests {
                 num_init_accounts: 200,
             },
         );
+    }
+
+    fn fetch_features(db: &crate::DbReaderWriter) -> Features {
+        Features::fetch_config(&db.reader.latest_state_checkpoint_view().unwrap())
+            .unwrap()
+            .unwrap()
+    }
+
+    #[test]
+    fn test_apply_features_after_init() {
+        aptos_logger::Logger::new().init();
+
+        // `enable` starts disabled in the benchmark genesis, `disable` starts
+        // enabled, so a successful flip is observable on both.
+        let enable = FeatureFlag::CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION;
+        let disable = FeatureFlag::ENABLE_ENUM_TYPES;
+
+        let features = default_benchmark_features();
+
+        let db_dir = TempPath::new();
+        fs::create_dir_all(db_dir.as_ref()).unwrap();
+        bootstrap_with_genesis(&db_dir, features.clone());
+
+        let (mut config, genesis_key) =
+            aptos_genesis::test_utils::test_config_with_custom_features(features);
+        config.storage.dir = db_dir.as_ref().to_path_buf();
+        config.storage.storage_pruner_config = NO_OP_STORAGE_PRUNER_CONFIG;
+        config.indexer_grpc.enabled = false;
+
+        let db = init_db(&config);
+
+        let before = fetch_features(&db);
+        assert!(!before.is_enabled(enable));
+        assert!(before.is_enabled(disable));
+
+        let root_account = TransactionGenerator::read_root_account(genesis_key, &db);
+        let ts = BenchmarkTimestamp::from_db(&db);
+
+        apply_features_after_init(&db, &root_account, &ts, &FeatureFlagOverrides {
+            enable: vec![enable],
+            disable: vec![disable],
+        });
+
+        let after = fetch_features(&db);
+        assert!(after.is_enabled(enable));
+        assert!(!after.is_enabled(disable));
     }
 }
