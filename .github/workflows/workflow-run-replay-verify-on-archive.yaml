@@ -38,14 +38,23 @@ on:
         type: boolean
         description: Collect framework function usage instead of only replay-verifying.
         default: false
-      RESULTS_BUCKET:
+    secrets:
+      APTOS_BOT_PAT:
         required: false
-        type: string
-        description: GCS bucket used for framework usage shards.
-      REPORT_BUCKET:
+      AWS_ACCESS_KEY_ID:
         required: false
-        type: string
-        description: Public GCS bucket used to publish the rendered HTML report.
+      AWS_DOCKER_ARTIFACT_REPO:
+        required: false
+      AWS_SECRET_ACCESS_KEY:
+        required: false
+      ENV_ECR_AWS_ACCOUNT_NUM:
+        required: false
+      GCP_SERVICE_ACCOUNT_EMAIL:
+        required: false
+      GCP_WORKLOAD_IDENTITY_PROVIDER:
+        required: false
+      GIT_CREDENTIALS:
+        required: false
 
   workflow_dispatch:
     inputs:
@@ -83,14 +92,6 @@ on:
         type: boolean
         description: Collect framework function usage instead of only replay-verifying.
         default: false
-      RESULTS_BUCKET:
-        required: false
-        type: string
-        description: GCS bucket used for framework usage shards.
-      REPORT_BUCKET:
-        required: false
-        type: string
-        description: Public GCS bucket used to publish the rendered HTML report.
 permissions:
   contents: read
 
@@ -105,7 +106,6 @@ jobs:
           END_VERSION: ${{ inputs.END_VERSION }}
           END_TIME: ${{ inputs.END_TIME }}
           FRAMEWORK_USAGE: ${{ inputs.FRAMEWORK_USAGE }}
-          RESULTS_BUCKET: ${{ inputs.RESULTS_BUCKET }}
         run: |
           if [ -n "$START_VERSION" ] && [ -n "$START_TIME" ]; then
             echo "::error::START_VERSION and START_TIME are mutually exclusive. Please specify only one."
@@ -131,8 +131,15 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    secrets: inherit
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      ENV_ECR_AWS_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
+      GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+    uses: ./.github/workflows/workflow-run-docker-rust-build.yaml
     with:
       GIT_SHA: ${{ inputs.IMAGE_TAG || github.event.pull_request.head.sha || github.sha }}
       TARGET_CACHE_ID: ${{ github.event.number && format('pr-{0}', github.event.number) || github.ref_name }}
@@ -143,6 +150,10 @@ jobs:
     runs-on: 4cpu-gh-ubuntu24-x64
     timeout-minutes: 420 # 7 hours
     needs: build-images
+    env:
+      FRAMEWORK_USAGE_BUCKET: aptos-framework-usage-reports
+      REPORT_BRANCH: gh-pages
+      REPORT_REPOSITORY: aptos-labs/aptos-core-private
     permissions:
       contents: read
       id-token: write
@@ -191,6 +202,20 @@ jobs:
         shell: bash
         run: gcloud config set project aptos-devinfra-0
 
+      - name: Verify private framework usage shard bucket
+        if: ${{ inputs.DRY_RUN == false && inputs.FRAMEWORK_USAGE }}
+        run: |
+          PUBLIC_ACCESS_PREVENTION="$(gcloud storage buckets describe "gs://${FRAMEWORK_USAGE_BUCKET}" --format='value(public_access_prevention)')"
+          UNIFORM_BUCKET_ACCESS="$(gcloud storage buckets describe "gs://${FRAMEWORK_USAGE_BUCKET}" --format='value(uniform_bucket_level_access)')"
+          if [ "$PUBLIC_ACCESS_PREVENTION" != "enforced" ]; then
+            echo "::error::Framework usage shard bucket must enforce public access prevention."
+            exit 1
+          fi
+          if [ "$UNIFORM_BUCKET_ACCESS" != "true" ]; then
+            echo "::error::Framework usage shard bucket must use uniform bucket-level access."
+            exit 1
+          fi
+
       - uses: ./.github/actions/python-setup
         with:
           pyproject_directory: testsuite/replay-verify
@@ -206,7 +231,6 @@ jobs:
           END_TIME: ${{ inputs.END_TIME }}
           IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
           FRAMEWORK_USAGE: ${{ inputs.FRAMEWORK_USAGE }}
-          RESULTS_BUCKET: ${{ inputs.RESULTS_BUCKET }}
         run: |
           cd testsuite/replay-verify
           ARGS=(--network "$NETWORK")
@@ -227,44 +251,81 @@ jobs:
           fi
           if [ "$FRAMEWORK_USAGE" = "true" ]; then
             ARGS+=(--framework-usage-output-dir ../../framework-usage-results)
-            if [ -n "$RESULTS_BUCKET" ]; then
-              ARGS+=(--framework-usage-bucket "$RESULTS_BUCKET")
-            fi
+            ARGS+=(--framework-usage-bucket "$FRAMEWORK_USAGE_BUCKET")
           fi
           ARGS+=(--image_profile performance)
           poetry run python main.py "${ARGS[@]}"
         timeout-minutes: 420 # 7 hours
 
-      - name: Upload framework usage report
+      - name: Verify private framework usage Pages site
         if: ${{ inputs.DRY_RUN == false && inputs.FRAMEWORK_USAGE }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # pin@v4.6.2
+        env:
+          GH_TOKEN: ${{ secrets.APTOS_BOT_PAT }}
+        run: |
+          REPOSITORY_PRIVATE="$(gh api "repos/${REPORT_REPOSITORY}" --jq '.private')"
+          PAGES_PUBLIC="$(gh api "repos/${REPORT_REPOSITORY}/pages" --jq '.public')"
+          PAGES_BRANCH="$(gh api "repos/${REPORT_REPOSITORY}/pages" --jq '.source.branch')"
+
+          if [ "$REPOSITORY_PRIVATE" != "true" ]; then
+            echo "::error::Refusing to publish framework usage data to a public repository."
+            exit 1
+          fi
+          if [ "$PAGES_PUBLIC" != "false" ]; then
+            echo "::error::Refusing to publish framework usage data to a public Pages site."
+            exit 1
+          fi
+          if [ "$PAGES_BRANCH" != "$REPORT_BRANCH" ]; then
+            echo "::error::Pages publishes from '${PAGES_BRANCH}', not the configured '${REPORT_BRANCH}' branch."
+            exit 1
+          fi
+
+      - name: Checkout private framework usage Pages site
+        if: ${{ inputs.DRY_RUN == false && inputs.FRAMEWORK_USAGE }}
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # pin@v4.4.0
         with:
-          name: framework-usage-${{ inputs.NETWORK }}-${{ github.run_id }}
-          path: framework-usage-results/
-          if-no-files-found: error
+          repository: aptos-labs/aptos-core-private
+          ref: gh-pages
+          path: framework-usage-pages
+          token: ${{ secrets.APTOS_BOT_PAT }}
+          fetch-depth: 1
 
       - name: Publish framework usage reports
-        if: ${{ inputs.DRY_RUN == false && inputs.FRAMEWORK_USAGE && inputs.REPORT_BUCKET != '' }}
+        if: ${{ inputs.DRY_RUN == false && inputs.FRAMEWORK_USAGE }}
         env:
           NETWORK: ${{ inputs.NETWORK }}
-          REPORT_BUCKET: ${{ inputs.REPORT_BUCKET }}
+          GH_TOKEN: ${{ secrets.APTOS_BOT_PAT }}
         run: |
           REPORT_JSON="framework-usage-results/framework-usage.json"
           REPORT_HTML="framework-usage-results/framework-usage.html"
           REPORT_PREFIX="framework-usage/${NETWORK}/runs/${GITHUB_RUN_ID}/attempt-${GITHUB_RUN_ATTEMPT}"
-          HTML_OBJECT_PATH="${REPORT_PREFIX}/index.html"
-          JSON_OBJECT_PATH="${REPORT_PREFIX}/framework-usage.json"
-          HTML_REPORT_URL="https://storage.googleapis.com/${REPORT_BUCKET}/${HTML_OBJECT_PATH}"
-          JSON_REPORT_URL="https://storage.googleapis.com/${REPORT_BUCKET}/${JSON_OBJECT_PATH}"
+          REPORT_DIRECTORY="framework-usage-pages/${REPORT_PREFIX}"
+          LATEST_REPORT_PREFIX="framework-usage/${NETWORK}"
+          LATEST_REPORT_DIRECTORY="framework-usage-pages/${LATEST_REPORT_PREFIX}"
+          install -D -m 0644 "$REPORT_HTML" "${REPORT_DIRECTORY}/index.html"
+          install -D -m 0644 "$REPORT_JSON" "${REPORT_DIRECTORY}/framework-usage.json"
+          install -D -m 0644 "$REPORT_HTML" "${LATEST_REPORT_DIRECTORY}/index.html"
+          install -D -m 0644 "$REPORT_JSON" "${LATEST_REPORT_DIRECTORY}/framework-usage.json"
 
-          gcloud storage cp "$REPORT_HTML" "gs://${REPORT_BUCKET}/${HTML_OBJECT_PATH}" \
-            --content-type="text/html; charset=utf-8" \
-            --content-disposition=inline \
-            --cache-control="public,max-age=31536000,immutable"
-          gcloud storage cp "$REPORT_JSON" "gs://${REPORT_BUCKET}/${JSON_OBJECT_PATH}" \
-            --content-type="application/json" \
-            --content-disposition=inline \
-            --cache-control="public,max-age=31536000,immutable"
+          git -C framework-usage-pages config user.name "aptos-bot[bot]"
+          git -C framework-usage-pages config user.email "aptos-bot[bot]@users.noreply.github.com"
+          git -C framework-usage-pages add -- "$REPORT_PREFIX" "${LATEST_REPORT_PREFIX}/index.html" "${LATEST_REPORT_PREFIX}/framework-usage.json"
+          git -C framework-usage-pages commit -m "Publish framework usage report ${GITHUB_RUN_ID}"
+          for attempt in 1 2 3; do
+            if git -C framework-usage-pages pull --rebase origin "$REPORT_BRANCH" && git -C framework-usage-pages push origin "HEAD:${REPORT_BRANCH}"; then
+              break
+            fi
+            if [ "$attempt" = 3 ]; then
+              echo "::error::Failed to publish the framework usage report after ${attempt} attempts."
+              exit 1
+            fi
+            sleep "$attempt"
+          done
+
+          PAGES_URL="$(gh api "repos/${REPORT_REPOSITORY}/pages" --jq '.html_url')"
+          HTML_REPORT_URL="${PAGES_URL%/}/${REPORT_PREFIX}/index.html"
+          JSON_REPORT_URL="${PAGES_URL%/}/${REPORT_PREFIX}/framework-usage.json"
+          LATEST_HTML_REPORT_URL="${PAGES_URL%/}/${LATEST_REPORT_PREFIX}/index.html"
+          LATEST_JSON_REPORT_URL="${PAGES_URL%/}/${LATEST_REPORT_PREFIX}/framework-usage.json"
 
           START_VERSION="$(jq -r '.start_version' "$REPORT_JSON")"
           END_VERSION="$(jq -r '.end_version' "$REPORT_JSON")"
@@ -281,6 +342,8 @@ jobs:
             echo
             echo "- [Open interactive HTML report](${HTML_REPORT_URL})"
             echo "- [Open merged JSON report](${JSON_REPORT_URL})"
+            echo "- [Open latest ${NETWORK} HTML report](${LATEST_HTML_REPORT_URL})"
+            echo "- [Open latest ${NETWORK} JSON report](${LATEST_JSON_REPORT_URL})"
             echo
             echo "| Property | Value |"
             echo "| --- | --- |"

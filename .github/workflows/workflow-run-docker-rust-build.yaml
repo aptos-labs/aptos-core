@@ -35,6 +35,21 @@ on:
         type: boolean
         description: If true, the workflow will not build and push images.
         default: false
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: false
+      AWS_DOCKER_ARTIFACT_REPO:
+        required: false
+      AWS_SECRET_ACCESS_KEY:
+        required: false
+      ENV_ECR_AWS_ACCOUNT_NUM:
+        required: false
+      GCP_SERVICE_ACCOUNT_EMAIL:
+        required: false
+      GCP_WORKLOAD_IDENTITY_PROVIDER:
+        required: false
+      GIT_CREDENTIALS:
+        required: false
 
   workflow_dispatch:
     inputs:

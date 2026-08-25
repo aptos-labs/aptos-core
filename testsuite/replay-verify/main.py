@@ -1,6 +1,5 @@
 import argparse
 from collections import Counter
-import csv
 from dataclasses import dataclass
 import datetime
 import dateparser
@@ -1442,7 +1441,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--framework-usage-output-dir",
         required=False,
-        help="Local directory for merged framework usage artifacts",
+        help="Local directory for merged framework usage reports",
     )
     parser.add_argument("--cleanup", required=False, action="store_true", default=False)
     args = parser.parse_args()
@@ -1535,6 +1534,55 @@ def merge_usage_rows(
     return dropped_invocation_count, dropped_transaction_count
 
 
+def merge_usage_rows_per_group(
+    aggregate_rows: dict[str, dict],
+    rows: list[dict],
+    group_field: str,
+    max_rows_per_group: int,
+) -> tuple[int, int]:
+    rows_per_group = Counter(
+        json.dumps(row[group_field], sort_keys=True, separators=(",", ":"))
+        for row in aggregate_rows.values()
+    )
+    count_fields = {
+        "invocation_count",
+        "transaction_count",
+        "first_version",
+        "last_version",
+    }
+    dropped_invocation_count = 0
+    dropped_transaction_count = 0
+    for row in rows:
+        key = {name: value for name, value in row.items() if name not in count_fields}
+        encoded_key = json.dumps(key, sort_keys=True, separators=(",", ":"))
+        if encoded_key not in aggregate_rows:
+            encoded_group = json.dumps(
+                row[group_field], sort_keys=True, separators=(",", ":")
+            )
+            if rows_per_group[encoded_group] >= max_rows_per_group:
+                dropped_invocation_count += row["invocation_count"]
+                dropped_transaction_count += row["transaction_count"]
+                continue
+            rows_per_group[encoded_group] += 1
+            aggregate_rows[encoded_key] = {
+                **key,
+                "invocation_count": 0,
+                "transaction_count": 0,
+                "first_version": row["first_version"],
+                "last_version": row["last_version"],
+            }
+        aggregate = aggregate_rows[encoded_key]
+        aggregate["invocation_count"] += row["invocation_count"]
+        aggregate["transaction_count"] += row["transaction_count"]
+        aggregate["first_version"] = min(
+            aggregate["first_version"], row["first_version"]
+        )
+        aggregate["last_version"] = max(
+            aggregate["last_version"], row["last_version"]
+        )
+    return dropped_invocation_count, dropped_transaction_count
+
+
 def shard_start_version(source: str) -> int:
     file_name = os.path.basename(source)
     try:
@@ -1566,12 +1614,6 @@ def read_framework_usage_html_template() -> str:
             "framework usage HTML template has an invalid Rust delimiter"
         )
     return template
-
-
-def format_module_id(module_id: Optional[dict]) -> str:
-    if module_id is None:
-        return ""
-    return f"{module_id['address']}::{module_id['name']}"
 
 
 def merge_framework_usage_reports(
@@ -1619,10 +1661,14 @@ def merge_framework_usage_reports(
     usage_detail_truncated = False
     dropped_usage_invocation_count = 0
     dropped_usage_transaction_count = 0
+    root_function_usage_truncated = False
+    dropped_root_function_usage_invocation_count = 0
+    dropped_root_function_usage_transaction_count = 0
     active_entry_function_callers_truncated = False
     dropped_active_entry_function_framework_invocation_count = 0
     dropped_active_entry_function_transaction_count = 0
     function_usage: dict[str, dict] = {}
+    root_function_usage: dict[str, dict] = {}
     usage: dict[str, dict] = {}
     active_entry_function_callers: dict[str, dict] = {}
     for shard_source in sources:
@@ -1642,6 +1688,7 @@ def merge_framework_usage_reports(
                 "target_modules",
                 "functions",
                 "usage_detail_row_limit",
+                "root_function_row_limit_per_function",
                 "active_entry_function_caller_row_limit",
             ):
                 if report[field] != reference[field]:
@@ -1670,6 +1717,13 @@ def merge_framework_usage_reports(
         usage_detail_truncated |= report["usage_detail_truncated"]
         dropped_usage_invocation_count += report["dropped_usage_invocation_count"]
         dropped_usage_transaction_count += report["dropped_usage_transaction_count"]
+        root_function_usage_truncated |= report["root_function_usage_truncated"]
+        dropped_root_function_usage_invocation_count += report[
+            "dropped_root_function_usage_invocation_count"
+        ]
+        dropped_root_function_usage_transaction_count += report[
+            "dropped_root_function_usage_transaction_count"
+        ]
         active_entry_function_callers_truncated |= report[
             "active_entry_function_callers_truncated"
         ]
@@ -1680,6 +1734,15 @@ def merge_framework_usage_reports(
             "dropped_active_entry_function_transaction_count"
         ]
         merge_usage_rows(function_usage, report["function_usage"])
+        dropped_invocations, dropped_transactions = merge_usage_rows_per_group(
+            root_function_usage,
+            report["root_function_usage"],
+            group_field="callee",
+            max_rows_per_group=reference["root_function_row_limit_per_function"],
+        )
+        dropped_root_function_usage_invocation_count += dropped_invocations
+        dropped_root_function_usage_transaction_count += dropped_transactions
+        root_function_usage_truncated |= dropped_invocations > 0
         dropped_invocations, dropped_transactions = merge_usage_rows(
             usage,
             report["usage"],
@@ -1705,8 +1768,14 @@ def merge_framework_usage_reports(
     assert reference is not None
     assert start_timestamp_usecs is not None
     assert end_timestamp_usecs is not None
+    report_generated_at_utc = (
+        datetime.datetime.now(datetime.timezone.utc)
+        .isoformat(timespec="seconds")
+        .replace("+00:00", "Z")
+    )
     merged = {
         "schema_version": reference["schema_version"],
+        "report_generated_at_utc": report_generated_at_utc,
         "network": network,
         "start_version": expected_start,
         "end_version": expected_end,
@@ -1721,6 +1790,16 @@ def merge_framework_usage_reports(
         "usage_detail_truncated": usage_detail_truncated,
         "dropped_usage_invocation_count": dropped_usage_invocation_count,
         "dropped_usage_transaction_count": dropped_usage_transaction_count,
+        "root_function_row_limit_per_function": reference[
+            "root_function_row_limit_per_function"
+        ],
+        "root_function_usage_truncated": root_function_usage_truncated,
+        "dropped_root_function_usage_invocation_count": (
+            dropped_root_function_usage_invocation_count
+        ),
+        "dropped_root_function_usage_transaction_count": (
+            dropped_root_function_usage_transaction_count
+        ),
         "active_entry_function_caller_row_limit": reference[
             "active_entry_function_caller_row_limit"
         ],
@@ -1740,6 +1819,9 @@ def merge_framework_usage_reports(
         "gcs_prefix": f"gs://{bucket_name}/{prefix}/" if bucket_name else None,
         "functions": reference["functions"],
         "function_usage": [function_usage[key] for key in sorted(function_usage)],
+        "root_function_usage": [
+            root_function_usage[key] for key in sorted(root_function_usage)
+        ],
         "usage": [usage[key] for key in sorted(usage)],
         "active_entry_function_callers": [
             active_entry_function_callers[key]
@@ -1770,95 +1852,7 @@ def merge_framework_usage_reports(
     with open(html_path, "w") as output:
         output.write(html.replace(marker, embedded_json))
 
-    totals: dict[str, dict] = {}
-    for row in merged["function_usage"]:
-        encoded_callee = json.dumps(row["callee"], sort_keys=True)
-        if encoded_callee not in totals:
-            totals[encoded_callee] = {
-                "invocation_count": 0,
-                "transaction_count": 0,
-                "first_version": row["first_version"],
-                "last_version": row["last_version"],
-            }
-        total = totals[encoded_callee]
-        total["invocation_count"] += row["invocation_count"]
-        total["transaction_count"] += row["transaction_count"]
-        total["first_version"] = min(total["first_version"], row["first_version"])
-        total["last_version"] = max(total["last_version"], row["last_version"])
-
-    summary_path = os.path.join(output_dir, "framework-usage-summary.csv")
-    columns = [
-        "module_id",
-        "function_name",
-        "visibility",
-        "is_entry",
-        "is_native",
-        "type_parameter_count",
-        "invocation_count",
-        "transaction_count",
-        "first_version",
-        "last_version",
-    ]
-    with open(summary_path, "w", newline="") as output:
-        writer = csv.DictWriter(output, fieldnames=columns)
-        writer.writeheader()
-        for function in merged["functions"]:
-            function_id = {
-                "module_id": function["module_id"],
-                "function_name": function["function_name"],
-            }
-            total = totals.get(json.dumps(function_id, sort_keys=True), {})
-            writer.writerow(
-                {
-                    **function,
-                    "module_id": format_module_id(function["module_id"]),
-                    "invocation_count": total.get("invocation_count", 0),
-                    "transaction_count": total.get("transaction_count", 0),
-                    "first_version": total.get("first_version", ""),
-                    "last_version": total.get("last_version", ""),
-                }
-            )
-
-    callers_path = os.path.join(output_dir, "framework-usage-callers.csv")
-    caller_columns = [
-        "callee_module_id",
-        "callee_function",
-        "caller_module_id",
-        "caller_function",
-        "root_module_id",
-        "root_function",
-        "call_kind",
-        "outcome",
-        "invocation_count",
-        "transaction_count",
-        "first_version",
-        "last_version",
-    ]
-    with open(callers_path, "w", newline="") as output:
-        writer = csv.DictWriter(output, fieldnames=caller_columns)
-        writer.writeheader()
-        for row in merged["usage"]:
-            caller = row.get("caller") or {}
-            root = row.get("root_function") or {}
-            writer.writerow(
-                {
-                    "callee_module_id": format_module_id(
-                        row["callee"].get("module_id")
-                    ),
-                    "callee_function": row["callee"]["function_name"],
-                    "caller_module_id": format_module_id(caller.get("module_id")),
-                    "caller_function": caller.get("function_name", ""),
-                    "root_module_id": format_module_id(root.get("module_id")),
-                    "root_function": root.get("function_name", ""),
-                    "call_kind": row["call_kind"],
-                    "outcome": row["outcome"],
-                    "invocation_count": row["invocation_count"],
-                    "transaction_count": row["transaction_count"],
-                    "first_version": row["first_version"],
-                    "last_version": row["last_version"],
-                }
-            )
-    logger.info(f"Wrote merged framework usage artifacts to {output_dir}")
+    logger.info(f"Wrote merged framework usage reports to {output_dir}")
 
 
 if __name__ == "__main__":
