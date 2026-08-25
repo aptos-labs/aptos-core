@@ -41,7 +41,7 @@ jobs:
     # Run on a machine with more local storage for large docker images
     runs-on: runs-on,cpu=16,family=m6id,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         with:
@@ -50,16 +50,16 @@ jobs:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
       - name: Login to Docker Hub
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           username: ${{ secrets.ENV_DOCKERHUB_USERNAME }}
           password: ${{ secrets.ENV_DOCKERHUB_PASSWORD }}
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version-file: .node-version
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
 
       - name: Release Images
         env:

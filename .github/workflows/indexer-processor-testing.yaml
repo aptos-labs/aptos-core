@@ -20,7 +20,7 @@ jobs:
 
     steps:
       - name: Checkout the repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           ref: ${{ github.event.pull_request.head.ref }}
 
@@ -40,14 +40,14 @@ jobs:
         run: rustup update
 
       - id: auth
-        uses: "google-github-actions/auth@v3"
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
 
       - name: Prepare and Replace API Keys in Yaml
         id: api_key_tokens
-        uses: 'google-github-actions/get-secretmanager-secrets@v3'
+        uses: google-github-actions/get-secretmanager-secrets@bc9c54b29fdffb8a47776820a7d26e77b379d262 # v3.0.0
         with:
           secrets: |-
             testnet_api_key:aptos-ci/TESTNET_INDEXER_API_KEY
@@ -141,7 +141,7 @@ jobs:
 
       - id: 'secrets'
         if: steps.diff_check.outputs.diff_found == 'true' && steps.diff_check.outputs.new_file_found == 'false'
-        uses: 'google-github-actions/get-secretmanager-secrets@v3'
+        uses: google-github-actions/get-secretmanager-secrets@bc9c54b29fdffb8a47776820a7d26e77b379d262 # v3.0.0
         with:
           secrets: |-
             token:aptos-ci/github-actions-repository-dispatch

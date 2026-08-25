@@ -159,7 +159,7 @@ jobs:
       id-token: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
           # Match forge.find_recent_images' 100-commit search window.
@@ -178,7 +178,7 @@ jobs:
       # Authenticate to Google Cloud the project is aptos-ci with credentails files generated
       - name: Authenticate to Google Cloud
         id: auth
-        uses: "google-github-actions/auth@v3"
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
@@ -194,7 +194,7 @@ jobs:
           echo "CLOUDSDK_AUTH_ACCESS_TOKEN=${{ steps.auth.outputs.access_token }}" >> $GITHUB_ENV
 
       - name: Set up Cloud SDK
-        uses: "google-github-actions/setup-gcloud@v3"
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
         with:
           install_components: "kubectl, gke-gcloud-auth-plugin"
 
@@ -281,7 +281,7 @@ jobs:
 
       - name: Checkout private framework usage Pages site
         if: ${{ inputs.DRY_RUN == false && inputs.FRAMEWORK_USAGE }}
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # pin@v6.1.0
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           repository: aptos-labs/aptos-core-private
           ref: gh-pages

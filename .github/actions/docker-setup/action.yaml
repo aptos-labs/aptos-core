@@ -77,7 +77,7 @@ runs:
 
     - id: auth
       name: "Authenticate to Google Cloud"
-      uses: "google-github-actions/auth@v3"
+      uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
       with:
         create_credentials_file: false
         token_format: "access_token"
@@ -87,21 +87,21 @@ runs:
         export_environment_variables: ${{ inputs.EXPORT_GCP_PROJECT_VARIABLES }}
 
     - name: Login to us-west1 Google Artifact Registry
-      uses: docker/login-action@v4
+      uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
       with:
         registry: us-west1-docker.pkg.dev
         username: oauth2accesstoken
         password: ${{ steps.auth.outputs.access_token }}
 
     - name: Login to US multi-region Google Artifact Registry
-      uses: docker/login-action@v4
+      uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
       with:
         registry: us-docker.pkg.dev
         username: oauth2accesstoken
         password: ${{ steps.auth.outputs.access_token }}
 
     - name: Login to ECR
-      uses: docker/login-action@v4
+      uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
       if: inputs.AWS_ACCESS_KEY_ID != ''
       with:
         registry: ${{ inputs.AWS_DOCKER_ARTIFACT_REPO }}

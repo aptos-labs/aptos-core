@@ -32,7 +32,7 @@ runs:
   steps:
     # Checkout repository based on base branch or target branch
     - name: Checkout branch
-      uses: actions/checkout@v6
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       with:
         ref: ${{ inputs.base-branch || inputs.branch }}
         path: checkout_branch
@@ -61,7 +61,7 @@ runs:
     # Checkout the determined or target branch
     - name: Checkout target branch
       if: ${{ steps.set-target-branch.outputs.TARGET_BRANCH != inputs.branch }}
-      uses: actions/checkout@v6
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       with:
         ref: ${{ steps.set-target-branch.outputs.TARGET_BRANCH }}
         path: checkout_branch
