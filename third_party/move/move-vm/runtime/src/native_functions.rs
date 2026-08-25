@@ -39,7 +39,7 @@ use move_vm_types::{
     gas::{ambassador_impl_DependencyGasMeter, DependencyGasMeter, DependencyKind, NativeGasMeter},
     loaded_data::runtime_types::{Type, TypeParamMap},
     natives::function::NativeResult,
-    values::{AbstractFunction, Value},
+    values::{AbstractFunction, GlobalValue, Value},
 };
 use std::{
     collections::{HashMap, VecDeque},
@@ -150,38 +150,25 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
             .debug_print_stack_trace(buf, self.module_storage.runtime_environment())
     }
 
-    pub fn exists_at(
+    /// Loads resource from global storage for immutable borrow.
+    /// Returns the value and the number of bytes loaded.
+    pub fn load_resource(
         &mut self,
         address: AccountAddress,
         ty: &Type,
-    ) -> PartialVMResult<(bool, Option<NumBytes>)> {
-        self.data_cache.native_check_resource_exists(
-            self.gas_meter,
-            self.traversal_context,
-            &address,
-            ty,
-        )
-    }
-
-    /// Borrows an immutable reference to a resource in global storage.
-    /// Returns the reference value and the number of bytes loaded.
-    pub fn borrow_resource(
-        &mut self,
-        address: AccountAddress,
-        ty: &Type,
-    ) -> PartialVMResult<(Value, Option<NumBytes>)> {
+    ) -> PartialVMResult<(&GlobalValue, Option<NumBytes>)> {
         self.data_cache
-            .native_borrow_resource(self.gas_meter, self.traversal_context, &address, ty)
+            .native_load_resource(self.gas_meter, self.traversal_context, &address, ty)
     }
 
-    /// Borrows a mutable reference to a resource in global storage.
-    /// Returns the reference value and the number of bytes loaded.
-    pub fn borrow_resource_mut(
+    /// Loads resource from global storage for mutable borrow.
+    /// Returns the value and the number of bytes loaded.
+    pub fn load_resource_mut(
         &mut self,
         address: AccountAddress,
         ty: &Type,
-    ) -> PartialVMResult<(Value, Option<NumBytes>)> {
-        self.data_cache.native_borrow_resource_mut(
+    ) -> PartialVMResult<(&mut GlobalValue, Option<NumBytes>)> {
+        self.data_cache.native_load_resource_mut(
             self.gas_meter,
             self.traversal_context,
             &address,
