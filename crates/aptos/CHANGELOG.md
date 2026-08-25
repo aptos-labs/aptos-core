@@ -4,6 +4,8 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+- Change default REST URLs for `aptos init` from `fullnode.*.aptoslabs.com` to `api.*.aptoslabs.com` for mainnet, testnet, and devnet.
+
 ## [9.5.0]
 - Compiler now uses receiver style calls for macro-generated code.
 - Point `aptos update movefmt` at the new `aptos-labs/movefmt` repo and bump default movefmt version to 1.5.3.
