@@ -1,7 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{errors::DiscardReason, outcome::TxnOutcome};
+use crate::{
+    errors::{DiscardReason, NoEffectsReason},
+    outcome::TxnOutcome,
+};
 use aptos_types::{
     state_store::state_storage_usage::StateStorageUsage,
     transaction::{AuxiliaryInfo, Transaction},
@@ -69,8 +72,8 @@ impl<'a> AptosTransactionExecutor<'a> {
 
     /// Executes any transaction, dispatching to its kind's entry point.
     //
-    // TODO(completeness): genesis, state-checkpoint, validator, and
-    // block-epilogue transactions; some may stay the block coordinator's job.
+    // TODO(completeness): genesis and validator transactions; some may stay
+    // the block coordinator's job.
     pub fn execute_transaction(
         &self,
         txn: &Transaction,
@@ -84,17 +87,19 @@ impl<'a> AptosTransactionExecutor<'a> {
             Transaction::BlockMetadataExt(block_metadata_ext) => {
                 self.execute_block_metadata_ext_transaction(block_metadata_ext, aux_info)
             },
+            Transaction::BlockEpilogue(block_epilogue) => {
+                self.execute_block_epilogue_transaction(block_epilogue)
+            },
             Transaction::GenesisTransaction(_) => {
                 TxnOutcome::Discarded(DiscardReason::Unsupported("genesis transactions"))
             },
+            // A state checkpoint runs nothing on-chain; it only marks a point
+            // for the executor to checkpoint the state tree at.
             Transaction::StateCheckpoint(_) => {
-                TxnOutcome::Discarded(DiscardReason::Unsupported("state checkpoints"))
+                TxnOutcome::ExecutedNoEffects(NoEffectsReason::NothingToExecute)
             },
             Transaction::ValidatorTransaction(_) => {
                 TxnOutcome::Discarded(DiscardReason::Unsupported("validator transactions"))
-            },
-            Transaction::BlockEpilogue(_) => {
-                TxnOutcome::Discarded(DiscardReason::Unsupported("block epilogues"))
             },
         }
     }

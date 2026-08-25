@@ -47,6 +47,10 @@ fn param_types(
 //
 // TODO(correctness): rework this part as a whole together with proper argument
 // validation.
+//
+// TODO(perf): don't mandate BCS-encoded arguments: a caller that already holds
+// the values (e.g. system function inputs) should be able to place them
+// directly, without the BCS round trip.
 pub(crate) fn place_args(
     interp: &mut InterpreterContext<'_>,
     func: &Function,
