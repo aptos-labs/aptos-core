@@ -4,7 +4,11 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+- _No changes yet._
+
+## [9.5.1]
 - Change default REST URLs for `aptos init` from `fullnode.*.aptoslabs.com` to `api.*.aptoslabs.com` for mainnet, testnet, and devnet.
+- Improve CLI help text and crate README: document `--is-multi-step` and `--next-execution-hash` on governance proposals, and fix a 404 in the multisig payload mismatch error.
 
 ## [9.5.0]
 - Compiler now uses receiver style calls for macro-generated code.
