@@ -4,17 +4,28 @@
 //! Common utilities shared by all system transactions.
 
 use crate::{
-    errors::ExecutionStatus, executor::AptosTransactionExecutor, natives::extensions_with,
+    calls::{call_system_function_unmetered, into_result, invariant_violation},
+    errors::{ExecutionStatus, MoveExecutionFailure},
+    executor::AptosTransactionExecutor,
+    natives::extensions_with,
     outcome::TxnOutcome,
 };
+use anyhow::anyhow;
 use aptos_types::{
-    block_metadata::BlockMetadata, block_metadata_ext::BlockMetadataExt,
-    fee_statement::FeeStatement, transaction::SessionId,
+    block_metadata::BlockMetadata,
+    block_metadata_ext::BlockMetadataExt,
+    fee_statement::FeeStatement,
+    transaction::{BlockEpiloguePayload, SessionId},
 };
-use mono_move_core::GasMeter;
+use mono_move_core::{GasMeter, Interner};
+use mono_move_global_context::ExecutionGuard;
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
 use mono_move_natives::TransactionContextExtension;
 use mono_move_runtime::InterpreterContext;
+use move_core_types::{account_address::AccountAddress, ident_str, identifier::IdentStr};
+use serde::Serialize;
+
+const BLOCK: &IdentStr = ident_str!("block");
 
 /// A system transaction's session identity: what seeds its transaction
 /// context in place of user-transaction metadata.
@@ -32,6 +43,16 @@ impl SystemTxnMetadata {
     /// The session identity of an extended block-metadata transaction.
     pub fn for_block_metadata_ext(block_metadata_ext: &BlockMetadataExt) -> Self {
         Self::from_session_id(SessionId::block_meta_ext(block_metadata_ext))
+    }
+
+    /// The session identity of a block-epilogue transaction.
+    pub fn for_block_epilogue(block_epilogue: &BlockEpiloguePayload) -> Self {
+        let block_id = match block_epilogue {
+            BlockEpiloguePayload::V0 { block_id, .. }
+            | BlockEpiloguePayload::V1 { block_id, .. }
+            | BlockEpiloguePayload::V2 { block_id, .. } => *block_id,
+        };
+        Self::from_session_id(SessionId::block_epilogue(block_id))
     }
 
     fn from_session_id(session_id: SessionId) -> Self {
@@ -80,4 +101,32 @@ pub(super) fn system_txn_outcome<'guard>(interp: InterpreterContext<'guard>) -> 
         fee_statement: FeeStatement::zero(),
         effects: interp.finish(),
     }
+}
+
+/// BCS-encodes one system-call argument.
+pub(super) fn serialize<T: Serialize>(value: &T) -> Result<Vec<u8>, MoveExecutionFailure> {
+    bcs::to_bytes(value)
+        .map_err(|e| invariant_violation(anyhow!("system call argument does not serialize: {e}")))
+        .map_err(MoveExecutionFailure::RuntimeError)
+}
+
+/// Calls `0x1::block::<function>` as the VM (`0x0`).
+pub(super) fn call_block_function(
+    interp: &mut InterpreterContext<'_>,
+    guard: &ExecutionGuard<'_>,
+    function: &IdentStr,
+    args: &[Vec<u8>],
+) -> Result<(), MoveExecutionFailure> {
+    let status = call_system_function_unmetered(
+        guard,
+        interp,
+        &AccountAddress::ONE,
+        BLOCK,
+        function,
+        guard.type_list_of(&[]),
+        &[AccountAddress::ZERO.into_bytes()],
+        args,
+    )
+    .map_err(MoveExecutionFailure::RuntimeError)?;
+    into_result(status)
 }

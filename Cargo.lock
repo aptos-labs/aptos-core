@@ -13050,8 +13050,8 @@ name = "mono-move-replay-benchmark"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-block-executor",
  "aptos-cached-packages",
+ "aptos-logger",
  "aptos-move-debugger",
  "aptos-rest-client",
  "aptos-transaction-simulation",

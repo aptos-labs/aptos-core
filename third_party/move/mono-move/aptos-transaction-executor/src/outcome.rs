@@ -2,7 +2,9 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    errors::{DiscardReason, ExecutionStatus, MaterializationError, SystemTxnFailure},
+    errors::{
+        DiscardReason, ExecutionStatus, MaterializationError, NoEffectsReason, SystemTxnFailure,
+    },
     materialize,
     providers::AptosDataProvider,
 };
@@ -21,6 +23,10 @@ pub enum TxnOutcome<'guard> {
     /// A system transaction failed unexpectedly: there is no per-transaction
     /// output, and the whole block must be aborted.
     UnexpectedSystemTransactionFailure(SystemTxnFailure),
+    /// Committed with no side effects and a zero fee. The reason distinguishes
+    /// a transaction that had nothing to do from a block epilogue whose
+    /// failure was absorbed; both render as an empty success.
+    ExecutedNoEffects(NoEffectsReason),
     /// Executed: the fee is charged and the side effects are real, whether or
     /// not the payload succeeded.
     Executed {
@@ -64,6 +70,9 @@ impl TxnOutcome<'_> {
                     "system transaction failed in {}: {:?}",
                     failure.call, failure.failure
                 )]))
+            },
+            TxnOutcome::ExecutedNoEffects(_) => {
+                Ok(materialize::empty_success_output(auxiliary_data))
             },
             TxnOutcome::Executed {
                 status: execution_status,

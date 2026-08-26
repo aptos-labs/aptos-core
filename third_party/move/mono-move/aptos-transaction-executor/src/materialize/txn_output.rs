@@ -6,7 +6,9 @@
 use crate::{errors::MaterializationError, providers::AptosDataProvider};
 use aptos_types::{
     state_store::state_key::StateKey,
-    transaction::{TransactionAuxiliaryData, TransactionOutput, TransactionStatus},
+    transaction::{
+        ExecutionStatus, TransactionAuxiliaryData, TransactionOutput, TransactionStatus,
+    },
     write_set::{WriteOp, WriteSet},
 };
 use bytes::Bytes;
@@ -59,6 +61,18 @@ pub(crate) fn discarded_output(
         vec![],
         0,
         TransactionStatus::Discard(status_code),
+        auxiliary_data,
+    )
+}
+
+/// Creates the committed empty output: successful, no writes, no events, no
+/// fee.
+pub(crate) fn empty_success_output(auxiliary_data: TransactionAuxiliaryData) -> TransactionOutput {
+    TransactionOutput::new(
+        WriteSet::default(),
+        vec![],
+        0,
+        TransactionStatus::Keep(ExecutionStatus::Success),
         auxiliary_data,
     )
 }

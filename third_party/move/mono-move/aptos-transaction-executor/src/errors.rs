@@ -46,6 +46,16 @@ pub enum DiscardReason {
     InvariantViolation(String),
 }
 
+/// Why a transaction committed without side effects.
+#[derive(Debug)]
+pub enum NoEffectsReason {
+    /// The transaction had nothing to execute.
+    NothingToExecute,
+    /// The block epilogue failed. AptosVM commits an empty success rather than
+    /// aborting the block.
+    BlockEpilogueFailed(MoveExecutionFailure),
+}
+
 /// A system transaction failed. System code is expected to always succeed, and
 /// if it fails, it means there is a bug in the executor or the framework.
 ///

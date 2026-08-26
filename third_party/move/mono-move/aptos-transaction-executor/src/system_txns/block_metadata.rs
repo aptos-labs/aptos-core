@@ -1,9 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use super::common::{system_txn_outcome, SystemTxnMetadata};
+use super::common::{call_block_function, serialize, system_txn_outcome, SystemTxnMetadata};
 use crate::{
-    calls::{call_system_function_unmetered, into_result, invariant_violation},
+    calls::invariant_violation,
     errors::{MoveExecutionFailure, SystemTxnFailure},
     executor::AptosTransactionExecutor,
     outcome::TxnOutcome,
@@ -13,13 +13,10 @@ use aptos_types::{
     block_metadata::BlockMetadata, block_metadata_ext::BlockMetadataExt, randomness::Randomness,
     transaction::AuxiliaryInfo,
 };
-use mono_move_core::Interner;
 use mono_move_global_context::ExecutionGuard;
 use mono_move_runtime::InterpreterContext;
 use move_core_types::{account_address::AccountAddress, ident_str, identifier::IdentStr};
-use serde::Serialize;
 
-const BLOCK: &IdentStr = ident_str!("block");
 const BLOCK_PROLOGUE: &IdentStr = ident_str!("block_prologue");
 const BLOCK_PROLOGUE_EXT: &IdentStr = ident_str!("block_prologue_ext");
 const BLOCK_PROLOGUE_EXT_V2: &IdentStr = ident_str!("block_prologue_ext_v2");
@@ -67,12 +64,6 @@ impl<'guard> AptosTransactionExecutor<'guard> {
     }
 }
 
-fn serialize<T: Serialize>(value: &T) -> Result<Vec<u8>, MoveExecutionFailure> {
-    bcs::to_bytes(value)
-        .map_err(|e| invariant_violation(anyhow!("block prologue arg does not serialize: {e}")))
-        .map_err(MoveExecutionFailure::RuntimeError)
-}
-
 /// Arguments shared by every block-prologue variant.
 //
 // TODO(perf): place the arguments directly into the interpreter's heap,
@@ -103,27 +94,6 @@ fn block_prologue_common_args(
         serialize(&previous_block_votes_bitvec)?,
         serialize(&timestamp_usecs)?,
     ])
-}
-
-/// Calls `0x1::block::<function>` as the VM (`0x0`).
-fn call_block_function(
-    interp: &mut InterpreterContext<'_>,
-    guard: &ExecutionGuard<'_>,
-    function: &IdentStr,
-    args: &[Vec<u8>],
-) -> Result<(), MoveExecutionFailure> {
-    let status = call_system_function_unmetered(
-        guard,
-        interp,
-        &AccountAddress::ONE,
-        BLOCK,
-        function,
-        guard.type_list_of(&[]),
-        &[AccountAddress::ZERO.into_bytes()],
-        args,
-    )
-    .map_err(MoveExecutionFailure::RuntimeError)?;
-    into_result(status)
 }
 
 /// Calls `0x1::block::block_prologue` with the block's consensus metadata.
