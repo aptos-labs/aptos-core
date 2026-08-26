@@ -21,6 +21,7 @@ use aptos_types::{
         AccumulatorRangeProof, TransactionAccumulatorRangeProof, TransactionInfoListWithProof,
     },
     state_store::{
+        hot_state::{HotStateValue, HotStateValueChunkWithProof},
         state_key::StateKey,
         state_value::{StateValue, StateValueChunkWithProof},
     },
@@ -106,6 +107,12 @@ pub trait StorageReaderInterface: Clone + Send + 'static {
         kind: StateKind,
     ) -> aptos_storage_service_types::Result<u64, Error>;
 
+    /// Returns the number of hot states at the specified version.
+    fn get_number_of_hot_states(
+        &self,
+        version: u64,
+    ) -> aptos_storage_service_types::Result<u64, Error>;
+
     /// Returns a chunk holding a list of state values starting at the
     /// specified `start_index` and ending at `end_index` (inclusive). In
     /// some cases, less state values may be returned (e.g., due to network
@@ -117,6 +124,14 @@ pub trait StorageReaderInterface: Clone + Send + 'static {
         end_index: u64,
         kind: StateKind,
     ) -> aptos_storage_service_types::Result<StateValueChunkWithProof, Error>;
+
+    /// Returns a chunk holding hot state values and their range proof.
+    fn get_hot_state_value_chunk_with_proof(
+        &self,
+        version: u64,
+        start_index: u64,
+        end_index: u64,
+    ) -> aptos_storage_service_types::Result<HotStateValueChunkWithProof, Error>;
 }
 
 /// The underlying implementation of the StorageReaderInterface, used by the
@@ -1022,6 +1037,32 @@ impl StorageReader {
         Ok(chunk_with_proof)
     }
 
+    /// Returns a hot state value chunk with proof, bounded by the configured item, byte, and time
+    /// limits. Hot state only supports the iterator and proof construction path.
+    fn get_hot_state_value_chunk_with_proof_by_size(
+        &self,
+        version: u64,
+        start_index: u64,
+        end_index: u64,
+    ) -> Result<HotStateValueChunkWithProof, Error> {
+        self.get_value_chunk_with_proof_by_size(
+            version,
+            start_index,
+            end_index,
+            self.config.max_network_chunk_bytes,
+            "hot state value",
+            DataResponse::get_hot_state_value_chunk_with_proof_label(),
+            |first_index, chunk_size| {
+                self.storage
+                    .get_hot_state_value_chunk_iter(version, first_index, chunk_size)
+            },
+            |first_index, hot_state_values| {
+                self.storage
+                    .get_hot_state_value_chunk_proof(version, first_index, hot_state_values)
+            },
+        )
+    }
+
     /// Returns a state value chunk with proof response (bound by the max response size in bytes).
     /// This is the legacy implementation (that does not use size and time-aware chunking).
     fn get_state_value_chunk_with_proof_by_size_legacy(
@@ -1238,6 +1279,14 @@ impl StorageReaderInterface for StorageReader {
         Ok(number_of_states as u64)
     }
 
+    fn get_number_of_hot_states(
+        &self,
+        version: u64,
+    ) -> aptos_storage_service_types::Result<u64, Error> {
+        let number_of_hot_states = self.storage.get_hot_state_item_count(version)?;
+        Ok(number_of_hot_states as u64)
+    }
+
     fn get_state_value_chunk_with_proof(
         &self,
         version: u64,
@@ -1253,6 +1302,15 @@ impl StorageReaderInterface for StorageReader {
             self.config.enable_size_and_time_aware_chunking,
             kind,
         )
+    }
+
+    fn get_hot_state_value_chunk_with_proof(
+        &self,
+        version: u64,
+        start_index: u64,
+        end_index: u64,
+    ) -> aptos_storage_service_types::Result<HotStateValueChunkWithProof, Error> {
+        self.get_hot_state_value_chunk_with_proof_by_size(version, start_index, end_index)
     }
 }
 
@@ -1328,6 +1386,8 @@ impl DbReader for TimedStorageReader {
 
         fn get_state_item_count(&self, version: Version, kind: StateKind) -> StorageResult<usize>;
 
+        fn get_hot_state_item_count(&self, version: Version) -> StorageResult<usize>;
+
         fn get_state_value_chunk_with_proof(
             &self,
             version: Version,
@@ -1388,6 +1448,20 @@ impl DbReader for TimedStorageReader {
             state_key_values: Vec<(StateKey, StateValue)>,
             kind: StateKind,
         ) -> StorageResult<StateValueChunkWithProof>;
+
+        fn get_hot_state_value_chunk_iter(
+            &self,
+            version: Version,
+            first_index: usize,
+            chunk_size: usize,
+        ) -> StorageResult<Box<dyn Iterator<Item = StorageResult<(StateKey, HotStateValue)>> + '_>>;
+
+        fn get_hot_state_value_chunk_proof(
+            &self,
+            version: Version,
+            first_index: usize,
+            raw_values: Vec<(StateKey, HotStateValue)>,
+        ) -> StorageResult<HotStateValueChunkWithProof>;
 
         fn get_persisted_auxiliary_info_iterator(
             &self,
