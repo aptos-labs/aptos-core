@@ -624,6 +624,95 @@ fn compare_system_outputs(v1_output: &TransactionOutput, v2_output: &Transaction
     assert_eq!(v1_output.events(), v2_output.events(), "events differ");
 }
 
+/// A V0 block epilogue runs nothing on-chain: both VMs commit an empty
+/// success output.
+#[test]
+fn block_epilogue_v0_is_empty_like_v1() {
+    use aptos_types::transaction::BlockEndInfo;
+
+    let (fx, _alice, _bob) = setup();
+    let block_epilogue = Transaction::block_epilogue_v0(
+        aptos_crypto::HashValue::sha3_256_of(b"mono-move epilogue block"),
+        BlockEndInfo::new_empty(),
+    );
+
+    let v1_outputs = fx
+        .execute_transaction_block(vec![block_epilogue.clone()])
+        .expect("v1 executes the block");
+    let v1_output = &v1_outputs[0];
+    assert!(
+        v1_output.write_set().write_op_iter().next().is_none(),
+        "a V0 block epilogue must write nothing"
+    );
+
+    let v2_output = execute_v2_with(fx.get_state_view(), |executor| {
+        executor.execute_transaction(&block_epilogue, &first_txn_aux_info())
+    });
+    compare_system_outputs(v1_output, &v2_output);
+}
+
+/// A state-checkpoint transaction runs nothing on-chain: both VMs commit an
+/// empty success.
+#[test]
+fn state_checkpoint_is_empty_like_v1() {
+    let (fx, _alice, _bob) = setup();
+    let state_checkpoint = Transaction::StateCheckpoint(aptos_crypto::HashValue::sha3_256_of(
+        b"mono-move checkpoint",
+    ));
+
+    let v1_outputs = fx
+        .execute_transaction_block(vec![state_checkpoint.clone()])
+        .expect("v1 executes the block");
+    let v1_output = &v1_outputs[0];
+    assert!(
+        v1_output.write_set().write_op_iter().next().is_none(),
+        "a state checkpoint must write nothing"
+    );
+
+    let v2_output = execute_v2_with(fx.get_state_view(), |executor| {
+        executor.execute_transaction(&state_checkpoint, &first_txn_aux_info())
+    });
+    compare_system_outputs(v1_output, &v2_output);
+}
+
+/// A V1 block epilogue distributes the block's transaction fees to its
+/// validators via `0x1::block::block_epilogue`, producing byte-identical
+/// outputs on both VMs.
+#[test]
+fn block_epilogue_v1_matches_v1() {
+    use aptos_types::transaction::{BlockEndInfoExt, FeeDistribution};
+
+    let (fx, _alice, _bob) = setup();
+    let block_epilogue = Transaction::block_epilogue_v1(
+        aptos_crypto::HashValue::sha3_256_of(b"mono-move epilogue block"),
+        BlockEndInfoExt::new_empty(),
+        // Genesis has a single validator, at index 0.
+        FeeDistribution::new(BTreeMap::from([(0, 100_000)])),
+    );
+
+    let v1_outputs = fx
+        .execute_transaction_block(vec![block_epilogue.clone()])
+        .expect("v1 executes the block");
+    let v1_output = &v1_outputs[0];
+    assert_eq!(
+        v1_output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::Success),
+        "v1 rejected the block epilogue: {:?}",
+        v1_output.status()
+    );
+    // Guard against v1 hitting its swallow-the-failure fallback, which would
+    // make the comparison below vacuous.
+    assert!(
+        v1_output.write_set().write_op_iter().next().is_some(),
+        "v1 recorded no fee"
+    );
+
+    let v2_output = execute_v2_with(fx.get_state_view(), |executor| {
+        executor.execute_transaction(&block_epilogue, &first_txn_aux_info())
+    });
+    compare_system_outputs(v1_output, &v2_output);
+}
+
 /// Two dependent transfers executed sequentially, each transaction's outputs
 /// applied to the state before the next: the second transaction's prologue
 /// only passes if it observes the first one's sequence-number bump.

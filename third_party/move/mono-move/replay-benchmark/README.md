@@ -1,7 +1,9 @@
 # mono-move-replay-benchmark
 
 Measures the execution-time speedup of the **MonoMove-backed Aptos transaction executor** (V2)
-over the legacy **AptosVM** (V1) by replaying a real mainnet entry-function transaction on both.
+over the legacy **AptosVM** (V1) by replaying a transaction captured from a real network
+(mainnet, testnet, or devnet) on both. Entry-function user transactions, block-metadata
+transactions, and block-epilogue transactions are supported.
 
 The two transaction outputs are compared strictly (status, write set, events, barring gas), and
 a speedup is only reported when the VMs agree on what the transaction did.
@@ -27,7 +29,7 @@ cargo run -p mono-move-replay-benchmark -- capture \
     --begin-version 5663916074 --end-version 5663916090 \
     --out-dir dump/
 
-# 2. Benchmark every entry-function transaction in the dump on both VMs.
+# 2. Benchmark every supported transaction in the dump on both VMs.
 cargo run --release -p mono-move-replay-benchmark -- bench \
     --data-dir dump/ \
     --warmup 50 --samples 200 --limit 20
