@@ -138,13 +138,13 @@ fun add_u64(r0, r1): u64 {
 fun adder(r0): u64 {
   slots: params(1), locals(1), temps(1)
     r0: u64
-    r1: |u64|u64
+    r1: |u64|u64 has drop
     r2: u64
   code:
   L0:
     0: r1 := pack_closure __lambda__1__adder, 1, [r0] @1
     1: r2 := ld_u64 8 @3
-    2: [r2] := call_closure [|u64|u64], [r2, r1] @5
+    2: [r2] := call_closure [|u64|u64 has drop], [r2, r1] @5
     3: ret [r2] @6
 }
 
@@ -152,12 +152,12 @@ fun all_captured(r0, r1): u64 {
   slots: params(2), locals(0), temps(2)
     r0: u64
     r1: u64
-    r2: |u64, u64|u64
+    r2: ||u64 has copy + drop
     r3: u64
   code:
   L0:
     0: r2 := pack_closure add_u64, 11, [r0, r1] @2
-    1: [r3] := call_closure [||u64], [r2] @3
+    1: [r3] := call_closure [||u64 has drop], [r2] @3
     2: ret [r3] @4
 }
 
@@ -165,26 +165,26 @@ fun capture_ends(r0, r1): u64 {
   slots: params(2), locals(1), temps(1)
     r0: u64
     r1: u64
-    r2: |u64|u64
+    r2: |u64|u64 has drop
     r3: u64
   code:
   L0:
     0: r2 := pack_closure add3, 101, [r0, r1] @2
     1: r3 := ld_u64 100 @4
-    2: [r3] := call_closure [|u64|u64], [r3, r2] @6
+    2: [r3] := call_closure [|u64|u64 has drop], [r3, r2] @6
     3: ret [r3] @7
 }
 
 fun capture_second(r0): u64 {
   slots: params(1), locals(1), temps(1)
     r0: u64
-    r1: |u64|u64
+    r1: |u64|u64 has drop
     r2: u64
   code:
   L0:
     0: r1 := pack_closure add_u64, 10, [r0] @1
     1: r2 := ld_u64 7 @3
-    2: [r2] := call_closure [|u64|u64], [r2, r1] @5
+    2: [r2] := call_closure [|u64|u64 has drop], [r2, r1] @5
     3: ret [r2] @6
 }
 
@@ -192,20 +192,20 @@ fun capture_two(r0, r1): u64 {
   slots: params(2), locals(1), temps(1)
     r0: u64
     r1: u64
-    r2: |u64|u64
+    r2: |u64|u64 has drop
     r3: u64
   code:
   L0:
     0: r2 := pack_closure add3, 11, [r0, r1] @2
     1: r3 := ld_u64 1 @4
-    2: [r3] := call_closure [|u64|u64], [r3, r2] @6
+    2: [r3] := call_closure [|u64|u64 has drop], [r3, r2] @6
     3: ret [r3] @7
 }
 
 fun make_adder(r0): |u64|u64 {
   slots: params(1), locals(0), temps(1)
     r0: u64
-    r1: |u64, u64|u64
+    r1: |u64|u64 has copy + drop
   code:
   L0:
     0: r1 := pack_closure __lambda__1__make_adder, 1, [r0] @1
@@ -216,12 +216,12 @@ fun use_adder(r0, r1): u64 {
   slots: params(2), locals(1), temps(1), transfer(1)
     r0: u64
     r1: u64
-    r2: |u64|u64
+    r2: |u64|u64 has drop
     r3: u64
   code:
   L0:
     0: [r2] := call make_adder, [r0] @1
-    1: [r3] := call_closure [|u64|u64], [r1, r2] @5
+    1: [r3] := call_closure [|u64|u64 has drop], [r1, r2] @5
     2: ret [r3] @6
 }
 

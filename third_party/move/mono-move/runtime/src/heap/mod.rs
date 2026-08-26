@@ -232,8 +232,13 @@ pub struct Heap {
 }
 
 impl Heap {
+    /// Creates a heap backed by an uninitialized buffer of the given size.
+    ///
+    /// The buffer is not zeroed. This is sound only while this contract holds:
+    /// every heap object is fully written before any byte of it is read, and
+    /// nothing reads the unbumped tail `[bump_ptr, buffer.end)`.
     pub fn new(size: usize) -> Self {
-        let buffer = MemoryRegion::new(size);
+        let buffer = MemoryRegion::new_uninit(size);
         Self {
             bump_ptr: buffer.as_ptr(),
             buffer,
@@ -453,6 +458,13 @@ impl<'a> RootScanner<'a> {
 ///
 /// Returns [`AllocationError::OutOfHeapMemory`] when the heap is full
 /// so the caller can trigger GC and retry.
+///
+/// # Invariants
+///
+/// Each object's region is zeroed before it is returned. The GC and deep-copy
+/// copy the full object image, including inter-field padding and alignment
+/// gaps. Zeroing makes those bytes reproducibly zero, so the copied image is
+/// deterministic rather than arbitrary heap contents.
 pub(crate) fn heap_alloc(
     heap: &mut Heap,
     total_size: usize,
@@ -494,11 +506,16 @@ pub(crate) fn heap_alloc(
         // material win for large/wide-variant enums). It is not a drop-in
         // change: `gc_copy_object` / `deep_copy` copy the full object image
         // including dead-variant tail and inter-field padding, which is
-        // deterministically zero today; leaving it uninitialized makes that
-        // image carry stale heap bytes. Prefer zeroing only the
-        // tail/padding the active variant does not write (still skipping the
-        // large active body), or audit that no byte-image consumer
-        // (state commit / hashing) depends on those bytes first.
+        // deterministically zero today because this memset is the sole
+        // initializer (the backing buffer is uninitialized). Skipping it leaves
+        // those bytes uninitialized. A raw byte copy of them is fine in
+        // principle, but compilers (e.g. LLVM) may lower a small copy to a
+        // typed integer load/store, and reading uninitialized bytes as a typed
+        // value is UB, not merely a stale read.
+        // Prefer zeroing only the tail/padding the active variant does not
+        // write (still skipping the large active body), or audit that no
+        // byte-image consumer (state commit / hashing) depends on those bytes
+        // first.
         std::ptr::write_bytes(header_start, 0, aligned_size);
         let obj_ptr = header_start.add(OBJECT_HEADER_SIZE);
         write_object_header(obj_ptr, descriptor_id, aligned_size as u32);
@@ -812,7 +829,9 @@ pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
 ) -> VMResult<()> {
     heap.gc_count += 1;
 
-    let to_space = MemoryRegion::new(heap.buffer.len());
+    // Uninitialized is safe: the copy below fills to-space contiguously up to
+    // `free_ptr`, and the Phase-2 scan only reads `[to_space.start, free_ptr)`.
+    let to_space = MemoryRegion::new_uninit(heap.buffer.len());
     // `free_ptr` is a raw bump cursor — it points at the start of the
     // next *header* reservation, advancing by each object's total size.
     // Treating it as a raw cursor (rather than as an "object pointer"

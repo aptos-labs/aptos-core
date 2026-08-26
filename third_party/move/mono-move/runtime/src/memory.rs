@@ -22,13 +22,59 @@ pub struct MemoryRegion {
 impl MemoryRegion {
     /// Allocates a zeroed, [`MAX_ALIGN`]-aligned memory region of the given size.
     ///
+    /// Use this whenever a caller may read a slot before writing it (e.g. the
+    /// interpreter stack). For memory that is always written before it is read,
+    /// prefer [`Self::new_uninit`] to skip the zeroing.
+    ///
     /// OOM is handled by aborting via `handle_alloc_error`.
-    pub fn new(size: usize) -> Self {
-        debug_assert!(size > 0);
+    pub fn new_zeroed(size: usize) -> Self {
+        Self::new::<true>(size)
+    }
+
+    /// Allocates an uninitialized, [`MAX_ALIGN`]-aligned memory region of the
+    /// given size. The bytes hold arbitrary values, so the region must be
+    /// written before it is read.
+    ///
+    /// # Invariants
+    ///
+    /// The caller must write every byte before it is read. The region carries
+    /// no guarantee about its initial contents; callers must not rely on any
+    /// (in particular, must not assume it is zeroed).
+    ///
+    /// OOM is handled by aborting via `handle_alloc_error`.
+    pub fn new_uninit(size: usize) -> Self {
+        let region = Self::new::<false>(size);
+
+        // The allocator often hands back fresh, already-zeroed OS pages, so in
+        // practice uninitialized memory reads as zeros and code that wrongly
+        // relies on the old zeroing would keep passing. Poison the region in
+        // debug builds so the write-before-read contract is exercised in tests
+        // and CI. Gated on `not(miri)`: this write initializes the memory, which
+        // would otherwise hide genuine uninitialized reads from Miri.
+        #[cfg(all(debug_assertions, not(miri)))]
+        // SAFETY: `region.ptr` is a valid, `size`-byte allocation just returned
+        // by `Self::new` above.
+        unsafe {
+            std::ptr::write_bytes(region.ptr, 0xAA, size);
+        }
+        region
+    }
+
+    /// Shared body of [`Self::new_zeroed`] / [`Self::new_uninit`]. `ZEROED`
+    /// selects `alloc_zeroed` vs `alloc`; both paths null-check and abort via
+    /// `handle_alloc_error` on OOM.
+    fn new<const ZEROED: bool>(size: usize) -> Self {
+        assert!(size > 0);
         let layout = Layout::from_size_align(size, MAX_ALIGN).expect("invalid memory layout");
-        // SAFETY: layout is valid (power-of-two alignment) and `alloc_zeroed` handles
-        // zero-size layouts per the GlobalAlloc contract. Null is checked below.
-        let ptr = unsafe { alloc::alloc_zeroed(layout) };
+        // SAFETY: layout is valid (power-of-two alignment, non-zero size). Null
+        // is checked below.
+        let ptr = unsafe {
+            if ZEROED {
+                alloc::alloc_zeroed(layout)
+            } else {
+                alloc::alloc(layout)
+            }
+        };
         if ptr.is_null() {
             alloc::handle_alloc_error(layout);
         }

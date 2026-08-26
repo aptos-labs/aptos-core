@@ -1,0 +1,23 @@
+processed 2 tasks
+task 0 lines 1-21:  publish [import Move]
+Error: compilation errors:
+ error: cannot transfer mutable local `_competing` since it is borrowed
+   ┌─ TEMPFILE:11:5
+   │
+10 │     let selected ← &mut owner
+   │     ------------------------- previously mutably borrowed here
+11 │     let _competing ← &mut owner
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ transfer attempted here
+12 │     selected := 5
+   │     ------------- conflicting reference `selected` used here
+
+
+exiting with stackless-bytecode optimization errors
+task 1 lines 23-23:  run 0x0::LeanerBorrowPermissiveUnused::run
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

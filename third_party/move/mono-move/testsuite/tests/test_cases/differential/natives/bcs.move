@@ -1,6 +1,14 @@
 // RUN: publish
+module 0x1::boxes {
+    struct Box<T> { value: T }
+
+    struct Pair<A, B> { first: A, second: B }
+}
+
 module 0x1::main {
     use std::bcs;
+    use std::option;
+    use 0x1::boxes;
 
     struct Pair has drop {
         a: u64,
@@ -74,6 +82,34 @@ module 0x1::main {
     public fun size_wrap(): u64 {
         bcs::serialized_size(&Wrap { v: b"hi" })
     }
+
+    public fun const_size_box_u64(): u64 {
+        option::destroy_some(bcs::constant_serialized_size<boxes::Box<u64>>())
+    }
+
+    public fun const_size_box_bool(): u64 {
+        option::destroy_some(bcs::constant_serialized_size<boxes::Box<bool>>())
+    }
+
+    public fun const_size_box_address(): u64 {
+        option::destroy_some(bcs::constant_serialized_size<boxes::Box<address>>())
+    }
+
+    public fun const_size_pair(): u64 {
+        option::destroy_some(bcs::constant_serialized_size<boxes::Pair<u64, bool>>())
+    }
+
+    public fun const_size_nested(): u64 {
+        option::destroy_some(bcs::constant_serialized_size<boxes::Box<boxes::Pair<u64, u128>>>())
+    }
+
+    public fun const_size_is_some_box_u64(): bool {
+        option::is_some(&bcs::constant_serialized_size<boxes::Box<u64>>())
+    }
+
+    public fun const_size_is_some_box_vec(): bool {
+        option::is_some(&bcs::constant_serialized_size<boxes::Box<vector<u8>>>())
+    }
 }
 
 // RUN: execute 0x1::main::bytes_u64
@@ -125,3 +161,24 @@ module 0x1::main {
 
 // RUN: execute 0x1::main::size_wrap
 // CHECK: results: 3
+
+// RUN: execute 0x1::main::const_size_box_u64
+// CHECK: results: 8
+
+// RUN: execute 0x1::main::const_size_box_bool
+// CHECK: results: 1
+
+// RUN: execute 0x1::main::const_size_box_address
+// CHECK: results: 32
+
+// RUN: execute 0x1::main::const_size_pair
+// CHECK: results: 9
+
+// RUN: execute 0x1::main::const_size_nested
+// CHECK: results: 24
+
+// RUN: execute 0x1::main::const_size_is_some_box_u64
+// CHECK: results: true
+
+// RUN: execute 0x1::main::const_size_is_some_box_vec
+// CHECK: results: false

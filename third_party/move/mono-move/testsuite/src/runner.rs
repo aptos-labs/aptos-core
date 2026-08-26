@@ -8,8 +8,8 @@ use crate::{
     compile::{compile, compile_move_path, compile_move_stdlib, SourceKind},
     engine::RunResult,
     extensions::{
-        seed_extensions, TEST_CHAIN_ID, TEST_SESSION_COUNTER, TEST_STATE_BYTES, TEST_STATE_ITEMS,
-        TEST_TXN_HASH, TEST_TXN_INDEX,
+        seed_extensions, test_user_transaction_context, TEST_CHAIN_ID, TEST_SCRIPT_HASH,
+        TEST_SESSION_COUNTER, TEST_STATE_BYTES, TEST_STATE_ITEMS, TEST_TXN_HASH,
     },
     matcher::check_output,
     module_provider::InMemoryModuleProvider,
@@ -24,20 +24,18 @@ use aptos_framework_natives::{
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::{
     contract_event::ContractEvent,
-    event::EventKey,
     on_chain_config::{Features, TimedFeaturesBuilder},
     state_store::{
         errors::StateViewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
         StateViewId,
     },
-    transaction::user_transaction_context::{TransactionIndexKind, UserTransactionContext},
 };
 use aptos_vm::natives::aptos_natives;
 use aptos_vm_types::resolver::StateStorageView;
-use mono_move_core::{native::NativeExtensions, types::type_to_string};
+use mono_move_core::native::NativeExtensions;
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
-use mono_move_natives::{EventKind, EventStore};
-use mono_move_runtime::serialize;
+use mono_move_natives::EventStore;
+use mono_move_output::to_contract_events_from_store;
 use move_binary_format::{errors::Location, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
@@ -131,9 +129,14 @@ fn render_execution_output(vals: &[String], events: &[String]) -> String {
 /// Renders the events emitted into the legacy VM's [`NativeEventContext`], in
 /// emission order, for cross-VM comparison.
 pub fn finalize_events_v1(extensions: &NativeContextExtensions) -> Vec<String> {
-    extensions
-        .get::<NativeEventContext>()
-        .events_iter()
+    render_contract_events(extensions.get::<NativeEventContext>().events_iter())
+}
+
+/// Renders materialized events into the normalized form used for cross-VM
+/// comparison.
+fn render_contract_events<'a>(events: impl IntoIterator<Item = &'a ContractEvent>) -> Vec<String> {
+    events
+        .into_iter()
         .map(|event| {
             let type_str = event.type_tag().to_canonical_string();
             match event {
@@ -155,40 +158,20 @@ pub fn finalize_events_v1(extensions: &NativeContextExtensions) -> Vec<String> {
 ///
 /// # Safety
 ///
-/// The VM heap must be live: each entry's `msg_data` embeds heap pointers that
-/// [`serialize`] dereferences.
+/// Every allocation reachable through the event data must remain live, and
+/// `layouts` must be the matching execution guard. No GC may run during
+/// serialization.
 pub unsafe fn finalize_events_v2(
     extensions: &NativeExtensions,
     layouts: &ExecutionGuard<'_>,
 ) -> Vec<String> {
     let store = extensions
-        .get_mut::<EventStore>()
+        .get::<EventStore>()
         .expect("event store installed");
-    store
-        .entries()
-        .iter()
-        .map(|entry| {
-            let type_str = type_to_string(entry.msg_ty);
-            // SAFETY: forwarded from this function's contract — the heap is live.
-            let blob = unsafe { serialize(layouts, entry.msg_data.as_ptr(), entry.msg_ty) }
-                .expect("event value serializes");
-            match &entry.kind {
-                EventKind::V2 => render_event(None, None, &type_str, &blob),
-                EventKind::V1 {
-                    guid,
-                    sequence_number,
-                } => {
-                    let key: EventKey = bcs::from_bytes(guid).expect("guid decodes to EventKey");
-                    render_event(
-                        Some(key.get_creator_address()),
-                        Some(*sequence_number),
-                        &type_str,
-                        &blob,
-                    )
-                },
-            }
-        })
-        .collect()
+    // SAFETY: forwarded from this function's contract.
+    let events = unsafe { to_contract_events_from_store(&store, layouts) }
+        .expect("events materialize into ContractEvents");
+    render_contract_events(&events)
 }
 
 /// Run all steps in a differential test, checking both VMs produce matching
@@ -464,26 +447,11 @@ fn execute_function_v1(
         usage: StateStorageUsage::new(TEST_STATE_ITEMS as usize, TEST_STATE_BYTES as usize),
     };
     let mut extensions = NativeContextExtensions::default();
-    let user_transaction_context = UserTransactionContext::new(
-        AccountAddress::ZERO,
-        vec![],
-        AccountAddress::ZERO,
-        0,
-        0,
-        TEST_CHAIN_ID, // chain_id, read by transaction_context::chain_id_internal
-        None,
-        None,
-        TransactionIndexKind::BlockExecution {
-            transaction_index: TEST_TXN_INDEX,
-        },
-        false, // is_encrypted_txn
-        false, // is_orderless_txn
-    );
     extensions.add(NativeTransactionContext::new(
         TEST_TXN_HASH.to_vec(),
-        vec![],
+        TEST_SCRIPT_HASH.to_vec(),
         TEST_CHAIN_ID,
-        Some(user_transaction_context),
+        Some(test_user_transaction_context()),
         TEST_SESSION_COUNTER,
     ));
     extensions.add(NativeObjectContext::default());
@@ -558,8 +526,8 @@ fn execute_function_v2(
     return_kinds: &[PrimitiveKind],
     heap_size: Option<usize>,
 ) -> (Output, usize) {
-    // Seed extensions with the same fixed inputs as the legacy side.
-    let extensions = seed_extensions();
+    // For differential tests, treat transaction as a user transaction.
+    let extensions = seed_extensions(true);
 
     // Run through the shared pipeline engine. Argument placement and result
     // reading mirror mono-move's frame slot layout.

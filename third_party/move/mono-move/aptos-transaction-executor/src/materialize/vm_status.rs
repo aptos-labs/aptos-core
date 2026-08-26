@@ -5,6 +5,7 @@
 
 use crate::errors::{
     is_cant_pay_fee_abort, DiscardReason, ExecutionStage, ExecutionStatus, MoveExecutionFailure,
+    PreExecutionCheckFailure,
 };
 use aptos_types::{
     error::{split_canonical, INVALID_ARGUMENT, INVALID_STATE, OUT_OF_RANGE},
@@ -65,6 +66,7 @@ fn internal_error_to_status(err: &VMInternalError) -> VMStatus {
 pub(crate) fn discard_to_vm_status(reason: DiscardReason) -> VMStatus {
     match reason {
         DiscardReason::Unsupported(msg) => unsupported_status(msg),
+        DiscardReason::PreExecutionCheck(failure) => pre_execution_check_status(failure),
         DiscardReason::InvalidTypeArgument(detail) => {
             VMStatus::error(StatusCode::TYPE_RESOLUTION_FAILURE, Some(detail))
         },
@@ -77,6 +79,21 @@ pub(crate) fn discard_to_vm_status(reason: DiscardReason) -> VMStatus {
         },
         DiscardReason::InvariantViolation(detail) => invariant_status(detail),
     }
+}
+
+/// Converts a violated pre-execution bound into the legacy validation status.
+fn pre_execution_check_status(failure: PreExecutionCheckFailure) -> VMStatus {
+    use PreExecutionCheckFailure as F;
+    let code = match &failure {
+        F::TransactionTooLarge { .. } => StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE,
+        F::GasBudgetAboveBound { .. } => StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND,
+        F::GasBudgetBelowIntrinsicCost { .. } => {
+            StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS
+        },
+        F::GasPriceBelowMinimum { .. } => StatusCode::GAS_UNIT_PRICE_BELOW_MIN_BOUND,
+        F::GasPriceAboveMaximum { .. } => StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND,
+    };
+    VMStatus::error(code, Some(failure.to_string()))
 }
 
 /// Converts an executed transaction's conclusion into its `VMStatus`.
@@ -242,7 +259,7 @@ fn runtime_error_to_status(err: &RuntimeError) -> VMStatus {
         | E::BCSRemainingInput { .. }
         | E::BCSInvalidBool { .. }
         | E::BCSSignerNotDeserializable => StatusCode::UNKNOWN_STATUS,
-        E::InvariantViolation(_) | E::ResourceProvider(_) => {
+        E::Unsupported(_) | E::InvariantViolation(_) | E::ResourceProvider(_) => {
             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
         },
     };

@@ -2473,6 +2473,8 @@ impl AptosVM {
                     txn_limits_request,
                     meter_balance,
                     &NoopBlockSynchronizationKillSwitch {},
+                    self.timed_features()
+                        .is_enabled(TimedFeatureFlag::MeterValueNodesOnDeserialize),
                 ))
             },
             auxiliary_info,
@@ -2493,7 +2495,23 @@ impl AptosVM {
             code_storage,
             txn,
             log_context,
-            make_prod_gas_meter,
+            |gas_feature_version,
+             vm_gas_params,
+             storage_gas_params,
+             txn_limits_request,
+             meter_balance,
+             block_synchronization_kill_switch| {
+                make_prod_gas_meter(
+                    gas_feature_version,
+                    vm_gas_params,
+                    storage_gas_params,
+                    txn_limits_request,
+                    meter_balance,
+                    block_synchronization_kill_switch,
+                    self.timed_features()
+                        .is_enabled(TimedFeatureFlag::MeterValueNodesOnDeserialize),
+                )
+            },
             auxiliary_info,
         ) {
             Ok((vm_status, vm_output, _gas_meter)) => (vm_status, vm_output),
@@ -2926,7 +2944,10 @@ impl AptosVM {
             type_args,
             arguments,
             max_gas_amount,
-            |gas_feature_version, vm_gas_params, storage_gas_params| {
+            |gas_feature_version,
+             vm_gas_params,
+             storage_gas_params,
+             meter_value_nodes_on_deserialize| {
                 make_prod_gas_meter(
                     gas_feature_version,
                     vm_gas_params,
@@ -2934,6 +2955,7 @@ impl AptosVM {
                     None,
                     max_gas_amount.into(),
                     &NoopBlockSynchronizationKillSwitch {},
+                    meter_value_nodes_on_deserialize,
                 )
             },
         );
@@ -2972,7 +2994,10 @@ impl AptosVM {
             type_args,
             arguments,
             max_gas_amount,
-            |gas_feature_version, vm_gas_params, storage_gas_params| {
+            |gas_feature_version,
+             vm_gas_params,
+             storage_gas_params,
+             meter_value_nodes_on_deserialize| {
                 let gas_meter = make_prod_gas_meter_impl::<_, M>(
                     gas_feature_version,
                     vm_gas_params,
@@ -2980,6 +3005,7 @@ impl AptosVM {
                     None,
                     max_gas_amount.into(),
                     &NoopBlockSynchronizationKillSwitch {},
+                    meter_value_nodes_on_deserialize,
                 );
                 modify_gas_meter(gas_meter)
             },
@@ -2999,7 +3025,7 @@ impl AptosVM {
         type_args: Vec<TypeTag>,
         arguments: Vec<Vec<u8>>,
         max_gas_amount: u64,
-        make_gas_meter: impl FnOnce(u64, VMGasParameters, StorageGasParameters) -> G,
+        make_gas_meter: impl FnOnce(u64, VMGasParameters, StorageGasParameters, bool) -> G,
     ) -> (ViewFunctionOutput, Option<G>) {
         let env = AptosEnvironment::new(state_view);
         let vm = AptosVM::new(&env);
@@ -3033,8 +3059,13 @@ impl AptosVM {
             },
         };
 
-        let mut gas_meter =
-            make_gas_meter(vm.gas_feature_version(), vm_gas_params, storage_gas_params);
+        let mut gas_meter = make_gas_meter(
+            vm.gas_feature_version(),
+            vm_gas_params,
+            storage_gas_params,
+            vm.timed_features()
+                .is_enabled(TimedFeatureFlag::MeterValueNodesOnDeserialize),
+        );
 
         let resolver = state_view.as_move_resolver();
         let module_storage = state_view.as_aptos_code_storage(&env);
@@ -3615,6 +3646,8 @@ impl VMValidator for AptosVM {
             txn_data.txn_limits.as_ref(),
             initial_balance,
             &NoopBlockSynchronizationKillSwitch {},
+            self.timed_features()
+                .is_enabled(TimedFeatureFlag::MeterValueNodesOnDeserialize),
         );
         let storage = TraversalStorage::new();
 

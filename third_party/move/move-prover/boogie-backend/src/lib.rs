@@ -538,7 +538,7 @@ pub fn add_prelude(
     cmp_struct_types.sort();
     cmp_struct_types.dedup();
     context.insert("cmp_int_instances", &cmp_int_types);
-    env.cmp_types.borrow_mut().extend(cmp_struct_types);
+    *env.cmp_types.borrow_mut() = cmp_struct_types.into_iter().collect();
 
     let filter_cmp_instances_with_name_prefix = |name_prefix: &str| {
         cmp_instances

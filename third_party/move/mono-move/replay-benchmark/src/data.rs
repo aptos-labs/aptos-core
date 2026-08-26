@@ -8,6 +8,8 @@
 use anyhow::{bail, Context};
 use aptos_transaction_simulation::InMemoryStateStore;
 use aptos_types::{
+    block_metadata::BlockMetadata,
+    block_metadata_ext::BlockMetadataExt,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
         PersistedAuxiliaryInfo, SignedTransaction, Transaction, TransactionBlock,
@@ -16,22 +18,28 @@ use aptos_types::{
 };
 use std::{collections::HashMap, path::Path as FsPath, sync::Arc};
 
-/// Everything needed to benchmark a single entry-function transaction on both VMs.
-pub struct BenchmarkInput {
-    /// On-chain version of the transaction (for reporting).
-    pub version: Version,
-    /// The transaction to replay.
-    pub txn: SignedTransaction,
-    /// The transaction's on-chain auxiliary info (its index in the block).
-    pub aux_info: PersistedAuxiliaryInfo,
-    /// The state the transaction executes against.
-    pub state: Arc<InMemoryStateStore>,
+/// The transaction kinds the benchmark replays.
+pub enum BenchmarkTxn {
+    /// An entry-function user transaction.
+    User(SignedTransaction),
+    BlockMetadata(BlockMetadata),
+    BlockMetadataExt(BlockMetadataExt),
 }
 
-impl BenchmarkInput {
-    /// The entry function's `module::function<type args>`, for reporting.
-    pub fn function_label(&self) -> String {
-        match self.txn.executable_ref() {
+impl BenchmarkTxn {
+    /// The `Transaction` this replays, for the legacy VM's block-level API.
+    pub fn to_transaction(&self) -> Transaction {
+        match self {
+            BenchmarkTxn::User(txn) => Transaction::UserTransaction(txn.clone()),
+            BenchmarkTxn::BlockMetadata(bm) => Transaction::BlockMetadata(bm.clone()),
+            BenchmarkTxn::BlockMetadataExt(bme) => Transaction::BlockMetadataExt(bme.clone()),
+        }
+    }
+
+    /// What the transaction runs, for reporting: the entry function's
+    /// `module::function<type args>`, or the block-metadata kind.
+    pub fn label(&self) -> String {
+        let entry_label = |txn: &SignedTransaction| match txn.executable_ref() {
             Ok(TransactionExecutableRef::EntryFunction(entry)) => {
                 let mut label = format!(
                     "{}::{}",
@@ -50,7 +58,36 @@ impl BenchmarkInput {
                 label
             },
             _ => "<not an entry function>".to_string(),
+        };
+        match self {
+            BenchmarkTxn::User(txn) => entry_label(txn),
+            BenchmarkTxn::BlockMetadata(_) => "block_metadata".to_string(),
+            BenchmarkTxn::BlockMetadataExt(bme) => match bme {
+                BlockMetadataExt::V0(_) => "block_metadata_ext_v0".to_string(),
+                BlockMetadataExt::V1(_) => "block_metadata_ext_v1".to_string(),
+                BlockMetadataExt::V2(_) => "block_metadata_ext_v2".to_string(),
+                BlockMetadataExt::V3(_) => "block_metadata_ext_v3".to_string(),
+            },
         }
+    }
+}
+
+/// Everything needed to benchmark a single transaction on both VMs.
+pub struct BenchmarkInput {
+    /// On-chain version of the transaction (for reporting).
+    pub version: Version,
+    /// The transaction to replay.
+    pub txn: BenchmarkTxn,
+    /// The transaction's on-chain auxiliary info (its index in the block).
+    pub aux_info: PersistedAuxiliaryInfo,
+    /// The state the transaction executes against.
+    pub state: Arc<InMemoryStateStore>,
+}
+
+impl BenchmarkInput {
+    /// What the transaction runs, for reporting.
+    pub fn function_label(&self) -> String {
+        self.txn.label()
     }
 }
 
@@ -70,8 +107,8 @@ pub fn load_read_sets(
     bcs::from_bytes(&bytes).context("Failed to decode read-sets")
 }
 
-/// Loads both files and produces one [`BenchmarkInput`] per entry-function user transaction found,
-/// pairing each block with its read-set by index.
+/// Loads both files and produces one [`BenchmarkInput`] per replayable transaction found
+/// (see [`BenchmarkTxn`]), pairing each block with its read-set by index.
 pub fn load_inputs(
     transactions_file: impl AsRef<FsPath>,
     inputs_file: impl AsRef<FsPath>,
@@ -94,7 +131,7 @@ pub fn load_inputs(
         let state = Arc::new(state);
         let mut version = block.begin_version;
         for (i, txn) in block.transactions.iter().enumerate() {
-            if let Some(txn) = as_entry_function_transaction(txn) {
+            if let Some(txn) = as_benchmark_transaction(txn) {
                 let aux_info = block
                     .persisted_auxiliary_infos
                     .get(i)
@@ -148,17 +185,22 @@ pub fn load_inputs_from_dir(dir: impl AsRef<FsPath>) -> anyhow::Result<Vec<Bench
     Ok(inputs)
 }
 
-/// If `txn` is an entry-function user transaction, returns it. Both executors
-/// derive everything else (signers, gas, session identity) from the
+/// The benchmark form of `txn`, if it is a kind the benchmark replays:
+/// entry-function user transactions and block-metadata transactions. Both
+/// executors derive everything else (signers, gas, session identity) from the
 /// transaction themselves.
-fn as_entry_function_transaction(txn: &Transaction) -> Option<SignedTransaction> {
-    let signed = match txn {
-        Transaction::UserTransaction(signed) => signed,
-        _ => return None,
-    };
-    matches!(
-        signed.executable_ref(),
-        Ok(TransactionExecutableRef::EntryFunction(_))
-    )
-    .then(|| signed.clone())
+fn as_benchmark_transaction(txn: &Transaction) -> Option<BenchmarkTxn> {
+    match txn {
+        Transaction::UserTransaction(signed) => matches!(
+            signed.executable_ref(),
+            Ok(TransactionExecutableRef::EntryFunction(_))
+        )
+        .then(|| BenchmarkTxn::User(signed.clone())),
+        Transaction::BlockMetadata(bm) => Some(BenchmarkTxn::BlockMetadata(bm.clone())),
+        Transaction::BlockMetadataExt(bme) => Some(BenchmarkTxn::BlockMetadataExt(bme.clone())),
+        Transaction::GenesisTransaction(_)
+        | Transaction::StateCheckpoint(_)
+        | Transaction::ValidatorTransaction(_)
+        | Transaction::BlockEpilogue(_) => None,
+    }
 }

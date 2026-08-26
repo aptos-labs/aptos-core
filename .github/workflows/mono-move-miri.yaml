@@ -1,0 +1,79 @@
+name: "mono-move-miri"
+
+# Runs the MonoMove test suites under Miri, via scripts/miri.sh so that CI and
+# local runs share one definition of each pass.
+#
+# Advisory, not a required check: a path-filtered workflow that gets skipped
+# leaves a required check pending and the PR never becomes mergeable. To make it
+# required, drop the path filter and gate the expensive jobs with a job-level
+# `if` behind an always-present aggregate job.
+#
+# Known gap: mono-move depends on crates outside these paths (`aptos-types`,
+# `move-core-types`, ...), so changes there do not trigger this workflow.
+on:
+  # `pull_request`, never `pull_request_target`: this runs untrusted PR code on
+  # a self-hosted runner, and `pull_request_target` would hand that code a
+  # writable token in the base-repo context.
+  pull_request:
+    types: [labeled, opened, synchronize, reopened]
+    paths:
+      - "third_party/move/mono-move/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".cargo/config.toml"
+      - ".github/workflows/mono-move-miri.yaml"
+  workflow_dispatch:
+
+concurrency:
+  group: mono-move-miri-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  miri:
+    # Dispatch, or a same-repo (non-fork) PR carrying the `mono-move` label.
+    if: |
+      github.event_name != 'pull_request' ||
+      (
+        contains(github.event.pull_request.labels.*.name, 'mono-move') &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      )
+    runs-on: runs-on,cpu=16,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        # PRs run only `stacked` (Stacked Borrows + strict provenance); a manual
+        # run adds `concurrency` and `tree`. Separate jobs: each multiplies the
+        # suite by its own factor, so composing them composes their costs.
+        pass: ${{ (github.event_name == 'pull_request' && fromJSON('["stacked"]')) || fromJSON('["stacked","concurrency","tree"]') }}
+    env:
+      # Miri's isolation hides the environment from the test binary, so the
+      # runner forwards this with -Zmiri-env-forward; set without forwarding,
+      # it is silently ignored. Property tests dominate wall clock, so raise
+      # this carefully.
+      PROPTEST_CASES: ${{ github.event_name == 'pull_request' && '1' || '4' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Deliberately NOT the shared rust-setup action: it installs the stable
+      # toolchain named by rust-toolchain.toml, and Miri is nightly-only.
+      - name: Cache cargo and target
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # pin@v2.9.1
+        with:
+          key: mono-move-miri-${{ matrix.pass }}
+
+      - name: Install the pinned nightly and build the Miri sysroot
+        run: third_party/move/mono-move/scripts/miri.sh setup
+
+      - name: "Run Miri pass ${{ matrix.pass }}"
+        # The same entry point developers run locally, so CI and local results
+        # cannot diverge. UPBL is never set: baseline updates write to the
+        # filesystem and must not happen in a Miri job.
+        run: third_party/move/mono-move/scripts/miri.sh ${{ matrix.pass }}

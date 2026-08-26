@@ -1,0 +1,12 @@
+processed 6 tasks
+task 0 lines 1-34:  publish [import Move]
+task 1 lines 36-36:  run 0x0::LeanerCalls::composed --args 7u64
+return values: 15
+task 2 lines 38-38:  run 0x0::LeanerCalls::bound_call --args 7u64
+return values: 16
+task 3 lines 40-40:  run 0x0::LeanerCalls::sum_down --args 5u64
+return values: 15
+task 4 lines 42-42:  run 0x0::LeanerCalls::even_flag --args 6u64
+return values: 1
+task 5 lines 44-44:  run 0x0::LeanerCalls::even_flag --args 7u64
+return values: 0

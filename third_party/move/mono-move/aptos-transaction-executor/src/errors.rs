@@ -34,6 +34,8 @@ impl MaterializationError {
 pub enum DiscardReason {
     /// A transaction shape this executor does not support yet.
     Unsupported(&'static str),
+    /// A pre-execution check failed.
+    PreExecutionCheck(PreExecutionCheckFailure),
     /// A type argument failed to resolve.
     InvalidTypeArgument(String),
     Failure {
@@ -42,6 +44,33 @@ pub enum DiscardReason {
     },
     /// An executor-internal invariant violation.
     InvariantViolation(String),
+}
+
+/// A system transaction failed. System code is expected to always succeed, and
+/// if it fails, it means there is a bug in the executor or the framework.
+///
+/// When this happens, the block executor has no choice but to abort the whole block.
+#[derive(Debug)]
+pub struct SystemTxnFailure {
+    /// The framework call that failed.
+    pub call: &'static str,
+    pub failure: MoveExecutionFailure,
+}
+
+/// The pre-execution bound a transaction violated. Sizes are in bytes, gas in
+/// gas units, prices in octas per gas unit.
+#[derive(Debug, Error)]
+pub enum PreExecutionCheckFailure {
+    #[error("transaction size {size} exceeds the maximum {max}")]
+    TransactionTooLarge { size: u64, max: u64 },
+    #[error("max gas amount {max_gas} exceeds the bound {bound}")]
+    GasBudgetAboveBound { max_gas: u64, bound: u64 },
+    #[error("max gas amount {max_gas} is below the transaction's base cost {min}")]
+    GasBudgetBelowIntrinsicCost { max_gas: u64, min: u64 },
+    #[error("gas unit price {price} is below the minimum {min}")]
+    GasPriceBelowMinimum { price: u64, min: u64 },
+    #[error("gas unit price {price} is above the maximum {max}")]
+    GasPriceAboveMaximum { price: u64, max: u64 },
 }
 
 /// Which Move call the transaction was in when it failed.

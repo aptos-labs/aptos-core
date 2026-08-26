@@ -13,8 +13,8 @@ The implementation reuses archive replay and output verification, but it does
 not reuse the existing Move bytecode coverage file format. Instead, the VM
 exposes a low-overhead function-call observer. Replay workers aggregate
 observations into deterministic JSON range shards, and a manually triggered
-GitHub Actions workflow merges those shards into a machine-readable JSON report
-and a zero-inclusive CSV inventory.
+GitHub Actions workflow merges those shards into a canonical machine-readable
+JSON report and a self-contained HTML view.
 
 The first implementation requires sequential execution inside each replayed
 transaction block. Replay ranges can still run concurrently, as they do today.
@@ -310,6 +310,14 @@ first_version: u64
 last_version: u64
 ```
 
+Per-function totals are complete. Caller identities are transaction-controlled,
+so detailed immediate-call paths use a global row limit. Root entry attribution
+is collected separately with a row limit per callee; this prevents high-cardinality
+traffic to one popular function from hiding which entry function reached an
+otherwise rare framework function. Reports expose both limits and all dropped
+counts. The HTML distinguishes an unobserved function from an observed function
+whose detailed attribution was truncated.
+
 Type arguments are not part of the key. They would create high cardinality and
 are not needed to decide whether a generic function is used.
 
@@ -321,7 +329,8 @@ Each shard contains:
 - ledger timestamps for the first and last version in the range
 - the target module list and complete function inventory
 - processed ledger transaction and user-transaction usage record counts
-- exact per-function and per-call-path aggregates
+- exact per-function aggregates, bounded per-function root-entry attribution,
+  and bounded immediate-call-path aggregates
 
 Each shard is named deterministically by its exact range. Retrying a range
 overwrites its previous object, preventing retry double-counting.
@@ -406,8 +415,6 @@ Inputs mirror replay verify:
 - `IMAGE_TAG`
 - `START_VERSION` and `END_VERSION`
 - `START_TIME` and `END_TIME`
-- `RESULTS_BUCKET`
-- `REPORT_BUCKET`
 - `DRY_RUN`
 
 Version and time inputs remain mutually exclusive. UTC times are resolved to
@@ -415,13 +422,13 @@ versions before tasks are created, and the resolved range is included in the
 manifest.
 
 The replay scheduler is extended with a framework-usage worker mode while
-retaining the same archive snapshot provisioning and cleanup behavior. For
-ranges of up to 10,000 transactions, completed workers delimit their report in
-the existing Kubernetes pod logs and the scheduler extracts and validates it.
-Larger runs require `RESULTS_BUCKET`; workers then write result shards to a
-run-specific object-storage prefix. Object names use the requested range and
-workflow run identity. The worker must successfully upload the shard before
-its Kubernetes job is considered successful.
+retaining the same archive snapshot provisioning and cleanup behavior. The CI
+workflow writes result shards to a run-specific prefix in the fixed
+`aptos-framework-usage-reports` bucket. Before scheduling workers, it requires
+that the bucket enforce public access prevention and uniform bucket-level
+access. Object names use the requested range and workflow run identity. The
+worker must successfully upload the shard before its Kubernetes job is
+considered successful.
 
 After every task succeeds, the GitHub runner downloads and merges the shards.
 The merge step rejects:
@@ -432,33 +439,35 @@ The merge step rejects:
 - unexplained gaps
 - failed replay verification
 
-The final GitHub Actions artifact contains:
+The final private report contains:
 
 - `framework-usage.html`: self-contained interactive deprecation evidence view
-- `framework-usage-summary.csv`: one row per framework function, including zero
-  counts
-- `framework-usage-callers.csv`: immediate and root contract caller breakdown
-- `framework-usage.json`: complete per-function and immediate/root caller
-  aggregates plus run metadata
+- `framework-usage.json`: complete per-function totals, bounded root-entry and
+  immediate-caller aggregates, truncation metadata, and run metadata; this is
+  the canonical machine-readable report
 
-When `REPORT_BUCKET` is set, the workflow also publishes the self-contained
-HTML under a path unique to the workflow run and retry attempt. The Actions job
-summary links directly to that rendered report and shows its resolved UTC time
-range, ledger-version range, and processed transaction count. The bucket grants
-CI object-creation access and public object-read access; raw JSON and CSV files
-remain available only through the Actions artifact.
+The workflow publishes both the self-contained HTML and merged JSON under a
+path unique to the workflow run and retry attempt on the private GitHub Pages
+site in `aptos-labs/aptos-core-private`, using its `gh-pages` branch. The Actions
+job summary links directly to both reports and shows its resolved UTC time
+range, ledger-version range, and processed transaction count. Access to the
+rendered report follows the private repository's GitHub access controls. The
+repository and branch are fixed in the workflow rather than dispatch inputs.
+Each publication also updates stable `framework-usage/<network>/index.html` and
+`framework-usage/<network>/framework-usage.json` URLs. The merged JSON records
+its UTC generation timestamp, which the HTML displays in its header.
 
-When a result bucket is used, it should have a lifecycle policy. CI cleanup
-always removes pods and temporary PVCs, while completed workflow artifacts
-remain available for the configured retention period.
+The result bucket should have a lifecycle policy. CI cleanup always removes
+pods and temporary PVCs, and final reports remain available through the private
+Pages site.
 
 ## Report Interpretation
 
-The CSV provides exact total invocation and distinct-transaction counts for
-each current bundled function, including zero rows. The JSON additionally
-separates successful and aborted outcomes and retains immediate and root caller
-paths. A zero-count function is a deprecation candidate, not an automatic
-removal candidate. A review must additionally consider:
+The JSON provides exact invocation and distinct-transaction counts, separates
+successful and aborted outcomes, and retains immediate and root caller paths.
+The HTML derives its deprecation view from that canonical data. A zero-count
+function is a deprecation candidate, not an automatic removal candidate. A
+review must additionally consider:
 
 - static references from published bytecode
 - public API and bytecode compatibility rules

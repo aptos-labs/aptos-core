@@ -16,6 +16,7 @@ use crate::{
     validate::TranslationWitness,
 };
 use mono_move_core::{
+    abilities::{module_nominal_lookup, AbilityCalculator, AbilityError},
     convert_mut_to_immut_ref, strip_ref,
     types::{self as ty, view_type, view_type_list, InternedType, InternedTypeList, Type},
     ExecutionErrorKind, IntTy, Interner, IntoExecutionError, PreparedModule, VMInternalError,
@@ -24,12 +25,14 @@ use mono_move_core::{
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
-        Bytecode, CodeOffset, FieldHandleIndex, FieldInstantiationIndex, FunctionHandleIndex,
-        FunctionInstantiationIndex, StructDefInstantiationIndex, StructDefinitionIndex,
-        StructFieldInformation, StructVariantInstantiationIndex, VariantFieldHandleIndex,
-        VariantFieldInstantiationIndex, VariantIndex,
+        Bytecode, CodeOffset, FieldHandleIndex, FieldInstantiationIndex, FunctionAttribute,
+        FunctionHandle, FunctionHandleIndex, FunctionInstantiationIndex,
+        StructDefInstantiationIndex, StructDefinitionIndex, StructFieldInformation,
+        StructVariantInstantiationIndex, VariantFieldHandleIndex, VariantFieldInstantiationIndex,
+        VariantIndex,
     },
 };
+use move_core_types::{ability::AbilitySet, function::ClosureMask};
 use shared_dsa::{Entry, UnorderedMap};
 use std::ops::Range;
 use thiserror::Error;
@@ -48,6 +51,15 @@ enum SsaConversionError {
 
     #[error("ValueId {value_id} out of range")]
     ValueIdOutOfRange { value_id: u16 },
+
+    #[error("closure mask captures parameter {max_captured} of a {num_params}-parameter function")]
+    ClosureMaskOutOfRange {
+        max_captured: usize,
+        num_params: usize,
+    },
+
+    #[error("closure captured value abilities: {0}")]
+    CapturedAbilities(#[from] AbilityError),
 
     #[error("expected a ValueId slot on the operand stack")]
     ExpectedValueIdOnStack,
@@ -88,8 +100,10 @@ impl IntoExecutionError for SsaConversionError {
             | ExpectedEnumType
             | ClosureSignatureEmpty
             | ClosureSignatureNotFunction
+            | ClosureMaskOutOfRange { .. }
             | ExpectedReferenceType
             | ExpectedMutableReference => ExecutionErrorKind::InvariantViolation,
+            CapturedAbilities(err) => err.kind(),
         }
     }
 }
@@ -145,6 +159,9 @@ pub(crate) struct SsaConverter<'a, I: Interner> {
     local_types: Vec<InternedType>,
     /// Types of value IDs, indexed directly by value ID number.
     value_id_types: Vec<InternedType>,
+    /// Ability constraints on the enclosing function's type parameters, indexed
+    /// by [`Type::TypeParam`]'s `idx`.
+    ty_param_constraints: &'a [AbilitySet],
     /// Interner for composite type construction.
     interner: &'a I,
     /// Completed basic blocks.
@@ -162,12 +179,17 @@ pub(crate) struct SsaConverter<'a, I: Interner> {
 }
 
 impl<'a, I: Interner> SsaConverter<'a, I> {
-    pub(crate) fn new(local_types: Vec<InternedType>, interner: &'a I) -> Self {
+    pub(crate) fn new(
+        local_types: Vec<InternedType>,
+        ty_param_constraints: &'a [AbilitySet],
+        interner: &'a I,
+    ) -> Self {
         Self {
             next_value_id: 0,
             stack: Vec::new(),
             local_types,
             value_id_types: Vec::new(),
+            ty_param_constraints,
             interner,
             blocks: Vec::new(),
             current_block_instrs: InstrSeq::new(),
@@ -193,6 +215,67 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             .ok_or(SsaConversionError::TooManySsaValues)?;
         self.value_id_types.push(ty);
         Ok(value_id)
+    }
+
+    /// Interned type of the value produced by `PackClosure`: the callee's
+    /// non-captured parameters (what a caller must still supply), its
+    /// returns, and the closure's own abilities.
+    ///
+    /// The abilities begin as the callee's: copy and drop, plus store when the
+    /// function is persistent. That set is intersected with the abilities of
+    /// every captured value.
+    ///
+    /// `params` must already be instantiated at the call site's type
+    /// arguments, if any.
+    ///
+    /// Note: we should not share this derivation with code that validates its
+    /// result.
+    fn closure_type(
+        &self,
+        module: &PreparedModule,
+        handle: &FunctionHandle,
+        params: &[InternedType],
+        returns: InternedTypeList,
+        mask: ClosureMask,
+        captured: &[SsaSlot],
+    ) -> VMResult<InternedType> {
+        if let Some(max_captured) = mask.max_captured()
+            && max_captured >= params.len()
+        {
+            return Err(VMInternalError::new(
+                SsaConversionError::ClosureMaskOutOfRange {
+                    max_captured,
+                    num_params: params.len(),
+                },
+            ));
+        }
+        let not_captured = params
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, ty)| (!mask.is_captured(idx)).then_some(*ty))
+            .collect::<Vec<_>>();
+        let not_captured = self.interner.type_list_of(&not_captured);
+
+        let mut abilities = if handle.attributes.contains(&FunctionAttribute::Persistent) {
+            AbilitySet::PUBLIC_FUNCTIONS
+        } else {
+            AbilitySet::PRIVATE_FUNCTIONS
+        };
+        // TODO(perf): both bindings are fixed for the whole conversion, so this
+        // could be hoisted to `convert_bytecode` and threaded down, letting the
+        // memo survive across closures. Needs a `&mut` parameter rather than a
+        // field, since `closure_type` borrows `self` for `value_id_type`.
+        let mut calculator =
+            AbilityCalculator::new(module_nominal_lookup(module), self.ty_param_constraints);
+        for slot in captured {
+            let captured_ty = self.value_id_type(*slot)?;
+            let captured_abilities = calculator
+                .abilities_of(captured_ty)
+                .map_err(SsaConversionError::CapturedAbilities)?;
+            abilities = abilities.intersect(captured_abilities);
+        }
+
+        Ok(self.interner.function_of(not_captured, returns, abilities))
     }
 
     fn push_slot(&mut self, r: SsaSlot) {
@@ -1021,17 +1104,15 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let captured_count = mask.captured_count() as usize;
                 let captured = self.pop_n_reverse(captured_count)?;
                 let handle = module.function_handle_at(*fhi);
-                let params = self
-                    .interner
-                    .type_list_of(module.interned_types_at(handle.parameters));
-                let returns = self
-                    .interner
-                    .type_list_of(module.interned_types_at(handle.return_));
-                let ty = self.interner.function_of(
-                    params,
-                    returns,
-                    move_core_types::ability::AbilitySet::EMPTY,
-                );
+                let signature = module.function_signature_at(*fhi);
+                let ty = self.closure_type(
+                    module,
+                    handle,
+                    ty::view_type_list(signature.params),
+                    signature.returns,
+                    *mask,
+                    &captured,
+                )?;
                 let dst = self.alloc_value_id(ty)?;
                 self.emit(Instr::PackClosure {
                     data: Box::new(PackClosureData {
@@ -1047,28 +1128,24 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             B::PackClosureGeneric(fii, mask) => {
                 let captured_count = mask.captured_count() as usize;
                 let captured = self.pop_n_reverse(captured_count)?;
-                let (handle_idx, ty_args) = self.fun_inst_parts(module, *fii);
+                let handle_idx = module.function_instantiation_at(*fii).handle;
                 let handle = module.function_handle_at(handle_idx);
-                let params = self
-                    .interner
-                    .type_list_of(module.interned_types_at(handle.parameters));
-                let returns = self
-                    .interner
-                    .type_list_of(module.interned_types_at(handle.return_));
-
-                let params = self.interner.subst_type_list(params, ty_args)?;
-                let returns = self.interner.subst_type_list(returns, ty_args)?;
-                let ty = self.interner.function_of(
-                    params,
-                    returns,
-                    move_core_types::ability::AbilitySet::EMPTY,
-                );
+                // Already substituted under the instantiation's type arguments.
+                let signature = module.function_instantiation_signature_at(*fii);
+                let ty = self.closure_type(
+                    module,
+                    handle,
+                    ty::view_type_list(signature.params),
+                    signature.returns,
+                    *mask,
+                    &captured,
+                )?;
                 let dst = self.alloc_value_id(ty)?;
                 self.emit(Instr::PackClosure {
                     data: Box::new(PackClosureData {
                         dst,
                         function_handle: handle_idx,
-                        ty_args,
+                        ty_args: signature.ty_args,
                         mask: *mask,
                         captured,
                     }),

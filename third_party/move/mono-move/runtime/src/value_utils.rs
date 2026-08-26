@@ -192,10 +192,8 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
             unsafe { serialize_impl(layouts, obj_ptr.add(ENUM_DATA_OFFSET), variant_layout, out)? };
             Ok(())
         },
-        LayoutKind::Function => {
-            // TODO(completeness): function values are not yet supported.
-            todo!("function values are not yet supported");
-        },
+        // TODO(completeness): function values are not yet supported.
+        LayoutKind::Function => Err(VMInternalError::new(function_values_unsupported())),
         LayoutKind::Ref => Err(VMInternalError::new(unreachable(
             "References cannot be serialized",
         ))),
@@ -355,10 +353,8 @@ unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
                 )
             }
         },
-        LayoutKind::Function => {
-            // TODO(completeness): function values are not yet supported.
-            todo!("function values are not yet supported");
-        },
+        // TODO(completeness): function values are not yet supported.
+        LayoutKind::Function => Err(VMInternalError::new(function_values_unsupported())),
         LayoutKind::Ref => Err(VMInternalError::new(unreachable(
             "Equality runs on pointee types only",
         ))),
@@ -558,10 +554,8 @@ unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
                 )
             }
         },
-        LayoutKind::Function => {
-            // TODO(completeness): function values are not yet supported.
-            todo!("function values are not yet supported");
-        },
+        // TODO(completeness): function values are not yet supported.
+        LayoutKind::Function => Err(VMInternalError::new(function_values_unsupported())),
         LayoutKind::Ref => Err(VMInternalError::new(unreachable(
             "Comparison runs on pointee types only",
         ))),
@@ -585,8 +579,8 @@ unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
 ///
 /// # Safety
 ///
-/// `dst` pointer must be writable for the in-memory size of the given type and
-/// outlive the call.
+/// `dst` must be writable for the in-memory size of the given type, meet the
+/// type's alignment, and outlive the call.
 pub unsafe fn deserialize<T: LayoutProvider + ?Sized>(
     layouts: &T,
     heap: &mut Heap,
@@ -595,6 +589,10 @@ pub unsafe fn deserialize<T: LayoutProvider + ?Sized>(
     dst: *mut u8,
 ) -> AllocationResult<()> {
     let layout = layouts.layout_by_ty(ty).ok_or_else(layout_not_found)?;
+    debug_assert!(
+        dst.addr().is_multiple_of(layout.align as usize),
+        "deserialize destination must meet the type's alignment"
+    );
 
     let mut cursor = 0usize;
     // SAFETY: caller must enforce the safety precondition.
@@ -804,10 +802,8 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
             unsafe { write_ptr(dst, 0usize, obj_ptr) };
             Ok(())
         },
-        LayoutKind::Function => {
-            // TODO(completeness): function values are not yet supported.
-            todo!("function values are not yet supported");
-        },
+        // TODO(completeness): function values are not yet supported.
+        LayoutKind::Function => Err(function_values_unsupported().into()),
         LayoutKind::Ref => Err(unreachable("References cannot be deserialized").into()),
     }
 }
@@ -913,6 +909,13 @@ fn unreachable(message: &str) -> RuntimeError {
     RuntimeError::InvariantViolation(RuntimeInvariantViolation::Unreachable(message.to_string()))
 }
 
+/// Function values are a valid Move feature that the value walks do not support
+/// yet. Surfaced as an error (never a panic) so callers can classify it as an
+/// unsupported construct instead of aborting.
+fn function_values_unsupported() -> RuntimeError {
+    RuntimeError::Unsupported("function values are not yet supported")
+}
+
 /// Invariant violation when an enum tag does not name a variant, whether read
 /// from an in-memory value or decoded from BCS. A well-formed enum's tag is
 /// always in range, so an out-of-range tag signals corruption, not a legitimate
@@ -922,6 +925,50 @@ fn enum_tag_out_of_range(tag: u64, variant_count: usize) -> RuntimeError {
         tag,
         variant_count,
     })
+}
+
+// `#[repr(align(N))]` needs a literal, so `AlignedBuf` uses `u64` backing to
+// get `MAX_ALIGN`.
+//
+// TODO(cleanup, testing): `MemoryRegion` is already `MAX_ALIGN`-aligned by
+// construction and could replace this helper.
+#[cfg(test)]
+const _: () = assert!(
+    std::mem::align_of::<u64>() >= mono_move_core::MAX_ALIGN,
+    "u64 no longer covers MAX_ALIGN"
+);
+
+/// A `MAX_ALIGN`-aligned byte buffer.
+///
+/// `vec![0u8; n]` is only byte-aligned, but the (de)serializers write pointer
+/// and integer fields as aligned 8-byte stores.
+#[cfg(test)]
+struct AlignedBuf {
+    words: Vec<u64>,
+    len: usize,
+}
+
+#[cfg(test)]
+impl AlignedBuf {
+    fn zeroed(len: usize) -> Self {
+        Self {
+            words: vec![0u64; len.div_ceil(std::mem::size_of::<u64>())],
+            len,
+        }
+    }
+
+    fn as_mut_ptr(&mut self) -> *mut u8 {
+        self.words.as_mut_ptr().cast()
+    }
+
+    fn as_ptr(&self) -> *const u8 {
+        self.words.as_ptr().cast()
+    }
+
+    fn as_slice(&self) -> &[u8] {
+        // SAFETY: `zeroed` allocated and initialized at least `len` bytes.
+        unsafe { std::slice::from_raw_parts(self.as_ptr(), self.len) }
+    }
 }
 
 #[cfg(test)]
@@ -1334,7 +1381,7 @@ mod tests {
             // Round-trip through the packed bytes, not `dst` directly: the
             // field walk leaves padding bytes in `dst` untouched.
             let mut heap = Heap::new(128);
-            let mut dst = vec![0u8; size];
+            let mut dst = AlignedBuf::zeroed(size);
             let mut cursor = 0;
             unsafe {
                 deserialize_impl(
@@ -1539,10 +1586,10 @@ mod tests {
         let layout = table.layout(id).unwrap();
         let mut heap = Heap::new(8192);
         // Each buffer holds the deserialized value; its boxes live in `heap`.
-        let mut bufs: Vec<Vec<u8>> = Vec::with_capacity(values.len());
+        let mut bufs: Vec<AlignedBuf> = Vec::with_capacity(values.len());
         for v in values {
             let bytes = bcs::to_bytes(v).unwrap();
-            let mut dst = vec![0u8; size];
+            let mut dst = AlignedBuf::zeroed(size);
             let mut cursor = 0;
             unsafe {
                 deserialize_impl(
@@ -1575,6 +1622,19 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    #[should_panic(expected = "must meet the type's alignment")]
+    fn deserialize_rejects_unaligned_destination() {
+        let mut table = ValueLayoutTable::new();
+        // A vector is stored as an 8-byte heap pointer, so alignment 8.
+        table.push(U64_TY, vector_layout(U64_LAYOUT_ID));
+        let mut heap = Heap::new(128);
+        let mut buf = AlignedBuf::zeroed(16);
+        // SAFETY: the precondition check panics before any access through `dst`.
+        let unaligned = unsafe { buf.as_mut_ptr().add(1) };
+        let _ = unsafe { deserialize(&table, &mut heap, U64_TY, &[], unaligned) };
     }
 
     #[test]
@@ -1854,7 +1914,7 @@ mod prop_tests {
                     );
 
                     // Deserialize reproduces the value's in-memory bytes.
-                    let mut dst = vec![0u8; size];
+                    let mut dst = AlignedBuf::zeroed(size);
                     unsafe {
                         deserialize(&table, &mut heap, $ty, &bytes, dst.as_mut_ptr()).unwrap()
                     };

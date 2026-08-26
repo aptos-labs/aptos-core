@@ -1,7 +1,6 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::metadata::TxnMetadata;
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
 use mono_move_core::{
     native::{NativeExtensions, NativeName},
@@ -39,18 +38,14 @@ pub fn production_natives(guard: &ExecutionGuard<'_>) -> ProductionNativeRegistr
     natives
 }
 
-/// The native extensions a user transaction runs with.
-pub(crate) fn transaction_extensions(
-    txn_data: &TxnMetadata,
+/// The native extensions every transaction kind runs with, around its own
+/// transaction-context extension.
+pub(crate) fn extensions_with(
+    txn_context: TransactionContextExtension,
     usage: StateStorageUsage,
 ) -> NativeExtensions {
     let mut extensions = NativeExtensions::new();
-    extensions.add(TransactionContextExtension::new(
-        txn_data.txn_hash,
-        txn_data.chain_id,
-        txn_data.session_counter,
-        txn_data.transaction_index,
-    ));
+    extensions.add(txn_context);
     extensions.add(ObjectContextExtension::new());
     extensions.add(StorageUsageAtEpochBoundary::new(
         usage.items() as u64,

@@ -1,0 +1,4 @@
+processed 2 tasks
+task 0 lines 1-21:  publish [import Move]
+task 1 lines 23-23:  run 0x0::LeanerBorrowPermissiveUnused::run
+return values: 5

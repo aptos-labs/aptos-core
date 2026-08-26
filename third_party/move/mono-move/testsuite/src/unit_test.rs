@@ -185,7 +185,8 @@ fn execute(
         natives,
         function,
     )
-    .with_extensions(seed_extensions());
+    // For Move unit tests, there is no user transaction context.
+    .with_extensions(seed_extensions(false));
 
     // Reference arguments point into this storage, so it must outlive `run()`.
     let _ref_args = marshal_args(&mut interpreter, function, &test.arguments);
@@ -367,6 +368,8 @@ fn classify_runtime_error(err: &RuntimeError) -> TestResult {
         | RuntimeError::VecAllocSizeOverflow
         | RuntimeError::AbortMessageTooLong { .. }
         | RuntimeError::StateKeyTypeTooDeep => TestResult::RuntimeFailure(err.to_string()),
+
+        RuntimeError::Unsupported(_) => TestResult::Unsupported(err.to_string()),
 
         // Genuine problems: infrastructure failure, or a VM bug.
         RuntimeError::InvariantViolation(_) | RuntimeError::ResourceProvider(_) => {

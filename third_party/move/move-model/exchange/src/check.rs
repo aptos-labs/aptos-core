@@ -54,7 +54,18 @@ impl SpecSort {
     pub fn of(ty: &Type) -> SpecSort {
         match ty {
             Type::Bool => SpecSort::Bool,
-            Type::U64 => SpecSort::Num,
+            Type::U8
+            | Type::U16
+            | Type::U32
+            | Type::U64
+            | Type::U128
+            | Type::U256
+            | Type::I8
+            | Type::I16
+            | Type::I32
+            | Type::I64
+            | Type::I128
+            | Type::I256 => SpecSort::Num,
             Type::Address | Type::Signer => SpecSort::Address,
             Type::TypeParameter(i) => SpecSort::TypeParameter(*i),
             Type::Struct(r) => SpecSort::Struct(*r),
@@ -119,7 +130,7 @@ impl SpecCheckCtx<'_> {
     fn value_sort(value: &Value) -> Result<SpecSort, String> {
         match value {
             Value::Bool(_) => Ok(SpecSort::Bool),
-            Value::U64(_) => Ok(SpecSort::Num),
+            Value::Num(_) => Ok(SpecSort::Num),
             Value::Address(_) => Ok(SpecSort::Address),
             Value::Vector(values) => {
                 let Some(first) = values.first() else {
@@ -250,7 +261,7 @@ impl SpecCheckCtx<'_> {
                         expect(sr, SpecSort::Num, "right")?;
                         if !matches!(
                             r.as_ref(),
-                            SpecExp::Value(Value::U64(n)) if *n != 0
+                            SpecExp::Value(Value::Num(n)) if n != "0"
                         ) {
                             return Err(format!(
                                 "right operand of `{:?}` must be a statically nonzero literal",
@@ -547,7 +558,7 @@ mod tests {
         fun.spec.requires = vec![SpecExp::binop(
             SpecBinOp::Lt,
             SpecExp::Local(1),
-            SpecExp::Value(Value::U64(1)),
+            SpecExp::Value(Value::Num("1".to_string())),
         )];
         let err = check(&[], &locals, &[], &fun).unwrap_err();
         assert!(err.contains("not a parameter"), "{}", err);
@@ -566,7 +577,7 @@ mod tests {
         fun.spec.requires = vec![SpecExp::binop(
             SpecBinOp::Add,
             SpecExp::Local(0),
-            SpecExp::Value(Value::U64(1)),
+            SpecExp::Value(Value::Num("1".to_string())),
         )];
         let err = check(&[], &locals, &returns, &fun).unwrap_err();
         assert!(err.contains("must be a boolean condition"), "{}", err);
@@ -605,7 +616,7 @@ mod tests {
                 Type::U64,
                 SpecExp::binop(
                     SpecBinOp::Le,
-                    SpecExp::Value(Value::U64(0)),
+                    SpecExp::Value(Value::Num("0".to_string())),
                     SpecExp::Bvar(0),
                 ),
             ),
@@ -626,7 +637,7 @@ mod tests {
             invariants: vec![SpecExp::binop(
                 SpecBinOp::Lt,
                 SpecExp::Local(1),
-                SpecExp::Value(Value::U64(10)),
+                SpecExp::Value(Value::Num("10".to_string())),
             )],
         }];
         check(&structs, &locals, &returns, &fun).unwrap();
@@ -654,7 +665,7 @@ mod tests {
         fun.spec.requires = vec![SpecExp::binop(
             SpecBinOp::Eq,
             SpecExp::Local(0),
-            SpecExp::Value(Value::U64(0)),
+            SpecExp::Value(Value::Num("0".to_string())),
         )];
         let err = check(&[], &locals, &[], &fun).unwrap_err();
         assert!(err.contains("mutable-reference local"), "{}", err);
@@ -674,7 +685,7 @@ mod tests {
         fun.spec.ensures = vec![SpecExp::binop(
             SpecBinOp::Eq,
             SpecExp::Result(0),
-            SpecExp::Value(Value::U64(0)),
+            SpecExp::Value(Value::Num("0".to_string())),
         )];
         let err = check(&[], &[], &returns, &fun).unwrap_err();
         assert!(err.contains("mutable-reference result"), "{}", err);
@@ -688,7 +699,7 @@ mod tests {
         fun.spec.requires = vec![SpecExp::binop(
             SpecBinOp::Eq,
             SpecExp::binop(SpecBinOp::Div, SpecExp::Local(0), SpecExp::Local(1)),
-            SpecExp::Value(Value::U64(0)),
+            SpecExp::Value(Value::Num("0".to_string())),
         )];
         let err = check(&[], &locals, &[], &fun).unwrap_err();
         assert!(err.contains("statically nonzero literal"), "{}", err);
@@ -698,9 +709,9 @@ mod tests {
             SpecExp::binop(
                 SpecBinOp::Div,
                 SpecExp::Local(0),
-                SpecExp::Value(Value::U64(1)),
+                SpecExp::Value(Value::Num("1".to_string())),
             ),
-            SpecExp::Value(Value::U64(0)),
+            SpecExp::Value(Value::Num("0".to_string())),
         )];
         check(&[], &locals, &[], &fun).unwrap();
     }

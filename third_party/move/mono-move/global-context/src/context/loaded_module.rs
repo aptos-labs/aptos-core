@@ -5,13 +5,17 @@
 //! with the lowered monomorphic functions and generic function instantiations.
 
 use crate::context::ExecutionGuard;
+use anyhow::Result;
+use aptos_types::vm::module_metadata::get_metadata;
 use mono_move_alloc::{LeakedBoxPtr, VersionedLeakedBoxPtr};
 use mono_move_core::{
+    intern_struct_tag,
     interner::{InternedIdentifier, InternedModuleId},
-    types::InternedTypeList,
-    Function, FunctionDefinitionIndex, FunctionPtr,
+    types::{InternedType, InternedTypeList},
+    Function, FunctionDefinitionIndex, FunctionPtr, Interner,
 };
 use move_binary_format::access::ModuleAccess;
+use move_core_types::identifier::IdentStr;
 use parking_lot::Mutex;
 use shared_dsa::{Entry, UnorderedMap};
 use specializer::{FunctionIR, ModuleIR};
@@ -177,6 +181,11 @@ pub struct LoadedModule {
     // TODO(cleanup): revisit data structure used for actual monomorphized function storage.
     instantiated_functions:
         Mutex<UnorderedMap<(InternedIdentifier, InternedTypeList), FunctionSlot>>,
+    /// Maps the name of a group member defined in this module (a nominal type)
+    /// to its group container type (also a nominal type). Built once when the
+    /// module is loaded. If struct's or enum's name is not in the map, then it
+    /// is not a resource group member.
+    resource_group_members: UnorderedMap<InternedIdentifier, InternedType>,
 }
 
 impl LoadedModule {
@@ -184,7 +193,8 @@ impl LoadedModule {
         ir: ModuleIR,
         cost: u64,
         mandatory_dependencies: ModuleMandatoryDependencies,
-    ) -> Box<Self> {
+        interner: &impl Interner,
+    ) -> Result<Box<Self>> {
         let mut functions = UnorderedMap::with_capacity(ir.functions.len());
         let mut function_indices = UnorderedMap::with_capacity(ir.functions.len());
 
@@ -210,14 +220,41 @@ impl LoadedModule {
                 functions.insert(name, OnceLock::new());
             }
         }
-        Box::new(Self {
+        let resource_group_members = Self::build_resource_group_members(&ir, interner)?;
+        Ok(Box::new(Self {
             ir,
             cost,
             mandatory_dependencies,
             functions,
             function_indices,
             instantiated_functions: Mutex::new(UnorderedMap::new()),
-        })
+            resource_group_members,
+        }))
+    }
+
+    /// Builds the group-member map from this module's metadata:
+    ///
+    ///   - For each struct/enum carrying a `#[resource_group_member]`
+    ///     attribute, its interned name maps to the interned type of the
+    ///     group container it belongs to.
+    fn build_resource_group_members(
+        ir: &ModuleIR,
+        interner: &impl Interner,
+    ) -> Result<UnorderedMap<InternedIdentifier, InternedType>> {
+        let mut members = UnorderedMap::new();
+        if let Some(metadata) = get_metadata(&ir.module.metadata) {
+            for (struct_name, attributes) in &metadata.struct_attributes {
+                if let Some(group_tag) = attributes
+                    .iter()
+                    .find_map(|attr| attr.get_resource_group_member())
+                {
+                    let name = interner.identifier_of(IdentStr::new(struct_name)?);
+                    let container = intern_struct_tag(&group_tag, interner)?;
+                    members.insert(name, container);
+                }
+            }
+        }
+        Ok(members)
     }
 
     /// Returns the polymorphic stackless IR.
@@ -294,6 +331,13 @@ impl LoadedModule {
             Entry::Occupied(e) => e.get().function,
             Entry::Vacant(e) => e.insert(FunctionSlot::new(function, function_ms)).function,
         }
+    }
+
+    /// Returns the group container type the named struct or enum is a member
+    /// of, or [`None`] if it is not a resource-group member (it lives in its
+    /// own storage slot).
+    pub fn resource_group_of(&self, name: &InternedIdentifier) -> Option<InternedType> {
+        self.resource_group_members.get(name).copied()
     }
 }
 

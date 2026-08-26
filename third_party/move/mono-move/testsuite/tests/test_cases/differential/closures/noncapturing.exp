@@ -45,16 +45,16 @@ fun identity(l0: u64): u64
 fun call_double_twice(r0): u64 {
   slots: params(1), locals(1), temps(3)
     r0: u64
-    r1: |u64|u64
-    r2: |u64|u64
+    r1: |u64|u64 has copy + drop
+    r2: |u64|u64 has copy + drop
     r3: u64
     r4: u64
   code:
   L0:
     0: r1 := pack_closure double, 0, [] @0
     1: r2 := copy r1 @3
-    2: [r3] := call_closure [|u64|u64], [r0, r2] @4
-    3: [r4] := call_closure [|u64|u64], [r0, r1] @7
+    2: [r3] := call_closure [|u64|u64 has copy + drop], [r0, r2] @4
+    3: [r4] := call_closure [|u64|u64 has copy + drop], [r0, r1] @7
     4: r4 := add r3, r4 @8
     5: ret [r4] @9
 }
@@ -62,12 +62,12 @@ fun call_double_twice(r0): u64 {
 fun call_identity(r0): u64 {
   slots: params(1), locals(1), temps(1)
     r0: u64
-    r1: |u64|u64
+    r1: |u64|u64 has drop
     r2: u64
   code:
   L0:
     0: r1 := pack_closure identity, 0, [] @0
-    1: [r2] := call_closure [|u64|u64], [r0, r1] @4
+    1: [r2] := call_closure [|u64|u64 has drop], [r0, r1] @4
     2: ret [r2] @5
 }
 

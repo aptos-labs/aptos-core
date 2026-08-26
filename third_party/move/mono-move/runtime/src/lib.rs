@@ -12,7 +12,6 @@ mod native_context;
 mod types;
 mod value_utils;
 mod verifier;
-mod write_set;
 
 pub use error::{RuntimeError, RuntimeStatus};
 pub use global_storage::{ResourceReadWriteSet, WriteClass};
@@ -30,4 +29,3 @@ pub use native_context::{
 pub use types::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
 pub use value_utils::{deserialize_into, serialize};
 pub use verifier::{verify_function, verify_program, VerificationError};
-pub use write_set::serialize_value;

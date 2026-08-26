@@ -1,0 +1,12 @@
+processed 6 tasks
+task 0 lines 1-42:  publish [import Move]
+task 1 lines 44-44:  run 0x0::LeanerEnumPatterns::one_number --args 7u64
+return values: 7
+task 2 lines 46-46:  run 0x0::LeanerEnumPatterns::one_none
+return values: 0
+task 3 lines 48-48:  run 0x0::LeanerEnumPatterns::two_numbers --args 4u64 5u64
+return values: 9
+task 4 lines 50-50:  run 0x0::LeanerEnumPatterns::left_missing --args 5u64
+return values: 0
+task 5 lines 52-52:  run 0x0::LeanerEnumPatterns::right_missing --args 4u64
+return values: 0

@@ -14,10 +14,10 @@
 use crate::{data::BenchmarkInput, measure, timing::TimingConfig, BenchmarkRun};
 use anyhow::{anyhow, Result};
 use aptos_types::{
-    on_chain_config::{Features, OnChainConfig},
     state_store::TStateView,
     transaction::{AuxiliaryInfo, TransactionAuxiliaryData, TransactionOutput},
 };
+use aptos_vm_environment::environment::AptosEnvironment;
 use mono_move_aptos_state_view_providers::{StateViewModuleProvider, StateViewResourceProvider};
 use mono_move_aptos_transaction_executor::{production_natives, AptosTransactionExecutor};
 use mono_move_global_context::GlobalContext;
@@ -34,29 +34,26 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun
     let module_provider = StateViewModuleProvider::new(state_view);
     let data_provider = StateViewResourceProvider::new(&guard, state_view);
 
-    let features = Features::fetch_config(state_view)
-        .ok()
-        .flatten()
-        .unwrap_or_default();
+    let env = AptosEnvironment::new(state_view);
     let usage = state_view.get_usage()?;
     let executor = AptosTransactionExecutor::new(
         &guard,
         &natives,
         &module_provider,
         &data_provider,
-        &features,
+        &env,
         usage,
     )
     .without_metering();
 
     let aux_info = AuxiliaryInfo::new(input.aux_info, None);
+    let txn = input.txn.to_transaction();
     let execute_once = || -> Result<TransactionOutput> {
         executor
-            .execute_user_transaction(&input.txn, &aux_info)
+            .execute_transaction(&txn, &aux_info)
             .materialize(
-                &guard,
                 &data_provider,
-                &features,
+                env.features(),
                 TransactionAuxiliaryData::default(),
             )
             .map_err(|e| anyhow!("failed to materialize V2 output: {}", e))

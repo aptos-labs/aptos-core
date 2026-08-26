@@ -13,16 +13,17 @@ mod calls;
 mod errors;
 mod executor;
 mod materialize;
-mod metadata;
 mod natives;
 mod outcome;
 mod providers;
-mod sys_calls;
+mod system_txns;
+mod user_txn;
 
 pub use errors::{
     DiscardReason, ExecutionStage, ExecutionStatus, MaterializationError, MoveExecutionFailure,
+    PreExecutionCheckFailure, SystemTxnFailure,
 };
 pub use executor::AptosTransactionExecutor;
 pub use natives::production_natives;
 pub use outcome::TxnOutcome;
-pub use providers::{decode_group_members, AptosDataProvider, GroupMembers, StorageLocation};
+pub use providers::{decode_group_members, AptosDataProvider, GroupMembers};

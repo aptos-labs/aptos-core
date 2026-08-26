@@ -1,5 +1,5 @@
 {
-  "version": 7,
+  "version": 10,
   "structs": [],
   "funs": [
     {
@@ -9,14 +9,14 @@
       "returns": ["u64"],
       "blocks": [
         {
-          "instrs": [{"assign": [1, 0]}, {"load": [2, {"u64": "0"}]}, {"call": [[3], "lt", [2, 1]]}],
+          "instrs": [{"assign": [1, 0]}, {"load": [2, {"num": "0"}]}, {"call": [[3], "lt", [2, 1]]}],
           "term": {"branch": [3, 1, 2]}
         },
         {
           "instrs": [
             {"assign": [4, 0]},
-            {"load": [5, {"u64": "1"}]},
-            {"call": [[6], "sub", [4, 5]]},
+            {"load": [5, {"num": "1"}]},
+            {"call": [[6], {"sub": "u64"}, [4, 5]]},
             {"assign": [0, 6]}
           ],
           "term": {"jump": 0}

@@ -105,6 +105,9 @@ pub enum RuntimeError {
 
     #[error("BCS deserialize: cannot deserialize a signer")]
     BCSSignerNotDeserializable,
+
+    #[error("unsupported: {0}")]
+    Unsupported(&'static str),
 }
 
 impl IntoExecutionError for RuntimeError {
@@ -140,6 +143,8 @@ impl IntoExecutionError for RuntimeError {
             | BCSRemainingInput { .. }
             | BCSInvalidBool { .. }
             | BCSSignerNotDeserializable => ExecutionErrorKind::InvalidOperation,
+
+            Unsupported(_) => ExecutionErrorKind::InvariantViolation,
 
             InvariantViolation(_) => ExecutionErrorKind::InvariantViolation,
             ResourceProvider(e) => e.kind(),

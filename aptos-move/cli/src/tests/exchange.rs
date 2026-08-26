@@ -28,7 +28,7 @@ l2: move_loc x
         .unwrap(),
     )
     .unwrap();
-    assert_eq!(json["version"], json!(7));
+    assert_eq!(json["version"], json!(10));
     let fun = &json["funs"][0];
     assert_eq!(fun["name"], json!("count_down"));
     assert_eq!(fun["params"], json!(1));
@@ -92,18 +92,26 @@ fun withdraw(s: &signer, addr: address, amount: u64) acquires Account
 }
 
 #[test]
-fn unsupported_rejected() {
-    let err = exchange::masm_to_module(
-        r#"
+fn small_integer_constants_use_untyped_number_encoding() {
+    let json = serde_json::to_value(
+        exchange::masm_to_module(
+            r#"
 module 0x42::m
 
 fun f(): u8
     ld_u8 1
     ret
 "#,
+        )
+        .unwrap(),
     )
-    .unwrap_err();
-    assert!(format!("{:#}", err).contains("unsupported type"));
+    .unwrap();
+    let fun = &json["funs"][0];
+    assert_eq!(fun["returns"], json!(["u8"]));
+    assert_eq!(
+        fun["blocks"][0]["instrs"][0],
+        json!({"load": [0, {"num": "1"}]})
+    );
 }
 
 #[test]
@@ -137,17 +145,17 @@ l2: move_loc x
     let fun = &json["funs"][0];
     assert_eq!(
         fun["spec"]["requires"],
-        json!([{"binop": ["lt", {"local": 0}, {"value": {"u64": "1000"}}]}])
+        json!([{"binop": ["lt", {"local": 0}, {"value": {"num": "1000"}}]}])
     );
     assert_eq!(
         fun["spec"]["ensures"],
-        json!([{"binop": ["eq", {"result": 0}, {"value": {"u64": "0"}}]},
+        json!([{"binop": ["eq", {"result": 0}, {"value": {"num": "0"}}]},
                {"quant": ["all", "u64",
-                          {"binop": ["le", {"value": {"u64": "0"}}, {"bvar": 0}]}]}])
+                          {"binop": ["le", {"value": {"num": "0"}}, {"bvar": 0}]}]}])
     );
     assert_eq!(
         fun["loops"][0]["invariants"],
-        json!([{"binop": ["lt", {"local": 0}, {"value": {"u64": "1000"}}]}])
+        json!([{"binop": ["lt", {"local": 0}, {"value": {"num": "1000"}}]}])
     );
 }
 
@@ -430,6 +438,6 @@ module 0x42::count_down {
     assert_eq!(
         fun["loops"][0]["invariants"],
         json!([{"binop": ["le", {"local": 0},
-                         {"value": {"u64": "18446744073709551615"}}]}])
+                         {"value": {"num": "18446744073709551615"}}]}])
     );
 }

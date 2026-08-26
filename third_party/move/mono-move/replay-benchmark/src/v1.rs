@@ -11,16 +11,24 @@
 //! trial run warms the module cache, and each timed sample covers execution
 //! plus materialization into a [`TransactionOutput`].
 
-use crate::{data::BenchmarkInput, measure, timing::TimingConfig, BenchmarkRun};
+use crate::{
+    data::{BenchmarkInput, BenchmarkTxn},
+    measure,
+    timing::TimingConfig,
+    BenchmarkRun,
+};
 use anyhow::{anyhow, Result};
 use aptos_types::{
     state_store::TStateView,
-    transaction::{AuxiliaryInfo, TransactionOutput},
+    transaction::{
+        signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo,
+        TransactionOutput,
+    },
 };
 use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
+use aptos_vm_types::{module_and_script_storage::AsAptosCodeStorage, output::VMOutput};
 
 pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun> {
     let state_view = input.state.as_ref();
@@ -31,18 +39,43 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun
     let log_context = AdapterLogSchema::new(state_view.id(), 0);
     let aux_info = AuxiliaryInfo::new(input.aux_info, None);
 
-    let execute_once = || -> Result<TransactionOutput> {
-        let (_, vm_output) = vm.execute_user_transaction(
-            &resolver,
-            &code_storage,
-            &input.txn,
-            &log_context,
-            &aux_info,
-        );
+    let materialize = |vm_output: VMOutput| -> Result<TransactionOutput> {
         vm_output
             .try_materialize_into_transaction_output()
             .map_err(|status| anyhow!("failed to materialize V1 output: {:?}", status))
     };
 
-    measure(timing, execute_once)
+    match &input.txn {
+        BenchmarkTxn::User(txn) => {
+            let execute_once = || {
+                let (_, vm_output) = vm.execute_user_transaction(
+                    &resolver,
+                    &code_storage,
+                    txn,
+                    &log_context,
+                    &aux_info,
+                );
+                materialize(vm_output)
+            };
+            measure(timing, execute_once)
+        },
+        BenchmarkTxn::BlockMetadata(_) | BenchmarkTxn::BlockMetadataExt(_) => {
+            // System transactions go through the block-level entry point,
+            // pre-marked as signature-verified like the block executor does.
+            let txn = SignatureVerifiedTransaction::Valid(input.txn.to_transaction());
+            let execute_once = || {
+                let (_, vm_output) = vm
+                    .execute_single_transaction(
+                        &txn,
+                        &resolver,
+                        &code_storage,
+                        &log_context,
+                        &aux_info,
+                    )
+                    .map_err(|status| anyhow!("V1 rejected the transaction: {:?}", status))?;
+                materialize(vm_output)
+            };
+            measure(timing, execute_once)
+        },
+    }
 }

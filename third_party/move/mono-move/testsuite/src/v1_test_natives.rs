@@ -68,8 +68,7 @@ fn v1_native_create_signers_for_testing(
 ) -> PartialVMResult<NativeResult> {
     let num_signers = pop_arg!(args, u64);
     let signers = Value::vector_unchecked(
-        (0..num_signers)
-            .map(|i| Value::master_signer(AccountAddress::new(address_bytes_for_index(i)))),
+        (0..num_signers).map(|i| Value::signer(AccountAddress::new(address_bytes_for_index(i)))),
     )?;
     Ok(NativeResult::ok(InternalGas::zero(), smallvec![signers]))
 }

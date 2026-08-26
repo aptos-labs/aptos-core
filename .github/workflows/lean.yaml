@@ -39,30 +39,52 @@ concurrency:
 jobs:
   build-and-test:
     runs-on: runs-on,cpu=32,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
-    env:
-      LEAN_NUM_THREADS: "1"
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Lean toolchain
-        run: scripts/dev_setup.sh -b -p -l -k
+        run: |
+          scripts/dev_setup.sh -b -p -l -k
+          echo "$HOME/bin" >> "$GITHUB_PATH"
 
-      - name: Build the frontend CLI
-        run: cargo build --locked -p aptos --bin aptos
+      - name: Verify Lean toolchain
+        run: |
+          lean --version
+          lake --version
 
-      - name: Build Lean core and examples
-        working-directory: third_party/move/lean
-        env:
-          APTOS_CLI: ${{ github.workspace }}/target/debug/aptos
+      - name: Build the lightweight exchange frontend
+        run: cargo build --locked -p aptos-move-cli --bin aptos-move-exchange
+
+      - name: Build MoveModel frontend
+        working-directory: third_party/move/lean/move-model
         run: |
           source "$HOME/.profile"
-          lake build MoveModel
-          lake build Examples
+          lake build MoveModel.Frontend.Elab
 
-      - name: Run Lean tests
-        working-directory: third_party/move/lean
+      - name: Build Leaner Move
+        working-directory: third_party/move/lean/move
+        run: |
+          source "$HOME/.profile"
+          lake build
+
+      - name: Test MoveModel
+        working-directory: third_party/move/lean/move-model
         env:
-          APTOS_CLI: ${{ github.workspace }}/target/debug/aptos
+          APTOS_MOVE_EXCHANGE: ${{ github.workspace }}/target/debug/aptos-move-exchange
         run: |
           source "$HOME/.profile"
           lake test
+
+      - name: Test Leaner Move
+        working-directory: third_party/move/lean/move
+        env:
+          APTOS_MOVE_EXCHANGE: ${{ github.workspace }}/target/debug/aptos-move-exchange
+        run: |
+          source "$HOME/.profile"
+          lake test
+
+      - name: Test compiler-v2 Lean integration
+        run: |
+          cargo test --locked -p move-compiler-v2 leaner::tests
+          cargo test --locked -p move-compiler-v2-transactional-tests \
+            --test tests -- leaner/

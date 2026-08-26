@@ -92,7 +92,7 @@ fun capture_one(r0): u64 {
   slots: params(1), locals(2), temps(2)
     r0: u64
     r1: vector<u64>
-    r2: |u64|u64
+    r2: |u64|u64 has drop
     r3: &mut vector<u64>
     r4: u64
   code:
@@ -108,7 +108,7 @@ fun capture_one(r0): u64 {
     8: r4 := ld_u64 30 @9
     9: vec_push_back u64, r3, r4 @10
     10: r2 := pack_closure len_plus, 1, [r1] @12
-    11: [r4] := call_closure [|u64|u64], [r0, r2] @16
+    11: [r4] := call_closure [|u64|u64 has drop], [r0, r2] @16
     12: ret [r4] @17
 }
 
@@ -117,7 +117,7 @@ fun capture_two(r0): u64 {
     r0: u64
     r1: vector<u64>
     r2: vector<u64>
-    r3: |u64|u64
+    r3: |u64|u64 has drop
     r4: &mut vector<u64>
     r5: u64
   code:
@@ -140,7 +140,7 @@ fun capture_two(r0): u64 {
     15: r5 := ld_u64 5 @17
     16: vec_push_back u64, r4, r5 @18
     17: r3 := pack_closure len_sum, 11, [r1, r2] @21
-    18: [r5] := call_closure [|u64|u64], [r0, r3] @25
+    18: [r5] := call_closure [|u64|u64 has drop], [r0, r3] @25
     19: ret [r5] @26
 }
 

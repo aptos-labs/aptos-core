@@ -1,0 +1,17 @@
+processed 1 task
+task 0 lines 1-20:  publish [import Move]
+Error: compilation errors:
+ error: Move enum `LeanerTxnRejectEmptyEnum.Empty` must declare at least one variant
+   ┌─ TEMPFILE:12:29
+   │
+12 │ end LeanerTxnRejectEmptyEnum
+   │                             ^
+
+error: cannot evaluate code because an unresolved expression uses 'sorry' and/or contains errors
+   ┌─ TEMPFILE:12:29
+   │
+12 │ end LeanerTxnRejectEmptyEnum
+   │                             ^
+
+
+exiting with Leaner elaboration errors
