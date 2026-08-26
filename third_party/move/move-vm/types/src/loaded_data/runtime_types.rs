@@ -270,9 +270,19 @@ impl StructType {
     }
 }
 
-#[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
+// `interned_module_id` is a pool-local cache key, not part of struct identity.
+// Equality, hashing, and ordering use the canonical `(module, name)` pair.
+#[derive(Derivative)]
+#[derivative(Debug, Clone, Eq, Hash, PartialEq, Ord, PartialOrd)]
 pub struct StructIdentifier {
     module: ModuleId,
+    #[derivative(
+        Debug = "ignore",
+        PartialEq = "ignore",
+        Hash = "ignore",
+        Ord = "ignore",
+        PartialOrd = "ignore"
+    )]
     interned_module_id: InternedModuleId,
     name: Identifier,
 }
@@ -2269,5 +2279,46 @@ mod unit_tests {
         let (_, _, vec_tag) = nested_vec_for_test(max_ty_size + 1);
         let err = assert_err!(ty_builder.create_ty(&vec_tag, no_op));
         assert_eq!(err.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
+    }
+
+    #[test]
+    fn test_struct_identifier_identity_is_interner_history_independent() {
+        use move_core_types::account_address::AccountAddress;
+        use std::{
+            cmp::Ordering,
+            hash::{DefaultHasher, Hash, Hasher},
+        };
+
+        fn hash_of(identifier: &StructIdentifier) -> u64 {
+            let mut hasher = DefaultHasher::new();
+            identifier.hash(&mut hasher);
+            hasher.finish()
+        }
+
+        let alpha = ModuleId::new(AccountAddress::ONE, Identifier::new("alpha").unwrap());
+        let beta = ModuleId::new(AccountAddress::TWO, Identifier::new("beta").unwrap());
+        let name = Identifier::new("S").unwrap();
+
+        // Warm two pools in opposite orders, so the same module gets different interned ids.
+        let cold_pool = InternedModuleIdPool::new();
+        let cold_beta = StructIdentifier::new(&cold_pool, beta.clone(), name.clone());
+        let cold_alpha = StructIdentifier::new(&cold_pool, alpha.clone(), name.clone());
+
+        let warm_pool = InternedModuleIdPool::new();
+        let warm_alpha = StructIdentifier::new(&warm_pool, alpha, name.clone());
+        let warm_beta = StructIdentifier::new(&warm_pool, beta, name);
+
+        assert_ne!(
+            cold_alpha.interned_module_id(),
+            warm_alpha.interned_module_id()
+        );
+
+        // Identity, hashing, and ordering must not depend on interner history.
+        assert_eq!(cold_alpha, warm_alpha);
+        assert_eq!(cold_beta, warm_beta);
+        assert_eq!(hash_of(&cold_alpha), hash_of(&warm_alpha));
+        assert_eq!(cold_alpha.cmp(&warm_alpha), Ordering::Equal);
+        assert_eq!(cold_alpha.partial_cmp(&warm_alpha), Some(Ordering::Equal));
+        assert_eq!(cold_alpha.cmp(&cold_beta), warm_alpha.cmp(&warm_beta));
     }
 }
