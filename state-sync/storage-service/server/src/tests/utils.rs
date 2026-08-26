@@ -20,8 +20,8 @@ use aptos_storage_service_notifications::{
 };
 use aptos_storage_service_types::{
     requests::{
-        DataRequest, StateValuesWithProofRequest, StorageServiceRequest,
-        SubscribeTransactionOutputsWithProofRequest,
+        DataRequest, HotStateValuesWithProofRequest, StateValuesWithProofRequest,
+        StorageServiceRequest, SubscribeTransactionOutputsWithProofRequest,
         SubscribeTransactionsOrOutputsWithProofRequest, SubscribeTransactionsWithProofRequest,
         SubscriptionStreamMetadata, TransactionsWithProofRequest,
     },
@@ -816,6 +816,16 @@ pub async fn get_number_of_states(
     send_storage_request(mock_client, use_compression, data_request).await
 }
 
+/// Sends a request for the number of hot states at a version.
+pub async fn get_number_of_hot_states(
+    mock_client: &mut MockClient,
+    version: u64,
+    use_compression: bool,
+) -> Result<StorageServiceResponse, StorageServiceError> {
+    let data_request = DataRequest::GetNumberOfHotStatesAtVersion(version);
+    send_storage_request(mock_client, use_compression, data_request).await
+}
+
 /// Generates and returns a random number (u64)
 pub fn get_random_u64() -> u64 {
     OsRng.r#gen()
@@ -830,6 +840,22 @@ pub async fn get_state_values_with_proof(
     use_compression: bool,
 ) -> Result<StorageServiceResponse, StorageServiceError> {
     let data_request = DataRequest::GetStateValuesWithProof(StateValuesWithProofRequest {
+        version,
+        start_index,
+        end_index,
+    });
+    send_storage_request(mock_client, use_compression, data_request).await
+}
+
+/// Sends a hot state values with proof request and processes the response.
+pub async fn get_hot_state_values_with_proof(
+    mock_client: &mut MockClient,
+    version: u64,
+    start_index: u64,
+    end_index: u64,
+    use_compression: bool,
+) -> Result<StorageServiceResponse, StorageServiceError> {
+    let data_request = DataRequest::GetHotStateValuesWithProof(HotStateValuesWithProofRequest {
         version,
         start_index,
         end_index,
