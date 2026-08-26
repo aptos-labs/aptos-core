@@ -418,6 +418,9 @@ impl<T: StorageReaderInterface> Handler<T> {
             DataRequest::GetStateValuesWithProofV2(request) => {
                 self.get_state_value_chunk_with_proof_v2(request)
             },
+            DataRequest::GetHotStateValuesWithProof(request) => {
+                self.get_hot_state_value_chunk_with_proof(request)
+            },
             DataRequest::GetEpochEndingLedgerInfos(request) => {
                 self.get_epoch_ending_ledger_infos(request)
             },
