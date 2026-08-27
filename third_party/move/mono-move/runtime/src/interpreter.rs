@@ -31,8 +31,8 @@ use mono_move_core::{
     captured_values_size,
     interner::{module_id_of, InternedIdentifier, InternedModuleId},
     native::{
-        NativeABI, NativeExtension, NativeExtensions, NativeIdx, NativeStatus, ObjectHandle,
-        RootPool,
+        NativeABI, NativeDescriptor, NativeExtension, NativeExtensions, NativeIdx, NativeStatus,
+        ObjectHandle, RootPool,
     },
     next_captured_value_offset,
     storage::resource_provider::InMemoryStorageKey,
@@ -50,7 +50,9 @@ use mono_move_core::{
 use mono_move_global_context::ExecutionGuard;
 use mono_move_loader::{Loader, ModuleReadSet};
 use move_core_types::{
+    identifier::Identifier,
     int256::{I256, U256},
+    language_storage::ModuleId,
     vm_status::AbortLocation,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -207,6 +209,21 @@ fn abort_location(module_id: InternedModuleId) -> VMResult<AbortLocation> {
     }
 }
 
+/// Materializes the [`AbortLocation`] naming a native's own module from its
+/// descriptor. The descriptor's name parts are process-static literals, so the
+/// module name is always a valid identifier in practice.
+fn native_abort_location(descriptor: &NativeDescriptor) -> VMResult<AbortLocation> {
+    match Identifier::new(descriptor.module) {
+        Ok(module) => Ok(AbortLocation::Module(ModuleId::new(
+            descriptor.address,
+            module,
+        ))),
+        Err(_) => invariant_violation!(Unreachable(
+            "native module name is not a valid identifier".to_string()
+        )),
+    }
+}
+
 /// Per-transaction interpreter context with a unified call stack and a
 /// GC-managed heap: owns the transaction state (code loader and read-set, gas
 /// meter, native extensions, resource read-write set) and the machine state
@@ -227,11 +244,7 @@ pub struct InterpreterContext<'guard> {
     /// Read-set of the modules loaded by this transaction.
     read_set: ModuleReadSet<'guard>,
     pub(crate) gas_meter: GasMeter,
-    // TODO(cleanup): Move the native registry off the per-transaction context
-    // and onto a long-lived owner (e.g. the global context).
-    //
-    // TODO(correctness): Enforce that `natives` here and the `NativeResolver`
-    // passed to `loader` are the same instance.
+    /// A process-wide global native function table.
     natives: &'guard ProductionNativeRegistry,
     /// Per-transaction native extensions, shared across native calls.
     pub(crate) extensions: NativeExtensions,
@@ -1327,8 +1340,8 @@ impl InterpreterContext<'_> {
                             // Attribute the abort to the native's own module
                             // (not the caller's, which `regs.func` names here)
                             // — the same rule as a Move-level abort.
-                            let location = match self.natives.module_by_idx(native_idx) {
-                                Some(module_id) => abort_location(module_id)?,
+                            let location = match self.natives.name_by_idx(native_idx) {
+                                Some(descriptor) => native_abort_location(descriptor)?,
                                 None => invariant_violation!(NativeIdxOutOfBounds {
                                     idx: native_idx.0,
                                     registry_size: self.natives.len(),

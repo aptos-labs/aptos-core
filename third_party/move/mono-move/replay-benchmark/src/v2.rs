@@ -29,7 +29,7 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun
     let guard = ctx
         .try_execution_context(0)
         .ok_or_else(|| anyhow!("failed to acquire MonoMove execution guard"))?;
-    let natives = production_natives(&guard);
+    let natives = production_natives();
 
     let module_provider = StateViewModuleProvider::new(state_view);
     let data_provider = StateViewResourceProvider::new(&guard, state_view);
@@ -38,7 +38,7 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun
     let usage = state_view.get_usage()?;
     let executor = AptosTransactionExecutor::new(
         &guard,
-        &natives,
+        natives,
         &module_provider,
         &data_provider,
         &env,

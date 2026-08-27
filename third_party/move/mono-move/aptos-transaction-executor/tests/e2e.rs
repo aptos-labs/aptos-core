@@ -84,14 +84,14 @@ fn execute_v2_with<S: StateView>(
     let guard = global_ctx
         .try_execution_context(0)
         .expect("execution context is available");
-    let natives = production_natives(&guard);
+    let natives = production_natives();
     let module_provider = StateViewModuleProvider::new(state);
     let data_provider = StateViewResourceProvider::new(&guard, state);
     let env = AptosEnvironment::new(state);
     let usage = state.get_usage().expect("usage is readable");
     let executor = AptosTransactionExecutor::new(
         &guard,
-        &natives,
+        natives,
         &module_provider,
         &data_provider,
         &env,

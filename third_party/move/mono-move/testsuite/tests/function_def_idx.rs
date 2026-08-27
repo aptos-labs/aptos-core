@@ -95,16 +95,10 @@ fn def_idx_stamped_and_resolvable_by_name() {
 
 #[test]
 fn registry_name_by_idx_round_trips() {
-    let ctx = GlobalContext::with_num_execution_workers(1);
-    let guard = ctx
-        .try_execution_context(0)
-        .expect("worker 0 execution context must be available");
-    let natives = build_natives(&guard);
+    let natives = build_natives();
     assert!(!natives.is_empty());
     for raw_idx in 0..natives.len() as u32 {
-        let idx = NativeIdx(raw_idx);
-        let name = natives.name_by_idx(idx).expect("index in range");
-        assert!(natives.module_by_idx(idx) == Some(name.module()));
+        assert!(natives.name_by_idx(NativeIdx(raw_idx)).is_some());
     }
     assert!(natives
         .name_by_idx(NativeIdx(natives.len() as u32))
