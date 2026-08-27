@@ -289,7 +289,7 @@ impl TimedFeatureFlag {
             // with this feature off, matching the pre-feature old image and avoiding a
             // fork (see UseFullTransactionSizeForGasCheck).
             (MeterValueNodesOnDeserialize, TESTING) => Los_Angeles
-                .with_ymd_and_hms(2026, 8, 28, 14, 0, 0)
+                .with_ymd_and_hms(2026, 8, 27, 12, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
             (MeterValueNodesOnDeserialize, TESTNET) => Los_Angeles
