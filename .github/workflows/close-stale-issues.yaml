@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: write # required by actions/stale v10 to create/delete its progress cache
   # contents: write # only for delete-branch option
   issues: write
   pull-requests: write
