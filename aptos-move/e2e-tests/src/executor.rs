@@ -1413,6 +1413,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                         None,
                         1_000_000_000_000_000.into(),
                         &NoopBlockSynchronizationKillSwitch {},
+                        true,
                     )),
                     None,
                 ),
@@ -1524,17 +1525,20 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                 &fun_name,
                 type_params,
                 args,
-                &mut StandardGasMeter::new(CalibrationAlgebra {
-                    base: StandardGasAlgebra::new(
-                        env.gas_feature_version(),
-                        env.gas_params().as_ref().unwrap().vm.clone(),
-                        env.storage_gas_params().as_ref().unwrap().clone(),
-                        None,
-                        10_000_000_000_000,
-                        &NoopBlockSynchronizationKillSwitch {},
-                    ),
-                    shared_buffer: Arc::clone(&a1),
-                }),
+                &mut StandardGasMeter::new(
+                    CalibrationAlgebra {
+                        base: StandardGasAlgebra::new(
+                            env.gas_feature_version(),
+                            env.gas_params().as_ref().unwrap().vm.clone(),
+                            env.storage_gas_params().as_ref().unwrap().clone(),
+                            None,
+                            10_000_000_000_000,
+                            &NoopBlockSynchronizationKillSwitch {},
+                        ),
+                        shared_buffer: Arc::clone(&a1),
+                    },
+                    true,
+                ),
                 &mut traversal_context,
                 &module_storage,
             );

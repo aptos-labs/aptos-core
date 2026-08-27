@@ -5,7 +5,6 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_gas_algebra::{InternalGas, InternalGasPerAbstractValueUnit};
 use aptos_gas_schedule::gas_params::natives::move_stdlib::*;
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
@@ -26,13 +25,6 @@ use move_vm_types::{
 };
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
-
-// Set to 3x `cmp::compare`'s base and per-abstract-value-unit costs
-// (3670 and 140).
-// TODO: add these to 1.50 schedule.
-const BCS_PER_VALUE_TRAVERSAL_BASE: InternalGas = InternalGas::new(11010);
-const BCS_PER_VALUE_TRAVERSAL_PER_ABS_VAL_UNIT: InternalGasPerAbstractValueUnit =
-    InternalGasPerAbstractValueUnit::new(420);
 
 pub fn create_option_u64(enum_option_enabled: bool, value: Option<u64>) -> Value {
     if enum_option_enabled {
@@ -74,9 +66,7 @@ fn native_to_bytes(
     // serialization traversal and drop).
     if context.timed_feature_enabled(TimedFeatureFlag::MeterBcsByValueSize) {
         let size = context.abs_val_size_dereferenced(&reference_value)?;
-        context.charge(
-            BCS_PER_VALUE_TRAVERSAL_BASE + BCS_PER_VALUE_TRAVERSAL_PER_ABS_VAL_UNIT * size,
-        )?;
+        context.charge_value_traversal(size)?;
     }
 
     let layout = if context.get_feature_flags().is_lazy_loading_enabled() {
@@ -153,9 +143,7 @@ fn native_serialized_size(
     // serialization traversal and drop).
     if context.timed_feature_enabled(TimedFeatureFlag::MeterBcsByValueSize) {
         let size = context.abs_val_size_dereferenced(&reference_value)?;
-        context.charge(
-            BCS_PER_VALUE_TRAVERSAL_BASE + BCS_PER_VALUE_TRAVERSAL_PER_ABS_VAL_UNIT * size,
-        )?;
+        context.charge_value_traversal(size)?;
     }
 
     let reference = reference_value
