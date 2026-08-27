@@ -48,42 +48,6 @@ module std::cmp {
         pragma intrinsic;
     }
 
-    spec is_eq {
-        pragma intrinsic;
-        pragma opaque;
-        pragma verify = false;
-    }
-
-    spec is_ne {
-        pragma intrinsic;
-        pragma opaque;
-        pragma verify = false;
-    }
-
-    spec is_lt {
-        pragma intrinsic;
-        pragma opaque;
-        pragma verify = false;
-    }
-
-    spec is_le {
-        pragma intrinsic;
-        pragma opaque;
-        pragma verify = false;
-    }
-
-    spec is_gt {
-        pragma intrinsic;
-        pragma opaque;
-        pragma verify = false;
-    }
-
-    spec is_ge {
-        pragma intrinsic;
-        pragma opaque;
-        pragma verify = false;
-    }
-
     #[test_only]
     struct SomeStruct has drop {
         field_1: u64,

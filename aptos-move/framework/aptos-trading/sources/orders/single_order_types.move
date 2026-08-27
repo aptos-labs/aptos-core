@@ -101,6 +101,10 @@ module aptos_trading::single_order_types {
         self.account
     }
 
+    spec get_account {
+        aborts_if false;
+    }
+
     // public fun get_metadata<M: store + copy + drop>(
     //     self: &SingleOrderRequest<M>
     // ): M {
@@ -177,6 +181,10 @@ module aptos_trading::single_order_types {
         &self.order_request
     }
 
+    spec get_order_request {
+        aborts_if false;
+    }
+
     public fun get_order_request_mut<M: store + copy + drop>(
         self: &mut SingleOrder<M>
     ): &mut SingleOrderRequest<M> {
@@ -187,6 +195,10 @@ module aptos_trading::single_order_types {
         self: &OrderWithState<M>
     ): &SingleOrder<M> {
         &self.order
+    }
+
+    spec get_order_from_state {
+        aborts_if false;
     }
 
     public fun get_order_from_state_mut<M: store + copy + drop>(
@@ -229,10 +241,40 @@ module aptos_trading::single_order_types {
         self.order.order_request.remaining_size -= size;
     }
 
+    spec decrease_remaining_size_from_state {
+        aborts_if self.order.order_request.remaining_size <= size;
+        ensures self.order.order_request.remaining_size
+            == old(self.order.order_request.remaining_size) - size;
+        /// The decrease touches only the remaining size. Without this frame a
+        /// caller that reads the order back after the call knows nothing about
+        /// the fields it did not change, so it cannot state what it then does
+        /// with them.
+        ensures self.is_active == old(self.is_active);
+        ensures self.order.unique_priority_idx == old(self.order.unique_priority_idx);
+        ensures self.order.order_request.account == old(self.order.order_request.account);
+        ensures self.order.order_request.price == old(self.order.order_request.price);
+        ensures self.order.order_request.is_bid == old(self.order.order_request.is_bid);
+    }
+
     public fun set_remaining_size_from_state<M: store + copy + drop>(
         self: &mut OrderWithState<M>, remaining_size: u64
     ) {
         self.order.order_request.remaining_size = remaining_size;
+    }
+
+    spec set_remaining_size_from_state {
+        aborts_if false;
+        ensures self.order.order_request.remaining_size == remaining_size;
+        /// Setting the size touches only the size. Without this frame a caller that
+        /// reads the order back — to check it is still active, or to find its key —
+        /// knows nothing about the fields it did not change.
+        ensures self.is_active == old(self.is_active);
+        ensures self.order.unique_priority_idx == old(self.order.unique_priority_idx);
+        ensures self.order.order_request.account == old(self.order.order_request.account);
+        ensures self.order.order_request.price == old(self.order.order_request.price);
+        ensures self.order.order_request.is_bid == old(self.order.order_request.is_bid);
+        ensures self.order.order_request.client_order_id
+            == old(self.order.order_request.client_order_id);
     }
 
     public fun get_remaining_size_from_state<M: store + copy + drop>(

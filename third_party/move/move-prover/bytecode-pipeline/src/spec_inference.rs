@@ -6533,7 +6533,13 @@ impl<'env> SpecInferenceAnalyzer<'env> {
 
         let bindings = collect_write_of_bindings(env, &state.ensures);
 
-        let mut sites: Vec<(Exp, Vec<Exp>, MemoryRange)> = Vec::new();
+        // Per site: the callee, the `old`-stripped arguments used for site
+        // identity, the arguments as written (which keep `old(..)` on the
+        // pre-state of a `&mut`), and the memory range. Identity must ignore
+        // `old` so the same call in different branches matches, but the
+        // emitted predicate must not: dropping `old` there would name the
+        // post-state in the callee's pre-state slot.
+        let mut sites: Vec<(Exp, Vec<Exp>, Vec<Exp>, MemoryRange)> = Vec::new();
         for (write_of_call, _lhs) in &bindings {
             let ExpData::Call(_, AstOp::Behavior(_, range), bp_args) = write_of_call.as_ref()
             else {
@@ -6551,16 +6557,16 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             // branch's pre/post state to the other.
             if !sites
                 .iter()
-                .any(|(f, a, r)| calls_match(f, a, &fun_exp, &args_natural) && r == range)
+                .any(|(f, a, _, r)| calls_match(f, a, &fun_exp, &args_natural) && r == range)
             {
-                sites.push((fun_exp, args_natural, range.clone()));
+                sites.push((fun_exp, args_natural, args.to_vec(), range.clone()));
             }
         }
 
         let mut to_remove: BTreeSet<usize> = BTreeSet::new();
         let mut to_add: Vec<Exp> = Vec::new();
 
-        for (fun_exp, args_natural, range) in &sites {
+        for (fun_exp, args_natural, args_as_written, range) in &sites {
             let num_inputs = args_natural.len();
             let fun_type = env.get_node_type(fun_exp.node_id());
             let Type::Fun(arg_ty_box, result_ty, _) = fun_type else {
@@ -6671,7 +6677,7 @@ impl<'env> SpecInferenceAnalyzer<'env> {
                 } else {
                     dests.push(self.mk_result_of_at_with_state(
                         fun_exp.clone(),
-                        args_natural.clone(),
+                        args_as_written.clone(),
                         &result_type,
                         i,
                         num_declared_results,
@@ -6681,10 +6687,14 @@ impl<'env> SpecInferenceAnalyzer<'env> {
                 }
             }
 
-            let mut canonical_args: Vec<Exp> =
-                Vec::with_capacity(1 + args_natural.len() + dests.len() + post_state_slots.len());
+            let mut canonical_args: Vec<Exp> = Vec::with_capacity(
+                1 + args_as_written.len() + dests.len() + post_state_slots.len(),
+            );
             canonical_args.push(fun_exp.clone());
-            canonical_args.extend(args_natural.iter().cloned());
+            // As written, not `old`-stripped: the leading slots are the
+            // callee's pre-state, and a bare `&mut` temp there would denote
+            // its post-state instead.
+            canonical_args.extend(args_as_written.iter().cloned());
             canonical_args.extend(dests);
             canonical_args.extend(post_state_slots);
             let bool_ty = Type::Primitive(PrimitiveType::Bool);

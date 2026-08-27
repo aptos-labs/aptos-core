@@ -335,7 +335,7 @@ module 0x42::mutations {
     spec pass_ref_to_fn(p: &mut Point, val: u64) {
         pragma opaque = true;
         ensures [inferred] p == update_field(old(p), x, p.x);
-        ensures [inferred] ensures_of<write_to_ref>(p.x, val, p.x);
+        ensures [inferred] ensures_of<write_to_ref>(old(p).x, val, p.x);
         aborts_if [inferred] false;
     }
 
@@ -378,7 +378,7 @@ module 0x42::mutations {
     spec call_replace(r: &mut u64): u64 {
         pragma opaque = true;
         ensures [inferred] result == result_of<replace_ref>(old(r), 99);
-        ensures [inferred] ensures_of<replace_ref>(r, 99, result, r);
+        ensures [inferred] ensures_of<replace_ref>(old(r), 99, result, r);
         aborts_if [inferred] false;
     }
 
