@@ -48,7 +48,7 @@ const DUPLICATE_POINT_HANDLE: u64 = aptos_types::error::cancelled(3);
 /// Per-transaction store of ristretto points, indexed by handle.
 ///
 /// TODO(perf, security): points are held in a Rust `Vec` here; they should
-/// eventually live on the VM's own heap.
+/// eventually live on the VM's own heap as a single rooted vector.
 #[derive(Default)]
 pub struct RistrettoPointStore {
     points: Vec<RistrettoPoint>,
@@ -63,6 +63,9 @@ impl RistrettoPointStore {
     /// Allocates a new handle for `point`, or aborts if too many points have
     /// been created.
     fn add(&mut self, point: RistrettoPoint) -> Result<u64, NativeStatus> {
+        // Points are never deduplicated, not even identity: `*_assign` natives
+        // mutate the slot at a handle in place, so sharing a slot between callers
+        // would let one caller's mutation corrupt another's point.
         let id = self.points.len();
         if id >= NUM_POINTS_LIMIT {
             Err(NativeStatus::Abort {
@@ -108,6 +111,14 @@ impl NativeExtension for RistrettoPointStore {
         self.checkpoints.push(self.points.len());
     }
 
+    /// Rolls back by truncating the point vector to the checkpoint length.
+    ///
+    /// Correct despite in-place `set`: a `RistrettoPoint` never crosses a
+    /// checkpoint boundary (it is `drop`-only and each phase is a separate
+    /// top-level call), so a phase only mutates points it created above the
+    /// watermark. Truncation drops exactly those; points below were never
+    /// touched. Handles never leave the store, so a rolled-back point is
+    /// unobservable regardless.
     fn on_rollback(&mut self, n: usize) -> VMResult<()> {
         if n > self.checkpoints.len() {
             return Err(native_invariant_violation(format!(
