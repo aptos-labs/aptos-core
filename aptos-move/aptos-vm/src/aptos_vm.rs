@@ -3454,6 +3454,26 @@ pub struct AptosVMBlockExecutor {
 }
 
 impl AptosVMBlockExecutor {
+    /// Builds the local execution config from process-global VM settings.
+    fn default_local_config() -> BlockExecutorLocalConfig {
+        BlockExecutorLocalConfig {
+            blockstm_v2: AptosVM::get_blockstm_v2_enabled(),
+            concurrency_level: AptosVM::get_concurrency_level(),
+            allow_fallback: true,
+            discard_failed_blocks: AptosVM::get_discard_failed_blocks(),
+            module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
+            enable_pre_write: AptosVM::get_enable_pre_write(),
+        }
+    }
+
+    /// Creates a new block executor whose blocks run with the given local config
+    /// instead of the process-global VM settings.
+    pub fn new_with_local_config(local_config: BlockExecutorLocalConfig) -> Self {
+        Self {
+            module_cache_manager: AptosModuleCacheManager::new(local_config),
+        }
+    }
+
     /// Executes transactions with the specified [BlockExecutorConfig] and returns output for each
     /// one of them.
     pub fn execute_block_with_config(
@@ -3499,9 +3519,7 @@ impl AptosVMBlockExecutor {
 
 impl VMBlockExecutor for AptosVMBlockExecutor {
     fn new() -> Self {
-        Self {
-            module_cache_manager: AptosModuleCacheManager::new(),
-        }
+        Self::new_with_local_config(Self::default_local_config())
     }
 
     fn execute_block(
@@ -3512,14 +3530,7 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
         transaction_slice_metadata: TransactionSliceMetadata,
     ) -> BlockExecutionResult<SignatureVerifiedTransaction, TransactionOutput> {
         let config = BlockExecutorConfig {
-            local: BlockExecutorLocalConfig {
-                blockstm_v2: AptosVM::get_blockstm_v2_enabled(),
-                concurrency_level: AptosVM::get_concurrency_level(),
-                allow_fallback: true,
-                discard_failed_blocks: AptosVM::get_discard_failed_blocks(),
-                module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
-                enable_pre_write: AptosVM::get_enable_pre_write(),
-            },
+            local: self.module_cache_manager.local_config().clone(),
             onchain: onchain_config,
         };
         self.execute_block_with_config(txn_provider, state_view, config, transaction_slice_metadata)

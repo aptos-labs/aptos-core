@@ -12,7 +12,7 @@ use crate::{
 use aptos_gas_schedule::gas_feature_versions::RELEASE_V1_34;
 use aptos_types::{
     block_executor::{
-        config::BlockExecutorModuleCacheLocalConfig,
+        config::{BlockExecutorLocalConfig, BlockExecutorModuleCacheLocalConfig},
         transaction_slice_metadata::TransactionSliceMetadata,
     },
     error::PanicError,
@@ -178,16 +178,25 @@ where
 /// Module cache manager used by Aptos block executor. Ensures that only one thread has exclusive
 /// access to it at a time.
 pub struct AptosModuleCacheManager {
+    /// Local execution config bound to this manager. Block executors that own the
+    /// manager read it instead of process-global settings.
+    local_config: BlockExecutorLocalConfig,
     inner: Mutex<ModuleCacheManager<ModuleId, CompiledModule, Module, AptosModuleExtension>>,
 }
 
 impl AptosModuleCacheManager {
-    /// Returns a new manager in its default (empty) state.
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
+    /// Returns a new manager in its default (empty) state, bound to the given
+    /// local execution config.
+    pub fn new(local_config: BlockExecutorLocalConfig) -> Self {
         Self {
+            local_config,
             inner: Mutex::new(ModuleCacheManager::new()),
         }
+    }
+
+    /// Returns the local execution config bound to this manager.
+    pub fn local_config(&self) -> &BlockExecutorLocalConfig {
+        &self.local_config
     }
 
     /// Tries to lock the manager. If succeeds, checks if the manager (caches, environment, etc.)
@@ -196,7 +205,6 @@ impl AptosModuleCacheManager {
     fn try_lock_inner(
         &self,
         state_view: &impl StateView,
-        config: &BlockExecutorModuleCacheLocalConfig,
         transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<AptosModuleCacheManagerGuard<'_>, VMStatus> {
         // Get the current environment from storage.
@@ -205,7 +213,11 @@ impl AptosModuleCacheManager {
 
         Ok(match self.inner.try_lock() {
             Some(mut guard) => {
-                guard.check_ready(storage_environment, config, transaction_slice_metadata)?;
+                guard.check_ready(
+                    storage_environment,
+                    &self.local_config.module_cache_config,
+                    transaction_slice_metadata,
+                )?;
                 AptosModuleCacheManagerGuard::Guard { guard }
             },
             None => {
@@ -226,15 +238,19 @@ impl AptosModuleCacheManager {
     pub fn try_lock(
         &self,
         state_view: &impl StateView,
-        config: &BlockExecutorModuleCacheLocalConfig,
         transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<AptosModuleCacheManagerGuard<'_>, VMStatus> {
-        let mut guard = self.try_lock_inner(state_view, config, transaction_slice_metadata)?;
+        let mut guard = self.try_lock_inner(state_view, transaction_slice_metadata)?;
 
         // To avoid cold starts, fetch the framework code. This ensures the state with 0 modules
         // cached is not possible for block execution (as long as the config enables the framework
         // prefetch).
-        if guard.module_cache().num_modules() == 0 && config.prefetch_framework_code {
+        if guard.module_cache().num_modules() == 0
+            && self
+                .local_config
+                .module_cache_config
+                .prefetch_framework_code
+        {
             prefetch_aptos_framework(state_view, &mut guard).map_err(|err| {
                 alert_or_println!("Failed to load Aptos framework to module cache: {:?}", err);
                 VMError::from(err).into_vm_status()
@@ -847,22 +863,22 @@ mod test {
 
     #[test]
     fn test_try_lock_inner_single_thread() {
-        let manager = AptosModuleCacheManager::new();
+        let manager = AptosModuleCacheManager::new(BlockExecutorLocalConfig::default());
 
         let state_view = MockStateView::empty();
-        let config = BlockExecutorModuleCacheLocalConfig::default();
         let metadata = TransactionSliceMetadata::block_from_u64(0, 1);
 
-        let guard = assert_ok!(manager.try_lock(&state_view, &config, metadata));
+        let guard = assert_ok!(manager.try_lock(&state_view, metadata));
         assert!(matches!(guard, AptosModuleCacheManagerGuard::Guard { .. }));
     }
 
     #[test]
     fn test_try_lock_inner_multiple_threads() {
-        let manager = Arc::new(AptosModuleCacheManager::new());
+        let manager = Arc::new(AptosModuleCacheManager::new(
+            BlockExecutorLocalConfig::default(),
+        ));
 
         let state_view = Arc::new(MockStateView::empty());
-        let config = Arc::new(BlockExecutorModuleCacheLocalConfig::default());
         let metadata = TransactionSliceMetadata::block_from_u64(0, 1);
 
         let counter = Arc::new(AtomicU64::new(0));
@@ -873,11 +889,10 @@ mod test {
             let handle = std::thread::spawn({
                 let manager = manager.clone();
                 let state_view = state_view.clone();
-                let config = config.clone();
                 let counter = counter.clone();
 
                 move || {
-                    let guard = assert_ok!(manager.try_lock_inner(&state_view, &config, metadata));
+                    let guard = assert_ok!(manager.try_lock_inner(&state_view, metadata));
 
                     // Wait for all threads to complete.
                     counter.fetch_add(1, Ordering::SeqCst);

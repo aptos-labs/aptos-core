@@ -14,7 +14,8 @@ use aptos_package_builder::PackageBuilder;
 use aptos_types::{
     account_address::AccountAddress,
     block_executor::{
-        config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
+        config::{BlockExecutorConfig, BlockExecutorLocalConfig},
+        transaction_slice_metadata::TransactionSliceMetadata,
     },
     state_store::StateView,
     transaction::{
@@ -147,7 +148,7 @@ fn execute_block(
 #[test]
 fn cold_vs_warm_status_matches() {
     let (mut h, acc) = setup();
-    let manager = AptosModuleCacheManager::new();
+    let manager = AptosModuleCacheManager::new(BlockExecutorLocalConfig::default());
 
     // Block 1: Runs a transaction to warm up the cache.
     let sender = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
@@ -176,7 +177,7 @@ fn cold_vs_warm_status_matches() {
     let cold = execute_block(
         target,
         h.executor.get_state_view(),
-        &AptosModuleCacheManager::new(),
+        &AptosModuleCacheManager::new(BlockExecutorLocalConfig::default()),
         2,
         3,
     );

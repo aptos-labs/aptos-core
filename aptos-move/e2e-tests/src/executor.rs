@@ -877,7 +877,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                 &txn_provider,
                 &state_view,
                 self.module_cache_manager_opt()
-                    .unwrap_or(&AptosModuleCacheManager::new()),
+                    .unwrap_or(&AptosModuleCacheManager::new(config.local.clone())),
                 config,
                 metadata,
                 None,
@@ -924,15 +924,11 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
     fn maybe_snapshot_hot_cache(
         &self,
         state_view: &(impl StateView + Sync),
-        local_cfg: &BlockExecutorModuleCacheLocalConfig,
         metadata: TransactionSliceMetadata,
     ) -> Option<ModuleHotCacheSnapshot> {
         match &self.block_state {
             BlockState::Fuzzing(shared) => {
-                let mut guard = shared
-                    .manager
-                    .try_lock(state_view, local_cfg, metadata)
-                    .unwrap();
+                let mut guard = shared.manager.try_lock(state_view, metadata).unwrap();
                 Some(guard.snapshot_hot_cache())
             },
             BlockState::None => None,
@@ -943,16 +939,12 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
     fn maybe_rollback_hot_cache(
         &self,
         state_view: &(impl StateView + Sync),
-        local_cfg: &BlockExecutorModuleCacheLocalConfig,
         metadata: TransactionSliceMetadata,
         snapshot: Option<ModuleHotCacheSnapshot>,
     ) {
         if let Some(s) = snapshot {
             if let BlockState::Fuzzing(shared) = &self.block_state {
-                let mut guard = shared
-                    .manager
-                    .try_lock(state_view, local_cfg, metadata)
-                    .unwrap();
+                let mut guard = shared.manager.try_lock(state_view, metadata).unwrap();
                 guard.rollback_hot_cache(s);
             }
         }
@@ -1026,11 +1018,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         #[cfg(fuzzing)]
         {
             if mode == ExecutorMode::BothComparison {
-                snapshot = self.maybe_snapshot_hot_cache(
-                    state_view,
-                    &config.local.module_cache_config,
-                    metadata,
-                );
+                snapshot = self.maybe_snapshot_hot_cache(state_view, metadata);
                 assert!(
                     snapshot.is_some(),
                     "snapshot should be Some if mode is BothComparison"
@@ -1051,12 +1039,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         #[cfg(fuzzing)]
         {
             if mode == ExecutorMode::BothComparison {
-                self.maybe_rollback_hot_cache(
-                    state_view,
-                    &config.local.module_cache_config,
-                    metadata,
-                    snapshot.take(),
-                );
+                self.maybe_rollback_hot_cache(state_view, metadata, snapshot.take());
             }
         }
 

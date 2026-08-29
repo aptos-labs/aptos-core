@@ -421,11 +421,7 @@ impl<
         BLOCK_EXECUTOR_CONCURRENCY.set(config.local.concurrency_level as i64);
 
         let mut module_cache_manager_guard = module_cache_manager
-            .try_lock(
-                &state_view,
-                &config.local.module_cache_config,
-                transaction_slice_metadata,
-            )
+            .try_lock(&state_view, transaction_slice_metadata)
             .map_err(|status| BlockError::new(status.to_string()))?;
 
         let executor = BlockExecutor::<
