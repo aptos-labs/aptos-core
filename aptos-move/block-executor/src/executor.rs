@@ -936,7 +936,7 @@ where
         num_workers: usize,
         runtime_environment: &RuntimeEnvironment,
         scheduler: SchedulerWrapper,
-        shared_sync_params: &SharedSyncParams<T, E, S>,
+        shared_sync_params: &SharedSyncParams<'_, T, E, S>,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let versioned_cache = shared_sync_params.versioned_cache;
         let last_input_output = shared_sync_params.last_input_output;
@@ -1012,7 +1012,7 @@ where
         scheduler: SchedulerWrapper,
         environment: &AptosEnvironment,
         executor: &E,
-        shared_sync_params: &SharedSyncParams<T, E, S>,
+        shared_sync_params: &SharedSyncParams<'_, T, E, S>,
     ) -> Result<CommittedOutput<E>, PanicError> {
         let last_input_output = shared_sync_params.last_input_output;
 
@@ -1073,7 +1073,7 @@ where
         txn_idx: TxnIndex,
         output_idx: TxnIndex,
         committed_output: CommittedOutput<E>,
-        shared_sync_params: &SharedSyncParams<T, E, S>,
+        shared_sync_params: &SharedSyncParams<'_, T, E, S>,
     ) -> Result<(), PanicError> {
         if output_idx < txn_idx {
             return Err(code_invariant_error(format!(
@@ -1098,7 +1098,7 @@ where
         block: &TP,
         scheduler: &Scheduler,
         skip_module_reads_validation: &AtomicBool,
-        shared_sync_params: &SharedSyncParams<T, E, S>,
+        shared_sync_params: &SharedSyncParams<'_, T, E, S>,
         num_workers: usize,
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let num_txns = block.num_txns();
@@ -1376,7 +1376,7 @@ where
         transaction_slice_metadata: &TransactionSliceMetadata,
         scheduler: SchedulerWrapper,
         environment: &AptosEnvironment,
-        shared_sync_params: &SharedSyncParams<T, E, S>,
+        shared_sync_params: &SharedSyncParams<'_, T, E, S>,
     ) -> Result<Option<T>, PanicError> {
         let _timer = PARALLEL_FINALIZE_SECONDS.start_timer();
         let mut maybe_block_epilogue_txn = None;
@@ -1600,11 +1600,14 @@ where
         WORKER_POOL.scope(num_workers as usize, |worker_id| {
             let worker_id = worker_id as u32;
             let environment = module_cache_manager_guard.environment();
+            let ctx = module_cache_manager_guard.global_context();
             let executor = {
                 let _init_timer = VM_INIT_SECONDS.start_timer();
                 E::init(
                     &environment.clone(),
+                    ctx,
                     shared_sync_params.base_view,
+                    worker_id,
                     async_runtime_checks_enabled,
                 )
             };
@@ -1786,11 +1789,14 @@ where
         WORKER_POOL.scope(num_workers, |worker_id| {
             let worker_id = worker_id as u32;
             let environment = module_cache_manager_guard.environment();
+            let ctx = module_cache_manager_guard.global_context();
             let executor = {
                 let _init_timer = VM_INIT_SECONDS.start_timer();
                 E::init(
                     &environment.clone(),
+                    ctx,
                     base_view,
+                    worker_id,
                     async_runtime_checks_enabled,
                 )
             };
@@ -2059,7 +2065,8 @@ where
 
         let init_timer = VM_INIT_SECONDS.start_timer();
         let environment = module_cache_manager_guard.environment();
-        let executor = E::init(environment, base_view, false);
+        let ctx = module_cache_manager_guard.global_context();
+        let executor = E::init(environment, ctx, base_view, 0, false);
         drop(init_timer);
 
         let runtime_environment = environment.runtime_environment();

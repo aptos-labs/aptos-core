@@ -210,12 +210,13 @@ where
         let block_size = txn_provider.num_txns();
         let timer = Instant::now();
 
-        let executor = AptosVMBlockExecutor::new();
+        let config = BlockExecutorConfig::new_maybe_block_limit(1, maybe_block_gas_limit);
+        let executor = AptosVMBlockExecutor::new_with_local_config(config.local);
         let output = executor
-            .execute_block_with_config(
+            .execute_block(
                 txn_provider,
                 self.state_view.as_ref(),
-                BlockExecutorConfig::new_maybe_block_limit(1, maybe_block_gas_limit),
+                config.onchain,
                 TransactionSliceMetadata::unknown(),
             )
             .expect("Sequential block execution should succeed")
@@ -259,15 +260,14 @@ where
         let block_size = txn_provider.num_txns();
         let timer = Instant::now();
 
-        let executor = AptosVMBlockExecutor::new();
+        let config =
+            BlockExecutorConfig::new_maybe_block_limit(concurrency_level, maybe_block_gas_limit);
+        let executor = AptosVMBlockExecutor::new_with_local_config(config.local);
         let output = executor
-            .execute_block_with_config(
+            .execute_block(
                 txn_provider,
                 self.state_view.as_ref(),
-                BlockExecutorConfig::new_maybe_block_limit(
-                    concurrency_level,
-                    maybe_block_gas_limit,
-                ),
+                config.onchain,
                 TransactionSliceMetadata::unknown(),
             )
             .expect("Parallel block execution should succeed")

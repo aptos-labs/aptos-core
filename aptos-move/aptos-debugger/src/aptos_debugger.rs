@@ -9,7 +9,7 @@ use aptos_rest_client::Client;
 use aptos_types::{
     account_address::AccountAddress,
     block_executor::{
-        config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
+        config::{BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
         transaction_slice_metadata::TransactionSliceMetadata,
     },
     contract_event::ContractEvent,
@@ -546,15 +546,13 @@ fn execute_block_no_limit(
     state_view: &DebuggerStateView,
     concurrency_level: usize,
 ) -> Result<Vec<TransactionOutput>, BlockError> {
-    let executor = AptosVMBlockExecutor::new();
+    let local_config = BlockExecutorLocalConfig::default_with_concurrency_level(concurrency_level);
+    let executor = AptosVMBlockExecutor::new_with_local_config(local_config);
     executor
-        .execute_block_with_config(
+        .execute_block(
             txn_provider,
             state_view,
-            BlockExecutorConfig {
-                local: BlockExecutorLocalConfig::default_with_concurrency_level(concurrency_level),
-                onchain: BlockExecutorConfigFromOnchain::new_no_block_limit(), // TODO(HotState): will need to incorporate some features.
-            },
+            BlockExecutorConfigFromOnchain::new_no_block_limit(), // TODO(HotState): will need to incorporate some features.
             TransactionSliceMetadata::unknown(),
         )
         .map(BlockOutput::into_transaction_outputs_forced)

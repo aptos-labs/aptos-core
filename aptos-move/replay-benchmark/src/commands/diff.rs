@@ -2,13 +2,16 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    commands::init_logger_and_metrics, diff::TransactionDiffBuilder, execution::execute_workload,
-    state_view::ReadSet, workload::Workload,
+    commands::init_logger_and_metrics,
+    diff::TransactionDiffBuilder,
+    execution::{execute_workload, local_config},
+    state_view::ReadSet,
+    workload::Workload,
 };
 use anyhow::{anyhow, bail};
 use aptos_logger::Level;
 use aptos_types::transaction::{TransactionBlock, TransactionOutput};
-use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
+use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use clap::Parser;
 use std::path::PathBuf;
 use tokio::fs;
@@ -151,13 +154,12 @@ impl DiffCommand {
         workloads: &[Workload],
         inputs: &[ReadSet],
     ) -> Vec<Vec<TransactionOutput>> {
-        let executor = AptosVMBlockExecutor::new();
+        let executor =
+            AptosVMBlockExecutor::new_with_local_config(local_config(self.concurrency_level));
         workloads
             .iter()
             .zip(inputs)
-            .map(|(workload, input)| {
-                execute_workload(&executor, workload, input, self.concurrency_level)
-            })
+            .map(|(workload, input)| execute_workload(&executor, workload, input))
             .collect()
     }
 }
