@@ -119,16 +119,9 @@ impl GlobalArenaPool {
     }
 
     /// Creates the specified number of arenas in the pool, each with the
-    /// specified capacity.
-    ///
-    /// # Panics
-    ///
-    /// - If number of arenas is zero, or larger than 128.
+    /// specified capacity. The number of arenas is clamped to at least 1.
     pub fn with_capacity_and_num_arenas(arena_capacity: usize, num_arenas: usize) -> Self {
-        // Number of arenas is ~ number of working threads. Upper bound by 128
-        // is good enough to accommodate most of the CPUs.
-        assert!(num_arenas > 0);
-        assert!(num_arenas <= 128);
+        let num_arenas = num_arenas.max(1);
 
         let arenas = (0..num_arenas)
             .map(|_| CachePadded::new(Mutex::new(Bump::with_capacity(arena_capacity))))
