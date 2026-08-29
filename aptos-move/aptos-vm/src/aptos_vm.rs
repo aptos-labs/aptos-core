@@ -3474,13 +3474,13 @@ impl AptosVMBlockExecutor {
         }
     }
 
-    /// Executes transactions with the specified [BlockExecutorConfig] and returns output for each
+    /// Executes transactions with the specified onchain config and returns output for each
     /// one of them.
-    pub fn execute_block_with_config(
+    fn execute_block_with_config(
         &self,
         txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo>,
         state_view: &(impl StateView + Sync),
-        config: BlockExecutorConfig,
+        onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
     ) -> BlockExecutionResult<SignatureVerifiedTransaction, TransactionOutput> {
         fail_point!("aptos_vm_block_executor::execute_block_with_config", |_| {
@@ -3505,7 +3505,10 @@ impl AptosVMBlockExecutor {
             txn_provider,
             state_view,
             &self.module_cache_manager,
-            config,
+            BlockExecutorConfig {
+                local: self.module_cache_manager.local_config().clone(),
+                onchain: onchain_config,
+            },
             transaction_slice_metadata,
             None,
         );
@@ -3529,11 +3532,12 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
     ) -> BlockExecutionResult<SignatureVerifiedTransaction, TransactionOutput> {
-        let config = BlockExecutorConfig {
-            local: self.module_cache_manager.local_config().clone(),
-            onchain: onchain_config,
-        };
-        self.execute_block_with_config(txn_provider, state_view, config, transaction_slice_metadata)
+        self.execute_block_with_config(
+            txn_provider,
+            state_view,
+            onchain_config,
+            transaction_slice_metadata,
+        )
     }
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>>(
