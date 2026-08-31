@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    counters::{DEC_QUEUE_SIZE, SECRET_SHARE_STORAGE_EVENTS},
+    counters::DEC_QUEUE_SIZE,
     logging::{LogEvent, LogSchema},
     network::{IncomingSecretShareRequest, NetworkSender, TConsensusMsg},
     pipeline::buffer_manager::{OrderedBlocks, ResetAck, ResetRequest, ResetSignal},
@@ -11,7 +11,7 @@ use crate::{
         network_messages::{SecretShareMessage, SecretShareRpc},
         reliable_broadcast_state::SecretShareAggregateState,
         secret_share_store::{SecretShareAggregationResult, SecretShareStore},
-        storage::{storage_key, SecretShareKey, SecretShareStorage, SecretShareStorageError},
+        storage::{storage_key, SecretShareKey, SecretShareStorage},
         types::RequestSecretShare,
         verifier::SecretShareVerifier,
     },
@@ -50,14 +50,6 @@ pub type Receiver<T> = UnboundedReceiver<T>;
 
 type PendingDeriveFut =
     Pin<Box<dyn Future<Output = (Round, TaskResult<SecretShareResult>)> + Send>>;
-
-fn storage_error_label(error: &SecretShareStorageError) -> &'static str {
-    match error {
-        SecretShareStorageError::Conflict { .. } => "conflict",
-        SecretShareStorageError::Corruption(_) => "corruption",
-        SecretShareStorageError::Io(_) => "io_failure",
-    }
-}
 
 pub struct SecretShareManager {
     author: Author,
@@ -127,17 +119,11 @@ impl SecretShareManager {
             let share = match loaded_share {
                 Ok(share) => share,
                 Err(error) => {
-                    SECRET_SHARE_STORAGE_EVENTS
-                        .with_label_values(&["recovery", storage_error_label(&error)])
-                        .inc();
                     error!("Ignoring invalid persisted secret share: {error}");
                     continue;
                 },
             };
             if share.epoch() != epoch_state.epoch || share.author() != &author {
-                SECRET_SHARE_STORAGE_EVENTS
-                    .with_label_values(&["recovery", "corruption"])
-                    .inc();
                 error!(
                     expected_epoch = epoch_state.epoch,
                     share_epoch = share.epoch(),
@@ -148,9 +134,6 @@ impl SecretShareManager {
                 continue;
             }
             if let Err(error) = verifier.verify(&share, &author) {
-                SECRET_SHARE_STORAGE_EVENTS
-                    .with_label_values(&["recovery", "corruption"])
-                    .inc();
                 error!(
                     epoch = share.epoch(),
                     round = share.round(),
@@ -158,9 +141,6 @@ impl SecretShareManager {
                 );
                 continue;
             }
-            SECRET_SHARE_STORAGE_EVENTS
-                .with_label_values(&["recovery", "loaded"])
-                .inc();
             recovered_self_shares.insert(storage_key(share.metadata()), share);
         }
 
@@ -265,9 +245,6 @@ impl SecretShareManager {
         }
 
         if let Err(error) = self.secret_share_storage.save_self_share(&share) {
-            SECRET_SHARE_STORAGE_EVENTS
-                .with_label_values(&["write", storage_error_label(&error)])
-                .inc();
             error!(
                 epoch = share.epoch(),
                 round = round,
@@ -276,9 +253,6 @@ impl SecretShareManager {
             );
             return;
         }
-        SECRET_SHARE_STORAGE_EVENTS
-            .with_label_values(&["write", "success"])
-            .inc();
         self.recovered_self_shares
             .insert(storage_key(share.metadata()), share.clone());
 
@@ -551,18 +525,11 @@ impl SecretShareManager {
                     .filter(|share| share.metadata() == request.metadata())
                     .cloned();
                 if let Some(share) = recovered_share {
-                    SECRET_SHARE_STORAGE_EVENTS
-                        .with_label_values(&["recovery", "success"])
-                        .inc();
                     self.process_response(
                         protocol,
                         response_sender,
                         SecretShareMessage::Share(share),
                     );
-                } else {
-                    SECRET_SHARE_STORAGE_EVENTS
-                        .with_label_values(&["recovery", "miss"])
-                        .inc();
                 }
             },
             SecretShareMessage::Share(share) => {
@@ -658,7 +625,10 @@ mod tests {
     use crate::{
         network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
         rand::secret_sharing::{
-            storage::{InMemorySecretShareStorage, LoadedSecretShare, SecretShareDb},
+            storage::{
+                InMemorySecretShareStorage, LoadedSecretShare, SecretShareDb,
+                SecretShareStorageError,
+            },
             test_utils::{
                 create_bad_secret_share, create_metadata, create_secret_share, TestContext,
             },
