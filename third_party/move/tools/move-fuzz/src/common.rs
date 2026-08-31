@@ -204,43 +204,41 @@ impl TxnArgTypeWithRef {
         }
     }
 
+    /// Whether a value of type `token` can be silently discarded, i.e., whether
+    /// the type has the `drop` ability. `generics` supplies the ability
+    /// constraints of the enclosing function's type parameters.
+    ///
+    /// This delegates to `BinaryIndexedView::abilities`
+    /// (`third_party/move/move-binary-format/src/binary_views.rs`), the same
+    /// helper the bytecode verifier uses, so the fuzzer cannot drift from the
+    /// VM's notion of abilities.
+    ///
+    /// Note in particular that function values are *not* unconditionally
+    /// droppable. The abilities of a function type are exactly the ones written
+    /// on the type itself (`Function(_, _, abilities) => Ok(*abilities)`), so a
+    /// bare `|u64|u64` has no abilities at all; the runtime applies the same
+    /// rule in `Type::abilities`
+    /// (`move-vm/types/src/loaded_data/runtime_types.rs`). Captured values are
+    /// already folded into that ability set when the closure is built:
+    /// `clos_pack` in `move-bytecode-verifier/src/type_safety.rs` (and
+    /// `verify_pack_closure` in `move-vm/runtime/src/runtime_type_checks.rs`)
+    /// starts from `AbilitySet::PRIVATE_FUNCTIONS`/`PUBLIC_FUNCTIONS` and
+    /// intersects the abilities of every captured argument, so a closure over a
+    /// non-droppable capture already carries a function type without `drop`.
+    /// There is nothing extra to compute here.
+    ///
+    /// A resolver error (only reachable for a malformed module) is reported as
+    /// "not droppable" so callers skip the function instead of emitting a bridge
+    /// script that fails to compile.
     pub fn is_droppable(
         binary: BinaryIndexedView,
         generics: &[AbilitySet],
         token: &SignatureToken,
     ) -> bool {
-        match token {
-            SignatureToken::Bool
-            | SignatureToken::U8
-            | SignatureToken::I8
-            | SignatureToken::U16
-            | SignatureToken::I16
-            | SignatureToken::U32
-            | SignatureToken::I32
-            | SignatureToken::U64
-            | SignatureToken::I64
-            | SignatureToken::U128
-            | SignatureToken::I128
-            | SignatureToken::U256
-            | SignatureToken::I256
-            | SignatureToken::Address
-            | SignatureToken::Signer
-            | SignatureToken::Reference(_)
-            | SignatureToken::MutableReference(_)
-            | SignatureToken::Function(..) => true,
-            SignatureToken::Struct(idx) | SignatureToken::StructInstantiation(idx, _) => {
-                let _ = idx;
-                binary
-                    .abilities(token, generics)
-                    .map(|abilities| abilities.has_drop())
-                    .unwrap_or(false)
-            },
-            SignatureToken::Vector(sub) => Self::is_droppable(binary, generics, sub.as_ref()),
-            SignatureToken::TypeParameter(idx) => generics
-                .get(*idx as usize)
-                .expect("type parameter")
-                .has_drop(),
-        }
+        binary
+            .abilities(token, generics)
+            .map(|abilities| abilities.has_drop())
+            .unwrap_or(false)
     }
 }
 
@@ -248,7 +246,14 @@ impl TxnArgTypeWithRef {
 mod tests {
     use super::{Account, TxnArg, TxnArgType, TxnArgTypeWithRef};
     use aptos_types::account_address::create_resource_address;
-    use move_core_types::account_address::AccountAddress;
+    use move_binary_format::{
+        binary_views::BinaryIndexedView,
+        file_format::{empty_module, SignatureToken},
+    };
+    use move_core_types::{
+        ability::{Ability, AbilitySet},
+        account_address::AccountAddress,
+    };
 
     #[test]
     fn test_resource_account_address_matches_move_derivation() {
@@ -277,5 +282,93 @@ mod tests {
     fn test_txn_arg_type_with_ref_reduce_preserves_base_type() {
         let ty = TxnArgTypeWithRef::RefMut(TxnArgType::Address);
         assert!(matches!(ty.reduce(), TxnArgType::Address));
+    }
+
+    /// A function value is droppable exactly when its type declares `drop`.
+    /// See `BinaryIndexedView::abilities`: `Function(_, _, abilities) =>
+    /// Ok(*abilities)`.
+    #[test]
+    fn test_is_droppable_for_function_values_follows_declared_abilities() {
+        fn fun_ty(abilities: AbilitySet) -> SignatureToken {
+            SignatureToken::Function(
+                vec![SignatureToken::U64],
+                vec![SignatureToken::U64],
+                abilities,
+            )
+        }
+
+        let module = empty_module();
+        let view = BinaryIndexedView::Module(&module);
+
+        // `|u64|u64` carries no abilities at all, so it must not be dropped.
+        // This is also the shape produced by `PackClosure` when a capture is
+        // not droppable, since the verifier intersects the captured argument
+        // abilities into the resulting function type.
+        assert!(!TxnArgTypeWithRef::is_droppable(
+            view,
+            &[],
+            &fun_ty(AbilitySet::EMPTY)
+        ));
+        // `|u64|u64 has copy` still cannot be dropped.
+        assert!(!TxnArgTypeWithRef::is_droppable(
+            view,
+            &[],
+            &fun_ty(AbilitySet::EMPTY.add(Ability::Copy))
+        ));
+        // `|u64|u64 has drop` can.
+        assert!(TxnArgTypeWithRef::is_droppable(
+            view,
+            &[],
+            &fun_ty(AbilitySet::EMPTY.add(Ability::Drop))
+        ));
+        // ... and non-droppability propagates through `vector<_>`.
+        assert!(!TxnArgTypeWithRef::is_droppable(
+            view,
+            &[],
+            &SignatureToken::Vector(Box::new(fun_ty(AbilitySet::EMPTY)))
+        ));
+        assert!(TxnArgTypeWithRef::is_droppable(
+            view,
+            &[],
+            &SignatureToken::Vector(Box::new(fun_ty(AbilitySet::EMPTY.add(Ability::Drop))))
+        ));
+    }
+
+    #[test]
+    fn test_is_droppable_for_primitives_references_and_type_params() {
+        let module = empty_module();
+        let view = BinaryIndexedView::Module(&module);
+
+        for token in [
+            SignatureToken::Bool,
+            SignatureToken::U64,
+            SignatureToken::U256,
+            SignatureToken::Address,
+            SignatureToken::Signer,
+            SignatureToken::Reference(Box::new(SignatureToken::U64)),
+            SignatureToken::MutableReference(Box::new(SignatureToken::U64)),
+            SignatureToken::Vector(Box::new(SignatureToken::U8)),
+        ] {
+            assert!(TxnArgTypeWithRef::is_droppable(view, &[], &token));
+        }
+
+        // Type parameters take the abilities of their declared constraints, and
+        // `vector<T>` is droppable exactly when `T` is.
+        let constraints = [AbilitySet::EMPTY, AbilitySet::EMPTY.add(Ability::Drop)];
+        assert!(!TxnArgTypeWithRef::is_droppable(
+            view,
+            &constraints,
+            &SignatureToken::TypeParameter(0)
+        ));
+        assert!(TxnArgTypeWithRef::is_droppable(
+            view,
+            &constraints,
+            &SignatureToken::TypeParameter(1)
+        ));
+        assert!(!TxnArgTypeWithRef::is_droppable(
+            view,
+            &constraints,
+            &SignatureToken::Vector(Box::new(SignatureToken::TypeParameter(0)))
+        ));
     }
 }
