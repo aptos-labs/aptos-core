@@ -370,7 +370,7 @@ pub async fn simulate_multistep_proposal(
 
     // Compile all scripts.
     println!("Compiling scripts...");
-    let mut compiled_scripts = vec![];
+    let mut scripts = vec![];
     for path in proposal_scripts {
         let framework_package_args = FrameworkPackageArgs::try_parse_from([
             "dummy_executable_name",
@@ -382,7 +382,7 @@ pub async fn simulate_multistep_proposal(
             "failed to parse framework package args for compiling scripts, this should not happen",
         )?;
 
-        let (blob, hash) = compile_in_temp_dir(
+        let (blob, _hash) = compile_in_temp_dir(
             &DiagWriter::stderr(),
             "script",
             path,
@@ -394,9 +394,35 @@ pub async fn simulate_multistep_proposal(
         )
         .with_context(|| format!("failed to compile script {}", path.display()))?;
 
-        compiled_scripts.push((blob, hash));
+        let name = path
+            .file_stem()
+            .with_context(|| format!("script path has no file stem: {}", path.display()))?
+            .to_string_lossy()
+            .into_owned();
+        scripts.push((name, blob));
     }
 
+    simulate_compiled_scripts(
+        remote_url,
+        &proposal_dir.join("gas-profiling"),
+        &scripts,
+        profile_gas,
+        node_api_key,
+    )
+    .await
+}
+
+/// Simulate a multi-step proposal's compiled scripts, in order, against the
+/// remote network state. `scripts` pairs each script's display name with its
+/// bytecode; each script's execution hash is the hash of its bytecode. Gas
+/// profiling reports (if enabled) are written under `gas_report_dir/<name>`.
+pub async fn simulate_compiled_scripts(
+    remote_url: Url,
+    gas_report_dir: &Path,
+    scripts: &[(String, Vec<u8>)],
+    profile_gas: bool,
+    node_api_key: Option<String>,
+) -> Result<()> {
     // Set up the simulation state view.
     let mut client_builder = Client::builder(AptosBaseUrl::Custom(remote_url));
     if let Some(api_key) = node_api_key.clone() {
@@ -423,9 +449,8 @@ pub async fn simulate_multistep_proposal(
     // Execute the governance scripts in sorted order.
     println!("Executing governance scripts...");
 
-    for (script_idx, (script_path, (script_blob, script_hash))) in
-        proposal_scripts.iter().zip(compiled_scripts).enumerate()
-    {
+    for (script_idx, (script_name, script_blob)) in scripts.iter().enumerate() {
+        let script_hash = HashValue::sha3_256_of(script_blob);
         // Force-end the epoch so that buffered configuration changes get applied.
         force_end_epoch(&state_view).context("failed to force end epoch")?;
 
@@ -454,7 +479,7 @@ pub async fn simulate_multistep_proposal(
 
         // If the script is the last step of the proposal, it MUST NOT have a next execution hash.
         // Set the boolean flag to true to use a modified patch to catch this.
-        let forbid_next_execution_hash = script_idx == proposal_scripts.len() - 1;
+        let forbid_next_execution_hash = script_idx == scripts.len() - 1;
         patch_aptos_governance(&state_view, forbid_next_execution_hash)
             .context("failed to patch resolve_multistep_proposal")?;
 
@@ -463,7 +488,6 @@ pub async fn simulate_multistep_proposal(
         add_script_execution_hash(&state_view, script_hash)
             .context("failed to add script execution hash")?;
 
-        let script_name = script_path.file_name().unwrap().to_string_lossy();
         println!("    {}", script_name);
 
         // Create a new VM to ensure the loader is clean.
@@ -477,7 +501,7 @@ pub async fn simulate_multistep_proposal(
         let txn = account
             .account()
             .transaction()
-            .script(Script::new(script_blob, vec![], vec![
+            .script(Script::new(script_blob.clone(), vec![], vec![
                 TransactionArgument::U64(DUMMY_PROPOSAL_ID), // dummy proposal id, ignored by the patched function
             ]))
             .chain_id(chain_id.chain_id())
@@ -508,9 +532,7 @@ pub async fn simulate_multistep_proposal(
                 )?;
 
             let gas_log = gas_profiler.finish();
-            let report_path = proposal_dir
-                .join("gas-profiling")
-                .join(script_path.file_stem().unwrap());
+            let report_path = gas_report_dir.join(script_name);
             gas_log.generate_html_report(&report_path, format!("Gas Report - {}", script_name))?;
 
             println!("        Gas report saved to {}", report_path.display());
