@@ -122,11 +122,26 @@ fn is_object_group_struct_tag(struct_tag: &StructTag) -> bool {
 }
 
 /// Concrete transaction inputs for one script invocation.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SeedInput {
+///
+/// `V` selects the representation of the call arguments: [`MoveValue`] for the
+/// live seeds handed to the executor, and [`crate::state::PersistedMoveValue`]
+/// for the on-disk mirror, which [`crate::state::PersistedSeedInput`] aliases.
+/// Keeping one struct means the two views cannot drift apart field by field.
+///
+/// Only the persisted instantiation is (de)serializable. `MoveValue`'s own
+/// `Serialize` impl erases type tags (`U8(1)` and `U64(1)` both encode as `1`)
+/// and has no `Deserialize` counterpart, so the `PersistedValue` bound below
+/// deliberately makes `SeedInput<MoveValue>` non-serializable instead of
+/// letting lossy state reach disk or a seed identity hash.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(bound(
+    serialize = "V: crate::state::PersistedValue",
+    deserialize = "V: crate::state::PersistedValue"
+))]
+pub struct SeedInput<V = MoveValue> {
     pub sender: AccountAddress,
     pub ty_args: Vec<VmTypeTag>,
-    pub args: Vec<MoveValue>,
+    pub args: Vec<V>,
 }
 
 impl SeedInput {

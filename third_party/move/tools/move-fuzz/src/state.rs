@@ -166,6 +166,18 @@ impl PersistedExecCoverageMap {
     }
 }
 
+/// Value representations allowed inside persisted fuzz state.
+///
+/// Implemented only for [`PersistedMoveValue`]. [`SeedInput`] is generic over
+/// its argument representation and derives serde under this bound, so the
+/// in-memory `SeedInput<MoveValue>` is kept out of every serialization path:
+/// `MoveValue`'s `Serialize` impl drops type tags and has no `Deserialize`, so
+/// persisting it would silently lose information and collide seed identities
+/// (see `chain_instance_identity` in `crate::fuzzer`).
+pub trait PersistedValue: Serialize + serde::de::DeserializeOwned {}
+
+impl PersistedValue for PersistedMoveValue {}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PersistedMoveValue {
     Bool(bool),
@@ -245,14 +257,14 @@ impl PersistedMoveValue {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PersistedSeedInput {
-    pub sender: AccountAddress,
-    pub ty_args: Vec<VmTypeTag>,
-    pub args: Vec<PersistedMoveValue>,
-}
+/// On-disk mirror of [`SeedInput`]: the same struct with arguments stored in
+/// the tagged, round-trippable [`PersistedMoveValue`] form. This is a plain
+/// alias, so the two can no longer drift out of sync. The JSON layout is
+/// unchanged (serde does not encode the Rust struct name for JSON objects),
+/// so `AUTO_STATE_VERSION` does not need a bump.
+pub type PersistedSeedInput = SeedInput<PersistedMoveValue>;
 
-impl PersistedSeedInput {
+impl SeedInput<PersistedMoveValue> {
     pub fn try_from_seed(seed: &SeedInput) -> Result<Self> {
         Ok(Self {
             sender: seed.sender,
@@ -707,6 +719,40 @@ mod tests {
         };
         let persisted = PersistedSeedInput::try_from_seed(&seed)?;
         assert_eq!(persisted.into_seed()?, seed);
+        Ok(())
+    }
+
+    #[test]
+    fn test_persisted_seed_input_json_layout_unchanged() -> Result<()> {
+        // `PersistedSeedInput` is an alias of `SeedInput<PersistedMoveValue>`.
+        // serde does not encode the Rust struct name for JSON objects, so the
+        // on-disk layout must be identical to the standalone struct it
+        // replaced, and `auto_state.json` files written by older builds must
+        // still load without an `AUTO_STATE_VERSION` bump.
+        #[derive(serde::Serialize)]
+        struct LegacyPersistedSeedInput {
+            sender: AccountAddress,
+            ty_args: Vec<move_core_types::language_storage::TypeTag>,
+            args: Vec<PersistedMoveValue>,
+        }
+
+        let seed = SeedInput {
+            sender: AccountAddress::from_hex_literal("0x44")?,
+            ty_args: vec![move_core_types::language_storage::TypeTag::Bool],
+            args: vec![MoveValue::U64(99), MoveValue::Signer(AccountAddress::ONE)],
+        };
+        let persisted = PersistedSeedInput::try_from_seed(&seed)?;
+        let legacy = LegacyPersistedSeedInput {
+            sender: persisted.sender,
+            ty_args: persisted.ty_args.clone(),
+            args: persisted.args.clone(),
+        };
+
+        let legacy_json = serde_json::to_string(&legacy)?;
+        assert_eq!(serde_json::to_string(&persisted)?, legacy_json);
+
+        let restored: PersistedSeedInput = serde_json::from_str(&legacy_json)?;
+        assert_eq!(restored, persisted);
         Ok(())
     }
 
