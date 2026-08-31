@@ -25,7 +25,7 @@ use crate::{
         },
         secret_sharing::{
             secret_share_manager::SecretShareManager,
-            storage::{LoadedSecretShare, SecretShareStorage, SecretShareStorageError},
+            storage::{LoadedSecretShare, SecretShareStorage},
             verifier::SecretShareVerifier,
         },
     },
@@ -558,45 +558,16 @@ impl TExecutionClient for ExecutionProxyClient {
         highest_committed_round: Round,
     ) {
         let epoch = epoch_state.epoch;
-        let prune_result = self.secret_share_storage.prune_before_epoch(epoch);
-        match prune_result {
-            Ok(()) => counters::SECRET_SHARE_STORAGE_EVENTS
-                .with_label_values(&["prune", "success"])
-                .inc(),
-            Err(error) => {
-                let result = match error {
-                    SecretShareStorageError::Conflict { .. } => "conflict",
-                    SecretShareStorageError::Corruption(_) => "corruption",
-                    SecretShareStorageError::Io(_) => "io_failure",
-                };
-                counters::SECRET_SHARE_STORAGE_EVENTS
-                    .with_label_values(&["prune", result])
-                    .inc();
-                error!(
-                    epoch = epoch,
-                    "Failed to prune old secret shares at epoch start: {error}"
-                );
-            },
+        if let Err(error) = self.secret_share_storage.prune_before_epoch(epoch) {
+            error!(
+                epoch = epoch,
+                "Failed to prune old secret shares at epoch start: {error}"
+            );
         }
         let loaded_self_shares = if secret_share_verifier.is_some() {
             match self.secret_share_storage.load_self_shares(epoch) {
-                Ok(shares) => {
-                    counters::SECRET_SHARE_STORAGE_EVENTS
-                        .with_label_values(&["load", "success"])
-                        .inc();
-                    shares
-                },
-                Err(error) => {
-                    let result = match &error {
-                        SecretShareStorageError::Conflict { .. } => "conflict",
-                        SecretShareStorageError::Corruption(_) => "corruption",
-                        SecretShareStorageError::Io(_) => "io_failure",
-                    };
-                    counters::SECRET_SHARE_STORAGE_EVENTS
-                        .with_label_values(&["load", result])
-                        .inc();
-                    panic!("Failed to load secret shares at epoch start: {error}");
-                },
+                Ok(shares) => shares,
+                Err(error) => panic!("Failed to load secret shares at epoch start: {error}"),
             }
         } else {
             Vec::new()
