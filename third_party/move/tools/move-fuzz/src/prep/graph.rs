@@ -34,17 +34,23 @@ pub enum DatatypeItem {
 }
 
 impl DatatypeItem {
+    /// Build a datatype node for a type item.
+    ///
+    /// Returns `None` when the type does not need a datatype node in the flow graph:
+    /// either it is a simple (trivially constructible) type, or its shape is not
+    /// supported at all (see `TypeMode::convert`). Unsupported shapes are ultimately
+    /// rejected by `DriverCanvas::try_build`, which skips the whole script.
     fn from_type_item(ty: &TypeItem) -> Option<Self> {
         let converted = match ty {
-            TypeItem::Base(t) => match TypeMode::convert(t) {
+            TypeItem::Base(t) => match TypeMode::convert(t)? {
                 TypeMode::Simple(_) => return None,
                 TypeMode::Complex(complex_ty) => Self::Base(complex_ty),
             },
-            TypeItem::ImmRef(t) => match TypeMode::convert(t) {
+            TypeItem::ImmRef(t) => match TypeMode::convert(t)? {
                 TypeMode::Simple(_) => return None,
                 TypeMode::Complex(complex_ty) => Self::ImmRef(complex_ty),
             },
-            TypeItem::MutRef(t) => match TypeMode::convert(t) {
+            TypeItem::MutRef(t) => match TypeMode::convert(t)? {
                 TypeMode::Simple(_) => return None,
                 TypeMode::Complex(complex_ty) => Self::MutRef(complex_ty),
             },

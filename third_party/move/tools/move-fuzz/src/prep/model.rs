@@ -9,7 +9,7 @@ use crate::{
         function::{FunctionDecl, FunctionRegistry},
         graph::GraphBuilder,
         ident::FunctionIdent,
-        typing::{TypeBase, TypeItem, TypeRef, TypeSubstitution},
+        typing::{TypeBase, TypeItem, TypeMode, TypeRef, TypeSubstitution},
     },
 };
 use itertools::Itertools;
@@ -239,6 +239,14 @@ impl Model {
                     .enumerate()
                     .map(|(index, abilities)| TypeBase::Param { index, abilities })
                     .collect();
+
+                // skip instantiations whose parameter shapes the driver generator cannot
+                // materialize (e.g. `vector<|..|..>`); the entrypoint is excluded from the
+                // campaign rather than aborting the whole run
+                if let Some((idx, ty)) = find_unsupported_param(self, decl, &type_args) {
+                    debug!("  -> skipping instantiation: unsupported type `{ty}` for param {idx}");
+                    continue;
+                }
 
                 // identify Function-typed params and find matching candidates
                 let lambda_params = find_lambda_params(self, decl, &type_args);
@@ -501,6 +509,28 @@ fn parse_declared_module_ids(source: &str) -> Vec<String> {
         }
     }
     ids
+}
+
+/// Find the first parameter whose instantiated type cannot be materialized by the driver
+/// generator (currently: a vector of function values).
+///
+/// Entrypoints with such a parameter are skipped, mirroring how other unsupported argument
+/// shapes (e.g. a `TxnArgType::convert` failure) exclude an entrypoint instead of failing.
+fn find_unsupported_param(
+    model: &Model,
+    decl: &FunctionDecl,
+    type_args: &[TypeBase],
+) -> Option<(usize, TypeItem)> {
+    for (idx, ty) in decl.parameters.iter().enumerate() {
+        let ty_inst = model.datatype_registry.instantiate_type_ref(ty, type_args);
+        let ty_base = match &ty_inst {
+            TypeItem::Base(b) | TypeItem::ImmRef(b) | TypeItem::MutRef(b) => b,
+        };
+        if TypeMode::convert(ty_base).is_none() {
+            return Some((idx, ty_inst));
+        }
+    }
+    None
 }
 
 /// Identify `Function`-typed parameters in a function instantiation (decl + type args).

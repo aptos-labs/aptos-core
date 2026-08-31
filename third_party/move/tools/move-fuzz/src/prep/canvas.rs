@@ -350,15 +350,19 @@ impl DriverCanvas {
                         };
 
                         let arg_var = match arg_ty {
-                            TypeItem::Base(ty_base) => match TypeMode::convert(&ty_base) {
+                            TypeItem::Base(ty_base) => match TypeMode::convert(&ty_base)? {
                                 TypeMode::Simple(SimpleType::Signer) => {
                                     call_signer_moves += 1;
                                     signer_singleton(&mut canvas, &mut signer_var)
                                 },
-                                TypeMode::Simple(SimpleType::Function { .. }) => {
+                                TypeMode::Simple(SimpleType::Function { params, .. }) => {
+                                    // Lambda bindings are computed for the root entrypoint
+                                    // only, but a callee pulled in as a provider may also
+                                    // take a function value. Skip the script instead of
+                                    // panicking on (or misusing) a foreign binding.
                                     let binding = lambda_bindings
                                         .get(&index)
-                                        .expect("lambda binding for Function param");
+                                        .filter(|b| b.fn_params.len() == params.len())?;
                                     canvas.add_lambda(binding)
                                 },
                                 TypeMode::Simple(simple_ty) => {
@@ -366,16 +370,16 @@ impl DriverCanvas {
                                 },
                                 TypeMode::Complex(_) => dt_vars.get(&index).copied()?,
                             },
-                            TypeItem::ImmRef(ty_base) => match TypeMode::convert(&ty_base) {
+                            TypeItem::ImmRef(ty_base) => match TypeMode::convert(&ty_base)? {
                                 TypeMode::Simple(SimpleType::Signer) => {
                                     call_signer_imm_borrows += 1;
                                     let base_var = signer_singleton(&mut canvas, &mut signer_var);
                                     canvas.new_stmt_imm_borrow(base_var)
                                 },
-                                TypeMode::Simple(SimpleType::Function { .. }) => {
+                                TypeMode::Simple(SimpleType::Function { params, .. }) => {
                                     let binding = lambda_bindings
                                         .get(&index)
-                                        .expect("lambda binding for Function param");
+                                        .filter(|b| b.fn_params.len() == params.len())?;
                                     let base_var = canvas.add_lambda(binding);
                                     canvas.new_stmt_imm_borrow(base_var)
                                 },
@@ -385,16 +389,16 @@ impl DriverCanvas {
                                 },
                                 TypeMode::Complex(_) => dt_vars.get(&index).copied()?,
                             },
-                            TypeItem::MutRef(ty_base) => match TypeMode::convert(&ty_base) {
+                            TypeItem::MutRef(ty_base) => match TypeMode::convert(&ty_base)? {
                                 TypeMode::Simple(SimpleType::Signer) => {
                                     call_signer_mut_borrows += 1;
                                     let base_var = signer_singleton(&mut canvas, &mut signer_var);
                                     canvas.new_stmt_mut_borrow(base_var)
                                 },
-                                TypeMode::Simple(SimpleType::Function { .. }) => {
+                                TypeMode::Simple(SimpleType::Function { params, .. }) => {
                                     let binding = lambda_bindings
                                         .get(&index)
-                                        .expect("lambda binding for Function param");
+                                        .filter(|b| b.fn_params.len() == params.len())?;
                                     let base_var = canvas.add_lambda(binding);
                                     canvas.new_stmt_mut_borrow(base_var)
                                 },
@@ -1072,6 +1076,65 @@ mod tests {
             },
             stmt => panic!("expected call statement, got {stmt:?}"),
         }
+    }
+
+    #[test]
+    fn test_driver_canvas_try_build_skips_vector_of_function_values() {
+        let ident = function("takes_vector_of_lambdas");
+        let model = model_with_decl(FunctionDecl {
+            ident: ident.clone(),
+            generics: vec![],
+            parameters: vec![TypeRef::Base(TypeTag::Vector {
+                element: Box::new(TypeTag::Function {
+                    params: vec![TypeRef::Base(TypeTag::U64)],
+                    returns: vec![TypeRef::Base(TypeTag::U64)],
+                    abilities: AbilitySet::PRIMITIVES,
+                }),
+            })],
+            return_sig: vec![],
+            kind: PkgKind::Primary,
+            is_entry: true,
+        });
+        let mut graph = FlowGraph {
+            graph: StableGraph::new(),
+            generics: BTreeMap::new(),
+        };
+        graph.graph.add_node(FlowGraphNode::Function(FunctionInst {
+            ident,
+            type_args: vec![],
+        }));
+
+        // must degrade to "skip this entrypoint" rather than panic
+        assert!(DriverCanvas::try_build(&model, &graph, &BTreeMap::new()).is_none());
+    }
+
+    #[test]
+    fn test_driver_canvas_try_build_skips_function_param_without_binding() {
+        let ident = function("takes_lambda");
+        let model = model_with_decl(FunctionDecl {
+            ident: ident.clone(),
+            generics: vec![],
+            parameters: vec![TypeRef::Base(TypeTag::Function {
+                params: vec![TypeRef::Base(TypeTag::U64)],
+                returns: vec![TypeRef::Base(TypeTag::U64)],
+                abilities: AbilitySet::PRIMITIVES,
+            })],
+            return_sig: vec![],
+            kind: PkgKind::Primary,
+            is_entry: true,
+        });
+        let mut graph = FlowGraph {
+            graph: StableGraph::new(),
+            generics: BTreeMap::new(),
+        };
+        graph.graph.add_node(FlowGraphNode::Function(FunctionInst {
+            ident,
+            type_args: vec![],
+        }));
+
+        // a provider callee taking a function value has no lambda binding at that
+        // index: skip the canvas instead of unwrapping a missing binding
+        assert!(DriverCanvas::try_build(&model, &graph, &BTreeMap::new()).is_none());
     }
 
     #[test]

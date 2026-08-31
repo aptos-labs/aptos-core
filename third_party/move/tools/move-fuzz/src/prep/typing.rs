@@ -1222,9 +1222,13 @@ pub enum TypeMode {
 }
 
 impl TypeMode {
-    /// Convert a type base into a type mode
-    pub fn convert(t: &TypeBase) -> Self {
-        match t {
+    /// Convert a type base into a type mode.
+    ///
+    /// Returns `None` when the shape cannot be materialized by the driver generator.
+    /// Currently the only such shape is a vector of function values. Callers must
+    /// degrade gracefully and skip the enclosing entrypoint instead of failing.
+    pub fn convert(t: &TypeBase) -> Option<Self> {
+        let converted = match t {
             TypeBase::Bool => Self::Simple(SimpleType::Bool),
             TypeBase::U8 => Self::Simple(SimpleType::U8),
             TypeBase::I8 => Self::Simple(SimpleType::I8),
@@ -1242,10 +1246,12 @@ impl TypeMode {
             TypeBase::String => Self::Simple(SimpleType::String),
             TypeBase::Address => Self::Simple(SimpleType::Address),
             TypeBase::Signer => Self::Simple(SimpleType::Signer),
-            TypeBase::Vector { element } => match Self::convert(element) {
-                Self::Simple(SimpleType::Function { .. }) => {
-                    todo!("vector<Function> is not yet supported as a fuzz input")
-                },
+            TypeBase::Vector { element } => match Self::convert(element)? {
+                // A vector of function values cannot be materialized: lambdas are bound
+                // per-parameter (see `LambdaBinding`), not per-element, so there is no way
+                // to synthesize the elements. Report the shape as unsupported so the
+                // enclosing entrypoint is skipped rather than crashing the run.
+                Self::Simple(SimpleType::Function { .. }) => return None,
                 Self::Simple(elem_simple) => Self::Simple(SimpleType::Vector {
                     element: Box::new(elem_simple),
                 }),
@@ -1288,13 +1294,17 @@ impl TypeMode {
                 returns: returns.clone(),
                 abilities: *abilities,
             }),
-        }
+        };
+        Some(converted)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{TypeBase, TypeItem, TypeRef, TypeSubstitution, TypeTag, TypeUnification};
+    use super::{
+        SimpleType, TypeBase, TypeItem, TypeMode, TypeRef, TypeSubstitution, TypeTag,
+        TypeUnification,
+    };
     use crate::prep::ident::DatatypeIdent;
     use move_core_types::{
         ability::{Ability, AbilitySet},
@@ -1481,5 +1491,42 @@ mod tests {
         };
         assert!(subst.unify(&tag, &base));
         assert_eq!(subst.finish(), vec![Some(TypeBase::U64)]);
+    }
+
+    #[test]
+    fn test_type_mode_convert_rejects_vector_of_function_values() {
+        let fn_ty = TypeBase::Function {
+            params: vec![TypeItem::Base(TypeBase::U64)],
+            returns: vec![TypeItem::Base(TypeBase::U64)],
+            abilities: AbilitySet::PRIMITIVES,
+        };
+
+        // a bare function value is still supported (bound via a lambda binding)
+        assert!(matches!(
+            TypeMode::convert(&fn_ty),
+            Some(TypeMode::Simple(SimpleType::Function { .. }))
+        ));
+
+        // ... but a vector of them is unsupported and must be skipped, not panic
+        assert!(TypeMode::convert(&TypeBase::Vector {
+            element: Box::new(fn_ty.clone()),
+        })
+        .is_none());
+
+        // rejection propagates through nesting
+        assert!(TypeMode::convert(&TypeBase::Vector {
+            element: Box::new(TypeBase::Vector {
+                element: Box::new(fn_ty),
+            }),
+        })
+        .is_none());
+
+        // ordinary vectors are unaffected
+        assert!(matches!(
+            TypeMode::convert(&TypeBase::Vector {
+                element: Box::new(TypeBase::U64),
+            }),
+            Some(TypeMode::Simple(SimpleType::Vector { .. }))
+        ));
     }
 }
