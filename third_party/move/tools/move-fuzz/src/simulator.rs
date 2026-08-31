@@ -82,6 +82,15 @@ pub enum Runnable {
     },
 }
 
+/// How a runnable is submitted to the local testnet
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RunMode {
+    /// Execute against the local state only, without submitting the transaction
+    Simulate,
+    /// Submit the transaction and commit its effects
+    Commit,
+}
+
 /// Simulator for local testnet
 pub struct Simulator {
     /// simulator config
@@ -729,7 +738,7 @@ impl Simulator {
         runnable: &Runnable,
         ty_args: &[String],
         txn_args: &[TxnArg],
-        simulate: bool,
+        mode: RunMode,
     ) -> Result<(bool, Vec<String>)> {
         let formatted_args: Vec<_> = txn_args
             .iter()
@@ -800,8 +809,11 @@ impl Simulator {
             command.arg("--args").args(formatted_args);
         }
         // command: configs
-        if simulate {
-            command.arg("--local");
+        match mode {
+            RunMode::Simulate => {
+                command.arg("--local");
+            },
+            RunMode::Commit => (),
         }
         // command: misc
         command

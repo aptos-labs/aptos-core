@@ -5,7 +5,7 @@ use crate::{
     common::{Account, TxnArg, TxnArgType, TxnArgTypeWithRef},
     deps::Project,
     package,
-    simulator::{Runnable, Simulator},
+    simulator::{RunMode, Runnable, Simulator},
 };
 use anyhow::{anyhow, bail, Result};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
@@ -210,18 +210,16 @@ struct Step {
     signer: String,
     /// Arguments (parameters) for the transaction
     params: Vec<Value>,
-    /// Type arguments (a.k.a., type instantiation for generics)
+    /// Type instantiation for the generic parameters of the target
     #[serde(default)]
-    typing: Vec<String>,
-    /// Expected console output
+    type_arguments: Vec<String>,
     #[serde(default)]
-    expect: Option<Vec<Value>>,
-    /// Events generated
+    expect_console_output: Option<Vec<Value>>,
+    /// Events expected to be emitted by this step
     #[serde(default)]
     events: Option<Vec<String>>,
-    /// Whether this step should abort
     #[serde(default)]
-    aborts: bool,
+    should_abort: bool,
 }
 
 #[derive(Serialize)]
@@ -470,10 +468,10 @@ pub fn execute_runbook(simulator: &mut Simulator, runbook_path: &Path) -> Result
             target,
             signer,
             params,
-            typing,
-            expect,
+            type_arguments,
+            expect_console_output,
             events: expecting_events,
-            aborts,
+            should_abort,
         } = step;
         info!(
             "step {}: {} [{}] {}",
@@ -562,7 +560,7 @@ pub fn execute_runbook(simulator: &mut Simulator, runbook_path: &Path) -> Result
         };
 
         // check generics matches
-        if generics.len() != typing.len() {
+        if generics.len() != type_arguments.len() {
             bail!("wrong number of type arguments");
         }
 
@@ -645,14 +643,13 @@ pub fn execute_runbook(simulator: &mut Simulator, runbook_path: &Path) -> Result
             },
         };
 
-        // execute the target (first in simulate mode)
         let (success, stdout) = simulator.run(
             &signer_profile,
             &signer_addr,
             &runnable,
-            &typing,
+            &type_arguments,
             &parsed_args,
-            true,
+            RunMode::Simulate,
         )?;
         if !success {
             bail!(
@@ -693,14 +690,14 @@ pub fn execute_runbook(simulator: &mut Simulator, runbook_path: &Path) -> Result
 
         // extract the result
         let response: StepResponse = serde_json::from_str(&result.join("\n"))?;
-        match (aborts, response.result.success) {
+        match (should_abort, response.result.success) {
             (true, true) => bail!("expect failure while transaction executed"),
             (false, false) => bail!("expect success while transaction failed"),
             _ => (),
         }
 
         // cross-check the debug messages (if explicitly requested)
-        if let Some(debugs_expect) = expect {
+        if let Some(debugs_expect) = expect_console_output {
             if debugs.len() != debugs_expect.len() {
                 error!("debug messages received:");
                 for item in debugs {
@@ -759,16 +756,15 @@ pub fn execute_runbook(simulator: &mut Simulator, runbook_path: &Path) -> Result
             }
         }
 
-        // execute the script (now in commit mode)
         let (success, _) = simulator.run(
             &signer_profile,
             &signer_addr,
             &runnable,
-            &typing,
+            &type_arguments,
             &parsed_args,
-            false,
+            RunMode::Commit,
         )?;
-        match (aborts, success) {
+        match (should_abort, success) {
             (true, true) => bail!(
                 "expect script execution to fail at case {} step {} but passed",
                 counter_case,
@@ -790,7 +786,7 @@ pub fn execute_runbook(simulator: &mut Simulator, runbook_path: &Path) -> Result
 
 #[cfg(test)]
 mod tests {
-    use super::{create_bridge_script, Runbook, StepHash};
+    use super::{create_bridge_script, Runbook, RunbookEntry, StepHash};
     use anyhow::Result;
     use move_binary_format::file_format::{empty_module as blank_module, CompiledModule};
     use move_core_types::{
@@ -826,9 +822,24 @@ mod tests {
         let book: Runbook = serde_json::from_value(json!([
             {"_": "info"},
             {"//": "case"},
-            {"entry": "foo", "signer": "@alice", "params": [], "typing": []}
+            {
+                "entry": "foo",
+                "signer": "@alice",
+                "params": [],
+                "type_arguments": ["u64"],
+                "should_abort": true
+            }
         ]))?;
         assert_eq!(book.0.len(), 3);
+        match book.0.last().expect("step entry") {
+            RunbookEntry::Step(step) => {
+                assert_eq!(step.type_arguments, vec!["u64".to_string()]);
+                assert!(step.should_abort);
+            },
+            RunbookEntry::Info { .. } | RunbookEntry::Case { .. } => {
+                panic!("expected a step entry")
+            },
+        }
         Ok(())
     }
 
