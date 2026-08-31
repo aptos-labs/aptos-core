@@ -769,8 +769,8 @@ impl ResolvedGraph {
 
     pub fn file_sources(&self) -> BTreeMap<FileHash, (Symbol, String)> {
         self.package_table
-            .iter()
-            .flat_map(|(_, rpkg)| {
+            .values()
+            .flat_map(|rpkg| {
                 rpkg.get_sources(&self.build_options)
                     .unwrap()
                     .iter()

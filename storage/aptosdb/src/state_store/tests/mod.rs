@@ -216,7 +216,7 @@ proptest! {
             prop_assert!(
                 itertools::equal(
                     actual.iter(),
-                    expected.iter().filter_map(|(_h, kv)| kv.as_ref())
+                    expected.values().filter_map(|kv| kv.as_ref())
                 )
             );
         }
