@@ -66,25 +66,34 @@ cargo build -p move-fuzz --bin move-fuzz-dev
 The main user-facing command is:
 
 ```bash
-aptos move fuzz <PATH> [TOP_LEVEL_OPTIONS] <COMMAND> [COMMAND_OPTIONS]
+aptos move fuzz [TOP_LEVEL_OPTIONS] <COMMAND> [COMMAND_OPTIONS]
 ```
 
 The standalone developer runner uses the same arguments:
 
 ```bash
-move-fuzz-dev <PATH> [TOP_LEVEL_OPTIONS] <COMMAND> [COMMAND_OPTIONS]
+move-fuzz-dev [TOP_LEVEL_OPTIONS] <COMMAND> [COMMAND_OPTIONS]
 ```
 
-`<PATH>` is the root directory of the Move project collection you want to analyze.
+The project root is selected with `--package-dir <PATH>`, the same flag every other
+`aptos move` subcommand uses, and defaults to the current directory. Unlike the other
+subcommands, it may point at a directory tree that holds several Move packages rather
+than a single `Move.toml`.
 
 ### Top-level options
 
-These options apply to all subcommands:
+These options apply to all subcommands. Where a flag also exists on the other `aptos move`
+subcommands it keeps the same name and value syntax (see `MovePackageOptions`); only the
+defaults differ, as noted below.
 
+- `--package-dir <PATH>`
+  Root directory of the Move project collection to analyze. Defaults to the current directory.
 - `--subdir <PATH>`
-  Restrict the analysis to one or more package directories under `<PATH>`. Pass it multiple times to fuzz a subset of a large workspace.
-- `--language <VERSION>`
-  Select the Move language version. The current default is `2.3+`.
+  Restrict the analysis to one or more package directories under `--package-dir`. Pass it multiple times to fuzz a subset of a large workspace.
+- `--language-version <VERSION>` (alias: `--language`)
+  Select the Move language version. Defaults to `2.3` (the other subcommands default to the latest stable version).
+- `--optimize <none|default|extra>`
+  Select the optimization level. Defaults to `extra`, so that fuzzing exercises the full optimizer pipeline.
 - `--alias <NAME=NAME>`
   Declare named-address aliases.
 - `--resource <RESOURCE=BASE:SEED>`

@@ -52,7 +52,7 @@ use move_binary_format::{binary_views::BinaryIndexedView, file_format::Signature
 use move_core_types::{
     ability::AbilitySet,
     account_address::AccountAddress,
-    int256::{I256, U256},
+    int256::U256,
 };
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;

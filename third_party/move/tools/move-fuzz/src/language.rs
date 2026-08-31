@@ -18,6 +18,21 @@ pub enum OptLevel {
     Extra,
 }
 
+impl FromStr for OptLevel {
+    type Err = anyhow::Error;
+
+    /// Accepts the same spellings as the `--optimize` flag of the other
+    /// `aptos move` subcommands, so the two can be used interchangeably.
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "none" => Ok(OptLevel::None),
+            "default" => Ok(OptLevel::Default),
+            "extra" => Ok(OptLevel::Extra),
+            _ => anyhow::bail!("unrecognized optimization level \"{s}\" (expected one of: none, default, extra)"),
+        }
+    }
+}
+
 /// Move compilation specification
 #[derive(Copy, Clone)]
 pub struct LanguageSetting {
