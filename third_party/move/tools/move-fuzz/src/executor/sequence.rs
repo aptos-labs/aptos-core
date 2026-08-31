@@ -6,7 +6,7 @@ use crate::{
         clone_exec_coverage_map, collect_coverage_keys, count_coverage_entries, coverage_delta,
         merge_coverage,
         oneshot::ExecStatus,
-        tracing::{ResourceRead, ResourceWrite, TracingExecutor},
+        tracing::{ResourceRead, ResourceSlot, ResourceWrite, TracingExecutor},
     },
     mutate::mutator::{Mutator, TypePool},
     prep::canvas::{BasicInput, ScriptSignature},
@@ -19,6 +19,7 @@ use crate::{
 use anyhow::{bail, Result};
 use aptos_types::{
     account_address::AccountAddress,
+    state_store::state_key::StateKey,
     transaction::{
         ExecutionStatus, Script, TransactionArgument, TransactionPayload, TransactionStatus,
     },
@@ -50,26 +51,68 @@ const NUM_DISCOVERY_RUNS: usize = 10;
 // Resource tagging and script profiling (kept from original)
 // ---------------------------------------------------------------------------
 
-/// A global-state identifier for def-use matching.
-/// Includes both storage account and resource type.
+/// A global-state identifier for def-use matching: the storage account plus
+/// the Move type stored under it.
+///
+/// This is deliberately *not* an [`aptos_types::state_store::state_key::StateKey`].
+/// `StateKey` is the physical slot identity; the DUG is keyed on the logical
+/// `(account, type)` decomposition because:
+///
+/// * The object heuristic (`tags_are_compatible` / `equivalent_type_nodes`)
+///   relates nodes that share a `StructTag` but live at *different* object
+///   addresses. `StateKey` fuses address and type into a single interned
+///   identity (its `PartialEq` is `Arc::ptr_eq`), so those nodes are simply
+///   unequal, and recovering the type costs an `AccessPath::get_path()` BCS
+///   decode plus a `StructTag` allocation - per comparison, inside a scan over
+///   every type node, per unmet dependency, per scheduling decision.
+/// * `ResourceTag::tracked` and `is_object_group_struct_tag` filter on the
+///   module/name of the type, which `StateKey` hides behind that same decode.
+/// * Only `(account, type)` is load-bearing for def-use matching, so the
+///   physical `is_resource_group` bit is dropped. That makes the mapping a
+///   lossy projection: a `ResourceTag` cannot be turned back into a
+///   `StateKey`, and synthetic table/raw tags have no `StateKey` at all.
+/// * The graph is persisted as JSON (`auto_state.json`). `StructTag`
+///   round-trips as readable JSON; `StateKey` delegates to `StateKeyInner`,
+///   whose byte fields are `#[serde(with = "serde_bytes")]` and therefore
+///   render as integer arrays, and whose `Deserialize` is fallible and
+///   re-interns into the process-global key registry on every load.
+///
+/// [`ResourceTag::from_state_key`] is the conversion from a raw `StateKey`.
+/// There is no inverse, for the reason given above.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct ResourceTag {
     pub account: AccountAddress,
     pub struct_tag: StructTag,
 }
 
-fn should_track_resource_tag(account: AccountAddress, struct_tag: &StructTag) -> bool {
-    // Keep synthetic table/raw keys in the DUG. They are often the only
-    // observable cross-transaction state for table-backed protocols.
-    // The transaction-context tags are still omitted because they are
-    // high-volume per-txn noise rather than durable contract state.
-    if account == AccountAddress::ONE {
-        let module = struct_tag.module.as_str();
-        if module == "transaction_context" {
-            return false;
+impl ResourceTag {
+    /// Build the DUG identity for a state slot, or `None` when the slot is
+    /// deliberately not tracked.
+    ///
+    /// Synthetic table/raw tags are kept: they are often the only observable
+    /// cross-transaction state for table-backed protocols. The
+    /// transaction-context tags are omitted because they are high-volume
+    /// per-txn noise rather than durable contract state.
+    pub fn tracked(account: AccountAddress, struct_tag: &StructTag) -> Option<Self> {
+        if account == AccountAddress::ONE && struct_tag.module.as_str() == "transaction_context" {
+            return None;
         }
+        Some(Self {
+            account,
+            struct_tag: struct_tag.clone(),
+        })
     }
-    true
+
+    /// Build the DUG identity directly from a raw `StateKey`.
+    ///
+    /// Returns `None` for code slots and for slots this fuzzer does not track.
+    /// This is the bridge from the physical key space into the def-use graph's
+    /// logical key space; see the type-level comment for why the graph is not
+    /// keyed on `StateKey` itself.
+    pub fn from_state_key(state_key: &StateKey) -> Option<Self> {
+        let slot = ResourceSlot::from_state_key(state_key)?;
+        Self::tracked(slot.address, &slot.struct_tag)
+    }
 }
 
 fn is_object_group_struct_tag(struct_tag: &StructTag) -> bool {
@@ -138,22 +181,16 @@ impl ExecResourceProfile {
     ) -> Self {
         let mut reads = BTreeSet::new();
         for read in resource_reads {
-            if should_track_resource_tag(read.address, &read.struct_tag) {
-                reads.insert(ResourceTag {
-                    account: read.address,
-                    struct_tag: read.struct_tag.clone(),
-                });
+            if let Some(tag) = ResourceTag::tracked(read.address, &read.struct_tag) {
+                reads.insert(tag);
             }
         }
 
         let mut writes = BTreeSet::new();
         if succeeded {
             for write in resource_writes {
-                if should_track_resource_tag(write.address, &write.struct_tag) {
-                    writes.insert(ResourceTag {
-                        account: write.address,
-                        struct_tag: write.struct_tag.clone(),
-                    });
+                if let Some(tag) = ResourceTag::tracked(write.address, &write.struct_tag) {
+                    writes.insert(tag);
                 }
             }
         }
@@ -230,11 +267,8 @@ pub fn discover_profiles(
             if let Ok((vm_status, txn_status, resource_writes, resource_reads)) = result {
                 // collect reads
                 for read in &resource_reads {
-                    if should_track_resource_tag(read.address, &read.struct_tag) {
-                        all_reads.insert(ResourceTag {
-                            account: read.address,
-                            struct_tag: read.struct_tag.clone(),
-                        });
+                    if let Some(tag) = ResourceTag::tracked(read.address, &read.struct_tag) {
+                        all_reads.insert(tag);
                     }
                 }
 
@@ -249,11 +283,8 @@ pub fn discover_profiles(
                 if is_success {
                     ever_succeeded = true;
                     for write in &resource_writes {
-                        if should_track_resource_tag(write.address, &write.struct_tag) {
-                            all_writes.insert(ResourceTag {
-                                account: write.address,
-                                struct_tag: write.struct_tag.clone(),
-                            });
+                        if let Some(tag) = ResourceTag::tracked(write.address, &write.struct_tag) {
+                            all_writes.insert(tag);
                         }
                     }
                 }
@@ -660,11 +691,7 @@ impl DefUseGraph {
     pub fn ingest_initial_writes(&mut self, writes: &[ResourceWrite]) -> bool {
         let mut changed = false;
         for write in writes {
-            if should_track_resource_tag(write.address, &write.struct_tag) {
-                let tag = ResourceTag {
-                    account: write.address,
-                    struct_tag: write.struct_tag.clone(),
-                };
+            if let Some(tag) = ResourceTag::tracked(write.address, &write.struct_tag) {
                 changed |= self.add_initial_tag(&tag);
             }
         }
@@ -2819,6 +2846,66 @@ mod tests {
             struct_tag: tag.struct_tag,
             is_resource_group: false,
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // StateKey <-> ResourceTag conversion
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_resource_tag_from_state_key() {
+        let coin_store = StructTag {
+            address: AccountAddress::ONE,
+            module: Identifier::new("coin").unwrap(),
+            name: Identifier::new("CoinStore").unwrap(),
+            type_args: vec![],
+        };
+
+        // A resource slot decomposes into (storage address, type).
+        let key = StateKey::resource(&AccountAddress::TWO, &coin_store).unwrap();
+        assert_eq!(
+            ResourceTag::from_state_key(&key),
+            Some(ResourceTag {
+                account: AccountAddress::TWO,
+                struct_tag: coin_store.clone(),
+            })
+        );
+
+        // The same type at a different storage address is a distinct node that
+        // still shares the struct tag. That shared tag is what the object
+        // heuristic keys on, and it is exactly what an interned `StateKey`
+        // (address and type fused into one identity) cannot express.
+        let key_elsewhere = StateKey::resource(&AccountAddress::THREE, &coin_store).unwrap();
+        let elsewhere = ResourceTag::from_state_key(&key_elsewhere).unwrap();
+        assert_ne!(elsewhere, ResourceTag::from_state_key(&key).unwrap());
+        assert_eq!(elsewhere.struct_tag, coin_store);
+
+        // Code slots are not tracked state.
+        let module_name = Identifier::new("coin").unwrap();
+        assert_eq!(
+            ResourceTag::from_state_key(&StateKey::module(&AccountAddress::ONE, &module_name)),
+            None
+        );
+
+        // Transaction-context resources are filtered out as per-txn noise.
+        let txn_context = StructTag {
+            address: AccountAddress::ONE,
+            module: Identifier::new("transaction_context").unwrap(),
+            name: Identifier::new("AUID").unwrap(),
+            type_args: vec![],
+        };
+        assert_eq!(
+            ResourceTag::from_state_key(
+                &StateKey::resource(&AccountAddress::ONE, &txn_context).unwrap()
+            ),
+            None
+        );
+
+        // Slots with no Move type get a synthetic tag rather than being dropped.
+        let raw = ResourceTag::from_state_key(&StateKey::raw(b"raw-state")).unwrap();
+        assert_eq!(raw.account, AccountAddress::ONE);
+        assert_eq!(raw.struct_tag.module.as_str(), "global_state");
+        assert!(raw.struct_tag.name.as_str().starts_with("raw_"));
     }
 
     // -----------------------------------------------------------------------

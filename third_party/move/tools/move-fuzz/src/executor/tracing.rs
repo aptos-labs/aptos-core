@@ -123,6 +123,83 @@ fn synthetic_struct_tag(prefix: &str, state_key: &StateKey) -> StructTag {
     }
 }
 
+/// The `(address, type)` decomposition of a single state slot, as the fuzzer
+/// sees it.
+///
+/// [`ResourceSlot::from_state_key`] is the one and only place a raw `StateKey`
+/// is turned into fuzzer-facing state identity; see
+/// [`crate::executor::sequence::ResourceTag`] for why the def-use graph is
+/// keyed on this decomposition rather than on `StateKey` itself.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ResourceSlot {
+    pub address: AccountAddress,
+    pub struct_tag: StructTag,
+    pub is_resource_group: bool,
+}
+
+impl ResourceSlot {
+    /// Decompose a `StateKey`. Returns `None` for code (module) slots, which
+    /// are not tracked state.
+    ///
+    /// Slots that carry no Move type of their own - table items, raw keys and
+    /// trading-native keys - are represented by a synthetic `StructTag` derived
+    /// from the key (see [`synthetic_struct_tag`]). They are reported as
+    /// resource groups so that the two-pass object detection in
+    /// `Mutator::update_object_dict` never mistakes one for a resource stored
+    /// at an object address.
+    pub fn from_state_key(state_key: &StateKey) -> Option<Self> {
+        match state_key.inner() {
+            StateKeyInner::AccessPath(ap) => match ap.get_path() {
+                Path::Resource(struct_tag) => Some(Self {
+                    address: ap.address,
+                    struct_tag,
+                    is_resource_group: false,
+                }),
+                Path::ResourceGroup(struct_tag) => Some(Self {
+                    address: ap.address,
+                    struct_tag,
+                    is_resource_group: true,
+                }),
+                // We don't care about code publishing.
+                Path::Code(..) => None,
+            },
+            StateKeyInner::TableItem { .. } => Some(Self::synthetic("table_", state_key)),
+            StateKeyInner::Raw(..) => Some(Self::synthetic("raw_", state_key)),
+            StateKeyInner::TradingNative(..) => {
+                Some(Self::synthetic("trading_native_", state_key))
+            },
+        }
+    }
+
+    fn synthetic(prefix: &str, state_key: &StateKey) -> Self {
+        Self {
+            address: AccountAddress::ONE,
+            struct_tag: synthetic_struct_tag(prefix, state_key),
+            is_resource_group: true,
+        }
+    }
+}
+
+impl From<ResourceSlot> for ResourceRead {
+    fn from(slot: ResourceSlot) -> Self {
+        Self {
+            address: slot.address,
+            struct_tag: slot.struct_tag,
+            is_resource_group: slot.is_resource_group,
+        }
+    }
+}
+
+impl From<ResourceSlot> for ResourceWrite {
+    fn from(slot: ResourceSlot) -> Self {
+        Self {
+            address: slot.address,
+            struct_tag: slot.struct_tag,
+            is_resource_group: slot.is_resource_group,
+        }
+    }
+}
+
 /// A state view wrapper that records all state key accesses
 struct RecordingStateView<'a, S: ?Sized> {
     inner: &'a S,
@@ -139,41 +216,12 @@ impl<'a, S: TStateView<Key = StateKey> + ?Sized> RecordingStateView<'a, S> {
 
     /// Extract resource reads from the recorded state key accesses
     fn extract_resource_reads(&self) -> Vec<ResourceRead> {
-        let mut result = Vec::new();
-        for key in self.reads.borrow().iter() {
-            let read = match key.inner() {
-                StateKeyInner::AccessPath(ap) => match ap.get_path() {
-                    Path::Resource(struct_tag) => ResourceRead {
-                        struct_tag,
-                        address: ap.address,
-                        is_resource_group: false,
-                    },
-                    Path::ResourceGroup(struct_tag) => ResourceRead {
-                        struct_tag,
-                        address: ap.address,
-                        is_resource_group: true,
-                    },
-                    Path::Code(..) => continue,
-                },
-                StateKeyInner::TableItem { .. } => ResourceRead {
-                    struct_tag: synthetic_struct_tag("table_", key),
-                    address: AccountAddress::ONE,
-                    is_resource_group: false,
-                },
-                StateKeyInner::Raw(..) => ResourceRead {
-                    struct_tag: synthetic_struct_tag("raw_", key),
-                    address: AccountAddress::ONE,
-                    is_resource_group: false,
-                },
-                StateKeyInner::TradingNative(..) => ResourceRead {
-                    struct_tag: synthetic_struct_tag("trading_native_", key),
-                    address: AccountAddress::ONE,
-                    is_resource_group: false,
-                },
-            };
-            result.push(read);
-        }
-        result
+        self.reads
+            .borrow()
+            .iter()
+            .filter_map(ResourceSlot::from_state_key)
+            .map(ResourceRead::from)
+            .collect()
     }
 }
 
@@ -353,47 +401,13 @@ impl TracingExecutor {
     /// Returns tuples of `(struct_tag, address, is_resource_group)` for each
     /// non-deletion resource/resource-group/table-item/raw write.
     fn extract_resource_writes(output: &TransactionOutput) -> Vec<ResourceWrite> {
-        let mut result = Vec::new();
-        for (state_key, write_op) in output.write_set().write_op_iter() {
-            if write_op.is_deletion() {
-                continue;
-            }
-            let write = match state_key.inner() {
-                StateKeyInner::AccessPath(ap) => match ap.get_path() {
-                    Path::Resource(struct_tag) => ResourceWrite {
-                        struct_tag,
-                        address: ap.address,
-                        is_resource_group: false,
-                    },
-                    Path::ResourceGroup(struct_tag) => ResourceWrite {
-                        struct_tag,
-                        address: ap.address,
-                        is_resource_group: true,
-                    },
-                    Path::Code(..) => {
-                        // we don't care about code publishing
-                        continue;
-                    },
-                },
-                StateKeyInner::TableItem { .. } => ResourceWrite {
-                    struct_tag: synthetic_struct_tag("table_", state_key),
-                    address: AccountAddress::ONE,
-                    is_resource_group: true,
-                },
-                StateKeyInner::Raw(..) => ResourceWrite {
-                    struct_tag: synthetic_struct_tag("raw_", state_key),
-                    address: AccountAddress::ONE,
-                    is_resource_group: true,
-                },
-                StateKeyInner::TradingNative(..) => ResourceWrite {
-                    struct_tag: synthetic_struct_tag("trading_native_", state_key),
-                    address: AccountAddress::ONE,
-                    is_resource_group: true,
-                },
-            };
-            result.push(write);
-        }
-        result
+        output
+            .write_set()
+            .write_op_iter()
+            .filter(|(_, write_op)| !write_op.is_deletion())
+            .filter_map(|(state_key, _)| ResourceSlot::from_state_key(state_key))
+            .map(ResourceWrite::from)
+            .collect()
     }
 
     fn root_module_publish_chunks(
@@ -601,53 +615,12 @@ impl TracingExecutor {
     /// objects and which resources belong to them.
     pub fn scan_all_resource_writes(&self) -> Vec<ResourceWrite> {
         let delta = self.executor.get_state_delta();
-        let mut result = Vec::new();
-        for (state_key, value_opt) in &delta {
-            if value_opt.is_none() {
-                continue;
-            }
-            match state_key.inner() {
-                StateKeyInner::AccessPath(ap) => match ap.get_path() {
-                    Path::Resource(struct_tag) => {
-                        result.push(ResourceWrite {
-                            address: ap.address,
-                            struct_tag,
-                            is_resource_group: false,
-                        });
-                    },
-                    Path::ResourceGroup(struct_tag) => {
-                        result.push(ResourceWrite {
-                            address: ap.address,
-                            struct_tag,
-                            is_resource_group: true,
-                        });
-                    },
-                    Path::Code(..) => {},
-                },
-                StateKeyInner::TableItem { .. } => {
-                    result.push(ResourceWrite {
-                        address: AccountAddress::ONE,
-                        struct_tag: synthetic_struct_tag("table_", state_key),
-                        is_resource_group: true,
-                    });
-                },
-                StateKeyInner::Raw(..) => {
-                    result.push(ResourceWrite {
-                        address: AccountAddress::ONE,
-                        struct_tag: synthetic_struct_tag("raw_", state_key),
-                        is_resource_group: true,
-                    });
-                },
-                StateKeyInner::TradingNative(..) => {
-                    result.push(ResourceWrite {
-                        address: AccountAddress::ONE,
-                        struct_tag: synthetic_struct_tag("trading_native_", state_key),
-                        is_resource_group: true,
-                    });
-                },
-            }
-        }
-        result
+        delta
+            .iter()
+            .filter(|(_, value_opt)| value_opt.is_some())
+            .filter_map(|(state_key, _)| ResourceSlot::from_state_key(state_key))
+            .map(ResourceWrite::from)
+            .collect()
     }
 
     /// Execute a transaction without committing, tracking state reads
