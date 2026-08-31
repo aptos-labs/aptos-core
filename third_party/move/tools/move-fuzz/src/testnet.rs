@@ -384,8 +384,8 @@ fn create_bridge_script(
         param_decl.push(format!("p{}: {}", i, p.reduce().type_name()));
         let repr = match p {
             TxnArgTypeWithRef::Base(_) => format!("p{}", i),
-            TxnArgTypeWithRef::RefImm(_) => format!("&p{}", i),
-            TxnArgTypeWithRef::RefMut(_) => format!("&mut p{}", i),
+            TxnArgTypeWithRef::ImmRef(_) => format!("&p{}", i),
+            TxnArgTypeWithRef::MutRef(_) => format!("&mut p{}", i),
         };
         param_use.push(repr);
     }
@@ -851,7 +851,7 @@ mod tests {
             &[AbilitySet::EMPTY.add(Ability::Drop)],
             &[
                 crate::common::TxnArgTypeWithRef::Base(crate::common::TxnArgType::U64),
-                crate::common::TxnArgTypeWithRef::RefImm(crate::common::TxnArgType::Address),
+                crate::common::TxnArgTypeWithRef::ImmRef(crate::common::TxnArgType::Address),
             ],
             Some(false),
             &path_stage,

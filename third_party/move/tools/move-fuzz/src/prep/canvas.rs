@@ -5,7 +5,7 @@ use crate::prep::{
     graph::{FlowGraph, FlowGraphEdge, FlowGraphNode},
     ident::{DatatypeIdent, FunctionIdent},
     model::Model,
-    typing::{SimpleType, TypeBase, TypeItem, TypeMode},
+    typing::{ParamStyle, SimpleType, TypeBase, TypeItem, TypeMode},
 };
 use itertools::Itertools;
 use move_core_types::ability::AbilitySet;
@@ -13,7 +13,30 @@ use petgraph::{algo::toposort, visit::EdgeRef, Direction};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt::Display, fs, path::Path};
 
-/// Types that can be argument of driver function
+/// Types that can be an argument of a generated driver script.
+///
+/// This is the last rung of the ladder described in [`crate::prep::typing`]: the
+/// exact set of types that (a) can be spelled as a parameter of the emitted
+/// `script fun` and (b) the mutator can generate and mutate a `MoveValue` for.
+///
+/// It is deliberately narrower than [`SimpleType`], and deliberately not
+/// `move_core_types::language_storage::TypeTag`:
+///
+/// - no `Bitvec`: a `BitVector` parameter is passed in as `vector<bool>` and
+///   bridged inside the generated script (`DriverStatement::Arg2Bitvec`), so it
+///   can never reach the mutator;
+/// - no `Function`: function-typed parameters are supplied by a
+///   [`LambdaBinding`], not by a fuzzed input;
+/// - no `Datatype` / `Param`: those are exactly the `Complex` half of
+///   [`TypeMode`], which is produced by calls rather than by inputs;
+/// - no abilities: they are irrelevant once a type is known to be an input, and
+///   this type is serialized into the on-disk entrypoint cache, so keeping
+///   derived data out of it keeps that format stable and keeps `ScriptSignature`
+///   equality (used for wrapper dedup) meaningful.
+///
+/// Because those variants are absent, the matches over `BasicInput` in
+/// `mutate::mutator` are total; widening this to [`SimpleType`] would reintroduce
+/// unreachable arms there and change the persisted format.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BasicInput {
     Bool,
@@ -734,87 +757,20 @@ fn format_bitvec_bridge(src: &str, dst: &str, depth: usize, indent: &str) -> Str
     }
 }
 
-/// Utility: print a TypeBase for scripting
-fn display_type_base(t: &TypeBase) -> String {
-    match t {
-        TypeBase::Bool => "bool".to_string(),
-        TypeBase::U8 => "u8".to_string(),
-        TypeBase::I8 => "i8".to_string(),
-        TypeBase::U16 => "u16".to_string(),
-        TypeBase::I16 => "i16".to_string(),
-        TypeBase::U32 => "u32".to_string(),
-        TypeBase::I32 => "i32".to_string(),
-        TypeBase::U64 => "u64".to_string(),
-        TypeBase::I64 => "i64".to_string(),
-        TypeBase::U128 => "u128".to_string(),
-        TypeBase::I128 => "i128".to_string(),
-        TypeBase::U256 => "u256".to_string(),
-        TypeBase::I256 => "i256".to_string(),
-        TypeBase::Bitvec => "std::bit_vector::BitVector".to_string(),
-        TypeBase::String => "std::string::String".to_string(),
-        TypeBase::Address => "address".to_string(),
-        TypeBase::Signer => "signer".to_string(),
-        TypeBase::Vector { element } => {
-            format!("vector<{}>", display_type_base(element))
-        },
-        TypeBase::Datatype {
-            ident,
-            type_args,
-            abilities: _,
-        } => {
-            let args_str = if type_args.is_empty() {
-                "".to_string()
-            } else {
-                format!("<{}>", type_args.iter().map(display_type_base).join(", "))
-            };
-            format!("{}{}", ident, args_str)
-        },
-        TypeBase::Param {
-            index,
-            abilities: _,
-        } => format!("T{index}"),
-        TypeBase::ObjectKnown {
-            ident,
-            type_args,
-            abilities: _,
-        } => {
-            if type_args.is_empty() {
-                format!("aptos_framework::object::Object<{}>", ident)
-            } else {
-                let args_str = type_args.iter().map(display_type_base).join(", ");
-                format!("aptos_framework::object::Object<{}<{}>>", ident, args_str)
-            }
-        },
-        TypeBase::ObjectParam {
-            index: param,
-            abilities: _,
-        } => format!("aptos_framework::object::Object<T{param}>"),
-        TypeBase::Function {
-            params,
-            returns,
-            abilities: _,
-        } => {
-            let params_str = params.iter().map(display_type_item).join(", ");
-            let returns_str = returns.iter().map(display_type_item).join(", ");
-            format!("|{params_str}| ({returns_str})")
-        },
-    }
-}
-
-/// Utility: print a TypeItem for scripting
-fn display_type_item(t: &TypeItem) -> String {
-    match t {
-        TypeItem::Base(base) => display_type_base(base),
-        TypeItem::ImmRef(base) => format!("&{}", display_type_base(base)),
-        TypeItem::MutRef(base) => format!("&mut {}", display_type_base(base)),
-    }
-}
-
+/// Utility: print a list of type arguments as a Move generic instantiation.
+///
+/// The per-type rendering lives on the type itself
+/// (`TypeBase::render` / `TypeItem::render`); this module used to carry a
+/// duplicate of it that differed from `Display` only in spelling type
+/// parameters `T0` instead of `#0`, which is now [`ParamStyle::Source`].
 fn display_type_bases_as_generics(ts: &[TypeBase]) -> String {
     if ts.is_empty() {
         "".to_string()
     } else {
-        format!("<{}>", ts.iter().map(display_type_base).join(", "))
+        format!(
+            "<{}>",
+            ts.iter().map(|t| t.render(ParamStyle::Source)).join(", ")
+        )
     }
 }
 

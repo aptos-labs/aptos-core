@@ -1,7 +1,68 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::prep::ident::DatatypeIdent;
+//! The type language used by the driver-script synthesizer.
+//!
+//! # Why not an existing Move type representation?
+//!
+//! The synthesizer needs a representation with four properties at the same time:
+//!
+//! 1. *absolute* datatype identity (address + module + name), because the whole
+//!    point of the flow graph is to chain a function in one module into a
+//!    function in another;
+//! 2. *type parameters*, because it reasons about uninstantiated declarations
+//!    and about the generics of the script it is about to emit;
+//! 3. *references* (`&T` / `&mut T`), because it models borrow chains;
+//! 4. *memoized abilities*, because ability checks dominate the search and are
+//!    not recoverable from a type in isolation.
+//!
+//! None of the obvious candidates has all four:
+//!
+//! - `move_binary_format::file_format::SignatureToken` has 2 and 3 but not 1:
+//!   `Struct(StructHandleIndex)` indexes one specific `CompiledModule`'s handle
+//!   table and is meaningless outside it. For 4 it carries abilities only on
+//!   `Function(.., AbilitySet)`; there is nowhere to memoize the abilities of a
+//!   struct instantiation or of a type parameter.
+//! - `move_core_types::language_storage::TypeTag` has 1 but neither 2 nor 3: it
+//!   is fully instantiated and cannot express a reference. It *is* used in this
+//!   crate - imported as `VmTypeTag` - for the type arguments that actually
+//!   reach the VM.
+//! - `move_model::ty::Type` has 2 and 3 but not 1 or 4: it names structs by
+//!   `(ModuleId, StructId)` indices into a `GlobalEnv`, carries specification-
+//!   and inference-only variants (`TypeDomain`, `ResourceDomain`, `Var`,
+//!   `Error`), and is not `serde`-serializable. The synthesis pipeline here
+//!   builds its types from `SignatureToken`s in compiled units and has no
+//!   `GlobalEnv` in hand - one is only ever constructed on the unit-test path,
+//!   in `crate::package::unit_test` - and these types must round-trip through
+//!   the on-disk corpus.
+//!
+//! # The ladder
+//!
+//! Four representations here form a deliberate ladder. They are not four
+//! spellings of one thing:
+//!
+//! - [`TypeTag`] - a type as *written in a declaration*. `Param(usize)` refers
+//!   to a generic slot of the declaring function or struct. No abilities.
+//! - [`TypeBase`] - the same shape after *instantiation*: abilities of each
+//!   datatype and parameter are memoized, and `Param` now refers to a generic
+//!   slot of the *generated script*.
+//! - [`SimpleType`] / [`ComplexType`] - a partition of [`TypeBase`] by whether a
+//!   value can be produced directly (`Simple`) or only by calling something that
+//!   returns it (`Complex`). Splitting the enum, rather than testing a
+//!   predicate, is what keeps the matches in `prep::canvas` and `prep::graph`
+//!   total.
+//! - `crate::prep::canvas::BasicInput` - what actually becomes a parameter of
+//!   the emitted script, and the exact domain of the mutator.
+//!
+//! [`TypeRef`], [`TypeItem`] and `crate::prep::graph::DatatypeItem` are the
+//! first three of these under a reference mode; all three are aliases of the one
+//! generic [`crate::common::Refty`].
+//!
+//! Note that this module's [`TypeTag`] is *not*
+//! `move_core_types::language_storage::TypeTag`; wherever both are in scope this
+//! crate imports the latter as `VmTypeTag`.
+
+use crate::{common::Refty, prep::ident::DatatypeIdent};
 use itertools::Itertools;
 use move_core_types::{ability::AbilitySet, account_address::AccountAddress};
 use serde::{Deserialize, Serialize};
@@ -125,23 +186,9 @@ impl Display for TypeTag {
     }
 }
 
-/// A type token that can appear in function declarations
-#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize)]
-pub enum TypeRef {
-    Base(TypeTag),
-    ImmRef(TypeTag),
-    MutRef(TypeTag),
-}
-
-impl Display for TypeRef {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Base(tag) => write!(f, "{tag}"),
-            Self::ImmRef(tag) => write!(f, "&{tag}"),
-            Self::MutRef(tag) => write!(f, "&mut {tag}"),
-        }
-    }
-}
+/// A type token that can appear in function declarations: a [`TypeTag`] under
+/// one of Move's three reference modes; see [`Refty`].
+pub type TypeRef = Refty<TypeTag>;
 
 /// A type instance with concrete execution semantics
 ///
@@ -308,81 +355,110 @@ impl TypeBase {
     }
 }
 
-impl Display for TypeBase {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+/// How a type parameter is spelled when a type is rendered.
+///
+/// The same `TypeBase` / `TypeItem` tree is printed for two audiences and the
+/// two renderings differ in exactly one place, so they share one renderer
+/// instead of two copies that silently drift when a variant is added.
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum ParamStyle {
+    /// `#0` - diagnostics, traces and canvas dedup keys.
+    Diagnostic,
+    /// `T0` - the declaration name used in generated Move source.
+    Source,
+}
+
+impl TypeBase {
+    /// Render this type, spelling type parameters according to `style`.
+    ///
+    /// This is the *only* renderer for `TypeBase`: `Display` is
+    /// `render(ParamStyle::Diagnostic)`, and the script generator in
+    /// `prep::canvas` uses `render(ParamStyle::Source)`.
+    pub fn render(&self, style: ParamStyle) -> String {
         match self {
-            Self::Bool => write!(f, "bool"),
-            Self::U8 => write!(f, "u8"),
-            Self::I8 => write!(f, "i8"),
-            Self::U16 => write!(f, "u16"),
-            Self::I16 => write!(f, "i16"),
-            Self::U32 => write!(f, "u32"),
-            Self::I32 => write!(f, "i32"),
-            Self::U64 => write!(f, "u64"),
-            Self::I64 => write!(f, "i64"),
-            Self::U128 => write!(f, "u128"),
-            Self::I128 => write!(f, "i128"),
-            Self::U256 => write!(f, "u256"),
-            Self::I256 => write!(f, "i256"),
-            Self::Bitvec => write!(f, "std::bit_vector::BitVector"),
-            Self::String => write!(f, "std::string::String"),
-            Self::Address => write!(f, "address"),
-            Self::Signer => write!(f, "signer"),
-            Self::Vector { element } => write!(f, "vector<{element}>"),
+            Self::Bool => "bool".to_string(),
+            Self::U8 => "u8".to_string(),
+            Self::I8 => "i8".to_string(),
+            Self::U16 => "u16".to_string(),
+            Self::I16 => "i16".to_string(),
+            Self::U32 => "u32".to_string(),
+            Self::I32 => "i32".to_string(),
+            Self::U64 => "u64".to_string(),
+            Self::I64 => "i64".to_string(),
+            Self::U128 => "u128".to_string(),
+            Self::I128 => "i128".to_string(),
+            Self::U256 => "u256".to_string(),
+            Self::I256 => "i256".to_string(),
+            Self::Bitvec => "std::bit_vector::BitVector".to_string(),
+            Self::String => "std::string::String".to_string(),
+            Self::Address => "address".to_string(),
+            Self::Signer => "signer".to_string(),
+            Self::Vector { element } => format!("vector<{}>", element.render(style)),
             Self::Datatype {
                 ident,
                 type_args,
                 abilities: _,
             } => {
                 if type_args.is_empty() {
-                    write!(f, "{ident}")
+                    ident.to_string()
                 } else {
-                    let inst = type_args.iter().join(", ");
-                    write!(f, "{ident}<{inst}>")
+                    let inst = type_args.iter().map(|t| t.render(style)).join(", ");
+                    format!("{ident}<{inst}>")
                 }
             },
             Self::Param {
                 index,
                 abilities: _,
-            } => write!(f, "#{index}"),
+            } => match style {
+                ParamStyle::Diagnostic => format!("#{index}"),
+                ParamStyle::Source => format!("T{index}"),
+            },
             Self::ObjectKnown {
                 ident,
                 type_args,
                 abilities: _,
             } => {
                 if type_args.is_empty() {
-                    write!(f, "aptos_framework::object::Object<{ident}>")
+                    format!("aptos_framework::object::Object<{ident}>")
                 } else {
-                    let inst = type_args.iter().join(", ");
-                    write!(f, "aptos_framework::object::Object<{ident}<{inst}>>")
+                    let inst = type_args.iter().map(|t| t.render(style)).join(", ");
+                    format!("aptos_framework::object::Object<{ident}<{inst}>>")
                 }
             },
             Self::ObjectParam {
                 index,
                 abilities: _,
-            } => write!(f, "aptos_framework::object::Object<#{index}>"),
+            } => match style {
+                ParamStyle::Diagnostic => format!("aptos_framework::object::Object<#{index}>"),
+                ParamStyle::Source => format!("aptos_framework::object::Object<T{index}>"),
+            },
             Self::Function {
                 params,
                 returns,
                 abilities: _,
             } => {
-                let params_str = params.iter().join(", ");
-                let returns_str = returns.iter().join(", ");
-                write!(f, "|{params_str}| ({returns_str})")
+                let params_str = params.iter().map(|t| t.render(style)).join(", ");
+                let returns_str = returns.iter().map(|t| t.render(style)).join(", ");
+                format!("|{params_str}| ({returns_str})")
             },
         }
     }
 }
 
-/// A type token with concrete execution semantics
-#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize)]
-pub enum TypeItem {
-    Base(TypeBase),
-    ImmRef(TypeBase),
-    MutRef(TypeBase),
+impl Display for TypeBase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.render(ParamStyle::Diagnostic))
+    }
 }
 
-impl TypeItem {
+/// A type token with concrete execution semantics: a [`TypeBase`] under one of
+/// Move's three reference modes; see [`Refty`].
+///
+/// `Display` (inherited from `Refty`) renders type parameters as `#0`; call
+/// `render` with [`ParamStyle::Source`] to emit Move source.
+pub type TypeItem = Refty<TypeBase>;
+
+impl Refty<TypeBase> {
     /// Retrieve the abilities of this type base
     pub fn abilities(&self) -> AbilitySet {
         match self {
@@ -393,20 +469,15 @@ impl TypeItem {
 
     /// Collected involved type parameters
     pub fn involved_parameters(&self, params: &mut BTreeSet<usize>) {
-        match self {
-            Self::Base(base) | Self::ImmRef(base) | Self::MutRef(base) => {
-                base.involved_parameters(params)
-            },
-        }
+        self.base().involved_parameters(params)
     }
-}
 
-impl Display for TypeItem {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    /// Render this type, spelling type parameters according to `style`.
+    pub fn render(&self, style: ParamStyle) -> String {
         match self {
-            Self::Base(base) => write!(f, "{base}"),
-            Self::ImmRef(base) => write!(f, "&{base}"),
-            Self::MutRef(base) => write!(f, "&mut {base}"),
+            Self::Base(base) => base.render(style),
+            Self::ImmRef(base) => format!("&{}", base.render(style)),
+            Self::MutRef(base) => format!("&mut {}", base.render(style)),
         }
     }
 }

@@ -553,11 +553,7 @@ impl DatatypeRegistry {
 
     /// Instantiate type parameters in this type ref with the type arguments
     pub fn instantiate_type_ref(&self, t: &TypeRef, ty_args: &[TypeBase]) -> TypeItem {
-        match t {
-            TypeRef::Base(tag) => TypeItem::Base(self.instantiate_type_tag(tag, ty_args)),
-            TypeRef::ImmRef(tag) => TypeItem::ImmRef(self.instantiate_type_tag(tag, ty_args)),
-            TypeRef::MutRef(tag) => TypeItem::MutRef(self.instantiate_type_tag(tag, ty_args)),
-        }
+        t.map(|tag| self.instantiate_type_tag(tag, ty_args))
     }
 }
 

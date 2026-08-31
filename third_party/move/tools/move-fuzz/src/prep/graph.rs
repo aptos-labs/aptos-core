@@ -1,13 +1,16 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::prep::{
-    function::FunctionDecl,
-    ident::FunctionIdent,
-    model::{ability_set_candidates, Model},
-    typing::{
-        ComplexType, TypeBase, TypeItem, TypeMode, TypeRef, TypeSubstitution, TypeTag,
-        TypeUnification,
+use crate::{
+    common::Refty,
+    prep::{
+        function::FunctionDecl,
+        ident::FunctionIdent,
+        model::{ability_set_candidates, Model},
+        typing::{
+            ComplexType, TypeBase, TypeItem, TypeMode, TypeRef, TypeSubstitution, TypeTag,
+            TypeUnification,
+        },
     },
 };
 use itertools::Itertools;
@@ -25,15 +28,15 @@ use std::{
     time::{Duration, Instant},
 };
 
-/// Datatype node
-#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub enum DatatypeItem {
-    Base(ComplexType),
-    ImmRef(ComplexType),
-    MutRef(ComplexType),
-}
+/// Datatype node: a [`ComplexType`] under one of Move's three reference modes.
+///
+/// Same three variants as [`TypeItem`], carrying only the `Complex` half of
+/// [`TypeMode`]. Narrowing the payload is the point: a flow-graph node is by
+/// construction a value that must be *produced by a call*, so the matches over
+/// it below never need a `Simple` arm. See [`Refty`].
+pub type DatatypeItem = Refty<ComplexType>;
 
-impl DatatypeItem {
+impl Refty<ComplexType> {
     /// Build a datatype node for a type item.
     ///
     /// Returns `None` when the type does not need a datatype node in the flow graph:
@@ -41,29 +44,14 @@ impl DatatypeItem {
     /// supported at all (see `TypeMode::convert`). Unsupported shapes are ultimately
     /// rejected by `DriverCanvas::try_build`, which skips the whole script.
     fn from_type_item(ty: &TypeItem) -> Option<Self> {
-        let converted = match ty {
-            TypeItem::Base(t) => match TypeMode::convert(t)? {
-                TypeMode::Simple(_) => return None,
-                TypeMode::Complex(complex_ty) => Self::Base(complex_ty),
-            },
-            TypeItem::ImmRef(t) => match TypeMode::convert(t)? {
-                TypeMode::Simple(_) => return None,
-                TypeMode::Complex(complex_ty) => Self::ImmRef(complex_ty),
-            },
-            TypeItem::MutRef(t) => match TypeMode::convert(t)? {
-                TypeMode::Simple(_) => return None,
-                TypeMode::Complex(complex_ty) => Self::MutRef(complex_ty),
-            },
-        };
-        Some(converted)
+        match TypeMode::convert(ty.base())? {
+            TypeMode::Simple(_) => None,
+            TypeMode::Complex(complex_ty) => Some(ty.map(|_| complex_ty)),
+        }
     }
 
     fn as_type_item(&self) -> TypeItem {
-        match self {
-            Self::Base(t) => TypeItem::Base(t.revert()),
-            Self::ImmRef(t) => TypeItem::ImmRef(t.revert()),
-            Self::MutRef(t) => TypeItem::MutRef(t.revert()),
-        }
+        self.map(ComplexType::revert)
     }
 }
 

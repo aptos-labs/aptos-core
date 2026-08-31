@@ -8,10 +8,70 @@ use aptos_types::{
 };
 use move_binary_format::{binary_views::BinaryIndexedView, file_format::SignatureToken};
 use move_core_types::{
+    ability::AbilitySet,
     account_address::AccountAddress,
     int256::{I256, U256},
 };
-use move_model::model::AbilitySet;
+use serde::{Deserialize, Serialize};
+use std::fmt::Display;
+
+/// Move's three reference modes applied to a base type `T`.
+///
+/// Move has no references to references, so a reference mode is a single,
+/// non-nestable wrapper around a base type. This crate used to carry four
+/// hand-written copies of these same three variants: `TxnArgTypeWithRef` here,
+/// `prep::typing::TypeRef`, `prep::typing::TypeItem` and
+/// `prep::graph::DatatypeItem`. All four are now aliases of this one enum.
+///
+/// Two things about this type are load-bearing and must not change:
+/// - variant *order*, because `Ord` is derived and the aliases are used as
+///   `BTreeMap` / `BTreeSet` keys and in sorted output;
+/// - variant *names*, because `Refty<TypeTag>` and `Refty<TypeBase>` are
+///   serialized into the on-disk entrypoint cache (`PersistedEntrypointCache`).
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize)]
+pub enum Refty<T> {
+    /// `T`
+    Base(T),
+    /// `&T`
+    ImmRef(T),
+    /// `&mut T`
+    MutRef(T),
+}
+
+impl<T> Refty<T> {
+    /// The base type, with the reference mode dropped.
+    pub fn base(&self) -> &T {
+        match self {
+            Self::Base(t) | Self::ImmRef(t) | Self::MutRef(t) => t,
+        }
+    }
+
+    /// Rewrite the base type, keeping the reference mode.
+    pub fn map<U>(&self, f: impl FnOnce(&T) -> U) -> Refty<U> {
+        match self {
+            Self::Base(t) => Refty::Base(f(t)),
+            Self::ImmRef(t) => Refty::ImmRef(f(t)),
+            Self::MutRef(t) => Refty::MutRef(f(t)),
+        }
+    }
+}
+
+impl<T: Clone> Refty<T> {
+    /// An owned copy of the base type, with the reference mode dropped.
+    pub fn reduce(&self) -> T {
+        self.base().clone()
+    }
+}
+
+impl<T: Display> Display for Refty<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Base(t) => write!(f, "{t}"),
+            Self::ImmRef(t) => write!(f, "&{t}"),
+            Self::MutRef(t) => write!(f, "&mut {t}"),
+        }
+    }
+}
 
 /// Account (either referenced or owned)
 pub enum Account {
@@ -31,6 +91,22 @@ impl Account {
 }
 
 /// Supported transaction argument types.
+///
+/// This is the vocabulary of the *external* driver (`simulator` / `testnet`),
+/// which runs the `aptos` CLI as a subprocess: `type_mark` is literally the
+/// CLI's `--args` marker (`u64:`, `string:`, ...) and `type_name` is the Move
+/// source spelling used in a generated bridge script. It is therefore a
+/// deliberately small, closed set, and `convert` *failing* on anything else is
+/// the check that decides whether a function is runnable through the CLI at all.
+///
+/// Why not `move_core_types::language_storage::TypeTag`: that type has no notion
+/// of "expressible as a CLI argument", so adopting it would turn the check above
+/// into a second, separate validation pass over an already-converted type.
+///
+/// Why not `crate::prep::canvas::BasicInput`: `BasicInput` is total by
+/// construction (it is produced by the script synthesizer, never parsed from
+/// user input) and can name objects and script generics, neither of which the
+/// CLI path can carry.
 ///
 /// TODO: signed integer types (i8, i16, i32, i64, i128, i256) are not yet
 /// supported here.
@@ -176,32 +252,22 @@ impl TxnArg {
     }
 }
 
-/// Supported API (a.k.a., public function) argument types
-#[derive(Clone)]
-pub enum TxnArgTypeWithRef {
-    Base(TxnArgType),
-    RefImm(TxnArgType),
-    RefMut(TxnArgType),
-}
+/// Supported API (a.k.a., public function) argument types: a [`TxnArgType`]
+/// under one of Move's three reference modes; see [`Refty`].
+pub type TxnArgTypeWithRef = Refty<TxnArgType>;
 
-impl TxnArgTypeWithRef {
+impl Refty<TxnArgType> {
     pub fn convert(binary: BinaryIndexedView, token: &SignatureToken) -> Result<Self> {
         let converted = match token {
             SignatureToken::Reference(sub) => {
-                Self::RefImm(TxnArgType::convert(binary, sub.as_ref())?)
+                Self::ImmRef(TxnArgType::convert(binary, sub.as_ref())?)
             },
             SignatureToken::MutableReference(sub) => {
-                Self::RefMut(TxnArgType::convert(binary, sub.as_ref())?)
+                Self::MutRef(TxnArgType::convert(binary, sub.as_ref())?)
             },
             _ => Self::Base(TxnArgType::convert(binary, token)?),
         };
         Ok(converted)
-    }
-
-    pub fn reduce(&self) -> TxnArgType {
-        match self {
-            Self::Base(ty) | Self::RefImm(ty) | Self::RefMut(ty) => ty.clone(),
-        }
     }
 
     /// Whether a value of type `token` can be silently discarded, i.e., whether
@@ -280,7 +346,7 @@ mod tests {
 
     #[test]
     fn test_txn_arg_type_with_ref_reduce_preserves_base_type() {
-        let ty = TxnArgTypeWithRef::RefMut(TxnArgType::Address);
+        let ty = TxnArgTypeWithRef::MutRef(TxnArgType::Address);
         assert!(matches!(ty.reduce(), TxnArgType::Address));
     }
 
