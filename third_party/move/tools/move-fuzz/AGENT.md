@@ -151,6 +151,8 @@ Important `auto` flags:
 - `--max-chain-length`
 - `--max-chain-repetition`
 - `--saturation-secs`
+- `--max-total-secs`
+- `--max-iterations`
 
 ## Current behavior that agents must not accidentally regress
 
@@ -205,9 +207,10 @@ Phase 1:
 
 Phase 2:
 
-- chain fuzzers are created lazily after Phase 1 saturation
+- chain fuzzers are created lazily after Phase 1 saturation, or after the Phase 1 time cap (10x `saturation_secs`, at most half of `--max-total-secs`)
 - scheduling becomes DUG- and chain-seed-driven
 - stopping uses `saturation_secs` against Phase 2 novelty as well
+- `--max-total-secs` / `--max-iterations` stop either phase unconditionally; all exits leave the mutation loop through the single post-loop checkpoint, so do not reintroduce an early `return` from inside the loop
 
 If you change phase transitions, seed selection, or DUG growth, test both phases explicitly.
 

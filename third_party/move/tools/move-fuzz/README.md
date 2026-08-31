@@ -138,7 +138,11 @@ The `auto` command currently performs the full move-fuzz pipeline:
 - `--max-chain-repetition <N>`
   Maximum number of times one script may repeat within a single chain.
 - `--saturation-secs <SECS>`
-  Seconds without new coverage before the fuzzer transitions from Phase 1 to Phase 2.
+  Seconds without new coverage before the fuzzer transitions from Phase 1 to Phase 2. Phase 1 also hands over unconditionally after 10x this value (or half of `--max-total-secs`, whichever is smaller), so one script that keeps finding coverage cannot keep the campaign out of Phase 2.
+- `--max-total-secs <SECS>`
+  Hard wall-clock budget for the whole campaign. The fuzzer writes a final checkpoint and exits when it elapses, in either phase. The budget is measured per invocation, so a run resumed from a checkpoint starts a fresh one. `0` (the default) means no limit.
+- `--max-iterations <N>`
+  Hard cap on mutation-loop rounds across both phases, counted per invocation, with the same clean shutdown. `0` (the default) means no limit.
 
 #### Package filtering
 

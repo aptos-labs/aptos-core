@@ -133,6 +133,19 @@ pub enum FuzzCommand {
         /// Seconds without new coverage before transitioning from Phase 1 to Phase 2
         #[clap(long, default_value = "120")]
         saturation_secs: u64,
+
+        /// Hard wall-clock budget for the whole campaign, in seconds. When it
+        /// elapses the fuzzer stops in whichever phase it is in, after writing
+        /// a final checkpoint. The budget is per invocation: a resumed run
+        /// starts a fresh one. 0 means no limit.
+        #[clap(long, default_value = "0")]
+        max_total_secs: u64,
+
+        /// Hard cap on the number of mutation-loop rounds across both phases.
+        /// When it is reached the fuzzer stops, after writing a final
+        /// checkpoint. Counted per invocation. 0 means no limit.
+        #[clap(long, default_value = "0")]
+        max_iterations: u64,
     },
 }
 
@@ -367,6 +380,8 @@ pub fn run_on(
             max_chain_length,
             max_chain_repetition,
             saturation_secs,
+            max_total_secs,
+            max_iterations,
         } => {
             cmd_auto(
                 &project_root,
@@ -385,6 +400,8 @@ pub fn run_on(
                 max_chain_length,
                 max_chain_repetition,
                 saturation_secs,
+                max_total_secs,
+                max_iterations,
             )?;
         },
     }
@@ -471,6 +488,8 @@ fn cmd_auto(
     max_chain_length: usize,
     max_chain_repetition: usize,
     saturation_secs: u64,
+    max_total_secs: u64,
+    max_iterations: u64,
 ) -> Result<()> {
     // we need to see all packages unless the package is explicitly excluded
     if !pkg_filter.include_framework {
@@ -685,6 +704,8 @@ authors = []
         max_chain_length,
         max_chain_repetition,
         saturation_secs,
+        max_total_secs,
+        max_iterations,
     )
 }
 

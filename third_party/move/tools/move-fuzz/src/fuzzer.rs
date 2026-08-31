@@ -46,6 +46,12 @@ use std::{
 
 const CHAIN_REBUILD_INTERVAL_SECS: u64 = 60;
 const SEQUENCE_MUTATION_INTERVAL_SECS: u64 = 30;
+// Phase 1 hands over to Phase 2 once every script has been quiet for
+// `saturation_secs`. That condition is conjunctive, so a single script that
+// sporadically finds new coverage can hold the whole campaign in Phase 1
+// forever. Cap Phase 1 at this multiple of `saturation_secs` so
+// multi-transaction fuzzing is always reached.
+const PHASE1_MAX_SATURATION_MULTIPLIER: u64 = 10;
 // Reward weights summed by `execution_seed_score` to prioritize seeds: a seed's
 // score is the sum of the rewards for the signals its execution triggered, and
 // higher-scoring seeds are favored for mutation. The relative magnitudes encode
@@ -1055,6 +1061,12 @@ pub fn entrypoint(
     max_chain_length: usize,
     max_chain_repetition: usize,
     saturation_secs: u64,
+    // Hard wall-clock budget for the whole campaign, measured from the start of
+    // this invocation; 0 disables it.
+    max_total_secs: u64,
+    // Hard cap on mutation-loop rounds across both phases, counted from the
+    // start of this invocation; 0 disables it.
+    max_iterations: u64,
 ) -> Result<()> {
     // build a model on the packages
     let model = Model::new(&pkg_defs);
@@ -1271,7 +1283,24 @@ pub fn entrypoint(
     let mut last_report = Instant::now();
     let mut last_report_coverage = 0usize;
 
-    loop {
+    // The campaign always terminates: either a phase-specific saturation
+    // condition fires, or one of the hard budgets below is hit. `stop_reason`
+    // makes this the single exit path, so every exit checkpoints exactly once.
+    let stop_reason = loop {
+        if budget_exhausted(max_total_secs, start_time.elapsed().as_secs()) {
+            break format!(
+                "wall-clock budget of {max_total_secs}s exhausted (phase {}, {iteration} round(s))",
+                if phase2_entered { 2 } else { 1 }
+            );
+        }
+        if budget_exhausted(max_iterations, iteration) {
+            break format!(
+                "round budget of {max_iterations} reached (phase {}, {}s elapsed)",
+                if phase2_entered { 2 } else { 1 },
+                start_time.elapsed().as_secs()
+            );
+        }
+
         let mut round_writes = vec![];
         let mut pending_missing_data_targets = BTreeSet::new();
 
@@ -1778,9 +1807,18 @@ pub fn entrypoint(
             let phase1_saturated = last_script_coverage_time
                 .iter()
                 .all(|t| t.elapsed().as_secs() >= saturation_secs);
-            if !phase2_entered && phase1_saturated {
+            // Backstop: one script that keeps finding coverage must not keep
+            // the campaign in Phase 1 for the entire run.
+            let phase1_deadline_hit = start_time.elapsed().as_secs()
+                >= phase1_budget_secs(saturation_secs, max_total_secs);
+            if !phase2_entered && (phase1_saturated || phase1_deadline_hit) {
                 info!(
-                    "Phase 1 saturated per script after {}s ({} execution profiles collected). Transitioning to Phase 2.",
+                    "Phase 1 {} after {}s ({} execution profiles collected). Transitioning to Phase 2.",
+                    if phase1_saturated {
+                        "saturated per script"
+                    } else {
+                        "hit its time cap"
+                    },
                     start_time.elapsed().as_secs(),
                     bootstrap_profile_count
                 );
@@ -2040,33 +2078,39 @@ pub fn entrypoint(
                 && coverage_delta == 0
                 && last_phase2_novelty.elapsed().as_secs() >= saturation_secs
             {
-                info!(
-                    "Phase 2 saturated after {}s without coverage/DUG novelty for {}s. Stopping.",
+                break format!(
+                    "Phase 2 saturated after {}s ({}s without coverage/DUG novelty)",
                     start_time.elapsed().as_secs(),
                     saturation_secs
                 );
-                save_checkpoint(
-                    &path_auto_state,
-                    &campaign_fingerprint,
-                    RuntimeCheckpoint {
-                        entrypoint_identities: &entrypoint_identities,
-                        phase2_entered,
-                        bootstrap_profile_count,
-                        bootstrap_dug: &bootstrap_dug,
-                        dug: dug.as_ref(),
-                        oneshot_fuzzers: &oneshot_fuzzers,
-                        seq_db: &seq_db,
-                        chain_fuzzers: &chain_fuzzers,
-                        chain_seed_nonce,
-                        object_state: current_object_state(&oneshot_fuzzers, &chain_fuzzers),
-                        missing_data_signals: &missing_data_signals,
-                    },
-                    &mut state_dirty,
-                )?;
-                return Ok(());
             }
         }
-    }
+    };
+
+    // Single exit path for the mutation loop: always checkpoint before leaving.
+    // `save_checkpoint` is a no-op when nothing changed since the last periodic
+    // save, so a budget stop right after a report costs nothing.
+    info!("stopping fuzz campaign: {stop_reason}");
+    eprintln!("\n=== Fuzzing stopped: {stop_reason} ===");
+    save_checkpoint(
+        &path_auto_state,
+        &campaign_fingerprint,
+        RuntimeCheckpoint {
+            entrypoint_identities: &entrypoint_identities,
+            phase2_entered,
+            bootstrap_profile_count,
+            bootstrap_dug: &bootstrap_dug,
+            dug: dug.as_ref(),
+            oneshot_fuzzers: &oneshot_fuzzers,
+            seq_db: &seq_db,
+            chain_fuzzers: &chain_fuzzers,
+            chain_seed_nonce,
+            object_state: current_object_state(&oneshot_fuzzers, &chain_fuzzers),
+            missing_data_signals: &missing_data_signals,
+        },
+        &mut state_dirty,
+    )?;
+    Ok(())
 }
 
 /// Mix two u64 values into a deterministic, well-scrambled seed.
@@ -2298,6 +2342,25 @@ fn compute_instantiated_abilities(
     actual_abilities
 }
 
+/// True when a hard budget has been exhausted. A limit of `0` disables the
+/// budget, matching libFuzzer's `-max_total_time=0` / `-runs=-1` convention.
+fn budget_exhausted(limit: u64, current: u64) -> bool {
+    limit > 0 && current >= limit
+}
+
+/// Hard cap on how long Phase 1 may run before handing over to Phase 2, even if
+/// some script is still occasionally finding new coverage. Under a global
+/// wall-clock budget Phase 1 gets at most half of it, so Phase 2 always gets a
+/// share of the run.
+fn phase1_budget_secs(saturation_secs: u64, max_total_secs: u64) -> u64 {
+    let cap = saturation_secs.saturating_mul(PHASE1_MAX_SATURATION_MULTIPLIER);
+    if max_total_secs > 0 {
+        cap.min(max_total_secs / 2)
+    } else {
+        cap
+    }
+}
+
 /// Format a Duration as HH:MM:SS
 fn fmt_elapsed(secs: u64) -> String {
     let hh = secs / 3600;
@@ -2321,10 +2384,10 @@ fn fmt_ago(since: Instant) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        add_type_candidate, campaign_fingerprint, chain_instance_identity,
+        add_type_candidate, budget_exhausted, campaign_fingerprint, chain_instance_identity,
         chain_missing_data_resolution, entrypoint_cache_fingerprint,
-        expand_generic_struct_candidates, record_missing_data_signal, MissingDataSignal, SeedInput,
-        MAX_GENERIC_TYPE_POOL_ROUNDS,
+        expand_generic_struct_candidates, phase1_budget_secs, record_missing_data_signal,
+        MissingDataSignal, SeedInput, MAX_GENERIC_TYPE_POOL_ROUNDS,
     };
     use crate::{
         deps::PkgKind,
@@ -2346,6 +2409,27 @@ mod tests {
         language_storage::{StructTag, TypeTag as VmTypeTag},
     };
     use std::collections::{BTreeMap, BTreeSet};
+
+    #[test]
+    fn budget_zero_is_unlimited() {
+        assert!(!budget_exhausted(0, 0));
+        assert!(!budget_exhausted(0, u64::MAX));
+        assert!(!budget_exhausted(10, 9));
+        assert!(budget_exhausted(10, 10));
+        assert!(budget_exhausted(10, 11));
+    }
+
+    #[test]
+    fn phase1_budget_is_bounded_by_the_global_budget() {
+        // no global budget: 10x the saturation window
+        assert_eq!(phase1_budget_secs(120, 0), 1200);
+        // global budget: phase 1 may take at most half of it
+        assert_eq!(phase1_budget_secs(120, 600), 300);
+        // global budget larger than the multiplier cap: the multiplier wins
+        assert_eq!(phase1_budget_secs(120, 100_000), 1200);
+        // no overflow on absurd saturation windows
+        assert_eq!(phase1_budget_secs(u64::MAX, 0), u64::MAX);
+    }
 
     fn make_decl(name: &str, generics: Vec<(AbilitySet, bool)>) -> DatatypeDecl {
         DatatypeDecl {
