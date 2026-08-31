@@ -625,10 +625,7 @@ mod tests {
     use crate::{
         network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
         rand::secret_sharing::{
-            storage::{
-                InMemorySecretShareStorage, LoadedSecretShare, SecretShareDb,
-                SecretShareStorageError,
-            },
+            storage::{InMemorySecretShareStorage, LoadedSecretShare, SecretShareDb},
             test_utils::{
                 create_bad_secret_share, create_metadata, create_secret_share, TestContext,
             },
@@ -652,24 +649,15 @@ mod tests {
     struct FailingStorage;
 
     impl SecretShareStorage for FailingStorage {
-        fn save_self_share(
-            &self,
-            _share: &SecretShare,
-        ) -> crate::rand::secret_sharing::storage::Result<()> {
-            Err(SecretShareStorageError::Io("injected failure".into()))
+        fn save_self_share(&self, _share: &SecretShare) -> anyhow::Result<()> {
+            anyhow::bail!("injected failure")
         }
 
-        fn load_self_shares(
-            &self,
-            _epoch: u64,
-        ) -> crate::rand::secret_sharing::storage::Result<Vec<LoadedSecretShare>> {
+        fn load_self_shares(&self, _epoch: u64) -> anyhow::Result<Vec<LoadedSecretShare>> {
             Ok(Vec::new())
         }
 
-        fn prune_before_epoch(
-            &self,
-            _epoch: u64,
-        ) -> crate::rand::secret_sharing::storage::Result<()> {
+        fn prune_before_epoch(&self, _epoch: u64) -> anyhow::Result<()> {
             Ok(())
         }
     }

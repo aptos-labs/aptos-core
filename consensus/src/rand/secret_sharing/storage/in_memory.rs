@@ -1,10 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use super::{
-    storage_key, LoadedSecretShare, Result, SecretShareKey, SecretShareStorage,
-    SecretShareStorageError,
-};
+use super::{storage_key, LoadedSecretShare, SecretShareKey, SecretShareStorage};
+use anyhow::{bail, ensure, Result};
 use aptos_infallible::Mutex;
 use aptos_types::secret_sharing::SecretShare;
 use std::collections::HashMap;
@@ -35,15 +33,15 @@ impl Default for InMemorySecretShareStorage {
 impl SecretShareStorage for InMemorySecretShareStorage {
     fn save_self_share(&self, share: &SecretShare) -> Result<()> {
         let key = storage_key(share.metadata());
-        let serialized = bcs::to_bytes(share)
-            .map_err(|error| SecretShareStorageError::Corruption(error.to_string()))?;
+        let serialized = bcs::to_bytes(share)?;
         let mut shares = self.shares.lock();
         match shares.get(&key) {
             Some(existing) if existing == &serialized => Ok(()),
-            Some(_) => Err(SecretShareStorageError::Conflict {
-                epoch: key.0,
-                block_id: key.1,
-            }),
+            Some(_) => bail!(
+                "conflicting secret share for epoch {}, block {}",
+                key.0,
+                key.1
+            ),
             None => {
                 shares.insert(key, serialized);
                 Ok(())
@@ -58,18 +56,14 @@ impl SecretShareStorage for InMemorySecretShareStorage {
             .iter()
             .filter(|((stored_epoch, _), _)| *stored_epoch == epoch)
             .map(|(key, serialized)| {
-                bcs::from_bytes::<SecretShare>(serialized)
-                    .map_err(|error| SecretShareStorageError::Corruption(error.to_string()))
-                    .and_then(|share| {
-                        if storage_key(share.metadata()) == *key {
-                            Ok(share)
-                        } else {
-                            Err(SecretShareStorageError::Corruption(format!(
-                                "stored key does not match secret share metadata for epoch {}, block {}",
-                                key.0, key.1
-                            )))
-                        }
-                    })
+                let share = bcs::from_bytes::<SecretShare>(serialized)?;
+                ensure!(
+                    storage_key(share.metadata()) == *key,
+                    "stored key does not match secret share metadata for epoch {}, block {}",
+                    key.0,
+                    key.1
+                );
+                Ok(share)
             })
             .collect())
     }
