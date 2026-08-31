@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    counters::DEC_QUEUE_SIZE,
+    counters::{DEC_QUEUE_SIZE, SECRET_SHARE_STORAGE_EVENTS},
     logging::{LogEvent, LogSchema},
     network::{IncomingSecretShareRequest, NetworkSender, TConsensusMsg},
     pipeline::buffer_manager::{OrderedBlocks, ResetAck, ResetRequest, ResetSignal},
@@ -11,6 +11,10 @@ use crate::{
         network_messages::{SecretShareMessage, SecretShareRpc},
         reliable_broadcast_state::SecretShareAggregateState,
         secret_share_store::{SecretShareAggregationResult, SecretShareStore},
+        storage::{
+            storage_key, LoadedSecretShare, SecretShareKey, SecretShareStorage,
+            SecretShareStorageError,
+        },
         types::RequestSecretShare,
         verifier::SecretShareVerifier,
     },
@@ -27,7 +31,10 @@ use aptos_logger::{debug, error, info, spawn_named, warn};
 use aptos_network::{protocols::network::RpcError, ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
-use aptos_types::{epoch_state::EpochState, secret_sharing::SecretShareMetadata};
+use aptos_types::{
+    epoch_state::EpochState,
+    secret_sharing::{SecretShare, SecretShareMetadata},
+};
 use bytes::Bytes;
 use futures::{
     future::{AbortHandle, Abortable},
@@ -38,7 +45,7 @@ use futures_channel::{
     mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
     oneshot,
 };
-use std::{future::Future, pin::Pin, sync::Arc, time::Duration};
+use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
 pub type Sender<T> = UnboundedSender<T>;
@@ -47,6 +54,14 @@ pub type Receiver<T> = UnboundedReceiver<T>;
 type PendingDeriveFut =
     Pin<Box<dyn Future<Output = (Round, TaskResult<SecretShareResult>)> + Send>>;
 
+fn storage_error_label(error: &SecretShareStorageError) -> &'static str {
+    match error {
+        SecretShareStorageError::Conflict { .. } => "conflict",
+        SecretShareStorageError::Corruption(_) => "corruption",
+        SecretShareStorageError::Io(_) => "io_failure",
+    }
+}
+
 pub struct SecretShareManager {
     author: Author,
     epoch_state: Arc<EpochState>,
@@ -54,6 +69,7 @@ pub struct SecretShareManager {
     verifier: Arc<SecretShareVerifier>,
     reliable_broadcast: Arc<ReliableBroadcast<SecretShareMessage, ExponentialBackoff>>,
     network_sender: Arc<NetworkSender>,
+    secret_share_storage: Arc<dyn SecretShareStorage>,
     secret_share_request_delay_ms: u64,
 
     // local channel received from dec_store
@@ -62,6 +78,7 @@ pub struct SecretShareManager {
     outgoing_blocks: Sender<OrderedBlocks>,
     // local state
     secret_share_store: Arc<Mutex<SecretShareStore>>,
+    recovered_self_shares: HashMap<SecretShareKey, SecretShare>,
     block_queue: BlockQueue,
     pending_derives: FuturesUnordered<PendingDeriveFut>,
 }
@@ -73,6 +90,8 @@ impl SecretShareManager {
         verifier: Arc<SecretShareVerifier>,
         outgoing_blocks: Sender<OrderedBlocks>,
         network_sender: Arc<NetworkSender>,
+        secret_share_storage: Arc<dyn SecretShareStorage>,
+        loaded_self_shares: Vec<LoadedSecretShare>,
         bounded_executor: BoundedExecutor,
         rb_config: &ReliableBroadcastConfig,
         secret_share_request_delay_ms: u64,
@@ -88,7 +107,7 @@ impl SecretShareManager {
             rb_backoff_policy,
             TimeService::real(),
             Duration::from_millis(rb_config.rpc_timeout_ms),
-            bounded_executor,
+            bounded_executor.clone(),
         ));
         let (decision_tx, decision_rx) = unbounded();
 
@@ -98,6 +117,47 @@ impl SecretShareManager {
             verifier.clone(),
             decision_tx,
         )));
+        let mut recovered_self_shares = HashMap::new();
+        for loaded_share in loaded_self_shares {
+            let share = match loaded_share {
+                Ok(share) => share,
+                Err(error) => {
+                    SECRET_SHARE_STORAGE_EVENTS
+                        .with_label_values(&["recovery", storage_error_label(&error)])
+                        .inc();
+                    error!("Ignoring invalid persisted secret share: {error}");
+                    continue;
+                },
+            };
+            if share.epoch() != epoch_state.epoch || share.author() != &author {
+                SECRET_SHARE_STORAGE_EVENTS
+                    .with_label_values(&["recovery", "corruption"])
+                    .inc();
+                error!(
+                    expected_epoch = epoch_state.epoch,
+                    share_epoch = share.epoch(),
+                    expected_author = author,
+                    share_author = share.author(),
+                    "Ignoring persisted secret share with invalid identity"
+                );
+                continue;
+            }
+            if let Err(error) = verifier.verify(&share, &author) {
+                SECRET_SHARE_STORAGE_EVENTS
+                    .with_label_values(&["recovery", "corruption"])
+                    .inc();
+                error!(
+                    epoch = share.epoch(),
+                    round = share.round(),
+                    "Ignoring cryptographically invalid persisted secret share: {error}"
+                );
+                continue;
+            }
+            SECRET_SHARE_STORAGE_EVENTS
+                .with_label_values(&["recovery", "loaded"])
+                .inc();
+            recovered_self_shares.insert(storage_key(share.metadata()), share);
+        }
 
         Self {
             author,
@@ -106,12 +166,14 @@ impl SecretShareManager {
             verifier,
             reliable_broadcast,
             network_sender,
+            secret_share_storage,
             secret_share_request_delay_ms,
 
             decision_rx,
             outgoing_blocks,
 
             secret_share_store: dec_store,
+            recovered_self_shares,
             block_queue: BlockQueue::new(),
             pending_derives: FuturesUnordered::new(),
         }
@@ -153,8 +215,8 @@ impl SecretShareManager {
         Ok(())
     }
 
-    /// Handles a completed self-share derivation: updates the store, broadcasts
-    /// the share, and spawns the share requester task.
+    /// Handles a completed self-share derivation. The synchronous database write
+    /// must succeed before the share enters either memory cache or the network.
     fn process_completed_derive(&mut self, round: Round, result: TaskResult<SecretShareResult>) {
         let share = match result {
             Ok(Some(share)) => share,
@@ -181,6 +243,39 @@ impl SecretShareManager {
                 return;
             },
         };
+
+        if share.author() != &self.author
+            || share.epoch() != self.epoch_state.epoch
+            || share.round() != round
+        {
+            error!(
+                epoch = self.epoch_state.epoch,
+                round = round,
+                share_epoch = share.epoch(),
+                share_round = share.round(),
+                share_author = share.author(),
+                "Derived self share has invalid identity or metadata"
+            );
+            return;
+        }
+
+        if let Err(error) = self.secret_share_storage.save_self_share(&share) {
+            SECRET_SHARE_STORAGE_EVENTS
+                .with_label_values(&["write", storage_error_label(&error)])
+                .inc();
+            error!(
+                epoch = share.epoch(),
+                round = round,
+                block_id = share.metadata().block_id,
+                "CRITICAL: Failed to persist self secret share: {error}"
+            );
+            return;
+        }
+        SECRET_SHARE_STORAGE_EVENTS
+            .with_label_values(&["write", "success"])
+            .inc();
+        self.recovered_self_shares
+            .insert(storage_key(share.metadata()), share.clone());
 
         let metadata = share.metadata().clone();
         {
@@ -408,7 +503,7 @@ impl SecretShareManager {
         DropGuard::new(abort_handle)
     }
 
-    fn handle_incoming_msg(&self, rpc: SecretShareRpc) {
+    fn handle_incoming_msg(&mut self, rpc: SecretShareRpc) {
         let SecretShareRpc {
             msg,
             protocol,
@@ -416,27 +511,53 @@ impl SecretShareManager {
         } = rpc;
         match msg {
             SecretShareMessage::RequestShare(request) => {
+                if request.metadata().epoch != self.epoch_state.epoch {
+                    warn!(
+                        requested_epoch = request.metadata().epoch,
+                        current_epoch = self.epoch_state.epoch,
+                        "Rejecting secret share request from old or future epoch"
+                    );
+                    return;
+                }
                 let result = self
                     .secret_share_store
                     .lock()
                     .get_self_share(request.metadata());
-                match result {
-                    Ok(Some(share)) => {
-                        self.process_response(
-                            protocol,
-                            response_sender,
-                            SecretShareMessage::Share(share),
-                        );
+                let active_share = match result {
+                    Ok(Some(share)) => Some(share),
+                    Ok(None) => None,
+                    Err(error) => {
+                        debug!("Self share not available in active store: {error}");
+                        None
                     },
-                    Ok(None) => {
-                        warn!(
-                            "Self secret share could not be found for RPC request {}",
-                            request.metadata().round
-                        );
-                    },
-                    Err(e) => {
-                        warn!("[SecretShareManager] Failed to get share: {}", e);
-                    },
+                };
+                if let Some(share) = active_share {
+                    self.process_response(
+                        protocol,
+                        response_sender,
+                        SecretShareMessage::Share(share),
+                    );
+                    return;
+                }
+
+                let recovered_share = self
+                    .recovered_self_shares
+                    .get(&storage_key(request.metadata()))
+                    .filter(|share| share.metadata() == request.metadata())
+                    .cloned();
+                if let Some(share) = recovered_share {
+                    SECRET_SHARE_STORAGE_EVENTS
+                        .with_label_values(&["recovery", "success"])
+                        .inc();
+                    self.process_response(
+                        protocol,
+                        response_sender,
+                        SecretShareMessage::Share(share),
+                    );
+                } else {
+                    SECRET_SHARE_STORAGE_EVENTS
+                        .with_label_values(&["recovery", "miss"])
+                        .inc();
                 }
             },
             SecretShareMessage::Share(share) => {
@@ -523,5 +644,397 @@ impl SecretShareManager {
     pub fn observe_queue(&self) {
         let queue = &self.block_queue.queue();
         DEC_QUEUE_SIZE.set(queue.len() as i64);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
+        rand::secret_sharing::{
+            storage::{InMemorySecretShareStorage, SecretShareDb},
+            test_utils::{
+                create_bad_secret_share, create_metadata, create_secret_share, TestContext,
+            },
+        },
+    };
+    use aptos_channels::{aptos_channel, message_queues::QueueStyle};
+    use aptos_config::{
+        config::ReliableBroadcastConfig,
+        network_id::{NetworkId, PeerNetworkId},
+    };
+    use aptos_network::{
+        application::{interface::NetworkClient, storage::PeersAndMetadata},
+        peer_manager::{ConnectionRequestSender, PeerManagerRequest, PeerManagerRequestSender},
+        protocols::{network::NewNetworkSender, wire::handshake::v1::ProtocolIdSet},
+        transport::ConnectionMetadata,
+    };
+    use aptos_temppath::TempPath;
+    use maplit::hashmap;
+    use std::iter::FromIterator;
+
+    struct FailingStorage;
+
+    impl SecretShareStorage for FailingStorage {
+        fn save_self_share(
+            &self,
+            _share: &SecretShare,
+        ) -> crate::rand::secret_sharing::storage::Result<()> {
+            Err(SecretShareStorageError::Io("injected failure".into()))
+        }
+
+        fn load_self_shares(
+            &self,
+            _epoch: u64,
+        ) -> crate::rand::secret_sharing::storage::Result<Vec<LoadedSecretShare>> {
+            Ok(Vec::new())
+        }
+
+        fn prune_before_epoch(
+            &self,
+            _epoch: u64,
+        ) -> crate::rand::secret_sharing::storage::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn make_manager(
+        ctx: &TestContext,
+        local_index: usize,
+        storage: Arc<dyn SecretShareStorage>,
+    ) -> (
+        SecretShareManager,
+        aptos_channel::Receiver<(Author, ProtocolId), PeerManagerRequest>,
+    ) {
+        let peers_and_metadata = PeersAndMetadata::new(&[NetworkId::Validator]);
+        for peer in &ctx.authors {
+            let peer_network_id = PeerNetworkId::new(NetworkId::Validator, *peer);
+            let mut connection_metadata = ConnectionMetadata::mock(*peer);
+            connection_metadata.application_protocols = ProtocolIdSet::from_iter(DIRECT_SEND);
+            peers_and_metadata
+                .insert_connection_metadata(peer_network_id, connection_metadata)
+                .unwrap();
+        }
+
+        let (network_reqs_tx, network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 16, None);
+        let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 16, None);
+        let network_sender = aptos_network::protocols::network::NetworkSender::new(
+            PeerManagerRequestSender::new(network_reqs_tx),
+            ConnectionRequestSender::new(connection_reqs_tx),
+        );
+        let network_client = NetworkClient::new(
+            DIRECT_SEND.into(),
+            RPC.into(),
+            hashmap! { NetworkId::Validator => network_sender },
+            peers_and_metadata,
+        );
+        let consensus_network_client = ConsensusNetworkClient::new(network_client);
+        let (self_sender, _) = aptos_channels::new_unbounded_test();
+        let network_sender = Arc::new(NetworkSender::new(
+            ctx.authors[local_index],
+            consensus_network_client,
+            self_sender,
+            ctx.validator_verifier.clone(),
+        ));
+        let (outgoing_blocks, _) = unbounded();
+        let bounded_executor = BoundedExecutor::new(4, tokio::runtime::Handle::current());
+        let loaded_self_shares = storage.load_self_shares(ctx.epoch).unwrap();
+        let manager = SecretShareManager::new(
+            ctx.authors[local_index],
+            Arc::new(EpochState {
+                epoch: ctx.epoch,
+                verifier: ctx.validator_verifier.clone(),
+            }),
+            Arc::new(SecretShareVerifier::new(
+                ctx.secret_share_config.clone(),
+                true,
+            )),
+            outgoing_blocks,
+            network_sender,
+            storage,
+            loaded_self_shares,
+            bounded_executor,
+            &ReliableBroadcastConfig::default(),
+            1_000_000,
+        );
+        (manager, network_reqs_rx)
+    }
+
+    fn request_rpc(
+        metadata: SecretShareMetadata,
+    ) -> (SecretShareRpc, oneshot::Receiver<Result<Bytes, RpcError>>) {
+        let (response_sender, response_rx) = oneshot::channel();
+        (
+            SecretShareRpc {
+                msg: SecretShareMessage::RequestShare(RequestSecretShare::new(metadata)),
+                protocol: ProtocolId::ConsensusRpcBcs,
+                response_sender,
+            },
+            response_rx,
+        )
+    }
+
+    #[tokio::test]
+    async fn test_write_completes_before_cache_and_broadcast() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let storage = Arc::new(InMemorySecretShareStorage::new());
+        let (mut manager, mut network_rx) = make_manager(&ctx, 0, storage.clone());
+        let metadata = create_metadata(ctx.epoch, 10);
+        let share = create_secret_share(&ctx, 0, &metadata);
+        manager
+            .secret_share_store
+            .lock()
+            .update_highest_known_round(metadata.round);
+
+        manager.process_completed_derive(metadata.round, Ok(Some(share.clone())));
+
+        let persisted = storage
+            .load_self_shares(ctx.epoch)
+            .unwrap()
+            .into_iter()
+            .next()
+            .unwrap()
+            .unwrap();
+        assert_eq!(persisted.metadata(), &metadata);
+        assert_eq!(
+            manager
+                .recovered_self_shares
+                .get(&storage_key(&metadata))
+                .unwrap()
+                .metadata(),
+            &metadata
+        );
+        assert!(manager
+            .secret_share_store
+            .lock()
+            .get_self_share(&metadata)
+            .unwrap()
+            .is_some());
+        assert!(network_rx.next().await.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_write_failure_prevents_publication() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let (mut manager, mut network_rx) = make_manager(&ctx, 0, Arc::new(FailingStorage));
+        let metadata = create_metadata(ctx.epoch, 10);
+        let share = create_secret_share(&ctx, 0, &metadata);
+        manager
+            .secret_share_store
+            .lock()
+            .update_highest_known_round(metadata.round);
+
+        manager.process_completed_derive(metadata.round, Ok(Some(share)));
+
+        assert!(manager
+            .secret_share_store
+            .lock()
+            .get_self_share(&metadata)
+            .unwrap()
+            .is_none());
+        assert!(manager.recovered_self_shares.is_empty());
+        assert!(
+            tokio::time::timeout(Duration::from_millis(10), network_rx.next())
+                .await
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_reset_preserves_recovered_self_shares() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let storage = Arc::new(InMemorySecretShareStorage::new());
+        let (mut manager, mut network_rx) = make_manager(&ctx, 0, storage.clone());
+        let metadata = create_metadata(ctx.epoch, 10);
+        let share = create_secret_share(&ctx, 0, &metadata);
+        manager
+            .secret_share_store
+            .lock()
+            .update_highest_known_round(metadata.round);
+        manager.process_completed_derive(metadata.round, Ok(Some(share)));
+        assert!(network_rx.next().await.is_some());
+
+        let (tx, rx) = oneshot::channel();
+        manager.process_reset(ResetRequest {
+            tx,
+            signal: ResetSignal::TargetRound(metadata.round),
+        });
+        rx.await.unwrap();
+
+        assert_eq!(manager.recovered_self_shares.len(), 1);
+        assert!(manager
+            .secret_share_store
+            .lock()
+            .get_self_share(&metadata)
+            .unwrap()
+            .is_none());
+
+        let (request, response) = request_rpc(metadata.clone());
+        manager.handle_incoming_msg(request);
+        assert!(response.await.unwrap().is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_cache_miss_uses_preloaded_share() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let storage = Arc::new(InMemorySecretShareStorage::new());
+        let metadata = create_metadata(ctx.epoch, 10);
+        let share = create_secret_share(&ctx, 0, &metadata);
+        storage.save_self_share(&share).unwrap();
+        let (mut manager, _) = make_manager(&ctx, 0, storage.clone());
+        manager
+            .secret_share_store
+            .lock()
+            .update_highest_known_round(metadata.round);
+        let (request_1, response_1) = request_rpc(metadata.clone());
+        let (request_2, response_2) = request_rpc(metadata.clone());
+
+        manager.handle_incoming_msg(request_1);
+        manager.handle_incoming_msg(request_2);
+
+        for response in [response_1, response_2] {
+            let bytes = response.await.unwrap().unwrap();
+            let message: ConsensusMsg = ProtocolId::ConsensusRpcBcs.from_bytes(&bytes).unwrap();
+            let SecretShareMessage::Share(recovered) =
+                SecretShareMessage::from_network_message(message).unwrap()
+            else {
+                panic!("expected a secret share response")
+            };
+            assert_eq!(recovered.metadata(), &metadata);
+            assert_eq!(recovered.author(), &ctx.authors[0]);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_invalid_recovered_records_and_requests_are_rejected() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let metadata = create_metadata(ctx.epoch, 10);
+
+        let wrong_author_storage = Arc::new(InMemorySecretShareStorage::new());
+        wrong_author_storage
+            .save_self_share(&create_secret_share(&ctx, 1, &metadata))
+            .unwrap();
+        let (mut manager, _) = make_manager(&ctx, 0, wrong_author_storage);
+        manager
+            .secret_share_store
+            .lock()
+            .update_highest_known_round(metadata.round);
+        let (request, response) = request_rpc(metadata.clone());
+        manager.handle_incoming_msg(request);
+        assert!(response.await.is_err());
+
+        let bad_crypto_storage = Arc::new(InMemorySecretShareStorage::new());
+        bad_crypto_storage
+            .save_self_share(&create_bad_secret_share(&ctx, 0, &metadata))
+            .unwrap();
+        let (mut manager, _) = make_manager(&ctx, 0, bad_crypto_storage);
+        manager
+            .secret_share_store
+            .lock()
+            .update_highest_known_round(metadata.round);
+        let (request, response) = request_rpc(metadata.clone());
+        manager.handle_incoming_msg(request);
+        assert!(response.await.is_err());
+
+        let forged_storage = Arc::new(InMemorySecretShareStorage::new());
+        forged_storage
+            .save_self_share(&create_secret_share(&ctx, 0, &metadata))
+            .unwrap();
+        let (mut manager, _) = make_manager(&ctx, 0, forged_storage.clone());
+        manager
+            .secret_share_store
+            .lock()
+            .update_highest_known_round(metadata.round);
+        let mut forged_metadata = metadata.clone();
+        forged_metadata.timestamp += 1;
+        let (request, response) = request_rpc(forged_metadata);
+        manager.handle_incoming_msg(request);
+        assert!(response.await.is_err());
+
+        let old_epoch_metadata = create_metadata(ctx.epoch - 1, metadata.round);
+        let (request, response) = request_rpc(old_epoch_metadata);
+        manager.handle_incoming_msg(request);
+        assert!(response.await.is_err());
+
+        let corrupt_storage = Arc::new(InMemorySecretShareStorage::new());
+        corrupt_storage.insert_raw(storage_key(&metadata), vec![0xFF, 0xFF]);
+        let (mut manager, _) = make_manager(&ctx, 0, corrupt_storage);
+        manager
+            .secret_share_store
+            .lock()
+            .update_highest_known_round(metadata.round);
+        let (request, response) = request_rpc(metadata);
+        manager.handle_incoming_msg(request);
+        assert!(response.await.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_persisted_threshold_recovers_after_restart_and_lost_handoff() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let metadata = create_metadata(ctx.epoch, 10);
+        let mut peer_paths = Vec::new();
+
+        // These three authors formed the threshold that made the original
+        // decryption possible. Persist their shares, then drop the databases to
+        // model full process shutdown.
+        for author_index in 0..3 {
+            let path = TempPath::new();
+            {
+                let db = SecretShareDb::new(&path);
+                db.save_self_share(&create_secret_share(&ctx, author_index, &metadata))
+                    .unwrap();
+            }
+            peer_paths.push(path);
+        }
+
+        // The fourth validator lost its original pipeline handoff. After its
+        // restart/replay, its own derivation succeeds and it requests the
+        // threshold authors' shares from their freshly restarted managers.
+        let target_storage = Arc::new(InMemorySecretShareStorage::new());
+        let (mut target, _) = make_manager(&ctx, 3, target_storage);
+        target
+            .secret_share_store
+            .lock()
+            .update_highest_known_round(metadata.round);
+        target.process_completed_derive(
+            metadata.round,
+            Ok(Some(create_secret_share(&ctx, 3, &metadata))),
+        );
+
+        for (author_index, path) in peer_paths.iter().enumerate() {
+            let restarted_storage = Arc::new(SecretShareDb::new(path));
+            let (mut restarted_peer, _) = make_manager(&ctx, author_index, restarted_storage);
+            restarted_peer
+                .secret_share_store
+                .lock()
+                .update_highest_known_round(metadata.round);
+            let (request, response) = request_rpc(metadata.clone());
+            restarted_peer.handle_incoming_msg(request);
+
+            let bytes = response.await.unwrap().unwrap();
+            let message: ConsensusMsg = ProtocolId::ConsensusRpcBcs.from_bytes(&bytes).unwrap();
+            let SecretShareMessage::Share(recovered) =
+                SecretShareMessage::from_network_message(message).unwrap()
+            else {
+                panic!("expected a secret share response")
+            };
+            target
+                .secret_share_store
+                .lock()
+                .add_share(recovered)
+                .unwrap();
+        }
+
+        let result = tokio::time::timeout(Duration::from_secs(5), target.decision_rx.next())
+            .await
+            .expect("timed out waiting for reconstructed key")
+            .expect("secret share decision channel closed");
+        match result {
+            SecretShareAggregationResult::Success(key) => assert_eq!(key.metadata, metadata),
+            SecretShareAggregationResult::Failure { .. } => {
+                panic!("persisted threshold did not reconstruct the key")
+            },
+        }
     }
 }

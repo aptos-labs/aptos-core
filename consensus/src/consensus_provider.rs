@@ -17,7 +17,7 @@ use crate::{
     persistent_liveness_storage::StorageWriteProxy,
     pipeline::execution_client::{DummyExecutionClient, ExecutionProxyClient, TExecutionClient},
     quorum_store::quorum_store_db::QuorumStoreDB,
-    rand::rand_gen::storage::db::RandDb,
+    rand::{rand_gen::storage::db::RandDb, secret_sharing::storage::SecretShareDb},
     state_computer::ExecutionProxy,
     txn_notifier::MempoolNotifier,
     util::time_service::ClockTimeService,
@@ -83,6 +83,7 @@ pub fn start_consensus(
         runtime.handle().clone(),
     );
     let rand_storage = Arc::new(RandDb::new(node_config.storage.dir()));
+    let secret_share_storage = Arc::new(SecretShareDb::new(node_config.storage.dir()));
 
     let execution_client = Arc::new(ExecutionProxyClient::new(
         node_config.consensus.clone(),
@@ -92,6 +93,7 @@ pub fn start_consensus(
         consensus_network_client.clone(),
         bounded_executor.clone(),
         rand_storage.clone(),
+        secret_share_storage,
         node_config.consensus_observer,
         consensus_publisher.clone(),
     ));
@@ -167,6 +169,7 @@ pub fn start_consensus_observer(
         let bounded_executor =
             BoundedExecutor::new(32, consensus_observer_runtime.handle().clone());
         let rand_storage = Arc::new(RandDb::new(node_config.storage.dir()));
+        let secret_share_storage = Arc::new(SecretShareDb::new(node_config.storage.dir()));
         let execution_proxy_client = Arc::new(ExecutionProxyClient::new(
             node_config.consensus.clone(),
             Arc::new(execution_proxy),
@@ -175,6 +178,7 @@ pub fn start_consensus_observer(
             consensus_network_client,
             bounded_executor,
             rand_storage.clone(),
+            secret_share_storage,
             node_config.consensus_observer,
             consensus_publisher.clone(),
         ));

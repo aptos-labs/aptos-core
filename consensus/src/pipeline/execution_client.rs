@@ -23,7 +23,11 @@ use crate::{
             storage::interface::RandStorage,
             types::{AugmentedData, RandConfig, Share},
         },
-        secret_sharing::{secret_share_manager::SecretShareManager, verifier::SecretShareVerifier},
+        secret_sharing::{
+            secret_share_manager::SecretShareManager,
+            storage::{LoadedSecretShare, SecretShareStorage, SecretShareStorageError},
+            verifier::SecretShareVerifier,
+        },
     },
     state_computer::ExecutionProxy,
     state_replication::StateComputer,
@@ -191,6 +195,7 @@ pub struct ExecutionProxyClient {
     // channels to buffer manager
     handle: Arc<RwLock<BufferManagerHandle>>,
     rand_storage: Arc<dyn RandStorage<AugmentedData>>,
+    secret_share_storage: Arc<dyn SecretShareStorage>,
     consensus_observer_config: ConsensusObserverConfig,
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
 }
@@ -204,6 +209,7 @@ impl ExecutionProxyClient {
         network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
         bounded_executor: BoundedExecutor,
         rand_storage: Arc<dyn RandStorage<AugmentedData>>,
+        secret_share_storage: Arc<dyn SecretShareStorage>,
         consensus_observer_config: ConsensusObserverConfig,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
     ) -> Self {
@@ -216,6 +222,7 @@ impl ExecutionProxyClient {
             bounded_executor,
             handle: Arc::new(RwLock::new(BufferManagerHandle::new())),
             rand_storage,
+            secret_share_storage,
             consensus_observer_config,
             consensus_publisher,
         }
@@ -272,6 +279,7 @@ impl ExecutionProxyClient {
         &self,
         epoch_state: &Arc<EpochState>,
         verifier: Arc<SecretShareVerifier>,
+        loaded_self_shares: Vec<LoadedSecretShare>,
         secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
         highest_committed_round: u64,
         network_sender: &Arc<NetworkSender>,
@@ -292,6 +300,8 @@ impl ExecutionProxyClient {
             verifier,
             secret_ready_block_tx,
             network_sender.clone(),
+            self.secret_share_storage.clone(),
+            loaded_self_shares,
             self.bounded_executor.clone(),
             &self.consensus_config.secret_share_rb_config,
             self.consensus_config.secret_share_request_delay_ms,
@@ -383,6 +393,7 @@ impl ExecutionProxyClient {
         epoch_state: Arc<EpochState>,
         rand_config: Option<RandConfig>,
         secret_share_verifier: Option<Arc<SecretShareVerifier>>,
+        loaded_self_shares: Vec<LoadedSecretShare>,
         onchain_consensus_config: &OnChainConsensusConfig,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
@@ -425,6 +436,7 @@ impl ExecutionProxyClient {
                 ) = self.make_secret_sharing_manager(
                     &epoch_state,
                     secret_share_verifier,
+                    loaded_self_shares,
                     secret_sharing_msg_rx,
                     highest_committed_round,
                     &network_sender,
@@ -467,6 +479,7 @@ impl ExecutionProxyClient {
                     self.make_secret_sharing_manager(
                         &epoch_state,
                         secret_sharing_config,
+                        loaded_self_shares,
                         secret_sharing_msg_rx,
                         highest_committed_round,
                         &network_sender,
@@ -544,6 +557,51 @@ impl TExecutionClient for ExecutionProxyClient {
         secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
         highest_committed_round: Round,
     ) {
+        let epoch = epoch_state.epoch;
+        let prune_result = self.secret_share_storage.prune_before_epoch(epoch);
+        match prune_result {
+            Ok(()) => counters::SECRET_SHARE_STORAGE_EVENTS
+                .with_label_values(&["prune", "success"])
+                .inc(),
+            Err(error) => {
+                let result = match error {
+                    SecretShareStorageError::Conflict { .. } => "conflict",
+                    SecretShareStorageError::Corruption(_) => "corruption",
+                    SecretShareStorageError::Io(_) => "io_failure",
+                };
+                counters::SECRET_SHARE_STORAGE_EVENTS
+                    .with_label_values(&["prune", result])
+                    .inc();
+                error!(
+                    epoch = epoch,
+                    "Failed to prune old secret shares at epoch start: {error}"
+                );
+            },
+        }
+        let loaded_self_shares = if secret_share_verifier.is_some() {
+            match self.secret_share_storage.load_self_shares(epoch) {
+                Ok(shares) => {
+                    counters::SECRET_SHARE_STORAGE_EVENTS
+                        .with_label_values(&["load", "success"])
+                        .inc();
+                    shares
+                },
+                Err(error) => {
+                    let result = match &error {
+                        SecretShareStorageError::Conflict { .. } => "conflict",
+                        SecretShareStorageError::Corruption(_) => "corruption",
+                        SecretShareStorageError::Io(_) => "io_failure",
+                    };
+                    counters::SECRET_SHARE_STORAGE_EVENTS
+                        .with_label_values(&["load", result])
+                        .inc();
+                    panic!("Failed to load secret shares at epoch start: {error}");
+                },
+            }
+        } else {
+            Vec::new()
+        };
+
         let network_sender = Arc::new(NetworkSender::new(
             self.author,
             self.network_sender.clone(),
@@ -556,6 +614,7 @@ impl TExecutionClient for ExecutionProxyClient {
             epoch_state.clone(),
             rand_config,
             secret_share_verifier.clone(),
+            loaded_self_shares,
             onchain_consensus_config,
             rand_msg_rx,
             secret_sharing_msg_rx,
