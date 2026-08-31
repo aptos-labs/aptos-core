@@ -51,7 +51,7 @@ pub fn provision_simulator(simulator: &mut Simulator, project: &Project) -> Resu
                 AuthenticationKey::ed25519(&key.public_key()).account_address(),
                 name.clone(),
             )),
-            _ => None,
+            Account::Ref(_) | Account::Resource(..) => None,
         })
         .collect();
 
@@ -569,7 +569,16 @@ pub fn execute_runbook(simulator: &mut Simulator, runbook_path: &Path) -> Result
         if arg_types.len() == params.len() + 1 {
             match entry_sig_iter.next().unwrap() {
                 TxnArgType::Signer => (),
-                _ => {
+                TxnArgType::Bool
+                | TxnArgType::U8
+                | TxnArgType::U16
+                | TxnArgType::U32
+                | TxnArgType::U64
+                | TxnArgType::U128
+                | TxnArgType::U256
+                | TxnArgType::Address
+                | TxnArgType::String
+                | TxnArgType::Vector(_) => {
                     bail!(
                         "wrong number of arguments (NOTE: the first parameter is not a signer type)"
                     )
@@ -693,7 +702,7 @@ pub fn execute_runbook(simulator: &mut Simulator, runbook_path: &Path) -> Result
         match (should_abort, response.result.success) {
             (true, true) => bail!("expect failure while transaction executed"),
             (false, false) => bail!("expect success while transaction failed"),
-            _ => (),
+            (true, false) | (false, true) => (),
         }
 
         // cross-check the debug messages (if explicitly requested)
@@ -722,7 +731,7 @@ pub fn execute_runbook(simulator: &mut Simulator, runbook_path: &Path) -> Result
                             }
                         },
                     },
-                    _ => bail!("not supported yet"),
+                    Value::Null | Value::Array(_) | Value::Object(_) => bail!("not supported yet"),
                 };
                 if message != remapped {
                     bail!(
@@ -775,7 +784,7 @@ pub fn execute_runbook(simulator: &mut Simulator, runbook_path: &Path) -> Result
                 counter_case,
                 counter_step
             ),
-            _ => (),
+            (true, false) | (false, true) => (),
         }
 
         // clean-up

@@ -161,7 +161,27 @@ impl TxnArgType {
             },
             SignatureToken::Vector(sub) => Self::Vector(Self::convert(binary, sub)?.into()),
             // TODO: support signed integer types (i8, i16, i32, i64, i128, i256)
-            _ => bail!("unexpected type in function signature"),
+            SignatureToken::I8
+            | SignatureToken::I16
+            | SignatureToken::I32
+            | SignatureToken::I64
+            | SignatureToken::I128
+            | SignatureToken::I256 => {
+                bail!("unexpected signed integer type in function signature")
+            },
+            // TODO: support generic structs/enums (planned)
+            SignatureToken::StructInstantiation(..) => {
+                bail!("unexpected generic struct in function signature")
+            },
+            SignatureToken::MutableReference(_) => {
+                bail!("unexpected mutable reference in function signature")
+            },
+            SignatureToken::Function(..) => {
+                bail!("unexpected function type in function signature")
+            },
+            SignatureToken::TypeParameter(_) => {
+                bail!("unexpected type parameter in function signature")
+            },
         };
         Ok(converted)
     }
@@ -265,7 +285,26 @@ impl Refty<TxnArgType> {
             SignatureToken::MutableReference(sub) => {
                 Self::MutRef(TxnArgType::convert(binary, sub.as_ref())?)
             },
-            _ => Self::Base(TxnArgType::convert(binary, token)?),
+            SignatureToken::Bool
+            | SignatureToken::U8
+            | SignatureToken::U16
+            | SignatureToken::U32
+            | SignatureToken::U64
+            | SignatureToken::U128
+            | SignatureToken::U256
+            | SignatureToken::I8
+            | SignatureToken::I16
+            | SignatureToken::I32
+            | SignatureToken::I64
+            | SignatureToken::I128
+            | SignatureToken::I256
+            | SignatureToken::Address
+            | SignatureToken::Signer
+            | SignatureToken::Vector(_)
+            | SignatureToken::Function(..)
+            | SignatureToken::Struct(_)
+            | SignatureToken::StructInstantiation(..)
+            | SignatureToken::TypeParameter(_) => Self::Base(TxnArgType::convert(binary, token)?),
         };
         Ok(converted)
     }

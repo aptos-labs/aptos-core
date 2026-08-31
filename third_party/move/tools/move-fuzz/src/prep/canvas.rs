@@ -340,7 +340,14 @@ impl DriverCanvas {
                                 let exists = dt_vars.insert(*param, var);
                                 assert!(exists.is_none());
                             },
-                            _ => unreachable!(
+                            FlowGraphEdge::Def(_)
+                            | FlowGraphEdge::Copy
+                            | FlowGraphEdge::Deref
+                            | FlowGraphEdge::Freeze
+                            | FlowGraphEdge::ImmBorrow
+                            | FlowGraphEdge::MutBorrow
+                            | FlowGraphEdge::VectorToElement
+                            | FlowGraphEdge::ElementToVector => unreachable!(
                                 "unexpected incoming edge of non-use kind for a function node"
                             ),
                         }
@@ -463,7 +470,14 @@ impl DriverCanvas {
                     for edge in graph.edges_directed(node, Direction::Outgoing) {
                         let param = match edge.weight() {
                             FlowGraphEdge::Def(param) => *param,
-                            _ => unreachable!(
+                            FlowGraphEdge::Use(_)
+                            | FlowGraphEdge::Copy
+                            | FlowGraphEdge::Deref
+                            | FlowGraphEdge::Freeze
+                            | FlowGraphEdge::ImmBorrow
+                            | FlowGraphEdge::MutBorrow
+                            | FlowGraphEdge::VectorToElement
+                            | FlowGraphEdge::ElementToVector => unreachable!(
                                 "unexpected outgoing edge of non-def kind for a function node"
                             ),
                         };

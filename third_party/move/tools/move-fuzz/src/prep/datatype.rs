@@ -390,7 +390,29 @@ impl DatatypeRegistry {
                                 TypeRef::Base(TypeExpr::ObjectKnown { ident, type_args })
                             },
                             TypeExpr::Param(index) => TypeRef::Base(TypeExpr::ObjectParam(index)),
-                            _ => panic!("type argument for Object must be a datatype or parameter"),
+                            TypeExpr::Bool
+                            | TypeExpr::U8
+                            | TypeExpr::I8
+                            | TypeExpr::U16
+                            | TypeExpr::I16
+                            | TypeExpr::U32
+                            | TypeExpr::I32
+                            | TypeExpr::U64
+                            | TypeExpr::I64
+                            | TypeExpr::U128
+                            | TypeExpr::I128
+                            | TypeExpr::U256
+                            | TypeExpr::I256
+                            | TypeExpr::Bitvec
+                            | TypeExpr::String
+                            | TypeExpr::Address
+                            | TypeExpr::Signer
+                            | TypeExpr::Vector { .. }
+                            | TypeExpr::ObjectKnown { .. }
+                            | TypeExpr::ObjectParam(_)
+                            | TypeExpr::Function { .. } => {
+                                panic!("type argument for Object must be a datatype or parameter")
+                            },
                         }
                     },
                     None => {
@@ -530,7 +552,29 @@ impl DatatypeRegistry {
                         type_args: type_args.clone(),
                         abilities: *abilities,
                     },
-                    _ => panic!("expect a datatype or a parameter as the type argument for object"),
+                    TypeBase::Bool
+                    | TypeBase::U8
+                    | TypeBase::I8
+                    | TypeBase::U16
+                    | TypeBase::I16
+                    | TypeBase::U32
+                    | TypeBase::I32
+                    | TypeBase::U64
+                    | TypeBase::I64
+                    | TypeBase::U128
+                    | TypeBase::I128
+                    | TypeBase::U256
+                    | TypeBase::I256
+                    | TypeBase::Bitvec
+                    | TypeBase::String
+                    | TypeBase::Address
+                    | TypeBase::Signer
+                    | TypeBase::Vector { .. }
+                    | TypeBase::ObjectKnown { .. }
+                    | TypeBase::ObjectParam { .. }
+                    | TypeBase::Function { .. } => {
+                        panic!("expect a datatype or a parameter as the type argument for object")
+                    },
                 }
             },
             TypeExpr::Function {
@@ -581,7 +625,7 @@ fn merge_pkg_kind(existing: PkgKind, incoming: PkgKind) -> PkgKind {
     match (existing, incoming) {
         (PkgKind::Primary, _) | (_, PkgKind::Primary) => PkgKind::Primary,
         (PkgKind::Dependency, _) | (_, PkgKind::Dependency) => PkgKind::Dependency,
-        _ => PkgKind::Framework,
+        (PkgKind::Framework, PkgKind::Framework) => PkgKind::Framework,
     }
 }
 

@@ -559,7 +559,28 @@ fn find_lambda_params(
             } => {
                 result.push((idx, params.clone(), returns.clone()));
             },
-            _ => continue,
+            TypeBase::Bool
+            | TypeBase::U8
+            | TypeBase::I8
+            | TypeBase::U16
+            | TypeBase::I16
+            | TypeBase::U32
+            | TypeBase::I32
+            | TypeBase::U64
+            | TypeBase::I64
+            | TypeBase::U128
+            | TypeBase::I128
+            | TypeBase::U256
+            | TypeBase::I256
+            | TypeBase::Bitvec
+            | TypeBase::String
+            | TypeBase::Address
+            | TypeBase::Signer
+            | TypeBase::Vector { .. }
+            | TypeBase::Datatype { .. }
+            | TypeBase::Param { .. }
+            | TypeBase::ObjectKnown { .. }
+            | TypeBase::ObjectParam { .. } => continue,
         }
     }
     result
@@ -641,7 +662,9 @@ fn unify_ref(unifier: &mut TypeSubstitution, decl_ty: &TypeRef, fn_ty: &TypeItem
         (TypeRef::Base(tag), TypeItem::Base(base))
         | (TypeRef::ImmRef(tag), TypeItem::ImmRef(base))
         | (TypeRef::MutRef(tag), TypeItem::MutRef(base)) => unifier.unify(tag, base),
-        _ => false,
+        (TypeRef::Base(_), TypeItem::ImmRef(_) | TypeItem::MutRef(_))
+        | (TypeRef::ImmRef(_), TypeItem::Base(_) | TypeItem::MutRef(_))
+        | (TypeRef::MutRef(_), TypeItem::Base(_) | TypeItem::ImmRef(_)) => false,
     }
 }
 

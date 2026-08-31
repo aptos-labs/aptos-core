@@ -620,8 +620,54 @@ impl<'a> TypeSubstitution<'a> {
                     && self.unify_all_refs(returns_tag, returns_base)
             },
 
-            // all other cases
-            _ => false,
+            // all other cases: the type shapes do not match
+            (
+                TypeExpr::Bool
+                | TypeExpr::U8
+                | TypeExpr::I8
+                | TypeExpr::U16
+                | TypeExpr::I16
+                | TypeExpr::U32
+                | TypeExpr::I32
+                | TypeExpr::U64
+                | TypeExpr::I64
+                | TypeExpr::U128
+                | TypeExpr::I128
+                | TypeExpr::U256
+                | TypeExpr::I256
+                | TypeExpr::Bitvec
+                | TypeExpr::String
+                | TypeExpr::Address
+                | TypeExpr::Signer
+                | TypeExpr::Vector { .. }
+                | TypeExpr::Datatype { .. }
+                | TypeExpr::ObjectKnown { .. }
+                | TypeExpr::ObjectParam(_)
+                | TypeExpr::Function { .. },
+                TypeBase::Bool
+                | TypeBase::U8
+                | TypeBase::I8
+                | TypeBase::U16
+                | TypeBase::I16
+                | TypeBase::U32
+                | TypeBase::I32
+                | TypeBase::U64
+                | TypeBase::I64
+                | TypeBase::U128
+                | TypeBase::I128
+                | TypeBase::U256
+                | TypeBase::I256
+                | TypeBase::Bitvec
+                | TypeBase::String
+                | TypeBase::Address
+                | TypeBase::Signer
+                | TypeBase::Vector { .. }
+                | TypeBase::Datatype { .. }
+                | TypeBase::Param { .. }
+                | TypeBase::ObjectKnown { .. }
+                | TypeBase::ObjectParam { .. }
+                | TypeBase::Function { .. },
+            ) => false,
         }
     }
 
@@ -645,7 +691,9 @@ impl<'a> TypeSubstitution<'a> {
                 | (TypeRef::ImmRef(tag), TypeItem::ImmRef(base))
                 | (TypeRef::MutRef(tag), TypeItem::MutRef(base)) => self.unify(tag, base),
                 // reference kinds do not match
-                _ => false,
+                (TypeRef::Base(_), TypeItem::ImmRef(_) | TypeItem::MutRef(_))
+                | (TypeRef::ImmRef(_), TypeItem::Base(_) | TypeItem::MutRef(_))
+                | (TypeRef::MutRef(_), TypeItem::Base(_) | TypeItem::ImmRef(_)) => false,
             };
             if !unified {
                 return false;
@@ -977,7 +1025,27 @@ impl TypeUnifier {
                         type_args,
                         abilities,
                     },
-                    _ => {
+                    TypeBase::Bool
+                    | TypeBase::U8
+                    | TypeBase::I8
+                    | TypeBase::U16
+                    | TypeBase::I16
+                    | TypeBase::U32
+                    | TypeBase::I32
+                    | TypeBase::U64
+                    | TypeBase::I64
+                    | TypeBase::U128
+                    | TypeBase::I128
+                    | TypeBase::U256
+                    | TypeBase::I256
+                    | TypeBase::Bitvec
+                    | TypeBase::String
+                    | TypeBase::Address
+                    | TypeBase::Signer
+                    | TypeBase::Vector { .. }
+                    | TypeBase::ObjectKnown { .. }
+                    | TypeBase::ObjectParam { .. }
+                    | TypeBase::Function { .. } => {
                         unreachable!(
                             "expected symmetric object param unification to yield a param or datatype"
                         )
@@ -1033,7 +1101,28 @@ impl TypeUnifier {
                         type_args,
                         abilities,
                     },
-                    _ => unreachable!(
+                    TypeBase::Bool
+                    | TypeBase::U8
+                    | TypeBase::I8
+                    | TypeBase::U16
+                    | TypeBase::I16
+                    | TypeBase::U32
+                    | TypeBase::I32
+                    | TypeBase::U64
+                    | TypeBase::I64
+                    | TypeBase::U128
+                    | TypeBase::I128
+                    | TypeBase::U256
+                    | TypeBase::I256
+                    | TypeBase::Bitvec
+                    | TypeBase::String
+                    | TypeBase::Address
+                    | TypeBase::Signer
+                    | TypeBase::Vector { .. }
+                    | TypeBase::Param { .. }
+                    | TypeBase::ObjectKnown { .. }
+                    | TypeBase::ObjectParam { .. }
+                    | TypeBase::Function { .. } => unreachable!(
                         "expected asymmetric object param unification to yield datatype only"
                     ),
                 }
@@ -1065,8 +1154,53 @@ impl TypeUnifier {
                 }
             },
 
-            // all other cases are considered mismatch
-            _ => return Ok(None),
+            // all other combinations are considered a mismatch
+            (
+                TypeBase::Bool
+                | TypeBase::U8
+                | TypeBase::I8
+                | TypeBase::U16
+                | TypeBase::I16
+                | TypeBase::U32
+                | TypeBase::I32
+                | TypeBase::U64
+                | TypeBase::I64
+                | TypeBase::U128
+                | TypeBase::I128
+                | TypeBase::U256
+                | TypeBase::I256
+                | TypeBase::Bitvec
+                | TypeBase::String
+                | TypeBase::Address
+                | TypeBase::Signer
+                | TypeBase::Vector { .. }
+                | TypeBase::Datatype { .. }
+                | TypeBase::ObjectKnown { .. }
+                | TypeBase::ObjectParam { .. }
+                | TypeBase::Function { .. },
+                TypeBase::Bool
+                | TypeBase::U8
+                | TypeBase::I8
+                | TypeBase::U16
+                | TypeBase::I16
+                | TypeBase::U32
+                | TypeBase::I32
+                | TypeBase::U64
+                | TypeBase::I64
+                | TypeBase::U128
+                | TypeBase::I128
+                | TypeBase::U256
+                | TypeBase::I256
+                | TypeBase::Bitvec
+                | TypeBase::String
+                | TypeBase::Address
+                | TypeBase::Signer
+                | TypeBase::Vector { .. }
+                | TypeBase::Datatype { .. }
+                | TypeBase::ObjectKnown { .. }
+                | TypeBase::ObjectParam { .. }
+                | TypeBase::Function { .. },
+            ) => return Ok(None),
         };
 
         // return the inferred type
@@ -1109,7 +1243,11 @@ impl TypeUnifier {
                 (TypeItem::MutRef(l_base), TypeItem::MutRef(r_base)) => {
                     TypeItem::MutRef(ti_unwrap!(self.unify(l_base, r_base, involved)))
                 },
-                _ => return Ok(None),
+                (TypeItem::Base(_), TypeItem::ImmRef(_) | TypeItem::MutRef(_))
+                | (TypeItem::ImmRef(_), TypeItem::Base(_) | TypeItem::MutRef(_))
+                | (TypeItem::MutRef(_), TypeItem::Base(_) | TypeItem::ImmRef(_)) => {
+                    return Ok(None)
+                },
             };
             result.push(unified);
         }

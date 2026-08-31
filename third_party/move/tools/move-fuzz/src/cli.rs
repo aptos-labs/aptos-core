@@ -207,7 +207,7 @@ impl FilterPackage {
                 PkgKind::Dependency if !self.include_deps => {
                     continue;
                 },
-                _ => (),
+                PkgKind::Primary | PkgKind::Dependency | PkgKind::Framework => (),
             }
 
             // filter based on name

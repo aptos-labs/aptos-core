@@ -503,7 +503,14 @@ impl TracingExecutor {
                 assert!(matches!(vm_status, VMStatus::Executed));
                 Ok(())
             },
-            _ => bail!(
+            TransactionStatus::Keep(
+                ExecutionStatus::OutOfGas
+                | ExecutionStatus::MoveAbort { .. }
+                | ExecutionStatus::ExecutionFailure { .. }
+                | ExecutionStatus::MiscellaneousError(_),
+            )
+            | TransactionStatus::Discard(_)
+            | TransactionStatus::Retry => bail!(
                 "transaction failed unexpectedly with status: {:?}",
                 txn_status
             ),

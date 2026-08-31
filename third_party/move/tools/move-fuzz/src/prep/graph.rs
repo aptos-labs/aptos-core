@@ -208,7 +208,28 @@ impl<'a> GraphBuilder<'a> {
                     let exists = generics.insert(*index, *abilities);
                     assert!(exists.is_none());
                 },
-                _ => panic!("expected type parameter only"),
+                TypeBase::Bool
+                | TypeBase::U8
+                | TypeBase::I8
+                | TypeBase::U16
+                | TypeBase::I16
+                | TypeBase::U32
+                | TypeBase::I32
+                | TypeBase::U64
+                | TypeBase::I64
+                | TypeBase::U128
+                | TypeBase::I128
+                | TypeBase::U256
+                | TypeBase::I256
+                | TypeBase::Bitvec
+                | TypeBase::String
+                | TypeBase::Address
+                | TypeBase::Signer
+                | TypeBase::Vector { .. }
+                | TypeBase::Datatype { .. }
+                | TypeBase::ObjectKnown { .. }
+                | TypeBase::ObjectParam { .. }
+                | TypeBase::Function { .. } => panic!("expected type parameter only"),
             }
         }
 
@@ -343,7 +364,7 @@ impl<'a> GraphBuilder<'a> {
         // lookup the datatype item
         let dt_type = match base.graph.node_weight(dt_node).unwrap() {
             FlowGraphNode::Datatype(t) => t.clone(),
-            _ => panic!("expected datatype node"),
+            FlowGraphNode::Function(_) => panic!("expected datatype node"),
         };
 
         trace!(
@@ -530,7 +551,16 @@ impl<'a> GraphBuilder<'a> {
                         let inserted = used_returns.insert(*idx);
                         assert!(inserted);
                     },
-                    _ => panic!("unexpected outgoing edge from function node"),
+                    FlowGraphEdge::Use(_)
+                    | FlowGraphEdge::Copy
+                    | FlowGraphEdge::Deref
+                    | FlowGraphEdge::Freeze
+                    | FlowGraphEdge::ImmBorrow
+                    | FlowGraphEdge::MutBorrow
+                    | FlowGraphEdge::VectorToElement
+                    | FlowGraphEdge::ElementToVector => {
+                        panic!("unexpected outgoing edge from function node")
+                    },
                 }
             }
 
@@ -561,7 +591,9 @@ impl<'a> GraphBuilder<'a> {
                         }
                         unifier.finish()
                     },
-                    _ => continue,
+                    (TypeItem::Base(_), TypeItem::ImmRef(_) | TypeItem::MutRef(_))
+                    | (TypeItem::ImmRef(_), TypeItem::Base(_) | TypeItem::MutRef(_))
+                    | (TypeItem::MutRef(_), TypeItem::Base(_) | TypeItem::ImmRef(_)) => continue,
                 };
 
                 // found a candidate
@@ -629,7 +661,9 @@ impl<'a> GraphBuilder<'a> {
                         }
                         unifier.finish()
                     },
-                    _ => continue,
+                    (TypeRef::Base(_), TypeItem::ImmRef(_) | TypeItem::MutRef(_))
+                    | (TypeRef::ImmRef(_), TypeItem::Base(_) | TypeItem::MutRef(_))
+                    | (TypeRef::MutRef(_), TypeItem::Base(_) | TypeItem::ImmRef(_)) => continue,
                 };
 
                 // found a candidate, create new function instantiations
@@ -676,7 +710,28 @@ impl<'a> GraphBuilder<'a> {
                                 let exists = new_graph.generics.insert(*index, *abilities);
                                 assert!(exists.is_none());
                             },
-                            _ => panic!("expected type parameter only"),
+                            TypeBase::Bool
+                            | TypeBase::U8
+                            | TypeBase::I8
+                            | TypeBase::U16
+                            | TypeBase::I16
+                            | TypeBase::U32
+                            | TypeBase::I32
+                            | TypeBase::U64
+                            | TypeBase::I64
+                            | TypeBase::U128
+                            | TypeBase::I128
+                            | TypeBase::U256
+                            | TypeBase::I256
+                            | TypeBase::Bitvec
+                            | TypeBase::String
+                            | TypeBase::Address
+                            | TypeBase::Signer
+                            | TypeBase::Vector { .. }
+                            | TypeBase::Datatype { .. }
+                            | TypeBase::ObjectKnown { .. }
+                            | TypeBase::ObjectParam { .. }
+                            | TypeBase::Function { .. } => panic!("expected type parameter only"),
                         }
                     }
 
@@ -767,7 +822,14 @@ impl<'a> GraphBuilder<'a> {
                                     return false;
                                 }
                             },
-                            _ => unreachable!(
+                            FlowGraphEdge::Def(_)
+                            | FlowGraphEdge::Copy
+                            | FlowGraphEdge::Deref
+                            | FlowGraphEdge::Freeze
+                            | FlowGraphEdge::ImmBorrow
+                            | FlowGraphEdge::MutBorrow
+                            | FlowGraphEdge::VectorToElement
+                            | FlowGraphEdge::ElementToVector => unreachable!(
                                 "unexpected incoming edge of non-use kind for a function node"
                             ),
                         }
@@ -1054,7 +1116,27 @@ impl FlowGraph {
                         type_args: type_args.clone(),
                         abilities: *abilities,
                     },
-                    _ => panic!("invalid replacement for object param"),
+                    TypeBase::Bool
+                    | TypeBase::U8
+                    | TypeBase::I8
+                    | TypeBase::U16
+                    | TypeBase::I16
+                    | TypeBase::U32
+                    | TypeBase::I32
+                    | TypeBase::U64
+                    | TypeBase::I64
+                    | TypeBase::U128
+                    | TypeBase::I128
+                    | TypeBase::U256
+                    | TypeBase::I256
+                    | TypeBase::Bitvec
+                    | TypeBase::String
+                    | TypeBase::Address
+                    | TypeBase::Signer
+                    | TypeBase::Vector { .. }
+                    | TypeBase::ObjectKnown { .. }
+                    | TypeBase::ObjectParam { .. }
+                    | TypeBase::Function { .. } => panic!("invalid replacement for object param"),
                 },
             },
             TypeBase::Function {

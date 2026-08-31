@@ -187,7 +187,9 @@ impl AddressRegistry {
                         }
                         assert!(names.contains(&name));
                     },
-                    _ => bail!("expecting {addr} to be a named address, found '{details}'"),
+                    AddressDetails::User { .. } => {
+                        bail!("expecting {addr} to be a named address, found '{details}'")
+                    },
                 }
 
                 // no new account created

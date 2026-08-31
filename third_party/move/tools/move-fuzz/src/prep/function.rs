@@ -135,7 +135,7 @@ fn merge_pkg_kind(existing: PkgKind, incoming: PkgKind) -> PkgKind {
     match (existing, incoming) {
         (PkgKind::Primary, _) | (_, PkgKind::Primary) => PkgKind::Primary,
         (PkgKind::Dependency, _) | (_, PkgKind::Dependency) => PkgKind::Dependency,
-        _ => PkgKind::Framework,
+        (PkgKind::Framework, PkgKind::Framework) => PkgKind::Framework,
     }
 }
 
