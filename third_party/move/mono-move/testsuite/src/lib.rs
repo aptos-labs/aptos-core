@@ -17,7 +17,8 @@ pub mod unit_test;
 pub mod v1_test_natives;
 
 pub use compile::{
-    assemble_masm_source, compile, compile_move_path, compile_move_source, SourceKind,
+    assemble_masm_source, compile, compile_move_path, compile_move_source, function_def_index,
+    SourceKind,
 };
 pub use engine::{
     build_natives, with_loaded_module, with_loaded_mono_function, with_mono_function, MonoRunner,

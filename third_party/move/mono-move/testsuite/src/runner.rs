@@ -33,14 +33,14 @@ use aptos_types::{
 };
 use aptos_vm::natives::aptos_natives;
 use aptos_vm_types::resolver::StateStorageView;
-use mono_move_core::{native::NativeExtensions, VMInternalError};
+use mono_move_core::{native::NativeExtensions, BytecodeOffset, VMInternalError};
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_natives::EventStore;
 use mono_move_output::{
     to_contract_events_from_store,
     v1_error::{self, V1Equivalent},
 };
-use move_binary_format::{errors::Location, CompiledModule};
+use move_binary_format::{errors::Location, file_format::FunctionDefinitionIndex, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::IdentStr,
@@ -97,20 +97,40 @@ impl Output {
     }
 }
 
-/// Renders a failure as the status, sub-status, and message V1 reports for it.
-/// Both VMs render through this, so `CHECK-ERROR-PARITY` compares like with
-/// like.
-fn render_v1_error(status: StatusCode, sub_status: Option<u64>, message: Option<&str>) -> String {
+/// Renders a failure's V1 status, sub-status, message, and error location for
+/// `CHECK-ERROR-PARITY`.
+fn render_v1_error(
+    status: StatusCode,
+    sub_status: Option<u64>,
+    message: Option<&str>,
+    location: &Location,
+    offset: Option<(FunctionDefinitionIndex, BytecodeOffset)>,
+) -> String {
     format!(
-        "{:?} | sub-status {} | {}",
+        "{:?} | sub-status {} | {} | in {} at {}",
         status,
         sub_status.map_or_else(|| "none".to_string(), |sub| sub.to_string()),
         message.unwrap_or("no message"),
+        render_error_location(location),
+        offset.map_or_else(
+            || "no offset".to_string(),
+            |(def_idx, code_offset)| format!("function {} offset {}", def_idx.0, code_offset)
+        ),
     )
 }
 
+/// Renders an error location as `undefined`, `script`, or a module ID.
+pub(crate) fn render_error_location(location: &Location) -> String {
+    match location {
+        Location::Undefined => "undefined".to_string(),
+        Location::Script => "script".to_string(),
+        Location::Module(module_id) => render_module_location(module_id),
+    }
+}
+
 /// MonoMove's failure in V1 terms, when it can be stated in them at all.
-/// A failure that cannot be is not comparable with V1's.
+/// A failure that cannot be stated, including one that was never located, is
+/// not comparable with V1's.
 fn describe_v2_error_as_v1(err: &VMInternalError) -> ParityOutcome {
     let V1Equivalent::Described(descriptor) = v1_error::describe(err) else {
         return ParityOutcome::Unmappable;
@@ -118,10 +138,17 @@ fn describe_v2_error_as_v1(err: &VMInternalError) -> ParityOutcome {
     if !descriptor.message.is_comparable() || !descriptor.sub_status.is_comparable() {
         return ParityOutcome::Unmappable;
     }
+    // A missing location attachment is not equivalent to V1's explicit
+    // `Location::Undefined` and cannot be compared as agreement.
+    let Some(location) = err.location() else {
+        return ParityOutcome::Unmappable;
+    };
     ParityOutcome::Comparable(render_v1_error(
         descriptor.status,
         descriptor.sub_status.known(),
         descriptor.message.text(),
+        &location.location,
+        location.offset,
     ))
 }
 
@@ -559,15 +586,10 @@ fn execute_function_v1(
         },
         Err(err) if err.major_status() == StatusCode::ABORTED => {
             let code = err.sub_status().unwrap();
-            let location = match err.location() {
-                Location::Module(module_id) => render_module_location(module_id),
-                Location::Script => "script".to_string(),
-                Location::Undefined => "undefined".to_string(),
-            };
             Output::aborted(render_abort(
                 code,
                 err.message().map(String::as_str),
-                &location,
+                &render_error_location(err.location()),
             ))
         },
         // V1 is the reference, so its own failure is the expected value.
@@ -577,6 +599,9 @@ fn execute_function_v1(
                 err.major_status(),
                 err.sub_status(),
                 err.message().map(String::as_str),
+                err.location(),
+                // V1 attaches at most one
+                err.offsets().last().copied(),
             )),
         },
     };

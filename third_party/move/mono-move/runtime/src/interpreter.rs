@@ -41,9 +41,9 @@ use mono_move_core::{
     storage::resource_provider::InMemoryStorageKey,
     types::{view_type, view_type_list, InternedType, InternedTypeList, Type},
     CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex, DescriptorId,
-    FrameOffset, Function, FunctionPtr, FunctionRef, GasMeter, IntBinaryOp, IntCastOp, IntNegateOp,
-    IntOperand, IntShiftOp, IntTy, LayoutProvider, MicroOp, PackClosureOp, ResourceProvider,
-    ShiftOperand, VMInternalError, VMResult, VecPackOp, VecUnpackOp,
+    ErrorLocation, FrameOffset, Function, FunctionPtr, FunctionRef, GasMeter, IntBinaryOp,
+    IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, LayoutProvider, MicroOp, PackClosureOp,
+    ResourceProvider, ShiftOperand, VMInternalError, VMResult, VecPackOp, VecUnpackOp,
     CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET,
     CAPTURED_DATA_VALUES_SIZE_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID,
     CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET,
@@ -51,7 +51,8 @@ use mono_move_core::{
     OBJECT_HEADER_SIZE,
 };
 use mono_move_global_context::ExecutionGuard;
-use mono_move_loader::{Loader, ModuleReadSet};
+use mono_move_loader::{Loader, LoaderError, ModuleReadSet};
+use move_binary_format::errors::Location;
 use move_core_types::{
     identifier::Identifier,
     int256::{I256, U256},
@@ -222,6 +223,57 @@ fn native_abort_location(name: &NativeName) -> VMResult<AbortLocation> {
             "native module name is not a valid identifier".to_string()
         )),
     }
+}
+
+/// Converts an interned module ID into the [`Location`] an error is
+/// attributed to.
+///
+/// Unlike [`abort_location`], this returns [`Location::Undefined`] for an
+/// invalid interned name so location conversion does not replace the original
+/// error. That divergence is incidental rather than by design: see the
+/// `TODO(cleanup)` on `module_id_of`.
+// TODO(completeness): return `Location::Script` for errors in scripts.
+fn error_location(module_id: InternedModuleId) -> Location {
+    match module_id_of(module_id) {
+        Some(module_id) => Location::Module(module_id),
+        None => Location::Undefined,
+    }
+}
+
+/// Attaches the executing function's module and the original bytecode offset of
+/// the faulting micro-op.
+///
+/// The offset remains absent when the micro-op has no bytecode origin or the
+/// program counter is past the end of the code.
+#[cold]
+fn locate_bytecode_failure(err: VMInternalError, regs: VMRegisters) -> VMInternalError {
+    // SAFETY: `regs.func` points at the function that was executing, which the
+    // execution guard keeps alive.
+    let func = unsafe { regs.func.as_ref() };
+    let offset = func
+        .code
+        .origins()
+        .get(regs.pc)
+        .map(|&origin| (func.def_idx, origin));
+    err.at(ErrorLocation::new(error_location(func.module_id), offset))
+}
+
+/// Attributes a callee load or link failure to the caller of the frame that
+/// issued the call, without an offset. A call from the outermost frame is
+/// attributed to [`Location::Undefined`].
+#[cold]
+fn locate_load_failure(err: VMInternalError, regs: VMRegisters) -> VMInternalError {
+    // SAFETY: every frame's metadata sits immediately below its frame pointer,
+    // holding the caller's function pointer (null in the root frame's sentinel
+    // metadata).
+    let caller = unsafe {
+        let meta = regs.fp.sub(FRAME_METADATA_SIZE);
+        (read_ptr(meta, META_SAVED_FUNC_PTR_OFFSET) as *const Function).as_ref()
+    };
+    let location = caller.map_or(Location::Undefined, |caller| {
+        error_location(caller.module_id)
+    });
+    err.at(ErrorLocation::new(location, None))
 }
 
 /// Per-transaction interpreter context with a unified call stack and a
@@ -1295,14 +1347,33 @@ impl InterpreterContext<'_> {
 
         // Hoist the VM registers into a local so the dispatch loop keeps
         // them in CPU registers rather than reloading from `self.registers`
-        // each iteration. Only sync back to `self` on exit.
+        // each iteration. Only sync back to `self` on success.
         let mut regs = self.registers;
 
+        match self.dispatch_loop(&mut regs) {
+            Ok(outcome) => {
+                self.registers = regs;
+                Ok(outcome)
+            },
+            // A failing micro-op leaves `regs.pc` on itself, so `regs` names
+            // the instruction that failed. An error keeps the first location
+            // attached to it, so this fills in only the errors that were not
+            // already located.
+            Err(err) => Err(locate_bytecode_failure(err, regs)),
+        }
+    }
+
+    /// The instruction dispatch loop.
+    ///
+    /// `regs` is borrowed rather than moved so `run` can read the failing
+    /// program counter afterwards.
+    #[inline(always)]
+    fn dispatch_loop(&mut self, regs: &mut VMRegisters) -> VMResult<RuntimeStatus> {
         // Charge the entry function's entry block before any of its instructions run.
         let entry_gas = unsafe { regs.func.as_ref() }.entry_gas;
         self.gas_meter.charge(entry_gas)?;
 
-        let outcome = loop {
+        Ok(loop {
             // SAFETY: Current function is always a valid, non-null pointer because
             // it is derived from function reference (e.g., entrypoint) or when
             // executing a call instruction, which stores a valid pointer.
@@ -1344,14 +1415,31 @@ impl InterpreterContext<'_> {
                         //   3. IC insert target
                         //   4. Patching:
                         //      If can patch caller, try it.
-                        let target = self.load_function(module_id, func_name, ty_args)?;
+                        let target = match self.load_function(module_id, func_name, ty_args) {
+                            Ok(target) => target,
+                            Err(err) => {
+                                // Leave a missing-native error unlocated so it
+                                // is attributed to this call instruction.
+                                // Attribute other load failures one frame up the
+                                // call stack, without an instruction offset.
+                                let missing_native = matches!(
+                                    err.downcast_ref::<LoaderError>(),
+                                    Some(LoaderError::NativeFunctionNotLoadable { .. })
+                                );
+                                return Err(if missing_native {
+                                    err
+                                } else {
+                                    locate_load_failure(err, *regs)
+                                });
+                            },
+                        };
                         // SAFETY: `target` points to a `Function`, which is not reclaimed during
                         // execution as guaranteed by the execution guard.
-                        self.call(func, &mut regs, target.as_ref_unchecked())?;
+                        self.call(func, regs, target.as_ref_unchecked())?;
                         continue;
                     },
                     MicroOp::CallDirect { ptr } => {
-                        self.call(func, &mut regs, ptr.as_ref_unchecked())?;
+                        self.call(func, regs, ptr.as_ref_unchecked())?;
                         continue;
                     },
 
@@ -1362,9 +1450,12 @@ impl InterpreterContext<'_> {
                     } => {
                         // On abort, halt; otherwise native success falls through to
                         // the common tail, which advances the pc by one.
-                        if let Some((code, message)) =
-                            self.exec_call_native(func, regs, native_idx, ty_args, abi)?
-                        {
+                        //
+                        // A failure here is left unlocated, so it is blamed on this
+                        // instruction: a native has no bytecode of its own to name.
+                        let aborted =
+                            self.exec_call_native(func, *regs, native_idx, ty_args, abi)?;
+                        if let Some((code, message)) = aborted {
                             // Attribute the abort to the native's own module
                             // (not the caller's, which `regs.func` names here)
                             // — the same rule as a Move-level abort.
@@ -1394,7 +1485,7 @@ impl InterpreterContext<'_> {
                             target,
                             gas_taken,
                             gas_fallthrough,
-                            &mut regs,
+                            regs,
                         )?;
                         continue;
                     },
@@ -1412,7 +1503,7 @@ impl InterpreterContext<'_> {
                             target,
                             gas_taken,
                             gas_fallthrough,
-                            &mut regs,
+                            regs,
                         )?;
                         continue;
                     },
@@ -1430,7 +1521,7 @@ impl InterpreterContext<'_> {
                             target,
                             gas_taken,
                             gas_fallthrough,
-                            &mut regs,
+                            regs,
                         )?;
                         continue;
                     },
@@ -1441,7 +1532,7 @@ impl InterpreterContext<'_> {
                             op.target,
                             op.gas_taken,
                             op.gas_fallthrough,
-                            &mut regs,
+                            regs,
                         )?;
                         continue;
                     },
@@ -1457,7 +1548,7 @@ impl InterpreterContext<'_> {
                             op.target,
                             op.gas_taken,
                             op.gas_fallthrough,
-                            &mut regs,
+                            regs,
                         )?;
                         continue;
                     },
@@ -1478,7 +1569,7 @@ impl InterpreterContext<'_> {
                             op.target,
                             op.gas_taken,
                             op.gas_fallthrough,
-                            &mut regs,
+                            regs,
                         )?;
                         continue;
                     },
@@ -1495,7 +1586,7 @@ impl InterpreterContext<'_> {
                             target,
                             gas_taken,
                             gas_fallthrough,
-                            &mut regs,
+                            regs,
                         )?;
                         continue;
                     },
@@ -1512,7 +1603,7 @@ impl InterpreterContext<'_> {
                             target,
                             gas_taken,
                             gas_fallthrough,
-                            &mut regs,
+                            regs,
                         )?;
                         continue;
                     },
@@ -1529,7 +1620,7 @@ impl InterpreterContext<'_> {
                             target,
                             gas_taken,
                             gas_fallthrough,
-                            &mut regs,
+                            regs,
                         )?;
                         continue;
                     },
@@ -1546,7 +1637,7 @@ impl InterpreterContext<'_> {
                             target,
                             gas_taken,
                             gas_fallthrough,
-                            &mut regs,
+                            regs,
                         )?;
                         continue;
                     },
@@ -1563,7 +1654,7 @@ impl InterpreterContext<'_> {
                             target,
                             gas_taken,
                             gas_fallthrough,
-                            &mut regs,
+                            regs,
                         )?;
                         continue;
                     },
@@ -1580,7 +1671,7 @@ impl InterpreterContext<'_> {
                             target,
                             gas_taken,
                             gas_fallthrough,
-                            &mut regs,
+                            regs,
                         )?;
                         continue;
                     },
@@ -1597,7 +1688,7 @@ impl InterpreterContext<'_> {
                             target,
                             gas_taken,
                             gas_fallthrough,
-                            &mut regs,
+                            regs,
                         )?;
                         continue;
                     },
@@ -1674,7 +1765,7 @@ impl InterpreterContext<'_> {
                     MicroOp::StoreImm16 { dst, ref imm } => write_int::<[u8; 16]>(fp, dst, **imm),
                     MicroOp::StoreImm32 { dst, ref imm } => write_int::<[u8; 32]>(fp, dst, **imm),
                     MicroOp::StoreImmVec { dst, idx } => {
-                        self.exec_store_imm_vec(regs, dst, idx)?;
+                        self.exec_store_imm_vec(*regs, dst, idx)?;
                     },
 
                     // Add
@@ -1974,7 +2065,7 @@ impl InterpreterContext<'_> {
                     },
 
                     MicroOp::VecPack(ref op) => {
-                        self.exec_vec_pack(regs, op)?;
+                        self.exec_vec_pack(*regs, op)?;
                     },
 
                     MicroOp::VecUnpack(ref op) => {
@@ -2173,10 +2264,10 @@ impl InterpreterContext<'_> {
                     },
 
                     MicroOp::PackClosure(ref op) => {
-                        self.exec_pack_closure(regs, op)?;
+                        self.exec_pack_closure(*regs, op)?;
                     },
                     MicroOp::CallClosure(ref op) => {
-                        regs = self.exec_call_closure(func, regs, op)?;
+                        *regs = self.exec_call_closure(func, *regs, op)?;
                         continue;
                     },
 
@@ -2228,7 +2319,7 @@ impl InterpreterContext<'_> {
                         )? {
                             EntryPtr::Writable(ptr) => ptr,
                             EntryPtr::NonWritable(ptr) => {
-                                let ptr = self.deep_copy(regs, ptr)?;
+                                let ptr = self.deep_copy(*regs, ptr)?;
                                 self.read_write_set.commit_borrow_global_mut(&key, ptr);
                                 ptr
                             },
@@ -2250,7 +2341,7 @@ impl InterpreterContext<'_> {
                         let ptr = match entry_ptr {
                             EntryPtr::Writable(ptr) => ptr,
                             EntryPtr::NonWritable(ptr) => {
-                                let ptr = self.deep_copy(regs, ptr)?;
+                                let ptr = self.deep_copy(*regs, ptr)?;
                                 self.read_write_set.commit_move_from(&key);
                                 ptr
                             },
@@ -2456,7 +2547,7 @@ impl InterpreterContext<'_> {
                             // pointer at one offset. Uses single-root `deep_copy`,
                             // avoiding the batch's per-op `Vec`s.
                             if let Some(src) = NonNull::new(read_ptr(fp, (base.0 + off) as usize)) {
-                                let new = self.deep_copy(regs, src)?;
+                                let new = self.deep_copy(*regs, src)?;
                                 write_ptr(fp, (base.0 + off) as usize, new.as_ptr());
                             }
                         } else {
@@ -2470,7 +2561,7 @@ impl InterpreterContext<'_> {
                                     sources.push(src);
                                 }
                             }
-                            let copies = self.deep_copy_batch(regs, &sources)?;
+                            let copies = self.deep_copy_batch(*regs, &sources)?;
                             for (off, new) in live_offsets.iter().zip(copies) {
                                 write_ptr(fp, (base.0 + off) as usize, new.as_ptr());
                             }
@@ -2480,10 +2571,7 @@ impl InterpreterContext<'_> {
             }
 
             regs.pc += 1;
-        };
-
-        self.registers = regs;
-        Ok(outcome)
+        })
     }
 
     /// Allocates vector from constant pool and writes data pointer into `dst`.
@@ -2883,6 +2971,8 @@ impl InterpreterContext<'_> {
             let (callee, resolved_now): (&Function, bool) = match func_tag {
                 FUNC_REF_TAG_RESOLVED => (&*(payload as *const Function), false),
                 FUNC_REF_TAG_UNRESOLVED => {
+                    // Deliberately left unlocated, so the failure is blamed on
+                    // this instruction rather than on the calling frame.
                     let func_ref = &*(payload as *const FunctionRef);
                     let func_ptr = self.load_function(
                         func_ref.module_id,
