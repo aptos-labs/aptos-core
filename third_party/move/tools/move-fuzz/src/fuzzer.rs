@@ -28,7 +28,7 @@ use legacy_move_compiler::compiled_unit::CompiledUnitEnum;
 use log::{debug, info};
 use move_binary_format::file_format::StructTypeParameter;
 use move_core_types::{
-    ability::AbilitySet, account_address::AccountAddress, language_storage::TypeTag as VmTypeTag,
+    ability::AbilitySet, account_address::AccountAddress, language_storage::TypeTag,
 };
 use move_vm_runtime::tracing::{clear_tracing_buffer, enable_tracing};
 use rand::{rngs::StdRng, SeedableRng};
@@ -2139,14 +2139,14 @@ fn build_type_pool(model: &Model) -> TypePool {
 
     // add all primitive types as candidates
     let primitives = [
-        VmTypeTag::Bool,
-        VmTypeTag::U8,
-        VmTypeTag::U16,
-        VmTypeTag::U32,
-        VmTypeTag::U64,
-        VmTypeTag::U128,
-        VmTypeTag::U256,
-        VmTypeTag::Address,
+        TypeTag::Bool,
+        TypeTag::U8,
+        TypeTag::U16,
+        TypeTag::U32,
+        TypeTag::U64,
+        TypeTag::U128,
+        TypeTag::U256,
+        TypeTag::Address,
     ];
     for prim in &primitives {
         add_type_candidate(
@@ -2168,7 +2168,7 @@ fn build_type_pool(model: &Model) -> TypePool {
             &mut pool,
             &mut seen_pool_entries,
             &mut candidates,
-            VmTypeTag::Struct(Box::new(struct_tag)),
+            TypeTag::Struct(Box::new(struct_tag)),
             decl.abilities,
         );
     }
@@ -2192,20 +2192,20 @@ fn build_type_pool(model: &Model) -> TypePool {
 
 fn add_type_candidate(
     pool: &mut TypePool,
-    seen_pool_entries: &mut BTreeSet<VmTypeTag>,
-    candidates: &mut BTreeMap<VmTypeTag, AbilitySet>,
-    ty: VmTypeTag,
+    seen_pool_entries: &mut BTreeSet<TypeTag>,
+    candidates: &mut BTreeMap<TypeTag, AbilitySet>,
+    ty: TypeTag,
     abilities: AbilitySet,
 ) -> bool {
     let inserted = insert_type_entry(pool, seen_pool_entries, candidates, ty.clone(), abilities);
 
-    if !matches!(ty, VmTypeTag::Vector(_)) {
+    if !matches!(ty, TypeTag::Vector(_)) {
         let vector_abilities = abilities.intersect(AbilitySet::VECTOR);
         insert_type_entry(
             pool,
             seen_pool_entries,
             candidates,
-            VmTypeTag::Vector(Box::new(ty)),
+            TypeTag::Vector(Box::new(ty)),
             vector_abilities,
         );
     }
@@ -2215,9 +2215,9 @@ fn add_type_candidate(
 
 fn insert_type_entry(
     pool: &mut TypePool,
-    seen_pool_entries: &mut BTreeSet<VmTypeTag>,
-    candidates: &mut BTreeMap<VmTypeTag, AbilitySet>,
-    ty: VmTypeTag,
+    seen_pool_entries: &mut BTreeSet<TypeTag>,
+    candidates: &mut BTreeMap<TypeTag, AbilitySet>,
+    ty: TypeTag,
     abilities: AbilitySet,
 ) -> bool {
     match candidates.entry(ty.clone()) {
@@ -2237,8 +2237,8 @@ fn insert_type_entry(
 
 fn expand_generic_struct_candidates(
     pool: &mut TypePool,
-    seen_pool_entries: &mut BTreeSet<VmTypeTag>,
-    candidates: &mut BTreeMap<VmTypeTag, AbilitySet>,
+    seen_pool_entries: &mut BTreeSet<TypeTag>,
+    candidates: &mut BTreeMap<TypeTag, AbilitySet>,
     generic_structs: &[&DatatypeDecl],
 ) {
     for _ in 0..MAX_GENERIC_TYPE_POOL_ROUNDS {
@@ -2285,7 +2285,7 @@ fn expand_generic_struct_candidates(
                     pool,
                     seen_pool_entries,
                     candidates,
-                    VmTypeTag::Struct(Box::new(struct_tag)),
+                    TypeTag::Struct(Box::new(struct_tag)),
                     actual_abilities,
                 );
             }
@@ -2301,8 +2301,8 @@ fn expand_generic_struct_candidates(
 fn compute_instantiated_abilities(
     declared_abilities: AbilitySet,
     generics: &[StructTypeParameter],
-    candidates: &BTreeMap<VmTypeTag, AbilitySet>,
-    type_args: &[VmTypeTag],
+    candidates: &BTreeMap<TypeTag, AbilitySet>,
+    type_args: &[TypeTag],
 ) -> AbilitySet {
     use move_core_types::ability::Ability;
 
@@ -2395,7 +2395,7 @@ mod tests {
         ability::AbilitySet,
         account_address::AccountAddress,
         identifier::Identifier,
-        language_storage::{StructTag, TypeTag as VmTypeTag},
+        language_storage::{StructTag, TypeTag},
     };
     use std::collections::{BTreeMap, BTreeSet};
 
@@ -2433,8 +2433,8 @@ mod tests {
         }
     }
 
-    fn make_struct(name: &str, type_args: Vec<VmTypeTag>) -> VmTypeTag {
-        VmTypeTag::Struct(Box::new(StructTag {
+    fn make_struct(name: &str, type_args: Vec<TypeTag>) -> TypeTag {
+        TypeTag::Struct(Box::new(StructTag {
             address: AccountAddress::ONE,
             module: Identifier::new("m").unwrap(),
             name: Identifier::new(name).unwrap(),
@@ -2475,7 +2475,7 @@ mod tests {
             &mut pool,
             &mut seen_pool_entries,
             &mut candidates,
-            VmTypeTag::U64,
+            TypeTag::U64,
             AbilitySet::PRIMITIVES,
         );
 
@@ -2489,7 +2489,7 @@ mod tests {
             &inner, &outer,
         ]);
 
-        let inner_u64 = make_struct("Inner", vec![VmTypeTag::U64]);
+        let inner_u64 = make_struct("Inner", vec![TypeTag::U64]);
         let outer_inner_u64 = make_struct("Outer", vec![inner_u64.clone()]);
         assert!(
             pool.candidates_for(AbilitySet::EMPTY)
@@ -2498,7 +2498,7 @@ mod tests {
         );
 
         let outer_vec_inner_u64 =
-            make_struct("Outer", vec![VmTypeTag::Vector(Box::new(inner_u64))]);
+            make_struct("Outer", vec![TypeTag::Vector(Box::new(inner_u64))]);
         assert!(
             pool.candidates_for(AbilitySet::EMPTY)
                 .contains(&&outer_vec_inner_u64),

@@ -8,7 +8,7 @@ use crate::{
         ident::FunctionIdent,
         model::{ability_set_candidates, Model},
         typing::{
-            ComplexType, TypeBase, TypeItem, TypeMode, TypeRef, TypeSubstitution, TypeTag,
+            ComplexType, TypeBase, TypeItem, TypeMode, TypeRef, TypeSubstitution, TypeExpr,
             TypeUnification,
         },
     },
@@ -800,11 +800,11 @@ impl<'a> GraphBuilder<'a> {
                     let mut call_signer_imm_borrows = 0;
                     let mut call_signer_mut_borrows = 0;
                     for param in &decl.parameters {
-                        if matches!(param, TypeRef::Base(TypeTag::Signer)) {
+                        if matches!(param, TypeRef::Base(TypeExpr::Signer)) {
                             call_signer_moves += 1;
-                        } else if matches!(param, TypeRef::ImmRef(TypeTag::Signer)) {
+                        } else if matches!(param, TypeRef::ImmRef(TypeExpr::Signer)) {
                             call_signer_imm_borrows += 1;
-                        } else if matches!(param, TypeRef::MutRef(TypeTag::Signer)) {
+                        } else if matches!(param, TypeRef::MutRef(TypeExpr::Signer)) {
                             call_signer_mut_borrows += 1;
                         }
                     }
@@ -1171,7 +1171,7 @@ mod tests {
             function::{FunctionDecl, FunctionRegistry},
             ident::FunctionIdent,
             model::Model,
-            typing::{ComplexType, TypeBase, TypeItem, TypeRef, TypeTag},
+            typing::{ComplexType, TypeBase, TypeItem, TypeRef, TypeExpr},
         },
     };
     use move_core_types::{
@@ -1275,7 +1275,7 @@ mod tests {
         let model = model_with_decl(FunctionDecl {
             ident: ident.clone(),
             generics: vec![AbilitySet::PRIMITIVES],
-            parameters: vec![TypeRef::Base(TypeTag::Param(0))],
+            parameters: vec![TypeRef::Base(TypeExpr::Param(0))],
             return_sig: vec![],
             kind: PkgKind::Primary,
             is_entry: true,
@@ -1299,7 +1299,7 @@ mod tests {
         let model = model_with_decl(FunctionDecl {
             ident: ident.clone(),
             generics: vec![],
-            parameters: vec![TypeRef::Base(TypeTag::U64)],
+            parameters: vec![TypeRef::Base(TypeExpr::U64)],
             return_sig: vec![],
             kind: PkgKind::Primary,
             is_entry: true,
@@ -1332,8 +1332,8 @@ mod tests {
             ident: ident.clone(),
             generics: vec![],
             parameters: vec![
-                TypeRef::Base(TypeTag::Signer),
-                TypeRef::ImmRef(TypeTag::Signer),
+                TypeRef::Base(TypeExpr::Signer),
+                TypeRef::ImmRef(TypeExpr::Signer),
             ],
             return_sig: vec![],
             kind: PkgKind::Primary,
@@ -1353,8 +1353,8 @@ mod tests {
             ident: ident.clone(),
             generics: vec![],
             parameters: vec![
-                TypeRef::MutRef(TypeTag::Signer),
-                TypeRef::ImmRef(TypeTag::Signer),
+                TypeRef::MutRef(TypeExpr::Signer),
+                TypeRef::ImmRef(TypeExpr::Signer),
             ],
             return_sig: vec![],
             kind: PkgKind::Primary,
@@ -1374,8 +1374,8 @@ mod tests {
             ident: ident.clone(),
             generics: vec![],
             parameters: vec![
-                TypeRef::ImmRef(TypeTag::Signer),
-                TypeRef::ImmRef(TypeTag::Signer),
+                TypeRef::ImmRef(TypeExpr::Signer),
+                TypeRef::ImmRef(TypeExpr::Signer),
             ],
             return_sig: vec![],
             kind: PkgKind::Primary,

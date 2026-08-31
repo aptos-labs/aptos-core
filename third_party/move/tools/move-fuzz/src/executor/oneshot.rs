@@ -18,7 +18,7 @@ use aptos_types::transaction::{
 };
 use log::warn;
 use move_core_types::{
-    language_storage::TypeTag as VmTypeTag,
+    language_storage::TypeTag,
     value::MoveValue,
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
@@ -539,7 +539,7 @@ impl OneshotFuzzer {
         self.replay_log.push(seed.clone());
     }
 
-    fn build_payload(&self, ty_args: Vec<VmTypeTag>, args: Vec<MoveValue>) -> TransactionPayload {
+    fn build_payload(&self, ty_args: Vec<TypeTag>, args: Vec<MoveValue>) -> TransactionPayload {
         TransactionPayload::Script(Script::new(
             self.script_code.clone(),
             ty_args,
@@ -667,7 +667,7 @@ impl OneshotFuzzer {
             .collect();
 
         // generate or mutate type arguments and value arguments
-        let (ty_args, args): (Vec<VmTypeTag>, Vec<MoveValue>) = match seed_choice {
+        let (ty_args, args): (Vec<TypeTag>, Vec<MoveValue>) = match seed_choice {
             None => {
                 // generate new type arguments and value arguments
                 let ty_args = self.mutator.random_type_args(&self.script_sig.generics);

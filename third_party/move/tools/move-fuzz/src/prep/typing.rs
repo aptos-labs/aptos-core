@@ -25,8 +25,8 @@
 //!   struct instantiation or of a type parameter.
 //! - `move_core_types::language_storage::TypeTag` has 1 but neither 2 nor 3: it
 //!   is fully instantiated and cannot express a reference. It *is* used in this
-//!   crate - imported as `VmTypeTag` - for the type arguments that actually
-//!   reach the VM.
+//!   crate, under its own name, for the type arguments that actually reach the
+//!   VM.
 //! - `move_model::ty::Type` has 2 and 3 but not 1 or 4: it names structs by
 //!   `(ModuleId, StructId)` indices into a `GlobalEnv`, carries specification-
 //!   and inference-only variants (`TypeDomain`, `ResourceDomain`, `Var`,
@@ -41,7 +41,7 @@
 //! Four representations here form a deliberate ladder. They are not four
 //! spellings of one thing:
 //!
-//! - [`TypeTag`] - a type as *written in a declaration*. `Param(usize)` refers
+//! - [`TypeExpr`] - a type as *written in a declaration*. `Param(usize)` refers
 //!   to a generic slot of the declaring function or struct. No abilities.
 //! - [`TypeBase`] - the same shape after *instantiation*: abilities of each
 //!   datatype and parameter are memoized, and `Param` now refers to a generic
@@ -58,9 +58,10 @@
 //! first three of these under a reference mode; all three are aliases of the one
 //! generic [`crate::common::Refty`].
 //!
-//! Note that this module's [`TypeTag`] is *not*
-//! `move_core_types::language_storage::TypeTag`; wherever both are in scope this
-//! crate imports the latter as `VmTypeTag`.
+//! Note that this module's [`TypeExpr`] is *not*
+//! `move_core_types::language_storage::TypeTag`. The two used to be told apart by
+//! aliasing the core type to `VmTypeTag` at every import; naming this one
+//! `TypeExpr` says what it actually is and lets the core type keep its own name.
 
 use crate::{common::Refty, prep::ident::DatatypeIdent};
 use itertools::Itertools;
@@ -96,7 +97,7 @@ impl IntrinsicType {
 
 /// A specific type instance within a typing context
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize)]
-pub enum TypeTag {
+pub enum TypeExpr {
     Bool,
     U8,
     I8,
@@ -134,7 +135,7 @@ pub enum TypeTag {
     },
 }
 
-impl Display for TypeTag {
+impl Display for TypeExpr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Bool => write!(f, "bool"),
@@ -186,13 +187,13 @@ impl Display for TypeTag {
     }
 }
 
-/// A type token that can appear in function declarations: a [`TypeTag`] under
+/// A type token that can appear in function declarations: a [`TypeExpr`] under
 /// one of Move's three reference modes; see [`Refty`].
-pub type TypeRef = Refty<TypeTag>;
+pub type TypeRef = Refty<TypeExpr>;
 
 /// A type instance with concrete execution semantics
 ///
-/// This enum is intentionally kept in-sync with `TypeTag`,
+/// This enum is intentionally kept in-sync with `TypeExpr`,
 /// with the addition of `abilities` information for datatypes and generics.
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize)]
 pub enum TypeBase {
@@ -521,30 +522,30 @@ impl<'a> TypeSubstitution<'a> {
     }
 
     /// Try to unify a type tag and a type base
-    pub fn unify(&mut self, ty_tag: &TypeTag, ty_base: &TypeBase) -> bool {
-        match (ty_tag, ty_base) {
+    pub fn unify(&mut self, ty_expr: &TypeExpr, ty_base: &TypeBase) -> bool {
+        match (ty_expr, ty_base) {
             // direct unification
-            (TypeTag::Bool, TypeBase::Bool)
-            | (TypeTag::U8, TypeBase::U8)
-            | (TypeTag::I8, TypeBase::I8)
-            | (TypeTag::U16, TypeBase::U16)
-            | (TypeTag::I16, TypeBase::I16)
-            | (TypeTag::U32, TypeBase::U32)
-            | (TypeTag::I32, TypeBase::I32)
-            | (TypeTag::U64, TypeBase::U64)
-            | (TypeTag::I64, TypeBase::I64)
-            | (TypeTag::U128, TypeBase::U128)
-            | (TypeTag::I128, TypeBase::I128)
-            | (TypeTag::U256, TypeBase::U256)
-            | (TypeTag::I256, TypeBase::I256)
-            | (TypeTag::Bitvec, TypeBase::Bitvec)
-            | (TypeTag::String, TypeBase::String)
-            | (TypeTag::Address, TypeBase::Address)
-            | (TypeTag::Signer, TypeBase::Signer) => true,
+            (TypeExpr::Bool, TypeBase::Bool)
+            | (TypeExpr::U8, TypeBase::U8)
+            | (TypeExpr::I8, TypeBase::I8)
+            | (TypeExpr::U16, TypeBase::U16)
+            | (TypeExpr::I16, TypeBase::I16)
+            | (TypeExpr::U32, TypeBase::U32)
+            | (TypeExpr::I32, TypeBase::I32)
+            | (TypeExpr::U64, TypeBase::U64)
+            | (TypeExpr::I64, TypeBase::I64)
+            | (TypeExpr::U128, TypeBase::U128)
+            | (TypeExpr::I128, TypeBase::I128)
+            | (TypeExpr::U256, TypeBase::U256)
+            | (TypeExpr::I256, TypeBase::I256)
+            | (TypeExpr::Bitvec, TypeBase::Bitvec)
+            | (TypeExpr::String, TypeBase::String)
+            | (TypeExpr::Address, TypeBase::Address)
+            | (TypeExpr::Signer, TypeBase::Signer) => true,
 
             // delegated unification
             (
-                TypeTag::Vector {
+                TypeExpr::Vector {
                     element: element_tag,
                 },
                 TypeBase::Vector {
@@ -552,7 +553,7 @@ impl<'a> TypeSubstitution<'a> {
                 },
             ) => self.unify(element_tag, element_base),
             (
-                TypeTag::Datatype {
+                TypeExpr::Datatype {
                     ident: ident_tag,
                     type_args: type_args_tag,
                 },
@@ -563,7 +564,7 @@ impl<'a> TypeSubstitution<'a> {
                 },
             )
             | (
-                TypeTag::ObjectKnown {
+                TypeExpr::ObjectKnown {
                     ident: ident_tag,
                     type_args: type_args_tag,
                 },
@@ -575,8 +576,8 @@ impl<'a> TypeSubstitution<'a> {
             ) => ident_tag == ident_base && self.unify_all(type_args_tag, type_args_base),
 
             // param assignment
-            (TypeTag::Param(param), ty) => self.check_and_assign_param(*param, ty.clone()),
-            (TypeTag::ObjectParam(param), TypeBase::ObjectParam { index, abilities }) => {
+            (TypeExpr::Param(param), ty) => self.check_and_assign_param(*param, ty.clone()),
+            (TypeExpr::ObjectParam(param), TypeBase::ObjectParam { index, abilities }) => {
                 let ty = TypeBase::Param {
                     index: *index,
                     abilities: *abilities,
@@ -584,7 +585,7 @@ impl<'a> TypeSubstitution<'a> {
                 self.check_and_assign_param(*param, ty)
             },
             (
-                TypeTag::ObjectParam(param),
+                TypeExpr::ObjectParam(param),
                 TypeBase::ObjectKnown {
                     ident,
                     type_args,
@@ -601,7 +602,7 @@ impl<'a> TypeSubstitution<'a> {
 
             // function type unification
             (
-                TypeTag::Function {
+                TypeExpr::Function {
                     params: params_tag,
                     returns: returns_tag,
                     abilities: abilities_tag,
@@ -625,10 +626,10 @@ impl<'a> TypeSubstitution<'a> {
     }
 
     /// Try to unify a series of (type_tag, type_base) pairs
-    pub fn unify_all(&mut self, ty_tags: &[TypeTag], ty_bases: &[TypeBase]) -> bool {
-        assert_eq!(ty_tags.len(), ty_bases.len());
-        for (ty_tag, ty_base) in ty_tags.iter().zip(ty_bases.iter()) {
-            if !self.unify(ty_tag, ty_base) {
+    pub fn unify_all(&mut self, ty_exprs: &[TypeExpr], ty_bases: &[TypeBase]) -> bool {
+        assert_eq!(ty_exprs.len(), ty_bases.len());
+        for (ty_expr, ty_base) in ty_exprs.iter().zip(ty_bases.iter()) {
+            if !self.unify(ty_expr, ty_base) {
                 return false;
             }
         }
@@ -1373,7 +1374,7 @@ impl TypeMode {
 #[cfg(test)]
 mod tests {
     use super::{
-        SimpleType, TypeBase, TypeItem, TypeMode, TypeRef, TypeSubstitution, TypeTag,
+        SimpleType, TypeBase, TypeItem, TypeMode, TypeRef, TypeSubstitution, TypeExpr,
         TypeUnification,
     };
     use crate::prep::ident::DatatypeIdent;
@@ -1395,9 +1396,9 @@ mod tests {
     #[test]
     fn test_type_substitution_unifies_generic_datatype_arguments() {
         let mut subst = TypeSubstitution::new(&[AbilitySet::PRIMITIVES]);
-        let tag = TypeTag::Datatype {
+        let tag = TypeExpr::Datatype {
             ident: datatype("Box"),
-            type_args: vec![TypeTag::Param(0)],
+            type_args: vec![TypeExpr::Param(0)],
         };
         let base = TypeBase::Datatype {
             ident: datatype("Box"),
@@ -1412,7 +1413,7 @@ mod tests {
     fn test_type_substitution_rejects_unsatisfied_ability_constraints() {
         let constraints = [AbilitySet::EMPTY.add(Ability::Key)];
         let mut subst = TypeSubstitution::new(&constraints);
-        assert!(!subst.unify(&TypeTag::Param(0), &TypeBase::U64));
+        assert!(!subst.unify(&TypeExpr::Param(0), &TypeBase::U64));
     }
 
     #[test]
@@ -1488,9 +1489,9 @@ mod tests {
 
     #[test]
     fn test_type_ref_display_formats_function_signatures() {
-        let ty = TypeRef::Base(TypeTag::Function {
-            params: vec![TypeRef::Base(TypeTag::U64)],
-            returns: vec![TypeRef::MutRef(TypeTag::Address)],
+        let ty = TypeRef::Base(TypeExpr::Function {
+            params: vec![TypeRef::Base(TypeExpr::U64)],
+            returns: vec![TypeRef::MutRef(TypeExpr::Address)],
             abilities: AbilitySet::EMPTY,
         });
         assert_eq!(ty.to_string(), "|u64| (&mut address)");
@@ -1501,8 +1502,8 @@ mod tests {
         // `|u64|` must not unify against `|bool|`: the reference kinds match (both `Base`),
         // so only the inner `unify` can reject the pair.
         let mut subst = TypeSubstitution::new(&[]);
-        let tag = TypeTag::Function {
-            params: vec![TypeRef::Base(TypeTag::U64)],
+        let tag = TypeExpr::Function {
+            params: vec![TypeRef::Base(TypeExpr::U64)],
             returns: vec![],
             abilities: AbilitySet::EMPTY,
         };
@@ -1521,10 +1522,10 @@ mod tests {
         // ill-typed substitution `[u64]`.
         let constraints = [AbilitySet::PRIMITIVES];
         let mut subst = TypeSubstitution::new(&constraints);
-        let tag = TypeTag::Function {
+        let tag = TypeExpr::Function {
             params: vec![
-                TypeRef::Base(TypeTag::Param(0)),
-                TypeRef::Base(TypeTag::Param(0)),
+                TypeRef::Base(TypeExpr::Param(0)),
+                TypeRef::Base(TypeExpr::Param(0)),
             ],
             returns: vec![],
             abilities: AbilitySet::EMPTY,
@@ -1544,12 +1545,12 @@ mod tests {
     fn test_type_substitution_unifies_matching_function_type_refs() {
         let constraints = [AbilitySet::PRIMITIVES];
         let mut subst = TypeSubstitution::new(&constraints);
-        let tag = TypeTag::Function {
+        let tag = TypeExpr::Function {
             params: vec![
-                TypeRef::Base(TypeTag::Param(0)),
-                TypeRef::ImmRef(TypeTag::Address),
+                TypeRef::Base(TypeExpr::Param(0)),
+                TypeRef::ImmRef(TypeExpr::Address),
             ],
-            returns: vec![TypeRef::MutRef(TypeTag::Bool)],
+            returns: vec![TypeRef::MutRef(TypeExpr::Bool)],
             abilities: AbilitySet::EMPTY,
         };
         let base = TypeBase::Function {

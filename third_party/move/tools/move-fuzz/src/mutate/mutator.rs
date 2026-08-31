@@ -12,7 +12,7 @@ use move_core_types::{
     ability::AbilitySet,
     account_address::AccountAddress,
     int256::{I256, U256},
-    language_storage::TypeTag as VmTypeTag,
+    language_storage::TypeTag,
     value::MoveValue,
 };
 use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
@@ -197,7 +197,7 @@ macro_rules! mutate_int_with_edges {
 #[derive(Clone)]
 pub struct TypePool {
     /// All types in the pool, each paired with its abilities
-    entries: Vec<(VmTypeTag, AbilitySet)>,
+    entries: Vec<(TypeTag, AbilitySet)>,
 }
 
 impl Default for TypePool {
@@ -215,12 +215,12 @@ impl TypePool {
     }
 
     /// Add a type with its abilities to the pool
-    pub fn add(&mut self, ty: VmTypeTag, abilities: AbilitySet) {
+    pub fn add(&mut self, ty: TypeTag, abilities: AbilitySet) {
         self.entries.push((ty, abilities));
     }
 
     /// Return all types whose abilities are a superset of the given constraint
-    pub fn candidates_for(&self, constraint: AbilitySet) -> Vec<&VmTypeTag> {
+    pub fn candidates_for(&self, constraint: AbilitySet) -> Vec<&TypeTag> {
         self.entries
             .iter()
             .filter(|(_, abilities)| constraint.is_subset(*abilities))
@@ -252,7 +252,7 @@ pub struct Mutator {
 
     // resource type -> set of object addresses where that resource exists
     // keyed by DatatypeIdent only (ignoring type_args) because converting
-    // runtime VmTypeTag to TypeBase requires ability information that is
+    // runtime TypeTag to TypeBase requires ability information that is
     // unavailable from write sets. matching by ident alone is sufficient
     // for fuzzing: a mismatched type arg just triggers an abort, which is
     // strictly better than the previous AccountAddress::ZERO.
@@ -439,7 +439,7 @@ impl Mutator {
     }
 
     /// Randomly generate type arguments satisfying the given ability constraints
-    pub fn random_type_args(&mut self, generics: &[AbilitySet]) -> Vec<VmTypeTag> {
+    pub fn random_type_args(&mut self, generics: &[AbilitySet]) -> Vec<TypeTag> {
         generics
             .iter()
             .map(|constraint| {
@@ -454,8 +454,8 @@ impl Mutator {
     pub fn mutate_type_args(
         &mut self,
         generics: &[AbilitySet],
-        current: &[VmTypeTag],
-    ) -> Vec<VmTypeTag> {
+        current: &[TypeTag],
+    ) -> Vec<TypeTag> {
         assert_eq!(generics.len(), current.len());
         if generics.is_empty() {
             return vec![];

@@ -26,7 +26,7 @@ use aptos_types::{
 };
 use log::{debug, warn};
 use move_core_types::{
-    language_storage::{StructTag, TypeTag as VmTypeTag},
+    language_storage::{StructTag, TypeTag},
     value::MoveValue,
     vm_status::VMStatus,
 };
@@ -147,12 +147,12 @@ fn is_object_group_struct_tag(struct_tag: &StructTag) -> bool {
 ))]
 pub struct SeedInput<V = MoveValue> {
     pub sender: AccountAddress,
-    pub ty_args: Vec<VmTypeTag>,
+    pub ty_args: Vec<TypeTag>,
     pub args: Vec<V>,
 }
 
 impl SeedInput {
-    pub fn new(sender: AccountAddress, ty_args: Vec<VmTypeTag>, args: Vec<MoveValue>) -> Self {
+    pub fn new(sender: AccountAddress, ty_args: Vec<TypeTag>, args: Vec<MoveValue>) -> Self {
         Self {
             sender,
             ty_args,
@@ -161,8 +161,8 @@ impl SeedInput {
     }
 }
 
-impl From<(Vec<VmTypeTag>, Vec<MoveValue>)> for SeedInput {
-    fn from(value: (Vec<VmTypeTag>, Vec<MoveValue>)) -> Self {
+impl From<(Vec<TypeTag>, Vec<MoveValue>)> for SeedInput {
+    fn from(value: (Vec<TypeTag>, Vec<MoveValue>)) -> Self {
         Self {
             sender: AccountAddress::ONE,
             ty_args: value.0,
@@ -3029,7 +3029,7 @@ mod tests {
     use super::*;
     use crate::prep::ident::FunctionIdent;
     use move_core_types::{
-        identifier::Identifier, language_storage::TypeTag as VmTypeTag, value::MoveValue,
+        identifier::Identifier, language_storage::TypeTag, value::MoveValue,
         vm_status::StatusCode,
     };
     use rand::SeedableRng;
@@ -3508,7 +3508,7 @@ mod tests {
             writes: BTreeSet::from([make_tag("B")]),
             succeeded: true,
         };
-        let seed = SeedInput::from((vec![VmTypeTag::Bool], vec![MoveValue::U64(7)]));
+        let seed = SeedInput::from((vec![TypeTag::Bool], vec![MoveValue::U64(7)]));
         let seed_id = dug
             .add_seed_observation(&profile, seed.clone())
             .1

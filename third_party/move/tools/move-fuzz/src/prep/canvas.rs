@@ -797,7 +797,7 @@ mod tests {
             graph::{DatatypeItem, FlowGraph, FlowGraphEdge, FlowGraphNode, FunctionInst},
             ident::{DatatypeIdent, FunctionIdent},
             model::Model,
-            typing::{ComplexType, TypeBase, TypeItem, TypeRef, TypeTag},
+            typing::{ComplexType, TypeBase, TypeItem, TypeRef, TypeExpr},
         },
     };
     use move_core_types::{
@@ -859,7 +859,7 @@ mod tests {
             FunctionDecl {
                 ident: function("root"),
                 generics: vec![abilities],
-                parameters: vec![root_signer, TypeRef::Base(TypeTag::Param(0))],
+                parameters: vec![root_signer, TypeRef::Base(TypeExpr::Param(0))],
                 return_sig: vec![],
                 kind: PkgKind::Primary,
                 is_entry: true,
@@ -868,7 +868,7 @@ mod tests {
                 ident: function("make"),
                 generics: vec![abilities],
                 parameters: vec![make_signer],
-                return_sig: vec![TypeRef::Base(TypeTag::Param(0))],
+                return_sig: vec![TypeRef::Base(TypeExpr::Param(0))],
                 kind: PkgKind::Primary,
                 is_entry: false,
             },
@@ -972,7 +972,7 @@ mod tests {
         let model = model_with_decl(FunctionDecl {
             ident: ident.clone(),
             generics: vec![AbilitySet::PRIMITIVES],
-            parameters: vec![TypeRef::Base(TypeTag::Param(0))],
+            parameters: vec![TypeRef::Base(TypeExpr::Param(0))],
             return_sig: vec![],
             kind: PkgKind::Primary,
             is_entry: true,
@@ -998,7 +998,7 @@ mod tests {
         let model = model_with_decl(FunctionDecl {
             ident: ident.clone(),
             generics: vec![],
-            parameters: vec![TypeRef::Base(TypeTag::U64)],
+            parameters: vec![TypeRef::Base(TypeExpr::U64)],
             return_sig: vec![],
             kind: PkgKind::Primary,
             is_entry: true,
@@ -1040,10 +1040,10 @@ mod tests {
         let model = model_with_decl(FunctionDecl {
             ident: ident.clone(),
             generics: vec![],
-            parameters: vec![TypeRef::Base(TypeTag::Vector {
-                element: Box::new(TypeTag::Function {
-                    params: vec![TypeRef::Base(TypeTag::U64)],
-                    returns: vec![TypeRef::Base(TypeTag::U64)],
+            parameters: vec![TypeRef::Base(TypeExpr::Vector {
+                element: Box::new(TypeExpr::Function {
+                    params: vec![TypeRef::Base(TypeExpr::U64)],
+                    returns: vec![TypeRef::Base(TypeExpr::U64)],
                     abilities: AbilitySet::PRIMITIVES,
                 }),
             })],
@@ -1070,9 +1070,9 @@ mod tests {
         let model = model_with_decl(FunctionDecl {
             ident: ident.clone(),
             generics: vec![],
-            parameters: vec![TypeRef::Base(TypeTag::Function {
-                params: vec![TypeRef::Base(TypeTag::U64)],
-                returns: vec![TypeRef::Base(TypeTag::U64)],
+            parameters: vec![TypeRef::Base(TypeExpr::Function {
+                params: vec![TypeRef::Base(TypeExpr::U64)],
+                returns: vec![TypeRef::Base(TypeExpr::U64)],
                 abilities: AbilitySet::PRIMITIVES,
             })],
             return_sig: vec![],
@@ -1098,8 +1098,8 @@ mod tests {
         // `make` takes the signer by value and is emitted first (it provides `root`'s complex
         // argument), so `root`'s `&signer` would borrow an already-moved local
         let (model, graph) = signer_flow(
-            TypeRef::ImmRef(TypeTag::Signer),
-            TypeRef::Base(TypeTag::Signer),
+            TypeRef::ImmRef(TypeExpr::Signer),
+            TypeRef::Base(TypeExpr::Signer),
         );
         assert!(DriverCanvas::try_build(&model, &graph, &BTreeMap::new()).is_none());
     }
@@ -1113,8 +1113,8 @@ mod tests {
             ident: ident.clone(),
             generics: vec![],
             parameters: vec![
-                TypeRef::MutRef(TypeTag::Signer),
-                TypeRef::ImmRef(TypeTag::Signer),
+                TypeRef::MutRef(TypeExpr::Signer),
+                TypeRef::ImmRef(TypeExpr::Signer),
             ],
             return_sig: vec![],
             kind: PkgKind::Primary,
@@ -1129,8 +1129,8 @@ mod tests {
     fn test_driver_canvas_try_build_allows_signer_move_after_borrow() {
         // the legal shape: the provider borrows the signer, the root call moves it last
         let (model, graph) = signer_flow(
-            TypeRef::Base(TypeTag::Signer),
-            TypeRef::ImmRef(TypeTag::Signer),
+            TypeRef::Base(TypeExpr::Signer),
+            TypeRef::ImmRef(TypeExpr::Signer),
         );
         let canvas = DriverCanvas::try_build(&model, &graph, &BTreeMap::new())
             .expect("borrow-before-move driver should build");
@@ -1156,8 +1156,8 @@ mod tests {
             ident: ident.clone(),
             generics: vec![],
             parameters: vec![
-                TypeRef::ImmRef(TypeTag::Signer),
-                TypeRef::ImmRef(TypeTag::Signer),
+                TypeRef::ImmRef(TypeExpr::Signer),
+                TypeRef::ImmRef(TypeExpr::Signer),
             ],
             return_sig: vec![],
             kind: PkgKind::Primary,

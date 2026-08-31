@@ -26,7 +26,7 @@ use std::fmt::Display;
 /// Two things about this type are load-bearing and must not change:
 /// - variant *order*, because `Ord` is derived and the aliases are used as
 ///   `BTreeMap` / `BTreeSet` keys and in sorted output;
-/// - variant *names*, because `Refty<TypeTag>` and `Refty<TypeBase>` are
+/// - variant *names*, because `Refty<TypeExpr>` and `Refty<TypeBase>` are
 ///   serialized into the on-disk entrypoint cache (`PersistedEntrypointCache`).
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Refty<T> {

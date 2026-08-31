@@ -5,7 +5,7 @@ use crate::{
     deps::PkgKind,
     prep::{
         ident::DatatypeIdent,
-        typing::{IntrinsicType, TypeBase, TypeItem, TypeRef, TypeTag},
+        typing::{IntrinsicType, TypeBase, TypeItem, TypeRef, TypeExpr},
     },
 };
 use move_binary_format::{
@@ -18,7 +18,7 @@ use move_binary_format::{
 use move_core_types::{
     ability::AbilitySet,
     identifier::Identifier,
-    language_storage::{StructTag, TypeTag as VmTypeTag},
+    language_storage::{StructTag, TypeTag},
 };
 use std::collections::{btree_map::Entry, BTreeMap};
 
@@ -50,7 +50,7 @@ pub struct DatatypeDecl {
 impl DatatypeDecl {
     /// Build the runtime-facing `StructTag` naming this datatype instantiated with
     /// `type_args`, so callers do not re-derive it from the ident components.
-    pub fn struct_tag(&self, type_args: Vec<VmTypeTag>) -> StructTag {
+    pub fn struct_tag(&self, type_args: Vec<TypeTag>) -> StructTag {
         StructTag {
             address: self.ident.address(),
             module: Identifier::new(self.ident.module_name()).expect("valid identifier"),
@@ -69,12 +69,12 @@ impl DatatypeDecl {
 /// type-parameter indices are meaningful only relative to the `CompiledModule` they
 /// were read from, whereas this registry outlives any single module and compares
 /// datatypes declared in different packages, so fields are stored as already-resolved
-/// `TypeTag`s. `Opaque` additionally doubles as the placeholder for a datatype seen
+/// `TypeExpr`s. `Opaque` additionally doubles as the placeholder for a datatype seen
 /// only through a `StructHandle` (see `ensure_decl_registered`).
 #[derive(Clone, PartialEq, Eq)]
 pub enum DatatypeContent {
-    Fields(Vec<TypeTag>),
-    Variants(BTreeMap<Identifier, Vec<TypeTag>>),
+    Fields(Vec<TypeExpr>),
+    Variants(BTreeMap<Identifier, Vec<TypeExpr>>),
     Opaque,
 }
 
@@ -196,7 +196,7 @@ impl DatatypeRegistry {
         binary: &BinaryIndexedView,
         fields: &[FieldDefinition],
         context: &str,
-    ) -> Vec<TypeTag> {
+    ) -> Vec<TypeExpr> {
         fields
             .iter()
             .map(
@@ -314,21 +314,21 @@ impl DatatypeRegistry {
         token: &SignatureToken,
     ) -> TypeRef {
         match token {
-            SignatureToken::Bool => TypeRef::Base(TypeTag::Bool),
-            SignatureToken::U8 => TypeRef::Base(TypeTag::U8),
-            SignatureToken::I8 => TypeRef::Base(TypeTag::I8),
-            SignatureToken::U16 => TypeRef::Base(TypeTag::U16),
-            SignatureToken::I16 => TypeRef::Base(TypeTag::I16),
-            SignatureToken::U32 => TypeRef::Base(TypeTag::U32),
-            SignatureToken::I32 => TypeRef::Base(TypeTag::I32),
-            SignatureToken::U64 => TypeRef::Base(TypeTag::U64),
-            SignatureToken::I64 => TypeRef::Base(TypeTag::I64),
-            SignatureToken::U128 => TypeRef::Base(TypeTag::U128),
-            SignatureToken::I128 => TypeRef::Base(TypeTag::I128),
-            SignatureToken::U256 => TypeRef::Base(TypeTag::U256),
-            SignatureToken::I256 => TypeRef::Base(TypeTag::I256),
-            SignatureToken::Address => TypeRef::Base(TypeTag::Address),
-            SignatureToken::Signer => TypeRef::Base(TypeTag::Signer),
+            SignatureToken::Bool => TypeRef::Base(TypeExpr::Bool),
+            SignatureToken::U8 => TypeRef::Base(TypeExpr::U8),
+            SignatureToken::I8 => TypeRef::Base(TypeExpr::I8),
+            SignatureToken::U16 => TypeRef::Base(TypeExpr::U16),
+            SignatureToken::I16 => TypeRef::Base(TypeExpr::I16),
+            SignatureToken::U32 => TypeRef::Base(TypeExpr::U32),
+            SignatureToken::I32 => TypeRef::Base(TypeExpr::I32),
+            SignatureToken::U64 => TypeRef::Base(TypeExpr::U64),
+            SignatureToken::I64 => TypeRef::Base(TypeExpr::I64),
+            SignatureToken::U128 => TypeRef::Base(TypeExpr::U128),
+            SignatureToken::I128 => TypeRef::Base(TypeExpr::I128),
+            SignatureToken::U256 => TypeRef::Base(TypeExpr::U256),
+            SignatureToken::I256 => TypeRef::Base(TypeExpr::I256),
+            SignatureToken::Address => TypeRef::Base(TypeExpr::Address),
+            SignatureToken::Signer => TypeRef::Base(TypeExpr::Signer),
             SignatureToken::Vector(element) => {
                 let element_tag = match self.convert_signature_token(binary, element) {
                     TypeRef::Base(tag) => tag,
@@ -336,7 +336,7 @@ impl DatatypeRegistry {
                         panic!("reference type as vector element is not expected");
                     },
                 };
-                TypeRef::Base(TypeTag::Vector {
+                TypeRef::Base(TypeExpr::Vector {
                     element: element_tag.into(),
                 })
             },
@@ -346,8 +346,8 @@ impl DatatypeRegistry {
 
                 // first try to see if this is an intrinsic type
                 match IntrinsicType::try_parse_ident(&ident) {
-                    Some(IntrinsicType::Bitvec) => TypeRef::Base(TypeTag::Bitvec),
-                    Some(IntrinsicType::String) => TypeRef::Base(TypeTag::String),
+                    Some(IntrinsicType::Bitvec) => TypeRef::Base(TypeExpr::Bitvec),
+                    Some(IntrinsicType::String) => TypeRef::Base(TypeExpr::String),
                     Some(IntrinsicType::Object) => {
                         panic!("Object<T> is cannot be `SignatureToken::Struct`");
                     },
@@ -356,7 +356,7 @@ impl DatatypeRegistry {
                         let ident = self.ensure_decl_registered(binary, handle);
                         let decl = self.lookup_decl(&ident);
                         assert!(decl.generics.is_empty());
-                        TypeRef::Base(TypeTag::Datatype {
+                        TypeRef::Base(TypeExpr::Datatype {
                             ident,
                             type_args: vec![],
                         })
@@ -386,10 +386,10 @@ impl DatatypeRegistry {
                     Some(IntrinsicType::Object) => {
                         assert_eq!(ty_args.len(), 1);
                         match ty_args.pop().unwrap() {
-                            TypeTag::Datatype { ident, type_args } => {
-                                TypeRef::Base(TypeTag::ObjectKnown { ident, type_args })
+                            TypeExpr::Datatype { ident, type_args } => {
+                                TypeRef::Base(TypeExpr::ObjectKnown { ident, type_args })
                             },
-                            TypeTag::Param(index) => TypeRef::Base(TypeTag::ObjectParam(index)),
+                            TypeExpr::Param(index) => TypeRef::Base(TypeExpr::ObjectParam(index)),
                             _ => panic!("type argument for Object must be a datatype or parameter"),
                         }
                     },
@@ -398,7 +398,7 @@ impl DatatypeRegistry {
                         let ident = self.ensure_decl_registered(binary, handle);
                         let decl = self.lookup_decl(&ident);
                         assert_eq!(decl.generics.len(), ty_args.len());
-                        TypeRef::Base(TypeTag::Datatype {
+                        TypeRef::Base(TypeExpr::Datatype {
                             ident,
                             type_args: ty_args,
                         })
@@ -432,40 +432,40 @@ impl DatatypeRegistry {
                     .iter()
                     .map(|t| self.convert_signature_token(binary, t))
                     .collect();
-                TypeRef::Base(TypeTag::Function {
+                TypeRef::Base(TypeExpr::Function {
                     params,
                     returns,
                     abilities: *abilities,
                 })
             },
-            SignatureToken::TypeParameter(idx) => TypeRef::Base(TypeTag::Param(*idx as usize)),
+            SignatureToken::TypeParameter(idx) => TypeRef::Base(TypeExpr::Param(*idx as usize)),
         }
     }
 
     /// Instantiate type parameters in this type tag with the type arguments
-    pub fn instantiate_type_tag(&self, tag: &TypeTag, ty_args: &[TypeBase]) -> TypeBase {
+    pub fn instantiate_type_expr(&self, tag: &TypeExpr, ty_args: &[TypeBase]) -> TypeBase {
         match tag {
-            TypeTag::Bool => TypeBase::Bool,
-            TypeTag::U8 => TypeBase::U8,
-            TypeTag::I8 => TypeBase::I8,
-            TypeTag::U16 => TypeBase::U16,
-            TypeTag::I16 => TypeBase::I16,
-            TypeTag::U32 => TypeBase::U32,
-            TypeTag::I32 => TypeBase::I32,
-            TypeTag::U64 => TypeBase::U64,
-            TypeTag::I64 => TypeBase::I64,
-            TypeTag::U128 => TypeBase::U128,
-            TypeTag::I128 => TypeBase::I128,
-            TypeTag::U256 => TypeBase::U256,
-            TypeTag::I256 => TypeBase::I256,
-            TypeTag::Bitvec => TypeBase::Bitvec,
-            TypeTag::String => TypeBase::String,
-            TypeTag::Address => TypeBase::Address,
-            TypeTag::Signer => TypeBase::Signer,
-            TypeTag::Vector { element } => TypeBase::Vector {
-                element: self.instantiate_type_tag(element, ty_args).into(),
+            TypeExpr::Bool => TypeBase::Bool,
+            TypeExpr::U8 => TypeBase::U8,
+            TypeExpr::I8 => TypeBase::I8,
+            TypeExpr::U16 => TypeBase::U16,
+            TypeExpr::I16 => TypeBase::I16,
+            TypeExpr::U32 => TypeBase::U32,
+            TypeExpr::I32 => TypeBase::I32,
+            TypeExpr::U64 => TypeBase::U64,
+            TypeExpr::I64 => TypeBase::I64,
+            TypeExpr::U128 => TypeBase::U128,
+            TypeExpr::I128 => TypeBase::I128,
+            TypeExpr::U256 => TypeBase::U256,
+            TypeExpr::I256 => TypeBase::I256,
+            TypeExpr::Bitvec => TypeBase::Bitvec,
+            TypeExpr::String => TypeBase::String,
+            TypeExpr::Address => TypeBase::Address,
+            TypeExpr::Signer => TypeBase::Signer,
+            TypeExpr::Vector { element } => TypeBase::Vector {
+                element: self.instantiate_type_expr(element, ty_args).into(),
             },
-            TypeTag::Datatype { ident, type_args } => {
+            TypeExpr::Datatype { ident, type_args } => {
                 let decl = self.lookup_decl(ident);
                 debug_assert_eq!(type_args.len(), decl.generics.len());
 
@@ -478,7 +478,7 @@ impl DatatypeRegistry {
                 } else {
                     let ty_args: Vec<_> = type_args
                         .iter()
-                        .map(|t| self.instantiate_type_tag(t, ty_args))
+                        .map(|t| self.instantiate_type_expr(t, ty_args))
                         .collect();
                     let actual_abilities = derive_actual_ability(decl, &ty_args);
                     TypeBase::Datatype {
@@ -488,11 +488,11 @@ impl DatatypeRegistry {
                     }
                 }
             },
-            TypeTag::Param(index) => ty_args
+            TypeExpr::Param(index) => ty_args
                 .get(*index)
                 .expect("type arguments in bound")
                 .clone(),
-            TypeTag::ObjectKnown { ident, type_args } => {
+            TypeExpr::ObjectKnown { ident, type_args } => {
                 let decl = self.lookup_decl(ident);
                 assert_eq!(type_args.len(), decl.generics.len());
 
@@ -505,7 +505,7 @@ impl DatatypeRegistry {
                 } else {
                     let ty_args: Vec<_> = type_args
                         .iter()
-                        .map(|t| self.instantiate_type_tag(t, ty_args))
+                        .map(|t| self.instantiate_type_expr(t, ty_args))
                         .collect();
                     let actual_abilities = derive_actual_ability(decl, &ty_args);
                     TypeBase::ObjectKnown {
@@ -515,7 +515,7 @@ impl DatatypeRegistry {
                     }
                 }
             },
-            TypeTag::ObjectParam(index) => {
+            TypeExpr::ObjectParam(index) => {
                 match ty_args.get(*index).expect("type arguments in bound") {
                     TypeBase::Param { index, abilities } => TypeBase::ObjectParam {
                         index: *index,
@@ -533,7 +533,7 @@ impl DatatypeRegistry {
                     _ => panic!("expect a datatype or a parameter as the type argument for object"),
                 }
             },
-            TypeTag::Function {
+            TypeExpr::Function {
                 params,
                 returns,
                 abilities,
@@ -553,7 +553,7 @@ impl DatatypeRegistry {
 
     /// Instantiate type parameters in this type ref with the type arguments
     pub fn instantiate_type_ref(&self, t: &TypeRef, ty_args: &[TypeBase]) -> TypeItem {
-        t.map(|tag| self.instantiate_type_tag(tag, ty_args))
+        t.map(|tag| self.instantiate_type_expr(tag, ty_args))
     }
 }
 
@@ -592,7 +592,7 @@ mod tests {
         deps::PkgKind,
         prep::{
             ident::DatatypeIdent,
-            typing::{TypeBase, TypeRef, TypeTag},
+            typing::{TypeBase, TypeRef, TypeExpr},
         },
     };
     use move_binary_format::file_format::StructTypeParameter;
@@ -600,7 +600,7 @@ mod tests {
         ability::{Ability, AbilitySet},
         account_address::AccountAddress,
         identifier::Identifier,
-        language_storage::{StructTag, TypeTag as VmTypeTag},
+        language_storage::{StructTag, TypeTag},
     };
 
     fn type_param(constraints: AbilitySet, is_phantom: bool) -> StructTypeParameter {
@@ -664,11 +664,11 @@ mod tests {
             kind: PkgKind::Primary,
         };
 
-        assert_eq!(decl.struct_tag(vec![VmTypeTag::U64]), StructTag {
+        assert_eq!(decl.struct_tag(vec![TypeTag::U64]), StructTag {
             address: AccountAddress::ONE,
             module: Identifier::new("m").unwrap(),
             name: Identifier::new("Vault").unwrap(),
-            type_args: vec![VmTypeTag::U64],
+            type_args: vec![TypeTag::U64],
         });
     }
 
@@ -677,7 +677,7 @@ mod tests {
         let ident = datatype("Vault");
         let registry = registry_with_decl(&ident, vec![]);
         let result =
-            registry.instantiate_type_tag(&TypeTag::ObjectParam(0), &[TypeBase::Datatype {
+            registry.instantiate_type_expr(&TypeExpr::ObjectParam(0), &[TypeBase::Datatype {
                 ident: ident.clone(),
                 type_args: vec![],
                 abilities: AbilitySet::EMPTY.add(Ability::Copy).add(Ability::Drop),
@@ -699,9 +699,9 @@ mod tests {
         let registry = registry_with_decl(&ident, vec![type_param(AbilitySet::EMPTY, false)]);
 
         let result = registry.instantiate_type_ref(
-            &TypeRef::MutRef(TypeTag::Datatype {
+            &TypeRef::MutRef(TypeExpr::Datatype {
                 ident: ident.clone(),
-                type_args: vec![TypeTag::Param(0)],
+                type_args: vec![TypeExpr::Param(0)],
             }),
             &[TypeBase::Bool],
         );
