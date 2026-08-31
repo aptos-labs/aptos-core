@@ -5,7 +5,7 @@ use crate::{
     block_storage::{
         pending_blocks::PendingBlocks,
         tracing::{observe_block, BlockStage},
-        BlockStore,
+        BlockReader, BlockStore,
     },
     consensus_observer::publisher::consensus_publisher::ConsensusPublisher,
     counters,
@@ -51,7 +51,9 @@ use crate::{
             storage::interface::RandStorage,
             types::{AugmentedData, RandConfig},
         },
-        secret_sharing::verifier::SecretShareVerifier,
+        secret_sharing::{
+            secret_share_recovery::OrderedBlockSecretShareRecovery, verifier::SecretShareVerifier,
+        },
     },
     recovery_manager::RecoveryManager,
     round_manager::{RoundManager, UnverifiedEvent, VerifiedEvent},
@@ -916,13 +918,24 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             Arc::clone(&self.time_service),
             self.config.vote_back_pressure_limit,
             self.config.max_commit_gap,
-            payload_manager,
+            payload_manager.clone(),
             onchain_consensus_config.order_vote_enabled(),
             onchain_consensus_config.window_size(),
             self.pending_blocks.clone(),
             Some(pipeline_builder),
             self.config.skip_sync_small_gap_rounds,
         ));
+        if let Some(verifier) = secret_share_verifier.as_ref() {
+            let block_reader: Arc<dyn BlockReader> = block_store.clone();
+            self.execution_client.set_secret_share_recovery(Arc::new(
+                OrderedBlockSecretShareRecovery::new(
+                    self.author,
+                    verifier.config().clone(),
+                    payload_manager.clone(),
+                    block_reader,
+                ),
+            ));
+        }
 
         let failures_tracker = Arc::new(Mutex::new(ExponentialWindowFailureTracker::new(
             100,

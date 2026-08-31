@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    counters::DEC_QUEUE_SIZE,
+    counters::{DEC_QUEUE_SIZE, SECRET_SHARE_RECOVERY_COUNT},
     logging::{LogEvent, LogSchema},
     network::{IncomingSecretShareRequest, NetworkSender, TConsensusMsg},
     pipeline::buffer_manager::{OrderedBlocks, ResetAck, ResetRequest, ResetSignal},
@@ -10,6 +10,7 @@ use crate::{
         block_queue::{BlockQueue, QueueItem},
         network_messages::{SecretShareMessage, SecretShareRpc},
         reliable_broadcast_state::SecretShareAggregateState,
+        secret_share_recovery::SecretShareRecovery,
         secret_share_store::{SecretShareAggregationResult, SecretShareStore},
         types::RequestSecretShare,
         verifier::SecretShareVerifier,
@@ -27,8 +28,12 @@ use aptos_logger::{debug, error, info, spawn_named, warn};
 use aptos_network::{protocols::network::RpcError, ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
-use aptos_types::{epoch_state::EpochState, secret_sharing::SecretShareMetadata};
+use aptos_types::{
+    epoch_state::EpochState,
+    secret_sharing::{SecretShare, SecretShareMetadata},
+};
 use bytes::Bytes;
+use fail::fail_point;
 use futures::{
     future::{AbortHandle, Abortable},
     stream::FuturesUnordered,
@@ -38,7 +43,7 @@ use futures_channel::{
     mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
     oneshot,
 };
-use std::{future::Future, pin::Pin, sync::Arc, time::Duration};
+use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
 pub type Sender<T> = UnboundedSender<T>;
@@ -46,6 +51,54 @@ pub type Receiver<T> = UnboundedReceiver<T>;
 
 type PendingDeriveFut =
     Pin<Box<dyn Future<Output = (Round, TaskResult<SecretShareResult>)> + Send>>;
+type RecoveryResponse = (ProtocolId, oneshot::Sender<Result<Bytes, RpcError>>);
+type RecoveryResult = (
+    SecretShareMetadata,
+    u64,
+    anyhow::Result<Option<SecretShare>>,
+);
+
+struct PendingRecoveryRequests<T> {
+    generation: u64,
+    requests: HashMap<SecretShareMetadata, Vec<T>>,
+}
+
+impl<T> Default for PendingRecoveryRequests<T> {
+    fn default() -> Self {
+        Self {
+            generation: 0,
+            requests: HashMap::new(),
+        }
+    }
+}
+
+impl<T> PendingRecoveryRequests<T> {
+    fn append_if_pending(&mut self, metadata: &SecretShareMetadata, request: T) -> Result<(), T> {
+        match self.requests.get_mut(metadata) {
+            Some(requests) => {
+                requests.push(request);
+                Ok(())
+            },
+            None => Err(request),
+        }
+    }
+
+    fn insert(&mut self, metadata: SecretShareMetadata, request: T) {
+        let previous = self.requests.insert(metadata, vec![request]);
+        debug_assert!(previous.is_none());
+    }
+
+    fn reset(&mut self) {
+        self.requests.clear();
+        self.generation = self.generation.wrapping_add(1);
+    }
+
+    fn take(&mut self, metadata: &SecretShareMetadata, generation: u64) -> Option<Vec<T>> {
+        (generation == self.generation)
+            .then(|| self.requests.remove(metadata))
+            .flatten()
+    }
+}
 
 pub struct SecretShareManager {
     author: Author,
@@ -55,6 +108,8 @@ pub struct SecretShareManager {
     reliable_broadcast: Arc<ReliableBroadcast<SecretShareMessage, ExponentialBackoff>>,
     network_sender: Arc<NetworkSender>,
     secret_share_request_delay_ms: u64,
+    recovery: Arc<dyn SecretShareRecovery>,
+    recovery_executor: BoundedExecutor,
 
     // local channel received from dec_store
     decision_rx: Receiver<SecretShareAggregationResult>,
@@ -64,6 +119,9 @@ pub struct SecretShareManager {
     secret_share_store: Arc<Mutex<SecretShareStore>>,
     block_queue: BlockQueue,
     pending_derives: FuturesUnordered<PendingDeriveFut>,
+    pending_recoveries: PendingRecoveryRequests<RecoveryResponse>,
+    recovery_result_tx: Sender<RecoveryResult>,
+    recovery_result_rx: Receiver<RecoveryResult>,
 }
 
 impl SecretShareManager {
@@ -76,6 +134,7 @@ impl SecretShareManager {
         bounded_executor: BoundedExecutor,
         rb_config: &ReliableBroadcastConfig,
         secret_share_request_delay_ms: u64,
+        recovery: Arc<dyn SecretShareRecovery>,
     ) -> Self {
         let rb_backoff_policy = ExponentialBackoff::from_millis(rb_config.backoff_policy_base_ms)
             .factor(rb_config.backoff_policy_factor)
@@ -88,9 +147,10 @@ impl SecretShareManager {
             rb_backoff_policy,
             TimeService::real(),
             Duration::from_millis(rb_config.rpc_timeout_ms),
-            bounded_executor,
+            bounded_executor.clone(),
         ));
         let (decision_tx, decision_rx) = unbounded();
+        let (recovery_result_tx, recovery_result_rx) = unbounded();
 
         let dec_store = Arc::new(Mutex::new(SecretShareStore::new(
             epoch_state.epoch,
@@ -107,6 +167,8 @@ impl SecretShareManager {
             reliable_broadcast,
             network_sender,
             secret_share_request_delay_ms,
+            recovery,
+            recovery_executor: bounded_executor,
 
             decision_rx,
             outgoing_blocks,
@@ -114,6 +176,9 @@ impl SecretShareManager {
             secret_share_store: dec_store,
             block_queue: BlockQueue::new(),
             pending_derives: FuturesUnordered::new(),
+            pending_recoveries: PendingRecoveryRequests::default(),
+            recovery_result_tx,
+            recovery_result_rx,
         }
     }
 
@@ -183,12 +248,18 @@ impl SecretShareManager {
         };
 
         let metadata = share.metadata().clone();
-        {
+        let drop_delivery = Self::drop_derived_share_delivery();
+        if !drop_delivery {
             let mut store = self.secret_share_store.lock();
             if let Err(e) = store.add_self_share(share.clone()) {
                 error!(round = round, "Failed to add self share to store: {:?}", e);
                 return;
             }
+        } else {
+            warn!(
+                round = round,
+                "Dropping derived self-share delivery due to failpoint"
+            );
         }
 
         info!(LogSchema::new(LogEvent::BroadcastSecretShare)
@@ -207,6 +278,14 @@ impl SecretShareManager {
                 "Secret share item not found for round {}", round
             );
         }
+    }
+
+    fn drop_derived_share_delivery() -> bool {
+        fail_point!(
+            "consensus::secret_share_manager::drop_derived_share_delivery",
+            |_| true
+        );
+        false
     }
 
     fn process_ready_blocks(&mut self, ready_blocks: Vec<OrderedBlocks>) {
@@ -234,6 +313,7 @@ impl SecretShareManager {
         };
         self.block_queue = BlockQueue::new();
         self.pending_derives = FuturesUnordered::new();
+        self.pending_recoveries.reset();
         self.secret_share_store.lock().reset(target_round);
         self.stop = matches!(signal, ResetSignal::Stop);
         let _ = tx.send(ResetAck::default());
@@ -297,6 +377,153 @@ impl SecretShareManager {
             .to_bytes(&msg)
             .expect("Message should be serializable into protocol")
             .into()));
+    }
+
+    fn schedule_recovery(&mut self, metadata: SecretShareMetadata, response: RecoveryResponse) {
+        let response = match self
+            .pending_recoveries
+            .append_if_pending(&metadata, response)
+        {
+            Ok(()) => {
+                SECRET_SHARE_RECOVERY_COUNT
+                    .with_label_values(&["deduplicated"])
+                    .inc();
+                return;
+            },
+            Err(response) => response,
+        };
+
+        let recovery = self.recovery.clone();
+        let result_tx = self.recovery_result_tx.clone();
+        let generation = self.pending_recoveries.generation;
+        let result_metadata = metadata.clone();
+        let task = async move {
+            let result = recovery.recover(result_metadata.clone()).await;
+            let _ = result_tx.unbounded_send((result_metadata, generation, result));
+        };
+        match self.recovery_executor.try_spawn(task) {
+            Ok(_) => {
+                self.pending_recoveries.insert(metadata, response);
+                SECRET_SHARE_RECOVERY_COUNT
+                    .with_label_values(&["scheduled"])
+                    .inc();
+            },
+            Err(_) => {
+                warn!(
+                    epoch = metadata.epoch,
+                    round = metadata.round,
+                    "Secret-share recovery executor is at capacity"
+                );
+                SECRET_SHARE_RECOVERY_COUNT
+                    .with_label_values(&["at_capacity"])
+                    .inc();
+            },
+        }
+    }
+
+    fn process_recovery_result(&mut self, result: RecoveryResult) {
+        let (metadata, generation, result) = result;
+        if generation != self.pending_recoveries.generation {
+            SECRET_SHARE_RECOVERY_COUNT
+                .with_label_values(&["stale"])
+                .inc();
+            return;
+        }
+        let Some(requesters) = self.pending_recoveries.take(&metadata, generation) else {
+            return;
+        };
+
+        let recovered_share = match result {
+            Ok(Some(share)) if share.metadata() == &metadata => share,
+            Ok(Some(_)) => {
+                warn!(
+                    epoch = metadata.epoch,
+                    round = metadata.round,
+                    "Recovered secret share has mismatched metadata"
+                );
+                SECRET_SHARE_RECOVERY_COUNT
+                    .with_label_values(&["metadata_mismatch"])
+                    .inc();
+                return;
+            },
+            Ok(None) => {
+                SECRET_SHARE_RECOVERY_COUNT
+                    .with_label_values(&["unavailable"])
+                    .inc();
+                return;
+            },
+            Err(error) => {
+                warn!(
+                    epoch = metadata.epoch,
+                    round = metadata.round,
+                    "Failed to recover secret share: {error:#}"
+                );
+                SECRET_SHARE_RECOVERY_COUNT
+                    .with_label_values(&["error"])
+                    .inc();
+                return;
+            },
+        };
+
+        let (share_to_send, inserted) = {
+            let mut store = self.secret_share_store.lock();
+            let already_present = matches!(store.get_self_share(&metadata), Ok(Some(_)));
+            let inserted = if already_present {
+                false
+            } else {
+                match store.add_self_share(recovered_share) {
+                    Ok(()) => true,
+                    Err(error) => {
+                        warn!(
+                            epoch = metadata.epoch,
+                            round = metadata.round,
+                            "Failed to add recovered self share: {error:#}"
+                        );
+                        false
+                    },
+                }
+            };
+            let share = match store.get_self_share(&metadata) {
+                Ok(share) => share,
+                Err(error) => {
+                    warn!(
+                        epoch = metadata.epoch,
+                        round = metadata.round,
+                        "Failed to read recovered self share: {error:#}"
+                    );
+                    None
+                },
+            };
+            (share, inserted)
+        };
+        let Some(share) = share_to_send else {
+            SECRET_SHARE_RECOVERY_COUNT
+                .with_label_values(&["store_conflict"])
+                .inc();
+            return;
+        };
+
+        for (protocol, response_sender) in requesters {
+            self.process_response(
+                protocol,
+                response_sender,
+                SecretShareMessage::Share(share.clone()),
+            );
+        }
+        if inserted {
+            let guard = self.spawn_share_requester_task(metadata.clone());
+            if let Some(item) = self.block_queue.item_mut(metadata.round) {
+                item.push_share_requester_handle(guard);
+            } else {
+                warn!(
+                    round = metadata.round,
+                    "Recovered secret share item not found in block queue"
+                );
+            }
+        }
+        SECRET_SHARE_RECOVERY_COUNT
+            .with_label_values(&["success"])
+            .inc();
     }
 
     async fn verification_task(
@@ -408,7 +635,7 @@ impl SecretShareManager {
         DropGuard::new(abort_handle)
     }
 
-    fn handle_incoming_msg(&self, rpc: SecretShareRpc) {
+    fn handle_incoming_msg(&mut self, rpc: SecretShareRpc) {
         let SecretShareRpc {
             msg,
             protocol,
@@ -432,6 +659,10 @@ impl SecretShareManager {
                         warn!(
                             "Self secret share could not be found for RPC request {}",
                             request.metadata().round
+                        );
+                        self.schedule_recovery(
+                            request.metadata().clone(),
+                            (protocol, response_sender),
                         );
                     },
                     Err(e) => {
@@ -508,6 +739,9 @@ impl SecretShareManager {
                 Some(request) = verified_msg_rx.next() => {
                     self.handle_incoming_msg(request);
                 }
+                Some(result) = self.recovery_result_rx.next() => {
+                    self.process_recovery_result(result);
+                }
                 _ = interval.tick().fuse() => {
                     self.observe_queue();
                 },
@@ -523,5 +757,32 @@ impl SecretShareManager {
     pub fn observe_queue(&self) {
         let queue = &self.block_queue.queue();
         DEC_QUEUE_SIZE.set(queue.len() as i64);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::PendingRecoveryRequests;
+    use crate::rand::secret_sharing::test_utils::create_metadata;
+
+    #[test]
+    fn pending_recovery_deduplicates_and_fans_out() {
+        let metadata = create_metadata(1, 10);
+        let mut pending = PendingRecoveryRequests::default();
+        assert_eq!(pending.append_if_pending(&metadata, 1), Err(1));
+        pending.insert(metadata.clone(), 1);
+        assert_eq!(pending.append_if_pending(&metadata, 2), Ok(()));
+        assert_eq!(pending.take(&metadata, 0), Some(vec![1, 2]));
+    }
+
+    #[test]
+    fn pending_recovery_reset_discards_stale_results() {
+        let metadata = create_metadata(1, 10);
+        let mut pending = PendingRecoveryRequests::default();
+        pending.insert(metadata.clone(), 1);
+        let stale_generation = pending.generation;
+        pending.reset();
+        assert!(pending.take(&metadata, stale_generation).is_none());
+        assert_eq!(pending.generation, stale_generation + 1);
     }
 }
