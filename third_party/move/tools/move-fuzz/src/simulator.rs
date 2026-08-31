@@ -7,8 +7,7 @@ use crate::{
     subexec::SubExec,
 };
 use anyhow::{anyhow, bail, Result};
-use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
-use aptos_types::transaction::authenticator::AuthenticationKey;
+use aptos_crypto::ed25519::Ed25519PrivateKey;
 use lazy_static::lazy_static;
 use log::{debug, error, info};
 use move_binary_format::{
@@ -284,7 +283,7 @@ impl Simulator {
         }
 
         // add the pair
-        let address = AuthenticationKey::ed25519(&key.public_key()).account_address();
+        let address = Account::address_of_key(&key);
         let existing = self
             .address_lookup
             .insert(address, AddressNamespace::Owned(name.clone()));
@@ -659,11 +658,13 @@ impl Simulator {
         match iter.next() {
             None => (),
             Some(token) => {
-                if !TxnArgTypeWithRef::is_droppable(
-                    BinaryIndexedView::Module(module),
-                    &handle.type_parameters,
-                    token,
-                ) {
+                // Ability computation already lives in the binary format; do not
+                // re-derive drop-ness here. It handles vectors, structs, generic
+                // instantiations, type parameters and function values.
+                let droppable = BinaryIndexedView::Module(module)
+                    .abilities(token, &handle.type_parameters)
+                    .is_ok_and(|abilities| abilities.has_drop());
+                if !droppable {
                     bail!("the return type of the public function is not droppable");
                 }
                 return_ref = Some(matches!(
@@ -740,28 +741,7 @@ impl Simulator {
         txn_args: &[TxnArg],
         mode: RunMode,
     ) -> Result<(bool, Vec<String>)> {
-        let formatted_args: Vec<_> = txn_args
-            .iter()
-            .map(|arg| match arg {
-                TxnArg::Bool(v) => format!("bool:{}", v),
-                TxnArg::U8(v) => format!("u8:{}", v),
-                TxnArg::I8(v) => format!("i8:{}", v),
-                TxnArg::U16(v) => format!("u16:{}", v),
-                TxnArg::I16(v) => format!("i16:{}", v),
-                TxnArg::U32(v) => format!("u32:{}", v),
-                TxnArg::I32(v) => format!("i32:{}", v),
-                TxnArg::U64(v) => format!("u64:{}", v),
-                TxnArg::I64(v) => format!("i64:{}", v),
-                TxnArg::U128(v) => format!("u128:{}", v),
-                TxnArg::I128(v) => format!("i128:{}", v),
-                TxnArg::U256(v) => format!("u256:{}", v),
-                TxnArg::I256(v) => format!("i256:{}", v),
-                TxnArg::Address(v) => format!("address:{}", v.to_standard_string()),
-                TxnArg::Signer(v) => format!("signer:{}", v.to_standard_string()),
-                TxnArg::String(v) => format!("string:{}", v),
-                TxnArg::Vector(sub, _) => format!("{}:{}", sub.type_mark(), arg.to_cli_string()),
-            })
-            .collect();
+        let formatted_args: Vec<_> = txn_args.iter().map(TxnArg::to_cli_arg).collect();
 
         // command: basics
         let mut command = Command::new(APTOS_BIN.as_path());

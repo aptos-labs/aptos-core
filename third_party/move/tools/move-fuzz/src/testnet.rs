@@ -8,8 +8,7 @@ use crate::{
     simulator::{RunMode, Runnable, Simulator},
 };
 use anyhow::{anyhow, bail, Result};
-use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
-use aptos_types::transaction::authenticator::AuthenticationKey;
+use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, Uniform};
 use legacy_move_compiler::compiled_unit::CompiledUnit;
 use log::{debug, error, info};
 use move_binary_format::{access::ModuleAccess, CompiledModule};
@@ -47,10 +46,7 @@ pub fn provision_simulator(simulator: &mut Simulator, project: &Project) -> Resu
     let owned_profiles_by_address: BTreeMap<_, _> = named_accounts
         .iter()
         .filter_map(|(name, account)| match account {
-            Account::Owned(key) => Some((
-                AuthenticationKey::ed25519(&key.public_key()).account_address(),
-                name.clone(),
-            )),
+            Account::Owned(_) => Some((account.address(), name.clone())),
             Account::Ref(_) | Account::Resource(..) => None,
         })
         .collect();
@@ -71,8 +67,8 @@ pub fn provision_simulator(simulator: &mut Simulator, project: &Project) -> Resu
                 )?;
                 num_accounts += 1;
             },
-            Account::Resource(base, seed) => {
-                let address = Account::Resource(*base, seed.clone()).address();
+            Account::Resource(base, _) => {
+                let address = account.address();
                 let signer_profile = owned_profiles_by_address.get(base).ok_or_else(|| {
                     anyhow!(
                         "resource account @{} cannot be used without an owned base signer for {}",
@@ -298,7 +294,7 @@ fn resolve_argument(
                             let key = pending_accounts
                                 .entry(name.to_string())
                                 .or_insert_with(|| Ed25519PrivateKey::generate(&mut OsRng));
-                            AuthenticationKey::ed25519(&key.public_key()).account_address()
+                            Account::address_of_key(key)
                         },
                         Some(addr) => addr,
                     };
@@ -317,7 +313,7 @@ fn resolve_argument(
                             let key = pending_accounts
                                 .entry(name.to_string())
                                 .or_insert_with(|| Ed25519PrivateKey::generate(&mut OsRng));
-                            AuthenticationKey::ed25519(&key.public_key()).account_address()
+                            Account::address_of_key(key)
                         },
                         Some(addr) => match simulator.signing_profile_for_address(&addr) {
                             Some(_) => addr,
