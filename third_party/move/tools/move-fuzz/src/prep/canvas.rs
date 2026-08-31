@@ -261,6 +261,11 @@ impl DriverCanvas {
 
         // track the single signer parameter so all &signer / &mut signer / signer usages share it
         let mut signer_var = None;
+        // `signer` has `drop` but not `copy`, so a by-value argument MOVES the shared signer
+        // parameter. Statements are emitted in the topological order below, which is fixed by
+        // the data flow (providers before consumers) and cannot be reordered, so any signer
+        // usage emitted at or after the move is ill-typed.
+        let mut signer_moved = false;
         for node in toposort(&graph, None).ok()? {
             match graph.node_weight(node).unwrap() {
                 FlowGraphNode::Datatype(_) => {
@@ -322,6 +327,9 @@ impl DriverCanvas {
                     let decl = model.function_registry.lookup_decl(&func.ident);
 
                     let mut args = vec![];
+                    let mut call_signer_moves = 0;
+                    let mut call_signer_imm_borrows = 0;
+                    let mut call_signer_mut_borrows = 0;
                     for (index, item) in decl.parameters.iter().enumerate() {
                         let arg_ty = model
                             .datatype_registry
@@ -344,6 +352,7 @@ impl DriverCanvas {
                         let arg_var = match arg_ty {
                             TypeItem::Base(ty_base) => match TypeMode::convert(&ty_base) {
                                 TypeMode::Simple(SimpleType::Signer) => {
+                                    call_signer_moves += 1;
                                     signer_singleton(&mut canvas, &mut signer_var)
                                 },
                                 TypeMode::Simple(SimpleType::Function { .. }) => {
@@ -359,6 +368,7 @@ impl DriverCanvas {
                             },
                             TypeItem::ImmRef(ty_base) => match TypeMode::convert(&ty_base) {
                                 TypeMode::Simple(SimpleType::Signer) => {
+                                    call_signer_imm_borrows += 1;
                                     let base_var = signer_singleton(&mut canvas, &mut signer_var);
                                     canvas.new_stmt_imm_borrow(base_var)
                                 },
@@ -377,6 +387,7 @@ impl DriverCanvas {
                             },
                             TypeItem::MutRef(ty_base) => match TypeMode::convert(&ty_base) {
                                 TypeMode::Simple(SimpleType::Signer) => {
+                                    call_signer_mut_borrows += 1;
                                     let base_var = signer_singleton(&mut canvas, &mut signer_var);
                                     canvas.new_stmt_mut_borrow(base_var)
                                 },
@@ -396,6 +407,29 @@ impl DriverCanvas {
                         };
                         args.push(arg_var);
                     }
+
+                    // Every signer argument aliases the driver's single `signer` parameter
+                    // (see `signer_var`), which has `drop` but not `copy`. That makes three
+                    // shapes ill-typed:
+                    // - a call that moves the signer more than once, or moves it while also
+                    //   borrowing it (the reference is live at the call site),
+                    // - a call taking a `&mut signer` alongside any other signer borrow,
+                    //   since both references to the same local are live at once, and
+                    // - any signer use emitted at or after the move.
+                    // Statement order is fixed by the data-flow topological order and cannot
+                    // be repaired by reordering, so reject the graph instead of emitting a
+                    // driver that fails to compile (the whole autogen package is built in one
+                    // shot, so a single bad script aborts the run).
+                    let call_signer_borrows = call_signer_imm_borrows + call_signer_mut_borrows;
+                    let call_uses_signer = call_signer_moves > 0 || call_signer_borrows > 0;
+                    if call_signer_moves > 1
+                        || (call_signer_moves > 0 && call_signer_borrows > 0)
+                        || (call_signer_mut_borrows > 0 && call_signer_borrows > 1)
+                        || (signer_moved && call_uses_signer)
+                    {
+                        return None;
+                    }
+                    signer_moved |= call_signer_moves > 0;
 
                     // analyze the return values
                     let mut rt_vars = BTreeMap::new();
@@ -800,10 +834,10 @@ mod tests {
         prep::{
             datatype::DatatypeRegistry,
             function::{FunctionDecl, FunctionRegistry},
-            graph::{FlowGraph, FlowGraphNode, FunctionInst},
+            graph::{DatatypeItem, FlowGraph, FlowGraphEdge, FlowGraphNode, FunctionInst},
             ident::{DatatypeIdent, FunctionIdent},
             model::Model,
-            typing::{TypeBase, TypeItem, TypeRef, TypeTag},
+            typing::{ComplexType, TypeBase, TypeItem, TypeRef, TypeTag},
         },
     };
     use move_core_types::{
@@ -829,12 +863,84 @@ mod tests {
     }
 
     fn model_with_decl(decl: FunctionDecl) -> Model {
+        model_with_decls(vec![decl])
+    }
+
+    fn model_with_decls(decls: Vec<FunctionDecl>) -> Model {
         let mut function_registry = FunctionRegistry::new();
-        function_registry.insert_for_test(decl);
+        for decl in decls {
+            function_registry.insert_for_test(decl);
+        }
         Model {
             datatype_registry: DatatypeRegistry::new(),
             function_registry,
         }
+    }
+
+    fn single_call_graph(ident: FunctionIdent) -> FlowGraph {
+        let mut graph = FlowGraph {
+            graph: StableGraph::new(),
+            generics: BTreeMap::new(),
+        };
+        graph.graph.add_node(FlowGraphNode::Function(FunctionInst {
+            ident,
+            type_args: vec![],
+        }));
+        graph
+    }
+
+    /// Build the model and flow graph for `make -> T0 -> root`, mirroring the node and edge
+    /// insertion order `GraphBuilder` produces when `make` is picked as an external provider
+    /// for `root`'s only complex parameter. `toposort` therefore emits `make` strictly before
+    /// `root`.
+    fn signer_flow(root_signer: TypeRef, make_signer: TypeRef) -> (Model, FlowGraph) {
+        let abilities = AbilitySet::PRIMITIVES;
+        let model = model_with_decls(vec![
+            FunctionDecl {
+                ident: function("root"),
+                generics: vec![abilities],
+                parameters: vec![root_signer, TypeRef::Base(TypeTag::Param(0))],
+                return_sig: vec![],
+                kind: PkgKind::Primary,
+                is_entry: true,
+            },
+            FunctionDecl {
+                ident: function("make"),
+                generics: vec![abilities],
+                parameters: vec![make_signer],
+                return_sig: vec![TypeRef::Base(TypeTag::Param(0))],
+                kind: PkgKind::Primary,
+                is_entry: false,
+            },
+        ]);
+
+        let type_args = vec![TypeBase::Param {
+            index: 0,
+            abilities,
+        }];
+        let mut graph = FlowGraph {
+            graph: StableGraph::new(),
+            generics: BTreeMap::from([(0, abilities)]),
+        };
+        let root = graph.graph.add_node(FlowGraphNode::Function(FunctionInst {
+            ident: function("root"),
+            type_args: type_args.clone(),
+        }));
+        let value = graph
+            .graph
+            .add_node(FlowGraphNode::Datatype(DatatypeItem::Base(
+                ComplexType::Param {
+                    index: 0,
+                    abilities,
+                },
+            )));
+        let make = graph.graph.add_node(FlowGraphNode::Function(FunctionInst {
+            ident: function("make"),
+            type_args,
+        }));
+        graph.graph.add_edge(value, root, FlowGraphEdge::Use(1));
+        graph.graph.add_edge(make, value, FlowGraphEdge::Def(0));
+        (model, graph)
     }
 
     #[test]
@@ -966,5 +1072,82 @@ mod tests {
             },
             stmt => panic!("expected call statement, got {stmt:?}"),
         }
+    }
+
+    #[test]
+    fn test_driver_canvas_try_build_rejects_signer_borrow_after_move() {
+        // `make` takes the signer by value and is emitted first (it provides `root`'s complex
+        // argument), so `root`'s `&signer` would borrow an already-moved local
+        let (model, graph) = signer_flow(
+            TypeRef::ImmRef(TypeTag::Signer),
+            TypeRef::Base(TypeTag::Signer),
+        );
+        assert!(DriverCanvas::try_build(&model, &graph, &BTreeMap::new()).is_none());
+    }
+
+    #[test]
+    fn test_driver_canvas_try_build_rejects_mut_and_imm_signer_borrow_in_one_call() {
+        // both references alias the driver's single signer local, so the mutable borrow is
+        // live at the same time as the immutable one
+        let ident = function("two_borrows");
+        let model = model_with_decl(FunctionDecl {
+            ident: ident.clone(),
+            generics: vec![],
+            parameters: vec![
+                TypeRef::MutRef(TypeTag::Signer),
+                TypeRef::ImmRef(TypeTag::Signer),
+            ],
+            return_sig: vec![],
+            kind: PkgKind::Primary,
+            is_entry: true,
+        });
+        let graph = single_call_graph(ident);
+
+        assert!(DriverCanvas::try_build(&model, &graph, &BTreeMap::new()).is_none());
+    }
+
+    #[test]
+    fn test_driver_canvas_try_build_allows_signer_move_after_borrow() {
+        // the legal shape: the provider borrows the signer, the root call moves it last
+        let (model, graph) = signer_flow(
+            TypeRef::Base(TypeTag::Signer),
+            TypeRef::ImmRef(TypeTag::Signer),
+        );
+        let canvas = DriverCanvas::try_build(&model, &graph, &BTreeMap::new())
+            .expect("borrow-before-move driver should build");
+        assert_eq!(canvas.parameters, vec![BasicInput::Signer]);
+        // pin the emission order: the borrow must precede both calls, and the call that moves
+        // the signer must come last
+        assert!(matches!(canvas.statements.as_slice(), [
+            DriverStatement::ImmBorrow { .. },
+            DriverStatement::Call { .. },
+            DriverStatement::Call { .. }
+        ]));
+        match canvas.statements.last().expect("statements emitted") {
+            DriverStatement::Call { ident, .. } => assert_eq!(ident, &function("root")),
+            stmt => panic!("expected call statement, got {stmt:?}"),
+        }
+    }
+
+    #[test]
+    fn test_driver_canvas_try_build_allows_two_imm_signer_borrows_in_one_call() {
+        // two immutable borrows of the same local are fine
+        let ident = function("two_imm_borrows");
+        let model = model_with_decl(FunctionDecl {
+            ident: ident.clone(),
+            generics: vec![],
+            parameters: vec![
+                TypeRef::ImmRef(TypeTag::Signer),
+                TypeRef::ImmRef(TypeTag::Signer),
+            ],
+            return_sig: vec![],
+            kind: PkgKind::Primary,
+            is_entry: true,
+        });
+        let graph = single_call_graph(ident);
+
+        let canvas = DriverCanvas::try_build(&model, &graph, &BTreeMap::new())
+            .expect("two immutable signer borrows should build");
+        assert_eq!(canvas.parameters, vec![BasicInput::Signer]);
     }
 }

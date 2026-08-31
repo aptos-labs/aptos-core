@@ -748,8 +748,18 @@ impl<'a> GraphBuilder<'a> {
 
         // the graph is not feasible if either of the following holds:
         // - more than one signer is needed
+        // - a single call uses the shared signer in a way that can never be well-typed
         // - at least one return value of a function is not dropped nor used
         // - a non-droppable base-typed datatype node is only borrowed, never consumed
+        //
+        // NOTE on signers: the generated driver declares at most one `signer` parameter and
+        // every `signer` / `&signer` / `&mut signer` argument in the graph is served from it
+        // (see `DriverCanvas::try_build`). `signer` has `drop` but not `copy`, so a by-value
+        // argument MOVES that parameter. Only the signer mixes that are ill-typed regardless
+        // of statement order are rejected here; whether a surviving graph can be laid out so
+        // that every borrow precedes the move depends on the topological order used to emit
+        // the driver, and is decided by `DriverCanvas::try_build`, which returns `None` when
+        // it cannot.
         let mut signer_count = 0;
         for node_idx in graph.graph.node_indices() {
             match graph.graph.node_weight(node_idx).unwrap() {
@@ -787,13 +797,32 @@ impl<'a> GraphBuilder<'a> {
                         return false;
                     }
 
+                    // Two shapes can never be emitted legally, whatever order the driver
+                    // statements are laid out in, because every signer argument aliases the
+                    // same driver local: a call that moves the signer while also borrowing
+                    // it, and a call taking a `&mut signer` alongside any other signer
+                    // borrow.
+                    let mut call_signer_moves = 0;
+                    let mut call_signer_imm_borrows = 0;
+                    let mut call_signer_mut_borrows = 0;
                     for param in &decl.parameters {
                         if matches!(param, TypeRef::Base(TypeTag::Signer)) {
-                            signer_count += 1;
-                            if signer_count > 1 {
-                                return false;
-                            }
+                            call_signer_moves += 1;
+                        } else if matches!(param, TypeRef::ImmRef(TypeTag::Signer)) {
+                            call_signer_imm_borrows += 1;
+                        } else if matches!(param, TypeRef::MutRef(TypeTag::Signer)) {
+                            call_signer_mut_borrows += 1;
                         }
+                    }
+                    let call_signer_borrows = call_signer_imm_borrows + call_signer_mut_borrows;
+                    if (call_signer_moves > 0 && call_signer_borrows > 0)
+                        || (call_signer_mut_borrows > 0 && call_signer_borrows > 1)
+                    {
+                        return false;
+                    }
+                    signer_count += call_signer_moves;
+                    if signer_count > 1 {
+                        return false;
                     }
 
                     // find which return indices are consumed via Def edges
@@ -1286,6 +1315,79 @@ mod tests {
             ident,
             type_args: vec![],
         }));
+
+        let builder = GraphBuilder::new(&model, 4, 1, None);
+        assert!(builder.is_feasible(&graph));
+    }
+
+    fn single_call_graph(ident: FunctionIdent) -> FlowGraph {
+        let mut graph = FlowGraph::new(BTreeMap::new());
+        graph.graph.add_node(FlowGraphNode::Function(FunctionInst {
+            ident,
+            type_args: vec![],
+        }));
+        graph
+    }
+
+    #[test]
+    fn test_is_feasible_rejects_call_mixing_signer_move_and_borrow() {
+        // the driver serves both parameters from the same `signer` local, so the call would
+        // move it while a reference to it is still live -- ill-typed in any order
+        let ident = function("mixed");
+        let model = model_with_decl(FunctionDecl {
+            ident: ident.clone(),
+            generics: vec![],
+            parameters: vec![
+                TypeRef::Base(TypeTag::Signer),
+                TypeRef::ImmRef(TypeTag::Signer),
+            ],
+            return_sig: vec![],
+            kind: PkgKind::Primary,
+            is_entry: true,
+        });
+        let graph = single_call_graph(ident);
+
+        let builder = GraphBuilder::new(&model, 4, 1, None);
+        assert!(!builder.is_feasible(&graph));
+    }
+
+    #[test]
+    fn test_is_feasible_rejects_call_with_mut_and_imm_signer_borrow() {
+        // a mutable borrow of the shared signer local cannot coexist with another borrow
+        let ident = function("two_borrows");
+        let model = model_with_decl(FunctionDecl {
+            ident: ident.clone(),
+            generics: vec![],
+            parameters: vec![
+                TypeRef::MutRef(TypeTag::Signer),
+                TypeRef::ImmRef(TypeTag::Signer),
+            ],
+            return_sig: vec![],
+            kind: PkgKind::Primary,
+            is_entry: true,
+        });
+        let graph = single_call_graph(ident);
+
+        let builder = GraphBuilder::new(&model, 4, 1, None);
+        assert!(!builder.is_feasible(&graph));
+    }
+
+    #[test]
+    fn test_is_feasible_accepts_call_with_two_imm_signer_borrows() {
+        // two immutable borrows of the shared signer local are fine
+        let ident = function("two_imm_borrows");
+        let model = model_with_decl(FunctionDecl {
+            ident: ident.clone(),
+            generics: vec![],
+            parameters: vec![
+                TypeRef::ImmRef(TypeTag::Signer),
+                TypeRef::ImmRef(TypeTag::Signer),
+            ],
+            return_sig: vec![],
+            kind: PkgKind::Primary,
+            is_entry: true,
+        });
+        let graph = single_call_graph(ident);
 
         let builder = GraphBuilder::new(&model, 4, 1, None);
         assert!(builder.is_feasible(&graph));
