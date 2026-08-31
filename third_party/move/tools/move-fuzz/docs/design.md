@@ -6,7 +6,7 @@ back, in about half an hour; after that you should be able to open any file in
 `src/` and know what it is responsible for.
 
 - User-facing instructions live in [`../README.md`](../README.md).
-- Agent-facing working rules live in [`../AGENT.md`](../AGENT.md).
+- Agent-facing working rules live in [`../AGENTS.md`](../AGENTS.md).
 - This file is the *architecture* reference. When you change phase behavior,
   DUG semantics, chain construction, or the persistence format, update it.
 

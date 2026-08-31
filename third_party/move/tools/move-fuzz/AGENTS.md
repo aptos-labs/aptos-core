@@ -1,4 +1,4 @@
-# AGENT.md
+# AGENTS.md
 
 This file is the local coding-agent guide for `third_party/move/tools/move-fuzz/`.
 
@@ -275,7 +275,7 @@ If you change CLI behavior, persistence behavior, phase behavior, or recommended
 
 - `README.md`
 - `docs/design.md`
-- this file (`AGENT.md`)
+- this file (`AGENTS.md`)
 
 Keep the README user-facing, keep `docs/design.md` architectural, and keep this
 file agent-facing. Architectural changes -- phase transitions, DUG semantics,
