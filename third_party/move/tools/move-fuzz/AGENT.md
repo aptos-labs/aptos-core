@@ -24,6 +24,13 @@ Phase 2 is multi-transaction fuzzing driven by the DUG and chain seed pools.
 
 The implementation intentionally goes beyond its original design sketch. When changing DUG-related logic, call out any semantic gap you introduce or close.
 
+The current architecture is written down in `docs/design.md`: motivation and the
+DUG idea, the end-to-end `auto` pipeline, the module map, the core data model,
+both phase algorithms including the saturation rule and chain construction, the
+persistence and cache-invalidation model, determinism caveats, and known
+limitations. Read it before touching generation, DUG semantics, phase behavior,
+or persistence.
+
 ## Primary entrypoints and files
 
 ### User-facing entrypoints
@@ -267,6 +274,12 @@ For changes affecting generation, provider discovery, DUG logic, caching, or run
 If you change CLI behavior, persistence behavior, phase behavior, or recommended invocation patterns, update:
 
 - `README.md`
+- `docs/design.md`
 - this file (`AGENT.md`)
 
-Keep the README user-facing and keep this file agent-facing.
+Keep the README user-facing, keep `docs/design.md` architectural, and keep this
+file agent-facing. Architectural changes -- phase transitions, DUG semantics,
+chain construction, cache keys, the on-disk state layout -- belong in
+`docs/design.md`, including its "Known limitations" section when a change closes
+or opens one. `docs/design.md` names specific constants, schema versions, and
+fingerprint inputs; if you change any of those values, grep the doc for them.

@@ -2,6 +2,13 @@
 
 This directory contains the source code of a coverage-guided fuzzer for Move smart contracts.
 
+## Design
+
+For the high-level design -- the DUG idea, the two-phase algorithm, the module
+map, the persistence model, determinism, and known limitations -- see
+[`docs/design.md`](docs/design.md). Read that before changing anything beyond the
+CLI surface.
+
 ## File Layout
 
 ```txt
@@ -12,31 +19,41 @@ This directory contains the source code of a coverage-guided fuzzer for Move sma
 - common.rs
 - language.rs
 
+# Accounts and address bookkeeping
+- account.rs
+
 # Package (including dependency) resolution, build, and testing
 - deps.rs
 - package.rs
 
-# Local testnet (localnet) simulation
+# Local testnet (localnet) simulation, used by the `exec` subcommand
 - simulator.rs
 - testnet.rs
 
-# Fuzzing core
+# Fuzzing core: campaign orchestration and persisted state
 - fuzzer.rs
+- state.rs
 
 - prep/
-  # Fuzzing preparation and test script generation
+  # Static analysis and driver-script generation
   - ident.rs
+  - typing.rs
   - datatype.rs
   - function.rs
+  - graph.rs
   - model.rs
   - canvas.rs
-  - driver.rs
 
-- base/ (WIP)
-  # Baseline fuzzer (oneshot execution of a single entry script)
-  - executor.rs
-  - mutate.rs
-  - oneshot.rs
+- mutate/
+  # Input generation and mutation
+  - mutator.rs
+
+- executor/
+  # Simulated execution and the two fuzzing phases
+  - mod.rs       # coverage-map merge/count/delta helpers
+  - tracing.rs   # forked FakeExecutor, read/write tracking, coverage tracing
+  - oneshot.rs   # Phase 1: single-transaction fuzzers
+  - sequence.rs  # Phase 2: DUG, chain construction, chain fuzzers
 
 # Utilities not directly related to fuzzing
 - utils.rs
@@ -135,7 +152,7 @@ The `auto` command currently performs the full move-fuzz pipeline:
 - `--num-user-accounts <N>`
   Number of user accounts to provision in the simulator.
 - `--dry-run`
-  Stop after script generation and script compilation, without entering the fuzzing loop.
+  Stop after script generation, without compiling the generated scripts and without entering the fuzzing loop. The generated `.move` sources are written to `<workdir>/autogen/sources/`; combine with `--in-place` to read them. Note that a dry run does not populate the entrypoint cache, so it does not speed up a later real run.
 - `--string-dict <PATH>`
   Load an external string dictionary, one string per line.
 - `--state-dir <PATH>`
