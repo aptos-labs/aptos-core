@@ -568,12 +568,16 @@ impl<'a> TypeSubstitution<'a> {
     fn unify_all_refs(&mut self, ty_refs: &[TypeRef], ty_items: &[TypeItem]) -> bool {
         assert_eq!(ty_refs.len(), ty_items.len());
         for (ty_ref, ty_item) in ty_refs.iter().zip(ty_items.iter()) {
-            match (ty_ref, ty_item) {
+            let unified = match (ty_ref, ty_item) {
                 (TypeRef::Base(tag), TypeItem::Base(base))
                 | (TypeRef::ImmRef(tag), TypeItem::ImmRef(base))
                 | (TypeRef::MutRef(tag), TypeItem::MutRef(base)) => self.unify(tag, base),
-                _ => return false,
+                // reference kinds do not match
+                _ => false,
             };
+            if !unified {
+                return false;
+            }
         }
         true
     }
@@ -1409,5 +1413,73 @@ mod tests {
             abilities: AbilitySet::EMPTY,
         });
         assert_eq!(ty.to_string(), "|u64| (&mut address)");
+    }
+
+    #[test]
+    fn test_type_substitution_rejects_function_type_with_mismatched_param() {
+        // `|u64|` must not unify against `|bool|`: the reference kinds match (both `Base`),
+        // so only the inner `unify` can reject the pair.
+        let mut subst = TypeSubstitution::new(&[]);
+        let tag = TypeTag::Function {
+            params: vec![TypeRef::Base(TypeTag::U64)],
+            returns: vec![],
+            abilities: AbilitySet::EMPTY,
+        };
+        let base = TypeBase::Function {
+            params: vec![TypeItem::Base(TypeBase::Bool)],
+            returns: vec![],
+            abilities: AbilitySet::EMPTY,
+        };
+        assert!(!subst.unify(&tag, &base));
+    }
+
+    #[test]
+    fn test_type_substitution_rejects_function_type_with_conflicting_param_assignment() {
+        // `|#0, #0|` must not unify against `|u64, bool|`: the second assignment of `#0`
+        // conflicts with the first, which would otherwise leave a fully resolved but
+        // ill-typed substitution `[u64]`.
+        let constraints = [AbilitySet::PRIMITIVES];
+        let mut subst = TypeSubstitution::new(&constraints);
+        let tag = TypeTag::Function {
+            params: vec![
+                TypeRef::Base(TypeTag::Param(0)),
+                TypeRef::Base(TypeTag::Param(0)),
+            ],
+            returns: vec![],
+            abilities: AbilitySet::EMPTY,
+        };
+        let base = TypeBase::Function {
+            params: vec![
+                TypeItem::Base(TypeBase::U64),
+                TypeItem::Base(TypeBase::Bool),
+            ],
+            returns: vec![],
+            abilities: AbilitySet::EMPTY,
+        };
+        assert!(!subst.unify(&tag, &base));
+    }
+
+    #[test]
+    fn test_type_substitution_unifies_matching_function_type_refs() {
+        let constraints = [AbilitySet::PRIMITIVES];
+        let mut subst = TypeSubstitution::new(&constraints);
+        let tag = TypeTag::Function {
+            params: vec![
+                TypeRef::Base(TypeTag::Param(0)),
+                TypeRef::ImmRef(TypeTag::Address),
+            ],
+            returns: vec![TypeRef::MutRef(TypeTag::Bool)],
+            abilities: AbilitySet::EMPTY,
+        };
+        let base = TypeBase::Function {
+            params: vec![
+                TypeItem::Base(TypeBase::U64),
+                TypeItem::ImmRef(TypeBase::Address),
+            ],
+            returns: vec![TypeItem::MutRef(TypeBase::Bool)],
+            abilities: AbilitySet::EMPTY,
+        };
+        assert!(subst.unify(&tag, &base));
+        assert_eq!(subst.finish(), vec![Some(TypeBase::U64)]);
     }
 }
