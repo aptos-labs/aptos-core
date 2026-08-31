@@ -35,7 +35,35 @@ struct SeedRecord {
     last_used_at: u64,
 }
 
-/// Status of one execution
+/// Status of one execution, as a triage bucket.
+///
+/// Why not reuse [`TransactionStatus`] directly? `ExecStatus` is deliberately the
+/// *join* of [`VMStatus`] and [`TransactionStatus`], projected onto the fields that
+/// are stable across runs:
+///
+/// * `TransactionStatus::Keep(ExecutionStatus::ExecutionFailure { .. })` keeps only
+///   `location`/`function`/`code_offset` and drops `status_code`/`sub_status`. Those
+///   two are what the fuzzer triages on: [`ExecStatus::is_missing_data`] feeds
+///   `record_missing_data_signal` / `spawn_targeted_missing_data_chains` in
+///   `fuzzer.rs`, and the status code is what separates e.g. `ARITHMETIC_ERROR` from
+///   `VECTOR_OPERATION_ERROR` in the `outcomes` histogram. They exist only on
+///   `VMStatus`.
+/// * `TransactionStatus` derives neither `Ord` nor `Hash` (only the inner
+///   `ExecutionStatus` does), while `fuzzer.rs` keeps `seen_exec_stats: BTreeSet<_>`
+///   to report each newly observed status exactly once.
+/// * Both core types carry free-form text -- `VMStatus::message` and
+///   `ExecutionStatus::MoveAbort { info: Option<AbortInfo> }` -- that varies with the
+///   execution context. Keying dedup and the histogram on it would fragment both, so
+///   it is dropped here on purpose.
+///
+/// The mapping from the core types lives *only* in the `From` impl below. It is
+/// exhaustive over `TransactionStatus` (a new upstream variant is a compile error
+/// here, not a runtime surprise) and never panics.
+///
+/// This type is not persisted: its only externalized form is [`Display`], used as a
+/// key in the `outcomes` map of `fuzz_stats.json`, which is regenerated every run and
+/// never read back. Treat the `Display` rendering as the stable triage key -- the unit
+/// tests below pin it.
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum ExecStatus {
     Success,
@@ -62,98 +90,81 @@ pub enum ExecStatus {
 }
 
 impl From<(VMStatus, TransactionStatus)> for ExecStatus {
-    fn from(val: (VMStatus, TransactionStatus)) -> Self {
-        match val {
-            (VMStatus::Executed, TransactionStatus::Keep(ExecutionStatus::Success)) => {
+    /// Fold a `(VMStatus, TransactionStatus)` pair into a triage bucket.
+    ///
+    /// `TransactionStatus` is authoritative for the keep/discard decision and the
+    /// coarse shape; `VMStatus` only supplies `status_code`/`sub_status`, which
+    /// `ExecutionStatus` throws away.
+    ///
+    /// Matching on the pair (as this used to) hardcodes which combinations
+    /// `TransactionStatus::from_vm_status` can emit. That function evolves with the VM
+    /// and is partly feature gated -- it consults `FeatureFlag::ENABLE_FUNCTION_VALUES`
+    /// and `FeatureFlag::VM_BINARY_FORMAT_V10` when calling `VMStatus::keep_or_discard`,
+    /// takes a caller-supplied `memory_limit_exceeded_as_miscellaneous_error` bool, and
+    /// consults `FeatureFlag::CHARGE_INVARIANT_VIOLATION` on the discard path. Several
+    /// producible pairs had no arm -- e.g.
+    /// `(ExecutionFailure { OUT_OF_GAS }, Keep(OutOfGas))`,
+    /// `(ExecutionFailure { EXECUTION_LIMIT_REACHED }, Keep(MiscellaneousError(..)))`,
+    /// and `(Error { <execution-type code> }, Keep(ExecutionFailure { Script, 0, 0 }))`,
+    /// which is what an execution-type error finished without a code offset turns into.
+    /// Any of those aborted a running campaign. Matching on `TransactionStatus` alone
+    /// makes the mapping exhaustive with no wildcard arm and no panic.
+    fn from((vm_status, txn_status): (VMStatus, TransactionStatus)) -> Self {
+        // `VMStatus::status_code()` yields EXECUTED / ABORTED for the two variants that
+        // carry no code of their own; neither is read in the arms that can see them.
+        let vm_status_code = vm_status.status_code();
+        let sub_status = vm_status.sub_status();
+
+        match txn_status {
+            TransactionStatus::Keep(ExecutionStatus::Success) => {
+                // Only `KeptVMStatus::Executed` (i.e. `VMStatus::Executed`) yields this.
+                // Debug-only: a mismatch must not take down a release campaign.
+                debug_assert_eq!(vm_status, VMStatus::Executed);
                 ExecStatus::Success
             },
-            (
-                VMStatus::Error {
-                    status_code,
-                    sub_status,
-                    message: _,
-                },
-                TransactionStatus::Discard(code),
-            ) => {
-                assert_eq!(status_code, code);
-                ExecStatus::ErrorDiscard {
-                    status_code,
-                    sub_status,
-                }
+            TransactionStatus::Keep(ExecutionStatus::OutOfGas) => ExecStatus::OutOfGas,
+            TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+                location,
+                code: abort_code,
+                // dropped on purpose: `AbortInfo` is resolved from framework metadata
+                // and is not part of the identity of the abort
+                info: _,
+            }) => ExecStatus::AbortDeclared {
+                abort_code,
+                location,
             },
-            (
-                VMStatus::Error {
-                    status_code,
-                    sub_status,
-                    message: _,
-                },
-                TransactionStatus::Keep(ExecutionStatus::OutOfGas),
-            ) => {
-                assert_eq!(status_code, StatusCode::OUT_OF_GAS);
-                assert!(sub_status.is_none());
-                ExecStatus::OutOfGas
+            TransactionStatus::Keep(ExecutionStatus::ExecutionFailure {
+                location,
+                function,
+                code_offset,
+            }) => ExecStatus::AbortIntrinsic {
+                // only `VMStatus` carries these; `ExecutionStatus` drops them
+                status_code: vm_status_code,
+                sub_status,
+                // NOTE: when the VM reported a bare `VMStatus::Error` with an
+                // execution-type code, `keep_or_discard` synthesizes
+                // `Script`/`0`/`0` here. Those are placeholders, not a real code
+                // offset -- the status code is the only meaningful part.
+                location,
+                function,
+                instruction: code_offset,
             },
-            (
-                VMStatus::Error {
-                    status_code,
-                    sub_status,
-                    message: _,
-                },
-                TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(code))),
-            ) => {
-                assert_eq!(status_code, code);
+            TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(code)) => {
                 ExecStatus::ErrorKept {
-                    status_code,
+                    status_code: code.unwrap_or(vm_status_code),
                     sub_status,
                 }
             },
-            (
-                VMStatus::MoveAbort {
-                    location,
-                    code: abort_code,
-                    message: _,
-                },
-                TransactionStatus::Keep(ExecutionStatus::MoveAbort {
-                    location: loc,
-                    code,
-                    info: _,
-                }),
-            ) => {
-                assert_eq!(location, loc);
-                assert_eq!(abort_code, code);
-                ExecStatus::AbortDeclared {
-                    abort_code,
-                    location,
-                }
+            TransactionStatus::Discard(code) => ExecStatus::ErrorDiscard {
+                status_code: code,
+                sub_status,
             },
-            (
-                VMStatus::ExecutionFailure {
-                    status_code,
-                    sub_status,
-                    location,
-                    function,
-                    code_offset: instruction,
-                    message: _,
-                },
-                TransactionStatus::Keep(ExecutionStatus::ExecutionFailure {
-                    location: loc,
-                    function: func,
-                    code_offset,
-                }),
-            ) => {
-                assert_eq!(location, loc);
-                assert_eq!(function, func);
-                assert_eq!(instruction, code_offset);
-                ExecStatus::AbortIntrinsic {
-                    status_code,
-                    sub_status,
-                    location,
-                    function,
-                    instruction,
-                }
-            },
-            (vm_status, txn_status) => {
-                panic!("invalid status combination: {vm_status:?} and {txn_status:?}");
+            // Unreachable through `TracingExecutor`, which bails on `Retry` before
+            // converting. Mirror `TransactionStatus::status()` instead of panicking so a
+            // future caller cannot take down a campaign.
+            TransactionStatus::Retry => ExecStatus::ErrorDiscard {
+                status_code: StatusCode::UNKNOWN_VALIDATION_STATUS,
+                sub_status: None,
             },
         }
     }
@@ -785,6 +796,129 @@ mod tests {
         assert!(matches!(status, ExecStatus::OutOfGas));
         assert_eq!(status.category(), "out-of-gas");
         assert_eq!(status.to_string(), "out-of-gas");
+    }
+
+    #[test]
+    fn test_exec_status_from_execution_failure_reported_as_vm_error() {
+        // `keep_or_discard` maps any execution-type `VMStatus::Error` (raised without a
+        // code offset, e.g. in `build_instantiated_script`) to
+        // `Keep(ExecutionFailure { location: Script, function: 0, code_offset: 0 })`.
+        // This pair used to hit the `panic!` fallback.
+        let status: ExecStatus = (
+            VMStatus::Error {
+                status_code: StatusCode::MISSING_DATA,
+                sub_status: None,
+                message: None,
+            },
+            TransactionStatus::Keep(ExecutionStatus::ExecutionFailure {
+                location: AbortLocation::Script,
+                function: 0,
+                code_offset: 0,
+            }),
+        )
+            .into();
+
+        assert!(matches!(
+            status,
+            ExecStatus::AbortIntrinsic {
+                status_code: StatusCode::MISSING_DATA,
+                ..
+            }
+        ));
+        assert!(status.is_missing_data());
+        assert_eq!(status.category(), "abort");
+    }
+
+    #[test]
+    fn test_exec_status_from_out_of_gas_reported_as_execution_failure() {
+        // `VMStatus::ExecutionFailure { OUT_OF_GAS }` also folds into `Keep(OutOfGas)`.
+        let status: ExecStatus = (
+            VMStatus::ExecutionFailure {
+                status_code: StatusCode::OUT_OF_GAS,
+                sub_status: None,
+                location: abort_location(),
+                function: 1,
+                code_offset: 2,
+                message: None,
+            },
+            TransactionStatus::Keep(ExecutionStatus::OutOfGas),
+        )
+            .into();
+
+        assert!(matches!(status, ExecStatus::OutOfGas));
+        assert_eq!(status.category(), "out-of-gas");
+    }
+
+    #[test]
+    fn test_exec_status_from_limit_reached_kept_as_miscellaneous_error() {
+        let status: ExecStatus = (
+            VMStatus::ExecutionFailure {
+                status_code: StatusCode::EXECUTION_LIMIT_REACHED,
+                sub_status: None,
+                location: abort_location(),
+                function: 3,
+                code_offset: 4,
+                message: None,
+            },
+            TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+                StatusCode::EXECUTION_LIMIT_REACHED,
+            ))),
+        )
+            .into();
+
+        assert!(matches!(
+            status,
+            ExecStatus::ErrorKept {
+                status_code: StatusCode::EXECUTION_LIMIT_REACHED,
+                sub_status: None,
+            }
+        ));
+        assert_eq!(status.category(), "error");
+    }
+
+    #[test]
+    fn test_exec_status_from_miscellaneous_error_without_code_falls_back_to_vm_status() {
+        // `From<KeptVMStatus> for ExecutionStatus` produces `MiscellaneousError(None)`;
+        // only `from_vm_status` fills in `Some`. Pin the fallback.
+        let status: ExecStatus = (
+            VMStatus::Error {
+                status_code: StatusCode::EXECUTION_LIMIT_REACHED,
+                sub_status: None,
+                message: None,
+            },
+            TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(None)),
+        )
+            .into();
+
+        assert!(matches!(
+            status,
+            ExecStatus::ErrorKept {
+                status_code: StatusCode::EXECUTION_LIMIT_REACHED,
+                sub_status: None,
+            }
+        ));
+    }
+
+    #[test]
+    fn test_exec_status_from_discard_uses_transaction_status_code() {
+        let status: ExecStatus = (
+            VMStatus::Error {
+                status_code: StatusCode::SEQUENCE_NUMBER_TOO_OLD,
+                sub_status: Some(3),
+                message: None,
+            },
+            TransactionStatus::Discard(StatusCode::SEQUENCE_NUMBER_TOO_OLD),
+        )
+            .into();
+
+        assert!(matches!(
+            status,
+            ExecStatus::ErrorDiscard {
+                status_code: StatusCode::SEQUENCE_NUMBER_TOO_OLD,
+                sub_status: Some(3),
+            }
+        ));
+        assert_eq!(status.category(), "discard");
     }
 
     #[test]
