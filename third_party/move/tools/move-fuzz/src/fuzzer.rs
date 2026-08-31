@@ -210,7 +210,7 @@ fn chain_missing_data_resolution(
     for &step in &chain.steps[..chain.len() - 1] {
         resolved.extend(dug.defs_of(step).iter().copied());
     }
-    dug.compatible_type_overlap_with_tags(&resolved, &signal.unresolved_tags)
+    dug.compatible_type_overlap_with_resource_tags(&resolved, &signal.unresolved_tags)
 }
 
 fn snapshot_missing_data_signals(
@@ -393,7 +393,7 @@ fn record_missing_data_signal(
     profile: &sequence::ExecResourceProfile,
 ) {
     let unresolved_tags =
-        dug.observed_unresolved_dependency_tags(profile.script_index, &profile.reads);
+        dug.observed_unresolved_dependency_resource_tags(profile.script_index, &profile.reads);
     if unresolved_tags.is_empty() {
         return;
     }
@@ -2442,7 +2442,7 @@ mod tests {
         }))
     }
 
-    fn make_tag_at(name: &str, account: AccountAddress) -> ResourceTag {
+    fn make_resource_tag_at(name: &str, account: AccountAddress) -> ResourceTag {
         ResourceTag {
             account,
             struct_tag: StructTag {
@@ -2454,7 +2454,7 @@ mod tests {
         }
     }
 
-    fn make_object_group_tag(account: AccountAddress) -> ResourceTag {
+    fn make_object_group_resource_tag(account: AccountAddress) -> ResourceTag {
         ResourceTag {
             account,
             struct_tag: StructTag {
@@ -2556,14 +2556,14 @@ mod tests {
     fn record_missing_data_signal_filters_noise_and_keeps_object_equivalent_reads() {
         let object_a = AccountAddress::from_hex_literal("0x100").unwrap();
         let object_b = AccountAddress::from_hex_literal("0x200").unwrap();
-        let ready = make_tag_at("Ready", AccountAddress::from_hex_literal("0x300").unwrap());
-        let needed = make_tag_at("Vault", object_a);
-        let observed_equivalent = make_tag_at("Vault", object_b);
+        let ready = make_resource_tag_at("Ready", AccountAddress::from_hex_literal("0x300").unwrap());
+        let needed = make_resource_tag_at("Vault", object_a);
+        let observed_equivalent = make_resource_tag_at("Vault", object_b);
 
         let mut dug = DefUseGraph::new(1);
-        dug.add_initial_tag(&make_object_group_tag(object_a));
-        dug.add_initial_tag(&make_object_group_tag(object_b));
-        dug.add_initial_tag(&ready);
+        dug.add_initial_resource_tag(&make_object_group_resource_tag(object_a));
+        dug.add_initial_resource_tag(&make_object_group_resource_tag(object_b));
+        dug.add_initial_resource_tag(&ready);
         dug.add_use(0, &needed);
         dug.add_use(0, &ready);
 
@@ -2592,14 +2592,14 @@ mod tests {
         let object_a = AccountAddress::from_hex_literal("0x400").unwrap();
         let object_b = AccountAddress::from_hex_literal("0x500").unwrap();
         let mut dug = DefUseGraph::new(2);
-        dug.add_initial_tag(&make_object_group_tag(object_a));
-        dug.add_initial_tag(&make_object_group_tag(object_b));
-        dug.add_def(0, &make_tag_at("Vault", object_a));
+        dug.add_initial_resource_tag(&make_object_group_resource_tag(object_a));
+        dug.add_initial_resource_tag(&make_object_group_resource_tag(object_b));
+        dug.add_def(0, &make_resource_tag_at("Vault", object_a));
 
         let signal = MissingDataSignal {
             hits: 1,
             last_seen_iter: 0,
-            unresolved_tags: BTreeSet::from([make_tag_at("Vault", object_b)]),
+            unresolved_tags: BTreeSet::from([make_resource_tag_at("Vault", object_b)]),
         };
 
         assert_eq!(

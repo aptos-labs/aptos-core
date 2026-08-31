@@ -531,9 +531,12 @@ impl DefUseGraph {
         self.num_scripts
     }
 
-    /// Get the ResourceTag for a type node index
+    /// Get the `ResourceTag` for a type node index.
+    ///
+    /// Named `resource_tag` rather than `type_tag`: this is a storage-slot
+    /// identifier (account + `StructTag`), not a Move `TypeTag`/`VmTypeTag`.
     #[cfg(test)]
-    pub fn type_tag(&self, type_node: usize) -> &ResourceTag {
+    pub fn resource_tag(&self, type_node: usize) -> &ResourceTag {
         &self.type_nodes[type_node]
     }
 
@@ -546,7 +549,7 @@ impl DefUseGraph {
     /// Register `tag.account` as an on-chain object address when `tag` is an
     /// `ObjectGroup` resource-group tag.
     ///
-    /// Deliberately reachable only from `add_initial_tag` and `add_def`, i.e.
+    /// Deliberately reachable only from `add_initial_resource_tag` and `add_def`, i.e.
     /// only for tags backed by *materialized* state: the provisioning state
     /// scan (`TracingExecutor::scan_all_resource_writes`) and the write sets of
     /// successful executions.
@@ -568,28 +571,29 @@ impl DefUseGraph {
     /// Note that `type_nodes` is a strict superset of those, because `add_use`
     /// and `add_seed_observation` also intern tags. `from_persisted` therefore
     /// rebuilds this set from `defs` and `initial_types`, never `type_nodes`.
-    fn note_object_address(&mut self, tag: &ResourceTag) {
-        if is_object_group_struct_tag(&tag.struct_tag) {
-            self.object_addresses.insert(tag.account);
+    fn note_object_address(&mut self, resource_tag: &ResourceTag) {
+        if is_object_group_struct_tag(&resource_tag.struct_tag) {
+            self.object_addresses.insert(resource_tag.account);
         }
     }
 
-    fn is_object_abstractable_tag(&self, tag: &ResourceTag) -> bool {
-        self.object_addresses.contains(&tag.account) && !is_object_group_struct_tag(&tag.struct_tag)
+    fn is_object_abstractable_resource_tag(&self, resource_tag: &ResourceTag) -> bool {
+        self.object_addresses.contains(&resource_tag.account)
+            && !is_object_group_struct_tag(&resource_tag.struct_tag)
     }
 
     fn equivalent_type_nodes(&self, type_node: usize) -> BTreeSet<usize> {
         let mut equivalent = BTreeSet::from([type_node]);
-        let Some(tag) = self.type_nodes.get(type_node) else {
+        let Some(resource_tag) = self.type_nodes.get(type_node) else {
             return equivalent;
         };
-        if !self.is_object_abstractable_tag(tag) {
+        if !self.is_object_abstractable_resource_tag(resource_tag) {
             return equivalent;
         }
         for (idx, other) in self.type_nodes.iter().enumerate() {
             if idx != type_node
-                && self.is_object_abstractable_tag(other)
-                && other.struct_tag == tag.struct_tag
+                && self.is_object_abstractable_resource_tag(other)
+                && other.struct_tag == resource_tag.struct_tag
             {
                 equivalent.insert(idx);
             }
@@ -636,73 +640,76 @@ impl DefUseGraph {
             .collect()
     }
 
-    fn tags_are_compatible(&self, available: &ResourceTag, needed: &ResourceTag) -> bool {
+    fn resource_tags_are_compatible(&self, available: &ResourceTag, needed: &ResourceTag) -> bool {
         available == needed
-            || (self.is_object_abstractable_tag(available)
-                && self.is_object_abstractable_tag(needed)
+            || (self.is_object_abstractable_resource_tag(available)
+                && self.is_object_abstractable_resource_tag(needed)
                 && available.struct_tag == needed.struct_tag)
     }
 
     fn resource_tag_is_available(
         &self,
-        available_tags: &BTreeSet<ResourceTag>,
-        needed_tag: &ResourceTag,
+        available_resource_tags: &BTreeSet<ResourceTag>,
+        needed_resource_tag: &ResourceTag,
     ) -> bool {
-        available_tags
+        available_resource_tags
             .iter()
-            .any(|available| self.tags_are_compatible(available, needed_tag))
+            .any(|available| self.resource_tags_are_compatible(available, needed_resource_tag))
     }
 
     fn compatible_resource_overlap(
         &self,
-        available_tags: &BTreeSet<ResourceTag>,
-        needed_tags: &BTreeSet<ResourceTag>,
+        available_resource_tags: &BTreeSet<ResourceTag>,
+        needed_resource_tags: &BTreeSet<ResourceTag>,
     ) -> usize {
-        needed_tags
+        needed_resource_tags
             .iter()
-            .filter(|needed| self.resource_tag_is_available(available_tags, needed))
+            .filter(|needed| self.resource_tag_is_available(available_resource_tags, needed))
             .count()
     }
 
-    pub fn compatible_type_overlap_with_tags(
+    pub fn compatible_type_overlap_with_resource_tags(
         &self,
         available_types: &BTreeSet<usize>,
-        needed_tags: &BTreeSet<ResourceTag>,
+        needed_resource_tags: &BTreeSet<ResourceTag>,
     ) -> usize {
-        needed_tags
+        needed_resource_tags
             .iter()
             .filter(|needed| {
                 available_types.iter().any(|&type_idx| {
-                    self.type_nodes
-                        .get(type_idx)
-                        .is_some_and(|available| self.tags_are_compatible(available, needed))
+                    self.type_nodes.get(type_idx).is_some_and(|available| {
+                        self.resource_tags_are_compatible(available, needed)
+                    })
                 })
             })
             .count()
     }
 
-    pub fn observed_unresolved_dependency_tags(
+    pub fn observed_unresolved_dependency_resource_tags(
         &self,
         script_index: usize,
         observed_reads: &BTreeSet<ResourceTag>,
     ) -> BTreeSet<ResourceTag> {
-        let unmet_tags = self.exact_unmet_dependency_tags(script_index);
-        if unmet_tags.is_empty() {
+        let unmet_resource_tags = self.exact_unmet_dependency_resource_tags(script_index);
+        if unmet_resource_tags.is_empty() {
             return BTreeSet::new();
         }
         observed_reads
             .iter()
             .filter(|read| {
-                unmet_tags
+                unmet_resource_tags
                     .iter()
-                    .any(|needed| self.tags_are_compatible(needed, read))
+                    .any(|needed| self.resource_tags_are_compatible(needed, read))
             })
             .cloned()
             .collect()
     }
 
-    /// Exact unmet dependency tags for a script after accounting for initial state.
-    pub fn exact_unmet_dependency_tags(&self, script_index: usize) -> BTreeSet<ResourceTag> {
+    /// Exact unmet dependency resource tags for a script after accounting for initial state.
+    pub fn exact_unmet_dependency_resource_tags(
+        &self,
+        script_index: usize,
+    ) -> BTreeSet<ResourceTag> {
         self.unmet_deps(script_index)
             .into_iter()
             .map(|type_idx| self.type_nodes[type_idx].clone())
@@ -713,24 +720,24 @@ impl DefUseGraph {
     // Mutation methods (for dynamic DUG updates)
     // -----------------------------------------------------------------------
 
-    /// Intern a ResourceTag, returning its type node index.
-    /// Creates a new type node if the tag hasn't been seen before.
-    fn intern_type(&mut self, tag: &ResourceTag) -> usize {
-        if let Some(&idx) = self.type_index.get(tag) {
+    /// Intern a `ResourceTag`, returning its type node index.
+    /// Creates a new type node if the resource tag hasn't been seen before.
+    fn intern_type(&mut self, resource_tag: &ResourceTag) -> usize {
+        if let Some(&idx) = self.type_index.get(resource_tag) {
             idx
         } else {
             let idx = self.type_nodes.len();
-            self.type_nodes.push(tag.clone());
-            self.type_index.insert(tag.clone(), idx);
+            self.type_nodes.push(resource_tag.clone());
+            self.type_index.insert(resource_tag.clone(), idx);
             idx
         }
     }
 
     /// Add a resource type that is already available from the initial state.
     /// Returns true if the initial-state availability changed the DUG.
-    pub fn add_initial_tag(&mut self, tag: &ResourceTag) -> bool {
-        self.note_object_address(tag);
-        let type_idx = self.intern_type(tag);
+    pub fn add_initial_resource_tag(&mut self, resource_tag: &ResourceTag) -> bool {
+        self.note_object_address(resource_tag);
+        let type_idx = self.intern_type(resource_tag);
         let inserted = self.initial_types.insert(type_idx);
         if inserted {
             self.modification_count += 1;
@@ -742,19 +749,19 @@ impl DefUseGraph {
     pub fn ingest_initial_writes(&mut self, writes: &[ResourceWrite]) -> bool {
         let mut changed = false;
         for write in writes {
-            if let Some(tag) = ResourceTag::tracked(write.address, &write.struct_tag) {
-                changed |= self.add_initial_tag(&tag);
+            if let Some(resource_tag) = ResourceTag::tracked(write.address, &write.struct_tag) {
+                changed |= self.add_initial_resource_tag(&resource_tag);
             }
         }
         changed
     }
 
-    /// Add a def edge: script `script_index` writes `tag`.
+    /// Add a def edge: script `script_index` writes `resource_tag`.
     /// Returns true if the edge was new (DUG changed).
-    pub fn add_def(&mut self, script_index: usize, tag: &ResourceTag) -> bool {
+    pub fn add_def(&mut self, script_index: usize, resource_tag: &ResourceTag) -> bool {
         assert!(script_index < self.num_scripts);
-        self.note_object_address(tag);
-        let ti = self.intern_type(tag);
+        self.note_object_address(resource_tag);
+        let ti = self.intern_type(resource_tag);
         let inserted = self.defs[script_index].insert(ti);
         if inserted {
             self.producers.entry(ti).or_default().insert(script_index);
@@ -763,16 +770,17 @@ impl DefUseGraph {
         inserted
     }
 
-    /// Add a use edge: script `script_index` reads `tag`.
+    /// Add a use edge: script `script_index` reads `resource_tag`.
     /// Returns true if the edge was new (DUG changed).
     ///
-    /// Unlike `add_def` and `add_initial_tag`, this intentionally does not call
-    /// `note_object_address`: a read only proves the VM touched the state key,
-    /// not that the resource exists, so a read-only `ObjectGroup` tag is not
-    /// evidence that its account is an object. See `note_object_address`.
-    pub fn add_use(&mut self, script_index: usize, tag: &ResourceTag) -> bool {
+    /// Unlike `add_def` and `add_initial_resource_tag`, this intentionally does
+    /// not call `note_object_address`: a read only proves the VM touched the
+    /// state key, not that the resource exists, so a read-only `ObjectGroup`
+    /// tag is not evidence that its account is an object. See
+    /// `note_object_address`.
+    pub fn add_use(&mut self, script_index: usize, resource_tag: &ResourceTag) -> bool {
         assert!(script_index < self.num_scripts);
-        let ti = self.intern_type(tag);
+        let ti = self.intern_type(resource_tag);
         let inserted = self.uses[script_index].insert(ti);
         if inserted {
             self.modification_count += 1;
@@ -797,13 +805,13 @@ impl DefUseGraph {
     /// Returns true when at least one edge/state in the DUG changed.
     pub fn ingest_profile(&mut self, profile: &ExecResourceProfile) -> bool {
         let mut changed = false;
-        for tag in &profile.reads {
-            changed |= self.add_use(profile.script_index, tag);
+        for resource_tag in &profile.reads {
+            changed |= self.add_use(profile.script_index, resource_tag);
         }
         if profile.succeeded {
             changed |= self.mark_succeeded(profile.script_index);
-            for tag in &profile.writes {
-                changed |= self.add_def(profile.script_index, tag);
+            for resource_tag in &profile.writes {
+                changed |= self.add_def(profile.script_index, resource_tag);
             }
         }
         changed
@@ -937,15 +945,15 @@ impl DefUseGraph {
         let changed = self.ingest_profile(profile);
 
         let mut seed_use_set = BTreeSet::new();
-        for tag in &profile.reads {
-            let ti = self.intern_type(tag);
+        for resource_tag in &profile.reads {
+            let ti = self.intern_type(resource_tag);
             seed_use_set.insert(ti);
         }
 
         let mut seed_def_set = BTreeSet::new();
         if profile.succeeded {
-            for tag in &profile.writes {
-                let ti = self.intern_type(tag);
+            for resource_tag in &profile.writes {
+                let ti = self.intern_type(resource_tag);
                 seed_def_set.insert(ti);
             }
         }
@@ -1018,9 +1026,9 @@ impl DefUseGraph {
         self.seed_modification_count
     }
 
-    /// Look up the type node index for a ResourceTag.
-    pub fn type_index_of(&self, tag: &ResourceTag) -> Option<&usize> {
-        self.type_index.get(tag)
+    /// Look up the type node index for a `ResourceTag`.
+    pub fn type_index_of(&self, resource_tag: &ResourceTag) -> Option<&usize> {
+        self.type_index.get(resource_tag)
     }
 
     /// Scripts that consume (read) a given type node.
@@ -1122,8 +1130,8 @@ impl DefUseGraph {
 
         let type_count = state.type_nodes.len();
         let mut type_index = BTreeMap::new();
-        for (idx, tag) in state.type_nodes.iter().cloned().enumerate() {
-            if type_index.insert(tag, idx).is_some() {
+        for (idx, resource_tag) in state.type_nodes.iter().cloned().enumerate() {
+            if type_index.insert(resource_tag, idx).is_some() {
                 bail!("persisted DUG contains duplicate type nodes");
             }
         }
@@ -1177,8 +1185,8 @@ impl DefUseGraph {
             .flat_map(|type_indices| type_indices.iter())
             .chain(state.initial_types.iter())
             .filter_map(|&type_idx| state.type_nodes.get(type_idx))
-            .filter(|tag| is_object_group_struct_tag(&tag.struct_tag))
-            .map(|tag| tag.account)
+            .filter(|resource_tag| is_object_group_struct_tag(&resource_tag.struct_tag))
+            .map(|resource_tag| resource_tag.account)
             .collect();
 
         let mut dug = Self {
@@ -1468,8 +1476,8 @@ impl SequenceDb {
             .iter()
             .zip(entry.step_produced_types.iter())
         {
-            for tag in reads {
-                if !dug.resource_tag_is_available(&available, tag) {
+            for resource_tag in reads {
+                if !dug.resource_tag_is_available(&available, resource_tag) {
                     return false;
                 }
             }
@@ -1488,7 +1496,7 @@ impl SequenceDb {
         }
 
         let next_step = chain_steps[entry.steps.len()];
-        let exact_needs = dug.exact_unmet_dependency_tags(next_step);
+        let exact_needs = dug.exact_unmet_dependency_resource_tags(next_step);
         if exact_needs.is_empty() {
             return usize::MAX;
         }
@@ -1586,8 +1594,8 @@ impl SequenceDb {
                 continue;
             }
 
-            for tag in &entry.produced_types {
-                if let Some(&ti) = dug.type_index_of(tag) {
+            for resource_tag in &entry.produced_types {
+                if let Some(&ti) = dug.type_index_of(resource_tag) {
                     for consumer in dug.consumers_of(ti) {
                         let mut ext_steps = entry.steps.clone();
                         ext_steps.push(consumer);
@@ -3036,7 +3044,7 @@ mod tests {
     use std::path::PathBuf;
 
     /// Helper: create a ResourceTag from a simple name
-    fn make_tag(name: &str) -> ResourceTag {
+    fn make_resource_tag(name: &str) -> ResourceTag {
         ResourceTag {
             account: aptos_types::account_address::AccountAddress::ONE,
             struct_tag: StructTag {
@@ -3049,7 +3057,7 @@ mod tests {
     }
 
     /// Helper: create a ResourceTag for a specific storage account
-    fn make_tag_at(name: &str, account: AccountAddress) -> ResourceTag {
+    fn make_resource_tag_at(name: &str, account: AccountAddress) -> ResourceTag {
         ResourceTag {
             account,
             struct_tag: StructTag {
@@ -3091,18 +3099,18 @@ mod tests {
     ) -> ScriptProfile {
         ScriptProfile {
             script_index: index,
-            reads: reads.into_iter().map(make_tag).collect(),
-            writes: writes.into_iter().map(make_tag).collect(),
+            reads: reads.into_iter().map(make_resource_tag).collect(),
+            writes: writes.into_iter().map(make_resource_tag).collect(),
             ever_succeeded: succeeded,
         }
     }
 
     /// Helper: create a ResourceWrite from a simple name
     fn make_resource_write(name: &str) -> ResourceWrite {
-        let tag = make_tag(name);
+        let resource_tag = make_resource_tag(name);
         ResourceWrite {
-            address: tag.account,
-            struct_tag: tag.struct_tag,
+            address: resource_tag.account,
+            struct_tag: resource_tag.struct_tag,
             is_resource_group: false,
         }
     }
@@ -3202,8 +3210,8 @@ mod tests {
         assert_eq!(dug.uses_of(2).len(), 2);
 
         // Producers of A = {S0}, producers of B = {S1}
-        let tag_a = make_tag("A");
-        let tag_b = make_tag("B");
+        let tag_a = make_resource_tag("A");
+        let tag_b = make_resource_tag("B");
         let ti_a = *dug.type_index.get(&tag_a).unwrap();
         let ti_b = *dug.type_index.get(&tag_b).unwrap();
         assert_eq!(dug.producers_of(ti_a), &BTreeSet::from([0]));
@@ -3237,7 +3245,7 @@ mod tests {
         let dug = DefUseGraph::from_profiles(&profiles);
 
         assert_eq!(dug.num_types(), 1);
-        let tag_x = make_tag("X");
+        let tag_x = make_resource_tag("X");
         let ti_x = *dug.type_index.get(&tag_x).unwrap();
         assert!(dug.producers_of(ti_x).is_empty());
     }
@@ -3252,21 +3260,21 @@ mod tests {
             ScriptProfile {
                 script_index: 0,
                 reads: BTreeSet::new(),
-                writes: BTreeSet::from([make_tag_at("A", account_1)]),
+                writes: BTreeSet::from([make_resource_tag_at("A", account_1)]),
                 ever_succeeded: true,
             },
             ScriptProfile {
                 script_index: 1,
                 reads: BTreeSet::new(),
-                writes: BTreeSet::from([make_tag_at("A", account_2)]),
+                writes: BTreeSet::from([make_resource_tag_at("A", account_2)]),
                 ever_succeeded: true,
             },
         ];
         let dug = DefUseGraph::from_profiles(&profiles);
 
         assert_eq!(dug.num_types(), 2);
-        let t1 = dug.type_index_of(&make_tag_at("A", account_1)).copied();
-        let t2 = dug.type_index_of(&make_tag_at("A", account_2)).copied();
+        let t1 = dug.type_index_of(&make_resource_tag_at("A", account_1)).copied();
+        let t2 = dug.type_index_of(&make_resource_tag_at("A", account_2)).copied();
         assert!(t1.is_some());
         assert!(t2.is_some());
         assert_ne!(t1, t2);
@@ -3284,12 +3292,12 @@ mod tests {
         dug.ingest_profile(&ExecResourceProfile {
             script_index: 0,
             reads: BTreeSet::new(),
-            writes: BTreeSet::from([make_tag_at("Vault", account_1)]),
+            writes: BTreeSet::from([make_resource_tag_at("Vault", account_1)]),
             succeeded: true,
         });
         dug.ingest_profile(&ExecResourceProfile {
             script_index: 1,
-            reads: BTreeSet::from([make_tag_at("Vault", account_2)]),
+            reads: BTreeSet::from([make_resource_tag_at("Vault", account_2)]),
             writes: BTreeSet::new(),
             succeeded: false,
         });
@@ -3309,12 +3317,12 @@ mod tests {
         let producer = ExecResourceProfile {
             script_index: 0,
             reads: BTreeSet::new(),
-            writes: BTreeSet::from([make_tag_at("Position", account_1)]),
+            writes: BTreeSet::from([make_resource_tag_at("Position", account_1)]),
             succeeded: true,
         };
         let consumer = ExecResourceProfile {
             script_index: 1,
-            reads: BTreeSet::from([make_tag_at("Position", account_2)]),
+            reads: BTreeSet::from([make_resource_tag_at("Position", account_2)]),
             writes: BTreeSet::new(),
             succeeded: false,
         };
@@ -3336,7 +3344,7 @@ mod tests {
         ]);
         dug.ingest_profile(&ExecResourceProfile {
             script_index: 1,
-            reads: BTreeSet::from([make_tag_at("Vault", account_2)]),
+            reads: BTreeSet::from([make_resource_tag_at("Vault", account_2)]),
             writes: BTreeSet::new(),
             succeeded: false,
         });
@@ -3345,7 +3353,7 @@ mod tests {
         let producer_profile = ExecResourceProfile {
             script_index: 0,
             reads: BTreeSet::new(),
-            writes: BTreeSet::from([make_tag_at("Vault", account_1)]),
+            writes: BTreeSet::from([make_resource_tag_at("Vault", account_1)]),
             succeeded: true,
         };
         seq_db.add_entry(
@@ -3365,14 +3373,14 @@ mod tests {
             compatible[0]
         ));
 
-        let exact_needs = dug.exact_unmet_dependency_tags(1);
+        let exact_needs = dug.exact_unmet_dependency_resource_tags(1);
         assert_eq!(
             dug.compatible_resource_overlap(&compatible[0].produced_types, &exact_needs),
             1,
         );
         assert!(!compatible[0]
             .produced_types
-            .contains(&make_tag_at("Vault", account_2)));
+            .contains(&make_resource_tag_at("Vault", account_2)));
     }
 
     #[test]
@@ -3391,7 +3399,7 @@ mod tests {
             reads: BTreeSet::new(),
             writes: BTreeSet::from([
                 make_object_group_tag(created),
-                make_tag_at("Vault", created),
+                make_resource_tag_at("Vault", created),
             ]),
             succeeded: true,
         });
@@ -3400,7 +3408,7 @@ mod tests {
             script_index: 1,
             reads: BTreeSet::from([
                 make_object_group_tag(probed),
-                make_tag_at("Vault", probed),
+                make_resource_tag_at("Vault", probed),
             ]),
             writes: BTreeSet::new(),
             succeeded: false,
@@ -3409,15 +3417,15 @@ mod tests {
         assert_eq!(dug.object_addresses(), &BTreeSet::from([created]));
         // Consequence: Vault@probed is not object-abstractable, so the def of
         // Vault@created does not satisfy it. Asserted through
-        // `compatible_type_overlap_with_tags` rather than
+        // `compatible_type_overlap_with_resource_tags` rather than
         // `are_dependencies_satisfied`, because the latter is already forced
         // to false by the exact unmet read of ObjectGroup@probed (ObjectGroup
         // tags are never object-abstractable) and so would not distinguish
         // this behaviour from the opposite one.
         assert_eq!(
-            dug.compatible_type_overlap_with_tags(
+            dug.compatible_type_overlap_with_resource_tags(
                 dug.defs_of(0),
-                &BTreeSet::from([make_tag_at("Vault", probed)])
+                &BTreeSet::from([make_resource_tag_at("Vault", probed)])
             ),
             0
         );
@@ -3434,13 +3442,13 @@ mod tests {
             reads: BTreeSet::new(),
             writes: BTreeSet::from([
                 make_object_group_tag(created),
-                make_tag_at("Vault", created),
+                make_resource_tag_at("Vault", created),
             ]),
             succeeded: true,
         });
         dug.ingest_profile(&ExecResourceProfile {
             script_index: 1,
-            reads: BTreeSet::from([make_tag_at("Vault", other)]),
+            reads: BTreeSet::from([make_resource_tag_at("Vault", other)]),
             writes: BTreeSet::new(),
             succeeded: false,
         });
@@ -3465,14 +3473,14 @@ mod tests {
             reads: BTreeSet::new(),
             writes: BTreeSet::from([
                 make_object_group_tag(created),
-                make_tag_at("Vault", created),
+                make_resource_tag_at("Vault", created),
             ]),
             succeeded: true,
         });
         // Script 1 reads a Vault at an address never confirmed to be an object.
         dug.ingest_profile(&ExecResourceProfile {
             script_index: 1,
-            reads: BTreeSet::from([make_tag_at("Vault", probed)]),
+            reads: BTreeSet::from([make_resource_tag_at("Vault", probed)]),
             writes: BTreeSet::new(),
             succeeded: false,
         });
@@ -3504,8 +3512,8 @@ mod tests {
         let mut dug = DefUseGraph::new(2);
         let profile = ExecResourceProfile {
             script_index: 1,
-            reads: BTreeSet::from([make_tag("A")]),
-            writes: BTreeSet::from([make_tag("B")]),
+            reads: BTreeSet::from([make_resource_tag("A")]),
+            writes: BTreeSet::from([make_resource_tag("B")]),
             succeeded: true,
         };
         let seed = SeedInput::from((vec![TypeTag::Bool], vec![MoveValue::U64(7)]));
@@ -3614,13 +3622,13 @@ mod tests {
                 ExecResourceProfile {
                     script_index: 0,
                     reads: BTreeSet::new(),
-                    writes: BTreeSet::from([make_tag("A")]),
+                    writes: BTreeSet::from([make_resource_tag("A")]),
                     succeeded: true,
                 },
                 ExecResourceProfile {
                     script_index: 1,
-                    reads: BTreeSet::from([make_tag("A")]),
-                    writes: BTreeSet::from([make_tag("B")]),
+                    reads: BTreeSet::from([make_resource_tag("A")]),
+                    writes: BTreeSet::from([make_resource_tag("B")]),
                     succeeded: true,
                 },
             ],
@@ -3852,7 +3860,7 @@ mod tests {
         assert_eq!(dug.num_types(), 1); // only A
 
         // Add a new def: S1 writes B (new type)
-        let tag_b = make_tag("B");
+        let tag_b = make_resource_tag("B");
         let changed = dug.add_def(1, &tag_b);
         assert!(changed);
         assert_eq!(dug.num_types(), 2); // A and B
@@ -3868,7 +3876,7 @@ mod tests {
         let marker = dug.modification_marker();
 
         // Adding the same def again should not change the DUG
-        let tag_a = make_tag("A");
+        let tag_a = make_resource_tag("A");
         let changed = dug.add_def(0, &tag_a);
         assert!(!changed);
         assert!(!dug.has_changed_since(marker));
@@ -3884,7 +3892,7 @@ mod tests {
         assert!(dug.uses_of(1).is_empty());
 
         // S1 now reads A
-        let tag_a = make_tag("A");
+        let tag_a = make_resource_tag("A");
         let changed = dug.add_use(1, &tag_a);
         assert!(changed);
         assert_eq!(dug.uses_of(1).len(), 1);
@@ -3897,7 +3905,7 @@ mod tests {
         assert_eq!(dug.num_types(), 0);
 
         // S0 reads X (type X does not exist yet)
-        let tag_x = make_tag("X");
+        let tag_x = make_resource_tag("X");
         let changed = dug.add_use(0, &tag_x);
         assert!(changed);
         assert_eq!(dug.num_types(), 1);
@@ -3929,14 +3937,14 @@ mod tests {
 
         assert_eq!(dug.unmet_deps(0).len(), 1);
         assert!(!dug.are_dependencies_satisfied(&[0]));
-        assert!(!dug.exact_unmet_dependency_tags(0).is_empty());
+        assert!(!dug.exact_unmet_dependency_resource_tags(0).is_empty());
 
         let changed = dug.ingest_initial_writes(&[make_resource_write("A")]);
         assert!(changed);
         assert!(dug.unmet_deps(0).is_empty());
         assert!(dug.are_dependencies_satisfied(&[0]));
-        assert!(dug.exact_unmet_dependency_tags(0).is_empty());
-        assert!(dug.initial_resource_tags().contains(&make_tag("A")));
+        assert!(dug.exact_unmet_dependency_resource_tags(0).is_empty());
+        assert!(dug.initial_resource_tags().contains(&make_resource_tag("A")));
     }
 
     #[test]
@@ -3952,7 +3960,7 @@ mod tests {
         assert!(!dug.has_changed_since(m0));
 
         // Add a new def
-        dug.add_def(1, &make_tag("B"));
+        dug.add_def(1, &make_resource_tag("B"));
         assert!(dug.has_changed_since(m0));
         let m1 = dug.modification_marker();
         assert!(!dug.has_changed_since(m1));
@@ -3970,8 +3978,8 @@ mod tests {
         // Ingest a profile where S1 reads A and writes B, and succeeded
         let profile = ExecResourceProfile {
             script_index: 1,
-            reads: vec![make_tag("A")].into_iter().collect(),
-            writes: vec![make_tag("B")].into_iter().collect(),
+            reads: vec![make_resource_tag("A")].into_iter().collect(),
+            writes: vec![make_resource_tag("B")].into_iter().collect(),
             succeeded: true,
         };
         dug.ingest_profile(&profile);
@@ -3992,7 +4000,7 @@ mod tests {
         let profile = ExecResourceProfile {
             script_index: 0,
             reads: BTreeSet::new(),
-            writes: BTreeSet::from([make_tag("A")]),
+            writes: BTreeSet::from([make_resource_tag("A")]),
             succeeded: true,
         };
         let seed = SeedInput::new(AccountAddress::ONE, vec![], vec![MoveValue::U64(1)]);
@@ -4009,7 +4017,7 @@ mod tests {
         let profile = ExecResourceProfile {
             script_index: 0,
             reads: BTreeSet::new(),
-            writes: BTreeSet::from([make_tag("A")]),
+            writes: BTreeSet::from([make_resource_tag("A")]),
             succeeded: true,
         };
 
@@ -4033,7 +4041,7 @@ mod tests {
         );
 
         // Phase 2 keeps concrete producers for the type the script writes.
-        let type_a = *dug.type_index_of(&make_tag("A")).expect("type A interned");
+        let type_a = *dug.type_index_of(&make_resource_tag("A")).expect("type A interned");
         assert_eq!(dug.seed_producers_of(type_a).len(), MAX_SEEDS_PER_SIGNATURE);
     }
 
@@ -4047,7 +4055,7 @@ mod tests {
                 let profile = ExecResourceProfile {
                     script_index: 0,
                     reads: BTreeSet::new(),
-                    writes: BTreeSet::from([make_tag(&format!("T{i}"))]),
+                    writes: BTreeSet::from([make_resource_tag(&format!("T{i}"))]),
                     succeeded: true,
                 };
                 let seed =
@@ -4082,7 +4090,7 @@ mod tests {
         // nothing - so they must not be the first thing eviction throws away.
         let failing = ExecResourceProfile {
             script_index: 1,
-            reads: BTreeSet::from([make_tag("A")]),
+            reads: BTreeSet::from([make_resource_tag("A")]),
             writes: BTreeSet::new(),
             succeeded: false,
         };
@@ -4098,7 +4106,7 @@ mod tests {
             let profile = ExecResourceProfile {
                 script_index: 0,
                 reads: BTreeSet::new(),
-                writes: BTreeSet::from([make_tag(&format!("T{i}"))]),
+                writes: BTreeSet::from([make_resource_tag(&format!("T{i}"))]),
                 succeeded: true,
             };
             let seed = SeedInput::new(AccountAddress::ONE, vec![], vec![MoveValue::U64(i as u64)]);
@@ -4131,7 +4139,7 @@ mod tests {
         assert!(chains_before.iter().all(|c| c.target() != 1));
 
         // Now S1 reads A — this creates an unmet dependency that S0 can resolve
-        dug.add_use(1, &make_tag("A"));
+        dug.add_use(1, &make_resource_tag("A"));
 
         let mut rng2 = StdRng::seed_from_u64(42);
         let chains_after = construct_chains(&dug, 5, 2, 10, &mut rng2);
@@ -4152,7 +4160,7 @@ mod tests {
         let p0 = ExecResourceProfile {
             script_index: 0,
             reads: BTreeSet::new(),
-            writes: BTreeSet::from([make_tag("A")]),
+            writes: BTreeSet::from([make_resource_tag("A")]),
             succeeded: true,
         };
         let id0 = dug
@@ -4163,7 +4171,7 @@ mod tests {
         let seed1 = SeedInput::new(sender_2, vec![], vec![MoveValue::U64(9)]);
         let p1 = ExecResourceProfile {
             script_index: 1,
-            reads: BTreeSet::from([make_tag("A")]),
+            reads: BTreeSet::from([make_resource_tag("A")]),
             writes: BTreeSet::new(),
             succeeded: false,
         };
@@ -4241,15 +4249,19 @@ mod tests {
         let dug = DefUseGraph::from_profiles(&profiles);
 
         // Known tags should return Some
-        assert!(dug.type_index_of(&make_tag("A")).is_some());
-        assert!(dug.type_index_of(&make_tag("B")).is_some());
+        assert!(dug.type_index_of(&make_resource_tag("A")).is_some());
+        assert!(dug.type_index_of(&make_resource_tag("B")).is_some());
         // Indices should be distinct
         assert_ne!(
-            dug.type_index_of(&make_tag("A")),
-            dug.type_index_of(&make_tag("B"))
+            dug.type_index_of(&make_resource_tag("A")),
+            dug.type_index_of(&make_resource_tag("B"))
         );
-        // Unknown tag should return None
-        assert!(dug.type_index_of(&make_tag("C")).is_none());
+        // Unknown resource tag should return None
+        assert!(dug.type_index_of(&make_resource_tag("C")).is_none());
+
+        // Type node index round-trips back to the resource tag
+        let ti_a = *dug.type_index_of(&make_resource_tag("A")).unwrap();
+        assert_eq!(dug.resource_tag(ti_a), &make_resource_tag("A"));
     }
 
     #[test]
@@ -4262,7 +4274,7 @@ mod tests {
         ];
         let dug = DefUseGraph::from_profiles(&profiles);
 
-        let ti_a = *dug.type_index_of(&make_tag("A")).unwrap();
+        let ti_a = *dug.type_index_of(&make_resource_tag("A")).unwrap();
         let consumers = dug.consumers_of(ti_a);
         assert_eq!(consumers, BTreeSet::from([1, 2]));
 
@@ -4283,8 +4295,8 @@ mod tests {
     ) -> ExecResourceProfile {
         ExecResourceProfile {
             script_index,
-            reads: reads.into_iter().map(make_tag).collect(),
-            writes: writes.into_iter().map(make_tag).collect(),
+            reads: reads.into_iter().map(make_resource_tag).collect(),
+            writes: writes.into_iter().map(make_resource_tag).collect(),
             succeeded,
         }
     }
@@ -4314,9 +4326,9 @@ mod tests {
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].steps, vec![0, 1]);
         assert!(entries[0].all_succeeded);
-        assert!(entries[0].produced_types.contains(&make_tag("A")));
-        assert!(entries[0].produced_types.contains(&make_tag("B")));
-        assert!(entries[0].consumed_types.contains(&make_tag("A")));
+        assert!(entries[0].produced_types.contains(&make_resource_tag("A")));
+        assert!(entries[0].produced_types.contains(&make_resource_tag("B")));
+        assert!(entries[0].consumed_types.contains(&make_resource_tag("A")));
     }
 
     #[test]
