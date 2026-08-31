@@ -16,9 +16,8 @@
 //! records which of the three a message is, so callers comparing against V1
 //! can tell when a mismatch is expected.
 //!
-//! TODO(cleanup): `unit_test.rs` still classifies runtime and loader errors
-//! itself rather than through this mapping, and the transactional-test adapter,
-//! once it exists, will render `VMError`s from this mapping.
+//! TODO(cleanup): render transactional-test `VMError`s from this mapping
+//! together with the attached error location.
 //!
 //! TODO(cleanup): **exact parity with V1 is not a goal.** These statuses
 //! become the `VMStatus` a transaction commits with, so for now they are what
@@ -29,9 +28,10 @@
 //! replay benchmark, which compares the two VMs by exact `TransactionStatus`
 //! equality and would report the divergence as a mismatch.
 
-use mono_move_core::{GasExhaustedError, IntTy, VMInternalError};
+use mono_move_core::{BytecodeOffset, ErrorLocation, GasExhaustedError, IntTy, VMInternalError};
 use mono_move_loader::LoaderError;
 use mono_move_runtime::{ArithOp, GlobalStorageOp, ReportedIntValue, RuntimeError};
+use move_binary_format::{errors::Location, file_format::FunctionDefinitionIndex};
 use move_core_types::vm_status::StatusCode;
 use move_vm_types::values::{INDEX_OUT_OF_BOUNDS, POP_EMPTY_VEC, VEC_UNPACK_PARITY_MISMATCH};
 
@@ -156,6 +156,21 @@ pub enum V1Equivalent {
     /// The V1 status is unknown because the error is unmapped or lacks the
     /// call-site context needed to determine the status.
     V1StatusUnknown,
+}
+
+/// V1's error location and faulting instruction for `location`.
+pub fn v1_location(
+    location: Option<&ErrorLocation>,
+) -> (Location, Option<(FunctionDefinitionIndex, BytecodeOffset)>) {
+    match location {
+        Some(ErrorLocation::Instruction {
+            module,
+            function,
+            offset,
+        }) => (Location::Module(module.clone()), Some((*function, *offset))),
+        Some(ErrorLocation::Module(module)) => (Location::Module(module.clone()), None),
+        None => (Location::Undefined, None),
+    }
 }
 
 /// Maps `err` to its V1 equivalent.
@@ -301,8 +316,14 @@ fn describe_loader_error(err: &LoaderError) -> V1Equivalent {
         L::FunctionNotFound { .. } => {
             V1ErrorInfo::with_mono_message(StatusCode::FUNCTION_RESOLUTION_FAILURE, err)
         },
-        // V1 runs both of these successfully, so it has no corresponding
-        // failure to describe.
+        // MonoMove-only loading or lowering gaps have no corresponding V1
+        // failure and therefore map to `NoV1Failure`.
+        //
+        // `NativeFunctionNotLoadable` is reachable only while MonoMove's native
+        // registry lacks a native that V1 implements. If neither VM implements
+        // it, V1 reports `MISSING_DEPENDENCY` at the call instead; that takes a
+        // framework release declaring an unregistered native, so this mapping
+        // does not distinguish it.
         L::NativeFunctionNotLoadable { .. } | L::LoweringSkipped { .. } => {
             return V1Equivalent::NoV1Failure
         },
@@ -650,6 +671,57 @@ mod tests {
              0000000000000000000000000000000000000000000000000000000000000099::test_enum \
              doesn't exist"
         );
+    }
+
+    /// A callee load failure is attributed to the call instruction, while V1
+    /// names the caller's module without an offset. Both persist identically
+    /// only while no load failure maps to an execution status: V1's
+    /// offset-less execution status persists as `ExecutionFailure { Script, 0,
+    /// 0 }`, whereas MonoMove's would persist the real call site. `OUT_OF_GAS`
+    /// is exempt because `keep_or_discard` persists both shapes as `OutOfGas`.
+    #[test]
+    fn load_failures_do_not_map_to_execution_statuses() {
+        use mono_move_loader::LoaderInvariantViolation;
+        use move_core_types::vm_status::StatusType;
+
+        let address = AccountAddress::ONE;
+        let cases = [
+            LoaderError::ModuleNotFound {
+                address,
+                name: "m".to_string(),
+            },
+            LoaderError::FunctionNotFound {
+                address,
+                module: "m".to_string(),
+                name: "f".to_string(),
+            },
+            LoaderError::NativeFunctionNotLoadable {
+                address,
+                module: "m".to_string(),
+                name: "f".to_string(),
+            },
+            LoaderError::LoweringSkipped { reason: "nominal" },
+            LoaderError::GlobalContext(std::fmt::Error.into()),
+            LoaderError::InvariantViolation(LoaderInvariantViolation::EntryAlreadyExists),
+        ];
+        for err in &cases {
+            // Exhaustive, so a new variant must be added to `cases`.
+            match err {
+                LoaderError::ModuleNotFound { .. }
+                | LoaderError::FunctionNotFound { .. }
+                | LoaderError::NativeFunctionNotLoadable { .. }
+                | LoaderError::LoweringSkipped { .. }
+                | LoaderError::GlobalContext(_)
+                | LoaderError::InvariantViolation(_) => {},
+            }
+            let status = match describe_loader_error(err) {
+                V1Equivalent::Described(info) => info.status,
+                // V1 does not fail here, so there is no V1 status to persist
+                // differently from.
+                V1Equivalent::NoV1Failure | V1Equivalent::V1StatusUnknown => continue,
+            };
+            assert_ne!(status.status_type(), StatusType::Execution, "{err}");
+        }
     }
 
     #[test]

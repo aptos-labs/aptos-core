@@ -228,14 +228,18 @@ pub fn type_tag_of(ty: InternedType) -> Option<TypeTag> {
     })
 }
 
-/// The owned [`language_storage::ModuleId`] for an interned module ID, or
-/// [`None`] if the interned name is not a valid identifier.
-pub fn module_id_of(module_id: InternedModuleId) -> Option<language_storage::ModuleId> {
+/// The owned [`language_storage::ModuleId`] for an interned module ID.
+///
+/// Every interning entry point takes an [`IdentStr`], so an interned module
+/// name is always a valid identifier.
+pub fn module_id_of(module_id: InternedModuleId) -> language_storage::ModuleId {
     let module_id = view_module_id(module_id);
-    Some(language_storage::ModuleId::new(
-        *module_id.address(),
-        Identifier::new(view_name(module_id.name())).ok()?,
-    ))
+    let name = view_name(module_id.name());
+    debug_assert!(
+        Identifier::is_valid(name),
+        "interned module name is not a valid identifier"
+    );
+    language_storage::ModuleId::new(*module_id.address(), Identifier::new_unchecked(name))
 }
 
 /// The [`StructTag`] for an interned nominal (struct/enum) type, or [`None`] if

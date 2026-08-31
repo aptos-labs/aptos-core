@@ -44,11 +44,11 @@ use mono_move_core::{
         is_signer_or_signer_immut_ref, view_type, view_type_list, InternedType, InternedTypeList,
         Type,
     },
-    CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex, FrameOffset, Function,
-    FunctionRef, GasMeter, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy,
-    LayoutProvider, MicroOp, PackClosureOp, ResourceProvider, ShiftOperand, VMInternalError,
-    VMResult, VecPackOp, VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
-    CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
+    CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex, ErrorLocation,
+    FrameOffset, Function, FunctionRef, GasMeter, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand,
+    IntShiftOp, IntTy, LayoutProvider, MicroOp, PackClosureOp, ResourceProvider, ShiftOperand,
+    VMInternalError, VMResult, VecPackOp, VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED,
+    CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
     CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
     FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
@@ -106,6 +106,8 @@ pub(crate) struct VMRegisters {
     /// Frame pointer of the current call frame.
     pub(crate) fp: *mut u8,
     /// The function currently executing.
+    // TODO(cleanup): dereference through the execution guard so the lifetime
+    // proof is explicit, instead of raw `as_ref` calls across the interpreter.
     pub(crate) func: NonNull<Function>,
 }
 
@@ -152,6 +154,19 @@ fn root_frame_base(stack: &MemoryRegion) -> *mut u8 {
     );
     // SAFETY: the offset is within `stack`, checked above.
     unsafe { stack.as_ptr().add(FRAME_METADATA_SIZE) }
+}
+
+/// The function pointer saved in the metadata below the frame at `fp`: that
+/// frame's caller, or null for the root frame.
+///
+/// # Safety
+///
+/// `fp` must point at a live frame, whose metadata sits immediately below it.
+#[inline(always)]
+unsafe fn saved_caller_ptr(fp: *mut u8) -> *const Function {
+    // SAFETY: the caller guarantees `fp` is a live frame pointer, so the
+    // metadata below it is readable.
+    unsafe { read_ptr(fp.sub(FRAME_METADATA_SIZE), META_SAVED_FUNC_PTR_OFFSET) as *const Function }
 }
 
 /// What a finished transaction leaves behind: the frozen heap, the
@@ -310,13 +325,8 @@ impl<'a> CallBuilder<'a, '_> {
 
 /// Materializes the [`AbortLocation`] naming the module that raised an abort.
 // TODO(completeness): return `AbortLocation::Script` for script aborts.
-fn abort_location(module_id: InternedModuleId) -> VMResult<AbortLocation> {
-    match module_id_of(module_id) {
-        Some(module_id) => Ok(AbortLocation::Module(module_id)),
-        None => invariant_violation!(Unreachable(
-            "interned module name is not a valid identifier".to_string()
-        )),
-    }
+fn abort_location(module_id: InternedModuleId) -> AbortLocation {
+    AbortLocation::Module(module_id_of(module_id))
 }
 
 /// Materializes the [`AbortLocation`] naming a native's own module from its
@@ -329,6 +339,26 @@ fn native_abort_location(name: &NativeName) -> VMResult<AbortLocation> {
             "native module name is not a valid identifier".to_string()
         )),
     }
+}
+
+/// Attaches the faulting micro-op's originating instruction, or only the
+/// executing function's module when the program counter is past the end of the
+/// code.
+#[cold]
+fn locate_bytecode_failure(err: VMInternalError, regs: VMRegisters) -> VMInternalError {
+    // SAFETY: `regs.func` points at the function that was executing, which the
+    // execution guard keeps alive.
+    let func = unsafe { regs.func.as_ref() };
+    let module = module_id_of(func.module_id);
+    let location = match func.code.origins().get(regs.pc) {
+        Some(&offset) => ErrorLocation::Instruction {
+            module,
+            function: func.def_idx,
+            offset,
+        },
+        None => ErrorLocation::Module(module),
+    };
+    err.at(location)
 }
 
 /// Per-transaction interpreter context with a unified call stack and a
@@ -1300,14 +1330,33 @@ impl InterpreterContext<'_> {
 
         // Hoist the VM registers into a local so the dispatch loop keeps
         // them in CPU registers rather than reloading from `self.registers`
-        // each iteration. Only sync back to `self` on exit.
+        // each iteration. Only sync back to `self` on success.
         let mut regs = self.registers;
 
+        match self.dispatch_loop(&mut regs) {
+            Ok(outcome) => {
+                self.registers = regs;
+                Ok(outcome)
+            },
+            // A failing micro-op leaves `regs.pc` on itself, so `regs` names
+            // the instruction that failed. An error keeps the first location
+            // attached to it, so this fills in only the errors that were not
+            // already located.
+            Err(err) => Err(locate_bytecode_failure(err, regs)),
+        }
+    }
+
+    /// The instruction dispatch loop.
+    ///
+    /// `regs` is borrowed rather than moved so `run` can read the failing
+    /// program counter afterwards.
+    #[inline(always)]
+    fn dispatch_loop(&mut self, regs: &mut VMRegisters) -> VMResult<RuntimeStatus> {
         // Charge the entry function's entry block before any of its instructions run.
         let entry_gas = unsafe { regs.func.as_ref() }.entry_gas;
         self.gas_meter.charge(entry_gas)?;
 
-        let outcome = loop {
+        Ok(loop {
             // SAFETY: Current function is always a valid, non-null pointer because
             // it is derived from function reference (e.g., entrypoint) or when
             // executing a call instruction, which stores a valid pointer.
@@ -1349,12 +1398,16 @@ impl InterpreterContext<'_> {
                         //   3. IC insert target
                         //   4. Patching:
                         //      If can patch caller, try it.
+                        // A load failure propagates unlocated and is attributed
+                        // to this call instruction like any other failure. This
+                        // is deliberately unlike V1, which names the caller's
+                        // module without an offset.
                         let target = self.load_function(module_id, func_name, ty_args)?;
-                        self.call(func, &mut regs, target)?;
+                        self.call(func, regs, target)?;
                         continue;
                     },
                     MicroOp::CallDirect { ptr } => {
-                        self.call(func, &mut regs, ptr.as_ref_unchecked())?;
+                        self.call(func, regs, ptr.as_ref_unchecked())?;
                         continue;
                     },
 
@@ -1365,9 +1418,12 @@ impl InterpreterContext<'_> {
                     } => {
                         // On abort, halt; otherwise native success falls through to
                         // the common tail, which advances the pc by one.
-                        if let Some((code, message)) =
-                            self.exec_call_native(func, regs, native_idx, ty_args, abi)?
-                        {
+                        //
+                        // A failure here is left unlocated, so it is blamed on this
+                        // instruction: a native has no bytecode of its own to name.
+                        let aborted =
+                            self.exec_call_native(func, *regs, native_idx, ty_args, abi)?;
+                        if let Some((code, message)) = aborted {
                             // Attribute the abort to the native's own module
                             // (not the caller's, which `regs.func` names here)
                             // — the same rule as a Move-level abort.
@@ -1397,7 +1453,7 @@ impl InterpreterContext<'_> {
                             target,
                             gas_taken,
                             gas_fallthrough,
-                            &mut regs,
+                            regs,
                         )?;
                         continue;
                     },
@@ -1415,7 +1471,7 @@ impl InterpreterContext<'_> {
                             target,
                             gas_taken,
                             gas_fallthrough,
-                            &mut regs,
+                            regs,
                         )?;
                         continue;
                     },
@@ -1433,7 +1489,7 @@ impl InterpreterContext<'_> {
                             target,
                             gas_taken,
                             gas_fallthrough,
-                            &mut regs,
+                            regs,
                         )?;
                         continue;
                     },
@@ -1444,7 +1500,7 @@ impl InterpreterContext<'_> {
                             op.target,
                             op.gas_taken,
                             op.gas_fallthrough,
-                            &mut regs,
+                            regs,
                         )?;
                         continue;
                     },
@@ -1460,7 +1516,7 @@ impl InterpreterContext<'_> {
                             op.target,
                             op.gas_taken,
                             op.gas_fallthrough,
-                            &mut regs,
+                            regs,
                         )?;
                         continue;
                     },
@@ -1481,7 +1537,7 @@ impl InterpreterContext<'_> {
                             op.target,
                             op.gas_taken,
                             op.gas_fallthrough,
-                            &mut regs,
+                            regs,
                         )?;
                         continue;
                     },
@@ -1498,7 +1554,7 @@ impl InterpreterContext<'_> {
                             target,
                             gas_taken,
                             gas_fallthrough,
-                            &mut regs,
+                            regs,
                         )?;
                         continue;
                     },
@@ -1515,7 +1571,7 @@ impl InterpreterContext<'_> {
                             target,
                             gas_taken,
                             gas_fallthrough,
-                            &mut regs,
+                            regs,
                         )?;
                         continue;
                     },
@@ -1532,7 +1588,7 @@ impl InterpreterContext<'_> {
                             target,
                             gas_taken,
                             gas_fallthrough,
-                            &mut regs,
+                            regs,
                         )?;
                         continue;
                     },
@@ -1549,7 +1605,7 @@ impl InterpreterContext<'_> {
                             target,
                             gas_taken,
                             gas_fallthrough,
-                            &mut regs,
+                            regs,
                         )?;
                         continue;
                     },
@@ -1566,7 +1622,7 @@ impl InterpreterContext<'_> {
                             target,
                             gas_taken,
                             gas_fallthrough,
-                            &mut regs,
+                            regs,
                         )?;
                         continue;
                     },
@@ -1583,7 +1639,7 @@ impl InterpreterContext<'_> {
                             target,
                             gas_taken,
                             gas_fallthrough,
-                            &mut regs,
+                            regs,
                         )?;
                         continue;
                     },
@@ -1600,7 +1656,7 @@ impl InterpreterContext<'_> {
                             target,
                             gas_taken,
                             gas_fallthrough,
-                            &mut regs,
+                            regs,
                         )?;
                         continue;
                     },
@@ -1612,17 +1668,15 @@ impl InterpreterContext<'_> {
                     },
 
                     MicroOp::Return => {
-                        let meta = fp.sub(FRAME_METADATA_SIZE);
-
-                        let saved_func_ptr =
-                            read_ptr(meta, META_SAVED_FUNC_PTR_OFFSET) as *const Function;
-                        if saved_func_ptr.is_null() {
+                        let caller = saved_caller_ptr(fp);
+                        if caller.is_null() {
                             break RuntimeStatus::Success;
                         }
                         // SAFETY: We have just checked that the saved function
                         // pointer is non-null.
-                        regs.func = NonNull::new_unchecked(saved_func_ptr as *mut Function);
+                        regs.func = NonNull::new_unchecked(caller as *mut Function);
 
+                        let meta = fp.sub(FRAME_METADATA_SIZE);
                         regs.pc = read_u64(meta, META_SAVED_PC_OFFSET) as usize;
                         regs.fp = read_ptr(meta, META_SAVED_FP_OFFSET);
                         continue;
@@ -1633,7 +1687,7 @@ impl InterpreterContext<'_> {
                         break RuntimeStatus::Aborted {
                             code,
                             message: None,
-                            location: abort_location(func.module_id)?,
+                            location: abort_location(func.module_id),
                         };
                     },
 
@@ -1665,7 +1719,7 @@ impl InterpreterContext<'_> {
                         break RuntimeStatus::Aborted {
                             code,
                             message: Some(message),
-                            location: abort_location(func.module_id)?,
+                            location: abort_location(func.module_id),
                         };
                     },
 
@@ -1677,7 +1731,7 @@ impl InterpreterContext<'_> {
                     MicroOp::StoreImm16 { dst, ref imm } => write_int::<[u8; 16]>(fp, dst, **imm),
                     MicroOp::StoreImm32 { dst, ref imm } => write_int::<[u8; 32]>(fp, dst, **imm),
                     MicroOp::StoreImmVec { dst, idx } => {
-                        self.exec_store_imm_vec(regs, dst, idx)?;
+                        self.exec_store_imm_vec(*regs, dst, idx)?;
                     },
 
                     // Add
@@ -1977,7 +2031,7 @@ impl InterpreterContext<'_> {
                     },
 
                     MicroOp::VecPack(ref op) => {
-                        self.exec_vec_pack(regs, op)?;
+                        self.exec_vec_pack(*regs, op)?;
                     },
 
                     MicroOp::VecUnpack(ref op) => {
@@ -2176,10 +2230,10 @@ impl InterpreterContext<'_> {
                     },
 
                     MicroOp::PackClosure(ref op) => {
-                        self.exec_pack_closure(regs, op)?;
+                        self.exec_pack_closure(*regs, op)?;
                     },
                     MicroOp::CallClosure(ref op) => {
-                        regs = self.exec_call_closure(func, regs, op)?;
+                        *regs = self.exec_call_closure(func, *regs, op)?;
                         continue;
                     },
 
@@ -2231,7 +2285,7 @@ impl InterpreterContext<'_> {
                         )? {
                             EntryPtr::Writable(ptr) => ptr,
                             EntryPtr::NonWritable(ptr) => {
-                                let ptr = self.deep_copy(regs, ptr)?;
+                                let ptr = self.deep_copy(*regs, ptr)?;
                                 self.read_write_set.commit_borrow_global_mut(&key, ptr);
                                 ptr
                             },
@@ -2253,7 +2307,7 @@ impl InterpreterContext<'_> {
                         let ptr = match entry_ptr {
                             EntryPtr::Writable(ptr) => ptr,
                             EntryPtr::NonWritable(ptr) => {
-                                let ptr = self.deep_copy(regs, ptr)?;
+                                let ptr = self.deep_copy(*regs, ptr)?;
                                 self.read_write_set.commit_move_from(&key);
                                 ptr
                             },
@@ -2459,7 +2513,7 @@ impl InterpreterContext<'_> {
                             // pointer at one offset. Uses single-root `deep_copy`,
                             // avoiding the batch's per-op `Vec`s.
                             if let Some(src) = NonNull::new(read_ptr(fp, (base.0 + off) as usize)) {
-                                let new = self.deep_copy(regs, src)?;
+                                let new = self.deep_copy(*regs, src)?;
                                 write_ptr(fp, (base.0 + off) as usize, new.as_ptr());
                             }
                         } else {
@@ -2473,7 +2527,7 @@ impl InterpreterContext<'_> {
                                     sources.push(src);
                                 }
                             }
-                            let copies = self.deep_copy_batch(regs, &sources)?;
+                            let copies = self.deep_copy_batch(*regs, &sources)?;
                             for (off, new) in live_offsets.iter().zip(copies) {
                                 write_ptr(fp, (base.0 + off) as usize, new.as_ptr());
                             }
@@ -2483,10 +2537,7 @@ impl InterpreterContext<'_> {
             }
 
             regs.pc += 1;
-        };
-
-        self.registers = regs;
-        Ok(outcome)
+        })
     }
 
     /// Allocates vector from constant pool and writes data pointer into `dst`.
@@ -2886,6 +2937,8 @@ impl InterpreterContext<'_> {
             let (callee, resolved_now): (&Function, bool) = match func_tag {
                 FUNC_REF_TAG_RESOLVED => (&*(payload as *const Function), false),
                 FUNC_REF_TAG_UNRESOLVED => {
+                    // Deliberately left unlocated, so the failure is blamed on
+                    // this instruction rather than on the calling frame.
                     let func_ref = &*(payload as *const FunctionRef);
                     let func = self.load_function(
                         func_ref.module_id,
