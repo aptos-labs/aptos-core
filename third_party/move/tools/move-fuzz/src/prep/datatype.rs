@@ -10,30 +10,82 @@ use crate::{
 };
 use move_binary_format::{
     binary_views::BinaryIndexedView,
-    file_format::{SignatureToken, StructFieldInformation, StructHandle},
+    file_format::{
+        FieldDefinition, SignatureToken, StructFieldInformation, StructHandle, StructTypeParameter,
+    },
     CompiledModule,
 };
-use move_core_types::ability::AbilitySet;
+use move_core_types::{
+    ability::AbilitySet,
+    identifier::Identifier,
+    language_storage::{StructTag, TypeTag as VmTypeTag},
+};
 use std::collections::{btree_map::Entry, BTreeMap};
 
-/// Declaration of a datatype
+/// Declaration of a datatype (struct or enum).
+///
+/// Deliberately neither `move_binary_format::file_format::StructHandle` nor
+/// `move_model::model::StructEnv`:
+/// - a `StructHandle` names its module and itself with `ModuleHandleIndex` /
+///   `IdentifierIndex`, i.e. indices into the tables of one `CompiledModule`, so it
+///   cannot key a registry that spans every package under analysis;
+/// - `StructEnv` / `QualifiedId<StructId>` are borrowed, `Symbol`-interned views into
+///   a `GlobalEnv`, which is built by `move_model::run_model_builder_*` from Move
+///   *source*. The fuzzer also consumes packages restored from the on-disk build
+///   cache (`FuzzPackage::Cached`), where only bytecode is available, so a
+///   `GlobalEnv` is not guaranteed to exist.
+///
+/// Everything that does have a stable, source-independent representation is reused
+/// as-is: `generics` is exactly `StructHandle::type_parameters` and `abilities` is
+/// `move_core_types::ability::AbilitySet`. The only state added over `StructHandle`
+/// is the module-independent `ident` and the `kind` provenance used to rank targets.
 #[derive(Clone, PartialEq, Eq)]
 pub struct DatatypeDecl {
     pub ident: DatatypeIdent,
-    pub generics: Vec<(AbilitySet, bool)>,
+    pub generics: Vec<StructTypeParameter>,
     pub abilities: AbilitySet,
     pub kind: PkgKind,
 }
 
-/// Content of a datatype
+impl DatatypeDecl {
+    /// Build the runtime-facing `StructTag` naming this datatype instantiated with
+    /// `type_args`, so callers do not re-derive it from the ident components.
+    pub fn struct_tag(&self, type_args: Vec<VmTypeTag>) -> StructTag {
+        StructTag {
+            address: self.ident.address(),
+            module: Identifier::new(self.ident.module_name()).expect("valid identifier"),
+            name: Identifier::new(self.ident.datatype_name()).expect("valid identifier"),
+            type_args,
+        }
+    }
+}
+
+/// Content of a datatype: the resolved counterpart of
+/// `move_binary_format::file_format::StructFieldInformation`.
+///
+/// The variants map 1:1 (`Native` -> `Opaque`, `Declared` -> `Fields`,
+/// `DeclaredVariants` -> `Variants`); only the field-type representation differs.
+/// `StructFieldInformation` carries `SignatureToken`s whose `StructHandleIndex` and
+/// type-parameter indices are meaningful only relative to the `CompiledModule` they
+/// were read from, whereas this registry outlives any single module and compares
+/// datatypes declared in different packages, so fields are stored as already-resolved
+/// `TypeTag`s. `Opaque` additionally doubles as the placeholder for a datatype seen
+/// only through a `StructHandle` (see `ensure_decl_registered`).
 #[derive(Clone, PartialEq, Eq)]
 pub enum DatatypeContent {
     Fields(Vec<TypeTag>),
-    Variants(BTreeMap<String, Vec<TypeTag>>),
+    Variants(BTreeMap<Identifier, Vec<TypeTag>>),
     Opaque,
 }
 
-/// A registry of datatypes
+/// A registry of every datatype reachable from the packages under analysis.
+///
+/// Plays the role `move_model::model::GlobalEnv` plays for source-based tools, but is
+/// populated from `CompiledModule`s alone (see `DatatypeDecl` for why a `GlobalEnv` is
+/// not available here). Beyond a lookup table it also (a) merges re-declarations of
+/// the same datatype observed through several packages, (b) tracks `PkgKind`
+/// provenance, and (c) upgrades an `Opaque` placeholder registered from a bare
+/// `StructHandle` into the real declaration once the defining module is analyzed.
 pub struct DatatypeRegistry {
     decls: BTreeMap<DatatypeIdent, DatatypeDecl>,
     contents: BTreeMap<DatatypeIdent, DatatypeContent>,
@@ -86,44 +138,7 @@ impl DatatypeRegistry {
             }
 
             // parse the content
-            let content = match &def.field_information {
-                StructFieldInformation::Native => DatatypeContent::Opaque,
-                StructFieldInformation::Declared(fields) => {
-                    let mut field_types = vec![];
-                    for field_def in fields.iter() {
-                        let tag =
-                            match self.convert_signature_token(&binary, &field_def.signature.0) {
-                                TypeRef::Base(tag) => tag,
-                                TypeRef::ImmRef(_) | TypeRef::MutRef(_) => {
-                                    panic!("unexpected reference type as struct field");
-                                },
-                            };
-                        field_types.push(tag);
-                    }
-                    DatatypeContent::Fields(field_types)
-                },
-                StructFieldInformation::DeclaredVariants(variants) => {
-                    let mut variant_table = BTreeMap::new();
-                    for variant_def in variants {
-                        let key = binary.identifier_at(variant_def.name).to_string();
-                        let mut field_types = vec![];
-                        for field_def in variant_def.fields.iter() {
-                            let tag = match self
-                                .convert_signature_token(&binary, &field_def.signature.0)
-                            {
-                                TypeRef::Base(tag) => tag,
-                                TypeRef::ImmRef(_) | TypeRef::MutRef(_) => {
-                                    panic!("unexpected reference type as enum variant");
-                                },
-                            };
-                            field_types.push(tag);
-                        }
-                        let existing = variant_table.insert(key, field_types);
-                        assert!(existing.is_none());
-                    }
-                    DatatypeContent::Variants(variant_table)
-                },
-            };
+            let content = self.convert_field_information(&binary, &def.field_information);
 
             // register the content
             self.insert_content(ident, content, /* allow_opaque_upgrade */ true);
@@ -144,14 +159,55 @@ impl DatatypeRegistry {
     ) -> DatatypeDecl {
         DatatypeDecl {
             ident: DatatypeIdent::from_struct_handle(binary, handle),
-            generics: handle
-                .type_parameters
-                .iter()
-                .map(|p| (p.constraints, p.is_phantom))
-                .collect(),
+            generics: handle.type_parameters.clone(),
             abilities: handle.abilities,
             kind,
         }
+    }
+
+    /// Resolve a `StructFieldInformation` into its `DatatypeContent` counterpart
+    fn convert_field_information(
+        &mut self,
+        binary: &BinaryIndexedView,
+        info: &StructFieldInformation,
+    ) -> DatatypeContent {
+        match info {
+            StructFieldInformation::Native => DatatypeContent::Opaque,
+            StructFieldInformation::Declared(fields) => {
+                DatatypeContent::Fields(self.convert_field_types(binary, fields, "struct field"))
+            },
+            StructFieldInformation::DeclaredVariants(variants) => {
+                let mut variant_table = BTreeMap::new();
+                for variant_def in variants {
+                    let key = binary.identifier_at(variant_def.name).to_owned();
+                    let field_types =
+                        self.convert_field_types(binary, &variant_def.fields, "enum variant");
+                    let existing = variant_table.insert(key, field_types);
+                    assert!(existing.is_none());
+                }
+                DatatypeContent::Variants(variant_table)
+            },
+        }
+    }
+
+    /// Resolve the declared types of a field list, rejecting reference types
+    fn convert_field_types(
+        &mut self,
+        binary: &BinaryIndexedView,
+        fields: &[FieldDefinition],
+        context: &str,
+    ) -> Vec<TypeTag> {
+        fields
+            .iter()
+            .map(
+                |field_def| match self.convert_signature_token(binary, &field_def.signature.0) {
+                    TypeRef::Base(tag) => tag,
+                    TypeRef::ImmRef(_) | TypeRef::MutRef(_) => {
+                        panic!("unexpected reference type as {context}");
+                    },
+                },
+            )
+            .collect()
     }
 
     fn insert_decl(&mut self, decl: DatatypeDecl, allow_opaque_upgrade: bool) {
@@ -508,8 +564,8 @@ impl DatatypeRegistry {
 /// Utility: derive the actual ability based on type arguments
 fn derive_actual_ability(decl: &DatatypeDecl, ty_args: &[TypeBase]) -> AbilitySet {
     let mut provided_abilities = AbilitySet::ALL;
-    for (t, (_, is_phantom)) in ty_args.iter().zip(decl.generics.iter()) {
-        if *is_phantom {
+    for (t, param) in ty_args.iter().zip(decl.generics.iter()) {
+        if param.is_phantom {
             continue;
         }
         provided_abilities = provided_abilities.intersect(t.abilities());
@@ -543,11 +599,20 @@ mod tests {
             typing::{TypeBase, TypeRef, TypeTag},
         },
     };
+    use move_binary_format::file_format::StructTypeParameter;
     use move_core_types::{
         ability::{Ability, AbilitySet},
         account_address::AccountAddress,
         identifier::Identifier,
+        language_storage::{StructTag, TypeTag as VmTypeTag},
     };
+
+    fn type_param(constraints: AbilitySet, is_phantom: bool) -> StructTypeParameter {
+        StructTypeParameter {
+            constraints,
+            is_phantom,
+        }
+    }
 
     fn datatype(name: &str) -> DatatypeIdent {
         DatatypeIdent::from_struct_tuple(
@@ -559,7 +624,7 @@ mod tests {
 
     fn registry_with_decl(
         ident: &DatatypeIdent,
-        generics: Vec<(AbilitySet, bool)>,
+        generics: Vec<StructTypeParameter>,
     ) -> DatatypeRegistry {
         let mut registry = DatatypeRegistry::new();
         registry.decls.insert(ident.clone(), DatatypeDecl {
@@ -579,7 +644,10 @@ mod tests {
         let ident = datatype("Box");
         let decl = DatatypeDecl {
             ident,
-            generics: vec![(AbilitySet::EMPTY, false), (AbilitySet::EMPTY, true)],
+            generics: vec![
+                type_param(AbilitySet::EMPTY, false),
+                type_param(AbilitySet::EMPTY, true),
+            ],
             abilities: AbilitySet::EMPTY.add(Ability::Copy).add(Ability::Drop),
             kind: PkgKind::Primary,
         };
@@ -589,6 +657,23 @@ mod tests {
             actual,
             AbilitySet::EMPTY.add(Ability::Copy).add(Ability::Drop)
         );
+    }
+
+    #[test]
+    fn test_struct_tag_reuses_ident_components() {
+        let decl = DatatypeDecl {
+            ident: datatype("Vault"),
+            generics: vec![type_param(AbilitySet::EMPTY, false)],
+            abilities: AbilitySet::EMPTY.add(Ability::Store),
+            kind: PkgKind::Primary,
+        };
+
+        assert_eq!(decl.struct_tag(vec![VmTypeTag::U64]), StructTag {
+            address: AccountAddress::ONE,
+            module: Identifier::new("m").unwrap(),
+            name: Identifier::new("Vault").unwrap(),
+            type_args: vec![VmTypeTag::U64],
+        });
     }
 
     #[test]
@@ -615,7 +700,7 @@ mod tests {
     #[test]
     fn test_instantiate_type_ref_preserves_reference_kind() {
         let ident = datatype("Vault");
-        let registry = registry_with_decl(&ident, vec![(AbilitySet::EMPTY, false)]);
+        let registry = registry_with_decl(&ident, vec![type_param(AbilitySet::EMPTY, false)]);
 
         let result = registry.instantiate_type_ref(
             &TypeRef::MutRef(TypeTag::Datatype {
@@ -643,7 +728,7 @@ mod tests {
         registry.insert_decl(
             DatatypeDecl {
                 ident: ident.clone(),
-                generics: vec![(AbilitySet::EMPTY, false)],
+                generics: vec![type_param(AbilitySet::EMPTY, false)],
                 abilities: AbilitySet::EMPTY.add(Ability::Store),
                 kind: PkgKind::Dependency,
             },
@@ -654,7 +739,7 @@ mod tests {
         registry.insert_decl(
             DatatypeDecl {
                 ident: ident.clone(),
-                generics: vec![(AbilitySet::EMPTY, false)],
+                generics: vec![type_param(AbilitySet::EMPTY, false)],
                 abilities: AbilitySet::EMPTY.add(Ability::Key),
                 kind: PkgKind::Framework,
             },

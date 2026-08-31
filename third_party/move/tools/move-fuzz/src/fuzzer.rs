@@ -26,11 +26,9 @@ use anyhow::Result;
 use aptos_vm_environment::prod_configs::set_debugging_enabled;
 use legacy_move_compiler::compiled_unit::CompiledUnitEnum;
 use log::{debug, info};
+use move_binary_format::file_format::StructTypeParameter;
 use move_core_types::{
-    ability::AbilitySet,
-    account_address::AccountAddress,
-    identifier::Identifier,
-    language_storage::{StructTag, TypeTag as VmTypeTag},
+    ability::AbilitySet, account_address::AccountAddress, language_storage::TypeTag as VmTypeTag,
 };
 use move_vm_runtime::tracing::{clear_tracing_buffer, enable_tracing};
 use rand::{rngs::StdRng, SeedableRng};
@@ -2165,12 +2163,7 @@ fn build_type_pool(model: &Model) -> TypePool {
         if !decl.generics.is_empty() {
             continue;
         }
-        let struct_tag = StructTag {
-            address: decl.ident.address(),
-            module: Identifier::new(decl.ident.module_name()).expect("valid identifier"),
-            name: Identifier::new(decl.ident.datatype_name()).expect("valid identifier"),
-            type_args: vec![],
-        };
+        let struct_tag = decl.struct_tag(vec![]);
         add_type_candidate(
             &mut pool,
             &mut seen_pool_entries,
@@ -2259,10 +2252,10 @@ fn expand_generic_struct_candidates(
             let per_param_candidates: Vec<Vec<_>> = decl
                 .generics
                 .iter()
-                .map(|(constraint, _is_phantom)| {
+                .map(|param| {
                     snapshot
                         .iter()
-                        .filter(|(_, abilities)| constraint.is_subset(*abilities))
+                        .filter(|(_, abilities)| param.constraints.is_subset(*abilities))
                         .collect()
                 })
                 .collect();
@@ -2287,12 +2280,7 @@ fn expand_generic_struct_candidates(
                     &type_args,
                 );
 
-                let struct_tag = StructTag {
-                    address: decl.ident.address(),
-                    module: Identifier::new(decl.ident.module_name()).expect("valid identifier"),
-                    name: Identifier::new(decl.ident.datatype_name()).expect("valid identifier"),
-                    type_args,
-                };
+                let struct_tag = decl.struct_tag(type_args);
                 added_any |= add_type_candidate(
                     pool,
                     seen_pool_entries,
@@ -2312,7 +2300,7 @@ fn expand_generic_struct_candidates(
 /// Compute the actual abilities of a generic struct instantiated with concrete type arguments
 fn compute_instantiated_abilities(
     declared_abilities: AbilitySet,
-    generics: &[(AbilitySet, bool)],
+    generics: &[StructTypeParameter],
     candidates: &BTreeMap<VmTypeTag, AbilitySet>,
     type_args: &[VmTypeTag],
 ) -> AbilitySet {
@@ -2320,8 +2308,8 @@ fn compute_instantiated_abilities(
 
     // collect abilities of each type argument
     let mut provided_abilities = AbilitySet::ALL;
-    for (ty_arg, (_, is_phantom)) in type_args.iter().zip(generics.iter()) {
-        if *is_phantom {
+    for (ty_arg, param) in type_args.iter().zip(generics.iter()) {
+        if param.is_phantom {
             continue;
         }
         let arg_abilities = *candidates
@@ -2402,6 +2390,7 @@ mod tests {
             ident::{DatatypeIdent, FunctionIdent},
         },
     };
+    use move_binary_format::file_format::StructTypeParameter;
     use move_core_types::{
         ability::AbilitySet,
         account_address::AccountAddress,
@@ -2431,7 +2420,7 @@ mod tests {
         assert_eq!(phase1_budget_secs(u64::MAX, 0), u64::MAX);
     }
 
-    fn make_decl(name: &str, generics: Vec<(AbilitySet, bool)>) -> DatatypeDecl {
+    fn make_decl(name: &str, generics: Vec<StructTypeParameter>) -> DatatypeDecl {
         DatatypeDecl {
             ident: DatatypeIdent::from_struct_tuple(
                 AccountAddress::ONE,
@@ -2490,8 +2479,12 @@ mod tests {
             AbilitySet::PRIMITIVES,
         );
 
-        let inner = make_decl("Inner", vec![(AbilitySet::EMPTY, false)]);
-        let outer = make_decl("Outer", vec![(AbilitySet::EMPTY, false)]);
+        let ty_param = StructTypeParameter {
+            constraints: AbilitySet::EMPTY,
+            is_phantom: false,
+        };
+        let inner = make_decl("Inner", vec![ty_param]);
+        let outer = make_decl("Outer", vec![ty_param]);
         expand_generic_struct_candidates(&mut pool, &mut seen_pool_entries, &mut candidates, &[
             &inner, &outer,
         ]);
