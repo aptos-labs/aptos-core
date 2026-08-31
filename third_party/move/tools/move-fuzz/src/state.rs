@@ -6,10 +6,7 @@ use crate::{
     prep::{canvas::ScriptSignature, ident::DatatypeIdent},
 };
 use anyhow::{anyhow, Context, Result};
-use move_core_types::{
-    account_address::AccountAddress, identifier::Identifier,
-    language_storage::TypeTag as VmTypeTag, value::MoveValue,
-};
+use move_core_types::{account_address::AccountAddress, identifier::Identifier, value::MoveValue};
 use move_coverage::coverage_map::{ExecCoverageMap, ModuleCoverageMap};
 use serde::{Deserialize, Serialize};
 use std::{
