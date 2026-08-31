@@ -11,10 +11,7 @@ use crate::{
         network_messages::{SecretShareMessage, SecretShareRpc},
         reliable_broadcast_state::SecretShareAggregateState,
         secret_share_store::{SecretShareAggregationResult, SecretShareStore},
-        storage::{
-            storage_key, LoadedSecretShare, SecretShareKey, SecretShareStorage,
-            SecretShareStorageError,
-        },
+        storage::{storage_key, SecretShareKey, SecretShareStorage, SecretShareStorageError},
         types::RequestSecretShare,
         verifier::SecretShareVerifier,
     },
@@ -91,7 +88,6 @@ impl SecretShareManager {
         outgoing_blocks: Sender<OrderedBlocks>,
         network_sender: Arc<NetworkSender>,
         secret_share_storage: Arc<dyn SecretShareStorage>,
-        loaded_self_shares: Vec<LoadedSecretShare>,
         bounded_executor: BoundedExecutor,
         rb_config: &ReliableBroadcastConfig,
         secret_share_request_delay_ms: u64,
@@ -117,6 +113,15 @@ impl SecretShareManager {
             verifier.clone(),
             decision_tx,
         )));
+        if let Err(error) = secret_share_storage.prune_before_epoch(epoch_state.epoch) {
+            error!(
+                epoch = epoch_state.epoch,
+                "Failed to prune old secret shares at epoch start: {error}"
+            );
+        }
+        let loaded_self_shares = secret_share_storage
+            .load_self_shares(epoch_state.epoch)
+            .unwrap_or_else(|error| panic!("Failed to load secret shares at epoch start: {error}"));
         let mut recovered_self_shares = HashMap::new();
         for loaded_share in loaded_self_shares {
             let share = match loaded_share {
@@ -653,7 +658,7 @@ mod tests {
     use crate::{
         network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
         rand::secret_sharing::{
-            storage::{InMemorySecretShareStorage, SecretShareDb},
+            storage::{InMemorySecretShareStorage, LoadedSecretShare, SecretShareDb},
             test_utils::{
                 create_bad_secret_share, create_metadata, create_secret_share, TestContext,
             },
@@ -739,7 +744,6 @@ mod tests {
         ));
         let (outgoing_blocks, _) = unbounded();
         let bounded_executor = BoundedExecutor::new(4, tokio::runtime::Handle::current());
-        let loaded_self_shares = storage.load_self_shares(ctx.epoch).unwrap();
         let manager = SecretShareManager::new(
             ctx.authors[local_index],
             Arc::new(EpochState {
@@ -753,7 +757,6 @@ mod tests {
             outgoing_blocks,
             network_sender,
             storage,
-            loaded_self_shares,
             bounded_executor,
             &ReliableBroadcastConfig::default(),
             1_000_000,
