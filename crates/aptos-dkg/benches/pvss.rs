@@ -4,7 +4,7 @@
 #![allow(clippy::ptr_arg)]
 #![allow(clippy::needless_borrow)]
 
-use aptos_crypto::{TSecretSharingConfig, Uniform};
+use aptos_crypto::{TSecretSharingConfig, Uniform, ValidCryptoMaterial};
 use aptos_dkg::pvss::{
     chunky::{UnsignedWeightedTranscript as Chunky_v1, UnsignedWeightedTranscriptv2 as Chunky_v2},
     das,
@@ -22,7 +22,7 @@ use ark_bls12_381::Bls12_381;
 use criterion::{
     black_box, criterion_group, criterion_main,
     measurement::{Measurement, WallTime},
-    BenchmarkGroup, Criterion, Throughput,
+    BatchSize, BenchmarkGroup, Criterion, Throughput,
 };
 use more_asserts::assert_le;
 use rand::{rngs::StdRng, thread_rng, Rng, SeedableRng};
@@ -172,7 +172,7 @@ pub fn subaggregatable_pvss_group_with_dealing<T>(
     let mut group = c.benchmark_group(group_name);
 
     pvss_deal::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
-    pvss_nonaggregate_serialize::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
+    pvss_nonaggregate_serde::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
     pvss_subaggregate::<T, WallTime>(sc, &d.pp, &mut group);
     pvss_nonaggregate_verify::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
     pvss_decrypt_own_share::<T, WallTime>(
@@ -279,6 +279,26 @@ fn pvss_subaggregate<T, M: Measurement>(
     g.throughput(Throughput::Elements(sc.get_total_num_shares() as u64));
     let mut rng = StdRng::seed_from_u64(42);
 
+    // Bytes of an aggregated subtranscript: the payload stored on chain and deserialized once per
+    // epoch (`consensus/src/epoch_manager.rs`). Aggregation is element-wise point addition, so the
+    // shape and byte length -- and hence the deserialization cost -- do not depend on how many
+    // dealings went in; two is representative. `normalize()` returns the affine form that is what
+    // actually gets serialized.
+    let agg_bytes = {
+        let first = T::generate(&sc, &pp, &mut rng);
+        let second = T::generate(&sc, &pp, &mut rng);
+        let mut agg = first.get_subtranscript().to_aggregated();
+        agg.aggregate_with(&sc, &second.get_subtranscript())
+            .expect("subtranscript aggregation should succeed");
+        agg.normalize().to_bytes()
+    };
+    let subtranscript_size = agg_bytes.len();
+
+    assert!(
+        T::Subtranscript::try_from(agg_bytes.as_slice()).is_ok(),
+        "an aggregated subtranscript must deserialize"
+    );
+
     g.bench_function(format!("aggregate/{}", sc), move |b| {
         b.iter_with_setup(
             || {
@@ -292,6 +312,23 @@ fn pvss_subaggregate<T, M: Measurement>(
             },
         )
     });
+
+    g.bench_function(
+        format!(
+            "deserialize-agg-subtranscript/{}/subtranscript_bytes={}",
+            sc, subtranscript_size
+        ),
+        move |b| {
+            b.iter_batched(
+                || (),
+                |()| {
+                    T::Subtranscript::try_from(black_box(agg_bytes.as_slice()))
+                        .expect("aggregated subtranscript should deserialize correctly")
+                },
+                BatchSize::PerIteration,
+            )
+        },
+    );
 }
 
 fn pvss_verify<T: AggregatableTranscript, M: Measurement>(
@@ -330,7 +367,14 @@ fn pvss_verify<T: AggregatableTranscript, M: Measurement>(
     });
 }
 
-fn pvss_nonaggregate_serialize<T: HasAggregatableSubtranscript, M: Measurement>(
+/// Benchmarks serializing and deserializing a dealt (non-aggregated) transcript.
+///
+/// Deserialization is the only side affected by the `Validate` mode in
+/// `aptos_crypto::arkworks::ark_de`: with `Validate::Yes`, every deserialized curve point gets a
+/// subgroup-membership check. Serialization (`ark_se`) is unaffected, so `serialize/` doubles as a
+/// control. In production a validator deserializes one transcript per dealer per DKG round
+/// (`dkg/src/chunky/common.rs`).
+fn pvss_nonaggregate_serde<T: HasAggregatableSubtranscript, M: Measurement>(
     sc: &T::SecretSharingConfig,
     pp: &T::PublicParameters,
     ssks: &[T::SigningSecretKey],
@@ -342,7 +386,9 @@ fn pvss_nonaggregate_serialize<T: HasAggregatableSubtranscript, M: Measurement>(
 
     let mut rng = StdRng::seed_from_u64(42);
 
-    let transcript_size = {
+    // Dealt once and kept: dealing costs orders of magnitude more than either direction of
+    // (de)serialization, so it has to stay out of the timing loops.
+    let bytes = {
         let s = T::InputSecret::generate(&mut rng);
         let trs = T::deal(
             &sc,
@@ -355,8 +401,9 @@ fn pvss_nonaggregate_serialize<T: HasAggregatableSubtranscript, M: Measurement>(
             &sc.get_player(0),
             &mut rng,
         );
-        trs.to_bytes().len()
+        trs.to_bytes()
     };
+    let transcript_size = bytes.len();
 
     g.bench_function(
         format!("serialize/{}/transcript_bytes={}", sc, transcript_size),
@@ -380,6 +427,28 @@ fn pvss_nonaggregate_serialize<T: HasAggregatableSubtranscript, M: Measurement>(
                     let bytes = trs.to_bytes();
                     black_box(&bytes);
                 },
+            )
+        },
+    );
+
+    // Fail loudly rather than mid-benchmark if `Validate::Yes` ever rejects an honest transcript.
+    assert!(
+        T::try_from(bytes.as_slice()).is_ok(),
+        "an honestly-dealt transcript must deserialize"
+    );
+
+    g.bench_function(
+        format!("deserialize/{}/transcript_bytes={}", sc, transcript_size),
+        move |b| {
+            // `PerIteration` keeps the transcript's `Drop` (thousands of `Vec`s) outside the
+            // measured region; `iter` would drop inside it.
+            b.iter_batched(
+                || (),
+                |()| {
+                    T::try_from(black_box(bytes.as_slice()))
+                        .expect("serialized transcript should deserialize correctly")
+                },
+                BatchSize::PerIteration,
             )
         },
     );
