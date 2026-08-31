@@ -121,7 +121,7 @@ fn get_metrics_map(metric_families: Vec<MetricFamily>) -> HashMap<String, String
             format!("{}{}", metric_family.get_name(), labels_string)
         });
 
-        for (name, value) in metric_names.zip(values.into_iter()) {
+        for (name, value) in metric_names.zip(values) {
             all_metrics.insert(name, value);
         }
     }

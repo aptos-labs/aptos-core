@@ -113,7 +113,7 @@ fn format_vector<'a>(
         return Ok(());
     }
     print_space_or_newline(newline, out, depth + 1);
-    for (i, (ty, val)) in fields.zip(values.into_iter()).enumerate() {
+    for (i, (ty, val)) in fields.zip(values).enumerate() {
         if i > 0 {
             out.push(',');
             print_space_or_newline(newline, out, depth + 1);

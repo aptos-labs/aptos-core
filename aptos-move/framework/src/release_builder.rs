@@ -56,8 +56,8 @@ impl ReleaseOptions {
         let mut source_paths = vec![];
         for ((package_path, rust_binding_path), use_latest_language) in packages
             .into_iter()
-            .zip(rust_bindings.into_iter())
-            .zip(package_use_latest_language.into_iter())
+            .zip(rust_bindings)
+            .zip(package_use_latest_language)
         {
             let cur_build_options = if use_latest_language {
                 build_options.clone().set_latest_language()

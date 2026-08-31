@@ -1121,10 +1121,7 @@ impl Analyzer<'_> {
             }
         }
         if let Some(option_qid) = option_qid {
-            for ty in option_v_to_register
-                .into_iter()
-                .chain(option_k_to_register.into_iter())
-            {
+            for ty in option_v_to_register.into_iter().chain(option_k_to_register) {
                 self.add_type(&Type::Struct(option_qid.module_id, option_qid.id, vec![ty]));
             }
         }
