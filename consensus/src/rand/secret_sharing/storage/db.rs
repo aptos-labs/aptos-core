@@ -3,12 +3,12 @@
 
 use super::{
     schema::{SecretShareSchema, SECRET_SHARE_CF_NAME},
-    storage_key, LoadedSecretShare, Result, SecretShareStorage, SecretShareStorageError,
+    storage_key, LoadedSecretShare, SecretShareStorage,
 };
+use anyhow::{bail, ensure, Result};
 use aptos_infallible::Mutex;
 use aptos_logger::info;
 use aptos_schemadb::{batch::SchemaBatch, Options, DB};
-use aptos_storage_interface::AptosDbError;
 use aptos_types::secret_sharing::SecretShare;
 use std::{path::Path, sync::Arc, time::Instant};
 
@@ -49,99 +49,56 @@ impl SecretShareDb {
             write_lock: Mutex::new(()),
         }
     }
-
-    fn map_db_error(error: AptosDbError) -> SecretShareStorageError {
-        match error {
-            AptosDbError::BcsError(message)
-            | AptosDbError::ParseIntError(message)
-            | AptosDbError::Other(message) => SecretShareStorageError::Corruption(message),
-            AptosDbError::NotFound(message)
-            | AptosDbError::RocksDbIncompleteResult(message)
-            | AptosDbError::OtherRocksDbError(message)
-            | AptosDbError::IoError(message)
-            | AptosDbError::RecvError(message) => SecretShareStorageError::Io(message),
-            AptosDbError::TooManyRequested(requested, max) => SecretShareStorageError::Io(format!(
-                "too many records requested: {requested}, max {max}"
-            )),
-            AptosDbError::MissingRootError(version) => {
-                SecretShareStorageError::Io(format!("missing root at version {version}"))
-            },
-            AptosDbError::LedgerPruned {
-                data_type,
-                version,
-                min_available_version,
-            } => SecretShareStorageError::Io(format!(
-                "{data_type} at version {version} pruned below {min_available_version}"
-            )),
-            AptosDbError::EventPruned {
-                requested_seq_num,
-                min_available_seq_num,
-            } => SecretShareStorageError::Io(format!(
-                "event {requested_seq_num} pruned below {min_available_seq_num}"
-            )),
-        }
-    }
 }
 
 impl SecretShareStorage for SecretShareDb {
     fn save_self_share(&self, share: &SecretShare) -> Result<()> {
         let key = storage_key(share.metadata());
-        let serialized = bcs::to_bytes(share)
-            .map_err(|error| SecretShareStorageError::Corruption(error.to_string()))?;
+        let serialized = bcs::to_bytes(share)?;
         let _guard = self.write_lock.lock();
 
-        match self
-            .db
-            .get::<SecretShareSchema>(&key)
-            .map_err(Self::map_db_error)?
-        {
+        match self.db.get::<SecretShareSchema>(&key)? {
             Some(existing) if existing == serialized => Ok(()),
-            Some(_) => Err(SecretShareStorageError::Conflict {
-                epoch: key.0,
-                block_id: key.1,
-            }),
+            Some(_) => bail!(
+                "conflicting secret share for epoch {}, block {}",
+                key.0,
+                key.1
+            ),
             None => {
                 let mut batch = SchemaBatch::new();
-                batch
-                    .put::<SecretShareSchema>(&key, &serialized)
-                    .map_err(Self::map_db_error)?;
-                self.db.write_schemas(batch).map_err(Self::map_db_error)
+                batch.put::<SecretShareSchema>(&key, &serialized)?;
+                self.db.write_schemas(batch)?;
+                Ok(())
             },
         }
     }
 
     fn load_self_shares(&self, epoch: u64) -> Result<Vec<LoadedSecretShare>> {
-        let mut iter = self
-            .db
-            .iter::<SecretShareSchema>()
-            .map_err(Self::map_db_error)?;
+        let mut iter = self.db.iter::<SecretShareSchema>()?;
         iter.seek_to_first();
 
         let mut shares = Vec::new();
         for entry in iter {
-            let (key, serialized) = match entry.map_err(Self::map_db_error) {
+            let (key, serialized) = match entry {
                 Ok(entry) => entry,
-                Err(error @ SecretShareStorageError::Corruption(_)) => {
-                    shares.push(Err(error));
+                Err(error) => {
+                    shares.push(Err(error.into()));
                     continue;
                 },
-                Err(error) => return Err(error),
             };
             if key.0 != epoch {
                 continue;
             }
-            let share = bcs::from_bytes::<SecretShare>(&serialized)
-                .map_err(|error| SecretShareStorageError::Corruption(error.to_string()))
-                .and_then(|share| {
-                    if storage_key(share.metadata()) == key {
-                        Ok(share)
-                    } else {
-                        Err(SecretShareStorageError::Corruption(format!(
-                            "stored key does not match secret share metadata for epoch {}, block {}",
-                            key.0, key.1
-                        )))
-                    }
-                });
+            let share = (|| {
+                let share = bcs::from_bytes::<SecretShare>(&serialized)?;
+                ensure!(
+                    storage_key(share.metadata()) == key,
+                    "stored key does not match secret share metadata for epoch {}, block {}",
+                    key.0,
+                    key.1
+                );
+                Ok(share)
+            })();
             shares.push(share);
         }
         Ok(shares)
@@ -149,25 +106,20 @@ impl SecretShareStorage for SecretShareDb {
 
     fn prune_before_epoch(&self, epoch: u64) -> Result<()> {
         let _guard = self.write_lock.lock();
-        let mut iter = self
-            .db
-            .iter::<SecretShareSchema>()
-            .map_err(Self::map_db_error)?;
+        let mut iter = self.db.iter::<SecretShareSchema>()?;
         iter.seek_to_first();
 
         let mut batch = SchemaBatch::new();
         let mut has_deletes = false;
         for entry in iter {
-            let (key, _) = entry.map_err(Self::map_db_error)?;
+            let (key, _) = entry?;
             if key.0 < epoch {
-                batch
-                    .delete::<SecretShareSchema>(&key)
-                    .map_err(Self::map_db_error)?;
+                batch.delete::<SecretShareSchema>(&key)?;
                 has_deletes = true;
             }
         }
         if has_deletes {
-            self.db.write_schemas(batch).map_err(Self::map_db_error)?;
+            self.db.write_schemas(batch)?;
         }
         Ok(())
     }
@@ -195,10 +147,11 @@ mod tests {
 
             let mut conflicting = share.clone();
             conflicting.metadata.timestamp += 1;
-            assert!(matches!(
-                db.save_self_share(&conflicting),
-                Err(SecretShareStorageError::Conflict { .. })
-            ));
+            assert!(db
+                .save_self_share(&conflicting)
+                .unwrap_err()
+                .to_string()
+                .contains("conflicting secret share"));
         }
 
         let reopened = SecretShareDb::new(&temp_path);
