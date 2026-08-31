@@ -38,7 +38,6 @@ xclippy = [
   "-Aclippy::unnecessary_sort_by",
   "-Aclippy::unneeded_wildcard_pattern",
   "-Aclippy::useless_borrows_in_formatting",
-  "-Aclippy::useless_conversion",
   "-Aclippy::useless_format",
   "-Aclippy::while_let_loop",
 ]

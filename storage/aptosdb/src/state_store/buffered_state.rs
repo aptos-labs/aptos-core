@@ -55,7 +55,7 @@ impl HotStateAccumulator {
         target: &mut [HotStateShardUpdates; NUM_STATE_SHARDS],
         incoming: [HotStateShardUpdates; NUM_STATE_SHARDS],
     ) {
-        for (t, i) in target.iter_mut().zip_eq(incoming.into_iter()) {
+        for (t, i) in target.iter_mut().zip_eq(incoming) {
             t.merge(i);
         }
     }
