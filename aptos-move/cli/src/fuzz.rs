@@ -14,7 +14,7 @@ use move_fuzz::{
     cli::{run_on, FuzzCommand},
     language::{LanguageSetting, OptLevel},
 };
-use move_model::metadata::LanguageVersion;
+use move_model::metadata::{LanguageVersion, LATEST_STABLE_LANGUAGE_VERSION, LATEST_STABLE_LANGUAGE_VERSION_VALUE};
 use std::path::PathBuf;
 
 // NOTE: this command deliberately does not `#[clap(flatten)]` `MovePackageOptions`
@@ -40,11 +40,11 @@ pub struct Fuzz {
 
     /// ...or --language LANGUAGE_VERSION
     /// Specify the language version to be supported.
-    /// Defaults to 2.3, the version move-fuzz currently targets (note that the other
-    /// `aptos move` subcommands default to the latest stable language version).
+    /// Defaults to the latest stable language version, as in the other
+    /// `aptos move` subcommands.
     #[clap(long, value_parser = clap::value_parser!(LanguageVersion),
            alias = "language",
-           default_value = "2.3",
+           default_value = LATEST_STABLE_LANGUAGE_VERSION,
            verbatim_doc_comment)]
     language_version: Option<LanguageVersion>,
 
@@ -105,7 +105,7 @@ impl CliCommand<&'static str> for Fuzz {
             command,
         } = self;
         let language = LanguageSetting {
-            version: language_version.unwrap_or(LanguageVersion::V2_3),
+            version: language_version.unwrap_or(LATEST_STABLE_LANGUAGE_VERSION_VALUE),
             // NOTE: unlike the other `aptos move` subcommands, an unspecified level means
             // `extra` here: fuzzing wants the most aggressive optimizer pipeline.
             optimization: match optimize {

@@ -108,7 +108,7 @@ defaults differ, as noted below.
 - `--subdir <PATH>`
   Restrict the analysis to one or more package directories under `--package-dir`. Pass it multiple times to fuzz a subset of a large workspace.
 - `--language-version <VERSION>` (alias: `--language`)
-  Select the Move language version. Defaults to `2.3` (the other subcommands default to the latest stable version).
+  Select the Move language version. Defaults to the latest stable version, as in the other `aptos move` subcommands.
 - `--optimize <none|default|extra>`
   Select the optimization level. Defaults to `extra`, so that fuzzing exercises the full optimizer pipeline.
 - `--alias <NAME=NAME>`
@@ -117,8 +117,8 @@ defaults differ, as noted below.
   Declare resource-account derivations.
 - `--in-place`
   Run directly in the target directory instead of copying the project to a temporary working directory first. This is useful for large projects and for debugging generated artifacts in place.
-- `--skip-deps-update`
-  Skip automated dependency updates during project resolution. This is useful when the dependency state is already prepared and you want to avoid extra network or resolver churn.
+- `--skip-fetch-latest-git-deps` (alias: `--skip-deps-update`)
+  Skip pulling the latest git dependencies during project resolution. This is useful when the dependency state is already prepared, when you want to avoid extra network or resolver churn, or when working offline. Same name and meaning as in the other `aptos move` subcommands.
 - `-v`, `-vv`, `-vvv`
   Increase logging verbosity. `-v` enables info logs, `-vv` enables debug logs, and `-vvv` enables trace logs.
 
@@ -127,7 +127,7 @@ defaults differ, as noted below.
 The main fuzzing entrypoint is:
 
 ```bash
-aptos move fuzz <PATH> [TOP_LEVEL_OPTIONS] auto [AUTO_OPTIONS]
+aptos move fuzz [TOP_LEVEL_OPTIONS] auto [AUTO_OPTIONS]
 ```
 
 The `auto` command currently performs the full move-fuzz pipeline:
@@ -199,25 +199,25 @@ Use `--reset-state` when you want a clean-slate run.
 #### List relevant Move packages
 
 ```bash
-aptos move fuzz <PATH> [TOP_LEVEL_OPTIONS] list
+aptos move fuzz [TOP_LEVEL_OPTIONS] list
 ```
 
 #### Build relevant Move packages
 
 ```bash
-aptos move fuzz <PATH> [TOP_LEVEL_OPTIONS] build [--dev] [FILTER_OPTIONS]
+aptos move fuzz [TOP_LEVEL_OPTIONS] build [--dev] [FILTER_OPTIONS]
 ```
 
 #### Run Move unit tests in relevant packages
 
 ```bash
-aptos move fuzz <PATH> [TOP_LEVEL_OPTIONS] test [FILTER_OPTIONS] [--test-filter <NAME>] [--gas] [--single-thread]
+aptos move fuzz [TOP_LEVEL_OPTIONS] test [FILTER_OPTIONS] [--test-filter <NAME>] [--gas] [--single-thread]
 ```
 
 #### Execute JSON runbooks on a fresh local simulator
 
 ```bash
-aptos move fuzz <PATH> [TOP_LEVEL_OPTIONS] exec [--runbook <PATH>] [--realistic-gas]
+aptos move fuzz [TOP_LEVEL_OPTIONS] exec [--runbook <PATH>] [--realistic-gas]
 ```
 
 ### Common examples
@@ -225,24 +225,70 @@ aptos move fuzz <PATH> [TOP_LEVEL_OPTIONS] exec [--runbook <PATH>] [--realistic-
 #### Minimal fuzz run
 
 ```bash
-aptos move fuzz /path/to/project auto
+aptos move fuzz --package-dir /path/to/project auto
 ```
 
 #### Dry-run script generation with verbose logs
 
 ```bash
-aptos move fuzz /path/to/project -vv auto --dry-run --max-trace-depth 4 --max-call-repetition 2
+aptos move fuzz --package-dir /path/to/project -vv auto --dry-run --max-trace-depth 4 --max-call-repetition 2
 ```
 
 #### Resume from a custom state directory
 
 ```bash
-aptos move fuzz /path/to/project --state-dir /tmp/my-move-fuzz auto --seed 1
+aptos move fuzz --package-dir /path/to/project --state-dir /tmp/my-move-fuzz auto --seed 1
 ```
 
 #### Clean-slate run
 
 ```bash
-aptos move fuzz /path/to/project auto --reset-state
+aptos move fuzz --package-dir /path/to/project auto --reset-state
+```
+
+## The bundled demo package
+
+`tests/demo` is a small, deliberately buggy Move package used to smoke-test the
+whole pipeline:
+
+```bash
+cargo build -p move-fuzz --bin move-fuzz-dev
+./target/debug/move-fuzz-dev --package-dir third_party/move/tools/move-fuzz/tests/demo \
+  --in-place --skip-fetch-latest-git-deps auto --saturation-secs 30 --max-total-secs 300
+```
+
+`--in-place` is not optional here: the package reaches its `AptosFramework`
+dependency through a relative path, which does not survive the copy into a
+temporary working directory.
+
+The default language version (the latest stable one) is required to compile the
+in-tree framework: `move-stdlib/sources/fixed_point32.move` and several
+`.spec.move` files use `proof { ... }` blocks, which need language version 2.4.
+Passing an older `--language-version` will fail to build the framework.
+
+| module | what it is there to exercise |
+| --- | --- |
+| `hello_fuzzer` | Phase 1 only: `vector<u8>` mutation against a magic-byte guard |
+| `vault` | Phase 2: `MISSING_DATA`-driven chains, resource def-use edges, and failures that need two, three and four transactions |
+| `badge` | objects: `Object<T>` inputs, object-address discovery, and a generic entry function |
+| `combinators` | driver generation: `Function`-typed parameters and a non-simple argument that has to be produced by a provider call |
+
+Add `--dry-run` to stop after script generation; the demo currently yields 26
+driver scripts.
+
+The Phase 2 banner prints `chains: 0` on entry - chains are constructed on the
+first def-use-graph rebuild *after* entry, so read `chain_fuzzer_count` in
+`.move-fuzz/fuzz_stats.json` instead (it settles around 40 for this package).
+
+A run writes `autogen/`, `build/` and `cov.trace` into the project directory
+and `.move-fuzz/` alongside it. None of them may be committed, and `autogen/`
+in particular must be removed by hand before the next run - a stale one makes
+resolution fail with `location mismatch of base package HelloFuzzer`, or, when
+re-running in the same directory, makes every generated script fail to compile
+with `no function named ... found`. Note that `--reset-state` clears only
+`.move-fuzz/`:
+
+```bash
+rm -rf third_party/move/tools/move-fuzz/tests/demo/{autogen,build,cov.trace,.move-fuzz}
 ```
 

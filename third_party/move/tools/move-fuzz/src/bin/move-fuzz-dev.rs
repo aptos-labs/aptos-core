@@ -12,7 +12,7 @@ use move_fuzz::{
     cli::{run_on, FuzzCommand},
     language::{LanguageSetting, OptLevel},
 };
-use move_model::metadata::LanguageVersion;
+use move_model::metadata::{LanguageVersion, LATEST_STABLE_LANGUAGE_VERSION};
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -28,8 +28,9 @@ struct Args {
     #[arg(long)]
     subdir: Vec<PathBuf>,
 
-    /// Specify the language version to be supported. Defaults to 2.3.
-    #[arg(long, alias = "language", default_value = "2.3")]
+    /// Specify the language version to be supported.
+    /// Defaults to the latest stable language version.
+    #[arg(long, alias = "language", default_value = LATEST_STABLE_LANGUAGE_VERSION)]
     language_version: LanguageVersion,
 
     /// Select optimization level.  Choices are "none", "default", or "extra".
