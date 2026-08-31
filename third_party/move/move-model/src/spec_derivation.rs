@@ -25,16 +25,20 @@
 
 use crate::{
     ast::{
-        Exp, ExpData, MatchArm, MemoryLabel, MemoryRange, Operation, Pattern, QuantKind, Value,
-        VisitorPosition,
+        Condition, ConditionKind, Exp, ExpData, MatchArm, MemoryLabel, MemoryRange, Operation,
+        Pattern, QuantKind, Value, VisitorPosition,
     },
-    exp_generator::{ExpGenerator, RangeCheckKind},
+    exp_generator::{ExpGenerator, FunExpGenerator, RangeCheckKind},
     exp_rewriter::{strip_all_olds, ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     exp_simplifier::ExpSimplifier,
     memory_labels::{self, MemoryLabelInfo},
     model::{
         FunId, GlobalEnv, ModuleId, NodeId, Parameter, QualifiedId, QualifiedInstId, SpecFunId,
         StructId,
+    },
+    pragmas::{
+        ABORTS_IF_IS_PARTIAL_PRAGMA, CONDITION_ABSTRACT_PROP, CONDITION_CONCRETE_PROP,
+        CONDITION_EXPORT_PROP, CONDITION_INJECTED_PROP,
     },
     pureness_checker::{FunctionPurenessChecker, FunctionPurenessCheckerMode},
     symbol::Symbol,
@@ -458,7 +462,10 @@ fn exp_is_pure_single_state_impl(
                 Operation::SpecFunction(mid, fid, range) => {
                     let qid = mid.qualified(*fid);
                     let decl = env.get_spec_fun(qid);
-                    if !range.is_default() || !decl.used_memory.is_empty() {
+                    if !range.is_default()
+                        || !decl.used_memory.is_empty()
+                        || !decl.generic_used_memory.is_empty()
+                    {
                         pure = false;
                     } else if reject_behavior && visited_spec_funs.insert(qid) {
                         // `used_memory` does not account for behavioral
@@ -808,7 +815,9 @@ fn exp_is_memory_free(
                                 }
                             },
                             None => {
-                                if !decl.used_memory.is_empty() {
+                                if !decl.used_memory.is_empty()
+                                    || !decl.generic_used_memory.is_empty()
+                                {
                                     ok = false;
                                 }
                             },
@@ -846,14 +855,17 @@ fn exp_is_memory_free(
     ok
 }
 
-fn has_functional_result_spec(env: &GlobalEnv, id: QualifiedId<FunId>) -> bool {
+/// Return unconditional functional result definitions from a function's
+/// attached specification. Concrete and inferred clauses are excluded: only
+/// caller-visible, independently authored contracts may be used as exact
+/// value substitutions.
+pub fn functional_result_spec_values(
+    env: &GlobalEnv,
+    id: QualifiedId<FunId>,
+) -> BTreeMap<usize, Exp> {
     use crate::ast::ConditionKind;
 
     let fun = env.get_function(id);
-    let result_count = fun.get_result_type().flatten().len();
-    if result_count == 0 {
-        return true;
-    }
     let mut_params = fun
         .get_parameters()
         .iter()
@@ -867,8 +879,7 @@ fn has_functional_result_spec(env: &GlobalEnv, id: QualifiedId<FunId>) -> bool {
     let inferred_prop = env
         .symbol_pool()
         .make(crate::pragmas::CONDITION_INFERRED_PROP);
-    let determined: BTreeSet<_> = fun
-        .get_spec()
+    fun.get_spec()
         .conditions
         .iter()
         .filter(|cond| cond.kind == ConditionKind::Ensures)
@@ -888,11 +899,19 @@ fn has_functional_result_spec(env: &GlobalEnv, id: QualifiedId<FunId>) -> bool {
                     let ExpData::Call(_, Operation::Result(idx), _) = lhs.as_ref() else {
                         return None;
                     };
-                    spec_value_over_prestate(env, rhs, &mut_params).then_some(*idx)
+                    spec_value_over_prestate(env, rhs, &mut_params).then(|| (*idx, rhs.clone()))
                 })
         })
-        .collect();
-    determined.len() == result_count && (0..result_count).all(|idx| determined.contains(&idx))
+        .collect()
+}
+
+fn has_functional_result_spec(env: &GlobalEnv, id: QualifiedId<FunId>) -> bool {
+    let result_count = env.get_function(id).get_result_type().flatten().len();
+    if result_count == 0 {
+        return true;
+    }
+    let determined = functional_result_spec_values(env, id);
+    determined.len() == result_count && (0..result_count).all(|idx| determined.contains_key(&idx))
 }
 
 fn has_exact_move_value_model(
@@ -952,6 +971,277 @@ pub fn move_fun_has_exact_value_model(env: &GlobalEnv, id: QualifiedId<FunId>) -
     has_exact_move_value_model(env, id, &mut BTreeSet::new())
 }
 
+/// Prepares a function's body for a placeholder-parameter derivation:
+/// generics instantiated and parameter temporaries bound to fresh
+/// placeholder symbols. Shared by the value, reference-result and abort
+/// derivations. `None` for functions whose body is not the authoritative
+/// contract (native, inline, opaque) or absent.
+fn fun_body_over_placeholders(
+    env: &GlobalEnv,
+    fun: QualifiedId<FunId>,
+    type_inst: &[Type],
+) -> Option<(Vec<Symbol>, Vec<(Symbol, Type)>, Exp)> {
+    let fun_env = env.get_function(fun);
+    if fun_env.is_native() || fun_env.is_inline() || fun_env.is_opaque() {
+        return None;
+    }
+    let def = fun_env.get_def()?.clone();
+    let params = fun_env.get_parameters();
+    let param_syms: Vec<Symbol> = (0..params.len())
+        .map(|i| env.symbol_pool().make(&format!("$cs_p{}", i)))
+        .collect();
+    let param_decls: Vec<(Symbol, Type)> = params
+        .iter()
+        .zip(&param_syms)
+        .map(|(Parameter(_, ty, _), sym)| (*sym, ty.instantiate(type_inst)))
+        .collect();
+    // The body references its parameters as temporaries — or, for a
+    // compiler-lifted lambda, by name; bind both forms to the placeholder
+    // symbols and instantiate generics. The rewriter tracks shadowing, so
+    // a body-local rebinding of a parameter name is left alone. A
+    // parameter name the body assigns to cannot be substituted (an
+    // assignment target is not an expression); leave such names unbound —
+    // the derivation then rejects the body as outside its fragment.
+    let mut assigned: BTreeSet<Symbol> = BTreeSet::new();
+    def.visit_pre_order(&mut |e| {
+        if let ExpData::Assign(_, pat, _) = e {
+            assigned.extend(pat.vars().iter().map(|(_, sym)| *sym));
+        }
+        true
+    });
+    let param_by_name: BTreeMap<Symbol, Symbol> = params
+        .iter()
+        .zip(&param_syms)
+        .filter(|(Parameter(name, _, _), _)| !assigned.contains(name))
+        .map(|(Parameter(name, _, _), sym)| (*name, *sym))
+        .collect();
+    let body = {
+        // The rewriter instantiates node types itself (`set_type_args`
+        // runs before the replacer); the placeholder reuses the node's
+        // already-instantiated type.
+        let mut replacer = |id: NodeId, target: RewriteTarget| {
+            let placeholder = match target {
+                RewriteTarget::Temporary(idx) => param_syms.get(idx).copied(),
+                RewriteTarget::LocalVar(sym) => param_by_name.get(&sym).copied(),
+            }?;
+            let node = env.new_node(env.get_node_loc(id), env.get_node_type(id));
+            Some(ExpData::LocalVar(node, placeholder).into_exp())
+        };
+        ExpRewriter::new(env, &mut replacer)
+            .set_type_args(type_inst)
+            .rewrite_exp(def)
+    };
+    Some((param_syms, param_decls, body))
+}
+
+/// Whether a condition of a callee is visible to its callers: `[concrete]`
+/// conditions are proof-only unless also `[abstract]`, and injected ones are
+/// visible only when exported. Mirrors the filter the behavioral-predicate
+/// translation applies.
+pub fn condition_is_caller_visible(env: &GlobalEnv, cond: &Condition) -> bool {
+    let abstract_ = env
+        .is_property_true(&cond.properties, CONDITION_ABSTRACT_PROP)
+        .unwrap_or(false);
+    let concrete = env
+        .is_property_true(&cond.properties, CONDITION_CONCRETE_PROP)
+        .unwrap_or(false);
+    let injected = env
+        .is_property_true(&cond.properties, CONDITION_INJECTED_PROP)
+        .unwrap_or(false);
+    let exported = env
+        .is_property_true(&cond.properties, CONDITION_EXPORT_PROP)
+        .unwrap_or(false);
+    (!injected || exported) && (abstract_ || !concrete)
+}
+
+/// Whether the function's own specification characterizes its aborts
+/// exactly, so that a behavioral `aborts_of` over it can be interpreted
+/// from the specification alone. With no `aborts_if` clauses nothing
+/// constrains the aborts, and `aborts_if_is_partial` declares the stated
+/// clauses a lower bound; in both cases the body is the only exact source
+/// (see [`derive_fun_aborts_conditions`]).
+pub fn spec_aborts_are_exact(env: &GlobalEnv, fun: QualifiedId<FunId>) -> bool {
+    let fun_env = env.get_function(fun);
+    // Stated `aborts_if` clauses are authoritative: verified exactly
+    // against the body for a transparent function, taken on trust for an
+    // opaque one. With none stated nothing constrains the aborts -- not
+    // even for an opaque function, whose callers havoc the abort.
+    //
+    // Only caller-visible clauses count. A `[concrete]` clause is proof-only
+    // and is dropped when the predicate is translated, so treating it as an
+    // exact characterization would leave `aborts_of` defaulting to `false`
+    // for a function which can abort.
+    let authoritative = fun_env
+        .get_spec()
+        .filter_kind(ConditionKind::AbortsIf)
+        .any(|cond| condition_is_caller_visible(env, cond))
+        || env
+            .get_intrinsics()
+            .get_abort_spec_fun_for_move_fun(&fun)
+            .is_some();
+    authoritative && !fun_env.is_pragma_true(ABORTS_IF_IS_PARTIAL_PRAGMA, || false)
+}
+
+/// The global memory read by the body-derived abort conditions of `fun`
+/// (empty when the specification already characterizes its aborts exactly,
+/// or the derivation declines). Callers want
+/// [`behavioral_target_memory`], which adds this to the function's own
+/// specification memory; the split exists because only the behavioral
+/// encoding consumes the derived conditions, so the function's stored
+/// memory summary stays a description of its written specification.
+pub fn fun_aborts_memory(
+    env: &GlobalEnv,
+    fun: QualifiedId<FunId>,
+    type_inst: &[Type],
+) -> BTreeSet<QualifiedInstId<StructId>> {
+    if spec_aborts_are_exact(env, fun) {
+        return BTreeSet::new();
+    }
+    let cache = summary_cache(env);
+    let key = (fun, type_inst.to_vec());
+    if let Some(memory) = cache.aborts_memory.borrow().get(&key) {
+        return memory.clone();
+    }
+    // The summary's placeholder form suffices: `directly_used_memory` reads
+    // node instantiations, which re-phrasing over temporaries preserves.
+    let memory: BTreeSet<_> = fun_aborts_summary(env, fun, type_inst)
+        .into_iter()
+        .flat_map(|(_, aborts)| aborts)
+        .flat_map(|exp| exp.directly_used_memory(env))
+        .collect();
+    cache.aborts_memory.borrow_mut().insert(key, memory.clone());
+    memory
+}
+
+/// The global memory a behavioral predicate over `fun` is evaluated in:
+/// the function's own specification memory, plus the memory read by the
+/// body-derived abort conditions which interpret `aborts_of` when the
+/// specification does not characterize the aborts exactly. Every side of
+/// the encoding -- the evaluator's parameter list, the arguments passed at
+/// a predicate call, and the memory a caller saves at the predicate's
+/// pre-state label -- must agree on this set.
+pub fn behavioral_target_memory(
+    env: &GlobalEnv,
+    fun: QualifiedId<FunId>,
+    type_inst: &[Type],
+) -> BTreeSet<QualifiedInstId<StructId>> {
+    let mut memory = env
+        .get_function(fun)
+        .get_spec_used_memory_instantiated(type_inst);
+    memory.extend(fun_aborts_memory(env, fun, type_inst));
+    memory
+}
+
+/// The exact abort behavior of a function's own body, as a disjunction of
+/// abort conditions phrased over the function's parameter temporaries —
+/// the form a source-level `aborts_if` of that function takes.
+///
+/// A specification which states no `aborts_if` (or only a lower bound,
+/// under `aborts_if_is_partial`) does not characterize the function's
+/// aborts, so the body is the only exact source of them. The derivation
+/// never approximates (see the module documentation): `Some(vec![])` means
+/// the function provably never aborts, and `None` means the abort behavior
+/// is not exactly describable here — because the body is outside the
+/// derivable fragment, is not the authoritative contract for the function
+/// (native, inline, opaque), or its abort conditions embed a behavioral
+/// carrier or closure which references the body's own callees and which
+/// the consuming context may not be allowed to name.
+///
+/// This is the named-function counterpart of the body derivation the
+/// inliner already performs for a spec-less lambda argument, and shares
+/// its memoization and recursion cycle breaking with the callee value
+/// summaries.
+pub fn derive_fun_aborts_conditions(
+    env: &GlobalEnv,
+    fun: QualifiedId<FunId>,
+    type_inst: &[Type],
+) -> Option<Vec<Exp>> {
+    let (param_syms, aborts) = fun_aborts_summary(env, fun, type_inst)?;
+    // Re-phrase over the function's parameter temporaries, inverting the
+    // placeholder binding, so the conditions read exactly like the
+    // function's own hand-written `aborts_if` clauses.
+    let temps: BTreeMap<Symbol, usize> = param_syms
+        .iter()
+        .copied()
+        .enumerate()
+        .map(|(idx, sym)| (sym, idx))
+        .collect();
+    let mut replacer = |id: NodeId, target: RewriteTarget| match target {
+        RewriteTarget::LocalVar(sym) => temps
+            .get(&sym)
+            .map(|idx| ExpData::Temporary(id, *idx).into_exp()),
+        RewriteTarget::Temporary(_) => None,
+    };
+    let mut rewriter = ExpRewriter::new(env, &mut replacer);
+    Some(
+        aborts
+            .iter()
+            .map(|exp| rewriter.rewrite_exp(exp.clone()))
+            .collect(),
+    )
+}
+
+/// The memoized abort summary of a function's body: the placeholder
+/// parameter symbols and the abort disjuncts phrased over them, in the
+/// same form as the callee value summaries so `substitute_placeholders`
+/// can splice a call's inputs into them.
+fn fun_aborts_summary(
+    env: &GlobalEnv,
+    fun: QualifiedId<FunId>,
+    type_inst: &[Type],
+) -> Option<(Vec<Symbol>, Vec<Exp>)> {
+    let cache = summary_cache(env);
+    let key = (fun, type_inst.to_vec());
+    if let Some(entry) = cache.aborts_entries.borrow().get(&key) {
+        return entry.clone();
+    }
+    if !cache.in_progress.borrow_mut().insert(fun) {
+        return None;
+    }
+    let computed = compute_fun_aborts_conditions(env, fun, type_inst);
+    cache.in_progress.borrow_mut().remove(&fun);
+    cache
+        .aborts_entries
+        .borrow_mut()
+        .insert(key, computed.clone());
+    computed
+}
+
+fn compute_fun_aborts_conditions(
+    env: &GlobalEnv,
+    fun: QualifiedId<FunId>,
+    type_inst: &[Type],
+) -> Option<(Vec<Symbol>, Vec<Exp>)> {
+    let (param_syms, param_decls, body) = fun_body_over_placeholders(env, fun, type_inst)?;
+    let fun_env = env.get_function(fun);
+    let result_ty = fun_env.get_result_type().instantiate(type_inst);
+    let var_types: BTreeMap<Symbol, Type> = param_decls.iter().cloned().collect();
+    let loc = fun_env.get_loc();
+    let mut builder = FunExpGenerator::new(fun_env, loc);
+    let derived = derive_spec(&mut builder, &param_decls, &var_types, &result_ty, &body)?;
+    // A surviving behavioral carrier names a callee whose abort behavior
+    // could not be resolved (`callee_abort_conditions` inlines the ones
+    // which could). The consuming context is the Boogie backend, which
+    // emits this condition after monomorphization has decided which
+    // evaluators exist, so it cannot introduce a reference to one; and a
+    // closure value's target is not known there at all. Either way the
+    // abort behavior is not describable in its terms. Global memory reads
+    // ARE describable: `fun_aborts_memory` reports them and the function's
+    // specification memory summary carries them into the parameterization.
+    let not_describable = |exp: &Exp| {
+        exp.any(&mut |e| {
+            matches!(
+                e,
+                ExpData::Call(_, Operation::Behavior(..) | Operation::Closure(..), _)
+            )
+        })
+    };
+    if derived.aborts.iter().any(not_describable) {
+        return None;
+    }
+    Some((param_syms, derived.aborts))
+}
+
 /// Check if a callee has an associated pure spec function (created by the
 /// spec rewriter) that can be called directly in spec expressions, returning
 /// the spec function id and instantiated result type if so.
@@ -993,18 +1283,71 @@ pub fn try_as_pure_spec_call(
         return Some((spec_qid.id, result_type));
     }
 
+    // A map package may keep an older constructor bound to `map_new` while
+    // marking a replacement constructor intrinsic at the function level
+    // (Aptos `simple_map::create`/`simple_map::new` is one such API pair).
+    // The replacement has no direct entry in `move_fun_to_intrinsic`, but its
+    // zero-argument result still has the canonical intrinsic-map value:
+    // `map_spec_new`.  Do not derive and call its `$` companion, whose body
+    // packs the source representation and is illegal for a backend intrinsic
+    // map type.
+    if callee.is_intrinsic() && callee.get_parameters().is_empty() {
+        let instantiated_result = callee.get_result_type().instantiate(type_inst);
+        if let Type::Struct(result_mid, result_sid, result_inst) = &instantiated_result {
+            let intrinsics = env.get_intrinsics();
+            let result_qid = result_mid.qualified(*result_sid);
+            if intrinsics.is_intrinsic_of_for_struct(
+                env.symbol_pool(),
+                &result_qid,
+                crate::pragmas::INTRINSIC_TYPE_MAP,
+            ) {
+                let decl = intrinsics.get_decl_for_struct(&result_qid)?;
+                let spec_qid =
+                    decl.lookup_spec_fun(env, crate::pragmas::INTRINSIC_FUN_MAP_SPEC_NEW)?;
+                let spec_decl = env.get_spec_fun(spec_qid);
+                if spec_decl.params.is_empty()
+                    && spec_decl.type_params.len() == result_inst.len()
+                    && spec_decl.result_type.instantiate(result_inst) == instantiated_result
+                {
+                    return Some((spec_qid.id, instantiated_result));
+                }
+            }
+        }
+    }
+
     // Must have an associated spec function with a body and no memory use.
     // `spec_rewriter` removes the body (`body = None`) for any spec function that
     // contains imperative expressions (Loop, Assign, Mutate, Return, LoopCont), so
     // a callee whose spec fun has side-effects or a while-loop body is rejected here.
     let (spec_fun_id, decl) = callee.find_spec_fun()?;
-    // Non-native functions without a derived body cannot be expressed as a
-    // spec call. Native body-less spec functions are resolved by the backend.
-    if !decl.is_native && decl.body.is_none() {
+    // An arbitrary body-less companion cannot be called as a spec function:
+    // native Move functions are not generally supplied by the Boogie prelude.
+    // Compiler-known type reflection and the native functions explicitly
+    // modeled by the Boogie prelude are the narrow exceptions; routing them
+    // through an unconstrained `result_of` loses equality with the runtime
+    // result.
+    let is_backend_primitive = callee.is_well_known(well_known::TYPE_NAME_MOVE)
+        || callee.is_well_known(well_known::TYPE_INFO_MOVE)
+        || callee.is_well_known(well_known::TYPE_NAME_GET_MOVE)
+        || well_known::is_boogie_prelude_spec_native(&callee);
+    if decl.body.is_none() && !is_backend_primitive {
+        return None;
+    }
+    // A derived companion can itself call another companion. Reject the
+    // whole direct-substitution path if that transitive body reaches an
+    // arbitrary body-less/native companion: the Boogie backend deliberately
+    // omits such declarations unless they are compiler-known primitives.
+    // Otherwise the generated caller spec compiles as Move but later contains
+    // a call to an undeclared `$module_$function` in Boogie.
+    if !pure_spec_companion_is_backend_supported(
+        env,
+        module_id.qualified(spec_fun_id),
+        &mut BTreeSet::new(),
+    ) {
         return None;
     }
     // Must not access global memory.
-    if !decl.used_memory.is_empty() {
+    if !decl.used_memory.is_empty() || !decl.generic_used_memory.is_empty() {
         return None;
     }
     // Additionally check the Move function body for specification-mode purity:
@@ -1024,6 +1367,48 @@ pub fn try_as_pure_spec_call(
     }
     let result_type = callee.get_result_type().instantiate(type_inst);
     Some((spec_fun_id, result_type))
+}
+
+fn pure_spec_companion_is_backend_supported(
+    env: &GlobalEnv,
+    spec_fun: QualifiedId<SpecFunId>,
+    visited: &mut BTreeSet<QualifiedId<SpecFunId>>,
+) -> bool {
+    if !visited.insert(spec_fun) {
+        return true;
+    }
+    let decl = env.get_spec_fun(spec_fun);
+    let backend_primitive = env
+        .get_module(spec_fun.module_id)
+        .get_functions()
+        .any(|fun| {
+            fun.find_spec_fun().is_some_and(|(id, _)| id == spec_fun.id)
+                && (fun.is_well_known(well_known::TYPE_NAME_MOVE)
+                    || fun.is_well_known(well_known::TYPE_INFO_MOVE)
+                    || fun.is_well_known(well_known::TYPE_NAME_GET_MOVE)
+                    || well_known::is_boogie_prelude_spec_native(&fun))
+        });
+    let Some(body) = &decl.body else {
+        return decl.uninterpreted || backend_primitive;
+    };
+    if body.called_spec_funs(env).into_iter().any(|called| {
+        !pure_spec_companion_is_backend_supported(env, called.to_qualified_id(), visited)
+    }) {
+        return false;
+    }
+    body.called_funs().into_iter().all(|called| {
+        let fun = env.get_function(called);
+        if fun.is_well_known(well_known::TYPE_NAME_MOVE)
+            || fun.is_well_known(well_known::TYPE_INFO_MOVE)
+            || fun.is_well_known(well_known::TYPE_NAME_GET_MOVE)
+            || well_known::is_boogie_prelude_spec_native(&fun)
+        {
+            return true;
+        }
+        fun.find_spec_fun().is_some_and(|(id, _)| {
+            pure_spec_companion_is_backend_supported(env, called.module_id.qualified(id), visited)
+        })
+    })
 }
 
 /// Whether `exp` mentions one of the given symbols outside of an
@@ -1176,14 +1561,21 @@ struct CalleeRefResultSummary {
     aborts: Vec<Exp>,
 }
 
-/// Cache of callee body value summaries, hosted as a `GlobalEnv`
-/// extension: entries are keyed per callee and type instantiation; the
-/// in-progress set breaks recursion cycles (shared by both summary kinds,
-/// which run the same body derivation).
+/// Cache of body derivations, hosted as a `GlobalEnv` extension: entries
+/// are keyed per function and type instantiation; the in-progress set
+/// breaks recursion cycles (shared by all entry kinds, which run the same
+/// body derivation).
 #[derive(Default)]
 struct CalleeValueSummaryCache {
     entries: RefCell<BTreeMap<(QualifiedId<FunId>, Vec<Type>), Option<CalleeValueSummary>>>,
     ref_entries: RefCell<BTreeMap<(QualifiedId<FunId>, Vec<Type>), Option<CalleeRefResultSummary>>>,
+    aborts_entries:
+        RefCell<BTreeMap<(QualifiedId<FunId>, Vec<Type>), Option<(Vec<Symbol>, Vec<Exp>)>>>,
+    /// Memory read by the body-derived abort conditions. Derived from
+    /// `aborts_entries`, but cached separately: it is queried at every
+    /// behavioral-predicate site, including inside expression walks.
+    aborts_memory:
+        RefCell<BTreeMap<(QualifiedId<FunId>, Vec<Type>), BTreeSet<QualifiedInstId<StructId>>>>,
     in_progress: RefCell<BTreeSet<QualifiedId<FunId>>>,
 }
 
@@ -2595,8 +2987,17 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
             .filter(|(_, ty)| !matches!(ty, Type::Tuple(_)))
         {
             let fun_exp = self.mk_callee_closure(mid, fid, &type_inst);
-            let aborts = self.builder.mk_aborts_of(fun_exp, inputs.clone());
-            self.add_abort(aborts);
+            match self.callee_abort_conditions(&fun_exp, &inputs) {
+                Some(conditions) => {
+                    for condition in conditions {
+                        self.add_abort(condition);
+                    }
+                },
+                None => {
+                    let aborts = self.builder.mk_aborts_of(fun_exp, inputs.clone());
+                    self.add_abort(aborts);
+                },
+            }
             let env = self.builder.global_env();
             // The companion may stem from the pre-inlining derivation stage,
             // where companions are not marked used eagerly; mark it (and its
@@ -2895,10 +3296,27 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
             let (pre, post) = self.advance_label()?;
             (Some(pre), Some(post))
         };
-        let aborts =
-            self.builder
-                .mk_aborts_of_with_state(fun_exp.clone(), inputs.clone(), pre, None);
-        self.add_abort(aborts);
+        // The callee's abort behavior, exact from its own body when its
+        // specification does not characterize it (the abort-side analogue
+        // of the result routing below); an `aborts_of` carrier otherwise,
+        // which the consuming context interprets from the callee's
+        // specification.
+        match self.callee_abort_conditions(&fun_exp, &inputs) {
+            Some(conditions) => {
+                for condition in conditions {
+                    self.add_abort(condition);
+                }
+            },
+            None => {
+                let aborts = self.builder.mk_aborts_of_with_state(
+                    fun_exp.clone(),
+                    inputs.clone(),
+                    pre,
+                    None,
+                );
+                self.add_abort(aborts);
+            },
+        }
         let result_tys = result_type.clone().flatten();
         // The `result_of` carrier is typed with the full (value-level)
         // result type; for a multi-result callee that is the tuple type,
@@ -3064,6 +3482,53 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
             .enumerate()
             .filter_map(|(pos, idx)| by_param.remove(&idx).map(|e| (pos, e)))
             .collect()
+    }
+
+    /// The callee's exact abort disjuncts at this call, spliced with the
+    /// call's inputs. `Some(vec![])` means the callee provably never
+    /// aborts. `None` when the callee's own specification characterizes
+    /// its aborts (the `aborts_of` carrier is then interpreted from it and
+    /// is the smaller encoding) or when its body is not exactly derivable.
+    fn callee_abort_conditions(&mut self, fun_exp: &Exp, inputs: &[Exp]) -> Option<Vec<Exp>> {
+        let ExpData::Call(id, Operation::Closure(mid, fid, mask), _) = fun_exp.as_ref() else {
+            return None;
+        };
+        if *mask != ClosureMask::empty() {
+            return None;
+        }
+        let env = self.builder.global_env();
+        let callee_qid = mid.qualified(*fid);
+        let type_inst = env.get_node_instantiation(*id);
+        if spec_aborts_are_exact(env, callee_qid) {
+            // The callee's own `aborts_if` clauses, phrased over its
+            // parameter temporaries; an opaque callee stating none claims
+            // abort-freedom, giving the empty disjunction.
+            let callee = env.get_function(callee_qid);
+            let spec = callee.get_spec();
+            let conditions: Vec<Exp> = spec
+                .filter_kind(ConditionKind::AbortsIf)
+                .filter(|cond| condition_is_caller_visible(env, cond))
+                .map(|cond| cond.exp.clone())
+                .collect();
+            let mut replacer = |_id: NodeId, target: RewriteTarget| match target {
+                RewriteTarget::Temporary(idx) => inputs.get(idx).cloned(),
+                RewriteTarget::LocalVar(_) => None,
+            };
+            let mut rewriter = ExpRewriter::new(env, &mut replacer).set_type_args(&type_inst);
+            return Some(
+                conditions
+                    .into_iter()
+                    .map(|exp| rewriter.rewrite_exp(exp))
+                    .collect(),
+            );
+        }
+        let (param_syms, aborts) = fun_aborts_summary(env, callee_qid, &type_inst)?;
+        Some(
+            aborts
+                .iter()
+                .map(|exp| substitute_placeholders(env, exp, &param_syms, inputs))
+                .collect(),
+        )
     }
 
     /// The exact result values of a summarized callee, keyed by result
@@ -3372,49 +3837,14 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
         computed
     }
 
-    /// Prepares a callee's body for a placeholder-parameter derivation:
-    /// generics instantiated and parameter temporaries bound to fresh
-    /// placeholder symbols. Shared by the value and reference-result
-    /// summary computations. `None` for callees whose body is not the
-    /// authoritative contract (native, inline, opaque) or absent.
+    /// Prepares a callee's body for a placeholder-parameter derivation;
+    /// see [`fun_body_over_placeholders`].
     fn callee_body_over_placeholders(
         &self,
         callee_qid: QualifiedId<FunId>,
         type_inst: &[Type],
     ) -> Option<(Vec<Symbol>, Vec<(Symbol, Type)>, Exp)> {
-        let env = self.builder.global_env();
-        let callee = env.get_function(callee_qid);
-        if callee.is_native() || callee.is_inline() || callee.is_opaque() {
-            return None;
-        }
-        let def = callee.get_def()?.clone();
-        let params = callee.get_parameters();
-        let param_syms: Vec<Symbol> = (0..params.len())
-            .map(|i| env.symbol_pool().make(&format!("$cs_p{}", i)))
-            .collect();
-        let param_decls: Vec<(Symbol, Type)> = params
-            .iter()
-            .zip(&param_syms)
-            .map(|(Parameter(_, ty, _), sym)| (*sym, ty.instantiate(type_inst)))
-            .collect();
-        // The body references its parameters as temporaries; bind them to
-        // the placeholder symbols and instantiate generics.
-        let body = {
-            // The rewriter instantiates node types itself (`set_type_args`
-            // runs before the replacer); the placeholder reuses the node's
-            // already-instantiated type.
-            let mut replacer = |id: NodeId, target: RewriteTarget| match target {
-                RewriteTarget::Temporary(idx) if idx < param_syms.len() => {
-                    let node = env.new_node(env.get_node_loc(id), env.get_node_type(id));
-                    Some(ExpData::LocalVar(node, param_syms[idx]).into_exp())
-                },
-                _ => None,
-            };
-            ExpRewriter::new(env, &mut replacer)
-                .set_type_args(type_inst)
-                .rewrite_exp(def)
-        };
-        Some((param_syms, param_decls, body))
+        fun_body_over_placeholders(self.builder.global_env(), callee_qid, type_inst)
     }
 
     fn compute_callee_body_value_summary(
@@ -5345,7 +5775,9 @@ mod tests {
             )],
             result_type: u64_ty(),
             used_memory: BTreeSet::new(),
+            generic_used_memory: BTreeSet::new(),
             old_memory: BTreeSet::new(),
+            generic_old_memory: BTreeSet::new(),
             uninterpreted: false,
             is_move_fun: true,
             is_native: false,
@@ -5404,6 +5836,103 @@ mod tests {
         data.is_native = is_native;
         data.spec = RefCell::new(spec);
         env.add_function_def_from_data(ModuleId::new(0), data)
+    }
+
+    #[test]
+    fn bodyless_native_companion_is_not_a_direct_spec_call() {
+        let mut env = test_env();
+        let callee = add_function_with_spec(
+            &mut env,
+            "native_callee",
+            &[("x", u64_ty())],
+            u64_ty(),
+            None,
+            true,
+            Spec::default(),
+        );
+        env.add_spec_function_def(ModuleId::new(0), SpecFunDecl {
+            loc: Loc::default(),
+            name: env.symbol_pool().make("$native_callee"),
+            type_params: vec![],
+            params: vec![Parameter(
+                env.symbol_pool().make("x"),
+                u64_ty(),
+                Loc::default(),
+            )],
+            result_type: u64_ty(),
+            used_memory: BTreeSet::new(),
+            generic_used_memory: BTreeSet::new(),
+            old_memory: BTreeSet::new(),
+            generic_old_memory: BTreeSet::new(),
+            uninterpreted: false,
+            is_move_fun: true,
+            is_native: true,
+            body: None,
+            callees: BTreeSet::new(),
+            is_recursive: RefCell::new(None),
+            uses_old: false,
+            frame_spec: None,
+            insts_using_generic_type_reflection: Default::default(),
+            spec: RefCell::new(Spec::default()),
+        });
+
+        assert!(try_as_pure_spec_call(&env, ModuleId::new(0), callee, &[]).is_none());
+    }
+
+    #[test]
+    fn unbound_intrinsic_map_constructor_uses_spec_new() {
+        let mut env = test_env();
+        let struct_id = StructId::new(env.symbol_pool().make("R"));
+        let struct_ty = Type::Struct(ModuleId::new(0), struct_id, vec![]);
+        let mut constructor_spec = Spec::default();
+        constructor_spec.properties.insert(
+            env.symbol_pool().make(crate::pragmas::INTRINSIC_PRAGMA),
+            crate::ast::PropertyValue::Value(crate::ast::Value::Bool(true)),
+        );
+        let constructor = add_function_with_spec(
+            &mut env,
+            "replacement_new",
+            &[],
+            struct_ty.clone(),
+            None,
+            false,
+            constructor_spec,
+        );
+        let spec_new = env.add_spec_function_def(ModuleId::new(0), SpecFunDecl {
+            loc: Loc::default(),
+            name: env.symbol_pool().make("spec_new_t"),
+            type_params: vec![],
+            params: vec![],
+            result_type: struct_ty.clone(),
+            used_memory: BTreeSet::new(),
+            generic_used_memory: BTreeSet::new(),
+            old_memory: BTreeSet::new(),
+            generic_old_memory: BTreeSet::new(),
+            uninterpreted: true,
+            is_move_fun: false,
+            is_native: false,
+            body: None,
+            callees: BTreeSet::new(),
+            is_recursive: RefCell::new(None),
+            uses_old: false,
+            frame_spec: None,
+            insts_using_generic_type_reflection: Default::default(),
+            spec: RefCell::new(Spec::default()),
+        });
+        let symbol = |name: &str| env.symbol_pool().make(name);
+        let decl = crate::intrinsics::IntrinsicDecl::new_for_test(
+            ModuleId::new(0).qualified(struct_id),
+            symbol(crate::pragmas::INTRINSIC_TYPE_MAP),
+            vec![],
+            vec![(symbol(crate::pragmas::INTRINSIC_FUN_MAP_SPEC_NEW), spec_new)],
+            vec![],
+        );
+        env.intrinsics.add_decl(&decl);
+
+        assert_eq!(
+            try_as_pure_spec_call(&env, ModuleId::new(0), constructor, &[]),
+            Some((spec_new.id, struct_ty))
+        );
     }
 
     /// A spec with the given (unconditional) `ensures` conditions.
@@ -5953,7 +6482,9 @@ mod tests {
                 params,
                 result_type: result,
                 used_memory: BTreeSet::new(),
+                generic_used_memory: BTreeSet::new(),
                 old_memory: BTreeSet::new(),
+                generic_old_memory: BTreeSet::new(),
                 uninterpreted: true,
                 is_move_fun: false,
                 is_native: false,
@@ -6304,7 +6835,9 @@ mod tests {
             )],
             result_type: Type::Tuple(vec![u64_ty(), u64_ty()]),
             used_memory: BTreeSet::new(),
+            generic_used_memory: BTreeSet::new(),
             old_memory: BTreeSet::new(),
+            generic_old_memory: BTreeSet::new(),
             uninterpreted: false,
             is_move_fun: true,
             is_native: false,

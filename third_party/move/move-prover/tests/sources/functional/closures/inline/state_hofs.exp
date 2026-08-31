@@ -1,4 +1,180 @@
 Move prover returns: exiting with verification errors
+warning: cannot derive `ensures_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/state_hofs.move:35:41
+   │
+35 │                 invariant forall j in 0..i: ensures_of<f>(v[j]);
+   │                                             ^^^^^^^^^^^^^^^^^^^
+   ·
+46 │ ╭           for_each_addr(v, |a| {
+   │ │ ╭──────────────────────────'
+47 │ │ │             let r = &mut R[a];
+48 │ │ │             r.v = r.v + 1;
+49 │ │ │         });
+   │ ╰─│──────────' from a call inlined at this callsite
+   │   ╰─────────' lambda argument
+
+warning: cannot derive `ensures_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/state_hofs.move:35:41
+   │
+35 │                 invariant forall j in 0..i: ensures_of<f>(v[j]);
+   │                                             ^^^^^^^^^^^^^^^^^^^
+   ·
+63 │ ╭           for_each_addr(v, |a| {
+   │ │ ╭──────────────────────────'
+64 │ │ │             let R { v: _ } = move_from<R>(a);
+65 │ │ │         });
+   │ ╰─│──────────' from a call inlined at this callsite
+   │   ╰─────────' lambda argument
+
+warning: cannot derive `ensures_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/state_hofs.move:35:41
+   │
+35 │                 invariant forall j in 0..i: ensures_of<f>(v[j]);
+   │                                             ^^^^^^^^^^^^^^^^^^^
+   ·
+79 │ ╭           for_each_addr(v, |a| {
+   │ │ ╭──────────────────────────'
+80 │ │ │             let r = &mut R[a];
+81 │ │ │             r.v = r.v + 1;
+82 │ │ │         });
+   │ ╰─│──────────' from a call inlined at this callsite
+   │   ╰─────────' lambda argument
+
+warning: cannot derive `aborts_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/state_hofs.move:36:42
+   │
+36 │                 invariant forall j in 0..i: !aborts_of<f>(v[j]);
+   │                                              ^^^^^^^^^^^^^^^^^^
+   ·
+46 │ ╭           for_each_addr(v, |a| {
+   │ │ ╭──────────────────────────'
+47 │ │ │             let r = &mut R[a];
+48 │ │ │             r.v = r.v + 1;
+49 │ │ │         });
+   │ ╰─│──────────' from a call inlined at this callsite
+   │   ╰─────────' lambda argument
+
+warning: cannot derive `aborts_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/state_hofs.move:36:42
+   │
+36 │                 invariant forall j in 0..i: !aborts_of<f>(v[j]);
+   │                                              ^^^^^^^^^^^^^^^^^^
+   ·
+63 │ ╭           for_each_addr(v, |a| {
+   │ │ ╭──────────────────────────'
+64 │ │ │             let R { v: _ } = move_from<R>(a);
+65 │ │ │         });
+   │ ╰─│──────────' from a call inlined at this callsite
+   │   ╰─────────' lambda argument
+
+warning: cannot derive `aborts_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/state_hofs.move:36:42
+   │
+36 │                 invariant forall j in 0..i: !aborts_of<f>(v[j]);
+   │                                              ^^^^^^^^^^^^^^^^^^
+   ·
+79 │ ╭           for_each_addr(v, |a| {
+   │ │ ╭──────────────────────────'
+80 │ │ │             let r = &mut R[a];
+81 │ │ │             r.v = r.v + 1;
+82 │ │ │         });
+   │ ╰─│──────────' from a call inlined at this callsite
+   │   ╰─────────' lambda argument
+
+warning: cannot derive `ensures_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ tests/sources/functional/closures/inline/state_hofs.move:124:41
+    │
+124 │             invariant forall j in 0..i: ensures_of<f>(v[j]);
+    │                                         ^^^^^^^^^^^^^^^^^^^
+    ·
+135 │         for_each_addr_framed(v, |a| bump(a));
+    │         ------------------------------------
+    │         │                       │
+    │         │                       lambda argument
+    │         from a call inlined at this callsite
+
+warning: cannot derive `aborts_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ tests/sources/functional/closures/inline/state_hofs.move:125:42
+    │
+125 │             invariant forall j in 0..i: !aborts_of<f>(v[j]);
+    │                                          ^^^^^^^^^^^^^^^^^^
+    ·
+135 │         for_each_addr_framed(v, |a| bump(a));
+    │         ------------------------------------
+    │         │                       │
+    │         │                       lambda argument
+    │         from a call inlined at this callsite
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/inline/state_hofs.move:55:9
+   │
+55 │         ensures forall i in 0..len(v): R[v[i]].v == old(R[v[i]].v) + 1;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/state_hofs.move:45: bump_all
+   =     at tests/sources/functional/closures/inline/state_hofs.move:52: bump_all (spec)
+   =     at tests/sources/functional/closures/inline/state_hofs.move:53: bump_all (spec)
+   =     at tests/sources/functional/closures/inline/state_hofs.move:45: bump_all
+   =         v = <redacted>
+   =     at tests/sources/functional/closures/inline/state_hofs.move:27: for_each_addr
+   =         v = <redacted>
+   =     at tests/sources/functional/closures/inline/state_hofs.move:28: for_each_addr
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/inline/state_hofs.move:29: for_each_addr
+   =         n = <redacted>
+   =     at tests/sources/functional/closures/inline/state_hofs.move:33: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:34: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:35: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:36: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:37: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:38: for_each_addr
+   =     enter loop, variable(s) i havocked and reassigned
+   =         i = <redacted>
+   =     loop invariant holds at current state
+   =     at tests/sources/functional/closures/inline/state_hofs.move:34: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:35: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:36: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:37: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:38: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:30: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:54: bump_all (spec)
+   =     at tests/sources/functional/closures/inline/state_hofs.move:55: bump_all (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/inline/state_hofs.move:71:9
+   │
+71 │         ensures forall i in 0..len(v): !exists<R>(v[i]);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/state_hofs.move:62: remove_all
+   =     at tests/sources/functional/closures/inline/state_hofs.move:68: remove_all (spec)
+   =     at tests/sources/functional/closures/inline/state_hofs.move:69: remove_all (spec)
+   =     at tests/sources/functional/closures/inline/state_hofs.move:62: remove_all
+   =         v = <redacted>
+   =     at tests/sources/functional/closures/inline/state_hofs.move:27: for_each_addr
+   =         v = <redacted>
+   =     at tests/sources/functional/closures/inline/state_hofs.move:28: for_each_addr
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/inline/state_hofs.move:29: for_each_addr
+   =         n = <redacted>
+   =     at tests/sources/functional/closures/inline/state_hofs.move:33: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:34: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:35: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:36: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:37: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:38: for_each_addr
+   =     enter loop, variable(s) i havocked and reassigned
+   =         i = <redacted>
+   =     loop invariant holds at current state
+   =     at tests/sources/functional/closures/inline/state_hofs.move:34: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:35: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:36: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:37: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:38: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:30: for_each_addr
+   =     at tests/sources/functional/closures/inline/state_hofs.move:70: remove_all (spec)
+   =     at tests/sources/functional/closures/inline/state_hofs.move:71: remove_all (spec)
+
 error: post-condition does not hold
    ┌─ tests/sources/functional/closures/inline/state_hofs.move:88:9
    │
@@ -33,3 +209,38 @@ error: post-condition does not hold
    =     at tests/sources/functional/closures/inline/state_hofs.move:30: for_each_addr
    =     at tests/sources/functional/closures/inline/state_hofs.move:87: bump_all_wrong (spec)
    =     at tests/sources/functional/closures/inline/state_hofs.move:88: bump_all_wrong (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/inline/state_hofs.move:141:9
+    │
+141 │         ensures forall i in 0..len(v): R[v[i]].v == old(R[v[i]].v) + 1;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/inline/state_hofs.move:134: bump_all_via_call
+    =     at tests/sources/functional/closures/inline/state_hofs.move:138: bump_all_via_call (spec)
+    =     at tests/sources/functional/closures/inline/state_hofs.move:139: bump_all_via_call (spec)
+    =     at tests/sources/functional/closures/inline/state_hofs.move:134: bump_all_via_call
+    =         v = <redacted>
+    =     at tests/sources/functional/closures/inline/state_hofs.move:116: for_each_addr_framed
+    =         v = <redacted>
+    =     at tests/sources/functional/closures/inline/state_hofs.move:117: for_each_addr_framed
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/inline/state_hofs.move:118: for_each_addr_framed
+    =         n = <redacted>
+    =     at tests/sources/functional/closures/inline/state_hofs.move:122: for_each_addr_framed
+    =     at tests/sources/functional/closures/inline/state_hofs.move:123: for_each_addr_framed
+    =     at tests/sources/functional/closures/inline/state_hofs.move:124: for_each_addr_framed
+    =     at tests/sources/functional/closures/inline/state_hofs.move:125: for_each_addr_framed
+    =     at tests/sources/functional/closures/inline/state_hofs.move:126: for_each_addr_framed
+    =     at tests/sources/functional/closures/inline/state_hofs.move:128: for_each_addr_framed
+    =     enter loop, variable(s) i havocked and reassigned
+    =         i = <redacted>
+    =     loop invariant holds at current state
+    =     at tests/sources/functional/closures/inline/state_hofs.move:123: for_each_addr_framed
+    =     at tests/sources/functional/closures/inline/state_hofs.move:124: for_each_addr_framed
+    =     at tests/sources/functional/closures/inline/state_hofs.move:125: for_each_addr_framed
+    =     at tests/sources/functional/closures/inline/state_hofs.move:126: for_each_addr_framed
+    =     at tests/sources/functional/closures/inline/state_hofs.move:128: for_each_addr_framed
+    =     at tests/sources/functional/closures/inline/state_hofs.move:119: for_each_addr_framed
+    =     at tests/sources/functional/closures/inline/state_hofs.move:140: bump_all_via_call (spec)
+    =     at tests/sources/functional/closures/inline/state_hofs.move:141: bump_all_via_call (spec)

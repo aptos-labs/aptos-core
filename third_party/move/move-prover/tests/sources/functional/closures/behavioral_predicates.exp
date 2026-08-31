@@ -1,4 +1,30 @@
 Move prover returns: exiting with verification errors
+warning: WP could not characterize the aborts of `behavioral_predicates::__lambda__2__test_requires_chain` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
+  = an abort condition had no representable source-level spelling
+    ┌─ tests/sources/functional/closures/behavioral_predicates.move:390:29
+    │
+390 │         apply_with_requires(|y| apply_with_requires(|z| z + 1, y), x)
+    │                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: WP could not characterize the aborts of `behavioral_predicates::__lambda__2__test_requires_deep_nest` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
+  = an abort condition had no representable source-level spelling
+    ┌─ tests/sources/functional/closures/behavioral_predicates.move:399:33
+    │
+399 │               apply_with_requires(|b|
+    │ ╭─────────────────────────────────^
+400 │ │                 apply_with_requires(|c| c * 2, b), a), x)
+    │ ╰─────────────────────────────────────────────────^
+
+warning: WP could not characterize the aborts of `behavioral_predicates::__lambda__3__test_requires_deep_nest` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
+  = an abort condition had no representable source-level spelling
+    ┌─ tests/sources/functional/closures/behavioral_predicates.move:398:29
+    │
+398 │           apply_with_requires(|a|
+    │ ╭─────────────────────────────^
+399 │ │             apply_with_requires(|b|
+400 │ │                 apply_with_requires(|c| c * 2, b), a), x)
+    │ ╰─────────────────────────────────────────────────────^
+
 error: post-condition does not hold
    ┌─ tests/sources/functional/closures/behavioral_predicates.move:38:9
    │
@@ -65,6 +91,44 @@ error: post-condition does not hold
     =     at tests/sources/functional/closures/behavioral_predicates.move:47: apply2
     =         result = <redacted>
     =     at tests/sources/functional/closures/behavioral_predicates.move:254: test_wrong_binary (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_predicates.move:393:9
+    │
+393 │         ensures result == x + 1;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_predicates.move:389: test_requires_chain
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates.move:390: test_requires_chain
+    =     at tests/sources/functional/closures/behavioral_predicates.move:342: apply_with_requires (spec)
+    =     at tests/sources/functional/closures/behavioral_predicates.move:390: test_requires_chain
+    =     at tests/sources/functional/closures/behavioral_predicates.move:342: apply_with_requires (spec)
+    =     at tests/sources/functional/closures/behavioral_predicates.move:338: apply_with_requires
+    =         f = <redacted>
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates.move:339: apply_with_requires
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates.move:393: test_requires_chain (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_predicates.move:403:9
+    │
+403 │         ensures result == x * 2;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_predicates.move:397: test_requires_deep_nest
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates.move:398: test_requires_deep_nest
+    =     at tests/sources/functional/closures/behavioral_predicates.move:342: apply_with_requires (spec)
+    =     at tests/sources/functional/closures/behavioral_predicates.move:398: test_requires_deep_nest
+    =     at tests/sources/functional/closures/behavioral_predicates.move:342: apply_with_requires (spec)
+    =     at tests/sources/functional/closures/behavioral_predicates.move:338: apply_with_requires
+    =         f = <redacted>
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates.move:339: apply_with_requires
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates.move:403: test_requires_deep_nest (spec)
 
 error: post-condition does not hold
     ┌─ tests/sources/functional/closures/behavioral_predicates.move:540:9

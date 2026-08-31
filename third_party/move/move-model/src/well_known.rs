@@ -11,7 +11,9 @@
 use crate::{
     ast::{Exp, ExpData, Operation},
     exp_generator::ExpGenerator,
-    model::{FunId, FunctionEnv, GlobalEnv, ModuleEnv, QualifiedId, SpecFunId},
+    model::{
+        FunId, FunctionEnv, GlobalEnv, ModuleEnv, QualifiedId, QualifiedInstId, SpecFunId, StructId,
+    },
     ty::Type,
 };
 use move_core_types::function::ClosureMask;
@@ -68,6 +70,52 @@ pub const TYPE_NAME_SPEC: &str = "type_info::$type_name";
 pub const TYPE_INFO_MOVE: &str = "type_info::type_of";
 pub const TYPE_INFO_SPEC: &str = "type_info::$type_of";
 pub const TYPE_SPEC_IS_STRUCT: &str = "type_info::spec_is_struct";
+/// A native Move operation whose specification has the exact meaning of a
+/// global resource-existence test.  Its special treatment is needed because
+/// Move permits `exists<T>` only in the module which defines `T`, whereas
+/// specifications are intentionally not subject to that visibility rule.
+pub const OBJECT_SPEC_EXISTS_AT: &str = "object::spec_exists_at";
+
+/// Whether the given spec function is [`OBJECT_SPEC_EXISTS_AT`], the one
+/// spec function whose footprint is the memory of its own type parameter.
+/// Callers of a spec function attribute that through
+/// `SpecFunDecl::generic_used_memory`, which the spec rewriter seeds for
+/// this declaration.
+pub fn is_object_spec_exists_at(env: &GlobalEnv, fun: QualifiedId<SpecFunId>) -> bool {
+    let module_env = env.get_module(fun.module_id);
+    if env.get_extlib_address() != *module_env.get_name().addr() {
+        return false;
+    }
+    let decl = module_env.get_spec_fun(fun.id);
+    format!(
+        "{}::{}",
+        module_env.get_name().name().display(env.symbol_pool()),
+        decl.name.display(env.symbol_pool()),
+    ) == OBJECT_SPEC_EXISTS_AT
+}
+
+/// The resource memory a call to [`OBJECT_SPEC_EXISTS_AT`] reads, at the
+/// call's instantiation. The declaration is bodyless and its footprint is
+/// the memory of its own type parameter, which `SpecFunDecl::used_memory`
+/// cannot name. Seeding `generic_used_memory` instead is not an option: it
+/// would also widen the spec function's own Boogie signature, for which the
+/// direct `$ResourceExists` translation supplies no argument. So the memory
+/// is reported here, to the memory-usage computations that need it. `None`
+/// when the call is not [`OBJECT_SPEC_EXISTS_AT`], or its instantiation is
+/// not (yet) a concrete resource type.
+pub fn object_spec_exists_at_memory(
+    env: &GlobalEnv,
+    fun: QualifiedId<SpecFunId>,
+    inst: &[Type],
+) -> Option<QualifiedInstId<StructId>> {
+    if !is_object_spec_exists_at(env, fun) {
+        return None;
+    }
+    let Some(Type::Struct(mid, sid, targs)) = inst.first().map(|ty| ty.skip_reference()) else {
+        return None;
+    };
+    Some(mid.qualified_inst(*sid, targs.clone()))
+}
 
 /// NOTE: `type_info::type_name` and `type_name::get` are very similar.
 /// The main difference (from a prover's perspective) include:
@@ -156,6 +204,31 @@ pub fn is_memory_free_native(fun_env: &FunctionEnv) -> bool {
     MEMORY_FREE_NATIVE_MODULES
         .iter()
         .any(|name| fun_env.module_env.is_module_in_std(name))
+}
+
+/// Whether the Boogie prelude defines a concrete `$` spec function for this
+/// native Move function. Bodyless native companions are safe as direct spec
+/// calls only for this closed set; all other native companions must remain
+/// behavioral and uninterpreted.
+pub fn is_boogie_prelude_spec_native(fun_env: &FunctionEnv) -> bool {
+    let module_functions: &[(&str, &[&str])] = &[
+        (VECTOR_MODULE, &[
+            "empty",
+            "push_back",
+            "length",
+            "borrow",
+            "borrow_mut",
+            "swap",
+        ]),
+        ("bcs", &["to_bytes"]),
+        ("from_bcs", &["from_bytes"]),
+        ("hash", &["sha2_256", "sha3_256"]),
+        (SIGNER_MODULE, &["borrow_address"]),
+    ];
+    let fun_name = fun_env.get_name_str();
+    module_functions.iter().any(|(module, functions)| {
+        fun_env.module_env.is_module_in_std(module) && functions.contains(&fun_name.as_str())
+    })
 }
 
 /// True when `fun_name` is the bare name of a `std::vector` function whose

@@ -1,5 +1,6 @@
-Move prover returns: exiting with verification errors
-error: post-condition does not hold
+Move prover returns: exiting with condition generation errors
+warning: WP could not characterize the aborts of `lambda_spec_discarded_result::__lambda__1__drive` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
+  = an abort condition did not survive a memory-havocking loop
    ┌─ tests/sources/functional/closures/lambda_spec_discarded_result.move:23:15
    │
 23 │           apply(|v| {
@@ -10,13 +11,15 @@ error: post-condition does not hold
 27 │ │             };
 28 │ │         }, x)
    │ ╰─────────^
+
+error: this function has no specification but is referenced by a behavioral predicate
+   ┌─ ../move-stdlib/sources/vector.move:65:5
    │
-   =     at tests/sources/functional/closures/lambda_spec_discarded_result.move:23: drive
-   =         v = <redacted>
-   =     at tests/sources/functional/closures/lambda_spec_discarded_result.move:24: drive
-   =     at tests/sources/functional/closures/lambda_spec_discarded_result.move:25: drive
-   =     at tests/sources/functional/closures/lambda_spec_discarded_result.move:26: drive
-   =     at tests/sources/functional/closures/lambda_spec_discarded_result.move:23: drive
-   =         v = <redacted>
-   =     at tests/sources/functional/closures/lambda_spec_discarded_result.move:28: drive
-   =     at tests/sources/functional/closures/lambda_spec_discarded_result.move:23: drive
+65 │ ╭     public fun reverse<Element>(v: &mut vector<Element>) {
+66 │ │         let len = length(v);
+67 │ │         if (len == 0) return;
+68 │ │
+   · │
+75 │ │         }
+76 │ │     }
+   │ ╰─────^

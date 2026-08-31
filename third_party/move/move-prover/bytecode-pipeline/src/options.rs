@@ -78,6 +78,11 @@ pub struct ProverOptions {
     /// Whether to run spec inference instead of verification.
     #[arg(skip)]
     pub inference: bool,
+    /// Optional bounded-unrolling depth for diagnostic loop-invariant evidence.
+    /// This is populated by the inference driver and is not a standalone prover
+    /// configuration option.
+    #[arg(skip)]
+    pub loop_invariant_evidence_depth: Option<usize>,
     /// Disable auto-inference of specs for lambda-lifted functions with empty user
     /// specs in verify mode. Inference is on by default; without it, behavioral
     /// predicates over such lambdas degrade to trivial values at call sites.
@@ -119,6 +124,7 @@ impl Default for ProverOptions {
             for_interpretation: false,
             skip_loop_analysis: false,
             inference: false,
+            loop_invariant_evidence_depth: None,
             no_infer_lambda_specs: false,
             no_inference_opaque: false,
             borrow_natives: vec![],

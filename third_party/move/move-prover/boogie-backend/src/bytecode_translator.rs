@@ -7,7 +7,7 @@
 
 use crate::{
     boogie_helpers::{
-        behavioral_old_memory, boogie_address, boogie_address_blob,
+        behavioral_old_memory_instantiated, boogie_address, boogie_address_blob,
         boogie_behavioral_eval_fun_name, boogie_behavioral_fun_result_name,
         boogie_behavioral_fun_spec_name, boogie_behavioral_result_fun_name,
         boogie_behavioral_spec_fun_name, boogie_byte_blob, boogie_closure_pack_name,
@@ -43,13 +43,14 @@ use move_model::{
     code_writer::CodeWriter,
     emit, emitln,
     model::{
-        FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, QualifiedInstId,
-        StructEnv, StructId,
+        FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, QualifiedId,
+        QualifiedInstId, StructEnv, StructId,
     },
     pragmas::{
-        ABORTS_IF_IS_PARTIAL_PRAGMA, ADDITION_OVERFLOW_UNCHECKED_PRAGMA, INTRINSIC_TYPE_MAP,
-        SEED_PRAGMA, TIMEOUT_PRAGMA, VERIFY_DURATION_ESTIMATE_PRAGMA,
+        ADDITION_OVERFLOW_UNCHECKED_PRAGMA, INTRINSIC_TYPE_MAP, SEED_PRAGMA, TIMEOUT_PRAGMA,
+        VERIFY_DURATION_ESTIMATE_PRAGMA,
     },
+    spec_derivation,
     spec_translator::wrap_mut_ref_spec_fun_inputs_deep,
     symbol::Symbol,
     ty::{PrimitiveType, Type, TypeDisplayContext, BOOL_TYPE},
@@ -126,66 +127,39 @@ pub struct StructTranslator<'env> {
 }
 
 /// Context for computing Boogie function names when translating a data-invariant
-/// body. Struct-field and function-parameter axiom variants use different name
-/// helpers; this enum selects the correct one based on the BP kind being emitted,
-/// so a body containing mixed kinds (e.g. `!aborts_of<f>(..) ==> result_of<f>(..) <= y`)
-/// translates to the right bool-returning / int-returning Boogie functions for
-/// each call.
-enum BpAxiomCtx<'a> {
-    StructField {
-        struct_id: &'a QualifiedInstId<StructId>,
-        field_sym: Symbol,
-    },
-    FunParam {
-        fun: &'a QualifiedInstId<FunId>,
-        param_sym: Symbol,
-        /// Instantiation of the struct declaring the invariant being lifted;
-        /// the invariant body's type parameters are the struct's.
-        struct_inst: &'a [Type],
-    },
+/// body over a struct's function-valued field: selects the correct witness
+/// function per BP kind being emitted, so a body containing mixed kinds (e.g.
+/// `!aborts_of<f>(..) ==> result_of<f>(..) <= y`) translates to the right
+/// bool-returning / int-returning Boogie functions for each call.
+struct BpAxiomCtx<'a> {
+    struct_id: &'a QualifiedInstId<StructId>,
+    field_sym: Symbol,
 }
 
 impl BpAxiomCtx<'_> {
     /// The type instantiation to apply to node types read from the invariant
-    /// body: the declaring struct's instantiation in both variants.
+    /// body: the declaring struct's instantiation.
     fn struct_inst(&self) -> &[Type] {
-        match self {
-            BpAxiomCtx::StructField { struct_id, .. } => &struct_id.inst,
-            BpAxiomCtx::FunParam { struct_inst, .. } => struct_inst,
-        }
+        &self.struct_id.inst
     }
 
     fn bp_fun_name(&self, env: &GlobalEnv, kind: BehaviorKind) -> String {
-        match self {
-            BpAxiomCtx::StructField {
-                struct_id,
-                field_sym,
-            } => {
-                if kind == BehaviorKind::ResultOf {
-                    boogie_struct_field_result_fun_name(
-                        env,
-                        struct_id,
-                        *field_sym,
-                        &struct_id.inst,
-                        false,
-                    )
-                } else {
-                    boogie_struct_field_spec_fun_name(
-                        env,
-                        struct_id,
-                        *field_sym,
-                        kind,
-                        &struct_id.inst,
-                    )
-                }
-            },
-            BpAxiomCtx::FunParam { fun, param_sym, .. } => {
-                if kind == BehaviorKind::ResultOf {
-                    boogie_behavioral_result_fun_name(env, fun, *param_sym, &[], false)
-                } else {
-                    boogie_behavioral_spec_fun_name(env, fun, *param_sym, kind, &[])
-                }
-            },
+        if kind == BehaviorKind::ResultOf {
+            boogie_struct_field_result_fun_name(
+                env,
+                self.struct_id,
+                self.field_sym,
+                &self.struct_id.inst,
+                false,
+            )
+        } else {
+            boogie_struct_field_spec_fun_name(
+                env,
+                self.struct_id,
+                self.field_sym,
+                kind,
+                &self.struct_id.inst,
+            )
         }
     }
 }
@@ -206,8 +180,9 @@ struct MemArgSlot {
 /// match the ground terms the procedure produces.
 struct BpMemArgs {
     slots: Vec<MemArgSlot>,
-    /// Struct-field variants use `"n"`; fun-param variants use `None`.
-    instance_id: Option<String>,
+    /// The struct-instance discriminator threaded through the witness
+    /// functions of a function-valued struct field.
+    instance_id: String,
 }
 
 impl BpMemArgs {
@@ -226,9 +201,7 @@ impl BpMemArgs {
                 parts.push(slot.cur.clone());
             }
         }
-        if let Some(n) = &self.instance_id {
-            parts.push(n.clone());
-        }
+        parts.push(self.instance_id.clone());
         parts.join(", ")
     }
 
@@ -248,9 +221,7 @@ impl BpMemArgs {
                 parts.push(slot.cur.clone());
             }
         }
-        if let Some(n) = &self.instance_id {
-            parts.push(n.clone());
-        }
+        parts.push(self.instance_id.clone());
         parts.join(", ")
     }
 }
@@ -811,6 +782,10 @@ impl<'env> BoogieTranslator<'env> {
         // Emit function types and closures
         let empty_param_infos = BTreeSet::new();
         let empty_struct_field_infos = BTreeSet::new();
+        // A behavioral spec function is named after its target function alone,
+        // so one target reachable under several function types (for instance
+        // differing only in abilities) must still be declared once per file.
+        let mut declared_behavioral_funs: BTreeSet<QualifiedInstId<FunId>> = BTreeSet::new();
         for (fun_type, closure_infos) in &mono_info.fun_infos {
             let fun_param_infos = mono_info
                 .fun_param_infos
@@ -827,6 +802,7 @@ impl<'env> BoogieTranslator<'env> {
                 struct_field_infos,
                 &translated_memory,
                 &mono_info,
+                &mut declared_behavioral_funs,
             )
         }
 
@@ -843,6 +819,7 @@ impl<'env> BoogieTranslator<'env> {
         struct_field_infos: &BTreeSet<StructFieldInfo>,
         memory: &[(QualifiedInstId<StructId>, String)],
         mono_info: &mono_analysis::MonoInfo,
+        declared_behavioral_funs: &mut BTreeSet<QualifiedInstId<FunId>>,
     ) {
         emitln!(
             self.writer,
@@ -910,7 +887,7 @@ impl<'env> BoogieTranslator<'env> {
                 if is_last { "" } else { "," }
             );
         }
-        // Add struct field variants for storable function-typed fields.
+        // Add struct field variants for function-typed fields.
         // These carry an `n: int` parameter to distinguish different struct instances.
         for (idx, info) in struct_field_infos.iter().enumerate() {
             let struct_env = self.env.get_struct_qid(info.struct_id.to_qualified_id());
@@ -1039,12 +1016,12 @@ impl<'env> BoogieTranslator<'env> {
                     || !struct_field_infos.is_empty());
         if needs_behavior {
             self.generate_behavioral_spec_funs_for_params(fun_type, fun_param_infos);
-            self.generate_behavioral_spec_funs_for_struct_fields(
+            self.generate_behavioral_spec_funs_for_struct_fields(fun_type, struct_field_infos);
+            self.generate_behavioral_spec_funs_for_functions(
                 fun_type,
-                struct_field_infos,
-                fun_param_infos,
+                closure_infos,
+                declared_behavioral_funs,
             );
-            self.generate_behavioral_spec_funs_for_functions(fun_type, closure_infos);
             for kind in [
                 BehaviorKind::RequiresOf,
                 BehaviorKind::AbortsOf,
@@ -1535,13 +1512,13 @@ impl<'env> BoogieTranslator<'env> {
             .expect("closure mask compose failed");
 
         // Build memory args (pre-state: both old and current slots use same variable)
-        let fun_mem_args = self.build_spec_memory_args(
-            &fun_env.get_spec_used_memory(),
-            &behavioral_old_memory(fun_env),
+        let inst_used = spec_derivation::behavioral_target_memory(
+            self.env,
+            info.fun.to_qualified_id(),
             &info.fun.inst,
-            &None,
-            None,
         );
+        let inst_old = behavioral_old_memory_instantiated(fun_env, &info.fun.inst);
+        let fun_mem_args = self.build_spec_memory_args(&inst_used, &inst_old, &[], &None, None);
         let bp_args = fun_mem_args.iter().chain(bp_arg_list.iter()).join(", ");
 
         let aborts_name =
@@ -1557,16 +1534,6 @@ impl<'env> BoogieTranslator<'env> {
         let frame_access = self.closure_frame_to_apply_frame(&frame_access_raw, &bp_arg_list);
 
         // Get spec memory for building post-state args
-        let inst_used: BTreeSet<_> = fun_env
-            .get_spec_used_memory()
-            .iter()
-            .map(|m| m.clone().instantiate(&info.fun.inst))
-            .collect();
-        let inst_old: BTreeSet<_> = behavioral_old_memory(fun_env)
-            .into_iter()
-            .map(|m| m.instantiate(&info.fun.inst))
-            .collect();
-
         self.emit_behavioral_predicate_body(
             &aborts_name,
             &ensures_name,
@@ -2767,6 +2734,34 @@ impl<'env> BoogieTranslator<'env> {
         }
     }
 
+    /// Whether a behavioral predicate names `fun` concretely.
+    ///
+    /// A predicate whose function argument is a closure over a named function
+    /// asks about that function's published contract. A predicate over a
+    /// function value — a parameter, local, or struct field — resolves through
+    /// the per-type evaluator instead and is not covered here.
+    fn named_by_behavioral_predicate(&self, fun: &QualifiedId<FunId>) -> bool {
+        self.env.get_modules().any(|module| {
+            module.is_target()
+                && module.get_functions().any(|caller| {
+                    caller.get_spec().conditions.iter().any(|cond| {
+                        cond.all_exps().any(|exp| {
+                            exp.any(&mut |e| {
+                                let ExpData::Call(_, AstOperation::Behavior(..), args) = e else {
+                                    return false;
+                                };
+                                matches!(
+                                    args.first().map(|a| a.as_ref()),
+                                    Some(ExpData::Call(_, AstOperation::Closure(mid, fid, _), _))
+                                        if mid.qualified(*fid) == *fun
+                                )
+                            })
+                        })
+                    })
+                })
+        })
+    }
+
     /// Whether `e` applies a behavioral predicate to a function VALUE (not a
     /// concrete closure) whose per-type evaluator takes memory arguments.
     /// `inst` instantiates the enclosing closure target's type parameters.
@@ -2861,16 +2856,18 @@ impl<'env> BoogieTranslator<'env> {
         &self,
         fun_type: &Type,
         closure_infos: &BTreeSet<ClosureInfo>,
+        declared_funs: &mut BTreeSet<QualifiedInstId<FunId>>,
     ) {
         let Type::Fun(_params, results, _abilities) = fun_type else {
             return;
         };
         let results_flat = results.clone().flatten();
 
-        // Deduplicate by qualified function id (different masks may target the same function)
-        let mut seen_funs: BTreeSet<QualifiedInstId<FunId>> = BTreeSet::new();
+        // Deduplicate by qualified function id. Different masks may target the
+        // same function, and the same target may be reached from more than one
+        // function type; the emitted names depend only on the target.
         for info in closure_infos {
-            if !seen_funs.insert(info.fun.clone()) {
+            if !declared_funs.insert(info.fun.clone()) {
                 continue;
             }
             let fun_env = self.env.get_function(info.fun.to_qualified_id());
@@ -2906,17 +2903,30 @@ impl<'env> BoogieTranslator<'env> {
                 );
             }
 
+            // A concrete target without a specification publishes no contract,
+            // and there is no sound default for one. A sound encoding may exist
+            // (e.g. via uninterpreted functions); for now this is restricted.
+            // A predicate over this function type reaches every target of the
+            // type through the evaluator, however the value is named -- as a
+            // closure, parameter, local, or struct field.
+            if closure_spec.conditions.is_empty()
+                && !fun_env.is_native()
+                && self.named_by_behavioral_predicate(&info.fun.to_qualified_id())
+            {
+                self.env.error(
+                    &fun_env.get_loc(),
+                    "this function has no specification but is referenced by a behavioral \
+                     predicate",
+                );
+            }
+
             // Get function's spec memory
-            let used_memory = fun_env.get_spec_used_memory();
-            let old_memory = behavioral_old_memory(&fun_env);
-            let inst_used: BTreeSet<_> = used_memory
-                .iter()
-                .map(|m| m.clone().instantiate(&info.fun.inst))
-                .collect();
-            let inst_old: BTreeSet<_> = old_memory
-                .iter()
-                .map(|m| m.clone().instantiate(&info.fun.inst))
-                .collect();
+            let inst_used = spec_derivation::behavioral_target_memory(
+                self.env,
+                info.fun.to_qualified_id(),
+                &info.fun.inst,
+            );
+            let inst_old = behavioral_old_memory_instantiated(&fun_env, &info.fun.inst);
             let (mem_param_decls, mem_args) =
                 Self::build_memory_params(self.env, &inst_used, &inst_old);
 
@@ -2940,30 +2950,6 @@ impl<'env> BoogieTranslator<'env> {
                 .any(|ty| matches!(ty.skip_reference(), Type::Fun(..)));
             for kind in [BehaviorKind::RequiresOf, BehaviorKind::AbortsOf] {
                 let bp_name = boogie_behavioral_fun_spec_name(self.env, &info.fun, kind);
-                let has_complete_aborts = (closure_spec
-                    .filter_kind(ConditionKind::AbortsIf)
-                    .next()
-                    .is_some()
-                    || self
-                        .env
-                        .get_intrinsics()
-                        .get_abort_spec_fun_for_move_fun(&fun_env.get_qualified_id())
-                        .is_some())
-                    && !fun_env.is_pragma_true(ABORTS_IF_IS_PARTIAL_PRAGMA, || false);
-                if kind == BehaviorKind::AbortsOf
-                    && !has_complete_aborts
-                    && (fun_env.is_pragma_true(ABORTS_IF_IS_PARTIAL_PRAGMA, || false)
-                        || fun_env.is_opaque()
-                        || fun_env.is_native_or_intrinsic())
-                {
-                    emitln!(
-                        self.writer,
-                        "function {}({}): bool;",
-                        bp_name,
-                        input_param_decls.join(", ")
-                    );
-                    continue;
-                }
                 let body = self.translate_fun_spec_conditions(
                     &fun_env,
                     &closure_spec,
@@ -2971,18 +2957,7 @@ impl<'env> BoogieTranslator<'env> {
                     &info.fun.inst,
                     &inst_old,
                 );
-                if let Some(body) = body {
-                    let condition_kind = if kind == BehaviorKind::RequiresOf {
-                        ConditionKind::Requires
-                    } else {
-                        ConditionKind::AbortsIf
-                    };
-                    let has_existential =
-                        closure_spec.filter_kind(condition_kind).any(|condition| {
-                            condition.exp.any(&mut |exp| {
-                                matches!(exp, ExpData::Quant(_, QuantKind::Exists, ..))
-                            })
-                        });
+                if let Some((body, has_existential)) = body {
                     let inline_attr = if is_higher_order || !has_existential {
                         "{:inline} "
                     } else {
@@ -3119,6 +3094,7 @@ impl<'env> BoogieTranslator<'env> {
                         &info.fun.inst,
                         &inst_old,
                     )
+                    .map(|(body, _)| body)
                 };
 
                 // ensures_of uses "r0" as the result variable name
@@ -3187,13 +3163,15 @@ impl<'env> BoogieTranslator<'env> {
                     &precond,
                 );
 
-                let ensures_body = self.translate_fun_spec_conditions(
-                    &fun_env,
-                    &closure_spec,
-                    BehaviorKind::EnsuresOf,
-                    &info.fun.inst,
-                    &inst_old,
-                );
+                let ensures_body = self
+                    .translate_fun_spec_conditions(
+                        &fun_env,
+                        &closure_spec,
+                        BehaviorKind::EnsuresOf,
+                        &info.fun.inst,
+                        &inst_old,
+                    )
+                    .map(|(body, _)| body);
                 if let Some(ensures_body) = ensures_body {
                     emitln!(
                         self.writer,
@@ -3239,13 +3217,15 @@ impl<'env> BoogieTranslator<'env> {
                     );
                 }
             } else {
-                let ensures_body = self.translate_fun_spec_conditions(
-                    &fun_env,
-                    &closure_spec,
-                    BehaviorKind::EnsuresOf,
-                    &info.fun.inst,
-                    &inst_old,
-                );
+                let ensures_body = self
+                    .translate_fun_spec_conditions(
+                        &fun_env,
+                        &closure_spec,
+                        BehaviorKind::EnsuresOf,
+                        &info.fun.inst,
+                        &inst_old,
+                    )
+                    .map(|(body, _)| body);
                 if let Some(ensures_body) = ensures_body {
                     emitln!(
                         self.writer,
@@ -3266,8 +3246,11 @@ impl<'env> BoogieTranslator<'env> {
         }
     }
 
-    /// Translate a function's spec conditions of the given kind to a Boogie expression.
-    /// Returns `None` when the predicate must remain uninterpreted.
+    /// Translate a function's spec conditions of the given kind to a Boogie
+    /// expression, together with whether the result contains an existential
+    /// quantifier (such bodies are kept opaque by the caller to avoid
+    /// re-Skolemization at each use). Returns `None` when the predicate must
+    /// remain uninterpreted.
     fn translate_fun_spec_conditions(
         &self,
         fun_env: &FunctionEnv<'_>,
@@ -3275,52 +3258,105 @@ impl<'env> BoogieTranslator<'env> {
         kind: BehaviorKind,
         type_inst: &[Type],
         old_memory: &BTreeSet<QualifiedInstId<StructId>>,
-    ) -> Option<String> {
+    ) -> Option<(String, bool)> {
         let conditions: Vec<_> = closure_spec
             .conditions
             .iter()
-            .filter(|c| match kind {
-                BehaviorKind::RequiresOf => matches!(c.kind, ConditionKind::Requires),
-                BehaviorKind::AbortsOf => matches!(c.kind, ConditionKind::AbortsIf),
-                BehaviorKind::EnsuresOf => matches!(c.kind, ConditionKind::Ensures),
-                // ResultOf/WriteOf are uninterpreted Skolems; the axiom in
-                // `generate_result_of_function_and_axiom` ties them to `ensures_of`.
-                // UnchangedOf/FoldsOf are not supported on function values
-                // (rejected in the spec translator) and have no
-                // spec-condition counterpart.
-                BehaviorKind::ResultOf
-                | BehaviorKind::WriteOf(_)
-                | BehaviorKind::UnchangedOf
-                | BehaviorKind::FoldsOf => false,
+            .filter(|c| {
+                let has_kind = match kind {
+                    BehaviorKind::RequiresOf => matches!(c.kind, ConditionKind::Requires),
+                    BehaviorKind::AbortsOf => matches!(c.kind, ConditionKind::AbortsIf),
+                    BehaviorKind::EnsuresOf => matches!(c.kind, ConditionKind::Ensures),
+                    // ResultOf/WriteOf are uninterpreted Skolems; the axiom in
+                    // `generate_result_of_function_and_axiom` ties them to `ensures_of`.
+                    // UnchangedOf/FoldsOf are not supported on function values
+                    // (rejected in the spec translator) and have no
+                    // spec-condition counterpart.
+                    BehaviorKind::ResultOf
+                    | BehaviorKind::WriteOf(_)
+                    | BehaviorKind::UnchangedOf
+                    | BehaviorKind::FoldsOf => false,
+                };
+                if !has_kind {
+                    return false;
+                }
+                // As in ordinary call-spec translation: concrete conditions are
+                // proof-only, injected ones are visible only if exported.
+                spec_derivation::condition_is_caller_visible(fun_env.module_env.env, c)
             })
             .collect();
 
-        if conditions.is_empty() {
+        let intrinsic_abort_spec_fun = self
+            .env
+            .get_intrinsics()
+            .get_abort_spec_fun_for_move_fun(&fun_env.get_qualified_id());
+
+        // A specification characterizes a function's aborts exactly only if
+        // it states abort conditions and does not declare them a lower bound.
+        // With no `aborts_if` there is nothing which constrains the aborts,
+        // so a `false` default would claim an unchecked absence of aborts,
+        // which a caller assuming the contract (an opaque callee, a data
+        // invariant) can rely on. The function's own body is then the
+        // authoritative source; derive the abort behavior from it exactly, as
+        // the inliner does for a spec-less lambda argument. Where even that is
+        // not exactly describable, the predicate stays uninterpreted:
+        // everything else is still proven, modulo unknown aborts.
+        let derived_aborts = if kind == BehaviorKind::AbortsOf
+            && !spec_derivation::spec_aborts_are_exact(self.env, fun_env.get_qualified_id())
+        {
+            Some(spec_derivation::derive_fun_aborts_conditions(
+                self.env,
+                fun_env.get_qualified_id(),
+                type_inst,
+            )?)
+        } else {
+            None
+        };
+
+        // The expressions to translate, paired with the condition kind they
+        // are phrased as. Derived abort conditions carry no spec `let`s.
+        let items: Vec<(ConditionKind, Exp)> = match derived_aborts.as_ref() {
+            Some(exps) => exps
+                .iter()
+                .map(|exp| (ConditionKind::AbortsIf, exp.clone()))
+                .collect(),
+            None => conditions
+                .iter()
+                .map(|cond| (cond.kind.clone(), cond.exp.clone()))
+                .collect(),
+        };
+
+        if items.is_empty() {
             // For intrinsic functions with abort-condition spec functions registered,
             // emit a call to the abort spec function instead of the default "false".
             if matches!(kind, BehaviorKind::AbortsOf) {
-                if let Some(abort_spec_qid) = self
-                    .env
-                    .get_intrinsics()
-                    .get_abort_spec_fun_for_move_fun(&fun_env.get_qualified_id())
-                {
+                if let Some(abort_spec_qid) = intrinsic_abort_spec_fun {
                     let spec_mod_env = self.env.get_module(abort_spec_qid.module_id);
                     let boogie_name =
                         boogie_spec_fun_name(&spec_mod_env, abort_spec_qid.id, type_inst, false);
                     let param_count = fun_env.get_parameter_count();
                     let params: Vec<String> = (0..param_count).map(|i| format!("p{}", i)).collect();
-                    return Some(format!("{}({})", boogie_name, params.join(", ")));
+                    return Some((format!("{}({})", boogie_name, params.join(", ")), false));
                 }
             }
-            return Some(match kind {
-                BehaviorKind::RequiresOf | BehaviorKind::EnsuresOf => "true".to_string(),
-                BehaviorKind::AbortsOf => "false".to_string(),
-                BehaviorKind::ResultOf
-                | BehaviorKind::WriteOf(_)
-                | BehaviorKind::UnchangedOf
-                | BehaviorKind::FoldsOf => "true".to_string(),
-            });
+            return Some((
+                match kind {
+                    BehaviorKind::RequiresOf | BehaviorKind::EnsuresOf => "true".to_string(),
+                    // Reached only with a derivation which proved the
+                    // function abort-free.
+                    BehaviorKind::AbortsOf => "false".to_string(),
+                    BehaviorKind::ResultOf
+                    | BehaviorKind::WriteOf(_)
+                    | BehaviorKind::UnchangedOf
+                    | BehaviorKind::FoldsOf => "true".to_string(),
+                },
+                false,
+            ));
         }
+
+        let has_existential = items.iter().any(|(_, exp)| {
+            exp.any(&mut |exp| matches!(exp, ExpData::Quant(_, QuantKind::Exists, ..)))
+        });
 
         let num_params = fun_env.get_parameter_count();
         let num_results = fun_env.get_return_count();
@@ -3335,15 +3371,19 @@ impl<'env> BoogieTranslator<'env> {
 
         let is_two_state = !old_memory.is_empty() || fun_env.spec_uses_old();
 
-        let translated: Vec<_> = conditions
+        let translated: Vec<_> = items
             .iter()
-            .map(|cond| {
-                let exp = self.wrap_behavioral_condition_with_lets(
-                    closure_spec,
-                    &cond.kind,
-                    is_two_state,
-                    &cond.exp,
-                );
+            .map(|(cond_kind, cond_exp)| {
+                let exp = if derived_aborts.is_some() {
+                    cond_exp.clone()
+                } else {
+                    self.wrap_behavioral_condition_with_lets(
+                        closure_spec,
+                        cond_kind,
+                        is_two_state,
+                        cond_exp,
+                    )
+                };
                 // Calls to two-state spec funs with `&mut` parameters take a
                 // doubled `(old(arg), arg)` pair per `&mut` slot in Boogie.
                 // Instrumentation doubles them for procedure contexts; here
@@ -3431,7 +3471,7 @@ impl<'env> BoogieTranslator<'env> {
             BehaviorKind::ResultOf
             | BehaviorKind::WriteOf(_)
             | BehaviorKind::UnchangedOf
-            | BehaviorKind::FoldsOf => return Some("true".to_string()),
+            | BehaviorKind::FoldsOf => return Some(("true".to_string(), false)),
         };
 
         // Collect intermediate labels from conditions that need existential wrapping.
@@ -3443,8 +3483,8 @@ impl<'env> BoogieTranslator<'env> {
         let temp_writer = CodeWriter::new(self.env.internal_loc());
         let temp_trans = SpecTranslator::new(&temp_writer, self.env, self.options);
         let mut all_labels = BTreeSet::new();
-        for cond in &conditions {
-            all_labels.extend(temp_trans.collect_intermediate_labels_from_exp(&cond.exp));
+        for (_, exp) in &items {
+            all_labels.extend(temp_trans.collect_intermediate_labels_from_exp(exp));
         }
         let result = if all_labels.is_empty() {
             joined
@@ -3621,7 +3661,7 @@ impl<'env> BoogieTranslator<'env> {
                 },
             }
         }
-        Some(result)
+        Some((result, has_existential))
     }
 
     /// Wraps a condition expression with `(var sym := binding; body)` for each
@@ -3714,9 +3754,8 @@ impl<'env> BoogieTranslator<'env> {
         let mut old_memory_resources: BTreeSet<QualifiedInstId<StructId>> = BTreeSet::new();
         for info in closure_infos.iter() {
             let fun_env = env.get_function(info.fun.to_qualified_id());
-            for mem in behavioral_old_memory(&fun_env) {
-                old_memory_resources.insert(mem.clone().instantiate(&info.fun.inst));
-            }
+            old_memory_resources
+                .extend(behavioral_old_memory_instantiated(&fun_env, &info.fun.inst));
         }
         for info in fun_param_infos.iter() {
             let (_, old) = Self::get_param_memory(env, &info.fun, info.param_sym);
@@ -3741,12 +3780,12 @@ impl<'env> BoogieTranslator<'env> {
         let mut union_old_memory = BTreeSet::new();
         for info in closure_infos {
             let fun_env = env.get_function(info.fun.to_qualified_id());
-            for mem in fun_env.get_spec_used_memory().iter() {
-                union_used_memory.insert(mem.clone().instantiate(&info.fun.inst));
-            }
-            for mem in behavioral_old_memory(&fun_env) {
-                union_old_memory.insert(mem.clone().instantiate(&info.fun.inst));
-            }
+            union_used_memory.extend(spec_derivation::behavioral_target_memory(
+                env,
+                info.fun.to_qualified_id(),
+                &info.fun.inst,
+            ));
+            union_old_memory.extend(behavioral_old_memory_instantiated(&fun_env, &info.fun.inst));
         }
         for info in fun_param_infos {
             let (used, old) = Self::get_param_memory(env, &info.fun, info.param_sym);
@@ -3784,10 +3823,9 @@ impl<'env> BoogieTranslator<'env> {
         fun_env: &FunctionEnv,
         inst: &[Type],
     ) -> Vec<String> {
-        let used = fun_env.get_spec_used_memory();
-        let old = behavioral_old_memory(fun_env);
-        let inst_used: BTreeSet<_> = used.iter().map(|m| m.clone().instantiate(inst)).collect();
-        let inst_old: BTreeSet<_> = old.into_iter().map(|m| m.instantiate(inst)).collect();
+        let inst_used =
+            spec_derivation::behavioral_target_memory(env, fun_env.get_qualified_id(), inst);
+        let inst_old = behavioral_old_memory_instantiated(fun_env, inst);
         let (_, args) = Self::build_memory_params(env, &inst_used, &inst_old);
         args
     }
@@ -4208,7 +4246,6 @@ impl<'env> BoogieTranslator<'env> {
         &self,
         fun_type: &Type,
         struct_field_infos: &BTreeSet<StructFieldInfo>,
-        fun_param_infos: &BTreeSet<FunParamInfo>,
     ) {
         let Type::Fun(params, results, _) = fun_type else {
             return;
@@ -4221,7 +4258,6 @@ impl<'env> BoogieTranslator<'env> {
             let struct_env = self.env.get_struct_qid(info.struct_id.to_qualified_id());
             let field_access = struct_env.get_field_access_of();
             let access_decl = field_access.iter().find(|a| a.fun_param == info.field_sym);
-            let has_memory = access_decl.is_some();
 
             // Build memory parameter declarations if the field has access declarations.
             // `slots` captures the (old, cur) structure per memory type so that the
@@ -4293,7 +4329,6 @@ impl<'env> BoogieTranslator<'env> {
                 ));
                 input_args.push(format!("arg{}", i));
             }
-            let _ = has_memory;
 
             let precond = Self::validity_precondition(self.env, &params, "arg");
             // Structured memory-arg carrier for the axiom body translator.
@@ -4302,7 +4337,7 @@ impl<'env> BoogieTranslator<'env> {
             // emission (see spec_translator.rs:1712,1828).
             let sf_mem_args = BpMemArgs {
                 slots,
-                instance_id: Some("n".to_string()),
+                instance_id: "n".to_string(),
             };
 
             // For requires_of and aborts_of: generate uninterpreted predicates
@@ -4371,18 +4406,7 @@ impl<'env> BoogieTranslator<'env> {
                 // invariant's own BP-call occurrences, so no single trigger
                 // application is passed in.
                 {
-                    let data_param_decls: Vec<String> = params
-                        .iter()
-                        .enumerate()
-                        .map(|(i, ty)| {
-                            format!(
-                                "arg{}: {}",
-                                i,
-                                boogie_type(self.env, ty.skip_reference(), false)
-                            )
-                        })
-                        .collect();
-                    let sf_ctx = BpAxiomCtx::StructField {
+                    let sf_ctx = BpAxiomCtx {
                         struct_id: &info.struct_id,
                         field_sym: info.field_sym,
                     };
@@ -4392,6 +4416,16 @@ impl<'env> BoogieTranslator<'env> {
                         BehaviorKind::AbortsOf,
                         BehaviorKind::RequiresOf,
                     ] {
+                        // The invariant is emitted only for the struct-field
+                        // witness functions. A function-typed PARAMETER of the
+                        // same function type must NOT inherit it: a verified
+                        // function assumes its parameter equals its abstract
+                        // parameter variant, and a caller can pass any value
+                        // of the type -- not only ones drawn from a field
+                        // guarded by this invariant. A callee which needs the
+                        // property states it as a `requires`, which the call
+                        // site checks against the actual argument (where the
+                        // struct-field witness axiom applies).
                         self.emit_data_invariant_axiom_for_behavior(
                             info,
                             kind,
@@ -4401,49 +4435,6 @@ impl<'env> BoogieTranslator<'env> {
                             &params,
                             &precond,
                         );
-                        // Also emit for function parameter variants (the
-                        // evaluator dispatch branches on discriminator tag, so
-                        // both variants must be constrained).
-                        for fp_info in fun_param_infos {
-                            let (fp_used_memory, fp_old_memory) =
-                                Self::get_param_memory(self.env, &fp_info.fun, fp_info.param_sym);
-                            let (mut fp_input_param_decls, _) = Self::build_memory_params(
-                                self.env,
-                                &fp_used_memory,
-                                &fp_old_memory,
-                            );
-                            fp_input_param_decls.extend(data_param_decls.iter().cloned());
-                            let fp_mem_args = BpMemArgs {
-                                slots: fp_used_memory
-                                    .iter()
-                                    .map(|memory| {
-                                        let name =
-                                            boogie_resource_memory_name(self.env, memory, &None);
-                                        MemArgSlot {
-                                            old: fp_old_memory
-                                                .contains(memory)
-                                                .then(|| format!("old_{}", name)),
-                                            cur: name,
-                                        }
-                                    })
-                                    .collect(),
-                                instance_id: None,
-                            };
-                            let fp_ctx = BpAxiomCtx::FunParam {
-                                fun: &fp_info.fun,
-                                param_sym: fp_info.param_sym,
-                                struct_inst: &info.struct_id.inst,
-                            };
-                            self.emit_data_invariant_axiom_for_behavior(
-                                info,
-                                kind,
-                                &fp_input_param_decls,
-                                &fp_ctx,
-                                &fp_mem_args,
-                                &params,
-                                &precond,
-                            );
-                        }
                     }
                 }
                 let body = format!("{}({}) == result0", result_fun_name, input_args_str);
@@ -5161,7 +5152,7 @@ impl StructTranslator<'_> {
 
     /// Return identity constraint for a function-valued field `f` if it has a
     /// `StructFieldInfo` entry, e.g. `s->$0_Continuation is $struct_field'State$0'`.
-    /// Returns `None` if the field isn't a storable function type with a StructFieldInfo.
+    /// Returns `None` if the field has no function type with a StructFieldInfo.
     pub fn boogie_field_identity_constraint(
         &self,
         field: &FieldEnv<'_>,
@@ -5169,31 +5160,28 @@ impl StructTranslator<'_> {
     ) -> Option<String> {
         let env = self.parent.env;
         let field_ty = field.get_type().instantiate(self.type_inst);
-        if let Type::Fun(_, _, abilities) = &field_ty {
-            if abilities.has_store() {
-                let mono_info = mono_analysis::get_info(env);
-                // Keys must derive from the same canonical forms the
-                // registration uses (`check_struct_fun_field`): the deep
-                // `normalize_fun` for the function type, and
-                // ability-normalized instantiation arguments for the
-                // containing struct.
-                let normalized = field_ty.clone().normalize_fun();
-                let struct_qid = self.struct_env.get_qualified_id().instantiate(
-                    self.type_inst
-                        .iter()
-                        .map(|t| t.clone().normalize_nested_funs())
-                        .collect(),
-                );
-                if let Some(field_infos) = mono_info.fun_struct_field_infos.get(&normalized) {
-                    let has_entry = field_infos.iter().any(|info| {
-                        info.struct_id == struct_qid && info.field_sym == field.get_name()
-                    });
-                    if has_entry {
-                        let sel = format!("s->{}", boogie_field_sel(field));
-                        let ctor_name =
-                            boogie_struct_field_name(env, &struct_qid, field.get_name());
-                        return Some(format!("{}{} is {}", sep, sel, ctor_name));
-                    }
+        if let Type::Fun(..) = &field_ty {
+            let mono_info = mono_analysis::get_info(env);
+            // Keys must derive from the same canonical forms the
+            // registration uses (`check_struct_fun_field`): the deep
+            // `normalize_fun` for the function type, and
+            // ability-normalized instantiation arguments for the
+            // containing struct.
+            let normalized = field_ty.clone().normalize_fun();
+            let struct_qid = self.struct_env.get_qualified_id().instantiate(
+                self.type_inst
+                    .iter()
+                    .map(|t| t.clone().normalize_nested_funs())
+                    .collect(),
+            );
+            if let Some(field_infos) = mono_info.fun_struct_field_infos.get(&normalized) {
+                let has_entry = field_infos
+                    .iter()
+                    .any(|info| info.struct_id == struct_qid && info.field_sym == field.get_name());
+                if has_entry {
+                    let sel = format!("s->{}", boogie_field_sel(field));
+                    let ctor_name = boogie_struct_field_name(env, &struct_qid, field.get_name());
+                    return Some(format!("{}{} is {}", sep, sel, ctor_name));
                 }
             }
         }
@@ -6285,14 +6273,16 @@ impl FunctionTranslator<'_> {
                         };
                     if let Some((inst, mid, fid)) = closure_info {
                         let closure_fun_env = env.get_function(mid.qualified(fid));
-                        for memory in closure_fun_env.get_spec_used_memory().iter() {
-                            let memory = memory.clone().instantiate(&inst);
+                        for memory in spec_derivation::behavioral_target_memory(
+                            env,
+                            mid.qualified(fid),
+                            &inst,
+                        ) {
                             for label in range.labels() {
                                 result.insert((label, memory.clone()));
                             }
                         }
-                        for memory in behavioral_old_memory(&closure_fun_env) {
-                            let memory = memory.clone().instantiate(&inst);
+                        for memory in behavioral_old_memory_instantiated(&closure_fun_env, &inst) {
                             for label in range.labels() {
                                 result.insert((label, memory.clone()));
                             }
@@ -8803,7 +8793,7 @@ impl FunctionTranslator<'_> {
     }
 
     /// Emit identity assumptions for function-valued struct fields.
-    /// After a WellFormed assume for a struct with storable function-typed fields,
+    /// After a WellFormed assume for a struct with function-typed fields,
     /// this emits `assume <value>-><field> is <struct_field_ctor>;` so the apply
     /// procedure can dispatch on the correct variant.
     fn emit_struct_field_identity_assumes(&self, exp: &Exp, env: &GlobalEnv, writer: &CodeWriter) {
@@ -8862,33 +8852,31 @@ impl FunctionTranslator<'_> {
         };
         for field in &fields {
             let field_ty = field.get_type().instantiate(inst);
-            if let Type::Fun(_, _, abilities) = &field_ty {
-                if abilities.has_store() {
-                    // Same canonical keys as the registration; see
-                    // `boogie_field_identity_constraint`.
-                    let normalized = field_ty.clone().normalize_fun();
-                    let struct_qid = struct_env.get_qualified_id().instantiate(
-                        inst.iter()
-                            .map(|t| t.clone().normalize_nested_funs())
-                            .collect(),
-                    );
-                    // Check if this field has a StructFieldInfo entry
-                    if let Some(field_infos) = mono_info.fun_struct_field_infos.get(&normalized) {
-                        let has_entry = field_infos.iter().any(|info| {
-                            info.struct_id == struct_qid && info.field_sym == field.get_name()
-                        });
-                        if has_entry {
-                            let field_sel = boogie_field_sel(field);
-                            let ctor_name =
-                                boogie_struct_field_name(env, &struct_qid, field.get_name());
-                            emitln!(
-                                writer,
-                                "assume {}->{} is {};",
-                                boogie_value,
-                                field_sel,
-                                ctor_name
-                            );
-                        }
+            if let Type::Fun(..) = &field_ty {
+                // Same canonical keys as the registration; see
+                // `boogie_field_identity_constraint`.
+                let normalized = field_ty.clone().normalize_fun();
+                let struct_qid = struct_env.get_qualified_id().instantiate(
+                    inst.iter()
+                        .map(|t| t.clone().normalize_nested_funs())
+                        .collect(),
+                );
+                // Check if this field has a StructFieldInfo entry
+                if let Some(field_infos) = mono_info.fun_struct_field_infos.get(&normalized) {
+                    let has_entry = field_infos.iter().any(|info| {
+                        info.struct_id == struct_qid && info.field_sym == field.get_name()
+                    });
+                    if has_entry {
+                        let field_sel = boogie_field_sel(field);
+                        let ctor_name =
+                            boogie_struct_field_name(env, &struct_qid, field.get_name());
+                        emitln!(
+                            writer,
+                            "assume {}->{} is {};",
+                            boogie_value,
+                            field_sel,
+                            ctor_name
+                        );
                     }
                 }
             }
@@ -8926,12 +8914,12 @@ fn derive_closure_frame_access(
     inst: &[Type],
 ) -> BTreeMap<QualifiedInstId<StructId>, FrameAccessKind> {
     let mut result = BTreeMap::new();
-    let all_memory: BTreeSet<_> = closure_fun
-        .get_spec_used_memory()
-        .iter()
-        .chain(closure_fun.get_spec_old_memory().iter())
-        .map(|m| m.clone().instantiate(inst))
-        .collect();
+    let mut all_memory = spec_derivation::behavioral_target_memory(
+        closure_fun.module_env.env,
+        closure_fun.get_qualified_id(),
+        inst,
+    );
+    all_memory.extend(behavioral_old_memory_instantiated(closure_fun, inst));
 
     if !closure_fun.is_opaque() {
         // Non-opaque: all resources get WritesAll
