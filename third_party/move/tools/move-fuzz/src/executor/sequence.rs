@@ -24,7 +24,7 @@ use aptos_types::{
         ExecutionStatus, Script, TransactionArgument, TransactionPayload, TransactionStatus,
     },
 };
-use log::debug;
+use log::{debug, warn};
 use move_core_types::{
     language_storage::{StructTag, TypeTag as VmTypeTag},
     value::MoveValue,
@@ -43,6 +43,13 @@ use std::{
 /// Maximum number of chain fuzzers to create
 pub const MAX_CHAIN_FUZZERS: usize = 50;
 const MAX_CHAIN_CORPUS: usize = 160;
+
+/// Cap on the number of chain executions kept in the replay transcript.
+///
+/// Lower than the one-shot cap because each entry replays up to `chain.len()`
+/// transactions on resume, and up to `MAX_CHAIN_FUZZERS` chains are restored.
+/// See `ChainFuzzer::record_replay_entry` for the fidelity contract.
+const MAX_CHAIN_REPLAY_LOG: usize = 128;
 
 /// Number of discovery runs per script during profiling
 const NUM_DISCOVERY_RUNS: usize = 10;
@@ -2314,7 +2321,12 @@ pub struct ChainFuzzer {
     seedpool: Vec<ChainSeedRecord>,
 
     /// Ordered replay transcript for reconstructing executor state on resume.
+    /// Bounded by `MAX_CHAIN_REPLAY_LOG`.
     replay_log: Vec<Vec<SeedInput>>,
+
+    /// Set once the transcript hit its cap: the executor state can then only be
+    /// restored up to the capped prefix, not to the live state.
+    replay_log_capped: bool,
 
     /// Concrete bootstrap seed that distinguishes this chain instance.
     identity_seed: Vec<SeedInput>,
@@ -2371,6 +2383,7 @@ impl ChainFuzzer {
             coverage: ExecCoverageMap::new(String::new()),
             seedpool: vec![],
             replay_log: vec![],
+            replay_log_capped: false,
             identity_seed: vec![],
             exec_count: 0,
             last_new_coverage_time: None,
@@ -2604,7 +2617,19 @@ impl ChainFuzzer {
         replay_log: Vec<Vec<PersistedSeedInput>>,
     ) -> Result<()> {
         self.replay_log.clear();
-        for record in replay_log {
+        // A checkpoint written before this cap existed can hold more entries
+        // than we are willing to replay. Keep the prefix rather than a sample:
+        // the prefix rebuilds a state this chain genuinely passed through.
+        self.replay_log_capped = replay_log.len() >= MAX_CHAIN_REPLAY_LOG;
+        if self.replay_log_capped {
+            warn!(
+                "replay transcript for chain {} is capped at {} entries; restoring the \
+                 executor state as of that point, not the state the campaign ended in",
+                self.script_desc(),
+                MAX_CHAIN_REPLAY_LOG,
+            );
+        }
+        for record in replay_log.into_iter().take(MAX_CHAIN_REPLAY_LOG) {
             if record.len() > self.chain.len() {
                 bail!("persisted chain replay log entry exceeds chain length");
             }
@@ -2618,6 +2643,40 @@ impl ChainFuzzer {
             self.replay_log.push(seed);
         }
         Ok(())
+    }
+
+    /// Append one chain execution to the replay transcript.
+    ///
+    /// `run_one` breaks out of the step loop at the first non-successful step,
+    /// so at most the final recorded step can have failed. If that step was
+    /// *discarded* it applied no write set, so trimming it - or dropping the
+    /// whole entry when nothing else ran - is lossless. Otherwise the same
+    /// prefix-truncation contract as the one-shot transcript applies: past the
+    /// cap the transcript stops growing, and a resumed campaign rebuilds the
+    /// state this chain was in at the cap rather than replaying an
+    /// ever-lengthening transcript.
+    fn record_replay_entry(&mut self, last_status: &ExecStatus, entry: &[SeedInput]) {
+        let committed = if last_status.commits_state() {
+            entry
+        } else {
+            &entry[..entry.len().saturating_sub(1)]
+        };
+        if committed.is_empty() {
+            return;
+        }
+        if self.replay_log.len() >= MAX_CHAIN_REPLAY_LOG {
+            if !self.replay_log_capped {
+                self.replay_log_capped = true;
+                warn!(
+                    "replay transcript for chain {} reached the {}-entry cap; a resumed \
+                     campaign will restore the executor state as of that point",
+                    self.script_desc(),
+                    MAX_CHAIN_REPLAY_LOG,
+                );
+            }
+            return;
+        }
+        self.replay_log.push(committed.to_vec());
     }
 
     fn build_step_payload(&self, step_idx: usize, seed_input: &SeedInput) -> TransactionPayload {
@@ -2852,6 +2911,13 @@ impl ChainFuzzer {
             }
         }
 
+        // Record the transcript entry before the fallible coverage read; the
+        // executor state has already moved by this point. (An error here is
+        // currently fatal to the campaign, so this is defensive rather than a
+        // bug fix.)
+        let seed_clone = step_inputs[..step_raw_profiles.len()].to_vec();
+        self.record_replay_entry(&last_status, &seed_clone);
+
         // Flush trace buffer and read coverage from all executed steps.
         flush_tracing_buffer();
 
@@ -2861,8 +2927,6 @@ impl ChainFuzzer {
         if found_new {
             self.last_new_coverage_time = Some(Instant::now());
         }
-        let seed_clone = step_inputs[..step_raw_profiles.len()].to_vec();
-        self.replay_log.push(seed_clone.clone());
         let profiles = step_raw_profiles
             .iter()
             .map(|(script_index, writes, reads, succeeded)| {
@@ -2966,6 +3030,7 @@ mod tests {
     use crate::prep::ident::FunctionIdent;
     use move_core_types::{
         identifier::Identifier, language_storage::TypeTag as VmTypeTag, value::MoveValue,
+        vm_status::StatusCode,
     };
     use rand::SeedableRng;
     use std::path::PathBuf;
@@ -3654,6 +3719,54 @@ mod tests {
         assert_eq!(fuzzer.best_seed_score(), 17);
         assert!(fuzzer.average_seed_score() > 0.0);
         assert_eq!(fuzzer.seed_pool_snapshot().len(), fuzzer.corpus_size());
+    }
+
+    #[test]
+    fn test_chain_replay_log_trims_discards_and_truncates_to_a_prefix() {
+        let sig = ScriptSignature {
+            name: "script_0".to_string(),
+            ident: FunctionIdent::from_function_tuple(
+                AccountAddress::ONE,
+                Identifier::new("m").unwrap(),
+                Identifier::new("f").unwrap(),
+            ),
+            generics: vec![],
+            parameters: vec![BasicInput::U64],
+        };
+        let entrypoints = vec![(sig.clone(), vec![]), (sig, vec![])];
+        let mut fuzzer = ChainFuzzer::new(
+            TracingExecutor::new(),
+            13,
+            Chain { steps: vec![0, 1] },
+            &entrypoints,
+            TypePool::new(),
+            PathBuf::from("/tmp/move-fuzz-chain-replay-tests.trace"),
+            vec![],
+        );
+        let discarded = ExecStatus::ErrorDiscard {
+            status_code: StatusCode::SEQUENCE_NUMBER_TOO_OLD,
+            sub_status: None,
+        };
+        let entry = |v: u64| {
+            vec![
+                SeedInput::from((vec![], vec![MoveValue::U64(v)])),
+                SeedInput::from((vec![], vec![MoveValue::U64(v + 1000)])),
+            ]
+        };
+
+        // a chain whose only executed step was discarded changed nothing
+        fuzzer.record_replay_entry(&discarded, &entry(0)[..1]);
+        assert!(fuzzer.replay_log.is_empty());
+
+        // a discarded final step is trimmed; the committed prefix is kept
+        fuzzer.record_replay_entry(&discarded, &entry(1));
+        assert_eq!(fuzzer.replay_log, vec![entry(1)[..1].to_vec()]);
+
+        for value in 0..(MAX_CHAIN_REPLAY_LOG as u64 + 8) {
+            fuzzer.record_replay_entry(&ExecStatus::Success, &entry(value));
+        }
+        assert_eq!(fuzzer.replay_log.len(), MAX_CHAIN_REPLAY_LOG);
+        assert!(fuzzer.replay_log_capped);
     }
 
     #[test]
