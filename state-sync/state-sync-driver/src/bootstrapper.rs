@@ -237,7 +237,7 @@ impl VerifiedEpochStates {
     /// exists).
     pub fn next_epoch_ending_version(&self, version: Version) -> Option<Version> {
         // BTreeMap keys are iterated through in increasing key orders (i.e., versions)
-        for (epoch_ending_version, _) in self.new_epoch_ending_ledger_infos.iter() {
+        for epoch_ending_version in self.new_epoch_ending_ledger_infos.keys() {
             if *epoch_ending_version > version {
                 return Some(*epoch_ending_version);
             }
