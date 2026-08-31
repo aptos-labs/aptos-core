@@ -24,8 +24,7 @@ use crate::{
             types::{AugmentedData, RandConfig, Share},
         },
         secret_sharing::{
-            secret_share_manager::SecretShareManager,
-            storage::{LoadedSecretShare, SecretShareStorage},
+            secret_share_manager::SecretShareManager, storage::SecretShareStorage,
             verifier::SecretShareVerifier,
         },
     },
@@ -279,7 +278,6 @@ impl ExecutionProxyClient {
         &self,
         epoch_state: &Arc<EpochState>,
         verifier: Arc<SecretShareVerifier>,
-        loaded_self_shares: Vec<LoadedSecretShare>,
         secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
         highest_committed_round: u64,
         network_sender: &Arc<NetworkSender>,
@@ -301,7 +299,6 @@ impl ExecutionProxyClient {
             secret_ready_block_tx,
             network_sender.clone(),
             self.secret_share_storage.clone(),
-            loaded_self_shares,
             self.bounded_executor.clone(),
             &self.consensus_config.secret_share_rb_config,
             self.consensus_config.secret_share_request_delay_ms,
@@ -393,7 +390,6 @@ impl ExecutionProxyClient {
         epoch_state: Arc<EpochState>,
         rand_config: Option<RandConfig>,
         secret_share_verifier: Option<Arc<SecretShareVerifier>>,
-        loaded_self_shares: Vec<LoadedSecretShare>,
         onchain_consensus_config: &OnChainConsensusConfig,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
@@ -436,7 +432,6 @@ impl ExecutionProxyClient {
                 ) = self.make_secret_sharing_manager(
                     &epoch_state,
                     secret_share_verifier,
-                    loaded_self_shares,
                     secret_sharing_msg_rx,
                     highest_committed_round,
                     &network_sender,
@@ -479,7 +474,6 @@ impl ExecutionProxyClient {
                     self.make_secret_sharing_manager(
                         &epoch_state,
                         secret_sharing_config,
-                        loaded_self_shares,
                         secret_sharing_msg_rx,
                         highest_committed_round,
                         &network_sender,
@@ -557,22 +551,6 @@ impl TExecutionClient for ExecutionProxyClient {
         secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
         highest_committed_round: Round,
     ) {
-        let epoch = epoch_state.epoch;
-        if let Err(error) = self.secret_share_storage.prune_before_epoch(epoch) {
-            error!(
-                epoch = epoch,
-                "Failed to prune old secret shares at epoch start: {error}"
-            );
-        }
-        let loaded_self_shares = if secret_share_verifier.is_some() {
-            match self.secret_share_storage.load_self_shares(epoch) {
-                Ok(shares) => shares,
-                Err(error) => panic!("Failed to load secret shares at epoch start: {error}"),
-            }
-        } else {
-            Vec::new()
-        };
-
         let network_sender = Arc::new(NetworkSender::new(
             self.author,
             self.network_sender.clone(),
@@ -585,7 +563,6 @@ impl TExecutionClient for ExecutionProxyClient {
             epoch_state.clone(),
             rand_config,
             secret_share_verifier.clone(),
-            loaded_self_shares,
             onchain_consensus_config,
             rand_msg_rx,
             secret_sharing_msg_rx,
