@@ -267,7 +267,7 @@ impl EventSubscriptionService {
         }
 
         let new_configs = self.read_on_chain_configs(version)?;
-        for (_, reconfig_subscription) in self.reconfig_subscriptions.iter_mut() {
+        for reconfig_subscription in self.reconfig_subscriptions.values_mut() {
             reconfig_subscription.notify_subscriber_of_configs(version, new_configs.clone())?;
         }
 

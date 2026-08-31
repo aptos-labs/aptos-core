@@ -26,7 +26,6 @@ xclippy = [
   "-Aclippy::drain_collect",
   "-Aclippy::explicit_counter_loop",
   "-Aclippy::extra_unused_lifetimes",
-  "-Aclippy::for_kv_map",
   "-Aclippy::iter_kv_map",
   "-Aclippy::manual_checked_ops",
   "-Aclippy::manual_clear",
