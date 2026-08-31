@@ -178,6 +178,62 @@ pub trait PersistedValue: Serialize + serde::de::DeserializeOwned {}
 
 impl PersistedValue for PersistedMoveValue {}
 
+/// Serde-stable mirror of the [`MoveValue`] subset that can appear as a transaction
+/// argument.
+///
+/// The fuzzer itself *does* use [`MoveValue`] end to end: `Mutator::random_value` /
+/// `Mutator::mutate_value` produce it, [`SeedInput::args`] holds it, and
+/// `OneshotFuzzer::build_payload` hands it to the VM via `MoveValue::simple_serialize`.
+/// This mirror exists purely for the on-disk state (`auto_state.json`, written with
+/// `serde_json`), which [`MoveValue`] cannot be `#[derive(Deserialize)]`-persisted into:
+///
+/// 1. It has no `Deserialize` impl. `move_core_types::value` provides only
+///    `impl DeserializeSeed for &MoveTypeLayout`, i.e. a value can be decoded only by a
+///    reader that already holds its `MoveTypeLayout`. The seed records in
+///    `auto_state.json` carry no layout of their own -- entry-point signatures live in a
+///    separate `entrypoints_cache.json` ([`PersistedEntrypoint`]) -- so there is nothing
+///    to seed a decoder with at load time.
+/// 2. Its `Serialize` impl is the BCS *value* encoding, which is type-erasing:
+///    `U8(7)`, `U16(7)`, `U32(7)`, `U64(7)` and `I64(7)` all emit a bare `7`, and
+///    `U256`/`I256` both emit the same 32-byte little-endian array, so the variant cannot
+///    be recovered from the output. The derived representation here is externally tagged
+///    by variant *name*, so the state file is self-describing and is unaffected by
+///    [`MoveValue`] variant reordering (whose discriminants are pinned to bytecode
+///    versions).
+/// 3. It pins the closed domain of values the fuzzer can actually replay; anything
+///    outside it is rejected at the boundary by `TryFrom<&MoveValue>` rather than being
+///    written to disk and mis-replayed later.
+///
+/// A [`MoveValue`] of *any* shape could still be persisted as a `(MoveTypeLayout, BCS
+/// blob)` pair: `MoveTypeLayout` does derive `Serialize`/`Deserialize`, and
+/// `MoveValue::simple_serialize` / `MoveValue::simple_deserialize` are the two halves of
+/// that trip. That is the escape hatch if the value domain ever has to grow. It is not
+/// used today because it turns the state file into an opaque blob and requires threading
+/// a layout onto every seed record.
+///
+/// Two [`MoveValue`] variants are deliberately absent:
+///
+/// - [`MoveValue::Closure`]: function values are not valid transaction arguments --
+///   `aptos_vm::verifier::transaction_arg_validation::legacy_is_valid_txn_arg` maps
+///   `Type::Function { .. }` to `false` -- so a closure can never reach
+///   [`SeedInput::args`]. Function-typed *parameters* are still covered, one level up:
+///   `prep::model` selects a `prep::canvas::LambdaBinding` and the generated driver
+///   script constructs the closure in Move source via
+///   `prep::canvas::DriverStatement::Lambda`; only the script's own `BasicInput`
+///   parameters cross the transaction boundary.
+///   TODO: if entry points ever accept function values, persist them with the
+///   `(MoveTypeLayout, BCS blob)` encoding described above rather than hand-mirroring
+///   `move_core_types::function::MoveClosure` -- its `captured` field is itself
+///   `Vec<(MoveTypeLayout, MoveValue)>`, so a hand-mirror would have to recurse back into
+///   this type anyway -- and bump [`AUTO_STATE_VERSION`].
+/// - [`MoveValue::Struct`]: the only struct-shaped arguments the fuzzer emits are
+///   `String` and `Object<T>`, which `prep::canvas::BasicInput` already models as
+///   `Vector(U8..)` and `Address` respectively.
+///   TODO: modelling further allow-listed argument structs (e.g. `Option`) would need a
+///   `Struct` variant here plus an [`AUTO_STATE_VERSION`] bump.
+///
+/// Any change to this variant set or to the variant names changes the on-disk layout and
+/// must bump [`AUTO_STATE_VERSION`].
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PersistedMoveValue {
     Bool(bool),
@@ -198,8 +254,18 @@ pub enum PersistedMoveValue {
     Vector(Vec<PersistedMoveValue>),
 }
 
-impl PersistedMoveValue {
-    pub fn try_from_move_value(value: &MoveValue) -> Result<Self> {
+impl TryFrom<&MoveValue> for PersistedMoveValue {
+    type Error = anyhow::Error;
+
+    /// Lossless within the supported domain: every accepted [`MoveValue`] maps to exactly
+    /// one [`PersistedMoveValue`], and `From<PersistedMoveValue> for MoveValue` maps it
+    /// back to an identical [`MoveValue`]. Values outside the domain are rejected here
+    /// rather than approximated, so an unsupported value can never be silently persisted.
+    ///
+    /// The rejecting arm names the unsupported variants explicitly instead of using `_`,
+    /// so a new upstream [`MoveValue`] variant is a compile error here and forces a
+    /// deliberate decision about persisting it.
+    fn try_from(value: &MoveValue) -> Result<Self> {
         Ok(match value {
             MoveValue::Bool(v) => Self::Bool(*v),
             MoveValue::U8(v) => Self::U8(*v),
@@ -219,41 +285,42 @@ impl PersistedMoveValue {
             MoveValue::Vector(values) => Self::Vector(
                 values
                     .iter()
-                    .map(Self::try_from_move_value)
+                    .map(Self::try_from)
                     .collect::<Result<Vec<_>>>()?,
             ),
-            other => {
+            other @ (MoveValue::Struct(_) | MoveValue::Closure(_)) => {
                 return Err(anyhow!(
                     "unsupported MoveValue in persisted fuzz state: {other:?}"
                 ));
             },
         })
     }
+}
 
-    pub fn into_move_value(self) -> Result<MoveValue> {
-        Ok(match self {
-            Self::Bool(v) => MoveValue::Bool(v),
-            Self::U8(v) => MoveValue::U8(v),
-            Self::I8(v) => MoveValue::I8(v),
-            Self::U16(v) => MoveValue::U16(v),
-            Self::I16(v) => MoveValue::I16(v),
-            Self::U32(v) => MoveValue::U32(v),
-            Self::I32(v) => MoveValue::I32(v),
-            Self::U64(v) => MoveValue::U64(v),
-            Self::I64(v) => MoveValue::I64(v),
-            Self::U128(v) => MoveValue::U128(v),
-            Self::I128(v) => MoveValue::I128(v),
-            Self::U256(v) => MoveValue::U256(v),
-            Self::I256(v) => MoveValue::I256(v),
-            Self::Address(v) => MoveValue::Address(v),
-            Self::Signer(v) => MoveValue::Signer(v),
-            Self::Vector(values) => MoveValue::Vector(
-                values
-                    .into_iter()
-                    .map(Self::into_move_value)
-                    .collect::<Result<Vec<_>>>()?,
-            ),
-        })
+impl From<PersistedMoveValue> for MoveValue {
+    /// Total and lossless: the persisted mirror only holds variants that exist verbatim
+    /// in [`MoveValue`], so this direction cannot fail.
+    fn from(value: PersistedMoveValue) -> Self {
+        match value {
+            PersistedMoveValue::Bool(v) => MoveValue::Bool(v),
+            PersistedMoveValue::U8(v) => MoveValue::U8(v),
+            PersistedMoveValue::I8(v) => MoveValue::I8(v),
+            PersistedMoveValue::U16(v) => MoveValue::U16(v),
+            PersistedMoveValue::I16(v) => MoveValue::I16(v),
+            PersistedMoveValue::U32(v) => MoveValue::U32(v),
+            PersistedMoveValue::I32(v) => MoveValue::I32(v),
+            PersistedMoveValue::U64(v) => MoveValue::U64(v),
+            PersistedMoveValue::I64(v) => MoveValue::I64(v),
+            PersistedMoveValue::U128(v) => MoveValue::U128(v),
+            PersistedMoveValue::I128(v) => MoveValue::I128(v),
+            PersistedMoveValue::U256(v) => MoveValue::U256(v),
+            PersistedMoveValue::I256(v) => MoveValue::I256(v),
+            PersistedMoveValue::Address(v) => MoveValue::Address(v),
+            PersistedMoveValue::Signer(v) => MoveValue::Signer(v),
+            PersistedMoveValue::Vector(values) => {
+                MoveValue::Vector(values.into_iter().map(MoveValue::from).collect())
+            },
+        }
     }
 }
 
@@ -272,20 +339,20 @@ impl SeedInput<PersistedMoveValue> {
             args: seed
                 .args
                 .iter()
-                .map(PersistedMoveValue::try_from_move_value)
+                .map(PersistedMoveValue::try_from)
                 .collect::<Result<Vec<_>>>()?,
         })
     }
 
+    /// The argument conversion itself is infallible (see
+    /// `From<PersistedMoveValue> for MoveValue`); the `Result` is kept for symmetry with
+    /// [`Self::try_from_seed`] and so that future fallible fields (identifiers, tags) can
+    /// be added without churning the ~10 call sites.
     pub fn into_seed(self) -> Result<SeedInput> {
         Ok(SeedInput {
             sender: self.sender,
             ty_args: self.ty_args,
-            args: self
-                .args
-                .into_iter()
-                .map(PersistedMoveValue::into_move_value)
-                .collect::<Result<Vec<_>>>()?,
+            args: self.args.into_iter().map(MoveValue::from).collect(),
         })
     }
 }
@@ -678,8 +745,13 @@ mod tests {
     };
     use anyhow::Result;
     use move_core_types::{
-        ability::AbilitySet, account_address::AccountAddress, identifier::Identifier,
-        language_storage::StructTag, value::MoveValue,
+        ability::AbilitySet,
+        account_address::AccountAddress,
+        function::{ClosureMask, MoveClosure},
+        identifier::Identifier,
+        int256::{I256, U256},
+        language_storage::{ModuleId, StructTag},
+        value::{MoveStruct, MoveValue},
     };
     use move_coverage::coverage_map::ExecCoverageMap;
     use std::collections::{BTreeMap, BTreeSet};
@@ -696,18 +768,81 @@ mod tests {
         coverage
     }
 
+    /// Every supported variant survives both legs of the boundary: the in-memory
+    /// `MoveValue -> PersistedMoveValue -> MoveValue` round trip, and the `serde_json`
+    /// round trip that `auto_state.json` actually performs. The JSON leg is the reason
+    /// this mirror type exists at all -- `MoveValue` has no `Deserialize` impl (only
+    /// `DeserializeSeed for &MoveTypeLayout`) and its `Serialize` is the type-erasing BCS
+    /// value encoding, so it cannot be read back out of the state file.
     #[test]
-    fn test_persisted_move_value_roundtrip_nested_vector() -> Result<()> {
-        let value = MoveValue::Vector(vec![
-            MoveValue::U8(7),
+    fn test_persisted_move_value_roundtrip_all_variants() -> Result<()> {
+        let values = vec![
+            MoveValue::Bool(true),
+            MoveValue::U8(u8::MAX),
+            MoveValue::I8(i8::MIN),
+            MoveValue::U16(u16::MAX),
+            MoveValue::I16(i16::MIN),
+            MoveValue::U32(u32::MAX),
+            MoveValue::I32(i32::MIN),
+            MoveValue::U64(u64::MAX),
+            MoveValue::I64(i64::MIN),
+            MoveValue::U128(u128::MAX),
+            MoveValue::I128(i128::MIN),
+            MoveValue::U256(U256::MAX),
+            MoveValue::I256(I256::MIN),
+            MoveValue::Address(AccountAddress::ONE),
+            MoveValue::Signer(AccountAddress::TWO),
             MoveValue::Vector(vec![
-                MoveValue::Bool(true),
-                MoveValue::Address(AccountAddress::ONE),
+                MoveValue::U8(7),
+                MoveValue::Vector(vec![
+                    MoveValue::Bool(true),
+                    MoveValue::Address(AccountAddress::ONE),
+                ]),
             ]),
-        ]);
-        let persisted = PersistedMoveValue::try_from_move_value(&value)?;
-        assert_eq!(persisted.clone().into_move_value()?, value);
+        ];
+        // Keeps this list in step with the variant set: `TryFrom<&MoveValue>` matches
+        // `MoveValue` exhaustively, so a new upstream variant is already a compile error
+        // there, and this assertion catches a variant added to `PersistedMoveValue`
+        // without a matching case here.
+        assert_eq!(values.len(), 16);
+
+        for value in values {
+            let persisted = PersistedMoveValue::try_from(&value)?;
+            assert_eq!(MoveValue::from(persisted.clone()), value);
+
+            let json = serde_json::to_string(&persisted)?;
+            let decoded: PersistedMoveValue = serde_json::from_str(&json)?;
+            assert_eq!(decoded, persisted);
+            assert_eq!(MoveValue::from(decoded), value);
+        }
         Ok(())
+    }
+
+    /// `MoveValue` variants that cannot appear as a transaction argument are rejected at
+    /// the persistence boundary rather than silently dropped or approximated.
+    #[test]
+    fn test_persisted_move_value_rejects_unsupported_variants() {
+        let struct_value = MoveValue::Struct(MoveStruct::Runtime(vec![MoveValue::U8(1)]));
+        assert!(PersistedMoveValue::try_from(&struct_value).is_err());
+
+        // Function values are not valid transaction arguments -- see
+        // `aptos_vm::verifier::transaction_arg_validation::legacy_is_valid_txn_arg`, which
+        // maps `Type::Function { .. }` to `false` -- so a closure can never reach
+        // `SeedInput::args`. Function-typed parameters are covered instead by building the
+        // closure inside the generated driver script
+        // (`prep::canvas::DriverStatement::Lambda`).
+        let closure_value = MoveValue::Closure(Box::new(MoveClosure {
+            module_id: ModuleId::new(AccountAddress::ONE, Identifier::new("m").unwrap()),
+            fun_id: Identifier::new("f").unwrap(),
+            ty_args: vec![],
+            mask: ClosureMask::empty(),
+            captured: vec![],
+        }));
+        assert!(PersistedMoveValue::try_from(&closure_value).is_err());
+
+        // Nested occurrences are rejected too, not just top-level ones.
+        let nested = MoveValue::Vector(vec![MoveValue::U8(1), struct_value]);
+        assert!(PersistedMoveValue::try_from(&nested).is_err());
     }
 
     #[test]
