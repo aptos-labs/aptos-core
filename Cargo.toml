@@ -306,7 +306,7 @@ license = "LicenseRef-Aptos"
 license-file = "LICENSE"
 publish = false
 repository = "https://github.com/aptos-labs/aptos-core"
-rust-version = "1.88"
+rust-version = "1.93"
 
 [workspace.dependencies]
 # Internal crate dependencies.
