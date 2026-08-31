@@ -1,6 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+//! Fuzzing campaign orchestration.
+//!
+//! Builds the static model, generates or reloads the entrypoint scripts,
+//! provisions the tracing executor, and then schedules one-shot and chain
+//! fuzzers while reporting progress and checkpointing state to disk.
+
 use crate::{
     common::Account,
     deps::{PkgDefinition, PkgManifest},

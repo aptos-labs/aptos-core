@@ -1,6 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+//! The `aptos move fuzz` subcommand.
+//!
+//! Thin `CliCommand` wrapper that forwards the project path and fuzzing options
+//! to `move_fuzz::cli::run_on`.
+
 use crate::move_types::OptimizationLevel;
 use aptos_cli_common::{dir_default_to_current, CliCommand, CliTypedResult};
 use async_trait::async_trait;

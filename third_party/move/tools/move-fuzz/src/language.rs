@@ -1,6 +1,13 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+//! Move language and compiler settings.
+//!
+//! Parses a `LanguageSetting` (language version plus an optimization suffix)
+//! and derives from it both a `CompilerConfig` and the equivalent `aptos` CLI
+//! compilation flags; both derivations must track
+//! `aptos_framework::build_package::BuildOptions::move_2()`.
+
 use aptos_framework::extended_checks;
 use move_binary_format::file_format_common;
 use move_model::metadata::{CompilerVersion, LanguageVersion};

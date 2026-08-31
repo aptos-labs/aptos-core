@@ -1,6 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+//! Stable identifiers for modules, datatypes, and functions.
+//!
+//! Serializable idents built from `file_format` handles, used as map keys
+//! throughout the registries, flow graphs, and persisted state.
+
 use move_binary_format::{
     binary_views::BinaryIndexedView,
     file_format::{FunctionHandle, StructHandle},

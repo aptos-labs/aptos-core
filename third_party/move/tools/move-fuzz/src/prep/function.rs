@@ -1,6 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+//! Registry of script-callable functions.
+//!
+//! Collects `public` function declarations (parameters, returns, generics, and
+//! the `entry` flag) from compiled modules, consulting the module source when
+//! available to drop `public(package)` and `public(friend)` functions.
+
 use crate::{
     deps::PkgKind,
     prep::{datatype::DatatypeRegistry, ident::FunctionIdent, typing::TypeRef},

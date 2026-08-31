@@ -1,6 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+//! Static model of the analyzed packages.
+//!
+//! Aggregates the datatype and function registries, then walks the primary
+//! functions (entry first), resolves bindings for function-typed parameters,
+//! and generates driver scripts subject to per-function caps and timeouts.
+
 use crate::{
     deps::{PkgDefinition, PkgKind},
     prep::{

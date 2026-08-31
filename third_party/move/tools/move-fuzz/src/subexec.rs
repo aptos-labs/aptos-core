@@ -1,6 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+//! Subprocess execution helper.
+//!
+//! Runs a command in its own process group, streams stdout and stderr on
+//! background threads (logging and optionally capturing them), and supports
+//! waiting on or interrupting the whole group.
+
 use anyhow::{anyhow, bail, Result};
 use command_group::{CommandGroup, GroupChild, Signal, UnixChildExt};
 use log::{error, trace};

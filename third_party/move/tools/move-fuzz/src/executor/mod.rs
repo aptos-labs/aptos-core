@@ -1,6 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+//! Execution backends for the fuzzer.
+//!
+//! Hosts the tracing VM executor and the one-shot and chain fuzzing loops, plus
+//! shared helpers for counting, keying, merging, cloning, and diffing coverage
+//! maps.
+
 use move_coverage::coverage_map::{CoverageMap, ExecCoverageMap, ModuleCoverageMap};
 use std::collections::BTreeSet;
 

@@ -1,6 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+//! Driver script construction.
+//!
+//! Turns a flow graph into a `DriverCanvas` of generics, fuzzable parameters,
+//! and statements, renders it as a Move script on disk, and returns the
+//! `ScriptSignature` the fuzzer uses to feed inputs at runtime.
+
 use crate::prep::{
     graph::{FlowGraph, FlowGraphEdge, FlowGraphNode},
     ident::{DatatypeIdent, FunctionIdent},

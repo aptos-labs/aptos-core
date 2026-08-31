@@ -1,6 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+//! Random generation and mutation of script inputs.
+//!
+//! Produces and mutates Move values for a script's parameter types and its
+//! generic type arguments, drawing on address, string, and object dictionaries;
+//! the object dictionary is refreshed from observed write sets.
+
 use crate::{
     account::{AddressKind, NamedAddressKind},
     executor::tracing::ResourceWrite,

@@ -1,6 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+//! Address registry for the in-process executor.
+//!
+//! Binds Move named addresses (primary, dependency, framework) and synthetic
+//! user accounts to concrete `AccountAddress`es, rejecting conflicting
+//! assignments and handing out deterministic user addresses.
+
 use anyhow::{bail, Result};
 use aptos_language_e2e_tests::account::Account;
 use move_core_types::account_address::AccountAddress;

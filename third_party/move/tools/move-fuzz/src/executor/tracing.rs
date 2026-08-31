@@ -1,6 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+//! In-process VM executor with state-access tracing.
+//!
+//! Wraps the e2e-test `FakeExecutor` to provision packages and accounts and run
+//! transactions under a chosen gas profile, recording the resources each
+//! execution reads and writes so def-use tracking can consume them.
+
 use crate::{
     account::{AddressKind, AddressRegistry, NamedAddressKind},
     deps::{PkgDefinition, PkgKind},

@@ -1,6 +1,13 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+//! Project and package dependency resolution.
+//!
+//! Walks a directory for `Move.toml` manifests, recursively resolves their
+//! dependencies into primary, dependency, and framework packages, and assigns
+//! named addresses (including aliases and resource accounts) to form a
+//! `Project`.
+
 use crate::{common::Account, language::LanguageSetting, package::FuzzPackage};
 use anyhow::{bail, Result};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, Uniform};

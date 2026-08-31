@@ -1,6 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+//! Multi-transaction (chain) fuzzing.
+//!
+//! Profiles which resources each script reads and writes, records them in a
+//! bipartite def-use graph, constructs and mutates dependency chains from it,
+//! and shares coverage-producing sequences through a common database.
+
 use crate::{
     executor::{
         clone_exec_coverage_map, collect_coverage_keys, count_coverage_entries, coverage_delta,

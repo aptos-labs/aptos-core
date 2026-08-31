@@ -1,6 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+//! Single-transaction fuzzing loop.
+//!
+//! Repeatedly generates or mutates inputs for one generated script, executes it
+//! on a tracing executor, and keeps a scored, bounded corpus of the seeds that
+//! reached new bytecode coverage.
+
 use crate::{
     executor::{
         clone_exec_coverage_map, collect_coverage_keys, count_coverage_entries, coverage_delta,

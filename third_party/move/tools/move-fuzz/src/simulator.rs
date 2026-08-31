@@ -1,6 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+//! Local testnet simulator driven through the `aptos` CLI.
+//!
+//! Spawns a localnet in a temporary directory, registers and funds accounts,
+//! publishes packages, resolves entry/public functions and structs by name, and
+//! runs entry functions or compiled scripts against it.
+
 use crate::{
     common::{Account, TxnArg, TxnArgType, TxnArgTypeWithRef},
     language::LanguageSetting,

@@ -1,6 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+//! Standalone developer runner for `move-fuzz`.
+//!
+//! Exposes the same options as `aptos move fuzz` and forwards them to
+//! `cli::run_on`, so the fuzzer can be exercised without building the full
+//! Aptos CLI.
+
 use clap::Parser;
 use move_fuzz::{
     cli::{run_on, FuzzCommand},

@@ -1,6 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+//! Small helpers not specific to fuzzing.
+//!
+//! Currently just `with_logging_disabled`, which silences the `log` facade for
+//! the duration of a closure and restores the previous level even on panic.
+
 use log::LevelFilter;
 
 struct LogLevelGuard(LevelFilter);

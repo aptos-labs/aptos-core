@@ -1,6 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+//! Runbook execution on top of the local testnet simulator.
+//!
+//! Provisions a `Simulator` from a resolved `Project` and replays a JSON
+//! runbook of transaction steps, resolving arguments, generating bridge scripts
+//! for public (non-entry) functions, and checking expected output and aborts.
+
 use crate::{
     common::{Account, TxnArg, TxnArgType, TxnArgTypeWithRef},
     deps::Project,

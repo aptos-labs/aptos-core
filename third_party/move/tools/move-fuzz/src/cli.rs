@@ -1,6 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+//! Command-line surface of the fuzzer.
+//!
+//! Defines the `FuzzCommand` subcommands (list, build, test, exec, auto) and
+//! `run_on`, which prepares logging, the working and state directories, and the
+//! resolved project before dispatching to each command.
+
 use crate::{
     deps::{self, PkgDeclaration, PkgDefinition, PkgKind, PkgManifest, Project},
     fuzzer,

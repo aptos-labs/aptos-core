@@ -1,6 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+//! Registry of datatypes declared by the analyzed packages.
+//!
+//! Records struct and enum declarations with their generics and abilities, and
+//! converts `SignatureToken`s into this crate's type representation, including
+//! instantiation of type parameters with concrete arguments.
+
 use crate::{
     deps::PkgKind,
     prep::{

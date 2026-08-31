@@ -1,6 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+//! Flow graphs describing how to produce a function's arguments.
+//!
+//! For a target function instantiation, searches the model for functions and
+//! datatypes that can supply each parameter, building a depth- and
+//! repetition-bounded graph of calls that is then checked for feasibility.
+
 use crate::{
     common::Refty,
     prep::{

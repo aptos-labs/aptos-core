@@ -1,6 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+//! Building and unit-testing Move packages.
+//!
+//! Wraps freshly built and cached packages behind `FuzzPackage`, maintains an
+//! on-disk build cache keyed by a source and configuration fingerprint, and
+//! runs Move unit tests for a package.
+
 use crate::{
     common::Account,
     deps::{PkgManifest, PkgNamedAddr},

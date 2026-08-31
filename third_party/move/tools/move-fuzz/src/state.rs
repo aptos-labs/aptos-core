@@ -1,6 +1,14 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+//! On-disk persistence of fuzzing state.
+//!
+//! Serde mirrors of the in-memory fuzzer structures (corpora, coverage, def-use
+//! graph, sequence database, entrypoint and build caches), the schema-version
+//! constants stamped on every saved file, and save/load helpers that write
+//! atomically via a temporary file and rename. Callers compare the loaded
+//! version against the constant here and discard state from an older schema.
+
 use crate::{
     executor::sequence::{ResourceTag, SeedInput},
     prep::{canvas::ScriptSignature, ident::DatatypeIdent},
