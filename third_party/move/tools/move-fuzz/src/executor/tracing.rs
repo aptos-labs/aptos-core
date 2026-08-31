@@ -41,10 +41,10 @@ use aptos_vm_types::{
 use legacy_move_compiler::compiled_unit::CompiledUnit;
 use move_core_types::{identifier::Identifier, language_storage::StructTag};
 use move_package::compilation::compiled_package::CompiledUnitWithSource;
+use sha3::{Digest, Sha3_256};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet},
-    hash::{Hash, Hasher},
     path::Path as StdPath,
 };
 
@@ -93,14 +93,31 @@ pub struct ResourceRead {
 
 /// Convert non-resource state keys (table item / raw) into synthetic StructTags
 /// so they can still participate in def-use tracking.
+///
+/// The name is derived from the state key's canonical physical-storage
+/// encoding (`StateKey::encoded()`, the same bytes `StateKey::decode` reads
+/// back) hashed with SHA3-256, matching the stable fingerprinting used
+/// elsewhere in this crate. Neither `StateKey`'s `Debug` rendering nor
+/// `DefaultHasher` is stable across toolchain/dependency updates, and drift
+/// there would silently rename every synthetic node in the def-use graph and
+/// invalidate persisted campaign state without any error. If the derivation
+/// below is ever changed on purpose, bump `crate::state::AUTO_STATE_VERSION`
+/// so previously persisted tags are discarded instead of misinterpreted.
 fn synthetic_struct_tag(prefix: &str, state_key: &StateKey) -> StructTag {
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    format!("{state_key:?}").hash(&mut hasher);
-    let suffix = hasher.finish();
+    let mut hasher = Sha3_256::new();
+    hasher.update(b"move-fuzz-synthetic-state-key-v1");
+    hasher.update(prefix.as_bytes());
+    hasher.update(b"\0");
+    hasher.update(state_key.encoded());
+    let digest = hasher.finalize();
+    // Keep 128 bits of the digest: collision-free in practice, and short
+    // enough to keep the generated identifiers readable in logs and in the
+    // persisted state file.
+    let suffix = hex::encode(&digest[..16]);
     StructTag {
         address: AccountAddress::ONE,
         module: Identifier::new("global_state").expect("valid synthetic module identifier"),
-        name: Identifier::new(format!("{prefix}{suffix:016x}"))
+        name: Identifier::new(format!("{prefix}{suffix}"))
             .expect("valid synthetic struct identifier"),
         type_args: vec![],
     }
@@ -818,6 +835,20 @@ mod tests {
         assert_eq!(table_tag.module.as_str(), "global_state");
         assert!(table_tag.name.as_str().starts_with("table_"));
         assert!(raw_tag.name.as_str().starts_with("raw_"));
+
+        // Golden values. Synthetic tag names are persisted inside
+        // `auto_state.json` (as `ResourceTag`s in the def-use graph and the
+        // sequence db), so the derivation must not drift with a toolchain or
+        // dependency bump. If these assertions fail, the naming scheme changed
+        // and `crate::state::AUTO_STATE_VERSION` must be bumped alongside it.
+        assert_eq!(
+            table_tag.name.as_str(),
+            "table_ef1a21e703f66fc1700f03730c4b4a2f"
+        );
+        assert_eq!(
+            raw_tag.name.as_str(),
+            "raw_3508cef5bb00c6a8ea5db51f7ff51c36"
+        );
     }
 
     #[test]

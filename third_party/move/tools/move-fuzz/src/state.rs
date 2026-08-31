@@ -19,11 +19,13 @@ use std::{
 };
 
 /// Schema version of the persisted auto-state (`auto_state.json`). Bump this
-/// whenever the serialized layout of [`PersistedAutoState`] changes, so that
-/// state written by an older build is detected and ignored on load instead of
-/// being misinterpreted. The current value reflects the number of such layout
-/// changes made so far.
-pub const AUTO_STATE_VERSION: u32 = 6;
+/// whenever the serialized layout of [`PersistedAutoState`] changes, or when
+/// the meaning of a persisted value changes without changing its layout (for
+/// example the derivation of the synthetic [`ResourceTag`] names produced by
+/// `synthetic_struct_tag`), so that state written by an older build is detected
+/// and ignored on load instead of being misinterpreted. The current value
+/// reflects the number of such changes made so far.
+pub const AUTO_STATE_VERSION: u32 = 7;
 pub const AUTO_STATE_FILENAME: &str = "auto_state.json";
 /// Schema version of the persisted entrypoint cache (`entrypoints_cache.json`).
 /// Bump this whenever its serialized layout changes (see `AUTO_STATE_VERSION`).
