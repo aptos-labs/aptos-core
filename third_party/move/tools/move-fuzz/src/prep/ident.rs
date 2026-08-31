@@ -3,7 +3,7 @@
 
 use move_binary_format::{
     binary_views::BinaryIndexedView,
-    file_format::{FunctionHandle, ModuleHandle, StructHandle},
+    file_format::{FunctionHandle, StructHandle},
 };
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
@@ -11,38 +11,26 @@ use move_core_types::{
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
-/// A unique identifier for a module
-#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ModuleIdent {
-    address: AccountAddress,
-    name: Identifier,
+/// Render a [`ModuleId`] the way Move source code spells it, e.g. `0x1::coin`.
+///
+/// This deliberately does *not* use `<ModuleId as Display>`. That impl is a frozen
+/// on-chain format (it prints `address.to_hex()`, i.e. the raw 32-byte hex with no
+/// `0x` prefix), so its output is not parseable Move. The idents below are spliced
+/// verbatim into the Move scripts this crate generates (see `prep::canvas` and
+/// `prep::typing`), so they must render as valid source. This helper is the only
+/// reason the idents wrap `ModuleId` instead of being replaced by it outright.
+fn fmt_module_id(f: &mut std::fmt::Formatter<'_>, module: &ModuleId) -> std::fmt::Result {
+    write!(f, "{}::{}", module.address, module.name)
 }
 
-impl ModuleIdent {
-    /// Utility conversion from the corresponding handle in file_format
-    pub fn from_module_handle(binary: &BinaryIndexedView, handle: &ModuleHandle) -> Self {
-        Self {
-            address: *binary.address_identifier_at(handle.address),
-            name: binary.identifier_at(handle.name).to_owned(),
-        }
-    }
-
-    /// Convert the ident to a `ModuleId`
-    pub fn to_module_id(&self) -> ModuleId {
-        ModuleId::new(self.address, self.name.clone())
-    }
-}
-
-impl Display for ModuleIdent {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}::{}", self.address, self.name)
-    }
-}
-
-/// A unique identifier for a datatype
+/// A unique identifier for a datatype: the declaring [`ModuleId`] plus the datatype name.
+///
+/// This is intentionally not `StructTag`: a `StructTag` also carries type arguments,
+/// whereas this names the *declaration* and is used as a `BTreeMap` key throughout
+/// `prep` and `mutate`.
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DatatypeIdent {
-    module: ModuleIdent,
+    module: ModuleId,
     datatype: Identifier,
 }
 
@@ -54,10 +42,7 @@ impl DatatypeIdent {
         struct_name: Identifier,
     ) -> Self {
         Self {
-            module: ModuleIdent {
-                address,
-                name: module_name,
-            },
+            module: ModuleId::new(address, module_name),
             datatype: struct_name,
         }
     }
@@ -65,9 +50,14 @@ impl DatatypeIdent {
     /// Utility conversion from the corresponding handle in file_format
     pub fn from_struct_handle(binary: &BinaryIndexedView, handle: &StructHandle) -> Self {
         Self {
-            module: ModuleIdent::from_module_handle(binary, binary.module_handle_at(handle.module)),
+            module: binary.module_id_for_handle(binary.module_handle_at(handle.module)),
             datatype: binary.identifier_at(handle.name).to_owned(),
         }
+    }
+
+    /// Get the id of the module declaring this datatype
+    pub fn module_id(&self) -> &ModuleId {
+        &self.module
     }
 
     /// Get the address
@@ -88,14 +78,15 @@ impl DatatypeIdent {
 
 impl Display for DatatypeIdent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}::{}", self.module, self.datatype)
+        fmt_module_id(f, &self.module)?;
+        write!(f, "::{}", self.datatype)
     }
 }
 
-/// A unique identifier for a function
+/// A unique identifier for a function: the declaring [`ModuleId`] plus the function name.
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize)]
 pub struct FunctionIdent {
-    module: ModuleIdent,
+    module: ModuleId,
     function: Identifier,
 }
 
@@ -107,10 +98,7 @@ impl FunctionIdent {
         function_name: Identifier,
     ) -> Self {
         Self {
-            module: ModuleIdent {
-                address,
-                name: module_name,
-            },
+            module: ModuleId::new(address, module_name),
             function: function_name,
         }
     }
@@ -118,9 +106,14 @@ impl FunctionIdent {
     /// Utility conversion from the corresponding handle in file_format
     pub fn from_function_handle(binary: &BinaryIndexedView, handle: &FunctionHandle) -> Self {
         Self {
-            module: ModuleIdent::from_module_handle(binary, binary.module_handle_at(handle.module)),
+            module: binary.module_id_for_handle(binary.module_handle_at(handle.module)),
             function: binary.identifier_at(handle.name).to_owned(),
         }
+    }
+
+    /// Get the id of the module declaring this function
+    pub fn module_id(&self) -> &ModuleId {
+        &self.module
     }
 
     /// Get the address
@@ -138,22 +131,26 @@ impl FunctionIdent {
         self.function.as_str()
     }
 
-    /// Convert the ident to a `ModuleId`
+    /// Split the ident into the `(ModuleId, function name)` pair the VM entry
+    /// points expect.
     pub fn to_module_and_function_id(&self) -> (ModuleId, Identifier) {
-        (self.module.to_module_id(), self.function.clone())
+        (self.module.clone(), self.function.clone())
     }
 }
 
 impl Display for FunctionIdent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}::{}", self.module, self.function)
+        fmt_module_id(f, &self.module)?;
+        write!(f, "::{}", self.function)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::DatatypeIdent;
-    use move_core_types::{account_address::AccountAddress, identifier::Identifier};
+    use super::{DatatypeIdent, FunctionIdent};
+    use move_core_types::{
+        account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
+    };
 
     #[test]
     fn test_datatype_ident_display_and_accessors() {
@@ -168,5 +165,44 @@ mod tests {
         assert_eq!(ident.module_name(), "vault");
         assert_eq!(ident.datatype_name(), "Position");
         assert_eq!(ident.to_string(), format!("{address}::vault::Position"));
+        assert_eq!(
+            ident.module_id(),
+            &ModuleId::new(address, Identifier::new("vault").unwrap())
+        );
+    }
+
+    #[test]
+    fn test_display_renders_valid_move_source_path() {
+        // Idents are spliced verbatim into the Move scripts generated by
+        // `prep::canvas`, so the address must carry a `0x` prefix. `ModuleId`'s own
+        // `Display` is unusable here: it prints the raw hex with no prefix.
+        let ident = FunctionIdent::from_function_tuple(
+            AccountAddress::ONE,
+            Identifier::new("coin").unwrap(),
+            Identifier::new("transfer").unwrap(),
+        );
+        assert_eq!(ident.to_string(), "0x1::coin::transfer");
+        assert_ne!(
+            ident.to_string(),
+            format!("{}::transfer", ident.module_id())
+        );
+    }
+
+    #[test]
+    fn test_function_ident_serde_shape_is_stable() {
+        // `FunctionIdent` is embedded in `ScriptSignature`, which is persisted in
+        // `entrypoints_cache.json`. Wrapping `ModuleId` must not change that shape.
+        let ident = FunctionIdent::from_function_tuple(
+            AccountAddress::ONE,
+            Identifier::new("coin").unwrap(),
+            Identifier::new("transfer").unwrap(),
+        );
+        let expected = serde_json::json!({
+            "module": { "address": AccountAddress::ONE.to_hex(), "name": "coin" },
+            "function": "transfer",
+        });
+        assert_eq!(serde_json::to_value(&ident).unwrap(), expected);
+        let round: FunctionIdent = serde_json::from_value(expected).unwrap();
+        assert_eq!(round, ident);
     }
 }
