@@ -321,6 +321,23 @@ pub fn discover_profiles(
 // Def-Use Graph (DUG)
 // ---------------------------------------------------------------------------
 
+/// Hard cap on concrete seed nodes retained in the DUG.
+///
+/// Seed nodes carry full concrete inputs and are serialized into `auto_state.json`
+/// at every checkpoint, so the catalog must not grow with execution count.
+const MAX_SEED_NODES: usize = 2048;
+
+/// Maximum seeds retained per distinct seed signature.
+///
+/// Executions that repeat a signature teach Phase 2 nothing new about the shape of
+/// the def-use graph; a handful of concrete inputs per signature is enough to seed
+/// chain construction.
+const MAX_SEEDS_PER_SIGNATURE: usize = 8;
+
+/// Identity of a seed observation for admission accounting:
+/// `(script index, outcome, produced types, consumed types)`.
+type SeedSignature = (usize, bool, BTreeSet<usize>, BTreeSet<usize>);
+
 /// A bipartite Def-Use Graph of global state.
 ///
 /// Nodes are either **type nodes** (resource types) or **script nodes** (by index).
@@ -373,6 +390,16 @@ pub struct DefUseGraph {
     /// type_node_index -> set of seed node indices that produce (write) it
     seed_producers: BTreeMap<usize, BTreeSet<usize>>,
 
+    /// Retained-seed count per seed signature, used to reject near-duplicate seeds.
+    /// Derived from the seed vectors, so it is rebuilt rather than persisted.
+    seed_signature_counts: BTreeMap<SeedSignature, usize>,
+
+    /// Retained-seed count per `(script index, outcome)` class. Eviction always
+    /// takes from the largest class, which keeps the catalog proportional across
+    /// scripts and keeps failing seeds - the Phase 2 chain targets - alive when a
+    /// successful script floods the catalog. Derived, so it is rebuilt, not persisted.
+    seed_class_counts: BTreeMap<(usize, bool), usize>,
+
     /// Monotonic seed ID allocator
     next_seed_id: u64,
 }
@@ -405,6 +432,8 @@ impl DefUseGraph {
             seed_defs: Vec::new(),
             seed_uses: Vec::new(),
             seed_producers: BTreeMap::new(),
+            seed_signature_counts: BTreeMap::new(),
+            seed_class_counts: BTreeMap::new(),
             next_seed_id: 0,
         }
     }
@@ -773,13 +802,131 @@ impl DefUseGraph {
         changed
     }
 
+    /// Admission signature of a stored seed node.
+    fn seed_signature(&self, seed_node: usize) -> SeedSignature {
+        (
+            self.seed_nodes[seed_node].script_index,
+            self.seed_nodes[seed_node].succeeded,
+            self.seed_defs[seed_node].clone(),
+            self.seed_uses[seed_node].clone(),
+        )
+    }
+
+    /// Rebuild the derived seed indexes from the retained seed nodes.
+    fn rebuild_seed_indexes(&mut self) {
+        self.seed_signature_counts.clear();
+        self.seed_class_counts.clear();
+        for idx in 0..self.seed_nodes.len() {
+            let signature = self.seed_signature(idx);
+            *self.seed_signature_counts.entry(signature).or_insert(0) += 1;
+            let class = (
+                self.seed_nodes[idx].script_index,
+                self.seed_nodes[idx].succeeded,
+            );
+            *self.seed_class_counts.entry(class).or_insert(0) += 1;
+        }
+    }
+
+    /// Retention rank of a seed node; the minimum is evicted first.
+    ///
+    /// The dominant term is the size of the seed's `(script, outcome)` class, so
+    /// eviction always takes from the most over-represented class. That matters: a
+    /// failing seed writes nothing, so it can never be a sole producer, and ranking
+    /// on producer-ness or def count first would evict every failing seed before
+    /// touching a successful one - exactly the seeds `seed_target_priority` and
+    /// `construct_seed_chains_for_targets` need as chain targets. Within a class, a
+    /// seed that is the only concrete producer of some resource type is evicted
+    /// last, then the oldest goes first so the catalog keeps refreshing. Every term
+    /// is a pure function of the observation stream: no clock, no rng.
+    fn seed_retention_rank(&self, seed_node: usize) -> (std::cmp::Reverse<usize>, bool, u64) {
+        let node = &self.seed_nodes[seed_node];
+        let class_count = self
+            .seed_class_counts
+            .get(&(node.script_index, node.succeeded))
+            .copied()
+            .unwrap_or(1);
+        let sole_producer = self.seed_defs[seed_node]
+            .iter()
+            .any(|ti| self.seed_producers.get(ti).is_some_and(|p| p.len() == 1));
+        (std::cmp::Reverse(class_count), sole_producer, node.id)
+    }
+
+    /// Remove one seed node, keeping every seed-indexed structure consistent.
+    ///
+    /// Uses `swap_remove`, so the last seed node takes over the freed index and all
+    /// `seed_producers` references to it are rewritten.
+    fn remove_seed_node(&mut self, seed_node: usize) {
+        let last = self.seed_nodes.len() - 1;
+
+        let signature = self.seed_signature(seed_node);
+        if let Some(count) = self.seed_signature_counts.get_mut(&signature) {
+            *count -= 1;
+            if *count == 0 {
+                self.seed_signature_counts.remove(&signature);
+            }
+        }
+        let class = (
+            self.seed_nodes[seed_node].script_index,
+            self.seed_nodes[seed_node].succeeded,
+        );
+        if let Some(count) = self.seed_class_counts.get_mut(&class) {
+            *count -= 1;
+            if *count == 0 {
+                self.seed_class_counts.remove(&class);
+            }
+        }
+
+        let evicted_defs: Vec<usize> = self.seed_defs[seed_node].iter().copied().collect();
+        for ti in evicted_defs {
+            if let Some(producers) = self.seed_producers.get_mut(&ti) {
+                producers.remove(&seed_node);
+                if producers.is_empty() {
+                    self.seed_producers.remove(&ti);
+                }
+            }
+        }
+
+        if seed_node != last {
+            let moved_defs: Vec<usize> = self.seed_defs[last].iter().copied().collect();
+            for ti in moved_defs {
+                if let Some(producers) = self.seed_producers.get_mut(&ti) {
+                    producers.remove(&last);
+                    producers.insert(seed_node);
+                }
+            }
+        }
+
+        self.seed_nodes.swap_remove(seed_node);
+        self.seed_defs.swap_remove(seed_node);
+        self.seed_uses.swap_remove(seed_node);
+    }
+
+    /// Evict the least valuable seed nodes until at most `limit` remain.
+    fn prune_seed_nodes_to(&mut self, limit: usize) {
+        while self.seed_nodes.len() > limit {
+            let victim = (0..self.seed_nodes.len())
+                .min_by_key(|&idx| self.seed_retention_rank(idx))
+                .expect("seed catalog over the limit is non-empty");
+            self.remove_seed_node(victim);
+        }
+    }
+
     /// Ingest one concrete seed observation (profile + concrete sender/args).
-    /// Returns `(dug_changed, seed_id)`.
+    ///
+    /// The script-level def/use edges are always ingested; they are bounded by
+    /// scripts x types. The concrete seed itself is only *retained* when it can still
+    /// teach Phase 2 something: either the observation grew the DUG, or its
+    /// `(script, outcome, defs, uses)` signature still has spare capacity. A global
+    /// cap bounds the catalog regardless, so memory and `auto_state.json` no longer
+    /// grow with execution count.
+    ///
+    /// Returns `(dug_changed, retained_seed_id)`; the id is `None` when the seed was
+    /// not retained.
     pub fn add_seed_observation(
         &mut self,
         profile: &ExecResourceProfile,
         seed: SeedInput,
-    ) -> (bool, u64) {
+    ) -> (bool, Option<u64>) {
         let changed = self.ingest_profile(profile);
 
         let mut seed_use_set = BTreeSet::new();
@@ -796,6 +943,24 @@ impl DefUseGraph {
             }
         }
 
+        let signature: SeedSignature = (
+            profile.script_index,
+            profile.succeeded,
+            seed_def_set.clone(),
+            seed_use_set.clone(),
+        );
+        let retained_for_signature = self
+            .seed_signature_counts
+            .get(&signature)
+            .copied()
+            .unwrap_or(0);
+        if !changed && retained_for_signature >= MAX_SEEDS_PER_SIGNATURE {
+            return (changed, None);
+        }
+
+        // Make room before inserting, so a seed reported as retained really is one.
+        self.prune_seed_nodes_to(MAX_SEED_NODES - 1);
+
         let seed_id = self.next_seed_id;
         self.next_seed_id += 1;
         let seed_node_idx = self.seed_nodes.len();
@@ -807,6 +972,11 @@ impl DefUseGraph {
         });
         self.seed_uses.push(seed_use_set);
         self.seed_defs.push(seed_def_set.clone());
+        *self.seed_signature_counts.entry(signature).or_insert(0) += 1;
+        *self
+            .seed_class_counts
+            .entry((profile.script_index, profile.succeeded))
+            .or_insert(0) += 1;
         if profile.succeeded {
             for ti in seed_def_set {
                 self.seed_producers
@@ -817,7 +987,7 @@ impl DefUseGraph {
         }
         self.seed_modification_count += 1;
 
-        (changed, seed_id)
+        (changed, Some(seed_id))
     }
 
     /// Check if the DUG has been modified since a given marker value.
@@ -1004,7 +1174,7 @@ impl DefUseGraph {
             .map(|tag| tag.account)
             .collect();
 
-        Ok(Self {
+        let mut dug = Self {
             num_scripts: state.num_scripts,
             type_nodes: state.type_nodes,
             type_index,
@@ -1031,8 +1201,17 @@ impl DefUseGraph {
             seed_defs: state.seed_defs,
             seed_uses: state.seed_uses,
             seed_producers: state.seed_producers,
+            seed_signature_counts: BTreeMap::new(),
+            seed_class_counts: BTreeMap::new(),
             next_seed_id: state.next_seed_id,
-        })
+        };
+
+        // The seed indexes are derived state and are never persisted. Rebuilding
+        // them also lets the cap apply to checkpoints written before it existed, so
+        // an oversized auto_state.json shrinks on the next checkpoint.
+        dug.rebuild_seed_indexes();
+        dug.prune_seed_nodes_to(MAX_SEED_NODES);
+        Ok(dug)
     }
 }
 
@@ -3265,7 +3444,10 @@ mod tests {
             succeeded: true,
         };
         let seed = SeedInput::from((vec![VmTypeTag::Bool], vec![MoveValue::U64(7)]));
-        let (_, seed_id) = dug.add_seed_observation(&profile, seed.clone());
+        let seed_id = dug
+            .add_seed_observation(&profile, seed.clone())
+            .1
+            .expect("first observation of a signature is always retained");
 
         let snapshot = dug.snapshot().unwrap();
         let restored = DefUseGraph::from_persisted(snapshot).unwrap();
@@ -3709,6 +3891,119 @@ mod tests {
     }
 
     #[test]
+    fn test_dug_seed_catalog_is_bounded_per_signature() {
+        let mut dug = DefUseGraph::new(1);
+        let profile = ExecResourceProfile {
+            script_index: 0,
+            reads: BTreeSet::new(),
+            writes: BTreeSet::from([make_tag("A")]),
+            succeeded: true,
+        };
+
+        // Every execution reports the same resource profile, which is the common
+        // case in a long campaign: only the concrete args differ.
+        let mut retained = 0usize;
+        for i in 0..10_000u64 {
+            let seed = SeedInput::new(AccountAddress::ONE, vec![], vec![MoveValue::U64(i)]);
+            if dug.add_seed_observation(&profile, seed).1.is_some() {
+                retained += 1;
+            }
+        }
+
+        // The catalog (and therefore auto_state.json) stops growing with exec count.
+        assert_eq!(retained, MAX_SEEDS_PER_SIGNATURE);
+        assert_eq!(dug.num_seeds(), MAX_SEEDS_PER_SIGNATURE);
+        let retained_ids: Vec<u64> = (0..dug.num_seeds()).map(|i| dug.seed_node(i).id).collect();
+        assert_eq!(
+            retained_ids,
+            (0..MAX_SEEDS_PER_SIGNATURE as u64).collect::<Vec<_>>()
+        );
+
+        // Phase 2 keeps concrete producers for the type the script writes.
+        let type_a = *dug.type_index_of(&make_tag("A")).expect("type A interned");
+        assert_eq!(dug.seed_producers_of(type_a).len(), MAX_SEEDS_PER_SIGNATURE);
+    }
+
+    #[test]
+    fn test_dug_seed_catalog_eviction_is_bounded_and_deterministic() {
+        // Each observation writes a fresh resource type, so each one grows the DUG
+        // and is admitted: only the global cap can bound the catalog here.
+        let observe = || {
+            let mut dug = DefUseGraph::new(1);
+            for i in 0..(MAX_SEED_NODES + 64) {
+                let profile = ExecResourceProfile {
+                    script_index: 0,
+                    reads: BTreeSet::new(),
+                    writes: BTreeSet::from([make_tag(&format!("T{i}"))]),
+                    succeeded: true,
+                };
+                let seed =
+                    SeedInput::new(AccountAddress::ONE, vec![], vec![MoveValue::U64(i as u64)]);
+                dug.add_seed_observation(&profile, seed);
+            }
+            dug
+        };
+        let ids =
+            |dug: &DefUseGraph| -> Vec<u64> { (0..dug.num_seeds()).map(|i| dug.seed_node(i).id).collect() };
+
+        let dug = observe();
+        assert_eq!(dug.num_seeds(), MAX_SEED_NODES);
+
+        // Eviction keeps every seed-indexed structure consistent: from_persisted
+        // bails on seed_producers indices past the end of the seed vector.
+        let restored = DefUseGraph::from_persisted(dug.snapshot().unwrap()).unwrap();
+        assert_eq!(restored.num_seeds(), MAX_SEED_NODES);
+        assert_eq!(ids(&dug), ids(&restored));
+
+        // Retention is a pure function of the observation stream: no clock, no rng.
+        assert_eq!(ids(&dug), ids(&observe()));
+    }
+
+    #[test]
+    fn test_dug_seed_eviction_keeps_failing_scripts_represented() {
+        let mut dug = DefUseGraph::new(2);
+
+        // Script 1 keeps failing on the same missing read. These are precisely the
+        // seeds `construct_seed_chains_for_targets` needs as Phase 2 chain targets,
+        // and they can never be "sole producers" because a failed seed writes
+        // nothing - so they must not be the first thing eviction throws away.
+        let failing = ExecResourceProfile {
+            script_index: 1,
+            reads: BTreeSet::from([make_tag("A")]),
+            writes: BTreeSet::new(),
+            succeeded: false,
+        };
+        for i in 0..64u64 {
+            let seed = SeedInput::new(AccountAddress::ONE, vec![], vec![MoveValue::U64(i)]);
+            dug.add_seed_observation(&failing, seed);
+        }
+        let failing_admitted = dug.num_seeds();
+        assert_eq!(failing_admitted, MAX_SEEDS_PER_SIGNATURE);
+
+        // Script 0 now floods the catalog with novel successful writes.
+        for i in 0..(MAX_SEED_NODES + 64) {
+            let profile = ExecResourceProfile {
+                script_index: 0,
+                reads: BTreeSet::new(),
+                writes: BTreeSet::from([make_tag(&format!("T{i}"))]),
+                succeeded: true,
+            };
+            let seed = SeedInput::new(AccountAddress::ONE, vec![], vec![MoveValue::U64(i as u64)]);
+            dug.add_seed_observation(&profile, seed);
+        }
+
+        assert_eq!(dug.num_seeds(), MAX_SEED_NODES);
+        let failing_left = (0..dug.num_seeds())
+            .filter(|&i| !dug.seed_node(i).succeeded)
+            .count();
+        assert_eq!(
+            failing_left, failing_admitted,
+            "eviction must take from the largest (script, outcome) class, not from \
+             the failing seeds Phase 2 targets"
+        );
+    }
+
+    #[test]
     fn test_dug_chain_reconstruction_after_mutation() {
         // Initially: S0 writes A, S1 reads nothing (no chain possible to S1)
         let profiles = vec![
@@ -3747,7 +4042,10 @@ mod tests {
             writes: BTreeSet::from([make_tag("A")]),
             succeeded: true,
         };
-        let (_, id0) = dug.add_seed_observation(&p0, seed0.clone());
+        let id0 = dug
+            .add_seed_observation(&p0, seed0.clone())
+            .1
+            .expect("first observation of a signature is always retained");
 
         let seed1 = SeedInput::new(sender_2, vec![], vec![MoveValue::U64(9)]);
         let p1 = ExecResourceProfile {
@@ -3756,7 +4054,10 @@ mod tests {
             writes: BTreeSet::new(),
             succeeded: false,
         };
-        let (_, id1) = dug.add_seed_observation(&p1, seed1.clone());
+        let id1 = dug
+            .add_seed_observation(&p1, seed1.clone())
+            .1
+            .expect("first observation of a signature is always retained");
 
         let mut rng = StdRng::seed_from_u64(11);
         let chains = construct_seed_chains(&dug, 5, 2, 10, &mut rng);
