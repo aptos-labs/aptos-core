@@ -455,6 +455,37 @@ impl DefUseGraph {
         &self.type_nodes[type_node]
     }
 
+    /// Addresses confirmed to hold an `ObjectGroup` in materialized state.
+    #[cfg(test)]
+    pub fn object_addresses(&self) -> &BTreeSet<AccountAddress> {
+        &self.object_addresses
+    }
+
+    /// Register `tag.account` as an on-chain object address when `tag` is an
+    /// `ObjectGroup` resource-group tag.
+    ///
+    /// Deliberately reachable only from `add_initial_tag` and `add_def`, i.e.
+    /// only for tags backed by *materialized* state: the provisioning state
+    /// scan (`TracingExecutor::scan_all_resource_writes`) and the write sets of
+    /// successful executions.
+    ///
+    /// `add_use` must NOT call this. Read sets come from
+    /// `RecordingStateView::extract_resource_reads`, which records every state
+    /// key the VM *touched*, including probes for resources that do not exist:
+    /// `object::address_to_object(addr)` on a fuzzer-generated plain user
+    /// account emits an `ObjectGroup` read at that account. Promoting such an
+    /// address would make every plain resource stored under it
+    /// object-abstractable, so unrelated account-scoped resources
+    /// (`CoinStore<T>@user_a` vs `CoinStore<T>@user_b`) would compare equal in
+    /// `tags_are_compatible` and produce bogus def->use edges.
+    /// `Mutator::update_object_dict` classifies objects from writes only for
+    /// the same reason.
+    ///
+    /// Invariant: `object_addresses` is always exactly the set of
+    /// `ObjectGroup` accounts reachable from `defs` union `initial_types`.
+    /// Note that `type_nodes` is a strict superset of those, because `add_use`
+    /// and `add_seed_observation` also intern tags. `from_persisted` therefore
+    /// rebuilds this set from `defs` and `initial_types`, never `type_nodes`.
     fn note_object_address(&mut self, tag: &ResourceTag) {
         if is_object_group_struct_tag(&tag.struct_tag) {
             self.object_addresses.insert(tag.account);
@@ -656,6 +687,11 @@ impl DefUseGraph {
 
     /// Add a use edge: script `script_index` reads `tag`.
     /// Returns true if the edge was new (DUG changed).
+    ///
+    /// Unlike `add_def` and `add_initial_tag`, this intentionally does not call
+    /// `note_object_address`: a read only proves the VM touched the state key,
+    /// not that the resource exists, so a read-only `ObjectGroup` tag is not
+    /// evidence that its account is an object. See `note_object_address`.
     pub fn add_use(&mut self, script_index: usize, tag: &ResourceTag) -> bool {
         assert!(script_index < self.num_scripts);
         let ti = self.intern_type(tag);
@@ -909,9 +945,19 @@ impl DefUseGraph {
             }
         }
 
+        // Object addresses are established only by materialized state, so
+        // rebuild them from def edges and initial types rather than from every
+        // interned type node. Deriving them from `type_nodes` would also pick
+        // up `ObjectGroup` tags interned by `add_use` alone, which
+        // `note_object_address` deliberately ignores, so a checkpoint restore
+        // would silently widen object abstraction relative to the in-memory
+        // DUG that produced the snapshot.
         let object_addresses = state
-            .type_nodes
+            .defs
             .iter()
+            .flat_map(|type_indices| type_indices.iter())
+            .chain(state.initial_types.iter())
+            .filter_map(|&type_idx| state.type_nodes.get(type_idx))
             .filter(|tag| is_object_group_struct_tag(&tag.struct_tag))
             .map(|tag| tag.account)
             .collect();
@@ -2742,6 +2788,14 @@ mod tests {
         }
     }
 
+    fn make_object_group_tag(account: AccountAddress) -> ResourceTag {
+        let write = make_object_group_write(account);
+        ResourceTag {
+            account: write.address,
+            struct_tag: write.struct_tag,
+        }
+    }
+
     /// Helper: create a ScriptProfile
     fn make_profile(
         index: usize,
@@ -2973,6 +3027,130 @@ mod tests {
         assert!(!compatible[0]
             .produced_types
             .contains(&make_tag_at("Vault", account_2)));
+    }
+
+    #[test]
+    fn test_dug_read_only_object_group_is_not_an_object_address() {
+        // Read sets record every state key the VM touched, including probes for
+        // resources that do not exist, so a read-only `ObjectGroup` tag must
+        // NOT promote its account to an object address. See
+        // `DefUseGraph::note_object_address`.
+        let created = AccountAddress::from_hex_literal("0x41").unwrap();
+        let probed = AccountAddress::from_hex_literal("0x42").unwrap();
+
+        let mut dug = DefUseGraph::new(2);
+        // Script 0 really creates an object and stores a Vault under it.
+        dug.ingest_profile(&ExecResourceProfile {
+            script_index: 0,
+            reads: BTreeSet::new(),
+            writes: BTreeSet::from([
+                make_object_group_tag(created),
+                make_tag_at("Vault", created),
+            ]),
+            succeeded: true,
+        });
+        // Script 1 aborts after merely probing `probed`; both tags are reads.
+        dug.ingest_profile(&ExecResourceProfile {
+            script_index: 1,
+            reads: BTreeSet::from([
+                make_object_group_tag(probed),
+                make_tag_at("Vault", probed),
+            ]),
+            writes: BTreeSet::new(),
+            succeeded: false,
+        });
+
+        assert_eq!(dug.object_addresses(), &BTreeSet::from([created]));
+        // Consequence: Vault@probed is not object-abstractable, so the def of
+        // Vault@created does not satisfy it. Asserted through
+        // `compatible_type_overlap_with_tags` rather than
+        // `are_dependencies_satisfied`, because the latter is already forced
+        // to false by the exact unmet read of ObjectGroup@probed (ObjectGroup
+        // tags are never object-abstractable) and so would not distinguish
+        // this behaviour from the opposite one.
+        assert_eq!(
+            dug.compatible_type_overlap_with_tags(
+                dug.defs_of(0),
+                &BTreeSet::from([make_tag_at("Vault", probed)])
+            ),
+            0
+        );
+    }
+
+    #[test]
+    fn test_dug_object_abstraction_requires_materialized_object_address() {
+        let created = AccountAddress::from_hex_literal("0x51").unwrap();
+        let other = AccountAddress::from_hex_literal("0x52").unwrap();
+
+        let mut dug = DefUseGraph::new(2);
+        dug.ingest_profile(&ExecResourceProfile {
+            script_index: 0,
+            reads: BTreeSet::new(),
+            writes: BTreeSet::from([
+                make_object_group_tag(created),
+                make_tag_at("Vault", created),
+            ]),
+            succeeded: true,
+        });
+        dug.ingest_profile(&ExecResourceProfile {
+            script_index: 1,
+            reads: BTreeSet::from([make_tag_at("Vault", other)]),
+            writes: BTreeSet::new(),
+            succeeded: false,
+        });
+        assert!(!dug.are_dependencies_satisfied(&[0, 1]));
+
+        // Confirming `other` from materialized state is what unlocks the
+        // object abstraction, not observing it in a read.
+        dug.ingest_initial_writes(&[make_object_group_write(other)]);
+        assert_eq!(dug.object_addresses(), &BTreeSet::from([created, other]));
+        assert!(dug.are_dependencies_satisfied(&[0, 1]));
+    }
+
+    #[test]
+    fn test_dug_snapshot_roundtrip_preserves_object_addresses() {
+        let created = AccountAddress::from_hex_literal("0x61").unwrap();
+        let probed = AccountAddress::from_hex_literal("0x62").unwrap();
+
+        let mut dug = DefUseGraph::new(3);
+        // Script 0 really creates the object and stores a Vault under it.
+        dug.ingest_profile(&ExecResourceProfile {
+            script_index: 0,
+            reads: BTreeSet::new(),
+            writes: BTreeSet::from([
+                make_object_group_tag(created),
+                make_tag_at("Vault", created),
+            ]),
+            succeeded: true,
+        });
+        // Script 1 reads a Vault at an address never confirmed to be an object.
+        dug.ingest_profile(&ExecResourceProfile {
+            script_index: 1,
+            reads: BTreeSet::from([make_tag_at("Vault", probed)]),
+            writes: BTreeSet::new(),
+            succeeded: false,
+        });
+        // Script 2 only probes `probed` for an object, so ObjectGroup@probed is
+        // interned by `add_use` alone and appears in `type_nodes` but not in
+        // any def or initial type.
+        dug.ingest_profile(&ExecResourceProfile {
+            script_index: 2,
+            reads: BTreeSet::from([make_object_group_tag(probed)]),
+            writes: BTreeSet::new(),
+            succeeded: false,
+        });
+
+        assert_eq!(dug.object_addresses(), &BTreeSet::from([created]));
+        assert!(!dug.are_dependencies_satisfied(&[0, 1]));
+
+        let restored = DefUseGraph::from_persisted(dug.snapshot().unwrap()).unwrap();
+
+        // A checkpoint restore must not widen object abstraction: `probed` was
+        // only ever read, so it stays out of `object_addresses` and chain
+        // formation is unchanged across the resume boundary.
+        assert_eq!(restored.object_addresses(), dug.object_addresses());
+        assert_eq!(restored.object_addresses(), &BTreeSet::from([created]));
+        assert!(!restored.are_dependencies_satisfied(&[0, 1]));
     }
 
     #[test]
