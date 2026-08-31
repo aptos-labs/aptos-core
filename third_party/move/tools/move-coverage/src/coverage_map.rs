@@ -59,6 +59,25 @@ pub struct TraceMap {
     pub exec_maps: BTreeMap<String, Vec<TraceEntry>>,
 }
 
+/// Checks that a two-segment raw-trace context is a script `main` frame.
+///
+/// The Move VM writes script frames into the raw trace as `script::main` (see
+/// `LoadedFunction::name_as_pretty_string` in move-vm-runtime). The same frame was spelled
+/// `Script::main` before https://github.com/aptos-labs/aptos-core/pull/14185 changed the
+/// loader, so both spellings are accepted and traces recorded by older binaries keep
+/// parsing. Anything else is reported as an error rather than a panic: the trace file is
+/// external input and every caller already returns `Result`.
+fn check_script_context(context: &str, context_segs: &[&str]) -> Result<()> {
+    match context_segs {
+        ["script" | "Script", "main"] => Ok(()),
+        _ => Err(format_err!(
+            "Unexpected trace context '{}': expected '<address>::<module>::<function>' or \
+             'script::main'",
+            context
+        )),
+    }
+}
+
 impl CoverageMap {
     /// Takes in a file containing a raw VM trace, and returns an updated coverage map.
     pub fn update_coverage_from_trace_file<P: AsRef<Path> + std::fmt::Debug>(
@@ -84,9 +103,8 @@ impl CoverageMap {
                     AccountAddress::from_hex_literal(context_segs.pop().unwrap()).unwrap();
                 self.insert(exec_id, module_addr, module_name, func_name, pc);
             } else {
-                // Don't count scripts (for now)
-                assert_eq!(context_segs.pop().unwrap(), "main",);
-                assert_eq!(context_segs.pop().unwrap(), "script",);
+                // Don't count scripts (for now), but sanity-check the trace format.
+                check_script_context(context, &context_segs)?;
             }
         }
         Ok(self)
@@ -330,9 +348,8 @@ impl TraceMap {
                     AccountAddress::from_hex_literal(context_segs.pop().unwrap()).unwrap();
                 self.insert(exec_id, module_addr, module_name, func_name, pc);
             } else {
-                // Don't count scripts (for now)
-                assert_eq!(context_segs.pop().unwrap(), "main",);
-                assert_eq!(context_segs.pop().unwrap(), "script",);
+                // Don't count scripts (for now), but sanity-check the trace format.
+                check_script_context(context, &context_segs)?;
             }
         }
         Ok(self)
@@ -384,4 +401,20 @@ pub fn output_map_to_file<M: Serialize, P: AsRef<Path> + std::fmt::Debug>(
     let mut file = File::create(file_name)?;
     file.write_all(&bytes)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::check_script_context;
+
+    #[test]
+    fn script_context_accepts_both_spellings() {
+        // What the VM emits today (`LoadedFunction::name_as_pretty_string`).
+        assert!(check_script_context("script::main", &["script", "main"]).is_ok());
+        // What it emitted before aptos-labs/aptos-core#14185; old traces must still parse.
+        assert!(check_script_context("Script::main", &["Script", "main"]).is_ok());
+        // Anything else is an error, not a panic.
+        assert!(check_script_context("script::foo", &["script", "foo"]).is_err());
+        assert!(check_script_context("0x1::m", &["0x1", "m"]).is_err());
+    }
 }
