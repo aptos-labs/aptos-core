@@ -49,7 +49,6 @@ impl FromStr for LanguageSetting {
 impl LanguageSetting {
     fn compiler_version(version: LanguageVersion) -> CompilerVersion {
         match version {
-            LanguageVersion::V2_0 | LanguageVersion::V2_1 => CompilerVersion::V2_0,
             LanguageVersion::V2_2
             | LanguageVersion::V2_3
             | LanguageVersion::V2_4
@@ -86,8 +85,6 @@ impl LanguageSetting {
             language_version: Some(*version),
             compiler_version: Some(Self::compiler_version(*version)),
             bytecode_version: Some(match version {
-                LanguageVersion::V2_0 => file_format_common::VERSION_7,
-                LanguageVersion::V2_1 => file_format_common::VERSION_7,
                 LanguageVersion::V2_2 => file_format_common::VERSION_8,
                 LanguageVersion::V2_3 => file_format_common::VERSION_9,
                 LanguageVersion::V2_4 | LanguageVersion::V2_5 => file_format_common::VERSION_10,
@@ -105,22 +102,6 @@ impl LanguageSetting {
 
         // FIXME(mengxu): keep in sync with `aptos_framework::build_package::BuildOptions::move_2()`
         match version {
-            LanguageVersion::V2_0 => command.args([
-                "--language-version",
-                "2.0",
-                "--compiler-version",
-                "2.0",
-                "--bytecode-version",
-                "7",
-            ]),
-            LanguageVersion::V2_1 => command.args([
-                "--language-version",
-                "2.1",
-                "--compiler-version",
-                "2.0",
-                "--bytecode-version",
-                "7",
-            ]),
             LanguageVersion::V2_2 => command.args([
                 "--language-version",
                 "2.2",
@@ -207,8 +188,6 @@ mod tests {
     #[test]
     fn test_language_setting_cli_and_config_use_same_compiler_version() {
         for version in [
-            LanguageVersion::V2_0,
-            LanguageVersion::V2_1,
             LanguageVersion::V2_2,
             LanguageVersion::V2_3,
             LanguageVersion::V2_4,
@@ -230,12 +209,8 @@ mod tests {
     }
 
     #[test]
-    fn test_language_setting_v2_1_uses_stable_compiler_in_cli() {
-        let args = command_args(LanguageSetting {
-            version: LanguageVersion::V2_1,
-            optimization: OptLevel::Default,
-        });
-        let expected = CompilerVersion::V2_0.to_string();
-        assert_eq!(compiler_flag(&args), Some(expected.as_str()));
+    fn test_language_setting_rejects_unsupported_v2_minors() {
+        assert!(LanguageSetting::from_str("2.0").is_err());
+        assert!(LanguageSetting::from_str("2.1").is_err());
     }
 }

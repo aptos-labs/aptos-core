@@ -293,27 +293,32 @@ impl TracingExecutor {
             |gas_feature_version,
              vm_gas_params,
              _,
-             is_approved_gov_script,
+             txn_limits_request,
              meter_balance,
              kill_switch| {
-                StandardGasMeter::new(StandardGasAlgebra::new(
-                    gas_feature_version,
-                    VMGasParameters {
-                        misc: MiscGasParameters::zeros(),
-                        instr: InstructionGasParameters::zeros(),
-                        txn: vm_gas_params.txn,
-                    },
-                    StorageGasParameters::unlimited(),
-                    is_approved_gov_script,
-                    meter_balance,
-                    kill_switch,
-                ))
+                StandardGasMeter::new(
+                    StandardGasAlgebra::new(
+                        gas_feature_version,
+                        VMGasParameters {
+                            misc: MiscGasParameters::zeros(),
+                            instr: InstructionGasParameters::zeros(),
+                            txn: vm_gas_params.txn,
+                        },
+                        StorageGasParameters::unlimited(),
+                        txn_limits_request,
+                        meter_balance,
+                        kill_switch,
+                    ),
+                    // Execution gas is zeroed out above, so keep the per-value-node charge
+                    // off as well: the fuzzer only meters the transaction-level limits.
+                    false,
+                )
             },
             &AuxiliaryInfo::default(),
         );
         match vm_result {
             Ok((status, output, _gas_meter)) => {
-                match output.try_materialize_into_transaction_output(&resolver) {
+                match output.try_materialize_into_transaction_output() {
                     Ok(txn_output) => Ok((status, txn_output)),
                     Err(error_status) => {
                         bail!("AptosVM failed unexpectedly with status: {error_status}")
@@ -669,28 +674,33 @@ impl TracingExecutor {
             |gas_feature_version,
              vm_gas_params,
              _,
-             is_approved_gov_script,
+             txn_limits_request,
              meter_balance,
              kill_switch| {
-                StandardGasMeter::new(StandardGasAlgebra::new(
-                    gas_feature_version,
-                    VMGasParameters {
-                        misc: MiscGasParameters::zeros(),
-                        instr: InstructionGasParameters::zeros(),
-                        txn: vm_gas_params.txn,
-                    },
-                    StorageGasParameters::unlimited(),
-                    is_approved_gov_script,
-                    meter_balance,
-                    kill_switch,
-                ))
+                StandardGasMeter::new(
+                    StandardGasAlgebra::new(
+                        gas_feature_version,
+                        VMGasParameters {
+                            misc: MiscGasParameters::zeros(),
+                            instr: InstructionGasParameters::zeros(),
+                            txn: vm_gas_params.txn,
+                        },
+                        StorageGasParameters::unlimited(),
+                        txn_limits_request,
+                        meter_balance,
+                        kill_switch,
+                    ),
+                    // Execution gas is zeroed out above, so keep the per-value-node charge
+                    // off as well: the fuzzer only meters the transaction-level limits.
+                    false,
+                )
             },
             &AuxiliaryInfo::default(),
         );
         let resource_reads = recording_view.extract_resource_reads();
         match vm_result {
             Ok((status, output, _gas_meter)) => {
-                match output.try_materialize_into_transaction_output(&resolver) {
+                match output.try_materialize_into_transaction_output() {
                     Ok(txn_output) => Ok((status, txn_output, resource_reads)),
                     Err(error_status) => {
                         bail!("AptosVM failed unexpectedly with status: {error_status}")
