@@ -1,0 +1,52 @@
+% Shared body of the paper: everything the two drivers have in common.
+% `main.tex` builds the arXiv preprint, `main-anon.tex` the double-blind
+% submission; they differ only in the option passed to the workshop style,
+% which sets `\if@anonymous` and so drives every `\Anon{...}{...}` below and in
+% the section files.
+%
+% Do not add a \documentclass here -- the drivers own that.
+
+\usepackage[utf8]{inputenc}
+
+\input{prelude.tex}
+
+\bibliographystyle{plainnat}
+
+% The template requires both: \title is the paper, \workshoptitle the venue
+% named in the page-1 notice of a camera-ready copy.
+\title{Combining Mechanical and Agentic\\ Specification Inference}
+\workshoptitle{AI for Verifiable Coding}
+
+% Under double blind the style prints ``Anonymous Author(s)'' and ignores this
+% block -- but it still typesets \thanks, so the footnote has to go too.
+\author{%
+	\Anon{Wolfgang Grieskamp\thanks{Corresponding author: \texttt{wg@aptoslabs.com}},
+	Teng Zhang, and Vineeth Kashyap \\
+	Aptos Labs, Palo Alto, USA}{Anonymous Author(s)}
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+	We describe a specification inference tool that combines mechanical weakest-precondition (\WP) analysis with an agentic coding CLI such as Claude Code.
+	It is implemented for Move and the Move Prover, but the approach is general enough to be suitable for any Rust-style language.
+	Inference reduces the boilerplate of verification which often hit applications in practice: to establish a high-level property such as a global state invariant, pre- and post-conditions for the supporting functions typically have to be written for the whole software system, a laborius and tedious task.
+	A Model Context Protocol (MCP) service exposes the \WP analysis and the verifier to the coding agent.
+	The \WP analysis provides a sound, mechanical baseline for inference; the AI is used precisely where \WP is weakest --- for loop invariants and high-level idiomatic specifications such as monotonicity, conservation, and structural invariants.
+	The verifier serves as the oracle that decides whether the generated specs are valid, and the agent is equipped to generate proof hints and to refine the inferred specification until verification succeeds.
+	We evaluate the approach on 17 targets drawn from a private perpetual-trading codebase, comparing three inference tactics --- one without \WP and two with --- over four replicates each.
+	At the stated GLM-5.3 prices, the \WP-backed tactics cost about 28\% less and leave fewer contracts incomplete, though the unaided agent still produces a complete specification in 64 of its 68 sessions.
+\end{abstract}
+
+\input{intro}
+\input{example}
+\input{wp}
+\input{skills}
+\input{evaluation}
+\input{conclusion}
+
+\bibliography{biblio}
+
+\end{document}

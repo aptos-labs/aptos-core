@@ -1,0 +1,17 @@
+[package]
+name = "examples"
+version = "1.0.0"
+authors = []
+
+[addresses]
+defi = "_"
+std = "_"
+
+[dev-addresses]
+defi = "0x100"
+std = "0x1"
+
+[dependencies]
+MoveStdlib = { local = "../../../../move-stdlib" }
+
+[dev-dependencies]

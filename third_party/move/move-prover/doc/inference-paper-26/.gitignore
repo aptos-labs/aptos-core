@@ -1,0 +1,5 @@
+# Build output. The v2 arXiv bundle (v2/arxiv-submission.tar.gz) is tracked
+# deliberately so the submission stays reproducible.
+build/
+stage/
+runs/

@@ -1,0 +1,99 @@
+% !TEX root = main.tex
+\Section{Evaluation}
+\label{sec:evaluation}
+
+\Paragraph{Setup}
+The evaluation setup aims at testing the three different tactics (arms) mentioned above -- \textit{agent-only}, \textit{hybrid-flexible}, and \textit{hybrid-guided}, which are run under the same conditions, using Claude Code with GLM-5.3 as the underlying model.
+
+The corpus is drawn from \Anon{Etna, the private Move code of the perpetual trading system Decibel}{the private Move code of a production perpetual trading system}, plus five targets that are not from it: three functions from a public Move library, and two written for the corpus. None of the five carries an upstream specification either.
+A private codebase matters here: the model cannot have seen these functions, or any specification of them, during training, so a contract has to be inferred rather than recalled.
+
+During selection, every candidate target is classified by the features (strata) its contract has to account for --- loops and accumulators, early returns and breaks, arithmetic overflow and underflow, casts and truncation, mutable references and in-place permutation, function values, quantifiers, composition through a callee's contract, and others, 34 such features in all.
+A target is admitted only if it proves in a few seconds against a hand-written reference specification.
+The result is \textbf{17 tasks} covering all 34 features across 12 modules, 9 of which contain loops.
+With 3 arms and 4 replicates this makes \textbf{204 cells}.
+
+\Paragraph{Scoring}
+A cell reaches \emph{operational success} when its specification compiles, verifies, and passes a set of tests which check its \textit{completeness}. 
+Completeness is a significant problem for agent-based inference, since postconditions in particular can be weaker than the actual behavior of the function, and agents tend to select the shortest path to a solution. 
+The skills make it very clear that completeness is a requirement, but an agent may ignore this. 
+There is no deductive method for checking completeness in the general case.
+\WP guarantees completeness only in the presence of complete loop invariants and complete specs of callees; if completeness is not reached, it may be able to generate a warning.
+The agent-only tactic does not have this mechanism.
+
+The harness evaluates completeness using \textit{mutation testing} with a set of hand-generated mutants, changing the verified implementation. 
+To pass the test, each of the mutants needs to be killed --- that is, verification fails when the mutant is verified against the inferred spec.
+
+
+\Paragraph{Cost}
+Costs in US dollars use the GLM-5.3 prices recorded for the round: \$1.40 per million uncached input tokens, \$0.26 per million cached input tokens, and \$4.40 per million output tokens.
+For the corresponding token counts $I_u$, $I_c$, and $O$, the cost is
+$\mathit{cost}_{\mathrm{USD}} = (1.40 I_u + 0.26 I_c + 4.40 O) / 10^6$.
+Cache-creation tokens are currently uncharged and contribute zero; we recompute from the recorded token counters rather than use the SDK's cost estimate.
+Table~\ref{tab:costs} gives cost per cell, by target.
+Both hybrid arms are about 28\% cheaper in the mean, and less variable across the round: the coefficient of variation falls from 110\% to 60--69\%, and the 12 agent-only cells above \$0.50 become six and five.
+The saving is uneven. The hybrids are cheaper on 12 and 11 of the 17 targets, and the round-level figure is carried by a few of them rather than spread evenly: |VS-contrib-003| costs agent-only 5.6$\times$ what it costs hybrid-guided and 6.6$\times$ what it costs hybrid-flexible, while |TL-lev-020| and |VS-shares-002| cost 1.5$\times$ and 1.7$\times$ as much under hybrid-guided as without \WP.
+Within a target the four replicates vary widely in their own right (CV 10--146\%), so the per-target ratios are not individually resolved; the round-level ratio is.
+
+\begin{table}[t]
+\centering
+\caption{Cost in US dollars per cell by target: mean and median over the four replicates,
+variation across them (CV), the hybrid mean as a percentage of agent-only's (\% ag.), and whether the specification killed every mutant
+(\Checkmark) or was defeated by one (\XSolidBrush, subscripted with
+the count where more than one replicate failed). $\circ$ marks a task-arm whose
+replicate was lost to an infrastructure fault. Summed over the round the arms
+cost \$25.54, \$18.25 and \$18.37, i.e.\ 0.71$\times$ and 0.72$\times$
+agent-only.}
+
+\label{tab:costs}
+\footnotesize
+\setlength{\tabcolsep}{1.8pt}
+\begin{tabular}{lrrrcrrrrcrrrrc}
+\toprule
+& \multicolumn{4}{c}{agent-only} & \multicolumn{5}{c}{hybrid-guided} & \multicolumn{5}{c}{hybrid-flexible} \\
+\cmidrule(lr){2-5} \cmidrule(lr){6-10} \cmidrule(lr){11-15}
+target & mean \$ & med. \$ & CV\% & ok & mean \$ & \% ag. & med. \$ & CV\% & ok & mean \$ & \% ag. & med. \$ & CV\% & ok \\
+\midrule
+|BA-base-012| & 0.380 & 0.393 & 12 & \Checkmark & 0.251 & 66 & 0.248 & 49 & \Checkmark & 0.311 & 82 & 0.290 & 28 & \Checkmark \\
+|LP-price-021| & 0.197 & 0.191 & 42 & \Checkmark & 0.228 & 116 & 0.188 & 49 & \Checkmark & 0.207 & 105 & 0.185 & 30 & \Checkmark \\
+|MM-min-013| & 0.126 & 0.098 & 61 & \Checkmark & 0.141 & 112 & 0.133 & 34 & \Checkmark & 0.134 & 106 & 0.134 & 10 & \Checkmark \\
+|OV-order-006| & 0.097 & 0.091 & 18 & \Checkmark & 0.076 & 78 & 0.071 & 14 & \Checkmark & 0.080 & 83 & 0.070 & 37 & \Checkmark \\
+|QP-part-025| & 0.698 & 0.660 & 35 & \XSolidBrush$_{2}$ & 0.490 & 70 & 0.475 & 22 & \Checkmark & 0.448 & 64 & 0.470 & 42 & \XSolidBrush \\
+|SM-select-022| & 0.406 & 0.375 & 35 & \Checkmark & 0.434 & 107 & 0.380 & 51 & \Checkmark & 0.276 & 68 & 0.280 & 34 & \Checkmark \\
+|TL-lev-020| & 0.205 & 0.193 & 31 & \Checkmark & 0.313 & 153 & 0.360 & 34 & \Checkmark & 0.206 & 100 & 0.195 & 31 & \Checkmark \\
+|TR-cancel-026| & 0.442 & 0.403 & 56 & \Checkmark & 0.335 & 76 & 0.350 & 26 & \Checkmark & 0.359 & 81 & 0.346 & 17 & \Checkmark \\
+|TR-discard-011| & 0.238 & 0.229 & 12 & \Checkmark & 0.217 & 91 & 0.221 & 22 & \Checkmark & 0.292 & 122 & 0.275 & 29 & \Checkmark \\
+|TR-order-010| & 0.287 & 0.295 & 17 & \Checkmark & 0.197 & 69 & 0.185 & 29 & \Checkmark & 0.245 & 85 & 0.261 & 33 & \Checkmark \\
+|TS-trial-019| & 0.407 & 0.380 & 56 & \Checkmark & 0.371 & 91 & 0.285 & 73 & $\circ$ & 0.317 & 78 & 0.272 & 55 & \Checkmark \\
+|UC-credits-008| & 0.806 & 0.262 & 146 & \XSolidBrush & 0.215 & 27 & 0.197 & 23 & \Checkmark & 0.389 & 48 & 0.222 & 98 & \Checkmark \\
+|VS-contrib-003| & 1.028 & 0.753 & 80 & \XSolidBrush & 0.182 & 18 & 0.123 & 68 & \Checkmark & 0.155 & 15 & 0.159 & 28 & \Checkmark \\
+|VS-fees-001| & 0.233 & 0.210 & 34 & \Checkmark & 0.208 & 90 & 0.224 & 24 & \Checkmark & 0.200 & 86 & 0.200 & 14 & \Checkmark \\
+|VS-redeem-004| & 0.555 & 0.496 & 34 & \Checkmark & 0.516 & 93 & 0.503 & 16 & \Checkmark & 0.603 & 109 & 0.496 & 60 & $\circ$ \\
+|VS-shares-002| & 0.157 & 0.151 & 24 & \Checkmark & 0.273 & 173 & 0.277 & 49 & \Checkmark & 0.265 & 169 & 0.241 & 45 & \Checkmark \\
+|WU-consume-023| & 0.121 & 0.115 & 27 & \Checkmark & 0.116 & 96 & 0.109 & 16 & \Checkmark & 0.106 & 87 & 0.106 & 10 & \Checkmark \\
+\midrule
+\textbf{all 17} & 0.376 & 0.276 & 110 & 64/68 & 0.268 & 71 & 0.221 & 60 & 67/67 & 0.270 & 72 & 0.233 & 69 & 66/67 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The mechanism is visible in the tool counts. The agent-only arm performs about 70\% more edits and three times as many verify calls as hybrid-flexible, and its self-reports describe a different search: it reaches its contract through counterexamples (52\% of answers, against 29\% for both hybrids) and through mutation probes it designed itself (42\% against 7--17\%).
+A third of the hybrid answers instead report \WP naming the uninvariant loop, a sentence absent from all 68 agent-only answers.
+The arms agree on the product --- opaque contracts, recursive spec helpers, loop invariants, at nearly identical rates --- and differ on how the work was found.
+
+\Paragraph{Failure points}
+Five of the 204 cells failed the mutation test, and 2 more were lost to infrastructure faults; Table~\ref{tab:costs} marks where.
+Every failure is an agent-only cell but one.
+Three are |weak_contract|: a mutant survived, in every case leaving |normal-result| unconstrained.
+Two of those are |QP-part-025|, the in-place permutation, where the surviving class was ``right partition point, wrong contents'' --- a contract that pins where the partition lands but not what it contains.
+The fourth agent-only failure is different in kind: on |UC-credits-008| the arm changed the implementation rather than specify it, which the edit policy forbids.
+The one hybrid failure is on the same target and of the same class as two of the agent-only ones.
+The two infrastructure faults are unrelated to inference (the MCP supervisor restarted the session) and fall one in each hybrid arm.
+
+Pooling the two hybrid arms, agent-only left a mutant alive in 4 of its 68 cells against 1 of the hybrids' 134 --- 5.9\% against 0.75\% --- and a Fisher exact test gives $p = 0.045$, two-sided.
+The comparison rests on five events, so it is fragile: the test says the difference is unlikely to be chance, not how large it is, and a single cell moving either way would change that.
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:
