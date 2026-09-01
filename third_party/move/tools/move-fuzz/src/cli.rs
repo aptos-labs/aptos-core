@@ -316,6 +316,28 @@ pub fn run_on(
         .map_or(path.as_path(), |d| d.path())
         .canonicalize()?;
 
+    // `auto` writes its generated drivers into `<workdir>/autogen`. Clear a
+    // previous run's output BEFORE resolving the project: `deps::resolve` walks
+    // every `Move.toml` under the work directory, so a leftover autogen package
+    // is otherwise discovered as a second primary package. It then either fails
+    // the initial build (its scripts still name the previous run's random
+    // addresses) or, if it happens to compile, becomes a dependency of the
+    // freshly written manifest and the build dies with a package cycle.
+    //
+    // This runs the same ownership check as `prepare_autogen_dir`, so an
+    // `autogen` directory move-fuzz does not own still stops the run loudly --
+    // and does so before anything is built, rather than after.
+    if matches!(command, FuzzCommand::Auto { .. }) {
+        let autogen_dir = workdir.join("autogen");
+        if autogen_dir.exists() {
+            remove_owned_dir(
+                &autogen_dir,
+                "the autogen directory",
+                "Move it aside; move fuzz needs to own this directory to write generated drivers.",
+            )?;
+        }
+    }
+
     // resolve the project
     let project = deps::resolve(
         &workdir,
