@@ -346,6 +346,16 @@ pub(crate) async fn analyze_selected_seed(
             "no timed-out SMT capture was found",
         )];
     }
+    // Explaining a timeout must not cost more than the timeout it explains.
+    // A split root can capture many timed-out VCs, so the replays share one
+    // budget of the root's own soft timeout instead of each getting a fresh
+    // one. `replay_capture` clamps its budget to what the deadline leaves and
+    // reports the captures that no longer fit as unavailable.
+    let analysis_deadline = Instant::now() + Duration::from_secs(root_timeout_secs as u64);
+    let deadline = Some(match process_deadline {
+        Some(process_deadline) => analysis_deadline.min(process_deadline),
+        None => analysis_deadline,
+    });
     let mut results = Vec::with_capacity(captures.len());
     for (path, contents) in captures {
         results.push(
@@ -354,7 +364,7 @@ pub(crate) async fn analyze_selected_seed(
                 path,
                 contents,
                 root_timeout_secs,
-                process_deadline,
+                deadline,
                 keep_artifacts,
                 process_sem.clone(),
             )

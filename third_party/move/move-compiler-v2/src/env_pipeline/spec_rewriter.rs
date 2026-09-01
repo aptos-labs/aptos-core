@@ -1418,13 +1418,17 @@ fn compute_arg_memory(
     BTreeSet<QualifiedInstId<StructId>>,
 ) {
     match arg.as_ref() {
-        // Direct closure: use the closure target's spec memory
-        ExpData::Call(_, Operation::Closure(mid, fid, _), _) => {
-            let target_id = mid.qualified(*fid);
-            let target_env = env.get_function(target_id);
-            let used = target_env.get_spec_used_memory().clone();
-            let old = target_env.get_spec_old_memory().clone();
-            (used, old)
+        // Direct closure: use the closure target's spec memory at the
+        // instantiation of the closure. The instantiating accessors also
+        // resolve resources whose struct head is a bare type parameter of
+        // the target, such as the `T` in `object::spec_exists_at<T>`.
+        ExpData::Call(id, Operation::Closure(mid, fid, _), _) => {
+            let target_env = env.get_function(mid.qualified(*fid));
+            let inst = env.get_node_instantiation(*id);
+            (
+                target_env.get_spec_used_memory_instantiated(&inst),
+                target_env.get_spec_old_memory_instantiated(&inst),
+            )
         },
         // Lambda with inline spec: compute memory from the lambda body + spec
         ExpData::Lambda(_, _, body, _, spec_opt) => {

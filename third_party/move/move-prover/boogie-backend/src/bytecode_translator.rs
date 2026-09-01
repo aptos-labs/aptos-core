@@ -6328,8 +6328,12 @@ impl FunctionTranslator<'_> {
                         let inst = Type::instantiate_slice(&inst, self.type_inst);
                         let module = env.get_module(*mid);
                         let fun = module.get_spec_fun(*fid);
-                        for mem in fun.used_memory.iter() {
-                            let mem = mem.clone().instantiate(&inst);
+                        // Instantiated footprint, so that a resource whose
+                        // struct head is a bare type parameter of the spec
+                        // function is declared here as well. The call
+                        // translator resolves the same summary and emits a
+                        // labeled memory argument for it.
+                        for mem in fun.used_memory_instantiated(&inst) {
                             for label in range.labels() {
                                 result.insert((label, mem.clone()));
                             }

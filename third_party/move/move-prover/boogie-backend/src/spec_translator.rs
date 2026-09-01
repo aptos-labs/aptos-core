@@ -1923,6 +1923,25 @@ impl SpecTranslator<'_> {
         }
     }
 
+    /// Translate `Operation::Index`. Besides vector subscript, this operation
+    /// denotes tuple component selection, which the model uses for the results
+    /// of a multi-value `result_of`. Boogie represents tuples as `$TupleN`
+    /// records, so a tuple base selects with `->$i` (as in `translate_block`)
+    /// instead of `ReadVec`.
+    fn translate_index(&self, loc: &Loc, args: &[Exp]) {
+        if !matches!(self.get_node_type(args[0].node_id()), Type::Tuple(_)) {
+            self.translate_primitive_call("ReadVec", args);
+            return;
+        }
+        let ExpData::Value(_, Value::Number(index)) = args[1].as_ref() else {
+            self.error(loc, "tuple selection requires a constant index");
+            return;
+        };
+        emit!(self.writer, "(");
+        self.translate_exp(&args[0]);
+        emit!(self.writer, ")->${}", index);
+    }
+
     fn translate_call(&self, node_id: NodeId, oper: &Operation, args: &[Exp]) {
         let loc = self.env.get_node_loc(node_id);
         match oper {
@@ -1996,7 +2015,7 @@ impl SpecTranslator<'_> {
             Operation::Result(pos) => {
                 emit!(self.writer, "$ret{}", pos);
             },
-            Operation::Index => self.translate_primitive_call("ReadVec", args),
+            Operation::Index => self.translate_index(&loc, args),
             Operation::Slice => self.translate_primitive_call("$SliceVecByRange", args),
             Operation::Range => self.translate_primitive_call("$Range", args),
 

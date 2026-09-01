@@ -3320,8 +3320,9 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
         let result_tys = result_type.clone().flatten();
         // The `result_of` carrier is typed with the full (value-level)
         // result type; for a multi-result callee that is the tuple type,
-        // which the component extraction destructures (and whose tuple
-        // node type the Boogie backend's block translation projects on).
+        // whose components are selected by `Operation::Index`. Both the
+        // sourcifier and the specification backend read that operation as
+        // tuple selection when its base has a tuple type.
         let carrier_ty = Type::tuple(
             result_tys
                 .iter()

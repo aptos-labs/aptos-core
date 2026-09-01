@@ -8123,6 +8123,11 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         // Incompleteness of either branch is incompleteness of the join, as in
         // `AbstractDomain::join`. Dropping these here would let a branch whose
         // callee has unknown aborts merge into an exact `aborts_if false`.
+        // Raising a flag counts as a change: it must reach the enclosing
+        // branch, and a join which only raises one would otherwise report
+        // `Unchanged` and stop the fixpoint before it propagates.
+        let flags_changed = (incoming.aborts_partial && !current.aborts_partial)
+            || (incoming.solver_hard && !current.solver_hard);
         current.aborts_partial |= incoming.aborts_partial;
         current.solver_hard |= incoming.solver_hard;
 
@@ -8135,6 +8140,7 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             || captured_globals_changed
             || modifies_changed
             || body_modifies_changed
+            || flags_changed
         {
             JoinResult::Changed
         } else {
