@@ -24,6 +24,7 @@ move-core-types = { workspace = true }
 rand = { workspace = true }
 shared-dsa = { workspace = true }
 thiserror = { workspace = true }
+triomphe = { workspace = true }
 
 [dev-dependencies]
 num-bigint = { workspace = true }

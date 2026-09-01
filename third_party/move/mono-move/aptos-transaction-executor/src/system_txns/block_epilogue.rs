@@ -21,7 +21,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
     pub fn execute_block_epilogue_transaction(
         &self,
         block_epilogue: &BlockEpiloguePayload,
-    ) -> TxnOutcome<'guard> {
+    ) -> TxnOutcome {
         let fee_distribution = match block_epilogue {
             // V0 carries no fee distribution: nothing runs on-chain.
             BlockEpiloguePayload::V0 { .. } => {

@@ -30,11 +30,11 @@ use mono_move_core::{
     native::{NativeABI, NativeExtensions},
     types::InternedType,
     DescriptorId, DescriptorProvider, FrameOffset, Function, LayoutProvider, ObjectDescriptorInner,
-    RootPool, VMInternalError, VMResult, CAPTURED_DATA_VALUES_OFFSET,
+    ReadAnchor, RootPool, VMInternalError, VMResult, CAPTURED_DATA_VALUES_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DATA_SIZE, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
     FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE,
 };
-use std::ptr::NonNull;
+use std::{cell::RefCell, ptr::NonNull};
 
 // ---------------------------------------------------------------------------
 // Macros
@@ -269,6 +269,38 @@ impl Heap {
         std::ptr::NonNull::new(ptr)
     }
 }
+
+// A frozen session heap anchors reads that other transactions take against it.
+impl ReadAnchor for Heap {}
+
+/// A [`Heap`] that can be shared and appended to through a shared reference.
+///
+/// Storage providers materialize values lazily into a long-lived arena but hand
+/// out reads anchored by an `Arc`. This newtype gives them interior-mutable,
+/// append-only allocation while the arena stays shared. It is never
+/// garbage-collected or reset, so allocated objects never move and the pointers
+/// handed out stay valid for the arena's whole life.
+pub struct SharedArena {
+    heap: RefCell<Heap>,
+}
+
+impl SharedArena {
+    /// Creates a shared arena backed by an uninitialized buffer of `size` bytes.
+    pub fn new(size: usize) -> Self {
+        Self {
+            heap: RefCell::new(Heap::new(size)),
+        }
+    }
+
+    /// Runs `f` with exclusive access to the inner heap for one allocation
+    /// episode. A pointer `f` returns outlives the borrow: the arena is
+    /// append-only, so the object it points to is never moved or freed.
+    pub fn with_heap_mut<R>(&self, f: impl FnOnce(&mut Heap) -> R) -> R {
+        f(&mut self.heap.borrow_mut())
+    }
+}
+
+impl ReadAnchor for SharedArena {}
 
 /// Outcome of a bump-allocation attempt.
 #[derive(Debug)]

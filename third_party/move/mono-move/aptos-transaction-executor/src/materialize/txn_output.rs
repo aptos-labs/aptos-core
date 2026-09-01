@@ -14,6 +14,7 @@ use aptos_types::{
 use bytes::Bytes;
 use mono_move_core::{
     nominal_tag, storage::resource_provider::InMemoryStorageKey, types::InternedType,
+    value_layout::LayoutProvider,
 };
 use mono_move_output::to_contract_events;
 use mono_move_runtime::{serialize, SessionEffects, WriteClass};
@@ -28,19 +29,16 @@ use std::{
 
 /// Creates the output of an executed transaction from its effects.
 pub(crate) fn executed_output(
-    effects: &SessionEffects<'_>,
+    effects: &SessionEffects,
+    layouts: &impl LayoutProvider,
     provider: &dyn AptosDataProvider,
     gas_used: u64,
     status: TransactionStatus,
     auxiliary_data: TransactionAuxiliaryData,
 ) -> Result<TransactionOutput, MaterializationError> {
-    if !effects.originates_from_provider(provider) {
-        return Err(MaterializationError::new(vec![
-            "materialization provider differs from execution provider".to_string(),
-        ]));
-    }
-    let write_set = drain_write_set(effects, provider).map_err(MaterializationError::new)?;
-    let events = to_contract_events(effects)
+    let write_set =
+        drain_write_set(effects, layouts, provider).map_err(MaterializationError::new)?;
+    let events = to_contract_events(effects, layouts)
         .map_err(|e| MaterializationError::new(vec![format!("event finalization failed: {e}")]))?;
     Ok(TransactionOutput::new(
         write_set,
@@ -93,17 +91,17 @@ type MemberOp = Option<Bytes>;
 //
 // TODO(metering): writes are not charged IO gas or storage fees.
 fn drain_write_set(
-    effects: &SessionEffects<'_>,
+    effects: &SessionEffects,
+    layouts: &impl LayoutProvider,
     provider: &dyn AptosDataProvider,
 ) -> Result<WriteSet, Vec<String>> {
-    let layouts = effects.layout_provider();
     let mut writes: Vec<(StateKey, WriteOp)> = vec![];
     let mut group_ops: HashMap<StateKey, HashMap<InternedType, MemberOp>> = HashMap::new();
     let mut failures: Vec<String> = vec![];
 
     // SAFETY: written pointers refer to live values in the effects' frozen
-    // heap, the retained layout provider originates from the same execution,
-    // and no GC runs during the drain.
+    // heap, `layouts` describes their interned types, and no GC runs during the
+    // drain.
     let written_bytes = |ptr: NonNull<u8>, ty: InternedType| -> Result<Bytes, String> {
         // SAFETY: forwarded from this function's contract.
         let blob = unsafe { serialize(layouts, ptr.as_ptr(), ty) }
