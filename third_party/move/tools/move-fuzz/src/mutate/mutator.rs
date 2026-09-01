@@ -10,15 +10,16 @@
 use crate::{
     account::{AddressKind, NamedAddressKind},
     executor::tracing::ResourceWrite,
-    prep::{canvas::BasicInput, ident::DatatypeIdent},
-    state::{PersistedDatatypeIdent, PersistedObjectBucket, PersistedObjectState},
+    prep::{canvas::BasicInput, ident::DatatypeIdent, typing::TypeBase},
+    state::{PersistedObjectBucket, PersistedObjectState},
 };
 use anyhow::Result;
 use move_core_types::{
     ability::AbilitySet,
     account_address::AccountAddress,
+    identifier::Identifier,
     int256::{I256, U256},
-    language_storage::TypeTag,
+    language_storage::{StructTag, TypeTag},
     value::MoveValue,
 };
 use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
@@ -257,6 +258,27 @@ impl TypePool {
     }
 }
 
+/// The resource `StructTag` an `Object<T>` parameter refers to.
+///
+/// The object dictionary is populated from write sets, which record the
+/// *resource* stored at an object address, so the lookup key is `T` itself and
+/// not the `Object<T>` wrapper.
+///
+/// `None` when `T` is still open (a type parameter): there is no concrete
+/// resource to match, and the caller falls back to any known object address,
+/// exactly as it already does for `BasicInput::ObjectParam`.
+fn object_resource_tag(ident: &DatatypeIdent, type_args: &[TypeBase]) -> Option<StructTag> {
+    Some(StructTag {
+        address: ident.address(),
+        module: Identifier::new(ident.module_name()).expect("valid module identifier"),
+        name: Identifier::new(ident.datatype_name()).expect("valid datatype identifier"),
+        type_args: type_args
+            .iter()
+            .map(TypeBase::to_type_tag)
+            .collect::<Option<Vec<_>>>()?,
+    })
+}
+
 /// Input generator and mutator
 pub struct Mutator {
     // random number generator
@@ -272,13 +294,16 @@ pub struct Mutator {
     // object tracking: addresses confirmed as objects (have ObjectGroup)
     object_addresses: BTreeSet<AccountAddress>,
 
-    // resource type -> set of object addresses where that resource exists
-    // keyed by DatatypeIdent only (ignoring type_args) because converting
-    // runtime TypeTag to TypeBase requires ability information that is
-    // unavailable from write sets. matching by ident alone is sufficient
-    // for fuzzing: a mismatched type arg just triggers an abort, which is
-    // strictly better than the previous AccountAddress::ZERO.
-    dict_object: BTreeMap<DatatypeIdent, BTreeSet<AccountAddress>>,
+    // resource type -> set of object addresses where that resource exists.
+    //
+    // Keyed by the full `StructTag`, type arguments included. Keying on the
+    // datatype name alone made `Object<Coin<A>>` and `Object<Coin<B>>` the same
+    // bucket, so a dictionary hit for one was handed to a parameter wanting the
+    // other and the call aborted -- turning the dictionary's whole purpose, a
+    // known-good address, into a guaranteed failure. Write sets carry the full
+    // tag, and `TypeBase::to_type_tag` builds the requested one, so both sides
+    // can speak the same language.
+    dict_object: BTreeMap<StructTag, BTreeSet<AccountAddress>>,
 }
 
 impl Mutator {
@@ -351,8 +376,11 @@ impl Mutator {
             BasicInput::String => self.random_string(),
             BasicInput::Address => MoveValue::Address(self.random_address()),
             BasicInput::Signer => MoveValue::Signer(self.random_signer()),
-            BasicInput::ObjectKnown { ident, .. } => {
-                MoveValue::Address(self.random_object_address_for(ident))
+            BasicInput::ObjectKnown { ident, type_args } => {
+                MoveValue::Address(match object_resource_tag(ident, type_args) {
+                    Some(struct_tag) => self.random_object_address_for(&struct_tag),
+                    None => self.random_object_address_any(),
+                })
             },
             BasicInput::ObjectParam { .. } => MoveValue::Address(self.random_object_address_any()),
             BasicInput::Vector(element) => {
@@ -434,12 +462,15 @@ impl Mutator {
                 MoveValue::Address(addr) => MoveValue::Signer(self.mutate_signer(*addr)),
                 _ => MoveValue::Signer(self.random_signer()),
             },
-            BasicInput::ObjectKnown { ident, .. } => {
+            BasicInput::ObjectKnown { ident, type_args } => {
                 let current = match val {
                     MoveValue::Address(addr) | MoveValue::Signer(addr) => Some(*addr),
                     _ => None,
                 };
-                MoveValue::Address(self.mutate_object_address(ident, current))
+                MoveValue::Address(match object_resource_tag(ident, type_args) {
+                    Some(struct_tag) => self.mutate_object_address(&struct_tag, current),
+                    None => self.mutate_any_object_address(current),
+                })
             },
             BasicInput::ObjectParam { .. } => {
                 let current = match val {
@@ -691,7 +722,7 @@ impl Mutator {
 
     fn mutate_object_address(
         &mut self,
-        ident: &DatatypeIdent,
+        struct_tag: &StructTag,
         current: Option<AccountAddress>,
     ) -> AccountAddress {
         if let Some(addr) = current {
@@ -700,7 +731,7 @@ impl Mutator {
             }
         }
         if self.random_percent() < 80 {
-            self.random_object_address_for(ident)
+            self.random_object_address_for(struct_tag)
         } else {
             self.random_address()
         }
@@ -817,12 +848,10 @@ impl Mutator {
         } in writes
         {
             if !is_resource_group && self.object_addresses.contains(address) {
-                let ident = DatatypeIdent::from_struct_tuple(
-                    struct_tag.address,
-                    struct_tag.module.clone(),
-                    struct_tag.name.clone(),
-                );
-                self.dict_object.entry(ident).or_default().insert(*address);
+                self.dict_object
+                    .entry(struct_tag.clone())
+                    .or_default()
+                    .insert(*address);
             }
         }
     }
@@ -834,8 +863,8 @@ impl Mutator {
             dict_object: self
                 .dict_object
                 .iter()
-                .map(|(ident, addrs)| PersistedObjectBucket {
-                    ident: PersistedDatatypeIdent::from_ident(ident),
+                .map(|(struct_tag, addrs)| PersistedObjectBucket {
+                    struct_tag: struct_tag.clone(),
                     addresses: addrs.clone(),
                 })
                 .collect(),
@@ -847,18 +876,17 @@ impl Mutator {
         self.object_addresses = state.object_addresses.clone();
         self.dict_object.clear();
         for bucket in &state.dict_object {
-            let ident = bucket.ident.clone().into_ident()?;
             self.dict_object
-                .entry(ident)
+                .entry(bucket.struct_tag.clone())
                 .or_default()
                 .extend(bucket.addresses.iter().copied());
         }
         Ok(())
     }
 
-    /// Get a random object address for a known object type
-    fn random_object_address_for(&mut self, ident: &DatatypeIdent) -> AccountAddress {
-        if let Some(addrs) = self.dict_object.get(ident) {
+    /// Get a random object address holding exactly `struct_tag`.
+    fn random_object_address_for(&mut self, struct_tag: &StructTag) -> AccountAddress {
+        if let Some(addrs) = self.dict_object.get(struct_tag) {
             if !addrs.is_empty() {
                 let index = self.rng.gen_range(0, addrs.len());
                 return *addrs.iter().nth(index).unwrap();
@@ -1028,11 +1056,12 @@ mod tests {
         let object_addr = AccountAddress::from_hex_literal("0xabc").unwrap();
         mutator.object_addresses.insert(object_addr);
         mutator.dict_object.insert(
-            DatatypeIdent::from_struct_tuple(
-                AccountAddress::ONE,
-                move_core_types::identifier::Identifier::new("m").unwrap(),
-                move_core_types::identifier::Identifier::new("Vault").unwrap(),
-            ),
+            StructTag {
+                address: AccountAddress::ONE,
+                module: Identifier::new("m").unwrap(),
+                name: Identifier::new("Vault").unwrap(),
+                type_args: vec![],
+            },
             BTreeSet::from([object_addr]),
         );
 
@@ -1092,5 +1121,41 @@ mod tests {
         // arity 1 and 0 are degenerate
         assert_eq!(mutator.pick_mutation_positions(1).len(), 1);
         assert!(mutator.pick_mutation_positions(0).is_empty());
+    }
+
+    /// `Object<Coin<A>>` and `Object<Coin<B>>` are different types. Keying the
+    /// dictionary on the datatype name alone merged them, so a known-good
+    /// address for one was handed to a parameter wanting the other and the call
+    /// aborted -- the dictionary's purpose inverted.
+    #[test]
+    fn test_object_dictionary_distinguishes_type_arguments() {
+        let mut mutator = test_mutator_with_address_buckets(11);
+        let coin = |arg: &str| StructTag {
+            address: AccountAddress::ONE,
+            module: Identifier::new("coin").unwrap(),
+            name: Identifier::new("Coin").unwrap(),
+            type_args: vec![move_core_types::language_storage::TypeTag::Struct(
+                Box::new(StructTag {
+                    address: AccountAddress::ONE,
+                    module: Identifier::new("m").unwrap(),
+                    name: Identifier::new(arg).unwrap(),
+                    type_args: vec![],
+                }),
+            )],
+        };
+        let addr_a = AccountAddress::from_hex_literal("0xaaa").unwrap();
+        let addr_b = AccountAddress::from_hex_literal("0xbbb").unwrap();
+        mutator
+            .dict_object
+            .insert(coin("A"), BTreeSet::from([addr_a]));
+        mutator
+            .dict_object
+            .insert(coin("B"), BTreeSet::from([addr_b]));
+
+        // each request gets the address holding exactly its own type
+        for _ in 0..32 {
+            assert_eq!(mutator.random_object_address_for(&coin("A")), addr_a);
+            assert_eq!(mutator.random_object_address_for(&coin("B")), addr_b);
+        }
     }
 }

@@ -11,11 +11,14 @@
 
 use crate::{
     executor::sequence::{ResourceTag, SeedInput},
-    prep::{canvas::ScriptSignature, ident::DatatypeIdent},
+    prep::canvas::ScriptSignature,
 };
 use anyhow::{anyhow, Context, Result};
 use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
-use move_core_types::{account_address::AccountAddress, identifier::Identifier, value::MoveValue};
+use move_core_types::{
+    account_address::AccountAddress, identifier::Identifier, language_storage::StructTag,
+    value::MoveValue,
+};
 use move_coverage::coverage_map::{ExecCoverageMap, ModuleCoverageMap};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -31,7 +34,7 @@ use std::{
 /// `synthetic_struct_tag`), so that state written by an older build is detected
 /// and ignored on load instead of being misinterpreted. The current value
 /// reflects the number of such changes made so far.
-pub const AUTO_STATE_VERSION: u32 = 7;
+pub const AUTO_STATE_VERSION: u32 = 8;
 pub const AUTO_STATE_FILENAME: &str = "auto_state.json";
 /// Schema version of the persisted entrypoint cache (`entrypoints_cache.json`).
 /// Bump this whenever its serialized layout changes (see `AUTO_STATE_VERSION`).
@@ -43,33 +46,6 @@ pub const PACKAGE_BUILD_CACHE_DIR: &str = "package-cache";
 pub const PACKAGE_BUILD_CACHE_INFO_VERSION: u32 = 2;
 pub const PACKAGE_BUILD_CACHE_INFO_FILENAME: &str = "build_cache_info.json";
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct PersistedDatatypeIdent {
-    pub address: AccountAddress,
-    pub module: String,
-    pub name: String,
-}
-
-impl PersistedDatatypeIdent {
-    pub fn from_ident(ident: &DatatypeIdent) -> Self {
-        Self {
-            address: ident.address(),
-            module: ident.module_name().to_string(),
-            name: ident.datatype_name().to_string(),
-        }
-    }
-
-    pub fn into_ident(self) -> Result<DatatypeIdent> {
-        Ok(DatatypeIdent::from_struct_tuple(
-            self.address,
-            move_core_types::identifier::Identifier::new(self.module)
-                .context("invalid persisted datatype module name")?,
-            move_core_types::identifier::Identifier::new(self.name)
-                .context("invalid persisted datatype name")?,
-        ))
-    }
-}
-
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct PersistedObjectState {
     pub object_addresses: BTreeSet<AccountAddress>,
@@ -78,27 +54,32 @@ pub struct PersistedObjectState {
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct PersistedObjectBucket {
-    pub ident: PersistedDatatypeIdent,
+    /// The full resource type, type arguments included. This was the datatype
+    /// name alone, which merged `Object<Coin<A>>` and `Object<Coin<B>>` into one
+    /// bucket and handed addresses of one to parameters wanting the other.
+    pub struct_tag: StructTag,
     pub addresses: BTreeSet<AccountAddress>,
 }
 
 impl PersistedObjectState {
     pub fn merge(states: impl IntoIterator<Item = Self>) -> Self {
         let mut merged = Self::default();
-        let mut dict_object: BTreeMap<PersistedDatatypeIdent, BTreeSet<AccountAddress>> =
-            BTreeMap::new();
+        let mut dict_object: BTreeMap<StructTag, BTreeSet<AccountAddress>> = BTreeMap::new();
         for state in states {
             merged.object_addresses.extend(state.object_addresses);
             for bucket in state.dict_object {
                 dict_object
-                    .entry(bucket.ident)
+                    .entry(bucket.struct_tag)
                     .or_default()
                     .extend(bucket.addresses);
             }
         }
         merged.dict_object = dict_object
             .into_iter()
-            .map(|(ident, addresses)| PersistedObjectBucket { ident, addresses })
+            .map(|(struct_tag, addresses)| PersistedObjectBucket {
+                struct_tag,
+                addresses,
+            })
             .collect();
         merged
     }
@@ -937,11 +918,12 @@ mod tests {
     fn test_auto_state_file_roundtrip() -> Result<()> {
         let tmp = TempDir::new()?;
         let path = tmp.path().join("auto_state.json");
-        let object_ident = DatatypeIdent::from_struct_tuple(
-            AccountAddress::from_hex_literal("0xcafe")?,
-            Identifier::new("vault")?,
-            Identifier::new("Position")?,
-        );
+        let object_struct_tag = StructTag {
+            address: AccountAddress::from_hex_literal("0xcafe")?,
+            module: Identifier::new("vault")?,
+            name: Identifier::new("Position")?,
+            type_args: vec![],
+        };
         let state = PersistedAutoState::new(
             "fingerprint".to_string(),
             vec!["script-a".to_string()],
@@ -1010,7 +992,7 @@ mod tests {
             PersistedObjectState {
                 object_addresses: BTreeSet::from([AccountAddress::from_hex_literal("0x44")?]),
                 dict_object: vec![PersistedObjectBucket {
-                    ident: super::PersistedDatatypeIdent::from_ident(&object_ident),
+                    struct_tag: object_struct_tag.clone(),
                     addresses: BTreeSet::from([AccountAddress::from_hex_literal("0x55")?]),
                 }],
             },
@@ -1065,8 +1047,8 @@ mod tests {
         assert_eq!(loaded.object_state.object_addresses.len(), 1);
         assert_eq!(loaded.object_state.dict_object.len(), 1);
         assert_eq!(
-            loaded.object_state.dict_object[0].ident,
-            super::PersistedDatatypeIdent::from_ident(&object_ident)
+            loaded.object_state.dict_object[0].struct_tag,
+            object_struct_tag
         );
         assert_eq!(loaded.missing_data_signals.len(), 1);
         assert_eq!(loaded.missing_data_signals[0].hits, 4);
@@ -1075,21 +1057,19 @@ mod tests {
 
     #[test]
     fn test_persisted_object_state_merge_unions_buckets() -> Result<()> {
-        let ident_a = super::PersistedDatatypeIdent {
+        let tag = |name: &str| StructTag {
             address: AccountAddress::ONE,
-            module: "m".to_string(),
-            name: "A".to_string(),
+            module: Identifier::new("m").unwrap(),
+            name: Identifier::new(name).unwrap(),
+            type_args: vec![],
         };
-        let ident_b = super::PersistedDatatypeIdent {
-            address: AccountAddress::ONE,
-            module: "m".to_string(),
-            name: "B".to_string(),
-        };
+        let ident_a = tag("A");
+        let ident_b = tag("B");
         let merged = PersistedObjectState::merge([
             PersistedObjectState {
                 object_addresses: BTreeSet::from([AccountAddress::from_hex_literal("0x44")?]),
                 dict_object: vec![PersistedObjectBucket {
-                    ident: ident_a.clone(),
+                    struct_tag: ident_a.clone(),
                     addresses: BTreeSet::from([AccountAddress::from_hex_literal("0x44")?]),
                 }],
             },
@@ -1097,11 +1077,11 @@ mod tests {
                 object_addresses: BTreeSet::from([AccountAddress::from_hex_literal("0x55")?]),
                 dict_object: vec![
                     PersistedObjectBucket {
-                        ident: ident_a.clone(),
+                        struct_tag: ident_a.clone(),
                         addresses: BTreeSet::from([AccountAddress::from_hex_literal("0x66")?]),
                     },
                     PersistedObjectBucket {
-                        ident: ident_b.clone(),
+                        struct_tag: ident_b.clone(),
                         addresses: BTreeSet::from([AccountAddress::from_hex_literal("0x55")?]),
                     },
                 ],
@@ -1115,7 +1095,7 @@ mod tests {
             ])
         );
         assert_eq!(merged.dict_object.len(), 2);
-        assert_eq!(merged.dict_object[0].ident, ident_a);
+        assert_eq!(merged.dict_object[0].struct_tag, ident_a);
         assert_eq!(
             merged.dict_object[0].addresses,
             BTreeSet::from([
@@ -1123,7 +1103,7 @@ mod tests {
                 AccountAddress::from_hex_literal("0x66")?,
             ])
         );
-        assert_eq!(merged.dict_object[1].ident, ident_b);
+        assert_eq!(merged.dict_object[1].struct_tag, ident_b);
         assert_eq!(
             merged.dict_object[1].addresses,
             BTreeSet::from([AccountAddress::from_hex_literal("0x55")?])

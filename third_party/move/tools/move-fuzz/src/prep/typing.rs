@@ -65,7 +65,12 @@
 
 use crate::{common::Refty, prep::ident::DatatypeIdent};
 use itertools::Itertools;
-use move_core_types::{ability::AbilitySet, account_address::AccountAddress};
+use move_core_types::{
+    ability::AbilitySet,
+    account_address::AccountAddress,
+    identifier::Identifier,
+    language_storage::{StructTag, TypeTag},
+};
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
@@ -307,6 +312,69 @@ pub enum TypeBase {
 }
 
 impl TypeBase {
+    /// The concrete runtime type this denotes, if it has one.
+    ///
+    /// Returns `None` for anything still open: an uninstantiated type
+    /// parameter, an object over one, or a function value. Those have no single
+    /// `TypeTag`, and a caller comparing against runtime state -- which is
+    /// always concrete -- must treat them as unknown rather than guess.
+    pub fn to_type_tag(&self) -> Option<TypeTag> {
+        fn datatype_tag(ident: &DatatypeIdent, type_args: &[TypeBase]) -> Option<StructTag> {
+            Some(StructTag {
+                address: ident.address(),
+                module: Identifier::new(ident.module_name()).expect("valid module identifier"),
+                name: Identifier::new(ident.datatype_name()).expect("valid datatype identifier"),
+                type_args: type_args
+                    .iter()
+                    .map(TypeBase::to_type_tag)
+                    .collect::<Option<Vec<_>>>()?,
+            })
+        }
+        fn framework_tag(module: &str, name: &str, type_args: Vec<TypeTag>) -> TypeTag {
+            TypeTag::Struct(Box::new(StructTag {
+                address: AccountAddress::ONE,
+                module: Identifier::new(module).expect("valid module identifier"),
+                name: Identifier::new(name).expect("valid datatype identifier"),
+                type_args,
+            }))
+        }
+
+        let tag = match self {
+            Self::Bool => TypeTag::Bool,
+            Self::U8 => TypeTag::U8,
+            Self::I8 => TypeTag::I8,
+            Self::U16 => TypeTag::U16,
+            Self::I16 => TypeTag::I16,
+            Self::U32 => TypeTag::U32,
+            Self::I32 => TypeTag::I32,
+            Self::U64 => TypeTag::U64,
+            Self::I64 => TypeTag::I64,
+            Self::U128 => TypeTag::U128,
+            Self::I128 => TypeTag::I128,
+            Self::U256 => TypeTag::U256,
+            Self::I256 => TypeTag::I256,
+            Self::Address => TypeTag::Address,
+            Self::Signer => TypeTag::Signer,
+            Self::Bitvec => framework_tag("bit_vector", "BitVector", vec![]),
+            Self::String => framework_tag("string", "String", vec![]),
+            Self::Vector { element } => TypeTag::Vector(Box::new(element.to_type_tag()?)),
+            Self::Datatype {
+                ident,
+                type_args,
+                abilities: _,
+            } => TypeTag::Struct(Box::new(datatype_tag(ident, type_args)?)),
+            Self::ObjectKnown {
+                ident,
+                type_args,
+                abilities: _,
+            } => framework_tag("object", "Object", vec![TypeTag::Struct(Box::new(
+                datatype_tag(ident, type_args)?,
+            ))]),
+            Self::Param { .. } | Self::ObjectParam { .. } | Self::Function { .. } => return None,
+        };
+        Some(tag)
+    }
+
     /// Retrieve the abilities of this type base
     pub fn abilities(&self) -> AbilitySet {
         match self {
