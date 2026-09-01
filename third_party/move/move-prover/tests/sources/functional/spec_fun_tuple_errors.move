@@ -8,18 +8,20 @@ module 0x42::TupleErrors {
     // Error: 1-tuple - parentheses don't create a tuple, just grouping
     spec fun single(x: u64): (u64) { (x) }
 
-    // Error: tuple too large (9 elements)
+    // Error: tuple too large (12 elements)
     spec fun too_large(a: u64, b: u64, c: u64, d: u64, e: u64,
-                       f: u64, g: u64, h: u64, i: u64):
-        (u64, u64, u64, u64, u64, u64, u64, u64, u64) {
-        (a, b, c, d, e, f, g, h, i)
+                       f: u64, g: u64, h: u64, i: u64, j: u64,
+                       k: u64, l: u64):
+        (u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64) {
+        (a, b, c, d, e, f, g, h, i, j, k, l)
     }
 
-    // Error: tuple way too large (10 elements)
+    // Error: tuple way too large (13 elements)
     spec fun way_too_large(a: u64, b: u64, c: u64, d: u64, e: u64,
-                           f: u64, g: u64, h: u64, i: u64, j: u64):
-        (u64, u64, u64, u64, u64, u64, u64, u64, u64, u64) {
-        (a, b, c, d, e, f, g, h, i, j)
+                           f: u64, g: u64, h: u64, i: u64, j: u64,
+                           k: u64, l: u64, m: u64):
+        (u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64) {
+        (a, b, c, d, e, f, g, h, i, j, k, l, m)
     }
 
     /// Need to use the spec functions, otherwise the monomorphizer will eliminate them.
@@ -29,7 +31,9 @@ module 0x42::TupleErrors {
         ensures empty() == ();
         ensures single(42) == 42;
         // These are errors - tuples too large
-        ensures too_large(1, 2, 3, 4, 5, 6, 7, 8, 9) == too_large(1, 2, 3, 4, 5, 6, 7, 8, 9);
-        ensures way_too_large(1, 2, 3, 4, 5, 6, 7, 8, 9, 10) == way_too_large(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+        ensures too_large(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)
+            == too_large(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
+        ensures way_too_large(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)
+            == way_too_large(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13);
     }
 }

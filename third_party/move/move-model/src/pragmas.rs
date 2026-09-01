@@ -661,6 +661,70 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
         ])
     });
 
+/// Pragmas accepted in a module specification block.
+const MODULE_PRAGMAS: &[&str] = &[
+    VERIFY_PRAGMA,
+    EMITS_IS_STRICT_PRAGMA,
+    EMITS_IS_PARTIAL_PRAGMA,
+    ABORTS_IF_IS_STRICT_PRAGMA,
+    ABORTS_IF_IS_PARTIAL_PRAGMA,
+    INTRINSIC_PRAGMA,
+    UNROLL_PRAGMA,
+    INFERENCE_PRAGMA,
+];
+
+/// Pragmas accepted in a function specification block.
+const FUNCTION_PRAGMAS: &[&str] = &[
+    VERIFY_PRAGMA,
+    TIMEOUT_PRAGMA,
+    SEED_PRAGMA,
+    VERIFY_DURATION_ESTIMATE_PRAGMA,
+    INTRINSIC_PRAGMA,
+    OPAQUE_PRAGMA,
+    EMITS_IS_STRICT_PRAGMA,
+    EMITS_IS_PARTIAL_PRAGMA,
+    ABORTS_IF_IS_PARTIAL_PRAGMA,
+    ABORTS_IF_IS_STRICT_PRAGMA,
+    REQUIRES_IF_ABORTS_PRAGMA,
+    ALWAYS_ABORTS_TEST_PRAGMA,
+    ADDITION_OVERFLOW_UNCHECKED_PRAGMA,
+    ASSUME_NO_ABORT_FROM_HERE_PRAGMA,
+    EXPORT_ENSURES_PRAGMA,
+    FRIEND_PRAGMA,
+    DISABLE_INVARIANTS_IN_BODY_PRAGMA,
+    DELEGATE_INVARIANTS_TO_CALLER_PRAGMA,
+    BV_PARAM_PROP,
+    BV_RET_PROP,
+    BV_INTERNAL_PRAGMA,
+    UNROLL_PRAGMA,
+    INFERENCE_PRAGMA,
+];
+
+/// Pragmas accepted in a struct specification block, besides the associated
+/// functions of an intrinsic map type.
+const STRUCT_PRAGMAS: &[&str] = &[INTRINSIC_PRAGMA, BV_PARAM_PROP];
+
+/// Pragmas accepted in a specification block of the given kind.
+fn pragmas_for_block(target: &SpecBlockContext) -> &'static [&'static str] {
+    use crate::builder::module_builder::SpecBlockContext::*;
+    match target {
+        Module => MODULE_PRAGMAS,
+        Function(..) | FunctionCodeV2(.., Some(..)) => FUNCTION_PRAGMAS,
+        Struct(..) => STRUCT_PRAGMAS,
+        _ => &[],
+    }
+}
+
+/// Pragmas accepted in a specification block of the given kind, sorted by name.
+///
+/// Reported alongside an invalid-pragma error so that a rejected name does not
+/// have to be diagnosed by trial and error.
+pub fn valid_pragmas_for_block(target: &SpecBlockContext) -> Vec<&'static str> {
+    let mut names = pragmas_for_block(target).to_vec();
+    names.sort_unstable();
+    names
+}
+
 /// Checks whether a pragma is valid in a specific spec block.
 pub fn is_pragma_valid_for_block(
     symbols: &SymbolPool,
@@ -669,58 +733,20 @@ pub fn is_pragma_valid_for_block(
     pragma: &str,
 ) -> bool {
     use crate::builder::module_builder::SpecBlockContext::*;
-    match target {
-        Module => matches!(
-            pragma,
-            VERIFY_PRAGMA
-                | EMITS_IS_STRICT_PRAGMA
-                | EMITS_IS_PARTIAL_PRAGMA
-                | ABORTS_IF_IS_STRICT_PRAGMA
-                | ABORTS_IF_IS_PARTIAL_PRAGMA
-                | INTRINSIC_PRAGMA
-                | UNROLL_PRAGMA
-                | INFERENCE_PRAGMA
-        ),
-        Function(..) | FunctionCodeV2(.., Some(..)) => matches!(
-            pragma,
-            VERIFY_PRAGMA
-                | TIMEOUT_PRAGMA
-                | SEED_PRAGMA
-                | VERIFY_DURATION_ESTIMATE_PRAGMA
-                | INTRINSIC_PRAGMA
-                | OPAQUE_PRAGMA
-                | EMITS_IS_STRICT_PRAGMA
-                | EMITS_IS_PARTIAL_PRAGMA
-                | ABORTS_IF_IS_PARTIAL_PRAGMA
-                | ABORTS_IF_IS_STRICT_PRAGMA
-                | REQUIRES_IF_ABORTS_PRAGMA
-                | ALWAYS_ABORTS_TEST_PRAGMA
-                | ADDITION_OVERFLOW_UNCHECKED_PRAGMA
-                | ASSUME_NO_ABORT_FROM_HERE_PRAGMA
-                | EXPORT_ENSURES_PRAGMA
-                | FRIEND_PRAGMA
-                | DISABLE_INVARIANTS_IN_BODY_PRAGMA
-                | DELEGATE_INVARIANTS_TO_CALLER_PRAGMA
-                | BV_PARAM_PROP
-                | BV_RET_PROP
-                | BV_INTERNAL_PRAGMA
-                | UNROLL_PRAGMA
-                | INFERENCE_PRAGMA
-        ),
-        Struct(..) => match pragma {
-            INTRINSIC_PRAGMA | BV_PARAM_PROP => true,
-            _ if INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS.contains_key(pragma) => bag
-                .get(&symbols.make(INTRINSIC_PRAGMA))
-                .map(|v| match v {
-                    PropertyValue::Symbol(s) => symbols.string(*s).as_str() == INTRINSIC_TYPE_MAP,
-                    _ => false,
-                })
-                .unwrap_or(false),
-            // all other cases
-            _ => false,
-        },
-        _ => false,
+    if pragmas_for_block(target).contains(&pragma) {
+        return true;
     }
+    // A struct block can in addition name the associated functions of an
+    // intrinsic map type, provided it declares the type as such.
+    matches!(target, Struct(..))
+        && INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS.contains_key(pragma)
+        && bag
+            .get(&symbols.make(INTRINSIC_PRAGMA))
+            .map(|v| match v {
+                PropertyValue::Symbol(s) => symbols.string(*s).as_str() == INTRINSIC_TYPE_MAP,
+                _ => false,
+            })
+            .unwrap_or(false)
 }
 
 /// Internal property attached to conditions if they are injected via an apply or a module
@@ -770,12 +796,16 @@ pub const CONDITION_DEACTIVATED_PROP: &str = "deactivated";
 /// `Symbol("sathard")` for hard-to-solve quantifier patterns.
 pub const CONDITION_INFERRED_PROP: &str = "inferred";
 
-/// Symbol value for `inferred` property indicating vacuously strong conditions
-/// (unconstrained quantifier variables).
+/// Symbol value for `inferred` property indicating a condition the derivation
+/// cannot justify: an unconstrained quantifier variable, or state carried past
+/// the havoc of a loop without an invariant. Such conditions are reported and
+/// then dropped rather than published, since they may simply be false.
 pub const CONDITION_INFERRED_VACUOUS: &str = "vacuous";
 
-/// Symbol value for `inferred` property indicating conditions with quantifiers
-/// that are hard for SAT/SMT solvers (exists in aborts_if, forall in ensures).
+/// Symbol value for `inferred` property indicating a condition which holds but
+/// is hard for SAT/SMT solvers (`exists` in `aborts_if`, `forall` in
+/// `ensures`, or a dependency on an unverified callee's contract). Unlike
+/// `vacuous` these are kept, since they are justified -- only expensive.
 pub const CONDITION_INFERRED_SATHARD: &str = "sathard";
 
 /// Symbol value for `inferred` property indicating conditions suggested by an

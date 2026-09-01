@@ -1,8 +1,10 @@
-Move prover returns: exiting with condition generation errors
-error: the specification of this function (used as a function value) applies a behavioral predicate to a function-typed parameter whose possible targets or declared `modifies_of`/`reads_of` footprints access global memory; this is not yet supported — give the lambda an explicit specification or exclude it from verification
-   ┌─ tests/sources/functional/closures/lambda_nested_hof_memory_err.move:20:5
+warning: WP could not characterize the aborts of `lambda_nested_hof_memory_err::__lambda__2__drive` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
+  = an emitted abort condition is flagged `vacuous` or `sathard`
+  = an abort condition had no representable source-level spelling
+   ┌─ tests/sources/functional/closures/lambda_nested_hof_memory_err.move:32:15
    │
-20 │ ╭     public fun apply(f: |u64| has drop, x: u64) {
-21 │ │         f(x)
-22 │ │     }
-   │ ╰─────^
+32 │           apply(|outer| {
+   │ ╭───────────────^
+33 │ │             apply(|inner| credit(inner + 1), outer + 1)
+34 │ │         }, x)
+   │ ╰─────────^

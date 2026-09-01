@@ -128,6 +128,12 @@ module aptos_framework::confidential_amount {
     fun compress_points(points: &vector<RistrettoPoint>): vector<CompressedRistretto> {
         points.map_ref(|point| point.point_compress())
     }
+    spec compress_points {
+        // Stated rather than derived: this body loops, which is outside the
+        // fragment the abort derivation describes exactly, and passing the
+        // function to `map_ref` needs an exact `aborts_of` for it.
+        aborts_if false;
+    }
 
     public(friend) fun compress(self: &Amount): CompressedAmount {
         CompressedAmount {

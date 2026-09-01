@@ -129,6 +129,10 @@ pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
     /// Boogie translator interpret them as field-path expressions over the
     /// underlying mut-ref param).
     pub in_behavior_pred_arg: bool,
+    /// Whether the expression currently translated is the function target of
+    /// a behavioral predicate. Inline functions are legal in this position:
+    /// the inliner resolves the predicate before function-value lowering.
+    pub in_behavior_pred_target: bool,
 }
 
 #[derive(Debug)]
@@ -203,6 +207,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             loop_stack: vec![],
             state_label_map: BTreeMap::new(),
             in_behavior_pred_arg: false,
+            in_behavior_pred_target: false,
         }
     }
 
@@ -4322,7 +4327,7 @@ impl ExpTranslator<'_, '_, '_> {
         }
 
         if let Some(entry) = self.parent.parent.fun_table.get(&global_var_sym) {
-            if entry.kind == FunctionKind::Inline {
+            if entry.kind == FunctionKind::Inline && !self.in_behavior_pred_target {
                 self.error(loc, "inline function cannot be used as a function value");
                 return self.new_error_exp();
             }
@@ -6495,7 +6500,9 @@ impl ExpTranslator<'_, '_, '_> {
 
         // Translate the target expression and validate it has function type
         let fun_type_var = self.fresh_type_var();
+        let previous = std::mem::replace(&mut self.in_behavior_pred_target, true);
         let fun_exp_data = self.translate_exp(target, &fun_type_var);
+        self.in_behavior_pred_target = previous;
         let fun_exp = fun_exp_data.into_exp();
 
         // Extract function arg/result types. The type may be a concrete Type::Fun

@@ -41,8 +41,8 @@ use move_model::{
     ty::{NoUnificationContext, PrimitiveType, ReferenceKind, Type, TypeDisplayContext, Variance},
     ty_invariant_analysis::{TypeInstantiationDerivation, TypeUnificationAdapter},
     well_known::{
-        TYPE_INFO_MOVE, TYPE_INFO_SPEC, TYPE_NAME_GET_MOVE, TYPE_NAME_GET_SPEC, TYPE_NAME_MOVE,
-        TYPE_NAME_SPEC, TYPE_SPEC_IS_STRUCT,
+        OBJECT_SPEC_EXISTS_AT, TYPE_INFO_MOVE, TYPE_INFO_SPEC, TYPE_NAME_GET_MOVE,
+        TYPE_NAME_GET_SPEC, TYPE_NAME_MOVE, TYPE_NAME_SPEC, TYPE_SPEC_IS_STRUCT,
     },
 };
 use move_stackless_bytecode::{
@@ -86,7 +86,7 @@ pub struct MonoInfo {
     /// A map from function types to function-typed parameters of verification target functions.
     /// This enables the Boogie backend to generate parameter variants in the function type datatype.
     pub fun_param_infos: BTreeMap<Type, BTreeSet<FunParamInfo>>,
-    /// A map from function types to struct fields containing storable function values.
+    /// A map from function types to struct fields containing function values.
     /// This enables the Boogie backend to generate struct field variants in the function type
     /// datatype with uninterpreted behavioral predicates.
     pub fun_struct_field_infos: BTreeMap<Type, BTreeSet<StructFieldInfo>>,
@@ -146,7 +146,7 @@ pub struct FunParamInfo {
     pub param_sym: Symbol,
 }
 
-/// Information about a struct field that has a storable function type.
+/// Information about a struct field that has a function type.
 /// This is used to track function-valued fields in structs so the Boogie backend
 /// can generate appropriate datatype variants with uninterpreted behavioral predicates.
 #[derive(Clone, Debug, PartialOrd, PartialEq, Ord, Eq)]
@@ -1590,11 +1590,15 @@ impl Analyzer<'_> {
                         .entry(mid.qualified(*fid))
                         .or_default()
                         .insert(actuals);
-                } else if !callee_env.is_opaque() && !callee_env.is_struct_api() {
+                } else if !callee_env.is_opaque()
+                    && !callee_env.is_struct_api()
+                    && (!callee_env.is_inline() || callee_env.is_inline_verified())
+                {
                     // This call needs to be inlined, with targs instantiated by self.inst_opt.
                     // Struct API wrappers are excluded: their call sites are translated to native
-                    // ops (Pack, BorrowField, etc.) in stackless_bytecode_generator, so there is
-                    // no independent bytecode target to schedule for monomorphization.
+                    // ops (Pack, BorrowField, etc.) in stackless_bytecode_generator. Ordinary
+                    // inline functions are expanded at their call sites and likewise have no
+                    // independent bytecode target (verified inline functions are the exception).
                     // Schedule for later processing if this instance has not been processed yet.
                     let entry = (mid.qualified(*fid), FunctionVariant::Baseline, actuals);
                     self.add_dependency(MonoNode::Fun(entry.0, entry.1.clone(), entry.2.clone()));
@@ -1608,7 +1612,18 @@ impl Analyzer<'_> {
                 if let Call(_, dests, Closure(_mid, _fid, _targs, mask), ..) = bc {
                     let fun_type =
                         self.normalize_fun_ty(self.instantiate(target.get_local_type(dests[0])));
-                    let fun = mid.qualified_inst(*fid, self.instantiate_vec(targs));
+                    // Closure constructor names use Boogie type names, which
+                    // intentionally erase function abilities. Canonicalize
+                    // nested function types in the target instantiation too,
+                    // so equivalent ability variants do not become duplicate
+                    // constructors in one function-value datatype.
+                    let fun = mid.qualified_inst(
+                        *fid,
+                        self.instantiate_vec(targs)
+                            .into_iter()
+                            .map(Type::normalize_nested_funs)
+                            .collect(),
+                    );
                     self.analyze_function_spec(&fun);
                     self.info
                         .fun_infos
@@ -1677,14 +1692,9 @@ impl Analyzer<'_> {
             return;
         }
         let fun_env = self.env.get_function(fun.to_qualified_id());
-        let mems: Vec<_> = fun_env
-            .get_spec_used_memory()
-            .iter()
-            .chain(fun_env.get_spec_old_memory().iter())
-            .cloned()
-            .collect();
+        let mut mems = fun_env.get_spec_used_memory_instantiated(&fun.inst);
+        mems.extend(fun_env.get_spec_old_memory_instantiated(&fun.inst));
         for mem in mems {
-            let mem = mem.instantiate(&fun.inst);
             let struct_env = self.env.get_struct_qid(mem.to_qualified_id());
             self.add_struct(struct_env, &mem.inst);
         }
@@ -1756,7 +1766,14 @@ impl Analyzer<'_> {
             }
             // Handle Closure operations in spec expressions
             if let ExpData::Call(node_id, ast::Operation::Closure(mid, fid, mask), _) = e {
-                let inst = self.instantiate_vec(&self.env.get_node_instantiation(*node_id));
+                // Keep `ClosureInfo` keyed by the same ability-erased form as
+                // `boogie_closure_pack_name`; otherwise two generic uses of
+                // a function value can emit the same Boogie constructor twice.
+                let inst: Vec<Type> = self
+                    .instantiate_vec(&self.env.get_node_instantiation(*node_id))
+                    .into_iter()
+                    .map(Type::normalize_nested_funs)
+                    .collect();
                 let fun = mid.qualified_inst(*fid, inst.clone());
                 let fun_type =
                     self.normalize_fun_ty(self.instantiate(&self.env.get_node_type(*node_id)));
@@ -1779,6 +1796,7 @@ impl Analyzer<'_> {
                     if !callee_env.is_native_or_intrinsic()
                         && !callee_env.is_opaque()
                         && !callee_env.is_struct_api()
+                        && (!callee_env.is_inline() || callee_env.is_inline_verified())
                     {
                         let entry = (fun.to_qualified_id(), FunctionVariant::Baseline, inst);
                         self.add_dependency(MonoNode::Fun(
@@ -1825,7 +1843,17 @@ impl Analyzer<'_> {
                         module.get_name().name().display(self.env.symbol_pool()),
                         spec_fun.name.display(self.env.symbol_pool()),
                     );
-                    if qualified_name == TYPE_NAME_SPEC
+                    if qualified_name == OBJECT_SPEC_EXISTS_AT {
+                        // `object::spec_exists_at<T>` is modelled exactly as
+                        // `exists<T>`. Record its concrete resource instance
+                        // so the backend declares the memory read by the
+                        // direct translation of the predicate. It is a
+                        // direct translation (rather than a normal spec-fun
+                        // call), so preserve the type in the current root's
+                        // semantic slice as well.
+                        self.add_node_type(actuals[0].clone());
+                        self.add_type(&actuals[0]);
+                    } else if qualified_name == TYPE_NAME_SPEC
                         || qualified_name == TYPE_INFO_SPEC
                         || qualified_name == TYPE_SPEC_IS_STRUCT
                     {
@@ -1957,7 +1985,7 @@ impl Analyzer<'_> {
         }
     }
 
-    /// Check if a struct field has a storable function type and register it in
+    /// Check if a struct field has a function type and register it in
     /// `fun_struct_field_infos` if so.
     fn check_struct_fun_field(
         &mut self,
@@ -1966,44 +1994,42 @@ impl Analyzer<'_> {
         field_ty: &Type,
         targs: &[Type],
     ) {
-        if let Type::Fun(_, _, abilities) = field_ty {
-            if abilities.has_store() {
-                let normalized = self.normalize_fun_ty(field_ty.clone());
-                // Normalize fun-type elements of the containing struct's
-                // instantiation too: the constructor name is derived from
-                // the boogie struct name, which drops fun abilities at every
-                // nesting depth. Without normalizing here, two
-                // ability-variant instantiations of the same wrapper (e.g.
-                // `Option<|u64| has drop>` and
-                // `Option<|u64| has drop + copy + store>`, directly or
-                // nested as in `Option<Option<|u64| has drop>>`) would
-                // produce two `StructFieldInfo` set entries mangling to one
-                // datatype constructor.
-                let normalized_targs: Vec<Type> = targs
-                    .iter()
-                    .map(|t| t.clone().normalize_nested_funs())
-                    .collect();
-                let info = StructFieldInfo {
-                    struct_id: struct_env.get_qualified_id().instantiate(normalized_targs),
-                    field_sym: field.get_name(),
-                };
-                self.info
-                    .fun_struct_field_infos
-                    .entry(normalized.clone())
-                    .or_default()
-                    .insert(info);
-                for access in struct_env
-                    .get_field_access_of()
-                    .iter()
-                    .filter(|access| access.fun_param == field.get_name())
-                {
-                    for memory in access.used_memory.iter().chain(&access.old_memory) {
-                        self.add_type(&memory.clone().instantiate(targs).to_type());
-                    }
+        if let Type::Fun(..) = field_ty {
+            let normalized = self.normalize_fun_ty(field_ty.clone());
+            // Normalize fun-type elements of the containing struct's
+            // instantiation too: the constructor name is derived from
+            // the boogie struct name, which drops fun abilities at every
+            // nesting depth. Without normalizing here, two
+            // ability-variant instantiations of the same wrapper (e.g.
+            // `Option<|u64| has drop>` and
+            // `Option<|u64| has drop + copy + store>`, directly or
+            // nested as in `Option<Option<|u64| has drop>>`) would
+            // produce two `StructFieldInfo` set entries mangling to one
+            // datatype constructor.
+            let normalized_targs: Vec<Type> = targs
+                .iter()
+                .map(|t| t.clone().normalize_nested_funs())
+                .collect();
+            let info = StructFieldInfo {
+                struct_id: struct_env.get_qualified_id().instantiate(normalized_targs),
+                field_sym: field.get_name(),
+            };
+            self.info
+                .fun_struct_field_infos
+                .entry(normalized.clone())
+                .or_default()
+                .insert(info);
+            for access in struct_env
+                .get_field_access_of()
+                .iter()
+                .filter(|access| access.fun_param == field.get_name())
+            {
+                for memory in access.used_memory.iter().chain(&access.old_memory) {
+                    self.add_type(&memory.clone().instantiate(targs).to_type());
                 }
-                // Ensure the function type is also registered in fun_infos
-                self.info.fun_infos.entry(normalized).or_default();
             }
+            // Ensure the function type is also registered in fun_infos
+            self.info.fun_infos.entry(normalized).or_default();
         }
     }
 

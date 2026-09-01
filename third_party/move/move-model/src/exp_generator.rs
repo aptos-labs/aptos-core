@@ -1035,7 +1035,9 @@ pub trait ExpGenerator<'env> {
         self.mk_aborts_of_with_label(fun_exp, args, None)
     }
 
-    /// Build aborts_of<f, @label>(args) predicate with optional post memory label.
+    /// Build aborts_of<f, @label>(args) predicate with an optional state label.
+    /// `aborts_of` describes the state in which the callee is invoked, so its
+    /// only legal source label is the pre-state label.
     fn mk_aborts_of_with_label(
         &self,
         fun_exp: Exp,
@@ -1045,8 +1047,8 @@ pub trait ExpGenerator<'env> {
         let mut all_args = vec![fun_exp];
         all_args.extend(args);
         let range = MemoryRange {
-            pre: None,
-            post: label,
+            pre: label,
+            post: None,
         };
         self.mk_bool_call(Operation::Behavior(BehaviorKind::AbortsOf, range), all_args)
     }
@@ -1083,36 +1085,19 @@ pub trait ExpGenerator<'env> {
     ) -> Exp {
         let result_exp = self.mk_result_of_with_state(fun_exp, args, result_type, pre, post);
 
-        // For multiple returns, extract the nth component via let-binding deconstruction
+        // For multiple returns, extract the component directly.  The
+        // sourcifier renders tuple `Index` as `.N`; introducing a nested
+        // destructuring block here makes clause-level state-label hoisting
+        // split the block from the temporary that scopes it.
         if num_results > 1 {
-            let elem_types: Vec<Type> = if let Type::Tuple(types) = result_type {
-                types.clone()
+            let component_type = if let Type::Tuple(types) = result_type {
+                types.get(result_index).cloned().unwrap_or(Type::Error)
             } else {
-                vec![result_type.clone(); num_results]
+                Type::Error
             };
-            let mut pat_elems = Vec::with_capacity(num_results);
-            let mut selected_sym = None;
-            let mut selected_ty = Type::Error;
-            for (i, ty) in elem_types.iter().enumerate() {
-                let sym = self.mk_symbol(&format!("_t{}", i));
-                let pat = self.mk_decl(sym, ty.clone());
-                pat_elems.push(pat);
-                if i == result_index {
-                    selected_sym = Some(sym);
-                    selected_ty = ty.clone();
-                }
-            }
-            let Some(sym) = selected_sym else {
-                let index_exp = self.mk_num_const(BigInt::from(result_index));
-                let select_node = self.new_node(Type::Error, None);
-                return ExpData::Call(select_node, Operation::Index, vec![result_exp, index_exp])
-                    .into_exp();
-            };
-            let tuple_pat_node = self.new_node(result_type.clone(), None);
-            let pattern = Pattern::Tuple(tuple_pat_node, pat_elems);
-            let body = self.mk_local_by_sym(sym, selected_ty.clone());
-            let block_node = self.new_node(selected_ty, None);
-            ExpData::Block(block_node, pattern, Some(result_exp), body).into_exp()
+            let index_exp = self.mk_num_const(BigInt::from(result_index));
+            let select_node = self.new_node(component_type, None);
+            ExpData::Call(select_node, Operation::Index, vec![result_exp, index_exp]).into_exp()
         } else {
             result_exp
         }

@@ -1,4 +1,28 @@
 Move prover returns: exiting with verification errors
+warning: cannot derive `requires_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ tests/sources/functional/closures/inline/bp_specfun_state.move:118:41
+    │
+118 │             invariant forall j in 0..i: requires_of<f>(v[j]); // error: false at entry for the `loop_false_at_entry` caller
+    │                                         ^^^^^^^^^^^^^^^^^^^^
+    ·
+125 │         for_each_bump(v, a, |y| y spec { requires spec_get_v(a) == 0; ensures result == y; });
+    │         -------------------------------------------------------------------------------------
+    │         │                   │
+    │         │                   lambda argument
+    │         from a call inlined at this callsite
+
+warning: cannot derive `requires_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ tests/sources/functional/closures/inline/bp_specfun_state.move:118:41
+    │
+118 │             invariant forall j in 0..i: requires_of<f>(v[j]); // error: false at entry for the `loop_false_at_entry` caller
+    │                                         ^^^^^^^^^^^^^^^^^^^^
+    ·
+137 │         for_each_bump(v, a, |y| y spec { requires spec_get_v(a) > 0; ensures result == y; });
+    │         ------------------------------------------------------------------------------------
+    │         │                   │
+    │         │                   lambda argument
+    │         from a call inlined at this callsite
+
 error: unknown assertion failed
    ┌─ tests/sources/functional/closures/inline/bp_specfun_state.move:37:13
    │
@@ -66,41 +90,3 @@ error: unknown assertion failed
    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:102: aborts_at_application (spec)
    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:76: apply_then_bump_na
    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:78: apply_then_bump_na
-
-error: induction case of the loop invariant does not hold
-    ┌─ tests/sources/functional/closures/inline/bp_specfun_state.move:118:13
-    │
-118 │             invariant forall j in 0..i: requires_of<f>(v[j]); // error: false at entry for the `loop_false_at_entry` caller
-    │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    │
-    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:136: loop_false_at_entry
-    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:140: loop_false_at_entry (spec)
-    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:141: loop_false_at_entry (spec)
-    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:136: loop_false_at_entry
-    =         v = <redacted>
-    =         a = <redacted>
-    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:108: for_each_bump
-    =         a' = <redacted>
-    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:109: for_each_bump
-    =         i = <redacted>
-    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:110: for_each_bump
-    =         n = <redacted>
-    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:115: for_each_bump
-    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:116: for_each_bump
-    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:117: for_each_bump
-    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:118: for_each_bump
-    =     enter loop, variable(s) i havocked and reassigned
-    =         i = <redacted>
-    =     loop invariant holds at current state
-    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:116: for_each_bump
-    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:117: for_each_bump
-    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:118: for_each_bump
-    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:111: for_each_bump
-    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:112: for_each_bump
-    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:113: for_each_bump
-    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:114: for_each_bump
-    =         i = <redacted>
-    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:111: for_each_bump
-    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:116: for_each_bump
-    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:117: for_each_bump
-    =     at tests/sources/functional/closures/inline/bp_specfun_state.move:118: for_each_bump

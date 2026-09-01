@@ -26,6 +26,7 @@ use crate::{
     },
     symbol::Symbol,
     ty::{PrimitiveType, Type, BOOL_TYPE},
+    well_known,
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -762,6 +763,18 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
         label
     }
 
+    /// Save already-instantiated resource memory under the shared old label.
+    fn save_memory_concrete(
+        &mut self,
+        used_memory: impl IntoIterator<Item = QualifiedInstId<StructId>>,
+    ) -> MemoryLabel {
+        let label = self.get_or_create_old_label();
+        for memory in used_memory {
+            self.result.saved_memory.insert((memory, label));
+        }
+        label
+    }
+
     /// Walks a `Proof` tree, rewrites all embedded expressions via `translate_exp`,
     /// and flattens the tree into `result.pre_proof` / `result.post_proof` vectors.
     /// Path conditions from enclosing `if/else` blocks are accumulated and applied
@@ -1421,18 +1434,18 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                 // If the spec fun uses old() and has no pre-label, save memory
                 // for the pre-state. This happens with `..S |~ spec_fun(a)` where
                 // post=S but pre=None (function entry).
-                let (uses_old, has_old_memory, used_memory) = {
+                let inst = self.builder.global_env().get_node_instantiation(id);
+                let (uses_old, old_memory, used_memory) = {
                     let module_env = self.builder.global_env().get_module(*mid);
                     let decl = module_env.get_spec_fun(*fid);
                     (
                         decl.uses_old,
-                        !decl.old_memory.is_empty(),
-                        decl.used_memory.clone(),
+                        decl.old_memory_instantiated(&inst),
+                        decl.used_memory_instantiated(&inst),
                     )
                 };
-                if uses_old && has_old_memory && range.pre.is_none() {
-                    let inst = self.builder.global_env().get_node_instantiation(id);
-                    let label = self.save_memory_shared(&used_memory, &inst);
+                if uses_old && !old_memory.is_empty() && range.pre.is_none() {
+                    let label = self.save_memory_concrete(used_memory);
                     let new_range = MemoryRange {
                         pre: Some(label),
                         post: range.post,
@@ -1444,13 +1457,19 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
             },
             // SpecFunction in old context: save memory for pre-state
             SpecFunction(mid, fid, range) if self.in_old => {
-                let used_memory = {
-                    let module_env = self.builder.global_env().get_module(*mid);
-                    let decl = module_env.get_spec_fun(*fid);
-                    decl.used_memory.clone()
-                };
                 let inst = self.builder.global_env().get_node_instantiation(id);
-                let label = self.save_memory_shared(&used_memory, &inst);
+                let used_memory = {
+                    let env = self.builder.global_env();
+                    let decl = env.get_module(*mid).get_spec_fun(*fid).clone();
+                    let mut used_memory = decl.used_memory_instantiated(&inst);
+                    used_memory.extend(well_known::object_spec_exists_at_memory(
+                        env,
+                        mid.qualified(*fid),
+                        &inst,
+                    ));
+                    used_memory
+                };
+                let label = self.save_memory_concrete(used_memory);
                 let new_range = MemoryRange {
                     pre: Some(label),
                     post: range.post,
@@ -1459,18 +1478,18 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
             },
             // SpecFunction outside old but uses_old: save memory for pre-state
             SpecFunction(mid, fid, range) if !self.in_old => {
-                let (uses_old, has_old_memory, used_memory) = {
+                let inst = self.builder.global_env().get_node_instantiation(id);
+                let (uses_old, old_memory, used_memory) = {
                     let module_env = self.builder.global_env().get_module(*mid);
                     let decl = module_env.get_spec_fun(*fid);
                     (
                         decl.uses_old,
-                        !decl.old_memory.is_empty(),
-                        decl.used_memory.clone(),
+                        decl.old_memory_instantiated(&inst),
+                        decl.used_memory_instantiated(&inst),
                     )
                 };
-                if uses_old && has_old_memory {
-                    let inst = self.builder.global_env().get_node_instantiation(id);
-                    let label = self.save_memory_shared(&used_memory, &inst);
+                if uses_old && !old_memory.is_empty() {
+                    let label = self.save_memory_concrete(used_memory);
                     let new_range = MemoryRange {
                         pre: Some(label),
                         post: range.post,
@@ -1491,10 +1510,13 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                 if let Some(ExpData::Call(closure_id, Operation::Closure(mid, fid, _), _)) =
                     args.first().map(|a| a.as_ref())
                 {
-                    let fun_env = env.get_function(mid.qualified(*fid));
-                    let used_memory = fun_env.get_spec_used_memory().clone();
                     let inst = env.get_node_instantiation(*closure_id);
-                    let label = self.save_memory_shared(&used_memory, &inst);
+                    let used_memory = crate::spec_derivation::behavioral_target_memory(
+                        env,
+                        mid.qualified(*fid),
+                        &inst,
+                    );
+                    let label = self.save_memory_concrete(used_memory);
                     let new_range = MemoryRange {
                         pre: Some(label),
                         post: self.in_old.then_some(label).or(range.post),

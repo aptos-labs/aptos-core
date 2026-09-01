@@ -50,9 +50,9 @@ use std::{
 
 const REQUIRES_FAILS_MESSAGE: &str = "precondition does not hold at this call";
 const ENSURES_FAILS_MESSAGE: &str = "post-condition does not hold";
-const ABORTS_IF_FAILS_MESSAGE: &str = "function does not abort under this condition";
-const ABORT_NOT_COVERED: &str = "abort not covered by any of the `aborts_if` clauses";
-const ABORTS_CODE_NOT_COVERED: &str =
+pub(crate) const ABORTS_IF_FAILS_MESSAGE: &str = "function does not abort under this condition";
+pub(crate) const ABORT_NOT_COVERED: &str = "abort not covered by any of the `aborts_if` clauses";
+pub(crate) const ABORTS_CODE_NOT_COVERED: &str =
     "abort code not covered by any of the `aborts_if` or `aborts_with` clauses";
 const EMITS_FAILS_MESSAGE: &str = "function does not emit the expected event";
 const EMITS_NOT_COVERED: &str = "emitted event not covered by any of the `emits` clauses";
@@ -95,8 +95,14 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
             })
             .collect();
         *self.opaque_callee_modifies.lock().unwrap() = effects;
-        // Perform static analysis part of modifies check.
-        check_modifies(env, targets);
+        // In inference mode the target's specification is intentionally absent
+        // or incomplete until SpecInferenceProcessor runs later in the pipeline.
+        // Checking caller/callee modifies relations here would therefore reject
+        // valid inference targets merely because an existing caller already has
+        // a frame declaration for memory the target modifies.
+        if !ProverOptions::get(env).inference {
+            check_modifies(env, targets);
+        }
     }
 
     fn process(
@@ -2509,6 +2515,20 @@ impl<'a> Instrumenter<'a> {
                 });
                 if all_deps_met {
                     for &idx in &indices {
+                        // `all_conditions` is `post` followed by `aborts`.
+                        let is_aborts = idx >= spec.post.len();
+                        // A postcondition holds where it is assumed, on the
+                        // success path. An abort condition does not: assuming
+                        // it here states that the function aborts on the path
+                        // where it did not, contradicting the non-aborting
+                        // arithmetic the body just performed, and every
+                        // postcondition then holds vacuously. Its label is
+                        // still recorded as emitted so the ordering below is
+                        // unaffected, and the abort path keeps its defining
+                        // fragment.
+                        if is_aborts && !abort_path {
+                            continue;
+                        }
                         self.emit_traces(spec, all_conditions[idx]);
                         let cond = if abort_path {
                             Self::defining_fragment(all_conditions[idx])

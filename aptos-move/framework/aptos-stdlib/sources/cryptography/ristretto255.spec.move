@@ -28,11 +28,13 @@ spec aptos_std::ristretto255 {
     spec point_decompress_internal {
         // TODO: temporary mockup.
         pragma opaque;
+        aborts_if [abstract] false;
     }
 
     spec point_compress_internal {
         // TODO: temporary mockup.
         pragma opaque;
+        aborts_if [abstract] false;
     }
 
     spec point_mul_internal {
@@ -63,6 +65,7 @@ spec aptos_std::ristretto255 {
     spec point_clone_internal {
         // TODO: temporary mockup.
         pragma opaque;
+        aborts_if [abstract] false;
     }
 
     spec point_sub_internal {

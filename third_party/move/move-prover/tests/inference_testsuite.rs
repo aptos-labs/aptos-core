@@ -57,11 +57,14 @@ fn test_runner(path: &Path) -> anyhow::Result<()> {
     };
 
     let mut inf_options = make_options(path, &extra_sources)?;
+    let loop_invariant_evidence = inf_options.inference.loop_invariant_evidence;
+    let check_evidence_isolation = loop_invariant_evidence.is_some();
     inf_options.inference = InferenceOptions {
         inference: true,
         inference_output: InferenceOutput::Unified,
         inference_output_dir: Some(enriched_dir.path().to_string_lossy().to_string()),
         inference_unified_suffix: "enriched.move".to_string(),
+        loop_invariant_evidence,
     };
     inf_options.setup_logging_for_test();
     inf_options.prover.stable_test_output = true;
@@ -84,6 +87,7 @@ fn test_runner(path: &Path) -> anyhow::Result<()> {
 
     // Collect inference-phase diagnostics (shown at the end in a comment).
     let mut diags = String::new();
+    let inference_failed = result.is_err();
     match result {
         Ok(()) => {},
         Err(err) => {
@@ -105,57 +109,94 @@ fn test_runner(path: &Path) -> anyhow::Result<()> {
         baseline_out += "\n";
     }
 
+    // Evidence must be an extra diagnostic only. For evidence baselines, run a
+    // control inference with the option disabled and require the generated Move
+    // source to remain byte-for-byte identical.
+    if check_evidence_isolation {
+        let control_dir = tempfile::TempDir::new()?;
+        let control_path = control_dir
+            .path()
+            .join(path.with_extension("enriched.move").file_name().unwrap());
+        let mut control_options = make_options(path, &extra_sources)?;
+        control_options.inference = InferenceOptions {
+            inference: true,
+            inference_output: InferenceOutput::Unified,
+            inference_output_dir: Some(control_dir.path().to_string_lossy().to_string()),
+            inference_unified_suffix: "enriched.move".to_string(),
+            loop_invariant_evidence: None,
+        };
+        control_options.setup_logging_for_test();
+        control_options.prover.stable_test_output = true;
+        control_options.backend.stable_test_output = true;
+        let mut control_writer = Buffer::no_color();
+        let control_result = run_move_prover_v2(&mut control_writer, control_options, vec![]);
+        anyhow::ensure!(
+            control_result.is_err() == inference_failed,
+            "enabling --loop-invariant-evidence changed whether inference returned an error"
+        );
+        anyhow::ensure!(
+            enriched_path.exists() == control_path.exists(),
+            "loop-invariant evidence changed whether Move source was generated"
+        );
+        if enriched_path.exists() {
+            let evidence_source = std::fs::read(&enriched_path)?;
+            let control_source = std::fs::read(&control_path)?;
+            anyhow::ensure!(
+                evidence_source == control_source,
+                "loop-invariant evidence changed generated Move source"
+            );
+        }
+    }
+
     // ── Step 2: Run the prover on the enriched source ────────────────
 
-    // Use the enriched file as the single source for verification.
-    let verify_source = if enriched_path.exists() {
-        &enriched_path
-    } else {
-        path
-    };
+    // An inference error intentionally produces no enriched source. Do not run
+    // inference a second time through the verification step in that case.
+    if !inference_failed {
+        let verify_result = (|| -> anyhow::Result<()> {
+            let no_tools =
+                read_env_var("BOOGIE_EXE").is_empty() || read_env_var("Z3_EXE").is_empty();
 
-    let verify_result = (|| -> anyhow::Result<()> {
-        let no_tools = read_env_var("BOOGIE_EXE").is_empty() || read_env_var("Z3_EXE").is_empty();
-
-        let mut verify_options = make_options(verify_source, &extra_sources)?;
-        verify_options.setup_logging_for_test();
-        verify_options.prover.stable_test_output = true;
-        verify_options.backend.stable_test_output = true;
-        if no_tools {
-            verify_options.prover.generate_only = true;
-            if NOT_CONFIGURED_WARNED
-                .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
-                .is_ok()
-            {
-                warn!(
-                    "Prover tools are not configured, verification will be skipped. \
-                     Set BOOGIE_EXE and Z3_EXE to enable full verification."
-                );
-            }
-        }
-        verify_options.backend.check_tool_versions()?;
-
-        let mut error_writer = Buffer::no_color();
-        let result = run_move_prover_v2(&mut error_writer, verify_options, experiments);
-        let verify_diags = String::from_utf8_lossy(&error_writer.into_inner()).to_string();
-        match result {
-            Ok(()) if verify_diags.is_empty() => {
-                diags += "Verification: Succeeded.\n";
-            },
-            Ok(()) => {
-                diags += &format!("Verification:\n{}", verify_diags);
-            },
-            Err(err) => {
-                diags += &format!("Verification: {}\n", err);
-                if !verify_diags.is_empty() {
-                    diags += &verify_diags;
+            let mut verify_options = make_options(&enriched_path, &extra_sources)?;
+            verify_options.setup_logging_for_test();
+            verify_options.prover.stable_test_output = true;
+            verify_options.backend.stable_test_output = true;
+            if no_tools {
+                verify_options.prover.generate_only = true;
+                if NOT_CONFIGURED_WARNED
+                    .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
+                    .is_ok()
+                {
+                    warn!(
+                        "Prover tools are not configured, verification will be skipped. \
+                         Set BOOGIE_EXE and Z3_EXE to enable full verification."
+                    );
                 }
-            },
-        }
-        Ok(())
-    })();
+            }
+            verify_options.backend.check_tool_versions()?;
 
-    verify_result?;
+            let mut error_writer = Buffer::no_color();
+            let result = run_move_prover_v2(&mut error_writer, verify_options, experiments);
+            let verify_diags = String::from_utf8_lossy(&error_writer.into_inner()).to_string();
+            match result {
+                Ok(()) if verify_diags.is_empty() => {
+                    diags += "Verification: Succeeded.\n";
+                },
+                Ok(()) => {
+                    diags += &format!("Verification:\n{}", verify_diags);
+                },
+                Err(err) => {
+                    diags += &format!("Verification: {}\n", err);
+                    if !verify_diags.is_empty() {
+                        diags += &verify_diags;
+                    }
+                },
+            }
+            Ok(())
+        })();
+
+        verify_result?;
+    }
 
     // ── Step 3: Append diagnostics as a block comment ───────────────
     if !diags.is_empty() {

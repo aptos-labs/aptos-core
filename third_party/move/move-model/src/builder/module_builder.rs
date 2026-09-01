@@ -28,8 +28,9 @@ use crate::{
         SpecFunId, SpecVarId, StructData, StructId, TypeParameter, TypeParameterKind, UserId,
     },
     pragmas::{
-        is_pragma_valid_for_block, is_property_valid_for_condition, CONDITION_DEACTIVATED_PROP,
-        CONDITION_EXPORT_PROP, CONDITION_INJECTED_PROP, INTRINSIC_PRAGMA,
+        is_pragma_valid_for_block, is_property_valid_for_condition, valid_pragmas_for_block,
+        CONDITION_DEACTIVATED_PROP, CONDITION_EXPORT_PROP, CONDITION_INJECTED_PROP,
+        INTRINSIC_PRAGMA,
     },
     symbol::{Symbol, SymbolPool},
     ty::{
@@ -907,7 +908,9 @@ impl ModuleBuilder<'_, '_> {
             params,
             result_type,
             used_memory: BTreeSet::new(),
+            generic_used_memory: BTreeSet::new(),
             old_memory: BTreeSet::new(),
+            generic_old_memory: BTreeSet::new(),
             uninterpreted,
             is_move_fun: false,
             is_native: false,
@@ -1342,7 +1345,7 @@ impl ModuleBuilder<'_, '_> {
                     if let Some(kind) = self.convert_condition_kind(kind, &context) {
                         let properties = self.translate_properties(properties, &|_, _, prop| {
                             if !is_property_valid_for_condition(&kind, prop) {
-                                Some(loc.clone())
+                                Some((loc.clone(), vec![]))
                             } else {
                                 None
                             }
@@ -1791,6 +1794,13 @@ impl ModuleBuilder<'_, '_> {
                                     predicates.push((range.pre, range.post, *id, None));
                                 }
                             },
+                            Operation::SpecPublish(range)
+                            | Operation::SpecRemove(range)
+                            | Operation::SpecUpdate(range) => {
+                                if range.pre.is_some() || range.post.is_some() {
+                                    predicates.push((range.pre, range.post, *id, None));
+                                }
+                            },
                             Operation::Global(Some(label)) | Operation::Exists(Some(label)) => {
                                 memory_labels.push((*label, *id));
                             },
@@ -1958,7 +1968,7 @@ impl ModuleBuilder<'_, '_> {
                 if let Some(kind) = self.convert_condition_kind(kind, context) {
                     let properties = self.translate_properties(properties, &|_, _, prop| {
                         if !is_property_valid_for_condition(&kind, prop) {
-                            Some(loc.clone())
+                            Some((loc.clone(), vec![]))
                         } else {
                             None
                         }
@@ -2668,7 +2678,13 @@ impl ModuleBuilder<'_, '_> {
     ) {
         let mut properties = self.translate_properties(properties, &|symbols, bag, prop| {
             if !is_pragma_valid_for_block(symbols, bag, context, prop) {
-                Some(loc.clone())
+                let valid = valid_pragmas_for_block(context);
+                let notes = if valid.is_empty() {
+                    vec!["this specification block accepts no pragmas".to_string()]
+                } else {
+                    vec![format!("valid pragmas here are: {}", valid.join(", "))]
+                };
+                Some((loc.clone(), notes))
             } else {
                 None
             }
@@ -2690,8 +2706,8 @@ impl ModuleBuilder<'_, '_> {
         check_prop: &F,
     ) -> PropertyBag
     where
-        // Returns the location if not valid
-        F: Fn(&SymbolPool, &PropertyBag, &str) -> Option<Loc>,
+        // Returns the location and explanatory notes if not valid
+        F: Fn(&SymbolPool, &PropertyBag, &str) -> Option<(Loc, Vec<String>)>,
     {
         let mut props = PropertyBag::default();
         for prop in properties {
@@ -2706,14 +2722,15 @@ impl ModuleBuilder<'_, '_> {
         prop: &EA::PragmaProperty,
         check_prop: &F,
     ) where
-        // Returns the location if not valid
-        F: Fn(&SymbolPool, &PropertyBag, &str) -> Option<Loc>,
+        // Returns the location and explanatory notes if not valid
+        F: Fn(&SymbolPool, &PropertyBag, &str) -> Option<(Loc, Vec<String>)>,
     {
         let prop_str = prop.value.name.value.as_str();
-        if let Some(loc) = check_prop(self.symbol_pool(), bag, prop_str) {
-            self.parent.error(
+        if let Some((loc, notes)) = check_prop(self.symbol_pool(), bag, prop_str) {
+            self.parent.error_with_notes(
                 &loc,
                 &format!("property `{}` is not valid in this context", prop_str),
+                notes,
             );
             return;
         }
@@ -4678,7 +4695,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     if let Some(kind) = self.convert_condition_kind(kind, &context) {
                         let properties = self.translate_properties(properties, &|_, _, prop| {
                             if !is_property_valid_for_condition(&kind, prop) {
-                                Some(member_loc.clone())
+                                Some((member_loc.clone(), vec![]))
                             } else {
                                 None
                             }
@@ -5614,7 +5631,9 @@ impl ModuleBuilder<'_, '_> {
                 access_specifiers,
                 fun_param_access_of,
                 spec_used_memory: std::cell::RefCell::new(BTreeSet::new()),
+                spec_generic_used_memory: std::cell::RefCell::new(BTreeSet::new()),
                 spec_old_memory: std::cell::RefCell::new(BTreeSet::new()),
+                spec_generic_old_memory: std::cell::RefCell::new(BTreeSet::new()),
                 spec_uses_old: std::cell::Cell::new(false),
                 acquired_structs: None,
                 spec: spec.into(),
@@ -5654,7 +5673,9 @@ impl ModuleBuilder<'_, '_> {
                 access_specifiers: None,
                 fun_param_access_of: vec![],
                 spec_used_memory: std::cell::RefCell::new(BTreeSet::new()),
+                spec_generic_used_memory: std::cell::RefCell::new(BTreeSet::new()),
                 spec_old_memory: std::cell::RefCell::new(BTreeSet::new()),
+                spec_generic_old_memory: std::cell::RefCell::new(BTreeSet::new()),
                 spec_uses_old: std::cell::Cell::new(false),
                 acquired_structs: None,
                 spec: spec.into(),

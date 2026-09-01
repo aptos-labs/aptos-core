@@ -1,4 +1,18 @@
 Move prover returns: exiting with verification errors
+warning: WP could not characterize the aborts of `lambda_captured_fun_loop::__lambda__1__wrap2` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
+  = an abort condition did not survive a memory-havocking loop
+   ┌─ tests/sources/functional/closures/lambda_captured_fun_loop.move:22:19
+   │
+22 │           apply_mut(|v| {
+   │ ╭───────────────────^
+23 │ │             let i = 0;
+24 │ │             while (i < n) {
+25 │ │                 g(v);
+26 │ │                 i += 1;
+27 │ │             };
+28 │ │         }, x)
+   │ ╰─────────^
+
 error: post-condition does not hold
    ┌─ tests/sources/functional/closures/lambda_captured_fun_loop.move:22:19
    │
@@ -24,5 +38,3 @@ error: post-condition does not hold
    =     at tests/sources/functional/closures/lambda_captured_fun_loop.move:24: wrap2
    =     at tests/sources/functional/closures/lambda_captured_fun_loop.move:22: wrap2
    =         v = <redacted>
-   =     at tests/sources/functional/closures/lambda_captured_fun_loop.move:28: wrap2
-   =     at tests/sources/functional/closures/lambda_captured_fun_loop.move:22: wrap2

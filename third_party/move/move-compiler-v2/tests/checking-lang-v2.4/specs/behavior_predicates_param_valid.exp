@@ -55,8 +55,8 @@ module 0x42::M {
     }
 
     spec apply2(f: |u64|u64, x: u64): u64 {
-        ensures ..s1 |~ ensures_of<f>(x, result);
-        ensures s1.. |~ ensures_of<f>(x, result);
+        ensures ..s1 |~ (ensures_of<f>(x, result));
+        ensures s1.. |~ (ensures_of<f>(x, result));
     }
 
     fun apply_aborts(f: |u64|u64, x: u64): u64 {

@@ -1,4 +1,11 @@
 Move prover returns: exiting with condition generation errors
+warning: WP could not characterize the aborts of `lambda_funparam_memory_err::__lambda__1__wrap` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
+  = an abort condition did not survive a memory-havocking loop
+   ┌─ tests/sources/functional/closures/lambda_funparam_memory_err.move:32:15
+   │
+32 │         apply(|v| g(v + 1), x)
+   │               ^^^^^^^^^^^^
+
 error: the specification of this function (used as a function value) applies a behavioral predicate to a function-typed parameter whose possible targets or declared `modifies_of`/`reads_of` footprints access global memory; this is not yet supported — give the lambda an explicit specification or exclude it from verification
    ┌─ tests/sources/functional/closures/lambda_funparam_memory_err.move:32:15
    │

@@ -11,8 +11,9 @@ use crate::{
     emit, emitln,
     exp_builder::ExpBuilder,
     model::{
-        FieldEnv, FunId, FunctionEnv, GlobalEnv, ModuleId, NamedConstantEnv, NodeId, Parameter,
-        QualifiedId, QualifiedInstId, SpecVarId, StructEnv, StructId, TypeParameter, Visibility,
+        FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, NamedConstantEnv, NodeId,
+        Parameter, QualifiedId, QualifiedInstId, SpecVarId, StructEnv, StructId, TypeParameter,
+        Visibility,
     },
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type, TypeDisplayContext},
@@ -264,6 +265,39 @@ fn substitute_structural(exp: &Exp, target: &Exp, replacement: &Exp) -> Exp {
     .rewrite_exp(exp.clone())
 }
 
+/// Reduce tuple projections introduced after replacing a tuple-valued
+/// expression with the tuple reconstructed by a destructuring `let`.
+/// Move source does not support `.N` projection on tuples, so `(a, b).0`
+/// must become `a` before sourcification.
+fn simplify_tuple_indexes(exp: &Exp) -> Exp {
+    use crate::exp_rewriter::ExpRewriterFunctions;
+    struct Simplify;
+    impl ExpRewriterFunctions for Simplify {
+        fn rewrite_exp(&mut self, exp: Exp) -> Exp {
+            let rewritten = self.rewrite_exp_descent(exp);
+            let ExpData::Call(_, Operation::Index, args) = rewritten.as_ref() else {
+                return rewritten;
+            };
+            let [tuple, index] = args.as_slice() else {
+                return rewritten;
+            };
+            let ExpData::Call(_, Operation::Tuple, elements) = tuple.as_ref() else {
+                return rewritten;
+            };
+            let ExpData::Value(_, Value::Number(index)) = index.as_ref() else {
+                return rewritten;
+            };
+            elements
+                .iter()
+                .enumerate()
+                .find(|(position, _)| index == &BigInt::from(*position))
+                .map(|(_, element)| element.clone())
+                .unwrap_or(rewritten)
+        }
+    }
+    Simplify.rewrite_exp(exp.clone())
+}
+
 /// Returns the priority and operator string for binary ops that support label hoisting.
 fn hoistable_bin_op_info(op: &Operation) -> Option<(Priority, &'static str)> {
     match op {
@@ -313,6 +347,15 @@ impl<'a> Sourcifier<'a> {
 
     pub fn writer(&self) -> &CodeWriter {
         &self.writer
+    }
+
+    /// Print one expression using the same source-oriented rendering as a
+    /// function specification. This is useful for diagnostics which need
+    /// readable Move syntax without constructing a temporary `Spec`.
+    pub fn print_exp_for_fun_spec(&self, fun_env: &FunctionEnv, exp: &Exp) {
+        let exp_sourcifier =
+            ExpSourcifier::for_fun_spec(self, fun_env, fun_env.get_type_display_ctx(), self.amend);
+        exp_sourcifier.print_exp(Prio::General, false, exp);
     }
 
     /// Destructs and returns the result
@@ -1111,39 +1154,45 @@ impl<'a> Sourcifier<'a> {
         use ConditionKind::*;
         match &cond.kind {
             LetPre(name, _) => {
-                emit!(
-                    self.writer,
-                    "let {} = ",
-                    name.display(self.env().symbol_pool())
-                );
+                let name = source_identifier(&name.display(self.env().symbol_pool()).to_string());
+                emit!(self.writer, "let {} = ", name);
                 exp_sourcifier.print_exp(Prio::General, false, &cond.exp);
                 emitln!(self.writer, ";");
             },
             LetPost(name, _) => {
-                emit!(
-                    self.writer,
-                    "let post {} = ",
-                    name.display(self.env().symbol_pool())
-                );
+                let name = source_identifier(&name.display(self.env().symbol_pool()).to_string());
+                emit!(self.writer, "let post {} = ", name);
                 exp_sourcifier.print_exp(Prio::General, false, &cond.exp);
                 emitln!(self.writer, ";");
             },
             Requires => {
                 emit!(self.writer, "requires ");
                 self.print_properties(&cond.properties);
-                exp_sourcifier.print_exp(Prio::General, false, &cond.exp);
+                exp_sourcifier.print_condition_exp(
+                    &cond.exp,
+                    QuantKind::Forall,
+                    /*hoist_label=*/ false,
+                );
                 emitln!(self.writer, ";");
             },
             Ensures => {
                 emit!(self.writer, "ensures ");
                 self.print_properties(&cond.properties);
-                exp_sourcifier.print_exp_hoisting_label(&cond.exp);
+                exp_sourcifier.print_condition_exp(
+                    &cond.exp,
+                    QuantKind::Forall,
+                    /*hoist_label=*/ true,
+                );
                 emitln!(self.writer, ";");
             },
             AbortsIf => {
                 emit!(self.writer, "aborts_if ");
                 self.print_properties(&cond.properties);
-                exp_sourcifier.print_exp_hoisting_label(&cond.exp);
+                exp_sourcifier.print_condition_exp(
+                    &cond.exp,
+                    QuantKind::Exists,
+                    /*hoist_label=*/ true,
+                );
                 // Check for abort code in additional_exps
                 if !cond.additional_exps.is_empty() {
                     emit!(self.writer, " with ");
@@ -1306,7 +1355,8 @@ impl<'a> Sourcifier<'a> {
         if let Some(frame) = frame_spec {
             for target in &frame.modifies_targets {
                 emit!(self.writer, "modifies ");
-                exp_sourcifier.print_exp(Prio::General, false, target);
+                let lowered = exp_sourcifier.lower_frame_target_tuple_indexes(target);
+                exp_sourcifier.print_exp(Prio::General, false, &lowered);
                 emitln!(self.writer, ";");
             }
             if !frame.reads_targets.is_empty() {
@@ -1349,46 +1399,52 @@ impl<'a> Sourcifier<'a> {
     ) {
         use crate::ast::Operation;
         let current_mid = fun_env.module_env.get_id();
-        // Modules with module-level imports: `use m;`, `use m as n;`, or
-        // `use m::{Self, ...}` — all make the module qualifier available.
-        let pool = fun_env.module_env.env.symbol_pool();
-        let self_sym = pool.make("Self");
-        let env = self.env();
-        let imported_names: BTreeSet<Symbol> = fun_env
-            .module_env
-            .get_use_decls()
-            .iter()
-            .filter(|u| {
-                u.members.is_empty()
-                    || u.alias.is_some()
-                    || u.members.iter().any(|(_, sym, _)| *sym == self_sym)
-            })
-            .map(|u| u.module_name.name())
-            .collect();
         let mut needed: BTreeSet<ModuleId> = BTreeSet::new();
         let mut check_mid = |mid: &ModuleId| {
-            if *mid != current_mid
-                && !imported_names.contains(&env.get_module(*mid).get_name().name())
-            {
+            // A generated function-spec block can be written to a companion
+            // `.spec.move` file, where imports in the implementation module
+            // are not in scope.  Emit every external module needed by this
+            // block; a local spec import is harmless for inline output and is
+            // required for standalone/merged output.
+            if *mid != current_mid {
                 needed.insert(*mid);
             }
         };
-        for cond in &spec.conditions {
-            cond.exp.as_ref().visit_pre_order(&mut |e: &ExpData| {
-                if let ExpData::Call(_, Operation::SpecFunction(mid, _, _), _) = e {
-                    check_mid(mid);
+        let mut inspect_exp = |exp: &Exp| {
+            exp.as_ref().visit_pre_order(&mut |e: &ExpData| {
+                let ExpData::Call(node_id, operation, _) = e else {
+                    return true;
+                };
+                match operation {
+                    Operation::MoveFunction(mid, _)
+                    | Operation::Closure(mid, _, _)
+                    | Operation::SpecFunction(mid, _, _)
+                    | Operation::Pack(mid, _, _)
+                    | Operation::Select(mid, _, _)
+                    | Operation::SelectVariants(mid, _, _)
+                    | Operation::TestVariants(mid, _, _)
+                    | Operation::UpdateField(mid, _, _) => check_mid(mid),
+                    _ => {},
+                }
+                let mut inspect_type = |ty: &Type| match ty {
+                    Type::Struct(mid, _, _) | Type::ResourceDomain(mid, _, _) => check_mid(mid),
+                    _ => {},
+                };
+                self.env().get_node_type(*node_id).visit(&mut inspect_type);
+                if let Some(inst) = self.env().get_node_instantiation_opt(*node_id) {
+                    for ty in inst {
+                        ty.visit(&mut inspect_type);
+                    }
                 }
                 true
             });
+        };
+        for cond in &spec.conditions {
+            inspect_exp(&cond.exp);
         }
         if let Some(frame) = &spec.frame_spec {
             for target in &frame.modifies_targets {
-                target.as_ref().visit_pre_order(&mut |e: &ExpData| {
-                    if let ExpData::Call(_, Operation::SpecFunction(mid, _, _), _) = e {
-                        check_mid(mid);
-                    }
-                    true
-                });
+                inspect_exp(target);
             }
         }
         for mid in &needed {
@@ -1758,6 +1814,41 @@ impl<'a> ExpSourcifier<'a> {
     const LET_BIND_NAMES: &'static [&'static str] = &["a", "b", "c", "d", "e", "f"];
     /// Base names for lambda/closure parameters.
     const PARAM_NAMES: &'static [&'static str] = &["x", "y", "z", "w", "v", "u"];
+
+    /// Print a specification condition, restoring quantification for
+    /// compiler-generated havoc variables if an inference simplification has
+    /// left them free.  Havoc is universal on normal-return paths and
+    /// existential on abort paths.
+    fn print_condition_exp(&self, exp: &Exp, kind: QuantKind, hoist_label: bool) {
+        let generated_free_vars = exp
+            .free_vars_with_types(self.env())
+            .into_iter()
+            .filter(|(sym, _)| {
+                sym.display(self.env().symbol_pool())
+                    .to_string()
+                    .starts_with("$q")
+            })
+            .collect_vec();
+        if !generated_free_vars.is_empty() {
+            let keyword = match kind {
+                QuantKind::Forall => "forall",
+                QuantKind::Exists => "exists",
+                QuantKind::Choose | QuantKind::ChooseMin => {
+                    unreachable!("conditions only restore forall/exists havoc variables")
+                },
+            };
+            emit!(self.wr(), "{} ", keyword);
+            self.parent
+                .print_list("", ", ", ": ", generated_free_vars.iter(), |(sym, ty)| {
+                    emit!(self.wr(), "{}: {}", self.sym(*sym), self.ty(ty));
+                });
+        }
+        if hoist_label {
+            self.print_exp_hoisting_label(exp)
+        } else {
+            self.print_exp(Prio::General, false, exp)
+        }
+    }
 
     /// Creates a sourcifier for the given expression in the context of the function
     pub fn for_fun(
@@ -2596,6 +2687,28 @@ impl<'a> ExpSourcifier<'a> {
                 emit!(self.wr(), " as {}", self.ty(&ty))
             }),
             Operation::Exists(memory_label) => {
+                // Specification variables are represented internally as synthetic
+                // `Ghost$...` resources at address 0.  Their backing memory is
+                // unconditionally present (see well_formed_instrumentation), but
+                // the synthetic resource name is not legal Move source.  WP can
+                // expose this existence guard while propagating a callee's spec;
+                // render the source-level meaning instead of leaking `Ghost$...`.
+                let is_ghost_memory = self
+                    .env()
+                    .get_node_instantiation_opt(id)
+                    .and_then(|inst| inst.first().cloned())
+                    .is_some_and(|ty| match ty {
+                        Type::Struct(mid, sid, _) => self
+                            .env()
+                            .get_module(mid)
+                            .into_struct(sid)
+                            .is_ghost_memory(),
+                        _ => false,
+                    });
+                if is_ghost_memory {
+                    emit!(self.wr(), "true");
+                    return;
+                }
                 if let Some(label) = memory_label {
                     if self
                         .parent
@@ -2898,9 +3011,9 @@ impl<'a> ExpSourcifier<'a> {
                 self.parenthesize(context_prio, Prio::Postfix, || {
                     let module_env = self.env().get_module(*mid);
                     let spec_fun = module_env.get_spec_fun(*sid);
-                    // Strip the leading '$' from spec function names as it's not valid Move syntax
-                    let name = spec_fun.name.display(self.env().symbol_pool()).to_string();
-                    let name = name.strip_prefix('$').unwrap_or(&name);
+                    let name = source_identifier(
+                        &spec_fun.name.display(self.env().symbol_pool()).to_string(),
+                    );
                     emit!(
                         self.wr(),
                         "{}{}",
@@ -3035,11 +3148,9 @@ impl<'a> ExpSourcifier<'a> {
                 let kind_str = kind.to_string();
                 let has_labels = range.pre.is_some() || range.post.is_some();
 
-                // If args carry their own labels, hoist them out into
+                // If the function target or arguments carry their own labels, hoist them out into
                 // `let` bindings to avoid visually nested labels.
-                // `args[0]` is the function target and never hoisted.
-                let needs_let =
-                    has_labels && args.iter().skip(1).any(|a| !prints_without_label_prefix(a));
+                let needs_let = has_labels && args.iter().any(|a| !prints_without_label_prefix(a));
                 if needs_let {
                     let wrapped =
                         self.hoist_nested_labels(id, oper, args, /*keep_outer_label=*/ true);
@@ -3190,11 +3301,54 @@ impl<'a> ExpSourcifier<'a> {
     /// Hoisting produces `S |~ global<R>(a) == x`, where the label provides context
     /// for the entire relation — a more natural reading for humans.
     fn print_exp_hoisting_label(&self, exp: &Exp) {
-        let preprocessed = self.hoist_clause_level_labels(exp);
+        // Move source has tuple destructuring but no tuple projection syntax.
+        // Lower `tuple_exp[N]` to a destructuring let before any label
+        // normalization, so a multi-result behavioral call round-trips as
+        // `{ let (a_0, a_1) = result_of<f>(...); a_0 }` rather than the
+        // model-only `result_of<f>(...).0` form.
+        let tuple_preprocessed = self.hoist_tuple_index_bases(exp);
+        let label_preprocessed = self.hoist_clause_level_labels(&tuple_preprocessed);
+        // Label hoisting can itself introduce a block as the base of a tuple
+        // projection.  For example, a tuple-valued behavioral call whose
+        // argument needs a labeled let becomes
+        // `{ let a = labeled_call; tuple_call(a) }[0]`.  Run the tuple
+        // lowering once more so this newly introduced model-only projection
+        // is emitted as a source-level destructuring let as well.
+        let preprocessed = self.hoist_tuple_index_bases(&label_preprocessed);
         let exp = &preprocessed;
+        // `print_exp` already rewrites a labeled behavior with labeled
+        // arguments into `let` bindings whose final expression retains the
+        // outer label. Hoisting here would move that label in front of the
+        // resulting block, which is invalid source syntax.
+        let behavior_needs_let = matches!(
+            exp.as_ref(),
+            ExpData::Call(
+                _,
+                Operation::Behavior(_, range),
+                args,
+            ) if (range.pre.is_some() || range.post.is_some())
+                && args.iter().any(|arg| !prints_without_label_prefix(arg))
+        );
+        let is_block = matches!(exp.as_ref(), ExpData::Block(..) | ExpData::Sequence(..));
+        if behavior_needs_let || is_block {
+            // A block is a valid spec expression only when parenthesized in a
+            // condition such as `ensures <exp>;`.  This also keeps a generated
+            // `let` scope around every use of the temporary it introduces.
+            emit!(self.wr(), "(");
+            self.print_exp(Prio::General, false, exp);
+            emit!(self.wr(), ")");
+            return;
+        }
+        // A label can be hoisted through a block semantically, but `S.. |~ {
+        // let ...; expr }` is not legal Move spec syntax. Keep labels on the
+        // block's result expression, where the parser accepts them.
         if has_hoistable_label(exp) {
             self.print_hoisted_label_prefix(exp);
+            // A parenthesized RHS is accepted for every labeled expression and
+            // is required when label stripping reveals a block expression.
+            emit!(self.wr(), "(");
             self.print_exp_without_label(Prio::General, exp);
+            emit!(self.wr(), ")");
         } else {
             self.print_exp(Prio::General, false, exp);
         }
@@ -3215,7 +3369,7 @@ impl<'a> ExpSourcifier<'a> {
             return exp.clone();
         }
 
-        labeled.sort_by_key(|e| node_count(e.as_ref()));
+        labeled.sort_by_cached_key(|e| node_count(e.as_ref()));
 
         // Pass the clause as scope so generated names don't shadow free
         // vars or temp display names in scope.
@@ -3227,6 +3381,7 @@ impl<'a> ExpSourcifier<'a> {
             for (target, repl) in &substitutions {
                 sub_substituted = substitute_structural(&sub_substituted, target, repl);
             }
+            sub_substituted = simplify_tuple_indexes(&sub_substituted);
             let (pat, var_exp) = self.let_bind_exp(&sub_substituted, scope);
             let_bindings.push((pat, sub_substituted));
             substitutions.push((sub.clone(), var_exp));
@@ -3235,6 +3390,7 @@ impl<'a> ExpSourcifier<'a> {
         for (target, repl) in &substitutions {
             new_exp = substitute_structural(&new_exp, target, repl);
         }
+        new_exp = simplify_tuple_indexes(&new_exp);
         self.wrap_in_lets(let_bindings, new_exp)
     }
 
@@ -3369,7 +3525,7 @@ impl<'a> ExpSourcifier<'a> {
                 // Caller already emitted the outer label, but args may
                 // still carry labels: hoist them so labels don't visually
                 // nest.
-                let nested_label = args.iter().skip(1).any(|a| !prints_without_label_prefix(a));
+                let nested_label = args.iter().any(|a| !prints_without_label_prefix(a));
                 if nested_label {
                     let wrapped =
                         self.hoist_nested_labels(*id, oper, args, /*keep_outer_label=*/ false);
@@ -3476,7 +3632,9 @@ impl<'a> ExpSourcifier<'a> {
                 // have function type, found u64").  Emit the fully-qualified
                 // `addr::module::fun` form only in that case; otherwise use
                 // module_qualifier (which emits "" for same-module, keeping output concise).
-                if self.spec_let_names.contains(&fun_name) {
+                if self.spec_let_names.contains(&fun_name)
+                    || self.temp_names.values().any(|name| *name == fun_name)
+                {
                     emit!(self.wr(), "{}", fun_env.get_full_name_with_address());
                 } else {
                     emit!(
@@ -3641,15 +3799,165 @@ impl<'a> ExpSourcifier<'a> {
     /// extractions produce distinct names.
     fn let_bind_exp(&self, exp: &Exp, scope: &[Exp]) -> (Pattern, Exp) {
         let count = self.let_counter.get();
-        let base = Self::LET_BIND_NAMES[count % Self::LET_BIND_NAMES.len()];
+        let base_index = count % Self::LET_BIND_NAMES.len();
+        let round = count / Self::LET_BIND_NAMES.len();
+        let base = if round == 0 {
+            Self::LET_BIND_NAMES[base_index].to_string()
+        } else {
+            format!("{}_{}", Self::LET_BIND_NAMES[base_index], round)
+        };
         self.let_counter.set(count + 1);
-        let name = self.new_unique_name(scope, base);
         let ty = self.env().get_node_type(exp.node_id());
         let loc = self.env().get_node_loc(exp.node_id());
+        if matches!(ty, Type::Tuple(_)) {
+            let mut next = 0;
+            let mut chosen = Vec::new();
+            return self.let_bind_tuple_type(&ty, &loc, scope, &base, &mut next, &mut chosen);
+        }
+        let name = self.new_unique_name(scope, &base);
         let local_id = self.env().new_node(loc, ty);
         let pat = Pattern::Var(local_id, name);
         let var_exp = ExpData::LocalVar(local_id, name).into_exp();
         (pat, var_exp)
+    }
+
+    /// Replace projections from tuple-valued expressions with a source-level
+    /// destructuring let. Tuple literals reconstructed from prior lets are
+    /// simplified directly and do not need another binding.
+    fn hoist_tuple_index_bases(&self, exp: &Exp) -> Exp {
+        use crate::exp_rewriter::ExpRewriterFunctions;
+
+        // A binding introduced outside an existing block cannot refer to the
+        // block's locals. Rewrite each binding and body as its own scope first,
+        // and keep the outer collection pass from crossing block boundaries.
+        // This preserves the ordering in
+        // `{ let x = first_call(); tuple_call(x)[0] }`.
+        struct RewriteBlocks<'a, 'b> {
+            sourcifier: &'a ExpSourcifier<'b>,
+        }
+        impl ExpRewriterFunctions for RewriteBlocks<'_, '_> {
+            fn rewrite_exp(&mut self, exp: Exp) -> Exp {
+                let ExpData::Block(id, pattern, binding, body) = exp.as_ref() else {
+                    return self.rewrite_exp_descent(exp);
+                };
+                let binding = binding
+                    .as_ref()
+                    .map(|binding| self.sourcifier.hoist_tuple_index_bases(binding));
+                let body = self.sourcifier.hoist_tuple_index_bases(body);
+                ExpData::Block(*id, pattern.clone(), binding, body).into_exp()
+            }
+        }
+        let exp = RewriteBlocks { sourcifier: self }.rewrite_exp(exp.clone());
+        let mut bases: Vec<Exp> = Vec::new();
+        exp.as_ref().visit_pre_order(&mut |item| {
+            if matches!(item, ExpData::Block(..)) {
+                return false;
+            }
+            let ExpData::Call(_, Operation::Index, args) = item else {
+                return true;
+            };
+            let [base, _] = args.as_slice() else {
+                return true;
+            };
+            if !matches!(self.env().get_node_type(base.node_id()), Type::Tuple(_))
+                || matches!(base.as_ref(), ExpData::Call(_, Operation::Tuple, _))
+            {
+                return true;
+            }
+            if !bases
+                .iter()
+                .any(|existing| existing.as_ref().structural_eq(base))
+            {
+                bases.push(base.clone());
+            }
+            false
+        });
+        if bases.is_empty() {
+            return exp;
+        }
+        bases.sort_by_cached_key(|base| node_count(base.as_ref()));
+        let scope = std::slice::from_ref(&exp);
+        let mut bindings = Vec::new();
+        let mut substitutions = Vec::new();
+        for base in bases {
+            let mut binding = base.clone();
+            for (target, replacement) in &substitutions {
+                binding = substitute_structural(&binding, target, replacement);
+            }
+            binding = simplify_tuple_indexes(&binding);
+            let (pattern, reconstructed) = self.let_bind_exp(&binding, scope);
+            bindings.push((pattern, binding));
+            substitutions.push((base, reconstructed));
+        }
+        let mut rewritten = exp;
+        for (target, replacement) in &substitutions {
+            rewritten = substitute_structural(&rewritten, target, replacement);
+        }
+        self.wrap_in_lets(bindings, simplify_tuple_indexes(&rewritten))
+    }
+
+    /// Frame syntax requires the resource access to remain the outermost
+    /// expression (`modifies R[address]`). Lower tuple projections only in
+    /// the address expression so the emitted form is
+    /// `R[{ let (...) = result_of<f>(...); component }]`.
+    fn lower_frame_target_tuple_indexes(&self, target: &Exp) -> Exp {
+        let ExpData::Call(id, operation @ Operation::Global(_), args) = target.as_ref() else {
+            return target.clone();
+        };
+        let [address] = args.as_slice() else {
+            return target.clone();
+        };
+        let lowered_address = self.hoist_tuple_index_bases(address);
+        if lowered_address.as_ref().structural_eq(address) {
+            target.clone()
+        } else {
+            ExpData::Call(*id, operation.clone(), vec![lowered_address]).into_exp()
+        }
+    }
+
+    /// Build a destructuring pattern and a reconstructing expression for a
+    /// tuple-valued binding. Move forbids a tuple as the type of one local, so
+    /// `let a = tuple_exp` must instead become `let (a_0, a_1) = tuple_exp`.
+    /// Recursing also handles nested tuple results without introducing a
+    /// tuple-typed leaf local.
+    fn let_bind_tuple_type(
+        &self,
+        ty: &Type,
+        loc: &Loc,
+        scope: &[Exp],
+        base: &str,
+        next: &mut usize,
+        chosen: &mut Vec<Exp>,
+    ) -> (Pattern, Exp) {
+        if let Type::Tuple(element_types) = ty {
+            let mut patterns = Vec::new();
+            let mut elements = Vec::new();
+            for element_type in element_types {
+                let (pattern, element) =
+                    self.let_bind_tuple_type(element_type, loc, scope, base, next, chosen);
+                patterns.push(pattern);
+                elements.push(element);
+            }
+            let pattern_id = self.env().new_node(loc.clone(), ty.clone());
+            let tuple_id = self.env().new_node(loc.clone(), ty.clone());
+            (
+                Pattern::Tuple(pattern_id, patterns),
+                ExpData::Call(tuple_id, Operation::Tuple, elements).into_exp(),
+            )
+        } else {
+            let candidate = format!("{}_{}", base, *next);
+            *next += 1;
+            let name_scope = scope
+                .iter()
+                .cloned()
+                .chain(chosen.iter().cloned())
+                .collect::<Vec<_>>();
+            let name = self.new_unique_name(&name_scope, &candidate);
+            let local_id = self.env().new_node(loc.clone(), ty.clone());
+            let local = ExpData::LocalVar(local_id, name).into_exp();
+            chosen.push(local.clone());
+            (Pattern::Var(local_id, name), local)
+        }
     }
 
     /// Wrap `body` in a flat block with the given let-bindings.
@@ -3667,8 +3975,8 @@ impl<'a> ExpSourcifier<'a> {
             })
     }
 
-    /// Lift labeled subexpressions in `args[1..]` into a `let` chain wrapping
-    /// the call. Smaller subexprs are bound first so outer ones can reference
+    /// Lift labeled subexpressions in the behavior target and arguments into a
+    /// `let` chain wrapping the call. Smaller subexprs are bound first so outer ones can reference
     /// inner names. `keep_outer_label = false` strips the call's range when
     /// the caller already emitted the prefix (i.e. via
     /// `print_exp_without_label`).
@@ -3680,7 +3988,7 @@ impl<'a> ExpSourcifier<'a> {
         keep_outer_label: bool,
     ) -> Exp {
         let mut labeled: Vec<Exp> = Vec::new();
-        for arg in args.iter().skip(1) {
+        for arg in args {
             arg.as_ref().visit_pre_order(&mut |e: &ExpData| {
                 if has_label_at_top(e) {
                     let e_exp = ExpData::into_exp(e.clone());
@@ -3693,7 +4001,7 @@ impl<'a> ExpSourcifier<'a> {
                 }
             });
         }
-        labeled.sort_by_key(|e| node_count(e.as_ref()));
+        labeled.sort_by_cached_key(|e| node_count(e.as_ref()));
 
         let mut let_bindings: Vec<(Pattern, Exp)> = Vec::new();
         let mut substitutions: Vec<(Exp, Exp)> = Vec::new();
@@ -3702,6 +4010,7 @@ impl<'a> ExpSourcifier<'a> {
             for (target, repl) in &substitutions {
                 sub_substituted = substitute_structural(&sub_substituted, target, repl);
             }
+            sub_substituted = simplify_tuple_indexes(&sub_substituted);
             let (pat, var_exp) = self.let_bind_exp(&sub_substituted, args);
             let_bindings.push((pat, sub_substituted));
             substitutions.push((sub.clone(), var_exp));
@@ -3709,17 +4018,12 @@ impl<'a> ExpSourcifier<'a> {
 
         let new_args: Vec<Exp> = args
             .iter()
-            .enumerate()
-            .map(|(i, arg)| {
-                if i == 0 {
-                    arg.clone()
-                } else {
-                    let mut current = arg.clone();
-                    for (target, repl) in &substitutions {
-                        current = substitute_structural(&current, target, repl);
-                    }
-                    current
+            .map(|arg| {
+                let mut current = arg.clone();
+                for (target, repl) in &substitutions {
+                    current = substitute_structural(&current, target, repl);
                 }
+                simplify_tuple_indexes(&current)
             })
             .collect();
 
@@ -3736,5 +4040,26 @@ impl<'a> ExpSourcifier<'a> {
 
     fn is_unspecified_abort_code(exp: &Exp) -> bool {
         matches!(exp.as_ref(), ExpData::Value(_, Value::Number(n)) if *n == UNSPECIFIED_ABORT_CODE.into())
+    }
+}
+
+/// Convert compiler-generated spec symbols to legal Move source identifiers.
+/// A leading `$` is an internal marker; embedded `$lambda$N` fragments are
+/// generated names and use `_lambda_N` in emitted source.
+fn source_identifier(name: &str) -> String {
+    name.strip_prefix('$').unwrap_or(name).replace('$', "_")
+}
+
+#[cfg(test)]
+mod source_identifier_tests {
+    use super::source_identifier;
+
+    #[test]
+    fn sanitizes_generated_spec_symbols() {
+        assert_eq!(source_identifier("$result"), "result");
+        assert_eq!(
+            source_identifier("spec_map_ref$lambda$6"),
+            "spec_map_ref_lambda_6"
+        );
     }
 }
