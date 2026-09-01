@@ -141,7 +141,7 @@ function install_build_essentials {
 
 function install_clang_lld {
   PACKAGE_MANAGER=$1
-  VERSION=${2:-21}
+  VERSION=${2:-22}
 
   if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
     # Skip installation entirely if the desired clang version is already
