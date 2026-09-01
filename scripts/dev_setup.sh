@@ -141,7 +141,7 @@ function install_build_essentials {
 
 function install_clang_lld {
   PACKAGE_MANAGER=$1
-  VERSION=${2:-21}
+  VERSION=${2:-22}
 
   if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
     # Skip installation entirely if the desired clang version is already
@@ -154,6 +154,12 @@ function install_clang_lld {
       "${PRE_COMMAND[@]}" apt-get install -y gnupg lsb-release software-properties-common wget
       "${PRE_COMMAND[@]}" bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" llvm.sh "${VERSION}"
     fi
+    # Clear alternatives registered by earlier runs, otherwise a previously
+    # installed version sitting at the same priority keeps winning the auto
+    # selection and /usr/bin/clang points at the wrong compiler.
+    for TOOL in clang clang++ lld; do
+      "${PRE_COMMAND[@]}" update-alternatives --remove-all "$TOOL" &>/dev/null || true
+    done
     "${PRE_COMMAND[@]}" update-alternatives --install /usr/bin/clang clang "/usr/bin/clang-${VERSION}" 100
     "${PRE_COMMAND[@]}" update-alternatives --install /usr/bin/clang++ clang++ "/usr/bin/clang++-${VERSION}" 100
     "${PRE_COMMAND[@]}" update-alternatives --install /usr/bin/lld lld "/usr/bin/lld-${VERSION}" 100
