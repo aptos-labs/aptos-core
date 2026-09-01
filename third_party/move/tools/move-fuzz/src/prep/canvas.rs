@@ -284,6 +284,7 @@ impl DriverCanvas {
         lambda_bindings: &BTreeMap<usize, LambdaBinding>,
     ) -> Option<Self> {
         let FlowGraph { graph, generics } = flow;
+        let root = flow.root();
 
         // create a new canvas
         let mut canvas = Self::new();
@@ -415,13 +416,24 @@ impl DriverCanvas {
                                     signer_singleton(&mut canvas, &mut signer_var)
                                 },
                                 TypeMode::Simple(SimpleType::Function { params, .. }) => {
-                                    // Lambda bindings are computed for the root entrypoint
-                                    // only, but a callee pulled in as a provider may also
-                                    // take a function value. Skip the script instead of
-                                    // panicking on (or misusing) a foreign binding.
+                                    // `lambda_bindings` is keyed by ROOT parameter index, so
+                                    // a function value can only appear on the root call.
+                                    // `GraphBuilder::is_feasible` rejects any graph whose
+                                    // provider takes one, precisely so that this lookup
+                                    // cannot silently hand a provider the root's binding.
+                                    assert_eq!(
+                                        node, root,
+                                        "function-valued parameter on a non-root call; \
+                                         is_feasible should have rejected this graph"
+                                    );
                                     let binding = lambda_bindings
                                         .get(&index)
-                                        .filter(|b| b.fn_params.len() == params.len())?;
+                                        .expect("root function-valued parameter without a binding");
+                                    assert_eq!(
+                                        binding.fn_params.len(),
+                                        params.len(),
+                                        "lambda binding arity does not match the parameter"
+                                    );
                                     canvas.add_lambda(binding)
                                 },
                                 TypeMode::Simple(simple_ty) => {
@@ -1119,8 +1131,14 @@ mod tests {
         assert!(DriverCanvas::try_build(&model, &graph, &BTreeMap::new()).is_none());
     }
 
+    /// A function-valued parameter on the root always has a binding, because
+    /// `Model::populate` computes one per root parameter before building the
+    /// canvas, and `is_feasible` rejects providers that take function values.
+    /// Reaching the canvas without one means that chain was broken upstream, so
+    /// it is an invariant violation rather than a graph to skip.
     #[test]
-    fn test_driver_canvas_try_build_skips_function_param_without_binding() {
+    #[should_panic(expected = "without a binding")]
+    fn test_driver_canvas_try_build_requires_a_binding_for_root_lambda() {
         let ident = function("takes_lambda");
         let model = model_with_decl(FunctionDecl {
             ident: ident.clone(),
@@ -1143,9 +1161,7 @@ mod tests {
             type_args: vec![],
         }));
 
-        // a provider callee taking a function value has no lambda binding at that
-        // index: skip the canvas instead of unwrapping a missing binding
-        assert!(DriverCanvas::try_build(&model, &graph, &BTreeMap::new()).is_none());
+        let _ = DriverCanvas::try_build(&model, &graph, &BTreeMap::new());
     }
 
     #[test]

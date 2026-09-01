@@ -14,8 +14,8 @@ use crate::{
         ident::FunctionIdent,
         model::{ability_set_candidates, Model},
         typing::{
-            ComplexType, TypeBase, TypeExpr, TypeItem, TypeMode, TypeRef, TypeSubstitution,
-            TypeUnification,
+            ComplexType, SimpleType, TypeBase, TypeExpr, TypeItem, TypeMode, TypeRef,
+            TypeSubstitution, TypeUnification,
         },
     },
 };
@@ -820,6 +820,7 @@ impl<'a> GraphBuilder<'a> {
     /// Check if a graph is feasible
     pub fn is_feasible(&self, graph: &FlowGraph) -> bool {
         graph.check_integrity();
+        let root = graph.root();
 
         // the graph is not feasible if either of the following holds:
         // - more than one signer is needed
@@ -877,6 +878,27 @@ impl<'a> GraphBuilder<'a> {
                         .collect::<BTreeSet<_>>();
                     if provided_complex_params != expected_complex_params {
                         return false;
+                    }
+
+                    // Lambda bindings are chosen per ROOT parameter index, so only the
+                    // root can be given a function value. A provider taking one would be
+                    // handed the root's binding for the same index, whose argument and
+                    // return types are unrelated -- an ill-typed driver whenever the
+                    // arities happen to agree. Reject the graph here so the canvas can
+                    // treat "function value implies root" as an invariant.
+                    if node_idx != root {
+                        for param in &decl.parameters {
+                            let instantiated = self
+                                .model
+                                .datatype_registry
+                                .instantiate_type_ref(param, &func.type_args);
+                            if matches!(
+                                TypeMode::convert(instantiated.base()),
+                                Some(TypeMode::Simple(SimpleType::Function { .. }))
+                            ) {
+                                return false;
+                            }
+                        }
                     }
 
                     // Two shapes can never be emitted legally, whatever order the driver
@@ -1203,6 +1225,27 @@ impl FlowGraph {
     }
 
     /// Check graph integrity
+    /// The entrypoint of this graph: the unique function node with no outgoing
+    /// edges. Every other function node is a provider feeding it.
+    pub fn root(&self) -> NodeIndex {
+        let mut root = None;
+        for node in self.graph.node_indices() {
+            if matches!(
+                self.graph.node_weight(node),
+                Some(FlowGraphNode::Function(_))
+            ) && self
+                .graph
+                .edges_directed(node, Direction::Outgoing)
+                .next()
+                .is_none()
+            {
+                assert!(root.is_none(), "flow graph has more than one root");
+                root = Some(node);
+            }
+        }
+        root.expect("flow graph has no root")
+    }
+
     pub fn check_integrity(&self) {
         // the graph should always be acyclic
         assert!(!is_cyclic_directed(&self.graph));
