@@ -126,10 +126,25 @@ fn render_build_fingerprint(pkg_defs: &[PkgDefinition]) -> Vec<String> {
         // stable format across dependency versions and would silently
         // invalidate persisted caches. (`pkg.kind` is a local enum, so its
         // `Debug` is controlled by this crate and is stable here.)
+        // The resolved named-address map and the optimization experiments both
+        // change the emitted bytecode. Omitting them let the entrypoint cache
+        // hand back wrappers compiled against a previous run's addresses, whose
+        // function handles then fail at runtime with LINKER_ERROR on every
+        // execution.
+        let addresses = info
+            .address_alias_instantiation
+            .iter()
+            .map(|(name, addr)| format!("{name}={}", addr.to_standard_string()))
+            .collect::<Vec<_>>()
+            .join(",");
+        let experiments = info.build_flags.compiler_config.experiments.join(",");
         entries.push(format!(
-            "{:?}|{}|{}|{}|{}|{}",
+            "{:?}|{}|{}|{}|{}|{}|{}|{}|{}",
             pkg.kind,
             info.package_name,
+            addresses,
+            experiments,
+            info.build_flags.compiler_config.skip_attribute_checks,
             info.source_digest
                 .map(|digest| digest.to_string())
                 .unwrap_or_default(),
@@ -163,7 +178,7 @@ fn entrypoint_cache_fingerprint(
     max_script_gen_secs_per_function: u64,
 ) -> String {
     let mut hasher = Sha3_256::new();
-    hasher.update(b"move-fuzz-entrypoint-cache-v2");
+    hasher.update(b"move-fuzz-entrypoint-cache-v3");
     hasher.update(max_trace_depth.to_le_bytes());
     hasher.update(max_call_repetition.to_le_bytes());
     hasher.update(max_script_gen_secs_per_function.to_le_bytes());
@@ -499,15 +514,45 @@ fn load_or_generate_entrypoints(
     Ok(entrypoints)
 }
 
+/// Digest of every module the campaign runs against.
+///
+/// The wrapper bytecode in `entrypoints` names the functions it calls but not
+/// their implementations, so without this a target could be edited freely --
+/// same signature, different body -- and the old coverage, DUG observations and
+/// corpora would be resumed into a different program.
+fn provisioned_code_digest(pkg_defs: &[PkgDefinition]) -> String {
+    let mut modules = Vec::new();
+    for pkg in pkg_defs {
+        for unit in pkg.package.root_compiled_units() {
+            let mut hasher = Sha3_256::new();
+            hasher.update(&unit.unit.serialize(None));
+            modules.push(format!(
+                "{}:{}",
+                unit.unit.name(),
+                hex::encode(hasher.finalize())
+            ));
+        }
+    }
+    modules.sort();
+    let mut hasher = Sha3_256::new();
+    hasher.update(b"move-fuzz-provisioned-code-v1");
+    for module in modules {
+        hasher.update(module.as_bytes());
+    }
+    hex::encode(hasher.finalize())
+}
+
 fn campaign_fingerprint(
     entrypoints: &[(ScriptSignature, Vec<u8>)],
     initial_resource_writes: &[ResourceWrite],
+    provisioned_code: &str,
     max_chain_length: usize,
     max_chain_repetition: usize,
     num_user_accounts: usize,
 ) -> String {
     let mut hasher = Sha3_256::new();
-    hasher.update(b"move-fuzz-auto-state-v1");
+    hasher.update(b"move-fuzz-auto-state-v2");
+    hasher.update(provisioned_code.as_bytes());
     hasher.update(max_chain_length.to_le_bytes());
     hasher.update(max_chain_repetition.to_le_bytes());
     hasher.update(num_user_accounts.to_le_bytes());
@@ -1152,6 +1197,7 @@ pub fn entrypoint(
     let campaign_fingerprint = campaign_fingerprint(
         &entrypoints,
         &initial_resource_writes,
+        &provisioned_code_digest(&pkg_defs),
         max_chain_length,
         max_chain_repetition,
         num_user_accounts,
@@ -2558,8 +2604,8 @@ mod tests {
         );
 
         let fingerprint_ab =
-            campaign_fingerprint(&[entry_a.clone(), entry_b.clone()], &[], 5, 2, 4);
-        let fingerprint_ba = campaign_fingerprint(&[entry_b, entry_a], &[], 5, 2, 4);
+            campaign_fingerprint(&[entry_a.clone(), entry_b.clone()], &[], "code", 5, 2, 4);
+        let fingerprint_ba = campaign_fingerprint(&[entry_b, entry_a], &[], "code", 5, 2, 4);
         assert_eq!(fingerprint_ab, fingerprint_ba);
     }
 
@@ -2665,8 +2711,9 @@ mod tests {
             is_resource_group: false,
         };
 
-        let without_state = campaign_fingerprint(std::slice::from_ref(&entry), &[], 5, 2, 4);
-        let with_state = campaign_fingerprint(&[entry], &[write], 5, 2, 4);
+        let without_state =
+            campaign_fingerprint(std::slice::from_ref(&entry), &[], "code", 5, 2, 4);
+        let with_state = campaign_fingerprint(&[entry], &[write], "code", 5, 2, 4);
         assert_ne!(without_state, with_state);
     }
 }
