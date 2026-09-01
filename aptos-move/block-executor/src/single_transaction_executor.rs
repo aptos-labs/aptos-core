@@ -73,7 +73,7 @@ pub enum ViewMode<'a, I: TxnInput> {
 pub trait SingleTransactionExecutor {
     type Txn: Transaction;
     type AuxiliaryInfo: AuxiliaryInfoTrait;
-    type Key: Ord + Send + Sync + Clone + Hash + Debug + 'static;
+    type Key: Eq + Send + Sync + Clone + Hash + Debug + 'static;
     type Tag: Ord + Send + Sync + Clone + Hash + Debug + Serialize + 'static;
     type Value: SpeculativeValue + 'static;
 
@@ -130,6 +130,13 @@ pub trait SingleTransactionExecutor {
     fn pre_write_values(_txn: &Self::Txn) -> Vec<(Self::Key, Self::Value)> {
         vec![]
     }
+
+    /// Materializes a VM in-memory key into the storage key persisted at the
+    /// block epilogue.
+    fn materialize_storage_key(
+        &self,
+        key: Self::Key,
+    ) -> Result<<Self::Txn as Transaction>::Key, PanicError>;
 }
 
 /// Builds the legacy `LatestView` from the view ingredients.
@@ -285,5 +292,12 @@ impl<E: ExecutorTask> SingleTransactionExecutor for LegacyTransactionExecutor<E>
         ValueWithLayout<<E::Txn as Transaction>::Value>,
     )> {
         E::pre_write_values(txn)
+    }
+
+    fn materialize_storage_key(
+        &self,
+        key: Self::Key,
+    ) -> Result<<E::Txn as Transaction>::Key, PanicError> {
+        Ok(key)
     }
 }
