@@ -938,16 +938,23 @@ impl<'a> GraphBuilder<'a> {
                         continue;
                     }
 
-                    // non-droppable base value: check it has at least one consuming edge
+                    // Non-droppable base value: it must have at least one edge that
+                    // actually MOVES it, or the generated driver leaves it live at
+                    // function exit and fails to compile.
+                    //
+                    // `VectorToElement` is deliberately absent: canvas renders it as
+                    // `vector::pop_back(&mut src)`, which consumes one element and
+                    // leaves `src: vector<T>` behind. For a non-droppable `T` the
+                    // vector is itself non-droppable, so popping from it does not
+                    // discharge the obligation. `ElementToVector` does consume, since
+                    // `vector::singleton(src)` moves the element in.
                     let has_consuming_edge = graph
                         .graph
                         .edges_directed(node_idx, Direction::Outgoing)
                         .any(|e| {
                             matches!(
                                 e.weight(),
-                                FlowGraphEdge::Use(_)
-                                    | FlowGraphEdge::VectorToElement
-                                    | FlowGraphEdge::ElementToVector
+                                FlowGraphEdge::Use(_) | FlowGraphEdge::ElementToVector
                             )
                         });
                     if !has_consuming_edge {
@@ -1274,7 +1281,9 @@ impl FlowGraph {
 
 #[cfg(test)]
 mod tests {
-    use super::{DatatypeItem, FlowGraph, FlowGraphNode, FunctionInst, GraphBuilder};
+    use super::{
+        DatatypeItem, FlowGraph, FlowGraphEdge, FlowGraphNode, FunctionInst, GraphBuilder,
+    };
     use crate::{
         deps::PkgKind,
         prep::{
@@ -1305,8 +1314,14 @@ mod tests {
     }
 
     fn model_with_decl(decl: FunctionDecl) -> Model {
+        model_with_decls(vec![decl])
+    }
+
+    fn model_with_decls(decls: Vec<FunctionDecl>) -> Model {
         let mut function_registry = FunctionRegistry::new();
-        function_registry.insert_for_test(decl);
+        for decl in decls {
+            function_registry.insert_for_test(decl);
+        }
         Model {
             datatype_registry: DatatypeRegistry::new(),
             function_registry,
