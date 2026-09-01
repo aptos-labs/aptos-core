@@ -152,7 +152,7 @@ The `auto` command currently performs the full move-fuzz pipeline:
 - `--num-user-accounts <N>`
   Number of user accounts to provision in the simulator.
 - `--dry-run`
-  Stop after script generation, without compiling the generated scripts and without entering the fuzzing loop. The generated `.move` sources are written to `<workdir>/autogen/sources/`; combine with `--in-place` to read them. Note that a dry run does not populate the entrypoint cache, so it does not speed up a later real run.
+  Generate the driver scripts and compile them, then stop without entering the fuzzing loop. The generated `.move` sources are written to `<workdir>/autogen/sources/`; combine with `--in-place` to read them. Compiling is what makes a dry run a real check on generation: a driver can be generated yet be ill-typed, and only the compiler catches that. Note that a dry run still does not populate the entrypoint cache, so it does not speed up a later real run.
 - `--string-dict <PATH>`
   Load an external string dictionary, one string per line.
 - `--state-dir <PATH>`
@@ -273,7 +273,7 @@ Passing an older `--language-version` will fail to build the framework.
 | `badge` | objects: `Object<T>` inputs, object-address discovery, and a generic entry function |
 | `combinators` | driver generation: `Function`-typed parameters and a non-simple argument that has to be produced by a provider call |
 
-Add `--dry-run` to stop after script generation; the demo currently yields 26
+Add `--dry-run` to stop after generating and compiling the scripts; the demo currently yields 26
 driver scripts.
 
 The Phase 2 banner prints `chains: 0` on entry - chains are constructed on the

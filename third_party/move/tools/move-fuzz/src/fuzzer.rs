@@ -28,7 +28,7 @@ use crate::{
         PersistedOneshotFuzzer, PersistedSeedInput, AUTO_STATE_VERSION, ENTRYPOINT_CACHE_VERSION,
     },
 };
-use anyhow::Result;
+use anyhow::{Context, Result};
 use aptos_vm_environment::prod_configs::set_debugging_enabled;
 use legacy_move_compiler::compiled_unit::CompiledUnitEnum;
 use log::{debug, info};
@@ -1086,8 +1086,14 @@ pub fn entrypoint(
             "scripts generated in the autogen package: {}",
             autogen_manifest.path.display()
         );
+        // Compile what we just generated. Generation alone cannot tell whether a
+        // driver is well typed -- reference safety in particular is only checked
+        // by the compiler -- so a dry run that skipped this would report success
+        // on scripts that abort the real campaign at its first build.
+        package::build(&autogen_manifest, &named_accounts, language, false)
+            .context("the generated autogen package does not compile")?;
         info!(
-            "dry-run mode: generated {} script(s), stopping before fuzzing loop",
+            "dry-run mode: generated and compiled {} script(s), stopping before fuzzing loop",
             generated_scripts.len()
         );
         return Ok(());

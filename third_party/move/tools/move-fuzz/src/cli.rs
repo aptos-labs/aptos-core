@@ -111,7 +111,7 @@ pub enum FuzzCommand {
         #[clap(long, default_value = "3")]
         num_user_accounts: usize,
 
-        /// Stop after script generation (do not enter fuzzing loop)
+        /// Generate and compile the driver scripts, then stop (do not enter fuzzing loop)
         #[clap(long)]
         dry_run: bool,
 

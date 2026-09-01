@@ -118,7 +118,7 @@ objects, none of which a purely static analysis handles well.
   |      DriverCanvas::try_build -> statements + params            |
   |      dedup, cap at MAX_SCRIPTS_PER_FUNCTION, write .move       |
   |    into <workdir>/autogen/sources/                             |
-  |    (--dry-run STOPS HERE: sources are written, never compiled) |
+  |    (--dry-run runs stage 5 to compile, then STOPS)             |
   +---------------------------------------------------------------+
         |  package.rs :: build (the "Autogen" package)
         v
@@ -144,12 +144,15 @@ Stage 2 and stages 4/5 are individually cached. On a re-run against an unchanged
 project, stage 2 is served entirely from the package cache and stages 4 and 5 are
 skipped in favor of the entrypoint cache; stages 0, 1, 3 and 6 always run.
 
-**Two things about `--dry-run` that the diagram makes explicit, because they are
-easy to get wrong.** It returns immediately after `Model::populate` (see
-`fuzzer.rs`, the `if dry_run { ... return Ok(()) }` block): the generated `.move`
-sources are written to `<workdir>/autogen/sources/`, but the autogen package is
-never built, no bytecode is produced, and *the entrypoint cache is never
-written*. A dry run therefore never speeds up a subsequent real run.
+**One thing about `--dry-run` that the diagram makes explicit, because it is easy
+to get wrong.** It writes the generated `.move` sources to
+`<workdir>/autogen/sources/` *and compiles them* (see `fuzzer.rs`, the
+`if dry_run { ... return Ok(()) }` block), then returns before the fuzzing loop.
+Compiling is the point: generation alone cannot tell whether a driver is well
+typed -- reference safety in particular is only checked by the compiler -- so a
+dry run that skipped it would report success on drivers that abort the real
+campaign at its first build. What a dry run still does *not* do is populate the
+entrypoint cache, so it never speeds up a subsequent real run.
 
 ---
 
@@ -1072,11 +1075,11 @@ In this order:
   error rather than concluding the run died.
 - `-v` / `-vv` / `-vvv` for info / debug / trace. `-vv` prints the per-script and
   per-chain tables, coverage events, and new status codes.
-- `--dry-run` stops after script *generation*: it writes
-  `<workdir>/autogen/sources/*.move` and returns without compiling them and
-  without populating the entrypoint cache. It is the right flag for debugging
-  resolution, model building, and codegen -- but if you need bytecode or want to
-  warm the cache, run without it.
+- `--dry-run` writes `<workdir>/autogen/sources/*.move`, compiles the autogen
+  package, and returns without entering the fuzzing loop or populating the
+  entrypoint cache. It is the right flag for debugging resolution, model
+  building, and codegen, and it is a genuine generation smoke test because the
+  compile runs -- but if you want to warm the cache, run without it.
 - `--in-place` keeps `autogen/` and `cov.trace` in the project directory so you
   can read the generated scripts. Combine with `--dry-run` to inspect codegen.
 - `--reset-state` for a clean slate; `--state-dir` to keep experiments apart.
