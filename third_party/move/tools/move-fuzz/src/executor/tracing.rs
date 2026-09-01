@@ -96,6 +96,16 @@ pub struct ResourceRead {
     pub address: AccountAddress,
     pub struct_tag: StructTag,
     pub is_resource_group: bool,
+    /// Whether the slot actually held a value when the VM looked.
+    ///
+    /// The VM probes state it expects to be absent as readily as state it
+    /// expects to be present: `assert!(!exists<R>(a)); move_to(a, R {})` reads
+    /// `R@a`, finds nothing, and creates it. Recording that as a plain read
+    /// makes an initializer *depend on the very resource it produces*, which is
+    /// unsatisfiable -- no producer can run before it, and running a second
+    /// initializer first makes the assertion fail. Keeping presence lets a
+    /// def-use edge be drawn only from reads that wanted something to be there.
+    pub was_present: bool,
 }
 
 /// Convert non-resource state keys (table item / raw) into synthetic StructTags
@@ -185,12 +195,13 @@ impl ResourceSlot {
     }
 }
 
-impl From<ResourceSlot> for ResourceRead {
-    fn from(slot: ResourceSlot) -> Self {
+impl ResourceRead {
+    fn from_slot(slot: ResourceSlot, was_present: bool) -> Self {
         Self {
             address: slot.address,
             struct_tag: slot.struct_tag,
             is_resource_group: slot.is_resource_group,
+            was_present,
         }
     }
 }
@@ -208,14 +219,15 @@ impl From<ResourceSlot> for ResourceWrite {
 /// A state view wrapper that records all state key accesses
 struct RecordingStateView<'a, S: ?Sized> {
     inner: &'a S,
-    reads: RefCell<BTreeSet<StateKey>>,
+    /// Every key the VM looked at, and whether it found a value there.
+    reads: RefCell<BTreeMap<StateKey, bool>>,
 }
 
 impl<'a, S: TStateView<Key = StateKey> + ?Sized> RecordingStateView<'a, S> {
     fn new(inner: &'a S) -> Self {
         Self {
             inner,
-            reads: RefCell::new(BTreeSet::new()),
+            reads: RefCell::new(BTreeMap::new()),
         }
     }
 
@@ -224,8 +236,10 @@ impl<'a, S: TStateView<Key = StateKey> + ?Sized> RecordingStateView<'a, S> {
         self.reads
             .borrow()
             .iter()
-            .filter_map(ResourceSlot::from_state_key)
-            .map(ResourceRead::from)
+            .filter_map(|(state_key, was_present)| {
+                ResourceSlot::from_state_key(state_key)
+                    .map(|slot| ResourceRead::from_slot(slot, *was_present))
+            })
             .collect()
     }
 }
@@ -242,8 +256,16 @@ impl<S: TStateView<Key = StateKey> + ?Sized> TStateView for RecordingStateView<'
     }
 
     fn get_state_value(&self, state_key: &StateKey) -> StateViewResult<Option<StateValue>> {
-        self.reads.borrow_mut().insert(state_key.clone());
-        self.inner.get_state_value(state_key)
+        let value = self.inner.get_state_value(state_key)?;
+        // A slot read more than once in a transaction counts as present if any
+        // read found it: a later read can only see a value an earlier one
+        // created, and the dependency is on it existing at some point.
+        self.reads
+            .borrow_mut()
+            .entry(state_key.clone())
+            .and_modify(|present| *present |= value.is_some())
+            .or_insert(value.is_some());
+        Ok(value)
     }
 }
 

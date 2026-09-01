@@ -663,6 +663,7 @@ impl OneshotFuzzer {
             &resource_writes,
             &resource_reads,
             matches!(exec_status, ExecStatus::Success),
+            exec_status.is_missing_data(),
         );
 
         // only share resource writes from successful transactions

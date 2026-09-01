@@ -199,9 +199,27 @@ impl ExecResourceProfile {
         resource_writes: &[ResourceWrite],
         resource_reads: &[ResourceRead],
         succeeded: bool,
+        missing_data: bool,
     ) -> Self {
+        // Only reads that wanted a value become def-use dependencies.
+        //
+        // The VM probes state it expects to be absent as readily as state it
+        // expects to be present, and `RecordingStateView` sees both. Treating
+        // every touched key as a dependency made a successful initializer --
+        // `assert!(!exists<R>(a)); move_to(a, R {})` -- both use and define
+        // `R@a`. Nothing can satisfy that: no producer may run before it, and a
+        // second initializer aborts on the assertion. The demo's `vault::open`
+        // is exactly this shape, and it is why Phase 2 built no chains at all
+        // on that package.
+        //
+        // An absent read in a transaction that died of MISSING_DATA is the
+        // opposite: the code wanted a resource that was not there, which is the
+        // strongest dependency signal the fuzzer gets. Keep those.
         let mut reads = BTreeSet::new();
         for read in resource_reads {
+            if !read.was_present && !missing_data {
+                continue;
+            }
             if let Some(tag) = ResourceTag::tracked(read.address, &read.struct_tag) {
                 reads.insert(tag);
             }
@@ -2811,7 +2829,8 @@ impl ChainFuzzer {
         // Execute chain steps sequentially, collecting per-step resource data
         let mut all_writes = vec![];
         let mut last_status = ExecStatus::Success;
-        let mut step_raw_profiles: Vec<(usize, Vec<ResourceWrite>, Vec<ResourceRead>, bool)> =
+        // (script index, writes, reads, succeeded, missing_data)
+        let mut step_raw_profiles: Vec<(usize, Vec<ResourceWrite>, Vec<ResourceRead>, bool, bool)> =
             Vec::with_capacity(num_steps);
 
         for (step_idx, seed_input) in step_inputs.iter().enumerate() {
@@ -2825,7 +2844,13 @@ impl ChainFuzzer {
             let succeeded = matches!(step_status, ExecStatus::Success);
 
             // Collect raw profile data for this step (clone writes before moving)
-            step_raw_profiles.push((self.chain.steps[step_idx], writes.clone(), reads, succeeded));
+            step_raw_profiles.push((
+                self.chain.steps[step_idx],
+                writes.clone(),
+                reads,
+                succeeded,
+                step_status.is_missing_data(),
+            ));
 
             if succeeded {
                 for mutator in self.mutators.iter_mut() {
@@ -2858,8 +2883,14 @@ impl ChainFuzzer {
         }
         let profiles = step_raw_profiles
             .iter()
-            .map(|(script_index, writes, reads, succeeded)| {
-                ExecResourceProfile::from_execution(*script_index, writes, reads, *succeeded)
+            .map(|(script_index, writes, reads, succeeded, missing_data)| {
+                ExecResourceProfile::from_execution(
+                    *script_index,
+                    writes,
+                    reads,
+                    *succeeded,
+                    *missing_data,
+                )
             })
             .collect();
 
@@ -3031,6 +3062,66 @@ mod tests {
             struct_tag: resource_tag.struct_tag,
             is_resource_group: false,
         }
+    }
+
+    /// Helper: create a ResourceRead from a simple name
+    fn make_resource_read(name: &str, was_present: bool) -> ResourceRead {
+        let resource_tag = make_resource_tag(name);
+        ResourceRead {
+            address: resource_tag.account,
+            struct_tag: resource_tag.struct_tag,
+            is_resource_group: false,
+            was_present,
+        }
+    }
+
+    /// A successful initializer -- `assert!(!exists<R>(a)); move_to(a, R {})` --
+    /// probes `R@a`, finds nothing, and creates it. Counting that probe as a use
+    /// makes it depend on the resource it produces, which nothing can satisfy:
+    /// no producer may run before it, and a second initializer aborts on the
+    /// assertion. It is why Phase 2 built no chains at all on tests/demo.
+    #[test]
+    fn test_absent_read_on_success_is_not_a_dependency() {
+        let profile = ExecResourceProfile::from_execution(
+            0,
+            &[make_resource_write("Vault")],
+            &[make_resource_read("Vault", /* was_present */ false)],
+            /* succeeded */ true,
+            /* missing_data */ false,
+        );
+        assert!(
+            profile.reads.is_empty(),
+            "an absent probe in a successful txn is a negative precondition"
+        );
+        assert!(profile.writes.contains(&make_resource_tag("Vault")));
+    }
+
+    /// A read that found a value is a real dependency.
+    #[test]
+    fn test_present_read_is_a_dependency() {
+        let profile = ExecResourceProfile::from_execution(
+            0,
+            &[],
+            &[make_resource_read("Vault", /* was_present */ true)],
+            /* succeeded */ true,
+            /* missing_data */ false,
+        );
+        assert!(profile.reads.contains(&make_resource_tag("Vault")));
+    }
+
+    /// An absent read in a transaction that died of MISSING_DATA is the
+    /// strongest dependency signal there is: the code wanted a resource that
+    /// was not there.
+    #[test]
+    fn test_absent_read_under_missing_data_is_a_dependency() {
+        let profile = ExecResourceProfile::from_execution(
+            0,
+            &[],
+            &[make_resource_read("Vault", /* was_present */ false)],
+            /* succeeded */ false,
+            /* missing_data */ true,
+        );
+        assert!(profile.reads.contains(&make_resource_tag("Vault")));
     }
 
     // -----------------------------------------------------------------------
