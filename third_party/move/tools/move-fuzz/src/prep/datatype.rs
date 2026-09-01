@@ -182,8 +182,9 @@ impl DatatypeRegistry {
             StructFieldInformation::Declared(fields) => {
                 match self.convert_field_types(binary, fields, "struct field") {
                     Some(field_types) => DatatypeContent::Fields(field_types),
-                    // a field the registry cannot model: keep the declaration,
-                    // but treat the datatype as having no introspectable contents
+                    // A field whose type is uninhabited makes the whole struct
+                    // impossible to pack, so there is nothing to introspect;
+                    // keep the declaration and its abilities.
                     None => DatatypeContent::Opaque,
                 }
             },
@@ -328,13 +329,26 @@ impl DatatypeRegistry {
 
     /// Convert a signature token.
     ///
-    /// Returns `None` for a signature the fuzzer cannot model. The only such
-    /// shape today is an `Object<T>` whose type argument is neither a datatype
-    /// nor a type parameter: `Object<phantom T>` puts no ability constraint on
-    /// `T`, so `public fun f(o: Object<u64>)` is legal Move that this registry
-    /// has no `TypeExpr` for. Callers drop the enclosing declaration rather than
-    /// aborting the run -- the same way an unsupported transaction argument
-    /// excludes an entrypoint (see `TxnArgType::convert`).
+    /// Returns `None` when the token denotes an *uninhabited* type -- one that
+    /// has no values at all, so no caller could ever supply one. Today the only
+    /// such shape is `Object<T>` for a `T` that cannot carry `key`.
+    ///
+    /// `object::Object<phantom T>` declares no constraint on `T`, so
+    /// `public fun f(o: Object<u64>)` is legal Move and publishes fine. But
+    /// every framework constructor of an `Object<T>` value is declared
+    /// `<T: key>` -- `address_to_object`, `object_from_constructor_ref`,
+    /// `object_from_delete_ref` -- and the `inner` field is private to
+    /// `0x1::object`, so no Move code anywhere can produce an `Object<u64>`.
+    /// The VM agrees: it builds `Object` transaction arguments by calling
+    /// `address_to_object`, which fails its `key` constraint. Such an entry
+    /// point is dead code, and excluding it is the complete answer rather than
+    /// a fallback.
+    ///
+    /// Only datatypes can carry `key`, so `ObjectKnown` (an object of a
+    /// datatype) and `ObjectParam` (an object of a type parameter, which
+    /// `FunctionDecl::effective_generics` constrains to `key`) between them
+    /// cover every *inhabited* `Object<T>`. The model is complete; what is
+    /// excluded here has no values to fuzz.
     ///
     /// The remaining `panic!`s below are on shapes the bytecode verifier makes
     /// unrepresentable (a reference nested inside a vector, a type argument or
@@ -443,8 +457,8 @@ impl DatatypeRegistry {
                             | TypeExpr::ObjectKnown { .. }
                             | TypeExpr::ObjectParam(_)
                             | TypeExpr::Function { .. } => {
-                                // `Object<phantom T>` constrains nothing, so this is
-                                // legal Move the fuzzer simply cannot drive.
+                                // None of these can carry `key`, so `Object<_>`
+                                // over them is uninhabited; see the doc above.
                                 return None;
                             },
                         }
@@ -608,7 +622,15 @@ impl DatatypeRegistry {
                     | TypeBase::ObjectKnown { .. }
                     | TypeBase::ObjectParam { .. }
                     | TypeBase::Function { .. } => {
-                        panic!("expect a datatype or a parameter as the type argument for object")
+                        // Unreachable by construction: a type parameter used as
+                        // `Object<T>` has `key` added to its constraint by
+                        // `FunctionDecl::effective_generics`, and only datatypes
+                        // (or another `key`-constrained parameter) can satisfy
+                        // it. Reaching here means that inference was bypassed.
+                        panic!(
+                            "invariant violated: Object<_> instantiated with a type that \
+                             cannot carry `key`; effective_generics should have excluded it"
+                        )
                     },
                 }
             },

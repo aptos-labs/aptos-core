@@ -15,7 +15,7 @@ use log::debug;
 use move_binary_format::{
     binary_views::BinaryIndexedView, file_format::Visibility, CompiledModule,
 };
-use move_core_types::ability::AbilitySet;
+use move_core_types::ability::{Ability, AbilitySet};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Declaration of a function
@@ -27,6 +27,41 @@ pub struct FunctionDecl {
     pub return_sig: Vec<TypeRef>,
     pub kind: PkgKind,
     pub is_entry: bool,
+}
+
+impl FunctionDecl {
+    /// The ability constraints to use when enumerating type arguments for this
+    /// declaration.
+    ///
+    /// This is the declared `generics` list, with `key` added for every type
+    /// parameter that appears as the argument of an `Object<_>` in a parameter
+    /// or return type.
+    ///
+    /// `object::Object<phantom T>` declares no constraint on `T`, so
+    /// `fun f<T>(o: Object<T>)` is legal Move. It is nevertheless uncallable
+    /// unless `T` has `key`: every framework constructor of an `Object<T>`
+    /// value (`address_to_object`, `object_from_constructor_ref`,
+    /// `object_from_delete_ref`) is declared `<T: key>` and the `inner` field is
+    /// private to `0x1::object`, so for a non-`key` `T` the type has no values
+    /// at all. Enumerating those instantiations would spend the budget
+    /// generating drivers whose arguments can never be produced.
+    pub fn effective_generics(&self) -> Vec<AbilitySet> {
+        let mut object_params = BTreeSet::new();
+        for ty in self.parameters.iter().chain(self.return_sig.iter()) {
+            ty.base().object_type_params(&mut object_params);
+        }
+        self.generics
+            .iter()
+            .enumerate()
+            .map(|(index, constraint)| {
+                if object_params.contains(&index) {
+                    constraint.add(Ability::Key)
+                } else {
+                    *constraint
+                }
+            })
+            .collect()
+    }
 }
 
 pub struct FunctionRegistry {
@@ -274,7 +309,16 @@ fn parse_script_public_functions(source: &str) -> BTreeSet<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_script_public_functions;
+    use super::{parse_script_public_functions, FunctionDecl};
+    use crate::{
+        deps::PkgKind,
+        prep::{ident::FunctionIdent, typing::TypeRef},
+    };
+    use move_core_types::{
+        ability::{Ability, AbilitySet},
+        account_address::AccountAddress,
+        identifier::Identifier,
+    };
     use std::collections::BTreeSet;
 
     #[test]
@@ -305,5 +349,57 @@ mod tests {
             parse_script_public_functions(source),
             BTreeSet::from(["visible".to_string()])
         );
+    }
+
+    #[test]
+    fn test_effective_generics_infers_key_for_object_type_params() {
+        use crate::prep::typing::TypeExpr;
+
+        let decl = |parameters: Vec<TypeRef>, return_sig: Vec<TypeRef>| FunctionDecl {
+            ident: FunctionIdent::from_function_tuple(
+                AccountAddress::ONE,
+                Identifier::new("m").unwrap(),
+                Identifier::new("f").unwrap(),
+            ),
+            generics: vec![AbilitySet::EMPTY, AbilitySet::EMPTY],
+            parameters,
+            return_sig,
+            kind: PkgKind::Primary,
+            is_entry: true,
+        };
+
+        // `fun f<T0, T1>(o: Object<T0>, x: T1)`: only T0 is used as an object,
+        // and `Object<T>` has no values unless `T` has `key`.
+        let d = decl(
+            vec![
+                TypeRef::Base(TypeExpr::ObjectParam(0)),
+                TypeRef::Base(TypeExpr::Param(1)),
+            ],
+            vec![],
+        );
+        let effective = d.effective_generics();
+        assert!(effective[0].has_key());
+        assert!(!effective[1].has_key());
+
+        // the declared constraint is preserved, not replaced
+        let mut d = decl(vec![TypeRef::Base(TypeExpr::ObjectParam(0))], vec![]);
+        d.generics = vec![AbilitySet::EMPTY.add(Ability::Drop), AbilitySet::EMPTY];
+        let effective = d.effective_generics();
+        assert!(effective[0].has_key() && effective[0].has_drop());
+
+        // nesting counts too: `vector<Object<T0>>` and a return position
+        let d = decl(
+            vec![TypeRef::Base(TypeExpr::Vector {
+                element: Box::new(TypeExpr::ObjectParam(0)),
+            })],
+            vec![TypeRef::Base(TypeExpr::ObjectParam(1))],
+        );
+        let effective = d.effective_generics();
+        assert!(effective[0].has_key());
+        assert!(effective[1].has_key());
+
+        // a bare type parameter is untouched
+        let d = decl(vec![TypeRef::Base(TypeExpr::Param(0))], vec![]);
+        assert!(!d.effective_generics()[0].has_key());
     }
 }

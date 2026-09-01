@@ -135,6 +135,70 @@ pub enum TypeExpr {
     },
 }
 
+impl TypeExpr {
+    /// Collect the indices of type parameters that appear as the argument of an
+    /// `Object<_>` anywhere inside this type.
+    ///
+    /// `object::Object<phantom T>` puts no constraint on `T`, so `fun f<T>(o:
+    /// Object<T>)` compiles. But every constructor of an `Object<T>` value in
+    /// the framework -- `address_to_object`, `object_from_constructor_ref`,
+    /// `object_from_delete_ref` -- is declared `<T: key>`, and the `inner` field
+    /// is private to `0x1::object`. So `Object<T>` is *inhabited only when `T`
+    /// has `key`*: instantiating such a `T` with, say, `u64` yields a type no
+    /// caller can ever produce a value of.
+    ///
+    /// Callers use this to add `key` to the declared constraint before
+    /// enumerating type-argument candidates, so the search only explores
+    /// instantiations that can actually be driven.
+    pub fn object_type_params(&self, params: &mut BTreeSet<usize>) {
+        match self {
+            Self::Bool
+            | Self::U8
+            | Self::I8
+            | Self::U16
+            | Self::I16
+            | Self::U32
+            | Self::I32
+            | Self::U64
+            | Self::I64
+            | Self::U128
+            | Self::I128
+            | Self::U256
+            | Self::I256
+            | Self::Bitvec
+            | Self::String
+            | Self::Address
+            | Self::Signer
+            | Self::Param(_) => {},
+            Self::Vector { element } => element.object_type_params(params),
+            Self::Datatype {
+                ident: _,
+                type_args,
+            }
+            | Self::ObjectKnown {
+                ident: _,
+                type_args,
+            } => {
+                for arg in type_args {
+                    arg.object_type_params(params);
+                }
+            },
+            Self::ObjectParam(index) => {
+                params.insert(*index);
+            },
+            Self::Function {
+                params: fn_params,
+                returns,
+                abilities: _,
+            } => {
+                for ty in fn_params.iter().chain(returns.iter()) {
+                    ty.base().object_type_params(params);
+                }
+            },
+        }
+    }
+}
+
 impl Display for TypeExpr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

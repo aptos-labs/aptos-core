@@ -661,7 +661,9 @@ impl<'a> GraphBuilder<'a> {
                     | (TypeRef::ImmRef(tag), TypeItem::ImmRef(base))
                     | (TypeRef::MutRef(tag), TypeItem::MutRef(base)) => {
                         // try to unify them
-                        let mut unifier = TypeSubstitution::new(&decl.generics);
+                        // same inferred `key` as `effective_generics` below
+                        let decl_generics = decl.effective_generics();
+                        let mut unifier = TypeSubstitution::new(&decl_generics);
                         if !unifier.unify(tag, base) {
                             continue;
                         }
@@ -681,8 +683,13 @@ impl<'a> GraphBuilder<'a> {
                 let mut next_param_index = base.generics.len();
                 let mut per_ty_arg_insts = vec![];
                 let mut new_generics_pos = BTreeSet::new();
-                for (pos, (unified_ty, constraint)) in
-                    unified.into_iter().zip(decl.generics.iter()).enumerate()
+                // `key` is inferred for any type parameter used as `Object<T>`;
+                // see `FunctionDecl::effective_generics`.
+                let effective_generics = decl.effective_generics();
+                for (pos, (unified_ty, constraint)) in unified
+                    .into_iter()
+                    .zip(effective_generics.iter())
+                    .enumerate()
                 {
                     match unified_ty {
                         Some(base) => per_ty_arg_insts.push(vec![base]),
@@ -1142,7 +1149,10 @@ impl FlowGraph {
                     | TypeBase::Vector { .. }
                     | TypeBase::ObjectKnown { .. }
                     | TypeBase::ObjectParam { .. }
-                    | TypeBase::Function { .. } => panic!("invalid replacement for object param"),
+                    | TypeBase::Function { .. } => panic!(
+                        "invariant violated: object param replaced by a type that cannot carry \
+                         `key`; FunctionDecl::effective_generics should have excluded it"
+                    ),
                 },
             },
             TypeBase::Function {

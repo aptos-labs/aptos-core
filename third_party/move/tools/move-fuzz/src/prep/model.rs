@@ -222,8 +222,10 @@ impl Model {
             }
 
             // try to instantiate the function with identity type arguments with varying ability sets
-            let num_combos: usize = decl
-                .generics
+            // `key` is inferred for any type parameter used as `Object<T>`; see
+            // `FunctionDecl::effective_generics`.
+            let effective_generics = decl.effective_generics();
+            let num_combos: usize = effective_generics
                 .iter()
                 .map(|constraint| ability_set_candidates(*constraint).len())
                 .product();
@@ -233,8 +235,7 @@ impl Model {
             let mut function_limited = false;
             let module_count = module_script_counts.entry(module_key.clone()).or_insert(0);
 
-            'combo_loop: for combo in decl
-                .generics
+            'combo_loop: for combo in effective_generics
                 .iter()
                 .map(|constraint| ability_set_candidates(*constraint))
                 .multi_cartesian_product()
@@ -627,7 +628,10 @@ fn find_matching_functions(
         }
 
         // try to unify params and returns
-        let mut unifier = TypeSubstitution::new(&decl.generics);
+        // same inferred `key` as `effective_generics`: a parameter used as
+        // `Object<T>` must not unify with a type that cannot carry `key`
+        let decl_generics = decl.effective_generics();
+        let mut unifier = TypeSubstitution::new(&decl_generics);
 
         let mut ok = true;
         for (decl_param, fn_param) in decl.parameters.iter().zip(fn_params.iter()) {
