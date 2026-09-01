@@ -30,7 +30,6 @@ xclippy = [
   "-Aclippy::manual_filter",
   "-Aclippy::map_or_identity",
   "-Aclippy::missing_spin_loop",
-  "-Aclippy::needless_late_init",
   "-Aclippy::needless_return_with_question_mark",
   "-Aclippy::question_mark",
   "-Aclippy::single_range_in_vec_init",
