@@ -22,7 +22,8 @@ use move_package::{
     },
 };
 use petgraph::{algo::toposort, graph::DiGraph};
-use rand::rngs::OsRng;
+use rand::{rngs::StdRng, SeedableRng};
+use sha3::{Digest, Sha3_256};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{Display, Formatter},
@@ -475,6 +476,26 @@ fn analyze_package_manifest(
 }
 
 /// Resolve the dependency relation in the whole project
+/// Derive the account backing an unassigned (`_`) or development named address.
+///
+/// Deterministic in the name, so the same project is assigned the same addresses
+/// on every invocation. This was `Ed25519PrivateKey::generate(&mut OsRng)`, a
+/// fresh key per run, which silently defeated the persisted campaign state:
+/// restoring a checkpoint requires every sender it recorded to still exist in
+/// the executor's address registry, so on any project with a `_` address the
+/// expensive `auto_state.json` was discarded on the very next invocation.
+///
+/// Two different projects that happen to use the same named address get the
+/// same account, which is harmless: they are separate campaigns with separate
+/// state directories, and within one project a shared name *is* one address.
+fn key_for_named_address(named_address: &str) -> Ed25519PrivateKey {
+    let mut hasher = Sha3_256::new();
+    hasher.update(b"move-fuzz-named-address-v1");
+    hasher.update(named_address.as_bytes());
+    let seed: [u8; 32] = hasher.finalize().into();
+    Ed25519PrivateKey::generate(&mut StdRng::from_seed(seed))
+}
+
 pub fn resolve(
     path: &Path,
     subdirs: BTreeSet<PathBuf>,
@@ -703,7 +724,7 @@ pub fn resolve(
                 None => match named_addr {
                     PkgNamedAddr::Fixed(addr) => Account::Ref(*addr),
                     PkgNamedAddr::Devel(_) | PkgNamedAddr::Unset => {
-                        Account::Owned(Ed25519PrivateKey::generate(&mut OsRng))
+                        Account::Owned(key_for_named_address(key))
                     },
                 },
                 Some((base, seed)) => {
