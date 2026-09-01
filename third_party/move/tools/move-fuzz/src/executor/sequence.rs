@@ -2434,10 +2434,20 @@ impl ChainFuzzer {
                         } else {
                             seed_ty.clone()
                         };
+                        // subset mutation, as in the one-shot path: keep the
+                        // relations a chain seed already satisfies
+                        let positions = self.mutators[i].pick_mutation_positions(seed_args.len());
                         let args = seed_args
                             .iter()
                             .zip(non_signer_params.iter())
-                            .map(|(val, ty)| self.mutators[i].mutate_value(ty, val))
+                            .enumerate()
+                            .map(|(idx, (val, ty))| {
+                                if positions.contains(&idx) {
+                                    self.mutators[i].mutate_value(ty, val)
+                                } else {
+                                    val.clone()
+                                }
+                            })
                             .collect();
                         let sender = if self.mutators[i].random_percent() < 70 {
                             seed_input.sender
@@ -2491,10 +2501,20 @@ impl ChainFuzzer {
                         } else {
                             seed_ty.clone()
                         };
+                        // subset mutation, as in the one-shot path: keep the
+                        // relations a chain seed already satisfies
+                        let positions = self.mutators[i].pick_mutation_positions(seed_args.len());
                         let args = seed_args
                             .iter()
                             .zip(non_signer_params.iter())
-                            .map(|(val, ty)| self.mutators[i].mutate_value(ty, val))
+                            .enumerate()
+                            .map(|(idx, (val, ty))| {
+                                if positions.contains(&idx) {
+                                    self.mutators[i].mutate_value(ty, val)
+                                } else {
+                                    val.clone()
+                                }
+                            })
                             .collect();
                         let sender = if self.mutators[i].random_percent() < 70 {
                             seed_input.sender

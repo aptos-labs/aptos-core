@@ -619,10 +619,21 @@ impl OneshotFuzzer {
                     seed_ty_args.clone()
                 };
 
+                // Perturb a subset, keeping the rest of the seed intact: a seed
+                // that satisfied a relation between two arguments is worth more
+                // than a fresh random tuple. See `Mutator::pick_mutation_positions`.
+                let positions = self.mutator.pick_mutation_positions(seed_args.len());
                 let args = seed_args
                     .iter()
                     .zip(non_signer_params.iter())
-                    .map(|(val, ty)| self.mutator.mutate_value(ty, val))
+                    .enumerate()
+                    .map(|(idx, (val, ty))| {
+                        if positions.contains(&idx) {
+                            self.mutator.mutate_value(ty, val)
+                        } else {
+                            val.clone()
+                        }
+                    })
                     .collect();
                 (ty_args, args)
             },
@@ -643,10 +654,6 @@ impl OneshotFuzzer {
             .executor
             .run_payload_with_sender_tracking(executed_seed.sender, payload)?;
         let exec_status: ExecStatus = (vm_status, txn_status).into();
-
-        // record the transcript entry before anything fallible: the executor
-        // state has already moved, so an early return past this point must not
-        // leave the transcript unable to reproduce it
 
         // epilogue: flush and read coverage
         flush_tracing_buffer();

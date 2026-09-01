@@ -27,6 +27,22 @@ use std::collections::{BTreeMap, BTreeSet};
 // Probabilities and configurations
 const GEN_PROB: u8 = 50;
 const MUT_PROB: u8 = 50;
+
+/// How many argument positions one mutation step touches.
+///
+/// Mutating every argument every time destroys the relations between them.
+/// Contracts routinely require two arguments to agree -- an address and the
+/// object stored under it, a market id and its collateral type, an index and
+/// the vector it indexes -- and the chance of preserving such a relation by
+/// re-randomising all of them falls off geometrically with arity. A corpus seed
+/// that satisfied a relation is the most valuable thing the fuzzer has; it
+/// should be perturbed, not discarded.
+const MUT_ARGS_PROB_ONE: u8 = 70;
+const MUT_ARGS_PROB_FEW: u8 = 25;
+const MUT_ARGS_PROB_ALL: u8 = 5;
+const MUT_ARGS_PROB_TOTAL: u8 = MUT_ARGS_PROB_ONE + MUT_ARGS_PROB_FEW + MUT_ARGS_PROB_ALL;
+/// Upper bound on "a few", so a wide signature still keeps most of its seed.
+const MUT_ARGS_FEW_MAX: usize = 3;
 const TOTAL_PROB: u8 = GEN_PROB + MUT_PROB;
 
 const GEN_INT_PROB_MIN: u8 = 10;
@@ -437,6 +453,33 @@ impl Mutator {
                 _ => self.random_value(ty),
             },
         }
+    }
+
+    /// Choose which argument positions this mutation step should touch.
+    ///
+    /// Returns one position most of the time, a small subset sometimes, and
+    /// every position rarely. See `MUT_ARGS_PROB_ONE` for why mutating
+    /// everything is the wrong default.
+    pub fn pick_mutation_positions(&mut self, arity: usize) -> BTreeSet<usize> {
+        if arity == 0 {
+            return BTreeSet::new();
+        }
+        if arity == 1 {
+            return BTreeSet::from([0]);
+        }
+        let roll = self.rng.gen_range(0, MUT_ARGS_PROB_TOTAL);
+        let count = if roll < MUT_ARGS_PROB_ONE {
+            1
+        } else if roll < MUT_ARGS_PROB_ONE + MUT_ARGS_PROB_FEW {
+            self.rng.gen_range(2, MUT_ARGS_FEW_MAX.min(arity) + 1)
+        } else {
+            arity
+        };
+        let mut positions = BTreeSet::new();
+        while positions.len() < count {
+            positions.insert(self.rng.gen_range(0, arity));
+        }
+        positions
     }
 
     /// Decide whether to mutate type arguments (~30% probability)
@@ -1021,5 +1064,33 @@ mod tests {
             saw_object,
             "plain address generation never reused a known object"
         );
+    }
+
+    #[test]
+    fn test_pick_mutation_positions_usually_touches_one_argument() {
+        let mut mutator = test_mutator_with_address_buckets(7);
+        let mut counts = std::collections::BTreeMap::new();
+        for _ in 0..2000 {
+            let positions = mutator.pick_mutation_positions(7);
+            assert!(
+                !positions.is_empty(),
+                "a mutation step must change something"
+            );
+            assert!(positions.iter().all(|p| *p < 7), "positions stay in range");
+            *counts.entry(positions.len()).or_insert(0usize) += 1;
+        }
+        let one = counts.get(&1).copied().unwrap_or(0);
+        let all = counts.get(&7).copied().unwrap_or(0);
+        // single-argument steps dominate, so a seed that satisfies a relation
+        // between its arguments survives most mutations
+        assert!(
+            one > 1000,
+            "expected mostly single-argument steps, got {one}/2000"
+        );
+        // but the whole tuple is still re-rolled sometimes
+        assert!(all > 0, "expected some all-argument steps");
+        // arity 1 and 0 are degenerate
+        assert_eq!(mutator.pick_mutation_positions(1).len(), 1);
+        assert!(mutator.pick_mutation_positions(0).is_empty());
     }
 }
