@@ -232,6 +232,30 @@ fn test_mem_swap() -> PartialVMResult<()> {
         }
     }
 
+    // Swapping a container reference with itself must return an error, not panic.
+    // Index 4 is a specialized vector, index 8 is a generic container.
+    for i in [4, 8] {
+        assert_err!(get_local(&locals, i).swap_values(get_local(&locals, i)));
+    }
+
+    Ok(())
+}
+
+#[test]
+fn test_move_range_aliasing() -> PartialVMResult<()> {
+    use crate::loaded_data::runtime_types::Type;
+
+    let mut locals = Locals::new(1);
+    locals.store_loc(0, Value::vector_u64(vec![1, 2, 3]))?;
+
+    let get_ref = |ls: &Locals| ls.borrow_loc(0).unwrap().value_as::<VectorRef>().unwrap();
+
+    // Moving a range between a vector reference and itself must return an error,
+    // not panic.
+    let from = get_ref(&locals);
+    let to = get_ref(&locals);
+    assert_err!(VectorRef::move_range(&from, 0, 1, &to, 0, &Type::U64));
+
     Ok(())
 }
 

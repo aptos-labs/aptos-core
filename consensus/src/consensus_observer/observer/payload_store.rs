@@ -1260,7 +1260,7 @@ mod test {
     /// Returns the number of unverified payloads in the block payload store
     fn get_num_unverified_payloads(block_payload_store: &BlockPayloadStore) -> usize {
         let mut num_unverified_payloads = 0;
-        for (_, block_payload_status) in block_payload_store.block_payloads.lock().iter() {
+        for block_payload_status in block_payload_store.block_payloads.lock().values() {
             if let BlockPayloadStatus::AvailableAndUnverified(_) = block_payload_status {
                 num_unverified_payloads += 1;
             }
@@ -1271,7 +1271,7 @@ mod test {
     /// Returns the number of verified payloads in the block payload store
     fn get_num_verified_payloads(block_payload_store: &BlockPayloadStore) -> usize {
         let mut num_verified_payloads = 0;
-        for (_, block_payload_status) in block_payload_store.block_payloads.lock().iter() {
+        for block_payload_status in block_payload_store.block_payloads.lock().values() {
             if let BlockPayloadStatus::AvailableAndVerified(_) = block_payload_status {
                 num_verified_payloads += 1;
             }

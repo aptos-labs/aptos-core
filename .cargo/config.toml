@@ -19,6 +19,25 @@ xclippy = [
   "-Aclippy::result-large-err",
   "-Aclippy::sliced-string-as-bytes",
   "-Aclippy::upper_case_acronyms",
+  # New/expanded lints surfaced by the Rust 1.98 upgrade, suppressed to keep the
+  # toolchain bump mechanical. TODO: clean these up separately.
+  "-Aclippy::chunks_exact_to_as_chunks",
+  "-Aclippy::cloned_ref_to_slice_refs",
+  "-Aclippy::drain_collect",
+  "-Aclippy::explicit_counter_loop",
+  "-Aclippy::extra_unused_lifetimes",
+  "-Aclippy::manual_checked_ops",
+  "-Aclippy::manual_filter",
+  "-Aclippy::map_or_identity",
+  "-Aclippy::missing_spin_loop",
+  "-Aclippy::needless_return_with_question_mark",
+  "-Aclippy::question_mark",
+  "-Aclippy::single_range_in_vec_init",
+  "-Aclippy::unnecessary_sort_by",
+  "-Aclippy::unneeded_wildcard_pattern",
+  "-Aclippy::useless_borrows_in_formatting",
+  "-Aclippy::useless_format",
+  "-Aclippy::while_let_loop",
 ]
 x = "run --package aptos-cargo-cli --bin aptos-cargo-cli --"
 build-perf = ["build", "--profile", "performance", "--config", ".cargo/performance.toml"]

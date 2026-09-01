@@ -250,7 +250,7 @@ where
                                 group_key,
                                 idx_to_execute,
                                 incarnation,
-                                group_ops.into_iter(),
+                                group_ops,
                                 group_size,
                                 prev_tags,
                             )?,
@@ -293,7 +293,7 @@ where
                 group_key,
                 idx_to_execute,
                 incarnation,
-                group_ops.into_iter(),
+                group_ops,
                 group_size,
                 HashSet::new(), // No previous tags since this is a new group write
             )?)?;
@@ -602,7 +602,7 @@ where
                     group_key,
                     idx_to_execute,
                     incarnation,
-                    group_ops.into_iter(),
+                    group_ops,
                     group_size,
                     prev_tags,
                 )? {

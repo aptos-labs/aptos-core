@@ -1004,7 +1004,7 @@ pub fn replace_keywords(registry: &mut BTreeMap<String, ContainerFormat>) {
 fn swap_keyworded_fields(fields: Option<&mut ContainerFormat>) {
     match fields {
         Some(ContainerFormat::Enum(fields)) => {
-            for (_, val) in fields.iter_mut() {
+            for val in fields.values_mut() {
                 match val.name.as_str() {
                     "struct" => val.name = String::from("Struct"),
                     "bool" => val.name = String::from("Bool"),

@@ -189,6 +189,9 @@ pub const fn already_exists(r: u64) -> u64 {
 pub const fn resource_exhausted(r: u64) -> u64 {
     canonical(RESOURCE_EXHAUSTED, r)
 }
+pub const fn cancelled(r: u64) -> u64 {
+    canonical(CANCELLED, r)
+}
 pub const fn internal(r: u64) -> u64 {
     canonical(INTERNAL, r)
 }

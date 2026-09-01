@@ -6,8 +6,9 @@
 use crate::{
     align::MAX_ALIGN,
     memory::{read_fat_ptr, read_ptr, read_u64, write_fat_ptr, write_ptr},
+    native::native_vector_index_out_of_bounds,
     root_pool::{ObjectHandle, ReferenceHandle, RootPool},
-    VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+    VMResult, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -331,21 +332,27 @@ impl<'a, V> Vector<'a, V> {
     // TODO(completeness): Other vector APIs, added on-demand.
 }
 
-impl<'a, V> Vector<'a, Vector<'a, V>> {
-    /// Returns element `i` of a `vector<vector<V>>` -- the inner `vector<V>` --
-    /// as a handle rooted for the rest of the native call.
-    ///
-    /// Each element of a nested vector is an 8-byte heap pointer to the inner
-    /// vector object, so this reads that pointer and roots it, mirroring
-    /// [`Ref::borrow`]. The caller must ensure `i < len()`.
+impl<'a, V: VMValue<'a>> Vector<'a, V> {
+    /// Reads element `i` by value, using `V`'s in-frame representation. Any heap
+    /// pointer the element carries is rooted for the rest of the native call, so
+    /// the result survives GC. Returns an invalid-operation error if `i` is out
+    /// of bounds.
     #[inline]
-    pub fn get(&self, i: u64) -> Vector<'a, V> {
-        // SAFETY: element `i` (within bounds) of a `vector<vector<V>>` is an
-        // 8-byte heap pointer to the inner vector object.
-        let inner_ptr = unsafe { read_ptr(self.ptr(), VEC_DATA_OFFSET + i as usize * 8) };
-        // Root the inner vector so it survives GC for the rest of the call,
-        // even if the outer slot is later overwritten.
-        Vector::from_handle(unsafe { self.handle.pool().root_object(inner_ptr) })
+    pub fn get_element(&self, i: u64) -> VMResult<V> {
+        let len = self.len();
+        if i >= len {
+            return Err(native_vector_index_out_of_bounds(i, len));
+        }
+        // SAFETY: element `i` (bounds-checked above) lives at `VEC_DATA_OFFSET +
+        // i * FRAME_SLOT_SIZE` in the vector object; `read_from_frame` reads it
+        // and roots any heap pointer it carries.
+        Ok(unsafe {
+            V::read_from_frame(
+                self.handle.pool(),
+                self.ptr(),
+                VEC_DATA_OFFSET + i as usize * <V as VMValue<'a>>::FRAME_SLOT_SIZE,
+            )
+        })
     }
 }
 
@@ -500,8 +507,8 @@ mod tests {
         buf
     }
 
-    /// `Vector::<Vector<u8>>::get` reads each inner byte vector back by value,
-    /// including an empty inner vector.
+    /// `Vector::<Vector<u8>>::get_element` reads each inner byte vector back by
+    /// value, including an empty inner vector.
     #[test]
     fn nested_byte_vector_get_reads_elements() {
         let pool = RootPool::new();
@@ -530,11 +537,53 @@ mod tests {
 
         assert_eq!(vec.len(), 3);
         // Bind each inner handle so its bytes outlive the borrow.
-        let e0 = vec.get(0);
-        let e1 = vec.get(1);
-        let e2 = vec.get(2);
+        let e0 = vec.get_element(0).unwrap();
+        let e1 = vec.get_element(1).unwrap();
+        let e2 = vec.get_element(2).unwrap();
         assert_eq!(unsafe { e0.as_bytes() }, b"hello");
         assert_eq!(unsafe { e1.as_bytes() }, b"");
         assert_eq!(unsafe { e2.as_bytes() }, b"world!!");
+    }
+
+    /// `get_element` fails with an invalid-operation error on an out-of-bounds
+    /// index rather than reading past the vector object.
+    #[test]
+    fn get_element_out_of_bounds_errors() {
+        let pool = RootPool::new();
+
+        // Outer object holding two inner byte vectors.
+        let inners = [
+            byte_vec_object_for_test(b"a"),
+            byte_vec_object_for_test(b"b"),
+        ];
+        let mut outer = vec![0u64; 1 + inners.len()];
+        outer[0] = inners.len() as u64;
+        for (i, inner) in inners.iter().enumerate() {
+            outer[1 + i] = inner.as_ptr() as u64;
+        }
+
+        // SAFETY: `outer` is a valid `vector<vector<u8>>` object.
+        let vec: Vector<Vector<u8>> =
+            Vector::from_handle(unsafe { pool.root_object(outer.as_ptr() as *mut u8) });
+
+        assert_eq!(vec.len(), 2);
+        assert!(vec.get_element(0).is_ok());
+        // Index == len and beyond both fail.
+        match vec.get_element(2) {
+            Ok(_) => panic!("out-of-bounds index must not read an element"),
+            Err(err) => assert_eq!(err.kind(), crate::ExecutionErrorKind::InvalidOperation),
+        }
+        assert!(vec.get_element(u64::MAX).is_err());
+    }
+
+    /// `get_element` on an empty vector errors for every index.
+    #[test]
+    fn get_element_empty_vector_errors() {
+        let pool = RootPool::new();
+        // A null-backed vector reads as empty.
+        let vec: Vector<u64> =
+            Vector::from_handle(unsafe { pool.root_object(std::ptr::null_mut()) });
+        assert_eq!(vec.len(), 0);
+        assert!(vec.get_element(0).is_err());
     }
 }

@@ -414,8 +414,8 @@ impl<'a> Assembler<'a> {
                 .require_resolution_context()
                 .local_map
                 .clone()
-                .into_iter()
-                .filter_map(|(_, r)| {
+                .into_values()
+                .filter_map(|r| {
                     if r.0 as usize >= locals_start {
                         Some(r)
                     } else {

@@ -1130,7 +1130,7 @@ async fn parse_block_transactions(
         )
         .await;
 
-        for (_, account_balance) in balances.iter() {
+        for account_balance in balances.values() {
             if let Some(amount) = account_balance.get(&cur_version) {
                 assert!(*amount >= 0, "Amount shouldn't be negative!")
             }
