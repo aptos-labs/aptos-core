@@ -765,6 +765,19 @@ impl<'a> GraphBuilder<'a> {
         target_node: NodeIndex,
         target_type: &DatatypeItem,
     ) -> Vec<FlowGraph> {
+        // A mutable reference must never be duplicated, even though the ability
+        // system says it can be. `TypeItem::abilities` reports `AbilitySet::REFERENCES`
+        // (copy + drop) for both reference kinds, so the `has_copy()` guard at the call
+        // site admits `&mut T`; Move's *reference safety* is a separate check and
+        // rejects two simultaneously live mutable aliases of one location. Emitting
+        // `let v2 = v1;` for `v1: &mut T` therefore yields a driver that fails to
+        // compile with "cannot read local `v1` since it is mutably borrowed" (or a
+        // freeze conflict at the use site). Immutable references may be freely
+        // aliased, and owned values are already gated by the real `copy` ability.
+        if matches!(target_type, DatatypeItem::MutRef(_)) {
+            return vec![];
+        }
+
         let mut candidates = vec![];
         for node in base.graph.node_indices() {
             match base.graph.node_weight(node).unwrap() {

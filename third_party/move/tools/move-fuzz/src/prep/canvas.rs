@@ -8,7 +8,7 @@
 //! `ScriptSignature` the fuzzer uses to feed inputs at runtime.
 
 use crate::prep::{
-    graph::{FlowGraph, FlowGraphEdge, FlowGraphNode},
+    graph::{DatatypeItem, FlowGraph, FlowGraphEdge, FlowGraphNode},
     ident::{DatatypeIdent, FunctionIdent},
     model::Model,
     typing::{ParamStyle, SimpleType, TypeBase, TypeItem, TypeMode},
@@ -154,6 +154,9 @@ pub enum DriverStatement {
     Freeze {
         src: DriverVariable,
         dst: DriverVariable,
+        /// The datatype behind the reference, rendered as Move source. The
+        /// annotation is what performs the freeze; see the `Display` impl.
+        ty: String,
     },
     ImmBorrow {
         src: DriverVariable,
@@ -222,7 +225,12 @@ impl Display for DriverStatement {
             },
             DriverStatement::Copy { src, dst } => write!(f, "let {dst} = {src};"),
             DriverStatement::Deref { src, dst } => write!(f, "let {dst} = *{src};"),
-            DriverStatement::Freeze { src, dst } => write!(f, "let {dst} = {src};"),
+            // Freezing `&mut T` to `&T` has no expression form in Move source: a
+            // plain `let dst = src;` copies the mutable reference, leaving two live
+            // `&mut` aliases that reference safety rejects, and `&*src` means
+            // deref-then-borrow, which additionally demands `copy` on `T`. The type
+            // annotation is what drives the implicit freeze.
+            DriverStatement::Freeze { src, dst, ty } => write!(f, "let {dst}: &{ty} = {src};"),
             DriverStatement::ImmBorrow { src, dst } => write!(f, "let {dst} = &{src};"),
             DriverStatement::MutBorrow { src, dst } => write!(f, "let {dst} = &mut {src};"),
             DriverStatement::VectorToElement { src, dst } => {
@@ -319,7 +327,22 @@ impl DriverCanvas {
                             },
                             FlowGraphEdge::Copy => canvas.new_stmt_copy(src),
                             FlowGraphEdge::Deref => canvas.new_stmt_deref(src),
-                            FlowGraphEdge::Freeze => canvas.new_stmt_freeze(src),
+                            FlowGraphEdge::Freeze => {
+                                // The freeze target is always an `ImmRef`; spell its
+                                // datatype so the annotation can drive the freeze.
+                                let ty = match graph.node_weight(target)? {
+                                    FlowGraphNode::Datatype(DatatypeItem::ImmRef(inner)) => {
+                                        inner.revert().render(ParamStyle::Source)
+                                    },
+                                    FlowGraphNode::Datatype(
+                                        DatatypeItem::Base(_) | DatatypeItem::MutRef(_),
+                                    )
+                                    | FlowGraphNode::Function(_) => {
+                                        unreachable!("freeze edge must target an immutable ref")
+                                    },
+                                };
+                                canvas.new_stmt_freeze(src, ty)
+                            },
                             FlowGraphEdge::ImmBorrow => canvas.new_stmt_imm_borrow(src),
                             FlowGraphEdge::MutBorrow => canvas.new_stmt_mut_borrow(src),
                             FlowGraphEdge::VectorToElement => {
@@ -613,10 +636,11 @@ impl DriverCanvas {
         dst
     }
 
-    /// Create a freeze statement
-    fn new_stmt_freeze(&mut self, src: DriverVariable) -> DriverVariable {
+    /// Create a freeze statement, turning `&mut ty` into `&ty`
+    fn new_stmt_freeze(&mut self, src: DriverVariable, ty: String) -> DriverVariable {
         let dst = self.new_local();
-        self.statements.push(DriverStatement::Freeze { src, dst });
+        self.statements
+            .push(DriverStatement::Freeze { src, dst, ty });
         dst
     }
 
@@ -980,6 +1004,17 @@ mod tests {
 
         assert_eq!(copy.to_string(), "let v0 = p1;");
         assert_eq!(borrow.to_string(), "let v1 = &v0;");
+
+        // A freeze must actually freeze. `let v1 = v0;` copies the mutable
+        // reference, leaving two live `&mut` aliases that reference safety rejects;
+        // `&*v0` means deref-then-borrow and additionally requires `copy` on the
+        // datatype. Only the type annotation drives the implicit freeze.
+        let freeze = DriverStatement::Freeze {
+            src: DriverVariable::Local(0),
+            dst: DriverVariable::Local(1),
+            ty: "0x42::m::H".to_string(),
+        };
+        assert_eq!(freeze.to_string(), "let v1: &0x42::m::H = v0;");
         assert_eq!(
             TypeItem::MutRef(TypeBase::Address).to_string(),
             "&mut address"
