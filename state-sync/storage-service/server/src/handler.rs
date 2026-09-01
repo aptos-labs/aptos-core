@@ -23,8 +23,8 @@ use aptos_storage_interface::StateKind;
 use aptos_storage_service_types::{
     requests::{
         DataRequest, EpochEndingLedgerInfoRequest, GetTransactionDataWithProofRequest,
-        NumberOfStatesRequestV2, StateValuesWithProofRequest, StateValuesWithProofRequestV2,
-        StorageServiceRequest, TransactionOutputsWithProofRequest,
+        HotStateValuesWithProofRequest, NumberOfStatesRequestV2, StateValuesWithProofRequest,
+        StateValuesWithProofRequestV2, StorageServiceRequest, TransactionOutputsWithProofRequest,
         TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
     },
     responses::{
@@ -415,6 +415,9 @@ impl<T: StorageReaderInterface> Handler<T> {
             DataRequest::GetStateValuesWithProofV2(request) => {
                 self.get_state_value_chunk_with_proof_v2(request)
             },
+            DataRequest::GetHotStateValuesWithProof(request) => {
+                self.get_hot_state_value_chunk_with_proof(request)
+            },
             DataRequest::GetEpochEndingLedgerInfos(request) => {
                 self.get_epoch_ending_ledger_infos(request)
             },
@@ -423,6 +426,9 @@ impl<T: StorageReaderInterface> Handler<T> {
             },
             DataRequest::GetNumberOfStatesAtVersionV2(request) => {
                 self.get_number_of_states_at_version_v2(request)
+            },
+            DataRequest::GetNumberOfHotStatesAtVersion(version) => {
+                self.get_number_of_hot_states_at_version(*version)
             },
             DataRequest::GetTransactionOutputsWithProof(request) => {
                 self.get_transaction_outputs_with_proof(request)
@@ -486,6 +492,21 @@ impl<T: StorageReaderInterface> Handler<T> {
         ))
     }
 
+    fn get_hot_state_value_chunk_with_proof(
+        &self,
+        request: &HotStateValuesWithProofRequest,
+    ) -> aptos_storage_service_types::Result<DataResponse, Error> {
+        let hot_state_value_chunk_with_proof = self.storage.get_hot_state_value_chunk_with_proof(
+            request.version,
+            request.start_index,
+            request.end_index,
+        )?;
+
+        Ok(DataResponse::HotStateValueChunkWithProof(
+            hot_state_value_chunk_with_proof,
+        ))
+    }
+
     fn get_state_value_chunk_with_proof_v2(
         &self,
         request: &StateValuesWithProofRequestV2,
@@ -525,6 +546,16 @@ impl<T: StorageReaderInterface> Handler<T> {
             .get_number_of_states(version, StateKind::MainState)?;
 
         Ok(DataResponse::NumberOfStatesAtVersion(number_of_states))
+    }
+
+    fn get_number_of_hot_states_at_version(
+        &self,
+        version: Version,
+    ) -> aptos_storage_service_types::Result<DataResponse, Error> {
+        let number_of_hot_states = self.storage.get_number_of_hot_states(version)?;
+        Ok(DataResponse::NumberOfHotStatesAtVersion(
+            number_of_hot_states,
+        ))
     }
 
     fn get_number_of_states_at_version_v2(

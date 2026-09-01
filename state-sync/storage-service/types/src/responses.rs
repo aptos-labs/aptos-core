@@ -4,14 +4,15 @@
 use crate::{
     requests::{
         DataRequest::{
-            GetEpochEndingLedgerInfos, GetNewTransactionDataWithProof,
+            GetEpochEndingLedgerInfos, GetHotStateValuesWithProof, GetNewTransactionDataWithProof,
             GetNewTransactionOutputsWithProof, GetNewTransactionsOrOutputsWithProof,
-            GetNewTransactionsWithProof, GetNumberOfStatesAtVersion, GetNumberOfStatesAtVersionV2,
-            GetServerProtocolVersion, GetStateValuesWithProof, GetStateValuesWithProofV2,
-            GetStorageServerSummary, GetTransactionDataWithProof, GetTransactionOutputsWithProof,
-            GetTransactionsOrOutputsWithProof, GetTransactionsWithProof,
-            SubscribeTransactionDataWithProof, SubscribeTransactionOutputsWithProof,
-            SubscribeTransactionsOrOutputsWithProof, SubscribeTransactionsWithProof,
+            GetNewTransactionsWithProof, GetNumberOfHotStatesAtVersion, GetNumberOfStatesAtVersion,
+            GetNumberOfStatesAtVersionV2, GetServerProtocolVersion, GetStateValuesWithProof,
+            GetStateValuesWithProofV2, GetStorageServerSummary, GetTransactionDataWithProof,
+            GetTransactionOutputsWithProof, GetTransactionsOrOutputsWithProof,
+            GetTransactionsWithProof, SubscribeTransactionDataWithProof,
+            SubscribeTransactionOutputsWithProof, SubscribeTransactionsOrOutputsWithProof,
+            SubscribeTransactionsWithProof,
         },
         TransactionDataRequestType,
     },
@@ -26,7 +27,9 @@ use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{
     epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures,
-    state_store::{state_value::StateValueChunkWithProof, StateKind},
+    state_store::{
+        hot_state::HotStateValueChunkWithProof, state_value::StateValueChunkWithProof, StateKind,
+    },
     transaction::{
         TransactionListWithProof, TransactionListWithProofV2, TransactionOutputListWithProof,
         TransactionOutputListWithProofV2, Version,
@@ -163,6 +166,10 @@ pub enum DataResponse {
     // V2 state responses carry the `StateKind`, so one variant serves any snapshot kind.
     StateValueChunkWithProofV2(StateValueChunkWithProofResponseV2),
     NumberOfStatesAtVersionV2(NumberOfStatesResponseV2),
+
+    // Hot state response variants must remain at the end for BCS wire compatibility.
+    HotStateValueChunkWithProof(HotStateValueChunkWithProof),
+    NumberOfHotStatesAtVersion(u64),
 }
 
 /// A state value chunk response (of the given kind) with a proof.
@@ -210,7 +217,13 @@ impl DataResponse {
             },
             Self::NewTransactionsWithProof(_) => Self::get_new_transactions_with_proof_label(),
             Self::NumberOfStatesAtVersion(_) => Self::get_number_of_states_at_version_label(),
+            Self::NumberOfHotStatesAtVersion(_) => {
+                Self::get_number_of_hot_states_at_version_label()
+            },
             Self::ServerProtocolVersion(_) => Self::get_server_protocol_version_label(),
+            Self::HotStateValueChunkWithProof(_) => {
+                Self::get_hot_state_value_chunk_with_proof_label()
+            },
             Self::StateValueChunkWithProof(_) => Self::get_state_value_chunk_with_proof_label(),
             Self::StateValueChunkWithProofV2(_) => {
                 Self::get_state_value_chunk_with_proof_v2_label()
@@ -272,6 +285,11 @@ impl DataResponse {
         "number_of_states_at_version"
     }
 
+    /// Returns a label for the number of hot states at version response
+    pub fn get_number_of_hot_states_at_version_label() -> &'static str {
+        "number_of_hot_states_at_version"
+    }
+
     /// Returns a label for the server protocol version response
     pub fn get_server_protocol_version_label() -> &'static str {
         "server_protocol_version"
@@ -280,6 +298,11 @@ impl DataResponse {
     /// Returns a label for the state value chunk with proof response
     pub fn get_state_value_chunk_with_proof_label() -> &'static str {
         "state_value_chunk_with_proof"
+    }
+
+    /// Returns a label for the hot state value chunk with proof response
+    pub fn get_hot_state_value_chunk_with_proof_label() -> &'static str {
+        "hot_state_value_chunk_with_proof"
     }
 
     /// Returns a label for the v2 state value chunk with proof response
@@ -365,6 +388,21 @@ impl TryFrom<StorageServiceResponse> for StateValueChunkWithProof {
             DataResponse::StateValueChunkWithProof(inner) => Ok(inner),
             _ => Err(Error::UnexpectedResponseError(format!(
                 "expected state_value_chunk_with_proof, found {}",
+                data_response.get_label()
+            ))),
+        }
+    }
+}
+
+impl TryFrom<StorageServiceResponse> for HotStateValueChunkWithProof {
+    type Error = crate::responses::Error;
+
+    fn try_from(response: StorageServiceResponse) -> crate::Result<Self, Self::Error> {
+        let data_response = response.get_data_response()?;
+        match data_response {
+            DataResponse::HotStateValueChunkWithProof(inner) => Ok(inner),
+            _ => Err(Error::UnexpectedResponseError(format!(
+                "expected hot_state_value_chunk_with_proof, found {}",
                 data_response.get_label()
             ))),
         }
@@ -500,7 +538,8 @@ impl TryFrom<StorageServiceResponse> for u64 {
     fn try_from(response: StorageServiceResponse) -> crate::Result<Self, Self::Error> {
         let data_response = response.get_data_response()?;
         match data_response {
-            DataResponse::NumberOfStatesAtVersion(inner) => Ok(inner),
+            DataResponse::NumberOfStatesAtVersion(inner)
+            | DataResponse::NumberOfHotStatesAtVersion(inner) => Ok(inner),
             _ => Err(Error::UnexpectedResponseError(format!(
                 "expected number_of_states_at_version, found {}",
                 data_response.get_label()
@@ -793,8 +832,13 @@ impl DataSummary {
                 .states
                 .map(|range| range.contains(request.version))
                 .unwrap_or(false),
+            GetNumberOfHotStatesAtVersion(version) => self
+                .states
+                .map(|range| range.contains(*version))
+                .unwrap_or(false),
             GetStateValuesWithProof(request) => self.can_service_state_values(request.version),
             GetStateValuesWithProofV2(request) => self.can_service_state_values(request.version),
+            GetHotStateValuesWithProof(request) => self.can_service_state_values(request.version),
             GetTransactionOutputsWithProof(request) => self
                 .can_service_transaction_outputs_with_proof(
                     request.start_version,
