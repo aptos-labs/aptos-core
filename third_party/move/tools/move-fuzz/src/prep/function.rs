@@ -14,6 +14,7 @@ use crate::{
 use move_binary_format::{
     binary_views::BinaryIndexedView, file_format::Visibility, CompiledModule,
 };
+use log::debug;
 use move_core_types::ability::AbilitySet;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -74,14 +75,35 @@ impl FunctionRegistry {
                 }
             }
 
-            // parse parameters and return types
+            // parse parameters and return types; a signature the registry cannot
+            // model (e.g. `Object<u64>`) excludes the function instead of
+            // aborting the whole run
             let mut parameters = vec![];
+            let mut unsupported = false;
             for token in &binary.signature_at(handle.parameters).0 {
-                parameters.push(typing.convert_signature_token(&binary, token));
+                match typing.convert_signature_token(&binary, token) {
+                    Some(ty) => parameters.push(ty),
+                    None => {
+                        unsupported = true;
+                        break;
+                    },
+                }
             }
             let mut return_sig = vec![];
-            for token in &binary.signature_at(handle.return_).0 {
-                return_sig.push(typing.convert_signature_token(&binary, token));
+            if !unsupported {
+                for token in &binary.signature_at(handle.return_).0 {
+                    match typing.convert_signature_token(&binary, token) {
+                        Some(ty) => return_sig.push(ty),
+                        None => {
+                            unsupported = true;
+                            break;
+                        },
+                    }
+                }
+            }
+            if unsupported {
+                debug!("skipping {ident}: signature has a type move-fuzz cannot model");
+                continue;
             }
 
             // add the declaration

@@ -180,14 +180,22 @@ impl DatatypeRegistry {
         match info {
             StructFieldInformation::Native => DatatypeContent::Opaque,
             StructFieldInformation::Declared(fields) => {
-                DatatypeContent::Fields(self.convert_field_types(binary, fields, "struct field"))
+                match self.convert_field_types(binary, fields, "struct field") {
+                    Some(field_types) => DatatypeContent::Fields(field_types),
+                    // a field the registry cannot model: keep the declaration,
+                    // but treat the datatype as having no introspectable contents
+                    None => DatatypeContent::Opaque,
+                }
             },
             StructFieldInformation::DeclaredVariants(variants) => {
                 let mut variant_table = BTreeMap::new();
                 for variant_def in variants {
                     let key = binary.identifier_at(variant_def.name).to_owned();
-                    let field_types =
-                        self.convert_field_types(binary, &variant_def.fields, "enum variant");
+                    let Some(field_types) =
+                        self.convert_field_types(binary, &variant_def.fields, "enum variant")
+                    else {
+                        return DatatypeContent::Opaque;
+                    };
                     let existing = variant_table.insert(key, field_types);
                     assert!(existing.is_none());
                 }
@@ -196,21 +204,26 @@ impl DatatypeRegistry {
         }
     }
 
-    /// Resolve the declared types of a field list, rejecting reference types
+    /// Resolve the declared types of a field list, rejecting reference types.
+    ///
+    /// Returns `None` if any field has a type this registry cannot model; the
+    /// caller then records the datatype as `Opaque`, which already means
+    /// "declared, but contents not introspectable".
     fn convert_field_types(
         &mut self,
         binary: &BinaryIndexedView,
         fields: &[FieldDefinition],
         context: &str,
-    ) -> Vec<TypeExpr> {
+    ) -> Option<Vec<TypeExpr>> {
         fields
             .iter()
             .map(
                 |field_def| match self.convert_signature_token(binary, &field_def.signature.0) {
-                    TypeRef::Base(tag) => tag,
-                    TypeRef::ImmRef(_) | TypeRef::MutRef(_) => {
+                    Some(TypeRef::Base(tag)) => Some(tag),
+                    Some(TypeRef::ImmRef(_)) | Some(TypeRef::MutRef(_)) => {
                         panic!("unexpected reference type as {context}");
                     },
+                    None => None,
                 },
             )
             .collect()
@@ -313,13 +326,25 @@ impl DatatypeRegistry {
         (decl, content)
     }
 
-    /// Convert a signature token
+    /// Convert a signature token.
+    ///
+    /// Returns `None` for a signature the fuzzer cannot model. The only such
+    /// shape today is an `Object<T>` whose type argument is neither a datatype
+    /// nor a type parameter: `Object<phantom T>` puts no ability constraint on
+    /// `T`, so `public fun f(o: Object<u64>)` is legal Move that this registry
+    /// has no `TypeExpr` for. Callers drop the enclosing declaration rather than
+    /// aborting the run -- the same way an unsupported transaction argument
+    /// excludes an entrypoint (see `TxnArgType::convert`).
+    ///
+    /// The remaining `panic!`s below are on shapes the bytecode verifier makes
+    /// unrepresentable (a reference nested inside a vector, a type argument or
+    /// another reference), so they are invariant checks, not input validation.
     pub fn convert_signature_token(
         &mut self,
         binary: &BinaryIndexedView,
         token: &SignatureToken,
-    ) -> TypeRef {
-        match token {
+    ) -> Option<TypeRef> {
+        let converted = match token {
             SignatureToken::Bool => TypeRef::Base(TypeExpr::Bool),
             SignatureToken::U8 => TypeRef::Base(TypeExpr::U8),
             SignatureToken::I8 => TypeRef::Base(TypeExpr::I8),
@@ -336,7 +361,7 @@ impl DatatypeRegistry {
             SignatureToken::Address => TypeRef::Base(TypeExpr::Address),
             SignatureToken::Signer => TypeRef::Base(TypeExpr::Signer),
             SignatureToken::Vector(element) => {
-                let element_tag = match self.convert_signature_token(binary, element) {
+                let element_tag = match self.convert_signature_token(binary, element)? {
                     TypeRef::Base(tag) => tag,
                     TypeRef::ImmRef(_) | TypeRef::MutRef(_) => {
                         panic!("reference type as vector element is not expected");
@@ -377,12 +402,13 @@ impl DatatypeRegistry {
                 let mut ty_args: Vec<_> = inst
                     .iter()
                     .map(|t| match self.convert_signature_token(binary, t) {
-                        TypeRef::Base(tag) => tag,
-                        TypeRef::ImmRef(_) | TypeRef::MutRef(_) => {
+                        Some(TypeRef::Base(tag)) => Some(tag),
+                        Some(TypeRef::ImmRef(_)) | Some(TypeRef::MutRef(_)) => {
                             panic!("reference type as datatype instantiation is not expected");
                         },
+                        None => None,
                     })
-                    .collect();
+                    .collect::<Option<Vec<_>>>()?;
 
                 // first try to see if this is an intrinsic type
                 match IntrinsicType::try_parse_ident(&ident) {
@@ -417,7 +443,9 @@ impl DatatypeRegistry {
                             | TypeExpr::ObjectKnown { .. }
                             | TypeExpr::ObjectParam(_)
                             | TypeExpr::Function { .. } => {
-                                panic!("type argument for Object must be a datatype or parameter")
+                                // `Object<phantom T>` constrains nothing, so this is
+                                // legal Move the fuzzer simply cannot drive.
+                                return None;
                             },
                         }
                     },
@@ -434,7 +462,7 @@ impl DatatypeRegistry {
                 }
             },
             SignatureToken::Reference(inner) => {
-                let inner_tag = match self.convert_signature_token(binary, inner) {
+                let inner_tag = match self.convert_signature_token(binary, inner)? {
                     TypeRef::Base(tag) => tag,
                     TypeRef::ImmRef(_) | TypeRef::MutRef(_) => {
                         panic!("reference type behind immutable borrow is not expected");
@@ -443,7 +471,7 @@ impl DatatypeRegistry {
                 TypeRef::ImmRef(inner_tag)
             },
             SignatureToken::MutableReference(inner) => {
-                let inner_tag = match self.convert_signature_token(binary, inner) {
+                let inner_tag = match self.convert_signature_token(binary, inner)? {
                     TypeRef::Base(tag) => tag,
                     TypeRef::ImmRef(_) | TypeRef::MutRef(_) => {
                         panic!("reference type behind mutable borrow is not expected");
@@ -455,11 +483,11 @@ impl DatatypeRegistry {
                 let params = param_tokens
                     .iter()
                     .map(|t| self.convert_signature_token(binary, t))
-                    .collect();
+                    .collect::<Option<Vec<_>>>()?;
                 let returns = return_tokens
                     .iter()
                     .map(|t| self.convert_signature_token(binary, t))
-                    .collect();
+                    .collect::<Option<Vec<_>>>()?;
                 TypeRef::Base(TypeExpr::Function {
                     params,
                     returns,
@@ -467,7 +495,8 @@ impl DatatypeRegistry {
                 })
             },
             SignatureToken::TypeParameter(idx) => TypeRef::Base(TypeExpr::Param(*idx as usize)),
-        }
+        };
+        Some(converted)
     }
 
     /// Instantiate type parameters in this type tag with the type arguments
@@ -645,7 +674,11 @@ mod tests {
             typing::{TypeBase, TypeRef, TypeExpr},
         },
     };
-    use move_binary_format::file_format::StructTypeParameter;
+    use move_binary_format::file_format::{
+        empty_module, AddressIdentifierIndex, IdentifierIndex, ModuleHandle, ModuleHandleIndex,
+        SignatureToken, StructHandle, StructHandleIndex, StructTypeParameter,
+    };
+    use move_binary_format::{binary_views::BinaryIndexedView, CompiledModule};
     use move_core_types::{
         ability::{Ability, AbilitySet},
         account_address::AccountAddress,
@@ -797,5 +830,76 @@ mod tests {
         assert_eq!(decl.kind, PkgKind::Framework);
         assert_eq!(decl.abilities, AbilitySet::EMPTY.add(Ability::Key));
         assert!(matches!(content, DatatypeContent::Fields(fields) if fields.is_empty()));
+    }
+
+    /// `Object<phantom T>` puts no ability constraint on `T`, so
+    /// `public fun f(o: Object<u64>)` compiles. The registry has no `TypeExpr`
+    /// for it and used to `panic!`, taking down the whole `auto` run.
+    #[test]
+    fn test_convert_signature_token_rejects_object_of_non_datatype() {
+        // build a module that can name `0x1::object::Object<_>`
+        let mut module: CompiledModule = empty_module();
+        module.address_identifiers.push(AccountAddress::ONE);
+        module.identifiers.push(Identifier::new("object").unwrap());
+        module.identifiers.push(Identifier::new("Object").unwrap());
+        let object_module = IdentifierIndex((module.identifiers.len() - 2) as u16);
+        let object_name = IdentifierIndex((module.identifiers.len() - 1) as u16);
+        module.module_handles.push(ModuleHandle {
+            address: AddressIdentifierIndex((module.address_identifiers.len() - 1) as u16),
+            name: object_module,
+        });
+        module.struct_handles.push(StructHandle {
+            module: ModuleHandleIndex((module.module_handles.len() - 1) as u16),
+            name: object_name,
+            abilities: AbilitySet::EMPTY.add(Ability::Key).add(Ability::Store),
+            type_parameters: vec![type_param(AbilitySet::EMPTY, /* is_phantom */ true)],
+        });
+        let object_handle = StructHandleIndex((module.struct_handles.len() - 1) as u16);
+
+        let view = BinaryIndexedView::Module(&module);
+        let mut registry = DatatypeRegistry::new();
+
+        // `Object<u64>` is legal Move but not modellable: skip, do not panic
+        assert!(registry
+            .convert_signature_token(&view, &SignatureToken::StructInstantiation(
+                object_handle,
+                vec![SignatureToken::U64],
+            ))
+            .is_none());
+
+        // and the rejection propagates out of every nesting position
+        assert!(registry
+            .convert_signature_token(
+                &view,
+                &SignatureToken::Vector(Box::new(SignatureToken::StructInstantiation(
+                    object_handle,
+                    vec![SignatureToken::U64],
+                )))
+            )
+            .is_none());
+        assert!(registry
+            .convert_signature_token(
+                &view,
+                &SignatureToken::Reference(Box::new(SignatureToken::StructInstantiation(
+                    object_handle,
+                    vec![SignatureToken::Address],
+                )))
+            )
+            .is_none());
+
+        // `Object<T>` over a type parameter is still supported
+        assert!(matches!(
+            registry.convert_signature_token(&view, &SignatureToken::StructInstantiation(
+                object_handle,
+                vec![SignatureToken::TypeParameter(0)],
+            )),
+            Some(TypeRef::Base(TypeExpr::ObjectParam(0)))
+        ));
+
+        // ... as are ordinary types
+        assert!(matches!(
+            registry.convert_signature_token(&view, &SignatureToken::U64),
+            Some(TypeRef::Base(TypeExpr::U64))
+        ));
     }
 }
