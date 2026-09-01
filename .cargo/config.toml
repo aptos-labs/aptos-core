@@ -27,7 +27,6 @@ xclippy = [
   "-Aclippy::explicit_counter_loop",
   "-Aclippy::extra_unused_lifetimes",
   "-Aclippy::manual_checked_ops",
-  "-Aclippy::manual_clear",
   "-Aclippy::manual_filter",
   "-Aclippy::map_or_identity",
   "-Aclippy::missing_spin_loop",
