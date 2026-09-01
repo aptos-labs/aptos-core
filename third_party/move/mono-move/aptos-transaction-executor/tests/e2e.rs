@@ -78,7 +78,7 @@ fn first_txn_aux_info() -> AuxiliaryInfo {
 /// transaction through it, and materializes the outcome.
 fn execute_v2_with<S: StateView>(
     state: &S,
-    run: impl for<'guard> FnOnce(&AptosTransactionExecutor<'guard>) -> TxnOutcome<'guard>,
+    run: impl for<'guard> FnOnce(&AptosTransactionExecutor<'guard>) -> TxnOutcome,
 ) -> TransactionOutput {
     let global_ctx = GlobalContext::with_num_execution_workers(1);
     let guard = global_ctx
@@ -108,6 +108,7 @@ fn execute_v2_in<S: StateView>(
     );
     run(&executor)
         .materialize(
+            &guard,
             &data_provider,
             env.features(),
             TransactionAuxiliaryData::default(),
