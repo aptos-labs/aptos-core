@@ -26,15 +26,11 @@ use anyhow::{bail, Result};
 use aptos_types::{
     account_address::AccountAddress,
     state_store::{state_key::StateKey, state_value::StateValue},
-    transaction::{
-        ExecutionStatus, Script, TransactionArgument, TransactionPayload, TransactionStatus,
-    },
+    transaction::{Script, TransactionArgument, TransactionPayload},
 };
-use log::debug;
 use move_core_types::{
     language_storage::{StructTag, TypeTag},
     value::MoveValue,
-    vm_status::VMStatus,
 };
 use move_coverage::coverage_map::{CoverageMap, ExecCoverageMap};
 use move_vm_runtime::tracing::{clear_tracing_buffer, flush_tracing_buffer};
@@ -42,7 +38,7 @@ use rand::{rngs::StdRng, seq::SliceRandom, Rng};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    path::{Path, PathBuf},
+    path::PathBuf,
     time::Instant,
 };
 
@@ -50,11 +46,8 @@ use std::{
 pub const MAX_CHAIN_FUZZERS: usize = 50;
 const MAX_CHAIN_CORPUS: usize = 160;
 
-/// Number of discovery runs per script during profiling
-const NUM_DISCOVERY_RUNS: usize = 10;
-
 // ---------------------------------------------------------------------------
-// Resource tagging and script profiling (kept from original)
+// Resource tagging and per-execution profiling
 // ---------------------------------------------------------------------------
 
 /// A global-state identifier for def-use matching: the storage account plus
@@ -170,14 +163,6 @@ impl From<(Vec<TypeTag>, Vec<MoveValue>)> for SeedInput {
     }
 }
 
-/// Per-script resource access profile
-pub struct ScriptProfile {
-    pub script_index: usize,
-    pub reads: BTreeSet<ResourceTag>,
-    pub writes: BTreeSet<ResourceTag>,
-    pub ever_succeeded: bool,
-}
-
 /// Resource profile from a single execution.
 /// Used to feed per-seed observations back into the DUG.
 #[derive(Clone)]
@@ -191,9 +176,8 @@ pub struct ExecResourceProfile {
 impl ExecResourceProfile {
     /// Build from raw execution outputs.
     ///
-    /// Reads are always recorded.
-    /// Writes are only recorded when `succeeded` is true.
-    /// This matches the convention in `discover_profiles()`.
+    /// Writes are recorded only when `succeeded` is true; reads are filtered by
+    /// presence (see the body).
     pub fn from_execution(
         script_index: usize,
         resource_writes: &[ResourceWrite],
@@ -241,104 +225,6 @@ impl ExecResourceProfile {
             succeeded,
         }
     }
-}
-
-/// Discover resource access profiles for each script by running them
-/// multiple times with random inputs
-pub fn discover_profiles(
-    base_executor: &TracingExecutor,
-    entrypoints: &[(ScriptSignature, Vec<u8>)],
-    type_pool: &TypePool,
-    dict_string: &[String],
-    seed: u64,
-    _trace_path: &Path,
-) -> Vec<ScriptProfile> {
-    let mut profiles = Vec::with_capacity(entrypoints.len());
-
-    for (idx, (sig, code)) in entrypoints.iter().enumerate() {
-        let mut executor = base_executor.clone();
-        let mut mutator = Mutator::new(
-            seed.wrapping_add(idx as u64),
-            executor.all_addresses_by_kind(),
-            type_pool.clone(),
-            dict_string.to_vec(),
-        );
-
-        let mut all_reads = BTreeSet::new();
-        let mut all_writes = BTreeSet::new();
-        let mut ever_succeeded = false;
-
-        for _ in 0..NUM_DISCOVERY_RUNS {
-            let sender = mutator.random_signer();
-
-            let non_signer_params: Vec<_> = sig
-                .parameters
-                .iter()
-                .filter(|ty| !matches!(ty, BasicInput::Signer))
-                .collect();
-
-            let ty_args = mutator.random_type_args(&sig.generics);
-            let args: Vec<MoveValue> = non_signer_params
-                .iter()
-                .map(|ty| mutator.random_value(ty))
-                .collect();
-
-            let payload = TransactionPayload::Script(Script::new(
-                code.clone(),
-                ty_args,
-                args.iter()
-                    .map(|arg| {
-                        TransactionArgument::Serialized(
-                            MoveValue::simple_serialize(arg).expect("arguments must serialize"),
-                        )
-                    })
-                    .collect(),
-            ));
-
-            // clear trace buffer before discovery run
-            clear_tracing_buffer();
-
-            let result = executor.run_payload_with_sender_tracking(sender, payload);
-
-            // flush trace buffer after discovery run
-            flush_tracing_buffer();
-
-            if let Ok((vm_status, txn_status, resource_writes, resource_reads)) = result {
-                // collect reads
-                for read in &resource_reads {
-                    if let Some(tag) = ResourceTag::tracked(read.address, &read.struct_tag) {
-                        all_reads.insert(tag);
-                    }
-                }
-
-                // collect writes only from successful executions
-                let is_success = matches!(
-                    (&vm_status, &txn_status),
-                    (
-                        VMStatus::Executed,
-                        TransactionStatus::Keep(ExecutionStatus::Success)
-                    )
-                );
-                if is_success {
-                    ever_succeeded = true;
-                    for write in &resource_writes {
-                        if let Some(tag) = ResourceTag::tracked(write.address, &write.struct_tag) {
-                            all_writes.insert(tag);
-                        }
-                    }
-                }
-            }
-        }
-
-        profiles.push(ScriptProfile {
-            script_index: idx,
-            reads: all_reads,
-            writes: all_writes,
-            ever_succeeded,
-        });
-    }
-
-    profiles
 }
 
 // ---------------------------------------------------------------------------
@@ -460,26 +346,6 @@ impl DefUseGraph {
             seed_class_counts: BTreeMap::new(),
             next_seed_id: 0,
         }
-    }
-
-    /// Build a DUG from discovery profiles.
-    pub fn from_profiles(profiles: &[ScriptProfile]) -> Self {
-        let num_scripts = profiles.len();
-        let mut dug = Self::new(num_scripts);
-        for profile in profiles {
-            let exec_profile = ExecResourceProfile {
-                script_index: profile.script_index,
-                reads: profile.reads.clone(),
-                writes: profile.writes.clone(),
-                succeeded: profile.ever_succeeded,
-            };
-            dug.ingest_profile(&exec_profile);
-        }
-
-        // Building from historical profiles is a bootstrap operation.
-        // Reset the marker so dynamic updates start from 0.
-        dug.modification_count = 0;
-        dug
     }
 
     /// Number of seed nodes in the DUG.
@@ -622,13 +488,6 @@ impl DefUseGraph {
         self.equivalent_type_nodes(needed_type)
             .into_iter()
             .any(|type_idx| available_types.contains(&type_idx))
-    }
-
-    pub fn approx_producers_of(&self, type_node: usize) -> BTreeSet<usize> {
-        self.equivalent_type_nodes(type_node)
-            .into_iter()
-            .flat_map(|type_idx| self.producers_of(type_idx).iter().copied())
-            .collect()
     }
 
     pub fn approx_seed_producers_of(&self, type_node: usize) -> BTreeSet<usize> {
@@ -1454,38 +1313,6 @@ impl SequenceDb {
         id
     }
 
-    /// Find all entries whose `steps` are a prefix of (or equal to) `chain_steps`.
-    pub fn find_prefix_seeds(&self, chain_steps: &[usize]) -> Vec<&SequenceEntry> {
-        self.entries
-            .iter()
-            .filter(|e| {
-                e.all_succeeded
-                    && e.steps.len() <= chain_steps.len()
-                    && e.steps.as_slice() == &chain_steps[..e.steps.len()]
-            })
-            .collect()
-    }
-
-    /// Count prefix-compatible entries for a given chain.
-    pub fn prefix_compatible_count(&self, chain_steps: &[usize]) -> usize {
-        self.find_prefix_seeds(chain_steps).len()
-    }
-
-    /// Pick a random prefix-compatible entry's seed, truncated to the prefix length.
-    pub fn pick_prefix_seed(
-        &self,
-        chain_steps: &[usize],
-        rng: &mut StdRng,
-    ) -> Option<Vec<SeedInput>> {
-        let compatible: Vec<_> = self.find_prefix_seeds(chain_steps);
-        if compatible.is_empty() {
-            return None;
-        }
-        let entry = compatible[rng.gen_range(0, compatible.len())];
-        // Return seed truncated to the prefix length
-        Some(entry.seed[..entry.steps.len()].to_vec())
-    }
-
     fn entry_prefix_is_state_consistent(dug: &DefUseGraph, entry: &SequenceEntry) -> bool {
         let mut available = dug.initial_resource_tags();
         for (reads, writes) in entry
@@ -1946,63 +1773,6 @@ impl SequenceDb {
 // Chain construction
 // ---------------------------------------------------------------------------
 
-/// Construct dependency chains from the DUG.
-///
-/// For each target script that has unmet dependencies, build a chain by backward
-/// traversal of the DUG. Targets are prioritized: never-succeeded scripts first,
-/// then by number of unmet dependencies (more = more interesting).
-pub fn construct_chains(
-    dug: &DefUseGraph,
-    max_chain_length: usize,
-    max_repetition: usize,
-    max_chains: usize,
-    rng: &mut StdRng,
-) -> Vec<Chain> {
-    let mut chains = Vec::new();
-
-    // Collect and prioritize targets
-    let mut targets: Vec<usize> = (0..dug.num_scripts()).collect();
-    targets.sort_by(|a, b| {
-        let a_failed = !dug.script_ever_succeeded(*a);
-        let b_failed = !dug.script_ever_succeeded(*b);
-        // Never-succeeded scripts first, then by number of unmet deps (descending)
-        b_failed.cmp(&a_failed).then_with(|| {
-            let a_unmet = dug.unmet_deps(*a).len();
-            let b_unmet = dug.unmet_deps(*b).len();
-            b_unmet.cmp(&a_unmet)
-        })
-    });
-
-    for &target in &targets {
-        if chains.len() >= max_chains {
-            break;
-        }
-
-        // Only build chains for scripts with unmet dependencies
-        let unmet = dug.unmet_deps(target);
-        if unmet.is_empty() {
-            continue;
-        }
-
-        if let Some(chain) = build_one_chain(dug, target, max_chain_length, max_repetition, rng) {
-            debug!(
-                "chain for target {}: [{}] (length {})",
-                target,
-                chain
-                    .steps
-                    .iter()
-                    .map(|s| s.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", "),
-                chain.len(),
-            );
-            chains.push(chain);
-        }
-    }
-
-    chains
-}
-
 /// A chain with concrete seed inputs selected from DUG seed nodes.
 #[derive(Debug, Clone)]
 pub struct SeedChain {
@@ -2228,88 +1998,6 @@ fn build_one_seed_chain(
         seed_inputs,
         target_seed_id: target_seed.id,
     })
-}
-
-/// Build one chain ending at `target` by backward greedy traversal of the DUG.
-///
-/// Algorithm:
-/// 1. Start with `chain_reversed = [target]` and `resolved_types = defs_of(target)`
-/// 2. Queue all unmet dependencies (types target reads but doesn't write)
-/// 3. While queue non-empty and chain length < max_length:
-///    - Pop a needed type (random for variety)
-///    - Find a producer, preferring scripts that have succeeded (70/30 bias)
-///    - Add producer to chain, mark its defs as resolved, enqueue its unmet deps
-/// 4. Reverse to get execution order (producers first, target last)
-fn build_one_chain(
-    dug: &DefUseGraph,
-    target: usize,
-    max_length: usize,
-    max_repetition: usize,
-    rng: &mut StdRng,
-) -> Option<Chain> {
-    let mut steps = vec![target];
-    let mut occurrence_count: BTreeMap<usize, usize> = BTreeMap::new();
-    *occurrence_count.entry(target).or_insert(0) += 1;
-
-    while steps.len() < max_length {
-        let Some((insert_pos, needed_type)) = dug.first_unmet_dependency_in_steps(&steps) else {
-            break;
-        };
-        if needed_type == usize::MAX {
-            return None;
-        }
-
-        let mut currently_unresolved = BTreeSet::new();
-        let mut available = dug.initial_types.clone();
-        for &step in &steps {
-            for &read in dug.uses_of(step) {
-                if !dug.type_is_available(&available, read) {
-                    currently_unresolved.insert(read);
-                }
-            }
-            available.extend(dug.defs_of(step).iter().copied());
-        }
-
-        let producers = dug.approx_producers_of(needed_type);
-        if producers.is_empty() {
-            return None;
-        }
-
-        let mut eligible: Vec<usize> = producers
-            .into_iter()
-            .filter(|&p| occurrence_count.get(&p).copied().unwrap_or(0) < max_repetition)
-            .collect();
-        if eligible.is_empty() {
-            return None;
-        }
-
-        eligible.sort_by(|a, b| {
-            let a_defs = dug.defs_of(*a);
-            let b_defs = dug.defs_of(*b);
-            let a_score = (
-                dug.resolved_dependency_count(a_defs, &currently_unresolved),
-                a_defs.len(),
-                dug.script_ever_succeeded(*a),
-                dug.unmet_deps(*a).len(),
-            );
-            let b_score = (
-                dug.resolved_dependency_count(b_defs, &currently_unresolved),
-                b_defs.len(),
-                dug.script_ever_succeeded(*b),
-                dug.unmet_deps(*b).len(),
-            );
-            b_score.cmp(&a_score)
-        });
-        let top_n = eligible.len().min(3);
-        let producer = eligible[rng.gen_range(0, top_n)];
-        steps.insert(insert_pos, producer);
-        *occurrence_count.entry(producer).or_insert(0) += 1;
-    }
-
-    if steps.len() <= 1 || !dug.are_dependencies_satisfied(&steps) {
-        return None;
-    }
-    Some(Chain { steps })
 }
 
 // ---------------------------------------------------------------------------
@@ -3045,13 +2733,114 @@ mod tests {
         reads: Vec<&str>,
         writes: Vec<&str>,
         succeeded: bool,
-    ) -> ScriptProfile {
-        ScriptProfile {
+    ) -> ExecResourceProfile {
+        ExecResourceProfile {
             script_index: index,
             reads: reads.into_iter().map(make_resource_tag).collect(),
             writes: writes.into_iter().map(make_resource_tag).collect(),
-            ever_succeeded: succeeded,
+            succeeded,
         }
+    }
+
+    /// Build a DUG by ingesting profiles through the live `ingest_profile`.
+    ///
+    /// This replaced `DefUseGraph::from_profiles`, which did the same thing in
+    /// production purely so tests could call it. Keeping the constructor in the
+    /// test module means these tests still exercise the code the campaign runs,
+    /// without the crate shipping an entry point nothing uses.
+    fn dug_from_profiles(profiles: &[ExecResourceProfile]) -> DefUseGraph {
+        let mut dug = DefUseGraph::new(profiles.len());
+        for profile in profiles {
+            dug.ingest_profile(profile);
+        }
+        dug
+    }
+
+    #[test]
+    fn test_dug_empty() {
+        let profiles: Vec<ExecResourceProfile> = vec![];
+        let dug = dug_from_profiles(&profiles);
+        assert_eq!(dug.num_scripts(), 0);
+        assert_eq!(dug.num_types(), 0);
+    }
+
+    #[test]
+    fn test_dug_resource_tag_distinguishes_accounts() {
+        // Same struct type under different storage accounts should map to distinct nodes.
+        let account_1 = AccountAddress::from_hex_literal("0x1").unwrap();
+        let account_2 = AccountAddress::from_hex_literal("0x2").unwrap();
+
+        let profiles = vec![
+            ExecResourceProfile {
+                script_index: 0,
+                reads: BTreeSet::new(),
+                writes: BTreeSet::from([make_resource_tag_at("A", account_1)]),
+                succeeded: true,
+            },
+            ExecResourceProfile {
+                script_index: 1,
+                reads: BTreeSet::new(),
+                writes: BTreeSet::from([make_resource_tag_at("A", account_2)]),
+                succeeded: true,
+            },
+        ];
+        let dug = dug_from_profiles(&profiles);
+
+        assert_eq!(dug.num_types(), 2);
+        let t1 = dug
+            .type_index_of(&make_resource_tag_at("A", account_1))
+            .copied();
+        let t2 = dug
+            .type_index_of(&make_resource_tag_at("A", account_2))
+            .copied();
+        assert!(t1.is_some());
+        assert!(t2.is_some());
+        assert_ne!(t1, t2);
+    }
+
+    #[test]
+    fn test_seq_db_concrete_prefix_prefers_exact_needed_tag() {
+        let profiles = vec![
+            make_profile(0, vec![], vec!["A"], true),
+            make_profile(1, vec![], vec!["B"], true),
+            make_profile(2, vec!["A"], vec![], false),
+        ];
+        let dug = dug_from_profiles(&profiles);
+
+        let mut db = SequenceDb::new();
+        let seed_a = vec![SeedInput::new(
+            AccountAddress::from_hex_literal("0x1").unwrap(),
+            vec![],
+            vec![MoveValue::U64(10)],
+        )];
+        let seed_b = vec![SeedInput::new(
+            AccountAddress::from_hex_literal("0x2").unwrap(),
+            vec![],
+            vec![MoveValue::U64(20)],
+        )];
+        db.add_entry(vec![0], seed_a.clone(), &[make_exec_profile(
+            0,
+            vec![],
+            vec!["A"],
+            true,
+        )]);
+        db.add_entry(vec![1], seed_b, &[make_exec_profile(
+            1,
+            vec![],
+            vec!["B"],
+            true,
+        )]);
+
+        let compatible = db.find_concrete_prefix_seeds(&dug, &[0, 2]);
+        assert_eq!(compatible.len(), 1);
+        assert_eq!(compatible[0].steps, vec![0]);
+        assert_eq!(db.concrete_prefix_compatible_count(&dug, &[0, 2]), 1);
+
+        let mut rng = StdRng::seed_from_u64(9);
+        let picked = db
+            .pick_concrete_prefix_seed(&dug, &[0, 2], &mut rng)
+            .unwrap();
+        assert_eq!(picked, seed_a);
     }
 
     /// Helper: create a ResourceWrite from a simple name
@@ -3199,7 +2988,7 @@ mod tests {
             make_profile(2, vec!["A", "B"], vec![], false),
         ];
 
-        let dug = DefUseGraph::from_profiles(&profiles);
+        let dug = dug_from_profiles(&profiles);
 
         assert_eq!(dug.num_scripts(), 3);
         assert_eq!(dug.num_types(), 2); // A, B
@@ -3240,57 +3029,15 @@ mod tests {
     }
 
     #[test]
-    fn test_dug_empty() {
-        let profiles: Vec<ScriptProfile> = vec![];
-        let dug = DefUseGraph::from_profiles(&profiles);
-        assert_eq!(dug.num_scripts(), 0);
-        assert_eq!(dug.num_types(), 0);
-    }
-
-    #[test]
     fn test_dug_no_producers() {
         // S0: reads {T_X}, writes nothing, never succeeded
         let profiles = vec![make_profile(0, vec!["X"], vec![], false)];
-        let dug = DefUseGraph::from_profiles(&profiles);
+        let dug = dug_from_profiles(&profiles);
 
         assert_eq!(dug.num_types(), 1);
         let tag_x = make_resource_tag("X");
         let ti_x = *dug.type_index.get(&tag_x).unwrap();
         assert!(dug.producers_of(ti_x).is_empty());
-    }
-
-    #[test]
-    fn test_dug_resource_tag_distinguishes_accounts() {
-        // Same struct type under different storage accounts should map to distinct nodes.
-        let account_1 = AccountAddress::from_hex_literal("0x1").unwrap();
-        let account_2 = AccountAddress::from_hex_literal("0x2").unwrap();
-
-        let profiles = vec![
-            ScriptProfile {
-                script_index: 0,
-                reads: BTreeSet::new(),
-                writes: BTreeSet::from([make_resource_tag_at("A", account_1)]),
-                ever_succeeded: true,
-            },
-            ScriptProfile {
-                script_index: 1,
-                reads: BTreeSet::new(),
-                writes: BTreeSet::from([make_resource_tag_at("A", account_2)]),
-                ever_succeeded: true,
-            },
-        ];
-        let dug = DefUseGraph::from_profiles(&profiles);
-
-        assert_eq!(dug.num_types(), 2);
-        let t1 = dug
-            .type_index_of(&make_resource_tag_at("A", account_1))
-            .copied();
-        let t2 = dug
-            .type_index_of(&make_resource_tag_at("A", account_2))
-            .copied();
-        assert!(t1.is_some());
-        assert!(t2.is_some());
-        assert_ne!(t1, t2);
     }
 
     #[test]
@@ -3550,79 +3297,6 @@ mod tests {
     // -----------------------------------------------------------------------
 
     #[test]
-    fn test_chain_linear() {
-        // S0: writes {A}, reads {}
-        // S1: writes {B}, reads {A}
-        // S2: writes {}, reads {B}   (never succeeded)
-        let profiles = vec![
-            make_profile(0, vec![], vec!["A"], true),
-            make_profile(1, vec!["A"], vec!["B"], true),
-            make_profile(2, vec!["B"], vec![], false),
-        ];
-        let dug = DefUseGraph::from_profiles(&profiles);
-        let mut rng = StdRng::seed_from_u64(42);
-
-        let chains = construct_chains(&dug, 5, 2, 10, &mut rng);
-
-        // Should produce at least one chain ending at S2
-        assert!(!chains.is_empty());
-        let chain = &chains[0];
-        assert_eq!(chain.target(), 2);
-        // Chain must contain S1 (produces B) and may contain S0 (produces A for S1)
-        assert!(chain.steps.contains(&1));
-        // Target is last
-        assert_eq!(*chain.steps.last().unwrap(), 2);
-    }
-
-    #[test]
-    fn test_chain_diamond() {
-        // S0: writes {A}, reads {}
-        // S1: writes {B}, reads {}
-        // S2: writes {}, reads {A, B}  (never succeeded)
-        let profiles = vec![
-            make_profile(0, vec![], vec!["A"], true),
-            make_profile(1, vec![], vec!["B"], true),
-            make_profile(2, vec!["A", "B"], vec![], false),
-        ];
-        let dug = DefUseGraph::from_profiles(&profiles);
-        let mut rng = StdRng::seed_from_u64(42);
-
-        let chains = construct_chains(&dug, 5, 2, 10, &mut rng);
-
-        assert!(!chains.is_empty());
-        let chain = &chains[0];
-        assert_eq!(chain.target(), 2);
-        // Chain must include both S0 and S1
-        assert!(chain.steps.contains(&0));
-        assert!(chain.steps.contains(&1));
-        // Both must come before S2
-        let pos_0 = chain.steps.iter().position(|&s| s == 0).unwrap();
-        let pos_1 = chain.steps.iter().position(|&s| s == 1).unwrap();
-        let pos_2 = chain.steps.iter().position(|&s| s == 2).unwrap();
-        assert!(pos_0 < pos_2);
-        assert!(pos_1 < pos_2);
-    }
-
-    #[test]
-    fn test_chain_max_length() {
-        // Deep chain: S0->A, S1 reads A writes B, S2 reads B writes C, S3 reads C writes D, S4 reads D
-        let profiles = vec![
-            make_profile(0, vec![], vec!["A"], true),
-            make_profile(1, vec!["A"], vec!["B"], true),
-            make_profile(2, vec!["B"], vec!["C"], true),
-            make_profile(3, vec!["C"], vec!["D"], true),
-            make_profile(4, vec!["D"], vec![], false),
-        ];
-        let dug = DefUseGraph::from_profiles(&profiles);
-        let mut rng = StdRng::seed_from_u64(42);
-
-        // max_chain_length = 3 is insufficient to satisfy S4's transitive dependencies.
-        // With strict unresolved-dependency rejection, no chain targeting S4 should be returned.
-        let chains = construct_chains(&dug, 3, 2, 10, &mut rng);
-        assert!(chains.iter().all(|c| c.target() != 4));
-    }
-
-    #[test]
     fn test_sequence_db_snapshot_roundtrip_preserves_entry() {
         let mut db = SequenceDb::new();
         db.add_entry(
@@ -3742,75 +3416,6 @@ mod tests {
         assert_eq!(fuzzer.seed_pool_snapshot().len(), fuzzer.corpus_size());
     }
 
-    #[test]
-    fn test_chain_self_sufficient() {
-        // S0: reads {A}, writes {A}. Without initial state or a predecessor
-        // producer, the chain builder should not treat this as self-sufficient.
-        let profiles = vec![make_profile(0, vec!["A"], vec!["A"], true)];
-        let dug = DefUseGraph::from_profiles(&profiles);
-        let mut rng = StdRng::seed_from_u64(42);
-
-        let chains = construct_chains(&dug, 5, 2, 10, &mut rng);
-
-        assert_eq!(dug.unmet_deps(0).len(), 1);
-        assert!(chains.is_empty());
-    }
-
-    #[test]
-    fn test_chain_no_producer() {
-        // S0: reads {X}, writes {} (never succeeded, X has no producer)
-        let profiles = vec![make_profile(0, vec!["X"], vec![], false)];
-        let dug = DefUseGraph::from_profiles(&profiles);
-        let mut rng = StdRng::seed_from_u64(42);
-
-        let chains = construct_chains(&dug, 5, 2, 10, &mut rng);
-
-        // S0 has unmet deps but no producer can be found → no chain
-        assert!(chains.is_empty());
-    }
-
-    #[test]
-    fn test_chain_repetition_limit() {
-        // S0: reads {A}, writes {A, B}  (succeeded, needs itself for A)
-        // S1: reads {B}, writes {}  (never succeeded)
-        let profiles = vec![
-            make_profile(0, vec!["A"], vec!["A", "B"], true),
-            make_profile(1, vec!["B"], vec![], false),
-        ];
-        let mut dug = DefUseGraph::from_profiles(&profiles);
-        dug.ingest_initial_writes(&[make_resource_write("A")]);
-        let mut rng = StdRng::seed_from_u64(42);
-
-        let chains = construct_chains(&dug, 5, 1, 10, &mut rng);
-
-        // With A provisioned initially, S0 can run once and produce B for S1.
-        assert!(!chains.is_empty());
-        let chain = &chains[0];
-        assert_eq!(chain.target(), 1);
-        assert_eq!(chain.steps.iter().filter(|&&s| s == 0).count(), 1);
-    }
-
-    #[test]
-    fn test_chain_multiple_producers() {
-        // S0 and S1 both produce A; S2 reads A (never succeeded)
-        let profiles = vec![
-            make_profile(0, vec![], vec!["A"], true),
-            make_profile(1, vec![], vec!["A"], true),
-            make_profile(2, vec!["A"], vec![], false),
-        ];
-        let dug = DefUseGraph::from_profiles(&profiles);
-        let mut rng = StdRng::seed_from_u64(42);
-
-        let chains = construct_chains(&dug, 5, 2, 10, &mut rng);
-
-        assert!(!chains.is_empty());
-        let chain = &chains[0];
-        assert_eq!(chain.target(), 2);
-        // Chain should have one of S0 or S1 as producer (either is fine)
-        assert!(chain.steps.contains(&0) || chain.steps.contains(&1));
-        assert_eq!(chain.len(), 2);
-    }
-
     // -----------------------------------------------------------------------
     // DUG mutation tests
     // -----------------------------------------------------------------------
@@ -3821,7 +3426,7 @@ mod tests {
             make_profile(0, vec![], vec!["A"], true),
             make_profile(1, vec!["A"], vec![], false),
         ];
-        let mut dug = DefUseGraph::from_profiles(&profiles);
+        let mut dug = dug_from_profiles(&profiles);
         assert_eq!(dug.num_types(), 1); // only A
 
         // Add a new def: S1 writes B (new type)
@@ -3837,7 +3442,7 @@ mod tests {
     #[test]
     fn test_dug_add_def_idempotent() {
         let profiles = vec![make_profile(0, vec![], vec!["A"], true)];
-        let mut dug = DefUseGraph::from_profiles(&profiles);
+        let mut dug = dug_from_profiles(&profiles);
         let marker = dug.modification_marker();
 
         // Adding the same def again should not change the DUG
@@ -3853,7 +3458,7 @@ mod tests {
             make_profile(0, vec![], vec!["A"], true),
             make_profile(1, vec![], vec![], true),
         ];
-        let mut dug = DefUseGraph::from_profiles(&profiles);
+        let mut dug = dug_from_profiles(&profiles);
         assert!(dug.uses_of(1).is_empty());
 
         // S1 now reads A
@@ -3866,7 +3471,7 @@ mod tests {
     #[test]
     fn test_dug_add_use_new_type() {
         let profiles = vec![make_profile(0, vec![], vec![], false)];
-        let mut dug = DefUseGraph::from_profiles(&profiles);
+        let mut dug = dug_from_profiles(&profiles);
         assert_eq!(dug.num_types(), 0);
 
         // S0 reads X (type X does not exist yet)
@@ -3880,7 +3485,7 @@ mod tests {
     #[test]
     fn test_dug_mark_succeeded() {
         let profiles = vec![make_profile(0, vec!["A"], vec![], false)];
-        let mut dug = DefUseGraph::from_profiles(&profiles);
+        let mut dug = dug_from_profiles(&profiles);
         assert!(!dug.script_ever_succeeded(0));
 
         let changed = dug.mark_succeeded(0);
@@ -3898,7 +3503,7 @@ mod tests {
             make_profile(0, vec!["A"], vec![], false),
             make_profile(1, vec!["A"], vec!["B"], true),
         ];
-        let mut dug = DefUseGraph::from_profiles(&profiles);
+        let mut dug = dug_from_profiles(&profiles);
 
         assert_eq!(dug.unmet_deps(0).len(), 1);
         assert!(!dug.are_dependencies_satisfied(&[0]));
@@ -3920,7 +3525,7 @@ mod tests {
             make_profile(0, vec![], vec!["A"], true),
             make_profile(1, vec!["A"], vec![], false),
         ];
-        let mut dug = DefUseGraph::from_profiles(&profiles);
+        let mut dug = dug_from_profiles(&profiles);
         let m0 = dug.modification_marker();
 
         // No change yet
@@ -3939,7 +3544,7 @@ mod tests {
             make_profile(0, vec![], vec!["A"], true),
             make_profile(1, vec![], vec![], false),
         ];
-        let mut dug = DefUseGraph::from_profiles(&profiles);
+        let mut dug = dug_from_profiles(&profiles);
         let m0 = dug.modification_marker();
 
         // Ingest a profile where S1 reads A and writes B, and succeeded
@@ -4095,32 +3700,6 @@ mod tests {
     }
 
     #[test]
-    fn test_dug_chain_reconstruction_after_mutation() {
-        // Initially: S0 writes A, S1 reads nothing (no chain possible to S1)
-        let profiles = vec![
-            make_profile(0, vec![], vec!["A"], true),
-            make_profile(1, vec![], vec![], false),
-        ];
-        let mut dug = DefUseGraph::from_profiles(&profiles);
-        let mut rng = StdRng::seed_from_u64(42);
-
-        let chains_before = construct_chains(&dug, 5, 2, 10, &mut rng);
-        // S1 has no unmet deps, so no chains to it
-        assert!(chains_before.iter().all(|c| c.target() != 1));
-
-        // Now S1 reads A — this creates an unmet dependency that S0 can resolve
-        dug.add_use(1, &make_resource_tag("A"));
-
-        let mut rng2 = StdRng::seed_from_u64(42);
-        let chains_after = construct_chains(&dug, 5, 2, 10, &mut rng2);
-        // Now there should be a chain [S0, S1]
-        let chain_to_1 = chains_after.iter().find(|c| c.target() == 1);
-        assert!(chain_to_1.is_some());
-        let chain = chain_to_1.unwrap();
-        assert!(chain.steps.contains(&0));
-    }
-
-    #[test]
     fn test_construct_seed_chain_uses_seed_nodes_and_inputs() {
         let mut dug = DefUseGraph::new(2);
         let sender_1 = AccountAddress::from_hex_literal("0x1").unwrap();
@@ -4172,7 +3751,7 @@ mod tests {
             make_profile(3, vec![], vec!["X"], true),
             make_profile(4, vec!["X"], vec![], false),
         ];
-        let mut dug = DefUseGraph::from_profiles(&profiles);
+        let mut dug = dug_from_profiles(&profiles);
         for (idx, profile) in [
             make_exec_profile(0, vec![], vec!["A"], true),
             make_exec_profile(1, vec!["A"], vec!["B"], true),
@@ -4216,7 +3795,7 @@ mod tests {
             make_profile(0, vec![], vec!["A"], true),
             make_profile(1, vec!["A"], vec!["B"], true),
         ];
-        let dug = DefUseGraph::from_profiles(&profiles);
+        let dug = dug_from_profiles(&profiles);
 
         // Known tags should return Some
         assert!(dug.type_index_of(&make_resource_tag("A")).is_some());
@@ -4242,7 +3821,7 @@ mod tests {
             make_profile(1, vec!["A"], vec![], false),
             make_profile(2, vec!["A"], vec![], false),
         ];
-        let dug = DefUseGraph::from_profiles(&profiles);
+        let dug = dug_from_profiles(&profiles);
 
         let ti_a = *dug.type_index_of(&make_resource_tag("A")).unwrap();
         let consumers = dug.consumers_of(ti_a);
@@ -4292,7 +3871,7 @@ mod tests {
         assert!(!db.is_empty());
 
         // Verify the entry
-        let entries = db.find_prefix_seeds(&[0, 1]);
+        let entries = db.entries();
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].steps, vec![0, 1]);
         assert!(entries[0].all_succeeded);
@@ -4302,183 +3881,8 @@ mod tests {
     }
 
     #[test]
-    fn test_seq_db_prefix_matching_exact() {
-        let mut db = SequenceDb::new();
-        let profiles = vec![
-            make_exec_profile(0, vec![], vec!["A"], true),
-            make_exec_profile(1, vec!["A"], vec!["B"], true),
-            make_exec_profile(2, vec!["B"], vec![], true),
-        ];
-        let seed = vec![
-            (vec![], vec![MoveValue::U64(1)]),
-            (vec![], vec![MoveValue::U64(2)]),
-            (vec![], vec![MoveValue::U64(3)]),
-        ];
-        db.add_entry(vec![0, 1, 2], seed, &profiles);
-
-        // Exact match
-        let matches = db.find_prefix_seeds(&[0, 1, 2]);
-        assert_eq!(matches.len(), 1);
-        assert_eq!(matches[0].steps, vec![0, 1, 2]);
-    }
-
-    #[test]
-    fn test_seq_db_prefix_matching_superchain() {
-        let mut db = SequenceDb::new();
-        let profiles = vec![
-            make_exec_profile(0, vec![], vec!["A"], true),
-            make_exec_profile(1, vec!["A"], vec![], true),
-        ];
-        let seed = vec![
-            (vec![], vec![MoveValue::U64(1)]),
-            (vec![], vec![MoveValue::U64(2)]),
-        ];
-        db.add_entry(vec![0, 1], seed, &profiles);
-
-        // Entry [0,1] is a prefix of chain [0,1,2]
-        let matches = db.find_prefix_seeds(&[0, 1, 2]);
-        assert_eq!(matches.len(), 1);
-        assert_eq!(matches[0].steps, vec![0, 1]);
-    }
-
-    #[test]
-    fn test_seq_db_prefix_no_match() {
-        let mut db = SequenceDb::new();
-        let profiles = vec![
-            make_exec_profile(0, vec![], vec!["A"], true),
-            make_exec_profile(1, vec![], vec![], true),
-            make_exec_profile(3, vec![], vec![], true),
-        ];
-        let seed = vec![
-            (vec![], vec![MoveValue::U64(1)]),
-            (vec![], vec![MoveValue::U64(2)]),
-            (vec![], vec![MoveValue::U64(3)]),
-        ];
-        db.add_entry(vec![0, 1, 3], seed, &profiles);
-
-        // [0,1,3] is not a prefix of [0,1,2] (step 2 at position 2 differs from step 3)
-        let matches = db.find_prefix_seeds(&[0, 1, 2]);
-        assert_eq!(matches.len(), 0);
-    }
-
-    #[test]
-    fn test_seq_db_prefix_longer_entry() {
-        let mut db = SequenceDb::new();
-        let profiles = vec![
-            make_exec_profile(0, vec![], vec!["A"], true),
-            make_exec_profile(1, vec![], vec![], true),
-            make_exec_profile(2, vec![], vec![], true),
-            make_exec_profile(3, vec![], vec![], true),
-        ];
-        let seed = vec![
-            (vec![], vec![MoveValue::U64(1)]),
-            (vec![], vec![MoveValue::U64(2)]),
-            (vec![], vec![MoveValue::U64(3)]),
-            (vec![], vec![MoveValue::U64(4)]),
-        ];
-        db.add_entry(vec![0, 1, 2, 3], seed, &profiles);
-
-        // Entry [0,1,2,3] is longer than chain [0,1], not a prefix
-        let matches = db.find_prefix_seeds(&[0, 1]);
-        assert_eq!(matches.len(), 0);
-    }
-
-    #[test]
-    fn test_seq_db_prefix_seed_ignores_failed_entries() {
-        let mut db = SequenceDb::new();
-        let chain = vec![0, 1];
-
-        let failed_profiles = vec![
-            make_exec_profile(0, vec![], vec!["A"], true),
-            make_exec_profile(1, vec!["A"], vec!["B"], false),
-        ];
-        let failed_seed = vec![
-            SeedInput::new(
-                AccountAddress::from_hex_literal("0x1").unwrap(),
-                vec![],
-                vec![MoveValue::U64(10)],
-            ),
-            SeedInput::new(
-                AccountAddress::from_hex_literal("0x1").unwrap(),
-                vec![],
-                vec![MoveValue::U64(11)],
-            ),
-        ];
-        db.add_entry(chain.clone(), failed_seed, &failed_profiles);
-
-        let success_profiles = vec![
-            make_exec_profile(0, vec![], vec!["A"], true),
-            make_exec_profile(1, vec!["A"], vec!["B"], true),
-        ];
-        let success_seed = vec![
-            SeedInput::new(
-                AccountAddress::from_hex_literal("0x2").unwrap(),
-                vec![],
-                vec![MoveValue::U64(20)],
-            ),
-            SeedInput::new(
-                AccountAddress::from_hex_literal("0x2").unwrap(),
-                vec![],
-                vec![MoveValue::U64(21)],
-            ),
-        ];
-        db.add_entry(chain.clone(), success_seed.clone(), &success_profiles);
-
-        assert_eq!(db.prefix_compatible_count(&chain), 1);
-
-        let mut rng = StdRng::seed_from_u64(7);
-        let picked = db.pick_prefix_seed(&chain, &mut rng).unwrap();
-        assert_eq!(picked, success_seed);
-    }
-
-    #[test]
-    fn test_seq_db_concrete_prefix_prefers_exact_needed_tag() {
-        let profiles = vec![
-            make_profile(0, vec![], vec!["A"], true),
-            make_profile(1, vec![], vec!["B"], true),
-            make_profile(2, vec!["A"], vec![], false),
-        ];
-        let dug = DefUseGraph::from_profiles(&profiles);
-
-        let mut db = SequenceDb::new();
-        let seed_a = vec![SeedInput::new(
-            AccountAddress::from_hex_literal("0x1").unwrap(),
-            vec![],
-            vec![MoveValue::U64(10)],
-        )];
-        let seed_b = vec![SeedInput::new(
-            AccountAddress::from_hex_literal("0x2").unwrap(),
-            vec![],
-            vec![MoveValue::U64(20)],
-        )];
-        db.add_entry(vec![0], seed_a.clone(), &[make_exec_profile(
-            0,
-            vec![],
-            vec!["A"],
-            true,
-        )]);
-        db.add_entry(vec![1], seed_b, &[make_exec_profile(
-            1,
-            vec![],
-            vec!["B"],
-            true,
-        )]);
-
-        let compatible = db.find_concrete_prefix_seeds(&dug, &[0, 2]);
-        assert_eq!(compatible.len(), 1);
-        assert_eq!(compatible[0].steps, vec![0]);
-        assert_eq!(db.concrete_prefix_compatible_count(&dug, &[0, 2]), 1);
-
-        let mut rng = StdRng::seed_from_u64(9);
-        let picked = db
-            .pick_concrete_prefix_seed(&dug, &[0, 2], &mut rng)
-            .unwrap();
-        assert_eq!(picked, seed_a);
-    }
-
-    #[test]
     fn test_seq_db_concrete_prefix_allows_initial_state_prefix() {
-        let mut dug = DefUseGraph::from_profiles(&[
+        let mut dug = dug_from_profiles(&[
             make_profile(0, vec!["A"], vec!["B"], true),
             make_profile(1, vec!["B"], vec![], false),
         ]);
@@ -4515,7 +3919,7 @@ mod tests {
             make_profile(1, vec!["A"], vec!["B"], true),
             make_profile(2, vec!["B"], vec![], false),
         ];
-        let dug = DefUseGraph::from_profiles(&profiles);
+        let dug = dug_from_profiles(&profiles);
 
         let mut db = SequenceDb::new();
         // Stored sequence [0, 1] that produced type B
@@ -4546,7 +3950,7 @@ mod tests {
             make_profile(1, vec!["A"], vec!["B"], true),
             make_profile(2, vec!["B"], vec![], false),
         ];
-        let dug = DefUseGraph::from_profiles(&profiles);
+        let dug = dug_from_profiles(&profiles);
 
         let mut db = SequenceDb::new();
         // Entry where one step failed
@@ -4574,7 +3978,7 @@ mod tests {
             make_profile(1, vec![], vec!["C"], true),
             make_profile(2, vec!["A", "C"], vec![], false),
         ];
-        let dug = DefUseGraph::from_profiles(&profiles);
+        let dug = dug_from_profiles(&profiles);
 
         let mut db = SequenceDb::new();
         let exec_profiles = vec![make_exec_profile(0, vec![], vec!["A"], true)];
@@ -4595,7 +3999,7 @@ mod tests {
             make_profile(1, vec!["A"], vec!["B"], true),
             make_profile(2, vec!["B"], vec![], false),
         ];
-        let dug = DefUseGraph::from_profiles(&profiles);
+        let dug = dug_from_profiles(&profiles);
 
         let mut db = SequenceDb::new();
         let exec_profiles = vec![
@@ -4623,7 +4027,7 @@ mod tests {
             make_profile(0, vec![], vec!["A"], true),
             make_profile(1, vec!["A", "B"], vec!["B"], true),
         ];
-        let mut dug = DefUseGraph::from_profiles(&profiles);
+        let mut dug = dug_from_profiles(&profiles);
         dug.ingest_initial_writes(&[make_resource_write("B")]);
 
         let mut db = SequenceDb::new();
@@ -4668,7 +4072,7 @@ mod tests {
             make_profile(2, vec![], vec!["T3"], true),           // S3
             make_profile(3, vec!["T2"], vec!["T3"], true),       // S4
         ];
-        let dug = DefUseGraph::from_profiles(&profiles);
+        let dug = dug_from_profiles(&profiles);
 
         let mut db = SequenceDb::new();
         // P2 = <S2, S3, S1, S4> = [1, 2, 0, 3]
@@ -4707,7 +4111,7 @@ mod tests {
             make_profile(1, vec!["A"], vec!["B"], true),
             make_profile(2, vec!["B"], vec![], false),
         ];
-        let dug = DefUseGraph::from_profiles(&profiles);
+        let dug = dug_from_profiles(&profiles);
 
         // [0, 1, 2] is valid: A from S0, B from S1
         assert!(dug.are_dependencies_satisfied(&[0, 1, 2]));
@@ -4737,7 +4141,7 @@ mod tests {
             make_profile(1, vec!["A"], vec!["B"], true),
             make_profile(2, vec!["A"], vec![], false),
         ];
-        let dug = DefUseGraph::from_profiles(&profiles);
+        let dug = dug_from_profiles(&profiles);
 
         let mut db = SequenceDb::new();
         let exec_profiles = vec![
@@ -4772,7 +4176,7 @@ mod tests {
             make_profile(0, vec![], vec!["A"], true),
             make_profile(1, vec!["A"], vec![], false),
         ];
-        let dug = DefUseGraph::from_profiles(&profiles);
+        let dug = dug_from_profiles(&profiles);
 
         let mut db = SequenceDb::new();
         let exec_profiles = vec![
@@ -4816,7 +4220,7 @@ mod tests {
             make_profile(2, vec!["B"], vec!["C"], true),
             make_profile(3, vec!["C"], vec![], false),
         ];
-        let dug = DefUseGraph::from_profiles(&profiles);
+        let dug = dug_from_profiles(&profiles);
 
         let mut db = SequenceDb::new();
         let exec_profiles = vec![
@@ -4857,7 +4261,7 @@ mod tests {
             make_profile(2, vec!["A"], vec!["C"], true),
             make_profile(3, vec!["C"], vec![], false),
         ];
-        let dug = DefUseGraph::from_profiles(&profiles);
+        let dug = dug_from_profiles(&profiles);
 
         let mut db = SequenceDb::new();
         // Entry 1: [0, 1]
@@ -4909,7 +4313,7 @@ mod tests {
             make_profile(1, vec!["A"], vec!["B"], true),
             make_profile(2, vec!["B"], vec![], false),
         ];
-        let dug = DefUseGraph::from_profiles(&profiles);
+        let dug = dug_from_profiles(&profiles);
 
         let mut db = SequenceDb::new();
         let exec_profiles = vec![
@@ -4937,7 +4341,7 @@ mod tests {
     #[test]
     fn test_seq_db_propose_mutations_empty() {
         let profiles = vec![make_profile(0, vec![], vec!["A"], true)];
-        let dug = DefUseGraph::from_profiles(&profiles);
+        let dug = dug_from_profiles(&profiles);
         let db = SequenceDb::new();
 
         let mutations = db.propose_mutations(&dug, 5, 2, 10);
@@ -4950,7 +4354,7 @@ mod tests {
             make_profile(0, vec![], vec!["A"], true),
             make_profile(1, vec!["A"], vec![], true),
         ];
-        let dug = DefUseGraph::from_profiles(&profiles);
+        let dug = dug_from_profiles(&profiles);
 
         let mut db = SequenceDb::new();
         let exec_profiles = vec![
@@ -4976,7 +4380,7 @@ mod tests {
             make_profile(3, vec!["A"], vec!["C"], true),
             make_profile(4, vec!["C"], vec![], true),
         ];
-        let dug = DefUseGraph::from_profiles(&profiles);
+        let dug = dug_from_profiles(&profiles);
 
         let mut db = SequenceDb::new();
         let exec_profiles = vec![
