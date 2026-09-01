@@ -36,7 +36,7 @@ use aptos_types::{
         AuxiliaryInfo, ExecutionStatus, TransactionOutput, TransactionPayload, TransactionStatus,
     },
     vm_status::VMStatus,
-    write_set::TransactionWrite,
+    write_set::{TransactionWrite, WriteOp, WriteSetMut},
 };
 use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
 use aptos_vm_environment::environment::AptosEnvironment;
@@ -50,8 +50,9 @@ use move_package::compilation::compiled_package::CompiledUnitWithSource;
 use sha3::{Digest, Sha3_256};
 use std::{
     cell::RefCell,
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, HashMap},
     path::Path as StdPath,
+    sync::Arc,
 };
 
 /// Default APT fund per each new account (10M, with 8 decimals)
@@ -256,6 +257,14 @@ pub struct TracingExecutor {
 
     /// gas profile we are following now
     gas_profile: GasProfile,
+
+    /// State this executor was forked with, shared by every fuzzer forked from
+    /// the same provisioned executor. A checkpoint stores the difference from
+    /// this rather than the whole state store: the baseline is genesis plus the
+    /// framework plus provisioning, identical for all fuzzers and rebuilt
+    /// deterministically on the next run, so persisting it per fuzzer would
+    /// store the same tens of megabytes once per script.
+    baseline: Arc<HashMap<StateKey, Option<StateValue>>>,
 }
 
 impl TracingExecutor {
@@ -296,11 +305,13 @@ impl TracingExecutor {
             max_gas_units_per_txn: gas_params.vm.txn.maximum_number_of_gas_units.into(),
         };
 
-        // done with the tweaks
+        // done with the tweaks. The root executor has no baseline of its own; it
+        // is only ever forked from, and each fork captures the state at that point.
         Self {
             executor,
             address_registry: AddressRegistry::new(),
             gas_profile,
+            baseline: Arc::new(HashMap::new()),
         }
     }
 
@@ -618,6 +629,56 @@ impl TracingExecutor {
         self.address_registry.all_addresses_by_kind()
     }
 
+    /// Snapshot the executor's state as a delta over the provisioned baseline.
+    ///
+    /// This is what a checkpoint stores. It replaced a transcript of every kept
+    /// transaction, which the restore path re-executed: that grew one entry per
+    /// execution without bound, and any cap on it made a restored executor a
+    /// *prefix* of the campaign while the corpus, coverage, object dictionary
+    /// and DUG saved alongside it described the end -- a state the fuzzer was
+    /// never actually in. A delta is proportional to the state touched rather
+    /// than the number of executions, and it is the live state rather than a
+    /// point in its history.
+    pub fn state_delta_snapshot(&self) -> Vec<(StateKey, Option<StateValue>)> {
+        let current = self.executor.get_state_delta();
+        let mut delta: Vec<_> = current
+            .iter()
+            .filter(|(state_key, value)| self.baseline.get(*state_key) != Some(*value))
+            .map(|(state_key, value)| (state_key.clone(), value.clone()))
+            .collect();
+        // A key present in the baseline but gone from the current state has been
+        // deleted; record the deletion so restore reproduces it.
+        delta.extend(
+            self.baseline
+                .keys()
+                .filter(|state_key| !current.contains_key(*state_key))
+                .map(|state_key| (state_key.clone(), None)),
+        );
+        // deterministic order, so an unchanged campaign checkpoints identically
+        delta.sort_by(|(lhs, _), (rhs, _)| lhs.cmp(rhs));
+        delta
+    }
+
+    /// Restore a state delta produced by [`Self::state_delta_snapshot`].
+    pub fn restore_state_delta(&mut self, delta: Vec<(StateKey, Option<StateValue>)>) {
+        let writes: Vec<_> = delta
+            .into_iter()
+            .map(|(state_key, value)| {
+                let op = match value {
+                    Some(value) => {
+                        WriteOp::modification(value.bytes().clone(), value.metadata().clone())
+                    },
+                    None => WriteOp::legacy_deletion(),
+                };
+                (state_key, op)
+            })
+            .collect();
+        let write_set = WriteSetMut::new(writes)
+            .freeze()
+            .expect("state delta always freezes into a write set");
+        self.executor.apply_write_set(&write_set);
+    }
+
     /// Extract all resource writes from the full state store.
     ///
     /// Returns every resource/resource-group/table-item/raw entry as a `ResourceWrite`.
@@ -759,17 +820,52 @@ impl Default for TracingExecutor {
 }
 
 impl Clone for TracingExecutor {
+    /// Fork this executor. The clone starts from the current state, which
+    /// becomes its checkpoint baseline.
     fn clone(&self) -> Self {
         Self {
             executor: self.executor.duplicate_with_assumption(),
             address_registry: self.address_registry.clone(),
             gas_profile: self.gas_profile.clone(),
+            baseline: Arc::new(self.executor.get_state_delta()),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::TracingExecutor;
+    use aptos_types::state_store::state_value::StateValue;
+
+    /// A checkpoint must restore the state the fuzzer was actually in. The
+    /// transcript this replaced could not: capped, it rebuilt a prefix of the
+    /// campaign while the corpus and DUG saved beside it described the end.
+    #[test]
+    fn test_state_delta_snapshot_round_trips_through_restore() {
+        let root = TracingExecutor::new();
+
+        // fork: the clone's baseline is the provisioned state, so an untouched
+        // fork has nothing of its own to persist
+        let mut forked = root.clone();
+        assert!(
+            forked.state_delta_snapshot().is_empty(),
+            "a fresh fork differs from its baseline by nothing"
+        );
+
+        // a change made after the fork is exactly what the checkpoint carries
+        let key = StateKey::raw(b"move-fuzz-round-trip");
+        let value = StateValue::new_legacy(vec![7u8; 32].into());
+        forked.restore_state_delta(vec![(key.clone(), Some(value.clone()))]);
+
+        let snapshot = forked.state_delta_snapshot();
+        assert_eq!(snapshot, vec![(key.clone(), Some(value.clone()))]);
+
+        // and restoring it into another fork of the same baseline reproduces it
+        let mut resumed = root.clone();
+        resumed.restore_state_delta(snapshot);
+        assert_eq!(resumed.state_delta_snapshot(), vec![(key, Some(value))]);
+    }
+
     use super::{synthetic_struct_tag, RecordingStateView};
     use aptos_types::state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, table::TableHandle, TStateView,

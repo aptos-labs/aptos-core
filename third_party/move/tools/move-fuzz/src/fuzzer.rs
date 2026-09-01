@@ -24,8 +24,9 @@ use crate::{
     state::{
         load_auto_state, load_entrypoint_cache, save_auto_state, save_entrypoint_cache,
         PersistedAutoState, PersistedEntrypoint, PersistedEntrypointCache,
-        PersistedExecCoverageMap, PersistedMissingDataSignal, PersistedObjectState,
-        PersistedOneshotFuzzer, PersistedSeedInput, AUTO_STATE_VERSION, ENTRYPOINT_CACHE_VERSION,
+        PersistedExecCoverageMap, PersistedExecutorState, PersistedMissingDataSignal,
+        PersistedObjectState, PersistedOneshotFuzzer, PersistedSeedInput, AUTO_STATE_VERSION,
+        ENTRYPOINT_CACHE_VERSION,
     },
 };
 use anyhow::{Context, Result};
@@ -525,7 +526,7 @@ fn provisioned_code_digest(pkg_defs: &[PkgDefinition]) -> String {
     for pkg in pkg_defs {
         for unit in pkg.package.root_compiled_units() {
             let mut hasher = Sha3_256::new();
-            hasher.update(&unit.unit.serialize(None));
+            hasher.update(unit.unit.serialize(None));
             modules.push(format!(
                 "{}:{}",
                 unit.unit.name(),
@@ -814,7 +815,9 @@ fn snapshot_auto_state(
             Ok(PersistedOneshotFuzzer {
                 script_index,
                 script_identity: runtime.entrypoint_identities[script_index].clone(),
-                replay_log: fuzzer.replay_log_snapshot()?,
+                executor_state: PersistedExecutorState::from_delta(
+                    &fuzzer.executor_state_snapshot(),
+                )?,
                 seedpool: fuzzer.seed_record_snapshot()?,
                 coverage: PersistedExecCoverageMap::from_exec_coverage_map(
                     &fuzzer.coverage_snapshot(),
@@ -993,7 +996,7 @@ fn restore_auto_state(
             return Ok(false);
         };
         let fuzzer = &mut oneshot_fuzzers[script_index];
-        fuzzer.replay_checkpoint_log(saved.replay_log)?;
+        fuzzer.restore_executor_state(saved.executor_state.into_delta()?);
         fuzzer
             .restore_checkpoint_records(saved.seedpool, saved.coverage.into_exec_coverage_map()?)?;
         fuzzer.restore_object_state(&object_state)?;
@@ -1071,7 +1074,7 @@ fn restore_auto_state(
                 chain_seed_nonce,
             );
             fuzzer.set_identity_seed(identity_seed);
-            fuzzer.replay_checkpoint_log(saved_chain.replay_log)?;
+            fuzzer.restore_executor_state(saved_chain.executor_state.into_delta()?);
             fuzzer.restore_checkpoint_records(
                 saved_chain.seedpool,
                 saved_chain.coverage.into_exec_coverage_map()?,

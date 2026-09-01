@@ -1324,9 +1324,7 @@ impl FlowGraph {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        DatatypeItem, FlowGraph, FlowGraphEdge, FlowGraphNode, FunctionInst, GraphBuilder,
-    };
+    use super::{DatatypeItem, FlowGraph, FlowGraphNode, FunctionInst, GraphBuilder};
     use crate::{
         deps::PkgKind,
         prep::{

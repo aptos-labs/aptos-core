@@ -19,10 +19,12 @@ use crate::{
     state::{PersistedObjectState, PersistedOneshotSeedRecord, PersistedSeedInput},
 };
 use anyhow::Result;
-use aptos_types::transaction::{
-    ExecutionStatus, Script, TransactionArgument, TransactionPayload, TransactionStatus,
+use aptos_types::{
+    state_store::{state_key::StateKey, state_value::StateValue},
+    transaction::{
+        ExecutionStatus, Script, TransactionArgument, TransactionPayload, TransactionStatus,
+    },
 };
-use log::warn;
 use move_core_types::{
     language_storage::TypeTag,
     value::MoveValue,
@@ -34,16 +36,6 @@ use rand::Rng;
 use std::{collections::BTreeSet, fmt::Display, path::PathBuf, time::Instant};
 
 const MAX_ONESHOT_CORPUS: usize = 256;
-
-/// Cap on the number of state-changing executions kept in the replay transcript.
-///
-/// The transcript is how a resumed campaign rebuilds executor state, so it is
-/// re-serialized into the checkpoint on most reporting ticks and replayed
-/// transaction-by-transaction on resume. Uncapped it grows with the campaign
-/// length, which turns checkpointing into O(executions) work per save and
-/// resume into O(executions) VM executions. See `record_replay_entry` for what
-/// reaching the cap means for restore fidelity.
-const MAX_ONESHOT_REPLAY_LOG: usize = 512;
 
 #[derive(Clone)]
 struct SeedRecord {
@@ -216,8 +208,8 @@ impl ExecStatus {
     /// Only `Discard` transactions are dropped by the VM without applying any
     /// state change (not even the sender's sequence number). Every `Keep`
     /// status - success, declared abort, intrinsic abort, kept error and
-    /// out-of-gas - still charges gas and bumps the sequence number, so it has
-    /// to be replayed to reconstruct the executor state.
+    /// out-of-gas - still charges gas and bumps the sequence number, so it
+    /// leaves the executor in a different state than it found it.
     pub fn commits_state(&self) -> bool {
         match self {
             ExecStatus::Success
@@ -283,13 +275,6 @@ pub struct OneshotFuzzer {
     trace_path: PathBuf,
     coverage: ExecCoverageMap,
     seedpool: Vec<SeedRecord>,
-    /// Ordered transcript of state-changing executions, used to reconstruct the
-    /// executor state on resume. Bounded by `MAX_ONESHOT_REPLAY_LOG`.
-    replay_log: Vec<SeedInput>,
-    /// Set once the transcript hit its cap: the executor state can then only be
-    /// restored up to the capped prefix, not to the live state.
-    replay_log_capped: bool,
-
     // statistics counting
     exec_count: u64,
     last_new_coverage_time: Option<Instant>,
@@ -323,8 +308,6 @@ impl OneshotFuzzer {
             trace_path,
             coverage: ExecCoverageMap::new(String::new()),
             seedpool: vec![],
-            replay_log: vec![],
-            replay_log_capped: false,
             exec_count: 0,
             last_new_coverage_time: None,
             coverage_at_last_report: 0,
@@ -424,11 +407,9 @@ impl OneshotFuzzer {
             .collect()
     }
 
-    pub fn replay_log_snapshot(&self) -> Result<Vec<PersistedSeedInput>> {
-        self.replay_log
-            .iter()
-            .map(PersistedSeedInput::try_from_seed)
-            .collect()
+    /// Snapshot this fuzzer's executor state for the checkpoint.
+    pub fn executor_state_snapshot(&self) -> Vec<(StateKey, Option<StateValue>)> {
+        self.executor.state_delta_snapshot()
     }
 
     /// Import concrete seeds into the local corpus.
@@ -487,62 +468,9 @@ impl OneshotFuzzer {
         Ok(())
     }
 
-    pub fn replay_checkpoint_log(&mut self, replay_log: Vec<PersistedSeedInput>) -> Result<()> {
-        self.replay_log.clear();
-        // A checkpoint written before this cap existed can hold more entries
-        // than we are willing to replay. Keep the prefix rather than a sample:
-        // the prefix rebuilds a state this fuzzer genuinely passed through.
-        self.replay_log_capped = replay_log.len() >= MAX_ONESHOT_REPLAY_LOG;
-        if self.replay_log_capped {
-            warn!(
-                "replay transcript for {} is capped at {} entries; restoring the executor \
-                 state as of that point, not the state the campaign ended in",
-                self.script_short_desc(),
-                MAX_ONESHOT_REPLAY_LOG,
-            );
-        }
-        for record in replay_log.into_iter().take(MAX_ONESHOT_REPLAY_LOG) {
-            let seed = record.into_seed()?;
-            self.replay_seed(&seed)?;
-            self.replay_log.push(seed);
-        }
-        Ok(())
-    }
-
-    /// Append one execution to the replay transcript.
-    ///
-    /// The transcript exists to rebuild the executor state after a restart, so
-    /// it needs exactly the executions that changed that state. A discarded
-    /// transaction applies no write set and does not bump the sender's sequence
-    /// number, so dropping it is lossless - the replayed state is identical
-    /// either way.
-    ///
-    /// Past `MAX_ONESHOT_REPLAY_LOG` committed executions the transcript stops
-    /// growing. Truncation always keeps a *prefix*, so a resumed campaign
-    /// rebuilds exactly the state this fuzzer was in after its first
-    /// `MAX_ONESHOT_REPLAY_LOG` committed executions - a state it genuinely
-    /// passed through - rather than the unreachable state that evicting
-    /// arbitrary middle entries would produce. Corpus, coverage and object
-    /// discoveries are checkpointed separately and are never truncated, so no
-    /// search progress is lost; only on-chain state accumulated after the cap
-    /// is, and the fuzzer says so once, out loud.
-    fn record_replay_entry(&mut self, status: &ExecStatus, seed: &SeedInput) {
-        if !status.commits_state() {
-            return;
-        }
-        if self.replay_log.len() >= MAX_ONESHOT_REPLAY_LOG {
-            if !self.replay_log_capped {
-                self.replay_log_capped = true;
-                warn!(
-                    "replay transcript for {} reached the {}-entry cap; a resumed campaign \
-                     will restore the executor state as of that point, not the live state",
-                    self.script_short_desc(),
-                    MAX_ONESHOT_REPLAY_LOG,
-                );
-            }
-            return;
-        }
-        self.replay_log.push(seed.clone());
+    /// Restore this fuzzer's executor state from a checkpoint.
+    pub fn restore_executor_state(&mut self, delta: Vec<(StateKey, Option<StateValue>)>) {
+        self.executor.restore_state_delta(delta);
     }
 
     fn build_payload(&self, ty_args: Vec<TypeTag>, args: Vec<MoveValue>) -> TransactionPayload {
@@ -557,14 +485,6 @@ impl OneshotFuzzer {
                 })
                 .collect(),
         ))
-    }
-
-    fn replay_seed(&mut self, seed: &SeedInput) -> Result<()> {
-        let payload = self.build_payload(seed.ty_args.clone(), seed.args.clone());
-        let _ = self
-            .executor
-            .run_payload_with_sender(seed.sender, payload)?;
-        Ok(())
     }
 
     /// Export the current shared object-discovery state.
@@ -727,7 +647,6 @@ impl OneshotFuzzer {
         // record the transcript entry before anything fallible: the executor
         // state has already moved, so an early return past this point must not
         // leave the transcript unable to reproduce it
-        self.record_replay_entry(&exec_status, &executed_seed);
 
         // epilogue: flush and read coverage
         flush_tracing_buffer();
@@ -778,7 +697,7 @@ impl OneshotFuzzer {
 
 #[cfg(test)]
 mod tests {
-    use super::{ExecStatus, OneshotFuzzer, SeedInput, MAX_ONESHOT_CORPUS, MAX_ONESHOT_REPLAY_LOG};
+    use super::{ExecStatus, OneshotFuzzer, SeedInput, MAX_ONESHOT_CORPUS};
     use crate::{
         executor::tracing::TracingExecutor,
         mutate::mutator::TypePool,
@@ -1047,36 +966,5 @@ mod tests {
         assert_eq!(fuzzer.best_seed_score(), 17);
         assert!(fuzzer.average_seed_score() > 0.0);
         assert_eq!(fuzzer.seed_pool_snapshot().len(), fuzzer.corpus_size());
-    }
-
-    #[test]
-    fn test_replay_log_drops_discards_and_truncates_to_a_prefix() {
-        let mut fuzzer = make_test_fuzzer();
-        let discarded = ExecStatus::ErrorDiscard {
-            status_code: StatusCode::SEQUENCE_NUMBER_TOO_OLD,
-            sub_status: None,
-        };
-
-        // discarded transactions commit no write set, so replaying them is a
-        // no-op and they never enter the transcript
-        for value in 0..8 {
-            fuzzer.record_replay_entry(&discarded, &make_seed(value));
-        }
-        assert!(fuzzer.replay_log.is_empty());
-        assert!(!fuzzer.replay_log_capped);
-
-        // committed executions are recorded up to the cap, then dropped
-        for value in 0..(MAX_ONESHOT_REPLAY_LOG as u64 + 16) {
-            fuzzer.record_replay_entry(&ExecStatus::Success, &make_seed(value));
-        }
-        assert_eq!(fuzzer.replay_log.len(), MAX_ONESHOT_REPLAY_LOG);
-        assert!(fuzzer.replay_log_capped);
-
-        // what is retained is a prefix, so the replayed state is reachable
-        assert_eq!(fuzzer.replay_log[0], make_seed(0));
-        assert_eq!(
-            fuzzer.replay_log[MAX_ONESHOT_REPLAY_LOG - 1],
-            make_seed(MAX_ONESHOT_REPLAY_LOG as u64 - 1)
-        );
     }
 }

@@ -14,6 +14,7 @@ use crate::{
     prep::{canvas::ScriptSignature, ident::DatatypeIdent},
 };
 use anyhow::{anyhow, Context, Result};
+use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
 use move_core_types::{account_address::AccountAddress, identifier::Identifier, value::MoveValue};
 use move_coverage::coverage_map::{ExecCoverageMap, ModuleCoverageMap};
 use serde::{Deserialize, Serialize};
@@ -428,11 +429,45 @@ pub struct PersistedMissingDataSignal {
     pub unresolved_tags: BTreeSet<ResourceTag>,
 }
 
+/// A fuzzer's executor state, stored as a BCS-encoded state delta.
+///
+/// This replaced a transcript of every state-changing execution, which the
+/// restore path replayed transaction by transaction. That transcript grew one
+/// entry per execution, so it had to be capped -- and a capped transcript
+/// restores a *prefix* of the campaign while the corpus, coverage, object
+/// dictionary and DUG stored beside it describe the end, i.e. a state the
+/// fuzzer was never in. A delta is proportional to the state actually touched,
+/// needs no cap, and is the live state rather than a point in its history.
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct PersistedExecutorState {
+    /// `bcs(Vec<(StateKey, Option<StateValue>)>)`, hex-encoded.
+    pub delta_bcs_hex: String,
+}
+
+impl PersistedExecutorState {
+    pub fn from_delta(delta: &[(StateKey, Option<StateValue>)]) -> Result<Self> {
+        Ok(Self {
+            delta_bcs_hex: hex::encode(
+                bcs::to_bytes(delta).context("unable to encode the executor state delta")?,
+            ),
+        })
+    }
+
+    pub fn into_delta(self) -> Result<Vec<(StateKey, Option<StateValue>)>> {
+        let bytes = hex::decode(&self.delta_bcs_hex)
+            .context("persisted executor state is not valid hex")?;
+        bcs::from_bytes(&bytes).context("unable to decode the executor state delta")
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PersistedOneshotFuzzer {
     pub script_index: usize,
     pub script_identity: String,
-    pub replay_log: Vec<PersistedSeedInput>,
+    /// The fuzzer's executor state, as a delta over the provisioned baseline.
+    /// BCS-encoded, because `StateKey`/`StateValue` serialize as opaque bytes
+    /// that JSON would blow up into arrays of integers.
+    pub executor_state: PersistedExecutorState,
     pub seedpool: Vec<PersistedOneshotSeedRecord>,
     pub coverage: PersistedExecCoverageMap,
 }
@@ -443,7 +478,8 @@ pub struct PersistedChainFuzzer {
     pub step_identities: Vec<String>,
     #[serde(default)]
     pub identity_seed: Vec<PersistedSeedInput>,
-    pub replay_log: Vec<Vec<PersistedSeedInput>>,
+    /// See `PersistedOneshotFuzzer::executor_state`.
+    pub executor_state: PersistedExecutorState,
     pub seedpool: Vec<PersistedChainSeedRecord>,
     pub coverage: PersistedExecCoverageMap,
 }
@@ -736,10 +772,11 @@ mod tests {
         load_auto_state, load_entrypoint_cache, load_package_build_cache_info, save_auto_state,
         save_entrypoint_cache, save_package_build_cache_info, PersistedAutoState,
         PersistedChainFuzzer, PersistedChainSeedRecord, PersistedDefUseGraph, PersistedEntrypoint,
-        PersistedEntrypointCache, PersistedExecCoverageMap, PersistedMissingDataSignal,
-        PersistedMoveValue, PersistedObjectBucket, PersistedObjectState, PersistedOneshotFuzzer,
-        PersistedOneshotSeedRecord, PersistedPackageBuildCacheInfo, PersistedSeedInput,
-        PersistedSequenceDb, ENTRYPOINT_CACHE_VERSION, PACKAGE_BUILD_CACHE_INFO_VERSION,
+        PersistedEntrypointCache, PersistedExecCoverageMap, PersistedExecutorState,
+        PersistedMissingDataSignal, PersistedMoveValue, PersistedObjectBucket,
+        PersistedObjectState, PersistedOneshotFuzzer, PersistedOneshotSeedRecord,
+        PersistedPackageBuildCacheInfo, PersistedSeedInput, PersistedSequenceDb,
+        ENTRYPOINT_CACHE_VERSION, PACKAGE_BUILD_CACHE_INFO_VERSION,
     };
     use crate::{
         executor::sequence::{ResourceTag, SeedInput},
@@ -929,11 +966,7 @@ mod tests {
             vec![PersistedOneshotFuzzer {
                 script_index: 0,
                 script_identity: "script-a".to_string(),
-                replay_log: vec![PersistedSeedInput::try_from_seed(&SeedInput {
-                    sender: AccountAddress::from_hex_literal("0x44")?,
-                    ty_args: vec![],
-                    args: vec![MoveValue::U64(3)],
-                })?],
+                executor_state: PersistedExecutorState::default(),
                 seedpool: vec![PersistedOneshotSeedRecord {
                     input: PersistedSeedInput::try_from_seed(&SeedInput {
                         sender: AccountAddress::from_hex_literal("0x44")?,
@@ -959,11 +992,7 @@ mod tests {
                     ty_args: vec![],
                     args: vec![MoveValue::Bool(false)],
                 })?],
-                replay_log: vec![vec![PersistedSeedInput::try_from_seed(&SeedInput {
-                    sender: AccountAddress::from_hex_literal("0x44")?,
-                    ty_args: vec![],
-                    args: vec![MoveValue::Bool(false)],
-                })?]],
+                executor_state: PersistedExecutorState::default(),
                 seedpool: vec![PersistedChainSeedRecord {
                     input: vec![PersistedSeedInput::try_from_seed(&SeedInput {
                         sender: AccountAddress::from_hex_literal("0x44")?,
@@ -1011,12 +1040,18 @@ mod tests {
         assert_eq!(loaded.oneshot_fuzzers.len(), 1);
         assert_eq!(loaded.chain_fuzzers.len(), 1);
         assert_eq!(loaded.oneshot_fuzzers[0].script_identity, "script-a");
-        assert_eq!(loaded.oneshot_fuzzers[0].replay_log.len(), 1);
+        assert!(loaded.oneshot_fuzzers[0]
+            .executor_state
+            .delta_bcs_hex
+            .is_empty());
         assert_eq!(loaded.oneshot_fuzzers[0].seedpool[0].score, 9);
         assert_eq!(loaded.chain_fuzzers[0].step_identities, vec![
             "script-a".to_string()
         ]);
-        assert_eq!(loaded.chain_fuzzers[0].replay_log.len(), 1);
+        assert!(loaded.chain_fuzzers[0]
+            .executor_state
+            .delta_bcs_hex
+            .is_empty());
         assert_eq!(loaded.chain_fuzzers[0].seedpool[0].score, 5);
         assert_eq!(
             loaded.oneshot_fuzzers[0]
