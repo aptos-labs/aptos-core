@@ -13,11 +13,12 @@ use aptos_types::{
     on_chain_config::Features,
     transaction::{TransactionAuxiliaryData, TransactionOutput, TransactionStatus},
 };
+use mono_move_core::value_layout::LayoutProvider;
 use mono_move_runtime::SessionEffects;
 
 /// The outcome of one transaction, not yet materialized into a write set.
 /// Intended to be consumed by the block coordinator for efficient handling.
-pub enum TxnOutcome<'guard> {
+pub enum TxnOutcome {
     /// Rejected without side effects.
     Discarded(DiscardReason),
     /// A system transaction failed unexpectedly: there is no per-transaction
@@ -32,11 +33,11 @@ pub enum TxnOutcome<'guard> {
     Executed {
         status: ExecutionStatus,
         fee_statement: FeeStatement,
-        effects: SessionEffects<'guard>,
+        effects: SessionEffects,
     },
 }
 
-impl TxnOutcome<'_> {
+impl TxnOutcome {
     pub fn is_discarded(&self) -> bool {
         matches!(self, TxnOutcome::Discarded(_))
     }
@@ -46,14 +47,14 @@ impl TxnOutcome<'_> {
     /// events. Fails only if the effects cannot be converted to storage
     /// formats, e.g. BCS serialized, which is abnormal — unlike a discard,
     /// which is a normal outcome carried in the output's status.
-    /// `provider` must be the exact provider instance used for execution so its
-    /// pointer-keyed caches and resource-group pre-state match the effects;
-    /// materialization rejects a different provider.
+    /// `layouts` must describe the written and event values' interned types,
+    /// and `provider` supplies resource-group pre-state for member merges.
     //
     // TODO(perf): this is only intended for compatibility and testing, and
     // the block coordinator should eventually handle the effects directly.
     pub fn materialize(
         self,
+        layouts: &impl LayoutProvider,
         provider: &dyn AptosDataProvider,
         features: &Features,
         auxiliary_data: TransactionAuxiliaryData,
@@ -85,6 +86,7 @@ impl TxnOutcome<'_> {
                 let txn_status = TransactionStatus::from_vm_status(vm_status, features, true);
                 materialize::executed_output(
                     &effects,
+                    layouts,
                     provider,
                     fee_statement.gas_used(),
                     txn_status,

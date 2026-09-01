@@ -12975,6 +12975,7 @@ dependencies = [
  "shared-dsa",
  "smallvec",
  "thiserror 1.0.69",
+ "triomphe",
 ]
 
 [[package]]
@@ -13128,6 +13129,7 @@ dependencies = [
  "serde",
  "shared-dsa",
  "thiserror 1.0.69",
+ "triomphe",
 ]
 
 [[package]]
@@ -13171,6 +13173,7 @@ dependencies = [
  "specializer",
  "tempfile",
  "thiserror 1.0.69",
+ "triomphe",
  "walkdir",
 ]
 

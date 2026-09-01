@@ -73,11 +73,7 @@ impl<'a> AptosTransactionExecutor<'a> {
     //
     // TODO(completeness): genesis and validator transactions; some may stay
     // the block coordinator's job.
-    pub fn execute_transaction(
-        &self,
-        txn: &Transaction,
-        aux_info: &AuxiliaryInfo,
-    ) -> TxnOutcome<'a> {
+    pub fn execute_transaction(&self, txn: &Transaction, aux_info: &AuxiliaryInfo) -> TxnOutcome {
         match txn {
             Transaction::UserTransaction(txn) => self.execute_user_transaction(txn, aux_info),
             Transaction::BlockMetadata(block_metadata) => {

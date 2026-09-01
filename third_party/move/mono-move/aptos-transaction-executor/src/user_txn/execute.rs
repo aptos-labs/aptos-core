@@ -38,7 +38,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         &self,
         txn: &SignedTransaction,
         aux_info: &AuxiliaryInfo,
-    ) -> TxnOutcome<'guard> {
+    ) -> TxnOutcome {
         match self.execute_user_transaction_impl(txn, aux_info) {
             Ok(outcome) => outcome,
             Err(reason) => TxnOutcome::Discarded(reason),
@@ -50,7 +50,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         &self,
         txn: &SignedTransaction,
         aux_info: &AuxiliaryInfo,
-    ) -> Result<TxnOutcome<'guard>, DiscardReason> {
+    ) -> Result<TxnOutcome, DiscardReason> {
         let guard = self.guard;
 
         // ======================== Pre-execution checks ========================

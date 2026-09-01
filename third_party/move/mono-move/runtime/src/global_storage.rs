@@ -538,10 +538,11 @@ mod tests {
     use crate::{heap::Heap, write_object_header};
     use mono_move_alloc::GlobalArenaPtr;
     use mono_move_core::{
-        storage::resource_provider::ResourceProviderError, types::Type, DescriptorId,
-        OBJECT_HEADER_SIZE,
+        storage::resource_provider::ResourceProviderError, types::Type, DescriptorId, HeapAnchor,
+        ReadAnchor, OBJECT_HEADER_SIZE,
     };
     use move_core_types::account_address::AccountAddress;
+    use triomphe::Arc;
 
     // An `InternedType` is just an arena pointer; a `'static` node gives a
     // stable, cheap one without standing up an interner. Two distinct types let
@@ -581,6 +582,20 @@ mod tests {
         NonNull::new(ptr).expect("non-null")
     }
 
+    // The tests only store and compare read pointers, never dereferencing them,
+    // so a zero-sized stand-in keeps each external read's value graph nominally
+    // alive without a real heap.
+    struct TestAnchor;
+    impl ReadAnchor for TestAnchor {}
+
+    fn ext_read(ptr: NonNull<u8>) -> StorageRead {
+        StorageRead::ExternalHeap {
+            ptr,
+            version: 0,
+            anchor: HeapAnchor::new(Arc::new(TestAnchor)),
+        }
+    }
+
     /// Minimal in-crate provider: keys present here are external (committed)
     /// resources; everything else does not exist.
     #[derive(Default)]
@@ -607,7 +622,7 @@ mod tests {
             _group: Option<InternedType>,
         ) -> Result<StorageRead, ResourceProviderError> {
             Ok(match self.external.get(key) {
-                Some(&ptr) => StorageRead::ExternalHeap { ptr, version: 0 },
+                Some(&ptr) => ext_read(ptr),
                 None => StorageRead::DoesNotExist,
             })
         }
@@ -628,11 +643,7 @@ mod tests {
         let p = fake_ptr(0x10);
         // An unmodified entry follows its read.
         assert!(!entry(StorageRead::DoesNotExist, StorageWrite::NotModified).exists());
-        assert!(entry(
-            StorageRead::ExternalHeap { ptr: p, version: 0 },
-            StorageWrite::NotModified
-        )
-        .exists());
+        assert!(entry(ext_read(p), StorageWrite::NotModified).exists());
         // A local write means present, regardless of the read.
         assert!(entry(StorageRead::DoesNotExist, StorageWrite::LocalHeap {
             ptr: p,
@@ -640,11 +651,7 @@ mod tests {
         })
         .exists());
         // Deletion shadows any read.
-        assert!(!entry(
-            StorageRead::ExternalHeap { ptr: p, version: 0 },
-            StorageWrite::Deleted { epoch: 0 }
-        )
-        .exists());
+        assert!(!entry(ext_read(p), StorageWrite::Deleted { epoch: 0 }).exists());
     }
 
     #[test]
@@ -654,14 +661,7 @@ mod tests {
         // An external read hands back the provider's pointer unchanged — the
         // zero-copy read path.
         assert_eq!(
-            entry(
-                StorageRead::ExternalHeap {
-                    ptr: ext,
-                    version: 0
-                },
-                StorageWrite::NotModified
-            )
-            .as_ptr(),
+            entry(ext_read(ext), StorageWrite::NotModified).as_ptr(),
             Some(ext)
         );
         assert_eq!(
@@ -677,14 +677,7 @@ mod tests {
             None
         );
         assert_eq!(
-            entry(
-                StorageRead::ExternalHeap {
-                    ptr: ext,
-                    version: 0
-                },
-                StorageWrite::Deleted { epoch: 0 }
-            )
-            .as_ptr(),
+            entry(ext_read(ext), StorageWrite::Deleted { epoch: 0 }).as_ptr(),
             None
         );
     }
@@ -695,11 +688,7 @@ mod tests {
         let local = fake_ptr(0x31);
         // An external read is never directly writable — it needs a copy.
         assert!(matches!(
-            entry(
-                StorageRead::ExternalHeap { ptr: ext, version: 0 },
-                StorageWrite::NotModified
-            )
-            .as_ptr_mut(0),
+            entry(ext_read(ext), StorageWrite::NotModified).as_ptr_mut(0),
             Some(EntryPtr::NonWritable(p)) if p == ext
         ));
         // A local write in the current epoch is writable in place.
@@ -1045,10 +1034,7 @@ mod tests {
 
     #[test]
     fn write_class_covers_the_read_write_matrix() {
-        let ext = || StorageRead::ExternalHeap {
-            ptr: fake_ptr(0x10),
-            version: 0,
-        };
+        let ext = || ext_read(fake_ptr(0x10));
         let local = || StorageWrite::LocalHeap {
             ptr: fake_ptr(0x11),
             epoch: 0,
@@ -1106,10 +1092,7 @@ mod tests {
         let ext = fake_ptr(0xDEAD);
         let mut rws = ResourceReadWriteSet::new();
         rws.entries.insert(k_ext.clone(), Entry {
-            read: StorageRead::ExternalHeap {
-                ptr: ext,
-                version: 0,
-            },
+            read: ext_read(ext),
             write: StorageWrite::NotModified,
             group: None,
         });

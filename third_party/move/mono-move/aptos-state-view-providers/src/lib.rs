@@ -26,16 +26,16 @@ use mono_move_core::{
         },
     },
     types::InternedType,
-    ExecutionErrorKind, IntoExecutionError, LayoutProvider, VMInternalError, VMResult,
+    ExecutionErrorKind, HeapAnchor, IntoExecutionError, LayoutProvider, VMInternalError, VMResult,
     OBJECT_HEADER_SIZE,
 };
 use mono_move_global_context::ExecutionGuard;
-use mono_move_runtime::{deserialize_into, Heap};
+use mono_move_runtime::{deserialize_into, Heap, SharedArena};
 use move_binary_format::CompiledModule;
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, move_resource::MoveStructType,
 };
-use std::cell::RefCell;
+use std::{cell::RefCell, ptr::NonNull};
 use thiserror::Error;
 use triomphe::Arc;
 
@@ -144,9 +144,10 @@ pub struct StateViewResourceProvider<'a, 'ctx, S> {
 /// The provider's interior-mutable state: caches and the value arena.
 struct ProviderState {
     /// Bump arena holding the flat values that reads hand out pointers into.
-    /// Never collected or reset; occupancy is bounded by one materialization
-    /// per distinct key, thanks to the value cache.
-    arena: Heap,
+    /// Shared so each read can anchor its source heap. Never collected or reset;
+    /// occupancy is bounded by one materialization per distinct key, thanks to
+    /// the value cache.
+    arena: Arc<SharedArena>,
     /// Materialized reads, including negative ones. Sound because execution
     /// never mutates a value through a `StorageRead` pointer (mutation copies
     /// into the transaction's own heap first).
@@ -180,7 +181,7 @@ impl<'a, 'ctx, S: StateView> StateViewResourceProvider<'a, 'ctx, S> {
             guard,
             state_view,
             inner: RefCell::new(ProviderState {
-                arena: Heap::new(arena_size),
+                arena: Arc::new(SharedArena::new(arena_size)),
                 values: FxHashMap::default(),
                 groups: FxHashMap::default(),
             }),
@@ -224,7 +225,7 @@ impl<S: StateView> ResourceProvider for StateViewResourceProvider<'_, '_, S> {
     ) -> Result<StorageRead, ResourceProviderError> {
         let cache_key = (key.clone(), group);
         if let Some(read) = self.inner.borrow().values.get(&cache_key) {
-            return Ok(*read);
+            return Ok(read.clone());
         }
         let internal = |detail: String| ResourceProviderError::InvariantViolation(detail);
         let Some(blob) = self
@@ -252,19 +253,23 @@ impl<S: StateView> ResourceProvider for StateViewResourceProvider<'_, '_, S> {
             .ok_or_else(|| internal(format!("no GC descriptor for {:?}", key.address())))?;
 
         let mut inner = self.inner.borrow_mut();
-        let obj = inner
-            .arena
-            .alloc_object(OBJECT_HEADER_SIZE + layout.size as usize, descriptor)
-            .ok_or_else(|| internal("resource arena is full".to_string()))?;
-        // SAFETY: `obj` is a freshly reserved object sized for the value's
-        // layout; `deserialize_into` writes the flat value there.
-        unsafe { deserialize_into(self.guard, &mut inner.arena, ty, &blob, obj.as_ptr()) }
-            .map_err(|e| internal(format!("stored value failed to deserialize: {e}")))?;
+        let arena = inner.arena.clone();
+        let obj = arena.with_heap_mut(|heap: &mut Heap| -> Result<NonNull<u8>, _> {
+            let obj = heap
+                .alloc_object(OBJECT_HEADER_SIZE + layout.size as usize, descriptor)
+                .ok_or_else(|| internal("resource arena is full".to_string()))?;
+            // SAFETY: `obj` is a freshly reserved object sized for the value's
+            // layout; `deserialize_into` writes the flat value there.
+            unsafe { deserialize_into(self.guard, heap, ty, &blob, obj.as_ptr()) }
+                .map_err(|e| internal(format!("stored value failed to deserialize: {e}")))?;
+            Ok(obj)
+        })?;
         let read = StorageRead::ExternalHeap {
             ptr: obj,
             version: 0,
+            anchor: HeapAnchor::new(arena),
         };
-        inner.values.insert(cache_key, read);
+        inner.values.insert(cache_key, read.clone());
         Ok(read)
     }
 }
