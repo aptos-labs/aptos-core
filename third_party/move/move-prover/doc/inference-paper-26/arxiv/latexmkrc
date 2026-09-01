@@ -1,3 +1,8 @@
+  # Only the drivers are buildable: the other .tex files are \input fragments
+  # with no \documentclass, so a bare `latexmk` would try to typeset them and
+  # stop with "Undefined control sequence".
+  @default_files  = ('main.tex');
+
   $pdf_mode       = 1;        # produce PDF via pdflatex
   $aux_dir        = 'build';  # all .aux/.log/.fls/.fdb_latexmk/.bbl/... land here
   $out_dir        = '.';      # final main.pdf ends up beside main.tex

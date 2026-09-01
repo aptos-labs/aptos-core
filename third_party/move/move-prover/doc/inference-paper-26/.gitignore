@@ -1,0 +1,5 @@
+# Build output. The arXiv bundle (arxiv/arxiv-submission.tar.gz) is tracked
+# deliberately so the submission stays reproducible. Note the paper directory
+# itself is named arxiv/, so the staging directory is stage/, not arxiv/.
+build/
+stage/

@@ -1,19 +1,38 @@
-\documentclass[letterpaper,conference]{fmcad}
+% arXiv master of the specification-inference paper. This is the only version
+% built in this directory; shorter venue-specific versions are extracted from
+% it, not maintained alongside it.
+%
+% Style: the NeurIPS 2026 VeriCodeGen workshop style in its `preprint` mode:
+% deanonymized, no submission line numbers, and the page-1 notice reduced to
+% "Preprint." (no workshop branding). The short workshop version will be
+% extracted from this report later; using the workshop style here already
+% means floats, listings, and measure carry over unchanged.
+%
+% Built by `latexmk` (see latexmkrc); packaged by make-arxiv.sh.
+
+\documentclass{article}
+
+% The NeurIPS style loads natbib; ask for numeric, compressed citations.
+\PassOptionsToPackage{numbers, compress}{natbib}
+\usepackage[preprint]{neurips_2026_vericode}
+
+\usepackage[utf8]{inputenc}
 
 \input{prelude.tex}
 
+\bibliographystyle{plainnat}
+
 \begin{document}
 
-\title{Combining Mechanical and Agentic \\ Specification Inference for Move}
+\title{Combining Mechanical and Agentic\\ Specification Inference for Move}
 
 \author{%
-	\IEEEauthorblockN{Wolfgang Grieskamp\IEEEauthorrefmark{1} and Teng Zhang and Vineeth Kashyap}
-	\IEEEauthorblockA{Aptos Labs, Palo Alto, USA\\
-		\IEEEauthorrefmark{1}Corresponding author: \texttt{wg@aptoslabs.com}}
+	Wolfgang Grieskamp\thanks{Corresponding author: \texttt{wg@aptoslabs.com}},
+	Teng Zhang, and Vineeth Kashyap \\
+	Aptos Labs, Palo Alto, USA
 }
 
 \maketitle
-
 
 \begin{abstract}
 	In this paper, we describe early work on a \emph{specification inference tool} for the Move Prover that combines a weakest-precondition (\WP) analysis over Move bytecode with an agentic coding CLI such as Claude Code.
@@ -30,7 +49,6 @@
 \input{skills}
 \input{conclusion}
 
-\bibliographystyle{IEEEtran}
 \bibliography{biblio}
 
 \end{document}
