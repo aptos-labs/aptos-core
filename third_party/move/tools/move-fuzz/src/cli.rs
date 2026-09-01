@@ -16,7 +16,7 @@ use crate::{
     state::{AUTO_STATE_FILENAME, ENTRYPOINT_CACHE_FILENAME, PACKAGE_BUILD_CACHE_DIR},
     testnet::{execute_runbook, provision_simulator},
 };
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use aptos_framework::extended_checks;
 use aptos_vm::natives;
 use clap::{Parser, Subcommand};
@@ -807,24 +807,67 @@ fn build_address_aliases(name_aliases: Vec<String>) -> Result<Vec<BTreeSet<Strin
     Ok(address_aliases)
 }
 
+/// Name of the file move-fuzz drops into every directory it owns and may later
+/// delete. Deletion is gated on this marker and nothing else: a directory
+/// without it is somebody else's, whatever it happens to be called.
+const OWNERSHIP_MARKER: &str = ".move-fuzz-owned";
+
+const OWNERSHIP_MARKER_CONTENT: &str = "\
+# Created by `move fuzz`. This directory is regenerated on every run and any
+# file in it may be deleted without warning. Remove this marker to make
+# move-fuzz refuse to touch the directory.
+";
+
+/// Claim `dir` for move-fuzz by writing the ownership marker into it.
+fn claim_dir(dir: &Path) -> Result<()> {
+    fs::write(dir.join(OWNERSHIP_MARKER), OWNERSHIP_MARKER_CONTENT)
+        .with_context(|| format!("unable to mark {} as move-fuzz owned", dir.display()))
+}
+
+fn is_owned_dir(dir: &Path) -> bool {
+    dir.join(OWNERSHIP_MARKER).is_file()
+}
+
+fn is_empty_dir(dir: &Path) -> Result<bool> {
+    Ok(fs::read_dir(dir)
+        .with_context(|| format!("unable to read {}", dir.display()))?
+        .next()
+        .is_none())
+}
+
+/// Recursively delete a directory move-fuzz previously claimed.
+///
+/// Refuses anything without the ownership marker. move-fuzz has no way to tell
+/// a user's directory from its own except by the marker it wrote itself, so an
+/// unmarked directory is reported rather than guessed at.
+fn remove_owned_dir(dir: &Path, what: &str, remedy: &str) -> Result<()> {
+    if !dir.is_dir() {
+        bail!("{what} exists but is not a directory: {}", dir.display());
+    }
+    if is_empty_dir(dir)? {
+        return fs::remove_dir(dir).with_context(|| format!("unable to remove {}", dir.display()));
+    }
+    if !is_owned_dir(dir) {
+        bail!(
+            "refusing to delete {what} at {}: it is not empty and has no `{OWNERSHIP_MARKER}` \
+             marker, so it was not created by move fuzz. {remedy}",
+            dir.display()
+        );
+    }
+    fs::remove_dir_all(dir).with_context(|| format!("unable to remove {}", dir.display()))
+}
+
 fn prepare_autogen_dir(workdir: &Path) -> Result<PathBuf> {
     let autogen_dir = workdir.join("autogen");
     if autogen_dir.exists() {
-        let manifest = autogen_dir.join("Move.toml");
-        let is_fuzzer_autogen = fs::read_to_string(&manifest).ok().is_some_and(|contents| {
-            contents
-                .lines()
-                .any(|line| line.trim() == "name = \"Autogen\"")
-        });
-        if !is_fuzzer_autogen {
-            bail!(
-                "autogen directory already exists and was not created by move fuzz: {}",
-                autogen_dir.display()
-            );
-        }
-        fs::remove_dir_all(&autogen_dir)?;
+        remove_owned_dir(
+            &autogen_dir,
+            "the autogen directory",
+            "Move it aside; move fuzz needs to own this directory to write generated drivers.",
+        )?;
     }
     fs::create_dir_all(&autogen_dir)?;
+    claim_dir(&autogen_dir)?;
     Ok(autogen_dir)
 }
 
@@ -834,10 +877,43 @@ fn prepare_state_dir(
     reset_state: bool,
 ) -> Result<PathBuf> {
     let state_dir = resolve_state_dir(project_root, state_dir);
-    if reset_state && state_dir.exists() {
-        fs::remove_dir_all(&state_dir)?;
+
+    // A state directory that contains the project would put the project itself
+    // inside move-fuzz's regenerated-output area, where `--reset-state` deletes
+    // it. Reject the overlap instead of relying on the marker check below to
+    // catch it, so the mistake is named for what it is.
+    let resolved_state = state_dir
+        .canonicalize()
+        .unwrap_or_else(|_| state_dir.clone());
+    let resolved_project = project_root
+        .canonicalize()
+        .unwrap_or_else(|_| project_root.to_path_buf());
+    if resolved_project.starts_with(&resolved_state) {
+        bail!(
+            "--state-dir {} contains the project at {}; move-fuzz treats its state directory as \
+             disposable and would delete the project with it",
+            state_dir.display(),
+            project_root.display()
+        );
+    }
+
+    if state_dir.exists() {
+        if reset_state {
+            remove_owned_dir(
+                &state_dir,
+                "the state directory",
+                "Move it aside, or point --state-dir somewhere else.",
+            )?;
+        } else if !is_owned_dir(&state_dir) && !is_empty_dir(&state_dir)? {
+            bail!(
+                "state directory {} is not empty and has no `{OWNERSHIP_MARKER}` marker, so it \
+                 was not created by move fuzz. Point --state-dir at a fresh directory.",
+                state_dir.display()
+            );
+        }
     }
     fs::create_dir_all(&state_dir)?;
+    claim_dir(&state_dir)?;
     Ok(state_dir)
 }
 
@@ -867,8 +943,8 @@ fn configure_extended_checks_for_unit_test() {
 #[cfg(test)]
 mod tests {
     use super::{
-        build_address_aliases, prepare_autogen_dir, prepare_state_dir, resolve_state_dir,
-        split_on_char,
+        build_address_aliases, claim_dir, is_owned_dir, prepare_autogen_dir, prepare_state_dir,
+        resolve_state_dir, split_on_char,
     };
     use anyhow::Result;
     use std::{collections::BTreeSet, fs};
@@ -925,11 +1001,33 @@ mod tests {
             autogen.join("sources").join("stale.move"),
             "module 0x1::M {}",
         )?;
+        // only a directory move-fuzz claimed may be wiped
+        claim_dir(&autogen)?;
 
         let prepared = prepare_autogen_dir(tmp.path())?;
         assert_eq!(prepared, autogen);
         assert!(prepared.exists());
         assert!(!prepared.join("sources").join("stale.move").exists());
+        assert!(is_owned_dir(&prepared));
+        Ok(())
+    }
+
+    /// A user package that happens to be named `Autogen` must not be deleted.
+    /// The package name was the old provenance test; it is not evidence.
+    #[test]
+    fn test_prepare_autogen_dir_rejects_unmarked_package_named_autogen() -> Result<()> {
+        let tmp = TempDir::new()?;
+        let autogen = tmp.path().join("autogen");
+        fs::create_dir_all(autogen.join("sources"))?;
+        fs::write(
+            autogen.join("Move.toml"),
+            "[package]\nname = \"Autogen\"\nversion = \"1.0.0\"\n",
+        )?;
+        let precious = autogen.join("sources").join("mine.move");
+        fs::write(&precious, "module 0x1::mine {}")?;
+
+        assert!(prepare_autogen_dir(tmp.path()).is_err());
+        assert!(precious.exists(), "user source must survive the refusal");
         Ok(())
     }
 
@@ -977,11 +1075,63 @@ mod tests {
         let state_dir = tmp.path().join(".move-fuzz");
         fs::create_dir_all(&state_dir)?;
         fs::write(state_dir.join("stale.json"), "{}")?;
+        claim_dir(&state_dir)?;
 
         let prepared = prepare_state_dir(tmp.path(), None, true)?;
         assert_eq!(prepared, state_dir);
         assert!(prepared.exists());
         assert!(!prepared.join("stale.json").exists());
+        assert!(is_owned_dir(&prepared));
+        Ok(())
+    }
+
+    /// `--state-dir <project> --reset-state` used to delete the project: the
+    /// state directory was removed recursively with no ownership check.
+    #[test]
+    fn test_prepare_state_dir_refuses_to_reset_the_project() -> Result<()> {
+        let tmp = TempDir::new()?;
+        let project = tmp.path().join("project");
+        fs::create_dir_all(project.join("sources"))?;
+        let precious = project.join("sources").join("important.move");
+        fs::write(&precious, "module 0x1::important {}")?;
+
+        let err = prepare_state_dir(&project, Some(project.clone()), true).unwrap_err();
+        assert!(
+            err.to_string().contains("contains the project"),
+            "unexpected error: {err}"
+        );
+        assert!(precious.exists(), "project source must survive the refusal");
+        Ok(())
+    }
+
+    /// The same protection for an unrelated directory that simply already has
+    /// content: without the marker move-fuzz cannot know it is not ours.
+    #[test]
+    fn test_prepare_state_dir_refuses_unmarked_nonempty_dir() -> Result<()> {
+        let tmp = TempDir::new()?;
+        let elsewhere = tmp.path().join("someones-data");
+        fs::create_dir_all(&elsewhere)?;
+        let precious = elsewhere.join("notes.txt");
+        fs::write(&precious, "do not delete")?;
+
+        assert!(prepare_state_dir(tmp.path(), Some(elsewhere.clone()), true).is_err());
+        assert!(precious.exists());
+        // and the same without --reset-state, since the campaign would write into it
+        assert!(prepare_state_dir(tmp.path(), Some(elsewhere.clone()), false).is_err());
+        assert!(precious.exists());
+        Ok(())
+    }
+
+    /// An empty directory is safe to adopt: there is nothing to lose.
+    #[test]
+    fn test_prepare_state_dir_adopts_empty_dir() -> Result<()> {
+        let tmp = TempDir::new()?;
+        let state_dir = tmp.path().join("fresh");
+        fs::create_dir_all(&state_dir)?;
+
+        let prepared = prepare_state_dir(tmp.path(), Some(state_dir.clone()), false)?;
+        assert_eq!(prepared, state_dir);
+        assert!(is_owned_dir(&prepared));
         Ok(())
     }
 }
