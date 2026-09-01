@@ -11,10 +11,10 @@ use crate::{
     deps::PkgKind,
     prep::{datatype::DatatypeRegistry, ident::FunctionIdent, typing::TypeRef},
 };
+use log::debug;
 use move_binary_format::{
     binary_views::BinaryIndexedView, file_format::Visibility, CompiledModule,
 };
-use log::debug;
 use move_core_types::ability::AbilitySet;
 use std::collections::{BTreeMap, BTreeSet};
 

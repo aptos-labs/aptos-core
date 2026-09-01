@@ -14,7 +14,7 @@ use crate::{
         ident::FunctionIdent,
         model::{ability_set_candidates, Model},
         typing::{
-            ComplexType, TypeBase, TypeItem, TypeMode, TypeRef, TypeSubstitution, TypeExpr,
+            ComplexType, TypeBase, TypeExpr, TypeItem, TypeMode, TypeRef, TypeSubstitution,
             TypeUnification,
         },
     },
@@ -1259,7 +1259,7 @@ mod tests {
             function::{FunctionDecl, FunctionRegistry},
             ident::FunctionIdent,
             model::Model,
-            typing::{ComplexType, TypeBase, TypeItem, TypeRef, TypeExpr},
+            typing::{ComplexType, TypeBase, TypeExpr, TypeItem, TypeRef},
         },
     };
     use move_core_types::{

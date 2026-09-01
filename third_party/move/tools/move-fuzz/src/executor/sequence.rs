@@ -3043,8 +3043,7 @@ mod tests {
     use super::*;
     use crate::prep::ident::FunctionIdent;
     use move_core_types::{
-        identifier::Identifier, language_storage::TypeTag, value::MoveValue,
-        vm_status::StatusCode,
+        identifier::Identifier, language_storage::TypeTag, value::MoveValue, vm_status::StatusCode,
     };
     use rand::SeedableRng;
     use std::path::PathBuf;
@@ -3279,8 +3278,12 @@ mod tests {
         let dug = DefUseGraph::from_profiles(&profiles);
 
         assert_eq!(dug.num_types(), 2);
-        let t1 = dug.type_index_of(&make_resource_tag_at("A", account_1)).copied();
-        let t2 = dug.type_index_of(&make_resource_tag_at("A", account_2)).copied();
+        let t1 = dug
+            .type_index_of(&make_resource_tag_at("A", account_1))
+            .copied();
+        let t2 = dug
+            .type_index_of(&make_resource_tag_at("A", account_2))
+            .copied();
         assert!(t1.is_some());
         assert!(t2.is_some());
         assert_ne!(t1, t2);
@@ -3950,7 +3953,9 @@ mod tests {
         assert!(dug.unmet_deps(0).is_empty());
         assert!(dug.are_dependencies_satisfied(&[0]));
         assert!(dug.exact_unmet_dependency_resource_tags(0).is_empty());
-        assert!(dug.initial_resource_tags().contains(&make_resource_tag("A")));
+        assert!(dug
+            .initial_resource_tags()
+            .contains(&make_resource_tag("A")));
     }
 
     #[test]
@@ -4047,7 +4052,9 @@ mod tests {
         );
 
         // Phase 2 keeps concrete producers for the type the script writes.
-        let type_a = *dug.type_index_of(&make_resource_tag("A")).expect("type A interned");
+        let type_a = *dug
+            .type_index_of(&make_resource_tag("A"))
+            .expect("type A interned");
         assert_eq!(dug.seed_producers_of(type_a).len(), MAX_SEEDS_PER_SIGNATURE);
     }
 
@@ -4070,8 +4077,9 @@ mod tests {
             }
             dug
         };
-        let ids =
-            |dug: &DefUseGraph| -> Vec<u64> { (0..dug.num_seeds()).map(|i| dug.seed_node(i).id).collect() };
+        let ids = |dug: &DefUseGraph| -> Vec<u64> {
+            (0..dug.num_seeds()).map(|i| dug.seed_node(i).id).collect()
+        };
 
         let dug = observe();
         assert_eq!(dug.num_seeds(), MAX_SEED_NODES);

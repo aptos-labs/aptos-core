@@ -42,18 +42,13 @@
 //! Conversions the binary format already implements are not re-implemented here:
 //! drop-ability comes from `BinaryIndexedView::abilities`.
 
-
 use anyhow::{bail, Result};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
 use aptos_types::{
     account_address::create_resource_address, transaction::authenticator::AuthenticationKey,
 };
 use move_binary_format::{binary_views::BinaryIndexedView, file_format::SignatureToken};
-use move_core_types::{
-    ability::AbilitySet,
-    account_address::AccountAddress,
-    int256::U256,
-};
+use move_core_types::{ability::AbilitySet, account_address::AccountAddress, int256::U256};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 

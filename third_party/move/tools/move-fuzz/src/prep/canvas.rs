@@ -817,7 +817,7 @@ mod tests {
             graph::{DatatypeItem, FlowGraph, FlowGraphEdge, FlowGraphNode, FunctionInst},
             ident::{DatatypeIdent, FunctionIdent},
             model::Model,
-            typing::{ComplexType, TypeBase, TypeItem, TypeRef, TypeExpr},
+            typing::{ComplexType, TypeBase, TypeExpr, TypeItem, TypeRef},
         },
     };
     use move_core_types::{

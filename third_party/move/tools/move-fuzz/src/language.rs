@@ -35,7 +35,9 @@ impl FromStr for OptLevel {
             "none" => Ok(OptLevel::None),
             "default" => Ok(OptLevel::Default),
             "extra" => Ok(OptLevel::Extra),
-            _ => anyhow::bail!("unrecognized optimization level \"{s}\" (expected one of: none, default, extra)"),
+            _ => anyhow::bail!(
+                "unrecognized optimization level \"{s}\" (expected one of: none, default, extra)"
+            ),
         }
     }
 }

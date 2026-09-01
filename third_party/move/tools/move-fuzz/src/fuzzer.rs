@@ -2503,8 +2503,7 @@ mod tests {
             "expected nested generic struct after {MAX_GENERIC_TYPE_POOL_ROUNDS} expansion rounds",
         );
 
-        let outer_vec_inner_u64 =
-            make_struct("Outer", vec![TypeTag::Vector(Box::new(inner_u64))]);
+        let outer_vec_inner_u64 = make_struct("Outer", vec![TypeTag::Vector(Box::new(inner_u64))]);
         assert!(
             pool.candidates_for(AbilitySet::EMPTY)
                 .contains(&&outer_vec_inner_u64),
@@ -2562,7 +2561,8 @@ mod tests {
     fn record_missing_data_signal_filters_noise_and_keeps_object_equivalent_reads() {
         let object_a = AccountAddress::from_hex_literal("0x100").unwrap();
         let object_b = AccountAddress::from_hex_literal("0x200").unwrap();
-        let ready = make_resource_tag_at("Ready", AccountAddress::from_hex_literal("0x300").unwrap());
+        let ready =
+            make_resource_tag_at("Ready", AccountAddress::from_hex_literal("0x300").unwrap());
         let needed = make_resource_tag_at("Vault", object_a);
         let observed_equivalent = make_resource_tag_at("Vault", object_b);
 

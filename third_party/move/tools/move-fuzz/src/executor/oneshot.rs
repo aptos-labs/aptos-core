@@ -911,13 +911,10 @@ mod tests {
         )
             .into();
 
-        assert!(matches!(
-            status,
-            ExecStatus::AbortIntrinsic {
-                status_code: StatusCode::MISSING_DATA,
-                ..
-            }
-        ));
+        assert!(matches!(status, ExecStatus::AbortIntrinsic {
+            status_code: StatusCode::MISSING_DATA,
+            ..
+        }));
         assert!(status.is_missing_data());
         assert_eq!(status.category(), "abort");
     }
@@ -959,13 +956,10 @@ mod tests {
         )
             .into();
 
-        assert!(matches!(
-            status,
-            ExecStatus::ErrorKept {
-                status_code: StatusCode::EXECUTION_LIMIT_REACHED,
-                sub_status: None,
-            }
-        ));
+        assert!(matches!(status, ExecStatus::ErrorKept {
+            status_code: StatusCode::EXECUTION_LIMIT_REACHED,
+            sub_status: None,
+        }));
         assert_eq!(status.category(), "error");
     }
 
@@ -983,13 +977,10 @@ mod tests {
         )
             .into();
 
-        assert!(matches!(
-            status,
-            ExecStatus::ErrorKept {
-                status_code: StatusCode::EXECUTION_LIMIT_REACHED,
-                sub_status: None,
-            }
-        ));
+        assert!(matches!(status, ExecStatus::ErrorKept {
+            status_code: StatusCode::EXECUTION_LIMIT_REACHED,
+            sub_status: None,
+        }));
     }
 
     #[test]
@@ -1004,13 +995,10 @@ mod tests {
         )
             .into();
 
-        assert!(matches!(
-            status,
-            ExecStatus::ErrorDiscard {
-                status_code: StatusCode::SEQUENCE_NUMBER_TOO_OLD,
-                sub_status: Some(3),
-            }
-        ));
+        assert!(matches!(status, ExecStatus::ErrorDiscard {
+            status_code: StatusCode::SEQUENCE_NUMBER_TOO_OLD,
+            sub_status: Some(3),
+        }));
         assert_eq!(status.category(), "discard");
     }
 

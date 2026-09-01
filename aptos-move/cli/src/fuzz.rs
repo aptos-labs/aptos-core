@@ -14,7 +14,9 @@ use move_fuzz::{
     cli::{run_on, FuzzCommand},
     language::{LanguageSetting, OptLevel},
 };
-use move_model::metadata::{LanguageVersion, LATEST_STABLE_LANGUAGE_VERSION, LATEST_STABLE_LANGUAGE_VERSION_VALUE};
+use move_model::metadata::{
+    LanguageVersion, LATEST_STABLE_LANGUAGE_VERSION, LATEST_STABLE_LANGUAGE_VERSION_VALUE,
+};
 use std::path::PathBuf;
 
 // NOTE: this command deliberately does not `#[clap(flatten)]` `MovePackageOptions`

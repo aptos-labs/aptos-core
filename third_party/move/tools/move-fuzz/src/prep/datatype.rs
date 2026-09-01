@@ -11,7 +11,7 @@ use crate::{
     deps::PkgKind,
     prep::{
         ident::DatatypeIdent,
-        typing::{IntrinsicType, TypeBase, TypeItem, TypeRef, TypeExpr},
+        typing::{IntrinsicType, TypeBase, TypeExpr, TypeItem, TypeRef},
     },
 };
 use move_binary_format::{
@@ -671,14 +671,17 @@ mod tests {
         deps::PkgKind,
         prep::{
             ident::DatatypeIdent,
-            typing::{TypeBase, TypeRef, TypeExpr},
+            typing::{TypeBase, TypeExpr, TypeRef},
         },
     };
-    use move_binary_format::file_format::{
-        empty_module, AddressIdentifierIndex, IdentifierIndex, ModuleHandle, ModuleHandleIndex,
-        SignatureToken, StructHandle, StructHandleIndex, StructTypeParameter,
+    use move_binary_format::{
+        binary_views::BinaryIndexedView,
+        file_format::{
+            empty_module, AddressIdentifierIndex, IdentifierIndex, ModuleHandle, ModuleHandleIndex,
+            SignatureToken, StructHandle, StructHandleIndex, StructTypeParameter,
+        },
+        CompiledModule,
     };
-    use move_binary_format::{binary_views::BinaryIndexedView, CompiledModule};
     use move_core_types::{
         ability::{Ability, AbilitySet},
         account_address::AccountAddress,
@@ -861,10 +864,10 @@ mod tests {
 
         // `Object<u64>` is legal Move but not modellable: skip, do not panic
         assert!(registry
-            .convert_signature_token(&view, &SignatureToken::StructInstantiation(
-                object_handle,
-                vec![SignatureToken::U64],
-            ))
+            .convert_signature_token(
+                &view,
+                &SignatureToken::StructInstantiation(object_handle, vec![SignatureToken::U64],)
+            )
             .is_none());
 
         // and the rejection propagates out of every nesting position
@@ -889,10 +892,12 @@ mod tests {
 
         // `Object<T>` over a type parameter is still supported
         assert!(matches!(
-            registry.convert_signature_token(&view, &SignatureToken::StructInstantiation(
-                object_handle,
-                vec![SignatureToken::TypeParameter(0)],
-            )),
+            registry.convert_signature_token(
+                &view,
+                &SignatureToken::StructInstantiation(object_handle, vec![
+                    SignatureToken::TypeParameter(0)
+                ],)
+            ),
             Some(TypeRef::Base(TypeExpr::ObjectParam(0)))
         ));
 

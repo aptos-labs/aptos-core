@@ -171,9 +171,7 @@ impl ResourceSlot {
             },
             StateKeyInner::TableItem { .. } => Some(Self::synthetic("table_", state_key)),
             StateKeyInner::Raw(..) => Some(Self::synthetic("raw_", state_key)),
-            StateKeyInner::TradingNative(..) => {
-                Some(Self::synthetic("trading_native_", state_key))
-            },
+            StateKeyInner::TradingNative(..) => Some(Self::synthetic("trading_native_", state_key)),
         }
     }
 

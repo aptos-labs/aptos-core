@@ -1512,7 +1512,7 @@ impl TypeMode {
 #[cfg(test)]
 mod tests {
     use super::{
-        SimpleType, TypeBase, TypeItem, TypeMode, TypeRef, TypeSubstitution, TypeExpr,
+        SimpleType, TypeBase, TypeExpr, TypeItem, TypeMode, TypeRef, TypeSubstitution,
         TypeUnification,
     };
     use crate::prep::ident::DatatypeIdent;
