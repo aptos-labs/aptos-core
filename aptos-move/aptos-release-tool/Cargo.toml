@@ -21,10 +21,10 @@ anyhow = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-cli-common = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-infallible = { workspace = true }
 aptos-move-cli = { workspace = true }
 aptos-release-builder = { workspace = true }
 aptos-rest-client = { workspace = true }
-aptos-sdk = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 chrono = { workspace = true }
