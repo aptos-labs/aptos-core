@@ -29,7 +29,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         &self,
         block_metadata: &BlockMetadata,
         _aux_info: &AuxiliaryInfo,
-    ) -> TxnOutcome<'guard> {
+    ) -> TxnOutcome {
         let txn_data = SystemTxnMetadata::for_block_metadata(block_metadata);
         let mut interp = self.system_session(&txn_data);
         match run_block_prologue(&mut interp, self.guard, block_metadata) {
@@ -48,7 +48,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         &self,
         block_metadata_ext: &BlockMetadataExt,
         aux_info: &AuxiliaryInfo,
-    ) -> TxnOutcome<'guard> {
+    ) -> TxnOutcome {
         if let BlockMetadataExt::V0(block_metadata) = block_metadata_ext {
             return self.execute_block_metadata_transaction(block_metadata, aux_info);
         }
