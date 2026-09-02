@@ -6,10 +6,10 @@
 //!
 //! [`NativeContext`]: mono_move_core::native::NativeContext
 
-// Re-exported so the `natives!` macro can name it via `$crate::NativeFunction`
+// Re-exported so the native list macros can name these via `$crate::...`
 // without callers having to add `mono-move-core` to their imports.
-pub use mono_move_core::native::NativeFunction;
-use mono_move_core::{native::NativeContextFamily, types::InternedType};
+use mono_move_core::native::NativeContextFamily;
+pub use mono_move_core::native::{Dispatch, NativeFunction, NativeName};
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 
 mod address_derivation;
@@ -35,9 +35,11 @@ pub mod signer;
 pub mod state_storage;
 pub mod string;
 pub mod table;
+#[cfg(feature = "testing")]
 pub mod test_natives;
 pub mod transaction_context;
 pub mod type_info;
+#[cfg(feature = "testing")]
 pub mod unit_test;
 pub mod vector;
 
@@ -71,36 +73,16 @@ pub use signer::make_all_signer_natives;
 pub use state_storage::{make_all_state_storage_natives, StorageUsageAtEpochBoundary};
 pub use string::make_all_string_natives;
 pub use table::make_all_table_natives;
+#[cfg(feature = "testing")]
 pub use test_natives::{make_all_test_natives, native_u64_add, native_u64_identity};
 pub use transaction_context::{make_all_transaction_context_natives, TransactionContextExtension};
 pub use type_info::make_all_type_info_natives;
+#[cfg(feature = "testing")]
 pub use unit_test::make_all_unit_test_natives;
 pub use vector::make_all_vector_natives;
 
-/// How a native is dispatched against a call's type arguments. A native that
-/// works for any instantiation registers as [`Dispatch::Polymorphic`]; a native
-/// specialized to one concrete instantiation registers as
-/// [`Dispatch::Monomorphic`] carrying that instantiation's type arguments. The
-/// consumer interns these into a `NativeName` registry key.
-//
-// TODO(cleanup): this duplicates `NativeName`'s shape. We keep it separate because
-// `NativeName` holds arena-interned ids that require an `ExecutionGuard`, which
-// is unavailable when these tables are built statically. Revisit if interning
-// becomes available earlier.
-pub enum Dispatch {
-    Polymorphic,
-    Monomorphic(&'static [InternedType]),
-}
-
-/// One native registration: its qualified name parts, its dispatch kind, and
-/// the boxed implementation.
-pub type NativeEntry<F> = (
-    AccountAddress,
-    Identifier,
-    Identifier,
-    Dispatch,
-    NativeFunction<F>,
-);
+/// One native registration: its name and its implementation.
+pub type NativeEntry<F> = (NativeName, NativeFunction<F>);
 
 /// All natives shipped with the production MonoMove VM. Additional native
 /// modules are concatenated here as they are implemented.
@@ -138,17 +120,33 @@ pub fn make_all_production_natives<F: NativeContextFamily>() -> Vec<NativeEntry<
 //
 // TODO(cleanup): replace with a proper parser. See if one already exists in
 // move-core-types.
-pub(crate) fn parse_qualified_native_name(qname: &str) -> (AccountAddress, Identifier, Identifier) {
+// TODO(cleanup): make this a `const fn` so malformed names are caught at
+// compile time rather than when the native list is built at startup.
+pub(crate) fn parse_qualified_native_name(
+    qname: &'static str,
+) -> (AccountAddress, &'static str, &'static str) {
     let mut parts = qname.split("::");
     let addr_part = parts
         .next()
         .unwrap_or_else(|| panic!("malformed native name `{}`: missing address", qname));
-    let module_part = parts
+    let module = parts
         .next()
         .unwrap_or_else(|| panic!("malformed native name `{}`: missing module", qname));
-    let function_part = parts
+    if !Identifier::is_valid(module) {
+        panic!(
+            "malformed native name `{}`:` module name is not a valid identifier",
+            qname
+        );
+    }
+    let function = parts
         .next()
         .unwrap_or_else(|| panic!("malformed native name `{}`: missing function", qname));
+    if !Identifier::is_valid(function) {
+        panic!(
+            "malformed native name `{}`: function name is not a valid identifier",
+            qname
+        );
+    }
     assert!(
         parts.next().is_none(),
         "malformed native name `{}`: too many `::`-separated parts",
@@ -156,20 +154,32 @@ pub(crate) fn parse_qualified_native_name(qname: &str) -> (AccountAddress, Ident
     );
     let addr = AccountAddress::from_hex_literal(addr_part)
         .unwrap_or_else(|e| panic!("malformed native name `{}`: invalid address: {}", qname, e));
-    let module = Identifier::new(module_part)
-        .unwrap_or_else(|e| panic!("malformed native name `{}`: invalid module: {}", qname, e));
-    let function = Identifier::new(function_part)
-        .unwrap_or_else(|e| panic!("malformed native name `{}`: invalid function: {}", qname, e));
     (addr, module, function)
 }
 
-/// Builds one [`NativeEntry`]: parses the qualified name, boxes the function,
-/// and pairs it with the given [`Dispatch`]. Shared by the list macros below.
+/// Builds one [`NativeEntry`].
 macro_rules! native_entry {
     ($qname:expr, $dispatch:expr, $func:expr) => {{
-        let (addr, module, function) = $crate::parse_qualified_native_name($qname);
-        let func: $crate::NativeFunction<_> = ::std::boxed::Box::new(|ctx| $func(ctx));
-        (addr, module, function, $dispatch, func)
+        // The `wrapper` is a generic function whose lifetime is late-bound, so
+        // `wrapper::<F>` coerces to the higher-ranked:
+        // ```
+        //   for<'a> fn(&F::Of<'a>) -> ..
+        // ```
+        // that the native table stores.
+        fn wrapper<F: ::mono_move_core::native::NativeContextFamily>(
+            ctx: &<F as ::mono_move_core::native::NativeContextFamily>::Of<'_>,
+        ) -> ::mono_move_core::VMResult<::mono_move_core::native::NativeStatus> {
+            $func(ctx)
+        }
+
+        let (address, module, function) = $crate::parse_qualified_native_name($qname);
+        let name = $crate::NativeName {
+            address,
+            module,
+            function,
+            dispatch: $dispatch,
+        };
+        (name, wrapper::<F> as $crate::NativeFunction<F>)
     }};
 }
 pub(crate) use native_entry;
@@ -177,9 +187,12 @@ pub(crate) use native_entry;
 /// Builds a list of monomorphic natives: each body is registered for one
 /// concrete instantiation, and the specializer resolves it from the call's type
 /// arguments. Each entry is either `(name, fn)` — empty type arguments (a
-/// non-generic native) — or `(name, &[ty, ...], fn)` to specialize on the given
-/// static type arguments. The caller supplies the concrete types (e.g. the
-/// turbofished function and `&[U64_TY]`).
+/// non-generic native) — or `(name, &[ty, ...], fn)` to specialize on concrete
+/// type arguments. Each element of the type-argument slice must be a `'static`
+/// primitive type constant (e.g. `U64_TY`), never an arena-interned type.
+//
+// TODO(testing): debug-assert this in the registry builder instead of relying
+// on the doc invariant.
 ///
 /// Example:
 /// ```ignore

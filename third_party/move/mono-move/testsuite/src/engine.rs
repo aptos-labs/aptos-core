@@ -9,9 +9,9 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Result};
 use mono_move_core::{
-    native::{NativeExtensions, NativeName, NoNatives},
+    native::{NativeExtensions, NoNatives},
     types::EMPTY_TYPE_LIST,
-    Function, GasMeter, Interner, NoResourceProvider,
+    Function, GasMeter, NoResourceProvider,
 };
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
@@ -19,7 +19,6 @@ use mono_move_natives::{
     make_all_bls12381_test_natives, make_all_ed25519_test_natives,
     make_all_multi_ed25519_test_natives, make_all_production_natives,
     make_all_ristretto255_scalar_test_natives, make_all_test_natives, make_all_unit_test_natives,
-    Dispatch,
 };
 use mono_move_runtime::{
     InterpreterContext, ProductionContextFamily, ProductionNativeRegistry, RuntimeStatus,
@@ -28,6 +27,7 @@ use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, vm_status::AbortLocation,
 };
 use specializer::ModuleIR;
+use std::sync::LazyLock;
 
 /// Gas budget for engine runs. Effectively unbounded.
 const GAS_BUDGET: u64 = u64::MAX;
@@ -116,38 +116,23 @@ impl<'guard> MonoRunner<'guard> {
 }
 
 /// Build the native registry mono-move executes against: the synthetic test
-/// natives plus the real production natives, keyed by interned name.
-pub fn build_natives(guard: &ExecutionGuard<'_>) -> ProductionNativeRegistry {
-    let mut natives = ProductionNativeRegistry::new();
-    natives
-        .register_all(
-            make_all_test_natives::<ProductionContextFamily>()
-                .into_iter()
-                .chain(make_all_unit_test_natives::<ProductionContextFamily>())
-                .chain(make_all_ed25519_test_natives::<ProductionContextFamily>())
-                .chain(make_all_multi_ed25519_test_natives::<ProductionContextFamily>())
-                .chain(make_all_bls12381_test_natives::<ProductionContextFamily>())
-                .chain(make_all_ristretto255_scalar_test_natives::<
-                    ProductionContextFamily,
-                >())
-                .chain(make_all_production_natives::<ProductionContextFamily>())
-                .map(|(addr, module, function, dispatch, func)| {
-                    let module = guard.module_id_of(&addr, &module);
-                    let function = guard.identifier_of(&function);
-                    let name = match dispatch {
-                        Dispatch::Polymorphic => NativeName::Polymorphic { module, function },
-                        Dispatch::Monomorphic(ty_args) => NativeName::Monomorphic {
-                            module,
-                            function,
-                            ty_args: guard.type_list_of(ty_args),
-                        },
-                    };
-                    (name, func)
-                }),
-        )
-        .expect("natives have unique qualified names");
-    natives
+/// natives plus the real production natives.
+pub fn build_natives() -> &'static ProductionNativeRegistry {
+    &ALL_NATIVES
 }
+
+static ALL_NATIVES: LazyLock<ProductionNativeRegistry> = LazyLock::new(|| {
+    let mut natives = make_all_test_natives::<ProductionContextFamily>();
+    natives.extend(make_all_unit_test_natives::<ProductionContextFamily>());
+    natives.extend(make_all_ed25519_test_natives::<ProductionContextFamily>());
+    natives.extend(make_all_multi_ed25519_test_natives::<ProductionContextFamily>());
+    natives.extend(make_all_bls12381_test_natives::<ProductionContextFamily>());
+    natives.extend(make_all_ristretto255_scalar_test_natives::<
+        ProductionContextFamily,
+    >());
+    natives.extend(make_all_production_natives::<ProductionContextFamily>());
+    ProductionNativeRegistry::with_natives(natives)
+});
 
 /// Build the loader/native/interpreter stack over an existing guard and module
 /// provider, install `extensions`, load `address::module_name::function_name`,
@@ -164,13 +149,13 @@ pub fn with_mono_function<'guard, 'ctx, R>(
     heap_size: Option<usize>,
     body: impl FnOnce(&mut MonoRunner<'_>) -> R,
 ) -> Result<R> {
-    let natives = build_natives(guard);
+    let natives = build_natives();
 
     let loader = Loader::new_with_policy(
         guard,
         module_provider,
         LoadingPolicy::Lazy(LoweringPolicy::Lazy),
-        &natives,
+        natives,
     );
 
     let id = guard
@@ -197,7 +182,7 @@ pub fn with_mono_function<'guard, 'ctx, R>(
             read_set,
             gas_meter,
             &NoResourceProvider,
-            &natives,
+            natives,
             function,
             n,
         ),
@@ -206,7 +191,7 @@ pub fn with_mono_function<'guard, 'ctx, R>(
             read_set,
             gas_meter,
             &NoResourceProvider,
-            &natives,
+            natives,
             function,
         ),
     }

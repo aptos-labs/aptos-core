@@ -22,8 +22,7 @@ use mono_move_runtime::ProductionNativeRegistry;
 /// `system_txns`.
 pub struct AptosTransactionExecutor<'a> {
     pub(crate) guard: &'a ExecutionGuard<'a>,
-    // TODO(cleanup): We are considering moving the native registry into the GlobalContext.
-    // This parameter may disappear once it moves there.
+    /// All native functions available for this executor.
     pub(crate) natives: &'a ProductionNativeRegistry,
     pub(crate) module_provider: &'a dyn ModuleProvider,
     pub(crate) data_provider: &'a dyn ResourceProvider,
