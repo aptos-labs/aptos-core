@@ -9,9 +9,8 @@ use crate::{
 use anyhow::anyhow;
 use aptos_types::state_store::{state_key::StateKey, table::TableHandle as AptosTableHandle};
 use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
-use std::{fmt, ptr::NonNull};
+use std::{ptr::NonNull, sync::Arc};
 use thiserror::Error;
-use triomphe::Arc;
 
 /// Version of the read value (which can come from storage or from other
 /// transaction write).
@@ -133,36 +132,16 @@ impl IntoExecutionError for ResourceProviderError {
 
 /// Keeps a read's backing allocation alive. A [`StorageRead::ExternalHeap`]
 /// points into an arena owned by whoever produced the read: a storage provider,
-/// or another transaction's frozen heap. Retaining the anchor keeps that arena
+/// or another transaction's frozen heap. Retaining the pin keeps that arena
 /// from being freed while the read is held.
 //
 // TODO(cleanup): give this a method (or supertrait) once read-set validation
 // needs to inspect the backing allocation.
-pub trait ReadAnchor {}
-
-/// Type-erased owner of a read's backing allocation (see [`ReadAnchor`]). Cheap
-/// to clone (an `Arc` bump) and cloned into every entry that retains the read.
-// The `Arc` is held only for its `Drop`: keeping it alive is the whole point,
-// and nothing reads it until read-set validation grows a `ReadAnchor` method.
-#[derive(Clone)]
-pub struct HeapAnchor(#[allow(dead_code)] Arc<dyn ReadAnchor>);
-
-impl HeapAnchor {
-    /// Wraps an owner that keeps the read's backing allocation alive.
-    pub fn new<A: ReadAnchor + 'static>(anchor: Arc<A>) -> Self {
-        Self(anchor)
-    }
-}
-
-impl fmt::Debug for HeapAnchor {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("HeapAnchor")
-    }
-}
+pub trait ReadPin {}
 
 /// Storage read returned to the VM. Every VM execution records reads of any
 /// value coming from global storage.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum StorageRead {
     /// Value does not exist at this key.
     DoesNotExist,
@@ -176,7 +155,7 @@ pub enum StorageRead {
         /// Version of this read from Block-STM. Used for read-set validation.
         version: Version,
         /// Keeps the arena `ptr` points into alive while this read is retained.
-        anchor: HeapAnchor,
+        pin: Arc<dyn ReadPin>,
     },
 }
 
