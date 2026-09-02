@@ -29,7 +29,7 @@ use crate::{
         ENTRYPOINT_CACHE_VERSION,
     },
 };
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use aptos_vm_environment::prod_configs::set_debugging_enabled;
 use legacy_move_compiler::compiled_unit::CompiledUnitEnum;
 use log::{debug, info};
@@ -938,19 +938,30 @@ fn restore_auto_state(
     missing_data_signals: &mut BTreeMap<usize, MissingDataSignal>,
 ) -> Result<bool> {
     if loaded_state.version != AUTO_STATE_VERSION {
-        info!(
-            "ignoring persisted fuzz state with unsupported version {}",
+        log::warn!(
+            "discarding persisted fuzz state: it was written by schema version {} and this build expects {AUTO_STATE_VERSION}",
             loaded_state.version
         );
         return Ok(false);
     }
     if loaded_state.entrypoint_identities.len() != params.entrypoint_identities.len() {
-        info!("ignoring persisted fuzz state because script count changed");
+        log::warn!(
+            "discarding persisted fuzz state: it holds {} entrypoints and this campaign generated {}",
+            loaded_state.entrypoint_identities.len(),
+            params.entrypoint_identities.len()
+        );
         return Ok(false);
     }
+    // Unlike the two checks above, this is not a changed input: `save_auto_state`
+    // writes one oneshot fuzzer per entrypoint identity, so a file that disagrees
+    // with itself was either truncated or written by a buggy save. Discarding it
+    // would hide whichever of those it is.
     if loaded_state.oneshot_fuzzers.len() != loaded_state.entrypoint_identities.len() {
-        info!("ignoring persisted fuzz state because saved oneshot state is incomplete");
-        return Ok(false);
+        bail!(
+            "persisted fuzz state is inconsistent: {} entrypoint identities but {} oneshot fuzzers",
+            loaded_state.entrypoint_identities.len(),
+            loaded_state.oneshot_fuzzers.len()
+        );
     }
 
     let mut current_indices = BTreeMap::new();
@@ -1297,10 +1308,18 @@ pub fn entrypoint(
         },
         Ok(None) => {},
         Err(err) => {
-            info!(
-                "ignoring persisted fuzz state at {}: {err}",
-                path_auto_state.display()
-            );
+            // The file exists but could not be read or parsed. Discarding it
+            // silently throws away the whole campaign -- corpus, coverage, DUG
+            // and sequence database -- and reports a normal cold start, so a
+            // truncated checkpoint looks exactly like a first run. Fail instead
+            // and let the user decide, since `--reset-state` is the deliberate
+            // way to start over.
+            return Err(err).with_context(|| {
+                format!(
+                    "cannot resume from {}; pass --reset-state to discard it and start a new campaign",
+                    path_auto_state.display()
+                )
+            });
         },
     }
 
