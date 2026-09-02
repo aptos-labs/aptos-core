@@ -538,11 +538,11 @@ mod tests {
     use crate::{heap::Heap, write_object_header};
     use mono_move_alloc::GlobalArenaPtr;
     use mono_move_core::{
-        storage::resource_provider::ResourceProviderError, types::Type, DescriptorId, HeapAnchor,
-        ReadAnchor, OBJECT_HEADER_SIZE,
+        storage::resource_provider::ResourceProviderError, types::Type, DescriptorId, ReadPin,
+        OBJECT_HEADER_SIZE,
     };
     use move_core_types::account_address::AccountAddress;
-    use triomphe::Arc;
+    use std::sync::Arc;
 
     // An `InternedType` is just an arena pointer; a `'static` node gives a
     // stable, cheap one without standing up an interner. Two distinct types let
@@ -585,14 +585,14 @@ mod tests {
     // The tests only store and compare read pointers, never dereferencing them,
     // so a zero-sized stand-in keeps each external read's value graph nominally
     // alive without a real heap.
-    struct TestAnchor;
-    impl ReadAnchor for TestAnchor {}
+    struct TestPin;
+    impl ReadPin for TestPin {}
 
     fn ext_read(ptr: NonNull<u8>) -> StorageRead {
         StorageRead::ExternalHeap {
             ptr,
             version: 0,
-            anchor: HeapAnchor::new(Arc::new(TestAnchor)),
+            pin: Arc::new(TestPin),
         }
     }
 

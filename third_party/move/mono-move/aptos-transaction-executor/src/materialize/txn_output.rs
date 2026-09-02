@@ -27,6 +27,9 @@ use std::{
 // TODO(security): audit all error messages and make sure they do not lead to
 // deep recursions or OOMs.
 
+// TODO(security): pin providers so that execution and materialization use
+// identical layout and data providers.
+
 /// Creates the output of an executed transaction from its effects.
 pub(crate) fn executed_output(
     effects: &SessionEffects,

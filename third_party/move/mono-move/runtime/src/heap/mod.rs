@@ -30,7 +30,7 @@ use mono_move_core::{
     native::{NativeABI, NativeExtensions},
     types::InternedType,
     DescriptorId, DescriptorProvider, FrameOffset, Function, LayoutProvider, ObjectDescriptorInner,
-    ReadAnchor, RootPool, VMInternalError, VMResult, CAPTURED_DATA_VALUES_OFFSET,
+    ReadPin, RootPool, VMInternalError, VMResult, CAPTURED_DATA_VALUES_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DATA_SIZE, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
     FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE,
 };
@@ -270,13 +270,26 @@ impl Heap {
     }
 }
 
-// A frozen session heap anchors reads that other transactions take against it.
-impl ReadAnchor for Heap {}
+/// A session heap that has been frozen: no further execution can mutate it, so
+/// its allocations never move. It exposes no APIs; wrapping keeps the raw [`Heap`]
+/// methods unreachable so the only thing a holder can do is keep the heap alive,
+/// which is exactly what pinning a read against another transaction's heap needs.
+pub struct FrozenHeap(#[allow(dead_code)] Heap);
+
+impl FrozenHeap {
+    /// Freezes a session heap.
+    pub fn new(heap: Heap) -> Self {
+        Self(heap)
+    }
+}
+
+// A frozen session heap pins reads that other transactions take against it.
+impl ReadPin for FrozenHeap {}
 
 /// A [`Heap`] that can be shared and appended to through a shared reference.
 ///
 /// Storage providers materialize values lazily into a long-lived arena but hand
-/// out reads anchored by an `Arc`. This newtype gives them interior-mutable,
+/// out reads pinned by an `Arc`. This newtype gives them interior-mutable,
 /// append-only allocation while the arena stays shared. It is never
 /// garbage-collected or reset, so allocated objects never move and the pointers
 /// handed out stay valid for the arena's whole life.
@@ -300,7 +313,7 @@ impl SharedArena {
     }
 }
 
-impl ReadAnchor for SharedArena {}
+impl ReadPin for SharedArena {}
 
 /// Outcome of a bump-allocation attempt.
 #[derive(Debug)]
