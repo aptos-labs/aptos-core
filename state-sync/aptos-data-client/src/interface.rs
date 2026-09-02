@@ -6,7 +6,7 @@ use aptos_storage_interface::StateKind;
 use aptos_storage_service_types::{responses::TransactionOrOutputListWithProofV2, Epoch};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
-    state_store::state_value::StateValueChunkWithProof,
+    state_store::{hot_state::HotStateValueChunkWithProof, state_value::StateValueChunkWithProof},
     transaction::{TransactionListWithProofV2, TransactionOutputListWithProofV2, Version},
 };
 use async_trait::async_trait;
@@ -90,6 +90,24 @@ pub trait AptosDataClientInterface {
         request_timeout_ms: u64,
         kind: StateKind,
     ) -> error::Result<Response<StateValueChunkWithProof>>;
+
+    /// Fetches the number of hot states at the specified version.
+    async fn get_number_of_hot_states(
+        &self,
+        version: Version,
+        request_timeout_ms: u64,
+    ) -> error::Result<Response<u64>>;
+
+    /// Fetches a single hot state value chunk with proof, containing the values
+    /// from start to end index (inclusive) at the specified version. Otherwise
+    /// behaves like `get_state_values_with_proof`.
+    async fn get_hot_state_values_with_proof(
+        &self,
+        version: u64,
+        start_index: u64,
+        end_index: u64,
+        request_timeout_ms: u64,
+    ) -> error::Result<Response<HotStateValueChunkWithProof>>;
 
     /// Fetches a transaction output list with proof, with transaction
     /// outputs from start to end versions (inclusive). The proof is relative
@@ -268,6 +286,7 @@ impl<T> Response<T> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ResponsePayload {
     EpochEndingLedgerInfos(Vec<LedgerInfoWithSignatures>),
+    HotStateValuesWithProof(HotStateValueChunkWithProof),
     NewTransactionOutputsWithProof((TransactionOutputListWithProofV2, LedgerInfoWithSignatures)),
     NewTransactionsWithProof((TransactionListWithProofV2, LedgerInfoWithSignatures)),
     NumberOfStates(u64),
@@ -282,6 +301,7 @@ impl ResponsePayload {
     pub fn get_label(&self) -> &'static str {
         match self {
             Self::EpochEndingLedgerInfos(_) => "epoch_ending_ledger_infos",
+            Self::HotStateValuesWithProof(_) => "hot_state_values_with_proof",
             Self::NewTransactionOutputsWithProof(_) => "new_transaction_outputs_with_proof",
             Self::NewTransactionsWithProof(_) => "new_transactions_with_proof",
             Self::NumberOfStates(_) => "number_of_states",
@@ -297,6 +317,9 @@ impl ResponsePayload {
         match self {
             Self::EpochEndingLedgerInfos(epoch_ending_ledger_infos) => {
                 epoch_ending_ledger_infos.len()
+            },
+            Self::HotStateValuesWithProof(hot_state_values_with_proof) => {
+                hot_state_values_with_proof.raw_values.len()
             },
             Self::NewTransactionOutputsWithProof((outputs_with_proof, _)) => {
                 outputs_with_proof.get_num_outputs()
@@ -323,6 +346,12 @@ impl ResponsePayload {
 impl From<StateValueChunkWithProof> for ResponsePayload {
     fn from(inner: StateValueChunkWithProof) -> Self {
         Self::StateValuesWithProof(inner)
+    }
+}
+
+impl From<HotStateValueChunkWithProof> for ResponsePayload {
+    fn from(inner: HotStateValueChunkWithProof) -> Self {
+        Self::HotStateValuesWithProof(inner)
     }
 }
 
