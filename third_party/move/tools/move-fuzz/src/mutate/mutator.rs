@@ -176,23 +176,40 @@ macro_rules! mutate_int {
     }};
 }
 
+/// The 256-bit counterpart of [`mutate_int!`], with the same branches and the
+/// same weights.
+///
+/// It must wrap rather than saturate. `U256` and `I256` expose only `checked_*`,
+/// and folding their `None` into `ZERO` threw away exactly the values an
+/// arithmetic fuzzer is looking for: `0 - 1` produced `0` where the 128-bit path
+/// produces `MAX`. The bit-flip branch produced `ZERO` outright, so a fifth of
+/// all 256-bit mutations returned a constant the generator already emits
+/// constantly. Both are recovered here by going through the `ethnum` repr, which
+/// has the wrapping operators, and through the byte representation for the
+/// complement, since neither wrapper implements `Not` and `I256::MAX` is not
+/// all-ones.
 macro_rules! mutate_int256 {
     ($s:expr, $t:ty, $v:expr) => {{
         let x = $s.rng.gen_range(0, MUT_INT_PROB_TOTAL);
         if x < MUT_INT_PROB_ADD_1 {
-            <$t>::checked_add($v, <$t>::from(1u8)).unwrap_or(<$t>::ZERO)
+            <$t>::from($v.repr().wrapping_add(<$t>::from(1u8).repr()))
         } else if x < MUT_INT_PROB_ADD_1 + MUT_INT_PROB_SUB_1 {
-            <$t>::checked_sub($v, <$t>::from(1u8)).unwrap_or(<$t>::ZERO)
+            <$t>::from($v.repr().wrapping_sub(<$t>::from(1u8).repr()))
         } else if x < MUT_INT_PROB_ADD_1 + MUT_INT_PROB_SUB_1 + MUT_INT_PROB_MUL_2 {
-            <$t>::checked_mul($v, <$t>::from(2u8)).unwrap_or(<$t>::ZERO)
+            <$t>::from($v.repr().wrapping_mul(<$t>::from(2u8).repr()))
         } else if x < MUT_INT_PROB_ADD_1
             + MUT_INT_PROB_SUB_1
             + MUT_INT_PROB_MUL_2
             + MUT_INT_PROB_DIV_2
         {
-            <$t>::checked_div($v, <$t>::from(2u8)).unwrap_or(<$t>::ZERO)
+            // the only division that can fail is by zero, and the divisor is 2
+            <$t>::checked_div($v, <$t>::from(2u8)).expect("division by two never fails")
         } else {
-            <$t>::ZERO
+            let mut bytes = $v.to_le_bytes();
+            for byte in bytes.iter_mut() {
+                *byte = !*byte;
+            }
+            <$t>::from_le_bytes(bytes)
         }
     }};
 }
@@ -940,6 +957,50 @@ mod tests {
             BTreeSet::from([AccountAddress::from_hex_literal("0x44").unwrap()]),
         );
         Mutator::new(seed, dict_address, TypePool::new(), vec![])
+    }
+
+    /// The 256-bit mutator must reach the wrap-around edges, like the 128-bit one.
+    /// Folding `checked_*` overflow into `ZERO` and returning `ZERO` for the
+    /// bit-flip branch made `MAX` unreachable from a zero seed, which is the value
+    /// an arithmetic-overflow fuzzer most wants to try.
+    #[test]
+    fn test_u256_mutation_reaches_max_from_zero() {
+        let mut mutator = test_mutator_with_address_buckets(11);
+        let zero = MoveValue::U256(U256::ZERO);
+        let mut saw_max = false;
+        let mut saw_non_constant = false;
+        for _ in 0..512 {
+            match mutator.mutate_value(&BasicInput::U256, &zero) {
+                MoveValue::U256(v) if v == U256::MAX => saw_max = true,
+                MoveValue::U256(v) if v != U256::ZERO => saw_non_constant = true,
+                _ => {},
+            }
+        }
+        assert!(
+            saw_max,
+            "0 - 1 and !0 both yield U256::MAX; neither was reached"
+        );
+        assert!(
+            saw_non_constant,
+            "every mutation of zero collapsed back to zero"
+        );
+    }
+
+    /// Same for the signed type, where `MAX` is not all-ones so the complement
+    /// cannot be expressed as `v ^ MAX`.
+    #[test]
+    fn test_i256_bit_flip_is_a_true_complement() {
+        let mut mutator = test_mutator_with_address_buckets(13);
+        let zero = MoveValue::I256(I256::ZERO);
+        let mut saw_all_ones = false;
+        for _ in 0..512 {
+            if let MoveValue::I256(v) = mutator.mutate_value(&BasicInput::I256, &zero) {
+                if v.to_le_bytes() == [0xFFu8; 32] {
+                    saw_all_ones = true;
+                }
+            }
+        }
+        assert!(saw_all_ones, "!0 must be all ones for I256, not ZERO");
     }
 
     #[test]
