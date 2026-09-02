@@ -1,14 +1,18 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Tests for the hot state snapshot read APIs used by fast sync to serve hot state.
+//! Tests for the hot state snapshot APIs used by fast sync to serve and restore hot state.
 
 use crate::{db::test_helper::arb_blocks_to_commit_with_params, AptosDB};
+use aptos_config::config::{
+    HotStateConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+    DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
+};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_jellyfish_merkle::{
     mock_tree_store::MockTreeStore, restore::JellyfishMerkleRestore, JellyfishMerkleTree,
 };
-use aptos_storage_interface::{DbReader, Result as DbResult};
+use aptos_storage_interface::{DbReader, DbWriter, Result as DbResult};
 use aptos_temppath::TempPath;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -445,4 +449,65 @@ proptest! {
         // Reading at/after the end yields nothing.
         prop_assert!(collect_chunk(&db, ckpt, expected.len(), usize::MAX).is_empty());
     }
+}
+
+/// Opens a DB that keeps hot state across restarts, as a fast-syncing node must.
+fn open_persistent_hot_state_db(path: &TempPath) -> AptosDB {
+    AptosDB::open(
+        StorageDirPaths::from_path(path.path()),
+        false, /* readonly */
+        NO_OP_STORAGE_PRUNER_CONFIG,
+        RocksdbConfigs::default(),
+        BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+        DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+        None, /* internal_indexer_db */
+        HotStateConfig {
+            delete_on_restart: false,
+            ..HotStateConfig::default()
+        },
+    )
+    .unwrap()
+}
+
+#[test]
+fn test_hot_state_restore() {
+    let tmp_src = TempPath::new();
+    let src = AptosDB::new_for_test(&tmp_src);
+    // Spread `hot_since_version` across checkpoints, refresh a key and leave a vacancy.
+    let version = commit_blocks(&src, vec![
+        vec![(key("a"), Some(val(b"a0"))), (key("b"), Some(val(b"b0")))],
+        vec![(key("c"), Some(val(b"c1"))), (key("a"), Some(val(b"a1")))],
+        vec![(key("d"), Some(val(b"d2"))), (key("b"), None)],
+        vec![(key("e"), Some(val(b"e3")))],
+    ]);
+    let expected = collect_paged(&src, version, usize::MAX);
+    assert!(!expected.is_empty());
+    let chunks = collect_chunks_with_proof(&src, version, 2);
+    let root_hash = chunks[0].root_hash;
+
+    let tmp_dst = TempPath::new();
+    let dst = open_persistent_hot_state_db(&tmp_dst);
+    let mut receiver = dst
+        .get_hot_state_snapshot_receiver(version, root_hash)
+        .unwrap();
+    for chunk in &chunks {
+        receiver
+            .add_chunk(chunk.raw_values.clone(), chunk.proof.clone())
+            .unwrap();
+    }
+    receiver.finish_box().unwrap();
+
+    // The restored DB serves the same snapshot.
+    assert_eq!(
+        dst.get_hot_state_item_count(version).unwrap(),
+        expected.len()
+    );
+    assert_eq!(collect_paged(&dst, version, 3), expected);
+    assert_eq!(
+        dst.state_store
+            .hot_state_merkle_db
+            .get_root_hash(version)
+            .unwrap(),
+        root_hash
+    );
 }
