@@ -10,9 +10,9 @@
 //! is the verification oracle these tests lean on. `delete_on_restart` is false
 //! everywhere so restarts reload the persisted hot state rather than wiping it.
 //!
-//! Fast sync and backup/restore are intentionally excluded -- hot state does not
-//! support them yet -- so only apply-outputs and re-execution bootstrapping are
-//! exercised.
+//! Fast sync, apply-outputs, and re-execution bootstrapping are exercised. The
+//! fast-sync test also checks that the restored hot-state cache is populated and
+//! survives a restart with storage preserved.
 
 use crate::{
     smoke_test_environment::SwarmBuilder,
@@ -142,6 +142,55 @@ async fn run_hot_state_fullnode_sync(
 
     let vfn_peer_id = state_sync_utils::create_fullnode(vfn_config, &mut swarm).await;
     state_sync_utils::test_fullnode_sync(vfn_peer_id, &mut swarm, true, true).await;
+}
+
+/// A fullnode restores hot state through fast sync and reloads it after a restart.
+/// `TRANSACTION_INFO_V1` is on from genesis, so a wrong restore or reload would
+/// yield a mismatched hot state root and stall synchronization.
+#[tokio::test]
+async fn test_hot_state_fullnode_fast_sync() {
+    let mut swarm = SwarmBuilder::new_local(1)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| persist_hot_state(config)))
+        .with_init_genesis_config(hot_state_genesis(true))
+        .build()
+        .await;
+
+    let mut vfn_config = NodeConfig::get_default_vfn_config();
+    persist_hot_state(&mut vfn_config);
+    vfn_config.state_sync.state_sync_driver.bootstrapping_mode =
+        BootstrappingMode::DownloadLatestStates;
+    vfn_config
+        .state_sync
+        .state_sync_driver
+        .continuous_syncing_mode = ContinuousSyncingMode::ApplyTransactionOutputs;
+    let vfn_peer_id = state_sync_utils::create_fullnode(vfn_config, &mut swarm).await;
+
+    state_sync_utils::test_fullnode_sync(vfn_peer_id, &mut swarm, true, true).await;
+
+    {
+        let fullnode = swarm.fullnode_mut(vfn_peer_id).unwrap();
+        state_sync_utils::verify_fast_sync_version_and_metrics(fullnode, false).await;
+    }
+    wait_for_all_nodes(&mut swarm).await;
+    let hot_state_items = swarm
+        .fullnode_mut(vfn_peer_id)
+        .unwrap()
+        .inspection_client()
+        .get_node_metric_i64("aptos_storage_gauge{name=hot_state_items}")
+        .await
+        .unwrap()
+        .unwrap_or_default();
+    assert!(hot_state_items > 0, "fast sync restored no hot state items");
+
+    // Restart without deleting storage; the restored cache must remain usable.
+    swarm
+        .fullnode_mut(vfn_peer_id)
+        .unwrap()
+        .restart()
+        .await
+        .unwrap();
+    wait_for_all_nodes(&mut swarm).await;
 }
 
 /// A validator restarts without wiping storage: it must reload hot state from
