@@ -270,6 +270,18 @@ impl DbWriter for AptosDB {
                 .state_pruner
                 .state_kv_pruner
                 .save_min_readable_version(version)?;
+            self.state_store
+                .state_pruner
+                .hot_state_merkle_pruner
+                .save_min_readable_version(version)?;
+            self.state_store
+                .state_pruner
+                .hot_epoch_snapshot_pruner
+                .save_min_readable_version(version)?;
+            self.state_store
+                .state_pruner
+                .hot_state_kv_pruner
+                .save_min_readable_version(version)?;
 
             restore_utils::update_latest_ledger_info(self.ledger_db.metadata_db(), ledger_infos)?;
             self.state_store.reset();
