@@ -1,0 +1,97 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 60,
+        "offset": 1304,
+        "sha256": "2a2aeb81eb834f060cec9ad86a2f9aa25055186808cffc01736f53bd4694b05c"
+      },
+      "edit": {
+        "at": 58,
+        "kind": "substitute",
+        "length": 0,
+        "to": "    break;\n            "
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_tier_lookup.move",
+      "mutant_id": "UC-credits-008-first-match-wins",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 43,
+        "offset": 1212,
+        "sha256": "0116b89ef63275b7d6507d4153d261ef325ee9d6efa730ee6d7f9305092519be"
+      },
+      "edit": {
+        "at": 35,
+        "kind": "substitute",
+        "length": 7,
+        "to": "tier_rank"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_tier_lookup.move",
+      "mutant_id": "UC-credits-008-credits-from-rank",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 97,
+        "offset": 1114,
+        "sha256": "81cc2ab4ea4d87b08cbf3600cb5927a97cc3f7aedfbf5e2d5b499db8501f6ac3"
+      },
+      "edit": {
+        "at": 18,
+        "kind": "substitute",
+        "length": 0,
+        "to": "="
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_tier_lookup.move",
+      "mutant_id": "UC-credits-008-scan-past-end-credits",
+      "obligation_category": "abort",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "2503a3b897af4095958c2f73792ef2a9d879983c1f7a095f35b5757ed51157ef",
+  "schema_version": 2,
+  "task_id": "UC-credits-008"
+}

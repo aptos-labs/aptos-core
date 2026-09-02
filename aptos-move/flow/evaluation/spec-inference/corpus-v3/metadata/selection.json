@@ -1,0 +1,67 @@
+{
+ "guessable": 2,
+ "held_back": {
+  "BK-bucket-016": "lower rarity-weighted distinctiveness",
+  "DV-dev-018": "redundant with LP-price-021 on ['arithmetic_or_abort', 'branches']",
+  "MD-median-015": "lower rarity-weighted distinctiveness",
+  "MM-max-014": "redundant with MM-min-013 on ['accumulator', 'loops']",
+  "TF-taker-017": "redundant with LP-price-021 on ['arithmetic_or_abort', 'branches']",
+  "UC-leverage-009": "redundant with UC-credits-008 on ['enum-variant', 'last-match', 'loops']",
+  "WU-limit-024": "redundant with LP-price-021 on ['arithmetic_or_abort', 'branches']"
+ },
+ "loops": 8,
+ "max_guessable": 2,
+ "modules": 12,
+ "near_duplicate_targets": [
+  {
+   "similarity": 0.895,
+   "tasks": [
+    "MM-max-014",
+    "MM-min-013"
+   ]
+  },
+  {
+   "similarity": 0.555,
+   "tasks": [
+    "UC-credits-008",
+    "UC-leverage-009"
+   ]
+  }
+ ],
+ "schema_version": 1,
+ "selected": [
+  "BA-base-012",
+  "LP-price-021",
+  "MM-min-013",
+  "OV-order-006",
+  "QP-part-025",
+  "SM-select-022",
+  "TL-lev-020",
+  "TR-discard-011",
+  "TR-order-010",
+  "TS-trial-019",
+  "UC-credits-008",
+  "VS-contrib-003",
+  "VS-fees-001",
+  "VS-redeem-004",
+  "VS-shares-002",
+  "WU-consume-023"
+ ],
+ "size": 16,
+ "source_similarity_threshold": 0.5,
+ "strata_covered": 32,
+ "strata_lost": [],
+ "strata_total": 32,
+ "unique_stratum_carriers": [
+  "OV-order-006",
+  "QP-part-025",
+  "SM-select-022",
+  "TL-lev-020",
+  "TR-discard-011",
+  "TR-order-010",
+  "TS-trial-019",
+  "VS-fees-001",
+  "VS-redeem-004",
+  "WU-consume-023"
+ ]
+}

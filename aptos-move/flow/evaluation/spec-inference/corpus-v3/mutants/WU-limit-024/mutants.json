@@ -1,0 +1,97 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 111,
+        "offset": 2223,
+        "sha256": "c0794a6bfe27fa96cc3d4c48a555edb901e829b81dcc5165254a613a5130bad1"
+      },
+      "edit": {
+        "at": 97,
+        "kind": "substitute",
+        "length": 14,
+        "to": "\n            0"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_work_units.move",
+      "mutant_id": "WU-limit-024-floor-is-zero",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 51,
+        "offset": 2343,
+        "sha256": "ecade63be83e8036f7d4f94cc67be60c1e537997b73e5b3f0602b9ff14ab8b39"
+      },
+      "edit": {
+        "at": 37,
+        "kind": "substitute",
+        "length": 1,
+        "to": "<"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_work_units.move",
+      "mutant_id": "WU-limit-024-clamp-inverted",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 41,
+        "offset": 2173,
+        "sha256": "095aa035dc00a2926b95f61ac093bf82664e8432689196422d34a810a4dd6f09"
+      },
+      "edit": {
+        "at": 14,
+        "kind": "substitute",
+        "length": 26,
+        "to": "ORDER_MATCH_WORK_UNITS"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_work_units.move",
+      "mutant_id": "WU-limit-024-divides-by-match-units",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "890b37cc43b82b68ac92e8e487d520f5384e4d759daf3017be50df3ae19996eb",
+  "schema_version": 1,
+  "task_id": "WU-limit-024"
+}

@@ -1,0 +1,97 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 65,
+        "offset": 701,
+        "sha256": "9d7a3b9caafa0039baefda62c2977e699f93613b5de144c7d1692f23da1ac110"
+      },
+      "edit": {
+        "at": 59,
+        "kind": "substitute",
+        "length": 5,
+        "to": "/ 1"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_taker_fee.move",
+      "mutant_id": "TF-taker-017-discount-not-scaled",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 43,
+        "offset": 837,
+        "sha256": "ae47226f91921f632309245b39a64e5b0cd2b5e507bd8050bccb90d1a35ea552"
+      },
+      "edit": {
+        "at": 10,
+        "kind": "substitute",
+        "length": 16,
+        "to": "referred_fee_discount_pct"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_taker_fee.move",
+      "mutant_id": "TF-taker-017-referral-uses-discount",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 49,
+        "offset": 929,
+        "sha256": "4038a3bf3281550bdeb3b4b3915d74b1b8c0e9426e8ae25e9e7792e7acfc769f"
+      },
+      "edit": {
+        "at": 21,
+        "kind": "substitute",
+        "length": 28,
+        "to": "min_base_taker_fee - 1\n        }"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_taker_fee.move",
+      "mutant_id": "TF-taker-017-disabled-underflows",
+      "obligation_category": "abort",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "86522f532e90892efd17654893cff9d8b23c9e33520262f6ca3c740fd0be7cfa",
+  "schema_version": 1,
+  "task_id": "TF-taker-017"
+}

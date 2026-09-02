@@ -1,0 +1,97 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 34,
+        "offset": 956,
+        "sha256": "3567fff0eb0a0f30429ecdbd76fb68595821a0e4b83e9454c6d2eeba19433498"
+      },
+      "edit": {
+        "at": 10,
+        "kind": "substitute",
+        "length": 1,
+        "to": "1"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_base_math.move",
+      "mutant_id": "BA-base-012-skip-first-element",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 30,
+        "offset": 1003,
+        "sha256": "dde09feb76600fbb7844d5d9d6c32d640db568c01cff4b681c82362dd0b48064"
+      },
+      "edit": {
+        "at": 19,
+        "kind": "substitute",
+        "length": 1,
+        "to": "0"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_base_math.move",
+      "mutant_id": "BA-base-012-accumulate-first-only",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 30,
+        "offset": 1003,
+        "sha256": "dde09feb76600fbb7844d5d9d6c32d640db568c01cff4b681c82362dd0b48064"
+      },
+      "edit": {
+        "at": 20,
+        "kind": "substitute",
+        "length": 0,
+        "to": " + 1"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_base_math.move",
+      "mutant_id": "BA-base-012-index-past-end",
+      "obligation_category": "abort",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "792a9234bc7249a01dcd482d5deace33ea4e5b3a5ac3fd209eb43658162611bd",
+  "schema_version": 1,
+  "task_id": "BA-base-012"
+}

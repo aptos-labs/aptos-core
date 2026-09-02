@@ -1,0 +1,588 @@
+{
+ "corpus": "etna-v3",
+ "generated_file_sha256": {
+  "deps/acl.move": "bf430ab7d78046d6fa186f76a4417ae9d795f3a2132d18cefa6653464a3d7b48",
+  "deps/acl.spec.move": "f77ce2348dfe9df48a3a9a8b224b67d0b8aba279c3dfdbd6fd6f3d1d97f9c88c",
+  "deps/bcs.move": "e35293b8d4aa2f1a7d7d990161c3ddc7b9bd75730aaf9f75e6807147fa56a57f",
+  "deps/bit_vector.move": "c44927e11766924fa46b849a7af9c3aa64373f983e423a52eb3fa69f90fbe5a3",
+  "deps/bit_vector.spec.move": "3cec7900bcf3cc6cf81cc599e6f62500937b876972b9301877001c29c0e50f13",
+  "deps/cmp.move": "08b5bd8827ceff8b417994fa5e004554f1613c79b2bd4e8670b11c7e41a63b5d",
+  "deps/error.move": "601e2dfc1912e2511af75629f11786bd364732bd44e7d3e4da566c7f8096d784",
+  "deps/features.move": "34cc4cc34b784b500a927695ca9f7e5bb9f64b6e1b58e82cded74980273ebc5e",
+  "deps/features.spec.move": "12b57b7027559f650e1e240de55619a4702efebc65aa0145f1014aae10c0dfdd",
+  "deps/fixed_point32.move": "1b9841a48939f833084c7e48a7d936d4170f02ec815e471622dd58a3f6d65440",
+  "deps/fixed_point64.move": "afc203f028549656fd752ee14ae5d89891a3f92370d9587734794cd4c805807d",
+  "deps/hash.move": "c2a03491eec1bcd457c8ccf2253c2c2fcead565df3e31a3759e108996857af9b",
+  "deps/math128.move": "e40d1d5cd09106fb4334391ceac0dc02e54fdf1c5bc3425785c27cd49eefd528",
+  "deps/math64.move": "de4d7f6fb0a4d9122748b5605f457b99653e488d8387433cbf5117c00e359acf",
+  "deps/mem.move": "019160e63639fe76603d00a46ccde79895de804f94a1fe564340df6cfcbe2012",
+  "deps/option.move": "a73e14c2712ada2f4f7af72259b70204bde97c3f38ac6741d76e561a8d1921bd",
+  "deps/result.move": "1d74f56258c24ecb0b39a2d580da103f3c1ac9be1250ab37a97d0f1cc23e98e4",
+  "deps/signer.move": "441638048e1d0c5b8059bd78d3df7fac2a3d2086bfb6a975875e15693d0c6d20",
+  "deps/string.move": "cabbcf79eb26d2807a7ea34b4018fd66e701032e5b9a4316e1694fa3277408fe",
+  "deps/string.spec.move": "348b9b6cafcbb8dc721bffbef9d3d0c0c11a2b363d5d7e3371b8c127f9b59c2d",
+  "deps/vector.move": "5e40b6403567965a38a4db36cd030f5441a6fd53e721587723b96c02c55732b3",
+  "etna/extracted_base_math.move": "c642e824ab944b499d95609a8f7a123f20d09bd46d582fd382666699cc64d40b",
+  "etna/extracted_bucket_index.move": "0c8e18cc28f2d395267a204f0728779d76dd9f52d1deed126a84cc54501bf8f8",
+  "etna/extracted_deviation.move": "c2d89d64dc8b9028c2373ca90c07ff725b8e88b935b25ae05321f05944600517",
+  "etna/extracted_liquidation_price.move": "46eb7e069eb94233d66dd16b759288419872c3bb7bd34cceebcfd64365a72104",
+  "etna/extracted_median.move": "cbe1c7eababa1930800b73f9669e1905239536320546e8ec546e035b1e74836f",
+  "etna/extracted_minmax.move": "52ba5b95e392ae5986d233f5c7bcbd1522f2f9f6dfe6d8b2cd6279ede537b943",
+  "etna/extracted_order_validation.move": "baedabbc074e6a9fc61752620c7365fca734ae0bd52d2140c144a4363fb960a6",
+  "etna/extracted_pnl_math.move": "dc219fc9405846206376dfd7df02f5da6349bf6906c40136a9f9f36a0ed6c92b",
+  "etna/extracted_quote_math.move": "9e7ea059577a00452229ba328bd71326279d6aba36b829a75e68644cd77d0b3b",
+  "etna/extracted_taker_fee.move": "4c31eb38c4d669ff7ce5df58ef3e1f42d8c6a5f350d079ffa5a0b66d3991e4e8",
+  "etna/extracted_tier_leverage.move": "1dcb02d078620ada6ca0c2def0c79ca9ceff54f23f7257ff058563e89b303809",
+  "etna/extracted_tier_lookup.move": "e3e5d9ffef3e653833b89c00621d8448db72a9c6827dab441291dd67e8d1697d",
+  "etna/extracted_trial_size.move": "0be58b518a7c989835c73ab98bd0ae59352ade214e3c1e8573abc80e7291ae69",
+  "etna/extracted_work_units.move": "eade37ab9078f71d925a17cecea9378cf394e30fbe2726733f21c0505bd22998",
+  "etna/lomuto_partition.move": "0ae7ec80e2670cf90375bfa220ca232c3639abdfa58f905bed22f2e8374df114",
+  "etna/selection_machine.move": "2e98b971c100b8f4716e0e29d72fb928fe958a9e31e6131333ec104b3fd5f470",
+  "etna/vault_share_math.move": "c31fda52de99f2ff7a8a45403ac04510dde18914fcf8fd4d26b1d9710451aedd",
+  "trading/extracted_bulk_order_utils.move": "0571ab384ea55273f6e28cf2c33bc4380954652e5cae7f8f714a385adc255acc"
+ },
+ "provenance": {
+  "aptos_core": {
+   "commit": "3e9a22203f8dc55ea3369b8afa9696b3fc05637d",
+   "tracked_modifications": true
+  },
+  "etna": {
+   "commit": "dd23678f980266360e050037fb78317b13753068",
+   "repository": "https://github.com/aptos-labs/etna.git"
+  }
+ },
+ "records": [
+  {
+   "feature_strata": [
+    "loops",
+    "arithmetic_or_abort",
+    "accumulator",
+    "lemma"
+   ],
+   "function": "compute_base_needed",
+   "guessability": "hard",
+   "has_loop": true,
+   "module": "decibel_dex::extracted_base_math",
+   "provenance": "etna",
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "decibel_dex::extracted_base_math::compute_base_needed",
+   "task_id": "BA-base-012",
+   "why": "The contract cannot be stated from an invariant alone. Naming the accumulated value needs a recursive spec function, and ruling out a `u128` overflow of the accumulator before the assert needs a monotonicity lemma proved by recursive `apply` -- induction the solver does not perform. Omitting the lemma's `y <= len(sizes)` side condition, or instantiating it at one point instead of with `forall ... apply`, each fails with a distinct fast error. The accumulation is linear on purpose: the reference proves in 0.7s, so the reasoning is the difficulty rather than the solver time."
+  },
+  {
+   "feature_strata": [
+    "loops",
+    "branches",
+    "early-return"
+   ],
+   "function": "get_bucket_index",
+   "guessability": "hard",
+   "has_loop": true,
+   "module": "decibel_dex::extracted_bucket_index",
+   "provenance": "etna",
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "held_back",
+   "screening_status": "ready",
+   "target": "decibel_dex::extracted_bucket_index::get_bucket_index",
+   "task_id": "BK-bucket-016",
+   "why": "An early `return` makes the result the *least* admitting index, not just some admitting index. The contract needs a prefix fact plus the stopping fact; the weaker reading is satisfied by a different function."
+  },
+  {
+   "feature_strata": [
+    "branches",
+    "arithmetic_or_abort"
+   ],
+   "function": "calculate_deviation_bps",
+   "guessability": "hard",
+   "has_loop": false,
+   "module": "decibel_dex::extracted_deviation",
+   "provenance": "etna",
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "held_back",
+   "screening_status": "ready",
+   "target": "decibel_dex::extracted_deviation::calculate_deviation_bps",
+   "task_id": "DV-dev-018",
+   "why": "A zero price returns a sentinel rather than aborting, so a contract treating the degenerate input as an abort is wrong; the ratio itself can still overflow the `u64` result."
+  },
+  {
+   "feature_strata": [
+    "branches",
+    "arithmetic_or_abort"
+   ],
+   "function": "get_liquidation_price",
+   "guessability": "hard",
+   "has_loop": false,
+   "module": "decibel_dex::extracted_liquidation_price",
+   "provenance": "etna",
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "decibel_dex::extracted_liquidation_price::get_liquidation_price",
+   "task_id": "LP-price-021",
+   "why": "A two-branch ceiling ratio whose divisor is `market_max_leverage * divisor`, so a zero leverage aborts -- a case the source never mentions and which is easy to miss when writing the contract from the arithmetic. Both products can also leave `u64`."
+  },
+  {
+   "feature_strata": [
+    "branches"
+   ],
+   "function": "get_median_price",
+   "guessability": "guessable",
+   "has_loop": false,
+   "module": "decibel_dex::extracted_median",
+   "provenance": "etna",
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "held_back",
+   "screening_status": "ready",
+   "target": "decibel_dex::extracted_median::get_median_price",
+   "task_id": "MD-median-015",
+   "why": "A total function over three values: no loop, no arithmetic, no abort. A floor case and a control -- if this fails, the apparatus is at fault rather than the task."
+  },
+  {
+   "feature_strata": [
+    "loops",
+    "accumulator"
+   ],
+   "function": "find_max_value",
+   "guessability": "hard",
+   "has_loop": true,
+   "module": "decibel_dex::extracted_minmax",
+   "provenance": "etna",
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "held_back",
+   "screening_status": "ready",
+   "target": "decibel_dex::extracted_minmax::find_max_value",
+   "task_id": "MM-max-014",
+   "why": "The same loop shape as its twin with the accumulator started at zero, so an empty vector returns rather than aborts. Taken as a pair, a specification that does not distinguish the two is wrong about one."
+  },
+  {
+   "feature_strata": [
+    "loops",
+    "accumulator",
+    "abort"
+   ],
+   "function": "find_min_value",
+   "guessability": "hard",
+   "has_loop": true,
+   "module": "decibel_dex::extracted_minmax",
+   "provenance": "etna",
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "decibel_dex::extracted_minmax::find_min_value",
+   "task_id": "MM-min-013",
+   "why": "Reads `values[0]` before the loop, so it aborts on an empty vector -- the opposite of its twin. The result needs a recursive minimum over the scanned prefix; a contract that only bounds the result below is satisfied by a different function."
+  },
+  {
+   "feature_strata": [
+    "conjunction",
+    "modulo",
+    "why-no-abort"
+   ],
+   "function": "validate_order_input",
+   "guessability": "guessable",
+   "has_loop": false,
+   "module": "decibel_dex::extracted_order_validation",
+   "provenance": "etna",
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "decibel_dex::extracted_order_validation::validate_order_input",
+   "task_id": "OV-order-006",
+   "why": "Abort-freedom rests on `lot_size` and `tick_size` being non-zero, an invariant set at market registration and invisible here. A contract claiming `aborts_if false` without a precondition is wrong."
+  },
+  {
+   "feature_strata": [
+    "signed",
+    "truncation-toward-zero",
+    "cast",
+    "negation-overflow"
+   ],
+   "function": "calculate_pnl",
+   "guessability": "hard",
+   "has_loop": false,
+   "module": "decibel_dex::extracted_pnl_math",
+   "provenance": "etna",
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "not_ready",
+   "screening_status": "excluded_prover_defect",
+   "target": "decibel_dex::extracted_pnl_math::calculate_pnl",
+   "task_id": "PN-pnl-005",
+   "why": "Permanently excluded, not deferred. A complete contract does not verify: the range `aborts_if` is reported as not aborting and the `ensures` does not hold. Rounding and the narrowing cast were both probed and are modelled correctly, so the defect is in the composition -- see `blockers/signed-div-narrowing.move` for what has been ruled out. It is a prover-side defect rather than a property of the target, so the target returns only if the defect is fixed; the corpus does not wait on it."
+  },
+  {
+   "feature_strata": [
+    "loops",
+    "mutable-reference",
+    "in-place",
+    "permutation",
+    "lemma",
+    "abort"
+   ],
+   "function": "partition",
+   "guessability": "hard",
+   "has_loop": true,
+   "module": "decibel_dex::lomuto_partition",
+   "provenance": "authored",
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "decibel_dex::lomuto_partition::partition",
+   "task_id": "QP-part-025",
+   "why": "The only target that rearranges its input in place, and the quicksort case. The pivot value must be followed through two swaps to say where it ends up, and the loop invariant holds three regions at once: the strict prefix, the scanned suffix, and the pivot parked at the end. Saying the result is a rearrangement and not a rewrite needs a counting specification function, a swap lemma proved by segments, and an entry-point instantiation whose trigger is the double update the prover encodes `vector::swap` as; the direct `forall`/`exists` containment, a bare recursive count, and even a sum proxy all exhaust the solver. Neither abort is stated in the source: `length() - 1` underflows on an empty vector and the first swap rejects an out-of-range pivot. Authored rather than extracted: Etna has no sorting code."
+  },
+  {
+   "feature_strata": [
+    "loop",
+    "accumulator",
+    "floor-sum",
+    "overflow-assert"
+   ],
+   "function": "compute_quote_needed",
+   "guessability": "hard",
+   "has_loop": true,
+   "module": "decibel_dex::extracted_quote_math",
+   "provenance": "etna",
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "not_ready",
+   "screening_status": "blocked_solver_cost",
+   "target": "decibel_dex::extracted_quote_math::compute_quote_needed",
+   "task_id": "QT-quote-007",
+   "why": "Floors each level independently before summing, so the result is sum(floor(p*s/m)) and not floor(sum(p*s)/m); the two differ whenever any level has a remainder. WP alone yields a vacuous ensures and four sathard aborts, so the loop invariant must be discovered. Its accumulation loop needs a recursive helper whose proof sits at the solver boundary: it was the only unscorable run of corpus-v3-pilot-002 at 90s and the false timeout of pilot-001 at 40s. Blocked: a complete contract needs a recursive spec function plus a monotonicity lemma, and the per-level `p * s / m` term makes the resulting proof nonlinear -- the replay reports ~117k quantifier instantiations and it does not discharge at any budget tried up to 240s. Kept as the record of why the selection criterion prefers linear accumulation; `BA-base-012` exercises the same reasoning in under a second."
+  },
+  {
+   "feature_strata": [
+    "higher_order",
+    "function_values",
+    "loops",
+    "early-return",
+    "abort"
+   ],
+   "function": "select",
+   "guessability": "hard",
+   "has_loop": true,
+   "module": "decibel_dex::selection_machine",
+   "provenance": "authored",
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "decibel_dex::selection_machine::select",
+   "task_id": "SM-select-022",
+   "why": "The only target with function values. Both the continuation and the admissibility test arrive as parameters, so the contract cannot be stated without `result_of` and `aborts_of` over them, and the state after k draws needs a recursive specification function over a function value. Authored rather than extracted: Etna has no function-valued code, so without it the benchmark cannot exercise this at all."
+  },
+  {
+   "feature_strata": [
+    "branches",
+    "arithmetic_or_abort"
+   ],
+   "function": "calculate_min_net_taker_fee",
+   "guessability": "hard",
+   "has_loop": false,
+   "module": "decibel_dex::extracted_taker_fee",
+   "provenance": "etna",
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "held_back",
+   "screening_status": "ready",
+   "target": "decibel_dex::extracted_taker_fee::calculate_min_net_taker_fee",
+   "task_id": "TF-taker-017",
+   "why": "Two chained percentage reductions in `u128`. Each `100 - pct` underflows above 100, so the function aborts on inputs the source neither guards nor mentions -- a direct probe of whether unstated aborts get found."
+  },
+  {
+   "feature_strata": [
+    "loops",
+    "accumulator",
+    "quantifier",
+    "abort"
+   ],
+   "function": "checked_max_tier_leverage",
+   "guessability": "hard",
+   "has_loop": true,
+   "module": "decibel_campaign::extracted_tier_leverage",
+   "provenance": "etna",
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "decibel_campaign::extracted_tier_leverage::checked_max_tier_leverage",
+   "task_id": "TL-lev-020",
+   "why": "The abort is universally quantified over the vector while the result is an accumulated maximum. Neither states the other, so the contract needs both a quantifier and a recursive maximum."
+  },
+  {
+   "feature_strata": [
+    "loop",
+    "bounded-search",
+    "break",
+    "option"
+   ],
+   "function": "discard_price_crossing_levels",
+   "guessability": "hard",
+   "has_loop": true,
+   "module": "aptos_experimental::extracted_bulk_order_utils",
+   "provenance": "aptos_experimental",
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "aptos_experimental::extracted_bulk_order_utils::discard_price_crossing_levels",
+   "task_id": "TR-discard-011",
+   "why": "Bounded search stopping at the first non-crossing level. The contract must say both what was found and that nothing earlier qualified."
+  },
+  {
+   "feature_strata": [
+    "loop",
+    "adjacent-pair",
+    "early-return",
+    "quantified"
+   ],
+   "function": "validate_price_ordering",
+   "guessability": "hard",
+   "has_loop": true,
+   "module": "aptos_experimental::extracted_bulk_order_utils",
+   "provenance": "aptos_experimental",
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "aptos_experimental::extracted_bulk_order_utils::validate_price_ordering",
+   "task_id": "TR-order-010",
+   "why": "Adjacent-pair scan with an early return. WP infers a top-level quantifier and marks it sathard, so the contract must be restated in a form the solver can use."
+  },
+  {
+   "feature_strata": [
+    "arithmetic_or_abort",
+    "cast"
+   ],
+   "function": "trial_size_for",
+   "guessability": "hard",
+   "has_loop": false,
+   "module": "decibel_dex::extracted_trial_size",
+   "provenance": "etna",
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "decibel_dex::extracted_trial_size::trial_size_for",
+   "task_id": "TS-trial-019",
+   "why": "A four-way `u128` product over a product divisor, truncating. Beyond the two named asserts it aborts on a `u64` addition and on either `u128` product leaving range -- three aborts the source never mentions, before the range check it does state."
+  },
+  {
+   "feature_strata": [
+    "loop",
+    "last-match",
+    "tuple-result",
+    "enum-variant"
+   ],
+   "function": "credits_for_duration_days",
+   "guessability": "hard",
+   "has_loop": true,
+   "module": "decibel_campaign::extracted_tier_lookup",
+   "provenance": "etna",
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "decibel_campaign::extracted_tier_lookup::credits_for_duration_days",
+   "task_id": "UC-credits-008",
+   "why": "The scan never breaks, so the result is the LAST qualifying tier, not the first. Three accumulators move together. WP errors on a vacuous condition and supplies bounded evidence."
+  },
+  {
+   "feature_strata": [
+    "loop",
+    "last-match",
+    "enum-variant"
+   ],
+   "function": "leverage_for_tier_rank",
+   "guessability": "hard",
+   "has_loop": true,
+   "module": "decibel_campaign::extracted_tier_lookup",
+   "provenance": "etna",
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "held_back",
+   "screening_status": "ready",
+   "target": "decibel_campaign::extracted_tier_lookup::leverage_for_tier_rank",
+   "task_id": "UC-leverage-009",
+   "why": "Same last-match-wins shape with a single accumulator; the simpler member of the pair, so the two can be compared."
+  },
+  {
+   "feature_strata": [
+    "branches",
+    "tuple-result",
+    "assert",
+    "mul-div"
+   ],
+   "function": "convert_new_assets_to_share_count",
+   "guessability": "hard",
+   "has_loop": false,
+   "module": "decibel_vault::vault_share_math",
+   "provenance": "etna",
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "decibel_vault::vault_share_math::convert_new_assets_to_share_count",
+   "task_id": "VS-contrib-003",
+   "why": "Tuple result with a zero-shares fast path and an insolvency assert."
+  },
+  {
+   "feature_strata": [
+    "branches",
+    "enum-variant",
+    "u128-ratio",
+    "mul-div"
+   ],
+   "function": "calculate_unrealized_fees",
+   "guessability": "hard",
+   "has_loop": false,
+   "module": "decibel_vault::vault_share_math",
+   "provenance": "etna",
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "decibel_vault::vault_share_math::calculate_unrealized_fees",
+   "task_id": "VS-fees-001",
+   "why": "Five guarded returns and a cross-multiplied u128 ratio test. The fee is bounded by the value increase, which is the fact its callers need."
+  },
+  {
+   "feature_strata": [
+    "composition",
+    "tuple-result",
+    "mul-div",
+    "underflow"
+   ],
+   "function": "calculate_redemption_funds_and_fee",
+   "guessability": "hard",
+   "has_loop": false,
+   "module": "decibel_vault::vault_share_math",
+   "provenance": "etna",
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "decibel_vault::vault_share_math::calculate_redemption_funds_and_fee",
+   "task_id": "VS-redeem-004",
+   "why": "FLAGSHIP. Calls both other helpers. Freedom from underflow at `shares - shares_for_fee` holds only because the fee is bounded by the NAV -- established in the callee's contract, invisible in this body. WP leaves the obligation open, so it cannot be guessed from the caller."
+  },
+  {
+   "feature_strata": [
+    "assert",
+    "mul-div"
+   ],
+   "function": "convert_existing_shares_to_asset_amount",
+   "guessability": "guessable",
+   "has_loop": false,
+   "module": "decibel_vault::vault_share_math",
+   "provenance": "etna",
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "decibel_vault::vault_share_math::convert_existing_shares_to_asset_amount",
+   "task_id": "VS-shares-002",
+   "why": "Small by design: the composition partner whose contract the flagship must consume rather than re-derive."
+  },
+  {
+   "feature_strata": [
+    "mutable_references",
+    "state-transition",
+    "arithmetic_or_abort"
+   ],
+   "function": "consume_order_match_work_units",
+   "guessability": "hard",
+   "has_loop": false,
+   "module": "decibel_dex::extracted_work_units",
+   "provenance": "etna",
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "decibel_dex::extracted_work_units::consume_order_match_work_units",
+   "task_id": "WU-consume-023",
+   "why": "Mutates through a `&mut` and saturates to zero rather than underflowing, so the contract is a state transition rather than a value. Its `u32` arithmetic still overflows twice over -- forming the amount and doubling it -- and the source guards neither."
+  },
+  {
+   "feature_strata": [
+    "branches",
+    "arithmetic_or_abort"
+   ],
+   "function": "get_max_order_placement_limit",
+   "guessability": "guessable",
+   "has_loop": false,
+   "module": "decibel_dex::extracted_work_units",
+   "provenance": "etna",
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "held_back",
+   "screening_status": "ready",
+   "target": "decibel_dex::extracted_work_units::get_max_order_placement_limit",
+   "task_id": "WU-limit-024",
+   "why": "A clamped division whose floor is one, so it never returns zero however small the budget. A contract stating only the division misses both clamps."
+  }
+ ],
+ "schema_version": 1
+}

@@ -1,0 +1,97 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 44,
+        "offset": 1053,
+        "sha256": "37fca0c8ad6531254e11c84456172db9e7f9d54811cc9add8d4cce9041d1e3a8"
+      },
+      "edit": {
+        "at": 2,
+        "kind": "substitute",
+        "length": 32,
+        "to": "BPS_DENOM"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_trial_size.move",
+      "mutant_id": "TS-trial-019-slippage-ignored",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 31,
+        "offset": 963,
+        "sha256": "882942d54095f74006711a8d96597eecca6b3b7f40d8d60dbc741fbdc47d93ea"
+      },
+      "edit": {
+        "at": 3,
+        "kind": "substitute",
+        "length": 19,
+        "to": "leverage"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_trial_size.move",
+      "mutant_id": "TS-trial-019-duplicate-factor",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 28,
+        "offset": 1036,
+        "sha256": "523bb444d9c340128d73ebfafdfb40fcd5c0c7a0ad1e36760034679cd4aeb210"
+      },
+      "edit": {
+        "at": 15,
+        "kind": "substitute",
+        "length": 1,
+        "to": "-"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_trial_size.move",
+      "mutant_id": "TS-trial-019-denominator-underflows",
+      "obligation_category": "abort",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "a72c1cc1fa74d356664742f6d8a83d5f4c0745a9d5614e9492cb839d1d67bead",
+  "schema_version": 1,
+  "task_id": "TS-trial-019"
+}

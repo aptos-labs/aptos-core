@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "source_frames": [
+    {
+      "path": "aptos-move/framework/aptos-framework",
+      "include_paths": [],
+      "require_upstream_reference": true,
+      "eligible_reason": "eligible_upstream_reference"
+    },
+    {
+      "path": "aptos-move/framework/aptos-experimental",
+      "include_paths": [
+        "/sources/trading/market/",
+        "/sources/trading/order_book/",
+        "/sources/trading/position/"
+      ],
+      "require_upstream_reference": false,
+      "eligible_reason": "pending_expert_reference_and_mutant_review"
+    }
+  ],
+  "safety_exclusion_terms": [
+    "crypto",
+    "decryption",
+    "encryption",
+    "confidential",
+    "consensus",
+    "validator",
+    "dkg",
+    "randomness",
+    "genesis",
+    "reconfiguration",
+    "transaction_validation",
+    "block_prologue",
+    "block_epilogue",
+    "authentication",
+    "public_key",
+    "signature",
+    "webauthn",
+    "keyless",
+    "account_abstraction",
+    "jwk",
+    "key_"
+  ],
+  "module_function_count": { "min": 3, "max": 10 }
+}

@@ -4317,6 +4317,25 @@ impl Operation {
     /// Checks whether an expression calling the operation is OK to remove from code.  This includes
     /// side-effect-free expressions which are not related to Specs, Assertions, and won't generate
     /// errors or warnings in stackless-bytecode passes.
+    /// Whether this operation is a marker the inliner synthesises, rather than
+    /// anything a user can write.
+    ///
+    /// Inlining records state snapshots, fold-capture anchors and call
+    /// summaries as `assume`d spec conditions carrying one of these
+    /// operations, located at the *call site* of the inlined function. They
+    /// are machinery for the prover: they are not authored, cannot be
+    /// authored, and must not be presented to a user as part of a
+    /// specification -- an inlined higher-order iterator would otherwise make
+    /// a caller look as though it had written assumptions into the callee's
+    /// source file.
+    pub fn is_inline_marker(&self) -> bool {
+        use Operation::*;
+        matches!(
+            self,
+            SaveStateAnchor(..) | WithStateAnchor(..) | FoldsCaptureAnchor(..) | InlineCallSummary
+        )
+    }
+
     pub fn is_ok_to_remove_from_code(&self) -> bool {
         use Operation::*;
         match self {

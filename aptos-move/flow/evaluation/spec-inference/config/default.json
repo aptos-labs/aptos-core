@@ -1,0 +1,78 @@
+{
+ "allowed_builtin_tools": [
+  "Read",
+  "Glob",
+  "Grep",
+  "Edit",
+  "Write",
+  "TaskCreate",
+  "TaskUpdate",
+  "TaskList",
+  "TaskGet"
+ ],
+ "check_candidate_command": [
+  "move-flow",
+  "experiment",
+  "check-candidate",
+  "--config",
+  "{config}",
+  "--output",
+  "{output}"
+ ],
+ "claude_agent_sdk_version": "0.2.139",
+ "claude_code_version": "2.1.258",
+ "compile_command": [
+  "move-flow",
+  "experiment",
+  "check-package",
+  "--package",
+  "{package}",
+  "--output",
+  "{output}"
+ ],
+ "denied_builtin_tools": [
+  "Bash",
+  "WebSearch",
+  "WebFetch",
+  "Agent",
+  "Task"
+ ],
+ "effort": "max",
+ "eventual_timeout_seconds": 40,
+ "feedback_level": "acceptance",
+ "inference_command": [
+  "move-flow",
+  "experiment",
+  "infer",
+  "--package",
+  "{package}",
+  "--target",
+  "{target}",
+  "--write-inferred-specs",
+  "--output",
+  "{output}"
+ ],
+ "infrastructure_retries": 1,
+ "max_controller_turns": 6,
+ "max_model_turns_per_controller_turn": 60,
+ "max_output_tokens": 100000,
+ "max_wall_seconds": 2700,
+ "model": "glm-5.3[1m]",
+ "operational_timeout_seconds": 40,
+ "prove_command": [
+  "move-flow",
+  "experiment",
+  "prove",
+  "--package",
+  "{package}",
+  "--target",
+  "{target}",
+  "--timeout",
+  "{timeout}",
+  "--output",
+  "{output}"
+ ],
+ "provider_base_url": "https://api.z.ai/api/anthropic",
+ "schema_version": 1,
+ "source_commit": "6d836beedc56fc70c54f3b3046d1d248d850c64b"
+}

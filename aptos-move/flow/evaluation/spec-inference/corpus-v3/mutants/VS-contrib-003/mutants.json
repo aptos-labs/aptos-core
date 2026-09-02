@@ -1,0 +1,98 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 30,
+        "offset": 4382,
+        "sha256": "65b3fc7a1dbd92b71fd7ae00a58d9b2499a737bf4fc182a4e12cc76736bb3b19"
+      },
+      "edit": {
+        "a_length": 6,
+        "at": 20,
+        "b_length": 1,
+        "kind": "swap",
+        "separator_length": 2
+      },
+      "essential": true,
+      "file": "sources/etna/vault_share_math.move",
+      "mutant_id": "VS-contrib-003-swap-first-contribution",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 78,
+        "offset": 5312,
+        "sha256": "78987fd39e5319d963fd887795e3eab84775f0f616ee5d9e3a9c55b15a6a77dd"
+      },
+      "edit": {
+        "at": 57,
+        "kind": "substitute",
+        "length": 19,
+        "to": "nav, current_shares"
+      },
+      "essential": true,
+      "file": "sources/etna/vault_share_math.move",
+      "mutant_id": "VS-contrib-003-share-price-inverted",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 72,
+        "offset": 4425,
+        "sha256": "808cfc62f5be9e28ac47c6480bed7599f60c756e9cbed9a2ab6f2ff47166e611"
+      },
+      "edit": {
+        "at": 30,
+        "kind": "substitute",
+        "length": 1,
+        "to": "1"
+      },
+      "essential": true,
+      "file": "sources/etna/vault_share_math.move",
+      "mutant_id": "VS-contrib-003-insolvency-guard-off-by-one",
+      "obligation_category": "abort",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "6e5d76f09040b3324ab79d8684bcf22a147744055c01e56d39050a0997c6f426",
+  "schema_version": 2,
+  "task_id": "VS-contrib-003"
+}
