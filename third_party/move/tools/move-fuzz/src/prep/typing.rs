@@ -1594,6 +1594,17 @@ impl TypeMode {
                 // to synthesize the elements. Report the shape as unsupported so the
                 // enclosing entrypoint is skipped rather than crashing the run.
                 Self::Simple(SimpleType::Function { .. }) => return None,
+                // A signer is only ever available at the top of a script parameter list,
+                // where the VM injects it from the transaction sender. Nested, it would be
+                // emitted as a real transaction argument, and `legacy_is_valid_txn_arg`
+                // rejects `Signer` under a `Vector`, so every execution of such a script
+                // would be discarded with INVALID_MAIN_FUNCTION_SIGNATURE. Skip the shape
+                // here rather than generate an entrypoint that can never run.
+                //
+                // `Vector` is the only way to nest one: `signer` has neither `store` nor
+                // `key`, so it cannot appear in a struct field or as an `Object` type
+                // argument.
+                Self::Simple(SimpleType::Signer) => return None,
                 Self::Simple(elem_simple) => Self::Simple(SimpleType::Vector {
                     element: Box::new(elem_simple),
                 }),
@@ -1870,5 +1881,33 @@ mod tests {
             }),
             Some(TypeMode::Simple(SimpleType::Vector { .. }))
         ));
+    }
+
+    /// A `signer` is injected by the VM from the transaction sender, which can only
+    /// happen for a leading script parameter. Nested inside a vector it would be
+    /// emitted as a real transaction argument, and the VM's `legacy_is_valid_txn_arg`
+    /// rejects `Signer` under a `Vector`: every execution of the generated script
+    /// would be discarded with INVALID_MAIN_FUNCTION_SIGNATURE.
+    #[test]
+    fn test_type_mode_convert_rejects_nested_signer() {
+        // a bare signer is supported: the canvas emits it as the script's signer parameter
+        assert!(matches!(
+            TypeMode::convert(&TypeBase::Signer),
+            Some(TypeMode::Simple(SimpleType::Signer))
+        ));
+
+        // ... but a vector of them is unsupported and must be skipped
+        assert!(TypeMode::convert(&TypeBase::Vector {
+            element: Box::new(TypeBase::Signer),
+        })
+        .is_none());
+
+        // rejection propagates through nesting
+        assert!(TypeMode::convert(&TypeBase::Vector {
+            element: Box::new(TypeBase::Vector {
+                element: Box::new(TypeBase::Signer),
+            }),
+        })
+        .is_none());
     }
 }
