@@ -110,6 +110,47 @@ pub enum RuntimeError {
     Unsupported(&'static str),
 }
 
+impl RuntimeError {
+    /// Whether the error faults the BCS bytes being decoded, rather than the
+    /// VM or its limits.
+    pub fn is_bcs_decode_error(&self) -> bool {
+        use RuntimeError::*;
+        match self {
+            BCSEof
+            | BCSInvalidUleb
+            | BCSSequenceTooLong { .. }
+            | BCSRemainingInput { .. }
+            | BCSInvalidBool { .. }
+            | BCSSignerNotDeserializable => true,
+
+            ArithmeticOverflow { .. }
+            | ArithmeticUnderflow { .. }
+            | DivisionByZero { .. }
+            | ShiftAmountOutOfRange { .. }
+            | ArithmeticUnderOverflow { .. }
+            | DivisionByZeroOrOverflow { .. }
+            | NegateMinOverflow { .. }
+            | CastOutOfRange { .. }
+            | PopFromEmptyVector
+            | VecUnpackLengthMismatch { .. }
+            | VectorIndexOutOfBounds { .. }
+            | ResourceDoesNotExist { .. }
+            | ResourceAlreadyExists { .. }
+            | EnumVariantMismatch { .. }
+            | StackOverflow
+            | OutOfHeapMemory { .. }
+            | AllocationTooLarge { .. }
+            | VecAllocSizeOverflow
+            | InvalidAbortMessage
+            | AbortMessageTooLong { .. }
+            | StateKeyTypeTooDeep
+            | InvariantViolation(_)
+            | ResourceProvider(_)
+            | Unsupported(_) => false,
+        }
+    }
+}
+
 impl IntoExecutionError for RuntimeError {
     fn kind(&self) -> ExecutionErrorKind {
         use RuntimeError::*;
@@ -263,6 +304,12 @@ pub enum RuntimeInvariantViolation {
     #[error("type has no published layout")]
     ValueLayoutNotFound,
 
+    /// A Rust value placed as a call argument does not match its parameter's
+    /// layout. This is an invariant violation as the caller is expected to
+    /// ensure matching.
+    #[error("call argument mismatch: {0}")]
+    CallArgMismatch(String),
+
     #[error("unreachable: {0}")]
     Unreachable(String),
 
@@ -321,6 +368,9 @@ pub enum RuntimeInvariantViolation {
     #[error("rollback({requested}): only {available} checkpoint(s) on the stack")]
     RollbackUnderflow { requested: usize, available: usize },
 
+    /// A well-formed enum's tag is always in range, so an out-of-range tag —
+    /// read from an in-memory value or decoded from BCS — signals corruption,
+    /// not a legitimate runtime condition.
     #[error("enum tag {tag} out of range for {variant_count} variants")]
     EnumTagOutOfRange { tag: u64, variant_count: usize },
 

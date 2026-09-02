@@ -15,9 +15,10 @@ use crate::{
     transaction::{ReplayProtector, UserTxnLimitsRequest},
 };
 use move_core_types::account_address::AccountAddress;
+use move_value_view_derive::MoveValueView;
 use serde::Serialize;
 
-#[derive(Serialize)]
+#[derive(Serialize, MoveValueView)]
 pub enum PrologueArgs {
     V1 {
         needs_fee_payer_auth_check: bool,
@@ -35,7 +36,7 @@ pub enum PrologueArgs {
     },
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, MoveValueView)]
 pub enum EpilogueArgs {
     V1 {
         fee_statement: FeeStatement,

@@ -4,6 +4,7 @@
 use crate::{
     instruction::{CodeOffset, FrameOffset, MicroOp, SizedSlot, FRAME_METADATA_SIZE},
     interner::InternedModuleId,
+    types::InternedType,
 };
 use mono_move_alloc::{GlobalArenaPtr, LeakedBoxPtr};
 use move_binary_format::file_format::FunctionDefinitionIndex;
@@ -175,6 +176,8 @@ pub struct Function {
     pub entry_gas: u64,
     /// Per-parameter (aligned) frame slot, in declaration order.
     pub param_slots: Vec<SizedSlot>,
+    /// Per-parameter substituted type, parallel to `param_slots`.
+    pub param_tys: Vec<InternedType>,
     /// Byte size of the parameter region (includes padding in between parameters).
     pub param_region_size: usize,
     /// Size of the parameters + locals region. Frame metadata is stored

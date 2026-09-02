@@ -502,12 +502,12 @@ impl NativeContext for ProductionNativeContext<'_> {
     unsafe fn bcs_serialize_value(&self, base: *const u8, ty: InternedType) -> VMResult<Vec<u8>> {
         // SAFETY: forwarded from this method's contract; serialization performs
         // no VM-heap allocation, so `base` stays valid throughout.
-        unsafe { crate::value_utils::serialize(self.layouts, base, ty) }
+        unsafe { crate::value_conv::bcs::serialize(self.layouts, base, ty) }
     }
 
     unsafe fn bcs_serialized_size(&self, base: *const u8, ty: InternedType) -> VMResult<usize> {
         // SAFETY: forwarded from this method's contract.
-        unsafe { crate::value_utils::serialized_size(self.layouts, base, ty) }
+        unsafe { crate::value_conv::bcs::serialized_size(self.layouts, base, ty) }
     }
 
     fn bcs_deserialize_value(&self, ty: InternedType, bytes: &[u8]) -> VMResult<Option<Vec<u8>>> {
@@ -582,13 +582,13 @@ impl NativeContext for ProductionNativeContext<'_> {
     }
 
     fn constant_serialized_size(&self, ty: InternedType) -> VMResult<Option<u64>> {
-        let size = crate::value_utils::fixed_serialized_size(self.layouts, ty)?;
+        let size = crate::value_conv::bcs::fixed_serialized_size(self.layouts, ty)?;
         Ok(size.map(|n| n as u64))
     }
 
     unsafe fn compare(&self, a: *const u8, b: *const u8, ty: InternedType) -> VMResult<Ordering> {
         // SAFETY: forwarded from this method's contract.
-        unsafe { crate::value_utils::compare(self.layouts, a, b, ty) }
+        unsafe { crate::value_cmp::compare(self.layouts, a, b, ty) }
     }
 
     unsafe fn new_enum<'a, V: VMValue<'a>>(

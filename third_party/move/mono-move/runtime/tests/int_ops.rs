@@ -40,7 +40,7 @@ use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     native::NativeExtensions, Code, FrameLayoutInfo, FrameOffset as FO, Function,
     FunctionDefinitionIndex, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy,
-    MicroOp, ShiftOperand, SortedSafePointEntries, FRAME_METADATA_SIZE,
+    MicroOp, ShiftOperand, SizedSlot, SortedSafePointEntries, FRAME_METADATA_SIZE,
 };
 use move_core_types::int256::{I256, U256};
 use num_bigint::{BigInt, Sign};
@@ -188,15 +188,44 @@ const SLOT_LHS: u32 = 32;
 const SLOT_RHS: u32 = 64;
 const FRAME_SIZE: u32 = 96;
 
-fn make_func(op: MicroOp) -> Function {
+/// The interned unsigned type of `width` bytes. It serves signed operands
+/// too: the widths match and every byte pattern is a valid integer.
+fn operand_ty(width: usize) -> mono_move_core::types::InternedType {
+    use mono_move_core::types as ty;
+    match width {
+        1 => ty::U8_TY,
+        2 => ty::U16_TY,
+        4 => ty::U32_TY,
+        8 => ty::U64_TY,
+        16 => ty::U128_TY,
+        32 => ty::U256_TY,
+        _ => panic!("unsupported operand width {width}"),
+    }
+}
+
+/// Builds the single-op function, with one parameter per non-empty operand.
+fn make_func(op: MicroOp, lhs_width: usize, rhs_width: usize) -> Function {
+    let mut param_slots = vec![];
+    let mut param_tys = vec![];
+    for (offset, width) in [(SLOT_LHS, lhs_width), (SLOT_RHS, rhs_width)] {
+        if width > 0 {
+            param_slots.push(SizedSlot {
+                offset: FO(offset),
+                size: width as u32,
+                align: width.min(8) as u32,
+            });
+            param_tys.push(operand_ty(width));
+        }
+    }
     Function {
         name: GlobalArenaPtr::from_static("op"),
         module_id: crate::program_module_id!("test"),
         def_idx: FunctionDefinitionIndex(0),
         code: Code::from_vec(vec![op, MicroOp::Return]),
         entry_gas: 0,
-        param_slots: vec![],
-        param_region_size: 0,
+        param_slots,
+        param_tys,
+        param_region_size: FRAME_SIZE as usize,
         param_and_local_sizes_sum: FRAME_SIZE as usize,
         extended_frame_size: FRAME_SIZE as usize + FRAME_METADATA_SIZE,
         zero_frame: false,
@@ -214,20 +243,23 @@ fn run_wide(
     rhs_bytes: &[u8],
     dst_size: usize,
 ) -> Result<Vec<u8>, anyhow::Error> {
-    let func = make_func(op);
+    let func = make_func(op, lhs_bytes.len(), rhs_bytes.len());
     common::with_test_interpreter(&func, u64::MAX, NativeExtensions::new(), |ctx| {
-        if !lhs_bytes.is_empty() {
-            ctx.set_root_arg(SLOT_LHS, lhs_bytes);
+        let mut call = ctx
+            .build_call(&func)
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        for bytes in [lhs_bytes, rhs_bytes] {
+            if !bytes.is_empty() {
+                // A scalar's little-endian bytes are its BCS form.
+                call.arg_bcs(bytes).map_err(|e| anyhow::anyhow!("{}", e))?;
+            }
         }
-        if !rhs_bytes.is_empty() {
-            ctx.set_root_arg(SLOT_RHS, rhs_bytes);
-        }
-        ctx.run().map_err(|e| anyhow::anyhow!("{}", e))?;
+        call.run().map_err(|e| anyhow::anyhow!("{}", e))?;
 
         let mut out = vec![0u8; dst_size];
         let mut i = 0usize;
         while i < dst_size {
-            let word = ctx.root_result_at(SLOT_DST + i as u32);
+            let word = ctx.root_result_u64_at_for_test(SLOT_DST + i as u32);
             let bytes = word.to_ne_bytes();
             let copy_n = (dst_size - i).min(8);
             out[i..i + copy_n].copy_from_slice(&bytes[..copy_n]);

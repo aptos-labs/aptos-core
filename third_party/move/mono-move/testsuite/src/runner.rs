@@ -543,16 +543,24 @@ fn execute_function_v2(
         extensions,
         heap_size,
         |runner| {
+            // Split the directive's arguments in order: signers back the
+            // entry's signer parameters, the rest place as BCS bytes (a
+            // scalar's little-endian bytes are its BCS form).
+            let mut signers = Vec::new();
+            let mut byte_args = Vec::new();
+            for (arg, kind) in args.iter().zip(arg_kinds.iter()) {
+                let bytes = kind.parse_to_bytes(arg);
+                if matches!(kind, PrimitiveKind::Signer) {
+                    signers.push(
+                        AccountAddress::from_bytes(bytes).expect("a signer argument is 32 bytes"),
+                    );
+                } else {
+                    byte_args.push(bytes);
+                }
+            }
             let result = runner.run(
-                |interpreter| {
-                    let mut offset: u32 = 0;
-                    for (arg, kind) in args.iter().zip(arg_kinds.iter()) {
-                        offset = mono_move_core::align_up_u32(offset, kind.align());
-                        let bytes = kind.parse_to_bytes(arg);
-                        interpreter.set_root_arg(offset, &bytes);
-                        offset += kind.size();
-                    }
-                },
+                &signers,
+                |call, index| call.arg_bcs(&byte_args[index]),
                 |interpreter| {
                     let mut ret_off: u32 = 0;
                     let mut vals = Vec::with_capacity(return_kinds.len());

@@ -45,9 +45,9 @@ nothing else.
 | `materialize/` | `txn_output.rs` drains the write set (with resource-group merge-back) into a `TransactionOutput`; `vm_status.rs` projects the taxonomy onto `VMStatus` |
 | `providers.rs` | The `AptosDataProvider` trait: what write-set materialization needs from the data layer |
 | `natives.rs` | The production native registry and the per-transaction native extensions |
-| `calls.rs` | Making one function call in the shared interpreter context |
-| `metadata.rs` | The slice of transaction metadata the prologue needs |
-| `sys_calls.rs` | The unmetered prologue and epilogue calls |
+| `calls.rs` | Shared plumbing for making one call in the interpreter context |
+| `system_txns/` | Block metadata and block epilogue: unmetered, fee-free, consensus-produced |
+| `user_txn/` | The user-transaction flow: `execute.rs` drives it, `pre_execution_checks.rs` gates it, `validation.rs` runs the prologue and epilogue, `args.rs` places payload arguments, `metadata.rs` holds what they need |
 
 ## Testing
 

@@ -272,15 +272,16 @@ impl<S: StateView> ResourceProvider for StateViewResourceProvider<'_, '_, S> {
 impl<S: StateView> AptosDataProvider for StateViewResourceProvider<'_, '_, S> {
     /// Loaded from the state view on first access, caching absence as well so a
     /// missing group is read at most once.
-    fn group_members(&self, group_key: &StateKey) -> Result<Option<Arc<GroupMembers>>> {
+    fn group_members(
+        &self,
+        group_key: &StateKey,
+    ) -> Result<Option<Arc<GroupMembers>>, ResourceProviderError> {
         if let Some(members) = self.inner.borrow().groups.get(group_key) {
             return Ok(members.clone());
         }
-        let members = match self
-            .state_view
-            .get_state_value(group_key)
-            .map_err(|e| anyhow!("group read failed: {e}"))?
-        {
+        let members = match self.state_view.get_state_value(group_key).map_err(|e| {
+            ResourceProviderError::InvariantViolation(format!("group read failed: {e}"))
+        })? {
             Some(value) => Some(Arc::new(decode_group_members(value.bytes(), self.guard)?)),
             None => None,
         };

@@ -1,12 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Operations over value trees driven by value layouts: BCS-serializing an
-//! in-memory value and reporting its serialized size (fixed when the type
-//! allows, otherwise computed by walking the value), deserializing BCS bytes
-//! back into the flat in-memory representation (allocating heap storage for
-//! vectors, and failing rather than running GC when heap space runs out), and
-//! comparing two values for structural equality and ordering.
+//! Converts between VM values and their BCS encoding: serializing an
+//! in-memory value and reporting its serialized size, and deserializing bytes
+//! back into the flat in-memory representation, allocating heap storage for
+//! vectors and failing rather than running GC when space runs out.
 //!
 //! TODO(correctness):
 //!   Current implementation works only for little-endian architectures,
@@ -15,8 +13,8 @@
 //!   big endian hosts.
 //!
 //! TODO(cleanup):
-//!   Unify these value walks (serialize, deserialize, equals, compare) under a
-//!   shared visitor/fold abstraction instead of four parallel recursive
+//!   Unify the value walks (serialize, deserialize, equals, compare) under a
+//!   shared visitor/fold abstraction instead of parallel recursive
 //!   implementations.
 //!
 //! TODO(testing):
@@ -24,16 +22,14 @@
 
 use crate::{
     error::{RuntimeError, RuntimeInvariantViolation},
-    heap::{heap_alloc, AllocationResult, Heap},
-    memory::{read_enum_tag, read_ptr, read_vec_len, write_enum_tag, write_ptr, write_u64},
-    types::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET},
+    heap::{alloc_enum_no_gc, alloc_vec_no_gc, AllocationResult, Heap},
+    memory::{read_enum_tag, read_ptr, read_vec_len, write_ptr},
+    types::VEC_DATA_OFFSET,
 };
 use mono_move_core::{
-    types::InternedType, LayoutId, LayoutKind, LayoutProvider, VMInternalError, VMResult,
-    ValueLayout, ENUM_DATA_OFFSET, OBJECT_HEADER_SIZE,
+    types::InternedType, LayoutKind, LayoutProvider, VMInternalError, VMResult, ValueLayout,
+    ENUM_DATA_OFFSET,
 };
-use move_core_types::int256::{I256, U256};
-use std::cmp::Ordering;
 
 /// Returns the fixed BCS size of a value of the given type, or [`None`] when it
 /// is data-dependent (e.g., for vectors, enums, function values, etc.).
@@ -41,7 +37,9 @@ pub fn fixed_serialized_size<T: LayoutProvider + ?Sized>(
     layouts: &T,
     ty: InternedType,
 ) -> VMResult<Option<usize>> {
-    let layout = layouts.layout_by_ty(ty).ok_or_else(layout_not_found)?;
+    let layout = layouts.layout_by_ty(ty).ok_or({
+        RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
+    })?;
     Ok(layout.fixed_serialized_size().map(|n| n as usize))
 }
 
@@ -75,7 +73,9 @@ pub unsafe fn serialize<T: LayoutProvider + ?Sized>(
     base: *const u8,
     ty: InternedType,
 ) -> VMResult<Vec<u8>> {
-    let layout = layouts.layout_by_ty(ty).ok_or_else(layout_not_found)?;
+    let layout = layouts.layout_by_ty(ty).ok_or({
+        RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
+    })?;
 
     let mut out = vec![];
     if let Some(serialized_size) = layout.fixed_serialized_size() {
@@ -116,12 +116,15 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
         | LayoutKind::UnsignedInt
         | LayoutKind::SignedInt
         | LayoutKind::Address
-        | LayoutKind::Signer => Err(VMInternalError::new(unreachable(
-            "Scalars serialize on the no-pointers-no-padding fast path and never reach this arm",
+        | LayoutKind::Signer => Err(VMInternalError::new(RuntimeError::InvariantViolation(
+            RuntimeInvariantViolation::Unreachable(
+                "Scalars serialize on the no-pointers-no-padding fast path and never reach this arm"
+                    .to_string(),
+            ),
         ))),
         LayoutKind::Struct { fields } => {
             for field in fields.iter() {
-                let field_layout = layouts.layout(field.id).ok_or_else(layout_not_found)?;
+                let field_layout = layouts.layout(field.id).ok_or(RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound))?;
                 // SAFETY: the field lies within `base`'s region at `offset`
                 // which holds for well-typed values, as guaranteed by the
                 // safety precondition of this function.
@@ -147,7 +150,7 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
                 return Ok(());
             }
 
-            let elem_layout = layouts.layout(*elem_id).ok_or_else(layout_not_found)?;
+            let elem_layout = layouts.layout(*elem_id).ok_or(RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound))?;
             let elem_size = elem_layout.size as usize;
             if elem_layout.has_no_pointers_no_padding() {
                 // TODO(correctness): breaks on big-endian hosts, for the same
@@ -183,381 +186,26 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
             let tag = unsafe { read_enum_tag(obj_ptr) };
             let variant_id = variants
                 .get(tag as usize)
-                .ok_or_else(|| enum_tag_out_of_range(tag, variants.len()))?;
+                .ok_or({
+                    RuntimeError::InvariantViolation(RuntimeInvariantViolation::EnumTagOutOfRange {
+                        tag,
+                        variant_count: variants.len(),
+                    })
+                })?;
             write_uleb128_len(out, tag);
 
-            let variant_layout = layouts.layout(*variant_id).ok_or_else(layout_not_found)?;
+            let variant_layout = layouts.layout(*variant_id).ok_or(RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound))?;
             // SAFETY: the variant body lives at the specified offset within
             // the object.
             unsafe { serialize_impl(layouts, obj_ptr.add(ENUM_DATA_OFFSET), variant_layout, out)? };
             Ok(())
         },
         // TODO(completeness): function values are not yet supported.
-        LayoutKind::Function => Err(VMInternalError::new(function_values_unsupported())),
-        LayoutKind::Ref => Err(VMInternalError::new(unreachable(
-            "References cannot be serialized",
+        LayoutKind::Function => Err(VMInternalError::new(RuntimeError::Unsupported(
+            "function values are not yet supported",
         ))),
-    }
-}
-
-/// Structural equality of two non-reference values of the given type.
-///
-/// # Safety
-///
-/// Input pointers `a` and `b` must point to fully initialized values of the
-/// given type.
-///
-/// # Precondition
-///
-/// For reference values, the caller must first read the reference to obtain
-/// the `base` pointer to the actual data; these walks operate on the pointee.
-#[allow(dead_code)]
-pub unsafe fn equals<T: LayoutProvider + ?Sized>(
-    layouts: &T,
-    a: *const u8,
-    b: *const u8,
-    ty: InternedType,
-) -> VMResult<bool> {
-    let id = layouts.layout_id(ty).ok_or_else(layout_not_found)?;
-    // SAFETY: caller must enforce the safety precondition.
-    unsafe { equals_impl(layouts, a, b, id) }
-}
-
-/// Implementation of structural equality of two values of the given layout.
-///
-/// # Safety
-///
-/// Input pointers `a` and `b` must point to fully initialized values with the
-/// given layout.
-///
-/// # Precondition
-///
-/// For reference values, the caller must first read the reference to obtain
-/// the `base` pointer to the actual data; these walks operate on the pointee.
-unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
-    layouts: &T,
-    a: *const u8,
-    b: *const u8,
-    id: LayoutId,
-) -> VMResult<bool> {
-    // TODO(metering): This walk recurses on struct fields and vector elements; convert it
-    // to a non-recursive form to bound stack depth on deeply nested values.
-    let layout = layouts.layout(id).ok_or_else(layout_not_found)?;
-
-    if layout.has_no_pointers_no_padding() {
-        // SAFETY: both pointers must have layout's size and have no pointers,
-        // no padding.
-        return Ok(unsafe { bytes_cmp(a, b, layout.size as usize).is_eq() });
-    }
-
-    match &layout.kind {
-        LayoutKind::Bool
-        | LayoutKind::UnsignedInt
-        | LayoutKind::SignedInt
-        | LayoutKind::Address
-        | LayoutKind::Signer => Err(VMInternalError::new(unreachable(
-            "Primitive layouts must be handled by fast-path",
-        ))),
-        LayoutKind::Struct { fields } => {
-            for field in fields.iter() {
-                // SAFETY: value is a valid struct, so all fields lie at `offset`
-                // and are within bounds.
-                let eq = unsafe {
-                    equals_impl(
-                        layouts,
-                        a.add(field.offset as usize),
-                        b.add(field.offset as usize),
-                        field.id,
-                    )?
-                };
-                if !eq {
-                    return Ok(false);
-                }
-            }
-            Ok(true)
-        },
-        LayoutKind::Vector { elem_id, .. } => {
-            // SAFETY: vector values hold 8-byte heap pointers pointing to
-            // their data for any well-typed value. The length is stored in
-            // the data pointed to.
-            let vec_a = unsafe { read_ptr(a, 0usize) };
-            let len_a = unsafe { read_vec_len(vec_a) };
-            let vec_b = unsafe { read_ptr(b, 0usize) };
-            let len_b = unsafe { read_vec_len(vec_b) };
-
-            if len_a != len_b {
-                return Ok(false);
-            }
-            if len_a == 0 {
-                return Ok(true);
-            }
-
-            let elem_layout = layouts.layout(*elem_id).ok_or_else(layout_not_found)?;
-            let elem_size = elem_layout.size as usize;
-            if elem_layout.has_no_pointers_no_padding() {
-                // SAFETY: both vectors have same size specified by the layout.
-                let data_a = unsafe { vec_a.add(VEC_DATA_OFFSET) };
-                let data_b = unsafe { vec_b.add(VEC_DATA_OFFSET) };
-                return Ok(unsafe {
-                    bytes_cmp(data_a, data_b, len_a as usize * elem_size).is_eq()
-                });
-            }
-
-            for i in 0..len_a as usize {
-                // SAFETY: ith element lies within the vector data region,
-                // so the pointer is non-null and new pointer points within
-                // the data region. Lengths of `a` and `b` are the same.
-                let elem_a = unsafe { vec_a.add(VEC_DATA_OFFSET + i * elem_size) };
-                let elem_b = unsafe { vec_b.add(VEC_DATA_OFFSET + i * elem_size) };
-
-                // SAFETY: element pointers point to valid vector element
-                // values.
-                let eq = unsafe { equals_impl(layouts, elem_a, elem_b, *elem_id)? };
-                if !eq {
-                    return Ok(false);
-                }
-            }
-            Ok(true)
-        },
-        LayoutKind::FrozenEnum { variants, .. } => {
-            // SAFETY: well-typed enum values hold non-null heap pointers and
-            // every enum object stores its data following the offset.
-            let obj_a = unsafe { read_ptr(a, 0usize) };
-            let obj_b = unsafe { read_ptr(b, 0usize) };
-            let tag_a = unsafe { read_enum_tag(obj_a) };
-            let tag_b = unsafe { read_enum_tag(obj_b) };
-
-            // Validate both tags before the equality check. An out-of-range tag
-            // is heap corruption and must fail closed even when the tags differ.
-            let variant_id = *variants
-                .get(tag_a as usize)
-                .ok_or_else(|| enum_tag_out_of_range(tag_a, variants.len()))?;
-            if tag_b as usize >= variants.len() {
-                return Err(VMInternalError::new(enum_tag_out_of_range(
-                    tag_b,
-                    variants.len(),
-                )));
-            }
-
-            if tag_a != tag_b {
-                return Ok(false);
-            }
-
-            // SAFETY: both variant bodies live at the specified offset.
-            unsafe {
-                equals_impl(
-                    layouts,
-                    obj_a.add(ENUM_DATA_OFFSET),
-                    obj_b.add(ENUM_DATA_OFFSET),
-                    variant_id,
-                )
-            }
-        },
-        // TODO(completeness): function values are not yet supported.
-        LayoutKind::Function => Err(VMInternalError::new(function_values_unsupported())),
-        LayoutKind::Ref => Err(VMInternalError::new(unreachable(
-            "Equality runs on pointee types only",
-        ))),
-    }
-}
-
-/// Comparison of two values of the given type.
-///
-/// # Semantics
-///
-/// 1. Integers compare numerically.
-/// 2. Addresses or signers (also represented as an address) compare
-///    lexicographically over their bytes.
-/// 3. Vectors compare lexicographically (over smaller prefix)
-/// 4. Structs compare field-by-field.
-/// 5. Enums compare by variant tag first, then field-by-field over the
-///    matching variant's body.
-///
-/// # Safety
-///
-/// Input pointers `a` and `b` must point to fully initialized values with the
-/// given layout.
-///
-/// # Precondition
-///
-/// For reference values, the caller must first read the reference to obtain
-/// the `base` pointer to the actual data; these walks operate on the pointee.
-#[allow(dead_code)]
-pub unsafe fn compare<T: LayoutProvider + ?Sized>(
-    layouts: &T,
-    a: *const u8,
-    b: *const u8,
-    ty: InternedType,
-) -> VMResult<Ordering> {
-    let id = layouts.layout_id(ty).ok_or_else(layout_not_found)?;
-    // SAFETY: caller must enforce the safety precondition.
-    unsafe { compare_impl(layouts, a, b, id) }
-}
-
-/// Implementation of structural comparison of two non-reference values of the
-/// given layout.
-///
-/// # Safety
-///
-/// Input pointers `a` and `b` must point to fully initialized values with the
-/// given layout.
-///
-/// # Precondition
-///
-/// For reference values, the caller must first read the reference to obtain
-/// the `base` pointer to the actual data; these walks operate on the pointee.
-unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
-    layouts: &T,
-    a: *const u8,
-    b: *const u8,
-    id: LayoutId,
-) -> VMResult<Ordering> {
-    // TODO(metering): This walk recurses on struct fields and vector elements; convert it
-    // to a non-recursive form to bound stack depth on deeply nested values.
-    let layout = layouts.layout(id).ok_or_else(layout_not_found)?;
-    match &layout.kind {
-        // A `bool` is a 1-byte `0`/`1` value, so it compares like a `u8`.
-        LayoutKind::Bool | LayoutKind::UnsignedInt => {
-            // Read the little-endian bytes into the native integer of the
-            // matching width and compare numerically. `from_le_bytes` keeps
-            // this correct on any host endianness.
-            //
-            // TODO(cleanup): These are unaligned, little-endian numeric reads, distinct
-            // from the aligned native-endian helpers in `memory.rs`. Endianness
-            // makes unifying the two non-trivial; revisit whether a shared set
-            // of typed read helpers can serve both.
-            //
-            // SAFETY: both pointers point to a valid `layout.size`-byte region.
-            Ok(unsafe {
-                match layout.size {
-                    1 => (*a).cmp(&*b),
-                    2 => u16::from_le_bytes(read_array(a)).cmp(&u16::from_le_bytes(read_array(b))),
-                    4 => u32::from_le_bytes(read_array(a)).cmp(&u32::from_le_bytes(read_array(b))),
-                    8 => u64::from_le_bytes(read_array(a)).cmp(&u64::from_le_bytes(read_array(b))),
-                    16 => {
-                        u128::from_le_bytes(read_array(a)).cmp(&u128::from_le_bytes(read_array(b)))
-                    },
-                    32 => {
-                        U256::from_le_bytes(read_array(a)).cmp(&U256::from_le_bytes(read_array(b)))
-                    },
-                    _ => {
-                        return Err(VMInternalError::new(unreachable(
-                            "Unexpected unsigned integer width",
-                        )))
-                    },
-                }
-            })
-        },
-        LayoutKind::SignedInt => {
-            // SAFETY: both pointers point to a valid `layout.size`-byte region.
-            Ok(unsafe {
-                match layout.size {
-                    1 => (*(a as *const i8)).cmp(&*(b as *const i8)),
-                    2 => i16::from_le_bytes(read_array(a)).cmp(&i16::from_le_bytes(read_array(b))),
-                    4 => i32::from_le_bytes(read_array(a)).cmp(&i32::from_le_bytes(read_array(b))),
-                    8 => i64::from_le_bytes(read_array(a)).cmp(&i64::from_le_bytes(read_array(b))),
-                    16 => {
-                        i128::from_le_bytes(read_array(a)).cmp(&i128::from_le_bytes(read_array(b)))
-                    },
-                    32 => {
-                        I256::from_le_bytes(read_array(a)).cmp(&I256::from_le_bytes(read_array(b)))
-                    },
-                    _ => {
-                        return Err(VMInternalError::new(unreachable(
-                            "Unexpected signed integer width",
-                        )))
-                    },
-                }
-            })
-        },
-        LayoutKind::Address | LayoutKind::Signer => {
-            // SAFETY: values are valid byte arrays of the size specified by
-            // the layout, as guaranteed by the precondition of this function.
-            Ok(unsafe { bytes_cmp(a, b, layout.size as usize) })
-        },
-        LayoutKind::Struct { fields } => {
-            for field in fields.iter() {
-                // SAFETY: value is a valid struct, so all fields lie at `offset`
-                // and are within bounds.
-                let ord = unsafe {
-                    compare_impl(
-                        layouts,
-                        a.add(field.offset as usize),
-                        b.add(field.offset as usize),
-                        field.id,
-                    )?
-                };
-                if ord.is_ne() {
-                    return Ok(ord);
-                }
-            }
-            Ok(Ordering::Equal)
-        },
-        LayoutKind::Vector { elem_id, .. } => {
-            // SAFETY: vector values hold 8-byte heap pointers pointing to
-            // their data for any well-typed value. The length is stored in
-            // the data pointed to.
-            let vec_a = unsafe { read_ptr(a, 0usize) };
-            let len_a = unsafe { read_vec_len(vec_a) };
-            let vec_b = unsafe { read_ptr(b, 0usize) };
-            let len_b = unsafe { read_vec_len(vec_b) };
-
-            let elem = layouts.layout(*elem_id).ok_or_else(layout_not_found)?;
-            let elem_size = elem.size as usize;
-            for i in 0..len_a.min(len_b) as usize {
-                // SAFETY: ith element lies within the vector data region,
-                // so the pointer is non-null and new pointer points within
-                // the data region.
-                let elem_a = unsafe { vec_a.add(VEC_DATA_OFFSET + i * elem_size) };
-                let elem_b = unsafe { vec_b.add(VEC_DATA_OFFSET + i * elem_size) };
-
-                // SAFETY: element pointers point to valid values.
-                let ord = unsafe { compare_impl(layouts, elem_a, elem_b, *elem_id)? };
-                if ord.is_ne() {
-                    return Ok(ord);
-                }
-            }
-            Ok(len_a.cmp(&len_b))
-        },
-        LayoutKind::FrozenEnum { variants, .. } => {
-            // SAFETY: well-typed enum values hold non-null heap pointers and
-            // every enum object stores its tag followed by data payload.
-            let obj_a = unsafe { read_ptr(a, 0usize) };
-            let obj_b = unsafe { read_ptr(b, 0usize) };
-            let tag_a = unsafe { read_enum_tag(obj_a) };
-            let tag_b = unsafe { read_enum_tag(obj_b) };
-
-            // Validate both tags before ordering them. An out-of-range tag is
-            // heap corruption and must fail closed even when the tags differ.
-            let variant_id = *variants
-                .get(tag_a as usize)
-                .ok_or_else(|| enum_tag_out_of_range(tag_a, variants.len()))?;
-            if tag_b as usize >= variants.len() {
-                return Err(VMInternalError::new(enum_tag_out_of_range(
-                    tag_b,
-                    variants.len(),
-                )));
-            }
-
-            let ord = tag_a.cmp(&tag_b);
-            if ord.is_ne() {
-                return Ok(ord);
-            }
-
-            // SAFETY: both variant bodies live at the specified offset.
-            unsafe {
-                compare_impl(
-                    layouts,
-                    obj_a.add(ENUM_DATA_OFFSET),
-                    obj_b.add(ENUM_DATA_OFFSET),
-                    variant_id,
-                )
-            }
-        },
-        // TODO(completeness): function values are not yet supported.
-        LayoutKind::Function => Err(VMInternalError::new(function_values_unsupported())),
-        LayoutKind::Ref => Err(VMInternalError::new(unreachable(
-            "Comparison runs on pointee types only",
+        LayoutKind::Ref => Err(VMInternalError::new(RuntimeError::InvariantViolation(
+            RuntimeInvariantViolation::Unreachable("References cannot be serialized".to_string()),
         ))),
     }
 }
@@ -588,7 +236,9 @@ pub unsafe fn deserialize<T: LayoutProvider + ?Sized>(
     bytes: &[u8],
     dst: *mut u8,
 ) -> AllocationResult<()> {
-    let layout = layouts.layout_by_ty(ty).ok_or_else(layout_not_found)?;
+    let layout = layouts.layout_by_ty(ty).ok_or({
+        RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
+    })?;
     debug_assert!(
         dst.addr().is_multiple_of(layout.align as usize),
         "deserialize destination must meet the type's alignment"
@@ -667,14 +317,19 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
             unsafe { std::ptr::write(dst, byte) };
             Ok(())
         },
-        LayoutKind::UnsignedInt | LayoutKind::SignedInt | LayoutKind::Address => {
-            Err(unreachable("Integer and address layouts must be handled by fast-path").into())
-        },
+        LayoutKind::UnsignedInt | LayoutKind::SignedInt | LayoutKind::Address => Err(
+            RuntimeError::InvariantViolation(RuntimeInvariantViolation::Unreachable(
+                "Integer and address layouts must be handled by fast-path".to_string(),
+            ))
+            .into(),
+        ),
         // A signer is never deserialized.
         LayoutKind::Signer => Err(RuntimeError::BCSSignerNotDeserializable.into()),
         LayoutKind::Struct { fields } => {
             for field in fields.iter() {
-                let field_layout = layouts.layout(field.id).ok_or_else(layout_not_found)?;
+                let field_layout = layouts.layout(field.id).ok_or({
+                    RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
+                })?;
                 // SAFETY: value is a valid struct, so all fields lie at `offset`
                 // and are within bounds. `dst` is correctly sized so there is
                 // enough space to write all fields.
@@ -707,22 +362,15 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
                 return Ok(());
             }
 
-            let elem_layout = layouts.layout(*elem_id).ok_or_else(layout_not_found)?;
+            let elem_layout = layouts.layout(*elem_id).ok_or({
+                RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
+            })?;
             let elem_size = elem_layout.size as usize;
 
-            let data_size = (len as usize)
-                .checked_mul(elem_size)
-                .ok_or(RuntimeError::VecAllocSizeOverflow)?;
-            let total_size = data_size
-                .checked_add(OBJECT_HEADER_SIZE + VEC_DATA_OFFSET)
-                .ok_or(RuntimeError::VecAllocSizeOverflow)?;
-
             // An OOM here propagates as `AllocationError::OutOfHeapMemory`.
-            let vec_ptr = heap_alloc(heap, total_size, *descriptor_id)?;
-
-            // SAFETY: the allocated data must store length at this offset
-            // as guaranteed by the allocator.
-            unsafe { write_u64(vec_ptr, VEC_LENGTH_OFFSET, len) };
+            let vec_ptr = alloc_vec_no_gc(heap, *descriptor_id, elem_layout.size, len)?;
+            // The allocation checked this product against overflow.
+            let data_size = len as usize * elem_size;
 
             if elem_layout.all_byte_patterns_valid() {
                 // If every element byte pattern is valid, element bytes equal
@@ -771,18 +419,25 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
             // BCS encodes the variant index as a ULEB128 before the fields.
             let tag = read_uleb128_len(bytes, cursor)?;
             if tag >= variants.len() as u64 {
-                return Err(enum_tag_out_of_range(tag, variants.len()).into());
+                return Err(RuntimeError::InvariantViolation(
+                    RuntimeInvariantViolation::EnumTagOutOfRange {
+                        tag,
+                        variant_count: variants.len(),
+                    },
+                )
+                .into());
             }
 
-            let variant_layout = layouts
-                .layout(variants[tag as usize])
-                .ok_or_else(layout_not_found)?;
+            let variant_layout = layouts.layout(variants[tag as usize]).ok_or({
+                RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
+            })?;
 
-            let total_size = OBJECT_HEADER_SIZE + *max_size_across_variants as usize;
-            let obj_ptr = heap_alloc(heap, total_size, *descriptor_id)?;
-
-            // SAFETY: the allocation has enough size to write the tag.
-            unsafe { write_enum_tag(obj_ptr, tag) };
+            let obj_ptr = alloc_enum_no_gc(
+                heap,
+                *descriptor_id,
+                tag,
+                *max_size_across_variants as usize,
+            )?;
 
             // SAFETY: variant body lives at the specified offset. The maximum
             // size was allocated so there is enough space to deserialize into.
@@ -803,39 +458,13 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
             Ok(())
         },
         // TODO(completeness): function values are not yet supported.
-        LayoutKind::Function => Err(function_values_unsupported().into()),
-        LayoutKind::Ref => Err(unreachable("References cannot be deserialized").into()),
-    }
-}
-
-/// Reads `N` bytes from the pointer into an array.
-///
-/// # Safety
-///
-/// Pointer must point to at least `N` readable, initialized bytes.
-#[inline(always)]
-unsafe fn read_array<const N: usize>(p: *const u8) -> [u8; N] {
-    // SAFETY: `[u8; N]` has alignment 1, so this unaligned read is valid given
-    // the caller's guarantee of `N` readable bytes at `p`.
-    unsafe { (p as *const [u8; N]).read_unaligned() }
-}
-
-/// Byte comparison of two `n`-byte regions.
-///
-/// # Safety
-///
-/// Behavior is undefined if any of the following conditions are violated:
-///
-/// 1. Pointers are non-null.
-/// 2. Pointers point to a single allocation of `n` bytes, allocated.
-unsafe fn bytes_cmp(a: *const u8, b: *const u8, n: usize) -> Ordering {
-    // SAFETY: Caller guarantees non-null pointers of the specified length into
-    // a single allocation. The total size never overflows and the data is not
-    // being mutated.
-    unsafe {
-        let a = std::slice::from_raw_parts(a, n);
-        let b = std::slice::from_raw_parts(b, n);
-        a.cmp(b)
+        LayoutKind::Function => {
+            Err(RuntimeError::Unsupported("function values are not yet supported").into())
+        },
+        LayoutKind::Ref => Err(RuntimeError::InvariantViolation(
+            RuntimeInvariantViolation::Unreachable("References cannot be deserialized".to_string()),
+        )
+        .into()),
     }
 }
 
@@ -899,34 +528,6 @@ fn read_uleb128_len(bytes: &[u8], cursor: &mut usize) -> Result<u64, RuntimeErro
     }
 }
 
-/// Invariant violation error when layout is not available during value walk.
-fn layout_not_found() -> RuntimeError {
-    RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
-}
-
-/// An invariant violation for an unreachable state.
-fn unreachable(message: &str) -> RuntimeError {
-    RuntimeError::InvariantViolation(RuntimeInvariantViolation::Unreachable(message.to_string()))
-}
-
-/// Function values are a valid Move feature that the value walks do not support
-/// yet. Surfaced as an error (never a panic) so callers can classify it as an
-/// unsupported construct instead of aborting.
-fn function_values_unsupported() -> RuntimeError {
-    RuntimeError::Unsupported("function values are not yet supported")
-}
-
-/// Invariant violation when an enum tag does not name a variant, whether read
-/// from an in-memory value or decoded from BCS. A well-formed enum's tag is
-/// always in range, so an out-of-range tag signals corruption, not a legitimate
-/// runtime condition.
-fn enum_tag_out_of_range(tag: u64, variant_count: usize) -> RuntimeError {
-    RuntimeError::InvariantViolation(RuntimeInvariantViolation::EnumTagOutOfRange {
-        tag,
-        variant_count,
-    })
-}
-
 // `#[repr(align(N))]` needs a literal, so `AlignedBuf` uses `u64` backing to
 // get `MAX_ALIGN`.
 //
@@ -943,25 +544,25 @@ const _: () = assert!(
 /// `vec![0u8; n]` is only byte-aligned, but the (de)serializers write pointer
 /// and integer fields as aligned 8-byte stores.
 #[cfg(test)]
-struct AlignedBuf {
+pub(crate) struct AlignedBuf {
     words: Vec<u64>,
     len: usize,
 }
 
 #[cfg(test)]
 impl AlignedBuf {
-    fn zeroed(len: usize) -> Self {
+    pub(crate) fn zeroed(len: usize) -> Self {
         Self {
             words: vec![0u64; len.div_ceil(std::mem::size_of::<u64>())],
             len,
         }
     }
 
-    fn as_mut_ptr(&mut self) -> *mut u8 {
+    pub(crate) fn as_mut_ptr(&mut self) -> *mut u8 {
         self.words.as_mut_ptr().cast()
     }
 
-    fn as_ptr(&self) -> *const u8 {
+    pub(crate) fn as_ptr(&self) -> *const u8 {
         self.words.as_ptr().cast()
     }
 
@@ -974,7 +575,10 @@ impl AlignedBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::heap::AllocationError;
+    use crate::{
+        heap::AllocationError,
+        value_cmp::{compare_impl, equals_impl},
+    };
     use mono_move_core::{
         align_up_u32,
         types::U64_TY,
@@ -1872,6 +1476,7 @@ mod tests {
 #[cfg(test)]
 mod prop_tests {
     use super::*;
+    use crate::value_cmp::{compare, equals};
     use mono_move_core::{
         types::{
             ADDRESS_TY, BOOL_TY, I128_TY, I16_TY, I256_TY, I32_TY, I64_TY, I8_TY, U128_TY, U16_TY,

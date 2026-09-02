@@ -63,6 +63,8 @@ move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-model = { workspace = true }
 move-table-extension = { workspace = true }
+move-value-view = { workspace = true }
+move-value-view-derive = { workspace = true }
 move-vm-types = { workspace = true }
 num-bigint = { workspace = true }
 num-derive = { workspace = true }

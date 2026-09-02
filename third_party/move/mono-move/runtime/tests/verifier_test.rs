@@ -3,14 +3,14 @@
 
 //! Tests for the static verifier (`verify_function`, `verify_descriptors`).
 
-mod common;
-
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     types::InternedType, Code, CodeOffset as CO, DescriptorId, DescriptorProvider, FrameLayoutInfo,
     FrameOffset as FO, Function, FunctionDefinitionIndex, LayoutId, LayoutProvider, MicroOp,
     SortedSafePointEntries, ValueLayout,
 };
+mod common;
+
 use mono_move_runtime::{verify_function, ObjectDescriptor, ObjectDescriptorTable};
 
 /// A descriptor table paired with an empty layout provider, to satisfy the
@@ -49,6 +49,7 @@ fn minimal_func() -> Function {
         code: Code::from_vec(vec![MicroOp::Return]),
         entry_gas: 0,
         param_slots: vec![],
+        param_tys: vec![],
         param_region_size: 0,
         param_and_local_sizes_sum: 8,
         extended_frame_size: 32,

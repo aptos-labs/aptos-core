@@ -10,8 +10,8 @@ use crate::{
 use anyhow::{anyhow, bail, Result};
 use mono_move_core::{
     native::{NativeExtensions, NoNatives},
-    types::EMPTY_TYPE_LIST,
-    Function, GasMeter, NoResourceProvider,
+    types::{is_signer_or_signer_immut_ref, EMPTY_TYPE_LIST},
+    Function, GasMeter, NoResourceProvider, VMResult,
 };
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
@@ -21,7 +21,8 @@ use mono_move_natives::{
     make_all_ristretto255_scalar_test_natives, make_all_test_natives, make_all_unit_test_natives,
 };
 use mono_move_runtime::{
-    InterpreterContext, ProductionContextFamily, ProductionNativeRegistry, RuntimeStatus,
+    CallBuilder, InterpreterContext, InterpreterOptions, ProductionContextFamily,
+    ProductionNativeRegistry, RuntimeStatus,
 };
 use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, vm_status::AbortLocation,
@@ -63,19 +64,41 @@ impl<'guard> MonoRunner<'guard> {
         self.gc_count
     }
 
-    /// Run the entry function once. `set_args` places arguments into the root
-    /// frame before execution; on success `extract_returns` reads results from
-    /// it.
+    /// Run the entry function once, filling its parameters in order: signer
+    /// parameters from `signers`, every other from `place_arg` called with
+    /// the argument's index. On success `extract_returns` reads the results.
     pub fn run<R>(
         &mut self,
-        set_args: impl FnOnce(&mut InterpreterContext<'guard>),
+        signers: &[AccountAddress],
+        mut place_arg: impl FnMut(&mut CallBuilder<'_, '_>, usize) -> VMResult<()>,
         extract_returns: impl FnOnce(&InterpreterContext<'guard>) -> R,
     ) -> RunResult<R> {
-        // Each run starts from a clean state with a full budget, reusing the
-        // already-allocated stack and heap buffers.
-        self.interp.reset(self.function, GAS_BUDGET);
-        set_args(&mut self.interp);
-        let result = match self.interp.run() {
+        // Each run is its own transaction: a clean state with a full budget,
+        // reusing the already-allocated stack and heap buffers.
+        self.interp.reset_for_test(GAS_BUDGET);
+        let function = self.function;
+        let outcome = (|| {
+            let mut call = self.interp.build_call(function)?;
+            let mut placed_signers = 0;
+            for (index, &ty) in function.param_tys.iter().enumerate() {
+                if is_signer_or_signer_immut_ref(ty) {
+                    let buf = signers
+                        .get(placed_signers)
+                        .expect("a signer per signer parameter");
+                    call.signer(buf)?;
+                    placed_signers += 1;
+                } else {
+                    place_arg(&mut call, index - placed_signers)?;
+                }
+            }
+            assert_eq!(
+                placed_signers,
+                signers.len(),
+                "more signers than signer parameters"
+            );
+            call.run()
+        })();
+        let result = match outcome {
             Err(err) => RunResult::Error(format!("{}", err)),
             Ok(RuntimeStatus::Success) => RunResult::Success(extract_returns(&self.interp)),
             Ok(RuntimeStatus::Aborted {
@@ -93,17 +116,14 @@ impl<'guard> MonoRunner<'guard> {
     }
 
     /// Call an entry whose args are 8-byte words and that returns a single
-    /// 8-byte word. Each arg is written at a consecutive 8-byte offset; the
-    /// lone result is read from offset 0 as a raw `u64`. Callers reinterpret
-    /// those bits (e.g. `as i64`) when the entry's return type is signed.
+    /// 8-byte word. Arguments and the result are raw bit patterns, which the
+    /// caller reinterprets for signed types.
     pub fn call_words(&mut self, args: &[u64]) -> Result<u64> {
         match self.run(
-            |interp| {
-                for (index, value) in args.iter().enumerate() {
-                    interp.set_root_arg((index * 8) as u32, &value.to_le_bytes());
-                }
-            },
-            |interp| interp.root_result(),
+            &[],
+            // A scalar's little-endian bytes are its BCS form.
+            |call, index| call.arg_bcs(&args[index].to_le_bytes()),
+            |interp| interp.root_result_u64_for_test(),
         ) {
             RunResult::Success(value) => Ok(value),
             RunResult::Aborted { code, message, .. } => match message {
@@ -165,37 +185,23 @@ pub fn with_mono_function<'guard, 'ctx, R>(
         .intern_identifier(function_name)
         .into_global_arena_ptr();
 
-    let mut read_set = ModuleReadSet::new();
-    let mut gas_meter = GasMeter::new(GAS_BUDGET);
-    // SAFETY: the pointer lives in a `LoadedModule`'s arena. While `guard` is
-    // held the global executable cache cannot enter maintenance, so no arena
-    // reset can happen for the duration of `body`.
-    let function =
-        match loader.load_function(&mut read_set, &mut gas_meter, id, func, EMPTY_TYPE_LIST) {
-            Ok(ptr) => unsafe { ptr.as_ref_unchecked() },
-            Err(err) => return Err(anyhow!("failed to load function: {}", err)),
-        };
-
-    let interp = match heap_size {
-        Some(n) => InterpreterContext::with_heap_size(
-            loader,
-            read_set,
-            gas_meter,
-            &NoResourceProvider,
-            natives,
-            function,
-            n,
-        ),
-        None => InterpreterContext::new(
-            loader,
-            read_set,
-            gas_meter,
-            &NoResourceProvider,
-            natives,
-            function,
-        ),
+    let mut options = InterpreterOptions::default();
+    if let Some(n) = heap_size {
+        options.heap_size = n;
     }
+    let mut interp = InterpreterContext::new_with_options(
+        loader,
+        GasMeter::new(GAS_BUDGET),
+        &NoResourceProvider,
+        natives,
+        options,
+    )
     .with_extensions(extensions);
+    let function = match interp.load_function(id, func, EMPTY_TYPE_LIST) {
+        Ok(function) => function,
+        Err(err) => return Err(anyhow!("failed to load function: {}", err)),
+    };
+    mono_move_runtime::assert_verified(function, guard);
 
     let mut runner = MonoRunner {
         interp,

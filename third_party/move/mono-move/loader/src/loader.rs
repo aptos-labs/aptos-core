@@ -332,6 +332,8 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 }))
             },
         };
+        // TODO(security, metering): run the micro-op verifier on `function`
+        // here, once per cached lowering.
         Ok((function, function_ms))
     }
 }

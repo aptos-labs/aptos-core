@@ -13,9 +13,12 @@ use aptos_types::on_chain_config::{Features, OnChainConfig};
 use legacy_move_compiler::unit_test::{
     ExpectedFailure, ExpectedMoveError, NamedOrBytecodeModule, TestCase,
 };
-use mono_move_core::{types::EMPTY_TYPE_LIST, Function, GasMeter, Interner, VMInternalError};
+use mono_move_core::{
+    types::{is_signer_or_signer_immut_ref, EMPTY_TYPE_LIST},
+    GasMeter, Interner, VMInternalError,
+};
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
-use mono_move_loader::{Loader, LoaderError, LoadingPolicy, LoweringPolicy, ModuleReadSet};
+use mono_move_loader::{Loader, LoaderError, LoadingPolicy, LoweringPolicy};
 use mono_move_runtime::{
     InterpreterContext, ProductionNativeRegistry, RuntimeError, RuntimeStatus,
 };
@@ -162,36 +165,43 @@ fn execute(
         .intern_identifier(IdentStr::new(&test.test_name).unwrap())
         .into_global_arena_ptr();
 
-    let mut read_set = ModuleReadSet::new();
-    let mut gas_meter = GasMeter::new(GAS_BUDGET);
-    // SAFETY: the pointer lives in a `LoadedModule`'s arena; while `guard` is
-    // held the executable cache cannot reset that arena.
-    let function = match loader.load_function(
-        &mut read_set,
-        &mut gas_meter,
-        module_id,
-        func,
-        EMPTY_TYPE_LIST,
-    ) {
-        Ok(ptr) => unsafe { ptr.as_ref_unchecked() },
-        Err(err) => return classify_error(&err),
-    };
-
     let mut interpreter = InterpreterContext::new(
         loader,
-        read_set,
-        gas_meter,
+        GasMeter::new(GAS_BUDGET),
         resource_provider,
         natives,
-        function,
     )
     // For Move unit tests, there is no user transaction context.
     .with_extensions(seed_extensions(false));
+    let function = match interpreter.load_function(module_id, func, EMPTY_TYPE_LIST) {
+        Ok(function) => function,
+        Err(err) => return classify_error(&err),
+    };
+    // TODO(testing): remove once the loader verifies lowered functions itself.
+    mono_move_runtime::assert_verified(function, guard);
 
-    // Reference arguments point into this storage, so it must outlive `run()`.
-    let _ref_args = marshal_args(&mut interpreter, function, &test.arguments);
+    assert_eq!(
+        test.arguments.len(),
+        function.param_tys.len(),
+        "test argument count does not match the function's parameter count"
+    );
+    let outcome = (|| {
+        let mut call = interpreter.build_call(function)?;
+        for (arg, ty) in test.arguments.iter().zip(&function.param_tys) {
+            if is_signer_or_signer_immut_ref(*ty) {
+                // A signer parameter takes its address from the argument.
+                match arg {
+                    MoveValue::Signer(addr) | MoveValue::Address(addr) => call.signer(addr)?,
+                    other => panic!("a signer parameter got a non-address argument: {:?}", other),
+                }
+            } else {
+                call.arg(arg)?;
+            }
+        }
+        call.run()
+    })();
 
-    match interpreter.run() {
+    match outcome {
         Ok(RuntimeStatus::Success) => TestResult::Success,
         Ok(RuntimeStatus::Aborted {
             code,
@@ -203,76 +213,6 @@ fn execute(
             location,
         },
         Err(err) => classify_error(&err),
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Argument marshalling
-// ---------------------------------------------------------------------------
-
-/// A reference is a 16-byte fat pointer (8-byte base + 8-byte offset).
-/// TODO(cleanup): this reference size should be a shared constant, not redefined here.
-const REFERENCE_SIZE: u32 = 16;
-
-/// Write each argument into the root frame at its parameter-slot offset,
-/// returning backing storage that reference arguments point into; the caller
-/// must keep it alive until execution finishes.
-// Each target is boxed for a stable heap address: the fat pointer stores that
-// address, so a `Vec<[u8; 32]>` (whose elements move on reallocation) won't do.
-#[allow(clippy::vec_box)]
-fn marshal_args(
-    interpreter: &mut InterpreterContext<'_>,
-    function: &Function,
-    args: &[MoveValue],
-) -> Vec<Box<[u8; 32]>> {
-    assert_eq!(
-        args.len(),
-        function.param_slots.len(),
-        "test argument count does not match the function's parameter count"
-    );
-
-    let mut ref_args = Vec::new();
-    for (arg, slot) in args.iter().zip(&function.param_slots) {
-        let bytes = match arg {
-            // A `&signer`/`&address` is a fat pointer to a target kept alive past `run()`.
-            MoveValue::Signer(addr) | MoveValue::Address(addr) if slot.size == REFERENCE_SIZE => {
-                let boxed_bytes = Box::new(addr.into_bytes());
-                let mut fat = vec![0u8; REFERENCE_SIZE as usize];
-                fat[..8].copy_from_slice(&(boxed_bytes.as_ptr().addr() as u64).to_ne_bytes());
-                ref_args.push(boxed_bytes);
-                fat
-            },
-            _ => inline_bytes(arg),
-        };
-        assert_eq!(
-            bytes.len() as u32,
-            slot.size,
-            "argument size does not match its parameter slot"
-        );
-        interpreter.set_root_arg(slot.offset.0, &bytes);
-    }
-    ref_args
-}
-
-fn inline_bytes(value: &MoveValue) -> Vec<u8> {
-    match value {
-        MoveValue::Bool(b) => vec![*b as u8],
-        MoveValue::U8(x) => vec![*x],
-        MoveValue::U16(x) => x.to_le_bytes().to_vec(),
-        MoveValue::U32(x) => x.to_le_bytes().to_vec(),
-        MoveValue::U64(x) => x.to_le_bytes().to_vec(),
-        MoveValue::U128(x) => x.to_le_bytes().to_vec(),
-        MoveValue::U256(x) => x.to_le_bytes().to_vec(),
-        MoveValue::I8(x) => vec![*x as u8],
-        MoveValue::I16(x) => x.to_le_bytes().to_vec(),
-        MoveValue::I32(x) => x.to_le_bytes().to_vec(),
-        MoveValue::I64(x) => x.to_le_bytes().to_vec(),
-        MoveValue::I128(x) => x.to_le_bytes().to_vec(),
-        MoveValue::I256(x) => x.to_le_bytes().to_vec(),
-        MoveValue::Address(a) | MoveValue::Signer(a) => a.into_bytes().to_vec(),
-        MoveValue::Vector(_) | MoveValue::Struct(_) | MoveValue::Closure(_) => {
-            panic!("test argument cannot be a heap value")
-        },
     }
 }
 

@@ -375,6 +375,34 @@ pub fn intrinsic_slot_size_and_align(ty: &Type) -> Option<(Size, Alignment)> {
     })
 }
 
+/// Whether `ty` is `signer` or `&signer`, the parameter shapes that fill from
+/// a transaction signer.
+pub fn is_signer_or_signer_immut_ref(ty: InternedType) -> bool {
+    match view_type(ty) {
+        Type::Signer => true,
+        Type::ImmutRef { inner } => matches!(view_type(*inner), Type::Signer),
+        Type::Bool
+        | Type::U8
+        | Type::U16
+        | Type::U32
+        | Type::U64
+        | Type::U128
+        | Type::U256
+        | Type::I8
+        | Type::I16
+        | Type::I32
+        | Type::I64
+        | Type::I128
+        | Type::I256
+        | Type::Address
+        | Type::MutRef { .. }
+        | Type::Vector { .. }
+        | Type::Nominal { .. }
+        | Type::Function { .. }
+        | Type::TypeParam { .. } => false,
+    }
+}
+
 impl Type {
     /// The short kind word for this type (`"u64"`, `"vector"`, `"struct"`, ...).
     /// Mirrors the legacy VM's `TypeTag::to_short_string`.

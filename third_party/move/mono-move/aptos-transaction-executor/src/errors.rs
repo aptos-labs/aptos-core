@@ -6,6 +6,10 @@ use aptos_types::{
     transaction::validation::ECANT_PAY_GAS_DEPOSIT,
 };
 use mono_move_core::VMInternalError;
+use mono_move_runtime::{
+    error::{RuntimeError, RuntimeInvariantViolation},
+    RuntimeStatus,
+};
 use move_core_types::vm_status::AbortLocation;
 use thiserror::Error;
 
@@ -108,6 +112,19 @@ pub enum ExecutionStatus {
     },
 }
 
+/// Why a transaction's arguments were rejected.
+#[derive(Debug)]
+pub enum InvalidArguments {
+    /// A signer parameter follows a non-signer one.
+    SignerAfterArgument,
+    /// The argument count does not match the function's parameters.
+    ArgumentCountMismatch,
+    /// The signer count does not match the function's signer parameters.
+    SignerCountMismatch,
+    /// An argument's bytes do not decode to its parameter's type.
+    UndecodableArgument,
+}
+
 /// How Move execution failed, whether it was the prologue, the payload, the
 /// epilogue, or the transaction as a whole. What a failure means for the
 /// transaction is the driver's call.
@@ -119,8 +136,33 @@ pub enum MoveExecutionFailure {
         message: Option<String>,
         location: AbortLocation,
     },
+    /// The transaction's arguments were rejected.
+    InvalidArguments(InvalidArguments),
     /// Execution failed with a VM error.
     RuntimeError(VMInternalError),
+}
+
+/// An error that should not be reachable, as a VM error.
+pub(crate) fn invariant_violation(detail: impl Into<String>) -> VMInternalError {
+    VMInternalError::new(RuntimeError::InvariantViolation(
+        RuntimeInvariantViolation::Unreachable(detail.into()),
+    ))
+}
+
+/// Reduces a completed call to success or the abort it ended in.
+pub(crate) fn call_result(status: RuntimeStatus) -> Result<(), MoveExecutionFailure> {
+    match status {
+        RuntimeStatus::Success => Ok(()),
+        RuntimeStatus::Aborted {
+            code,
+            message,
+            location,
+        } => Err(MoveExecutionFailure::Abort {
+            code,
+            message,
+            location,
+        }),
+    }
 }
 
 /// Whether an epilogue abort is the fee payer failing to cover the fee.
