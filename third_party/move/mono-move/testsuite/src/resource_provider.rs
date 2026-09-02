@@ -13,13 +13,12 @@ use mono_move_core::{
         InMemoryStorageKey, ResourceProvider, ResourceProviderError, StorageRead,
     },
     types::InternedType,
-    FrameOffset, HeapAnchor, LayoutKind, LayoutProvider, ValueLayout, OBJECT_HEADER_SIZE,
+    FrameOffset, LayoutKind, LayoutProvider, ValueLayout, OBJECT_HEADER_SIZE,
 };
 use mono_move_global_context::ExecutionGuard;
 use mono_move_runtime::{deserialize_into, Heap, SharedArena};
 use move_core_types::account_address::AccountAddress;
-use std::{cell::RefCell, collections::HashMap, ptr::NonNull};
-use triomphe::Arc;
+use std::{cell::RefCell, collections::HashMap, ptr::NonNull, sync::Arc};
 
 /// Serves resources and table items to MonoMove, materializing each on first access.
 pub struct InMemoryResourceProvider<'guard, 'ctx> {
@@ -33,8 +32,8 @@ pub struct InMemoryResourceProvider<'guard, 'ctx> {
 
 struct Materialized {
     /// Long-lived arena holding the flat representation of materialized
-    /// resources. Shared so each read can anchor its source heap; never reset
-    /// between runs.
+    /// resources. Shared so each read can pin the source heap where the read
+    /// points to; never reset between runs.
     arena: Arc<SharedArena>,
     cache: HashMap<InMemoryStorageKey, NonNull<u8>>,
 }
@@ -47,6 +46,7 @@ impl<'guard, 'ctx> InMemoryResourceProvider<'guard, 'ctx> {
             resources: HashMap::new(),
             table_items: HashMap::new(),
             materialized: RefCell::new(Materialized {
+                #[allow(clippy::arc_with_non_send_sync)]
                 arena: Arc::new(SharedArena::new(heap_size)),
                 cache: HashMap::new(),
             }),
@@ -94,7 +94,7 @@ impl ResourceProvider for InMemoryResourceProvider<'_, '_> {
                 return Ok(StorageRead::ExternalHeap {
                     ptr,
                     version: 0,
-                    anchor: HeapAnchor::new(materialized.arena.clone()),
+                    pin: materialized.arena.clone(),
                 });
             }
         }
@@ -111,7 +111,7 @@ impl ResourceProvider for InMemoryResourceProvider<'_, '_> {
                 Ok(StorageRead::ExternalHeap {
                     ptr,
                     version: 0,
-                    anchor: HeapAnchor::new(arena),
+                    pin: arena,
                 })
             },
             None => Ok(StorageRead::DoesNotExist),

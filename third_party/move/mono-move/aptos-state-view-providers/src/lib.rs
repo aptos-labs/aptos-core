@@ -26,7 +26,7 @@ use mono_move_core::{
         },
     },
     types::InternedType,
-    ExecutionErrorKind, HeapAnchor, IntoExecutionError, LayoutProvider, VMInternalError, VMResult,
+    ExecutionErrorKind, IntoExecutionError, LayoutProvider, VMInternalError, VMResult,
     OBJECT_HEADER_SIZE,
 };
 use mono_move_global_context::ExecutionGuard;
@@ -144,10 +144,10 @@ pub struct StateViewResourceProvider<'a, 'ctx, S> {
 /// The provider's interior-mutable state: caches and the value arena.
 struct ProviderState {
     /// Bump arena holding the flat values that reads hand out pointers into.
-    /// Shared so each read can anchor its source heap. Never collected or reset;
-    /// occupancy is bounded by one materialization per distinct key, thanks to
-    /// the value cache.
-    arena: Arc<SharedArena>,
+    /// Shared so each read can pin the source heap where the read points to.
+    /// Never collected or reset; occupancy is bounded by one materialization per
+    /// distinct key, thanks to the value cache.
+    arena: std::sync::Arc<SharedArena>,
     /// Materialized reads, including negative ones. Sound because execution
     /// never mutates a value through a `StorageRead` pointer (mutation copies
     /// into the transaction's own heap first).
@@ -181,7 +181,8 @@ impl<'a, 'ctx, S: StateView> StateViewResourceProvider<'a, 'ctx, S> {
             guard,
             state_view,
             inner: RefCell::new(ProviderState {
-                arena: Arc::new(SharedArena::new(arena_size)),
+                #[allow(clippy::arc_with_non_send_sync)]
+                arena: std::sync::Arc::new(SharedArena::new(arena_size)),
                 values: FxHashMap::default(),
                 groups: FxHashMap::default(),
             }),
@@ -267,7 +268,7 @@ impl<S: StateView> ResourceProvider for StateViewResourceProvider<'_, '_, S> {
         let read = StorageRead::ExternalHeap {
             ptr: obj,
             version: 0,
-            anchor: HeapAnchor::new(arena),
+            pin: arena,
         };
         inner.values.insert(cache_key, read.clone());
         Ok(read)

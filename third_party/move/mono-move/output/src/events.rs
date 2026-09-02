@@ -12,6 +12,9 @@ use mono_move_runtime::{serialize, SessionEffects};
 /// Materializes the emitted events into [`ContractEvent`]s, in emission order.
 /// The effects retain every backing allocation reachable from the event values;
 /// `layouts` must describe those values' interned types.
+//
+// TODO(security): prove at compile time that the execution guard backing
+// `layouts` is held.
 pub fn to_contract_events<L: LayoutProvider + ?Sized>(
     effects: &SessionEffects,
     layouts: &L,
