@@ -1055,6 +1055,23 @@ execution therefore requires re-running the campaign. See limitations.
     interchangeable when *proposing* and *ranking* candidates. A proposal that
     turns out not to hold is rejected on execution, not before it.
 
+15. **A failed existence check contributes no dependency.** `from_execution`
+    keeps an absent read only when the transaction died of `MISSING_DATA`, which
+    is the `borrow_global` flavour. `assert!(exists<R>(a), E_NOT_FOUND)` has
+    `exists` return false and the code abort with its own status -- a *declared*
+    abort -- so that probe is dropped and Phase 2 never learns the dependency for
+    the explicit-precondition idiom, which is the more common one.
+
+    Widening the filter to keep absent reads from *every* failed transaction is
+    sound in isolation (a transaction that committed did not need what it found
+    absent) but measures worse: on etna over 600s and three paired seeds it moved
+    coverage 57.6k -> 52.1k (-9.5%, 1/3 paired wins) while doubling the DUG, from
+    ~571 type nodes and ~348 chains to ~1133 and ~650, at unchanged throughput.
+    Phase 2 divides a fixed budget over its targets, so more edges -- even
+    correct ones -- means less budget each. Closing this properly needs chain
+    scheduling that weighs a target by how likely it is to be satisfiable, not a
+    wider filter.
+
 ### Candidate next steps
 
 - Parallel workers with per-worker coverage sinks.
