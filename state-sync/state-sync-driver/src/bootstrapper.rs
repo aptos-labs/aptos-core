@@ -21,7 +21,7 @@ use aptos_data_streaming_service::{
     streaming_client::{DataStreamingClient, NotificationAndFeedback, NotificationFeedback},
 };
 use aptos_logger::{prelude::*, sample::SampleRate};
-use aptos_storage_interface::{DbReader, StateKind};
+use aptos_storage_interface::{DbReader, SnapshotKind, StateKind};
 use aptos_types::{
     epoch_change::Verifier,
     epoch_state::EpochState,
@@ -745,7 +745,7 @@ impl<
             .get_all_state_values(
                 target_ledger_info_version,
                 Some(next_state_index_to_process),
-                kind,
+                SnapshotKind::State(kind),
             )
             .await?;
         self.active_data_stream = Some(data_stream);
