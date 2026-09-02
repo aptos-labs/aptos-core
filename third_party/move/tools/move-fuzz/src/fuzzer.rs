@@ -1386,12 +1386,23 @@ pub fn entrypoint(
         // still periodically giving full rounds to avoid starvation.
         let run_all_oneshots = !phase2_entered || iteration.is_multiple_of(20);
         let mut oneshot_order: Vec<usize> = (0..oneshot_fuzzers.len()).collect();
+        // Rank every fuzzer's staleness against one instant. `sort_by_key` may
+        // evaluate the key more than once per element, so reading the clock
+        // inside the closure lets a fuzzer's key change mid-sort whenever
+        // `elapsed()` crosses a second boundary -- the sort then observes two
+        // different keys for the same element and panics with "user-provided
+        // comparison function does not correctly implement a total order".
+        // Fixing the instant also makes the ranking mean what it says: all
+        // fuzzers compared as of the same moment.
+        let ranked_at = Instant::now();
         oneshot_order.sort_by_key(|&i| {
             (
                 Reverse(missing_data_signals.get(&i).map_or(0, |signal| signal.hits)),
                 oneshot_fuzzers[i]
                     .last_new_coverage_time()
-                    .map_or(u64::MAX, |t| t.elapsed().as_secs()),
+                    .map_or(u64::MAX, |t| {
+                        ranked_at.saturating_duration_since(t).as_secs()
+                    }),
                 Reverse(oneshot_fuzzers[i].best_seed_score()),
                 Reverse(oneshot_fuzzers[i].corpus_size()),
             )
@@ -1487,6 +1498,8 @@ pub fn entrypoint(
             let mut chain_order: Vec<usize> = (0..chain_fuzzers.len()).collect();
             let (target_module_counts, module_signature_counts) =
                 chain_diversity_counts(&entrypoints, &chain_fuzzers);
+            // same fixed instant as the oneshot ranking above, for the same reason
+            let ranked_at = Instant::now();
             chain_order.sort_by_key(|&i| {
                 let chain_steps = chain_fuzzers[i].chain_steps();
                 let target_script = *chain_steps.last().unwrap_or(&0);
@@ -1506,7 +1519,9 @@ pub fn entrypoint(
                         .unwrap_or(0),
                     chain_fuzzers[i]
                         .last_new_coverage_time()
-                        .map_or(u64::MAX, |t| t.elapsed().as_secs()),
+                        .map_or(u64::MAX, |t| {
+                            ranked_at.saturating_duration_since(t).as_secs()
+                        }),
                     Reverse(chain_fuzzers[i].best_seed_score()),
                     Reverse(chain_fuzzers[i].corpus_size()),
                 )
