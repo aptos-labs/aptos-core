@@ -534,14 +534,15 @@ One `OneshotFuzzer` per generated script. Each owns:
 
 Two consequences that surprise people:
 
-- **Phase 1 is not stateless.** Each fuzzer's fork accumulates every successful
-  write it has ever made. Successive iterations therefore run against a
-  progressively richer state, which is intentional -- it is how a single-script
-  fuzzer ever gets past its own initialization function. The cost is that a
-  `SeedInput` does not describe the execution that produced it: the reads and
-  writes recorded beside it in the DUG were observed after an unrecorded prefix
-  of earlier executions, and replaying the seed alone against the provisioned
-  baseline need not reproduce them. See limitations.
+- **Every execution starts from the provisioned baseline.** `run_one` calls
+  `TracingExecutor::reset_to_baseline` before running, so a fuzzer's fork never
+  accumulates across executions and a `SeedInput` is a complete experiment: the
+  reads and writes recorded beside it in the DUG are exactly what that one
+  transaction did, and replaying it reproduces them. This is what makes DUG
+  edges mean what they say. Forks used to accumulate, on the theory that a
+  single-script fuzzer needs its own history to get past its initialization
+  function; reaching state that needs several transactions is what Phase 2
+  chains are for, and measurement did not support the theory -- see section 12.
 - **Forks do not share state.** Fuzzer `A`'s writes are invisible to fuzzer `B`'s
   storage. The only cross-fuzzer channels are (a) the object dictionary
   broadcast (`absorb_shared_object_writes`, so every mutator learns addresses of
@@ -826,9 +827,9 @@ validated every saved identity.
 **Executor state is restored from a state delta, not by replay.** Each fuzzer
 checkpoints `state_delta_snapshot()` -- the difference between its fork and the
 provisioned baseline shared by every fuzzer -- and `restore_state_delta` applies
-it as a write set. The delta is proportional to the state the fuzzer touched
-rather than to the number of executions it ran, and it is the live state rather
-than a point in its history.
+it as a write set. Since every execution now resets to that same baseline, the
+delta only ever describes the last execution and the next one discards it; the
+field is retained for schema compatibility (see section 12, limitation 2).
 
 ---
 
@@ -978,15 +979,12 @@ execution therefore requires re-running the campaign. See limitations.
    process-global file, and each fuzzer owns a private state fork. Parallelism
    needs either per-worker trace sinks or an in-VM coverage counter that does not
    go through a file at all.
-2. **A corpus seed does not describe the execution that produced it.** Each
-   fuzzer commits every kept transaction into its own fork indefinitely, but a
-   `SeedInput` records only sender, type arguments, and value arguments. So the
-   DUG stores an observation next to a seed that does not, on its own, reproduce
-   it, and Phase 1 is really repeated sequence fuzzing with the history omitted
-   from corpus identity. Resetting each fork to the provisioned baseline before
-   every Phase 1 execution and every Phase 2 chain would make a seed a complete
-   experiment; measured on the demo it is coverage-neutral, so the case for it is
-   soundness of the DUG rather than throughput.
+2. **Checkpoints still carry executor state that nothing reads.** Now that every
+   execution resets to the provisioned baseline, the per-fuzzer state delta in
+   `auto_state.json` only ever holds the writes of the last execution, and the
+   next execution discards it. It is harmless and small, but it is dead, and
+   removing `PersistedExecutorState` would need an `AUTO_STATE_VERSION` bump that
+   invalidates existing checkpoints.
 3. **No cross-fuzzer state sharing.** Because forks are private, discovered state
    propagates only as object-address hints and DUG/`SequenceDb` knowledge. Two
    scripts can each set up half of a precondition and never combine them except
@@ -1063,8 +1061,7 @@ execution therefore requires re-running the campaign. See limitations.
 - A real oracle layer: reproducer emission, crash de-duplication, minimization,
   and optional Move-level invariant hooks.
 - Test-mode compilation to reach `public(package)` / `friend` surface.
-- Fork isolation per seed, so a corpus entry is a self-contained experiment
-  (limitation 2).
+- Drop `PersistedExecutorState` (limitation 2).
 
 ---
 

@@ -160,7 +160,9 @@ The `auto` command currently performs the full move-fuzz pipeline:
 - `--reset-state`
   Wipe persistent move-fuzz state before starting. This removes cached package builds, cached entrypoints, seed/state files, and previous stats.
 - `--max-chain-length <N>`
-  Maximum dependency-chain length for multi-transaction fuzzing.
+  Maximum dependency-chain length for multi-transaction fuzzing. Each chain runs
+  against the provisioned baseline, so this bounds the whole transaction sequence
+  a trial executes, not a suffix of one.
 - `--max-chain-repetition <N>`
   Maximum number of times one script may repeat within a single chain.
 - `--saturation-secs <SECS>`

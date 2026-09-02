@@ -646,6 +646,10 @@ impl OneshotFuzzer {
         };
         let payload = self.build_payload(ty_args.clone(), args.clone());
 
+        // Start from the provisioned baseline, so this seed alone accounts for
+        // everything the execution reads and writes. See `reset_to_baseline`.
+        self.executor.reset_to_baseline();
+
         // prologue: reset the VM's trace buffer (truncates and reopens the file)
         clear_tracing_buffer();
 

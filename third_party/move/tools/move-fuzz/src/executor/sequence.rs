@@ -2438,6 +2438,11 @@ impl ChainFuzzer {
                 db.pick_concrete_prefix_seed(dug, &self.chain.steps, self.mutators[0].rng_mut())
             });
 
+        // Start from the provisioned baseline, so the chain is the whole
+        // experiment and `--max-chain-length` bounds what actually runs. Steps
+        // within the chain still accumulate: a chain *is* a sequence.
+        self.executor.reset_to_baseline();
+
         // Generate or mutate inputs for ALL steps up front
         let step_inputs: Vec<SeedInput> = (0..num_steps)
             .map(|i| {
