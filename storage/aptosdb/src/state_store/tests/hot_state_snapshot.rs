@@ -12,7 +12,7 @@ use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_jellyfish_merkle::{
     mock_tree_store::MockTreeStore, restore::JellyfishMerkleRestore, JellyfishMerkleTree,
 };
-use aptos_storage_interface::{DbReader, DbWriter, Result as DbResult};
+use aptos_storage_interface::{DbReader, DbWriter, Result as DbResult, StateKind};
 use aptos_temppath::TempPath;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -20,6 +20,7 @@ use aptos_types::{
         hot_state::{HotStateValue, HotStateValueChunkWithProof},
         state_key::StateKey,
         state_value::StateValue,
+        NUM_STATE_SHARDS,
     },
     transaction::{
         BlockEndInfo, ExecutionStatus, Transaction, TransactionAuxiliaryData, TransactionInfo,
@@ -469,6 +470,27 @@ fn open_persistent_hot_state_db(path: &TempPath) -> AptosDB {
     .unwrap()
 }
 
+/// Restores the cold state snapshot at `version` from `src` into `dst`, which `reset` needs
+/// to locate the latest snapshot.
+fn restore_cold_state(src: &AptosDB, dst: &AptosDB, version: Version) {
+    let root_hash = src.state_store.get_root_hash(version).unwrap();
+    let num_items = src
+        .get_state_item_count(version, StateKind::MainState)
+        .unwrap();
+    let mut receiver = dst
+        .get_state_snapshot_receiver(version, root_hash, StateKind::MainState)
+        .unwrap();
+    let mut first_index = 0;
+    while first_index < num_items {
+        let chunk = src
+            .get_state_value_chunk_with_proof(version, first_index, 2, StateKind::MainState)
+            .unwrap();
+        first_index += chunk.raw_values.len();
+        receiver.add_chunk(chunk.raw_values, chunk.proof).unwrap();
+    }
+    receiver.finish_box().unwrap();
+}
+
 #[test]
 fn test_hot_state_restore() {
     let tmp_src = TempPath::new();
@@ -487,6 +509,7 @@ fn test_hot_state_restore() {
 
     let tmp_dst = TempPath::new();
     let dst = open_persistent_hot_state_db(&tmp_dst);
+    restore_cold_state(&src, &dst, version);
     let mut receiver = dst
         .get_hot_state_snapshot_receiver(version, root_hash)
         .unwrap();
@@ -496,6 +519,7 @@ fn test_hot_state_restore() {
             .unwrap();
     }
     receiver.finish_box().unwrap();
+    dst.state_store.reset();
 
     // The restored DB serves the same snapshot.
     assert_eq!(
@@ -507,6 +531,31 @@ fn test_hot_state_restore() {
         dst.state_store
             .hot_state_merkle_db
             .get_root_hash(version)
+            .unwrap(),
+        root_hash
+    );
+
+    // `reset` reloaded the restored hot state into memory.
+    let (hot_view, state) = dst.get_persisted_state().unwrap();
+    let num_hot_items: usize = (0..NUM_STATE_SHARDS)
+        .map(|shard_id| state.num_hot_items(shard_id))
+        .sum();
+    assert_eq!(num_hot_items, expected.len());
+    for (key, hot_value) in &expected {
+        let slot = hot_view
+            .get_state_slot(key.crypto_hash_ref())
+            .expect("restored key must be hot");
+        assert_eq!(slot.as_state_value_opt(), hot_value.value_opt());
+        assert_eq!(
+            slot.expect_hot_since_version(),
+            hot_value.hot_since_version()
+        );
+    }
+    assert_eq!(
+        dst.state_store
+            .current_state_locked()
+            .summary()
+            .hot_root_hash()
             .unwrap(),
         root_hash
     );
