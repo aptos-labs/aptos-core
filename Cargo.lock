@@ -13089,6 +13089,7 @@ dependencies = [
  "proptest",
  "rand 0.7.3",
  "serde",
+ "shared-dsa",
  "thiserror 1.0.69",
 ]
 

@@ -15,8 +15,7 @@ pub use abi::{FrameSlot, NativeABI, NativeABIError};
 pub use context::NativeContext;
 pub use extension::{NativeExtension, NativeExtensions};
 pub use registry::{
-    Dispatch, NativeContextFamily, NativeDescriptor, NativeFunction, NativeIdx, NativeResolver,
-    NoNatives,
+    Dispatch, NativeContextFamily, NativeFunction, NativeIdx, NativeName, NativeResolver, NoNatives,
 };
 pub use result::{native_invariant_violation, native_vector_index_out_of_bounds, NativeStatus};
 pub use value::{Boxed, Opaque, Ref, TableHandle, VMValue, Vector};

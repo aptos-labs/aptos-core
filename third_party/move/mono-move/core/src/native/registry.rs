@@ -3,10 +3,11 @@
 
 //! Native function registry primitives shared across the VM.
 //!
-//! - [`NativeFunction`], the raw fn-pointer type a runtime's registry stores,
-//!   and [`NativeIdx`], the position in that table.
-//! - [`NativeResolver`], the trait the loader and specializer use to resolve a
-//!   native call by its name and type arguments to its [`NativeIdx`].
+//! A runtime keeps its natives in a table. Each one is stored as a raw function
+//! pointer, and its position in the table is its index. The loader and
+//! specializer take a native call, look at its name and type arguments, and ask
+//! for the matching index. This module holds the types and traits that make
+//! that lookup work.
 
 use super::context::NativeContext;
 use crate::{
@@ -29,13 +30,17 @@ pub enum Dispatch {
     Polymorphic,
     /// A native that is specialized to a single concrete instantiation or does
     /// not carry type arguments at all.
+    ///
+    /// Invariant: the slice holds only `'static` primitive type constants (e.g.
+    /// [`U64_TY`](crate::types::U64_TY)). It must never contain an arena-interned
+    /// type, since those do not outlive an execution guard.
     Monomorphic(&'static [InternedType]),
 }
 
-/// Describes a natives function: its module address and name, function name
+/// Describes a native function: its module address and name, function name
 /// and how it should be dispatched.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct NativeDescriptor {
+pub struct NativeName {
     pub address: AccountAddress,
     pub module: &'static str,
     pub function: &'static str,

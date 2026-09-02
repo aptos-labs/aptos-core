@@ -31,7 +31,7 @@ use mono_move_core::{
     captured_values_size,
     interner::{module_id_of, InternedIdentifier, InternedModuleId},
     native::{
-        NativeABI, NativeDescriptor, NativeExtension, NativeExtensions, NativeIdx, NativeStatus,
+        NativeABI, NativeExtension, NativeExtensions, NativeIdx, NativeName, NativeStatus,
         ObjectHandle, RootPool,
     },
     next_captured_value_offset,
@@ -210,14 +210,11 @@ fn abort_location(module_id: InternedModuleId) -> VMResult<AbortLocation> {
 }
 
 /// Materializes the [`AbortLocation`] naming a native's own module from its
-/// descriptor. The descriptor's name parts are process-static literals, so the
-/// module name is always a valid identifier in practice.
-fn native_abort_location(descriptor: &NativeDescriptor) -> VMResult<AbortLocation> {
-    match Identifier::new(descriptor.module) {
-        Ok(module) => Ok(AbortLocation::Module(ModuleId::new(
-            descriptor.address,
-            module,
-        ))),
+/// name. The name's parts are process-static literals, so the module name is
+/// always a valid identifier in practice.
+fn native_abort_location(name: &NativeName) -> VMResult<AbortLocation> {
+    match Identifier::new(name.module) {
+        Ok(module) => Ok(AbortLocation::Module(ModuleId::new(name.address, module))),
         Err(_) => invariant_violation!(Unreachable(
             "native module name is not a valid identifier".to_string()
         )),
@@ -1341,7 +1338,7 @@ impl InterpreterContext<'_> {
                             // (not the caller's, which `regs.func` names here)
                             // — the same rule as a Move-level abort.
                             let location = match self.natives.name_by_idx(native_idx) {
-                                Some(descriptor) => native_abort_location(descriptor)?,
+                                Some(name) => native_abort_location(name)?,
                                 None => invariant_violation!(NativeIdxOutOfBounds {
                                     idx: native_idx.0,
                                     registry_size: self.natives.len(),

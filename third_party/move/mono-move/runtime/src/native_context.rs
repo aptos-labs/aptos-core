@@ -23,8 +23,8 @@ use mono_move_core::{
     interner::{view_module_id, InternedIdentifier, InternedModuleId},
     native::{
         native_invariant_violation, Boxed, Dispatch, NativeABI, NativeContext, NativeContextFamily,
-        NativeDescriptor, NativeExtension, NativeExtensions, NativeFunction, NativeIdx,
-        NativeResolver, Opaque, Ref, RootPool, TableHandle, VMValue, Vector,
+        NativeExtension, NativeExtensions, NativeFunction, NativeIdx, NativeName, NativeResolver,
+        Opaque, Ref, RootPool, TableHandle, VMValue, Vector,
     },
     storage::resource_provider::InMemoryStorageKey,
     types::{view_name, view_type_list, InternedType, InternedTypeList},
@@ -33,10 +33,10 @@ use mono_move_core::{
     TRIVIAL_DESCRIPTOR_ID,
 };
 use move_core_types::account_address::AccountAddress;
+use shared_dsa::UnorderedMap;
 use std::{
     cell::{Cell, RefMut, UnsafeCell},
     cmp::Ordering,
-    collections::HashMap,
     ptr::NonNull,
 };
 
@@ -803,40 +803,43 @@ impl NativeContextFamily for ProductionContextFamily {
 /// Shorthand for the [`NativeFunction`] used by the production VM.
 pub type ProductionNativeFunction = NativeFunction<ProductionContextFamily>;
 
-/// The registry of native function available. Stores a function table paired
-/// with a resolver that can map a native function (by its descriptor) to its
+/// The registry of native functions available. Stores a function table paired
+/// with a resolver that can map a native function (by its name) to its
 /// index in the table or actual implementation.
+//
+// TODO(cleanup): rename to `NativeRegistry`. There is a single registry, and
+// "production" is an overloaded, misused term.
 pub struct ProductionNativeRegistry {
     funcs: Vec<ProductionNativeFunction>,
-    descriptors: Vec<NativeDescriptor>,
-    by_name: HashMap<NativeDescriptor, NativeIdx>,
+    names: Vec<NativeName>,
+    by_name: UnorderedMap<NativeName, NativeIdx>,
 }
 
 impl ProductionNativeRegistry {
     /// Builds a registry from native entries, placing each entry's function
-    /// pointer and descriptor at the same [`NativeIdx`].
+    /// pointer and name at the same [`NativeIdx`].
     ///
     /// # Panics
     ///
     /// Panics if two entries are register under the same key.
-    pub fn with_natives(entries: Vec<(NativeDescriptor, ProductionNativeFunction)>) -> Self {
+    pub fn with_natives(entries: Vec<(NativeName, ProductionNativeFunction)>) -> Self {
         let mut funcs = Vec::with_capacity(entries.len());
-        let mut descriptors = Vec::with_capacity(entries.len());
-        let mut by_name = HashMap::with_capacity(entries.len());
-        for (position, (descriptor, func)) in entries.into_iter().enumerate() {
+        let mut names = Vec::with_capacity(entries.len());
+        let mut by_name = UnorderedMap::with_capacity(entries.len());
+        for (position, (name, func)) in entries.into_iter().enumerate() {
             let idx = NativeIdx(position as u32);
-            if by_name.insert(descriptor, idx).is_some() {
+            if by_name.insert(name, idx).is_some() {
                 panic!(
                     "native `{}::{}` registered more than once",
-                    descriptor.module, descriptor.function
+                    name.module, name.function
                 );
             }
             funcs.push(func);
-            descriptors.push(descriptor);
+            names.push(name);
         }
         Self {
             funcs,
-            descriptors,
+            names,
             by_name,
         }
     }
@@ -845,8 +848,8 @@ impl ProductionNativeRegistry {
     pub fn new() -> Self {
         Self {
             funcs: vec![],
-            descriptors: vec![],
-            by_name: HashMap::new(),
+            names: vec![],
+            by_name: UnorderedMap::new(),
         }
     }
 
@@ -865,9 +868,9 @@ impl ProductionNativeRegistry {
         self.funcs.get(idx.0 as usize).copied()
     }
 
-    /// Returns the descriptor of the native registered at the specified index.
-    pub fn name_by_idx(&self, idx: NativeIdx) -> Option<&NativeDescriptor> {
-        self.descriptors.get(idx.0 as usize)
+    /// Returns the name of the native registered at the specified index.
+    pub fn name_by_idx(&self, idx: NativeIdx) -> Option<&NativeName> {
+        self.names.get(idx.0 as usize)
     }
 }
 
@@ -895,7 +898,7 @@ impl NativeResolver for ProductionNativeRegistry {
         let module = view_name(module_id.name());
         let function = view_name(function);
 
-        let query = NativeDescriptor {
+        let query = NativeName {
             address,
             module,
             function,
@@ -905,7 +908,7 @@ impl NativeResolver for ProductionNativeRegistry {
             return Some(*idx);
         }
         self.by_name
-            .get(&NativeDescriptor {
+            .get(&NativeName {
                 dispatch: Dispatch::Polymorphic,
                 ..query
             })

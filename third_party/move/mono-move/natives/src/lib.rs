@@ -9,7 +9,7 @@
 // Re-exported so the native list macros can name these via `$crate::...`
 // without callers having to add `mono-move-core` to their imports.
 use mono_move_core::native::NativeContextFamily;
-pub use mono_move_core::native::{Dispatch, NativeDescriptor, NativeFunction};
+pub use mono_move_core::native::{Dispatch, NativeFunction, NativeName};
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 
 mod address_derivation;
@@ -81,9 +81,8 @@ pub use type_info::make_all_type_info_natives;
 pub use unit_test::make_all_unit_test_natives;
 pub use vector::make_all_vector_natives;
 
-/// One native registration: its descriptor (qualified name parts and dispatch
-/// kind), as well as the implementation.
-pub type NativeEntry<F> = (NativeDescriptor, NativeFunction<F>);
+/// One native registration: its name and its implementation.
+pub type NativeEntry<F> = (NativeName, NativeFunction<F>);
 
 /// All natives shipped with the production MonoMove VM. Additional native
 /// modules are concatenated here as they are implemented.
@@ -121,7 +120,8 @@ pub fn make_all_production_natives<F: NativeContextFamily>() -> Vec<NativeEntry<
 //
 // TODO(cleanup): replace with a proper parser. See if one already exists in
 // move-core-types.
-// TODO(cleanup): this can be a static function and check
+// TODO(cleanup): make this a `const fn` so malformed names are caught at
+// compile time rather than when the native list is built at startup.
 pub(crate) fn parse_qualified_native_name(
     qname: &'static str,
 ) -> (AccountAddress, &'static str, &'static str) {
@@ -173,13 +173,13 @@ macro_rules! native_entry {
         }
 
         let (address, module, function) = $crate::parse_qualified_native_name($qname);
-        let descriptor = $crate::NativeDescriptor {
+        let name = $crate::NativeName {
             address,
             module,
             function,
             dispatch: $dispatch,
         };
-        (descriptor, wrapper::<F> as $crate::NativeFunction<F>)
+        (name, wrapper::<F> as $crate::NativeFunction<F>)
     }};
 }
 pub(crate) use native_entry;
@@ -188,8 +188,11 @@ pub(crate) use native_entry;
 /// concrete instantiation, and the specializer resolves it from the call's type
 /// arguments. Each entry is either `(name, fn)` — empty type arguments (a
 /// non-generic native) — or `(name, &[ty, ...], fn)` to specialize on concrete
-/// type arguments. Each element of the type-argument slice must be a canonical
-/// primitive constant (e.g. `U64_TY`).
+/// type arguments. Each element of the type-argument slice must be a `'static`
+/// primitive type constant (e.g. `U64_TY`), never an arena-interned type.
+//
+// TODO(testing): debug-assert this in the registry builder instead of relying
+// on the doc invariant.
 ///
 /// Example:
 /// ```ignore
