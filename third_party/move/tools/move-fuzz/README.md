@@ -166,7 +166,7 @@ The `auto` command currently performs the full move-fuzz pipeline:
 - `--saturation-secs <SECS>`
   Seconds without new coverage before the fuzzer transitions from Phase 1 to Phase 2. Phase 1 also hands over unconditionally after 10x this value (or half of `--max-total-secs`, whichever is smaller), so one script that keeps finding coverage cannot keep the campaign out of Phase 2.
 - `--max-total-secs <SECS>`
-  Hard wall-clock budget for the whole campaign. The fuzzer writes a final checkpoint and exits when it elapses, in either phase. The budget is measured per invocation, so a run resumed from a checkpoint starts a fresh one. `0` (the default) means no limit.
+  Wall-clock budget for the mutation loop. The fuzzer writes a final checkpoint and exits when it elapses, in either phase. It is measured from the moment fuzzing starts, so it does *not* cover package building, script generation, or entrypoint compilation -- on a cold run against a large project those can dominate. It is also checked between rounds, so a run overshoots by up to one round. The budget is per invocation, so a run resumed from a checkpoint starts a fresh one. `0` (the default) means no limit.
 - `--max-iterations <N>`
   Hard cap on mutation-loop rounds across both phases, counted per invocation, with the same clean shutdown. `0` (the default) means no limit.
 

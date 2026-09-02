@@ -514,8 +514,7 @@ One `OneshotFuzzer` per generated script. Each owns:
 - a **private fork** of the executor (`TracingExecutor::clone`),
 - its own `Mutator` seeded with `derive_seed(base_seed, script_index)`,
 - a corpus of scored `SeedInput`s (`MAX_ONESHOT_CORPUS = 256`),
-- its own accumulated `ExecCoverageMap`,
-- a `replay_log` of every executed seed.
+- its own accumulated `ExecCoverageMap`.
 
 `OneshotFuzzer::run_one()`:
 
@@ -538,8 +537,11 @@ Two consequences that surprise people:
 - **Phase 1 is not stateless.** Each fuzzer's fork accumulates every successful
   write it has ever made. Successive iterations therefore run against a
   progressively richer state, which is intentional -- it is how a single-script
-  fuzzer ever gets past its own initialization function. Reproducing an
-  interesting execution requires the whole replay log, not just the last seed.
+  fuzzer ever gets past its own initialization function. The cost is that a
+  `SeedInput` does not describe the execution that produced it: the reads and
+  writes recorded beside it in the DUG were observed after an unrecorded prefix
+  of earlier executions, and replaying the seed alone against the provisioned
+  baseline need not reproduce them. See limitations.
 - **Forks do not share state.** Fuzzer `A`'s writes are invisible to fuzzer `B`'s
   storage. The only cross-fuzzer channels are (a) the object dictionary
   broadcast (`absorb_shared_object_writes`, so every mutator learns addresses of
@@ -817,14 +819,16 @@ chain fuzzers (remapped by step *identity* where available, falling back to inde
 remapping), object dictionaries, the chain seed nonce, and the missing-data
 signals. Note that the last identity check inside the oneshot restore loop fires
 *after* `missing_data_signals` has already been overwritten and after some
-fuzzers have been replayed, so that particular bail leaves partially restored
+fuzzers have been restored, so that particular bail leaves partially restored
 state behind; it is unreachable in practice because check 4 above already
 validated every saved identity.
 
-**Executor state is restored by replay, not by snapshot.** Each fuzzer's
-`replay_log` is re-executed transaction by transaction against a fresh fork
-(`replay_checkpoint_log`). That is what makes the restored state faithful, and it
-is also the main cost of resuming a long campaign -- see limitations.
+**Executor state is restored from a state delta, not by replay.** Each fuzzer
+checkpoints `state_delta_snapshot()` -- the difference between its fork and the
+provisioned baseline shared by every fuzzer -- and `restore_state_delta` applies
+it as a write set. The delta is proportional to the state the fuzzer touched
+rather than to the number of executions it ran, and it is the live state rather
+than a point in its history.
 
 ---
 
@@ -931,10 +935,12 @@ same scripts in the same order.
    (the campaign fingerprint sorts rendered writes), so this does not leak into
    results, but do not rely on scan order.
 
-**Reproducing an execution.** There is currently no crash-reproducer file. The
-only faithful reproduction path is the per-fuzzer `replay_log` inside
-`auto_state.json`: it is an ordered transcript of every executed `SeedInput`, and
-re-running it against a fresh provisioned executor reconstructs the exact state.
+**Reproducing an execution.** There is currently no crash-reproducer file, and
+no faithful reproduction path at all. A checkpoint stores each fuzzer's *current*
+state as a delta over the provisioned baseline, which restores the campaign but
+does not describe how it got there; the corpus stores `SeedInput`s, which name a
+transaction but not the state it ran against. Reproducing a specific interesting
+execution therefore requires re-running the campaign. See limitations.
 
 ---
 
@@ -972,11 +978,15 @@ re-running it against a fresh provisioned executor reconstructs the exact state.
    process-global file, and each fuzzer owns a private state fork. Parallelism
    needs either per-worker trace sinks or an in-VM coverage counter that does not
    go through a file at all.
-2. **Resume is replay-based and unbounded.** Every executed seed is appended to a
-   `replay_log` that is never pruned, serialized in full into `auto_state.json`,
-   and re-executed on resume. Both the state file and the restart cost grow
-   linearly with total executions. A state-store snapshot (or a bounded,
-   coverage-preserving log) would fix this.
+2. **A corpus seed does not describe the execution that produced it.** Each
+   fuzzer commits every kept transaction into its own fork indefinitely, but a
+   `SeedInput` records only sender, type arguments, and value arguments. So the
+   DUG stores an observation next to a seed that does not, on its own, reproduce
+   it, and Phase 1 is really repeated sequence fuzzing with the history omitted
+   from corpus identity. Resetting each fork to the provisioned baseline before
+   every Phase 1 execution and every Phase 2 chain would make a seed a complete
+   experiment; measured on the demo it is coverage-neutral, so the case for it is
+   soundness of the DUG rather than throughput.
 3. **No cross-fuzzer state sharing.** Because forks are private, discovered state
    propagates only as object-address hints and DUG/`SequenceDb` knowledge. Two
    scripts can each set up half of a precondition and never combine them except
@@ -993,8 +1003,12 @@ re-running it against a fresh provisioned executor reconstructs the exact state.
    on exit, no corpus import/export.
 6. **Gas is disabled**, so gas-metering bugs and DoS surfaces are out of scope by
    construction.
-7. **`auto` has no time or iteration cap**; the only self-termination is Phase 2
-   saturation.
+7. **`--max-total-secs` and `--max-iterations` cover the mutation loop only.**
+   Both are measured from the moment Phase 1 starts, so neither bounds package
+   building, script generation, or entrypoint compilation -- on a large project
+   those dominate a cold run, and a budget of N seconds means N seconds *after*
+   them. The budget is also only checked between rounds, so a run overshoots by
+   up to one full round.
 
 ### Generation
 
@@ -1002,14 +1016,19 @@ re-running it against a fresh provisioned executor reconstructs the exact state.
    `public(friend)` functions are excluded, and the filter is a hand-rolled
    source tokenizer (`parse_script_public_functions`) applied on top of bytecode
    visibility -- so if a module's source cannot be located, the fuzzer silently
-   falls back to bytecode visibility alone.
+   falls back to bytecode visibility alone. `public inline fun` is out of reach
+   for a different reason: the compiler expands it at each call site and emits no
+   bytecode function, so there is nothing to call. Its body is still covered
+   whenever an inlining caller is fuzzed.
 9. **Generation is budget-sensitive.** Hitting `MAX_DERIVED_GRAPHS_PER_PROCESS`
    or the wall-clock cap truncates exploration. The *configured* budget is part of
    the entrypoint-cache fingerprint, but machine-speed jitter is not, so the same
    configuration can yield different script sets on different machines.
-10. **`vector<Function>` is `todo!()`** (`prep/typing.rs`), and each `Function`
-    parameter is bound to one pre-selected callee per combination rather than
-    being fuzzed over.
+10. **Function values are bound, not fuzzed.** Each `Function` parameter is bound
+    to one pre-selected callee per combination rather than being fuzzed over, and
+    a `vector` of them cannot be materialized at all -- lambdas are bound
+    per-parameter, not per-element -- so `TypeMode::convert` reports the shape as
+    unsupported and the enclosing entrypoint is skipped.
 11. **Script identity embeds the ordinal.** `ScriptSignature::name` is
     `fuzz_script_<N>`, and that name is hashed into the entrypoint identity, so
     inserting one script early shifts the names -- and thus the identities -- of
@@ -1021,29 +1040,31 @@ re-running it against a fresh provisioned executor reconstructs the exact state.
 
 12. **Object modeling is heuristic.** An address counts as an object only once an
     `0x1::object::ObjectGroup` write has been seen at it; `note_object_address` is
-    called from `add_initial_resource_tag` and `add_def` but not `add_use`. Object
-    arguments are matched by `DatatypeIdent` with type arguments ignored, so a
-    wrong instantiation shows up as an abort rather than being avoided.
-13. **Synthetic table/raw tags are `DefaultHasher`-derived** yet persisted (see
-    section 10).
-14. **Legacy code paths are still present but unwired.** `discover_profiles` has
-    no callers at all -- not even tests. `DefUseGraph::from_profiles`,
-    `construct_chains` / `build_one_chain`, and `SequenceDb::pick_prefix_seed` /
-    `find_prefix_seeds` are reachable only from `#[cfg(test)]` code. The live
-    pipeline builds the DUG online via `add_seed_observation`, constructs chains
-    via `construct_seed_chains`, and draws prefixes via
-    `pick_concrete_prefix_seed`. These should be either wired back in as a
-    fallback or deleted -- keeping two chain-construction algorithms alive
-    invites drift.
+    called from `add_initial_resource_tag` and `add_def` but not `add_use`. The
+    object dictionary is keyed by the full `StructTag`, type arguments included,
+    so `Object<Coin<A>>` and `Object<Coin<B>>` no longer share a bucket; an
+    address whose type arguments cannot be rendered as a `TypeTag` (an open
+    generic) is not recorded at all.
+13. **Table and raw state keys get synthetic tags.** They are not real
+    `StructTag`s: the slot is identified by a SHA3-256 digest of
+    `StateKey::encoded()`, which is stable across toolchains and safe to persist,
+    but it names a storage slot rather than a Move type, so nothing downstream
+    can reason about the type it holds.
+14. **Object-equivalence ranking is approximate by design.** `type_is_available`,
+    `resource_tag_is_available` and `entry_prefix_is_state_consistent` decide
+    satisfaction by exact tag identity, but `approx_seed_producers_of` and
+    `similar_resource_overlap` deliberately treat same-module resources as
+    interchangeable when *proposing* and *ranking* candidates. A proposal that
+    turns out not to hold is rejected on execution, not before it.
 
 ### Candidate next steps
 
 - Parallel workers with per-worker coverage sinks.
-- Snapshot-based checkpointing to replace replay logs.
 - A real oracle layer: reproducer emission, crash de-duplication, minimization,
   and optional Move-level invariant hooks.
 - Test-mode compilation to reach `public(package)` / `friend` surface.
-- Retire or reintegrate the offline profiling path.
+- Fork isolation per seed, so a corpus entry is a self-contained experiment
+  (limitation 2).
 
 ---
 

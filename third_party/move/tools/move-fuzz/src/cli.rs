@@ -140,10 +140,12 @@ pub enum FuzzCommand {
         #[clap(long, default_value = "120")]
         saturation_secs: u64,
 
-        /// Hard wall-clock budget for the whole campaign, in seconds. When it
-        /// elapses the fuzzer stops in whichever phase it is in, after writing
-        /// a final checkpoint. The budget is per invocation: a resumed run
-        /// starts a fresh one. 0 means no limit.
+        /// Wall-clock budget for the mutation loop, in seconds. When it elapses
+        /// the fuzzer stops in whichever phase it is in, after writing a final
+        /// checkpoint. Measured from the start of fuzzing, so it does not cover
+        /// package building, script generation, or entrypoint compilation, and
+        /// checked between rounds, so a run can overshoot by one round. Per
+        /// invocation: a resumed run starts a fresh one. 0 means no limit.
         #[clap(long, default_value = "0")]
         max_total_secs: u64,
 
