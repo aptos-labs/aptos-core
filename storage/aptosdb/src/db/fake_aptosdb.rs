@@ -42,6 +42,7 @@ use aptos_types::{
     state_proof::StateProof,
     state_store::{
         combine_sharded_state_updates,
+        hot_state::HotStateValue,
         state_key::{prefix::StateKeyPrefix, StateKey},
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
@@ -443,6 +444,16 @@ impl DbWriter for FakeAptosDB {
     ) -> Result<Box<dyn aptos_storage_interface::StateSnapshotReceiver<StateKey, StateValue>>> {
         self.inner
             .get_state_snapshot_receiver(version, expected_root_hash, kind)
+    }
+
+    fn get_hot_state_snapshot_receiver(
+        &self,
+        version: Version,
+        expected_root_hash: HashValue,
+    ) -> Result<Box<dyn aptos_storage_interface::StateSnapshotReceiver<StateKey, HotStateValue>>>
+    {
+        self.inner
+            .get_hot_state_snapshot_receiver(version, expected_root_hash)
     }
 
     fn finalize_state_snapshot(

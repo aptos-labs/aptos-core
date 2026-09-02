@@ -9,7 +9,7 @@ use crate::{
     tests::utils::{create_epoch_ending_ledger_info, create_ledger_info_at_version},
 };
 use aptos_schemadb::schema::fuzzing::assert_encode_decode;
-use aptos_storage_interface::StateKind;
+use aptos_storage_interface::{SnapshotKind, StateKind};
 use aptos_temppath::TempPath;
 use claims::{assert_err, assert_none};
 
@@ -21,7 +21,7 @@ fn test_create_then_open() {
 
     // Verify the storage is empty
     assert_none!(metadata_storage
-        .previous_snapshot_sync_target(StateKind::MainState)
+        .previous_snapshot_sync_target(SnapshotKind::State(StateKind::MainState))
         .unwrap());
 
     // Insert a new state value entry for the target
@@ -33,7 +33,7 @@ fn test_create_then_open() {
             &target_ledger_info,
             last_persisted_state_value,
             snapshot_sync_completed,
-            StateKind::MainState,
+            SnapshotKind::State(StateKind::MainState),
         )
         .unwrap();
 
@@ -45,19 +45,25 @@ fn test_create_then_open() {
     assert_eq!(
         Some(target_ledger_info.clone()),
         metadata_storage
-            .previous_snapshot_sync_target(StateKind::MainState)
+            .previous_snapshot_sync_target(SnapshotKind::State(StateKind::MainState))
             .unwrap()
     );
     assert_eq!(
         last_persisted_state_value,
         metadata_storage
-            .get_last_persisted_index(&target_ledger_info, StateKind::MainState)
+            .get_last_persisted_index(
+                &target_ledger_info,
+                SnapshotKind::State(StateKind::MainState)
+            )
             .unwrap()
     );
     assert_eq!(
         snapshot_sync_completed,
         metadata_storage
-            .is_snapshot_sync_complete(&target_ledger_info, StateKind::MainState)
+            .is_snapshot_sync_complete(
+                &target_ledger_info,
+                SnapshotKind::State(StateKind::MainState)
+            )
             .unwrap()
     );
 
@@ -69,7 +75,7 @@ fn test_create_then_open() {
             &target_ledger_info,
             last_persisted_state_value,
             snapshot_sync_completed,
-            StateKind::MainState,
+            SnapshotKind::State(StateKind::MainState),
         )
         .unwrap();
 
@@ -81,19 +87,25 @@ fn test_create_then_open() {
     assert_eq!(
         Some(target_ledger_info.clone()),
         metadata_storage
-            .previous_snapshot_sync_target(StateKind::MainState)
+            .previous_snapshot_sync_target(SnapshotKind::State(StateKind::MainState))
             .unwrap()
     );
     assert_eq!(
         last_persisted_state_value,
         metadata_storage
-            .get_last_persisted_index(&target_ledger_info, StateKind::MainState)
+            .get_last_persisted_index(
+                &target_ledger_info,
+                SnapshotKind::State(StateKind::MainState)
+            )
             .unwrap()
     );
     assert_eq!(
         snapshot_sync_completed,
         metadata_storage
-            .is_snapshot_sync_complete(&target_ledger_info, StateKind::MainState)
+            .is_snapshot_sync_complete(
+                &target_ledger_info,
+                SnapshotKind::State(StateKind::MainState)
+            )
             .unwrap()
     );
 }
@@ -108,6 +120,77 @@ fn test_metadata_schema_encode_decode() {
             snapshot_sync_completed: false,
         }),
     );
+    assert_encode_decode::<MetadataSchema>(
+        &MetadataKey::HotStateSnapshotSync,
+        &MetadataValue::HotStateSnapshotSync(StateSnapshotProgress {
+            target_ledger_info: create_epoch_ending_ledger_info(),
+            last_persisted_state_value_index: 1234,
+            snapshot_sync_completed: true,
+        }),
+    );
+}
+
+#[test]
+fn test_hot_state_snapshot_progress() {
+    // Create a new metadata storage
+    let tmp_dir = TempPath::new();
+    let metadata_storage = PersistentMetadataStorage::new(tmp_dir.path());
+
+    // The hot state row starts empty
+    let target_ledger_info = create_ledger_info_at_version(12345);
+    assert_none!(metadata_storage
+        .previous_snapshot_sync_target(SnapshotKind::HotState)
+        .unwrap());
+    assert_err!(
+        metadata_storage.get_last_persisted_index(&target_ledger_info, SnapshotKind::HotState)
+    );
+    assert_err!(
+        metadata_storage.is_snapshot_sync_complete(&target_ledger_info, SnapshotKind::HotState)
+    );
+
+    // Write hot state and main state progress; each lands on its own row
+    metadata_storage
+        .update_last_persisted_index(&target_ledger_info, 777, true, SnapshotKind::HotState)
+        .unwrap();
+    metadata_storage
+        .update_last_persisted_index(
+            &target_ledger_info,
+            555,
+            false,
+            SnapshotKind::State(StateKind::MainState),
+        )
+        .unwrap();
+
+    assert_eq!(
+        Some(target_ledger_info.clone()),
+        metadata_storage
+            .previous_snapshot_sync_target(SnapshotKind::HotState)
+            .unwrap()
+    );
+    assert_eq!(
+        777,
+        metadata_storage
+            .get_last_persisted_index(&target_ledger_info, SnapshotKind::HotState)
+            .unwrap()
+    );
+    assert!(metadata_storage
+        .is_snapshot_sync_complete(&target_ledger_info, SnapshotKind::HotState)
+        .unwrap());
+    assert_eq!(
+        555,
+        metadata_storage
+            .get_last_persisted_index(
+                &target_ledger_info,
+                SnapshotKind::State(StateKind::MainState)
+            )
+            .unwrap()
+    );
+    assert!(!metadata_storage
+        .is_snapshot_sync_complete(
+            &target_ledger_info,
+            SnapshotKind::State(StateKind::MainState)
+        )
+        .unwrap());
 }
 
 #[test]
@@ -119,14 +202,16 @@ fn test_multiple_reads_and_writes() {
     // Verify the storage is empty
     let target_ledger_info = create_ledger_info_at_version(100000);
     assert_none!(metadata_storage
-        .previous_snapshot_sync_target(StateKind::MainState)
+        .previous_snapshot_sync_target(SnapshotKind::State(StateKind::MainState))
         .unwrap());
-    assert_err!(
-        metadata_storage.is_snapshot_sync_complete(&target_ledger_info, StateKind::MainState)
-    );
-    assert_err!(
-        metadata_storage.get_last_persisted_index(&target_ledger_info, StateKind::MainState)
-    );
+    assert_err!(metadata_storage.is_snapshot_sync_complete(
+        &target_ledger_info,
+        SnapshotKind::State(StateKind::MainState)
+    ));
+    assert_err!(metadata_storage.get_last_persisted_index(
+        &target_ledger_info,
+        SnapshotKind::State(StateKind::MainState)
+    ));
 
     // Do multiple writes
     for index in 0..100 {
@@ -138,7 +223,7 @@ fn test_multiple_reads_and_writes() {
                 &target_ledger_info,
                 last_persisted_state_value,
                 snapshot_sync_completed,
-                StateKind::MainState,
+                SnapshotKind::State(StateKind::MainState),
             )
             .unwrap();
 
@@ -146,19 +231,25 @@ fn test_multiple_reads_and_writes() {
         assert_eq!(
             Some(target_ledger_info.clone()),
             metadata_storage
-                .previous_snapshot_sync_target(StateKind::MainState)
+                .previous_snapshot_sync_target(SnapshotKind::State(StateKind::MainState))
                 .unwrap()
         );
         assert_eq!(
             last_persisted_state_value,
             metadata_storage
-                .get_last_persisted_index(&target_ledger_info, StateKind::MainState)
+                .get_last_persisted_index(
+                    &target_ledger_info,
+                    SnapshotKind::State(StateKind::MainState)
+                )
                 .unwrap()
         );
         assert_eq!(
             snapshot_sync_completed,
             metadata_storage
-                .is_snapshot_sync_complete(&target_ledger_info, StateKind::MainState)
+                .is_snapshot_sync_complete(
+                    &target_ledger_info,
+                    SnapshotKind::State(StateKind::MainState)
+                )
                 .unwrap()
         );
     }
@@ -172,18 +263,28 @@ fn test_writes_to_different_targets() {
 
     // Verify the storage is empty
     assert_none!(metadata_storage
-        .previous_snapshot_sync_target(StateKind::MainState)
+        .previous_snapshot_sync_target(SnapshotKind::State(StateKind::MainState))
         .unwrap());
 
     // Write a new progress entry into the storage
     let target_ledger_info = create_ledger_info_at_version(100);
     metadata_storage
-        .update_last_persisted_index(&target_ledger_info, 10101, false, StateKind::MainState)
+        .update_last_persisted_index(
+            &target_ledger_info,
+            10101,
+            false,
+            SnapshotKind::State(StateKind::MainState),
+        )
         .unwrap();
 
     // Write another progress entry with a different target and verify that it fails
     let target_ledger_info = create_ledger_info_at_version(200);
     metadata_storage
-        .update_last_persisted_index(&target_ledger_info, 10101, false, StateKind::MainState)
+        .update_last_persisted_index(
+            &target_ledger_info,
+            10101,
+            false,
+            SnapshotKind::State(StateKind::MainState),
+        )
         .unwrap_err();
 }
