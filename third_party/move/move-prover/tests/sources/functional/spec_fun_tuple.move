@@ -1,6 +1,10 @@
 // Tests for spec function tuple return types
 module 0x42::TupleTest {
 
+    enum PairBox has copy, drop {
+        Pair { x: u64, y: u64 }
+    }
+
     // === Spec functions returning tuples ===
 
     // 2-tuple
@@ -12,10 +16,17 @@ module 0x42::TupleTest {
     // 4-tuple
     spec fun quad(a: u64, b: u64, c: u64, d: u64): (u64, u64, u64, u64) { (a, b, c, d) }
 
-    // 8-tuple (max size)
+    // 8-tuple
     spec fun octet(a: u64, b: u64, c: u64, d: u64, e: u64, f: u64, g: u64, h: u64):
         (u64, u64, u64, u64, u64, u64, u64, u64) {
         (a, b, c, d, e, f, g, h)
+    }
+
+    // 11-tuple (max size supported by the Boogie prelude)
+    spec fun eleven(a: u64, b: u64, c: u64, d: u64, e: u64, f: u64,
+                    g: u64, h: u64, i: u64, j: u64, k: u64):
+        (u64, u64, u64, u64, u64, u64, u64, u64, u64, u64, u64) {
+        (a, b, c, d, e, f, g, h, i, j, k)
     }
 
     // Swap using tuple - returns the arguments in reverse order
@@ -55,8 +66,25 @@ module 0x42::TupleTest {
 
     fun test_octet(): bool { true }
     spec test_octet {
-        // Test 8-tuple (max size)
+        // Test 8-tuple
         ensures octet(1, 2, 3, 4, 5, 6, 7, 8) == (1, 2, 3, 4, 5, 6, 7, 8);
+    }
+
+    fun test_eleven(): bool { true }
+    spec test_eleven {
+        ensures eleven(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
+            == (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11);
+    }
+
+    // Pure-function companion bodies may retain enum destructuring blocks.
+    fun unbox_pair(box: PairBox): (u64, u64) {
+        let PairBox::Pair { x, y } = box;
+        (x, y)
+    }
+
+    fun test_destructuring_companion(): bool { true }
+    spec test_destructuring_companion {
+        ensures unbox_pair(PairBox::Pair { x: 1, y: 2 }) == (1, 2);
     }
 
     fun test_swap(): bool { true }

@@ -38,6 +38,13 @@ pub enum StateKind {
     Position,
 }
 
+/// Identifies a snapshot store streamed by state sync. Hot state has a distinct leaf type and API.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+pub enum SnapshotKind {
+    State(StateKind),
+    HotState,
+}
+
 pub type StateViewResult<T, E = StateViewError> = std::result::Result<T, E>;
 
 /// A trait that defines a read-only snapshot of the global state. It is passed to the VM for

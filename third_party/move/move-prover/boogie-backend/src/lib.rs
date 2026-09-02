@@ -79,6 +79,7 @@ pub mod bytecode_translator;
 pub mod options;
 mod prover_task_runner;
 mod spec_translator;
+mod timeout_analysis;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
 struct TypeInfo {

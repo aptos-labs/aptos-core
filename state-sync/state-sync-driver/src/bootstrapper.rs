@@ -21,12 +21,12 @@ use aptos_data_streaming_service::{
     streaming_client::{DataStreamingClient, NotificationAndFeedback, NotificationFeedback},
 };
 use aptos_logger::{prelude::*, sample::SampleRate};
-use aptos_storage_interface::{DbReader, StateKind};
+use aptos_storage_interface::{DbReader, SnapshotKind, StateKind};
 use aptos_types::{
     epoch_change::Verifier,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    state_store::state_value::StateValueChunkWithProof,
+    state_store::{hot_state::HotStateValueChunkWithProof, state_value::StateValueChunkWithProof},
     transaction::{TransactionListWithProofV2, TransactionOutputListWithProofV2, Version},
     waypoint::Waypoint,
 };
@@ -40,7 +40,11 @@ pub const GENESIS_TRANSACTION_VERSION: u64 = 0; // The expected version of the g
 // The snapshot stores synced during fast sync. They are peers (independent
 // stores at the same version); this is just the drive order, and the fast sync
 // is finalized once all of them are written.
-const FAST_SYNC_SNAPSHOT_KINDS: [StateKind; 2] = [StateKind::MainState, StateKind::Position];
+const FAST_SYNC_SNAPSHOT_KINDS: [SnapshotKind; 3] = [
+    SnapshotKind::State(StateKind::MainState),
+    SnapshotKind::State(StateKind::Position),
+    SnapshotKind::HotState,
+];
 
 /// A simple container for verified epoch states and epoch ending ledger infos
 /// that have been fetched from the network.
@@ -298,7 +302,7 @@ pub struct Bootstrapper<MetadataStorage, StorageSyncer, StreamingClient> {
 
     // The snapshot kind of the active data stream, if it is a state-value
     // snapshot stream (used to detect an empty tree on a clean end-of-stream).
-    active_snapshot_kind: Option<StateKind>,
+    active_snapshot_kind: Option<SnapshotKind>,
 
     // The channel used to notify a listener of successful bootstrapping
     bootstrap_notifier_channel: Option<oneshot::Sender<Result<(), Error>>>,
@@ -323,6 +327,9 @@ pub struct Bootstrapper<MetadataStorage, StorageSyncer, StreamingClient> {
 
     // The component used to sync native-position state values
     position_value_syncer: StateValueSyncer,
+
+    // The component used to sync hot state values
+    hot_state_value_syncer: StateValueSyncer,
 
     // The client through which to stream data from the Aptos network
     streaming_client: StreamingClient,
@@ -359,6 +366,7 @@ impl<
         Self {
             state_value_syncer: StateValueSyncer::new(),
             position_value_syncer: StateValueSyncer::new(),
+            hot_state_value_syncer: StateValueSyncer::new(),
             active_data_stream: None,
             active_snapshot_kind: None,
             bootstrap_notifier_channel: None,
@@ -560,7 +568,7 @@ impl<
             // known ledger info. (All snapshot kinds sync to the same target.)
             let target = match self
                 .metadata_storage
-                .previous_snapshot_sync_target(StateKind::MainState)?
+                .previous_snapshot_sync_target(SnapshotKind::State(StateKind::MainState))?
             {
                 Some(target) => target,
                 None => highest_known_ledger_info,
@@ -632,6 +640,13 @@ impl<
                     )
                     .await?;
                 },
+                DataPayload::HotStateValuesWithProof(hot_state_value_chunk_with_proof) => {
+                    self.process_hot_state_values_payload(
+                        data_notification.notification_id,
+                        hot_state_value_chunk_with_proof,
+                    )
+                    .await?;
+                },
                 DataPayload::EpochEndingLedgerInfos(epoch_ending_ledger_infos) => {
                     self.process_epoch_ending_payload(
                         data_notification.notification_id,
@@ -685,7 +700,7 @@ impl<
     fn pin_ledger_info_to_sync(
         &mut self,
         target_ledger_info: LedgerInfoWithSignatures,
-        kind: StateKind,
+        kind: SnapshotKind,
     ) -> Result<(), Error> {
         if let Some(ledger_info_to_sync) = &self.state_value_syncer(kind).ledger_info_to_sync {
             if ledger_info_to_sync != &target_ledger_info {
@@ -712,7 +727,7 @@ impl<
         &mut self,
         target_ledger_info: LedgerInfoWithSignatures,
         existing_snapshot_progress: bool,
-        kind: StateKind,
+        kind: SnapshotKind,
     ) -> Result<(), Error> {
         // Initialize the target ledger info and verify it never changes
         self.pin_ledger_info_to_sync(target_ledger_info.clone(), kind)?;
@@ -947,23 +962,24 @@ impl<
         &mut self,
         notification_id: NotificationId,
         expected_start_index: u64,
-        kind: StateKind,
-        state_value_chunk_with_proof: &StateValueChunkWithProof,
+        kind: SnapshotKind,
+        first_index: u64,
+        last_index: u64,
+        num_values: usize,
     ) -> Result<(), Error> {
         // Verify the payload start index is valid
-        if expected_start_index != state_value_chunk_with_proof.first_index {
+        if expected_start_index != first_index {
             self.reset_stream(notification_id, NotificationFeedback::InvalidPayloadData)
                 .await?;
             return Err(Error::VerificationError(format!(
                 "The start index of the {:?} values was invalid! Expected: {:?}, received: {:?}",
-                kind, expected_start_index, state_value_chunk_with_proof.first_index
+                kind, expected_start_index, first_index
             )));
         }
 
         // Verify the end index and number of state values is valid
-        let expected_num_state_values = state_value_chunk_with_proof
-            .last_index
-            .checked_sub(state_value_chunk_with_proof.first_index)
+        let expected_num_state_values = last_index
+            .checked_sub(first_index)
             .and_then(|version| version.checked_add(1)) // expected_num_state_values = last_index - first_index + 1
             .ok_or_else(|| {
                 Error::IntegerOverflow(format!(
@@ -971,7 +987,7 @@ impl<
                     kind
                 ))
             })?;
-        let num_state_values = state_value_chunk_with_proof.raw_values.len() as u64;
+        let num_state_values = num_values as u64;
         if expected_num_state_values != num_state_values {
             self.reset_stream(notification_id, NotificationFeedback::InvalidPayloadData)
                 .await?;
@@ -985,18 +1001,20 @@ impl<
     }
 
     /// Returns the state value syncer for the given snapshot kind.
-    fn state_value_syncer(&self, kind: StateKind) -> &StateValueSyncer {
+    fn state_value_syncer(&self, kind: SnapshotKind) -> &StateValueSyncer {
         match kind {
-            StateKind::MainState => &self.state_value_syncer,
-            StateKind::Position => &self.position_value_syncer,
+            SnapshotKind::State(StateKind::MainState) => &self.state_value_syncer,
+            SnapshotKind::State(StateKind::Position) => &self.position_value_syncer,
+            SnapshotKind::HotState => &self.hot_state_value_syncer,
         }
     }
 
     /// Returns the mutable state value syncer for the given snapshot kind.
-    fn state_value_syncer_mut(&mut self, kind: StateKind) -> &mut StateValueSyncer {
+    fn state_value_syncer_mut(&mut self, kind: SnapshotKind) -> &mut StateValueSyncer {
         match kind {
-            StateKind::MainState => &mut self.state_value_syncer,
-            StateKind::Position => &mut self.position_value_syncer,
+            SnapshotKind::State(StateKind::MainState) => &mut self.state_value_syncer,
+            SnapshotKind::State(StateKind::Position) => &mut self.position_value_syncer,
+            SnapshotKind::HotState => &mut self.hot_state_value_syncer,
         }
     }
 
@@ -1005,7 +1023,7 @@ impl<
     /// the committed position state root (guaranteed present once the position
     /// stage runs, per `snapshot_kind_applies_to_target`). All kinds share the
     /// target version, so this is taken from the target output, not a storage read.
-    fn expected_snapshot_root(&mut self, kind: StateKind) -> Result<HashValue, Error> {
+    fn expected_snapshot_root(&mut self, kind: SnapshotKind) -> Result<HashValue, Error> {
         let transaction_output_to_sync = self.get_transaction_output_to_sync()?;
         let target_transaction_info = transaction_output_to_sync
             .get_output_list_with_proof()
@@ -1016,7 +1034,7 @@ impl<
                 Error::UnexpectedError("Target transaction info does not exist!".into())
             })?;
         match kind {
-            StateKind::MainState => target_transaction_info
+            SnapshotKind::State(StateKind::MainState) => target_transaction_info
                 .ensure_state_checkpoint_hash()
                 .map_err(|error| {
                     Error::UnexpectedError(format!(
@@ -1024,9 +1042,12 @@ impl<
                         error
                     ))
                 }),
-            StateKind::Position => target_transaction_info
+            SnapshotKind::State(StateKind::Position) => target_transaction_info
                 .position_state_checkpoint_hash()
                 .ok_or_else(|| Error::UnexpectedError("Missing position state root!".into())),
+            SnapshotKind::HotState => target_transaction_info
+                .hot_state_checkpoint_hash()
+                .ok_or_else(|| Error::UnexpectedError("Missing hot state root!".into())),
         }
     }
 
@@ -1035,11 +1056,10 @@ impl<
     async fn verify_state_value_chunk_root(
         &mut self,
         notification_id: NotificationId,
-        kind: StateKind,
-        state_value_chunk_with_proof: &StateValueChunkWithProof,
+        kind: SnapshotKind,
+        chunk_root_hash: HashValue,
     ) -> Result<HashValue, Error> {
         let expected_root_hash = self.expected_snapshot_root(kind)?;
-        let chunk_root_hash = state_value_chunk_with_proof.root_hash;
         if chunk_root_hash != expected_root_hash {
             self.reset_stream(notification_id, NotificationFeedback::InvalidPayloadData)
                 .await?;
@@ -1051,12 +1071,16 @@ impl<
         Ok(expected_root_hash)
     }
 
-    /// Process a single state value chunk with proof payload (of the given kind).
-    async fn process_state_values_payload(
+    /// Verifies a snapshot chunk of the given kind (mode, root, indices) and
+    /// latches the snapshot receiver on the first chunk.
+    async fn prepare_snapshot_chunk(
         &mut self,
         notification_id: NotificationId,
-        state_value_chunk_with_proof: StateValueChunkWithProof,
-        kind: StateKind,
+        kind: SnapshotKind,
+        chunk_root_hash: HashValue,
+        first_index: u64,
+        last_index: u64,
+        num_values: usize,
     ) -> Result<(), Error> {
         // Verify that we're expecting state value payloads
         if self.should_fetch_epoch_ending_ledger_infos()
@@ -1083,7 +1107,7 @@ impl<
         // receiver, so a bad first chunk doesn't latch a receiver bound to the
         // wrong root.
         let expected_root_hash = self
-            .verify_state_value_chunk_root(notification_id, kind, &state_value_chunk_with_proof)
+            .verify_state_value_chunk_root(notification_id, kind, chunk_root_hash)
             .await?;
 
         // Verify the state values payload start and end indices
@@ -1092,7 +1116,9 @@ impl<
             notification_id,
             expected_start_index,
             kind,
-            &state_value_chunk_with_proof,
+            first_index,
+            last_index,
+            num_values,
         )
         .await?;
 
@@ -1111,6 +1137,42 @@ impl<
             self.state_value_syncer_mut(kind)
                 .initialized_state_snapshot_receiver = true;
         }
+        Ok(())
+    }
+
+    /// Advances the kind's stream position after a chunk has been saved.
+    fn finish_snapshot_chunk(
+        &mut self,
+        kind: SnapshotKind,
+        last_state_value_index: u64,
+    ) -> Result<(), Error> {
+        self.state_value_syncer_mut(kind)
+            .next_state_index_to_process =
+            last_state_value_index.checked_add(1).ok_or_else(|| {
+                Error::IntegerOverflow(
+                    "The next state value index to process has overflown!".into(),
+                )
+            })?;
+        Ok(())
+    }
+
+    /// Process a single state value chunk with proof payload (of the given kind).
+    async fn process_state_values_payload(
+        &mut self,
+        notification_id: NotificationId,
+        state_value_chunk_with_proof: StateValueChunkWithProof,
+        state_kind: StateKind,
+    ) -> Result<(), Error> {
+        let kind = SnapshotKind::State(state_kind);
+        self.prepare_snapshot_chunk(
+            notification_id,
+            kind,
+            state_value_chunk_with_proof.root_hash,
+            state_value_chunk_with_proof.first_index,
+            state_value_chunk_with_proof.last_index,
+            state_value_chunk_with_proof.raw_values.len(),
+        )
+        .await?;
 
         // Process the state values chunk and proof
         let last_state_value_index = state_value_chunk_with_proof.last_index;
@@ -1126,17 +1188,41 @@ impl<
                 kind, error,
             )));
         }
+        self.finish_snapshot_chunk(kind, last_state_value_index)
+    }
 
-        // Update the next state value index to process
-        self.state_value_syncer_mut(kind)
-            .next_state_index_to_process =
-            last_state_value_index.checked_add(1).ok_or_else(|| {
-                Error::IntegerOverflow(
-                    "The next state value index to process has overflown!".into(),
-                )
-            })?;
+    /// Process a single hot state value chunk with proof payload.
+    async fn process_hot_state_values_payload(
+        &mut self,
+        notification_id: NotificationId,
+        hot_state_value_chunk_with_proof: HotStateValueChunkWithProof,
+    ) -> Result<(), Error> {
+        let kind = SnapshotKind::HotState;
+        self.prepare_snapshot_chunk(
+            notification_id,
+            kind,
+            hot_state_value_chunk_with_proof.root_hash,
+            hot_state_value_chunk_with_proof.first_index,
+            hot_state_value_chunk_with_proof.last_index,
+            hot_state_value_chunk_with_proof.raw_values.len(),
+        )
+        .await?;
 
-        Ok(())
+        // Process the hot state values chunk and proof
+        let last_state_value_index = hot_state_value_chunk_with_proof.last_index;
+        if let Err(error) = self
+            .storage_synchronizer
+            .save_hot_state_values(notification_id, hot_state_value_chunk_with_proof)
+            .await
+        {
+            self.reset_stream(notification_id, NotificationFeedback::InvalidPayloadData)
+                .await?;
+            return Err(Error::InvalidPayload(format!(
+                "The {:?} states chunk with proof was invalid! Error: {:?}",
+                kind, error,
+            )));
+        }
+        self.finish_snapshot_chunk(kind, last_state_value_index)
     }
 
     /// Whether the given snapshot kind participates in the fast sync to this
@@ -1145,10 +1231,10 @@ impl<
     /// executor sets it there is no authenticated position state to sync, so the
     /// stage is skipped rather than trusting an unproved peer-supplied root.
     /// Requires the target transaction output to already be fetched.
-    fn snapshot_kind_applies_to_target(&mut self, kind: StateKind) -> Result<bool, Error> {
+    fn snapshot_kind_applies_to_target(&mut self, kind: SnapshotKind) -> Result<bool, Error> {
         match kind {
-            StateKind::MainState => Ok(true),
-            StateKind::Position => {
+            SnapshotKind::State(StateKind::MainState) => Ok(true),
+            SnapshotKind::State(StateKind::Position) | SnapshotKind::HotState => {
                 let transaction_output_to_sync = self.get_transaction_output_to_sync()?;
                 let target_transaction_info = transaction_output_to_sync
                     .get_output_list_with_proof()
@@ -1158,9 +1244,14 @@ impl<
                     .ok_or_else(|| {
                         Error::UnexpectedError("Target transaction info does not exist!".into())
                     })?;
-                Ok(target_transaction_info
-                    .position_state_checkpoint_hash()
-                    .is_some())
+                let committed_root = match kind {
+                    SnapshotKind::State(StateKind::Position) => {
+                        target_transaction_info.position_state_checkpoint_hash()
+                    },
+                    SnapshotKind::HotState => target_transaction_info.hot_state_checkpoint_hash(),
+                    SnapshotKind::State(StateKind::MainState) => unreachable!(),
+                };
+                Ok(committed_root.is_some())
             },
         }
     }
@@ -1176,7 +1267,10 @@ impl<
     ) -> Result<(), Error> {
         // Pin the target (read by the output-verification path) and fetch the
         // target transaction output first, re-fetching it on resume.
-        self.pin_ledger_info_to_sync(target_ledger_info.clone(), StateKind::MainState)?;
+        self.pin_ledger_info_to_sync(
+            target_ledger_info.clone(),
+            SnapshotKind::State(StateKind::MainState),
+        )?;
         if self.state_value_syncer.transaction_output_to_sync.is_none() {
             let version = target_ledger_info.ledger_info().version();
             let data_stream = self

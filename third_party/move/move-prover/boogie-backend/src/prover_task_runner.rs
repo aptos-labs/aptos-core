@@ -5,7 +5,12 @@
 
 //! Bounded execution of prover tasks, including racing multiple solver seeds.
 
-use crate::options::BoogieOptions;
+use crate::{
+    options::BoogieOptions,
+    timeout_analysis::{
+        analyze_selected_seed, boogie_output_has_timeout, prover_log_pattern, RawTimeoutAnalysis,
+    },
+};
 use async_trait::async_trait;
 use futures::{stream::FuturesUnordered, StreamExt};
 use log::debug;
@@ -61,6 +66,17 @@ pub trait ProverTask {
 
     /// Returns a task result used for representing a hard timeout.
     fn make_timeout(&self) -> (Self::TaskId, Self::TaskResult);
+
+    /// Post-process the result selected by the task race. Implementations can
+    /// acquire the same process semaphore for bounded follow-up work.
+    async fn postprocess(
+        &mut self,
+        _task_id: Self::TaskId,
+        task_result: Self::TaskResult,
+        _sem: Arc<Semaphore>,
+    ) -> Self::TaskResult {
+        task_result
+    }
 }
 
 pub struct ProverTaskRunner();
@@ -180,13 +196,15 @@ impl ProverTaskRunner {
     {
         let task_ids = task.init(num_instances);
         let prefer_primary = task.prefer_primary();
-        let run = async {
+        let race_task = task.clone();
+        let race_sem = process_sem.clone();
+        let race = async move {
             if sequential {
                 let mut last_result = None;
                 for task_id in task_ids {
-                    let mut cloned_task = task.clone();
-                    let result = cloned_task.run(task_id, process_sem.clone()).await;
-                    if task.is_success(&result) {
+                    let mut cloned_task = race_task.clone();
+                    let result = cloned_task.run(task_id, race_sem.clone()).await;
+                    if race_task.is_success(&result) {
                         return (task_id, result);
                     }
                     last_result = Some((task_id, result));
@@ -197,8 +215,8 @@ impl ProverTaskRunner {
 
             let mut pending = FuturesUnordered::new();
             for (index, task_id) in task_ids.into_iter().enumerate() {
-                let mut cloned_task = task.clone();
-                let process_sem = process_sem.clone();
+                let mut cloned_task = race_task.clone();
+                let process_sem = race_sem.clone();
                 pending.push(async move {
                     cloned_task.wait_for_retry(index).await;
                     let result = cloned_task.run(task_id, process_sem).await;
@@ -210,7 +228,7 @@ impl ProverTaskRunner {
             let mut fallback_success = None;
             while let Some((index, task_id, result)) = pending.next().await {
                 remaining = remaining.saturating_sub(1);
-                let success = task.is_success(&result);
+                let success = race_task.is_success(&result);
                 if !prefer_primary && (remaining == 0 || success) {
                     return (task_id, result);
                 }
@@ -241,6 +259,13 @@ impl ProverTaskRunner {
             }
             unreachable!("a prover task must initialize at least one instance")
         };
+        let run = async {
+            let (task_id, task_result) = race.await;
+            let task_result = task
+                .postprocess(task_id, task_result, process_sem.clone())
+                .await;
+            (task_id, task_result)
+        };
 
         if hard_timeout_secs == 0 {
             run.await
@@ -267,6 +292,8 @@ pub struct RunBoogieWithSeeds {
     /// Process deadline after acquiring the global process permit. Zero means
     /// no per-process deadline.
     pub process_timeout_secs: u64,
+    /// Actual solver soft timeout for this verification root.
+    pub vc_timeout_secs: usize,
     /// Absolute deadline for all seeds of this job.
     pub process_deadline: Option<Instant>,
     /// Delay before starting a fallback seed for the implicit retry policy.
@@ -275,10 +302,16 @@ pub struct RunBoogieWithSeeds {
     pub primary_started: Arc<Notify>,
 }
 
+#[derive(Debug)]
+pub struct BoogieTaskOutput {
+    pub output: Output,
+    pub(crate) timeout_analysis: Vec<RawTimeoutAnalysis>,
+}
+
 #[async_trait]
 impl ProverTask for RunBoogieWithSeeds {
     type TaskId = usize;
-    type TaskResult = std::io::Result<Output>;
+    type TaskResult = std::io::Result<BoogieTaskOutput>;
 
     fn init(&mut self, num_instances: usize) -> Vec<Self::TaskId> {
         // If we are running only one Boogie instance, use the default random seed.
@@ -334,15 +367,19 @@ impl ProverTask for RunBoogieWithSeeds {
         } else {
             process.await
         }
+        .map(|output| BoogieTaskOutput {
+            output,
+            timeout_analysis: vec![],
+        })
     }
 
     fn is_success(&self, task_result: &Self::TaskResult) -> bool {
         match task_result {
             Ok(res) => {
-                if !res.status.success() {
+                if !res.output.status.success() {
                     return false;
                 }
-                let output = String::from_utf8_lossy(&res.stdout);
+                let output = String::from_utf8_lossy(&res.output.stdout);
                 self.contains_compilation_error(&output) || !self.contains_timeout(&output)
             },
             // Infrastructure failures terminate the race, but a timed-out seed
@@ -371,6 +408,45 @@ impl ProverTask for RunBoogieWithSeeds {
     fn make_timeout(&self) -> (Self::TaskId, Self::TaskResult) {
         (0, Err(std::io::Error::from(std::io::ErrorKind::TimedOut)))
     }
+
+    async fn postprocess(
+        &mut self,
+        task_id: Self::TaskId,
+        mut task_result: Self::TaskResult,
+        sem: Arc<Semaphore>,
+    ) -> Self::TaskResult {
+        if !self.options.timeout_analysis || self.options.stable_test_output {
+            return task_result;
+        }
+        let Ok(result) = task_result.as_mut() else {
+            return task_result;
+        };
+        let output = String::from_utf8_lossy(&result.output.stdout);
+        if !boogie_output_has_timeout(&output) {
+            return task_result;
+        }
+        match self.options.effective_z3_exe() {
+            Ok(z3_exe) => {
+                result.timeout_analysis = analyze_selected_seed(
+                    &z3_exe,
+                    &self.boogie_file,
+                    task_id,
+                    self.vc_timeout_secs,
+                    self.process_deadline,
+                    self.options.keep_artifacts,
+                    sem,
+                )
+                .await;
+            },
+            Err(err) => {
+                log::debug!("timeout analysis is unavailable: {}", err);
+                result.timeout_analysis = vec![RawTimeoutAnalysis::unavailable(
+                    "the configured solver cannot be replayed with Z3",
+                )];
+            },
+        }
+        task_result
+    }
 }
 
 impl RunBoogieWithSeeds {
@@ -379,7 +455,12 @@ impl RunBoogieWithSeeds {
         self.options
             .boogie_flags
             .push(format!("-proverOpt:O:smt.random_seed={}", seed));
-        self.options.get_boogie_command(&self.boogie_file)
+        let prover_log = self
+            .options
+            .timeout_analysis
+            .then(|| prover_log_pattern(&self.boogie_file, seed));
+        self.options
+            .get_boogie_command_with_prover_log(&self.boogie_file, prover_log.as_deref())
     }
 
     /// Returns whether the output string contains any Boogie compilation errors.
@@ -437,6 +518,20 @@ mod tests {
 
         fn make_timeout(&self) -> (Self::TaskId, Self::TaskResult) {
             (0, usize::MAX)
+        }
+
+        async fn postprocess(
+            &mut self,
+            _task_id: Self::TaskId,
+            task_result: Self::TaskResult,
+            sem: Arc<Semaphore>,
+        ) -> Self::TaskResult {
+            let _permit = sem.acquire().await.expect("semaphore closed");
+            let active = self.active.fetch_add(1, Ordering::SeqCst) + 1;
+            self.max_active.fetch_max(active, Ordering::SeqCst);
+            tokio::time::sleep(Duration::from_millis(2)).await;
+            self.active.fetch_sub(1, Ordering::SeqCst);
+            task_result
         }
     }
 
@@ -576,6 +671,7 @@ mod tests {
             boogie_file: "test.bpl".to_string(),
             prefer_primary: false,
             process_timeout_secs: 0,
+            vc_timeout_secs: 40,
             process_deadline: None,
             seed_handoff_after: None,
             primary_started: Arc::new(Notify::new()),
@@ -590,6 +686,7 @@ mod tests {
             boogie_file: "test.bpl".to_string(),
             prefer_primary: false,
             process_timeout_secs: 0,
+            vc_timeout_secs: 40,
             process_deadline: None,
             seed_handoff_after: Some(Duration::from_millis(20)),
             primary_started: Arc::new(Notify::new()),
@@ -752,6 +849,7 @@ mod tests {
             boogie_file: "test.bpl".to_string(),
             prefer_primary: false,
             process_timeout_secs: 1,
+            vc_timeout_secs: 40,
             process_deadline: None,
             seed_handoff_after: None,
             primary_started: Arc::new(Notify::new()),
@@ -767,6 +865,7 @@ mod tests {
             boogie_file: "test.bpl".to_string(),
             prefer_primary: false,
             process_timeout_secs: 60,
+            vc_timeout_secs: 40,
             process_deadline: Some(Instant::now() - Duration::from_secs(1)),
             seed_handoff_after: None,
             primary_started: Arc::new(Notify::new()),
@@ -786,6 +885,7 @@ mod tests {
             boogie_file: "test.bpl".to_string(),
             prefer_primary: false,
             process_timeout_secs: 60,
+            vc_timeout_secs: 40,
             process_deadline: Some(Instant::now() - Duration::from_secs(1)),
             seed_handoff_after: Some(Duration::from_millis(1)),
             primary_started: Arc::new(Notify::new()),

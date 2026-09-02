@@ -198,6 +198,11 @@ impl FunctionTargetProcessor for GlobalInvariantAnalysisProcessor {
             }
 
             let fenv = env.get_function(fun_id);
+            if fenv.no_verified_bytecode() {
+                // The analysis pass deliberately skips these functions, so
+                // they do not carry a PerFunctionRelevance annotation to dump.
+                continue;
+            }
             let target = targets.get_target(&fenv, &fun_variant);
             let result = target
                 .get_annotations()

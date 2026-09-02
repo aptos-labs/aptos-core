@@ -15,19 +15,21 @@ use crate::{
             create_data_stream_listener, create_empty_epoch_state, create_epoch_ending_ledger_info,
             create_epoch_ending_ledger_info_for_epoch, create_full_node_driver_configuration,
             create_global_summary, create_global_summary_with_version,
-            create_output_list_with_proof, create_random_epoch_ending_ledger_info,
-            create_state_value_chunk_with_proof, create_transaction_list_with_proof,
+            create_output_list_with_proof, create_output_list_with_proof_v1,
+            create_random_epoch_ending_ledger_info, create_state_value_chunk_with_proof,
+            create_transaction_list_with_proof,
         },
     },
     utils::OutputFallbackHandler,
 };
 use aptos_config::config::BootstrappingMode;
+use aptos_crypto::HashValue;
 use aptos_data_client::global_summary::GlobalDataSummary;
 use aptos_data_streaming_service::{
     data_notification::{DataNotification, DataPayload, NotificationId},
     streaming_client::{NotificationAndFeedback, NotificationFeedback},
 };
-use aptos_storage_interface::StateKind;
+use aptos_storage_interface::{SnapshotKind, StateKind};
 use aptos_time_service::TimeService;
 use aptos_types::{
     transaction::{TransactionOutputListWithProofV2, Version},
@@ -1070,7 +1072,7 @@ async fn test_snapshot_sync_epoch_change() {
         .with(
             eq(target_version),
             eq(Some(last_persisted_index)),
-            eq(StateKind::MainState),
+            eq(SnapshotKind::State(StateKind::MainState)),
         )
         .return_once(move |_, _, _| Ok(data_stream_listener_1));
 
@@ -1117,6 +1119,74 @@ async fn test_snapshot_sync_epoch_change() {
 }
 
 #[tokio::test]
+async fn test_snapshot_sync_hot_state_stage() {
+    // Create test data
+    let synced_version = GENESIS_TRANSACTION_VERSION; // Genesis is the highest synced
+    let target_version = 1000;
+    let highest_version = 5000;
+    let target_ledger_info = create_random_epoch_ending_ledger_info(target_version, 1);
+    let highest_ledger_info = create_random_epoch_ending_ledger_info(highest_version, 2);
+    let hot_state_root = HashValue::random();
+
+    // Create a driver configuration with a genesis waypoint and fast syncing
+    let mut driver_configuration = create_full_node_driver_configuration();
+    driver_configuration.config.bootstrapping_mode = BootstrappingMode::DownloadLatestStates;
+
+    // The main-state snapshot is complete; the hot-state snapshot hasn't started.
+    // (The position stage is skipped: the target commits no position root.)
+    let mut metadata_storage = MockMetadataStorage::new();
+    let target_ledger_info_clone = target_ledger_info.clone();
+    metadata_storage
+        .expect_previous_snapshot_sync_target()
+        .returning(move |kind| match kind {
+            SnapshotKind::State(StateKind::MainState) => Ok(Some(target_ledger_info_clone.clone())),
+            _ => Ok(None),
+        });
+    metadata_storage
+        .expect_is_snapshot_sync_complete()
+        .returning(|_, kind| Ok(kind == SnapshotKind::State(StateKind::MainState)));
+
+    // Expect the hot state stream to be created from index 0
+    let mut mock_streaming_client = create_mock_streaming_client();
+    let (_notification_sender, data_stream_listener) = create_data_stream_listener();
+    mock_streaming_client
+        .expect_get_all_state_values()
+        .times(1)
+        .with(eq(target_version), eq(Some(0)), eq(SnapshotKind::HotState))
+        .return_once(move |_, _, _| Ok(data_stream_listener));
+
+    // Create the bootstrapper
+    let mut bootstrapper = create_bootstrapper_with_storage(
+        driver_configuration,
+        mock_streaming_client,
+        metadata_storage,
+        None,
+        synced_version,
+        true,
+    );
+
+    // The target transaction output commits a hot state root
+    bootstrapper
+        .get_state_value_syncer()
+        .set_transaction_output_to_sync(create_output_list_with_proof_v1(
+            Some(hot_state_root),
+            None,
+        ));
+
+    // Insert an epoch ending ledger info into the verified states of the bootstrapper
+    manipulate_verified_epoch_states(&mut bootstrapper, true, true, Some(highest_version));
+
+    // Create a global data summary
+    let mut global_data_summary = create_global_summary(1);
+    global_data_summary.advertised_data.synced_ledger_infos = vec![highest_ledger_info.clone()];
+
+    // Drive progress to start the hot state value stream
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
 async fn test_snapshot_sync_epoch_change_genesis() {
     // Create test data
     let synced_version = GENESIS_TRANSACTION_VERSION; // Genesis is the highest synced version
@@ -1134,7 +1204,11 @@ async fn test_snapshot_sync_epoch_change_genesis() {
     mock_streaming_client
         .expect_get_all_state_values()
         .times(1)
-        .with(eq(target_version), eq(Some(0)), eq(StateKind::MainState))
+        .with(
+            eq(target_version),
+            eq(Some(0)),
+            eq(SnapshotKind::State(StateKind::MainState)),
+        )
         .return_once(move |_, _, _| Ok(data_stream_listener_1));
 
     // Create the mock metadata storage
@@ -1197,7 +1271,11 @@ async fn test_snapshot_sync_state_values_invalid_chunk_retries() {
         mock_streaming_client
             .expect_get_all_state_values()
             .times(1)
-            .with(always(), eq(Some(0)), eq(StateKind::MainState))
+            .with(
+                always(),
+                eq(Some(0)),
+                eq(SnapshotKind::State(StateKind::MainState)),
+            )
             .return_once(move |_, _, _| Ok(data_stream_listener))
             .in_sequence(&mut expectation_sequence);
     }
@@ -1292,7 +1370,7 @@ async fn test_snapshot_sync_epoch_change_genesis_restart() {
         .with(
             eq(target_version),
             eq(Some(last_persisted_index)),
-            eq(StateKind::MainState),
+            eq(SnapshotKind::State(StateKind::MainState)),
         )
         .return_once(move |_, _, _| Ok(data_stream_listener_1));
 
@@ -1364,7 +1442,7 @@ async fn test_snapshot_sync_existing_state() {
         .with(
             eq(highest_version),
             eq(Some(last_persisted_index)),
-            eq(StateKind::MainState),
+            eq(SnapshotKind::State(StateKind::MainState)),
         )
         .return_once(move |_, _, _| Ok(data_stream_listener_1))
         .in_sequence(&mut expectation_sequence);
@@ -1387,7 +1465,7 @@ async fn test_snapshot_sync_existing_state() {
         .with(
             eq(highest_version),
             eq(Some(last_persisted_index)),
-            eq(StateKind::MainState),
+            eq(SnapshotKind::State(StateKind::MainState)),
         )
         .return_once(move |_, _, _| Ok(data_stream_listener_2))
         .in_sequence(&mut expectation_sequence);
@@ -1469,7 +1547,11 @@ async fn test_snapshot_sync_fresh_state() {
     mock_streaming_client
         .expect_get_all_state_values()
         .times(1)
-        .with(eq(highest_version), eq(Some(0)), eq(StateKind::MainState))
+        .with(
+            eq(highest_version),
+            eq(Some(0)),
+            eq(SnapshotKind::State(StateKind::MainState)),
+        )
         .return_once(move |_, _, _| Ok(data_stream_listener_1));
 
     // Create the mock metadata storage

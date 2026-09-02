@@ -1,0 +1,21 @@
+=== mixed replay evidence ===
+error: verification out of resources/timeout (timeout set to 1s)
+  = timeout analysis replay: mixed quantifier and nonlinear arithmetic activity (48,231 observed quantifier instantiations; arith-nla-propagate-bounds=3,102, arith-nla-lemmas=17)
+  = top quantifier activity:
+      definition of spec function 0x1::staking_contract::spec_fold at sources/staking_contract.move:2 — 31,204+ observed instantiations
+      forall at sources/staking_contract.move:4 — 9,876+ observed instantiations
+
+=== partial replay evidence ===
+error: verification out of resources/timeout (timeout set to 1s)
+  = timeout analysis replay: quantifier activity (20,800 observed quantifier instantiations)
+  = top quantifier activity:
+      forall at sources/staking_contract.move:4 — 20,800+ observed instantiations
+  = timeout analysis incomplete; only partial replay evidence was available
+
+=== replay unavailable ===
+error: verification out of resources/timeout (timeout set to 1s)
+  = timeout analysis unavailable: the replay deadline expired before this capture could run
+
+=== stable test output ===
+error: verification out of resources/timeout (timeout set to 1s)
+  = timeout analysis requested; runtime evidence redacted for stable output

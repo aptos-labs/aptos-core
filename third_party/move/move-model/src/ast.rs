@@ -14,6 +14,7 @@ use crate::{
     },
     symbol::{Symbol, SymbolPool},
     ty::{ReferenceKind, Type, TypeDisplayContext},
+    well_known::OBJECT_SPEC_EXISTS_AT,
 };
 use either::Either;
 use internment::LocalIntern;
@@ -55,9 +56,17 @@ pub struct SpecFunDecl {
     pub params: Vec<Parameter>,
     pub result_type: Type,
     pub used_memory: BTreeSet<QualifiedInstId<StructId>>,
+    /// Resource memory selected by a bare type parameter.  Most resource
+    /// footprints have a statically known struct head and fit in
+    /// `used_memory`; `object::spec_exists_at<T>` is intentionally different:
+    /// its `T` can be the resource itself.  The concrete memory is recovered
+    /// when the specification function is instantiated.
+    pub generic_used_memory: BTreeSet<u16>,
     /// Resources accessed inside `old()` contexts (transitively).
     /// These require dual-state parameters (pre and post) for verification.
     pub old_memory: BTreeSet<QualifiedInstId<StructId>>,
+    /// The subset of `generic_used_memory` observed in an old-state context.
+    pub generic_old_memory: BTreeSet<u16>,
     pub uninterpreted: bool,
     pub is_move_fun: bool,
     pub is_native: bool,
@@ -76,6 +85,44 @@ pub struct SpecFunDecl {
     /// Spec conditions (ensures, requires, aborts_if) for uninterpreted spec functions
     /// derived from lambdas with imperative bodies that have spec blocks.
     pub spec: RefCell<Spec>,
+}
+
+impl SpecFunDecl {
+    /// Returns the complete resource-memory footprint at a concrete type
+    /// instantiation.  Bare generic resource uses are resolved here because
+    /// they have no statically known struct head in the declaration.
+    pub fn used_memory_instantiated(&self, inst: &[Type]) -> BTreeSet<QualifiedInstId<StructId>> {
+        let mut result: BTreeSet<_> = self
+            .used_memory
+            .iter()
+            .map(|memory| memory.clone().instantiate(inst))
+            .collect();
+        for type_param in &self.generic_used_memory {
+            if let Some(Type::Struct(module_id, struct_id, type_args)) =
+                inst.get(*type_param as usize).map(Type::skip_reference)
+            {
+                result.insert(module_id.qualified_inst(*struct_id, type_args.clone()));
+            }
+        }
+        result
+    }
+
+    /// Returns the instantiated old-state subset of the resource footprint.
+    pub fn old_memory_instantiated(&self, inst: &[Type]) -> BTreeSet<QualifiedInstId<StructId>> {
+        let mut result: BTreeSet<_> = self
+            .old_memory
+            .iter()
+            .map(|memory| memory.clone().instantiate(inst))
+            .collect();
+        for type_param in &self.generic_old_memory {
+            if let Some(Type::Struct(module_id, struct_id, type_args)) =
+                inst.get(*type_param as usize).map(Type::skip_reference)
+            {
+                result.insert(module_id.qualified_inst(*struct_id, type_args.clone()));
+            }
+        }
+        result
+    }
 }
 
 /// Frame condition specification: which resources are modified and/or read.
@@ -1347,15 +1394,18 @@ impl ExpData {
                 neutral = false;
                 false
             },
+            // An unlabeled state operation is evaluated in the ambient state,
+            // so moving a label around it changes its meaning just as surely
+            // as moving one around an explicitly labeled operation.
             ExpData::Call(
                 _,
-                Operation::Behavior(_, range)
-                | Operation::SpecFunction(_, _, range)
-                | Operation::SpecPublish(range)
-                | Operation::SpecRemove(range)
-                | Operation::SpecUpdate(range),
+                Operation::Behavior(..)
+                | Operation::SpecFunction(..)
+                | Operation::SpecPublish(..)
+                | Operation::SpecRemove(..)
+                | Operation::SpecUpdate(..),
                 _,
-            ) if range.pre.is_some() || range.post.is_some() => {
+            ) => {
                 neutral = false;
                 false
             },
@@ -1568,11 +1618,29 @@ impl ExpData {
                     let inst = &env.get_node_instantiation(*id);
                     let module = env.get_module(*mid);
                     let fun = module.get_spec_fun(*fid);
+                    // Use the post label from the range if available, otherwise pre
+                    let label = range.post.or(range.pre);
                     for mem in fun.used_memory.iter() {
-                        // Use the post label from the range if available, otherwise pre
-                        let label = range.post.or(range.pre);
                         result.insert((mem.to_owned().instantiate(inst), label));
                     }
+                    // Bare-resource footprints have no struct head in the
+                    // declaration and so are absent from `used_memory`; they
+                    // become concrete here. Without this, a global invariant
+                    // over `object::spec_exists_at<R>` would not record `R`,
+                    // and writes to `R` would neither schedule nor instrument
+                    // it. Mirrors `directly_used_memory`.
+                    let mut concrete = BTreeSet::new();
+                    if Self::is_object_spec_exists_at(env, *mid, *fid) {
+                        Self::add_resource_type_memory(&mut concrete, inst.first());
+                    } else {
+                        for type_param in &fun.generic_used_memory {
+                            Self::add_resource_type_memory(
+                                &mut concrete,
+                                inst.get(*type_param as usize),
+                            );
+                        }
+                    }
+                    result.extend(concrete.into_iter().map(|mem| (mem, label)));
                 },
                 _ => {},
             }
@@ -1601,6 +1669,24 @@ impl ExpData {
                     for mem in fun.used_memory.iter() {
                         result.insert(mem.to_owned().instantiate(inst));
                     }
+                    // `object::spec_exists_at<T>` has exactly the semantics
+                    // of `exists<T>`.  When T is a concrete struct, account
+                    // for its memory directly.  A bare type parameter is
+                    // recorded separately by `directly_generic_used_memory`.
+                    if Self::is_object_spec_exists_at(env, *mid, *fid) {
+                        Self::add_resource_type_memory(&mut result, inst.first());
+                    } else {
+                        // A user spec function can itself contain
+                        // `spec_exists_at<U>`.  Its bare-resource footprint
+                        // becomes concrete at this call site when U is
+                        // instantiated by a struct type.
+                        for type_param in &fun.generic_used_memory {
+                            Self::add_resource_type_memory(
+                                &mut result,
+                                inst.get(*type_param as usize),
+                            );
+                        }
+                    }
                 },
                 Call(id, SpecPublish(_), _)
                 | Call(id, SpecRemove(_), _)
@@ -1615,6 +1701,147 @@ impl ExpData {
         };
         self.visit_post_order(&mut visitor);
         result
+    }
+
+    /// Returns resource memory uses whose resource is a bare type parameter
+    /// of the enclosing specification function.  They cannot be represented
+    /// as `QualifiedInstId<StructId>` until an instantiation chooses the
+    /// resource's struct head.
+    pub fn directly_generic_used_memory(&self, env: &GlobalEnv) -> BTreeSet<u16> {
+        let mut result = BTreeSet::new();
+        self.visit_post_order(&mut |e: &ExpData| {
+            if let ExpData::Call(id, Operation::SpecFunction(mid, fid, _), _) = e {
+                let inst = &env.get_node_instantiation(*id);
+                let module = env.get_module(*mid);
+                let fun = module.get_spec_fun(*fid);
+                if Self::is_object_spec_exists_at(env, *mid, *fid) {
+                    if let Some(Type::TypeParameter(type_param)) = inst.first() {
+                        result.insert(*type_param);
+                    }
+                } else {
+                    for type_param in &fun.generic_used_memory {
+                        if let Some(Type::TypeParameter(enclosing_param)) =
+                            inst.get(*type_param as usize)
+                        {
+                            result.insert(*enclosing_param);
+                        }
+                    }
+                }
+            }
+            true
+        });
+        result
+    }
+
+    /// Returns direct resource memory reads beneath `old(..)`.  In addition
+    /// to normal `exists`/`global` expressions, this includes the special
+    /// global-existence predicate used by `object::spec_exists_at`.
+    pub fn directly_old_memory(&self, env: &GlobalEnv) -> BTreeSet<QualifiedInstId<StructId>> {
+        let mut result = BTreeSet::new();
+        let mut in_old_depth = 0usize;
+        self.visit_positions(&mut |pos, exp| {
+            match exp {
+                ExpData::Call(_, Operation::Old, _) => match pos {
+                    VisitorPosition::Pre => in_old_depth += 1,
+                    VisitorPosition::Post => in_old_depth -= 1,
+                    _ => {},
+                },
+                ExpData::Call(id, Operation::Global(_), _)
+                | ExpData::Call(id, Operation::Exists(_), _)
+                    if in_old_depth > 0 && matches!(pos, VisitorPosition::Pre) =>
+                {
+                    let inst = &env.get_node_instantiation(*id);
+                    Self::add_resource_type_memory(&mut result, inst.first());
+                },
+                ExpData::Call(id, Operation::SpecFunction(mid, fid, _), _)
+                    if in_old_depth > 0 && matches!(pos, VisitorPosition::Pre) =>
+                {
+                    let inst = &env.get_node_instantiation(*id);
+                    if Self::is_object_spec_exists_at(env, *mid, *fid) {
+                        Self::add_resource_type_memory(&mut result, inst.first());
+                    } else {
+                        // A wrapper spec function which itself reads
+                        // `spec_exists_at<U>` carries that in its
+                        // `generic_used_memory`; under `old(..)` the same
+                        // footprint is a pre-state read. Mirrors
+                        // `directly_used_memory`.
+                        for type_param in
+                            &env.get_module(*mid).get_spec_fun(*fid).generic_used_memory
+                        {
+                            Self::add_resource_type_memory(
+                                &mut result,
+                                inst.get(*type_param as usize),
+                            );
+                        }
+                    }
+                },
+                _ => {},
+            }
+            true
+        });
+        result
+    }
+
+    /// As [`Self::directly_old_memory`], for bare type-parameter resources.
+    pub fn directly_generic_old_memory(&self, env: &GlobalEnv) -> BTreeSet<u16> {
+        let mut result = BTreeSet::new();
+        let mut in_old_depth = 0usize;
+        self.visit_positions(&mut |pos, exp| {
+            match exp {
+                ExpData::Call(_, Operation::Old, _) => match pos {
+                    VisitorPosition::Pre => in_old_depth += 1,
+                    VisitorPosition::Post => in_old_depth -= 1,
+                    _ => {},
+                },
+                ExpData::Call(id, Operation::SpecFunction(mid, fid, _), _)
+                    if in_old_depth > 0 && matches!(pos, VisitorPosition::Pre) =>
+                {
+                    let inst = env.get_node_instantiation(*id);
+                    let slots: Vec<u16> = if Self::is_object_spec_exists_at(env, *mid, *fid) {
+                        vec![0]
+                    } else {
+                        env.get_module(*mid)
+                            .get_spec_fun(*fid)
+                            .generic_used_memory
+                            .iter()
+                            .copied()
+                            .collect()
+                    };
+                    for slot in slots {
+                        if let Some(Type::TypeParameter(type_param)) =
+                            inst.get(slot as usize).map(Type::skip_reference)
+                        {
+                            result.insert(*type_param);
+                        }
+                    }
+                },
+                _ => {},
+            }
+            true
+        });
+        result
+    }
+
+    fn is_object_spec_exists_at(env: &GlobalEnv, module_id: ModuleId, fun_id: SpecFunId) -> bool {
+        let module = env.get_module(module_id);
+        if env.get_extlib_address() != *module.get_name().addr() {
+            return false;
+        }
+        let fun = module.get_spec_fun(fun_id);
+        format!(
+            "{}::{}",
+            module.get_name().name().display(env.symbol_pool()),
+            fun.name.display(env.symbol_pool()),
+        ) == OBJECT_SPEC_EXISTS_AT
+    }
+
+    fn add_resource_type_memory(
+        result: &mut BTreeSet<QualifiedInstId<StructId>>,
+        ty: Option<&Type>,
+    ) {
+        if let Some(Type::Struct(module_id, struct_id, type_args)) = ty.map(Type::skip_reference) {
+            result.insert(module_id.qualified_inst(*struct_id, type_args.clone()));
+        }
     }
 
     /// Returns the temporaries used in this expression, with types. Result is ordered by occurrence.
@@ -4284,7 +4511,7 @@ impl ExpData {
                     SpecFunction(mid, fid, _) => {
                         let module = env.get_module(*mid);
                         let fun = module.get_spec_fun(*fid);
-                        if !fun.used_memory.is_empty() {
+                        if !fun.used_memory.is_empty() || !fun.generic_used_memory.is_empty() {
                             is_pure = false;
                             return false; // done visiting
                         }

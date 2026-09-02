@@ -20,6 +20,7 @@ use move_model::{
         SpecFunId, StructEnv, StructId, SCRIPT_MODULE_NAME,
     },
     pragmas::INTRINSIC_TYPE_MAP,
+    spec_derivation,
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type},
 };
@@ -28,24 +29,40 @@ use move_prover_bytecode_pipeline::number_operation::{
 };
 use move_stackless_bytecode::{function_target::FunctionTarget, stackless_bytecode::Constant};
 use num::BigUint;
-use once_cell::sync::Lazy;
-use regex::Regex;
 use std::collections::BTreeSet;
 
 pub const MAX_MAKE_VEC_ARGS: usize = 4;
-pub const MAX_TUPLE_SIZE: usize = 8;
+pub const MAX_TUPLE_SIZE: usize = 11;
 pub const TABLE_NATIVE_SPEC_ERROR: &str =
     "Native functions defined in Table cannot be used as specification functions";
 const NUM_TYPE_BASE_ERROR: &str = "cannot infer concrete integer type from `num`, consider using a concrete integer type or explicit type cast";
 const BV_TYPE_NOT_ENABLED_ERROR: &str = "signed integer cannot be turned into bit vector";
 
-/// Memory whose pre-state is needed by a function behavioral predicate.
-pub fn behavioral_old_memory(fun_env: &FunctionEnv<'_>) -> BTreeSet<QualifiedInstId<StructId>> {
-    let mut result = fun_env.get_spec_old_memory().clone();
+/// Returns memory whose pre-state is needed by a function behavioral predicate
+/// at a concrete type instantiation. In addition to ordinary parameterized
+/// resources, this resolves resource memory selected by a bare function type
+/// parameter (for example the `T` in `object::spec_exists_at<T>`).
+pub fn behavioral_old_memory_instantiated(
+    fun_env: &FunctionEnv<'_>,
+    inst: &[Type],
+) -> BTreeSet<QualifiedInstId<StructId>> {
+    let mut result = fun_env.get_spec_old_memory_instantiated(inst);
     let spec = fun_env.get_spec();
     for cond in &spec.conditions {
         if matches!(cond.kind, ConditionKind::LetPre(..)) {
-            result.extend(cond.exp.directly_used_memory(fun_env.env()));
+            result.extend(
+                cond.exp
+                    .directly_used_memory(fun_env.env())
+                    .into_iter()
+                    .map(|memory| memory.instantiate(inst)),
+            );
+            for type_param in cond.exp.directly_generic_used_memory(fun_env.env()) {
+                if let Some(Type::Struct(module_id, struct_id, type_args)) =
+                    inst.get(type_param as usize).map(Type::skip_reference)
+                {
+                    result.insert(module_id.qualified_inst(*struct_id, type_args.clone()));
+                }
+            }
         }
     }
     result
@@ -243,42 +260,7 @@ pub fn boogie_native_spec_fun_name(fun_env: &FunctionEnv<'_>, inst: &[Type]) -> 
 /// its result function must stay uninterpreted. The list mirrors the
 /// `$<module>_$<name>` function definitions in `src/prelude/*.bpl`.
 pub fn boogie_native_fun_has_spec_fun(fun_env: &FunctionEnv<'_>) -> bool {
-    let funs: &[(&str, &[&str])] = &[
-        ("0x1::vector", &[
-            "empty",
-            "push_back",
-            "length",
-            "borrow",
-            "borrow_mut",
-            "swap",
-        ]),
-        ("0x1::bcs", &["to_bytes"]),
-        ("0x1::from_bcs", &["from_bytes"]),
-        ("0x1::hash", &["sha2_256", "sha3_256"]),
-        ("0x1::signer", &["borrow_address"]),
-    ];
-    let module_name = fun_env.module_env.get_full_name_str();
-    let fun_name = fun_env.get_name_str();
-    funs.iter()
-        .any(|(m, fs)| *m == module_name && fs.contains(&fun_name.as_str()))
-}
-
-/// Reverse map mangled function name to source level function name.
-pub fn boogie_reverse_function_name(_env: &GlobalEnv, s: &str) -> Option<String> {
-    // TODO: in order to make this actually reversible, we can't use ${}_{}{} above
-    //   but must use something like ${}${}{}. This requires also changes in the prelude.
-    static REX: Lazy<Regex> =
-        Lazy::new(|| Regex::new(r"^\$([0-9,a-f,A-F]+)_(\w+)_(\w+)").expect("regex compiles"));
-    let cap = REX.captures(s)?;
-    let addr = cap.get(1)?;
-    let module_name = cap.get(2)?;
-    let fun_name = cap.get(3)?;
-    Some(format!(
-        "0x{}::{}::{}",
-        addr.as_str(),
-        module_name.as_str(),
-        fun_name.as_str()
-    ))
+    move_model::well_known::is_boogie_prelude_spec_native(fun_env)
 }
 
 /// Return boogie name of given spec var.
@@ -1616,12 +1598,12 @@ pub fn compute_evaluator_memory_union(
         }
         for info in closure_infos {
             let fun_env = env.get_function(info.fun.to_qualified_id());
-            for mem in fun_env.get_spec_used_memory().iter() {
-                union_used_memory.insert(mem.clone().instantiate(&info.fun.inst));
-            }
-            for mem in behavioral_old_memory(&fun_env) {
-                union_old_memory.insert(mem.clone().instantiate(&info.fun.inst));
-            }
+            union_used_memory.extend(spec_derivation::behavioral_target_memory(
+                env,
+                info.fun.to_qualified_id(),
+                &info.fun.inst,
+            ));
+            union_old_memory.extend(behavioral_old_memory_instantiated(&fun_env, &info.fun.inst));
         }
     }
 

@@ -1,14 +1,18 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Tests for the hot state snapshot read APIs used by fast sync to serve hot state.
+//! Tests for the hot state snapshot APIs used by fast sync to serve and restore hot state.
 
 use crate::{db::test_helper::arb_blocks_to_commit_with_params, AptosDB};
+use aptos_config::config::{
+    HotStateConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+    DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
+};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_jellyfish_merkle::{
     mock_tree_store::MockTreeStore, restore::JellyfishMerkleRestore, JellyfishMerkleTree,
 };
-use aptos_storage_interface::{DbReader, Result as DbResult};
+use aptos_storage_interface::{DbReader, DbWriter, Result as DbResult, StateKind};
 use aptos_temppath::TempPath;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -16,6 +20,7 @@ use aptos_types::{
         hot_state::{HotStateValue, HotStateValueChunkWithProof},
         state_key::StateKey,
         state_value::StateValue,
+        NUM_STATE_SHARDS,
     },
     transaction::{
         BlockEndInfo, ExecutionStatus, Transaction, TransactionAuxiliaryData, TransactionInfo,
@@ -445,4 +450,113 @@ proptest! {
         // Reading at/after the end yields nothing.
         prop_assert!(collect_chunk(&db, ckpt, expected.len(), usize::MAX).is_empty());
     }
+}
+
+/// Opens a DB that keeps hot state across restarts, as a fast-syncing node must.
+fn open_persistent_hot_state_db(path: &TempPath) -> AptosDB {
+    AptosDB::open(
+        StorageDirPaths::from_path(path.path()),
+        false, /* readonly */
+        NO_OP_STORAGE_PRUNER_CONFIG,
+        RocksdbConfigs::default(),
+        BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+        DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+        None, /* internal_indexer_db */
+        HotStateConfig {
+            delete_on_restart: false,
+            ..HotStateConfig::default()
+        },
+    )
+    .unwrap()
+}
+
+/// Restores the cold state snapshot at `version` from `src` into `dst`, which `reset` needs
+/// to locate the latest snapshot.
+fn restore_cold_state(src: &AptosDB, dst: &AptosDB, version: Version) {
+    let root_hash = src.state_store.get_root_hash(version).unwrap();
+    let num_items = src
+        .get_state_item_count(version, StateKind::MainState)
+        .unwrap();
+    let mut receiver = dst
+        .get_state_snapshot_receiver(version, root_hash, StateKind::MainState)
+        .unwrap();
+    let mut first_index = 0;
+    while first_index < num_items {
+        let chunk = src
+            .get_state_value_chunk_with_proof(version, first_index, 2, StateKind::MainState)
+            .unwrap();
+        first_index += chunk.raw_values.len();
+        receiver.add_chunk(chunk.raw_values, chunk.proof).unwrap();
+    }
+    receiver.finish_box().unwrap();
+}
+
+#[test]
+fn test_hot_state_restore() {
+    let tmp_src = TempPath::new();
+    let src = AptosDB::new_for_test(&tmp_src);
+    // Spread `hot_since_version` across checkpoints, refresh a key and leave a vacancy.
+    let version = commit_blocks(&src, vec![
+        vec![(key("a"), Some(val(b"a0"))), (key("b"), Some(val(b"b0")))],
+        vec![(key("c"), Some(val(b"c1"))), (key("a"), Some(val(b"a1")))],
+        vec![(key("d"), Some(val(b"d2"))), (key("b"), None)],
+        vec![(key("e"), Some(val(b"e3")))],
+    ]);
+    let expected = collect_paged(&src, version, usize::MAX);
+    assert!(!expected.is_empty());
+    let chunks = collect_chunks_with_proof(&src, version, 2);
+    let root_hash = chunks[0].root_hash;
+
+    let tmp_dst = TempPath::new();
+    let dst = open_persistent_hot_state_db(&tmp_dst);
+    restore_cold_state(&src, &dst, version);
+    let mut receiver = dst
+        .get_hot_state_snapshot_receiver(version, root_hash)
+        .unwrap();
+    for chunk in &chunks {
+        receiver
+            .add_chunk(chunk.raw_values.clone(), chunk.proof.clone())
+            .unwrap();
+    }
+    receiver.finish_box().unwrap();
+    dst.state_store.reset();
+
+    // The restored DB serves the same snapshot.
+    assert_eq!(
+        dst.get_hot_state_item_count(version).unwrap(),
+        expected.len()
+    );
+    assert_eq!(collect_paged(&dst, version, 3), expected);
+    assert_eq!(
+        dst.state_store
+            .hot_state_merkle_db
+            .get_root_hash(version)
+            .unwrap(),
+        root_hash
+    );
+
+    // `reset` reloaded the restored hot state into memory.
+    let (hot_view, state) = dst.get_persisted_state().unwrap();
+    let num_hot_items: usize = (0..NUM_STATE_SHARDS)
+        .map(|shard_id| state.num_hot_items(shard_id))
+        .sum();
+    assert_eq!(num_hot_items, expected.len());
+    for (key, hot_value) in &expected {
+        let slot = hot_view
+            .get_state_slot(key.crypto_hash_ref())
+            .expect("restored key must be hot");
+        assert_eq!(slot.as_state_value_opt(), hot_value.value_opt());
+        assert_eq!(
+            slot.expect_hot_since_version(),
+            hot_value.hot_since_version()
+        );
+    }
+    assert_eq!(
+        dst.state_store
+            .current_state_locked()
+            .summary()
+            .hot_root_hash()
+            .unwrap(),
+        root_hash
+    );
 }

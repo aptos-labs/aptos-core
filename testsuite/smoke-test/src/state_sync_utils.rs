@@ -8,7 +8,11 @@ use crate::{
         wait_for_all_nodes, MAX_HEALTHY_WAIT_SECS,
     },
 };
-use aptos_config::config::{BootstrappingMode, NodeConfig, OverrideNodeConfig};
+use aptos_config::config::{
+    BootstrappingMode, HotStateConfig, NodeConfig, OverrideNodeConfig, RocksdbConfigs,
+    StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+    DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
+};
 use aptos_db::AptosDB;
 use aptos_forge::{LocalNode, LocalSwarm, Node, NodeExt, Swarm};
 use aptos_inspection_service::inspection_client::InspectionClient;
@@ -198,8 +202,22 @@ fn verify_first_ledger_info(node: &mut LocalNode) {
     // Stop the node to prevent any DB contention
     node.stop();
 
-    // Verify that the ledger info exists at version 0
-    let aptos_db = AptosDB::new_for_test_with_sharding(db_path_buf.as_path(), 1 << 13);
+    // Verify that the ledger info exists at version 0. Open read-only so the
+    // test helper cannot apply `delete_on_restart` and wipe persisted hot state.
+    let aptos_db = AptosDB::open(
+        StorageDirPaths::from_path(db_path_buf.as_path()),
+        true, /* readonly */
+        NO_OP_STORAGE_PRUNER_CONFIG,
+        RocksdbConfigs::default(),
+        BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+        DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+        None,
+        HotStateConfig {
+            delete_on_restart: false,
+            ..HotStateConfig::default()
+        },
+    )
+    .unwrap();
     aptos_db.get_epoch_ending_ledger_info(0).unwrap();
 
     // Drop the DB handle before restarting the node to release the rocks DB lock file

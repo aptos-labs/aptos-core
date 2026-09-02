@@ -49,7 +49,10 @@ use crate::{
         state_with_summary::LedgerWithSummary,
     },
 };
-pub use aptos_types::{block_info::BlockHeight, state_store::StateKind};
+pub use aptos_types::{
+    block_info::BlockHeight,
+    state_store::{SnapshotKind, StateKind},
+};
 pub use errors::AptosDbError;
 pub use ledger_summary::LedgerSummary;
 
@@ -599,6 +602,16 @@ pub trait DbWriter: Send + Sync {
         expected_root_hash: HashValue,
         kind: StateKind,
     ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, StateValue>>> {
+        unimplemented!()
+    }
+
+    /// Get a (stateful) snapshot receiver for the hot state at `version`. Separate from
+    /// `get_state_snapshot_receiver` because hot state leaves are `HotStateValue`s.
+    fn get_hot_state_snapshot_receiver(
+        &self,
+        version: Version,
+        expected_root_hash: HashValue,
+    ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, HotStateValue>>> {
         unimplemented!()
     }
 

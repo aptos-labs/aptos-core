@@ -26,6 +26,7 @@
 //! | `--inference-output file` | Write per-module `.inferred.move` files. |
 //! | `--inference-output unified` | Emit a single unified output file. |
 //! | `--inference-output-dir DIR` | Directory for `file`/`unified` output. |
+//! | `--loop-invariant-evidence[=N]` | Emit diagnostic-only bounded loop-head facts (default N=3, max 8). |
 //! | `--dump-bytecode` | Also dump the bytecode pipeline with WP annotations. |
 
 use crate::cli::Options;
@@ -39,15 +40,30 @@ use move_model::{
     sourcifier::Sourcifier,
     symbol::Symbol,
 };
-use move_prover_bytecode_pipeline::pipeline_factory;
+use move_prover_bytecode_pipeline::{
+    pipeline_factory,
+    spec_inference::{InferredConditionTargets, InferredFrameTargets},
+};
 use move_stackless_bytecode::{
     function_target_pipeline::FunctionTargetsHolder, print_targets_with_annotations_for_test,
 };
 use std::{
+    collections::BTreeSet,
     fs,
     path::{Path, PathBuf},
     time::Instant,
 };
+
+fn parse_loop_invariant_evidence_depth(value: &str) -> Result<usize, String> {
+    let depth = value
+        .parse::<usize>()
+        .map_err(|_| "expected an integer from 1 through 8".to_string())?;
+    if (1..=8).contains(&depth) {
+        Ok(depth)
+    } else {
+        Err("expected an integer from 1 through 8".to_string())
+    }
+}
 
 #[derive(Debug, Clone, clap::Args)]
 pub struct InferenceOptions {
@@ -63,6 +79,19 @@ pub struct InferenceOptions {
     /// File suffix for unified output mode (default: "enriched.move").
     #[arg(long, default_value = "enriched.move")]
     pub inference_unified_suffix: String,
+    /// Emit diagnostic-only bounded evidence for loops which need invariants.
+    /// If the optional depth is omitted, three completed back-edge traversals
+    /// are analyzed. Depth must be between 1 and 8 inclusive.
+    #[arg(
+        long,
+        requires = "inference",
+        require_equals = true,
+        num_args = 0..=1,
+        default_value = "3",
+        default_missing_value = "3",
+        value_parser = parse_loop_invariant_evidence_depth
+    )]
+    pub loop_invariant_evidence: Option<usize>,
 }
 
 impl Default for InferenceOptions {
@@ -122,6 +151,11 @@ fn run_spec_inference_inner<W: WriteColor>(
 
     // Enable inference in prover options and add as environment extension.
     options.prover.inference = true;
+    // Depth zero means no evidence.
+    options.prover.loop_invariant_evidence_depth = options
+        .inference
+        .loop_invariant_evidence
+        .filter(|depth| *depth > 0);
     env.set_extension(options.prover.clone());
 
     // Create function targets for all functions in the environment.
@@ -238,11 +272,7 @@ fn output_to_stdout(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) {
             if !matches_verify_scope(&fun, scope) {
                 continue;
             }
-            let spec = fun.get_spec();
-            let has_inferred = spec
-                .conditions
-                .iter()
-                .any(|c| c.properties.contains_key(&inferred_sym));
+            let has_inferred = has_inferred_output(&fun, inferred_sym);
             if has_inferred {
                 sourcifier.print_fun(fun.get_qualified_id(), fun.get_def());
             }
@@ -253,6 +283,24 @@ fn output_to_stdout(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) {
     if !result.is_empty() {
         println!("{}", result);
     }
+}
+
+/// Whether inference produced source-level output for this function.
+///
+/// A frame-only contract has no inferred `Condition` to carry the usual
+/// marker, so the bytecode pass records those functions in an environment
+/// extension.
+fn has_inferred_output(fun: &FunctionEnv<'_>, inferred_sym: Symbol) -> bool {
+    let _ = inferred_sym;
+    fun.module_env
+        .env
+        .get_extension::<InferredConditionTargets>()
+        .is_some_and(|targets| targets.0.contains(&fun.get_qualified_id()))
+        || fun
+            .module_env
+            .env
+            .get_extension::<InferredFrameTargets>()
+            .is_some_and(|frames| frames.0.contains(&fun.get_qualified_id()))
 }
 
 /// Returns true when `fun` is in the user-specified verification scope.
@@ -297,10 +345,7 @@ fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> 
             if !matches_verify_scope(&fun, scope) {
                 return false;
             }
-            let spec = fun.get_spec();
-            spec.conditions
-                .iter()
-                .any(|c| c.properties.contains_key(&inferred_sym))
+            has_inferred_output(&fun, inferred_sym)
         });
         if !has_any_inferred {
             continue;
@@ -335,20 +380,6 @@ fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> 
             let module_id = module.get_id();
 
             let mut insertions: Vec<(usize, String)> = Vec::new();
-            // Track use module names already present in the spec file and those
-            // already scheduled for insertion, to prevent duplicate `use`
-            // declarations across multiple function spec blocks (Move spec `use`
-            // declarations share the module-level namespace).
-            let mut inserted_use_modules: std::collections::BTreeSet<String> = source
-                .lines()
-                .filter_map(|line| {
-                    let trimmed = line.trim();
-                    trimmed
-                        .strip_prefix("use ")
-                        .map(|rest| use_decl_module_path(rest.trim_end_matches(';').trim()))
-                })
-                .collect();
-
             // Find the position before the last `}` in the spec file — this is
             // the closing brace of the outer `spec module_name { }` block and
             // serves as the insertion point for new spec blocks.
@@ -366,12 +397,7 @@ fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> 
                 if !matches_verify_scope(&fun, scope) {
                     continue;
                 }
-                let has_inferred = {
-                    let spec = fun.get_spec();
-                    spec.conditions
-                        .iter()
-                        .any(|c| c.properties.contains_key(&inferred_sym))
-                };
+                let has_inferred = has_inferred_output(&fun, inferred_sym);
                 if !has_inferred {
                     continue;
                 }
@@ -411,9 +437,9 @@ fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> 
                     let indent = detect_indent(&source, block_start);
                     let inner_indent = format!("{}    ", indent);
 
-                    let original_prop_keys: std::collections::BTreeSet<Symbol> = {
-                        let block_src = &source[spec_info.loc.span().start().to_usize()
-                            ..spec_info.loc.span().end().to_usize()];
+                    let block_src = &source[spec_info.loc.span().start().to_usize()
+                        ..spec_info.loc.span().end().to_usize()];
+                    let original_prop_keys: BTreeSet<Symbol> = {
                         fun.get_spec()
                             .properties
                             .keys()
@@ -431,49 +457,43 @@ fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> 
                         inferred_sym,
                         &inner_indent,
                         &original_prop_keys,
+                        !contains_token(block_src, "modifies"),
                     );
 
                     let final_text = if is_single_line && !cond_text.is_empty() {
-                        let deduped_use = filter_new_uses(&use_text, &mut inserted_use_modules);
-                        format!("\n{}{}{}", deduped_use, cond_text, indent)
+                        let block_uses = filter_redundant_uses(block_src, &use_text);
+                        format!("\n{}{}{}", block_uses, cond_text, indent)
                     } else {
                         cond_text
                     };
 
-                    insertions.push((insert_pos, final_text));
-
+                    let mut final_text = final_text;
                     if !is_single_line && !use_text.is_empty() {
-                        let deduped = filter_new_uses(&use_text, &mut inserted_use_modules);
-                        if !deduped.is_empty() {
+                        let block_uses = filter_redundant_uses(block_src, &use_text);
+                        if !block_uses.is_empty() {
                             let use_insert_pos = source[open_brace_pos..]
                                 .find('\n')
                                 .map(|p| open_brace_pos + p + 1)
                                 .unwrap_or(open_brace_pos + 1);
-                            insertions.push((use_insert_pos, deduped));
+                            // An otherwise empty multi-line block has the same
+                            // insertion point for its opening and closing line.
+                            // Keep imports before conditions at that shared
+                            // offset; inserting them as two equal-offset edits
+                            // would otherwise preserve the opposite order.
+                            if use_insert_pos == insert_pos {
+                                final_text = format!("{}{}", block_uses, final_text);
+                            } else {
+                                insertions.push((use_insert_pos, block_uses));
+                            }
                         }
                     }
+                    insertions.push((insert_pos, final_text));
                 } else if let Some(insert_pos) = module_close_insert_pos {
                     // No existing spec block for this function — insert a full block
                     // before the closing `}` of the outer `spec module { }` block.
                     let indent = "    ";
                     let spec_text = generate_full_spec_block(env, &fun, inferred_sym, indent);
-                    // Filter duplicate `use` declarations from the new spec block
-                    // using the same tracking set as existing-block insertions.
-                    let mut filtered_spec: String = spec_text
-                        .lines()
-                        .filter(|line| {
-                            let trimmed = line.trim();
-                            if let Some(rest) = trimmed.strip_prefix("use ") {
-                                if let Some(m) = rest.trim_end_matches(';').rsplit("::").next() {
-                                    return inserted_use_modules.insert(m.to_string());
-                                }
-                            }
-                            true
-                        })
-                        .collect::<Vec<_>>()
-                        .join("\n");
-                    filtered_spec.push('\n');
-                    insertions.push((insert_pos, format!("{}\n", filtered_spec)));
+                    insertions.push((insert_pos, format!("{}\n", spec_text)));
                 }
             }
 
@@ -576,6 +596,62 @@ fn generate_fresh_spec_file(
     emitln!(sourcifier.writer(), "spec {} {{", module_header);
     sourcifier.writer().indent();
 
+    // The generated file is merged with the implementation module, so plain
+    // module imports and grouped imports containing an unaliased `Self` are
+    // already in scope. Member-only imports are different: the sourcifier
+    // prints signature types with a module qualifier, which is not introduced
+    // by e.g. `use m::{T}`. Add only those missing module aliases. Blindly
+    // copying every source import here would create duplicate aliases after
+    // the two modules are merged.
+    let self_sym = env.symbol_pool().make("Self");
+    let existing_default_module_aliases: BTreeSet<_> = module
+        .get_use_decls()
+        .iter()
+        .filter(|declaration| {
+            // `use m;`, `use m as A;` and `use m::{Self, ..}` all bring the
+            // module name itself into scope; `use m::{T}` does not.
+            declaration.alias.is_some()
+                || declaration.members.is_empty()
+                || declaration
+                    .members
+                    .iter()
+                    .any(|(_, member, _)| *member == self_sym)
+        })
+        .filter_map(|declaration| declaration.module_id)
+        .collect();
+    let mut imported_modules = BTreeSet::new();
+    for fun in module.get_functions() {
+        if fun.is_native()
+            || fun.is_intrinsic()
+            || fun.is_test_only()
+            || !matches_verify_scope(&fun, scope)
+        {
+            continue;
+        }
+        for ty in fun
+            .get_parameter_types()
+            .into_iter()
+            .chain(std::iter::once(fun.get_result_type()))
+        {
+            ty.visit(&mut |nested| match nested {
+                move_model::ty::Type::Struct(mid, _, _)
+                | move_model::ty::Type::ResourceDomain(mid, _, _) => {
+                    imported_modules.insert(*mid);
+                },
+                _ => {},
+            });
+        }
+    }
+    imported_modules.remove(&module.get_id());
+    imported_modules.retain(|mid| !existing_default_module_aliases.contains(mid));
+    for imported in imported_modules {
+        emitln!(
+            sourcifier.writer(),
+            "use {};",
+            env.get_module(imported).get_full_name_str()
+        );
+    }
+
     for fun in module.get_functions() {
         if fun.is_native() || fun.is_intrinsic() || fun.is_test_only() {
             continue;
@@ -593,7 +669,11 @@ fn generate_fresh_spec_file(
                 .collect();
             original
         };
-        if !fun.get_spec().conditions.is_empty() {
+        // A sound fallback boundary can contain only inferred pragmas (not an
+        // inferred condition), for example when WP had to discard an
+        // uninformative `aborts_if true` from a function which can also return.
+        // The run-local target marker is therefore authoritative here.
+        if has_inferred_output(&fun, inferred_sym) {
             sourcifier.print_fun_spec(&fun);
         }
         fun.get_mut_spec().conditions = original_conditions;
@@ -628,10 +708,7 @@ fn output_unified(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> a
             if !matches_verify_scope(&fun, scope) {
                 return false;
             }
-            let spec = fun.get_spec();
-            spec.conditions
-                .iter()
-                .any(|c| c.properties.contains_key(&inferred_sym))
+            has_inferred_output(&fun, inferred_sym)
         });
         if !has_any_inferred {
             continue;
@@ -655,14 +732,9 @@ fn output_unified(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> a
             if !matches_verify_scope(&fun, scope) {
                 continue;
             }
-            // Check for inferred conditions/frame_spec without keeping the Ref alive,
-            // since helper functions below need get_mut_spec().
-            let has_inferred = {
-                let spec = fun.get_spec();
-                spec.conditions
-                    .iter()
-                    .any(|c| c.properties.contains_key(&inferred_sym))
-            };
+            // Do not keep a FunctionSpec Ref alive: helper functions below
+            // temporarily mutate it while sourcifying inferred output.
+            let has_inferred = has_inferred_output(&fun, inferred_sym);
             if !has_inferred {
                 continue;
             }
@@ -736,9 +808,9 @@ fn output_unified(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> a
                 // Collect the set of property keys from the original spec block
                 // source text so we can distinguish user-written pragmas from
                 // inferred ones.
-                let original_prop_keys: std::collections::BTreeSet<Symbol> = {
-                    let block_src = &source[spec_info.loc.span().start().to_usize()
-                        ..spec_info.loc.span().end().to_usize()];
+                let block_src = &source[spec_info.loc.span().start().to_usize()
+                    ..spec_info.loc.span().end().to_usize()];
+                let original_prop_keys: BTreeSet<Symbol> = {
                     fun.get_spec()
                         .properties
                         .keys()
@@ -759,12 +831,13 @@ fn output_unified(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> a
                     inferred_sym,
                     &inner_indent,
                     &original_prop_keys,
+                    !contains_token(block_src, "modifies"),
                 );
-                // Filter out spec-level `use` declarations for modules already
-                // imported at module level (e.g. the original source has
-                // `use aptos_framework::object::{Self, …}` so we don't need
-                // `use 0x1::object;` inside the spec block).
-                let use_text = filter_redundant_uses(&source, &use_text);
+                // A `use` inside a function spec block is local to that block.
+                // Only suppress an import already written in this exact block;
+                // imports in the implementation or another spec block do not
+                // make the short qualifier available here.
+                let use_text = filter_redundant_uses(block_src, &use_text);
 
                 // For single-line blocks, wrap the conditions so the block expands:
                 //   `spec foo {}` -> `spec foo {\n    ...\n}`
@@ -774,7 +847,7 @@ fn output_unified(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> a
                     cond_text
                 };
 
-                insertions.push((insert_pos, final_text));
+                let mut final_text = final_text;
 
                 // Insert `use` declarations right after the opening `{` so they
                 // appear before existing user conditions.
@@ -784,8 +857,13 @@ fn output_unified(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> a
                         .find('\n')
                         .map(|p| open_brace_pos + p + 1)
                         .unwrap_or(open_brace_pos + 1);
-                    insertions.push((use_insert_pos, use_text));
+                    if use_insert_pos == insert_pos {
+                        final_text = format!("{}{}", use_text, final_text);
+                    } else {
+                        insertions.push((use_insert_pos, use_text));
+                    }
                 }
+                insertions.push((insert_pos, final_text));
             } else {
                 // No existing spec block: insert a full spec block after the function definition.
                 let fun_end = fun.get_loc().span().end().to_usize();
@@ -868,54 +946,6 @@ fn filter_redundant_uses(source: &str, use_text: &str) -> String {
     }
 }
 
-/// Filter `use_text` to only include `use` lines whose module names have not
-/// been seen before, then record those new module names in `seen`. This
-/// Normalise a `use` declaration's path to a canonical dedup key.
-/// Strips any alias (`… as Foo`) and brace-group (`…::{Self, Bar}`),
-/// returning the bare module path (e.g. `"0x1::signer"` or `"0x2::utils"`).
-fn use_decl_module_path(path: &str) -> String {
-    // Strip alias suffix: "0x1::foo as F" → "0x1::foo"
-    let path = if let Some(pos) = path.find(" as ") {
-        path[..pos].trim()
-    } else {
-        path
-    };
-    // Strip brace-group suffix: "0x1::foo::{Self, Bar}" → "0x1::foo"
-    let path = if let Some(pos) = path.find("::{") {
-        path[..pos].trim()
-    } else {
-        path
-    };
-    path.to_string()
-}
-
-/// Filter `use` lines in `use_text` that are already present in `seen`,
-/// adding newly emitted ones to `seen` so later blocks don't repeat them.
-/// Uses the full module path as the dedup key so distinct modules that share
-/// only a leaf name (e.g. `0x1::utils` vs `0x2::utils`) are kept separate.
-fn filter_new_uses(use_text: &str, seen: &mut std::collections::BTreeSet<String>) -> String {
-    if use_text.is_empty() {
-        return String::new();
-    }
-    let filtered: Vec<&str> = use_text
-        .lines()
-        .filter(|line| {
-            let trimmed = line.trim();
-            if let Some(rest) = trimmed.strip_prefix("use ") {
-                let key = use_decl_module_path(rest.trim_end_matches(';').trim());
-                // `insert` returns true if the key was not already present.
-                return seen.insert(key);
-            }
-            true
-        })
-        .collect();
-    if filtered.is_empty() {
-        String::new()
-    } else {
-        format!("{}\n", filtered.join("\n"))
-    }
-}
-
 fn detect_indent(source: &str, byte_offset: usize) -> String {
     // Find the start of the line containing this offset.
     let line_start = source[..byte_offset]
@@ -935,7 +965,8 @@ fn generate_inferred_conditions(
     fun: &move_model::model::FunctionEnv,
     inferred_sym: Symbol,
     indent: &str,
-    original_property_keys: &std::collections::BTreeSet<Symbol>,
+    original_property_keys: &BTreeSet<Symbol>,
+    include_frame_spec: bool,
 ) -> (String, String) {
     let sourcifier = Sourcifier::new(env, true);
 
@@ -943,7 +974,7 @@ fn generate_inferred_conditions(
     // The user-written `proof { ... }` block is also temporarily cleared so it
     // is not re-emitted alongside the inferred conditions (it already lives in
     // the source we are merging into).
-    let (original_conditions, original_properties, original_proof) = {
+    let (original_conditions, original_properties, original_proof, original_frame_spec) = {
         let mut spec = fun.get_mut_spec();
         let orig_conds = std::mem::take(&mut spec.conditions);
         spec.conditions = orig_conds
@@ -959,7 +990,11 @@ fn generate_inferred_conditions(
             .map(|(k, v)| (*k, v.clone()))
             .collect();
         let orig_proof = spec.proof.take();
-        (orig_conds, orig_props, orig_proof)
+        let orig_frame = spec.frame_spec.take();
+        if include_frame_spec {
+            spec.frame_spec = orig_frame.clone();
+        }
+        (orig_conds, orig_props, orig_proof, orig_frame)
     };
 
     // Expose the user-written let-binding names to the sourcifier so that
@@ -984,6 +1019,7 @@ fn generate_inferred_conditions(
         spec.conditions = original_conditions;
         spec.properties = original_properties;
         spec.proof = original_proof;
+        spec.frame_spec = original_frame_spec;
     }
 
     let raw = sourcifier.result();
@@ -1045,6 +1081,11 @@ fn generate_inferred_conditions(
     (uses, conds)
 }
 
+fn contains_token(text: &str, needle: &str) -> bool {
+    text.split(|character: char| !(character.is_ascii_alphanumeric() || character == '_'))
+        .any(|token| token == needle)
+}
+
 /// Generate a full `spec fn_name(...) { ... }` block for a function.
 fn generate_full_spec_block(
     env: &GlobalEnv,
@@ -1086,4 +1127,43 @@ fn generate_full_spec_block(
     }
 
     format!("{}\n", result_lines.join("\n"))
+}
+
+#[cfg(test)]
+mod option_tests {
+    use crate::cli::Options;
+    use clap::Parser;
+
+    #[test]
+    fn loop_evidence_uses_default_depth() {
+        let options = Options::try_parse_from([
+            "mvp",
+            "--inference",
+            "--loop-invariant-evidence",
+            "source.move",
+        ])
+        .expect("valid inference evidence options");
+        assert_eq!(options.inference.loop_invariant_evidence, Some(3));
+    }
+
+    #[test]
+    fn loop_evidence_requires_inference_and_bounded_depth() {
+        assert!(
+            Options::try_parse_from(["mvp", "--loop-invariant-evidence=3", "source.move"]).is_err()
+        );
+        assert!(Options::try_parse_from([
+            "mvp",
+            "--inference",
+            "--loop-invariant-evidence=0",
+            "source.move"
+        ])
+        .is_err());
+        assert!(Options::try_parse_from([
+            "mvp",
+            "--inference",
+            "--loop-invariant-evidence=9",
+            "source.move"
+        ])
+        .is_err());
+    }
 }

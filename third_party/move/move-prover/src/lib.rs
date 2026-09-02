@@ -47,6 +47,7 @@ struct BoogieJob {
     writer: CodeWriter,
     output_existed: bool,
     process_timeout: u64,
+    root_timeout: usize,
     seed_handoff_after: Option<Duration>,
     process_deadline: Option<Instant>,
 }
@@ -299,6 +300,7 @@ fn run_move_prover_with_model_v2_internal<W: WriteColor>(
                 Ok((
                     job.path.clone(),
                     job.process_timeout,
+                    job.root_timeout,
                     job.seed_handoff_after,
                     job.process_deadline,
                     job,
@@ -308,6 +310,7 @@ fn run_move_prover_with_model_v2_internal<W: WriteColor>(
                 let mut job_options = options.backend.clone();
                 job_options.proc_cores = 1;
                 job_options.hard_timeout_secs = job.process_timeout;
+                job_options.vc_timeout = job.root_timeout;
                 let boogie = BoogieWrapper {
                     env,
                     targets: &targets,
@@ -496,6 +499,7 @@ fn generate_boogie_job(
             writer,
             output_existed,
             process_timeout,
+            root_timeout,
             seed_handoff_after,
             process_deadline: package_deadline,
         },

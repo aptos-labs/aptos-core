@@ -27,6 +27,16 @@ module 0x42::vectors {
         vector::borrow(v, 0)
     }
 
+    // The second guard establishes `i < n - 1`. Normalizing offsets on both
+    // sides must prove both `i + 1 < n` and that `i + 1` cannot overflow, so
+    // the vector read adds no vacuous abort condition.
+    fun guarded_next(v: &vector<u64>, i: u64): u64 {
+        let n = vector::length(v);
+        if (n == 0) { return 0 };
+        if (i >= n - 1) { return 0 };
+        *vector::borrow(v, i + 1)
+    }
+
     // length used in arithmetic
     fun len_plus_one<T>(v: &vector<T>): u64 {
         vector::length(v) + 1

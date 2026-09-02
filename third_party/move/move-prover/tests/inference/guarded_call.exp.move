@@ -15,7 +15,7 @@ module 0x42::guarded_call {
         ensures s == old(s) - d;
         pragma opaque = true;
         ensures [inferred] s == old(s) - d;
-        aborts_if [inferred] s - d < 0;
+        aborts_if [inferred] s < d;
     }
 
     fun caller(s: &mut u64, c: bool, d: u64) {
@@ -45,7 +45,7 @@ module 0x42::guarded_call {
         ensures [inferred] c && !e ==> s == old(s);
         ensures [inferred] !c ==> s == old(s);
         ensures [inferred] c && e ==> ensures_of<dec>(s, d, s);
-        aborts_if [inferred] c && (e && aborts_of<dec>(s, d));
+        aborts_if [inferred] c && e && aborts_of<dec>(s, d);
     }
 
 }
