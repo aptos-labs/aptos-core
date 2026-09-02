@@ -1,129 +1,120 @@
-{# Shared spec inference rules: pitfalls, dedup, scope, loop invariants #}
+{# Shared inference decisions and safeguards. Keep treatment-specific tool
+   orchestration in spec_inf_tasks.md. #}
 {% if once(name="spec_inf_rules") %}
 
-### Common Pitfalls in AI Generated Spec Expressions
+### Tools this task needs
 
-Respect the `old()` usage rules and expression restrictions from the spec
-language reference above — violating them causes compilation errors. Additionally:
+Specification inference is a compile-and-prove loop, not a test loop:
 
-- **Do not forget space after property.** Write `aborts_if [inferred] !exists p` 
-  with spaces separating the `[..]` property.
+- `{{ tool(name="move_spec_check") }}` decides whether the work is
+  done, and is the only thing that does.
+- `{{ tool(name="move_package_verify") }}` proves a scope while the contract is
+  still taking shape.
+- `{{ tool(name="move_package_status") }}`,
+  `{{ tool(name="move_package_manifest") }}` and
+  `{{ tool(name="move_package_query") }}` answer questions about the package.
 
-### Avoiding Duplicate Conditions
+Nothing else is part of this task. In particular, running the package's unit
+tests says nothing about whether a specification holds: the prover reasons over
+all inputs, so a passing test neither supports a contract nor locates a missing
+condition, and the run leaves a coverage map in the package.
 
-Before adding any condition (ensures, aborts_if, loop invariant, etc.), check
-whether an equivalent condition already exists in the same spec block. Do not
-add a condition that is semantically identical to one already present — even if
-the WP tool produced it again.
+### Scope and evidence
 
-### Respecting Filter Scope
+- Work only in the requested function or module. Skip `#[test]` and
+  `#[test_only]` functions unless the user asks for test specifications.
+- Read the implementation, existing specifications, and relevant callee
+  contracts before writing conditions. Use `function_usage` for executable
+  calls and closure captures instead of inferring dependencies from imports.
+- Preserve user-written specifications. Report a conflict with the
+  implementation instead of silently changing their meaning.
 
-When a `filter` restricts inference to a specific function or module, only modify
-spec blocks for functions within that scope. Do not touch, add, or alter specs
-of any function outside the filter. Leave all other code and spec blocks exactly
-as they are.
+### Completion criteria
 
-### Marking Inferred Conditions
+Describe all behavior visible to a caller:
 
-Every condition you write during inference — whether during loop invariant
-synthesis or simplification — must carry the `[inferred]` property.
-Conditions without
-`[inferred]` are treated as user-written and will not be cleaned up on re-runs.
+- normal results and mutated reference values;
+- every direct and transitive abort, including arithmetic, bounds, and resource
+  access;
+- global-state changes and their `modifies` frames;
+- genuine API preconditions; and
+- loop invariants needed to prove the body.
 
-```
-ensures [inferred] result == x + 1;
-aborts_if [inferred] x + y > MAX_U64;
-invariant [inferred] acc == sum_up_to(i);
-```
+Check boundary cases explicitly. Similar control flow can still differ on empty
+input or a single element, and arithmetic can abort without an `assert!` in the
+source.
 
-Never write a bare `ensures`, `aborts_if`, or `invariant` during inference.
+Give the specification you author for the target `pragma opaque`. That pragma is
+the claim the whole task is judged on: it tells the prover a caller may be
+verified against the contract alone, without ever reading the body. A contract
+that omits a result, an abort, or a frame is therefore not merely incomplete, it
+is wrong — callers will be verified against a promise the implementation does not
+keep. Write the contract so that claim holds, rather than dropping the pragma to
+make a partial contract defensible. `pragma opaque` does not suppress
+verification of the function's own body, so an opaque contract still has to be
+proved against the implementation.
 
-### Synthesizing Loop Invariants
+Do not add `pragma opaque` to a helper outside what is being checked. Only the
+functions in scope are proved, so an opaque contract on a helper would be
+assumed at the target's call sites without ever being verified — and the check
+rejects it for that reason. A helper left transparent needs no contract at all:
+the prover reads its body, so the target is proved against what the helper
+really does.
 
-Add loop invariants for every loop in the target code which doesn't yet have one.
-Remove all existing `[inferred]` and `[inferred = *]`
-conditions.
+Do not weaken the contract to make verification pass. Never remove or narrow a
+behavioral condition, invent a restrictive `requires`, enable partial abort
+coverage, omit a frame, or skip verification. Replace a condition only with a
+semantically equivalent, complete form.
 
-**`old()` in loop invariants:** `old(x)` is only allowed when `x` is a simple
-function parameter name. To refer to a value from before the loop, save it into
-a `let` binding before the loop and reference that local in the invariant.
+### Loop abstractions
 
-Loop invariants often need **recursive spec helper functions** to express
-properties about values built up across iterations (e.g. partial sums,
-accumulated vectors, running products). When no existing spec function captures
-the relationship, define a new `spec fun` in the same module. Typical pattern:
+Derive an invariant from the implementation and the fact needed at loop exit.
+It must hold initially, survive one iteration, and constrain every relevant
+loop-modified value. A loop reported as needing an invariant comes with bounded
+loop-head facts for its first iterations; generalize those into a predicate that
+holds at entry and survives one back-edge. Common shapes include:
 
-```
-spec fun sum_up_to(n: u64): u64 {
-    if (n == 0) { 0 } else { n + sum_up_to(n - 1) }
-}
-```
+- **Accumulation:** relate the accumulator to the processed prefix, often with
+  a recursive helper or a processed-plus-remaining conservation relation.
+- **Search:** record the index bounds and what is known about the processed
+  prefix, including first-match or no-match facts required by the result.
+- **Quantified traversal:** restrict the final quantifier to the prefix already
+  visited.
+- **Stateful traversal:** relate modified references or resources to their
+  pre-loop state and state the necessary frame facts.
 
-Then reference the helper in the loop invariant:
+For an inline higher-order iterator, use `folds_of` when its capture transformer
+expresses the exact accumulated effect. If the prover says the fold is
+inapplicable, use an equivalent ordinary loop with explicit invariants.
 
-```
-invariant [inferred] acc == sum_up_to(i);
-```
+An inferred `vacuous` or `sathard` clause is an unresolved obligation, not a
+clause to delete. Diagnose its source:
 
-Create as many helpers as needed to make invariants precise and verifiable.
-Add a `///` doc comment to every new spec helper explaining the property it
-captures. Place new spec helper functions below the Move function and spec
-block that introduce them. Place lemmas for a helper directly beneath that
-helper's declaration.
+- loop havoc requires a stronger loop abstraction;
+- a hard quantifier or nonlinear expression requires an equivalent,
+  solver-friendly representation; and
+- an unconstrained `result_of`, `ensures_of`, or `aborts_of` carrier requires a
+  stronger callee or function-value contract.
 
-### Data Invariants and Global Update Invariants
+### Dependencies and abstraction
 
-Data invariants (`spec Struct { invariant <expr>; }`) express properties that
-must hold for every instance of a struct at all times. The prover checks them on
-construction and after every mutation.
+An ordinary non-inline callee needs a contract strong enough for the target.
+Verify an opaque callee's body against that contract once; callers then consume
+only its result, abort, and frame behavior. Retain specification functions used
+by the target even when they are outside the executable call graph.
 
-Good candidates for data invariants:
-- Positivity / non-zero bounds on fields that are denominators or reserves
-  (e.g., `invariant balance > 0;`). These eliminate impossible states and help the
-  prover rule out division-by-zero or underflow in callers.
-- Relationships between fields that hold by construction and are preserved by
-  all operations (e.g., `invariant len == vector::length(data);`).
+Do not synthesize ordinary contracts for `pragma intrinsic` functions; the
+prover supplies their semantics.
 
-Do NOT add data invariants that are broken by normal operations. For example,
-an AMM pool's exchange rate changes after every swap — a fixed-ratio invariant
-like `invariant x == y;` will fail verification on swap.
+### Output discipline
 
-Global update invariants (`spec module { invariant update ...; }`) constrain
-how a resource changes between its old and new state during any modification.
-They are verified once per function that modifies the resource, then assumed at
-every call site — including inside loops. This makes them powerful for loop
-verification: the prover gets the property at each iteration for free without
-needing recursive spec helpers.
-
-```
-spec module {
-    invariant update forall addr: address
-        where old(exists<T>(addr)) && exists<T>(addr):
-        old(global<T>(addr)).field <= global<T>(addr).field;
-}
-```
-
-Good candidates for update invariants:
-- Monotonicity properties: a value that only grows or only shrinks
-  (e.g., total supply, sequence numbers, timestamps).
-- Conservation laws: a quantity preserved across state transitions
-  (e.g., `old(x) + old(y) == x + y` for token transfers).
-- Product bounds: for AMM-style contracts, the constant-product property
-  `old(rx) * old(ry) <= rx * ry` (non-decreasing due to integer division
-  rounding). This is verified once on the swap function, then the prover uses
-  it at every loop iteration to bound intermediate reserve values without
-  recursive spec helpers.
-
-Update invariants are especially valuable when loop bodies call opaque functions.
-The prover cannot inline the function body but CAN use the update invariant to
-constrain how the resource changed — bridging the gap between opaque call
-semantics and loop invariant preservation.
-
-**Combining data and update invariants with loops:** A data invariant like
-`x > 0 && y > 0` plus an update invariant like `old(x) * old(y) <= x * y`
-gives the prover both a floor on individual fields and a relationship between
-them at every loop step — without any recursive spec functions or manual
-unfolding. This pattern is the key to verifying iterative operations over
-stateful resources.
+- Mark every authored condition and invariant `[inferred]`; never mark existing
+  user-written clauses.
+- Follow the package's inline or `.spec.move` placement convention. Loop
+  invariants always remain beside their executable loop.
+- Avoid equivalent duplicates and empty spec blocks. Document non-obvious
+  helpers and lemmas.
+- Finish with formatted, compiler-clean files and no unresolved `vacuous`,
+  `sathard`, uninvariant-loop, or inapplicable-fold diagnostic in scope.
 
 {% endif %}

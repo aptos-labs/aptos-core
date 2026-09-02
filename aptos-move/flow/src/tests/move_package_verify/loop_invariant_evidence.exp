@@ -1,0 +1,37 @@
+is_error: true
+verification failed:
+error: post-condition does not hold
+   ┌─ <TEMPDIR>/loop_sum.move:12:9
+   │
+12 │         ensures result == n * (n - 1) / 2;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at <TEMPDIR>/loop_sum.move:2: sum_to
+   =         n = <redacted>
+   =     at <TEMPDIR>/loop_sum.move:3: sum_to
+   =         i = <redacted>
+   =     at <TEMPDIR>/loop_sum.move:4: sum_to
+   =         s = <redacted>
+   =     at <TEMPDIR>/loop_sum.move:5: sum_to
+   =     enter loop, variable(s) i, s havocked and reassigned
+   =         i = <redacted>
+   =         s = <redacted>
+   =     at <TEMPDIR>/loop_sum.move:2: sum_to
+   =         result = <redacted>
+   =     at <TEMPDIR>/loop_sum.move:12: sum_to (spec)
+
+
+
+<TEMPDIR>/loop_sum.move:5: loop-invariant evidence (bounded to 3 completed back-edge traversal(s); diagnostic only)
+source-visible loop-carried state: i, s
+bounded WP status: exact within the displayed bound
+bounded loop-head facts (for paths reaching each head):
+  head[0]: head[0].i == 0
+           head[0].s == 0
+  head[1]: 0 < n ==> head[1].i == 1
+           0 < n ==> head[1].s == 0
+  head[2]: 1 < n ==> head[2].i == 2
+           1 < n ==> head[2].s == 1
+  head[3]: 2 < n ==> head[3].i == 3
+           2 < n ==> head[3].s == 3
+seek a predicate which includes the entry facts and is preserved by one back-edge; bounded observations are not an invariant or a proof

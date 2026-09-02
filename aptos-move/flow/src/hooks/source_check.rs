@@ -24,6 +24,10 @@
 //! 4. **Auto-format** — when no errors are found, runs `movefmt` in-place
 //!    (silently skipped if `movefmt` is not installed).
 
+use crate::{
+    mcp::{telemetry::Telemetry, TELEMETRY_JSONL_ENV_VAR},
+    GlobalOpts,
+};
 use anyhow::Result;
 use legacy_move_compiler::{
     diagnostics::{
@@ -44,7 +48,7 @@ use move_command_line_common::files::FileHash;
 use move_ir_types::location::Loc;
 use move_symbol_pool::Symbol;
 use serde::Deserialize;
-use std::{collections::HashMap, path::PathBuf, process::Command};
+use std::{collections::HashMap, path::PathBuf, process::Command, time::Instant};
 
 /// JSON shape of the PostToolUse hook input (only the fields we need).
 #[derive(Deserialize)]
@@ -67,14 +71,27 @@ pub(crate) struct CheckResult {
 }
 
 /// Entry point: reads stdin JSON, runs checks, prints output.
-pub fn run() -> Result<()> {
+pub fn run(global: &GlobalOpts) -> Result<()> {
     move_compiler_v2::logging::setup_logging(None);
     log::info!("edit hook invoked");
+    let evaluation = global.evaluation_config()?;
+    let telemetry_path = std::env::var_os(TELEMETRY_JSONL_ENV_VAR).map(PathBuf::from);
+    let telemetry = Telemetry::new(telemetry_path.as_deref(), evaluation)?;
+    let hook_start = Instant::now();
+    telemetry.emit("hook_start", serde_json::json!({"hook": "edit"}));
 
     let input: HookInput = match serde_json::from_reader(std::io::stdin()) {
         Ok(v) => v,
         Err(_) => {
             log::info!("edit hook: malformed input, skipping");
+            telemetry.emit(
+                "hook_end",
+                serde_json::json!({
+                    "hook": "edit",
+                    "duration_us": hook_start.elapsed().as_micros() as u64,
+                    "outcome": "skipped_malformed_input",
+                }),
+            );
             return Ok(());
         },
     };
@@ -83,6 +100,14 @@ pub fn run() -> Result<()> {
         Some(p) if p.ends_with(".move") => p,
         _ => {
             log::info!("edit hook: not a .move file, skipping");
+            telemetry.emit(
+                "hook_end",
+                serde_json::json!({
+                    "hook": "edit",
+                    "duration_us": hook_start.elapsed().as_micros() as u64,
+                    "outcome": "skipped_non_move_file",
+                }),
+            );
             return Ok(());
         },
     };
@@ -93,13 +118,40 @@ pub fn run() -> Result<()> {
         Ok(s) => s,
         Err(e) => {
             log::info!("edit hook: cannot read `{}`: {}", path, e);
+            telemetry.emit(
+                "hook_end",
+                serde_json::json!({
+                    "hook": "edit",
+                    "file": &path,
+                    "duration_us": hook_start.elapsed().as_micros() as u64,
+                    "outcome": "skipped_unreadable_file",
+                }),
+            );
             return Ok(());
         },
     };
 
+    let check_start = Instant::now();
     let result = check(&path, &source);
+    telemetry.emit(
+        "edit_check",
+        serde_json::json!({
+            "file": &path,
+            "duration_us": check_start.elapsed().as_micros() as u64,
+            "has_errors": result.has_errors,
+            "has_parse_errors": result.has_parse_errors,
+        }),
+    );
     if !result.has_parse_errors {
+        let format_start = Instant::now();
         format_file(&path);
+        telemetry.emit(
+            "edit_format",
+            serde_json::json!({
+                "file": &path,
+                "duration_us": format_start.elapsed().as_micros() as u64,
+            }),
+        );
     }
     if result.output.is_empty() {
         log::info!("edit hook: `{}` is clean", path);
@@ -110,11 +162,35 @@ pub fn run() -> Result<()> {
             result.has_errors,
             result.output
         );
-        print!("{}", result.output);
+        if result.has_errors {
+            // A blocking hook (exit code 2) feeds stderr, not stdout, back to
+            // the model.
+            eprint!("{}", result.output);
+        } else {
+            print!("{}", result.output);
+        }
     }
     if result.has_errors {
+        telemetry.emit(
+            "hook_end",
+            serde_json::json!({
+                "hook": "edit",
+                "file": &path,
+                "duration_us": hook_start.elapsed().as_micros() as u64,
+                "outcome": "diagnostics",
+            }),
+        );
         std::process::exit(2);
     }
+    telemetry.emit(
+        "hook_end",
+        serde_json::json!({
+            "hook": "edit",
+            "file": &path,
+            "duration_us": hook_start.elapsed().as_micros() as u64,
+            "outcome": "success",
+        }),
+    );
     Ok(())
 }
 

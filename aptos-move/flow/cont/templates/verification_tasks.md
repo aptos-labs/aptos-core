@@ -1,28 +1,41 @@
-{# Verification tasks — placed first in agent prompt before reference material #}
+{# Verification workflow, shared by proving and guided inference #}
 {% if once(name="verification_tasks") %}
 
-## Verification Tasks — Execute In Order
+## Verification workflow
 
-**Task: Full-scope verification run.** Run verification for the full requested scope
-with `timeout` set to {{ args.initial_verification_timeout }}. This gives an
-overview of all failures — both logical errors and timeouts.
+1. **Check and scope.** Confirm that the package compiles and identify the exact
+   function/module scope. If the request is diagnostic only, do not edit specs.
+2. **Run an initial full-scope proof.** Call the prover at timeout
+   {{ args.initial_verification_timeout }} to collect logical failures and
+   timeouts without exclusions.
+3. **Resolve logical failures first.** When repair is authorized, use
+   counterexamples and diagnostics to fix the implementation/specification
+   mismatch. Timed-out functions may be temporarily excluded while resolving
+   independent logical failures.
+4. **Resolve timeouts individually.** Use a function filter, timeout up to
+   {{ args.max_verification_timeout }}, and the simplification/proof strategies
+   below. `split_vcs_by_assert` is diagnostic help, not proof success by itself.
+{% if evaluation_mode %}
+   After {{ args.default_verification_attempts }} focused attempts, retain and
+   report an unresolved failure. Never disable or skip verification or weaken
+   an obligation because the budget ended.
+{% else %}
+   After {{ args.default_verification_attempts }} focused attempts, report the
+   remaining obligation and evidence. Do not introduce a trusted boundary
+   unless the user or project policy explicitly authorizes it.
+{% endif %}
+5. **Run a final full-scope proof.** Use timeout
+   {{ args.max_verification_timeout }} with no temporary exclusions.
+{% if evaluation_mode %}
+   Every requested obligation must be present and verified for success.
+{% else %}
+   Report verified, unresolved, and explicitly trusted functions separately.
+{% endif %}
+6. **Check the candidate.** When specifications were written or changed, close
+   with `{{ tool(name="move_spec_check") }}` over the same scope:
+   it proves once more and, unlike the prover, also rejects a contract that
+   weakened itself or left an obligation uncovered.
 
-**Task: Fix logical errors.** If there are any logical errors, iterate to fix them
-using the `exclude` parameter of the verify tool to exclude functions whose
-verification timed out. Only continue once all non-timeouts cleanly pass.
-
-**Task: Resolve timeouts.** Resolve timeouts one by one calling the prover with a
-function-level filter and `timeout` set to {{ args.max_verification_timeout }}.
-Apply the timeout resolution strategies from the reference material below
-(spec helpers, lemmas, proofs). If a function cannot be resolved after
-{{ args.default_verification_attempts }} attempts and the user did not request
-otherwise, add `pragma verify_duration_estimate = N;` where `N` is the exact
-timeout at which you observed verification succeed. If verification never
-succeeded, use `pragma verify = false;` instead.
-
-**Task: Final full-scope verification.** Run the prover for the full requested scope
-using `timeout` {{ args.max_verification_timeout }} to verify success. Functions
-with `pragma verify_duration_estimate = N;` where `N` exceeds the timeout will
-be automatically skipped — this is expected.
+{% include "templates/candidate_check.md" %}
 
 {% endif %}

@@ -1,14 +1,5 @@
-{{ frontmatter(name="move-check", description="Check and fix compilation errors in a Move package") }}
+{{ frontmatter(name="move-check", description="Diagnose and fix Move compiler errors; not prover or unit-test failures") }}
 
-{#
- # This agent allows to ask something like 'check compilation in a subagent'.
- # Claude derives from the skill name for inference that there must be
- # a matching agent name.
- #}
-
-You check a Move package for compilation errors and fix them. You run the
-Edit–Compile Cycle iteratively until the package compiles cleanly. You read
-diagnostics carefully, fix the source, and re-check until all errors are
-resolved.
+Diagnose and, when requested, fix Move compiler errors within the user's scope.
 
 {% include "templates/move_editing_ref.md" %}

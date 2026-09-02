@@ -37,7 +37,7 @@ Three subcommands via `move-flow <subcommand>`:
 
 ### MCP Tools
 
-`move_package_status`, `move_package_manifest`, `move_package_test`, `move_package_coverage`, `move_package_verify`, `move_package_query`, `move_package_spec_infer`, `move_replay_transaction`
+`move_package_status`, `move_package_manifest`, `move_package_test`, `move_package_coverage`, `move_package_verify`, `move_package_query`, `move_package_wp` (hybrid inference tactics only), `move_spec_check`, `move_replay_transaction`
 
 ## Testing
 

@@ -8,7 +8,8 @@
 //! against `.exp` baseline files.
 
 use crate::{
-    mcp::{session::FlowSession, McpArgs},
+    evaluation::{EvaluationConfig, FeedbackLevel, InferenceTactic},
+    mcp::{session::FlowSession, telemetry::Telemetry, McpArgs},
     GlobalOpts, Platform,
 };
 use aptos_package_builder::PackageBuilder;
@@ -53,11 +54,84 @@ pub fn make_package(name: &str, sources: &[(&str, &str)]) -> TempDir {
 /// Uses `tokio::io::duplex` for an in-memory transport pair; the server runs
 /// as a background tokio task.
 pub async fn make_client() -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
+    make_client_for_tactic(InferenceTactic::HybridGuided).await
+}
+
+/// Create an in-process MCP client with a specific inference tactic.
+pub async fn make_client_for_tactic(
+    tactic: InferenceTactic,
+) -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
+    make_client_for_config(tactic, None).await
+}
+
+/// Create an in-process MCP client which writes tool telemetry to `path`.
+pub async fn make_client_with_telemetry(
+    tactic: InferenceTactic,
+    path: &Path,
+) -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
+    make_client_for_config(tactic, Some(path)).await
+}
+
+/// Create an evaluation-mode client whose candidate check reads `config`.
+pub async fn make_evaluation_client(
+    tactic: InferenceTactic,
+    candidate_check: &Path,
+) -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
+    make_evaluation_client_at_level(tactic, candidate_check, FeedbackLevel::Acceptance).await
+}
+
+/// Create an evaluation-mode client at a specific feedback level, with a
+/// candidate check configured.
+pub async fn make_evaluation_client_at_level(
+    tactic: InferenceTactic,
+    candidate_check: &Path,
+    feedback_level: FeedbackLevel,
+) -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
+    make_session_client(
+        tactic,
+        None,
+        Some(candidate_check.to_path_buf()),
+        true,
+        feedback_level,
+    )
+    .await
+}
+
+/// Create a client at a specific feedback level.
+pub async fn make_client_at_level(
+    tactic: InferenceTactic,
+    feedback_level: FeedbackLevel,
+) -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
+    make_session_client(tactic, None, None, false, feedback_level).await
+}
+
+async fn make_client_for_config(
+    tactic: InferenceTactic,
+    telemetry_path: Option<&Path>,
+) -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
+    make_session_client(
+        tactic,
+        telemetry_path,
+        None,
+        false,
+        FeedbackLevel::Acceptance,
+    )
+    .await
+}
+
+async fn make_session_client(
+    tactic: InferenceTactic,
+    telemetry_path: Option<&Path>,
+    candidate_check: Option<PathBuf>,
+    evaluation_mode: bool,
+    feedback_level: FeedbackLevel,
+) -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
     // Suppress movefmt so baselines are deterministic across platforms.
     // SAFETY: test-only; each test process is single-threaded at this point.
     unsafe { std::env::set_var("MOVE_FLOW_NO_FMT", "1") };
 
     let args = McpArgs {
+        candidate_check,
         dev_mode: false,
         named_addresses: vec![],
         target_filter: None,
@@ -65,15 +139,28 @@ pub async fn make_client() -> rmcp::service::RunningService<rmcp::RoleClient, ()
         language_version: LanguageVersion::latest(),
         experiments: vec![],
         tool_timeout: 120,
+        telemetry_jsonl: None,
     };
     let global = GlobalOpts {
         platform: Platform::Claude,
         content_dir: None,
+        inference_tactic: Some(tactic),
+        evaluation_mode,
+        feedback_level: None,
+    };
+    let evaluation = EvaluationConfig {
+        inference_tactic: tactic,
+        evaluation_mode,
+        feedback_level,
     };
 
     let (client_half, server_half) = tokio::io::duplex(8192);
 
-    let session = FlowSession::new(args, global);
+    let telemetry = match telemetry_path {
+        Some(path) => Telemetry::new(Some(path), evaluation).expect("create telemetry"),
+        None => Telemetry::disabled(),
+    };
+    let session = FlowSession::new(args, global, evaluation, telemetry);
     let (server_read, server_write) = tokio::io::split(server_half);
     tokio::spawn(async move {
         let service = session
