@@ -484,10 +484,20 @@ impl DefUseGraph {
         equivalent
     }
 
+    /// Whether `needed_type` has actually been produced.
+    ///
+    /// Exact identity, deliberately. Object abstraction does not apply here:
+    /// two resources carrying the same `StructTag` at two confirmed object
+    /// addresses are different state, and producing `R@A` does not make `R@B`
+    /// exist. Treating them as interchangeable let a chain be declared
+    /// satisfied and then abort at the step that actually needed `B`, with the
+    /// consumer's seed still naming `B`.
+    ///
+    /// The abstraction remains where it is sound: `approx_seed_producers_of`
+    /// uses it to *propose* producers worth trying. Proposing a candidate and
+    /// proving a dependency are different claims.
     fn type_is_available(&self, available_types: &BTreeSet<usize>, needed_type: usize) -> bool {
-        self.equivalent_type_nodes(needed_type)
-            .into_iter()
-            .any(|type_idx| available_types.contains(&type_idx))
+        available_types.contains(&needed_type)
     }
 
     pub fn approx_seed_producers_of(&self, type_node: usize) -> BTreeSet<usize> {
@@ -516,7 +526,12 @@ impl DefUseGraph {
             .collect()
     }
 
-    fn resource_tags_are_compatible(&self, available: &ResourceTag, needed: &ResourceTag) -> bool {
+    /// Whether `available` is a plausible stand-in for `needed` when *ranking*
+    /// candidates: same resource type at some confirmed object address.
+    ///
+    /// This is a similarity measure, not a satisfaction proof. Do not use it to
+    /// decide that a dependency is met -- see `type_is_available`.
+    fn resource_tags_are_similar(&self, available: &ResourceTag, needed: &ResourceTag) -> bool {
         available == needed
             || (self.is_object_abstractable_resource_tag(available)
                 && self.is_object_abstractable_resource_tag(needed)
@@ -530,17 +545,29 @@ impl DefUseGraph {
     ) -> bool {
         available_resource_tags
             .iter()
-            .any(|available| self.resource_tags_are_compatible(available, needed_resource_tag))
+            .any(|available| available == needed_resource_tag)
     }
 
-    fn compatible_resource_overlap(
+    /// How many of `needed_resource_tags` a prefix plausibly covers.
+    ///
+    /// A *relevance score* used to rank stored prefixes, so object similarity
+    /// is the right measure here: a prefix that produced the same resource type
+    /// at a different object address is worth trying before one that produced
+    /// nothing related. This is deliberately looser than
+    /// `entry_prefix_is_state_consistent`, which decides whether a prefix
+    /// actually satisfies the chain and must be exact.
+    fn similar_resource_overlap(
         &self,
         available_resource_tags: &BTreeSet<ResourceTag>,
         needed_resource_tags: &BTreeSet<ResourceTag>,
     ) -> usize {
         needed_resource_tags
             .iter()
-            .filter(|needed| self.resource_tag_is_available(available_resource_tags, needed))
+            .filter(|needed| {
+                available_resource_tags
+                    .iter()
+                    .any(|available| self.resource_tags_are_similar(available, needed))
+            })
             .count()
     }
 
@@ -553,9 +580,9 @@ impl DefUseGraph {
             .iter()
             .filter(|needed| {
                 available_types.iter().any(|&type_idx| {
-                    self.type_nodes.get(type_idx).is_some_and(|available| {
-                        self.resource_tags_are_compatible(available, needed)
-                    })
+                    self.type_nodes
+                        .get(type_idx)
+                        .is_some_and(|available| self.resource_tags_are_similar(available, needed))
                 })
             })
             .count()
@@ -575,7 +602,7 @@ impl DefUseGraph {
             .filter(|read| {
                 unmet_resource_tags
                     .iter()
-                    .any(|needed| self.resource_tags_are_compatible(needed, read))
+                    .any(|needed| self.resource_tags_are_similar(needed, read))
             })
             .cloned()
             .collect()
@@ -1345,7 +1372,7 @@ impl SequenceDb {
             return usize::MAX;
         }
 
-        dug.compatible_resource_overlap(&entry.produced_types, &exact_needs)
+        dug.similar_resource_overlap(&entry.produced_types, &exact_needs)
     }
 
     /// Find successful prefix entries that are concrete-state compatible with a target chain.
@@ -3082,7 +3109,30 @@ mod tests {
             succeeded: false,
         });
 
-        assert!(dug.are_dependencies_satisfied(&[0, 1]));
+        // Producing `Vault@account_1` does not make `Vault@account_2` exist.
+        // Nothing rebinds the consumer's object argument between chain steps --
+        // `ChainFuzzer::run_one` builds every step's input before step 0 runs --
+        // so a chain accepted on this basis executes the consumer against the
+        // address it originally observed and aborts.
+        assert!(!dug.are_dependencies_satisfied(&[0, 1]));
+
+        // The same consumer reading the address the producer actually writes is
+        // satisfied, object abstraction or not.
+        let mut exact = DefUseGraph::new(2);
+        exact.ingest_initial_writes(&[make_object_group_write(account_1)]);
+        exact.ingest_profile(&ExecResourceProfile {
+            script_index: 0,
+            reads: BTreeSet::new(),
+            writes: BTreeSet::from([make_resource_tag_at("Vault", account_1)]),
+            succeeded: true,
+        });
+        exact.ingest_profile(&ExecResourceProfile {
+            script_index: 1,
+            reads: BTreeSet::from([make_resource_tag_at("Vault", account_1)]),
+            writes: BTreeSet::new(),
+            succeeded: false,
+        });
+        assert!(exact.are_dependencies_satisfied(&[0, 1]));
     }
 
     #[test]
@@ -3110,7 +3160,10 @@ mod tests {
         dug.add_seed_observation(&producer, seed.clone());
         dug.add_seed_observation(&consumer, seed);
 
-        assert!(dug.are_seed_dependencies_satisfied(&[0, 1]));
+        // Same rule for concrete seed chains: the recorded consumer seed names
+        // the address it originally read, and nothing rewrites it, so a
+        // different object address is not a substitute.
+        assert!(!dug.are_seed_dependencies_satisfied(&[0, 1]));
     }
 
     #[test]
@@ -3155,7 +3208,7 @@ mod tests {
 
         let exact_needs = dug.exact_unmet_dependency_resource_tags(1);
         assert_eq!(
-            dug.compatible_resource_overlap(&compatible[0].produced_types, &exact_needs),
+            dug.similar_resource_overlap(&compatible[0].produced_types, &exact_needs),
             1,
         );
         assert!(!compatible[0]
@@ -3234,11 +3287,14 @@ mod tests {
         });
         assert!(!dug.are_dependencies_satisfied(&[0, 1]));
 
-        // Confirming `other` from materialized state is what unlocks the
-        // object abstraction, not observing it in a read.
+        // Confirming `other` from materialized state registers it as an object
+        // address, which is what lets the abstraction *propose* script 0 as a
+        // producer worth trying. It does not make the dependency satisfied:
+        // script 0 writes `Vault@created` and script 1 still reads
+        // `Vault@other`.
         dug.ingest_initial_writes(&[make_object_group_write(other)]);
         assert_eq!(dug.object_addresses(), &BTreeSet::from([created, other]));
-        assert!(dug.are_dependencies_satisfied(&[0, 1]));
+        assert!(!dug.are_dependencies_satisfied(&[0, 1]));
     }
 
     #[test]
