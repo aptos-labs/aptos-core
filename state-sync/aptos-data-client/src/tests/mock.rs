@@ -36,7 +36,7 @@ use aptos_storage_service_types::{
 use aptos_time_service::{MockTimeService, TimeService};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
-    state_store::state_value::StateValueChunkWithProof,
+    state_store::{hot_state::HotStateValueChunkWithProof, state_value::StateValueChunkWithProof},
     transaction::{TransactionListWithProofV2, TransactionOutputListWithProofV2, Version},
     PeerId,
 };
@@ -316,6 +316,20 @@ mock! {
             request_timeout_ms: u64,
             kind: StateKind,
         ) -> Result<Response<StateValueChunkWithProof>>;
+
+        async fn get_number_of_hot_states(
+            &self,
+            version: Version,
+            request_timeout_ms: u64,
+        ) -> Result<Response<u64>>;
+
+        async fn get_hot_state_values_with_proof(
+            &self,
+            version: u64,
+            start_index: u64,
+            end_index: u64,
+            request_timeout_ms: u64,
+        ) -> Result<Response<HotStateValueChunkWithProof>>;
 
         async fn get_transaction_outputs_with_proof(
             &self,
