@@ -6,7 +6,7 @@
 //! Each submodule corresponds to an MCP tool (or meta-operation like
 //! `list_tools`) and contains test cases with `.exp` baseline files.
 
-mod common;
+pub(crate) mod common;
 
 mod edit_hook;
 mod list_tools;
@@ -17,6 +17,7 @@ mod move_package_status;
 mod move_package_test;
 mod move_package_verify;
 mod move_replay_transaction;
+mod spec_check;
 mod update;
 
 use super::*;
@@ -24,4 +25,22 @@ use super::*;
 #[test]
 fn test_platform_display_name() {
     assert_eq!(Platform::Claude.display_name(), "Claude Code");
+}
+
+#[test]
+fn inference_tactic_global_flag_is_accepted_after_subcommand() {
+    let cli = FlowCli::try_parse_from([
+        "move-flow",
+        "plugin",
+        "generated",
+        "--inference-tactic",
+        "agent-only",
+        "--evaluation-mode",
+    ])
+    .expect("parse plugin evaluation flags");
+    assert_eq!(
+        cli.global.inference_tactic,
+        Some(evaluation::InferenceTactic::AgentOnly)
+    );
+    assert!(cli.global.evaluation_mode);
 }

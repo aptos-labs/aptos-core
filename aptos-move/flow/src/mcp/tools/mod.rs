@@ -9,6 +9,7 @@ pub(crate) mod package_test;
 mod package_verify;
 pub(crate) mod replay_tracing;
 mod replay_transaction;
+mod spec_check;
 
 use super::package_data::VerifiedScope;
 use move_model::model::{GlobalEnv, VerificationScope};
@@ -32,9 +33,15 @@ use std::path::Path;
 pub(crate) fn load_sanitized_prover_options(
     package_path: &Path,
 ) -> Result<move_prover::cli::Options, String> {
+    let mut opts = move_prover::cli::Options::default();
+    // A timeout otherwise reports only that a budget was exhausted. The replay
+    // costs a bounded solver run on the failure path and names the definitions
+    // responsible, so Flow always asks for it. Sanitizing to the default
+    // backend keeps the Z3 solver the analysis requires.
+    opts.backend.timeout_analysis = true;
     let prover_toml = package_path.join("Prover.toml");
     if !prover_toml.exists() {
-        return Ok(move_prover::cli::Options::default());
+        return Ok(opts);
     }
     let from_toml = move_prover::cli::Options::create_from_toml_file(
         &prover_toml.to_string_lossy(),
@@ -46,7 +53,6 @@ pub(crate) fn load_sanitized_prover_options(
             e
         )
     })?;
-    let mut opts = move_prover::cli::Options::default();
     opts.prover.borrow_natives = from_toml.prover.borrow_natives;
     Ok(opts)
 }
@@ -139,5 +145,57 @@ pub(crate) fn resolve_filter(
             VerifiedScope::Module(module.get_id()),
             VerificationScope::OnlyModule(filter.to_string()),
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    /// A timeout otherwise reports only an exhausted budget, so every Flow
+    /// prover invocation asks for the replay analysis.
+    #[test]
+    fn prover_options_request_timeout_analysis_without_a_prover_toml() {
+        let package = tempfile::tempdir().unwrap();
+
+        let options = load_sanitized_prover_options(package.path()).unwrap();
+
+        assert!(options.backend.timeout_analysis);
+    }
+
+    #[test]
+    fn prover_options_request_timeout_analysis_with_a_prover_toml() {
+        let package = tempfile::tempdir().unwrap();
+        fs::write(
+            package.path().join("Prover.toml"),
+            "[prover]\nborrow_natives = [\"borrow_mut\"]\n",
+        )
+        .unwrap();
+
+        let options = load_sanitized_prover_options(package.path()).unwrap();
+
+        assert!(options.backend.timeout_analysis);
+        assert_eq!(
+            vec!["borrow_mut".to_string()],
+            options.prover.borrow_natives
+        );
+    }
+
+    /// The analysis drives the solver directly and rejects a non-Z3 backend,
+    /// so sanitization must not carry one over from the package.
+    #[test]
+    fn prover_options_keep_the_default_z3_backend() {
+        let package = tempfile::tempdir().unwrap();
+        fs::write(
+            package.path().join("Prover.toml"),
+            "[backend]\nuse_cvc5 = true\n",
+        )
+        .unwrap();
+
+        let options = load_sanitized_prover_options(package.path()).unwrap();
+
+        assert!(!options.backend.use_cvc5);
+        assert!(options.backend.boogie_flags.is_empty());
     }
 }

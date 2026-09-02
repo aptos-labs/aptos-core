@@ -45,6 +45,46 @@ claude --plugin-dir ./gen/claude
 
 Options: `--debug` (debug build), `--log <file>` (enable MCP server logging).
 
+### Inference Tactics
+
+`/move-inf` follows one of three tactics: `hybrid-guided` (WP diagnostics
+drive the invariant work; the default), `hybrid-flexible` (WP is available,
+the workflow is the agent's), and `agent-only` (direct reasoning, no WP tool).
+
+The two hybrid tactics share one tool inventory, so a hybrid plugin serves
+both and an invocation picks one without regenerating anything:
+
+```text
+/move-inf                         # the plugin's default hybrid tactic
+/move-inf hybrid-flexible sources/x.move
+```
+
+`move-flow plugin ... --inference-tactic <tactic>` (or
+`MOVE_FLOW_INFERENCE_TACTIC`) sets the default. The direct tactic is its own
+plugin: generated with `--inference-tactic agent-only`, it carries only that
+tactic and the WP tool is absent from both the advertised inventory and the
+runtime router.
+
+`--evaluation-mode` pins the tactic for a measured session: the skill carries
+only that tactic and accepts no override. It requires
+`--flow-source-commit COMMIT`; the generated `.mcp.json` records the tactic,
+the evaluation flag and the expected tool-inventory hash, and the MCP server
+refuses to start if an environment override disagrees. Pass
+`--telemetry-jsonl <path>` to forward a JSONL telemetry destination. The
+generated `move-flow-manifest.json` records the tactic, evaluation-mode flag,
+rendered inference-skill hash, and MCP tool-inventory hash.
+
+```bash
+move-flow plugin ./gen/agent --inference-tactic agent-only --evaluation-mode --flow-source-commit COMMIT
+```
+
+The paper-evaluation controller, hidden judge, corpus builder, and randomized
+schedule tooling live in [`evaluation/spec-inference`](evaluation/spec-inference/README.md).
+`move-flow experiment inventory` enumerates the two frozen source frames through
+the compiler model AST, while `move-flow experiment compare-implementation`
+lets the external judge reject runtime-code changes by comparing compiled Move
+modules.
+
 ### Debugging
 
 Logging is controlled via the `MVC_LOG` env var:
@@ -105,7 +145,8 @@ via OS-native file watchers when sources change.
 | `move_package_test` | Run unit tests, report coverage changes against a baseline |
 | `move_package_coverage` | Uncovered source lines |
 | `move_package_verify` | Run the Move Prover |
-| `move_package_spec_infer` | Infer and inject specifications |
+| `move_package_wp` | Infer and inject specifications with weakest preconditions (hybrid tactics only) |
+| `move_spec_check` | Acceptance check for a specification: compile, admissibility, contract coverage, prover |
 
 All tools accept a `package_path` parameter.
 

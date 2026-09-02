@@ -2,110 +2,121 @@
 
 {% include "templates/spec_editing_ref.md" %}
 {% include "templates/spec_lang_proofs.md" %}
+{% include "templates/toolchain_limits.md" %}
 
-## Verification 
+## Move Prover reference
 
-### Verification Tool
+Call `{{ tool(name="move_package_verify") }}` with `package_path` and an explicit
+timeout. Its optional controls are:
 
-Use `{{ tool(name="move_package_verify") }}` to run the Move Prover on a package and
-formally verify its specifications:
+- `filter: "module"` or `"module::function"` for a focused proof;
+- `exclude: [...]` to omit known targets temporarily while diagnosing others;
+- `split_vcs_by_assert: true` to identify which assertion in a function is hard
+  or false;
+- `error_limit` to bound counterexample output.
 
-- Call with `package_path` set to the package directory and `timeout` set to
-  {{ args.initial_verification_timeout }}.
-- The tool returns "verification succeeded" when all specs hold, or a diagnostic with a
-  counterexample when a spec fails.
+Filters and exclusions are diagnostic conveniences. A final proof must cover
+the user's requested scope, and an unmatched or excluded target is not success.
 
-#### Narrowing scope with filters
+### Reading a counterexample
 
-Use the `filter` parameter to restrict the verification scope:
+A counterexample shows the frames of one failing execution with the values the
+solver chose. Read the notation before drawing conclusions from it.
 
-- **Single function:** set `filter` to `module_name::function_name`.
-- **Single module:** set `filter` to `module_name`.
+- **Named locals** appear under their source names, and `result` is the return
+  value. Reason from these first.
+- **`$t<N>`** is a compiler- or prover-introduced temporary with no source
+  counterpart. Read it as an intermediate value at that step; do not look for
+  it in the source or name it in a specification.
+- **A frame marked `(spec)`** lies inside the function's spec block, so it
+  evaluates a condition rather than executed code.
+- **`<generic>`** is the value of a type parameter, withheld because it cannot
+  affect the outcome.
+- **A function value** prints as the source entity it came from. A closure
+  shows the function it packs and its captured arguments by parameter name.
+  `<value of function field ...>` and `<value of function parameter ...>` are
+  values the solver chose for that field or parameter, and the trailing `#n`
+  distinguishes distinct values of the same field, so a repeated `#n` is the
+  same value. Their behavior is only what the specification states about the
+  carrier, so give it exact `result_of` and `aborts_of` conditions.
+  ``<some `T`>`` is a function of type `T` the solver picked with nothing
+  tying it to a source entity.
 
-#### Excluding targets
+### Classify before editing
 
-Use the `exclude` parameter to skip specific functions or modules while
-verifying the rest of the scope:
+- **Compilation/spec-language error:** fix syntax, name resolution, placement,
+  or invalid `old()` use before reasoning about the proof.
+- **Postcondition counterexample:** trace the normal path. Determine whether the
+  implementation violates the intended contract, a callee contract is too weak,
+  or a loop invariant loses the needed fact.
+- **Abort counterexample:** enumerate direct and transitive aborts, including
+  arithmetic, indexing, resources, and opaque callees. Complete the exact abort
+  behavior; do not turn on partial abort checking.
+- **Frame failure:** compare executable global writes with `modifies` clauses,
+  especially across opaque callees.
+- **Invariant failure:** separately check initialization, preservation, and the
+  loop-exit implication. A stronger invariant is useful only if the body proves
+  it.
+- **Timeout/out of resources:** treat the contract as unresolved, not false and
+  not verified.
 
-- **Exclude function(s):** set `exclude` to `["module_name::function_name"]`.
-- **Exclude module(s):** set `exclude` to `["module_name"]`.
+Never make a desired property disappear to obtain a green prover result. A new
+precondition is valid only if it reflects the intended API, not because it
+excludes the counterexample.
 
-Exclusions take precedence over the `filter` scope — a target that matches both
-`filter` and `exclude` is excluded. This is useful in the "Fix logical errors" task to skip timed-out
-functions without modifying source files.
+### Reading timeout analysis
 
-#### Setting timeout
+A timeout diagnostic carries evidence from a replay: the prover re-runs the
+captured query under a profiling solver instead of reporting the original run.
+The counts therefore describe the same obligation without being exact, and a
+`+` marks a lower bound.
 
-Verification can be long-running (10 seconds or more). Always explicitly specify a timeout. 
-Start with a low timeout of {{ args.initial_verification_timeout }} to get quick feedback.
-Increase the timeout to not more than {{ args.max_verification_timeout }} in the case of 
-investigating difficult verification problems. 
+- **Quantifier activity** ranks what the solver instantiated, naming a source
+  location for each entry. Reduce the instantiations that entry needs instead
+  of raising the budget. A `definition of spec function` entry points at that
+  helper: align its recursion with the loop so one obligation unfolds one
+  step, and keep the recursion single. A `forall` entry points at a written
+  quantifier: give it a valid trigger, or replace it with a frame or a
+  bounded relation.
+- **Nonlinear arithmetic activity**, reported through the `arith-nla-*`
+  counters, means the search is in nonlinear arithmetic. Prefer additive
+  recurrences to closed forms and keep symbolic products out of invariants.
+- **Mixed activity** reports both. Address the top named quantifier first and
+  then the arithmetic; the two compound.
+- **Incomplete or partial evidence** still ranks the quantifiers, but the
+  classification is unsettled. Do not read a missing counter as evidence that
+  its cause is absent.
+- **Unavailable evidence** means the replay could not run. Fall back to
+  isolating the obligation with `split_vcs_by_assert` and a narrower filter.
 
-### Diagnosing Verification Failures
+A named source location is the place to change. A timeout leaves the contract
+unresolved either way, so never answer one by weakening it.
 
-When the prover reports a counterexample or error:
+### Timeout strategy
 
-- **Postcondition failure**: The `ensures` clause doesn't hold for some execution path.
-  Check whether an edge case is missing or the condition is too strong.
-- **Abort condition failure**: An abort path is not covered by `aborts_if`. Trace which
-  operations can abort (arithmetic overflow, missing resource, vector out-of-bounds) and
-  add the missing condition.
-- **Wrong `old()` usage**: Using `old()` in `aborts_if` or `requires` causes a compilation
-  error. Remove it — those clauses are already evaluated in the pre-state.
-- **Loop-related failures**: Missing or too-weak loop invariants cause havoced variables.
-  Strengthen the invariant to constrain all loop-modified variables.
-- **Timeout ("out of resources")**:
+Where the analysis names a definition, aim the work there; otherwise work
+from the smallest failing function. Preserve contract meaning:
 
-  Do not delete, comment out, or weaken any `aborts_if` or `ensures`
-  condition to resolve a timeout. This includes adding
-  `pragma aborts_if_is_partial;`, which silently suppresses uncovered abort
-  paths. Every condition is assumed semantically correct; removing one hides
-  real properties and makes the specification unsound.
+1. Simplify WP-generated or hand-written expressions: remove proven redundancy,
+   factor common terms, replace mechanical updates, and repair vacuous or
+   `sathard` loop output.
+2. Use `split_vcs_by_assert` and small `assert` proof hints to expose an
+   intermediate fact or separate cases.
+3. Replace hostile unbounded quantifiers with equivalent frames, bounded
+   relations, or recursive helpers. Add valid triggers when quantification is
+   unavoidable.
+4. Prefer additive recurrences to nonlinear closed forms. Do not wrap built-in
+   arithmetic in a helper merely to obscure it.
+5. Prove reusable facts as lemmas and instantiate them explicitly with `apply`.
+   Put `[weight = N]` on a recursive helper or a `forall ... apply` that the
+   analysis names, so the solver stops unrolling or instantiating it on its
+   own.
+6. Increase the per-condition timeout only after improving the proof shape, up
+   to {{ args.max_verification_timeout }}.
 
-  Timeout resolution strategies — try these in order, and iterate
-  aggressively before resorting to `pragma verify_duration_estimate`:
-
-  1. **Add data invariants and global update invariants** to constrain
-     resource state. These are checked once per modifying function and then
-     assumed at every call site (including inside loops), giving the prover
-     facts for free without recursive helpers. See the inference reference
-     for details on when to use each kind.
-
-  2. **Introduce spec helper functions** that capture intermediate properties.
-     Factor complex `ensures` into compositions of simpler helpers. Each
-     helper should express one logical step the solver can verify independently.
-
-  3. **Add lemmas** to establish properties about spec helpers
-     (e.g. monotonicity, induction steps) that the solver cannot discover
-     on its own. Lemmas are proven propositions — do not introduce axioms.
-
-  4. **Add `proof { ... }` blocks** to function specs or lemmas to guide
-     the verifier with `assert`, `apply`, and `calc` steps. Use `apply`
-     to instantiate lemmas at specific points in the proof.
-
-  5. **Rewrite spec expressions** while preserving their meaning — factor
-     out common sub-expressions into `let` bindings, reorder conjuncts,
-     or replace a complex closed-form with a recursive helper connected
-     by a lemma.
-
-  When you use universal lemma application, always add triggers, as
-  in `forall x: u64 {f(x)} apply lemma_for_f(x)`.
-
-  **Avoid non-linear arithmetic in spec helpers.** SMT solvers handle linear
-  arithmetic well but struggle with multiplication, division, or modulo between
-  two non-constant expressions. Prefer additive recurrences over closed-form
-  products. If a non-linear closed form is needed, connect it to a recursive
-  helper via a lemma so the solver reasons about each step linearly.
-
-  **Do not redefine built-in operations as spec helpers.** The SMT solver
-  already understands `*`, `/`, `%`, comparisons, and bitwise operations
-  natively. Only introduce a spec helper when it encodes logic the solver
-  does not have built in — such as a loop accumulation pattern or a
-  recursive data-structure traversal.
-
-  **Document every function and lemma.** Add a `///` doc comment explaining
-  what property it captures and why it is needed. Place new spec helper
-  functions below the Move function that introduces them. Place lemmas
-  directly beneath their helper's declaration.
+Data invariants and global update invariants may help when they express genuine
+properties preserved by **every** constructor or mutator. They create new proof
+obligations across the module, so do not add them as local solver hints without
+checking that global semantic commitment.
 
 {% endif %}

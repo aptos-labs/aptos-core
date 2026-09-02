@@ -1029,7 +1029,7 @@ fn report_uninvariant_loops(fun_env: &FunctionEnv, data: &FunctionData) {
             });
         if let Some(evidence) = evidence {
             let mut notes = vec![format!(
-                "loop-invariant evidence (bounded to {} completed back-edge traversal(s); diagnostic only)",
+                "{LOOP_INVARIANT_EVIDENCE_NOTE} (bounded to {} completed back-edge traversal(s); diagnostic only)",
                 evidence.depth
             )];
             if !evidence.carried_names.is_empty() {
@@ -1091,6 +1091,12 @@ fn report_uninvariant_loops(fun_env: &FunctionEnv, data: &FunctionData) {
         }
     }
 }
+
+/// First note of a bounded loop-invariant evidence diagnostic.
+///
+/// A consumer that wants the evidence selects on this rather than on the
+/// rendered text, so the two cannot drift apart.
+pub const LOOP_INVARIANT_EVIDENCE_NOTE: &str = "loop-invariant evidence";
 
 fn mark_transparent_result_dependencies_solver_hard(env: &GlobalEnv) {
     let inferred_sym = env.symbol_pool().make(CONDITION_INFERRED_PROP);

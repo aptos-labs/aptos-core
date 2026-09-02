@@ -3,12 +3,16 @@
 
 pub(crate) mod common;
 pub(crate) mod file_watcher;
-mod package_data;
+pub(crate) mod package_data;
 pub(crate) mod session;
 pub(crate) mod supervisor;
+pub(crate) mod telemetry;
 pub(crate) mod tools;
 
-use crate::GlobalOpts;
+use crate::{
+    evaluation::{sha256_hex, EXPECTED_TOOL_LIST_SHA256_ENV_VAR},
+    GlobalOpts,
+};
 use anyhow::Result;
 use aptos_framework::UPGRADE_POLICY_CUSTOM_FIELD;
 use clap::Parser;
@@ -18,6 +22,10 @@ use move_package::package_hooks::{register_package_hooks, PackageHooks};
 use move_symbol_pool::Symbol;
 use rmcp::{transport::stdio, ServiceExt};
 use session::FlowSession;
+use std::{path::PathBuf, sync::Once};
+use telemetry::Telemetry;
+
+pub const TELEMETRY_JSONL_ENV_VAR: &str = "MOVE_FLOW_TELEMETRY_JSONL";
 
 /// Package hooks for move-flow MCP server.
 /// Registers Aptos-specific custom fields to suppress unknown field warnings.
@@ -71,13 +79,38 @@ pub struct McpArgs {
     /// Global timeout (seconds) for any single MCP tool call. Default: 120.
     #[arg(long, default_value_t = 120)]
     pub tool_timeout: u64,
+
+    /// Append structured experiment telemetry to this JSONL file.
+    #[arg(long)]
+    pub telemetry_jsonl: Option<PathBuf>,
+
+    /// Candidate acceptance criteria for an evaluation task.
+    ///
+    /// The experiment controller writes this file outside the agent's writable
+    /// workspace; it names the pristine baseline, the target, the editable
+    /// paths, and the required contract categories.
+    #[arg(long)]
+    pub candidate_check: Option<PathBuf>,
+}
+
+impl McpArgs {
+    fn telemetry_path(&self) -> Option<PathBuf> {
+        self.telemetry_jsonl
+            .clone()
+            .or_else(|| std::env::var_os(TELEMETRY_JSONL_ENV_VAR).map(PathBuf::from))
+    }
+}
+
+pub(crate) fn register_move_flow_package_hooks() {
+    static REGISTER: Once = Once::new();
+    REGISTER.call_once(|| register_package_hooks(Box::new(MoveFlowPackageHooks)));
 }
 
 fn setup() {
     move_compiler_v2::logging::setup_logging_with_timestamps(None);
 
     // Register Aptos package hooks to recognize custom fields like upgrade_policy.
-    register_package_hooks(Box::new(MoveFlowPackageHooks));
+    register_move_flow_package_hooks();
 
     // Bridge `tracing` events (used by rmcp) into the `log` framework so that
     // flexi_logger captures transport-level diagnostics (e.g. "input stream
@@ -104,19 +137,62 @@ fn setup() {
 pub async fn run(args: &McpArgs, global: &GlobalOpts, restart: bool) -> Result<()> {
     setup();
 
+    let evaluation = global.evaluation_config()?;
+    evaluation.validate_expected()?;
+    let mut tool_names = FlowSession::tool_names(evaluation);
+    tool_names.sort();
+    if let Some(expected_hash) = std::env::var_os(EXPECTED_TOOL_LIST_SHA256_ENV_VAR) {
+        let expected_hash = expected_hash.into_string().map_err(|_| {
+            anyhow::anyhow!("{EXPECTED_TOOL_LIST_SHA256_ENV_VAR} is not valid UTF-8")
+        })?;
+        let actual_hash = sha256_hex(tool_names.join("\n").as_bytes());
+        anyhow::ensure!(
+            expected_hash == actual_hash,
+            "MCP tool inventory mismatch: generated plugin expects `{expected_hash}`, \
+             runtime produced `{actual_hash}`"
+        );
+    }
+    let telemetry_path = args.telemetry_path();
+    let telemetry = Telemetry::new(telemetry_path.as_deref(), evaluation)?;
+
     log::info!(
-        "move-flow MCP server v{} starting (tools: {})",
+        "move-flow MCP server v{} starting (tactic: {}, evaluation_mode: {}, tools: {})",
         env!("CARGO_PKG_VERSION"),
-        FlowSession::tool_names().join(", ")
+        evaluation.inference_tactic,
+        evaluation.evaluation_mode,
+        tool_names.join(", ")
+    );
+    // Record the configuration the server actually resolved. A flag lost on the
+    // way in is otherwise indistinguishable from one whose default happens to
+    // match what the caller expected, which has already hidden a whole
+    // evaluation round's treatment.
+    telemetry.emit(
+        "session_start",
+        serde_json::json!({
+            "restart": restart,
+            "feedback_level": evaluation.feedback_level.to_string(),
+            "candidate_check_configured": args.candidate_check.is_some(),
+        }),
     );
 
-    let session = FlowSession::new(args.clone(), global.clone());
-    if restart {
+    let session = FlowSession::new(args.clone(), global.clone(), evaluation, telemetry.clone());
+    let result = if restart {
         let service = rmcp::service::serve_directly(session, stdio(), None);
-        service.waiting().await?;
+        service.waiting().await
     } else {
-        let service = session.serve(stdio()).await?;
-        service.waiting().await?;
-    }
+        match session.serve(stdio()).await {
+            Ok(service) => service.waiting().await,
+            Err(error) => {
+                telemetry.emit(
+                    "session_end",
+                    serde_json::json!({"outcome": "startup_error", "error": error.to_string()}),
+                );
+                return Err(error.into());
+            },
+        }
+    };
+    let outcome = if result.is_ok() { "success" } else { "error" };
+    telemetry.emit("session_end", serde_json::json!({"outcome": outcome}));
+    result?;
     Ok(())
 }

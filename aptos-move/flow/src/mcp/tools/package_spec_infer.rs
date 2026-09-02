@@ -5,7 +5,7 @@ use super::{
     super::{package_data::DiagnosticSource, session::FlowSession},
     load_sanitized_prover_options, resolve_filter,
 };
-use crate::hooks::source_check;
+use crate::{evaluation::LOOP_INVARIANT_EVIDENCE_DEPTH, hooks::source_check};
 use codespan_reporting::term::termcolor::NoColor;
 use move_model::model::GlobalEnv;
 use move_prover::inference::InferenceOutput;
@@ -72,6 +72,10 @@ impl FlowSession {
         let (pkg, _) = self.resolve_package(&params.package_path).await?;
         let filter = params.filter.clone();
         let spec_output = params.spec_output;
+        let telemetry = self.telemetry().clone();
+        let telemetry_package = self.resolve_package_path(&params.package_path);
+        let telemetry_filter = filter.clone();
+        let evidence_depth = Some(LOOP_INVARIANT_EVIDENCE_DEPTH);
 
         let tool_timeout = self.tool_timeout();
         let wrote_files = Arc::new(AtomicBool::new(false));
@@ -84,7 +88,7 @@ impl FlowSession {
                 // 1. Check for compilation errors.
                 if data.has_compilation_errors() {
                     return Ok(CallToolResult::error(vec![Content::text(
-                        "package has compilation errors; run move_package_status for details",
+                        data.compilation_errors_report(),
                     )]));
                 }
 
@@ -112,6 +116,11 @@ impl FlowSession {
                     SpecOutput::File => InferenceOutput::File,
                 };
                 options.inference.inference_output_dir = None;
+                // Bounded loop-head evidence explains why a loop resists
+                // inference. It is diagnostic-only and never becomes a
+                // condition, so it rides with the failure classification rung.
+                // Inference overwrites the prover field from this one.
+                options.inference.loop_invariant_evidence = evidence_depth;
                 options.output_path = temp_dir
                     .path()
                     .join("output.bpl")
@@ -128,6 +137,7 @@ impl FlowSession {
                 // intent is to be skipped (e.g. `storage_slot`).
                 let mut error_writer = NoColor::new(Vec::new());
                 let mut filtered_env_holder: Option<GlobalEnv> = None;
+                let wp_start = Instant::now();
                 let inference_result = if let Some(filter_str) = filter.as_deref() {
                     let mut fresh = match data.build_filtered_env(Some(filter_str), &[]) {
                         Ok(env) => env,
@@ -155,6 +165,15 @@ impl FlowSession {
                         Instant::now(),
                     )
                 };
+                telemetry.emit(
+                    "wp_engine",
+                    serde_json::json!({
+                        "package_id": &telemetry_package,
+                        "filter": &telemetry_filter,
+                        "duration_us": wp_start.elapsed().as_micros() as u64,
+                        "outcome": if inference_result.is_ok() { "success" } else { "error" },
+                    }),
+                );
 
                 match inference_result {
                     Ok(()) => {
@@ -236,12 +255,35 @@ impl FlowSession {
                         }
 
                         if modified_files.is_empty() {
+                            telemetry.emit(
+                                "wp_output",
+                                serde_json::json!({
+                                    "package_id": &telemetry_package,
+                                    "filter": &telemetry_filter,
+                                    "files_written": 0,
+                                    "inferred_conditions_in_written_files": 0,
+                                }),
+                            );
                             log::info!("move_package_wp: no specs inferred");
                             Ok(CallToolResult::success(vec![Content::text(
                                 "inference completed but no specifications were inferred",
                             )]))
                         } else {
                             wrote_files_in.store(true, Ordering::Relaxed);
+                            let inferred_conditions = modified_files
+                                .iter()
+                                .filter_map(|path| fs::read_to_string(path).ok())
+                                .map(|source| source.matches("[inferred").count())
+                                .sum::<usize>();
+                            telemetry.emit(
+                                "wp_output",
+                                serde_json::json!({
+                                    "package_id": &telemetry_package,
+                                    "filter": &telemetry_filter,
+                                    "files_written": modified_files.len(),
+                                    "inferred_conditions_in_written_files": inferred_conditions,
+                                }),
+                            );
                             log::info!(
                                 "move_package_wp: wrote specs to {} file(s)",
                                 modified_files.len()
@@ -279,6 +321,20 @@ impl FlowSession {
                                     "\ndiagnostics in inferred output:\n{}",
                                     check_diags
                                 ));
+                            }
+                            // Inference warns rather than aborting, so that one
+                            // unusable function does not stop a module-wide run.
+                            // The warnings carry the reason and the bounded
+                            // evidence.
+                            let warnings =
+                                String::from_utf8(error_writer.into_inner()).unwrap_or_default();
+                            if !warnings.trim().is_empty() {
+                                msg.push_str(&format!("\n{}", warnings.trim_end()));
+                            }
+                            if !warnings.trim().is_empty() {
+                                data.set_diagnostics(DiagnosticSource::Inference, vec![warnings
+                                    .trim_end()
+                                    .to_string()]);
                             }
                             Ok(CallToolResult::success(vec![Content::text(msg)]))
                         }

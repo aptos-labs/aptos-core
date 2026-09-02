@@ -336,5 +336,44 @@
       "readOnlyHint": true,
       "destructiveHint": false
     }
+  },
+  {
+    "name": "move_spec_check",
+    "description": "Run every acceptance check for the current specification task: compilation, complete target verification, contract-category coverage and forbidden weakening. Given a baseline, also reports whether the runtime implementation and the edit scope changed. Returns CANDIDATE_ACCEPTED when the task is done.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "MovePackageCheckCandidateParams",
+      "type": "object",
+      "properties": {
+        "package_path": {
+          "description": "Path to the Move package directory holding the candidate specification.",
+          "type": "string"
+        },
+        "filter": {
+          "description": "Optional filter: `module_name` or `module_name::function_name`.\nWhen omitted, all target modules are checked. An evaluation session\ntakes its target from the task instead, so this is ignored there.",
+          "type": "string",
+          "nullable": true
+        },
+        "timeout": {
+          "description": "Solver timeout per verification condition, in seconds. Default: 10.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0,
+          "nullable": true
+        },
+        "baseline_path": {
+          "description": "Optional path to a pristine copy of the package, from before the\nspecification work started. Given one, the check also reports whether\nthe runtime implementation still compiles to the same bytecode.\nAn evaluation session takes its baseline from the task instead.",
+          "type": "string",
+          "nullable": true
+        }
+      },
+      "required": [
+        "package_path"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
   }
 ]

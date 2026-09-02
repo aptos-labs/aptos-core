@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::mcp::session::FlowSession;
+use crate::{evaluation::EvaluationConfig, mcp::session::FlowSession};
 use anyhow::{Context, Result};
 use std::{
     collections::{HashMap, HashSet},
@@ -39,10 +39,15 @@ const CONTENT_DIRS: &[(&str, &str)] = &[
 /// path preserves the original directory structure (e.g. `commands/example.md`).
 /// Templates under `templates/` are available for `{% include %}` but are not
 /// included in the output.
+/// `omitted_skills` names skill directories to leave out of the output. A skill
+/// whose tool is not served would fail `tool()` validation anyway, and shipping
+/// instructions for a tool the session does not have is worse than not
+/// shipping them.
 pub fn render_all(
     content_root: &Path,
     context: &tera::Context,
     tool_names: &[String],
+    omitted_skills: &[&str],
 ) -> Result<Vec<(PathBuf, String)>> {
     let mut tera = Tera::default();
     tera.register_function("tool", make_tool_function(tool_names.to_vec()));
@@ -76,7 +81,11 @@ pub fn render_all(
                 .with_context(|| format!("failed to parse template {}", abs_path.display()))?;
 
             // Only emit templates that are not partials.
-            if out_prefix != "templates" {
+            if out_prefix != "templates"
+                && !omitted_skills
+                    .iter()
+                    .any(|skill| rel_within.starts_with(skill) && out_prefix == "skills")
+            {
                 output_names.push((out_path, template_name));
             }
         }
@@ -91,6 +100,11 @@ pub fn render_all(
         let rendered = tera
             .render(&template_name, context)
             .with_context(|| format!("failed to render template {}", out_path.display()))?;
+        let rendered = if out_path.extension().is_some_and(|ext| ext == "md") {
+            normalize_markdown_spacing(&rendered)
+        } else {
+            rendered
+        };
 
         // Skills and agents must call frontmatter() to declare their metadata.
         let needs_frontmatter = out_path.starts_with("skills") || out_path.starts_with("agents");
@@ -106,6 +120,52 @@ pub fn render_all(
     }
 
     Ok(results)
+}
+
+/// Collapse redundant blank lines introduced by nested Tera includes while
+/// preserving whitespace inside fenced examples.
+fn normalize_markdown_spacing(content: &str) -> String {
+    let mut output = String::with_capacity(content.len());
+    let mut open_fence: Option<(char, usize)> = None;
+    let mut previous_blank = false;
+
+    for line in content.lines() {
+        let fence = markdown_fence(line);
+        let inside_fence = open_fence.is_some();
+        let blank = line.trim().is_empty();
+
+        if inside_fence || !blank || !previous_blank {
+            writeln!(output, "{line}").unwrap();
+        }
+        previous_blank = !inside_fence && blank;
+
+        match (open_fence, fence) {
+            (None, Some((marker, length, _))) => open_fence = Some((marker, length)),
+            (Some((open_marker, open_length)), Some((marker, length, only_marker)))
+                if marker == open_marker && length >= open_length && only_marker =>
+            {
+                open_fence = None;
+                previous_blank = false;
+            },
+            _ => {},
+        }
+    }
+
+    output
+}
+
+/// Return the marker, run length, and whether nothing follows a Markdown fence.
+fn markdown_fence(line: &str) -> Option<(char, usize, bool)> {
+    let trimmed = line.trim_start();
+    let marker = trimmed.chars().next()?;
+    if marker != '`' && marker != '~' {
+        return None;
+    }
+    let length = trimmed.chars().take_while(|ch| *ch == marker).count();
+    (length >= 3).then(|| {
+        let suffix = &trimmed[length..];
+        (marker, length, suffix.trim().is_empty())
+    })
 }
 
 /// Render a single template string through Tera.
@@ -157,7 +217,8 @@ fn make_once_function(tera: &mut Tera) -> Arc<Mutex<HashSet<String>>> {
 }
 
 /// Creates a Tera function `frontmatter(name="...", description="...")` that
-/// renders YAML frontmatter and validates that both fields are non-empty.
+/// renders YAML frontmatter and validates that both fields are non-empty. An
+/// optional `argument_hint` is emitted as the skill's `argument-hint`.
 ///
 /// Returns a shared flag that is set during rendering. The caller resets it
 /// between render passes and checks that skill/agent files have called this
@@ -191,8 +252,12 @@ fn make_frontmatter_function(tera: &mut Tera) -> Arc<AtomicBool> {
                     "frontmatter() `description` must not be empty",
                 ));
             }
+            let argument_hint = match args.get("argument_hint").and_then(|v| v.as_str()) {
+                Some(hint) if !hint.is_empty() => format!("\nargument-hint: {hint}"),
+                _ => String::new(),
+            };
             Ok(tera::Value::String(format!(
-                "---\nname: {name}\ndescription: {description}\n---"
+                "---\nname: {name}\ndescription: {description}{argument_hint}\n---"
             )))
         },
     );
@@ -236,7 +301,11 @@ fn parse_frontmatter(content: &str) -> Option<(String, String)> {
 }
 
 /// Generate a plugin README from the rendered files and MCP tool metadata.
-pub fn generate_readme(files: &[(PathBuf, String)], platform_display: &str) -> String {
+pub fn generate_readme(
+    files: &[(PathBuf, String)],
+    platform_display: &str,
+    evaluation: EvaluationConfig,
+) -> String {
     let version = env!("CARGO_PKG_VERSION");
     let mut out = String::new();
 
@@ -299,7 +368,7 @@ pub fn generate_readme(files: &[(PathBuf, String)], platform_display: &str) -> S
     }
 
     // MCP Tools
-    let tools = FlowSession::tool_descriptions();
+    let tools = FlowSession::tool_descriptions(evaluation);
     if !tools.is_empty() {
         writeln!(out, "## MCP Tools").unwrap();
         writeln!(out).unwrap();
@@ -374,6 +443,13 @@ mod tests {
     }
 
     #[test]
+    fn test_normalize_markdown_spacing_preserves_fenced_whitespace() {
+        let input = "first\n\n\nsecond\n```move\nline\n\n\nline\n```\n\n\nlast\n";
+        let expected = "first\n\nsecond\n```move\nline\n\n\nline\n```\n\nlast\n";
+        assert_eq!(normalize_markdown_spacing(input), expected);
+    }
+
+    #[test]
     fn test_render_with_variable() {
         let mut context = tera::Context::new();
         context.insert("platform", "claude");
@@ -405,6 +481,9 @@ mod tests {
         let global = crate::GlobalOpts {
             platform: Platform::Claude,
             content_dir: Some(content_root.clone()),
+            inference_tactic: None,
+            evaluation_mode: false,
+            feedback_level: None,
         };
         let mut context = tera::Context::from_serialize(&global).unwrap();
         context.insert("platform_display", global.platform.display_name());
@@ -415,11 +494,23 @@ mod tests {
             max_verification_timeout: 20,
             default_verification_attempts: 3,
             log: None,
+            telemetry_jsonl: None,
+            flow_source_commit: None,
         };
         context.insert("args", &args);
+        context.insert("inference_tactic", "hybrid_guided");
+        context.insert("wp_tool_enabled", &true);
+        context.insert("guided_workflow", &true);
+        context.insert("tactic_selectable", &true);
+        context.insert("evaluation_mode", &false);
+        context.insert("hook_env_setup", "");
 
-        let tool_names = FlowSession::tool_names();
-        let files = render_all(&content_root, &context, &tool_names).unwrap();
+        let tool_names = FlowSession::tool_names(EvaluationConfig {
+            inference_tactic: crate::evaluation::InferenceTactic::HybridGuided,
+            evaluation_mode: false,
+            feedback_level: crate::evaluation::FeedbackLevel::Acceptance,
+        });
+        let files = render_all(&content_root, &context, &tool_names, &[]).unwrap();
         assert!(!files.is_empty(), "should discover at least one file");
 
         let paths: Vec<_> = files.iter().map(|(p, _)| p.clone()).collect();
