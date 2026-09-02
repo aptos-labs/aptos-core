@@ -10,7 +10,7 @@ use crate::{
     heap::{
         deep_copy_or_gc, deserialize_or_gc,
         macros::{alloc_captured_data, alloc_obj, alloc_vec, gc_collect, grow_vec_ref},
-        AllocationError, Heap, TopFrame,
+        AllocationError, FrozenHeap, Heap, TopFrame,
     },
     invariant_violation,
     memory::{
@@ -151,18 +151,21 @@ fn root_frame_base(stack: &MemoryRegion) -> *mut u8 {
 ///
 /// Read-write-set writes and extension entries point into the owned frozen heap,
 /// so the parts are only valid together; the heap outlives them because it is
-/// the last field. Reads of values from other arenas carry their own anchors
+/// the last field. Reads of values from other arenas carry their own pins
 /// (see [`StorageRead::ExternalHeap`](mono_move_core::StorageRead)). Read-write-set
 /// keys and some extension entries, notably emitted events, hold interned types
 /// backed by the global arena, so the block's `GlobalContext` must outlive these
 /// effects; nothing here borrows it, so that is a caller invariant.
+//
+// TODO(security): prove at compile time that the block's `GlobalContext` guard
+// is held.
 pub struct SessionEffects {
     read_write_set: ResourceReadWriteSet,
     extensions: NativeExtensions,
     /// Owns the allocations referenced by the read-write set and extensions.
     /// Not read directly: those hold raw pointers into it, so it only needs to
     /// outlive them. Declared last because fields drop in declaration order.
-    _heap: Arc<Heap>,
+    _heap: Arc<FrozenHeap>,
 }
 
 impl SessionEffects {
@@ -463,7 +466,7 @@ impl<'guard> InterpreterContext<'guard> {
         SessionEffects {
             read_write_set: self.read_write_set,
             extensions: self.extensions,
-            _heap: Arc::new(self.heap),
+            _heap: Arc::new(FrozenHeap::new(self.heap)),
         }
     }
 
