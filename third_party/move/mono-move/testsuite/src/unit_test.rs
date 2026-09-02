@@ -60,7 +60,7 @@ pub fn run_package_unit_tests(
 
     let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx.try_execution_context(0).expect("worker 0 is free");
-    let natives = build_natives(&guard);
+    let natives = build_natives();
 
     let mut module_provider = InMemoryModuleProvider::new();
     for info in test_plan.module_info.values() {
@@ -76,7 +76,7 @@ pub fn run_package_unit_tests(
                 &guard,
                 &module_provider,
                 &resource_provider,
-                &natives,
+                natives,
                 module_id,
                 test,
             );

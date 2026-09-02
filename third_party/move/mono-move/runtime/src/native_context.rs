@@ -20,19 +20,20 @@ use crate::{
     types::{META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET},
 };
 use mono_move_core::{
-    interner::InternedModuleId,
+    interner::{view_module_id, InternedIdentifier, InternedModuleId},
     native::{
-        native_invariant_violation, Boxed, NativeABI, NativeContext, NativeContextFamily,
-        NativeExtension, NativeExtensions, NativeFunction, NativeRegistry, Opaque, Ref, RootPool,
-        TableHandle, VMValue, Vector,
+        native_invariant_violation, Boxed, Dispatch, NativeABI, NativeContext, NativeContextFamily,
+        NativeExtension, NativeExtensions, NativeFunction, NativeIdx, NativeName, NativeResolver,
+        Opaque, Ref, RootPool, TableHandle, VMValue, Vector,
     },
     storage::resource_provider::InMemoryStorageKey,
-    types::InternedType,
+    types::{view_name, view_type_list, InternedType, InternedTypeList},
     DescriptorId, DescriptorProvider, ExecutionErrorKind, Function, GasMeter, LayoutProvider,
     ResourceProvider, VMResult, ENUM_DATA_OFFSET, FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE,
     TRIVIAL_DESCRIPTOR_ID,
 };
 use move_core_types::account_address::AccountAddress;
+use shared_dsa::UnorderedMap;
 use std::{
     cell::{Cell, RefMut, UnsafeCell},
     cmp::Ordering,
@@ -799,8 +800,118 @@ impl NativeContextFamily for ProductionContextFamily {
     type Of<'a> = ProductionNativeContext<'a>;
 }
 
-/// Shorthand for the [`NativeRegistry`] used by the production VM.
-pub type ProductionNativeRegistry = NativeRegistry<ProductionContextFamily>;
-
 /// Shorthand for the [`NativeFunction`] used by the production VM.
 pub type ProductionNativeFunction = NativeFunction<ProductionContextFamily>;
+
+/// The registry of native functions available. Stores a function table paired
+/// with a resolver that can map a native function (by its name) to its
+/// index in the table or actual implementation.
+//
+// TODO(cleanup): rename to `NativeRegistry`. There is a single registry, and
+// "production" is an overloaded, misused term.
+pub struct ProductionNativeRegistry {
+    funcs: Vec<ProductionNativeFunction>,
+    names: Vec<NativeName>,
+    by_name: UnorderedMap<NativeName, NativeIdx>,
+}
+
+impl ProductionNativeRegistry {
+    /// Builds a registry from native entries, placing each entry's function
+    /// pointer and name at the same [`NativeIdx`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if two entries are register under the same key.
+    pub fn with_natives(entries: Vec<(NativeName, ProductionNativeFunction)>) -> Self {
+        let mut funcs = Vec::with_capacity(entries.len());
+        let mut names = Vec::with_capacity(entries.len());
+        let mut by_name = UnorderedMap::with_capacity(entries.len());
+        for (position, (name, func)) in entries.into_iter().enumerate() {
+            let idx = NativeIdx(position as u32);
+            if by_name.insert(name, idx).is_some() {
+                panic!(
+                    "native `{}::{}` registered more than once",
+                    name.module, name.function
+                );
+            }
+            funcs.push(func);
+            names.push(name);
+        }
+        Self {
+            funcs,
+            names,
+            by_name,
+        }
+    }
+
+    /// A registry with no natives.
+    pub fn new() -> Self {
+        Self {
+            funcs: vec![],
+            names: vec![],
+            by_name: UnorderedMap::new(),
+        }
+    }
+
+    /// Number of registered natives.
+    pub fn len(&self) -> usize {
+        self.funcs.len()
+    }
+
+    /// Returns true if there are no registered native functions.
+    pub fn is_empty(&self) -> bool {
+        self.funcs.is_empty()
+    }
+
+    /// Returns the function pointer for a native, if one exists.
+    pub fn lookup_by_idx(&self, idx: NativeIdx) -> Option<ProductionNativeFunction> {
+        self.funcs.get(idx.0 as usize).copied()
+    }
+
+    /// Returns the name of the native registered at the specified index.
+    pub fn name_by_idx(&self, idx: NativeIdx) -> Option<&NativeName> {
+        self.names.get(idx.0 as usize)
+    }
+}
+
+impl Default for ProductionNativeRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl NativeResolver for ProductionNativeRegistry {
+    /// Resolves the native function's name to its registered index. If the
+    /// native is not registered, returns [`None`].
+    ///
+    /// When resolving generic natives, first checks if there is a native that
+    /// has already been instantiated (monomorphic). If such a native does not
+    /// exist, fallbacks to returning an index of the polymorphic implementation.
+    fn resolve(
+        &self,
+        module: InternedModuleId,
+        function: InternedIdentifier,
+        ty_args: InternedTypeList,
+    ) -> Option<NativeIdx> {
+        let module_id = view_module_id(module);
+        let address = *module_id.address();
+        let module = view_name(module_id.name());
+        let function = view_name(function);
+
+        let query = NativeName {
+            address,
+            module,
+            function,
+            dispatch: Dispatch::Monomorphic(view_type_list(ty_args)),
+        };
+        if let Some(idx) = self.by_name.get(&query) {
+            return Some(*idx);
+        }
+        self.by_name
+            .get(&NativeName {
+                dispatch: Dispatch::Polymorphic,
+                ..query
+            })
+            .copied()
+    }
+}
