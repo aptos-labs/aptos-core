@@ -602,6 +602,16 @@ pub trait DbWriter: Send + Sync {
         unimplemented!()
     }
 
+    /// Get a (stateful) snapshot receiver for the hot state at `version`. Separate from
+    /// `get_state_snapshot_receiver` because hot state leaves are `HotStateValue`s.
+    fn get_hot_state_snapshot_receiver(
+        &self,
+        version: Version,
+        expected_root_hash: HashValue,
+    ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, HotStateValue>>> {
+        unimplemented!()
+    }
+
     /// Finalizes a state snapshot that has already been restored to the database through
     /// a state snapshot receiver. This is required to bootstrap the transaction accumulator,
     /// populate transaction information, save the epoch ending ledger infos and delete genesis.
