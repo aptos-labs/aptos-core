@@ -45,6 +45,7 @@ fn trivial_program() -> Function {
         code: Code::from_vec(vec![MicroOp::Return]),
         entry_gas: 0,
         param_slots: vec![],
+        param_tys: vec![],
         param_region_size: 0,
         param_and_local_sizes_sum: 40,
         extended_frame_size: 64,

@@ -7,9 +7,8 @@
 //! an in-memory provider. Every call then runs in its own interpreter
 //! context — the same isolation shape as one transaction per session — with
 //! the request's gas budget re-armed per call, so outcomes depend only on
-//! the request. The execution core is the transaction executor's public call
-//! machinery; this module contributes the compile step and the orchestration
-//! only.
+//! the request. Calls are placed and run through the runtime's `CallBuilder`;
+//! this module contributes the compile step and the orchestration only.
 
 use crate::{
     marshal::{encode_bcs, parse_address, read_root_results},
@@ -21,15 +20,18 @@ use crate::{
 use bytes::Bytes;
 use codespan_reporting::term::termcolor::Buffer;
 use legacy_move_compiler::{compiled_unit::CompiledUnit, shared::known_attributes::KnownAttribute};
-use mono_move_aptos_transaction_executor::{call_function, production_natives, return_types};
+use mono_move_aptos_transaction_executor::production_natives;
 use mono_move_core::{
-    types::EMPTY_TYPE_LIST, ExecutionErrorKind, GasMeter, Interner, IntoExecutionError,
-    NoResourceProvider, VMInternalError, VMResult,
+    interner::InternedIdentifier,
+    types::{view_type_list, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
+    ExecutionErrorKind, GasMeter, Interner, IntoExecutionError, NoResourceProvider,
+    VMInternalError, VMResult,
 };
-use mono_move_global_context::{ExecutionGuard, GlobalContext};
+use mono_move_global_context::{ExecutionGuard, FunctionIrLookup, GlobalContext, LoadedModule};
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleProvider};
 use mono_move_runtime::{
-    error::RuntimeError, InterpreterContext, ProductionNativeRegistry, RuntimeStatus,
+    error::RuntimeError, InterpreterContext, InterpreterOptions, ProductionNativeRegistry,
+    RuntimeStatus,
 };
 use move_binary_format::CompiledModule;
 use move_compiler_v2::Options;
@@ -191,16 +193,13 @@ fn run_call<'guard>(
             }
         },
     };
-    let signer_bufs = match call
+    let signers = match call
         .signers
         .iter()
         .map(|signer| parse_address(signer))
         .collect::<Result<Vec<_>, _>>()
     {
-        Ok(signers) => signers
-            .into_iter()
-            .map(|address| address.into_bytes())
-            .collect::<Vec<_>>(),
+        Ok(signers) => signers,
         Err(message) => {
             return Outcome::Error {
                 stage: Stage::Abi,
@@ -216,37 +215,38 @@ fn run_call<'guard>(
         natives,
     );
     let gas_meter = GasMeter::new(limits.gas);
-    let mut interp = match limits.heap {
-        Some(heap_size) => InterpreterContext::new_idle_with_heap_size(
-            loader,
-            gas_meter,
-            &NoResourceProvider,
-            natives,
-            heap_size,
-        ),
-        None => InterpreterContext::new_idle(loader, gas_meter, &NoResourceProvider, natives),
-    };
-
-    let result = call_function(
-        guard,
-        &mut interp,
-        &address,
-        module_name.as_ident_str(),
-        function_name.as_ident_str(),
-        EMPTY_TYPE_LIST,
-        &signer_bufs,
-        &args,
+    let mut options = InterpreterOptions::default();
+    if let Some(heap_size) = limits.heap {
+        options.heap_size = heap_size;
+    }
+    let mut interp = InterpreterContext::new_with_options(
+        loader,
+        gas_meter,
+        &NoResourceProvider,
+        natives,
+        options,
     );
+
+    let module_id = guard.module_id_of(&address, module_name.as_ident_str());
+    let function_id = guard.identifier_of(function_name.as_ident_str());
+    let result = (|| {
+        let func = interp.load_function(module_id, function_id, EMPTY_TYPE_LIST)?;
+        let mut call = interp.build_call(func)?;
+        for signer in &signers {
+            call.signer(signer)?;
+        }
+        for arg in &args {
+            call.arg_bcs(arg)?;
+        }
+        call.run()
+    })();
     let gas_used = limits.gas.saturating_sub(interp.gas_balance());
     let gc_count = interp.gc_count();
 
     match result {
         Ok(RuntimeStatus::Success) => {
             // Resolve the callee's return types through the read set the
-            // call left behind, mirroring how the executor itself reaches
-            // the loaded module.
-            let module_id = guard.module_id_of(&address, module_name.as_ident_str());
-            let function_id = guard.identifier_of(function_name.as_ident_str());
+            // call left behind.
             let returns = match interp
                 .read_set()
                 .get_loaded(guard.arena_ref_for_module_id(module_id))
@@ -327,6 +327,28 @@ fn run_call<'guard>(
             }
         },
     }
+}
+
+/// The return types of a loaded module's function, instantiated with
+/// `ty_args`.
+fn return_types(
+    guard: &ExecutionGuard<'_>,
+    loaded: &LoadedModule,
+    function: InternedIdentifier,
+    ty_args: InternedTypeList,
+) -> Result<Vec<InternedType>, String> {
+    let FunctionIrLookup::Ir(ir) = loaded.get_function_ir(function) else {
+        return Err("function has no IR in its loaded module".to_string());
+    };
+    let returns = loaded
+        .ir()
+        .module
+        .function_signature_at(ir.handle_idx)
+        .returns;
+    let returns = guard
+        .subst_type_list(returns, ty_args)
+        .map_err(|error| error.to_string())?;
+    Ok(view_type_list(returns).to_vec())
 }
 
 /// Parses `0x…::module::function`.

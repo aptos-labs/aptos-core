@@ -5,13 +5,13 @@
 //! session hosting the prologue, the payload, and the epilogue.
 
 use super::{
+    args::call_entry_function,
     metadata::TxnMetadata,
     pre_execution_checks::PreExecutionChecker,
-    validation::{run_epilogue, run_prologue, TxnSigners},
+    validation::{run_epilogue, run_prologue, ValidationSigners},
 };
 use crate::{
-    calls::call_function,
-    errors::{DiscardReason, ExecutionStage, ExecutionStatus, MoveExecutionFailure},
+    errors::{call_result, DiscardReason, ExecutionStage, ExecutionStatus, MoveExecutionFailure},
     executor::AptosTransactionExecutor,
     natives::extensions_with,
     outcome::TxnOutcome,
@@ -26,7 +26,7 @@ use mono_move_core::{
 };
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
 use mono_move_natives::TransactionContextExtension;
-use mono_move_runtime::{InterpreterContext, RuntimeStatus};
+use mono_move_runtime::InterpreterContext;
 
 impl<'guard> AptosTransactionExecutor<'guard> {
     /// Executes one user transaction, returning its side effects unmaterialized (see [`TxnOutcome`]).
@@ -99,7 +99,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         let extensions = transaction_extensions(&txn_data, self.usage);
 
         let max_gas = txn_data.max_gas_amount;
-        let mut interp = InterpreterContext::new_idle(
+        let mut interp = InterpreterContext::new(
             loader,
             // TODO(metering): MonoMove gas units are uncalibrated; budgeting
             // 1:1 against the transaction's gas units is a placeholder.
@@ -109,7 +109,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         )
         .with_extensions(extensions);
 
-        let signers = TxnSigners::for_validation(&txn_data);
+        let signers = ValidationSigners::new(&txn_data);
 
         // ============================ Prologue ==============================
         // Validate the transaction (auth key, sequence number or nonce, fee coverage etc.)
@@ -153,7 +153,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         // ============================ Epilogue ==============================
         // Transaction cleanup -- charge gas, bump sequence number etc.
         let fee_statement = placeholder_fee_statement(gas_used);
-        let epilogue = |interp: &mut InterpreterContext<'_>| {
+        let epilogue = |interp: &mut InterpreterContext<'guard>| {
             run_epilogue(
                 interp,
                 guard,
@@ -205,7 +205,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
 
     fn execute_entry_function(
         &self,
-        interp: &mut InterpreterContext<'_>,
+        interp: &mut InterpreterContext<'guard>,
         txn_data: &TxnMetadata,
         entry: &EntryFunction,
         ty_args: InternedTypeList,
@@ -216,32 +216,19 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         // `transaction_arg_validation`.
 
         // TODO(completeness): multi-agent transactions are untested.
-        let signers = TxnSigners::for_payload(txn_data);
-
-        let status = call_function(
+        let status = call_entry_function(
             self.guard,
             interp,
             &entry.module().address,
             entry.module().name(),
             entry.function(),
             ty_args,
-            signers.as_slice(),
+            &txn_data.sender,
+            &txn_data.secondary_signers,
             entry.args(),
-        )
-        .map_err(MoveExecutionFailure::RuntimeError)?;
+        )?;
 
-        match status {
-            RuntimeStatus::Success => Ok(()),
-            RuntimeStatus::Aborted {
-                code,
-                message,
-                location,
-            } => Err(MoveExecutionFailure::Abort {
-                code,
-                message,
-                location,
-            }),
-        }
+        call_result(status)
     }
 }
 

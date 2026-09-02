@@ -8,13 +8,12 @@ use mono_move_core::{
     Function, GasMeter, NoModuleProvider, NoResourceProvider,
 };
 use mono_move_global_context::GlobalContext;
-use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
+use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
 use mono_move_runtime::{InterpreterContext, ProductionNativeRegistry};
 
 /// Runs `f` with a fresh [`InterpreterContext`] over an empty module provider
-/// and no natives, with `entry` verified and installed. A fresh
-/// [`GlobalContext`] is built per call so no cached module or interned state
-/// leaks between tests.
+/// and no natives, with `entry` verified. A fresh global context per call
+/// keeps cached module and interned state from leaking between tests.
 // Not every test binary that includes `common` uses the helper.
 #[allow(dead_code)]
 pub fn with_test_interpreter<R>(
@@ -34,13 +33,12 @@ pub fn with_test_interpreter<R>(
         LoadingPolicy::Lazy(LoweringPolicy::Lazy),
         &NoNatives,
     );
+    mono_move_runtime::assert_verified(entry, &guard);
     let mut interp = InterpreterContext::new(
         loader,
-        ModuleReadSet::new(),
         GasMeter::new(gas_budget),
         &NoResourceProvider,
         &natives,
-        entry,
     )
     .with_extensions(extensions);
     f(&mut interp)

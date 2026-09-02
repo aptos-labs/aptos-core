@@ -41,27 +41,22 @@ module 0x1::test {
     let fib_name = guard
         .intern_identifier(ident_str!("fib"))
         .into_global_arena_ptr();
-    // Load with an effectively unbounded budget; the run itself gets a tiny
-    // budget of 10.
-    let mut read_set = ModuleReadSet::new();
-    let mut load_gas = GasMeter::with_max_budget();
-    let fib = loader
-        .load_function(&mut read_set, &mut load_gas, id, fib_name, EMPTY_TYPE_LIST)
-        .expect("load should succeed");
-
-    // SAFETY: `fib` is held alive by the executable cache via `guard`.
-    let fib = unsafe { fib.as_ref_unchecked() };
-
     let mut interpreter = InterpreterContext::new(
         loader,
-        read_set,
         GasMeter::new(10),
         &mono_move_core::NoResourceProvider,
         &natives,
-        fib,
     );
-    interpreter.set_root_arg(0, &10u64.to_le_bytes());
-    let err = interpreter.run().unwrap_err();
+    // Load with the budget suspended; the run itself gets a tiny budget of 10.
+    let fib = interpreter
+        .unmetered(|interp| interp.load_function(id, fib_name, EMPTY_TYPE_LIST))
+        .expect("load should succeed");
+    mono_move_runtime::assert_verified(fib, &guard);
+    let mut call = interpreter
+        .build_call(fib)
+        .expect("the root frame fits on the stack");
+    call.arg(&10u64).expect("argument placement succeeds");
+    let err = call.run().unwrap_err();
     assert!(err.downcast_ref::<GasExhaustedError>().is_some(),);
 }
 
