@@ -155,11 +155,25 @@ impl<'a> GraphBuilder<'a> {
         }
     }
 
-    fn reset_process_budget(&mut self) {
-        self.remaining_graph_budget = MAX_DERIVED_GRAPHS_PER_PROCESS;
+    /// Start the generation budget for one primary function.
+    ///
+    /// `--max-script-gen-secs-per-function` names a *function*, so its deadline
+    /// is set here rather than in `reset_process_budget`. Resetting it per
+    /// `process` call gave a function as many deadlines as it had ability-set
+    /// combinations, and (before the call was hoisted out of the lambda loop)
+    /// as many again per lambda combination -- so the flag bounded a fraction
+    /// of the work and the advertised number meant nothing.
+    pub fn begin_function(&mut self) {
         self.process_deadline = self
             .max_process_time
             .map(|duration| Instant::now() + duration);
+    }
+
+    /// Reset the per-instantiation graph budget. The wall-clock deadline is
+    /// deliberately not touched: it belongs to the function, not to one
+    /// instantiation of it.
+    fn reset_process_budget(&mut self) {
+        self.remaining_graph_budget = MAX_DERIVED_GRAPHS_PER_PROCESS;
         self.process_limit_hit = None;
     }
 

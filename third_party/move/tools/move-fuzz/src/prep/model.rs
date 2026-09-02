@@ -197,6 +197,9 @@ impl Model {
         let mut generated_scripts = vec![];
         for decl in primary_decls {
             primary_func_count += 1;
+            // one wall-clock budget per function, spanning every ability-set and
+            // lambda combination it expands into
+            builder.begin_function();
             let module_key = format!("{}::{}", decl.ident.address(), decl.ident.module_name());
 
             info!(
@@ -286,6 +289,28 @@ impl Model {
                         .collect()
                 };
 
+                // Build the flow graphs once per instantiation. A lambda binding
+                // only decides how one parameter is spelled in the emitted
+                // source; it does not change the search. Running `process` per
+                // lambda combination repeated identical work and, worse, called
+                // `reset_process_budget` each time, so neither the 4096-graph
+                // budget nor `--max-script-gen-secs-per-function` bounded what
+                // it advertised: a function with k lambda combinations got k
+                // times its stated deadline, and the ability-set product
+                // multiplied that again.
+                let raw_graphs = builder.process(decl, &type_args);
+                if let Some(limit_reason) = builder.process_limit_hit() {
+                    warn!(
+                        "  -> graph exploration truncated by {limit_reason} for {}",
+                        decl.ident
+                    );
+                    if !function_limited {
+                        function_limited = true;
+                        limited_functions += 1;
+                    }
+                }
+                let raw_count = raw_graphs.len();
+
                 for lambda_combo in lambda_combos {
                     // build the bindings map
                     let mut bindings = BTreeMap::new();
@@ -299,22 +324,8 @@ impl Model {
                         });
                     }
 
-                    // build flow graphs for this instantiation + lambda combination
-                    let raw_graphs = builder.process(decl, &type_args);
-                    if let Some(limit_reason) = builder.process_limit_hit() {
-                        warn!(
-                            "  -> graph exploration truncated by {limit_reason} for {}",
-                            decl.ident
-                        );
-                        if !function_limited {
-                            function_limited = true;
-                            limited_functions += 1;
-                        }
-                    }
-
-                    let raw_count = raw_graphs.len();
                     let mut feasible_count = 0;
-                    for graph in raw_graphs {
+                    for graph in &raw_graphs {
                         if scripts_for_func >= MAX_SCRIPTS_PER_FUNCTION {
                             debug!(
                                 "reached per-function cap ({MAX_SCRIPTS_PER_FUNCTION}) for {}",
@@ -322,7 +333,7 @@ impl Model {
                             );
                             break 'combo_loop;
                         }
-                        if builder.is_feasible(&graph) {
+                        if builder.is_feasible(graph) {
                             let graph = graph.compact_generics();
                             let Some(canvas) = DriverCanvas::try_build(self, &graph, &bindings)
                             else {
