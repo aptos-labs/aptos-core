@@ -1,0 +1,16 @@
+{
+  "schema_version": 3,
+  "stage": "trusted_boundary",
+  "target": "0x1::code::check_dependencies",
+  "basis": "expert_assumption",
+  "target_body_proof": "timeout",
+  "verified": false,
+  "timeout_seconds": 180,
+  "artifacts": [
+    "dependency-contract-verification.address-1-code-check_dependencies.timeout-60.json",
+    "dependency-contract-verification.address-1-code-check_dependencies.timeout-120.json",
+    "dependency-contract-verification.address-1-code-check_dependencies.timeout-180.json"
+  ],
+  "rationale": "The source has explicit per-dependency, first-match search, and per-package module-prefix invariants. The opaque contract exactly models the first named package, all policy aborts, the wildcard/module output sequence, and the only aggregate vector-capacity abort. Focused target-body proofs with a one-step recursive-vector lemma exceeded the package deadline at 60, 120, and 180 seconds without a counterexample.",
+  "metadata": "trusted-verification-boundaries.json"
+}

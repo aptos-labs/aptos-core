@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "stage": "prover",
+  "target": "0x1::pool_u64::shareholders",
+  "passed": true,
+  "diagnostics": []
+}

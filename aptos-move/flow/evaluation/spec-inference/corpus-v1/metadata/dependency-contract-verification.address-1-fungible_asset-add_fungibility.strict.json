@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "stage": "prover",
+  "target": "0x1::fungible_asset::add_fungibility",
+  "passed": false,
+  "diagnostics": [
+    "[internal] boogie exited with compilation errors:\n/tmp/move-prover-xACyTd/output.vc_0003.bpl(5418,194): Error: invalid type for argument 0 in application of $1_vector_$borrow'u8': Vec bv8 (expected: Vec int)\n1 type checking errors detected in /tmp/move-prover-xACyTd/output.vc_0003.bpl\n"
+  ]
+}

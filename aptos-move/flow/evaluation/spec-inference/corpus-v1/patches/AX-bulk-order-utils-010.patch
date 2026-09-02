@@ -1,0 +1,1011 @@
+diff --git a/.move-inference-task.json b/.move-inference-task.json
+new file mode 100644
+index 0000000000..188c18cfe1
+--- /dev/null
++++ b/.move-inference-task.json
+@@ -0,0 +1,276 @@
++{
++  "called_function_dependencies": [
++    "0x1::option::destroy_some",
++    "0x1::option::is_some",
++    "0x1::option::none",
++    "0x1::option::some",
++    "0x1::timestamp::now_microseconds",
++    "0x1::vector::borrow",
++    "0x1::vector::borrow_mut",
++    "0x1::vector::empty",
++    "0x1::vector::insert",
++    "0x1::vector::length",
++    "0x1::vector::move_range",
++    "0x1::vector::remove",
++    "0x5::bulk_order_types::get_all_prices",
++    "0x5::bulk_order_types::get_all_prices_mut",
++    "0x5::bulk_order_types::get_all_sizes_mut",
++    "0x5::bulk_order_types::get_order_request_mut",
++    "0x5::bulk_order_types::get_prices_and_sizes_mut",
++    "0x5::bulk_order_types::new_bulk_order",
++    "0x5::bulk_order_types::new_bulk_order_request",
++    "0x5::order_match_types::get_price_from_match_details",
++    "0x5::order_match_types::get_remaining_size_from_match_details",
++    "0x5::order_match_types::is_bid_from_match_details",
++    "0x7::bulk_order_utils::discard_price_crossing_levels",
++    "0x7::bulk_order_utils::trim_start",
++    "0x7::bulk_order_utils::validate_not_zero_sizes",
++    "0x7::bulk_order_utils::validate_price_ordering"
++  ],
++  "granularity": "module",
++  "package_module_target": "0x7::bulk_order_utils",
++  "schema_version": 3,
++  "source_commit": "6d836beedc56fc70c54f3b3046d1d248d850c64b",
++  "source_path": "sources/AptosExperimental/trading/order_book/bulk_order_utils.move",
++  "spec_function_dependencies": [
++    "0x1::option::$borrow",
++    "0x1::option::$destroy_some",
++    "0x1::option::$is_none",
++    "0x1::option::$is_some",
++    "0x1::option::spec_is_some",
++    "0x1::option::spec_none",
++    "0x1::option::spec_some",
++    "0x1::timestamp::spec_now_microseconds"
++  ],
++  "target_functions": [
++    "cancel_at_price_level",
++    "discard_price_crossing_levels",
++    "match_order_and_get_next_from_bulk_order",
++    "new_bulk_order_request_with_sanitization",
++    "new_bulk_order_with_sanitization",
++    "reinsert_order_into_bulk_order",
++    "trim_start",
++    "validate_not_zero_sizes",
++    "validate_price_ordering"
++  ],
++  "task_id": "AX-bulk-order-utils-010",
++  "transitive_called_function_dependencies": [
++    "0x1::option::destroy_some",
++    "0x1::option::is_some",
++    "0x1::option::none",
++    "0x1::option::some",
++    "0x1::timestamp::now_microseconds",
++    "0x1::vector::borrow",
++    "0x1::vector::borrow_mut",
++    "0x1::vector::destroy_empty",
++    "0x1::vector::empty",
++    "0x1::vector::insert",
++    "0x1::vector::length",
++    "0x1::vector::move_range",
++    "0x1::vector::pop_back",
++    "0x1::vector::push_back",
++    "0x1::vector::remove",
++    "0x1::vector::singleton",
++    "0x1::vector::swap",
++    "0x5::bulk_order_types::get_all_prices",
++    "0x5::bulk_order_types::get_all_prices_mut",
++    "0x5::bulk_order_types::get_all_sizes_mut",
++    "0x5::bulk_order_types::get_order_request_mut",
++    "0x5::bulk_order_types::get_prices_and_sizes_mut",
++    "0x5::bulk_order_types::new_bulk_order",
++    "0x5::bulk_order_types::new_bulk_order_request",
++    "0x5::order_match_types::get_price_from_match_details",
++    "0x5::order_match_types::get_remaining_size_from_match_details",
++    "0x5::order_match_types::is_bid_from_match_details",
++    "0x7::bulk_order_utils::discard_price_crossing_levels",
++    "0x7::bulk_order_utils::trim_start",
++    "0x7::bulk_order_utils::validate_not_zero_sizes",
++    "0x7::bulk_order_utils::validate_price_ordering"
++  ],
++  "transitive_function_dependencies": [
++    "0x1::option::destroy_some",
++    "0x1::option::is_some",
++    "0x1::option::none",
++    "0x1::option::some",
++    "0x1::timestamp::now_microseconds",
++    "0x1::vector::borrow",
++    "0x1::vector::borrow_mut",
++    "0x1::vector::destroy_empty",
++    "0x1::vector::empty",
++    "0x1::vector::insert",
++    "0x1::vector::length",
++    "0x1::vector::move_range",
++    "0x1::vector::pop_back",
++    "0x1::vector::push_back",
++    "0x1::vector::remove",
++    "0x1::vector::singleton",
++    "0x1::vector::swap",
++    "0x5::bulk_order_types::get_all_prices",
++    "0x5::bulk_order_types::get_all_prices_mut",
++    "0x5::bulk_order_types::get_all_sizes_mut",
++    "0x5::bulk_order_types::get_order_request_mut",
++    "0x5::bulk_order_types::get_prices_and_sizes_mut",
++    "0x5::bulk_order_types::new_bulk_order",
++    "0x5::bulk_order_types::new_bulk_order_request",
++    "0x5::order_match_types::get_price_from_match_details",
++    "0x5::order_match_types::get_remaining_size_from_match_details",
++    "0x5::order_match_types::is_bid_from_match_details",
++    "0x7::bulk_order_utils::discard_price_crossing_levels",
++    "0x7::bulk_order_utils::trim_start",
++    "0x7::bulk_order_utils::validate_not_zero_sizes",
++    "0x7::bulk_order_utils::validate_price_ordering"
++  ],
++  "transitive_module_dependencies": [
++    "0x1::account",
++    "0x1::account_abstraction",
++    "0x1::aggregator",
++    "0x1::aggregator_factory",
++    "0x1::aggregator_v2",
++    "0x1::any",
++    "0x1::aptos_account",
++    "0x1::aptos_coin",
++    "0x1::aptos_governance",
++    "0x1::aptos_hash",
++    "0x1::auth_data",
++    "0x1::bcs",
++    "0x1::bcs_stream",
++    "0x1::big_ordered_map",
++    "0x1::block",
++    "0x1::bls12381",
++    "0x1::bn254_algebra",
++    "0x1::chain_id",
++    "0x1::chain_status",
++    "0x1::chunky_dkg",
++    "0x1::chunky_dkg_config",
++    "0x1::chunky_dkg_config_seqnum",
++    "0x1::cmp",
++    "0x1::code",
++    "0x1::coin",
++    "0x1::comparator",
++    "0x1::confidential_amount",
++    "0x1::confidential_asset",
++    "0x1::confidential_balance",
++    "0x1::confidential_range_proofs",
++    "0x1::config_buffer",
++    "0x1::consensus_config",
++    "0x1::copyable_any",
++    "0x1::create_signer",
++    "0x1::crypto_algebra",
++    "0x1::decryption",
++    "0x1::delegation_pool",
++    "0x1::dispatchable_fungible_asset",
++    "0x1::dkg",
++    "0x1::ed25519",
++    "0x1::epoch_timeout_config",
++    "0x1::error",
++    "0x1::event",
++    "0x1::execution_config",
++    "0x1::features",
++    "0x1::federated_keyless",
++    "0x1::fixed_point32",
++    "0x1::fixed_point64",
++    "0x1::from_bcs",
++    "0x1::function_info",
++    "0x1::fungible_asset",
++    "0x1::gas_schedule",
++    "0x1::genesis",
++    "0x1::governance_proposal",
++    "0x1::guid",
++    "0x1::hash",
++    "0x1::init",
++    "0x1::jwk_consensus_config",
++    "0x1::jwks",
++    "0x1::keyless",
++    "0x1::keyless_account",
++    "0x1::math128",
++    "0x1::math64",
++    "0x1::math_fixed64",
++    "0x1::mem",
++    "0x1::multi_ed25519",
++    "0x1::multi_key",
++    "0x1::multisig_account",
++    "0x1::nonce_validation",
++    "0x1::object",
++    "0x1::option",
++    "0x1::optional_aggregator",
++    "0x1::ordered_map",
++    "0x1::pool_u64",
++    "0x1::pool_u64_unbound",
++    "0x1::primary_fungible_store",
++    "0x1::randomness",
++    "0x1::randomness_api_v0_config",
++    "0x1::randomness_config",
++    "0x1::randomness_config_seqnum",
++    "0x1::reconfiguration",
++    "0x1::reconfiguration_state",
++    "0x1::reconfiguration_with_dkg",
++    "0x1::reflect",
++    "0x1::resource_account",
++    "0x1::result",
++    "0x1::ristretto255",
++    "0x1::ristretto255_bulletproofs",
++    "0x1::ristretto255_pedersen",
++    "0x1::secp256k1",
++    "0x1::secp256r1",
++    "0x1::sigma_protocol",
++    "0x1::sigma_protocol_fiat_shamir",
++    "0x1::sigma_protocol_homomorphism",
++    "0x1::sigma_protocol_key_rotation",
++    "0x1::sigma_protocol_proof",
++    "0x1::sigma_protocol_registration",
++    "0x1::sigma_protocol_representation",
++    "0x1::sigma_protocol_representation_vec",
++    "0x1::sigma_protocol_statement",
++    "0x1::sigma_protocol_statement_builder",
++    "0x1::sigma_protocol_transfer",
++    "0x1::sigma_protocol_utils",
++    "0x1::sigma_protocol_withdraw",
++    "0x1::sigma_protocol_witness",
++    "0x1::signer",
++    "0x1::simple_map",
++    "0x1::single_key",
++    "0x1::smart_table",
++    "0x1::stake",
++    "0x1::staking_config",
++    "0x1::staking_contract",
++    "0x1::state_storage",
++    "0x1::storage_gas",
++    "0x1::storage_slots_allocator",
++    "0x1::string",
++    "0x1::string_utils",
++    "0x1::system_addresses",
++    "0x1::table",
++    "0x1::table_with_length",
++    "0x1::timestamp",
++    "0x1::transaction_context",
++    "0x1::transaction_fee",
++    "0x1::transaction_limits",
++    "0x1::transaction_validation",
++    "0x1::type_info",
++    "0x1::util",
++    "0x1::validator_consensus_info",
++    "0x1::vector",
++    "0x1::version",
++    "0x1::vesting",
++    "0x1::voting",
++    "0x5::bulk_order_types",
++    "0x5::order_book_types",
++    "0x5::order_match_types",
++    "0x5::single_order_types",
++    "0x7::bulk_order_book",
++    "0x7::dead_mans_switch_operations",
++    "0x7::dead_mans_switch_tracker",
++    "0x7::market_bulk_order",
++    "0x7::market_clearinghouse_order_info",
++    "0x7::market_types",
++    "0x7::order_book",
++    "0x7::order_book_utils",
++    "0x7::order_id_generation",
++    "0x7::order_operations",
++    "0x7::order_placement",
++    "0x7::pending_order_book_index",
++    "0x7::pre_cancellation_tracker",
++    "0x7::price_time_index",
++    "0x7::single_order_book"
++  ]
++}
+diff --git a/sources/AptosExperimental/trading/order_book/bulk_order_utils.spec.move b/sources/AptosExperimental/trading/order_book/bulk_order_utils.spec.move
+index d7cdc29b70..515959bf82 100644
+--- a/sources/AptosExperimental/trading/order_book/bulk_order_utils.spec.move
++++ b/sources/AptosExperimental/trading/order_book/bulk_order_utils.spec.move
+@@ -1,367 +1,367 @@
+ spec aptos_experimental::bulk_order_utils {
+ 
+-    spec discard_price_crossing_levels(prices: &vector<u64>, best_price: 0x1::option::Option<u64>, is_bid: bool): u64 {
+-        use 0x1::option;
+-        pragma opaque = true, aborts_if_is_partial = true;
+-        ensures [inferred = sathard] !option::is_some<u64>(best_price) ==> result == 0;
+-        ensures [inferred = sathard] option::is_some<u64>(best_price) ==> (forall x: u64: x >= len(prices) ==> result == x);
+-        ensures [inferred = sathard] option::is_some<u64>(best_price) ==> (forall x: u64: x < len(prices) && (is_bid && prices[x] < option::destroy_some<u64>(best_price)) ==> result == x);
+-        ensures [inferred = sathard] option::is_some<u64>(best_price) ==> (forall x: u64: x < len(prices) && (!is_bid && prices[x] > option::destroy_some<u64>(best_price)) ==> result == x);
+-        aborts_if [inferred = sathard] option::is_some<u64>(best_price) && (is_bid && (exists x: u64: x < len(prices) && !in_range(prices, x)));
+-        aborts_if [inferred = sathard] option::is_some<u64>(best_price) && (!is_bid && (exists x: u64: x < len(prices) && !in_range(prices, x)));
+-        aborts_if [inferred = sathard] option::is_some<u64>(best_price) && aborts_of<option::destroy_some<u64>>(best_price);
+-    }
++                                                                                                                       
++                        
++                                                          
++                                                                                       
++                                                                                                                            
++                                                                                                                                                                                            
++                                                                                                                                                                                             
++                                                                                                                                                
++                                                                                                                                                 
++                                                                                                                            
++     
+ 
+-    spec match_order_and_get_next_from_bulk_order<M: copy + drop + store>(order: &mut 0x5::bulk_order_types::BulkOrder<M>, is_bid: bool, matched_size: u64): (0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+-        use 0x1::option;
+-        use 0x5::bulk_order_types;
+-        pragma opaque = true;
+-        ensures [inferred = sathard] ({
+-            let (a_0,a_1) = {
+-                let b = ..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order);
+-                S1.. |~ result_of<bulk_order_types::get_prices_and_sizes_mut<M>>(b, is_bid)
+-            };
+-            forall _local52: bool: forall _local53: bool: matched_size > a_1[0] && (_local52 && !_local53) ==> order == update_field(order, order_request, ..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order))
+-        });
+-        ensures [inferred] ({
+-            let (a_0,a_1) = {
+-                let b = ..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order);
+-                S1.. |~ result_of<bulk_order_types::get_prices_and_sizes_mut<M>>(b, is_bid)
+-            };
+-            matched_size <= a_1[0] && (a_1[0] != 0 && len(a_1) == 0) ==> result_1 == option::none<u64>()
+-        });
+-        ensures [inferred] ({
+-            let (a_0,a_1) = {
+-                let b = ..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order);
+-                S1.. |~ result_of<bulk_order_types::get_prices_and_sizes_mut<M>>(b, is_bid)
+-            };
+-            matched_size <= a_1[0] && (a_1[0] != 0 && len(a_1) == 0) ==> result_2 == option::none<u64>()
+-        });
+-        ensures [inferred = sathard] ({
+-            let (a_0,a_1) = {
+-                let b = ..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order);
+-                S1.. |~ result_of<bulk_order_types::get_prices_and_sizes_mut<M>>(b, is_bid)
+-            };
+-            forall _local34: bool: forall _local35: bool: matched_size <= a_1[0] && (a_1[0] != 0 && (len(a_1) == 0 && (!_local34 && _local35))) ==> order == update_field(order, order_request, update_field(update_field(update_field(..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order), bid_prices, a_0), ask_prices, a_0), ask_sizes, a_1))
+-        });
+-        ensures [inferred = sathard] ({
+-            let (a_0,a_1) = {
+-                let b = ..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order);
+-                S1.. |~ result_of<bulk_order_types::get_prices_and_sizes_mut<M>>(b, is_bid)
+-            };
+-            forall _local34: bool: forall _local35: bool: matched_size <= a_1[0] && (a_1[0] != 0 && (len(a_1) == 0 && (_local34 && _local35))) ==> order == update_field(order, order_request, update_field(update_field(update_field(update_field(..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order), bid_prices, a_0), ask_prices, a_0), bid_sizes, a_1), ask_sizes, a_1))
+-        });
+-        ensures [inferred = sathard] ({
+-            let (a_0,a_1) = {
+-                let b = ..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order);
+-                S1.. |~ result_of<bulk_order_types::get_prices_and_sizes_mut<M>>(b, is_bid)
+-            };
+-            forall _local34: bool: forall _local35: bool: matched_size <= a_1[0] && (a_1[0] != 0 && (len(a_1) == 0 && (_local34 && !_local35))) ==> order == update_field(order, order_request, update_field(update_field(update_field(..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order), bid_prices, a_0), ask_prices, a_0), bid_sizes, a_1))
+-        });
+-        ensures [inferred] ({
+-            let (a_0,a_1) = {
+-                let b = ..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order);
+-                S1.. |~ result_of<bulk_order_types::get_prices_and_sizes_mut<M>>(b, is_bid)
+-            };
+-            matched_size <= a_1[0] && (a_1[0] != 0 && len(a_1) != 0) ==> result_1 == option::some<u64>(a_0[0])
+-        });
+-        ensures [inferred] ({
+-            let (a_0,a_1) = {
+-                let b = ..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order);
+-                S1.. |~ result_of<bulk_order_types::get_prices_and_sizes_mut<M>>(b, is_bid)
+-            };
+-            matched_size <= a_1[0] && (a_1[0] != 0 && len(a_1) != 0) ==> result_2 == option::some<u64>(a_1[0])
+-        });
+-        ensures [inferred = sathard] ({
+-            let (a_0,a_1) = {
+-                let b = ..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order);
+-                S1.. |~ result_of<bulk_order_types::get_prices_and_sizes_mut<M>>(b, is_bid)
+-            };
+-            forall _local47: bool: forall _local48: bool: matched_size <= a_1[0] && (a_1[0] != 0 && (len(a_1) != 0 && (!_local47 && _local48))) ==> order == update_field(order, order_request, update_field(update_field(update_field(..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order), bid_prices, a_0), ask_prices, a_0), ask_sizes, a_1))
+-        });
+-        ensures [inferred = sathard] ({
+-            let (a_0,a_1) = {
+-                let b = ..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order);
+-                S1.. |~ result_of<bulk_order_types::get_prices_and_sizes_mut<M>>(b, is_bid)
+-            };
+-            forall _local47: bool: forall _local48: bool: matched_size <= a_1[0] && (a_1[0] != 0 && (len(a_1) != 0 && (_local47 && _local48))) ==> order == update_field(order, order_request, update_field(update_field(update_field(update_field(..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order), bid_prices, a_0), ask_prices, a_0), bid_sizes, a_1), ask_sizes, a_1))
+-        });
+-        ensures [inferred = sathard] ({
+-            let (a_0,a_1) = {
+-                let b = ..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order);
+-                S1.. |~ result_of<bulk_order_types::get_prices_and_sizes_mut<M>>(b, is_bid)
+-            };
+-            forall _local47: bool: forall _local48: bool: matched_size <= a_1[0] && (a_1[0] != 0 && (len(a_1) != 0 && (_local47 && !_local48))) ==> order == update_field(order, order_request, update_field(update_field(update_field(..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order), bid_prices, a_0), ask_prices, a_0), bid_sizes, a_1))
+-        });
+-        ensures [inferred] ({
+-            let (a_0,a_1) = {
+-                let b = ..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order);
+-                S1.. |~ result_of<bulk_order_types::get_prices_and_sizes_mut<M>>(b, is_bid)
+-            };
+-            matched_size <= a_1[0] && (a_1[0] == 0 && len(concat(a_1[0..0], a_1[1..len(a_1)])) == 0) ==> result_1 == option::none<u64>()
+-        });
+-        ensures [inferred] ({
+-            let (a_0,a_1) = {
+-                let b = ..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order);
+-                S1.. |~ result_of<bulk_order_types::get_prices_and_sizes_mut<M>>(b, is_bid)
+-            };
+-            matched_size <= a_1[0] && (a_1[0] == 0 && len(concat(a_1[0..0], a_1[1..len(a_1)])) == 0) ==> result_2 == option::none<u64>()
+-        });
+-        ensures [inferred = sathard] ({
+-            let (a_0,a_1) = {
+-                let b = ..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order);
+-                S1.. |~ result_of<bulk_order_types::get_prices_and_sizes_mut<M>>(b, is_bid)
+-            };
+-            forall _local34: bool: forall _local35: bool: matched_size <= a_1[0] && (a_1[0] == 0 && (len(concat(a_1[0..0], a_1[1..len(a_1)])) == 0 && (!_local34 && _local35))) ==> order == update_field(order, order_request, update_field(update_field(update_field(..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order), bid_prices, concat(a_0[0..0], a_0[1..len(a_0)])), ask_prices, concat(a_0[0..0], a_0[1..len(a_0)])), ask_sizes, concat(a_1[0..0], a_1[1..len(a_1)])))
+-        });
+-        ensures [inferred = sathard] ({
+-            let (a_0,a_1) = {
+-                let b = ..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order);
+-                S1.. |~ result_of<bulk_order_types::get_prices_and_sizes_mut<M>>(b, is_bid)
+-            };
+-            forall _local34: bool: forall _local35: bool: matched_size <= a_1[0] && (a_1[0] == 0 && (len(concat(a_1[0..0], a_1[1..len(a_1)])) == 0 && (_local34 && _local35))) ==> order == update_field(order, order_request, update_field(update_field(update_field(update_field(..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order), bid_prices, concat(a_0[0..0], a_0[1..len(a_0)])), ask_prices, concat(a_0[0..0], a_0[1..len(a_0)])), bid_sizes, concat(a_1[0..0], a_1[1..len(a_1)])), ask_sizes, concat(a_1[0..0], a_1[1..len(a_1)])))
+-        });
+-        ensures [inferred = sathard] ({
+-            let (a_0,a_1) = {
+-                let b = ..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order);
+-                S1.. |~ result_of<bulk_order_types::get_prices_and_sizes_mut<M>>(b, is_bid)
+-            };
+-            forall _local34: bool: forall _local35: bool: matched_size <= a_1[0] && (a_1[0] == 0 && (len(concat(a_1[0..0], a_1[1..len(a_1)])) == 0 && (_local34 && !_local35))) ==> order == update_field(order, order_request, update_field(update_field(update_field(..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order), bid_prices, concat(a_0[0..0], a_0[1..len(a_0)])), ask_prices, concat(a_0[0..0], a_0[1..len(a_0)])), bid_sizes, concat(a_1[0..0], a_1[1..len(a_1)])))
+-        });
+-        ensures [inferred] ({
+-            let (a_0,a_1) = {
+-                let b = ..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order);
+-                S1.. |~ result_of<bulk_order_types::get_prices_and_sizes_mut<M>>(b, is_bid)
+-            };
+-            matched_size <= a_1[0] && (a_1[0] == 0 && len(concat(a_1[0..0], a_1[1..len(a_1)])) != 0) ==> result_1 == option::some<u64>(concat(a_0[0..0], a_0[1..len(a_0)])[0])
+-        });
+-        ensures [inferred] ({
+-            let (a_0,a_1) = {
+-                let b = ..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order);
+-                S1.. |~ result_of<bulk_order_types::get_prices_and_sizes_mut<M>>(b, is_bid)
+-            };
+-            matched_size <= a_1[0] && (a_1[0] == 0 && len(concat(a_1[0..0], a_1[1..len(a_1)])) != 0) ==> result_2 == option::some<u64>(concat(a_1[0..0], a_1[1..len(a_1)])[0])
+-        });
+-        ensures [inferred = sathard] ({
+-            let (a_0,a_1) = {
+-                let b = ..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order);
+-                S1.. |~ result_of<bulk_order_types::get_prices_and_sizes_mut<M>>(b, is_bid)
+-            };
+-            forall _local47: bool: forall _local48: bool: matched_size <= a_1[0] && (a_1[0] == 0 && (len(concat(a_1[0..0], a_1[1..len(a_1)])) != 0 && (!_local47 && _local48))) ==> order == update_field(order, order_request, update_field(update_field(update_field(..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order), bid_prices, concat(a_0[0..0], a_0[1..len(a_0)])), ask_prices, concat(a_0[0..0], a_0[1..len(a_0)])), ask_sizes, concat(a_1[0..0], a_1[1..len(a_1)])))
+-        });
+-        ensures [inferred = sathard] ({
+-            let (a_0,a_1) = {
+-                let b = ..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order);
+-                S1.. |~ result_of<bulk_order_types::get_prices_and_sizes_mut<M>>(b, is_bid)
+-            };
+-            forall _local47: bool: forall _local48: bool: matched_size <= a_1[0] && (a_1[0] == 0 && (len(concat(a_1[0..0], a_1[1..len(a_1)])) != 0 && (_local47 && _local48))) ==> order == update_field(order, order_request, update_field(update_field(update_field(update_field(..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order), bid_prices, concat(a_0[0..0], a_0[1..len(a_0)])), ask_prices, concat(a_0[0..0], a_0[1..len(a_0)])), bid_sizes, concat(a_1[0..0], a_1[1..len(a_1)])), ask_sizes, concat(a_1[0..0], a_1[1..len(a_1)])))
+-        });
+-        ensures [inferred = sathard] ({
+-            let (a_0,a_1) = {
+-                let b = ..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order);
+-                S1.. |~ result_of<bulk_order_types::get_prices_and_sizes_mut<M>>(b, is_bid)
+-            };
+-            forall _local47: bool: forall _local48: bool: matched_size <= a_1[0] && (a_1[0] == 0 && (len(concat(a_1[0..0], a_1[1..len(a_1)])) != 0 && (_local47 && !_local48))) ==> order == update_field(order, order_request, update_field(update_field(update_field(..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order), bid_prices, concat(a_0[0..0], a_0[1..len(a_0)])), ask_prices, concat(a_0[0..0], a_0[1..len(a_0)])), bid_sizes, concat(a_1[0..0], a_1[1..len(a_1)])))
+-        });
+-        aborts_if [inferred] ({
+-            let (a_0,a_1) = {
+-                let b = ..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order);
+-                S1.. |~ result_of<bulk_order_types::get_prices_and_sizes_mut<M>>(b, is_bid)
+-            };
+-            matched_size > a_1[0]
+-        });
+-        aborts_if [inferred] ({
+-            let (a_0,a_1) = {
+-                let b = ..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order);
+-                S1.. |~ result_of<bulk_order_types::get_prices_and_sizes_mut<M>>(b, is_bid)
+-            };
+-            matched_size <= a_1[0] && (a_1[0] != 0 && (len(a_1) != 0 && !in_range(a_0, 0)))
+-        });
+-        aborts_if [inferred] ({
+-            let (a_0,a_1) = {
+-                let b = ..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order);
+-                S1.. |~ result_of<bulk_order_types::get_prices_and_sizes_mut<M>>(b, is_bid)
+-            };
+-            matched_size <= a_1[0] && (a_1[0] == 0 && (len(concat(a_1[0..0], a_1[1..len(a_1)])) != 0 && !in_range(concat(a_1[0..0], a_1[1..len(a_1)]), 0)))
+-        });
+-        aborts_if [inferred] ({
+-            let (a_0,a_1) = {
+-                let b = ..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order);
+-                S1.. |~ result_of<bulk_order_types::get_prices_and_sizes_mut<M>>(b, is_bid)
+-            };
+-            matched_size <= a_1[0] && (a_1[0] == 0 && (len(concat(a_1[0..0], a_1[1..len(a_1)])) != 0 && !in_range(concat(a_0[0..0], a_0[1..len(a_0)]), 0)))
+-        });
+-        aborts_if [inferred] ({
+-            let (a_0,a_1) = {
+-                let b = ..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order);
+-                S1.. |~ result_of<bulk_order_types::get_prices_and_sizes_mut<M>>(b, is_bid)
+-            };
+-            matched_size <= a_1[0] && (a_1[0] == 0 && !in_range(a_0, 0))
+-        });
+-        aborts_if [inferred] ({
+-            let (a_0,a_1) = {
+-                let b = ..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order);
+-                S1.. |~ result_of<bulk_order_types::get_prices_and_sizes_mut<M>>(b, is_bid)
+-            };
+-            matched_size <= a_1[0] && a_1[0] - matched_size < 0
+-        });
+-        aborts_if [inferred] ({
+-            let (a_0,a_1) = {
+-                let b = ..S1 |~ result_of<bulk_order_types::get_order_request_mut<M>>(order);
+-                S1.. |~ result_of<bulk_order_types::get_prices_and_sizes_mut<M>>(b, is_bid)
+-            };
+-            !in_range(a_1, 0)
+-        });
+-    }
++                                                                                                                                                                                                                   
++                        
++                                  
++                             
++                                       
++                             
++                                                                                             
++                                                                                           
++              
++                                                                                                                                                                                                                                
++           
++                             
++                             
++                                                                                             
++                                                                                           
++              
++                                                                                                        
++           
++                             
++                             
++                                                                                             
++                                                                                           
++              
++                                                                                                        
++           
++                                       
++                             
++                                                                                             
++                                                                                           
++              
++                                                                                                                                                                                                                                                                                                                                                                 
++           
++                                       
++                             
++                                                                                             
++                                                                                           
++              
++                                                                                                                                                                                                                                                                                                                                                                                              
++           
++                                       
++                             
++                                                                                             
++                                                                                           
++              
++                                                                                                                                                                                                                                                                                                                                                                 
++           
++                             
++                             
++                                                                                             
++                                                                                           
++              
++                                                                                                              
++           
++                             
++                             
++                                                                                             
++                                                                                           
++              
++                                                                                                              
++           
++                                       
++                             
++                                                                                             
++                                                                                           
++              
++                                                                                                                                                                                                                                                                                                                                                                 
++           
++                                       
++                             
++                                                                                             
++                                                                                           
++              
++                                                                                                                                                                                                                                                                                                                                                                                              
++           
++                                       
++                             
++                                                                                             
++                                                                                           
++              
++                                                                                                                                                                                                                                                                                                                                                                 
++           
++                             
++                             
++                                                                                             
++                                                                                           
++              
++                                                                                                                                        
++           
++                             
++                             
++                                                                                             
++                                                                                           
++              
++                                                                                                                                        
++           
++                                       
++                             
++                                                                                             
++                                                                                           
++              
++                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
++           
++                                       
++                             
++                                                                                             
++                                                                                           
++              
++                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              
++           
++                                       
++                             
++                                                                                             
++                                                                                           
++              
++                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
++           
++                             
++                             
++                                                                                             
++                                                                                           
++              
++                                                                                                                                                                              
++           
++                             
++                             
++                                                                                             
++                                                                                           
++              
++                                                                                                                                                                              
++           
++                                       
++                             
++                                                                                             
++                                                                                           
++              
++                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
++           
++                                       
++                             
++                                                                                             
++                                                                                           
++              
++                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              
++           
++                                       
++                             
++                                                                                             
++                                                                                           
++              
++                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
++           
++                               
++                             
++                                                                                             
++                                                                                           
++              
++                                 
++           
++                               
++                             
++                                                                                             
++                                                                                           
++              
++                                                                                           
++           
++                               
++                             
++                                                                                             
++                                                                                           
++              
++                                                                                                                                                           
++           
++                               
++                             
++                                                                                             
++                                                                                           
++              
++                                                                                                                                                           
++           
++                               
++                             
++                                                                                             
++                                                                                           
++              
++                                                                        
++           
++                               
++                             
++                                                                                             
++                                                                                           
++              
++                                                               
++           
++                               
++                             
++                                                                                             
++                                                                                           
++              
++                             
++           
++     
+ 
+-    spec new_bulk_order_request_with_sanitization<M: copy + drop + store>(account: address, sequence_number: u64, bid_prices: vector<u64>, bid_sizes: vector<u64>, ask_prices: vector<u64>, ask_sizes: vector<u64>, metadata: M): 0x5::bulk_order_types::BulkOrderRequest<M> {
+-        use 0x5::bulk_order_types;
+-        pragma opaque = true, aborts_if_is_partial = true;
+-        ensures [inferred = sathard] ({
+-            let a = ..S1 |~ result_of<validate_not_zero_sizes>(bid_sizes);
+-            let b = S1..S2 |~ result_of<validate_not_zero_sizes>(ask_sizes);
+-            let c = S2..S3 |~ result_of<validate_price_ordering>(bid_prices, true);
+-            let d = S3.. |~ result_of<validate_price_ordering>(ask_prices, false);
+-            sequence_number > 0 && (len(bid_prices) == len(bid_sizes) && (len(ask_prices) == len(ask_sizes) && (len(bid_prices) > 0 && (len(bid_prices) <= 30 && (a && (b && (c && (d && len(ask_prices) == 0)))))))) ==> result == bulk_order_types::new_bulk_order_request<M>(account, sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, metadata)
+-        });
+-        ensures [inferred = sathard] ({
+-            let a = ..S1 |~ result_of<validate_not_zero_sizes>(bid_sizes);
+-            let b = S1..S2 |~ result_of<validate_not_zero_sizes>(ask_sizes);
+-            let c = S2..S3 |~ result_of<validate_price_ordering>(bid_prices, true);
+-            let d = S3.. |~ result_of<validate_price_ordering>(ask_prices, false);
+-            sequence_number > 0 && (len(bid_prices) == len(bid_sizes) && (len(ask_prices) == len(ask_sizes) && (len(bid_prices) > 0 && (len(bid_prices) <= 30 && (len(ask_prices) <= 30 && (a && (b && (c && (d && (len(ask_prices) > 0 && bid_prices[0] < ask_prices[0])))))))))) ==> result == bulk_order_types::new_bulk_order_request<M>(account, sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, metadata)
+-        });
+-        ensures [inferred = sathard] ({
+-            let a = ..S1 |~ result_of<validate_not_zero_sizes>(bid_sizes);
+-            let b = S1..S2 |~ result_of<validate_not_zero_sizes>(ask_sizes);
+-            let c = S2..S3 |~ result_of<validate_price_ordering>(bid_prices, true);
+-            let d = S3.. |~ result_of<validate_price_ordering>(ask_prices, false);
+-            sequence_number > 0 && (len(bid_prices) == len(bid_sizes) && (len(ask_prices) == len(ask_sizes) && (len(bid_prices) == 0 && (len(ask_prices) > 0 && (len(ask_prices) <= 30 && (a && (b && (c && d)))))))) ==> result == bulk_order_types::new_bulk_order_request<M>(account, sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, metadata)
+-        });
+-        aborts_if [inferred] sequence_number == 0;
+-        aborts_if [inferred] sequence_number > 0 && len(bid_prices) != len(bid_sizes);
+-        aborts_if [inferred] sequence_number > 0 && (len(bid_prices) == len(bid_sizes) && len(ask_prices) != len(ask_sizes));
+-        aborts_if [inferred] sequence_number > 0 && (len(bid_prices) == len(bid_sizes) && (len(ask_prices) == len(ask_sizes) && len(bid_prices) > 30));
+-        aborts_if [inferred] sequence_number > 0 && (len(bid_prices) == len(bid_sizes) && (len(ask_prices) == len(ask_sizes) && (len(bid_prices) > 0 && (len(bid_prices) <= 30 && len(ask_prices) > 30))));
+-        aborts_if [inferred = sathard] ({
+-            let a = ..S1 |~ result_of<validate_not_zero_sizes>(bid_sizes);
+-            sequence_number > 0 && (len(bid_prices) == len(bid_sizes) && (len(ask_prices) == len(ask_sizes) && (len(bid_prices) > 0 && (len(bid_prices) <= 30 && (len(ask_prices) <= 30 && !a)))))
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let a = ..S1 |~ result_of<validate_not_zero_sizes>(bid_sizes);
+-            let b = S1..S2 |~ result_of<validate_not_zero_sizes>(ask_sizes);
+-            sequence_number > 0 && (len(bid_prices) == len(bid_sizes) && (len(ask_prices) == len(ask_sizes) && (len(bid_prices) > 0 && (len(bid_prices) <= 30 && (len(ask_prices) <= 30 && (a && !b))))))
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let a = ..S1 |~ result_of<validate_not_zero_sizes>(bid_sizes);
+-            let b = S1..S2 |~ result_of<validate_not_zero_sizes>(ask_sizes);
+-            let c = S2..S3 |~ result_of<validate_price_ordering>(bid_prices, true);
+-            sequence_number > 0 && (len(bid_prices) == len(bid_sizes) && (len(ask_prices) == len(ask_sizes) && (len(bid_prices) > 0 && (len(bid_prices) <= 30 && (len(ask_prices) <= 30 && (a && (b && !c)))))))
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let a = ..S1 |~ result_of<validate_not_zero_sizes>(bid_sizes);
+-            let b = S1..S2 |~ result_of<validate_not_zero_sizes>(ask_sizes);
+-            let c = S2..S3 |~ result_of<validate_price_ordering>(bid_prices, true);
+-            let d = S3.. |~ result_of<validate_price_ordering>(ask_prices, false);
+-            sequence_number > 0 && (len(bid_prices) == len(bid_sizes) && (len(ask_prices) == len(ask_sizes) && (len(bid_prices) > 0 && (len(bid_prices) <= 30 && (len(ask_prices) <= 30 && (a && (b && (c && !d))))))))
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let a = ..S1 |~ result_of<validate_not_zero_sizes>(bid_sizes);
+-            let b = S1..S2 |~ result_of<validate_not_zero_sizes>(ask_sizes);
+-            let c = S2..S3 |~ result_of<validate_price_ordering>(bid_prices, true);
+-            let d = S3.. |~ result_of<validate_price_ordering>(ask_prices, false);
+-            sequence_number > 0 && (len(bid_prices) == len(bid_sizes) && (len(ask_prices) == len(ask_sizes) && (len(bid_prices) <= 30 && (len(ask_prices) <= 30 && (a && (b && (c && (d && (len(bid_prices) > 0 && (len(ask_prices) > 0 && bid_prices[0] >= ask_prices[0]))))))))))
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let a = ..S1 |~ result_of<validate_not_zero_sizes>(bid_sizes);
+-            let b = S1..S2 |~ result_of<validate_not_zero_sizes>(ask_sizes);
+-            let c = S2..S3 |~ result_of<validate_price_ordering>(bid_prices, true);
+-            let d = S3.. |~ result_of<validate_price_ordering>(ask_prices, false);
+-            sequence_number > 0 && (len(bid_prices) == len(bid_sizes) && (len(ask_prices) == len(ask_sizes) && (len(bid_prices) <= 30 && (len(ask_prices) <= 30 && (a && (b && (c && (d && (len(bid_prices) > 0 && (len(ask_prices) > 0 && !in_range(ask_prices, 0)))))))))))
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let a = ..S1 |~ result_of<validate_not_zero_sizes>(bid_sizes);
+-            let b = S1..S2 |~ result_of<validate_not_zero_sizes>(ask_sizes);
+-            let c = S2..S3 |~ result_of<validate_price_ordering>(bid_prices, true);
+-            let d = S3.. |~ result_of<validate_price_ordering>(ask_prices, false);
+-            sequence_number > 0 && (len(bid_prices) == len(bid_sizes) && (len(ask_prices) == len(ask_sizes) && (len(bid_prices) <= 30 && (len(ask_prices) <= 30 && (a && (b && (c && (d && (len(bid_prices) > 0 && (len(ask_prices) > 0 && !in_range(bid_prices, 0)))))))))))
+-        });
+-        aborts_if [inferred] sequence_number > 0 && (len(bid_prices) == len(bid_sizes) && (len(ask_prices) == len(ask_sizes) && (len(bid_prices) == 0 && len(ask_prices) == 0)));
+-        aborts_if [inferred] sequence_number > 0 && (len(bid_prices) == len(bid_sizes) && (len(ask_prices) == len(ask_sizes) && (len(bid_prices) == 0 && (len(ask_prices) > 0 && len(bid_prices) > 30))));
+-        aborts_if [inferred] sequence_number > 0 && (len(bid_prices) == len(bid_sizes) && (len(ask_prices) == len(ask_sizes) && (len(bid_prices) == 0 && (len(bid_prices) <= 30 && len(ask_prices) > 30))));
+-        aborts_if [inferred = sathard] ({
+-            let a = ..S1 |~ result_of<validate_not_zero_sizes>(bid_sizes);
+-            sequence_number > 0 && (len(bid_prices) == len(bid_sizes) && (len(ask_prices) == len(ask_sizes) && (len(bid_prices) == 0 && (len(ask_prices) > 0 && (len(bid_prices) <= 30 && (len(ask_prices) <= 30 && !a))))))
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let a = ..S1 |~ result_of<validate_not_zero_sizes>(bid_sizes);
+-            let b = S1..S2 |~ result_of<validate_not_zero_sizes>(ask_sizes);
+-            sequence_number > 0 && (len(bid_prices) == len(bid_sizes) && (len(ask_prices) == len(ask_sizes) && (len(bid_prices) == 0 && (len(ask_prices) > 0 && (len(bid_prices) <= 30 && (len(ask_prices) <= 30 && (a && !b)))))))
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let a = ..S1 |~ result_of<validate_not_zero_sizes>(bid_sizes);
+-            let b = S1..S2 |~ result_of<validate_not_zero_sizes>(ask_sizes);
+-            let c = S2..S3 |~ result_of<validate_price_ordering>(bid_prices, true);
+-            sequence_number > 0 && (len(bid_prices) == len(bid_sizes) && (len(ask_prices) == len(ask_sizes) && (len(bid_prices) == 0 && (len(ask_prices) > 0 && (len(bid_prices) <= 30 && (len(ask_prices) <= 30 && (a && (b && !c))))))))
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let a = ..S1 |~ result_of<validate_not_zero_sizes>(bid_sizes);
+-            let b = S1..S2 |~ result_of<validate_not_zero_sizes>(ask_sizes);
+-            let c = S2..S3 |~ result_of<validate_price_ordering>(bid_prices, true);
+-            let d = S3.. |~ result_of<validate_price_ordering>(ask_prices, false);
+-            sequence_number > 0 && (len(bid_prices) == len(bid_sizes) && (len(ask_prices) == len(ask_sizes) && (len(bid_prices) == 0 && (len(ask_prices) > 0 && (len(bid_prices) <= 30 && (len(ask_prices) <= 30 && (a && (b && (c && !d)))))))))
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let a = ..S1 |~ result_of<validate_not_zero_sizes>(bid_sizes);
+-            let b = S1..S2 |~ result_of<validate_not_zero_sizes>(ask_sizes);
+-            let c = S2..S3 |~ result_of<validate_price_ordering>(bid_prices, true);
+-            let d = S3.. |~ result_of<validate_price_ordering>(ask_prices, false);
+-            sequence_number > 0 && (len(bid_prices) == len(bid_sizes) && (len(ask_prices) == len(ask_sizes) && (len(bid_prices) == 0 && (len(bid_prices) <= 30 && (len(ask_prices) <= 30 && (a && (b && (c && (d && (len(bid_prices) > 0 && (len(ask_prices) > 0 && bid_prices[0] >= ask_prices[0])))))))))))
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let a = ..S1 |~ result_of<validate_not_zero_sizes>(bid_sizes);
+-            let b = S1..S2 |~ result_of<validate_not_zero_sizes>(ask_sizes);
+-            let c = S2..S3 |~ result_of<validate_price_ordering>(bid_prices, true);
+-            let d = S3.. |~ result_of<validate_price_ordering>(ask_prices, false);
+-            sequence_number > 0 && (len(bid_prices) == len(bid_sizes) && (len(ask_prices) == len(ask_sizes) && (len(bid_prices) == 0 && (len(bid_prices) <= 30 && (len(ask_prices) <= 30 && (a && (b && (c && (d && (len(bid_prices) > 0 && (len(ask_prices) > 0 && !in_range(ask_prices, 0))))))))))))
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let a = ..S1 |~ result_of<validate_not_zero_sizes>(bid_sizes);
+-            let b = S1..S2 |~ result_of<validate_not_zero_sizes>(ask_sizes);
+-            let c = S2..S3 |~ result_of<validate_price_ordering>(bid_prices, true);
+-            let d = S3.. |~ result_of<validate_price_ordering>(ask_prices, false);
+-            sequence_number > 0 && (len(bid_prices) == len(bid_sizes) && (len(ask_prices) == len(ask_sizes) && (len(bid_prices) == 0 && (len(bid_prices) <= 30 && (len(ask_prices) <= 30 && (a && (b && (c && (d && (len(bid_prices) > 0 && (len(ask_prices) > 0 && !in_range(bid_prices, 0))))))))))))
+-        });
+-    }
++                                                                                                                                                                                                                                                                              
++                                  
++                                                          
++                                       
++                                                                          
++                                                                            
++                                                                                   
++                                                                                  
++                                                                                                                                                                                                                                                                                                                                                                 
++           
++                                       
++                                                                          
++                                                                            
++                                                                                   
++                                                                                  
++                                                                                                                                                                                                                                                                                                                                                                                                                              
++           
++                                       
++                                                                          
++                                                                            
++                                                                                   
++                                                                                  
++                                                                                                                                                                                                                                                                                                                                                                 
++           
++                                                  
++                                                                                      
++                                                                                                                             
++                                                                                                                                                       
++                                                                                                                                                                                                           
++                                         
++                                                                          
++                                                                                                                                                                                                  
++           
++                                         
++                                                                          
++                                                                            
++                                                                                                                                                                                                         
++           
++                                         
++                                                                          
++                                                                            
++                                                                                   
++                                                                                                                                                                                                                
++           
++                                         
++                                                                          
++                                                                            
++                                                                                   
++                                                                                  
++                                                                                                                                                                                                                       
++           
++                                         
++                                                                          
++                                                                            
++                                                                                   
++                                                                                  
++                                                                                                                                                                                                                                                                                   
++           
++                                         
++                                                                          
++                                                                            
++                                                                                   
++                                                                                  
++                                                                                                                                                                                                                                                                             
++           
++                                         
++                                                                          
++                                                                            
++                                                                                   
++                                                                                  
++                                                                                                                                                                                                                                                                             
++           
++                                                                                                                                                                                 
++                                                                                                                                                                                                          
++                                                                                                                                                                                                            
++                                         
++                                                                          
++                                                                                                                                                                                                                            
++           
++                                         
++                                                                          
++                                                                            
++                                                                                                                                                                                                                                   
++           
++                                         
++                                                                          
++                                                                            
++                                                                                   
++                                                                                                                                                                                                                                          
++           
++                                         
++                                                                          
++                                                                            
++                                                                                   
++                                                                                  
++                                                                                                                                                                                                                                                 
++           
++                                         
++                                                                          
++                                                                            
++                                                                                   
++                                                                                  
++                                                                                                                                                                                                                                                                                                             
++           
++                                         
++                                                                          
++                                                                            
++                                                                                   
++                                                                                  
++                                                                                                                                                                                                                                                                                                       
++           
++                                         
++                                                                          
++                                                                            
++                                                                                   
++                                                                                  
++                                                                                                                                                                                                                                                                                                       
++           
++     
+ 
+-    spec new_bulk_order_with_sanitization<M: copy + drop + store>(order_id: 0x5::order_book_types::OrderId, unique_priority_idx: 0x5::order_book_types::IncreasingIdx, order_req: 0x5::bulk_order_types::BulkOrderRequest<M>, best_bid_price: 0x1::option::Option<u64>, best_ask_price: 0x1::option::Option<u64>): (0x5::bulk_order_types::BulkOrder<M>, vector<u64>, vector<u64>, vector<u64>, vector<u64>) {
+-        pragma opaque = true, aborts_if_is_partial = true;
+-        // Corpus dependency abstraction: WP currently emits no contract.
+-        ensures true;
+-    }
++                                                                                                                                                                                                                                                                                                                                                                                                              
++                                                          
++                                                                         
++                     
++     
+ 
+-    spec trim_start<Element>(v: &mut vector<Element>, new_start: u64): vector<Element> {
+-        use 0x1::vector;
+-        pragma opaque = true, aborts_if_is_partial = true;
+-        ensures [inferred] ensures_of<vector::move_range<Element>>(v, 0, new_start, vec<Element>(), 0, v, result);
+-    }
++                                                                                        
++                        
++                                                          
++                                                                                                                  
++     
+ 
+-    spec validate_not_zero_sizes(sizes: &vector<u64>): bool {
+-        pragma opaque = true, aborts_if_is_partial = true;
+-        ensures [inferred = sathard] result == true;
+-        ensures [inferred = sathard] forall x: u64: x < len(sizes) && sizes[x] == 0 ==> result == false;
+-        aborts_if [inferred = sathard] exists x: u64: x < len(sizes) && !in_range(sizes, x);
+-    }
++                                                             
++                                                          
++                                                    
++                                                                                                        
++                                                                                            
++     
+ 
+-    spec validate_price_ordering(prices: &vector<u64>, is_descending: bool): bool {
+-        pragma opaque = true, aborts_if_is_partial = true;
+-        ensures [inferred = sathard] len(prices) == 0 ==> result == true;
+-        ensures [inferred = sathard] len(prices) != 0 ==> (forall x: u64: x >= len(prices) - 1 ==> result == true);
+-        ensures [inferred = sathard] len(prices) != 0 ==> (forall x: u64: x < len(prices) - 1 && (is_descending && prices[x] <= prices[x + 1]) ==> result == false);
+-        ensures [inferred = sathard] len(prices) != 0 ==> (forall x: u64: x < len(prices) - 1 && (!is_descending && prices[x] >= prices[x + 1]) ==> result == false);
+-        aborts_if [inferred = sathard] len(prices) != 0 && (exists x: u64: x < len(prices) - 1 && !in_range(prices, x + 1));
+-        aborts_if [inferred = sathard] len(prices) != 0 && (exists x: u64: x < len(prices) - 1 && !in_range(prices, x));
+-        aborts_if [inferred = sathard] len(prices) != 0 && len(prices) == 0;
+-    }
++                                                                                   
++                                                          
++                                                                         
++                                                                                                                   
++                                                                                                                                                                    
++                                                                                                                                                                     
++                                                                                                                            
++                                                                                                                        
++                                                                            
++     
+ 
+ }

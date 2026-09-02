@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "stage": "prover",
+  "target": "0x7::bulk_order_utils::new_bulk_order_with_sanitization",
+  "passed": true,
+  "diagnostics": []
+}

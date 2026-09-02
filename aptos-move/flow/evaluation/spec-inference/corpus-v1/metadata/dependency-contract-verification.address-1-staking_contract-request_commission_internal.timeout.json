@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "stage": "prover",
+  "target": "0x1::staking_contract::request_commission_internal",
+  "passed": false,
+  "diagnostics": [
+    "error: Boogie execution exceeded hard timeout of 56s"
+  ]
+}

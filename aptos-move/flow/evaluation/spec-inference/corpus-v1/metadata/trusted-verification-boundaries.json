@@ -1,0 +1,205 @@
+{
+  "schema_version": 1,
+  "boundaries": [
+    {
+      "function": "0x1::staking_contract::update_distribution_pool",
+      "basis": "expert_assumption",
+      "rationale": "The shares-map fold, scalar effects, and individual transfer cases have target-body proof evidence. The remaining bridge from transfer_shares' exact remove-or-push vector relation to the stable-filter vector model is solver-intractable at the available proof limit; the complete normal, frame, and abort contract is retained as an explicit trusted boundary."
+    },
+    {
+      "function": "0x1::staking_contract::add_distribution",
+      "basis": "expert_assumption",
+      "rationale": "The contract is the exact composition of get_stake, the documented update_distribution_pool boundary, and the body-proved pool_u64::buy_in contract. Nine component state and abort-direction shards prove at 60 seconds; only unified strict abort coverage exceeds both 60 and 120 seconds."
+    },
+    {
+      "function": "0x1::staking_contract::request_commission_internal",
+      "basis": "expert_assumption",
+      "rationale": "The contract gives the exact commission result, complete StakingContract transform, owner-pool frame and unlock transform, and the exact composed abort domain. Nine component shards prove at 60 seconds; only unified strict abort coverage exceeds the limit while composing the already specified add_distribution and unlock_with_cap boundaries."
+    },
+    {
+      "function": "0x1::simple_map::find",
+      "basis": "intrinsic_model",
+      "rationale": "SimpleMap is intrinsic to the prover, which rejects selecting the implementation's data vector during body verification. The source is a bounded linear search and the complete opaque contract exposes the only caller-relevant abstraction: some exactly when the key is present."
+    },
+    {
+      "function": "0x1::ordered_map::binary_search",
+      "basis": "intrinsic_model",
+      "rationale": "The source has interval and recursive control-flow invariants, and its complete contract models both the selected result and malformed-range abort path exactly. A target-body proof with the exact recurrence exceeded the 60-second corpus limit without a counterexample; the helper is private and every current caller supplies its vector bounds."
+    },
+    {
+      "function": "0x1::ordered_map::iter_borrow",
+      "basis": "intrinsic_model",
+      "rationale": "OrderedMap is intrinsic to the prover, which rejects selecting its backing entries field during body verification. The complete opaque contract uses the intrinsic-map enumeration: it aborts exactly for End or an out-of-range position and otherwise returns the value at that position."
+    },
+    {
+      "function": "0x1::ordered_map::iter_borrow_key",
+      "basis": "intrinsic_model",
+      "rationale": "OrderedMap is intrinsic to the prover, which rejects selecting its backing entries field during body verification. The complete opaque contract uses the intrinsic-map enumeration: it aborts exactly for End or an out-of-range position and otherwise returns the key at that position."
+    },
+    {
+      "function": "0x1::ordered_map::internal_lower_bound",
+      "basis": "intrinsic_model",
+      "rationale": "OrderedMap is intrinsic to the prover, which rejects selecting its backing entries field during body verification. The complete opaque contract gives the lower-bound iterator in the intrinsic-map enumeration, including the end, prefix, and present-key cases used by callers."
+    },
+    {
+      "function": "0x1::ordered_map::iter_prev",
+      "basis": "intrinsic_model",
+      "rationale": "OrderedMap is intrinsic to the prover, which rejects selecting its backing entries field during body verification. The complete opaque contract gives the exact predecessor iterator and its end-on-empty or position-zero abort domain over the intrinsic-map length."
+    },
+    {
+      "function": "0x1::big_ordered_map::get_max_degree",
+      "basis": "intrinsic_model",
+      "rationale": "BigOrderedMap is intrinsic to the prover, which rejects selecting its configuration fields during body verification. The complete opaque contract directly models the leaf or inner maximum-degree field selected by the Boolean argument."
+    },
+    {
+      "function": "0x1::ordered_map::iter_add",
+      "basis": "intrinsic_model",
+      "rationale": "Private iterator-position maintenance for the intrinsic OrderedMap representation; callers consume the public intrinsic map and iterator model rather than this backing-vector implementation."
+    },
+    {
+      "function": "0x1::ordered_map::iter_remove",
+      "basis": "intrinsic_model",
+      "rationale": "Private iterator-position maintenance for the intrinsic OrderedMap representation; callers consume the public intrinsic map and iterator model rather than this backing-vector implementation."
+    },
+    {
+      "function": "0x1::ordered_map::iter_replace",
+      "basis": "intrinsic_model",
+      "rationale": "Private iterator-position maintenance for the intrinsic OrderedMap representation; callers consume the public intrinsic map and iterator model rather than this backing-vector implementation."
+    },
+    {
+      "function": "0x1::big_ordered_map::destroy_inner_child",
+      "basis": "intrinsic_model",
+      "rationale": "Private hidden-representation helper for the prover-intrinsic BigOrderedMap model; its behavior is consumed only through the complete public intrinsic map boundary."
+    },
+    {
+      "function": "0x1::big_ordered_map::internal_find",
+      "basis": "intrinsic_model",
+      "rationale": "Private hidden-representation helper for the prover-intrinsic BigOrderedMap model; its behavior is consumed only through the complete public intrinsic map boundary."
+    },
+    {
+      "function": "0x1::big_ordered_map::internal_lower_bound",
+      "basis": "intrinsic_model",
+      "rationale": "Private hidden-representation helper for the prover-intrinsic BigOrderedMap model; its behavior is consumed only through the complete public intrinsic map boundary."
+    },
+    {
+      "function": "0x1::big_ordered_map::internal_new_begin_iter",
+      "basis": "intrinsic_model",
+      "rationale": "Private hidden-representation helper for the prover-intrinsic BigOrderedMap model; its behavior is consumed only through the complete public intrinsic map boundary."
+    },
+    {
+      "function": "0x1::big_ordered_map::internal_new_end_iter",
+      "basis": "intrinsic_model",
+      "rationale": "Private hidden-representation helper for the prover-intrinsic BigOrderedMap model; its behavior is consumed only through the complete public intrinsic map boundary."
+    },
+    {
+      "function": "0x1::big_ordered_map::iter_borrow",
+      "basis": "intrinsic_model",
+      "rationale": "Private hidden-representation helper for the prover-intrinsic BigOrderedMap model; its behavior is consumed only through the complete public intrinsic map boundary."
+    },
+    {
+      "function": "0x1::big_ordered_map::iter_borrow_key",
+      "basis": "intrinsic_model",
+      "rationale": "Private hidden-representation helper for the prover-intrinsic BigOrderedMap model; its behavior is consumed only through the complete public intrinsic map boundary."
+    },
+    {
+      "function": "0x1::big_ordered_map::iter_is_end",
+      "basis": "intrinsic_model",
+      "rationale": "Private hidden-representation helper for the prover-intrinsic BigOrderedMap model; its behavior is consumed only through the complete public intrinsic map boundary."
+    },
+    {
+      "function": "0x1::big_ordered_map::iter_prev",
+      "basis": "intrinsic_model",
+      "rationale": "Private hidden-representation helper for the prover-intrinsic BigOrderedMap model; its behavior is consumed only through the complete public intrinsic map boundary."
+    },
+    {
+      "function": "0x1::big_ordered_map::new_inner_child",
+      "basis": "intrinsic_model",
+      "rationale": "Private hidden-representation helper for the prover-intrinsic BigOrderedMap model; its behavior is consumed only through the complete public intrinsic map boundary."
+    },
+    {
+      "function": "0x1::big_ordered_map::new_iter",
+      "basis": "intrinsic_model",
+      "rationale": "Private hidden-representation helper for the prover-intrinsic BigOrderedMap model; its behavior is consumed only through the complete public intrinsic map boundary."
+    },
+    {
+      "function": "0x1::big_ordered_map::new_leaf_child",
+      "basis": "intrinsic_model",
+      "rationale": "Private hidden-representation helper for the prover-intrinsic BigOrderedMap model; its behavior is consumed only through the complete public intrinsic map boundary."
+    },
+    {
+      "function": "0x1::big_ordered_map::new_node",
+      "basis": "intrinsic_model",
+      "rationale": "Private hidden-representation helper for the prover-intrinsic BigOrderedMap model; its behavior is consumed only through the complete public intrinsic map boundary."
+    },
+    {
+      "function": "0x1::big_ordered_map::new_node_with_children",
+      "basis": "intrinsic_model",
+      "rationale": "Private hidden-representation helper for the prover-intrinsic BigOrderedMap model; its behavior is consumed only through the complete public intrinsic map boundary."
+    },
+    {
+      "function": "0x1::big_ordered_map::replace_root",
+      "basis": "intrinsic_model",
+      "rationale": "Private hidden-representation helper for the prover-intrinsic BigOrderedMap model; its behavior is consumed only through the complete public intrinsic map boundary."
+    },
+    {
+      "function": "0x1::big_ordered_map::validate_dynamic_size_and_init_max_degrees",
+      "basis": "intrinsic_model",
+      "rationale": "Private configuration helper for the prover-intrinsic BigOrderedMap representation; callers consume its initialized state through the public intrinsic map boundary."
+    },
+    {
+      "function": "0x1::big_ordered_map::validate_size_and_init_max_degrees",
+      "basis": "intrinsic_model",
+      "rationale": "Private configuration helper for the prover-intrinsic BigOrderedMap representation; callers consume its initialized state through the public intrinsic map boundary."
+    },
+    {
+      "function": "0x1::big_ordered_map::validate_static_size_and_init_max_degrees",
+      "basis": "intrinsic_model",
+      "rationale": "Private configuration helper for the prover-intrinsic BigOrderedMap representation; callers consume its initialized state through the public intrinsic map boundary."
+    },
+    {
+      "function": "0x1::code::check_dependencies",
+      "basis": "expert_assumption",
+      "rationale": "The complete contract exactly models the declared-dependency traversal: registry existence, first package-name match, policy and arbitrary-address checks, ordered wildcard/module output, and output capacity. The source uses explicit per-dependency, first-match, and module-prefix invariants. Focused target-body proofs with an explicit one-step vector lemma reached the package deadline at 60, 120, and 180 seconds without a counterexample."
+    },
+    {
+      "function": "0x1::fungible_asset::add_fungibility",
+      "basis": "expert_assumption",
+      "rationale": "The complete contract follows the straight-line source: exact constructor and length aborts, metadata fields, branch-specific Supply or ConcurrentSupply creation, returned metadata object, and exact resource frames. Transparent verification at 60 seconds consistently fails during Boogie type checking because String's byte vector is emitted as Vec bv8 where Vec int is expected; no verification condition is evaluated and no counterexample is produced."
+    },
+    {
+      "function": "0x1::primary_fungible_store::create_primary_store_enabled_fungible_asset",
+      "basis": "expert_assumption",
+      "rationale": "This straight-line wrapper exactly composes the complete add_fungibility boundary with publishing the constructor's DeriveRefPod and declares both footprints. Transparent verification inherits add_fungibility's Boogie String byte-vector type-checking failure before any verification condition is evaluated."
+    },
+    {
+      "function": "0x1::code::publish_package",
+      "basis": "expert_assumption",
+      "rationale": "The contract captures the source's dependency and coexistence checks, first matching upgrade, exact registry replacement or append, publish request, lazy-initialization owner/reset effects, events, and all generated abort paths. The nested package/module String vectors and multiple loop states are not solver-scalable; check_dependencies is separately specified and documented as a trusted exact boundary."
+    },
+    {
+      "function": "0x1::aptos_account::deposit_coins",
+      "basis": "expert_assumption",
+      "rationale": "The complete contract explicitly composes optional account creation with the body-proved coin-to-FA deposit path and declares every account, pairing, supply, and primary-store resource that either branch can change. Its strict proof reaches an abort-coverage mismatch at the create_account behavioral boundary; the component coin deposit proof succeeds and no state or frame clause is omitted."
+    },
+    {
+      "function": "0x1::staking_contract::distribute_internal",
+      "basis": "expert_assumption",
+      "rationale": "The complete contract models withdrawal, the exact commission-update fold, first-shareholder redemptions, operator-beneficiary redirection, dust, the final empty distribution pool, and the finite staker/beneficiary APT-store frame. The pool representation restricts shareholders to the staker and operator. Transparent verification would compose the documented update_distribution_pool and deposit_coins expert boundaries, so this function is recorded at the same explicit boundary."
+    },
+    {
+      "function": "0x1::staking_contract::unlock_stake",
+      "basis": "expert_assumption",
+      "rationale": "The complete contract gives pure state transformers for the sequential distribution, commission, capped principal reduction, distribution buy-in, and stake unlock, together with the exact composed abort predicate and finite payout frame. Its only unproved components are the explicitly documented distribution and account-deposit boundaries."
+    },
+    {
+      "function": "0x1::vesting::unlock_stake",
+      "basis": "expert_assumption",
+      "rationale": "This private wrapper exactly forwards the derived vesting signer, operator, abort relation, normal effect, and full resource frame to the complete staking_contract::unlock_stake boundary; it introduces no independent state transformation."
+    },
+    {
+      "function": "0x1::vesting::unlock_rewards",
+      "basis": "expert_assumption",
+      "rationale": "This entry exactly composes the body-proved total_accumulated_rewards result and abort domain with the complete vesting unlock_stake wrapper, forwarding its normal effect and full resource frame without weakening either contract."
+    }
+  ]
+}

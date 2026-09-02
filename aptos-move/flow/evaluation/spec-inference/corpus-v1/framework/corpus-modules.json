@@ -1,0 +1,1353 @@
+{
+  "generated_specifications": [
+    "sources/AptosExperimental/trading/market/dead_mans_switch_tracker.spec.move",
+    "sources/AptosExperimental/trading/market/market_bulk_order.spec.move",
+    "sources/AptosExperimental/trading/market/market_types.spec.move",
+    "sources/AptosExperimental/trading/order_book/bulk_order_book.spec.move",
+    "sources/AptosExperimental/trading/order_book/bulk_order_utils.spec.move",
+    "sources/AptosExperimental/trading/order_book/order_book.spec.move",
+    "sources/AptosExperimental/trading/order_book/order_book_utils.spec.move",
+    "sources/AptosExperimental/trading/order_book/order_id_generation.spec.move",
+    "sources/AptosExperimental/trading/order_book/pending_order_book_index.spec.move",
+    "sources/AptosExperimental/trading/order_book/price_time_index.spec.move",
+    "sources/AptosExperimental/trading/order_book/single_order_book.spec.move",
+    "sources/AptosTrading/orders/bulk_order_types.spec.move",
+    "sources/AptosTrading/orders/order_book_types.spec.move",
+    "sources/AptosTrading/orders/order_match_types.spec.move",
+    "sources/AptosTrading/orders/single_order_types.spec.move",
+    "sources/MoveStdlib/error.spec.move",
+    "sources/MoveStdlib/reflect.spec.move",
+    "sources/MoveStdlib/result.spec.move",
+    "sources/MoveStdlib/signer.spec.move",
+    "sources/MoveStdlib/vector.spec.move"
+  ],
+  "kind": "shared_editable_module_union",
+  "modules": [
+    {
+      "implementation": "sources/AptosFramework/account/account.move",
+      "module": "0x1::account",
+      "specifications": [
+        "sources/AptosFramework/account/account.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/account/account_abstraction.move",
+      "module": "0x1::account_abstraction",
+      "specifications": [
+        "sources/AptosFramework/account/account_abstraction.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/aggregator/aggregator.move",
+      "module": "0x1::aggregator",
+      "specifications": [
+        "sources/AptosFramework/aggregator/aggregator.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/aggregator/aggregator_factory.move",
+      "module": "0x1::aggregator_factory",
+      "specifications": [
+        "sources/AptosFramework/aggregator/aggregator_factory.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/aggregator_v2/aggregator_v2.move",
+      "module": "0x1::aggregator_v2",
+      "specifications": [
+        "sources/AptosFramework/aggregator_v2/aggregator_v2.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosStdlib/any.move",
+      "module": "0x1::any",
+      "specifications": [
+        "sources/AptosStdlib/any.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/aptos_account.move",
+      "module": "0x1::aptos_account",
+      "specifications": [
+        "sources/AptosFramework/aptos_account.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/aptos_coin.move",
+      "module": "0x1::aptos_coin",
+      "specifications": [
+        "sources/AptosFramework/aptos_coin.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/aptos_governance.move",
+      "module": "0x1::aptos_governance",
+      "specifications": [
+        "sources/AptosFramework/aptos_governance.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosStdlib/hash.move",
+      "module": "0x1::aptos_hash",
+      "specifications": [
+        "sources/AptosStdlib/hash.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/account/auth_data.move",
+      "module": "0x1::auth_data",
+      "specifications": []
+    },
+    {
+      "implementation": "sources/MoveStdlib/bcs.move",
+      "module": "0x1::bcs",
+      "specifications": []
+    },
+    {
+      "implementation": "sources/AptosStdlib/bcs_stream.move",
+      "module": "0x1::bcs_stream",
+      "specifications": [
+        "sources/AptosStdlib/bcs_stream.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/datastructures/big_ordered_map.move",
+      "module": "0x1::big_ordered_map",
+      "specifications": [
+        "sources/AptosFramework/datastructures/big_ordered_map.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/block.move",
+      "module": "0x1::block",
+      "specifications": [
+        "sources/AptosFramework/block.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosStdlib/cryptography/bls12381.move",
+      "module": "0x1::bls12381",
+      "specifications": [
+        "sources/AptosStdlib/cryptography/bls12381.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosStdlib/cryptography/bn254_algebra.move",
+      "module": "0x1::bn254_algebra",
+      "specifications": []
+    },
+    {
+      "implementation": "sources/AptosFramework/chain_id.move",
+      "module": "0x1::chain_id",
+      "specifications": [
+        "sources/AptosFramework/chain_id.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/chain_status.move",
+      "module": "0x1::chain_status",
+      "specifications": [
+        "sources/AptosFramework/chain_status.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/chunky_dkg.move",
+      "module": "0x1::chunky_dkg",
+      "specifications": [
+        "sources/AptosFramework/chunky_dkg.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/configs/chunky_dkg_config.move",
+      "module": "0x1::chunky_dkg_config",
+      "specifications": [
+        "sources/AptosFramework/configs/chunky_dkg_config.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/configs/chunky_dkg_config_seqnum.move",
+      "module": "0x1::chunky_dkg_config_seqnum",
+      "specifications": [
+        "sources/AptosFramework/configs/chunky_dkg_config_seqnum.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/MoveStdlib/cmp.move",
+      "module": "0x1::cmp",
+      "specifications": []
+    },
+    {
+      "implementation": "sources/AptosFramework/code.move",
+      "module": "0x1::code",
+      "specifications": [
+        "sources/AptosFramework/code.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/coin.move",
+      "module": "0x1::coin",
+      "specifications": [
+        "sources/AptosFramework/coin.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosStdlib/comparator.move",
+      "module": "0x1::comparator",
+      "specifications": [
+        "sources/AptosStdlib/comparator.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/confidential_asset/confidential_amount.move",
+      "module": "0x1::confidential_amount",
+      "specifications": [
+        "sources/AptosFramework/confidential_asset/confidential_amount.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/confidential_asset/confidential_asset.move",
+      "module": "0x1::confidential_asset",
+      "specifications": [
+        "sources/AptosFramework/confidential_asset/confidential_asset.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/confidential_asset/confidential_balance.move",
+      "module": "0x1::confidential_balance",
+      "specifications": [
+        "sources/AptosFramework/confidential_asset/confidential_balance.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/confidential_asset/confidential_range_proofs.move",
+      "module": "0x1::confidential_range_proofs",
+      "specifications": [
+        "sources/AptosFramework/confidential_asset/confidential_range_proofs.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/configs/config_buffer.move",
+      "module": "0x1::config_buffer",
+      "specifications": [
+        "sources/AptosFramework/configs/config_buffer.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/configs/consensus_config.move",
+      "module": "0x1::consensus_config",
+      "specifications": [
+        "sources/AptosFramework/configs/consensus_config.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosStdlib/copyable_any.move",
+      "module": "0x1::copyable_any",
+      "specifications": [
+        "sources/AptosStdlib/copyable_any.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/create_signer.move",
+      "module": "0x1::create_signer",
+      "specifications": [
+        "sources/AptosFramework/create_signer.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosStdlib/cryptography/crypto_algebra.move",
+      "module": "0x1::crypto_algebra",
+      "specifications": [
+        "sources/AptosStdlib/cryptography/crypto_algebra.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/decryption.move",
+      "module": "0x1::decryption",
+      "specifications": [
+        "sources/AptosFramework/decryption.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/delegation_pool.move",
+      "module": "0x1::delegation_pool",
+      "specifications": [
+        "sources/AptosFramework/delegation_pool.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/dispatchable_fungible_asset.move",
+      "module": "0x1::dispatchable_fungible_asset",
+      "specifications": [
+        "sources/AptosFramework/dispatchable_fungible_asset.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/dkg.move",
+      "module": "0x1::dkg",
+      "specifications": [
+        "sources/AptosFramework/dkg.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosStdlib/cryptography/ed25519.move",
+      "module": "0x1::ed25519",
+      "specifications": [
+        "sources/AptosStdlib/cryptography/ed25519.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/configs/epoch_timeout_config.move",
+      "module": "0x1::epoch_timeout_config",
+      "specifications": [
+        "sources/AptosFramework/configs/epoch_timeout_config.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/MoveStdlib/error.move",
+      "module": "0x1::error",
+      "specifications": [
+        "sources/MoveStdlib/error.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/event.move",
+      "module": "0x1::event",
+      "specifications": [
+        "sources/AptosFramework/event.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/configs/execution_config.move",
+      "module": "0x1::execution_config",
+      "specifications": [
+        "sources/AptosFramework/configs/execution_config.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/MoveStdlib/configs/features.move",
+      "module": "0x1::features",
+      "specifications": [
+        "sources/MoveStdlib/configs/features.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosStdlib/cryptography/federated_keyless.move",
+      "module": "0x1::federated_keyless",
+      "specifications": [
+        "sources/AptosStdlib/cryptography/federated_keyless.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/MoveStdlib/fixed_point32.move",
+      "module": "0x1::fixed_point32",
+      "specifications": []
+    },
+    {
+      "implementation": "sources/AptosStdlib/fixed_point64.move",
+      "module": "0x1::fixed_point64",
+      "specifications": []
+    },
+    {
+      "implementation": "sources/AptosStdlib/from_bcs.move",
+      "module": "0x1::from_bcs",
+      "specifications": [
+        "sources/AptosStdlib/from_bcs.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/function_info.move",
+      "module": "0x1::function_info",
+      "specifications": [
+        "sources/AptosFramework/function_info.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/fungible_asset.move",
+      "module": "0x1::fungible_asset",
+      "specifications": [
+        "sources/AptosFramework/fungible_asset.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/configs/gas_schedule.move",
+      "module": "0x1::gas_schedule",
+      "specifications": [
+        "sources/AptosFramework/configs/gas_schedule.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/genesis.move",
+      "module": "0x1::genesis",
+      "specifications": [
+        "sources/AptosFramework/genesis.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/governance_proposal.move",
+      "module": "0x1::governance_proposal",
+      "specifications": [
+        "sources/AptosFramework/governance_proposal.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/guid.move",
+      "module": "0x1::guid",
+      "specifications": [
+        "sources/AptosFramework/guid.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/MoveStdlib/hash.move",
+      "module": "0x1::hash",
+      "specifications": []
+    },
+    {
+      "implementation": "sources/AptosFramework/init.move",
+      "module": "0x1::init",
+      "specifications": [
+        "sources/AptosFramework/init.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/configs/jwk_consensus_config.move",
+      "module": "0x1::jwk_consensus_config",
+      "specifications": [
+        "sources/AptosFramework/configs/jwk_consensus_config.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/jwks.move",
+      "module": "0x1::jwks",
+      "specifications": [
+        "sources/AptosFramework/jwks.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosStdlib/cryptography/keyless.move",
+      "module": "0x1::keyless",
+      "specifications": [
+        "sources/AptosStdlib/cryptography/keyless.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/keyless_account.move",
+      "module": "0x1::keyless_account",
+      "specifications": [
+        "sources/AptosFramework/keyless_account.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosStdlib/math128.move",
+      "module": "0x1::math128",
+      "specifications": [
+        "sources/AptosStdlib/math128.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosStdlib/math64.move",
+      "module": "0x1::math64",
+      "specifications": [
+        "sources/AptosStdlib/math64.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosStdlib/math_fixed64.move",
+      "module": "0x1::math_fixed64",
+      "specifications": [
+        "sources/AptosStdlib/math_fixed64.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/MoveStdlib/mem.move",
+      "module": "0x1::mem",
+      "specifications": []
+    },
+    {
+      "implementation": "sources/AptosStdlib/cryptography/multi_ed25519.move",
+      "module": "0x1::multi_ed25519",
+      "specifications": [
+        "sources/AptosStdlib/cryptography/multi_ed25519.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosStdlib/cryptography/multi_key.move",
+      "module": "0x1::multi_key",
+      "specifications": [
+        "sources/AptosStdlib/cryptography/multi_key.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/multisig_account.move",
+      "module": "0x1::multisig_account",
+      "specifications": [
+        "sources/AptosFramework/multisig_account.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/nonce_validation.move",
+      "module": "0x1::nonce_validation",
+      "specifications": []
+    },
+    {
+      "implementation": "sources/AptosFramework/object.move",
+      "module": "0x1::object",
+      "specifications": [
+        "sources/AptosFramework/object.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/MoveStdlib/option.move",
+      "module": "0x1::option",
+      "specifications": []
+    },
+    {
+      "implementation": "sources/AptosFramework/aggregator/optional_aggregator.move",
+      "module": "0x1::optional_aggregator",
+      "specifications": [
+        "sources/AptosFramework/aggregator/optional_aggregator.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/datastructures/ordered_map.move",
+      "module": "0x1::ordered_map",
+      "specifications": [
+        "sources/AptosFramework/datastructures/ordered_map.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosStdlib/pool_u64.move",
+      "module": "0x1::pool_u64",
+      "specifications": [
+        "sources/AptosStdlib/pool_u64.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosStdlib/pool_u64_unbound.move",
+      "module": "0x1::pool_u64_unbound",
+      "specifications": [
+        "sources/AptosStdlib/pool_u64_unbound.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/primary_fungible_store.move",
+      "module": "0x1::primary_fungible_store",
+      "specifications": [
+        "sources/AptosFramework/primary_fungible_store.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/randomness.move",
+      "module": "0x1::randomness",
+      "specifications": [
+        "sources/AptosFramework/randomness.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/configs/randomness_api_v0_config.move",
+      "module": "0x1::randomness_api_v0_config",
+      "specifications": [
+        "sources/AptosFramework/configs/randomness_api_v0_config.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/configs/randomness_config.move",
+      "module": "0x1::randomness_config",
+      "specifications": [
+        "sources/AptosFramework/configs/randomness_config.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/configs/randomness_config_seqnum.move",
+      "module": "0x1::randomness_config_seqnum",
+      "specifications": [
+        "sources/AptosFramework/configs/randomness_config_seqnum.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/reconfiguration.move",
+      "module": "0x1::reconfiguration",
+      "specifications": [
+        "sources/AptosFramework/reconfiguration.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/reconfiguration_state.move",
+      "module": "0x1::reconfiguration_state",
+      "specifications": [
+        "sources/AptosFramework/reconfiguration_state.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/reconfiguration_with_dkg.move",
+      "module": "0x1::reconfiguration_with_dkg",
+      "specifications": [
+        "sources/AptosFramework/reconfiguration_with_dkg.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/MoveStdlib/reflect.move",
+      "module": "0x1::reflect",
+      "specifications": [
+        "sources/MoveStdlib/reflect.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/resource_account.move",
+      "module": "0x1::resource_account",
+      "specifications": [
+        "sources/AptosFramework/resource_account.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/MoveStdlib/result.move",
+      "module": "0x1::result",
+      "specifications": [
+        "sources/MoveStdlib/result.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosStdlib/cryptography/ristretto255.move",
+      "module": "0x1::ristretto255",
+      "specifications": [
+        "sources/AptosStdlib/cryptography/ristretto255.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosStdlib/cryptography/ristretto255_bulletproofs.move",
+      "module": "0x1::ristretto255_bulletproofs",
+      "specifications": [
+        "sources/AptosStdlib/cryptography/ristretto255_bulletproofs.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosStdlib/cryptography/ristretto255_pedersen.move",
+      "module": "0x1::ristretto255_pedersen",
+      "specifications": [
+        "sources/AptosStdlib/cryptography/ristretto255_pedersen.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosStdlib/cryptography/secp256k1.move",
+      "module": "0x1::secp256k1",
+      "specifications": [
+        "sources/AptosStdlib/cryptography/secp256k1.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosStdlib/cryptography/secp256r1.move",
+      "module": "0x1::secp256r1",
+      "specifications": [
+        "sources/AptosStdlib/cryptography/secp256r1.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/confidential_asset/sigma_protocols/sigma_protocol.move",
+      "module": "0x1::sigma_protocol",
+      "specifications": []
+    },
+    {
+      "implementation": "sources/AptosFramework/confidential_asset/sigma_protocols/sigma_protocol_fiat_shamir.move",
+      "module": "0x1::sigma_protocol_fiat_shamir",
+      "specifications": []
+    },
+    {
+      "implementation": "sources/AptosFramework/confidential_asset/sigma_protocols/sigma_protocol_homomorphism.move",
+      "module": "0x1::sigma_protocol_homomorphism",
+      "specifications": []
+    },
+    {
+      "implementation": "sources/AptosFramework/confidential_asset/sigma_protocols/proofs/sigma_protocol_key_rotation.move",
+      "module": "0x1::sigma_protocol_key_rotation",
+      "specifications": []
+    },
+    {
+      "implementation": "sources/AptosFramework/confidential_asset/sigma_protocols/sigma_protocol_proof.move",
+      "module": "0x1::sigma_protocol_proof",
+      "specifications": []
+    },
+    {
+      "implementation": "sources/AptosFramework/confidential_asset/sigma_protocols/proofs/sigma_protocol_registration.move",
+      "module": "0x1::sigma_protocol_registration",
+      "specifications": []
+    },
+    {
+      "implementation": "sources/AptosFramework/confidential_asset/sigma_protocols/sigma_protocol_representation.move",
+      "module": "0x1::sigma_protocol_representation",
+      "specifications": []
+    },
+    {
+      "implementation": "sources/AptosFramework/confidential_asset/sigma_protocols/sigma_protocol_representation_vec.move",
+      "module": "0x1::sigma_protocol_representation_vec",
+      "specifications": []
+    },
+    {
+      "implementation": "sources/AptosFramework/confidential_asset/sigma_protocols/sigma_protocol_statement.move",
+      "module": "0x1::sigma_protocol_statement",
+      "specifications": []
+    },
+    {
+      "implementation": "sources/AptosFramework/confidential_asset/sigma_protocols/sigma_protocol_statement_builder.move",
+      "module": "0x1::sigma_protocol_statement_builder",
+      "specifications": []
+    },
+    {
+      "implementation": "sources/AptosFramework/confidential_asset/sigma_protocols/proofs/sigma_protocol_transfer.move",
+      "module": "0x1::sigma_protocol_transfer",
+      "specifications": []
+    },
+    {
+      "implementation": "sources/AptosFramework/confidential_asset/sigma_protocols/sigma_protocol_utils.move",
+      "module": "0x1::sigma_protocol_utils",
+      "specifications": []
+    },
+    {
+      "implementation": "sources/AptosFramework/confidential_asset/sigma_protocols/proofs/sigma_protocol_withdraw.move",
+      "module": "0x1::sigma_protocol_withdraw",
+      "specifications": []
+    },
+    {
+      "implementation": "sources/AptosFramework/confidential_asset/sigma_protocols/sigma_protocol_witness.move",
+      "module": "0x1::sigma_protocol_witness",
+      "specifications": []
+    },
+    {
+      "implementation": "sources/MoveStdlib/signer.move",
+      "module": "0x1::signer",
+      "specifications": [
+        "sources/MoveStdlib/signer.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosStdlib/simple_map.move",
+      "module": "0x1::simple_map",
+      "specifications": [
+        "sources/AptosStdlib/simple_map.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosStdlib/cryptography/single_key.move",
+      "module": "0x1::single_key",
+      "specifications": [
+        "sources/AptosStdlib/cryptography/single_key.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosStdlib/data_structures/smart_table.move",
+      "module": "0x1::smart_table",
+      "specifications": [
+        "sources/AptosStdlib/data_structures/smart_table.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/stake.move",
+      "module": "0x1::stake",
+      "specifications": [
+        "sources/AptosFramework/stake.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/configs/staking_config.move",
+      "module": "0x1::staking_config",
+      "specifications": [
+        "sources/AptosFramework/configs/staking_config.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/staking_contract.move",
+      "module": "0x1::staking_contract",
+      "specifications": [
+        "sources/AptosFramework/staking_contract.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/state_storage.move",
+      "module": "0x1::state_storage",
+      "specifications": [
+        "sources/AptosFramework/state_storage.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/storage_gas.move",
+      "module": "0x1::storage_gas",
+      "specifications": [
+        "sources/AptosFramework/storage_gas.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosStdlib/data_structures/storage_slots_allocator.move",
+      "module": "0x1::storage_slots_allocator",
+      "specifications": [
+        "sources/AptosStdlib/data_structures/storage_slots_allocator.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/MoveStdlib/string.move",
+      "module": "0x1::string",
+      "specifications": [
+        "sources/MoveStdlib/string.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosStdlib/string_utils.move",
+      "module": "0x1::string_utils",
+      "specifications": [
+        "sources/AptosStdlib/string_utils.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/system_addresses.move",
+      "module": "0x1::system_addresses",
+      "specifications": [
+        "sources/AptosFramework/system_addresses.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosStdlib/table.move",
+      "module": "0x1::table",
+      "specifications": [
+        "sources/AptosStdlib/table.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosStdlib/table_with_length.move",
+      "module": "0x1::table_with_length",
+      "specifications": [
+        "sources/AptosStdlib/table_with_length.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/timestamp.move",
+      "module": "0x1::timestamp",
+      "specifications": [
+        "sources/AptosFramework/timestamp.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/transaction_context.move",
+      "module": "0x1::transaction_context",
+      "specifications": [
+        "sources/AptosFramework/transaction_context.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/transaction_fee.move",
+      "module": "0x1::transaction_fee",
+      "specifications": [
+        "sources/AptosFramework/transaction_fee.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/transaction_limits.move",
+      "module": "0x1::transaction_limits",
+      "specifications": [
+        "sources/AptosFramework/transaction_limits.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/transaction_validation.move",
+      "module": "0x1::transaction_validation",
+      "specifications": [
+        "sources/AptosFramework/transaction_validation.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosStdlib/type_info.move",
+      "module": "0x1::type_info",
+      "specifications": [
+        "sources/AptosStdlib/type_info.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/util.move",
+      "module": "0x1::util",
+      "specifications": [
+        "sources/AptosFramework/util.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/validator_consensus_info.move",
+      "module": "0x1::validator_consensus_info",
+      "specifications": [
+        "sources/AptosFramework/validator_consensus_info.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/MoveStdlib/vector.move",
+      "module": "0x1::vector",
+      "specifications": [
+        "sources/MoveStdlib/vector.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/configs/version.move",
+      "module": "0x1::version",
+      "specifications": [
+        "sources/AptosFramework/configs/version.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/vesting.move",
+      "module": "0x1::vesting",
+      "specifications": [
+        "sources/AptosFramework/vesting.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosFramework/voting.move",
+      "module": "0x1::voting",
+      "specifications": [
+        "sources/AptosFramework/voting.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosTrading/orders/bulk_order_types.move",
+      "module": "0x5::bulk_order_types",
+      "specifications": [
+        "sources/AptosTrading/orders/bulk_order_types.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosTrading/orders/order_book_types.move",
+      "module": "0x5::order_book_types",
+      "specifications": [
+        "sources/AptosTrading/orders/order_book_types.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosTrading/orders/order_match_types.move",
+      "module": "0x5::order_match_types",
+      "specifications": [
+        "sources/AptosTrading/orders/order_match_types.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosTrading/orders/single_order_types.move",
+      "module": "0x5::single_order_types",
+      "specifications": [
+        "sources/AptosTrading/orders/single_order_types.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosExperimental/trading/order_book/bulk_order_book.move",
+      "module": "0x7::bulk_order_book",
+      "specifications": [
+        "sources/AptosExperimental/trading/order_book/bulk_order_book.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosExperimental/trading/order_book/bulk_order_utils.move",
+      "module": "0x7::bulk_order_utils",
+      "specifications": [
+        "sources/AptosExperimental/trading/order_book/bulk_order_utils.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosExperimental/trading/market/dead_mans_switch_operations.move",
+      "module": "0x7::dead_mans_switch_operations",
+      "specifications": []
+    },
+    {
+      "implementation": "sources/AptosExperimental/trading/market/dead_mans_switch_tracker.move",
+      "module": "0x7::dead_mans_switch_tracker",
+      "specifications": [
+        "sources/AptosExperimental/trading/market/dead_mans_switch_tracker.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosExperimental/trading/market/market_bulk_order.move",
+      "module": "0x7::market_bulk_order",
+      "specifications": [
+        "sources/AptosExperimental/trading/market/market_bulk_order.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosExperimental/trading/market/market_clearinghouse_order_info.move",
+      "module": "0x7::market_clearinghouse_order_info",
+      "specifications": []
+    },
+    {
+      "implementation": "sources/AptosExperimental/trading/market/market_types.move",
+      "module": "0x7::market_types",
+      "specifications": [
+        "sources/AptosExperimental/trading/market/market_types.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosExperimental/trading/order_book/order_book.move",
+      "module": "0x7::order_book",
+      "specifications": [
+        "sources/AptosExperimental/trading/order_book/order_book.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosExperimental/trading/order_book/order_book_utils.move",
+      "module": "0x7::order_book_utils",
+      "specifications": [
+        "sources/AptosExperimental/trading/order_book/order_book_utils.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosExperimental/trading/order_book/order_id_generation.move",
+      "module": "0x7::order_id_generation",
+      "specifications": [
+        "sources/AptosExperimental/trading/order_book/order_id_generation.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosExperimental/trading/market/order_operations.move",
+      "module": "0x7::order_operations",
+      "specifications": []
+    },
+    {
+      "implementation": "sources/AptosExperimental/trading/market/order_placement.move",
+      "module": "0x7::order_placement",
+      "specifications": []
+    },
+    {
+      "implementation": "sources/AptosExperimental/trading/order_book/pending_order_book_index.move",
+      "module": "0x7::pending_order_book_index",
+      "specifications": [
+        "sources/AptosExperimental/trading/order_book/pending_order_book_index.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosExperimental/trading/market/pre_cancellation_tracker.move",
+      "module": "0x7::pre_cancellation_tracker",
+      "specifications": []
+    },
+    {
+      "implementation": "sources/AptosExperimental/trading/order_book/price_time_index.move",
+      "module": "0x7::price_time_index",
+      "specifications": [
+        "sources/AptosExperimental/trading/order_book/price_time_index.spec.move"
+      ]
+    },
+    {
+      "implementation": "sources/AptosExperimental/trading/order_book/single_order_book.move",
+      "module": "0x7::single_order_book",
+      "specifications": [
+        "sources/AptosExperimental/trading/order_book/single_order_book.spec.move"
+      ]
+    }
+  ],
+  "resolved_address_aliases": {
+    "Extensions": "0x1",
+    "aptos_experimental": "0x7",
+    "aptos_framework": "0x1",
+    "aptos_fungible_asset": "0xA",
+    "aptos_std": "0x1",
+    "aptos_token": "0x3",
+    "aptos_trading": "0x5",
+    "core_resources": "0xA550C18",
+    "std": "0x1",
+    "vm": "0x0",
+    "vm_reserved": "0x0"
+  },
+  "schema_version": 2,
+  "source_packages": [
+    {
+      "package": "MoveStdlib",
+      "source_manifest_sha256": "ebbc1f3f22439e0259ab92e09e0250a3f0ab2fa322f89cb77209a463f7547a6e",
+      "source_path": "aptos-move/framework/move-stdlib"
+    },
+    {
+      "package": "AptosStdlib",
+      "source_manifest_sha256": "8c7a15c8ad8d3779d576711fbb10233fe209dc20558dce6c464ef9c3b931187d",
+      "source_path": "aptos-move/framework/aptos-stdlib"
+    },
+    {
+      "package": "AptosFramework",
+      "source_manifest_sha256": "8c7eedac1f6652943125d9123bbe8fab2edb32cec67f8e39a095608ab0dac364",
+      "source_path": "aptos-move/framework/aptos-framework"
+    },
+    {
+      "package": "AptosTrading",
+      "source_manifest_sha256": "a786efbedf3b6c89225d498fb1a77394a52a4a44c654e665bdea3e036407cd56",
+      "source_path": "aptos-move/framework/aptos-trading"
+    },
+    {
+      "package": "AptosExperimental",
+      "source_manifest_sha256": "8b54e03a8efbb91094c89028d61362d007e9d1e9ab1bcd44256f1fdf96eeb3fe",
+      "source_path": "aptos-move/framework/aptos-experimental"
+    }
+  ],
+  "source_path_map": {
+    "aptos-move/framework/aptos-experimental/sources/trading/market/dead_mans_switch_operations.move": "sources/AptosExperimental/trading/market/dead_mans_switch_operations.move",
+    "aptos-move/framework/aptos-experimental/sources/trading/market/dead_mans_switch_tracker.move": "sources/AptosExperimental/trading/market/dead_mans_switch_tracker.move",
+    "aptos-move/framework/aptos-experimental/sources/trading/market/market_bulk_order.move": "sources/AptosExperimental/trading/market/market_bulk_order.move",
+    "aptos-move/framework/aptos-experimental/sources/trading/market/market_clearinghouse_order_info.move": "sources/AptosExperimental/trading/market/market_clearinghouse_order_info.move",
+    "aptos-move/framework/aptos-experimental/sources/trading/market/market_types.move": "sources/AptosExperimental/trading/market/market_types.move",
+    "aptos-move/framework/aptos-experimental/sources/trading/market/order_operations.move": "sources/AptosExperimental/trading/market/order_operations.move",
+    "aptos-move/framework/aptos-experimental/sources/trading/market/order_placement.move": "sources/AptosExperimental/trading/market/order_placement.move",
+    "aptos-move/framework/aptos-experimental/sources/trading/market/pre_cancellation_tracker.move": "sources/AptosExperimental/trading/market/pre_cancellation_tracker.move",
+    "aptos-move/framework/aptos-experimental/sources/trading/order_book/bulk_order_book.move": "sources/AptosExperimental/trading/order_book/bulk_order_book.move",
+    "aptos-move/framework/aptos-experimental/sources/trading/order_book/bulk_order_utils.move": "sources/AptosExperimental/trading/order_book/bulk_order_utils.move",
+    "aptos-move/framework/aptos-experimental/sources/trading/order_book/order_book.move": "sources/AptosExperimental/trading/order_book/order_book.move",
+    "aptos-move/framework/aptos-experimental/sources/trading/order_book/order_book_utils.move": "sources/AptosExperimental/trading/order_book/order_book_utils.move",
+    "aptos-move/framework/aptos-experimental/sources/trading/order_book/order_id_generation.move": "sources/AptosExperimental/trading/order_book/order_id_generation.move",
+    "aptos-move/framework/aptos-experimental/sources/trading/order_book/pending_order_book_index.move": "sources/AptosExperimental/trading/order_book/pending_order_book_index.move",
+    "aptos-move/framework/aptos-experimental/sources/trading/order_book/price_time_index.move": "sources/AptosExperimental/trading/order_book/price_time_index.move",
+    "aptos-move/framework/aptos-experimental/sources/trading/order_book/single_order_book.move": "sources/AptosExperimental/trading/order_book/single_order_book.move",
+    "aptos-move/framework/aptos-framework/sources/account/account.move": "sources/AptosFramework/account/account.move",
+    "aptos-move/framework/aptos-framework/sources/account/account.spec.move": "sources/AptosFramework/account/account.spec.move",
+    "aptos-move/framework/aptos-framework/sources/account/account_abstraction.move": "sources/AptosFramework/account/account_abstraction.move",
+    "aptos-move/framework/aptos-framework/sources/account/account_abstraction.spec.move": "sources/AptosFramework/account/account_abstraction.spec.move",
+    "aptos-move/framework/aptos-framework/sources/account/auth_data.move": "sources/AptosFramework/account/auth_data.move",
+    "aptos-move/framework/aptos-framework/sources/aggregator/aggregator.move": "sources/AptosFramework/aggregator/aggregator.move",
+    "aptos-move/framework/aptos-framework/sources/aggregator/aggregator.spec.move": "sources/AptosFramework/aggregator/aggregator.spec.move",
+    "aptos-move/framework/aptos-framework/sources/aggregator/aggregator_factory.move": "sources/AptosFramework/aggregator/aggregator_factory.move",
+    "aptos-move/framework/aptos-framework/sources/aggregator/aggregator_factory.spec.move": "sources/AptosFramework/aggregator/aggregator_factory.spec.move",
+    "aptos-move/framework/aptos-framework/sources/aggregator/optional_aggregator.move": "sources/AptosFramework/aggregator/optional_aggregator.move",
+    "aptos-move/framework/aptos-framework/sources/aggregator/optional_aggregator.spec.move": "sources/AptosFramework/aggregator/optional_aggregator.spec.move",
+    "aptos-move/framework/aptos-framework/sources/aggregator_v2/aggregator_v2.move": "sources/AptosFramework/aggregator_v2/aggregator_v2.move",
+    "aptos-move/framework/aptos-framework/sources/aggregator_v2/aggregator_v2.spec.move": "sources/AptosFramework/aggregator_v2/aggregator_v2.spec.move",
+    "aptos-move/framework/aptos-framework/sources/aptos_account.move": "sources/AptosFramework/aptos_account.move",
+    "aptos-move/framework/aptos-framework/sources/aptos_account.spec.move": "sources/AptosFramework/aptos_account.spec.move",
+    "aptos-move/framework/aptos-framework/sources/aptos_coin.move": "sources/AptosFramework/aptos_coin.move",
+    "aptos-move/framework/aptos-framework/sources/aptos_coin.spec.move": "sources/AptosFramework/aptos_coin.spec.move",
+    "aptos-move/framework/aptos-framework/sources/aptos_governance.move": "sources/AptosFramework/aptos_governance.move",
+    "aptos-move/framework/aptos-framework/sources/aptos_governance.spec.move": "sources/AptosFramework/aptos_governance.spec.move",
+    "aptos-move/framework/aptos-framework/sources/block.move": "sources/AptosFramework/block.move",
+    "aptos-move/framework/aptos-framework/sources/block.spec.move": "sources/AptosFramework/block.spec.move",
+    "aptos-move/framework/aptos-framework/sources/chain_id.move": "sources/AptosFramework/chain_id.move",
+    "aptos-move/framework/aptos-framework/sources/chain_id.spec.move": "sources/AptosFramework/chain_id.spec.move",
+    "aptos-move/framework/aptos-framework/sources/chain_status.move": "sources/AptosFramework/chain_status.move",
+    "aptos-move/framework/aptos-framework/sources/chain_status.spec.move": "sources/AptosFramework/chain_status.spec.move",
+    "aptos-move/framework/aptos-framework/sources/chunky_dkg.move": "sources/AptosFramework/chunky_dkg.move",
+    "aptos-move/framework/aptos-framework/sources/chunky_dkg.spec.move": "sources/AptosFramework/chunky_dkg.spec.move",
+    "aptos-move/framework/aptos-framework/sources/code.move": "sources/AptosFramework/code.move",
+    "aptos-move/framework/aptos-framework/sources/code.spec.move": "sources/AptosFramework/code.spec.move",
+    "aptos-move/framework/aptos-framework/sources/coin.move": "sources/AptosFramework/coin.move",
+    "aptos-move/framework/aptos-framework/sources/coin.spec.move": "sources/AptosFramework/coin.spec.move",
+    "aptos-move/framework/aptos-framework/sources/confidential_asset/confidential_amount.move": "sources/AptosFramework/confidential_asset/confidential_amount.move",
+    "aptos-move/framework/aptos-framework/sources/confidential_asset/confidential_amount.spec.move": "sources/AptosFramework/confidential_asset/confidential_amount.spec.move",
+    "aptos-move/framework/aptos-framework/sources/confidential_asset/confidential_asset.move": "sources/AptosFramework/confidential_asset/confidential_asset.move",
+    "aptos-move/framework/aptos-framework/sources/confidential_asset/confidential_asset.spec.move": "sources/AptosFramework/confidential_asset/confidential_asset.spec.move",
+    "aptos-move/framework/aptos-framework/sources/confidential_asset/confidential_balance.move": "sources/AptosFramework/confidential_asset/confidential_balance.move",
+    "aptos-move/framework/aptos-framework/sources/confidential_asset/confidential_balance.spec.move": "sources/AptosFramework/confidential_asset/confidential_balance.spec.move",
+    "aptos-move/framework/aptos-framework/sources/confidential_asset/confidential_range_proofs.move": "sources/AptosFramework/confidential_asset/confidential_range_proofs.move",
+    "aptos-move/framework/aptos-framework/sources/confidential_asset/confidential_range_proofs.spec.move": "sources/AptosFramework/confidential_asset/confidential_range_proofs.spec.move",
+    "aptos-move/framework/aptos-framework/sources/confidential_asset/sigma_protocols/proofs/sigma_protocol_key_rotation.move": "sources/AptosFramework/confidential_asset/sigma_protocols/proofs/sigma_protocol_key_rotation.move",
+    "aptos-move/framework/aptos-framework/sources/confidential_asset/sigma_protocols/proofs/sigma_protocol_registration.move": "sources/AptosFramework/confidential_asset/sigma_protocols/proofs/sigma_protocol_registration.move",
+    "aptos-move/framework/aptos-framework/sources/confidential_asset/sigma_protocols/proofs/sigma_protocol_transfer.move": "sources/AptosFramework/confidential_asset/sigma_protocols/proofs/sigma_protocol_transfer.move",
+    "aptos-move/framework/aptos-framework/sources/confidential_asset/sigma_protocols/proofs/sigma_protocol_withdraw.move": "sources/AptosFramework/confidential_asset/sigma_protocols/proofs/sigma_protocol_withdraw.move",
+    "aptos-move/framework/aptos-framework/sources/confidential_asset/sigma_protocols/sigma_protocol.move": "sources/AptosFramework/confidential_asset/sigma_protocols/sigma_protocol.move",
+    "aptos-move/framework/aptos-framework/sources/confidential_asset/sigma_protocols/sigma_protocol_fiat_shamir.move": "sources/AptosFramework/confidential_asset/sigma_protocols/sigma_protocol_fiat_shamir.move",
+    "aptos-move/framework/aptos-framework/sources/confidential_asset/sigma_protocols/sigma_protocol_homomorphism.move": "sources/AptosFramework/confidential_asset/sigma_protocols/sigma_protocol_homomorphism.move",
+    "aptos-move/framework/aptos-framework/sources/confidential_asset/sigma_protocols/sigma_protocol_proof.move": "sources/AptosFramework/confidential_asset/sigma_protocols/sigma_protocol_proof.move",
+    "aptos-move/framework/aptos-framework/sources/confidential_asset/sigma_protocols/sigma_protocol_representation.move": "sources/AptosFramework/confidential_asset/sigma_protocols/sigma_protocol_representation.move",
+    "aptos-move/framework/aptos-framework/sources/confidential_asset/sigma_protocols/sigma_protocol_representation_vec.move": "sources/AptosFramework/confidential_asset/sigma_protocols/sigma_protocol_representation_vec.move",
+    "aptos-move/framework/aptos-framework/sources/confidential_asset/sigma_protocols/sigma_protocol_statement.move": "sources/AptosFramework/confidential_asset/sigma_protocols/sigma_protocol_statement.move",
+    "aptos-move/framework/aptos-framework/sources/confidential_asset/sigma_protocols/sigma_protocol_statement_builder.move": "sources/AptosFramework/confidential_asset/sigma_protocols/sigma_protocol_statement_builder.move",
+    "aptos-move/framework/aptos-framework/sources/confidential_asset/sigma_protocols/sigma_protocol_utils.move": "sources/AptosFramework/confidential_asset/sigma_protocols/sigma_protocol_utils.move",
+    "aptos-move/framework/aptos-framework/sources/confidential_asset/sigma_protocols/sigma_protocol_witness.move": "sources/AptosFramework/confidential_asset/sigma_protocols/sigma_protocol_witness.move",
+    "aptos-move/framework/aptos-framework/sources/configs/chunky_dkg_config.move": "sources/AptosFramework/configs/chunky_dkg_config.move",
+    "aptos-move/framework/aptos-framework/sources/configs/chunky_dkg_config.spec.move": "sources/AptosFramework/configs/chunky_dkg_config.spec.move",
+    "aptos-move/framework/aptos-framework/sources/configs/chunky_dkg_config_seqnum.move": "sources/AptosFramework/configs/chunky_dkg_config_seqnum.move",
+    "aptos-move/framework/aptos-framework/sources/configs/chunky_dkg_config_seqnum.spec.move": "sources/AptosFramework/configs/chunky_dkg_config_seqnum.spec.move",
+    "aptos-move/framework/aptos-framework/sources/configs/config_buffer.move": "sources/AptosFramework/configs/config_buffer.move",
+    "aptos-move/framework/aptos-framework/sources/configs/config_buffer.spec.move": "sources/AptosFramework/configs/config_buffer.spec.move",
+    "aptos-move/framework/aptos-framework/sources/configs/consensus_config.move": "sources/AptosFramework/configs/consensus_config.move",
+    "aptos-move/framework/aptos-framework/sources/configs/consensus_config.spec.move": "sources/AptosFramework/configs/consensus_config.spec.move",
+    "aptos-move/framework/aptos-framework/sources/configs/epoch_timeout_config.move": "sources/AptosFramework/configs/epoch_timeout_config.move",
+    "aptos-move/framework/aptos-framework/sources/configs/epoch_timeout_config.spec.move": "sources/AptosFramework/configs/epoch_timeout_config.spec.move",
+    "aptos-move/framework/aptos-framework/sources/configs/execution_config.move": "sources/AptosFramework/configs/execution_config.move",
+    "aptos-move/framework/aptos-framework/sources/configs/execution_config.spec.move": "sources/AptosFramework/configs/execution_config.spec.move",
+    "aptos-move/framework/aptos-framework/sources/configs/gas_schedule.move": "sources/AptosFramework/configs/gas_schedule.move",
+    "aptos-move/framework/aptos-framework/sources/configs/gas_schedule.spec.move": "sources/AptosFramework/configs/gas_schedule.spec.move",
+    "aptos-move/framework/aptos-framework/sources/configs/jwk_consensus_config.move": "sources/AptosFramework/configs/jwk_consensus_config.move",
+    "aptos-move/framework/aptos-framework/sources/configs/jwk_consensus_config.spec.move": "sources/AptosFramework/configs/jwk_consensus_config.spec.move",
+    "aptos-move/framework/aptos-framework/sources/configs/randomness_api_v0_config.move": "sources/AptosFramework/configs/randomness_api_v0_config.move",
+    "aptos-move/framework/aptos-framework/sources/configs/randomness_api_v0_config.spec.move": "sources/AptosFramework/configs/randomness_api_v0_config.spec.move",
+    "aptos-move/framework/aptos-framework/sources/configs/randomness_config.move": "sources/AptosFramework/configs/randomness_config.move",
+    "aptos-move/framework/aptos-framework/sources/configs/randomness_config.spec.move": "sources/AptosFramework/configs/randomness_config.spec.move",
+    "aptos-move/framework/aptos-framework/sources/configs/randomness_config_seqnum.move": "sources/AptosFramework/configs/randomness_config_seqnum.move",
+    "aptos-move/framework/aptos-framework/sources/configs/randomness_config_seqnum.spec.move": "sources/AptosFramework/configs/randomness_config_seqnum.spec.move",
+    "aptos-move/framework/aptos-framework/sources/configs/staking_config.move": "sources/AptosFramework/configs/staking_config.move",
+    "aptos-move/framework/aptos-framework/sources/configs/staking_config.spec.move": "sources/AptosFramework/configs/staking_config.spec.move",
+    "aptos-move/framework/aptos-framework/sources/configs/version.move": "sources/AptosFramework/configs/version.move",
+    "aptos-move/framework/aptos-framework/sources/configs/version.spec.move": "sources/AptosFramework/configs/version.spec.move",
+    "aptos-move/framework/aptos-framework/sources/create_signer.move": "sources/AptosFramework/create_signer.move",
+    "aptos-move/framework/aptos-framework/sources/create_signer.spec.move": "sources/AptosFramework/create_signer.spec.move",
+    "aptos-move/framework/aptos-framework/sources/datastructures/big_ordered_map.move": "sources/AptosFramework/datastructures/big_ordered_map.move",
+    "aptos-move/framework/aptos-framework/sources/datastructures/big_ordered_map.spec.move": "sources/AptosFramework/datastructures/big_ordered_map.spec.move",
+    "aptos-move/framework/aptos-framework/sources/datastructures/ordered_map.move": "sources/AptosFramework/datastructures/ordered_map.move",
+    "aptos-move/framework/aptos-framework/sources/datastructures/ordered_map.spec.move": "sources/AptosFramework/datastructures/ordered_map.spec.move",
+    "aptos-move/framework/aptos-framework/sources/decryption.move": "sources/AptosFramework/decryption.move",
+    "aptos-move/framework/aptos-framework/sources/decryption.spec.move": "sources/AptosFramework/decryption.spec.move",
+    "aptos-move/framework/aptos-framework/sources/delegation_pool.move": "sources/AptosFramework/delegation_pool.move",
+    "aptos-move/framework/aptos-framework/sources/delegation_pool.spec.move": "sources/AptosFramework/delegation_pool.spec.move",
+    "aptos-move/framework/aptos-framework/sources/dispatchable_fungible_asset.move": "sources/AptosFramework/dispatchable_fungible_asset.move",
+    "aptos-move/framework/aptos-framework/sources/dispatchable_fungible_asset.spec.move": "sources/AptosFramework/dispatchable_fungible_asset.spec.move",
+    "aptos-move/framework/aptos-framework/sources/dkg.move": "sources/AptosFramework/dkg.move",
+    "aptos-move/framework/aptos-framework/sources/dkg.spec.move": "sources/AptosFramework/dkg.spec.move",
+    "aptos-move/framework/aptos-framework/sources/event.move": "sources/AptosFramework/event.move",
+    "aptos-move/framework/aptos-framework/sources/event.spec.move": "sources/AptosFramework/event.spec.move",
+    "aptos-move/framework/aptos-framework/sources/function_info.move": "sources/AptosFramework/function_info.move",
+    "aptos-move/framework/aptos-framework/sources/function_info.spec.move": "sources/AptosFramework/function_info.spec.move",
+    "aptos-move/framework/aptos-framework/sources/fungible_asset.move": "sources/AptosFramework/fungible_asset.move",
+    "aptos-move/framework/aptos-framework/sources/fungible_asset.spec.move": "sources/AptosFramework/fungible_asset.spec.move",
+    "aptos-move/framework/aptos-framework/sources/genesis.move": "sources/AptosFramework/genesis.move",
+    "aptos-move/framework/aptos-framework/sources/genesis.spec.move": "sources/AptosFramework/genesis.spec.move",
+    "aptos-move/framework/aptos-framework/sources/governance_proposal.move": "sources/AptosFramework/governance_proposal.move",
+    "aptos-move/framework/aptos-framework/sources/governance_proposal.spec.move": "sources/AptosFramework/governance_proposal.spec.move",
+    "aptos-move/framework/aptos-framework/sources/guid.move": "sources/AptosFramework/guid.move",
+    "aptos-move/framework/aptos-framework/sources/guid.spec.move": "sources/AptosFramework/guid.spec.move",
+    "aptos-move/framework/aptos-framework/sources/init.move": "sources/AptosFramework/init.move",
+    "aptos-move/framework/aptos-framework/sources/init.spec.move": "sources/AptosFramework/init.spec.move",
+    "aptos-move/framework/aptos-framework/sources/jwks.move": "sources/AptosFramework/jwks.move",
+    "aptos-move/framework/aptos-framework/sources/jwks.spec.move": "sources/AptosFramework/jwks.spec.move",
+    "aptos-move/framework/aptos-framework/sources/keyless_account.move": "sources/AptosFramework/keyless_account.move",
+    "aptos-move/framework/aptos-framework/sources/keyless_account.spec.move": "sources/AptosFramework/keyless_account.spec.move",
+    "aptos-move/framework/aptos-framework/sources/multisig_account.move": "sources/AptosFramework/multisig_account.move",
+    "aptos-move/framework/aptos-framework/sources/multisig_account.spec.move": "sources/AptosFramework/multisig_account.spec.move",
+    "aptos-move/framework/aptos-framework/sources/nonce_validation.move": "sources/AptosFramework/nonce_validation.move",
+    "aptos-move/framework/aptos-framework/sources/object.move": "sources/AptosFramework/object.move",
+    "aptos-move/framework/aptos-framework/sources/object.spec.move": "sources/AptosFramework/object.spec.move",
+    "aptos-move/framework/aptos-framework/sources/primary_fungible_store.move": "sources/AptosFramework/primary_fungible_store.move",
+    "aptos-move/framework/aptos-framework/sources/primary_fungible_store.spec.move": "sources/AptosFramework/primary_fungible_store.spec.move",
+    "aptos-move/framework/aptos-framework/sources/randomness.move": "sources/AptosFramework/randomness.move",
+    "aptos-move/framework/aptos-framework/sources/randomness.spec.move": "sources/AptosFramework/randomness.spec.move",
+    "aptos-move/framework/aptos-framework/sources/reconfiguration.move": "sources/AptosFramework/reconfiguration.move",
+    "aptos-move/framework/aptos-framework/sources/reconfiguration.spec.move": "sources/AptosFramework/reconfiguration.spec.move",
+    "aptos-move/framework/aptos-framework/sources/reconfiguration_state.move": "sources/AptosFramework/reconfiguration_state.move",
+    "aptos-move/framework/aptos-framework/sources/reconfiguration_state.spec.move": "sources/AptosFramework/reconfiguration_state.spec.move",
+    "aptos-move/framework/aptos-framework/sources/reconfiguration_with_dkg.move": "sources/AptosFramework/reconfiguration_with_dkg.move",
+    "aptos-move/framework/aptos-framework/sources/reconfiguration_with_dkg.spec.move": "sources/AptosFramework/reconfiguration_with_dkg.spec.move",
+    "aptos-move/framework/aptos-framework/sources/resource_account.move": "sources/AptosFramework/resource_account.move",
+    "aptos-move/framework/aptos-framework/sources/resource_account.spec.move": "sources/AptosFramework/resource_account.spec.move",
+    "aptos-move/framework/aptos-framework/sources/stake.move": "sources/AptosFramework/stake.move",
+    "aptos-move/framework/aptos-framework/sources/stake.spec.move": "sources/AptosFramework/stake.spec.move",
+    "aptos-move/framework/aptos-framework/sources/staking_contract.move": "sources/AptosFramework/staking_contract.move",
+    "aptos-move/framework/aptos-framework/sources/staking_contract.spec.move": "sources/AptosFramework/staking_contract.spec.move",
+    "aptos-move/framework/aptos-framework/sources/state_storage.move": "sources/AptosFramework/state_storage.move",
+    "aptos-move/framework/aptos-framework/sources/state_storage.spec.move": "sources/AptosFramework/state_storage.spec.move",
+    "aptos-move/framework/aptos-framework/sources/storage_gas.move": "sources/AptosFramework/storage_gas.move",
+    "aptos-move/framework/aptos-framework/sources/storage_gas.spec.move": "sources/AptosFramework/storage_gas.spec.move",
+    "aptos-move/framework/aptos-framework/sources/system_addresses.move": "sources/AptosFramework/system_addresses.move",
+    "aptos-move/framework/aptos-framework/sources/system_addresses.spec.move": "sources/AptosFramework/system_addresses.spec.move",
+    "aptos-move/framework/aptos-framework/sources/timestamp.move": "sources/AptosFramework/timestamp.move",
+    "aptos-move/framework/aptos-framework/sources/timestamp.spec.move": "sources/AptosFramework/timestamp.spec.move",
+    "aptos-move/framework/aptos-framework/sources/transaction_context.move": "sources/AptosFramework/transaction_context.move",
+    "aptos-move/framework/aptos-framework/sources/transaction_context.spec.move": "sources/AptosFramework/transaction_context.spec.move",
+    "aptos-move/framework/aptos-framework/sources/transaction_fee.move": "sources/AptosFramework/transaction_fee.move",
+    "aptos-move/framework/aptos-framework/sources/transaction_fee.spec.move": "sources/AptosFramework/transaction_fee.spec.move",
+    "aptos-move/framework/aptos-framework/sources/transaction_limits.move": "sources/AptosFramework/transaction_limits.move",
+    "aptos-move/framework/aptos-framework/sources/transaction_limits.spec.move": "sources/AptosFramework/transaction_limits.spec.move",
+    "aptos-move/framework/aptos-framework/sources/transaction_validation.move": "sources/AptosFramework/transaction_validation.move",
+    "aptos-move/framework/aptos-framework/sources/transaction_validation.spec.move": "sources/AptosFramework/transaction_validation.spec.move",
+    "aptos-move/framework/aptos-framework/sources/util.move": "sources/AptosFramework/util.move",
+    "aptos-move/framework/aptos-framework/sources/util.spec.move": "sources/AptosFramework/util.spec.move",
+    "aptos-move/framework/aptos-framework/sources/validator_consensus_info.move": "sources/AptosFramework/validator_consensus_info.move",
+    "aptos-move/framework/aptos-framework/sources/validator_consensus_info.spec.move": "sources/AptosFramework/validator_consensus_info.spec.move",
+    "aptos-move/framework/aptos-framework/sources/vesting.move": "sources/AptosFramework/vesting.move",
+    "aptos-move/framework/aptos-framework/sources/vesting.spec.move": "sources/AptosFramework/vesting.spec.move",
+    "aptos-move/framework/aptos-framework/sources/voting.move": "sources/AptosFramework/voting.move",
+    "aptos-move/framework/aptos-framework/sources/voting.spec.move": "sources/AptosFramework/voting.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/any.move": "sources/AptosStdlib/any.move",
+    "aptos-move/framework/aptos-stdlib/sources/any.spec.move": "sources/AptosStdlib/any.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/bcs_stream.move": "sources/AptosStdlib/bcs_stream.move",
+    "aptos-move/framework/aptos-stdlib/sources/bcs_stream.spec.move": "sources/AptosStdlib/bcs_stream.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/comparator.move": "sources/AptosStdlib/comparator.move",
+    "aptos-move/framework/aptos-stdlib/sources/comparator.spec.move": "sources/AptosStdlib/comparator.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/copyable_any.move": "sources/AptosStdlib/copyable_any.move",
+    "aptos-move/framework/aptos-stdlib/sources/copyable_any.spec.move": "sources/AptosStdlib/copyable_any.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/cryptography/bls12381.move": "sources/AptosStdlib/cryptography/bls12381.move",
+    "aptos-move/framework/aptos-stdlib/sources/cryptography/bls12381.spec.move": "sources/AptosStdlib/cryptography/bls12381.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/cryptography/bn254_algebra.move": "sources/AptosStdlib/cryptography/bn254_algebra.move",
+    "aptos-move/framework/aptos-stdlib/sources/cryptography/crypto_algebra.move": "sources/AptosStdlib/cryptography/crypto_algebra.move",
+    "aptos-move/framework/aptos-stdlib/sources/cryptography/crypto_algebra.spec.move": "sources/AptosStdlib/cryptography/crypto_algebra.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/cryptography/ed25519.move": "sources/AptosStdlib/cryptography/ed25519.move",
+    "aptos-move/framework/aptos-stdlib/sources/cryptography/ed25519.spec.move": "sources/AptosStdlib/cryptography/ed25519.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/cryptography/federated_keyless.move": "sources/AptosStdlib/cryptography/federated_keyless.move",
+    "aptos-move/framework/aptos-stdlib/sources/cryptography/federated_keyless.spec.move": "sources/AptosStdlib/cryptography/federated_keyless.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/cryptography/keyless.move": "sources/AptosStdlib/cryptography/keyless.move",
+    "aptos-move/framework/aptos-stdlib/sources/cryptography/keyless.spec.move": "sources/AptosStdlib/cryptography/keyless.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/cryptography/multi_ed25519.move": "sources/AptosStdlib/cryptography/multi_ed25519.move",
+    "aptos-move/framework/aptos-stdlib/sources/cryptography/multi_ed25519.spec.move": "sources/AptosStdlib/cryptography/multi_ed25519.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/cryptography/multi_key.move": "sources/AptosStdlib/cryptography/multi_key.move",
+    "aptos-move/framework/aptos-stdlib/sources/cryptography/multi_key.spec.move": "sources/AptosStdlib/cryptography/multi_key.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/cryptography/ristretto255.move": "sources/AptosStdlib/cryptography/ristretto255.move",
+    "aptos-move/framework/aptos-stdlib/sources/cryptography/ristretto255.spec.move": "sources/AptosStdlib/cryptography/ristretto255.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/cryptography/ristretto255_bulletproofs.move": "sources/AptosStdlib/cryptography/ristretto255_bulletproofs.move",
+    "aptos-move/framework/aptos-stdlib/sources/cryptography/ristretto255_bulletproofs.spec.move": "sources/AptosStdlib/cryptography/ristretto255_bulletproofs.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/cryptography/ristretto255_pedersen.move": "sources/AptosStdlib/cryptography/ristretto255_pedersen.move",
+    "aptos-move/framework/aptos-stdlib/sources/cryptography/ristretto255_pedersen.spec.move": "sources/AptosStdlib/cryptography/ristretto255_pedersen.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/cryptography/secp256k1.move": "sources/AptosStdlib/cryptography/secp256k1.move",
+    "aptos-move/framework/aptos-stdlib/sources/cryptography/secp256k1.spec.move": "sources/AptosStdlib/cryptography/secp256k1.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/cryptography/secp256r1.move": "sources/AptosStdlib/cryptography/secp256r1.move",
+    "aptos-move/framework/aptos-stdlib/sources/cryptography/secp256r1.spec.move": "sources/AptosStdlib/cryptography/secp256r1.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/cryptography/single_key.move": "sources/AptosStdlib/cryptography/single_key.move",
+    "aptos-move/framework/aptos-stdlib/sources/cryptography/single_key.spec.move": "sources/AptosStdlib/cryptography/single_key.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/data_structures/smart_table.move": "sources/AptosStdlib/data_structures/smart_table.move",
+    "aptos-move/framework/aptos-stdlib/sources/data_structures/smart_table.spec.move": "sources/AptosStdlib/data_structures/smart_table.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/data_structures/storage_slots_allocator.move": "sources/AptosStdlib/data_structures/storage_slots_allocator.move",
+    "aptos-move/framework/aptos-stdlib/sources/data_structures/storage_slots_allocator.spec.move": "sources/AptosStdlib/data_structures/storage_slots_allocator.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/fixed_point64.move": "sources/AptosStdlib/fixed_point64.move",
+    "aptos-move/framework/aptos-stdlib/sources/from_bcs.move": "sources/AptosStdlib/from_bcs.move",
+    "aptos-move/framework/aptos-stdlib/sources/from_bcs.spec.move": "sources/AptosStdlib/from_bcs.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/hash.move": "sources/AptosStdlib/hash.move",
+    "aptos-move/framework/aptos-stdlib/sources/hash.spec.move": "sources/AptosStdlib/hash.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/math128.move": "sources/AptosStdlib/math128.move",
+    "aptos-move/framework/aptos-stdlib/sources/math128.spec.move": "sources/AptosStdlib/math128.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/math64.move": "sources/AptosStdlib/math64.move",
+    "aptos-move/framework/aptos-stdlib/sources/math64.spec.move": "sources/AptosStdlib/math64.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/math_fixed64.move": "sources/AptosStdlib/math_fixed64.move",
+    "aptos-move/framework/aptos-stdlib/sources/math_fixed64.spec.move": "sources/AptosStdlib/math_fixed64.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/pool_u64.move": "sources/AptosStdlib/pool_u64.move",
+    "aptos-move/framework/aptos-stdlib/sources/pool_u64.spec.move": "sources/AptosStdlib/pool_u64.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/pool_u64_unbound.move": "sources/AptosStdlib/pool_u64_unbound.move",
+    "aptos-move/framework/aptos-stdlib/sources/pool_u64_unbound.spec.move": "sources/AptosStdlib/pool_u64_unbound.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/simple_map.move": "sources/AptosStdlib/simple_map.move",
+    "aptos-move/framework/aptos-stdlib/sources/simple_map.spec.move": "sources/AptosStdlib/simple_map.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/string_utils.move": "sources/AptosStdlib/string_utils.move",
+    "aptos-move/framework/aptos-stdlib/sources/string_utils.spec.move": "sources/AptosStdlib/string_utils.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/table.move": "sources/AptosStdlib/table.move",
+    "aptos-move/framework/aptos-stdlib/sources/table.spec.move": "sources/AptosStdlib/table.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/table_with_length.move": "sources/AptosStdlib/table_with_length.move",
+    "aptos-move/framework/aptos-stdlib/sources/table_with_length.spec.move": "sources/AptosStdlib/table_with_length.spec.move",
+    "aptos-move/framework/aptos-stdlib/sources/type_info.move": "sources/AptosStdlib/type_info.move",
+    "aptos-move/framework/aptos-stdlib/sources/type_info.spec.move": "sources/AptosStdlib/type_info.spec.move",
+    "aptos-move/framework/aptos-trading/sources/orders/bulk_order_types.move": "sources/AptosTrading/orders/bulk_order_types.move",
+    "aptos-move/framework/aptos-trading/sources/orders/order_book_types.move": "sources/AptosTrading/orders/order_book_types.move",
+    "aptos-move/framework/aptos-trading/sources/orders/order_match_types.move": "sources/AptosTrading/orders/order_match_types.move",
+    "aptos-move/framework/aptos-trading/sources/orders/single_order_types.move": "sources/AptosTrading/orders/single_order_types.move",
+    "aptos-move/framework/move-stdlib/sources/bcs.move": "sources/MoveStdlib/bcs.move",
+    "aptos-move/framework/move-stdlib/sources/cmp.move": "sources/MoveStdlib/cmp.move",
+    "aptos-move/framework/move-stdlib/sources/configs/features.move": "sources/MoveStdlib/configs/features.move",
+    "aptos-move/framework/move-stdlib/sources/configs/features.spec.move": "sources/MoveStdlib/configs/features.spec.move",
+    "aptos-move/framework/move-stdlib/sources/error.move": "sources/MoveStdlib/error.move",
+    "aptos-move/framework/move-stdlib/sources/fixed_point32.move": "sources/MoveStdlib/fixed_point32.move",
+    "aptos-move/framework/move-stdlib/sources/hash.move": "sources/MoveStdlib/hash.move",
+    "aptos-move/framework/move-stdlib/sources/mem.move": "sources/MoveStdlib/mem.move",
+    "aptos-move/framework/move-stdlib/sources/option.move": "sources/MoveStdlib/option.move",
+    "aptos-move/framework/move-stdlib/sources/reflect.move": "sources/MoveStdlib/reflect.move",
+    "aptos-move/framework/move-stdlib/sources/result.move": "sources/MoveStdlib/result.move",
+    "aptos-move/framework/move-stdlib/sources/signer.move": "sources/MoveStdlib/signer.move",
+    "aptos-move/framework/move-stdlib/sources/string.move": "sources/MoveStdlib/string.move",
+    "aptos-move/framework/move-stdlib/sources/string.spec.move": "sources/MoveStdlib/string.spec.move",
+    "aptos-move/framework/move-stdlib/sources/vector.move": "sources/MoveStdlib/vector.move"
+  },
+  "standalone_spec_qualifications": [
+    {
+      "path": "sources/AptosFramework/dispatchable_fungible_asset.spec.move",
+      "replacements": [
+        {
+          "count": 4,
+          "from": "object::object_address",
+          "to": "aptos_framework::object::object_address"
+        }
+      ]
+    },
+    {
+      "path": "sources/AptosFramework/function_info.spec.move",
+      "replacements": [
+        {
+          "count": 4,
+          "from": "string::bytes",
+          "to": "std::string::bytes"
+        }
+      ]
+    }
+  ]
+}

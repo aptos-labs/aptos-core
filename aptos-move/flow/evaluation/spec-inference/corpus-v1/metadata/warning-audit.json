@@ -1,0 +1,11 @@
+{
+  "loop_normalization_sites": 0,
+  "results": [
+    "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus/manifest.json",
+    "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus/shared-package-compile.json",
+    "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus/warning-audit.json"
+  ],
+  "schema_version": 1,
+  "unique_warning_sites": 0,
+  "warnings": []
+}

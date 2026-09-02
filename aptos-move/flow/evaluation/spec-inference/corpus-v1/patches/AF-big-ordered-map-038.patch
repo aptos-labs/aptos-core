@@ -1,0 +1,163 @@
+diff --git a/.move-inference-task.json b/.move-inference-task.json
+new file mode 100644
+index 0000000000..53414e1e3e
+--- /dev/null
++++ b/.move-inference-task.json
+@@ -0,0 +1,48 @@
++{
++  "called_function_dependencies": [
++    "0x1::storage_slots_allocator::borrow"
++  ],
++  "granularity": "function",
++  "package_module_target": "0x1::big_ordered_map::internal_leaf_iter_borrow_entries_and_next_leaf_index",
++  "schema_version": 3,
++  "source_commit": "6d836beedc56fc70c54f3b3046d1d248d850c64b",
++  "source_path": "sources/AptosFramework/datastructures/big_ordered_map.move",
++  "spec_function_dependencies": [
++    "0x1::option::$borrow",
++    "0x1::option::$is_none",
++    "0x1::table_with_length::spec_contains",
++    "0x1::table_with_length::spec_get"
++  ],
++  "target_functions": [
++    "internal_leaf_iter_borrow_entries_and_next_leaf_index"
++  ],
++  "task_id": "AF-big-ordered-map-038",
++  "transitive_called_function_dependencies": [
++    "0x1::option::borrow",
++    "0x1::storage_slots_allocator::borrow",
++    "0x1::table::borrow",
++    "0x1::table::borrow_box",
++    "0x1::table_with_length::borrow"
++  ],
++  "transitive_function_dependencies": [
++    "0x1::option::borrow",
++    "0x1::storage_slots_allocator::borrow",
++    "0x1::table::borrow",
++    "0x1::table::borrow_box",
++    "0x1::table_with_length::borrow"
++  ],
++  "transitive_module_dependencies": [
++    "0x1::bcs",
++    "0x1::cmp",
++    "0x1::error",
++    "0x1::fixed_point32",
++    "0x1::math64",
++    "0x1::mem",
++    "0x1::option",
++    "0x1::ordered_map",
++    "0x1::storage_slots_allocator",
++    "0x1::table",
++    "0x1::table_with_length",
++    "0x1::vector"
++  ]
++}
+diff --git a/sources/AptosFramework/datastructures/big_ordered_map.spec.move b/sources/AptosFramework/datastructures/big_ordered_map.spec.move
+index 1b5fe6abb6..85dd94e2d7 100644
+--- a/sources/AptosFramework/datastructures/big_ordered_map.spec.move
++++ b/sources/AptosFramework/datastructures/big_ordered_map.spec.move
+@@ -817,55 +817,55 @@ spec aptos_framework::big_ordered_map {
+         ensures result == self.value;
+     }
+ 
+-    spec internal_leaf_iter_borrow_entries_and_next_leaf_index {
+-        pragma opaque;
+-        pragma verify = false;
+-        requires spec_leaf_iter_valid(self, map);
+-        aborts_if internal_leaf_iter_is_end(self);
+-        ensures spec_leaf_iter_valid(result_2, map);
+-        // Every entry in the returned leaf is a real map entry (a Leaf child
+-        // with contained key and matching value).
+-        ensures forall k: K where ordered_map::spec_contains_key(result_1, k):
+-            spec_contains_key(map, k);
+-        ensures forall k: K where ordered_map::spec_contains_key(result_1, k):
+-            (ordered_map::spec_get(result_1, k) is Child::Leaf<V>)
+-                && ordered_map::spec_get(result_1, k).value == spec_get(map, k);
+-        // Leaves of a nonempty map are nonempty.
+-        ensures spec_len(map) > 0 ==> ordered_map::spec_len(result_1) > 0;
+-        // The other direction, which the soundness clauses above do not give:
+-        // this leaf holds exactly the map's keys at positions
+-        // `offset .. offset + leaf size`, in that order. Leaves are visited in
+-        // ascending key order and each leaf's entries are ascending, so the
+-        // leaf's own enumeration lines up with the map's at that offset.
+-        ensures spec_leaf_offset(self, map) + ordered_map::spec_len(result_1)
+-            <= spec_len(map);
+-        ensures forall j in 0..ordered_map::spec_len(result_1):
+-            spec_key_at(map, spec_leaf_offset(self, map) + j)
+-                == ordered_map::spec_key_at(result_1, j);
+-        // The same correspondence for values, stated positionally. The
+-        // key-guarded clauses above cannot be used by a walk that has just read
+-        // position `j`: that would first require the key at `j` to be known
+-        // contained, which nothing about an opaque result gives. Leaf-ness is
+-        // part of it — `.value` is a variant selector, so without it the value
+-        // equality says nothing about the child a walk actually reads.
+-        ensures forall j in 0..ordered_map::spec_len(result_1):
+-            ordered_map::spec_get(result_1, ordered_map::spec_key_at(result_1, j))
+-                is Child::Leaf<V>;
+-        ensures forall j in 0..ordered_map::spec_len(result_1):
+-            ordered_map::spec_get(result_1, ordered_map::spec_key_at(result_1, j))
+-                .value
+-                == spec_get(map, spec_key_at(map, spec_leaf_offset(self, map) + j));
+-        // Advancing consumes exactly this leaf's keys, and the walk ends only
+-        // once every key has been consumed.
+-        ensures spec_leaf_offset(result_2, map)
+-            == spec_leaf_offset(self, map) + ordered_map::spec_len(result_1);
+-        // An offset counts keys, so it never goes backwards past the start.
+-        // Without this a walk could sit at a negative position, where a
+-        // position-indexed aggregate is trivially zero.
+-        ensures spec_leaf_offset(result_2, map) >= 0;
+-        ensures internal_leaf_iter_is_end(result_2) ==>
+-            spec_leaf_offset(result_2, map) == spec_len(map);
+-    }
++                                                                
++                      
++                              
++                                                 
++                                                  
++                                                    
++                                                                             
++                                                  
++                                                                              
++                                      
++                                                                              
++                                                                  
++                                                                                
++                                                 
++                                                                          
++                                                                              
++                                                              
++                                                                               
++                                                                            
++                                                                         
++                                                                             
++                             
++                                                               
++                                                             
++                                                         
++                                                                       
++                                                                                
++                                                                            
++                                                                              
++                                                                               
++                                                                       
++                                                               
++                                                                                  
++                                  
++                                                               
++                                                                                  
++                      
++                                                                                    
++                                                                              
++                                            
++                                               
++                                                                             
++                                                                            
++                                                                        
++                                                        
++                                                     
++                                                       
++                                                             
++     
+     spec add_or_upsert_impl<K: copy + drop + store, V: store>(self: &mut 0x1::big_ordered_map::BigOrderedMap<K, V>, key: K, value: V, allow_overwrite: bool): 0x1::option::Option<0x1::big_ordered_map::Child<V>> {
+         use 0x1::vector;
+         use 0x1::option;

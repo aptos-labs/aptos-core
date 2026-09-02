@@ -1,0 +1,953 @@
+diff --git a/.move-inference-task.json b/.move-inference-task.json
+new file mode 100644
+index 0000000000..1980422dc7
+--- /dev/null
++++ b/.move-inference-task.json
+@@ -0,0 +1,358 @@
++{
++  "called_function_dependencies": [
++    "0x1::code::can_change_upgrade_policy_to",
++    "0x1::code::check_coexistence",
++    "0x1::code::check_dependencies",
++    "0x1::code::check_upgradability",
++    "0x1::code::get_module_names",
++    "0x1::code::request_publish",
++    "0x1::code::request_publish_with_allowed_deps",
++    "0x1::code::upgrade_policy_arbitrary",
++    "0x1::code::upgrade_policy_immutable",
++    "0x1::error::canonical",
++    "0x1::error::invalid_argument",
++    "0x1::error::not_found",
++    "0x1::error::permission_denied",
++    "0x1::event::emit",
++    "0x1::event::write_module_event_to_store",
++    "0x1::features::code_dependency_check_enabled",
++    "0x1::features::is_enabled",
++    "0x1::features::is_lazy_module_initialization_enabled",
++    "0x1::from_bcs::from_bytes",
++    "0x1::from_bcs::to_u128",
++    "0x1::hash::sha3_256",
++    "0x1::init::module_id_from_name",
++    "0x1::init::record_deploy_owner",
++    "0x1::init::reset_initialized",
++    "0x1::object::address_to_object",
++    "0x1::object::is_object",
++    "0x1::object::is_owner",
++    "0x1::object::object_address",
++    "0x1::object::owner",
++    "0x1::object::root_owner",
++    "0x1::ordered_map::borrow_mut",
++    "0x1::signer::address_of",
++    "0x1::string::bytes",
++    "0x1::system_addresses::assert_aptos_framework",
++    "0x1::vector::borrow",
++    "0x1::vector::borrow_mut",
++    "0x1::vector::contains",
++    "0x1::vector::empty",
++    "0x1::vector::length",
++    "0x1::vector::push_back"
++  ],
++  "granularity": "module",
++  "package_module_target": "0x1::code",
++  "schema_version": 3,
++  "source_commit": "6d836beedc56fc70c54f3b3046d1d248d850c64b",
++  "source_path": "sources/AptosFramework/code.move",
++  "spec_function_dependencies": [
++    "0x1::code::$can_change_upgrade_policy_to",
++    "0x1::code::$is_policy_exempted_address",
++    "0x1::code::$upgrade_policy_arbitrary",
++    "0x1::code::$upgrade_policy_immutable",
++    "0x1::error::$canonical",
++    "0x1::features::spec_is_enabled",
++    "0x1::from_bcs::deserializable",
++    "0x1::from_bcs::deserialize",
++    "0x1::hash::$sha3_256",
++    "0x1::object::spec_exists_at",
++    "0x1::option::$none",
++    "0x1::option::$some",
++    "0x1::ordered_map::spec_contains_key",
++    "0x1::ordered_map::spec_get",
++    "0x1::signer::$address_of",
++    "0x1::signer::$borrow_address"
++  ],
++  "target_functions": [
++    "initialize",
++    "check_upgradability",
++    "freeze_code_object",
++    "get_module_names",
++    "publish_package"
++  ],
++  "task_id": "AF-code-017",
++  "transitive_called_function_dependencies": [
++    "0x1::cmp::compare",
++    "0x1::cmp::is_lt",
++    "0x1::code::can_change_upgrade_policy_to",
++    "0x1::code::check_coexistence",
++    "0x1::code::check_dependencies",
++    "0x1::code::check_upgradability",
++    "0x1::code::get_module_names",
++    "0x1::code::is_policy_exempted_address",
++    "0x1::code::request_publish",
++    "0x1::code::request_publish_with_allowed_deps",
++    "0x1::code::upgrade_policy_arbitrary",
++    "0x1::code::upgrade_policy_immutable",
++    "0x1::create_signer::create_signer",
++    "0x1::error::already_exists",
++    "0x1::error::canonical",
++    "0x1::error::invalid_argument",
++    "0x1::error::not_found",
++    "0x1::error::permission_denied",
++    "0x1::event::emit",
++    "0x1::event::write_module_event_to_store",
++    "0x1::features::code_dependency_check_enabled",
++    "0x1::features::contains",
++    "0x1::features::is_enabled",
++    "0x1::features::is_lazy_module_initialization_enabled",
++    "0x1::from_bcs::from_bytes",
++    "0x1::from_bcs::to_u128",
++    "0x1::hash::sha3_256",
++    "0x1::init::ensure_module_state",
++    "0x1::init::module_id_from_name",
++    "0x1::init::record_deploy_owner",
++    "0x1::init::reset_initialized",
++    "0x1::object::address_to_object",
++    "0x1::object::exists_at",
++    "0x1::object::is_object",
++    "0x1::object::is_owner",
++    "0x1::object::object_address",
++    "0x1::object::owner",
++    "0x1::object::root_owner",
++    "0x1::option::none",
++    "0x1::option::some",
++    "0x1::ordered_map::add",
++    "0x1::ordered_map::binary_search",
++    "0x1::ordered_map::borrow_mut",
++    "0x1::ordered_map::contains",
++    "0x1::ordered_map::internal_find",
++    "0x1::ordered_map::internal_lower_bound",
++    "0x1::ordered_map::internal_new_end_iter",
++    "0x1::ordered_map::iter_borrow_key",
++    "0x1::ordered_map::iter_borrow_mut",
++    "0x1::ordered_map::iter_is_end",
++    "0x1::ordered_map::new",
++    "0x1::signer::address_of",
++    "0x1::signer::borrow_address",
++    "0x1::string::bytes",
++    "0x1::string::internal_check_utf8",
++    "0x1::string::utf8",
++    "0x1::system_addresses::assert_aptos_framework",
++    "0x1::system_addresses::is_aptos_framework_address",
++    "0x1::vector::borrow",
++    "0x1::vector::borrow_mut",
++    "0x1::vector::contains",
++    "0x1::vector::destroy_empty",
++    "0x1::vector::empty",
++    "0x1::vector::insert",
++    "0x1::vector::length",
++    "0x1::vector::move_range",
++    "0x1::vector::pop_back",
++    "0x1::vector::push_back",
++    "0x1::vector::reverse",
++    "0x1::vector::reverse_slice",
++    "0x1::vector::singleton",
++    "0x1::vector::swap",
++    "0x1::vector::trim"
++  ],
++  "transitive_function_dependencies": [
++    "0x1::cmp::compare",
++    "0x1::cmp::is_lt",
++    "0x1::code::can_change_upgrade_policy_to",
++    "0x1::code::check_coexistence",
++    "0x1::code::check_dependencies",
++    "0x1::code::check_upgradability",
++    "0x1::code::get_module_names",
++    "0x1::code::is_policy_exempted_address",
++    "0x1::code::request_publish",
++    "0x1::code::request_publish_with_allowed_deps",
++    "0x1::code::upgrade_policy_arbitrary",
++    "0x1::code::upgrade_policy_immutable",
++    "0x1::create_signer::create_signer",
++    "0x1::error::already_exists",
++    "0x1::error::canonical",
++    "0x1::error::invalid_argument",
++    "0x1::error::not_found",
++    "0x1::error::permission_denied",
++    "0x1::event::emit",
++    "0x1::event::write_module_event_to_store",
++    "0x1::features::code_dependency_check_enabled",
++    "0x1::features::contains",
++    "0x1::features::is_enabled",
++    "0x1::features::is_lazy_module_initialization_enabled",
++    "0x1::from_bcs::from_bytes",
++    "0x1::from_bcs::to_u128",
++    "0x1::hash::sha3_256",
++    "0x1::init::ensure_module_state",
++    "0x1::init::module_id_from_name",
++    "0x1::init::record_deploy_owner",
++    "0x1::init::reset_initialized",
++    "0x1::object::address_to_object",
++    "0x1::object::exists_at",
++    "0x1::object::is_object",
++    "0x1::object::is_owner",
++    "0x1::object::object_address",
++    "0x1::object::owner",
++    "0x1::object::root_owner",
++    "0x1::option::none",
++    "0x1::option::some",
++    "0x1::ordered_map::add",
++    "0x1::ordered_map::binary_search",
++    "0x1::ordered_map::borrow_mut",
++    "0x1::ordered_map::contains",
++    "0x1::ordered_map::internal_find",
++    "0x1::ordered_map::internal_lower_bound",
++    "0x1::ordered_map::internal_new_end_iter",
++    "0x1::ordered_map::iter_borrow_key",
++    "0x1::ordered_map::iter_borrow_mut",
++    "0x1::ordered_map::iter_is_end",
++    "0x1::ordered_map::new",
++    "0x1::signer::address_of",
++    "0x1::signer::borrow_address",
++    "0x1::string::bytes",
++    "0x1::string::internal_check_utf8",
++    "0x1::string::utf8",
++    "0x1::system_addresses::assert_aptos_framework",
++    "0x1::system_addresses::is_aptos_framework_address",
++    "0x1::vector::borrow",
++    "0x1::vector::borrow_mut",
++    "0x1::vector::contains",
++    "0x1::vector::destroy_empty",
++    "0x1::vector::empty",
++    "0x1::vector::insert",
++    "0x1::vector::length",
++    "0x1::vector::move_range",
++    "0x1::vector::pop_back",
++    "0x1::vector::push_back",
++    "0x1::vector::reverse",
++    "0x1::vector::reverse_slice",
++    "0x1::vector::singleton",
++    "0x1::vector::swap",
++    "0x1::vector::trim"
++  ],
++  "transitive_module_dependencies": [
++    "0x1::account",
++    "0x1::account_abstraction",
++    "0x1::aggregator",
++    "0x1::aggregator_factory",
++    "0x1::aggregator_v2",
++    "0x1::any",
++    "0x1::aptos_account",
++    "0x1::aptos_coin",
++    "0x1::aptos_governance",
++    "0x1::aptos_hash",
++    "0x1::auth_data",
++    "0x1::bcs",
++    "0x1::bcs_stream",
++    "0x1::big_ordered_map",
++    "0x1::block",
++    "0x1::bls12381",
++    "0x1::bn254_algebra",
++    "0x1::chain_id",
++    "0x1::chain_status",
++    "0x1::chunky_dkg",
++    "0x1::chunky_dkg_config",
++    "0x1::chunky_dkg_config_seqnum",
++    "0x1::cmp",
++    "0x1::coin",
++    "0x1::comparator",
++    "0x1::confidential_amount",
++    "0x1::confidential_asset",
++    "0x1::confidential_balance",
++    "0x1::confidential_range_proofs",
++    "0x1::config_buffer",
++    "0x1::consensus_config",
++    "0x1::copyable_any",
++    "0x1::create_signer",
++    "0x1::crypto_algebra",
++    "0x1::decryption",
++    "0x1::delegation_pool",
++    "0x1::dispatchable_fungible_asset",
++    "0x1::dkg",
++    "0x1::ed25519",
++    "0x1::epoch_timeout_config",
++    "0x1::error",
++    "0x1::event",
++    "0x1::execution_config",
++    "0x1::features",
++    "0x1::federated_keyless",
++    "0x1::fixed_point32",
++    "0x1::fixed_point64",
++    "0x1::from_bcs",
++    "0x1::function_info",
++    "0x1::fungible_asset",
++    "0x1::gas_schedule",
++    "0x1::genesis",
++    "0x1::governance_proposal",
++    "0x1::guid",
++    "0x1::hash",
++    "0x1::init",
++    "0x1::jwk_consensus_config",
++    "0x1::jwks",
++    "0x1::keyless",
++    "0x1::keyless_account",
++    "0x1::math128",
++    "0x1::math64",
++    "0x1::math_fixed64",
++    "0x1::mem",
++    "0x1::multi_ed25519",
++    "0x1::multi_key",
++    "0x1::multisig_account",
++    "0x1::nonce_validation",
++    "0x1::object",
++    "0x1::option",
++    "0x1::optional_aggregator",
++    "0x1::ordered_map",
++    "0x1::pool_u64",
++    "0x1::pool_u64_unbound",
++    "0x1::primary_fungible_store",
++    "0x1::randomness",
++    "0x1::randomness_api_v0_config",
++    "0x1::randomness_config",
++    "0x1::randomness_config_seqnum",
++    "0x1::reconfiguration",
++    "0x1::reconfiguration_state",
++    "0x1::reconfiguration_with_dkg",
++    "0x1::reflect",
++    "0x1::resource_account",
++    "0x1::result",
++    "0x1::ristretto255",
++    "0x1::ristretto255_bulletproofs",
++    "0x1::ristretto255_pedersen",
++    "0x1::secp256k1",
++    "0x1::secp256r1",
++    "0x1::sigma_protocol",
++    "0x1::sigma_protocol_fiat_shamir",
++    "0x1::sigma_protocol_homomorphism",
++    "0x1::sigma_protocol_key_rotation",
++    "0x1::sigma_protocol_proof",
++    "0x1::sigma_protocol_registration",
++    "0x1::sigma_protocol_representation",
++    "0x1::sigma_protocol_representation_vec",
++    "0x1::sigma_protocol_statement",
++    "0x1::sigma_protocol_statement_builder",
++    "0x1::sigma_protocol_transfer",
++    "0x1::sigma_protocol_utils",
++    "0x1::sigma_protocol_withdraw",
++    "0x1::sigma_protocol_witness",
++    "0x1::signer",
++    "0x1::simple_map",
++    "0x1::single_key",
++    "0x1::smart_table",
++    "0x1::stake",
++    "0x1::staking_config",
++    "0x1::staking_contract",
++    "0x1::state_storage",
++    "0x1::storage_gas",
++    "0x1::storage_slots_allocator",
++    "0x1::string",
++    "0x1::string_utils",
++    "0x1::system_addresses",
++    "0x1::table",
++    "0x1::table_with_length",
++    "0x1::timestamp",
++    "0x1::transaction_context",
++    "0x1::transaction_fee",
++    "0x1::transaction_limits",
++    "0x1::transaction_validation",
++    "0x1::type_info",
++    "0x1::util",
++    "0x1::validator_consensus_info",
++    "0x1::vector",
++    "0x1::version",
++    "0x1::vesting",
++    "0x1::voting"
++  ]
++}
+diff --git a/sources/AptosFramework/code.spec.move b/sources/AptosFramework/code.spec.move
+index b4fb6c8432..3fbf5a15ca 100644
+--- a/sources/AptosFramework/code.spec.move
++++ b/sources/AptosFramework/code.spec.move
+@@ -72,265 +72,265 @@ spec aptos_framework::code {
+         pragma opaque;
+     }
+ 
+-    spec initialize(aptos_framework: &signer, package_owner: &signer, metadata: PackageMetadata) {
+-        use 0x1::signer;
+-        use 0x1::system_addresses;
+-        pragma opaque;
+-        let aptos_addr = signer::address_of(aptos_framework);
+-        let owner_addr = signer::address_of(package_owner);
+-        modifies global<PackageRegistry>(owner_addr);
+-        aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);
+-        ensures exists<PackageRegistry>(owner_addr);
+-        pragma aborts_if_is_partial = true;
+-        ensures [inferred] ({
+-            let a = S1 |~ exists<PackageRegistry>(signer::address_of(package_owner));
+-            !a ==> publish<PackageRegistry>(signer::address_of(package_owner), PackageRegistry{packages: vec(metadata)})
+-        });
+-        ensures [inferred] (S1 |~ exists<PackageRegistry>(signer::address_of(package_owner))) ==> update<PackageRegistry>(signer::address_of(package_owner), update_field(S1 |~ global<PackageRegistry>(signer::address_of(package_owner)), packages, concat((S1 |~ global<PackageRegistry>(signer::address_of(package_owner))).packages, vec(metadata))));
+-        ensures [inferred] ..S1 |~ (ensures_of<system_addresses::assert_aptos_framework>(aptos_framework));
+-        aborts_if [inferred] ({
+-            let a = S1 |~ exists<PackageRegistry>(signer::address_of(package_owner));
+-            !a && exists<PackageRegistry>(signer::address_of(package_owner))
+-        });
+-        aborts_if [inferred] aborts_of<system_addresses::assert_aptos_framework>(aptos_framework);
+-    }
++                                                                                                  
++                        
++                                  
++                      
++                                                             
++                                                           
++                                                     
++                                                                            
++                                                    
++                                           
++                             
++                                                                                     
++                                                                                                                        
++           
++                                                                                                                                                                                                                                                                                                                                                           
++                                                                                                           
++                               
++                                                                                     
++                                                                            
++           
++                                                                                                  
++     
+ 
+-    spec publish_package(owner: &signer, pack: PackageMetadata, code: vector<vector<u8>>) {
+-        use 0x1::string;
+-        use 0x1::signer;
+-        use 0x1::features;
+-        use 0x1::event;
+-        use 0x1::object;
+-        use 0x1::init;
+-        pragma aborts_if_is_partial;
+-        let addr = signer::address_of(owner);
+-        modifies global<PackageRegistry>(addr);
+-        aborts_if pack.upgrade_policy.policy <= upgrade_policy_arbitrary().policy;
+-        pragma opaque = true;
+-        ensures [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            let b = S4.. |~ result_of<object::is_object>(signer::address_of(owner));
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (a && !b) ==> (forall x: u64: x < len((S4 |~ global<PackageRegistry>(signer::address_of(owner))).packages) && (S4 |~ global<PackageRegistry>(signer::address_of(owner))).packages[x].name == pack.name ==> {
+-                let c = S4 |~ global<PackageRegistry>(signer::address_of(owner));
+-                let d = S2..S3 |~ result_of<get_module_names>(pack);
+-                S4.. |~ ensures_of<check_upgradability>(c.packages[x], pack, d)
+-            })
+-        });
+-        ensures [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            let b = S4.. |~ result_of<object::is_object>(signer::address_of(owner));
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (a && !b) ==> (forall x: u64: x < len((S4 |~ global<PackageRegistry>(signer::address_of(owner))).packages) && (S4 |~ global<PackageRegistry>(signer::address_of(owner))).packages[x].name != pack.name ==> {
+-                let c = S4 |~ global<PackageRegistry>(signer::address_of(owner));
+-                let d = S2..S3 |~ result_of<get_module_names>(pack);
+-                S4.. |~ ensures_of<check_coexistence>(c.packages[x], d)
+-            })
+-        });
+-        ensures [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            let b = S2..S3 |~ result_of<get_module_names>(pack);
+-            let c = S4.. |~ result_of<object::is_object>(signer::address_of(owner));
+-            let d = ..S2 |~ result_of<check_dependencies>(signer::address_of(owner), pack);
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (a && !c) ==> ensures_of<request_publish_with_allowed_deps>(signer::address_of(owner), b, d, code, pack.upgrade_policy.policy)
+-        });
+-        ensures [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            let b = S2..S3 |~ result_of<get_module_names>(pack);
+-            let c = S4.. |~ result_of<object::is_object>(signer::address_of(owner));
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (a && !c) ==> ensures_of<request_publish>(signer::address_of(owner), b, code, pack.upgrade_policy.policy)
+-        });
+-        ensures [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            let b = S4.. |~ result_of<object::is_object>(signer::address_of(owner));
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (a && !b) ==> (forall x: u64: S13..S16 |~ ensures_of<event::emit<PublishPackage>>(PublishPackage{code_address: signer::address_of(owner), is_upgrade: x > 0}))
+-        });
+-        ensures [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            let b = S4.. |~ result_of<object::is_object>(signer::address_of(owner));
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (a && !b) ==> (forall x: u64: {
+-                let c = signer::address_of(owner);
+-                let d = update_field(S4 |~ global<PackageRegistry>(signer::address_of(owner)), packages, concat((S4 |~ global<PackageRegistry>(signer::address_of(owner))).packages, vec(update_field(pack, upgrade_number, x))));
+-                ..S13 |~ update<PackageRegistry>(c, d)
+-            })
+-        });
+-        ensures [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            let b = S4.. |~ result_of<object::is_object>(signer::address_of(owner));
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (a && !b) ==> (forall x: u64: x < len(pack.modules) ==> ensures_of<init::reset_initialized>(signer::address_of(owner), string::bytes(pack.modules[x].name)))
+-        });
+-        ensures [inferred = sathard] pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && ((S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>()) && (S4.. |~ !result_of<object::is_object>(signer::address_of(owner)))) ==> {
+-            let a = signer::address_of(owner);
+-            let b = update_field(S4 |~ global<PackageRegistry>(signer::address_of(owner)), packages, (S4 |~ global<PackageRegistry>(signer::address_of(owner))).packages);
+-            ..S13 |~ update<PackageRegistry>(a, b)
+-        };
+-        ensures [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            let b = S4.. |~ result_of<object::is_object>(signer::address_of(owner));
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (a && b) ==> (forall x: u64: x < len(S2..S3 |~ result_of<get_module_names>(pack)) ==> ensures_of<init::record_deploy_owner>(signer::address_of(owner), string::bytes((S2..S3 |~ result_of<get_module_names>(pack))[x]), S4.. |~ result_of<object::root_owner<object::ObjectCore>>(object::address_to_object<object::ObjectCore>(signer::address_of(owner)))))
+-        });
+-        ensures [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            let b = S4.. |~ result_of<object::is_object>(signer::address_of(owner));
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (a && b) ==> (forall x: u64: x < len(old(PackageRegistry[signer::address_of(owner)]).packages) && old(PackageRegistry[signer::address_of(owner)]).packages[x].name == pack.name ==> ensures_of<check_upgradability>(old(PackageRegistry[signer::address_of(owner)]).packages[x], pack, S2..S3 |~ result_of<get_module_names>(pack)))
+-        });
+-        ensures [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            let b = S4.. |~ result_of<object::is_object>(signer::address_of(owner));
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (a && b) ==> (forall x: u64: x < len(old(PackageRegistry[signer::address_of(owner)]).packages) && old(PackageRegistry[signer::address_of(owner)]).packages[x].name != pack.name ==> ensures_of<check_coexistence>(old(PackageRegistry[signer::address_of(owner)]).packages[x], S2..S3 |~ result_of<get_module_names>(pack)))
+-        });
+-        ensures [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            let b = S2..S3 |~ result_of<get_module_names>(pack);
+-            let c = S4.. |~ result_of<object::is_object>(signer::address_of(owner));
+-            let d = ..S2 |~ result_of<check_dependencies>(signer::address_of(owner), pack);
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (a && c) ==> ensures_of<request_publish_with_allowed_deps>(signer::address_of(owner), b, d, code, pack.upgrade_policy.policy)
+-        });
+-        ensures [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            let b = S2..S3 |~ result_of<get_module_names>(pack);
+-            let c = S4.. |~ result_of<object::is_object>(signer::address_of(owner));
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (a && c) ==> ensures_of<request_publish>(signer::address_of(owner), b, code, pack.upgrade_policy.policy)
+-        });
+-        ensures [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            let b = S4.. |~ result_of<object::is_object>(signer::address_of(owner));
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (a && b) ==> (forall x: u64: S13..S16 |~ ensures_of<event::emit<PublishPackage>>(PublishPackage{code_address: signer::address_of(owner), is_upgrade: x > 0}))
+-        });
+-        ensures [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            let b = S4.. |~ result_of<object::is_object>(signer::address_of(owner));
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (a && b) ==> (forall x: u64: {
+-                let c = signer::address_of(owner);
+-                let d = update_field(old(PackageRegistry[signer::address_of(owner)]), packages, concat(old(PackageRegistry[signer::address_of(owner)]).packages, vec(update_field(pack, upgrade_number, x))));
+-                ..S13 |~ update<PackageRegistry>(c, d)
+-            })
+-        });
+-        ensures [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            let b = S4.. |~ result_of<object::is_object>(signer::address_of(owner));
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (a && b) ==> (forall x: u64: x < len(pack.modules) ==> ensures_of<init::reset_initialized>(signer::address_of(owner), string::bytes(pack.modules[x].name)))
+-        });
+-        ensures [inferred = sathard] pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && ((S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>()) && (S4.. |~ result_of<object::is_object>(signer::address_of(owner)))) ==> {
+-            let a = signer::address_of(owner);
+-            let b = update_field(old(PackageRegistry[signer::address_of(owner)]), packages, old(PackageRegistry[signer::address_of(owner)]).packages);
+-            ..S13 |~ update<PackageRegistry>(a, b)
+-        };
+-        ensures [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && !a ==> (forall x: u64: x < len((S4 |~ global<PackageRegistry>(signer::address_of(owner))).packages) && (S4 |~ global<PackageRegistry>(signer::address_of(owner))).packages[x].name == pack.name ==> {
+-                let b = S4 |~ global<PackageRegistry>(signer::address_of(owner));
+-                let c = S2..S3 |~ result_of<get_module_names>(pack);
+-                S4.. |~ ensures_of<check_upgradability>(b.packages[x], pack, c)
+-            })
+-        });
+-        ensures [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && !a ==> (forall x: u64: x < len((S4 |~ global<PackageRegistry>(signer::address_of(owner))).packages) && (S4 |~ global<PackageRegistry>(signer::address_of(owner))).packages[x].name != pack.name ==> {
+-                let b = S4 |~ global<PackageRegistry>(signer::address_of(owner));
+-                let c = S2..S3 |~ result_of<get_module_names>(pack);
+-                S4.. |~ ensures_of<check_coexistence>(b.packages[x], c)
+-            })
+-        });
+-        ensures [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            let b = S2..S3 |~ result_of<get_module_names>(pack);
+-            let c = ..S2 |~ result_of<check_dependencies>(signer::address_of(owner), pack);
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && !a ==> ensures_of<request_publish_with_allowed_deps>(signer::address_of(owner), b, c, code, pack.upgrade_policy.policy)
+-        });
+-        ensures [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            let b = S2..S3 |~ result_of<get_module_names>(pack);
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && !a ==> ensures_of<request_publish>(signer::address_of(owner), b, code, pack.upgrade_policy.policy)
+-        });
+-        ensures [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && !a ==> (forall x: u64: S13..S16 |~ ensures_of<event::emit<PublishPackage>>(PublishPackage{code_address: signer::address_of(owner), is_upgrade: x > 0}))
+-        });
+-        ensures [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && !a ==> (forall x: u64: {
+-                let b = signer::address_of(owner);
+-                let c = update_field(S4 |~ global<PackageRegistry>(signer::address_of(owner)), packages, concat((S4 |~ global<PackageRegistry>(signer::address_of(owner))).packages, vec(update_field(pack, upgrade_number, x))));
+-                ..S13 |~ update<PackageRegistry>(b, c)
+-            })
+-        });
+-        ensures [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && !a ==> (forall x: u64: x < len(pack.modules) ==> ensures_of<init::reset_initialized>(signer::address_of(owner), string::bytes(pack.modules[x].name)))
+-        });
+-        ensures [inferred = sathard] pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (S3..S4 |~ !result_of<features::is_lazy_module_initialization_enabled>()) ==> {
+-            let a = signer::address_of(owner);
+-            let b = update_field(S4 |~ global<PackageRegistry>(signer::address_of(owner)), packages, (S4 |~ global<PackageRegistry>(signer::address_of(owner))).packages);
+-            ..S13 |~ update<PackageRegistry>(a, b)
+-        };
+-        ensures [inferred = sathard] pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && !exists<PackageRegistry>(signer::address_of(owner)) ==> publish<PackageRegistry>(signer::address_of(owner), PackageRegistry{packages: vec<PackageMetadata>()});
+-        aborts_if [inferred = sathard] pack.upgrade_policy.policy <= upgrade_policy_arbitrary().policy;
+-        aborts_if [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            let b = S4 |~ global<PackageRegistry>(signer::address_of(owner));
+-            let c = S4.. |~ result_of<object::is_object>(signer::address_of(owner));
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (a && (!c && len(b.packages) == 18446744073709551616))
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            let b = S4.. |~ result_of<object::is_object>(signer::address_of(owner));
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (a && (!b && (exists x: u64: x < len((S4 |~ global<PackageRegistry>(signer::address_of(owner))).packages) && ((S4 |~ global<PackageRegistry>(signer::address_of(owner))).packages[x].name == pack.name && (S4 |~ global<PackageRegistry>(signer::address_of(owner))).packages[x].upgrade_number == MAX_U64))))
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            let b = S4.. |~ result_of<object::is_object>(signer::address_of(owner));
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (a && (!b && (exists x: u64: x < len((S4 |~ global<PackageRegistry>(signer::address_of(owner))).packages) && !in_range((S4 |~ global<PackageRegistry>(signer::address_of(owner))).packages, x))))
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            let b = S16 |~ aborts_of<features::code_dependency_check_enabled>();
+-            let c = S4.. |~ result_of<object::is_object>(signer::address_of(owner));
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (a && (!c && b))
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            let b = S4.. |~ result_of<object::is_object>(signer::address_of(owner));
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (S13 |~ a && (!b && (exists x: u64: aborts_of<event::emit<PublishPackage>>(PublishPackage{code_address: signer::address_of(owner), is_upgrade: x > 0}))))
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            let b = S4 |~ exists<PackageRegistry>(signer::address_of(owner));
+-            let c = S4.. |~ result_of<object::is_object>(signer::address_of(owner));
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (a && (!c && !b))
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            let b = S4.. |~ result_of<object::is_object>(signer::address_of(owner));
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (a && (b && aborts_of<object::address_to_object<object::ObjectCore>>(signer::address_of(owner))))
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            let b = S4 |~ global<PackageRegistry>(signer::address_of(owner));
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (!a && len(b.packages) == 18446744073709551616)
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (!a && (exists x: u64: x < len((S4 |~ global<PackageRegistry>(signer::address_of(owner))).packages) && ((S4 |~ global<PackageRegistry>(signer::address_of(owner))).packages[x].name == pack.name && (S4 |~ global<PackageRegistry>(signer::address_of(owner))).packages[x].upgrade_number == MAX_U64)))
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (!a && (exists x: u64: x < len((S4 |~ global<PackageRegistry>(signer::address_of(owner))).packages) && !in_range((S4 |~ global<PackageRegistry>(signer::address_of(owner))).packages, x)))
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            let b = S16 |~ aborts_of<features::code_dependency_check_enabled>();
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (!a && b)
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (S13 |~ !a && (exists x: u64: aborts_of<event::emit<PublishPackage>>(PublishPackage{code_address: signer::address_of(owner), is_upgrade: x > 0})))
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let a = S3..S4 |~ result_of<features::is_lazy_module_initialization_enabled>();
+-            let b = S4 |~ exists<PackageRegistry>(signer::address_of(owner));
+-            pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (!a && !b)
+-        });
+-        aborts_if [inferred = sathard] pack.upgrade_policy.policy > upgrade_policy_arbitrary().policy && (S3 |~ aborts_of<features::is_lazy_module_initialization_enabled>());
+-    }
++                                                                                           
++                        
++                        
++                          
++                       
++                        
++                      
++                                    
++                                             
++                                               
++                                                                                  
++                             
++                                       
++                                                                                           
++                                                                                    
++                                                                                                                                                                                                                                                                                          
++                                                                                 
++                                                                    
++                                                                               
++              
++           
++                                       
++                                                                                           
++                                                                                    
++                                                                                                                                                                                                                                                                                          
++                                                                                 
++                                                                    
++                                                                       
++              
++           
++                                       
++                                                                                           
++                                                                
++                                                                                    
++                                                                                           
++                                                                                                                                                                                                            
++           
++                                       
++                                                                                           
++                                                                
++                                                                                    
++                                                                                                                                                                                       
++           
++                                       
++                                                                                           
++                                                                                    
++                                                                                                                                                                                                                                            
++           
++                                       
++                                                                                           
++                                                                                    
++                                                                                                             
++                                                  
++                                                                                                                                                                                                                                  
++                                                      
++              
++           
++                                       
++                                                                                           
++                                                                                    
++                                                                                                                                                                                                                                          
++           
++                                                                                                                                                                                                                                                             
++                                              
++                                                                                                                                                                          
++                                                  
++          
++                                       
++                                                                                           
++                                                                                    
++                                                                                                                                                                                                                                                                                                                                                                                                                                           
++           
++                                       
++                                                                                           
++                                                                                    
++                                                                                                                                                                                                                                                                                                                                                                                                                  
++           
++                                       
++                                                                                           
++                                                                                    
++                                                                                                                                                                                                                                                                                                                                                                                                          
++           
++                                       
++                                                                                           
++                                                                
++                                                                                    
++                                                                                           
++                                                                                                                                                                                                           
++           
++                                       
++                                                                                           
++                                                                
++                                                                                    
++                                                                                                                                                                                      
++           
++                                       
++                                                                                           
++                                                                                    
++                                                                                                                                                                                                                                           
++           
++                                       
++                                                                                           
++                                                                                    
++                                                                                                            
++                                                  
++                                                                                                                                                                                                              
++                                                      
++              
++           
++                                       
++                                                                                           
++                                                                                    
++                                                                                                                                                                                                                                         
++           
++                                                                                                                                                                                                                                                            
++                                              
++                                                                                                                                                      
++                                                  
++          
++                                       
++                                                                                           
++                                                                                                                                                                                                                                                                                   
++                                                                                 
++                                                                    
++                                                                               
++              
++           
++                                       
++                                                                                           
++                                                                                                                                                                                                                                                                                   
++                                                                                 
++                                                                    
++                                                                       
++              
++           
++                                       
++                                                                                           
++                                                                
++                                                                                           
++                                                                                                                                                                                                     
++           
++                                       
++                                                                                           
++                                                                
++                                                                                                                                                                                
++           
++                                       
++                                                                                           
++                                                                                                                                                                                                                                     
++           
++                                       
++                                                                                           
++                                                                                                      
++                                                  
++                                                                                                                                                                                                                                  
++                                                      
++              
++           
++                                       
++                                                                                           
++                                                                                                                                                                                                                                   
++           
++                                                                                                                                                                                      
++                                              
++                                                                                                                                                                          
++                                                  
++          
++                                                                                                                                                                                                                                                                      
++                                                                                                       
++                                         
++                                                                                           
++                                                                             
++                                                                                    
++                                                                                                                                    
++           
++                                         
++                                                                                           
++                                                                                    
++                                                                                                                                                                                                                                                                                                                                                                                            
++           
++                                         
++                                                                                           
++                                                                                    
++                                                                                                                                                                                                                                                                               
++           
++                                         
++                                                                                           
++                                                                                
++                                                                                    
++                                                                                              
++           
++                                         
++                                                                                           
++                                                                                    
++                                                                                                                                                                                                                                       
++           
++                                         
++                                                                                           
++                                                                             
++                                                                                    
++                                                                                               
++           
++                                         
++                                                                                           
++                                                                                    
++                                                                                                                                                                               
++           
++                                         
++                                                                                           
++                                                                             
++                                                                                                                             
++           
++                                         
++                                                                                           
++                                                                                                                                                                                                                                                                                                                                                                                     
++           
++                                         
++                                                                                           
++                                                                                                                                                                                                                                                                        
++           
++                                         
++                                                                                           
++                                                                                
++                                                                                       
++           
++                                         
++                                                                                           
++                                                                                                                                                                                                                                
++           
++                                         
++                                                                                           
++                                                                             
++                                                                                        
++           
++                                                                                                                                                                              
++     
+ 
+     spec publish_package_txn {
+         use 0x1::signer;
+@@ -340,35 +340,35 @@ spec aptos_framework::code {
+         ensures [inferred] ensures_of<publish_package>(owner, util::spec_from_bytes<PackageMetadata>(metadata_serialized), code);
+     }
+ 
+-    spec check_upgradability(old_pack: &PackageMetadata, new_pack: &PackageMetadata, new_modules: &vector<String>) {
+-        pragma opaque = true;
+-        pragma aborts_if_is_partial;
+-        aborts_if old_pack.upgrade_policy.policy >= upgrade_policy_immutable().policy;
+-        aborts_if !can_change_upgrade_policy_to(old_pack.upgrade_policy, new_pack.upgrade_policy);
+-    }
++                                                                                                                    
++                             
++                                    
++                                                                                      
++                                                                                                  
++     
+ 
+-    spec get_module_names(pack: &PackageMetadata): vector<String> {
+-        pragma opaque;
+-        aborts_if [abstract] false;
+-        ensures [abstract] len(result) == len(pack.modules);
+-        ensures [abstract] forall i in 0..len(result): result[i] == pack.modules[i].name;
+-    }
++                                                                   
++                      
++                                   
++                                                            
++                                                                                         
++     
+ 
+-    spec freeze_code_object(publisher: &signer, code_object: Object<PackageRegistry>) {
+-        use 0x1::signer;
+-        use 0x1::object;
+-        pragma aborts_if_is_partial;
++                                                                                       
++                        
++                        
++                                    
+ 
+-        let code_object_addr = code_object.inner;
+-        aborts_if !exists<object::ObjectCore>(code_object_addr);
+-        aborts_if !exists<PackageRegistry>(code_object_addr);
+-        aborts_if !object::is_owner(code_object, signer::address_of(publisher));
++                                                 
++                                                                
++                                                             
++                                                                                
+ 
+-        modifies global<PackageRegistry>(code_object_addr);
+-        pragma opaque = true;
+-        aborts_if [inferred = sathard] !exists<PackageRegistry>(object::object_address<PackageRegistry>(code_object));
+-        aborts_if [inferred = sathard] exists<PackageRegistry>(object::object_address<PackageRegistry>(code_object)) && aborts_of<object::is_owner<PackageRegistry>>(code_object, signer::address_of(publisher));
+-    }
++                                                           
++                             
++                                                                                                                      
++                                                                                                                                                                                                                 
++     
+     spec can_change_upgrade_policy_to(from: 0x1::code::UpgradePolicy, to: 0x1::code::UpgradePolicy): bool {
+         pragma opaque = true;
+         ensures [inferred] result == (from.policy <= to.policy);

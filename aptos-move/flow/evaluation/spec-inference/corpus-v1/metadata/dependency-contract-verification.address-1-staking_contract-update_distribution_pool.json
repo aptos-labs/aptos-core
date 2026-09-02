@@ -1,0 +1,10 @@
+{
+  "schema_version": 3,
+  "stage": "trusted_boundary",
+  "target": "0x1::staking_contract::update_distribution_pool",
+  "basis": "expert_assumption",
+  "target_body_proof": "partial",
+  "verified": false,
+  "rationale": "The shares-map fold, scalar effects, and individual transfer cases have target-body proof evidence. The remaining bridge from transfer_shares' exact remove-or-push vector relation to the stable-filter vector model is solver-intractable at the available proof limit; the complete normal, frame, and abort contract is retained as an explicit trusted boundary.",
+  "metadata": "trusted-verification-boundaries.json"
+}

@@ -1,0 +1,296 @@
+/// This defines the fungible asset module that can issue fungible asset of any `Metadata` object. The
+/// metadata object can be any object that equipped with `Metadata` resource.
+///
+/// The dispatchable_fungible_asset wraps the existing fungible_asset module and adds the ability for token issuer
+/// to customize the logic for withdraw and deposit operations. For example:
+///
+/// - Deflation token: a fixed percentage of token will be destructed upon transfer.
+/// - Transfer allowlist: token can only be transfered to addresses in the allow list.
+/// - Predicated transfer: transfer can only happen when some certain predicate has been met.
+/// - Loyalty token: a fixed loyalty will be paid to a designated address when a fungible asset transfer happens
+///
+/// The api listed here intended to be an in-place replacement for defi applications that uses fungible_asset api directly
+/// and is safe for non-dispatchable (aka vanilla) fungible assets as well.
+///
+/// See AIP-73 for further discussion
+///
+module aptos_framework::dispatchable_fungible_asset {
+    use aptos_framework::fungible_asset::{Self, FungibleAsset, TransferRef};
+    use aptos_framework::function_info::{Self, FunctionInfo};
+    use aptos_framework::object::{ConstructorRef, Object};
+
+    use std::error;
+    use std::features;
+    use std::option::Option;
+    use aptos_framework::aggregator_v2::{AggregatorSnapshot, Self};
+
+    /// TransferRefStore doesn't exist on the fungible asset type.
+    const ESTORE_NOT_FOUND: u64 = 1;
+    /// Recipient is not getting the guaranteed value;
+    const EAMOUNT_MISMATCH: u64 = 2;
+    /// Dispatch target is not loaded.
+    const ENOT_LOADED: u64 = 4;
+
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    struct TransferRefStore has key {
+        transfer_ref: TransferRef
+    }
+
+    public fun register_dispatch_functions(
+        constructor_ref: &ConstructorRef,
+        withdraw_function: Option<FunctionInfo>,
+        deposit_function: Option<FunctionInfo>,
+        derived_balance_function: Option<FunctionInfo>
+    ) {
+        fungible_asset::register_dispatch_functions(
+            constructor_ref,
+            withdraw_function,
+            deposit_function,
+            derived_balance_function
+        );
+        let store_obj = &constructor_ref.generate_signer();
+        move_to<TransferRefStore>(
+            store_obj,
+            TransferRefStore {
+                transfer_ref: fungible_asset::generate_transfer_ref(constructor_ref)
+            }
+        );
+    }
+
+    public fun register_derive_supply_dispatch_function(
+        constructor_ref: &ConstructorRef, dispatch_function: Option<FunctionInfo>
+    ) {
+        fungible_asset::register_derive_supply_dispatch_function(
+            constructor_ref, dispatch_function
+        );
+    }
+
+    /// Withdraw `amount` of the fungible asset from `store` by the owner.
+    ///
+    /// The semantics of deposit will be governed by the function specified in DispatchFunctionStore.
+    public fun withdraw<T: key>(
+        owner: &signer, store: Object<T>, amount: u64
+    ): FungibleAsset acquires TransferRefStore {
+        fungible_asset::withdraw_sanity_check(owner, store, false);
+        let func_opt = fungible_asset::withdraw_dispatch_function(store);
+        if (func_opt.is_some()) {
+            let func = func_opt.borrow();
+            if (features::is_function_value_dispatch_enabled()) {
+                dispatch_withdraw_hook(
+                    store,
+                    amount,
+                    borrow_transfer_ref(store),
+                    func
+                )
+            } else {
+                function_info::load_module_from_function(func);
+                dispatchable_withdraw(
+                    store,
+                    amount,
+                    borrow_transfer_ref(store),
+                    func
+                )
+            }
+        } else {
+            fungible_asset::unchecked_withdraw(store.object_address(), amount)
+        }
+    }
+
+    /// Deposit `amount` of the fungible asset to `store`.
+    ///
+    /// The semantics of deposit will be governed by the function specified in DispatchFunctionStore.
+    public fun deposit<T: key>(store: Object<T>, fa: FungibleAsset) acquires TransferRefStore {
+        fungible_asset::deposit_sanity_check(store, false);
+        let func_opt = fungible_asset::deposit_dispatch_function(store);
+        if (func_opt.is_some()) {
+            let func = func_opt.borrow();
+            if (features::is_function_value_dispatch_enabled()) {
+                dispatch_deposit_hook(store, fa, borrow_transfer_ref(store), func)
+            } else {
+                function_info::load_module_from_function(func);
+                dispatchable_deposit(store, fa, borrow_transfer_ref(store), func)
+            }
+        } else {
+            fungible_asset::unchecked_deposit(store.object_address(), fa)
+        }
+    }
+
+    /// Transfer an `amount` of fungible asset from `from_store`, which should be owned by `sender`, to `receiver`.
+    /// Note: it does not move the underlying object.
+    public entry fun transfer<T: key>(
+        sender: &signer, from: Object<T>, to: Object<T>, amount: u64
+    ) acquires TransferRefStore {
+        let fa = withdraw(sender, from, amount);
+        deposit(to, fa);
+    }
+
+    /// Transfer an `amount` of fungible asset from `from_store`, which should be owned by `sender`, to `receiver`.
+    /// The recipient is guranteed to receive asset greater than the expected amount.
+    /// Note: it does not move the underlying object.
+    public entry fun transfer_assert_minimum_deposit<T: key>(
+        sender: &signer, from: Object<T>, to: Object<T>, amount: u64, expected: u64
+    ) acquires TransferRefStore {
+        let start = fungible_asset::balance(to);
+        let fa = withdraw(sender, from, amount);
+        deposit(to, fa);
+        let end = fungible_asset::balance(to);
+        assert!(
+            end - start >= expected, error::aborted(EAMOUNT_MISMATCH)
+        );
+    }
+
+    #[view]
+    /// Get the derived value of store using the overloaded hook.
+    ///
+    /// The semantics of value will be governed by the function specified in DispatchFunctionStore.
+    public fun derived_balance<T: key>(store: Object<T>): u64 {
+        let func_opt = fungible_asset::derived_balance_dispatch_function(store);
+        if (func_opt.is_some()) {
+            dispatched_derived_balance(store, func_opt.borrow())
+        } else {
+            fungible_asset::balance(store)
+        }
+    }
+
+    /// Get the derived value of store using the overloaded hook, as AggregatorSnapshot.
+    /// Allows us to obtain a balance object, without issuing a read - which would reduce parallelism,
+    /// if the dispatchable asset doesn't have a derived balance hook. If it has a derived balance hook,
+    /// full read is performed, without parallelism.
+    ///
+    /// The semantics of value will be governed by the function specified in DispatchFunctionStore.
+    public fun derived_balance_snapshot<T: key>(store: Object<T>): AggregatorSnapshot<u64> {
+        let func_opt = fungible_asset::derived_balance_dispatch_function(store);
+        if (func_opt.is_some()) {
+            aggregator_v2::create_snapshot(
+                dispatched_derived_balance(store, func_opt.borrow())
+            )
+        } else {
+            fungible_asset::balance_snapshot(store)
+        }
+    }
+
+    #[view]
+    /// Whether the derived value of store using the overloaded hook is at least `amount`
+    ///
+    /// The semantics of value will be governed by the function specified in DispatchFunctionStore.
+    public fun is_derived_balance_at_least<T: key>(
+        store: Object<T>, amount: u64
+    ): bool {
+        let func_opt = fungible_asset::derived_balance_dispatch_function(store);
+        if (func_opt.is_some()) {
+            dispatched_derived_balance(store, func_opt.borrow()) >= amount
+        } else {
+            fungible_asset::is_balance_at_least(store, amount)
+        }
+    }
+
+    /// Runs the derived-balance hook via the enabled dispatch mechanism. Inline, so both
+    /// callers compile to the same code as if the branch were written in place.
+    inline fun dispatched_derived_balance<T: key>(
+        store: Object<T>, func: &FunctionInfo
+    ): u64 {
+        if (features::is_function_value_dispatch_enabled()) {
+            dispatch_derived_balance_hook(store, func)
+        } else {
+            function_info::load_module_from_function(func);
+            dispatchable_derived_balance(store, func)
+        }
+    }
+
+    #[view]
+    /// Get the derived supply of the fungible asset using the overloaded hook.
+    ///
+    /// The semantics of supply will be governed by the function specified in DeriveSupplyDispatch.
+    public fun derived_supply<T: key>(metadata: Object<T>): Option<u128> {
+        let func_opt = fungible_asset::derived_supply_dispatch_function(metadata);
+        if (func_opt.is_some()) {
+            let func = func_opt.borrow();
+            if (features::is_function_value_dispatch_enabled()) {
+                dispatch_derived_supply_hook(metadata, func)
+            } else {
+                function_info::load_module_from_function(func);
+                dispatchable_derived_supply(metadata, func)
+            }
+        } else {
+            fungible_asset::supply(metadata)
+        }
+    }
+
+    inline fun borrow_transfer_ref<T: key>(metadata: Object<T>): &TransferRef {
+        let metadata_addr = fungible_asset::store_metadata(metadata).object_address();
+        assert!(
+            exists<TransferRefStore>(metadata_addr),
+            error::not_found(ESTORE_NOT_FOUND)
+        );
+        &borrow_global<TransferRefStore>(metadata_addr).transfer_ref
+    }
+
+    #[module_lock]
+    /// Runs a withdraw hook as a function value, replacing the legacy native dispatch, as
+    /// do the following runners; `#[module_lock]` preserves AIP-73 reentrancy semantics.
+    fun dispatch_withdraw_hook<T: key>(
+        store: Object<T>,
+        amount: u64,
+        transfer_ref: &TransferRef,
+        function: &FunctionInfo
+    ): FungibleAsset {
+        let f =
+            function.load_function_value<|Object<T>, u64, &TransferRef| FungibleAsset has copy
+                + drop>();
+        f(store, amount, transfer_ref)
+    }
+
+    #[module_lock]
+    fun dispatch_deposit_hook<T: key>(
+        store: Object<T>,
+        fa: FungibleAsset,
+        transfer_ref: &TransferRef,
+        function: &FunctionInfo
+    ) {
+        let f =
+            function.load_function_value<|
+                Object<T>,
+                FungibleAsset,
+                &TransferRef
+            | has copy + drop>();
+        f(store, fa, transfer_ref)
+    }
+
+    #[module_lock]
+    fun dispatch_derived_balance_hook<T: key>(
+        store: Object<T>, function: &FunctionInfo
+    ): u64 {
+        let f = function.load_function_value<|Object<T>| u64 has copy + drop>();
+        f(store)
+    }
+
+    #[module_lock]
+    fun dispatch_derived_supply_hook<T: key>(
+        metadata: Object<T>, function: &FunctionInfo
+    ): Option<u128> {
+        let f = function.load_function_value<|Object<T>| Option<u128> has copy + drop>();
+        f(metadata)
+    }
+
+    native fun dispatchable_withdraw<T: key>(
+        store: Object<T>,
+        amount: u64,
+        transfer_ref: &TransferRef,
+        function: &FunctionInfo
+    ): FungibleAsset;
+
+    native fun dispatchable_deposit<T: key>(
+        store: Object<T>,
+        fa: FungibleAsset,
+        transfer_ref: &TransferRef,
+        function: &FunctionInfo
+    );
+
+    native fun dispatchable_derived_balance<T: key>(
+        store: Object<T>, function: &FunctionInfo
+    ): u64;
+
+    native fun dispatchable_derived_supply<T: key>(
+        metadata: Object<T>, function: &FunctionInfo
+    ): Option<u128>;
+}

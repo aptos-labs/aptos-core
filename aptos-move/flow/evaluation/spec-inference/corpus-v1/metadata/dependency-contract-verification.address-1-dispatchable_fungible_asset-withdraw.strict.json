@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "stage": "prover",
+  "target": "0x1::dispatchable_fungible_asset::withdraw",
+  "passed": true,
+  "diagnostics": []
+}

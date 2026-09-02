@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "stage": "prover",
+  "target": "0x7::pending_order_book_index::new_pending_order_book_index",
+  "passed": true,
+  "diagnostics": []
+}

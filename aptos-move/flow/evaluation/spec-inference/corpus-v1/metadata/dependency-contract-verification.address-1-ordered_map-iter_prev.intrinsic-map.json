@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "stage": "prover",
+  "target": "0x1::ordered_map::iter_prev",
+  "passed": false,
+  "diagnostics": [
+    "error: cannot select a field of an intrinsic map type in verified code\n    ┌─ /tmp/ordered-map-iter-prev-prove.jfH17W/package/sources/AptosFramework/datastructures/ordered_map.move:490:13\n    │\n490 │             map.entries.length() - 1\n    │             ^^^^^^^^^^^^^^^^^^^^\n\n",
+    "exiting with condition generation errors"
+  ]
+}

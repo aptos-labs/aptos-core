@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "stage": "prover",
+  "target": "0x1::aptos_account::create_account",
+  "passed": true,
+  "diagnostics": [
+    "warning: unused alias\n    ┌─ /tmp/aptos-create-account-frame.VVVDq9/package/sources/AptosFramework/coin.spec.move:616:18\n    │\n616 │         use 0x1::account;\n    │                  ^^^^^^^ Unused 'use' of alias 'account'. Consider removing it\n\n"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "stage": "prover",
+  "target": "0x1::big_ordered_map::get_max_degree",
+  "passed": false,
+  "diagnostics": [
+    "error: cannot select a field of an intrinsic map type in verified code\n     ┌─ /tmp/big-ordered-map-get-max-degree-prove.OPAd63/package/sources/AptosFramework/datastructures/big_ordered_map.move:1240:13\n     │\n1240 │             self.leaf_max_degree as u64\n     │             ^^^^^^^^^^^^^^^^^^^^\n\nerror: cannot select a field of an intrinsic map type in verified code\n     ┌─ /tmp/big-ordered-map-get-max-degree-prove.OPAd63/package/sources/AptosFramework/datastructures/big_ordered_map.move:1242:13\n     │\n1242 │             self.inner_max_degree as u64\n     │             ^^^^^^^^^^^^^^^^^^^^^\n\nerror: cannot select field of intrinsic struct\n     ┌─ /tmp/big-ordered-map-get-max-degree-prove.OPAd63/package/sources/AptosFramework/datastructures/big_ordered_map.spec.move:1255:48\n     │\n1255 │         ensures [inferred] leaf ==> result == (self.leaf_max_degree as u64);\n     │                                                ^^^^^^^^^^^^^^^^^^^^\n\nerror: cannot select field of intrinsic struct\n     ┌─ /tmp/big-ordered-map-get-max-degree-prove.OPAd63/package/sources/AptosFramework/datastructures/big_ordered_map.spec.move:1256:49\n     │\n1256 │         ensures [inferred] !leaf ==> result == (self.inner_max_degree as u64);\n     │                                                 ^^^^^^^^^^^^^^^^^^^^^\n\n",
+    "exiting with condition generation errors"
+  ]
+}

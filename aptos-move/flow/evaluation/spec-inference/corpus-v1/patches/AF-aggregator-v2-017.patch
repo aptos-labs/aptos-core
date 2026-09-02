@@ -1,0 +1,65 @@
+diff --git a/.move-inference-task.json b/.move-inference-task.json
+new file mode 100644
+index 0000000000..b0e7b49a55
+--- /dev/null
++++ b/.move-inference-task.json
+@@ -0,0 +1,40 @@
++{
++  "called_function_dependencies": [
++    "0x1::error::canonical",
++    "0x1::error::invalid_state"
++  ],
++  "granularity": "function",
++  "package_module_target": "0x1::aggregator_v2::string_concat",
++  "schema_version": 3,
++  "source_commit": "6d836beedc56fc70c54f3b3046d1d248d850c64b",
++  "source_path": "sources/AptosFramework/aggregator_v2/aggregator_v2.move",
++  "spec_function_dependencies": [
++    "0x1::error::$canonical"
++  ],
++  "target_functions": [
++    "string_concat"
++  ],
++  "task_id": "AF-aggregator-v2-017",
++  "transitive_called_function_dependencies": [
++    "0x1::error::canonical",
++    "0x1::error::invalid_state"
++  ],
++  "transitive_function_dependencies": [
++    "0x1::error::canonical",
++    "0x1::error::invalid_state"
++  ],
++  "transitive_module_dependencies": [
++    "0x1::bcs",
++    "0x1::error",
++    "0x1::features",
++    "0x1::mem",
++    "0x1::option",
++    "0x1::signer",
++    "0x1::storage_slots_allocator",
++    "0x1::string",
++    "0x1::table",
++    "0x1::table_with_length",
++    "0x1::type_info",
++    "0x1::vector"
++  ]
++}
+diff --git a/sources/AptosFramework/aggregator_v2/aggregator_v2.spec.move b/sources/AptosFramework/aggregator_v2/aggregator_v2.spec.move
+index 267e19b777..3ff67abccd 100644
+--- a/sources/AptosFramework/aggregator_v2/aggregator_v2.spec.move
++++ b/sources/AptosFramework/aggregator_v2/aggregator_v2.spec.move
+@@ -89,10 +89,10 @@ spec aptos_framework::aggregator_v2 {
+     }
+ 
+     // deprecated
+-    spec string_concat {
+-        pragma opaque;
+-        aborts_if [abstract] true;
+-    }
++                        
++                      
++                                  
++     
+ 
+     // Get aggregator.value
+     spec native fun spec_get_value<IntElement>(aggregator: Aggregator<IntElement>): IntElement;

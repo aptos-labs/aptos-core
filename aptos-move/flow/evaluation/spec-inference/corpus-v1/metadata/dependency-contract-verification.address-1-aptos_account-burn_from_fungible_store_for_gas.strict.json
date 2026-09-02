@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "stage": "prover",
+  "target": "0x1::aptos_account::burn_from_fungible_store_for_gas",
+  "passed": true,
+  "diagnostics": []
+}

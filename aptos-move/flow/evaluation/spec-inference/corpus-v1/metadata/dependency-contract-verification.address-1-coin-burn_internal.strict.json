@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "stage": "prover",
+  "target": "0x1::coin::burn_internal",
+  "passed": true,
+  "diagnostics": [
+    "warning: generic type reflection in a function specification is not yet supported through behavioral predicates; leaving `aborts_of` uninterpreted; see https://github.com/aptos-labs/aptos-core/issues/20371\n    ┌─ /tmp/coin-burn.mFZPRJ/package/sources/AptosFramework/coin.move:740:5\n    │  \n740 │ ╭     fun coin_address<CoinType>(): address {\n741 │ │         let type_info = type_info::type_of<CoinType>();\n742 │ │         type_info.account_address()\n743 │ │     }\n    │ ╰─────^\n\nwarning: generic type reflection in a function specification is not yet supported through behavioral predicates; leaving `ensures_of` uninterpreted; see https://github.com/aptos-labs/aptos-core/issues/20371\n    ┌─ /tmp/coin-burn.mFZPRJ/package/sources/AptosFramework/coin.move:740:5\n    │  \n740 │ ╭     fun coin_address<CoinType>(): address {\n741 │ │         let type_info = type_info::type_of<CoinType>();\n742 │ │         type_info.account_address()\n743 │ │     }\n    │ ╰─────^\n\n"
+  ]
+}

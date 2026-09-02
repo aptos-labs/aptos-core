@@ -1,0 +1,717 @@
+{
+  "compile": {
+    "argv": [
+      "move-flow",
+      "experiment",
+      "check-package",
+      "--package",
+      "/tmp/move-inference-screen-AF-transaction-fee-001-de7vk4c0/package",
+      "--output",
+      "/tmp/move-inference-compatibility-11hcvp4o/stage.json"
+    ],
+    "duration_ms": 26640,
+    "infrastructure_error": null,
+    "returncode": 0,
+    "stage_report": {
+      "diagnostics": [],
+      "passed": true,
+      "schema_version": 1,
+      "stage": "compile",
+      "target": null
+    },
+    "stderr": "",
+    "stdout": "",
+    "timed_out": false
+  },
+  "enriched_compile": {
+    "argv": [
+      "move-flow",
+      "experiment",
+      "check-package",
+      "--package",
+      "/tmp/move-inference-compatibility-11hcvp4o/enriched-package",
+      "--output",
+      "/tmp/move-inference-compatibility-11hcvp4o/stage.json"
+    ],
+    "duration_ms": 24894,
+    "infrastructure_error": null,
+    "returncode": 0,
+    "stage_report": {
+      "diagnostics": [
+        "warning: unused alias\n  \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosExperimental/trading/market/dead_mans_switch_tracker.spec.move:4:18\n  \u2502\n4 \u2502         use 0x1::option;\n  \u2502                  ^^^^^^ Unused 'use' of alias 'option'. Consider removing it\n\n",
+        "warning: unused alias\n  \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosExperimental/trading/market/dead_mans_switch_tracker.spec.move:5:18\n  \u2502\n5 \u2502         use 0x1::event;\n  \u2502                  ^^^^^ Unused 'use' of alias 'event'. Consider removing it\n\n",
+        "warning: unused alias\n  \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosExperimental/trading/market/dead_mans_switch_tracker.spec.move:6:18\n  \u2502\n6 \u2502         use 0x1::big_ordered_map;\n  \u2502                  ^^^^^^^^^^^^^^^ Unused 'use' of alias 'big_ordered_map'. Consider removing it\n\n",
+        "warning: unused alias\n   \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosExperimental/trading/market/dead_mans_switch_tracker.spec.move:33:18\n   \u2502\n33 \u2502         use 0x7::order_book_utils;\n   \u2502                  ^^^^^^^^^^^^^^^^ Unused 'use' of alias 'order_book_utils'. Consider removing it\n\n",
+        "warning: unused alias\n   \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosExperimental/trading/market/market_bulk_order.spec.move:11:18\n   \u2502\n11 \u2502         use 0x1::option;\n   \u2502                  ^^^^^^ Unused 'use' of alias 'option'. Consider removing it\n\n",
+        "warning: unused alias\n   \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosExperimental/trading/market/market_bulk_order.spec.move:12:18\n   \u2502\n12 \u2502         use 0x5::bulk_order_types;\n   \u2502                  ^^^^^^^^^^^^^^^^ Unused 'use' of alias 'bulk_order_types'. Consider removing it\n\n",
+        "warning: unused alias\n   \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosExperimental/trading/market/market_bulk_order.spec.move:13:18\n   \u2502\n13 \u2502         use 0x7::order_book;\n   \u2502                  ^^^^^^^^^^ Unused 'use' of alias 'order_book'. Consider removing it\n\n",
+        "warning: unused alias\n   \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosExperimental/trading/market/market_bulk_order.spec.move:14:18\n   \u2502\n14 \u2502         use 0x7::market_types;\n   \u2502                  ^^^^^^^^^^^^ Unused 'use' of alias 'market_types'. Consider removing it\n\n",
+        "warning: unused alias\n   \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosExperimental/trading/order_book/bulk_order_book.spec.move:26:18\n   \u2502\n26 \u2502         use 0x7::price_time_index;\n   \u2502                  ^^^^^^^^^^^^^^^^ Unused 'use' of alias 'price_time_index'. Consider removing it\n\n",
+        "warning: unused alias\n   \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosExperimental/trading/order_book/bulk_order_book.spec.move:61:18\n   \u2502\n61 \u2502         use 0x1::option;\n   \u2502                  ^^^^^^ Unused 'use' of alias 'option'. Consider removing it\n\n",
+        "warning: unused alias\n   \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosExperimental/trading/order_book/bulk_order_book.spec.move:62:18\n   \u2502\n62 \u2502         use 0x1::big_ordered_map;\n   \u2502                  ^^^^^^^^^^^^^^^ Unused 'use' of alias 'big_ordered_map'. Consider removing it\n\n",
+        "warning: unused alias\n   \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosExperimental/trading/order_book/bulk_order_book.spec.move:63:18\n   \u2502\n63 \u2502         use 0x5::bulk_order_types;\n   \u2502                  ^^^^^^^^^^^^^^^^ Unused 'use' of alias 'bulk_order_types'. Consider removing it\n\n",
+        "warning: unused alias\n  \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosExperimental/trading/order_book/bulk_order_utils.spec.move:4:18\n  \u2502\n4 \u2502         use 0x1::option;\n  \u2502                  ^^^^^^ Unused 'use' of alias 'option'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosExperimental/trading/order_book/bulk_order_utils.spec.move:218:18\n    \u2502\n218 \u2502         use 0x5::bulk_order_types;\n    \u2502                  ^^^^^^^^^^^^^^^^ Unused 'use' of alias 'bulk_order_types'. Consider removing it\n\n",
+        "warning: unused alias\n  \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosExperimental/trading/order_book/order_book_utils.spec.move:4:18\n  \u2502\n4 \u2502         use 0x1::big_ordered_map;\n  \u2502                  ^^^^^^^^^^^^^^^ Unused 'use' of alias 'big_ordered_map'. Consider removing it\n\n",
+        "warning: unused alias\n   \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosExperimental/trading/order_book/price_time_index.spec.move:40:18\n   \u2502\n40 \u2502         use 0x1::big_ordered_map;\n   \u2502                  ^^^^^^^^^^^^^^^ Unused 'use' of alias 'big_ordered_map'. Consider removing it\n\n",
+        "warning: unused alias\n   \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosExperimental/trading/order_book/price_time_index.spec.move:41:18\n   \u2502\n41 \u2502         use 0x5::order_book_types;\n   \u2502                  ^^^^^^^^^^^^^^^^ Unused 'use' of alias 'order_book_types'. Consider removing it\n\n",
+        "warning: unused alias\n  \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosExperimental/trading/order_book/single_order_book.spec.move:4:18\n  \u2502\n4 \u2502         use 0x1::option;\n  \u2502                  ^^^^^^ Unused 'use' of alias 'option'. Consider removing it\n\n",
+        "warning: unused alias\n  \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosExperimental/trading/order_book/single_order_book.spec.move:5:18\n  \u2502\n5 \u2502         use 0x1::string;\n  \u2502                  ^^^^^^ Unused 'use' of alias 'string'. Consider removing it\n\n",
+        "warning: unused alias\n  \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosExperimental/trading/order_book/single_order_book.spec.move:6:18\n  \u2502\n6 \u2502         use 0x1::big_ordered_map;\n  \u2502                  ^^^^^^^^^^^^^^^ Unused 'use' of alias 'big_ordered_map'. Consider removing it\n\n",
+        "warning: unused alias\n  \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosExperimental/trading/order_book/single_order_book.spec.move:7:18\n  \u2502\n7 \u2502         use 0x5::order_book_types;\n  \u2502                  ^^^^^^^^^^^^^^^^ Unused 'use' of alias 'order_book_types'. Consider removing it\n\n",
+        "warning: unused alias\n  \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosExperimental/trading/order_book/single_order_book.spec.move:8:18\n  \u2502\n8 \u2502         use 0x5::single_order_types;\n  \u2502                  ^^^^^^^^^^^^^^^^^^ Unused 'use' of alias 'single_order_types'. Consider removing it\n\n",
+        "warning: unused alias\n  \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosExperimental/trading/order_book/single_order_book.spec.move:9:18\n  \u2502\n9 \u2502         use 0x7::price_time_index;\n  \u2502                  ^^^^^^^^^^^^^^^^ Unused 'use' of alias 'price_time_index'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/aptos_account.spec.move:310:18\n    \u2502\n310 \u2502         use 0x1::fungible_asset;\n    \u2502                  ^^^^^^^^^^^^^^ Unused 'use' of alias 'fungible_asset'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/aptos_account.spec.move:311:18\n    \u2502\n311 \u2502         use 0x1::primary_fungible_store;\n    \u2502                  ^^^^^^^^^^^^^^^^^^^^^^ Unused 'use' of alias 'primary_fungible_store'. Consider removing it\n\n",
+        "warning: unused alias\n   \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/code.spec.move:99:18\n   \u2502\n99 \u2502         use 0x1::string;\n   \u2502                  ^^^^^^ Unused 'use' of alias 'string'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/code.spec.move:101:18\n    \u2502\n101 \u2502         use 0x1::features;\n    \u2502                  ^^^^^^^^ Unused 'use' of alias 'features'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/code.spec.move:102:18\n    \u2502\n102 \u2502         use 0x1::event;\n    \u2502                  ^^^^^ Unused 'use' of alias 'event'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/code.spec.move:103:18\n    \u2502\n103 \u2502         use 0x1::object;\n    \u2502                  ^^^^^^ Unused 'use' of alias 'object'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/code.spec.move:104:18\n    \u2502\n104 \u2502         use 0x1::init;\n    \u2502                  ^^^^ Unused 'use' of alias 'init'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/datastructures/big_ordered_map.spec.move:351:18\n    \u2502\n351 \u2502         use 0x1::bcs;\n    \u2502                  ^^^ Unused 'use' of alias 'bcs'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/datastructures/big_ordered_map.spec.move:870:18\n    \u2502\n870 \u2502         use 0x1::vector;\n    \u2502                  ^^^^^^ Unused 'use' of alias 'vector'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/datastructures/big_ordered_map.spec.move:871:18\n    \u2502\n871 \u2502         use 0x1::option;\n    \u2502                  ^^^^^^ Unused 'use' of alias 'option'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/datastructures/big_ordered_map.spec.move:872:18\n    \u2502\n872 \u2502         use 0x1::error;\n    \u2502                  ^^^^^ Unused 'use' of alias 'error'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/datastructures/big_ordered_map.spec.move:873:18\n    \u2502\n873 \u2502         use 0x1::ordered_map;\n    \u2502                  ^^^^^^^^^^^ Unused 'use' of alias 'ordered_map'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/datastructures/big_ordered_map.spec.move:874:18\n    \u2502\n874 \u2502         use 0x1::storage_slots_allocator;\n    \u2502                  ^^^^^^^^^^^^^^^^^^^^^^^ Unused 'use' of alias 'storage_slots_allocator'. Consider removing it\n\n",
+        "warning: unused alias\n     \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/datastructures/big_ordered_map.spec.move:1220:18\n     \u2502\n1220 \u2502         use 0x1::option;\n     \u2502                  ^^^^^^ Unused 'use' of alias 'option'. Consider removing it\n\n",
+        "warning: unused alias\n     \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/datastructures/big_ordered_map.spec.move:1221:18\n     \u2502\n1221 \u2502         use 0x1::ordered_map;\n     \u2502                  ^^^^^^^^^^^ Unused 'use' of alias 'ordered_map'. Consider removing it\n\n",
+        "warning: unused alias\n     \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/datastructures/big_ordered_map.spec.move:1222:18\n     \u2502\n1222 \u2502         use 0x1::table_with_length;\n     \u2502                  ^^^^^^^^^^^^^^^^^ Unused 'use' of alias 'table_with_length'. Consider removing it\n\n",
+        "warning: unused alias\n     \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/datastructures/big_ordered_map.spec.move:1223:18\n     \u2502\n1223 \u2502         use 0x1::storage_slots_allocator;\n     \u2502                  ^^^^^^^^^^^^^^^^^^^^^^^ Unused 'use' of alias 'storage_slots_allocator'. Consider removing it\n\n",
+        "warning: unused alias\n     \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/datastructures/big_ordered_map.spec.move:1237:18\n     \u2502\n1237 \u2502         use 0x1::option;\n     \u2502                  ^^^^^^ Unused 'use' of alias 'option'. Consider removing it\n\n",
+        "warning: unused alias\n     \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/datastructures/big_ordered_map.spec.move:1238:18\n     \u2502\n1238 \u2502         use 0x1::ordered_map;\n     \u2502                  ^^^^^^^^^^^ Unused 'use' of alias 'ordered_map'. Consider removing it\n\n",
+        "warning: unused alias\n     \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/datastructures/big_ordered_map.spec.move:1239:18\n     \u2502\n1239 \u2502         use 0x1::table_with_length;\n     \u2502                  ^^^^^^^^^^^^^^^^^ Unused 'use' of alias 'table_with_length'. Consider removing it\n\n",
+        "warning: unused alias\n     \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/datastructures/big_ordered_map.spec.move:1240:18\n     \u2502\n1240 \u2502         use 0x1::storage_slots_allocator;\n     \u2502                  ^^^^^^^^^^^^^^^^^^^^^^^ Unused 'use' of alias 'storage_slots_allocator'. Consider removing it\n\n",
+        "warning: unused alias\n     \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/datastructures/big_ordered_map.spec.move:1279:18\n     \u2502\n1279 \u2502         use 0x1::ordered_map;\n     \u2502                  ^^^^^^^^^^^ Unused 'use' of alias 'ordered_map'. Consider removing it\n\n",
+        "warning: unused alias\n     \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/datastructures/big_ordered_map.spec.move:1330:18\n     \u2502\n1330 \u2502         use 0x1::vector;\n     \u2502                  ^^^^^^ Unused 'use' of alias 'vector'. Consider removing it\n\n",
+        "warning: unused alias\n     \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/datastructures/big_ordered_map.spec.move:1331:18\n     \u2502\n1331 \u2502         use 0x1::ordered_map;\n     \u2502                  ^^^^^^^^^^^ Unused 'use' of alias 'ordered_map'. Consider removing it\n\n",
+        "warning: unused alias\n     \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/datastructures/big_ordered_map.spec.move:1332:18\n     \u2502\n1332 \u2502         use 0x1::storage_slots_allocator;\n     \u2502                  ^^^^^^^^^^^^^^^^^^^^^^^ Unused 'use' of alias 'storage_slots_allocator'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/datastructures/ordered_map.spec.move:273:18\n    \u2502\n273 \u2502         use 0x1::cmp;\n    \u2502                  ^^^ Unused 'use' of alias 'cmp'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/datastructures/ordered_map.spec.move:356:18\n    \u2502\n356 \u2502         use 0x1::vector;\n    \u2502                  ^^^^^^ Unused 'use' of alias 'vector'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/datastructures/ordered_map.spec.move:357:18\n    \u2502\n357 \u2502         use 0x1::cmp;\n    \u2502                  ^^^ Unused 'use' of alias 'cmp'. Consider removing it\n\n",
+        "warning: unused alias\n   \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/dispatchable_fungible_asset.spec.move:13:18\n   \u2502\n13 \u2502         use 0x1::object;\n   \u2502                  ^^^^^^ Unused 'use' of alias 'object'. Consider removing it\n\n",
+        "warning: unused alias\n   \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/dispatchable_fungible_asset.spec.move:14:18\n   \u2502\n14 \u2502         use 0x1::function_info;\n   \u2502                  ^^^^^^^^^^^^^ Unused 'use' of alias 'function_info'. Consider removing it\n\n",
+        "warning: unused alias\n   \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/dispatchable_fungible_asset.spec.move:15:18\n   \u2502\n15 \u2502         use 0x1::fungible_asset;\n   \u2502                  ^^^^^^^^^^^^^^ Unused 'use' of alias 'fungible_asset'. Consider removing it\n\n",
+        "warning: unused alias\n   \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/dispatchable_fungible_asset.spec.move:25:18\n   \u2502\n25 \u2502         use 0x1::object;\n   \u2502                  ^^^^^^ Unused 'use' of alias 'object'. Consider removing it\n\n",
+        "warning: unused alias\n   \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/dispatchable_fungible_asset.spec.move:26:18\n   \u2502\n26 \u2502         use 0x1::function_info;\n   \u2502                  ^^^^^^^^^^^^^ Unused 'use' of alias 'function_info'. Consider removing it\n\n",
+        "warning: unused alias\n   \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/dispatchable_fungible_asset.spec.move:27:18\n   \u2502\n27 \u2502         use 0x1::fungible_asset;\n   \u2502                  ^^^^^^^^^^^^^^ Unused 'use' of alias 'fungible_asset'. Consider removing it\n\n",
+        "warning: unused alias\n   \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/dispatchable_fungible_asset.spec.move:37:18\n   \u2502\n37 \u2502         use 0x1::object;\n   \u2502                  ^^^^^^ Unused 'use' of alias 'object'. Consider removing it\n\n",
+        "warning: unused alias\n   \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/dispatchable_fungible_asset.spec.move:38:18\n   \u2502\n38 \u2502         use 0x1::function_info;\n   \u2502                  ^^^^^^^^^^^^^ Unused 'use' of alias 'function_info'. Consider removing it\n\n",
+        "warning: unused alias\n   \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/dispatchable_fungible_asset.spec.move:48:18\n   \u2502\n48 \u2502         use 0x1::option;\n   \u2502                  ^^^^^^ Unused 'use' of alias 'option'. Consider removing it\n\n",
+        "warning: unused alias\n   \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/dispatchable_fungible_asset.spec.move:49:18\n   \u2502\n49 \u2502         use 0x1::object;\n   \u2502                  ^^^^^^ Unused 'use' of alias 'object'. Consider removing it\n\n",
+        "warning: unused alias\n   \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/dispatchable_fungible_asset.spec.move:50:18\n   \u2502\n50 \u2502         use 0x1::function_info;\n   \u2502                  ^^^^^^^^^^^^^ Unused 'use' of alias 'function_info'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/dispatchable_fungible_asset.spec.move:140:18\n    \u2502\n140 \u2502         use 0x1::fungible_asset;\n    \u2502                  ^^^^^^^^^^^^^^ Unused 'use' of alias 'fungible_asset'. Consider removing it\n\n",
+        "warning: unused alias\n   \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/function_info.spec.move:44:18\n   \u2502\n44 \u2502         use 0x1::result;\n   \u2502                  ^^^^^^ Unused 'use' of alias 'result'. Consider removing it\n\n",
+        "warning: unused alias\n   \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/function_info.spec.move:45:18\n   \u2502\n45 \u2502         use 0x1::reflect;\n   \u2502                  ^^^^^^^ Unused 'use' of alias 'reflect'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/fungible_asset.spec.move:364:18\n    \u2502\n364 \u2502         use 0x1::aggregator_v2;\n    \u2502                  ^^^^^^^^^^^^^ Unused 'use' of alias 'aggregator_v2'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/fungible_asset.spec.move:468:18\n    \u2502\n468 \u2502         use 0x1::aggregator_v2;\n    \u2502                  ^^^^^^^^^^^^^ Unused 'use' of alias 'aggregator_v2'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/fungible_asset.spec.move:487:18\n    \u2502\n487 \u2502         use 0x1::aggregator_v2;\n    \u2502                  ^^^^^^^^^^^^^ Unused 'use' of alias 'aggregator_v2'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/fungible_asset.spec.move:572:18\n    \u2502\n572 \u2502         use 0x1::aggregator_v2;\n    \u2502                  ^^^^^^^^^^^^^ Unused 'use' of alias 'aggregator_v2'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/fungible_asset.spec.move:601:18\n    \u2502\n601 \u2502         use 0x1::aggregator_v2;\n    \u2502                  ^^^^^^^^^^^^^ Unused 'use' of alias 'aggregator_v2'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/fungible_asset.spec.move:669:18\n    \u2502\n669 \u2502         use 0x1::aggregator_v2;\n    \u2502                  ^^^^^^^^^^^^^ Unused 'use' of alias 'aggregator_v2'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/fungible_asset.spec.move:769:18\n    \u2502\n769 \u2502         use 0x1::aggregator_v2;\n    \u2502                  ^^^^^^^^^^^^^ Unused 'use' of alias 'aggregator_v2'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/fungible_asset.spec.move:786:18\n    \u2502\n786 \u2502         use 0x1::aggregator_v2;\n    \u2502                  ^^^^^^^^^^^^^ Unused 'use' of alias 'aggregator_v2'. Consider removing it\n\n",
+        "warning: unused alias\n     \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/fungible_asset.spec.move:1852:18\n     \u2502\n1852 \u2502         use 0x1::aggregator_v2;\n     \u2502                  ^^^^^^^^^^^^^ Unused 'use' of alias 'aggregator_v2'. Consider removing it\n\n",
+        "warning: unused alias\n   \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/init.spec.move:96:18\n   \u2502\n96 \u2502         use 0x1::option;\n   \u2502                  ^^^^^^ Unused 'use' of alias 'option'. Consider removing it\n\n",
+        "warning: unused alias\n   \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/init.spec.move:97:18\n   \u2502\n97 \u2502         use 0x1::ordered_map;\n   \u2502                  ^^^^^^^^^^^ Unused 'use' of alias 'ordered_map'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/init.spec.move:235:18\n    \u2502\n235 \u2502         use 0x1::option;\n    \u2502                  ^^^^^^ Unused 'use' of alias 'option'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/init.spec.move:236:18\n    \u2502\n236 \u2502         use 0x1::ordered_map;\n    \u2502                  ^^^^^^^^^^^ Unused 'use' of alias 'ordered_map'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/object.spec.move:679:18\n    \u2502\n679 \u2502         use 0x1::error;\n    \u2502                  ^^^^^ Unused 'use' of alias 'error'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/primary_fungible_store.spec.move:200:18\n    \u2502\n200 \u2502         use 0x1::signer;\n    \u2502                  ^^^^^^ Unused 'use' of alias 'signer'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/primary_fungible_store.spec.move:218:18\n    \u2502\n218 \u2502         use 0x1::fungible_asset;\n    \u2502                  ^^^^^^^^^^^^^^ Unused 'use' of alias 'fungible_asset'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/primary_fungible_store.spec.move:219:18\n    \u2502\n219 \u2502         use 0x1::dispatchable_fungible_asset;\n    \u2502                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ Unused 'use' of alias 'dispatchable_fungible_asset'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/primary_fungible_store.spec.move:233:18\n    \u2502\n233 \u2502         use 0x1::fungible_asset;\n    \u2502                  ^^^^^^^^^^^^^^ Unused 'use' of alias 'fungible_asset'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/primary_fungible_store.spec.move:234:18\n    \u2502\n234 \u2502         use 0x1::dispatchable_fungible_asset;\n    \u2502                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ Unused 'use' of alias 'dispatchable_fungible_asset'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/primary_fungible_store.spec.move:258:18\n    \u2502\n258 \u2502         use 0x1::fungible_asset;\n    \u2502                  ^^^^^^^^^^^^^^ Unused 'use' of alias 'fungible_asset'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/primary_fungible_store.spec.move:259:18\n    \u2502\n259 \u2502         use 0x1::dispatchable_fungible_asset;\n    \u2502                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ Unused 'use' of alias 'dispatchable_fungible_asset'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/primary_fungible_store.spec.move:326:18\n    \u2502\n326 \u2502         use 0x1::signer;\n    \u2502                  ^^^^^^ Unused 'use' of alias 'signer'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/primary_fungible_store.spec.move:342:18\n    \u2502\n342 \u2502         use 0x1::signer;\n    \u2502                  ^^^^^^ Unused 'use' of alias 'signer'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/primary_fungible_store.spec.move:375:18\n    \u2502\n375 \u2502         use 0x1::signer;\n    \u2502                  ^^^^^^ Unused 'use' of alias 'signer'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/primary_fungible_store.spec.move:376:18\n    \u2502\n376 \u2502         use 0x1::fungible_asset;\n    \u2502                  ^^^^^^^^^^^^^^ Unused 'use' of alias 'fungible_asset'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/primary_fungible_store.spec.move:377:18\n    \u2502\n377 \u2502         use 0x1::dispatchable_fungible_asset;\n    \u2502                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ Unused 'use' of alias 'dispatchable_fungible_asset'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/staking_contract.spec.move:555:18\n    \u2502\n555 \u2502         use 0x1::simple_map;\n    \u2502                  ^^^^^^^^^^ Unused 'use' of alias 'simple_map'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosFramework/staking_contract.spec.move:556:18\n    \u2502\n556 \u2502         use 0x1::pool_u64;\n    \u2502                  ^^^^^^^^ Unused 'use' of alias 'pool_u64'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosStdlib/data_structures/storage_slots_allocator.spec.move:118:18\n    \u2502\n118 \u2502         use 0x1::option;\n    \u2502                  ^^^^^^ Unused 'use' of alias 'option'. Consider removing it\n\n",
+        "warning: unused alias\n    \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosStdlib/data_structures/storage_slots_allocator.spec.move:119:18\n    \u2502\n119 \u2502         use 0x1::table_with_length;\n    \u2502                  ^^^^^^^^^^^^^^^^^ Unused 'use' of alias 'table_with_length'. Consider removing it\n\n",
+        "warning: unused alias\n   \u250c\u2500 /tmp/move-inference-compatibility-11hcvp4o/enriched-package/sources/AptosStdlib/simple_map.spec.move:65:18\n   \u2502\n65 \u2502         use 0x1::option;\n   \u2502                  ^^^^^^ Unused 'use' of alias 'option'. Consider removing it\n\n"
+      ],
+      "passed": true,
+      "schema_version": 1,
+      "stage": "compile",
+      "target": null
+    },
+    "stderr": "",
+    "stdout": "",
+    "timed_out": false
+  },
+  "failure_kind": null,
+  "package_sha256": "686eb0c4a9789421d77ba7975f98fc52702b27158eef0101a99f08962db1df3d",
+  "passed": true,
+  "prover": {
+    "argv": [
+      "move-flow",
+      "experiment",
+      "prove",
+      "--package",
+      "/tmp/move-inference-compatibility-11hcvp4o/enriched-package",
+      "--target",
+      "0x1::transaction_fee::burn_fee",
+      "--timeout",
+      "40",
+      "--output",
+      "/tmp/move-inference-compatibility-11hcvp4o/stage.json"
+    ],
+    "duration_ms": 29405,
+    "infrastructure_error": null,
+    "returncode": 0,
+    "stage_report": {
+      "diagnostics": [],
+      "passed": true,
+      "schema_version": 1,
+      "stage": "prover",
+      "target": "0x1::transaction_fee::burn_fee"
+    },
+    "stderr": "",
+    "stdout": "",
+    "timed_out": false
+  },
+  "removed_flagged_inferred_conditions": 454,
+  "schema_version": 4,
+  "target": "0x1::transaction_fee::burn_fee",
+  "threshold_exceeded_stage": null,
+  "threshold_seconds": 40,
+  "tool_executables": {
+    "compile": {
+      "path": "/home/wrw/aptos-core/.worktrees/dev2/target/debug/move-flow",
+      "sha256": "1d9feeef579e86ddb382c9be0ceb5e4a594b5ae09e4dcaefd7cac7bcb41dfb26"
+    },
+    "enriched_compile": {
+      "path": "/home/wrw/aptos-core/.worktrees/dev2/target/debug/move-flow",
+      "sha256": "1d9feeef579e86ddb382c9be0ceb5e4a594b5ae09e4dcaefd7cac7bcb41dfb26"
+    },
+    "prover": {
+      "path": "/home/wrw/aptos-core/.worktrees/dev2/target/debug/move-flow",
+      "sha256": "1d9feeef579e86ddb382c9be0ceb5e4a594b5ae09e4dcaefd7cac7bcb41dfb26"
+    },
+    "wp_inference": {
+      "path": "/home/wrw/aptos-core/.worktrees/dev2/target/debug/move-flow",
+      "sha256": "1d9feeef579e86ddb382c9be0ceb5e4a594b5ae09e4dcaefd7cac7bcb41dfb26"
+    }
+  },
+  "total_duration_ms": 112217,
+  "unused_alias_cleanup": {
+    "compile_report": "/tmp/move-inference-compatibility-11hcvp4o/stage.json",
+    "package": "/tmp/move-inference-compatibility-11hcvp4o/enriched-package",
+    "removed": [
+      {
+        "line": 4,
+        "path": "sources/AptosExperimental/trading/market/dead_mans_switch_tracker.spec.move",
+        "source": "use 0x1::option;"
+      },
+      {
+        "line": 5,
+        "path": "sources/AptosExperimental/trading/market/dead_mans_switch_tracker.spec.move",
+        "source": "use 0x1::event;"
+      },
+      {
+        "line": 6,
+        "path": "sources/AptosExperimental/trading/market/dead_mans_switch_tracker.spec.move",
+        "source": "use 0x1::big_ordered_map;"
+      },
+      {
+        "line": 33,
+        "path": "sources/AptosExperimental/trading/market/dead_mans_switch_tracker.spec.move",
+        "source": "use 0x7::order_book_utils;"
+      },
+      {
+        "line": 11,
+        "path": "sources/AptosExperimental/trading/market/market_bulk_order.spec.move",
+        "source": "use 0x1::option;"
+      },
+      {
+        "line": 12,
+        "path": "sources/AptosExperimental/trading/market/market_bulk_order.spec.move",
+        "source": "use 0x5::bulk_order_types;"
+      },
+      {
+        "line": 13,
+        "path": "sources/AptosExperimental/trading/market/market_bulk_order.spec.move",
+        "source": "use 0x7::order_book;"
+      },
+      {
+        "line": 14,
+        "path": "sources/AptosExperimental/trading/market/market_bulk_order.spec.move",
+        "source": "use 0x7::market_types;"
+      },
+      {
+        "line": 26,
+        "path": "sources/AptosExperimental/trading/order_book/bulk_order_book.spec.move",
+        "source": "use 0x7::price_time_index;"
+      },
+      {
+        "line": 61,
+        "path": "sources/AptosExperimental/trading/order_book/bulk_order_book.spec.move",
+        "source": "use 0x1::option;"
+      },
+      {
+        "line": 62,
+        "path": "sources/AptosExperimental/trading/order_book/bulk_order_book.spec.move",
+        "source": "use 0x1::big_ordered_map;"
+      },
+      {
+        "line": 63,
+        "path": "sources/AptosExperimental/trading/order_book/bulk_order_book.spec.move",
+        "source": "use 0x5::bulk_order_types;"
+      },
+      {
+        "line": 4,
+        "path": "sources/AptosExperimental/trading/order_book/bulk_order_utils.spec.move",
+        "source": "use 0x1::option;"
+      },
+      {
+        "line": 218,
+        "path": "sources/AptosExperimental/trading/order_book/bulk_order_utils.spec.move",
+        "source": "use 0x5::bulk_order_types;"
+      },
+      {
+        "line": 4,
+        "path": "sources/AptosExperimental/trading/order_book/order_book_utils.spec.move",
+        "source": "use 0x1::big_ordered_map;"
+      },
+      {
+        "line": 40,
+        "path": "sources/AptosExperimental/trading/order_book/price_time_index.spec.move",
+        "source": "use 0x1::big_ordered_map;"
+      },
+      {
+        "line": 41,
+        "path": "sources/AptosExperimental/trading/order_book/price_time_index.spec.move",
+        "source": "use 0x5::order_book_types;"
+      },
+      {
+        "line": 4,
+        "path": "sources/AptosExperimental/trading/order_book/single_order_book.spec.move",
+        "source": "use 0x1::option;"
+      },
+      {
+        "line": 5,
+        "path": "sources/AptosExperimental/trading/order_book/single_order_book.spec.move",
+        "source": "use 0x1::string;"
+      },
+      {
+        "line": 6,
+        "path": "sources/AptosExperimental/trading/order_book/single_order_book.spec.move",
+        "source": "use 0x1::big_ordered_map;"
+      },
+      {
+        "line": 7,
+        "path": "sources/AptosExperimental/trading/order_book/single_order_book.spec.move",
+        "source": "use 0x5::order_book_types;"
+      },
+      {
+        "line": 8,
+        "path": "sources/AptosExperimental/trading/order_book/single_order_book.spec.move",
+        "source": "use 0x5::single_order_types;"
+      },
+      {
+        "line": 9,
+        "path": "sources/AptosExperimental/trading/order_book/single_order_book.spec.move",
+        "source": "use 0x7::price_time_index;"
+      },
+      {
+        "line": 310,
+        "path": "sources/AptosFramework/aptos_account.spec.move",
+        "source": "use 0x1::fungible_asset;"
+      },
+      {
+        "line": 311,
+        "path": "sources/AptosFramework/aptos_account.spec.move",
+        "source": "use 0x1::primary_fungible_store;"
+      },
+      {
+        "line": 99,
+        "path": "sources/AptosFramework/code.spec.move",
+        "source": "use 0x1::string;"
+      },
+      {
+        "line": 101,
+        "path": "sources/AptosFramework/code.spec.move",
+        "source": "use 0x1::features;"
+      },
+      {
+        "line": 102,
+        "path": "sources/AptosFramework/code.spec.move",
+        "source": "use 0x1::event;"
+      },
+      {
+        "line": 103,
+        "path": "sources/AptosFramework/code.spec.move",
+        "source": "use 0x1::object;"
+      },
+      {
+        "line": 104,
+        "path": "sources/AptosFramework/code.spec.move",
+        "source": "use 0x1::init;"
+      },
+      {
+        "line": 351,
+        "path": "sources/AptosFramework/datastructures/big_ordered_map.spec.move",
+        "source": "use 0x1::bcs;"
+      },
+      {
+        "line": 870,
+        "path": "sources/AptosFramework/datastructures/big_ordered_map.spec.move",
+        "source": "use 0x1::vector;"
+      },
+      {
+        "line": 871,
+        "path": "sources/AptosFramework/datastructures/big_ordered_map.spec.move",
+        "source": "use 0x1::option;"
+      },
+      {
+        "line": 872,
+        "path": "sources/AptosFramework/datastructures/big_ordered_map.spec.move",
+        "source": "use 0x1::error;"
+      },
+      {
+        "line": 873,
+        "path": "sources/AptosFramework/datastructures/big_ordered_map.spec.move",
+        "source": "use 0x1::ordered_map;"
+      },
+      {
+        "line": 874,
+        "path": "sources/AptosFramework/datastructures/big_ordered_map.spec.move",
+        "source": "use 0x1::storage_slots_allocator;"
+      },
+      {
+        "line": 1220,
+        "path": "sources/AptosFramework/datastructures/big_ordered_map.spec.move",
+        "source": "use 0x1::option;"
+      },
+      {
+        "line": 1221,
+        "path": "sources/AptosFramework/datastructures/big_ordered_map.spec.move",
+        "source": "use 0x1::ordered_map;"
+      },
+      {
+        "line": 1222,
+        "path": "sources/AptosFramework/datastructures/big_ordered_map.spec.move",
+        "source": "use 0x1::table_with_length;"
+      },
+      {
+        "line": 1223,
+        "path": "sources/AptosFramework/datastructures/big_ordered_map.spec.move",
+        "source": "use 0x1::storage_slots_allocator;"
+      },
+      {
+        "line": 1237,
+        "path": "sources/AptosFramework/datastructures/big_ordered_map.spec.move",
+        "source": "use 0x1::option;"
+      },
+      {
+        "line": 1238,
+        "path": "sources/AptosFramework/datastructures/big_ordered_map.spec.move",
+        "source": "use 0x1::ordered_map;"
+      },
+      {
+        "line": 1239,
+        "path": "sources/AptosFramework/datastructures/big_ordered_map.spec.move",
+        "source": "use 0x1::table_with_length;"
+      },
+      {
+        "line": 1240,
+        "path": "sources/AptosFramework/datastructures/big_ordered_map.spec.move",
+        "source": "use 0x1::storage_slots_allocator;"
+      },
+      {
+        "line": 1279,
+        "path": "sources/AptosFramework/datastructures/big_ordered_map.spec.move",
+        "source": "use 0x1::ordered_map;"
+      },
+      {
+        "line": 1330,
+        "path": "sources/AptosFramework/datastructures/big_ordered_map.spec.move",
+        "source": "use 0x1::vector;"
+      },
+      {
+        "line": 1331,
+        "path": "sources/AptosFramework/datastructures/big_ordered_map.spec.move",
+        "source": "use 0x1::ordered_map;"
+      },
+      {
+        "line": 1332,
+        "path": "sources/AptosFramework/datastructures/big_ordered_map.spec.move",
+        "source": "use 0x1::storage_slots_allocator;"
+      },
+      {
+        "line": 273,
+        "path": "sources/AptosFramework/datastructures/ordered_map.spec.move",
+        "source": "use 0x1::cmp;"
+      },
+      {
+        "line": 356,
+        "path": "sources/AptosFramework/datastructures/ordered_map.spec.move",
+        "source": "use 0x1::vector;"
+      },
+      {
+        "line": 357,
+        "path": "sources/AptosFramework/datastructures/ordered_map.spec.move",
+        "source": "use 0x1::cmp;"
+      },
+      {
+        "line": 13,
+        "path": "sources/AptosFramework/dispatchable_fungible_asset.spec.move",
+        "source": "use 0x1::object;"
+      },
+      {
+        "line": 14,
+        "path": "sources/AptosFramework/dispatchable_fungible_asset.spec.move",
+        "source": "use 0x1::function_info;"
+      },
+      {
+        "line": 15,
+        "path": "sources/AptosFramework/dispatchable_fungible_asset.spec.move",
+        "source": "use 0x1::fungible_asset;"
+      },
+      {
+        "line": 25,
+        "path": "sources/AptosFramework/dispatchable_fungible_asset.spec.move",
+        "source": "use 0x1::object;"
+      },
+      {
+        "line": 26,
+        "path": "sources/AptosFramework/dispatchable_fungible_asset.spec.move",
+        "source": "use 0x1::function_info;"
+      },
+      {
+        "line": 27,
+        "path": "sources/AptosFramework/dispatchable_fungible_asset.spec.move",
+        "source": "use 0x1::fungible_asset;"
+      },
+      {
+        "line": 37,
+        "path": "sources/AptosFramework/dispatchable_fungible_asset.spec.move",
+        "source": "use 0x1::object;"
+      },
+      {
+        "line": 38,
+        "path": "sources/AptosFramework/dispatchable_fungible_asset.spec.move",
+        "source": "use 0x1::function_info;"
+      },
+      {
+        "line": 48,
+        "path": "sources/AptosFramework/dispatchable_fungible_asset.spec.move",
+        "source": "use 0x1::option;"
+      },
+      {
+        "line": 49,
+        "path": "sources/AptosFramework/dispatchable_fungible_asset.spec.move",
+        "source": "use 0x1::object;"
+      },
+      {
+        "line": 50,
+        "path": "sources/AptosFramework/dispatchable_fungible_asset.spec.move",
+        "source": "use 0x1::function_info;"
+      },
+      {
+        "line": 140,
+        "path": "sources/AptosFramework/dispatchable_fungible_asset.spec.move",
+        "source": "use 0x1::fungible_asset;"
+      },
+      {
+        "line": 44,
+        "path": "sources/AptosFramework/function_info.spec.move",
+        "source": "use 0x1::result;"
+      },
+      {
+        "line": 45,
+        "path": "sources/AptosFramework/function_info.spec.move",
+        "source": "use 0x1::reflect;"
+      },
+      {
+        "line": 364,
+        "path": "sources/AptosFramework/fungible_asset.spec.move",
+        "source": "use 0x1::aggregator_v2;"
+      },
+      {
+        "line": 468,
+        "path": "sources/AptosFramework/fungible_asset.spec.move",
+        "source": "use 0x1::aggregator_v2;"
+      },
+      {
+        "line": 487,
+        "path": "sources/AptosFramework/fungible_asset.spec.move",
+        "source": "use 0x1::aggregator_v2;"
+      },
+      {
+        "line": 572,
+        "path": "sources/AptosFramework/fungible_asset.spec.move",
+        "source": "use 0x1::aggregator_v2;"
+      },
+      {
+        "line": 601,
+        "path": "sources/AptosFramework/fungible_asset.spec.move",
+        "source": "use 0x1::aggregator_v2;"
+      },
+      {
+        "line": 669,
+        "path": "sources/AptosFramework/fungible_asset.spec.move",
+        "source": "use 0x1::aggregator_v2;"
+      },
+      {
+        "line": 769,
+        "path": "sources/AptosFramework/fungible_asset.spec.move",
+        "source": "use 0x1::aggregator_v2;"
+      },
+      {
+        "line": 786,
+        "path": "sources/AptosFramework/fungible_asset.spec.move",
+        "source": "use 0x1::aggregator_v2;"
+      },
+      {
+        "line": 1852,
+        "path": "sources/AptosFramework/fungible_asset.spec.move",
+        "source": "use 0x1::aggregator_v2;"
+      },
+      {
+        "line": 96,
+        "path": "sources/AptosFramework/init.spec.move",
+        "source": "use 0x1::option;"
+      },
+      {
+        "line": 97,
+        "path": "sources/AptosFramework/init.spec.move",
+        "source": "use 0x1::ordered_map;"
+      },
+      {
+        "line": 235,
+        "path": "sources/AptosFramework/init.spec.move",
+        "source": "use 0x1::option;"
+      },
+      {
+        "line": 236,
+        "path": "sources/AptosFramework/init.spec.move",
+        "source": "use 0x1::ordered_map;"
+      },
+      {
+        "line": 679,
+        "path": "sources/AptosFramework/object.spec.move",
+        "source": "use 0x1::error;"
+      },
+      {
+        "line": 200,
+        "path": "sources/AptosFramework/primary_fungible_store.spec.move",
+        "source": "use 0x1::signer;"
+      },
+      {
+        "line": 218,
+        "path": "sources/AptosFramework/primary_fungible_store.spec.move",
+        "source": "use 0x1::fungible_asset;"
+      },
+      {
+        "line": 219,
+        "path": "sources/AptosFramework/primary_fungible_store.spec.move",
+        "source": "use 0x1::dispatchable_fungible_asset;"
+      },
+      {
+        "line": 233,
+        "path": "sources/AptosFramework/primary_fungible_store.spec.move",
+        "source": "use 0x1::fungible_asset;"
+      },
+      {
+        "line": 234,
+        "path": "sources/AptosFramework/primary_fungible_store.spec.move",
+        "source": "use 0x1::dispatchable_fungible_asset;"
+      },
+      {
+        "line": 258,
+        "path": "sources/AptosFramework/primary_fungible_store.spec.move",
+        "source": "use 0x1::fungible_asset;"
+      },
+      {
+        "line": 259,
+        "path": "sources/AptosFramework/primary_fungible_store.spec.move",
+        "source": "use 0x1::dispatchable_fungible_asset;"
+      },
+      {
+        "line": 326,
+        "path": "sources/AptosFramework/primary_fungible_store.spec.move",
+        "source": "use 0x1::signer;"
+      },
+      {
+        "line": 342,
+        "path": "sources/AptosFramework/primary_fungible_store.spec.move",
+        "source": "use 0x1::signer;"
+      },
+      {
+        "line": 375,
+        "path": "sources/AptosFramework/primary_fungible_store.spec.move",
+        "source": "use 0x1::signer;"
+      },
+      {
+        "line": 376,
+        "path": "sources/AptosFramework/primary_fungible_store.spec.move",
+        "source": "use 0x1::fungible_asset;"
+      },
+      {
+        "line": 377,
+        "path": "sources/AptosFramework/primary_fungible_store.spec.move",
+        "source": "use 0x1::dispatchable_fungible_asset;"
+      },
+      {
+        "line": 555,
+        "path": "sources/AptosFramework/staking_contract.spec.move",
+        "source": "use 0x1::simple_map;"
+      },
+      {
+        "line": 556,
+        "path": "sources/AptosFramework/staking_contract.spec.move",
+        "source": "use 0x1::pool_u64;"
+      },
+      {
+        "line": 118,
+        "path": "sources/AptosStdlib/data_structures/storage_slots_allocator.spec.move",
+        "source": "use 0x1::option;"
+      },
+      {
+        "line": 119,
+        "path": "sources/AptosStdlib/data_structures/storage_slots_allocator.spec.move",
+        "source": "use 0x1::table_with_length;"
+      },
+      {
+        "line": 65,
+        "path": "sources/AptosStdlib/simple_map.spec.move",
+        "source": "use 0x1::option;"
+      }
+    ],
+    "removed_count": 96,
+    "schema_version": 1
+  },
+  "wp_inference": {
+    "argv": [
+      "move-flow",
+      "experiment",
+      "infer",
+      "--package",
+      "/tmp/move-inference-compatibility-11hcvp4o/enriched-package",
+      "--target",
+      "0x1::transaction_fee::burn_fee",
+      "--write-inferred-specs",
+      "--output",
+      "/tmp/move-inference-compatibility-11hcvp4o/stage.json"
+    ],
+    "duration_ms": 31278,
+    "infrastructure_error": null,
+    "returncode": 0,
+    "stage_report": {
+      "diagnostics": [],
+      "passed": true,
+      "schema_version": 1,
+      "stage": "wp_inference",
+      "target": "0x1::transaction_fee::burn_fee"
+    },
+    "stderr": "",
+    "stdout": "",
+    "timed_out": false
+  }
+}

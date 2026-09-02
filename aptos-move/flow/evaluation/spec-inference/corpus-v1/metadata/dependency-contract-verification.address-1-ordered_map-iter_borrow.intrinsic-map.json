@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "stage": "prover",
+  "target": "0x1::ordered_map::iter_borrow",
+  "passed": false,
+  "diagnostics": [
+    "error: cannot select a field of an intrinsic map type in verified code\n    ┌─ /tmp/ordered-map-iter-borrow-prove.kR4Zjr/package/sources/AptosFramework/datastructures/ordered_map.move:537:10\n    │\n537 │         &map.entries.borrow(self.index).value\n    │          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n",
+    "exiting with condition generation errors"
+  ]
+}

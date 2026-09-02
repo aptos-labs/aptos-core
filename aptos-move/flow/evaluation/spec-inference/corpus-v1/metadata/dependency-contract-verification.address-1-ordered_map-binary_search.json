@@ -1,0 +1,12 @@
+{
+  "schema_version": 3,
+  "stage": "trusted_boundary",
+  "target": "0x1::ordered_map::binary_search",
+  "basis": "expert_assumption",
+  "target_body_proof": "timeout",
+  "verified": false,
+  "timeout_seconds": 60,
+  "artifact": "dependency-contract-verification.address-1-ordered_map-binary_search.timeout-60.json",
+  "rationale": "The complete recursive result/abort model is connected to the source by interval and control-flow invariants. Target-body proof exceeded the 60-second corpus limit without a counterexample.",
+  "metadata": "trusted-verification-boundaries.json"
+}

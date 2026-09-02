@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "stage": "prover",
+  "target": "0x1::coin::ensure_paired_metadata",
+  "passed": false,
+  "diagnostics": [
+    "warning: unused alias\n    ┌─ /tmp/coin-ensure-fixed.ec6bHV/package/sources/AptosFramework/coin.spec.move:616:18\n    │\n616 │         use 0x1::account;\n    │                  ^^^^^^^ Unused 'use' of alias 'account'. Consider removing it\n\n",
+    "warning: generic type reflection in a function specification is not yet supported through behavioral predicates; leaving `ensures_of` uninterpreted; see https://github.com/aptos-labs/aptos-core/issues/20371\n    ┌─ /tmp/coin-ensure-fixed.ec6bHV/package/sources/AptosFramework/coin.move:322:5\n    │  \n322 │ ╭     inline fun create_and_return_paired_metadata_if_not_exist<CoinType>(\n323 │ │         allow_apt_creation: bool\n324 │ │     ): Object<Metadata> {\n325 │ │         assert!(\n    · │\n385 │ │         *map.coin_to_fungible_asset_map.borrow(type)\n386 │ │     }\n    │ ╰─────^\n\n",
+    "[internal] boogie exited with compilation errors:\n/tmp/move-prover-RdLbcY/output.vc_0003.bpl(6006,150): Error: invalid type for argument 0 in application of $IsEqual'u8': bv8 (expected: int)\n/tmp/move-prover-RdLbcY/output.vc_0003.bpl(6016,126): Error: invalid type for argument 0 in application of $1_features_$contains: Vec bv8 (expected: Vec int)\n2 type checking errors detected in /tmp/move-prover-RdLbcY/output.vc_0003.bpl\n"
+  ]
+}

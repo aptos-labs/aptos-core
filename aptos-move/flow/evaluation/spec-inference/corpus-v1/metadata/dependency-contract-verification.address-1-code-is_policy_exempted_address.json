@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "stage": "prover",
+  "target": "0x1::code::is_policy_exempted_address",
+  "passed": true,
+  "diagnostics": []
+}

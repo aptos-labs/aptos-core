@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "stage": "prover",
+  "target": "0x1::vesting::get_vesting_account_signer_internal",
+  "passed": true,
+  "diagnostics": []
+}

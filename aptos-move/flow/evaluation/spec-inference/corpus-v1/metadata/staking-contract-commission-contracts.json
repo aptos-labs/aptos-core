@@ -1,0 +1,63 @@
+{
+  "schema_version": 2,
+  "purpose": "Bottom-up proof evidence for the complete request_commission_internal dependency boundary",
+  "command_template": "target/debug/move-flow experiment prove --package corpus/framework --target <target> --timeout <seconds> --split-vcs-by-assert --output <artifact>",
+  "opaque_preserved": true,
+  "legacy_evidence_note": "The recorded results predate this correction and were produced in isolated copies that unnecessarily removed opaque. Ordinary targets should now be proved directly. A verify-false target may use a copy that re-enables verification, but opaque must remain present.",
+  "move_flow_sha256": "4ae5378f79be9d79ae6064906b91a39315164716948a1d4ef7f830f85a5ab64c",
+  "source_sha256": {
+    "sources/AptosFramework/event.spec.move": "490064fbed80f282ce999d46c24ee78ff761a6f1b733565b33920eddc3b0e0be",
+    "sources/AptosFramework/stake.spec.move": "58dcbb4d6beede17c0cbe1f526385b5571c92d4ad090d239b0baa4729293dda9",
+    "sources/AptosFramework/staking_contract.spec.move": "5e27eda04e826335d5846b9f98aea70f1761c27fa3f6ab1cfdabac27b5e8580e",
+    "sources/AptosStdlib/pool_u64.spec.move": "ad009f9c8dc18a1cfcd855075f2c4f13b36caf1cd22ea56775879396de02040c"
+  },
+  "target_body_proofs": [
+    {
+      "target": "0x1::pool_u64::buy_in",
+      "timeout_seconds": 60,
+      "passed": true,
+      "coverage": "exact result, exact Pool transform, and complete abort domain including share-conversion overflow"
+    },
+    {
+      "target": "0x1::stake::unlock_with_cap",
+      "timeout_seconds": 60,
+      "passed": true,
+      "coverage": "exact StakePool transform, owner-pool frame, existence preservation, and pending-inactive merge overflow"
+    },
+    {
+      "target": "0x1::event::emit",
+      "timeout_seconds": 60,
+      "passed": true,
+      "coverage": "total native module-event boundary"
+    },
+    {
+      "target": "0x1::staking_contract::get_staking_contract_amounts_internal",
+      "timeout_seconds": 60,
+      "passed": true,
+      "coverage": "exact three-value result and complete arithmetic/resource abort domain"
+    }
+  ],
+  "trusted_boundaries": [
+    {
+      "target": "0x1::staking_contract::add_distribution",
+      "basis": "expert_assumption",
+      "component_shards_passed": 9,
+      "attempted_timeouts_seconds": [
+        60,
+        120
+      ],
+      "remaining_obligation": "unified strict abort coverage",
+      "rationale": "The normal state and abort-direction obligations prove independently. The exact abstraction is the direct composition of get_stake, update_distribution_pool, and pool_u64::buy_in; only the unified control-flow disjunction exceeds the solver limit."
+    },
+    {
+      "target": "0x1::staking_contract::request_commission_internal",
+      "basis": "expert_assumption",
+      "component_shards_passed": 9,
+      "attempted_timeouts_seconds": [
+        60
+      ],
+      "remaining_obligation": "unified strict abort coverage",
+      "rationale": "The exact result, local-state transform, global frame, resource transform, and abort-direction obligations prove independently. The remaining shard composes the already specified add_distribution and unlock_with_cap boundaries."
+    }
+  ]
+}

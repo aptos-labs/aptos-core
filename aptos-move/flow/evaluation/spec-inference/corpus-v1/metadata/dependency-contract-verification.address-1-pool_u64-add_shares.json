@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "stage": "prover",
+  "target": "0x1::pool_u64::add_shares",
+  "passed": true,
+  "diagnostics": [
+    "warning: unused alias\n    ┌─ /tmp/canonical-pool-add_shares.S1wFpi/package/sources/AptosFramework/staking_contract.spec.move:786:18\n    │\n786 │         use 0x1::simple_map;\n    │                  ^^^^^^^^^^ Unused 'use' of alias 'simple_map'. Consider removing it\n\n",
+    "warning: unused alias\n    ┌─ /tmp/canonical-pool-add_shares.S1wFpi/package/sources/AptosFramework/staking_contract.spec.move:787:18\n    │\n787 │         use 0x1::pool_u64;\n    │                  ^^^^^^^^ Unused 'use' of alias 'pool_u64'. Consider removing it\n\n"
+  ]
+}

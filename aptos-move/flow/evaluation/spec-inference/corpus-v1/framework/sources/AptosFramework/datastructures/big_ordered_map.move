@@ -1,0 +1,3627 @@
+/// This module provides an implementation for an big ordered map.
+/// Big means that it is stored across multiple resources, and doesn't have an
+/// upper limit on number of elements it can contain.
+///
+/// Keys point to values, and each key in the map must be unique.
+///
+/// Currently, one implementation is provided - BPlusTreeMap, backed by a B+Tree,
+/// with each node being a separate resource, internally containing OrderedMap.
+///
+/// BPlusTreeMap is chosen since the biggest (performance and gas)
+/// costs are reading resources, and it:
+/// * reduces number of resource accesses
+/// * reduces number of rebalancing operations, and makes each rebalancing
+///   operation touch only few resources
+/// * it allows for parallelism for keys that are not close to each other,
+///   once it contains enough keys
+///
+/// Note: Default configuration (used in `new_with_config(0, 0, false)`) allows for keys and values of up to 5KB,
+/// or 100 times the first (key, value), to satisfy general needs.
+/// If you need larger, use other constructor methods.
+/// Based on initial configuration, BigOrderedMap will always accept insertion of keys and values
+/// up to the allowed size, and will abort with EKEY_BYTES_TOO_LARGE or EARGUMENT_BYTES_TOO_LARGE.
+///
+/// Warning: All iterator functions need to be carefully used, because they are just pointers into the
+/// structure, and modification of the map invalidates them (without compiler being able to catch it).
+/// Type is also named IteratorPtr, so that Iterator is free to use later.
+/// Better guarantees would need future Move improvements that will allow references to be part of the struct,
+/// allowing cleaner iterator APIs.
+///
+/// That's why all functions returning iterators are prefixed with "internal_", to clarify nuances needed to make
+/// sure usage is correct.
+/// A set of inline utility methods is provided instead, to provide guaranteed valid usage to iterators.
+module aptos_framework::big_ordered_map {
+    use std::error;
+    use std::vector;
+    use std::option::{Self as option, Option};
+    use std::bcs;
+    use aptos_std::cmp;
+    use aptos_std::storage_slots_allocator::{Self, StorageSlotsAllocator, StoredSlot};
+    use aptos_std::math64::{max, min};
+    use aptos_framework::ordered_map::{Self, OrderedMap};
+
+    #[test_only]
+    friend aptos_framework::big_ordered_map_test;
+
+    // Error constants shared with ordered_map (so try using same values)
+
+    /// Map key already exists
+    const EKEY_ALREADY_EXISTS: u64 = 1;
+    /// Map key is not found
+    const EKEY_NOT_FOUND: u64 = 2;
+    /// Trying to do an operation on an IteratorPtr that would go out of bounds
+    const EITER_OUT_OF_BOUNDS: u64 = 3;
+
+    // Error constants specific to big_ordered_map
+
+    /// The provided configuration parameter is invalid.
+    const EINVALID_CONFIG_PARAMETER: u64 = 11;
+    /// Map isn't empty
+    const EMAP_NOT_EMPTY: u64 = 12;
+    /// Trying to insert too large of an (key, value) into the map.
+    const EARGUMENT_BYTES_TOO_LARGE: u64 = 13;
+    /// borrow_mut requires that key and value types have constant size
+    /// (otherwise it wouldn't be able to guarantee size requirements are not violated)
+    /// Use remove() + add() combo instead.
+    const EBORROW_MUT_REQUIRES_CONSTANT_VALUE_SIZE: u64 = 14;
+    /// Trying to insert too large of a key into the map.
+    const EKEY_BYTES_TOO_LARGE: u64 = 15;
+
+    /// Cannot use new/new_with_reusable with variable-sized types.
+    /// Use `new_with_type_size_hints()` or `new_with_config()` instead if your types have variable sizes.
+    /// `new_with_config(0, 0, false)` tries to work reasonably well for variety of sizes
+    /// (allows keys or values of at least 5KB and 100x larger than the first inserted)
+    const ECANNOT_USE_NEW_WITH_VARIABLE_SIZED_TYPES: u64 = 16;
+
+    // Errors that should never be thrown
+
+    /// Internal errors.
+    const EINTERNAL_INVARIANT_BROKEN: u64 = 20;
+
+    // Internal constants.
+
+    // Bounds on degrees:
+
+    /// Smallest allowed degree on inner nodes.
+    const INNER_MIN_DEGREE: u16 = 4;
+    /// Smallest allowed degree on leaf nodes.
+    ///
+    /// We rely on 1 being valid size only for root node,
+    /// so this cannot be below 3 (unless that is changed)
+    const LEAF_MIN_DEGREE: u16 = 3;
+    /// Largest degree allowed (both for inner and leaf nodes)
+    const MAX_DEGREE: u64 = 4096;
+
+    // Bounds on serialized sizes:
+
+    /// Largest size all keys for inner nodes or key-value pairs for leaf nodes can have.
+    /// Node itself can be a bit larger, due to few other accounting fields.
+    /// This is a bit conservative, a bit less than half of the resource limit (which is 1MB)
+    const MAX_NODE_BYTES: u64 = 400 * 1024;
+    /// Target node size, from efficiency perspective.
+    const DEFAULT_TARGET_NODE_SIZE: u64 = 4096;
+
+    /// When using default constructors (new() / new_with_reusable() / new_with_config(0, 0, _))
+    /// making sure key or value of this size (5KB) will be accepted, which should satisfy most cases
+    /// If you need keys/values that are larger, use other constructors.
+    const DEFAULT_MAX_KEY_OR_VALUE_SIZE: u64 = 5 * 1024; // 5KB
+
+    /// Target max node size, when using hints (via new_with_type_size_hints).
+    /// Smaller than MAX_NODE_BYTES, to improve performence, as large nodes are innefficient.
+    const HINT_MAX_NODE_BYTES: u64 = 128 * 1024;
+
+    // Constants aligned with storage_slots_allocator
+    const NULL_INDEX: u64 = 0;
+    const ROOT_INDEX: u64 = 1;
+
+    /// A node of the BigOrderedMap.
+    ///
+    /// Inner node will have all children be Child::Inner, pointing to the child nodes.
+    /// Leaf node will have all children be Child::Leaf.
+    /// Basically - Leaf node is a single-resource OrderedMap, containing as much key/value entries, as can fit.
+    /// So Leaf node contains multiple values, not just one.
+    enum Node<K: store, V: store> has store {
+        V1 {
+            // Whether this node is a leaf node.
+            is_leaf: bool,
+            // The children of the nodes.
+            // When node is inner node, K represents max_key within the child subtree, and values are Child::Inner.
+            // When the node is leaf node, K represents key of the leaf, and values are Child::Leaf.
+            children: OrderedMap<K, Child<V>>,
+            // The node index of its previous node at the same level, or `NULL_INDEX` if it doesn't have a previous node.
+            prev: u64,
+            // The node index of its next node at the same level, or `NULL_INDEX` if it doesn't have a next node.
+            next: u64
+        }
+    }
+
+    /// Contents of a child node.
+    enum Child<V: store> has store {
+        Inner {
+            // The node index of it's child
+            node_index: StoredSlot
+        },
+        Leaf {
+            // Value associated with the leaf node.
+            value: V
+        }
+    }
+
+    /// An iterator to iterate all keys in the BigOrderedMap.
+    ///
+    /// TODO: Once fields can be (mutable) references, this class will be deprecated.
+    enum IteratorPtr<K> has copy, drop {
+        End,
+        Some {
+            /// The node index of the iterator pointing to.
+            node_index: u64,
+
+            /// Child iter it is pointing to
+            child_iter: ordered_map::IteratorPtr,
+
+            /// `key` to which `(node_index, child_iter)` are pointing to
+            /// cache to not require borrowing global resources to fetch again
+            key: K
+        }
+    }
+
+    struct IteratorPtrWithPath<K> has copy, drop {
+        iterator: IteratorPtr<K>,
+        path: vector<u64>
+    }
+
+    /// The BigOrderedMap data structure.
+    enum BigOrderedMap<K: store, V: store> has store {
+        BPlusTreeMap {
+            /// Root node. It is stored directly in the resource itself, unlike all other nodes.
+            root: Node<K, V>,
+            /// Storage of all non-root nodes. They are stored in separate storage slots.
+            nodes: StorageSlotsAllocator<Node<K, V>>,
+            /// The node index of the leftmost node.
+            min_leaf_index: u64,
+            /// The node index of the rightmost node.
+            max_leaf_index: u64,
+
+            /// Whether Key and Value have constant serialized size, and if so,
+            /// optimize out size checks on every insert.
+            constant_kv_size: bool,
+            /// The max number of children an inner node can have.
+            inner_max_degree: u16,
+            /// The max number of children a leaf node can have.
+            leaf_max_degree: u16
+        }
+    }
+
+    // ======================= Constructors && Destructors ====================
+
+    /// Returns a new BigOrderedMap with the default configuration.
+    ///
+    /// Cannot be used with variable-sized types.
+    /// Use `new_with_type_size_hints()` or `new_with_config()` instead if your types have variable sizes.
+    /// `new_with_config(0, 0, false)` tries to work reasonably well for variety of sizes
+    /// (allows keys or values of at least 5KB and 100x larger than the first inserted)
+    public fun new<K: store, V: store>(): BigOrderedMap<K, V> {
+        assert!(
+            bcs::constant_serialized_size<K>().is_some()
+                && bcs::constant_serialized_size<V>().is_some(),
+            error::invalid_argument(ECANNOT_USE_NEW_WITH_VARIABLE_SIZED_TYPES)
+        );
+        new_with_config(0, 0, false)
+    }
+
+    /// Returns a new BigOrderedMap with with reusable storage slots.
+    ///
+    /// Cannot be used with variable-sized types.
+    /// Use `new_with_type_size_hints()` or `new_with_config()` instead if your types have variable sizes.
+    /// `new_with_config(0, 0, false)` tries to work reasonably well for variety of sizes
+    /// (allows keys or values of at least 5KB and 100x larger than the first inserted)
+    public fun new_with_reusable<K: store, V: store>(): BigOrderedMap<K, V> {
+        assert!(
+            bcs::constant_serialized_size<K>().is_some()
+                && bcs::constant_serialized_size<V>().is_some(),
+            error::invalid_argument(ECANNOT_USE_NEW_WITH_VARIABLE_SIZED_TYPES)
+        );
+        new_with_config(0, 0, true)
+    }
+
+    /// Returns a new BigOrderedMap, configured based on passed key and value serialized size hints.
+    public fun new_with_type_size_hints<K: store, V: store>(
+        avg_key_bytes: u64,
+        max_key_bytes: u64,
+        avg_value_bytes: u64,
+        max_value_bytes: u64
+    ): BigOrderedMap<K, V> {
+        assert!(
+            avg_key_bytes <= max_key_bytes,
+            error::invalid_argument(EINVALID_CONFIG_PARAMETER)
+        );
+        assert!(
+            avg_value_bytes <= max_value_bytes,
+            error::invalid_argument(EINVALID_CONFIG_PARAMETER)
+        );
+
+        let inner_max_degree_from_avg =
+            max(
+                min(MAX_DEGREE, DEFAULT_TARGET_NODE_SIZE / avg_key_bytes),
+                INNER_MIN_DEGREE as u64
+            );
+        let inner_max_degree_from_max = HINT_MAX_NODE_BYTES / max_key_bytes;
+        assert!(
+            inner_max_degree_from_max >= (INNER_MIN_DEGREE as u64),
+            error::invalid_argument(EINVALID_CONFIG_PARAMETER)
+        );
+
+        let avg_entry_size = avg_key_bytes + avg_value_bytes;
+        let max_entry_size = max_key_bytes + max_value_bytes;
+
+        let leaf_max_degree_from_avg =
+            max(
+                min(MAX_DEGREE, DEFAULT_TARGET_NODE_SIZE / avg_entry_size),
+                LEAF_MIN_DEGREE as u64
+            );
+        let leaf_max_degree_from_max = HINT_MAX_NODE_BYTES / max_entry_size;
+        assert!(
+            leaf_max_degree_from_max >= (LEAF_MIN_DEGREE as u64),
+            error::invalid_argument(EINVALID_CONFIG_PARAMETER)
+        );
+
+        new_with_config(
+            min(inner_max_degree_from_avg, inner_max_degree_from_max) as u16,
+            min(leaf_max_degree_from_avg, leaf_max_degree_from_max) as u16,
+            false
+        )
+    }
+
+    /// Returns a new BigOrderedMap with the provided max degree consts (the maximum # of children a node can have, both inner and leaf).
+    ///
+    /// If 0 is passed, then it is dynamically computed based on size of first key and value.
+    /// WIth 0 it is configured to accept keys and values up to 5KB in size,
+    /// or as large as 100x the size of the first insert. (100 = MAX_NODE_BYTES / DEFAULT_TARGET_NODE_SIZE)
+    ///
+    /// Sizes of all elements must respect (or their additions will be rejected):
+    ///   `key_size * inner_max_degree <= MAX_NODE_BYTES`
+    ///   `entry_size * leaf_max_degree <= MAX_NODE_BYTES`
+    /// If keys or values have variable size, and first element could be non-representative in size (i.e. smaller than future ones),
+    /// it is important to compute and pass inner_max_degree and leaf_max_degree based on the largest element you want to be able to insert.
+    ///
+    /// `reuse_slots` means that removing elements from the map doesn't free the storage slots and returns the refund.
+    /// Together with `allocate_spare_slots`, it allows to preallocate slots and have inserts have predictable gas costs.
+    /// (otherwise, inserts that require map to add new nodes, cost significantly more, compared to the rest)
+    public fun new_with_config<K: store, V: store>(
+        inner_max_degree: u16, leaf_max_degree: u16, reuse_slots: bool
+    ): BigOrderedMap<K, V> {
+        assert!(
+            inner_max_degree == 0
+                || (
+                    inner_max_degree >= INNER_MIN_DEGREE
+                        && (inner_max_degree as u64) <= MAX_DEGREE
+                ),
+            error::invalid_argument(EINVALID_CONFIG_PARAMETER)
+        );
+        assert!(
+            leaf_max_degree == 0
+                || (leaf_max_degree >= LEAF_MIN_DEGREE
+                    && (leaf_max_degree as u64) <= MAX_DEGREE),
+            error::invalid_argument(EINVALID_CONFIG_PARAMETER)
+        );
+
+        // Assert that storage_slots_allocator special indices are aligned:
+        assert!(
+            storage_slots_allocator::is_null_index(NULL_INDEX),
+            error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+        );
+        assert!(
+            storage_slots_allocator::is_special_unused_index(ROOT_INDEX),
+            error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+        );
+
+        let nodes = storage_slots_allocator::new(reuse_slots);
+
+        let self = BigOrderedMap::BPlusTreeMap {
+            root: new_node(/*is_leaf=*/ true),
+            nodes: nodes,
+            min_leaf_index: ROOT_INDEX,
+            max_leaf_index: ROOT_INDEX,
+            constant_kv_size: false, // Will be initialized in validate_static_size_and_init_max_degrees below.
+            inner_max_degree,
+            leaf_max_degree
+        };
+        self.validate_static_size_and_init_max_degrees();
+        self
+    }
+
+    /// Create a BigOrderedMap from a vector of keys and values, with default configuration.
+    /// Aborts with EKEY_ALREADY_EXISTS if duplicate keys are passed in.
+    public fun new_from<K: drop + copy + store, V: store>(
+        keys: vector<K>, values: vector<V>
+    ): BigOrderedMap<K, V> {
+        let map = new();
+        map.add_all(keys, values);
+        map
+    }
+
+    /// Destroys the map if it's empty, otherwise aborts.
+    public fun destroy_empty<K: store, V: store>(self: BigOrderedMap<K, V>) {
+        let BigOrderedMap::BPlusTreeMap {
+            root,
+            nodes,
+            min_leaf_index: _,
+            max_leaf_index: _,
+            constant_kv_size: _,
+            inner_max_degree: _,
+            leaf_max_degree: _
+        } = self;
+        root.destroy_empty_node();
+        // If root node is empty, then we know that no storage slots are used,
+        // and so we can safely destroy all nodes.
+        nodes.destroy_empty();
+    }
+
+    /// Map was created with reuse_slots=true, you can allocate spare slots, to pay storage fee now, to
+    /// allow future insertions to not require any storage slot creation - making their gas more predictable
+    /// and better bounded/fair.
+    /// (otherwsie, unlucky inserts create new storage slots and are charge more for it)
+    public fun allocate_spare_slots<K: store, V: store>(
+        self: &mut BigOrderedMap<K, V>, num_to_allocate: u64
+    ) {
+        self.nodes.allocate_spare_slots(num_to_allocate)
+    }
+
+    /// Returns true iff the BigOrderedMap is empty.
+    public fun is_empty<K: store, V: store>(self: &BigOrderedMap<K, V>): bool {
+        self.root.is_leaf && self.root.children.is_empty()
+    }
+
+    /// Returns the number of elements in the BigOrderedMap.
+    /// This is an expensive function, as it goes through all the leaves to compute it.
+    public fun compute_length<K: store, V: store>(
+        self: &BigOrderedMap<K, V>
+    ): u64 {
+        let size = 0;
+        self.for_each_leaf_node_children_ref(|children| {
+            size += children.length();
+        });
+        size
+    }
+
+    // ======================= Section with Modifiers =========================
+
+    /// Inserts the key/value into the BigOrderedMap.
+    /// Aborts if the key is already in the map.
+    public fun add<K: drop + copy + store, V: store>(
+        self: &mut BigOrderedMap<K, V>, key: K, value: V
+    ) {
+        self.add_or_upsert_impl(key, value, false).destroy_none()
+    }
+
+    /// If the key doesn't exist in the map, inserts the key/value, and returns none.
+    /// Otherwise updates the value under the given key, and returns the old value.
+    public fun upsert<K: drop + copy + store, V: store>(
+        self: &mut BigOrderedMap<K, V>, key: K, value: V
+    ): Option<V> {
+        let result = self.add_or_upsert_impl(key, value, true);
+        if (result.is_some()) {
+            let Child::Leaf { value: old_value } = result.destroy_some();
+            option::some(old_value)
+        } else {
+            result.destroy_none();
+            option::none()
+        }
+    }
+
+    /// Removes the entry from BigOrderedMap and returns the value which `key` maps to.
+    /// Aborts if there is no entry for `key`.
+    public fun remove<K: drop + copy + store, V: store>(
+        self: &mut BigOrderedMap<K, V>, key: &K
+    ): V {
+        // Optimize case where only root node exists
+        // (optimizes out borrowing and path creation in `find_leaf_path`)
+        if (self.root.is_leaf) {
+            let Child::Leaf { value } = self.root.children.remove(key);
+            return value;
+        };
+
+        let path_to_leaf = self.find_leaf_path(key);
+
+        assert!(!path_to_leaf.is_empty(), error::invalid_argument(EKEY_NOT_FOUND));
+
+        let old_leaf = self.remove_at(path_to_leaf, key);
+        assert!(old_leaf.is_some(), error::invalid_argument(EKEY_NOT_FOUND));
+        let Child::Leaf { value } = old_leaf.destroy_some();
+        value
+    }
+
+    /// Removes the entry from BigOrderedMap and returns the value which `key` maps to.
+    /// Returns none if there is no entry for `key`.
+    public fun remove_or_none<K: drop + copy + store, V: store>(
+        self: &mut BigOrderedMap<K, V>, key: &K
+    ): Option<V> {
+        // Optimize case where only root node exists
+        // (optimizes out borrowing and path creation in `find_leaf_path`)
+        if (self.root.is_leaf) {
+            let value_option = self.root.children.remove_or_none(key);
+            if (value_option.is_some()) {
+                let Child::Leaf { value } = value_option.destroy_some();
+                return option::some(value);
+            } else {
+                value_option.destroy_none();
+                return option::none();
+            }
+        };
+
+        let path_to_leaf = self.find_leaf_path(key);
+        if (path_to_leaf.is_empty()) {
+            option::none()
+        } else {
+            let old_leaf = self.remove_at(path_to_leaf, key);
+            old_leaf.map(
+                |child| {
+                    let Child::Leaf { value } = child;
+                    value
+                }
+            )
+        }
+    }
+
+    /// Modifies the element in the map via calling f.
+    /// Aborts if element doesn't exist
+    public inline fun modify<K: drop + copy + store, V: store>(
+        self: &mut BigOrderedMap<K, V>, key: &K, f: |&mut V|
+    ) {
+        self.modify_and_return(key, |v| {
+            f(v);
+            true
+        });
+    }
+
+    /// Modifies the element in the map via calling f, and propagates the return value of the function.
+    /// Aborts if element doesn't exist
+    ///
+    /// This function cannot be inline, due to iter_modify requiring actual function value.
+    /// This also is why we return a value
+    public inline fun modify_and_return<K: drop + copy + store, V: store, R>(
+        self: &mut BigOrderedMap<K, V>, key: &K, f: |&mut V| R
+    ): R {
+        let iter = self.internal_find(key);
+        assert!(!iter.iter_is_end(self), error::invalid_argument(EKEY_NOT_FOUND));
+        iter.iter_modify(self, |v| f(v))
+    }
+
+    /// Modifies element by calling modify_f if it exists, or calling add_f to add if it doesn't.
+    /// Returns true if element already existed.
+    public inline fun modify_or_add<K: drop + copy + store, V: store>(
+        self: &mut BigOrderedMap<K, V>,
+        key: &K,
+        modify_f: |&mut V| has drop,
+        add_f: || V has drop
+    ): bool {
+        let exists =
+            self.modify_if_present_and_return(key, |v| {
+                modify_f(v);
+                true
+            }).is_some();
+        if (!exists) {
+            self.add(*key, add_f());
+        };
+        exists
+    }
+
+    public inline fun modify_if_present<K: drop + copy + store, V: store>(
+        self: &mut BigOrderedMap<K, V>, key: &K, modify_f: |&mut V| has drop
+    ): bool {
+        self.modify_if_present_and_return(key, |v| {
+            modify_f(v);
+            true
+        }).is_some()
+    }
+
+    /// Modifies the element in the map via calling modify_f, and propagates the return value of the function.
+    /// Returns None if not present.
+    ///
+    /// Function value cannot be inlined, due to iter_modify requiring actual function value.
+    /// This also is why we return a value
+    public inline fun modify_if_present_and_return<K: drop + copy + store, V: store, R>(
+        self: &mut BigOrderedMap<K, V>, key: &K, modify_f: |&mut V| R has drop
+    ): Option<R> {
+        let iter = self.internal_find(key);
+        if (iter.iter_is_end(self)) {
+            option::none()
+        } else {
+            option::some(iter.iter_modify(self, |v| modify_f(v)))
+        }
+    }
+
+    // /// If value exists, calls modify_f on it, which returns tuple (to_keep, result).
+    // /// If to_keep is false, value is deleted from the map, and option::some(result) is returned.
+    // /// This function cannot be inline, due to iter_modify requiring actual function value.
+    // /// This also is why we return a value
+    // public fun modify_or_remove_if_present_and_return<K: drop + copy + store, V: store, R>(self: &mut BigOrderedMap<K, V>, key: &K, modify_f: |&mut V|(R, bool) has drop): Option<R> {
+    //     let iter = self.find(key);
+    //     if (iter.iter_is_end(self)) {
+    //         option::none()
+    //     } else {
+    //         let (result, keep) = iter.iter_modify(self, modify_f);
+    //         if (!keep) {
+    //             iter.iter_remove(self);
+    //         };
+    //         option::some(result)
+    //     }
+    // }
+
+    /// Add multiple key/value pairs to the map. The keys must not already exist.
+    /// Aborts with EKEY_ALREADY_EXISTS if key already exist, or duplicate keys are passed in.
+    public fun add_all<K: drop + copy + store, V: store>(
+        self: &mut BigOrderedMap<K, V>, keys: vector<K>, values: vector<V>
+    ) {
+        // TODO: Can be optimized, both in insertion order (largest first, then from smallest),
+        // as well as on initializing inner_max_degree/leaf_max_degree better
+        let len = keys.length();
+        assert!(len == values.length(), 0x20002);
+        keys.reverse();
+        values.reverse();
+        while (len > 0) {
+            self.add(keys.pop_back(), values.pop_back());
+            len = len - 1;
+        };
+        keys.destroy_empty();
+        values.destroy_empty();
+    }
+
+    public fun pop_front<K: drop + copy + store, V: store>(
+        self: &mut BigOrderedMap<K, V>
+    ): (K, V) {
+        let it = self.internal_new_begin_iter();
+        let k = *it.iter_borrow_key();
+        let v = self.remove(&k);
+        (k, v)
+    }
+
+    public fun pop_back<K: drop + copy + store, V: store>(
+        self: &mut BigOrderedMap<K, V>
+    ): (K, V) {
+        let it = self.internal_new_end_iter().iter_prev(self);
+        let k = *it.iter_borrow_key();
+        let v = self.remove(&k);
+        (k, v)
+    }
+
+    // ============================= Accessors ================================
+
+    /// Warning: Marked as internal, as it is safer to utilize provided inline functions instead.
+    /// For direct usage of this method, check Warning at the top of the file corresponding to iterators.
+    ///
+    /// Returns an iterator pointing to the first element that is greater or equal to the provided
+    /// key, or an end iterator if such element doesn't exist.
+    public fun internal_lower_bound<K: drop + copy + store, V: store>(
+        self: &BigOrderedMap<K, V>, key: &K
+    ): IteratorPtr<K> {
+        let leaf = self.find_leaf(key);
+        if (leaf == NULL_INDEX) {
+            return self.internal_new_end_iter()
+        };
+
+        let node = self.borrow_node(leaf);
+        assert!(node.is_leaf, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
+
+        let children = &node.children;
+        let child_lower_bound = children.internal_lower_bound(key);
+        if (child_lower_bound.iter_is_end(children)) {
+            self.internal_new_end_iter()
+        } else {
+            let iter_key = *child_lower_bound.iter_borrow_key(children);
+            new_iter(leaf, child_lower_bound, iter_key)
+        }
+    }
+
+    /// Warning: Marked as internal, as it is safer to utilize provided inline functions instead.
+    /// For direct usage of this method, check Warning at the top of the file corresponding to iterators.
+    ///
+    /// Returns an iterator pointing to the element that equals to the provided key, or an end
+    /// iterator if the key is not found.
+    public fun internal_find<K: drop + copy + store, V: store>(
+        self: &BigOrderedMap<K, V>, key: &K
+    ): IteratorPtr<K> {
+        let internal_lower_bound = self.internal_lower_bound(key);
+        if (internal_lower_bound.iter_is_end(self)) {
+            internal_lower_bound
+        } else if (&internal_lower_bound.key == key) {
+            internal_lower_bound
+        } else {
+            self.internal_new_end_iter()
+        }
+    }
+
+    /// Warning: Marked as internal, as it is safer to utilize provided inline functions instead.
+    /// For direct usage of this method, check Warning at the top of the file corresponding to iterators.
+    ///
+    public fun internal_find_with_path<K: drop + copy + store, V: store>(
+        self: &BigOrderedMap<K, V>, key: &K
+    ): IteratorPtrWithPath<K> {
+        let leaf_path = self.find_leaf_path(key);
+        if (leaf_path.is_empty()) {
+            return IteratorPtrWithPath {
+                iterator: self.internal_new_end_iter(),
+                path: vector::empty()
+            };
+        };
+
+        let leaf = leaf_path[leaf_path.length() - 1];
+        let node = self.borrow_node(leaf);
+        assert!(node.is_leaf, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
+
+        let child_lower_bound = node.children.internal_lower_bound(key);
+        if (child_lower_bound.iter_is_end(&node.children)) {
+            IteratorPtrWithPath {
+                iterator: self.internal_new_end_iter(),
+                path: vector::empty()
+            }
+        } else {
+            let iter_key = *child_lower_bound.iter_borrow_key(&node.children);
+
+            if (&iter_key == key) {
+                IteratorPtrWithPath {
+                    iterator: new_iter(leaf, child_lower_bound, iter_key),
+                    path: leaf_path
+                }
+            } else {
+                IteratorPtrWithPath {
+                    iterator: self.internal_new_end_iter(),
+                    path: vector::empty()
+                }
+            }
+        }
+    }
+
+    public fun iter_with_path_get_iter<K: drop + copy + store>(
+        self: &IteratorPtrWithPath<K>
+    ): IteratorPtr<K> {
+        self.iterator
+    }
+
+    /// Returns true iff the key exists in the map.
+    public fun contains<K: drop + copy + store, V: store>(
+        self: &BigOrderedMap<K, V>, key: &K
+    ): bool {
+        let internal_lower_bound = self.internal_lower_bound(key);
+        if (internal_lower_bound.iter_is_end(self)) { false }
+        else {
+            &internal_lower_bound.key == key
+        }
+    }
+
+    /// Returns a reference to the element with its key, aborts if the key is not found.
+    public fun borrow<K: drop + copy + store, V: store>(
+        self: &BigOrderedMap<K, V>, key: &K
+    ): &V {
+        let iter = self.internal_find(key);
+        assert!(!iter.iter_is_end(self), error::invalid_argument(EKEY_NOT_FOUND));
+
+        iter.iter_borrow(self)
+    }
+
+    public fun get<K: drop + copy + store, V: copy + store>(
+        self: &BigOrderedMap<K, V>, key: &K
+    ): Option<V> {
+        let iter = self.internal_find(key);
+        if (iter.iter_is_end(self)) {
+            option::none()
+        } else {
+            option::some(*iter.iter_borrow(self))
+        }
+    }
+
+    public inline fun get_and_map<K: drop + copy + store, V: store, R>(
+        self: &BigOrderedMap<K, V>, key: &K, f: |&V| R has drop
+    ): Option<R> {
+        let iter = self.internal_find(key);
+        if (iter.iter_is_end(self)) {
+            option::none()
+        } else {
+            option::some(f(iter.iter_borrow(self)))
+        }
+    }
+
+    /// Returns a mutable reference to the element with its key at the given index, aborts if the key is not found.
+    /// Aborts with EBORROW_MUT_REQUIRES_CONSTANT_VALUE_SIZE if KV size doesn't have constant size,
+    /// because if it doesn't we cannot assert invariants on the size.
+    /// In case of variable size, use either `borrow`, `copy` then `upsert`, or `remove` and `add` instead of mutable borrow.
+    public fun borrow_mut<K: drop + copy + store, V: store>(
+        self: &mut BigOrderedMap<K, V>, key: &K
+    ): &mut V {
+        let iter = self.internal_find(key);
+        assert!(!iter.iter_is_end(self), error::invalid_argument(EKEY_NOT_FOUND));
+        iter.iter_borrow_mut(self)
+    }
+
+    public fun borrow_front<K: drop + copy + store, V: store>(
+        self: &BigOrderedMap<K, V>
+    ): (K, &V) {
+        let it = self.internal_new_begin_iter();
+        let key = *it.iter_borrow_key();
+        (key, it.iter_borrow(self))
+    }
+
+    public fun front_key<K: drop + copy + store, V: store>(
+        self: &BigOrderedMap<K, V>
+    ): K {
+        let it = self.internal_new_begin_iter();
+        *it.iter_borrow_key()
+    }
+
+    public fun borrow_back<K: drop + copy + store, V: store>(
+        self: &BigOrderedMap<K, V>
+    ): (K, &V) {
+        let it = self.internal_new_end_iter().iter_prev(self);
+        let key = *it.iter_borrow_key();
+        (key, it.iter_borrow(self))
+    }
+
+    public fun back_key<K: drop + copy + store, V: store>(
+        self: &BigOrderedMap<K, V>
+    ): K {
+        let it = self.internal_new_end_iter().iter_prev(self);
+        *it.iter_borrow_key()
+    }
+
+    public fun prev_key<K: drop + copy + store, V: store>(
+        self: &BigOrderedMap<K, V>, key: &K
+    ): Option<K> {
+        let it = self.internal_lower_bound(key);
+        if (it.iter_is_begin(self)) {
+            option::none()
+        } else {
+            option::some(*it.iter_prev(self).iter_borrow_key())
+        }
+    }
+
+    public fun next_key<K: drop + copy + store, V: store>(
+        self: &BigOrderedMap<K, V>, key: &K
+    ): Option<K> {
+        let it = self.internal_lower_bound(key);
+        if (it.iter_is_end(self)) {
+            option::none()
+        } else {
+            let cur_key = it.iter_borrow_key();
+            if (key == cur_key) {
+                let it = it.iter_next(self);
+                if (it.iter_is_end(self)) {
+                    option::none()
+                } else {
+                    option::some(*it.iter_borrow_key())
+                }
+            } else {
+                option::some(*cur_key)
+            }
+        }
+    }
+
+    // =========================== Views and Traversals ==============================
+
+    /// Convert a BigOrderedMap to an OrderedMap, which is supposed to be called mostly by view functions to get an atomic
+    /// view of the whole map.
+    /// Disclaimer: This function may be costly as the BigOrderedMap may be huge in size. Use it at your own discretion.
+    public fun to_ordered_map<K: drop + copy + store, V: copy + store>(
+        self: &BigOrderedMap<K, V>
+    ): OrderedMap<K, V> {
+        let result = ordered_map::new();
+        self.for_each_ref(
+            |k, v| {
+                result.internal_new_end_iter().iter_add(&mut result, *k, *v);
+            }
+        );
+        result
+    }
+
+    /// Get all keys.
+    ///
+    /// For a large enough BigOrderedMap this function will fail due to execution gas limits,
+    /// use iterartor or next_key/prev_key to iterate over across portion of the map.
+    public fun keys<K: store + copy + drop, V: store>(
+        self: &BigOrderedMap<K, V>
+    ): vector<K> {
+        let result = vector[];
+        self.for_each_ref(|k, _v| {
+            result.push_back(*k);
+        });
+        result
+    }
+
+    /// Apply the function to each element in the vector, consuming it, leaving the map empty.
+    ///
+    /// Current implementation is O(n * log(n)). After function values will be optimized
+    /// to O(n).
+    public inline fun for_each_and_clear<K: drop + copy + store, V: store>(
+        self: &mut BigOrderedMap<K, V>, f: |K, V|
+    ) {
+        // TODO - this can be done more efficiently, by destroying the leaves directly
+        // but that requires more complicated code and testing.
+        while (!self.is_empty()) {
+            let (k, v) = self.pop_front();
+            f(k, v);
+        };
+    }
+
+    /// Apply the function to each element in the vector, consuming it, and consuming the map
+    ///
+    /// Current implementation is O(n * log(n)). After function values will be optimized
+    /// to O(n).
+    public inline fun for_each<K: drop + copy + store, V: store>(
+        self: BigOrderedMap<K, V>, f: |K, V|
+    ) {
+        // TODO - this can be done more efficiently, by destroying the leaves directly
+        // but that requires more complicated code and testing.
+        self.for_each_and_clear(|k, v| f(k, v));
+        self.destroy_empty()
+    }
+
+    /// Apply the function to a reference of each element in the vector.
+    public inline fun for_each_ref<K: drop + copy + store, V: store>(
+        self: &BigOrderedMap<K, V>, f: |&K, &V|
+    ) {
+        self.for_each_leaf_node_children_ref(
+            |children| {
+                children.for_each_ref(
+                    |k: &K, v: &Child<V>| {
+                        f(k, v.internal_leaf_borrow_value());
+                    }
+                );
+            }
+        )
+    }
+
+    /// Calls given function on a tuple (key, self[key], other[key]) for all keys present in both maps.
+    public inline fun intersection_zip_for_each_ref<K: drop + copy + store, V1: store, V2: store>(
+        self: &BigOrderedMap<K, V1>,
+        other: &BigOrderedMap<K, V2>,
+        f: |&K, &V1, &V2|
+    ) {
+        // only roots can have empty children, if maps are not empty, we
+        // never need to check on child_iter.iter_is_end on a new iterator.
+        if (!self.is_empty() && !other.is_empty()) {
+            let iter1 = self.internal_leaf_new_begin_iter();
+            let iter2 = other.internal_leaf_new_begin_iter();
+            let (children1, iter1) =
+                iter1.internal_leaf_iter_borrow_entries_and_next_leaf_index(self);
+            let (children2, iter2) =
+                iter2.internal_leaf_iter_borrow_entries_and_next_leaf_index(other);
+
+            let child_iter1 = children1.internal_new_begin_iter();
+            let child_iter2 = children2.internal_new_begin_iter();
+
+            loop {
+                spec {
+                    invariant spec_leaf_iter_valid(iter1, self);
+                    invariant spec_leaf_iter_valid(iter2, other);
+                };
+                let key1 = child_iter1.iter_borrow_key(children1);
+                let key2 = child_iter2.iter_borrow_key(children2);
+                let inc1 = false;
+                let inc2 = false;
+                if (key1 < key2) {
+                    inc1 = true;
+                } else if (key1 > key2) {
+                    inc2 = true;
+                } else {
+                    f(
+                        key1,
+                        child_iter1.iter_borrow(children1).internal_leaf_borrow_value(),
+                        child_iter2.iter_borrow(children2).internal_leaf_borrow_value()
+                    );
+                    inc1 = true;
+                    inc2 = true;
+                };
+                if (inc1) {
+                    child_iter1 = child_iter1.iter_next(children1);
+                    if (child_iter1.iter_is_end(children1)) {
+                        if (iter1.internal_leaf_iter_is_end()) {
+                            break;
+                        };
+                        let (new_children, new_iter) =
+                            iter1.internal_leaf_iter_borrow_entries_and_next_leaf_index(
+                                self
+                            );
+                        iter1 = new_iter;
+                        children1 = new_children;
+                        child_iter1 = children1.internal_new_begin_iter();
+                    };
+                };
+                if (inc2) {
+                    child_iter2 = child_iter2.iter_next(children2);
+                    if (child_iter2.iter_is_end(children2)) {
+                        if (iter2.internal_leaf_iter_is_end()) {
+                            break;
+                        };
+                        let (new_children, new_iter) =
+                            iter2.internal_leaf_iter_borrow_entries_and_next_leaf_index(
+                                other
+                            );
+                        iter2 = new_iter;
+                        children2 = new_children;
+                        child_iter2 = children2.internal_new_begin_iter();
+                    };
+                };
+            }
+        }
+    }
+
+    /// Apply the function to a mutable reference of each key-value pair in the map.
+    public inline fun for_each_mut<K: copy + drop + store, V: store>(
+        self: &mut BigOrderedMap<K, V>, f: |&K, &mut V|
+    ) {
+        let iter = self.internal_new_begin_iter();
+        while ({
+            spec {
+                invariant spec_iter_valid(iter, self);
+            };
+            !iter.iter_is_end(self)
+        }) {
+            let key = *iter.iter_borrow_key();
+            f(&key, iter.iter_borrow_mut(self));
+            iter = iter.iter_next(self);
+        }
+    }
+
+    /// Destroy a map, by destroying elements individually.
+    ///
+    /// Current implementation is O(n * log(n)). After function values will be optimized
+    /// to O(n).
+    public inline fun destroy<K: drop + copy + store, V: store>(
+        self: BigOrderedMap<K, V>, dv: |V|
+    ) {
+        self.for_each(|_k, v| {
+            dv(v);
+        });
+    }
+
+    // ========================= IteratorPtr functions ===========================
+
+    /// Warning: Marked as internal, as it is safer to utilize provided inline functions instead.
+    /// For direct usage of this method, check Warning at the top of the file corresponding to iterators.
+    ///
+    /// Returns the begin iterator.
+    public fun internal_new_begin_iter<K: copy + store, V: store>(
+        self: &BigOrderedMap<K, V>
+    ): IteratorPtr<K> {
+        if (self.is_empty()) {
+            return IteratorPtr::End;
+        };
+
+        let node = self.borrow_node(self.min_leaf_index);
+        assert!(
+            !node.children.is_empty(),
+            error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+        );
+        let begin_child_iter = node.children.internal_new_begin_iter();
+        let begin_child_key = *begin_child_iter.iter_borrow_key(&node.children);
+        new_iter(self.min_leaf_index, begin_child_iter, begin_child_key)
+    }
+
+    /// Warning: Marked as internal, as it is safer to utilize provided inline functions instead.
+    /// For direct usage of this method, check Warning at the top of the file corresponding to iterators.
+    ///
+    /// Returns the end iterator.
+    public fun internal_new_end_iter<K: store, V: store>(
+        self: &BigOrderedMap<K, V>
+    ): IteratorPtr<K> {
+        IteratorPtr::End
+    }
+
+    // Returns true iff the iterator is a begin iterator.
+    public fun iter_is_begin<K: store, V: store>(
+        self: &IteratorPtr<K>, map: &BigOrderedMap<K, V>
+    ): bool {
+        if (self is IteratorPtr::End<K>) {
+            map.is_empty()
+        } else {
+            (
+                self.node_index == map.min_leaf_index
+                    && self.child_iter.iter_is_begin_from_non_empty()
+            )
+        }
+    }
+
+    // Returns true iff the iterator is an end iterator.
+    public fun iter_is_end<K: store, V: store>(
+        self: &IteratorPtr<K>, _map: &BigOrderedMap<K, V>
+    ): bool {
+        self is IteratorPtr::End<K>
+    }
+
+    /// Borrows the key given iterator points to.
+    /// Aborts with EITER_OUT_OF_BOUNDS if iterator is pointing to the end.
+    /// Note: Requires that the map is not changed after the input iterator is generated.
+    public fun iter_borrow_key<K>(self: &IteratorPtr<K>): &K {
+        assert!(
+            !(self is IteratorPtr::End<K>),
+            error::invalid_argument(EITER_OUT_OF_BOUNDS)
+        );
+        &self.key
+    }
+
+    /// Borrows the value given iterator points to.
+    /// Aborts with EITER_OUT_OF_BOUNDS if iterator is pointing to the end.
+    /// Note: Requires that the map is not changed after the input iterator is generated.
+    public fun iter_borrow<K: drop + store, V: store>(
+        self: IteratorPtr<K>, map: &BigOrderedMap<K, V>
+    ): &V {
+        assert!(!self.iter_is_end(map), error::invalid_argument(EITER_OUT_OF_BOUNDS));
+        let IteratorPtr::Some { node_index, child_iter, key: _ } = self;
+        let children = &map.borrow_node(node_index).children;
+        &child_iter.iter_borrow(children).value
+    }
+
+    /// Mutably borrows the value iterator points to.
+    /// Aborts with EITER_OUT_OF_BOUNDS if iterator is pointing to the end.
+    /// Aborts with EBORROW_MUT_REQUIRES_CONSTANT_VALUE_SIZE if KV size doesn't have constant size,
+    /// because if it doesn't we cannot assert invariants on the size.
+    /// In case of variable size, use either `borrow`, `copy` then `upsert`, or `remove` and `add` instead of mutable borrow.
+    ///
+    /// Note: Requires that the map is not changed after the input iterator is generated.
+    public fun iter_borrow_mut<K: drop + store, V: store>(
+        self: IteratorPtr<K>, map: &mut BigOrderedMap<K, V>
+    ): &mut V {
+        assert!(
+            map.constant_kv_size || bcs::constant_serialized_size<V>().is_some(),
+            error::invalid_argument(EBORROW_MUT_REQUIRES_CONSTANT_VALUE_SIZE)
+        );
+        assert!(!self.iter_is_end(map), error::invalid_argument(EITER_OUT_OF_BOUNDS));
+        let IteratorPtr::Some { node_index, child_iter, key: _ } = self;
+        let children = &mut map.borrow_node_mut(node_index).children;
+        &mut child_iter.iter_borrow_mut(children).value
+    }
+
+    public fun iter_modify<K: drop + store, V: store, R>(
+        self: IteratorPtr<K>, map: &mut BigOrderedMap<K, V>, f: |&mut V| R
+    ): R {
+        assert!(!self.iter_is_end(map), error::invalid_argument(EITER_OUT_OF_BOUNDS));
+        let IteratorPtr::Some { node_index, child_iter, key } = self;
+        let children = &mut map.borrow_node_mut(node_index).children;
+        let value_mut = &mut child_iter.iter_borrow_mut(children).value;
+        let result = f(value_mut);
+
+        if (map.constant_kv_size) {
+            return result;
+        };
+
+        // validate that after modifications size invariants hold
+        let key_size = bcs::serialized_size(&key);
+        let value_size = bcs::serialized_size(value_mut);
+        map.validate_size_and_init_max_degrees(key_size, value_size);
+        result
+    }
+
+    /// Removes the entry from BigOrderedMap and returns the value which `key` maps to.
+    /// Aborts if there is no entry for `key`.
+    public fun iter_remove<K: drop + copy + store, V: store>(
+        self: IteratorPtrWithPath<K>, map: &mut BigOrderedMap<K, V>
+    ): V {
+        let IteratorPtrWithPath { iterator: iter, path: path_to_leaf } = self;
+        assert!(!iter.iter_is_end(map), error::invalid_argument(EITER_OUT_OF_BOUNDS));
+        let IteratorPtr::Some { node_index: _, child_iter, key } = iter;
+
+        // Optimize case where only root node exists
+        // (optimizes out borrowing and path creation in `find_leaf_path`)
+        if (map.root.is_leaf) {
+            let Child::Leaf { value } = child_iter.iter_remove(&mut map.root.children);
+            return value;
+        };
+
+        assert!(!path_to_leaf.is_empty(), error::invalid_argument(EKEY_NOT_FOUND));
+        let old_leaf =
+            map.remove_at_with_iter_hint(path_to_leaf, &key, option::some(child_iter));
+        assert!(old_leaf.is_some(), error::invalid_argument(EKEY_NOT_FOUND));
+
+        let Child::Leaf { value } = old_leaf.destroy_some();
+        value
+    }
+
+    /// Returns the next iterator.
+    /// Aborts with EITER_OUT_OF_BOUNDS if iterator is pointing to the end.
+    /// Requires the map is not changed after the input iterator is generated.
+    public fun iter_next<K: drop + copy + store, V: store>(
+        self: IteratorPtr<K>, map: &BigOrderedMap<K, V>
+    ): IteratorPtr<K> {
+        assert!(
+            !(self is IteratorPtr::End<K>),
+            error::invalid_argument(EITER_OUT_OF_BOUNDS)
+        );
+
+        let node_index = self.node_index;
+        let node = map.borrow_node(node_index);
+
+        let child_iter = self.child_iter.iter_next(&node.children);
+        if (!child_iter.iter_is_end(&node.children)) {
+            // next is in the same leaf node
+            let iter_key = *child_iter.iter_borrow_key(&node.children);
+            return new_iter(node_index, child_iter, iter_key);
+        };
+
+        // next is in a different leaf node
+        let next_index = node.next;
+        if (next_index != NULL_INDEX) {
+            let next_node = map.borrow_node(next_index);
+
+            let child_iter = next_node.children.internal_new_begin_iter();
+            assert!(
+                !child_iter.iter_is_end(&next_node.children),
+                error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+            );
+            let iter_key = *child_iter.iter_borrow_key(&next_node.children);
+            return new_iter(next_index, child_iter, iter_key);
+        };
+
+        map.internal_new_end_iter()
+    }
+
+    /// Returns the previous iterator.
+    /// Aborts with EITER_OUT_OF_BOUNDS if iterator is pointing to the beginning.
+    /// Requires the map is not changed after the input iterator is generated.
+    public fun iter_prev<K: drop + copy + store, V: store>(
+        self: IteratorPtr<K>, map: &BigOrderedMap<K, V>
+    ): IteratorPtr<K> {
+        let prev_index =
+            if (self is IteratorPtr::End<K>) {
+                map.max_leaf_index
+            } else {
+                let node_index = self.node_index;
+                let node = map.borrow_node(node_index);
+
+                if (!self.child_iter.iter_is_begin(&node.children)) {
+                    // next is in the same leaf node
+                    let child_iter = self.child_iter.iter_prev(&node.children);
+                    let key = *child_iter.iter_borrow_key(&node.children);
+                    return new_iter(node_index, child_iter, key);
+                };
+                node.prev
+            };
+
+        assert!(prev_index != NULL_INDEX, error::invalid_argument(EITER_OUT_OF_BOUNDS));
+
+        // next is in a different leaf node
+        let prev_node = map.borrow_node(prev_index);
+
+        let prev_children = &prev_node.children;
+        let child_iter = prev_children.internal_new_end_iter().iter_prev(prev_children);
+        let iter_key = *child_iter.iter_borrow_key(prev_children);
+        new_iter(prev_index, child_iter, iter_key)
+    }
+
+    // ====================== Internal Implementations ========================
+
+    enum LeafNodeIteratorPtr has copy, drop {
+        NodeIndex {
+            /// The node index of the iterator pointing to.
+            /// NULL_INDEX if end iterator
+            node_index: u64
+        }
+    }
+
+    public fun internal_leaf_new_begin_iter<K: store, V: store>(
+        self: &BigOrderedMap<K, V>
+    ): LeafNodeIteratorPtr {
+        LeafNodeIteratorPtr::NodeIndex { node_index: self.min_leaf_index }
+    }
+
+    public fun internal_leaf_iter_is_end(self: &LeafNodeIteratorPtr): bool {
+        self.node_index == NULL_INDEX
+    }
+
+    public fun internal_leaf_borrow_value<V: store>(self: &Child<V>): &V {
+        &self.value
+    }
+
+    public fun internal_leaf_iter_borrow_entries_and_next_leaf_index<K: store, V: store>(
+        self: LeafNodeIteratorPtr, map: &BigOrderedMap<K, V>
+    ): (&OrderedMap<K, Child<V>>, LeafNodeIteratorPtr) {
+        assert!(self.node_index != NULL_INDEX, EITER_OUT_OF_BOUNDS);
+
+        let node = map.borrow_node(self.node_index);
+        assert!(node.is_leaf, EINTERNAL_INVARIANT_BROKEN);
+        self.node_index = node.next;
+        (&node.children, self)
+    }
+
+    inline fun for_each_leaf_node_children_ref<K: store, V: store>(
+        self: &BigOrderedMap<K, V>, f: |&OrderedMap<K, Child<V>>|
+    ) {
+        let iter = self.internal_leaf_new_begin_iter();
+
+        while ({
+            spec {
+                invariant spec_leaf_iter_valid(iter, self);
+            };
+            !iter.internal_leaf_iter_is_end()
+        }) {
+            let (node, next_iter) =
+                iter.internal_leaf_iter_borrow_entries_and_next_leaf_index(self);
+            f(node);
+            iter = next_iter;
+        }
+    }
+
+    /// Borrow a node, given an index. Works for both root (i.e. inline) node and separately stored nodes
+    inline fun borrow_node<K: store, V: store>(
+        self: &BigOrderedMap<K, V>, node_index: u64
+    ): &Node<K, V> {
+        if (node_index == ROOT_INDEX) {
+            &self.root
+        } else {
+            self.nodes.borrow(node_index)
+        }
+    }
+
+    /// Borrow a node mutably, given an index. Works for both root (i.e. inline) node and separately stored nodes
+    inline fun borrow_node_mut<K: store, V: store>(
+        self: &mut BigOrderedMap<K, V>, node_index: u64
+    ): &mut Node<K, V> {
+        if (node_index == ROOT_INDEX) {
+            &mut self.root
+        } else {
+            self.nodes.borrow_mut(node_index)
+        }
+    }
+
+    fun add_or_upsert_impl<K: drop + copy + store, V: store>(
+        self: &mut BigOrderedMap<K, V>, key: K, value: V, allow_overwrite: bool
+    ): Option<Child<V>> {
+        if (!self.constant_kv_size) {
+            self.validate_dynamic_size_and_init_max_degrees(&key, &value);
+        };
+
+        // Optimize case where only root node exists
+        // (optimizes out borrowing and path creation in `find_leaf_path`)
+        if (self.root.is_leaf) {
+            let children = &mut self.root.children;
+            let degree = children.length();
+
+            if (degree < (self.leaf_max_degree as u64)) {
+                let result = children.upsert(key, new_leaf_child(value));
+                assert!(
+                    allow_overwrite || result.is_none(),
+                    error::invalid_argument(EKEY_ALREADY_EXISTS)
+                );
+                return result;
+            };
+        };
+
+        let path_to_leaf = self.find_leaf_path(&key);
+
+        if (path_to_leaf.is_empty()) {
+            // In this case, the key is greater than all keys in the map.
+            // So we need to update `key` in the pointers to the last (rightmost) child
+            // on every level, to maintain the invariant of `add_at`
+            // we also create a path_to_leaf to the rightmost leaf.
+            let current = ROOT_INDEX;
+
+            loop {
+                path_to_leaf.push_back(current);
+
+                let current_node = self.borrow_node_mut(current);
+                if (current_node.is_leaf) {
+                    break;
+                };
+                let last_value =
+                    current_node.children
+                        .internal_new_end_iter()
+                        .iter_prev(&current_node.children)
+                        .iter_remove(&mut current_node.children);
+                current = last_value.node_index.stored_to_index();
+                current_node.children.add(key, last_value);
+            };
+        };
+
+        self.add_at(
+            path_to_leaf,
+            key,
+            new_leaf_child(value),
+            allow_overwrite
+        )
+    }
+
+    fun validate_dynamic_size_and_init_max_degrees<K: store, V: store>(
+        self: &mut BigOrderedMap<K, V>, key: &K, value: &V
+    ) {
+        let key_size = bcs::serialized_size(key);
+        let value_size = bcs::serialized_size(value);
+        self.validate_size_and_init_max_degrees(key_size, value_size)
+    }
+
+    fun validate_static_size_and_init_max_degrees<K: store, V: store>(
+        self: &mut BigOrderedMap<K, V>
+    ) {
+        let key_size = bcs::constant_serialized_size<K>();
+        let value_size = bcs::constant_serialized_size<V>();
+
+        if (key_size.is_some()) {
+            let key_size = key_size.destroy_some();
+            if (self.inner_max_degree == 0) {
+                self.inner_max_degree =
+                    max(
+                        min(MAX_DEGREE, DEFAULT_TARGET_NODE_SIZE / key_size),
+                        INNER_MIN_DEGREE as u64
+                    ) as u16;
+            };
+            assert!(
+                key_size * (self.inner_max_degree as u64) <= MAX_NODE_BYTES,
+                error::invalid_argument(EKEY_BYTES_TOO_LARGE)
+            );
+
+            if (value_size.is_some()) {
+                let value_size = value_size.destroy_some();
+                let entry_size = key_size + value_size;
+
+                if (self.leaf_max_degree == 0) {
+                    self.leaf_max_degree =
+                        max(
+                            min(MAX_DEGREE, DEFAULT_TARGET_NODE_SIZE / entry_size),
+                            LEAF_MIN_DEGREE as u64
+                        ) as u16;
+                };
+                assert!(
+                    entry_size * (self.leaf_max_degree as u64) <= MAX_NODE_BYTES,
+                    error::invalid_argument(EARGUMENT_BYTES_TOO_LARGE)
+                );
+
+                self.constant_kv_size = true;
+            };
+        }
+    }
+
+    fun validate_size_and_init_max_degrees<K: store, V: store>(
+        self: &mut BigOrderedMap<K, V>, key_size: u64, value_size: u64
+    ) {
+        let entry_size = key_size + value_size;
+
+        if (self.inner_max_degree == 0) {
+            let default_max_degree =
+                min(MAX_DEGREE, MAX_NODE_BYTES / DEFAULT_MAX_KEY_OR_VALUE_SIZE);
+            self.inner_max_degree =
+                max(
+                    min(default_max_degree, DEFAULT_TARGET_NODE_SIZE / key_size),
+                    INNER_MIN_DEGREE as u64
+                ) as u16;
+        };
+
+        if (self.leaf_max_degree == 0) {
+            let default_max_degree =
+                min(
+                    MAX_DEGREE, MAX_NODE_BYTES / DEFAULT_MAX_KEY_OR_VALUE_SIZE / 2
+                );
+            self.leaf_max_degree =
+                max(
+                    min(default_max_degree, DEFAULT_TARGET_NODE_SIZE / entry_size),
+                    LEAF_MIN_DEGREE as u64
+                ) as u16;
+        };
+
+        // Make sure that no nodes can exceed the upper size limit.
+        assert!(
+            key_size * (self.inner_max_degree as u64) <= MAX_NODE_BYTES,
+            error::invalid_argument(EKEY_BYTES_TOO_LARGE)
+        );
+        assert!(
+            entry_size * (self.leaf_max_degree as u64) <= MAX_NODE_BYTES,
+            error::invalid_argument(EARGUMENT_BYTES_TOO_LARGE)
+        );
+    }
+
+    fun destroy_inner_child<V: store>(self: Child<V>): StoredSlot {
+        let Child::Inner { node_index } = self;
+
+        node_index
+    }
+
+    fun destroy_empty_node<K: store, V: store>(self: Node<K, V>) {
+        let Node::V1 { children, is_leaf: _, prev: _, next: _ } = self;
+        assert!(children.is_empty(), error::invalid_argument(EMAP_NOT_EMPTY));
+        children.destroy_empty();
+    }
+
+    fun new_node<K: store, V: store>(is_leaf: bool): Node<K, V> {
+        Node::V1 {
+            is_leaf,
+            children: ordered_map::new(),
+            prev: NULL_INDEX,
+            next: NULL_INDEX
+        }
+    }
+
+    fun new_node_with_children<K: store, V: store>(
+        is_leaf: bool, children: OrderedMap<K, Child<V>>
+    ): Node<K, V> {
+        Node::V1 {
+            is_leaf,
+            children,
+            prev: NULL_INDEX,
+            next: NULL_INDEX
+        }
+    }
+
+    fun new_inner_child<V: store>(node_index: StoredSlot): Child<V> {
+        Child::Inner { node_index }
+    }
+
+    fun new_leaf_child<V: store>(value: V): Child<V> {
+        Child::Leaf { value }
+    }
+
+    fun new_iter<K>(
+        node_index: u64, child_iter: ordered_map::IteratorPtr, key: K
+    ): IteratorPtr<K> {
+        IteratorPtr::Some { node_index, child_iter, key }
+    }
+
+    /// Find leaf where the given key would fall in.
+    /// So the largest leaf with its `max_key <= key`.
+    /// return NULL_INDEX if `key` is larger than any key currently stored in the map.
+    fun find_leaf<K: store, V: store>(self: &BigOrderedMap<K, V>, key: &K): u64 {
+        let current = ROOT_INDEX;
+        loop {
+            let node = self.borrow_node(current);
+            if (node.is_leaf) {
+                return current;
+            };
+            let children = &node.children;
+            let child_iter = children.internal_lower_bound(key);
+            if (child_iter.iter_is_end(children)) {
+                return NULL_INDEX;
+            } else {
+                current = child_iter.iter_borrow(children).node_index.stored_to_index();
+            };
+        }
+    }
+
+    /// Find leaf where the given key would fall in.
+    /// So the largest leaf with it's `max_key <= key`.
+    /// Returns the path from root to that leaf (including the leaf itself)
+    /// Returns empty path if `key` is larger than any key currently stored in the map.
+    fun find_leaf_path<K: store, V: store>(
+        self: &BigOrderedMap<K, V>, key: &K
+    ): vector<u64> {
+        let vec = vector::empty();
+
+        let current = ROOT_INDEX;
+        loop {
+            vec.push_back(current);
+
+            let node = self.borrow_node(current);
+            if (node.is_leaf) {
+                return vec;
+            };
+            let children = &node.children;
+            let child_iter = children.internal_lower_bound(key);
+            if (child_iter.iter_is_end(children)) {
+                return vector::empty();
+            } else {
+                current = child_iter.iter_borrow(children).node_index.stored_to_index();
+            };
+        }
+    }
+
+    fun get_max_degree<K: store, V: store>(
+        self: &BigOrderedMap<K, V>, leaf: bool
+    ): u64 {
+        if (leaf) {
+            self.leaf_max_degree as u64
+        } else {
+            self.inner_max_degree as u64
+        }
+    }
+
+    fun replace_root<K: store, V: store>(
+        self: &mut BigOrderedMap<K, V>, new_root: Node<K, V>
+    ): Node<K, V> {
+        // TODO: once mem::replace is made public/released, update to:
+        // mem::replace(&mut self.root, new_root_node)
+
+        let root = &mut self.root;
+        let tmp_is_leaf = root.is_leaf;
+        root.is_leaf = new_root.is_leaf;
+        new_root.is_leaf = tmp_is_leaf;
+
+        assert!(
+            root.prev == NULL_INDEX,
+            error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+        );
+        assert!(
+            root.next == NULL_INDEX,
+            error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+        );
+        assert!(
+            new_root.prev == NULL_INDEX,
+            error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+        );
+        assert!(
+            new_root.next == NULL_INDEX,
+            error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+        );
+
+        // let tmp_prev = root.prev;
+        // root.prev = new_root.prev;
+        // new_root.prev = tmp_prev;
+
+        // let tmp_next = root.next;
+        // root.next = new_root.next;
+        // new_root.next = tmp_next;
+
+        let tmp_children = root.children.trim(0);
+        root.children.append_disjoint(new_root.children.trim(0));
+        new_root.children.append_disjoint(tmp_children);
+
+        new_root
+    }
+
+    /// Add a given child to a given node (last in the `path_to_node`), and update/rebalance the tree as necessary.
+    /// It is required that `key` pointers to the child node, on the `path_to_node` are greater or equal to the given key.
+    /// That means if we are adding a `key` larger than any currently existing in the map - we needed
+    /// to update `key` pointers on the `path_to_node` to include it, before calling this method.
+    ///
+    /// Returns Child previously associated with the given key.
+    /// If `allow_overwrite` is not set, function will abort if `key` is already present.
+    fun add_at<K: drop + copy + store, V: store>(
+        self: &mut BigOrderedMap<K, V>,
+        path_to_node: vector<u64>,
+        key: K,
+        child: Child<V>,
+        allow_overwrite: bool
+    ): Option<Child<V>> {
+        // Last node in the path is one where we need to add the child to.
+        let node_index = path_to_node.pop_back();
+        {
+            // First check if we can perform this operation, without changing structure of the tree (i.e. without adding any nodes).
+
+            // For that we can just borrow the single node
+            let node = self.borrow_node_mut(node_index);
+            let children = &mut node.children;
+            let degree = children.length();
+
+            // Compute directly, as we cannot use get_max_degree(), as self is already mutably borrowed.
+            let max_degree =
+                if (node.is_leaf) {
+                    self.leaf_max_degree as u64
+                } else {
+                    self.inner_max_degree as u64
+                };
+
+            if (degree < max_degree) {
+                // Adding a child to a current node doesn't exceed the size, so we can just do that.
+                let old_child = children.upsert(key, child);
+
+                if (node.is_leaf) {
+                    assert!(
+                        allow_overwrite || old_child.is_none(),
+                        error::invalid_argument(EKEY_ALREADY_EXISTS)
+                    );
+                    return old_child;
+                } else {
+                    assert!(
+                        !allow_overwrite && old_child.is_none(),
+                        error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+                    );
+                    return old_child;
+                };
+            };
+
+            // If we cannot add more nodes without exceeding the size,
+            // but node with `key` already exists, we either need to replace or abort.
+            let iter = children.internal_find(&key);
+            if (!iter.iter_is_end(children)) {
+                assert!(node.is_leaf, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
+                assert!(allow_overwrite, error::invalid_argument(EKEY_ALREADY_EXISTS));
+
+                return option::some(iter.iter_replace(children, child));
+            }
+        };
+
+        // # of children in the current node exceeds the threshold, need to split into two nodes.
+
+        // If we are at the root, we need to move root node to become a child and have a new root node,
+        // in order to be able to split the node on the level it is.
+        let (reserved_slot, node) =
+            if (node_index == ROOT_INDEX) {
+                assert!(
+                    path_to_node.is_empty(),
+                    error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+                );
+
+                // Splitting root now, need to create a new root.
+                // Since root is stored direclty in the resource, we will swap-in the new node there.
+                let new_root_node = new_node<K, V>(/*is_leaf=*/ false);
+
+                // Reserve a slot where the current root will be moved to.
+                let (replacement_node_slot, replacement_node_reserved_slot) =
+                    self.nodes.reserve_slot();
+
+                let max_key = {
+                    let root_children = &self.root.children;
+                    let max_key =
+                        *root_children.internal_new_end_iter().iter_prev(root_children).iter_borrow_key(
+                            root_children
+                        );
+                    // need to check if key is largest, as invariant is that "parent's pointers" have been updated,
+                    // but key itself can be larger than all previous ones.
+                    if (cmp::compare(&max_key, &key).is_lt()) {
+                        max_key = key;
+                    };
+                    max_key
+                };
+                // New root will have start with a single child - the existing root (which will be at replacement location).
+                new_root_node.children.add(
+                    max_key, new_inner_child(replacement_node_slot)
+                );
+                let node = self.replace_root(new_root_node);
+
+                // we moved the currently processing node one level down, so we need to update the path
+                path_to_node.push_back(ROOT_INDEX);
+
+                let replacement_index =
+                    replacement_node_reserved_slot.reserved_to_index();
+                if (node.is_leaf) {
+                    // replacement node is the only leaf, so we update the pointers:
+                    self.min_leaf_index = replacement_index;
+                    self.max_leaf_index = replacement_index;
+                };
+                (replacement_node_reserved_slot, node)
+            } else {
+                // In order to work on multiple nodes at the same time, we cannot borrow_mut, and need to be
+                // remove_and_reserve existing node.
+                let (cur_node_reserved_slot, node) =
+                    self.nodes.remove_and_reserve(node_index);
+                (cur_node_reserved_slot, node)
+            };
+
+        // move node_index out of scope, to make sure we don't accidentally access it, as we are done with it.
+        // (i.e. we should be using `reserved_slot` instead).
+        move node_index;
+
+        // Now we can perform the split at the current level, as we know we are not at the root level.
+        assert!(
+            !path_to_node.is_empty(),
+            error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+        );
+
+        // Parent has a reference under max key to the current node, so existing index
+        // needs to be the right node.
+        // Since ordered_map::trim moves from the end (i.e. smaller keys stay),
+        // we are going to put the contents of the current node on the left side,
+        // and create a new right node.
+        // So if we had before (node_index, node), we will change that to end up having:
+        // (new_left_node_index, node trimmed off) and (node_index, new node with trimmed off children)
+        //
+        // So let's rename variables cleanly:
+        let right_node_reserved_slot = reserved_slot;
+        let left_node = node;
+
+        let is_leaf = left_node.is_leaf;
+        let left_children = &mut left_node.children;
+
+        let right_node_index = right_node_reserved_slot.reserved_to_index();
+        let left_next = &mut left_node.next;
+        let left_prev = &mut left_node.prev;
+
+        // Compute directly, as we cannot use get_max_degree(), as self is already mutably borrowed.
+        let max_degree =
+            if (is_leaf) {
+                self.leaf_max_degree as u64
+            } else {
+                self.inner_max_degree as u64
+            };
+        // compute the target size for the left node:
+        let target_size = (max_degree + 1) / 2;
+
+        // Add child (which will exceed the size), and then trim off to create two sets of children of correct sizes.
+        left_children.add(key, child);
+        let right_node_children = left_children.trim(target_size);
+
+        assert!(
+            left_children.length() <= max_degree,
+            error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+        );
+        assert!(
+            right_node_children.length() <= max_degree,
+            error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+        );
+
+        let right_node = new_node_with_children(is_leaf, right_node_children);
+
+        let (left_node_slot, left_node_reserved_slot) = self.nodes.reserve_slot();
+        let left_node_index = left_node_slot.stored_to_index();
+
+        // right nodes next is the node that was next of the left (previous) node, and next of left node is the right node.
+        right_node.next = *left_next;
+        *left_next = right_node_index;
+
+        // right node's prev becomes current left node
+        right_node.prev = left_node_index;
+        // Since the previously used index is going to the right node, `prev` pointer of the next node is correct,
+        // and we need to update next pointer of the previous node (if exists)
+        if (*left_prev != NULL_INDEX) {
+            self.nodes.borrow_mut(*left_prev).next = left_node_index;
+            assert!(
+                right_node_index != self.min_leaf_index,
+                error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+            );
+        } else if (right_node_index == self.min_leaf_index) {
+            // Otherwise, if we were the smallest node on the level. if this is the leaf level, update the pointer.
+            assert!(is_leaf, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
+            self.min_leaf_index = left_node_index;
+        };
+
+        // Largest left key is the split key.
+        let max_left_key =
+            *left_children.internal_new_end_iter().iter_prev(left_children).iter_borrow_key(
+                left_children
+            );
+
+        self.nodes.fill_reserved_slot(left_node_reserved_slot, left_node);
+        self.nodes.fill_reserved_slot(right_node_reserved_slot, right_node);
+
+        // Add new Child (i.e. pointer to the left node) in the parent.
+        self.add_at(
+            path_to_node,
+            max_left_key,
+            new_inner_child(left_node_slot),
+            false
+        ).destroy_none();
+        option::none()
+    }
+
+    /// Given a path to node (excluding the node itself), which is currently stored under "old_key", update "old_key" to "new_key".
+    fun update_key<K: drop + copy + store, V: store>(
+        self: &mut BigOrderedMap<K, V>,
+        path_to_node: vector<u64>,
+        old_key: &K,
+        new_key: K
+    ) {
+        while (!path_to_node.is_empty()) {
+            let node_index = path_to_node.pop_back();
+            let node = self.borrow_node_mut(node_index);
+            let children = &mut node.children;
+            children.replace_key_inplace(old_key, new_key);
+
+            // If we were not updating the largest child, we don't need to continue.
+            if (children.internal_new_end_iter().iter_prev(children).iter_borrow_key(
+                children
+            ) != &new_key) { return };
+        }
+    }
+
+    inline fun remove_at<K: drop + copy + store, V: store>(
+        self: &mut BigOrderedMap<K, V>, path_to_node: vector<u64>, key: &K
+    ): Option<Child<V>> {
+        self.remove_at_with_iter_hint(path_to_node, key, option::none())
+    }
+
+    fun remove_at_with_iter_hint<K: drop + copy + store, V: store>(
+        self: &mut BigOrderedMap<K, V>,
+        path_to_node: vector<u64>,
+        key: &K,
+        iter_hint: Option<ordered_map::IteratorPtr>
+    ): Option<Child<V>> {
+        // Last node in the path is one where we need to remove the child from.
+        let node_index = path_to_node.pop_back();
+        let old_child = {
+            // First check if we can perform this operation, without changing structure of the tree (i.e. without rebalancing any nodes).
+
+            // For that we can just borrow the single node
+            let node = self.borrow_node_mut(node_index);
+
+            let children = &mut node.children;
+            let is_leaf = node.is_leaf;
+
+            let old_child =
+                if (iter_hint.is_some()) {
+                    let iter_hint = iter_hint.destroy_some();
+                    if (iter_hint.iter_is_end(children)) {
+                        option::none()
+                    } else {
+                        assert!(
+                            iter_hint.iter_borrow_key(children) == key,
+                            error::invalid_argument(EINTERNAL_INVARIANT_BROKEN)
+                        );
+                        option::some(iter_hint.iter_remove(children))
+                    }
+                } else {
+                    children.remove_or_none(key)
+                };
+            if (old_child.is_none()) {
+                // key not found, no need to rebalance
+                return old_child;
+            };
+
+            if (node_index == ROOT_INDEX) {
+                // If current node is root, lower limit of max_degree/2 nodes doesn't apply.
+                // So we can adjust internally
+                assert!(
+                    path_to_node.is_empty(),
+                    error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+                );
+
+                if (!is_leaf && children.length() == 1) {
+                    // If root is not leaf, but has a single child, promote only child to root,
+                    // and drop current root. Since root is stored directly in the resource, we
+                    // "move" the child into the root.
+
+                    let Child::Inner { node_index: inner_child_index } =
+                        children.internal_new_end_iter().iter_prev(children).iter_remove(
+                            children
+                        );
+
+                    let inner_child = self.nodes.remove(inner_child_index);
+                    if (inner_child.is_leaf) {
+                        self.min_leaf_index = ROOT_INDEX;
+                        self.max_leaf_index = ROOT_INDEX;
+                    };
+
+                    self.replace_root(inner_child).destroy_empty_node();
+                };
+                return old_child;
+            };
+
+            // Compute directly, as we cannot use get_max_degree(), as self is already mutably borrowed.
+            let max_degree =
+                if (is_leaf) {
+                    self.leaf_max_degree as u64
+                } else {
+                    self.inner_max_degree as u64
+                };
+            let degree = children.length();
+
+            // See if the node is big enough, or we need to merge it with another node on this level.
+            let big_enough = degree * 2 >= max_degree;
+
+            let new_max_key =
+                *children.internal_new_end_iter().iter_prev(children).iter_borrow_key(
+                    children
+                );
+
+            // See if max key was updated for the current node, and if so - update it on the path.
+            let max_key_updated = cmp::compare(&new_max_key, key).is_lt();
+            if (max_key_updated) {
+                assert!(degree >= 1, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
+
+                self.update_key(path_to_node, key, new_max_key);
+            };
+
+            // If node is big enough after removal, we are done.
+            if (big_enough) {
+                return old_child;
+            };
+
+            old_child
+        };
+        // Children size is below threshold, we need to rebalance with a neighbor on the same level.
+        self.process_rebalance_after_child_removal(node_index, path_to_node);
+        old_child
+    }
+
+    fun process_rebalance_after_child_removal<K: drop + copy + store, V: store>(
+        self: &mut BigOrderedMap<K, V>,
+        node_index: u64,
+        path_to_node: vector<u64>
+    ) {
+        // In order to work on multiple nodes at the same time, we cannot borrow_mut, and need to be
+        // remove_and_reserve existing node.
+        let (node_slot, node) = self.nodes.remove_and_reserve(node_index);
+
+        let is_leaf = node.is_leaf;
+        let max_degree = self.get_max_degree(is_leaf);
+        let prev = node.prev;
+        let next = node.next;
+
+        // index of the node we will rebalance with.
+        let sibling_index = {
+            let parent_children =
+                &self.borrow_node(path_to_node[path_to_node.length() - 1]).children;
+            assert!(
+                parent_children.length() >= 2,
+                error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+            );
+            // If we are the largest node from the parent, we merge with the `prev`
+            // (which is then guaranteed to have the same parent, as any node has >1 children),
+            // otherwise we merge with `next`.
+            if (parent_children.internal_new_end_iter()
+                .iter_prev(parent_children)
+                .iter_borrow(parent_children)
+                .node_index
+                .stored_to_index() == node_index) { prev }
+            else { next }
+        };
+
+        let children = &mut node.children;
+
+        let (sibling_slot, sibling_node) = self.nodes.remove_and_reserve(sibling_index);
+        assert!(
+            is_leaf == sibling_node.is_leaf,
+            error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+        );
+        let sibling_children = &mut sibling_node.children;
+
+        if ((sibling_children.length() - 1) * 2 >= max_degree) {
+            // The sibling node has enough elements, we can just borrow an element from the sibling node.
+            if (sibling_index == next) {
+                // if sibling is the node with larger keys, we remove a child from the start
+                let old_max_key =
+                    *children.internal_new_end_iter().iter_prev(children).iter_borrow_key(
+                        children
+                    );
+                let sibling_begin_iter = sibling_children.internal_new_begin_iter();
+                let borrowed_max_key =
+                    *sibling_begin_iter.iter_borrow_key(sibling_children);
+                let borrowed_element = sibling_begin_iter.iter_remove(sibling_children);
+
+                children.internal_new_end_iter().iter_add(
+                    children, borrowed_max_key, borrowed_element
+                );
+
+                // max_key of the current node changed, so update
+                self.update_key(path_to_node, &old_max_key, borrowed_max_key);
+            } else {
+                // if sibling is the node with smaller keys, we remove a child from the end
+                let sibling_end_iter =
+                    sibling_children.internal_new_end_iter().iter_prev(sibling_children);
+                let borrowed_max_key =
+                    *sibling_end_iter.iter_borrow_key(sibling_children);
+                let borrowed_element = sibling_end_iter.iter_remove(sibling_children);
+
+                children.add(borrowed_max_key, borrowed_element);
+
+                // max_key of the sibling node changed, so update
+                self.update_key(
+                    path_to_node,
+                    &borrowed_max_key,
+                    *sibling_children.internal_new_end_iter().iter_prev(sibling_children).iter_borrow_key(
+                        sibling_children
+                    )
+                );
+            };
+
+            self.nodes.fill_reserved_slot(node_slot, node);
+            self.nodes.fill_reserved_slot(sibling_slot, sibling_node);
+            return;
+        };
+
+        // The sibling node doesn't have enough elements to borrow, merge with the sibling node.
+        // Keep the slot of the node with larger keys of the two, to not require updating key on the parent nodes.
+        // But append to the node with smaller keys, as ordered_map::append is more efficient when adding to the end.
+        let (key_to_remove, reserved_slot_to_remove) =
+            if (sibling_index == next) {
+                // destroying larger sibling node, keeping sibling_slot.
+                let Node::V1 {
+                    children: sibling_children,
+                    is_leaf: _,
+                    prev: _,
+                    next: sibling_next
+                } = sibling_node;
+                let key_to_remove =
+                    *children.internal_new_end_iter().iter_prev(children).iter_borrow_key(
+                        children
+                    );
+                children.append_disjoint(sibling_children);
+                node.next = sibling_next;
+
+                if (node.next != NULL_INDEX) {
+                    assert!(
+                        self.nodes.borrow_mut(node.next).prev == sibling_index,
+                        error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+                    );
+                };
+
+                // we are removing node_index, which previous's node's next was pointing to,
+                // so update the pointer
+                if (node.prev != NULL_INDEX) {
+                    self.nodes.borrow_mut(node.prev).next = sibling_index;
+                };
+                // Otherwise, we were the smallest node on the level. if this is the leaf level, update the pointer.
+                if (self.min_leaf_index == node_index) {
+                    assert!(is_leaf, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
+                    self.min_leaf_index = sibling_index;
+                };
+
+                self.nodes.fill_reserved_slot(sibling_slot, node);
+
+                (key_to_remove, node_slot)
+            } else {
+                // destroying larger current node, keeping node_slot
+                let Node::V1 {
+                    children: node_children,
+                    is_leaf: _,
+                    prev: _,
+                    next: node_next
+                } = node;
+                let key_to_remove =
+                    *sibling_children.internal_new_end_iter().iter_prev(sibling_children).iter_borrow_key(
+                        sibling_children
+                    );
+                sibling_children.append_disjoint(node_children);
+                sibling_node.next = node_next;
+
+                if (sibling_node.next != NULL_INDEX) {
+                    assert!(
+                        self.nodes.borrow_mut(sibling_node.next).prev == node_index,
+                        error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+                    );
+                };
+                // we are removing sibling node_index, which previous's node's next was pointing to,
+                // so update the pointer
+                if (sibling_node.prev != NULL_INDEX) {
+                    self.nodes.borrow_mut(sibling_node.prev).next = node_index;
+                };
+                // Otherwise, sibling was the smallest node on the level. if this is the leaf level, update the pointer.
+                if (self.min_leaf_index == sibling_index) {
+                    assert!(is_leaf, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
+                    self.min_leaf_index = node_index;
+                };
+
+                self.nodes.fill_reserved_slot(node_slot, sibling_node);
+
+                (key_to_remove, sibling_slot)
+            };
+
+        assert!(
+            !path_to_node.is_empty(),
+            error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+        );
+        // we can destory_some() here, because inner node should always be present.
+        let slot_to_remove =
+            self.remove_at(path_to_node, &key_to_remove).destroy_some().destroy_inner_child();
+        self.nodes.free_reserved_slot(reserved_slot_to_remove, slot_to_remove);
+    }
+
+    // ===== spec ===========
+
+    spec module {
+        // Verification is disabled for this implementation module because the
+        // prover models BigOrderedMap at its intrinsic map abstraction, while
+        // these bodies expose its hidden B+tree representation. The explicit
+        // contracts in the companion spec file remain the caller boundary.
+        pragma verify = false;
+    }
+
+    // recursive functions need to be marked opaque
+
+    spec add_at {
+        // Private B+tree representation helper below the intrinsic map boundary.
+        pragma intrinsic;
+    }
+
+    spec remove_at_with_iter_hint {
+        // Private B+tree representation helper below the intrinsic map boundary.
+        pragma intrinsic;
+    }
+
+    // ============================= Tests ====================================
+
+    #[test_only]
+    public(friend) fun print_map<K: store, V: store>(
+        self: &BigOrderedMap<K, V>
+    ) {
+        // uncomment to debug:
+        // aptos_std::debug::print(&std::string::utf8(b"print map"));
+        // aptos_std::debug::print(self);
+        // self.print_map_for_node(ROOT_INDEX, 0);
+    }
+
+    #[test_only]
+    fun print_map_for_node<K: store + copy + drop, V: store>(
+        self: &BigOrderedMap<K, V>, node_index: u64, level: u64
+    ) {
+        let node = self.borrow_node(node_index);
+
+        aptos_std::debug::print(&level);
+        aptos_std::debug::print(&node_index);
+        aptos_std::debug::print(node);
+
+        if (!node.is_leaf) {
+            node.children.for_each_ref(
+                |_key, node| {
+                    self.print_map_for_node(node.node_index.stored_to_index(), level
+                        + 1);
+                }
+            );
+        };
+    }
+
+    #[test_only]
+    public(friend) fun destroy_and_validate<K: drop + copy + store, V: drop + store>(
+        self: BigOrderedMap<K, V>
+    ) {
+        let it = self.internal_new_begin_iter();
+        while (!it.iter_is_end(&self)) {
+            self.remove(it.iter_borrow_key());
+            assert!(
+                self.internal_find(it.iter_borrow_key()).iter_is_end(&self),
+                error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+            );
+            it = self.internal_new_begin_iter();
+            self.validate_map();
+        };
+
+        self.destroy_empty();
+    }
+
+    #[test_only]
+    fun validate_iteration<K: drop + copy + store, V: store>(
+        self: &BigOrderedMap<K, V>
+    ) {
+        let expected_num_elements = self.compute_length();
+        assert!(
+            (expected_num_elements == 0) == self.is_empty(),
+            error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+        );
+        let num_elements = 0;
+        let it = self.internal_new_begin_iter();
+        while (!it.iter_is_end(self)) {
+            num_elements += 1;
+            it = it.iter_next(self);
+        };
+
+        assert!(
+            num_elements == expected_num_elements,
+            error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+        );
+
+        let num_elements = 0;
+        let it = self.internal_new_end_iter();
+        while (!it.iter_is_begin(self)) {
+            it = it.iter_prev(self);
+            num_elements += 1;
+        };
+        assert!(
+            num_elements == expected_num_elements,
+            error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+        );
+
+        let it = self.internal_new_end_iter();
+        if (!it.iter_is_begin(self)) {
+            it = it.iter_prev(self);
+            assert!(
+                it.node_index == self.max_leaf_index,
+                error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+            );
+        } else {
+            assert!(
+                expected_num_elements == 0,
+                error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+            );
+        };
+    }
+
+    #[test_only]
+    fun validate_subtree<K: drop + copy + store, V: store>(
+        self: &BigOrderedMap<K, V>,
+        node_index: u64,
+        expected_lower_bound_key: Option<K>,
+        expected_max_key: Option<K>
+    ) {
+        let node = self.borrow_node(node_index);
+        let len = node.children.length();
+        assert!(
+            len <= self.get_max_degree(node.is_leaf),
+            error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+        );
+
+        if (node_index != ROOT_INDEX) {
+            assert!(len >= 1, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
+            assert!(
+                len * 2 >= self.get_max_degree(node.is_leaf),
+                error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+            );
+        };
+
+        node.children.validate_ordered();
+
+        let previous_max_key = expected_lower_bound_key;
+        node.children.for_each_ref(
+            |key: &K, child: &Child<V>| {
+                if (!node.is_leaf) {
+                    self.validate_subtree(
+                        child.node_index.stored_to_index(),
+                        previous_max_key,
+                        option::some(*key)
+                    );
+                } else {
+                    assert!(
+                        (child is Child::Leaf<V>),
+                        error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+                    );
+                };
+                previous_max_key = option::some(*key);
+            }
+        );
+
+        if (expected_max_key.is_some()) {
+            let expected_max_key = expected_max_key.extract();
+            assert!(
+                &expected_max_key
+                    == node.children
+                        .internal_new_end_iter()
+                        .iter_prev(&node.children)
+                        .iter_borrow_key(&node.children),
+                error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+            );
+        };
+
+        if (expected_lower_bound_key.is_some()) {
+            let expected_lower_bound_key = expected_lower_bound_key.extract();
+            assert!(
+                cmp::compare(
+                    &expected_lower_bound_key,
+                    node.children.internal_new_begin_iter().iter_borrow_key(&node.children)
+                ).is_lt(),
+                error::invalid_state(EINTERNAL_INVARIANT_BROKEN)
+            );
+        };
+    }
+
+    #[test_only]
+    public(friend) fun validate_map<K: drop + copy + store, V: store>(
+        self: &BigOrderedMap<K, V>
+    ) {
+        self.validate_subtree(ROOT_INDEX, option::none(), option::none());
+        self.validate_iteration();
+    }
+
+    // ========== Verify only functions ==========
+    #[verify_only]
+    fun test_verify_modify() {
+        let map = new_from(vector[1u64], vector[10u64]);
+        // Closure without `requires`: `iter_modify`'s precondition on the
+        // closure is trivially dischargeable.
+        map.modify(&1, |v| {
+            *v = 11;
+        });
+
+        spec {
+            assert spec_get(map, 1) == 11;
+        };
+        // Constrained closure used within its precondition: the caller
+        // discharges `requires_of` from the map's current content and gets
+        // the closure's postcondition in return.
+        let iter = map.internal_find(&1);
+        let r =
+            iter.iter_modify(
+                &mut map,
+                |v| {
+                    *v = 12;
+                    true
+                }
+
+                spec {
+                    requires v == 11;
+                    ensures v == 12;
+                    ensures result == true;
+                }
+            );
+
+        spec {
+            assert spec_get(map, 1) == 12;
+            assert r;
+        };
+        map.remove(&1);
+        map.destroy_empty();
+    }
+
+    spec test_verify_modify {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_borrow_front_key() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let (_key, _value) = map.borrow_front();
+
+        spec {
+            assert keys[0] == 1;
+            assert vector::spec_contains(keys, 1);
+            assert spec_contains_key(map, _key);
+            assert spec_get(map, _key) == _value;
+            assert _key == (1 as u64);
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_borrow_front_key {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_borrow_back_key() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let (key, value) = map.borrow_back();
+
+        spec {
+            assert keys[2] == 3;
+            assert vector::spec_contains(keys, 3);
+            assert spec_contains_key(map, key);
+            assert spec_get(map, key) == value;
+            assert key == (3 as u64);
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_borrow_back_key {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_upsert() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let (_key, _value) = map.borrow_back();
+        let result_1 = map.upsert(4, 5);
+
+        spec {
+            assert spec_contains_key(map, 4);
+            assert spec_get(map, 4) == 5;
+            assert result_1.is_none();
+        };
+        let result_2 = map.upsert(4, 6);
+
+        spec {
+            assert spec_contains_key(map, 4);
+            assert spec_get(map, 4) == 6;
+            assert result_2.is_some();
+            assert result_2.borrow() == 5;
+            assert!spec_contains_key(map, 10);
+        };
+
+        spec {
+            assert keys[0] == 1;
+            assert spec_contains_key(map, 1);
+            assert spec_get(map, 1) == 4;
+        };
+        let v = map.remove(&1);
+
+        spec {
+            assert v == 4;
+        };
+        map.remove(&2);
+        map.remove(&3);
+        map.remove(&4);
+
+        spec {
+            assert!spec_contains_key(map, 1);
+            assert!spec_contains_key(map, 2);
+            assert!spec_contains_key(map, 3);
+            assert!spec_contains_key(map, 4);
+            assert spec_len(map) == 0;
+        };
+        map.destroy_empty();
+    }
+
+    spec test_verify_upsert {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_iter_across_upsert() {
+        let map = new_from(vector[1u64, 2u64], vector[10u64, 20u64]);
+        let iter = map.internal_find(&1);
+        // An existing-key upsert replaces the value in place: the iterator
+        // stays valid across it.
+        let old_value = map.upsert(2, 21);
+
+        spec {
+            assert old_value.is_some();
+            assert spec_iter_valid(iter, map);
+        };
+        let v = *iter.iter_borrow(&map);
+
+        spec {
+            assert v == 10;
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.destroy_empty();
+    }
+
+    spec test_verify_iter_across_upsert {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_next_key() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let result_1 = map.next_key(&3);
+
+        spec {
+            assert result_1.is_none();
+        };
+        let result_2 = map.next_key(&1);
+
+        spec {
+            assert keys[0] == 1;
+            assert spec_contains_key(map, 1);
+            assert keys[1] == 2;
+            assert spec_contains_key(map, 2);
+            assert result_2.is_some();
+            assert result_2.borrow() == 2;
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_next_key {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_prev_key() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let result_1 = map.prev_key(&1);
+
+        spec {
+            assert result_1.is_none();
+        };
+        let result_2 = map.prev_key(&3);
+
+        spec {
+            assert keys[0] == 1;
+            assert spec_contains_key(map, 1);
+            assert keys[1] == 2;
+            assert spec_contains_key(map, 2);
+            assert result_2.is_some();
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_prev_key {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_remove() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+
+        spec {
+            assert keys[1] == 2;
+            assert vector::spec_contains(keys, 2);
+            assert spec_contains_key(map, 2);
+            assert spec_get(map, 2) == 5;
+            assert spec_len(map) == 3;
+        };
+        let v = map.remove(&1);
+
+        spec {
+            assert v == 4;
+            assert spec_contains_key(map, 2);
+            assert spec_get(map, 2) == 5;
+            assert spec_len(map) == 2;
+            assert!spec_contains_key(map, 1);
+        };
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_remove {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_aborts_if_new_from_1(): BigOrderedMap<u64, u64> {
+        let keys: vector<u64> = vector[1, 2, 3, 1];
+        let values: vector<u64> = vector[4, 5, 6, 7];
+
+        spec {
+            assert keys[0] == 1;
+            assert keys[3] == 1;
+        };
+        let map = new_from(keys, values);
+        map
+    }
+
+    spec test_aborts_if_new_from_1 {
+        pragma verify = true;
+        aborts_if true;
+    }
+
+    #[verify_only]
+    fun test_aborts_if_new_from_2(keys: vector<u64>, values: vector<u64>)
+        : BigOrderedMap<u64, u64> {
+        let map = new_from(keys, values);
+        map
+    }
+
+    spec test_aborts_if_new_from_2 {
+        pragma verify = true;
+        aborts_if exists i in 0..len(keys), j in 0..len(keys) where i != j:
+            keys[i] == keys[j];
+        aborts_if len(keys) != len(values);
+    }
+
+    #[verify_only]
+    fun test_aborts_if_remove(map: &mut BigOrderedMap<u64, u64>) {
+        map.remove(&1);
+    }
+
+    spec test_aborts_if_remove {
+        pragma verify = true;
+        aborts_if !spec_contains_key(map, 1);
+    }
+
+    #[verify_only]
+    fun test_verify_iter_next() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let map = new_from(keys, vector[4, 5, 6]);
+        let it = map.internal_find(&1);
+        let k1 = *it.iter_borrow_key();
+        let it2 = it.iter_next(&map);
+        let k2 = *it2.iter_borrow_key();
+        let it3 = it2.iter_next(&map);
+        let k3 = *it3.iter_borrow_key();
+        let it_end = it3.iter_next(&map);
+
+        spec {
+            assert keys[0] == 1;
+            assert keys[1] == 2;
+            assert keys[2] == 3;
+            assert vector::spec_contains(keys, 1);
+            assert vector::spec_contains(keys, 2);
+            assert vector::spec_contains(keys, 3);
+            assert spec_contains_key(map, 1);
+            assert spec_contains_key(map, 2);
+            assert spec_contains_key(map, 3);
+            assert spec_len(map) == 3;
+        };
+        ground_enum_123(&map);
+
+        spec {
+            assert k1 == (1 as u64);
+            assert k2 == (2 as u64);
+            assert k3 == (3 as u64);
+            assert iter_is_end(it_end, map);
+            // Each step advances the rank; End follows the last rank.
+            assert spec_rank(map, k1) == 0;
+            assert spec_rank(map, k2) == 1;
+            assert spec_rank(map, k3) == 2;
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_iter_next {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_iter_prev() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let it_end = map.internal_new_end_iter();
+        let it3 = it_end.iter_prev(&map);
+        let k3 = *it3.iter_borrow_key();
+        let it2 = it3.iter_prev(&map);
+        let k2 = *it2.iter_borrow_key();
+
+        spec {
+            assert k3 == (3 as u64);
+            // Materialize the ground fact so the maximality quantifier of
+            // iter_prev's contract instantiates at k == 2.
+            assert keys[1] == 2;
+            assert vector::spec_contains(keys, 2);
+            assert spec_contains_key(map, 2);
+            assert k2 == (2 as u64);
+            // Stepping back from End lands on the last rank, then decrements.
+            assert spec_len(map) == 3;
+            assert spec_rank(map, k3) == 2;
+            assert spec_rank(map, k2) == 1;
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_iter_prev {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_iter_modify() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let it = map.internal_find(&2);
+        let old_v = it.iter_modify(&mut map, |v| {
+            let o = *v;
+            *v = 50;
+            o
+        });
+
+        spec {
+            assert old_v == (5 as u64);
+            assert spec_get(map, 2) == (50 as u64);
+            assert spec_len(map) == 3;
+            // Materialize ground membership facts so the frame quantifier
+            // (spec_unchanged_except_at) instantiates at keys 1 and 3.
+            assert keys[0] == 1;
+            assert vector::spec_contains(keys, 1);
+            assert keys[2] == 3;
+            assert vector::spec_contains(keys, 3);
+            // Frame: other keys are untouched.
+            assert spec_get(map, 1) == (4 as u64);
+            assert spec_get(map, 3) == (6 as u64);
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_iter_modify {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_keys_sorted() {
+        let map = new_from(vector[3, 1, 2], vector[6, 4, 5]);
+        let ks = map.keys();
+
+        spec {
+            assert len(ks) == 3;
+            // Sortedness and membership come from the keys() contract.
+            assert ks[0] < ks[1];
+            assert ks[1] < ks[2];
+            assert spec_contains_key(map, ks[0]);
+            assert spec_contains_key(map, ks[1]);
+            assert spec_contains_key(map, ks[2]);
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_keys_sorted {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_leaf_iter() {
+        let map = new_from(vector[1, 2, 3], vector[4, 5, 6]);
+        let lit = map.internal_leaf_new_begin_iter();
+        // The begin leaf iterator is never end, so this cannot abort.
+        let (entries, _next) =
+            lit.internal_leaf_iter_borrow_entries_and_next_leaf_index(&map);
+        // Leaves of a nonempty map are nonempty, so borrowing the first leaf
+        // key cannot abort; the entry is a real map entry with matching value.
+        let ks = entries.keys();
+        let k0 = *ks.borrow(0);
+        let child = entries.borrow(&k0);
+        let v0 = *child.internal_leaf_borrow_value();
+
+        spec {
+            assert spec_contains_key(map, k0);
+            assert v0 == spec_get(map, k0);
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_leaf_iter {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    /// Witness-test support: derives the exact enumeration of a map holding
+    /// keys {1, 2, 3}, walking the stepwise assert ladder once; callers get
+    /// the facts from the ensures.
+    fun ground_enum_123(map: &BigOrderedMap<u64, u64>) {
+        // Also pulls in the key's cmp instantiation (gates the ascending axiom).
+        let _fk = map.front_key();
+
+        spec {
+            // Each contained key has an in-range rank that key_at inverts.
+            assert spec_rank(map, 1) >= 0
+                && spec_rank(map, 1) < 3
+                && spec_key_at(map, spec_rank(map, 1)) == (1 as u64);
+            assert spec_rank(map, 2) >= 0
+                && spec_rank(map, 2) < 3
+                && spec_key_at(map, spec_rank(map, 2)) == (2 as u64);
+            assert spec_rank(map, 3) >= 0
+                && spec_rank(map, 3) < 3
+                && spec_key_at(map, spec_rank(map, 3)) == (3 as u64);
+            // Ranks follow the key order.
+            assert spec_rank(map, 1) < spec_rank(map, 2);
+            assert spec_rank(map, 2) < spec_rank(map, 3);
+            // Three distinct ordered positions in 0..3 pin the ranks exactly.
+            assert spec_rank(map, 1) == 0;
+            assert spec_rank(map, 2) == 1;
+            assert spec_rank(map, 3) == 2;
+            // ... and therefore the enumeration itself.
+            assert spec_key_at(map, 0) == (1 as u64);
+            assert spec_key_at(map, 1) == (2 as u64);
+            assert spec_key_at(map, 2) == (3 as u64);
+        };
+    }
+
+    spec ground_enum_123 {
+        pragma verify = true;
+        requires spec_len(map) == 3;
+        requires spec_contains_key(map, 1);
+        requires spec_contains_key(map, 2);
+        requires spec_contains_key(map, 3);
+        ensures spec_rank(map, 1) == 0
+            && spec_rank(map, 2) == 1
+            && spec_rank(map, 3) == 2;
+        ensures spec_key_at(map, 0) == (1 as u64)
+            && spec_key_at(map, 1) == (2 as u64)
+            && spec_key_at(map, 2) == (3 as u64);
+    }
+
+    #[verify_only]
+    fun test_verify_enumeration_view() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let fk = map.front_key();
+
+        spec {
+            // Materialize ground membership facts for the quantifiers.
+            assert keys[0] == 1;
+            assert keys[1] == 2;
+            assert keys[2] == 3;
+            assert vector::spec_contains(keys, 1);
+            assert vector::spec_contains(keys, 2);
+            assert vector::spec_contains(keys, 3);
+            assert spec_contains_key(map, 1);
+            assert spec_contains_key(map, 2);
+            assert spec_contains_key(map, 3);
+            assert spec_len(map) == 3;
+        };
+        ground_enum_123(&map);
+
+        spec {
+            // Cross-checks: the ordering API agrees, and values compose.
+            assert fk == (1 as u64);
+            assert fk == spec_key_at(map, 0);
+            assert spec_get(map, spec_key_at(map, 0)) == (4 as u64);
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_enumeration_view {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_iter_rank_loop() {
+        let map = new_from(vector[1, 2, 3], vector[4, 5, 6]);
+        // Iterator loop counting entries; the invariant indexes the walk by rank.
+        let count = 0u64;
+        let it = map.internal_new_begin_iter();
+        while ({
+            spec {
+                invariant spec_iter_valid(it, map);
+                invariant !(it is IteratorPtr::End) ==>
+                    spec_contains_key(map, it.key) && count == spec_rank(map, it.key);
+                invariant (it is IteratorPtr::End) ==>
+                    count == spec_len(map);
+            };
+            !it.iter_is_end(&map)
+        }) {
+            count += 1;
+            it = it.iter_next(&map);
+        };
+
+        spec {
+            assert count == spec_len(map);
+            assert count == 3;
+        };
+        map.remove(&1);
+        map.remove(&2);
+        map.remove(&3);
+        map.destroy_empty();
+    }
+
+    spec test_verify_iter_rank_loop {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_pop_rank() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[10, 20, 30];
+        let map = new_from(keys, values);
+
+        spec {
+            // Materialize ground membership facts for the quantifiers.
+            assert keys[0] == 1;
+            assert keys[1] == 2;
+            assert keys[2] == 3;
+            assert vector::spec_contains(keys, 1);
+            assert vector::spec_contains(keys, 2);
+            assert vector::spec_contains(keys, 3);
+            assert spec_contains_key(map, 1);
+            assert spec_contains_key(map, 2);
+            assert spec_contains_key(map, 3);
+            assert spec_len(map) == 3;
+        };
+        ground_enum_123(&map);
+        let (k, v) = map.pop_front();
+
+        spec {
+            // Popped key had rank 0; survivors' ranks shift down by one.
+            assert k == (1 as u64);
+            assert v == (10 as u64);
+            assert spec_len(map) == 2;
+            assert spec_rank(map, 2) == 0;
+            assert spec_rank(map, 3) == 1;
+            assert spec_key_at(map, 0) == (2 as u64);
+            assert spec_key_at(map, 1) == (3 as u64);
+        };
+        let (k2, v2) = map.pop_back();
+
+        spec {
+            // Back border: the popped key had the last rank.
+            assert k2 == (3 as u64);
+            assert v2 == (30 as u64);
+            assert spec_len(map) == 1;
+            assert spec_key_at(map, 0) == (2 as u64);
+            assert spec_rank(map, 2) == 0;
+        };
+        let (k3, _v3) = map.pop_front();
+
+        spec {
+            assert k3 == (2 as u64);
+        };
+        map.destroy_empty();
+    }
+
+    spec test_verify_pop_rank {
+        pragma verify = true;
+    }
+
+    #[verify_only]
+    fun test_verify_drain_loop(): u64 {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[10, 20, 30];
+        let map = new_from(keys, values);
+
+        spec {
+            // Materialize ground membership and value facts for the invariant.
+            assert keys[0] == 1;
+            assert keys[1] == 2;
+            assert keys[2] == 3;
+            assert vector::spec_contains(keys, 1);
+            assert vector::spec_contains(keys, 2);
+            assert vector::spec_contains(keys, 3);
+            assert spec_contains_key(map, 1);
+            assert spec_contains_key(map, 2);
+            assert spec_contains_key(map, 3);
+            assert spec_len(map) == 3;
+            assert spec_get(map, 1) == (10 as u64);
+            assert spec_get(map, 2) == (20 as u64);
+            assert spec_get(map, 3) == (30 as u64);
+        };
+        ground_enum_123(&map);
+        // The shift axioms carry the enumeration across pops, letting the
+        // invariant characterize the map and the sum by length alone.
+        let sum = 0u64;
+        while ({
+            spec {
+                invariant spec_len(map) <= 3;
+                invariant forall i in 0..spec_len(map):
+                    spec_key_at(map, i) == i + 4 - spec_len(map);
+                invariant forall i in 0..spec_len(map):
+                    spec_get(map, spec_key_at(map, i)) == 10 * spec_key_at(map, i);
+                invariant sum == 10 * (3 - spec_len(map)) * (4 - spec_len(map)) / 2;
+            };
+            !map.is_empty()
+        }) {
+            let (_k, v) = map.pop_front();
+            sum += v;
+        };
+
+        spec {
+            assert sum == 60;
+        };
+        map.destroy_empty();
+        sum
+    }
+
+    spec test_verify_drain_loop {
+        pragma verify = true;
+        ensures result == 60;
+    }
+
+    spec module {
+        /// Witness-test support: sum of the values at the first `n` keys.
+        fun spec_test_sum_upto(m: BigOrderedMap<u64, u64>, n: num): num {
+            if (n <= 0) { 0 }
+            else {
+                spec_test_sum_upto(m, n - 1) + spec_get(m, spec_key_at(m, n - 1))
+            }
+        }
+    }
+
+    #[verify_only]
+    fun test_verify_iter_sum_symbolic(m: &BigOrderedMap<u64, u64>): u64 {
+        // Symbolic map + iterator walk: exercises the general axiom chain,
+        // not a concrete model.
+        let sum = 0u64;
+        let it = m.internal_new_begin_iter();
+        while ({
+            spec {
+                invariant spec_iter_valid(it, m);
+                invariant !(it is IteratorPtr::End) ==>
+                    spec_contains_key(m, it.key)
+                        && sum == spec_test_sum_upto(m, spec_rank(m, it.key));
+                invariant (it is IteratorPtr::End) ==>
+                    sum == spec_test_sum_upto(m, spec_len(m));
+            };
+            !it.iter_is_end(m)
+        }) {
+            sum += *it.iter_borrow(m);
+            it = it.iter_next(m);
+        };
+        sum
+    }
+
+    spec test_verify_iter_sum_symbolic {
+        pragma verify = true;
+        // Aborts unspecified: the running u64 addition can overflow.
+        ensures result == spec_test_sum_upto(m, spec_len(m));
+    }
+
+    #[verify_only]
+    fun test_verify_drain_symbolic(m: &mut BigOrderedMap<u64, u64>): u64 {
+        // Symbolic drain: the current map stays the suffix of old(m) past
+        // the popped prefix.
+        let count = 0u64;
+        while ({
+            spec {
+                invariant count + spec_len(m) == spec_len(old(m));
+                invariant forall i in 0..spec_len(m):
+                    spec_key_at(m, i) == spec_key_at(old(m), i + count);
+                invariant forall i in 0..spec_len(m):
+                    spec_get(m, spec_key_at(m, i)) == spec_get(old(m), spec_key_at(m, i));
+            };
+            !m.is_empty()
+        }) {
+            let (_k, _v) = m.pop_front();
+            count += 1;
+        };
+        count
+    }
+
+    spec test_verify_drain_symbolic {
+        pragma verify = true;
+        aborts_if false;
+        ensures result == spec_len(old(m));
+        ensures spec_len(m) == 0;
+    }
+
+    #[verify_only]
+    fun test_verify_remove_shift_symbolic(
+        m: &mut BigOrderedMap<u64, u64>, k: u64
+    ) {
+        // Removal at an ARBITRARY rank, not just a border: the surviving
+        // enumeration is the old one with that one position spliced out.
+        m.remove(&k);
+    }
+
+    spec test_verify_remove_shift_symbolic {
+        pragma verify = true;
+        requires spec_contains_key(m, k);
+        aborts_if false;
+        ensures spec_len(m) == spec_len(old(m)) - 1;
+        ensures !spec_contains_key(m, k);
+        ensures forall i in 0..spec_len(m):
+            spec_key_at(m, i)
+                == spec_key_at(old(m), if (i < spec_rank(old(m), k)) i
+                else i + 1);
+        ensures forall i in 0..spec_len(m):
+            spec_get(m, spec_key_at(m, i)) == spec_get(old(m), spec_key_at(m, i));
+    }
+
+    #[verify_only]
+    fun test_verify_pop_back_drain_symbolic(
+        m: &mut BigOrderedMap<u64, u64>
+    ): u64 {
+        // Back-border mirror of the drain above: popping from the back keeps
+        // the map a PREFIX of the entry map.
+        let count = 0u64;
+        while ({
+            spec {
+                invariant count + spec_len(m) == spec_len(old(m));
+                invariant forall i in 0..spec_len(m):
+                    spec_key_at(m, i) == spec_key_at(old(m), i);
+                invariant forall i in 0..spec_len(m):
+                    spec_get(m, spec_key_at(m, i)) == spec_get(old(m), spec_key_at(m, i));
+            };
+            !m.is_empty()
+        }) {
+            let (_k, _v) = m.pop_back();
+            count += 1;
+        };
+        count
+    }
+
+    spec test_verify_pop_back_drain_symbolic {
+        pragma verify = true;
+        aborts_if false;
+        ensures result == spec_len(old(m));
+        ensures spec_len(m) == 0;
+    }
+
+    #[verify_only]
+    fun test_verify_iter_collect_symbolic(m: &BigOrderedMap<u64, u64>): vector<u64> {
+        // A full traversal that COLLECTS: the result is the whole key set in
+        // ascending order, position by position.
+        let out = vector[];
+        let it = m.internal_new_begin_iter();
+        while ({
+            spec {
+                invariant spec_iter_valid(it, m);
+                invariant len(out) <= spec_len(m);
+                invariant forall i in 0..len(out): out[i] == spec_key_at(m, i);
+                invariant !(it is IteratorPtr::End) ==>
+                    spec_contains_key(m, it.key) && len(out) == spec_rank(m, it.key);
+                invariant (it is IteratorPtr::End) ==>
+                    len(out) == spec_len(m);
+            };
+            !it.iter_is_end(m)
+        }) {
+            out.push_back(*it.iter_borrow_key());
+            it = it.iter_next(m);
+        };
+        out
+    }
+
+    spec test_verify_iter_collect_symbolic {
+        pragma verify = true;
+        aborts_if false;
+        ensures len(result) == spec_len(m);
+        ensures forall i in 0..spec_len(m): result[i] == spec_key_at(m, i);
+    }
+
+    #[verify_only]
+    fun test_verify_iter_valid_after_insert_symbolic(
+        m: &mut BigOrderedMap<u64, u64>, k: u64, v: u64
+    ) {
+        // A structural change invalidates outstanding iterators, but an
+        // iterator taken afterwards is valid and lands on a real entry.
+        m.add(k, v);
+        let it = m.internal_new_begin_iter();
+
+        spec {
+            assert spec_iter_valid(it, m);
+            assert!(it is IteratorPtr::End);
+            assert spec_contains_key(m, it.key);
+        };
+    }
+
+    spec test_verify_iter_valid_after_insert_symbolic {
+        pragma verify = true;
+        requires !spec_contains_key(m, k);
+        aborts_if false;
+        ensures spec_contains_key(m, k);
+        ensures spec_len(m) == spec_len(old(m)) + 1;
+    }
+
+    #[verify_only]
+    fun test_verify_back_key_rank_symbolic(m: &BigOrderedMap<u64, u64>): u64 {
+        m.back_key()
+    }
+
+    spec test_verify_back_key_rank_symbolic {
+        pragma verify = true;
+        requires spec_len(m) > 0;
+        aborts_if false;
+        ensures spec_contains_key(m, result);
+        ensures spec_rank(m, result) == spec_len(m) - 1;
+        ensures spec_key_at(m, spec_len(m) - 1) == result;
+    }
+
+    #[verify_only]
+    fun test_verify_iter_borrow_mut_symbolic(
+        m: &mut BigOrderedMap<u64, u64>, k: u64, nv: u64
+    ) {
+        // Write through the iterator's `&mut V`: the edge carried by the
+        // reference lands the update on the abstract map at `self.key`.
+        let it = m.internal_find(&k);
+        let v_ref = it.iter_borrow_mut(m);
+        *v_ref = nv;
+    }
+
+    spec test_verify_iter_borrow_mut_symbolic {
+        pragma verify = true;
+        requires spec_contains_key(m, k);
+        aborts_if false;
+        ensures spec_get(m, k) == nv;
+        ensures spec_len(m) == spec_len(old(m));
+        ensures spec_contains_key(m, k);
+        // Frame: no other entry is touched.
+        ensures forall other: u64 where other != k:
+            spec_contains_key(m, other) == spec_contains_key(old(m), other);
+        ensures forall other: u64 where other != k && spec_contains_key(old(m), other):
+            spec_get(m, other) == spec_get(old(m), other);
+        // A value write is not a structural change, so positions are intact.
+        ensures forall i in 0..spec_len(m): spec_key_at(m, i) == spec_key_at(old(m), i);
+        ensures spec_rank(m, k) == spec_rank(old(m), k);
+    }
+
+    #[verify_only]
+    fun test_verify_iter_remove_symbolic(
+        m: &mut BigOrderedMap<u64, u64>, k: u64
+    ): u64 {
+        let it = m.internal_find_with_path(&k);
+        it.iter_remove(m)
+    }
+
+    spec test_verify_iter_remove_symbolic {
+        pragma verify = true;
+        requires spec_contains_key(m, k);
+        aborts_if false;
+        ensures result == spec_get(old(m), k);
+        ensures spec_len(m) == spec_len(old(m)) - 1;
+        ensures !spec_contains_key(m, k);
+        // Frame: every other entry survives with its value.
+        ensures forall other: u64 where other != k:
+            spec_contains_key(m, other) == spec_contains_key(old(m), other);
+        ensures forall other: u64 where other != k && spec_contains_key(old(m), other):
+            spec_get(m, other) == spec_get(old(m), other);
+    }
+
+    #[verify_only]
+    fun test_verify_iter_prev_loop_symbolic(m: &BigOrderedMap<u64, u64>): u64 {
+        // Backward traversal over a symbolic map: from End each step decrements
+        // the rank, so the step count measures the distance from the end, and
+        // reaching begin means the whole map was walked.
+        let count = 0u64;
+        let it = m.internal_new_end_iter();
+        while ({
+            spec {
+                invariant spec_iter_valid(it, m);
+                invariant count <= spec_len(m);
+                invariant (it is IteratorPtr::End) ==> count == 0;
+                invariant !(it is IteratorPtr::End) ==>
+                    spec_contains_key(m, it.key)
+                        && spec_rank(m, it.key) == spec_len(m) - count;
+            };
+            !it.iter_is_begin(m)
+        }) {
+            it = it.iter_prev(m);
+            count += 1;
+        };
+        count
+    }
+
+    spec test_verify_iter_prev_loop_symbolic {
+        pragma verify = true;
+        aborts_if false;
+        ensures result == spec_len(m);
+    }
+
+    #[verify_only]
+    fun test_verify_front_remove_drain_symbolic(
+        m: &mut BigOrderedMap<u64, u64>
+    ): u64 {
+        // Peek-then-remove, the shape callers write when they need the key
+        // before deciding: front_key's border rank fact plus the removal splice
+        // keep the map a suffix of the entry map, without going through
+        // pop_front's template.
+        let count = 0u64;
+        while ({
+            spec {
+                invariant count + spec_len(m) == spec_len(old(m));
+                invariant forall i in 0..spec_len(m):
+                    spec_key_at(m, i) == spec_key_at(old(m), i + count);
+                invariant forall i in 0..spec_len(m):
+                    spec_get(m, spec_key_at(m, i)) == spec_get(old(m), spec_key_at(m, i));
+            };
+            !m.is_empty()
+        }) {
+            let k = m.front_key();
+            m.remove(&k);
+            count += 1;
+        };
+        count
+    }
+
+    spec test_verify_front_remove_drain_symbolic {
+        pragma verify = true;
+        aborts_if false;
+        ensures result == spec_len(old(m));
+        ensures spec_len(m) == 0;
+    }
+
+    #[verify_only]
+    fun test_verify_iter_write_loop_symbolic(
+        m: &mut BigOrderedMap<u64, u64>, c: u64
+    ) {
+        // Writing values while traversing: the walk stays valid because a value
+        // write is not a structural mutation, and positions survive it, so the
+        // invariant can say "every position visited so far now holds c".
+        let count = 0u64;
+        let it = m.internal_new_begin_iter();
+        while ({
+            spec {
+                invariant spec_iter_valid(it, m);
+                invariant spec_len(m) == spec_len(old(m));
+                invariant count <= spec_len(m);
+                invariant forall i in 0..spec_len(m):
+                    spec_key_at(m, i) == spec_key_at(old(m), i);
+                invariant !(it is IteratorPtr::End) ==>
+                    spec_contains_key(m, it.key) && spec_rank(m, it.key) == count;
+                invariant (it is IteratorPtr::End) ==>
+                    count == spec_len(m);
+                invariant forall i in 0..count: spec_get(m, spec_key_at(m, i)) == c;
+            };
+            !it.iter_is_end(m)
+        }) {
+            let v_ref = it.iter_borrow_mut(m);
+            *v_ref = c;
+            it = it.iter_next(m);
+            count = count + 1;
+        };
+    }
+
+    spec test_verify_iter_write_loop_symbolic {
+        pragma verify = true;
+        aborts_if false;
+        ensures spec_len(m) == spec_len(old(m));
+        ensures forall i in 0..spec_len(m): spec_key_at(m, i) == spec_key_at(old(m), i);
+        ensures forall i in 0..spec_len(m): spec_get(m, spec_key_at(m, i)) == c;
+    }
+
+    #[verify_only]
+    fun test_verify_find_started_walk_symbolic(
+        m: &BigOrderedMap<u64, u64>, k: u64
+    ): u64 {
+        // Entering the walk at a found key rather than at begin: `internal_find`
+        // pins the iterator to that key, so the step count measures distance
+        // from its rank. This is the shape callers write when resuming from a
+        // known position.
+        let count = 0u64;
+        let it = m.internal_find(&k);
+        while ({
+            spec {
+                invariant spec_iter_valid(it, m);
+                invariant count + spec_rank(m, k) <= spec_len(m);
+                invariant !(it is IteratorPtr::End) ==>
+                    spec_contains_key(m, it.key)
+                        && spec_rank(m, it.key) == spec_rank(m, k) + count;
+                invariant (it is IteratorPtr::End) ==>
+                    count + spec_rank(m, k) == spec_len(m);
+            };
+            !it.iter_is_end(m)
+        }) {
+            it = it.iter_next(m);
+            count += 1;
+        };
+        count
+    }
+
+    spec test_verify_find_started_walk_symbolic {
+        pragma verify = true;
+        requires spec_contains_key(m, k);
+        aborts_if false;
+        ensures result == spec_len(m) - spec_rank(m, k);
+    }
+
+    #[verify_only]
+    fun test_verify_early_exit_walk_symbolic(
+        m: &BigOrderedMap<u64, u64>, target: u64
+    ): bool {
+        // Early exit on the first entry whose value meets a condition. What the
+        // prefix invariant buys: on a negative result every position was
+        // checked, so the answer is complete rather than merely sound.
+        let found = false;
+        let it = m.internal_new_begin_iter();
+        let seen = 0u64;
+        while ({
+            spec {
+                invariant spec_iter_valid(it, m);
+                invariant seen <= spec_len(m);
+                invariant !(it is IteratorPtr::End) ==>
+                    spec_contains_key(m, it.key) && spec_rank(m, it.key) == seen;
+                invariant (it is IteratorPtr::End) ==> seen == spec_len(m);
+                invariant !found ==>
+                    (forall i in 0..seen: spec_get(m, spec_key_at(m, i)) != target);
+            };
+            !found && !it.iter_is_end(m)
+        }) {
+            if (*it.iter_borrow(m) == target) {
+                found = true;
+            } else {
+                it = it.iter_next(m);
+                seen += 1;
+            }
+        };
+        found
+    }
+
+    spec test_verify_early_exit_walk_symbolic {
+        pragma verify = true;
+        aborts_if false;
+        // A false result is complete: no position holds the target.
+        ensures !result ==>
+            (forall i in 0..spec_len(m): spec_get(m, spec_key_at(m, i)) != target);
+    }
+
+    #[verify_only]
+    fun test_verify_bounded_walk_symbolic(
+        m: &BigOrderedMap<u64, u64>, limit: u64
+    ): vector<u64> {
+        // Collect at most `limit` keys — the take-ready shape. The result is the
+        // bounded prefix of the enumeration, not just some subset of the keys.
+        let out = vector[];
+        let it = m.internal_new_begin_iter();
+        while ({
+            spec {
+                invariant spec_iter_valid(it, m);
+                invariant len(out) <= limit && len(out) <= spec_len(m);
+                invariant forall i in 0..len(out): out[i] == spec_key_at(m, i);
+                invariant !(it is IteratorPtr::End) ==>
+                    spec_contains_key(m, it.key) && spec_rank(m, it.key) == len(out);
+                invariant (it is IteratorPtr::End) ==>
+                    len(out) == spec_len(m);
+            };
+            out.length() < limit && !it.iter_is_end(m)
+        }) {
+            out.push_back(*it.iter_borrow_key());
+            it = it.iter_next(m);
+        };
+        out
+    }
+
+    spec test_verify_bounded_walk_symbolic {
+        pragma verify = true;
+        aborts_if false;
+        ensures len(result) == (if (limit < spec_len(m)) limit
+        else spec_len(m));
+        ensures forall i in 0..len(result): result[i] == spec_key_at(m, i);
+    }
+
+    #[verify_only]
+    fun test_verify_keys_for_loop_symbolic(m: &BigOrderedMap<u64, u64>): u64 {
+        // Walking `keys()` with a `for` loop and summing the values it points
+        // at. The loop variable is a vector index, so this only closes if the
+        // returned vector agrees position-wise with the enumeration.
+        let ks = m.keys();
+        let sum = 0u64;
+        let n = ks.length();
+        for (i in 0..n) {
+            sum += *m.borrow(ks.borrow(i));
+        }
+
+        spec {
+            invariant n == spec_len(m);
+            invariant i <= spec_len(m);
+            invariant sum == spec_test_sum_upto(m, i);
+        };
+        sum
+    }
+
+    spec test_verify_keys_for_loop_symbolic {
+        pragma verify = true;
+        // Aborts unspecified: the running u64 addition can overflow.
+        ensures result == spec_test_sum_upto(m, spec_len(m));
+    }
+
+    #[verify_only]
+    fun test_verify_next_key_scan_symbolic(m: &BigOrderedMap<u64, u64>): u64 {
+        // Key stepping rather than iterators: start at the front and follow
+        // `next_key` to the end, the shape of a full scan that holds no
+        // iterator across calls. Counting the steps requires knowing that a
+        // successor sits one position later.
+        let count = 1u64;
+        let k = m.front_key();
+        let nxt = m.next_key(&k);
+        while ({
+            spec {
+                invariant spec_contains_key(m, k);
+                invariant spec_rank(m, k) == count - 1;
+                invariant count <= spec_len(m);
+                invariant option::spec_is_some(nxt) ==>
+                    spec_contains_key(m, option::spec_borrow(nxt))
+                        && spec_rank(m, option::spec_borrow(nxt)) == count;
+                invariant option::spec_is_none(nxt) ==>
+                    count == spec_len(m);
+            };
+            nxt.is_some()
+        }) {
+            k = *nxt.borrow();
+            nxt = m.next_key(&k);
+            count += 1;
+        };
+        count
+    }
+
+    spec test_verify_next_key_scan_symbolic {
+        pragma verify = true;
+        requires spec_len(m) > 0;
+        aborts_if false;
+        ensures result == spec_len(m);
+    }
+
+    #[verify_only]
+    fun test_verify_insert_shift_symbolic(
+        m: &mut BigOrderedMap<u64, u64>, k: u64, v: u64
+    ) {
+        // An insertion splices a position in: everything before the new key
+        // keeps its position, everything after moves up by one. Enumeration
+        // facts surviving an insert is what lets a caller reason about a map it
+        // has just added to.
+        m.add(k, v);
+    }
+
+    spec test_verify_insert_shift_symbolic {
+        pragma verify = true;
+        requires !spec_contains_key(m, k);
+        ensures spec_contains_key(m, k);
+        ensures spec_len(m) == spec_len(old(m)) + 1;
+        ensures spec_get(m, k) == v;
+        ensures forall i in 0..spec_rank(m, k):
+            spec_key_at(m, i) == spec_key_at(old(m), i);
+        ensures forall i in (spec_rank(m, k) + 1)..spec_len(m):
+            spec_key_at(m, i) == spec_key_at(old(m), i - 1);
+    }
+
+    #[verify_only]
+    fun test_verify_lower_bound_scan_start_symbolic(
+        m: &BigOrderedMap<u64, u64>, k: u64
+    ): IteratorPtr<u64> {
+        // Where a range scan begins. The search is characterized by comparison,
+        // so these are the facts that carry it into the enumeration; no clause of
+        // its own is needed, unlike the ordered_map case, because that
+        // characterization quantifies over keys and so instantiates at the key
+        // being searched for.
+        m.internal_lower_bound(&k)
+    }
+
+    spec test_verify_lower_bound_scan_start_symbolic {
+        pragma verify = true;
+        aborts_if false;
+        // A scan starting here has skipped only smaller keys.
+        ensures !iter_is_end(result, m) ==>
+            (
+                forall i in 0..spec_rank(m, result.key):
+                    std::cmp::compare(spec_key_at(m, i), k) == std::cmp::Ordering::Less
+            );
+        // A key that is present is landed on, not skipped past.
+        ensures spec_contains_key(m, k) ==>
+            !iter_is_end(result, m) && result.key == k;
+    }
+
+    #[verify_only]
+    fun test_verify_iter_modify_ranks_symbolic(
+        m: &mut BigOrderedMap<u64, u64>, k: u64
+    ): u64 {
+        // Writing a value through an iterator leaves the key set alone, so every
+        // position is untouched — what a traversal needs in order to keep a
+        // position-indexed invariant while updating as it goes.
+        let it = m.internal_find(&k);
+        it.iter_modify(m, |v| {
+            *v = 7;
+            *v
+        })
+    }
+
+    spec test_verify_iter_modify_ranks_symbolic {
+        pragma verify = true;
+        requires spec_contains_key(m, k);
+        aborts_if false;
+        ensures result == 7;
+        ensures spec_get(m, k) == 7;
+        ensures spec_len(m) == spec_len(old(m));
+        ensures forall i in 0..spec_len(m): spec_key_at(m, i) == spec_key_at(old(m), i);
+        ensures spec_rank(m, k) == spec_rank(old(m), k);
+    }
+
+    #[verify_only]
+    fun test_verify_iter_remove_shift_symbolic(
+        m: &mut BigOrderedMap<u64, u64>, k: u64
+    ): u64 {
+        // The mirror of the insert splice: removing through an iterator closes
+        // the position up, so keys before the removed one stay put and keys
+        // after it move down by one.
+        let it = m.internal_find_with_path(&k);
+        it.iter_remove(m)
+    }
+
+    spec test_verify_iter_remove_shift_symbolic {
+        pragma verify = true;
+        requires spec_contains_key(m, k);
+        aborts_if false;
+        ensures result == spec_get(old(m), k);
+        ensures !spec_contains_key(m, k);
+        ensures spec_len(m) == spec_len(old(m)) - 1;
+        ensures forall i in 0..spec_rank(old(m), k):
+            spec_key_at(m, i) == spec_key_at(old(m), i);
+        ensures forall i in spec_rank(old(m), k)..spec_len(m):
+            spec_key_at(m, i) == spec_key_at(old(m), i + 1);
+    }
+
+    #[verify_only]
+    fun test_verify_leaf_walk_sum_symbolic(m: &BigOrderedMap<u64, u64>): u64 {
+        // The shape `for_each_ref` expands into: an outer walk over leaves and
+        // an inner walk over each leaf's entries. The leaf offset carries the
+        // aggregate across the nesting, so the total is the sum over every key
+        // — which needs the leaves to tile the enumeration, not merely to hold
+        // real entries.
+        let sum = 0u64;
+        let it = m.internal_leaf_new_begin_iter();
+        while ({
+            spec {
+                invariant spec_leaf_iter_valid(it, m);
+                invariant 0 <= spec_leaf_offset(it, m)
+                    && spec_leaf_offset(it, m) <= spec_len(m);
+                // Carried, not just stated at the producer: the loop head
+                // havocs `it`, so without this the walk could exit early.
+                invariant internal_leaf_iter_is_end(it) ==>
+                    spec_leaf_offset(it, m) == spec_len(m);
+                invariant sum == spec_test_sum_upto(m, spec_leaf_offset(it, m));
+            };
+            !it.internal_leaf_iter_is_end()
+        }) {
+            let (entries, next_it) =
+                it.internal_leaf_iter_borrow_entries_and_next_leaf_index(m);
+            let oit = entries.internal_new_begin_iter();
+            while ({
+                spec {
+                    // `it` does not move during the inner walk, so its offset is
+                    // the stable base for the positions being consumed here.
+                    invariant !(oit is ordered_map::IteratorPtr::End) ==>
+                        oit.index < ordered_map::spec_len(entries);
+                    invariant sum
+                        == spec_test_sum_upto(
+                            m,
+                            spec_leaf_offset(it, m)
+                                + (
+                                    if (oit is ordered_map::IteratorPtr::End)
+                                        ordered_map::spec_len(entries)
+                                    else oit.index
+                                )
+                        );
+                };
+                !oit.iter_is_end(entries)
+            }) {
+                sum += *oit.iter_borrow(entries).internal_leaf_borrow_value();
+                oit = oit.iter_next(entries);
+            };
+            it = next_it;
+        };
+        sum
+    }
+
+    spec test_verify_leaf_walk_sum_symbolic {
+        pragma verify = true;
+        // Aborts unspecified: the running u64 addition can overflow.
+        ensures result == spec_test_sum_upto(m, spec_len(m));
+    }
+}

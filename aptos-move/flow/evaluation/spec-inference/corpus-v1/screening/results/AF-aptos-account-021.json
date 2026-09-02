@@ -1,0 +1,77 @@
+{
+  "compile": {
+    "argv": [
+      "move-flow",
+      "experiment",
+      "check-package",
+      "--package",
+      "/tmp/move-inference-screen-AF-aptos-account-021-fy1w9ruc/package",
+      "--output",
+      "/tmp/move-inference-compatibility-kziu37tf/stage.json"
+    ],
+    "duration_ms": 29246,
+    "infrastructure_error": null,
+    "returncode": 0,
+    "stage_report": {
+      "diagnostics": [],
+      "passed": true,
+      "schema_version": 1,
+      "stage": "compile",
+      "target": null
+    },
+    "stderr": "",
+    "stdout": "",
+    "timed_out": false
+  },
+  "enriched_compile": null,
+  "failure_kind": "compatibility_timeout",
+  "package_sha256": "d014e857f9c4c6135aa8af9d04887be7e7d051580e6d452faea9ee524b06d8be",
+  "passed": false,
+  "prover": null,
+  "removed_flagged_inferred_conditions": 0,
+  "schema_version": 4,
+  "target": "0x1::aptos_account",
+  "threshold_exceeded_stage": "wp_inference",
+  "threshold_seconds": 40,
+  "tool_executables": {
+    "compile": {
+      "path": "/home/wrw/aptos-core/.worktrees/dev2/target/debug/move-flow",
+      "sha256": "1d9feeef579e86ddb382c9be0ceb5e4a594b5ae09e4dcaefd7cac7bcb41dfb26"
+    },
+    "enriched_compile": {
+      "path": "/home/wrw/aptos-core/.worktrees/dev2/target/debug/move-flow",
+      "sha256": "1d9feeef579e86ddb382c9be0ceb5e4a594b5ae09e4dcaefd7cac7bcb41dfb26"
+    },
+    "prover": {
+      "path": "/home/wrw/aptos-core/.worktrees/dev2/target/debug/move-flow",
+      "sha256": "1d9feeef579e86ddb382c9be0ceb5e4a594b5ae09e4dcaefd7cac7bcb41dfb26"
+    },
+    "wp_inference": {
+      "path": "/home/wrw/aptos-core/.worktrees/dev2/target/debug/move-flow",
+      "sha256": "1d9feeef579e86ddb382c9be0ceb5e4a594b5ae09e4dcaefd7cac7bcb41dfb26"
+    }
+  },
+  "total_duration_ms": 69326,
+  "unused_alias_cleanup": null,
+  "wp_inference": {
+    "argv": [
+      "move-flow",
+      "experiment",
+      "infer",
+      "--package",
+      "/tmp/move-inference-compatibility-kziu37tf/enriched-package",
+      "--target",
+      "0x1::aptos_account",
+      "--write-inferred-specs",
+      "--output",
+      "/tmp/move-inference-compatibility-kziu37tf/stage.json"
+    ],
+    "duration_ms": 40080,
+    "infrastructure_error": null,
+    "returncode": -15,
+    "stage_report": null,
+    "stderr": "",
+    "stdout": "",
+    "timed_out": true
+  }
+}

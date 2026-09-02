@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "stage": "prover",
+  "target": "0x5::bulk_order_types::trim_sizes_start",
+  "passed": true,
+  "diagnostics": []
+}

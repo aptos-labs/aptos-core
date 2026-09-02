@@ -1,0 +1,1013 @@
+diff --git a/.move-inference-task.json b/.move-inference-task.json
+new file mode 100644
+index 0000000000..d81af592b4
+--- /dev/null
++++ b/.move-inference-task.json
+@@ -0,0 +1,590 @@
++{
++  "called_function_dependencies": [
++    "0x1::event::emit",
++    "0x1::event::write_module_event_to_store",
++    "0x1::option::destroy_with_default",
++    "0x1::option::none",
++    "0x1::option::some",
++    "0x1::signer::address_of",
++    "0x1::vector::borrow",
++    "0x1::vector::length",
++    "0x5::bulk_order_types::destroy_bulk_order",
++    "0x5::bulk_order_types::destroy_bulk_order_place_response_rejection",
++    "0x5::bulk_order_types::destroy_bulk_order_place_response_success",
++    "0x5::bulk_order_types::destroy_bulk_order_request",
++    "0x5::bulk_order_types::is_success_response",
++    "0x5::bulk_order_types::new_bulk_order_place_response_rejection",
++    "0x5::bulk_order_types::set_empty",
++    "0x7::bulk_order_book::cancel_bulk_order",
++    "0x7::bulk_order_book::place_bulk_order",
++    "0x7::bulk_order_utils::new_bulk_order_request_with_sanitization",
++    "0x7::bulk_order_utils::validate_not_zero_sizes",
++    "0x7::bulk_order_utils::validate_price_ordering",
++    "0x7::market_bulk_order::cancel_bulk_order_internal",
++    "0x7::market_types::cleanup_bulk_order_at_price",
++    "0x7::market_types::emit_event_for_bulk_order_cancelled",
++    "0x7::market_types::emit_event_for_bulk_order_placed",
++    "0x7::market_types::emit_event_for_bulk_order_rejection",
++    "0x7::market_types::get_order_book_mut",
++    "0x7::market_types::is_validation_result_valid",
++    "0x7::market_types::place_bulk_order",
++    "0x7::market_types::validate_bulk_order_placement",
++    "0x7::order_book::cancel_bulk_order",
++    "0x7::order_book::place_bulk_order"
++  ],
++  "granularity": "module",
++  "package_module_target": "0x7::market_bulk_order",
++  "schema_version": 3,
++  "source_commit": "6d836beedc56fc70c54f3b3046d1d248d850c64b",
++  "source_path": "sources/AptosExperimental/trading/market/market_bulk_order.move",
++  "spec_function_dependencies": [
++    "0x1::big_ordered_map::spec_contains_key",
++    "0x1::big_ordered_map::spec_get",
++    "0x1::option::$borrow",
++    "0x1::option::$is_none",
++    "0x1::option::$is_some",
++    "0x1::option::$some",
++    "0x1::option::spec_none",
++    "0x1::option::spec_some",
++    "0x1::signer::$borrow_address",
++    "0x5::bulk_order_types::$new_bulk_order_request",
++    "0x5::order_book_types::$get_order_id_value"
++  ],
++  "target_functions": [
++    "cancel_bulk_order",
++    "place_bulk_order",
++    "cancel_bulk_order_internal"
++  ],
++  "task_id": "AX-market-bulk-order-004",
++  "transitive_called_function_dependencies": [
++    "0x1::bcs::serialized_size",
++    "0x1::big_ordered_map::add",
++    "0x1::big_ordered_map::add_at",
++    "0x1::big_ordered_map::add_or_upsert_impl",
++    "0x1::big_ordered_map::borrow_back",
++    "0x1::big_ordered_map::borrow_front",
++    "0x1::big_ordered_map::destroy_empty_node",
++    "0x1::big_ordered_map::destroy_inner_child",
++    "0x1::big_ordered_map::find_leaf_path",
++    "0x1::big_ordered_map::get_max_degree",
++    "0x1::big_ordered_map::internal_new_begin_iter",
++    "0x1::big_ordered_map::internal_new_end_iter",
++    "0x1::big_ordered_map::is_empty",
++    "0x1::big_ordered_map::iter_borrow",
++    "0x1::big_ordered_map::iter_borrow_key",
++    "0x1::big_ordered_map::iter_is_end",
++    "0x1::big_ordered_map::iter_prev",
++    "0x1::big_ordered_map::new_inner_child",
++    "0x1::big_ordered_map::new_iter",
++    "0x1::big_ordered_map::new_leaf_child",
++    "0x1::big_ordered_map::new_node",
++    "0x1::big_ordered_map::new_node_with_children",
++    "0x1::big_ordered_map::process_rebalance_after_child_removal",
++    "0x1::big_ordered_map::remove",
++    "0x1::big_ordered_map::remove_at_with_iter_hint",
++    "0x1::big_ordered_map::remove_or_none",
++    "0x1::big_ordered_map::replace_root",
++    "0x1::big_ordered_map::update_key",
++    "0x1::big_ordered_map::validate_dynamic_size_and_init_max_degrees",
++    "0x1::big_ordered_map::validate_size_and_init_max_degrees",
++    "0x1::cmp::compare",
++    "0x1::cmp::is_eq",
++    "0x1::cmp::is_gt",
++    "0x1::cmp::is_lt",
++    "0x1::error::canonical",
++    "0x1::error::invalid_argument",
++    "0x1::error::invalid_state",
++    "0x1::event::emit",
++    "0x1::event::write_module_event_to_store",
++    "0x1::math64::max",
++    "0x1::math64::min",
++    "0x1::mem::replace",
++    "0x1::mem::swap",
++    "0x1::option::borrow",
++    "0x1::option::borrow_mut",
++    "0x1::option::destroy_none",
++    "0x1::option::destroy_some",
++    "0x1::option::destroy_with_default",
++    "0x1::option::fill",
++    "0x1::option::is_none",
++    "0x1::option::is_some",
++    "0x1::option::none",
++    "0x1::option::some",
++    "0x1::ordered_map::add",
++    "0x1::ordered_map::append_disjoint",
++    "0x1::ordered_map::append_impl",
++    "0x1::ordered_map::binary_search",
++    "0x1::ordered_map::destroy_empty",
++    "0x1::ordered_map::internal_find",
++    "0x1::ordered_map::internal_lower_bound",
++    "0x1::ordered_map::internal_new_begin_iter",
++    "0x1::ordered_map::internal_new_end_iter",
++    "0x1::ordered_map::is_empty",
++    "0x1::ordered_map::iter_add",
++    "0x1::ordered_map::iter_borrow",
++    "0x1::ordered_map::iter_borrow_key",
++    "0x1::ordered_map::iter_is_begin",
++    "0x1::ordered_map::iter_is_end",
++    "0x1::ordered_map::iter_prev",
++    "0x1::ordered_map::iter_remove",
++    "0x1::ordered_map::iter_replace",
++    "0x1::ordered_map::length",
++    "0x1::ordered_map::new",
++    "0x1::ordered_map::remove",
++    "0x1::ordered_map::remove_or_none",
++    "0x1::ordered_map::replace_key_inplace",
++    "0x1::ordered_map::trim",
++    "0x1::ordered_map::upsert",
++    "0x1::signer::address_of",
++    "0x1::signer::borrow_address",
++    "0x1::storage_slots_allocator::add_link",
++    "0x1::storage_slots_allocator::borrow",
++    "0x1::storage_slots_allocator::borrow_mut",
++    "0x1::storage_slots_allocator::fill_reserved_slot",
++    "0x1::storage_slots_allocator::free_reserved_slot",
++    "0x1::storage_slots_allocator::maybe_pop_from_reuse_queue",
++    "0x1::storage_slots_allocator::maybe_push_to_reuse_queue",
++    "0x1::storage_slots_allocator::next_slot_index",
++    "0x1::storage_slots_allocator::remove",
++    "0x1::storage_slots_allocator::remove_and_reserve",
++    "0x1::storage_slots_allocator::remove_link",
++    "0x1::storage_slots_allocator::reserve_slot",
++    "0x1::storage_slots_allocator::reserved_to_index",
++    "0x1::storage_slots_allocator::stored_to_index",
++    "0x1::table::add",
++    "0x1::table::add_box",
++    "0x1::table::borrow",
++    "0x1::table::borrow_box",
++    "0x1::table::borrow_box_mut",
++    "0x1::table::borrow_mut",
++    "0x1::table::new",
++    "0x1::table::new_table_handle",
++    "0x1::table::remove",
++    "0x1::table::remove_box",
++    "0x1::table_with_length::add",
++    "0x1::table_with_length::borrow",
++    "0x1::table_with_length::borrow_mut",
++    "0x1::table_with_length::new",
++    "0x1::table_with_length::remove",
++    "0x1::timestamp::now_microseconds",
++    "0x1::transaction_context::monotonically_increasing_counter",
++    "0x1::transaction_context::monotonically_increasing_counter_internal",
++    "0x1::transaction_context::monotonically_increasing_counter_internal_for_test_only",
++    "0x1::vector::append",
++    "0x1::vector::borrow",
++    "0x1::vector::borrow_mut",
++    "0x1::vector::destroy_empty",
++    "0x1::vector::empty",
++    "0x1::vector::insert",
++    "0x1::vector::is_empty",
++    "0x1::vector::length",
++    "0x1::vector::move_range",
++    "0x1::vector::pop_back",
++    "0x1::vector::push_back",
++    "0x1::vector::remove",
++    "0x1::vector::replace",
++    "0x1::vector::reverse",
++    "0x1::vector::reverse_append",
++    "0x1::vector::reverse_slice",
++    "0x1::vector::singleton",
++    "0x1::vector::swap",
++    "0x1::vector::trim",
++    "0x5::bulk_order_types::destroy_bulk_order",
++    "0x5::bulk_order_types::destroy_bulk_order_place_response_rejection",
++    "0x5::bulk_order_types::destroy_bulk_order_place_response_success",
++    "0x5::bulk_order_types::destroy_bulk_order_request",
++    "0x5::bulk_order_types::get_account",
++    "0x5::bulk_order_types::get_active_price",
++    "0x5::bulk_order_types::get_active_size",
++    "0x5::bulk_order_types::get_all_prices",
++    "0x5::bulk_order_types::get_all_prices_mut",
++    "0x5::bulk_order_types::get_all_sizes_mut",
++    "0x5::bulk_order_types::get_order_id",
++    "0x5::bulk_order_types::get_order_request",
++    "0x5::bulk_order_types::get_sequence_number",
++    "0x5::bulk_order_types::get_unique_priority_idx",
++    "0x5::bulk_order_types::is_success_response",
++    "0x5::bulk_order_types::new_bulk_order",
++    "0x5::bulk_order_types::new_bulk_order_place_response_rejection",
++    "0x5::bulk_order_types::new_bulk_order_place_response_success",
++    "0x5::bulk_order_types::new_bulk_order_request",
++    "0x5::bulk_order_types::set_empty",
++    "0x5::order_book_types::bulk_order_type",
++    "0x5::order_book_types::get_order_id_value",
++    "0x5::order_book_types::into_decreasing_idx_type",
++    "0x5::order_book_types::new_order_id_type",
++    "0x5::order_book_types::next_increasing_idx_type",
++    "0x7::bulk_order_book::activate_first_price_level_for_side",
++    "0x7::bulk_order_book::activate_first_price_levels",
++    "0x7::bulk_order_book::cancel_active_order_for_side",
++    "0x7::bulk_order_book::cancel_active_orders",
++    "0x7::bulk_order_book::cancel_bulk_order",
++    "0x7::bulk_order_book::place_bulk_order",
++    "0x7::bulk_order_utils::discard_price_crossing_levels",
++    "0x7::bulk_order_utils::new_bulk_order_request_with_sanitization",
++    "0x7::bulk_order_utils::new_bulk_order_with_sanitization",
++    "0x7::bulk_order_utils::trim_start",
++    "0x7::bulk_order_utils::validate_not_zero_sizes",
++    "0x7::bulk_order_utils::validate_price_ordering",
++    "0x7::market_bulk_order::cancel_bulk_order_internal",
++    "0x7::market_types::cleanup_bulk_order_at_price",
++    "0x7::market_types::emit_event_for_bulk_order_cancelled",
++    "0x7::market_types::emit_event_for_bulk_order_placed",
++    "0x7::market_types::emit_event_for_bulk_order_rejection",
++    "0x7::market_types::get_order_book_mut",
++    "0x7::market_types::is_validation_result_valid",
++    "0x7::market_types::place_bulk_order",
++    "0x7::market_types::validate_bulk_order_placement",
++    "0x7::order_book::cancel_bulk_order",
++    "0x7::order_book::place_bulk_order",
++    "0x7::order_id_generation::next_order_id",
++    "0x7::order_id_generation::reverse_bits",
++    "0x7::price_time_index::best_ask_price",
++    "0x7::price_time_index::best_bid_price",
++    "0x7::price_time_index::cancel_active_order",
++    "0x7::price_time_index::is_taker_order",
++    "0x7::price_time_index::place_maker_order"
++  ],
++  "transitive_function_dependencies": [
++    "0x1::bcs::serialized_size",
++    "0x1::big_ordered_map::add",
++    "0x1::big_ordered_map::add_at",
++    "0x1::big_ordered_map::add_or_upsert_impl",
++    "0x1::big_ordered_map::borrow_back",
++    "0x1::big_ordered_map::borrow_front",
++    "0x1::big_ordered_map::destroy_empty_node",
++    "0x1::big_ordered_map::destroy_inner_child",
++    "0x1::big_ordered_map::find_leaf_path",
++    "0x1::big_ordered_map::get_max_degree",
++    "0x1::big_ordered_map::internal_new_begin_iter",
++    "0x1::big_ordered_map::internal_new_end_iter",
++    "0x1::big_ordered_map::is_empty",
++    "0x1::big_ordered_map::iter_borrow",
++    "0x1::big_ordered_map::iter_borrow_key",
++    "0x1::big_ordered_map::iter_is_end",
++    "0x1::big_ordered_map::iter_prev",
++    "0x1::big_ordered_map::new_inner_child",
++    "0x1::big_ordered_map::new_iter",
++    "0x1::big_ordered_map::new_leaf_child",
++    "0x1::big_ordered_map::new_node",
++    "0x1::big_ordered_map::new_node_with_children",
++    "0x1::big_ordered_map::process_rebalance_after_child_removal",
++    "0x1::big_ordered_map::remove",
++    "0x1::big_ordered_map::remove_at_with_iter_hint",
++    "0x1::big_ordered_map::remove_or_none",
++    "0x1::big_ordered_map::replace_root",
++    "0x1::big_ordered_map::update_key",
++    "0x1::big_ordered_map::validate_dynamic_size_and_init_max_degrees",
++    "0x1::big_ordered_map::validate_size_and_init_max_degrees",
++    "0x1::cmp::compare",
++    "0x1::cmp::is_eq",
++    "0x1::cmp::is_gt",
++    "0x1::cmp::is_lt",
++    "0x1::error::canonical",
++    "0x1::error::invalid_argument",
++    "0x1::error::invalid_state",
++    "0x1::event::emit",
++    "0x1::event::write_module_event_to_store",
++    "0x1::math64::max",
++    "0x1::math64::min",
++    "0x1::mem::replace",
++    "0x1::mem::swap",
++    "0x1::option::borrow",
++    "0x1::option::borrow_mut",
++    "0x1::option::destroy_none",
++    "0x1::option::destroy_some",
++    "0x1::option::destroy_with_default",
++    "0x1::option::fill",
++    "0x1::option::is_none",
++    "0x1::option::is_some",
++    "0x1::option::none",
++    "0x1::option::some",
++    "0x1::ordered_map::add",
++    "0x1::ordered_map::append_disjoint",
++    "0x1::ordered_map::append_impl",
++    "0x1::ordered_map::binary_search",
++    "0x1::ordered_map::destroy_empty",
++    "0x1::ordered_map::internal_find",
++    "0x1::ordered_map::internal_lower_bound",
++    "0x1::ordered_map::internal_new_begin_iter",
++    "0x1::ordered_map::internal_new_end_iter",
++    "0x1::ordered_map::is_empty",
++    "0x1::ordered_map::iter_add",
++    "0x1::ordered_map::iter_borrow",
++    "0x1::ordered_map::iter_borrow_key",
++    "0x1::ordered_map::iter_is_begin",
++    "0x1::ordered_map::iter_is_end",
++    "0x1::ordered_map::iter_prev",
++    "0x1::ordered_map::iter_remove",
++    "0x1::ordered_map::iter_replace",
++    "0x1::ordered_map::length",
++    "0x1::ordered_map::new",
++    "0x1::ordered_map::remove",
++    "0x1::ordered_map::remove_or_none",
++    "0x1::ordered_map::replace_key_inplace",
++    "0x1::ordered_map::trim",
++    "0x1::ordered_map::upsert",
++    "0x1::signer::address_of",
++    "0x1::signer::borrow_address",
++    "0x1::storage_slots_allocator::add_link",
++    "0x1::storage_slots_allocator::borrow",
++    "0x1::storage_slots_allocator::borrow_mut",
++    "0x1::storage_slots_allocator::fill_reserved_slot",
++    "0x1::storage_slots_allocator::free_reserved_slot",
++    "0x1::storage_slots_allocator::maybe_pop_from_reuse_queue",
++    "0x1::storage_slots_allocator::maybe_push_to_reuse_queue",
++    "0x1::storage_slots_allocator::next_slot_index",
++    "0x1::storage_slots_allocator::remove",
++    "0x1::storage_slots_allocator::remove_and_reserve",
++    "0x1::storage_slots_allocator::remove_link",
++    "0x1::storage_slots_allocator::reserve_slot",
++    "0x1::storage_slots_allocator::reserved_to_index",
++    "0x1::storage_slots_allocator::stored_to_index",
++    "0x1::table::add",
++    "0x1::table::add_box",
++    "0x1::table::borrow",
++    "0x1::table::borrow_box",
++    "0x1::table::borrow_box_mut",
++    "0x1::table::borrow_mut",
++    "0x1::table::new",
++    "0x1::table::new_table_handle",
++    "0x1::table::remove",
++    "0x1::table::remove_box",
++    "0x1::table_with_length::add",
++    "0x1::table_with_length::borrow",
++    "0x1::table_with_length::borrow_mut",
++    "0x1::table_with_length::new",
++    "0x1::table_with_length::remove",
++    "0x1::timestamp::now_microseconds",
++    "0x1::transaction_context::monotonically_increasing_counter",
++    "0x1::transaction_context::monotonically_increasing_counter_internal",
++    "0x1::transaction_context::monotonically_increasing_counter_internal_for_test_only",
++    "0x1::vector::append",
++    "0x1::vector::borrow",
++    "0x1::vector::borrow_mut",
++    "0x1::vector::destroy_empty",
++    "0x1::vector::empty",
++    "0x1::vector::insert",
++    "0x1::vector::is_empty",
++    "0x1::vector::length",
++    "0x1::vector::move_range",
++    "0x1::vector::pop_back",
++    "0x1::vector::push_back",
++    "0x1::vector::remove",
++    "0x1::vector::replace",
++    "0x1::vector::reverse",
++    "0x1::vector::reverse_append",
++    "0x1::vector::reverse_slice",
++    "0x1::vector::singleton",
++    "0x1::vector::swap",
++    "0x1::vector::trim",
++    "0x5::bulk_order_types::destroy_bulk_order",
++    "0x5::bulk_order_types::destroy_bulk_order_place_response_rejection",
++    "0x5::bulk_order_types::destroy_bulk_order_place_response_success",
++    "0x5::bulk_order_types::destroy_bulk_order_request",
++    "0x5::bulk_order_types::get_account",
++    "0x5::bulk_order_types::get_active_price",
++    "0x5::bulk_order_types::get_active_size",
++    "0x5::bulk_order_types::get_all_prices",
++    "0x5::bulk_order_types::get_all_prices_mut",
++    "0x5::bulk_order_types::get_all_sizes_mut",
++    "0x5::bulk_order_types::get_order_id",
++    "0x5::bulk_order_types::get_order_request",
++    "0x5::bulk_order_types::get_sequence_number",
++    "0x5::bulk_order_types::get_unique_priority_idx",
++    "0x5::bulk_order_types::is_success_response",
++    "0x5::bulk_order_types::new_bulk_order",
++    "0x5::bulk_order_types::new_bulk_order_place_response_rejection",
++    "0x5::bulk_order_types::new_bulk_order_place_response_success",
++    "0x5::bulk_order_types::new_bulk_order_request",
++    "0x5::bulk_order_types::set_empty",
++    "0x5::order_book_types::bulk_order_type",
++    "0x5::order_book_types::get_order_id_value",
++    "0x5::order_book_types::into_decreasing_idx_type",
++    "0x5::order_book_types::new_order_id_type",
++    "0x5::order_book_types::next_increasing_idx_type",
++    "0x7::bulk_order_book::activate_first_price_level_for_side",
++    "0x7::bulk_order_book::activate_first_price_levels",
++    "0x7::bulk_order_book::cancel_active_order_for_side",
++    "0x7::bulk_order_book::cancel_active_orders",
++    "0x7::bulk_order_book::cancel_bulk_order",
++    "0x7::bulk_order_book::place_bulk_order",
++    "0x7::bulk_order_utils::discard_price_crossing_levels",
++    "0x7::bulk_order_utils::new_bulk_order_request_with_sanitization",
++    "0x7::bulk_order_utils::new_bulk_order_with_sanitization",
++    "0x7::bulk_order_utils::trim_start",
++    "0x7::bulk_order_utils::validate_not_zero_sizes",
++    "0x7::bulk_order_utils::validate_price_ordering",
++    "0x7::market_bulk_order::cancel_bulk_order_internal",
++    "0x7::market_types::cleanup_bulk_order_at_price",
++    "0x7::market_types::emit_event_for_bulk_order_cancelled",
++    "0x7::market_types::emit_event_for_bulk_order_placed",
++    "0x7::market_types::emit_event_for_bulk_order_rejection",
++    "0x7::market_types::get_order_book_mut",
++    "0x7::market_types::is_validation_result_valid",
++    "0x7::market_types::place_bulk_order",
++    "0x7::market_types::validate_bulk_order_placement",
++    "0x7::order_book::cancel_bulk_order",
++    "0x7::order_book::place_bulk_order",
++    "0x7::order_id_generation::next_order_id",
++    "0x7::order_id_generation::reverse_bits",
++    "0x7::price_time_index::best_ask_price",
++    "0x7::price_time_index::best_bid_price",
++    "0x7::price_time_index::cancel_active_order",
++    "0x7::price_time_index::is_taker_order",
++    "0x7::price_time_index::place_maker_order"
++  ],
++  "transitive_module_dependencies": [
++    "0x1::account",
++    "0x1::account_abstraction",
++    "0x1::aggregator",
++    "0x1::aggregator_factory",
++    "0x1::aggregator_v2",
++    "0x1::any",
++    "0x1::aptos_account",
++    "0x1::aptos_coin",
++    "0x1::aptos_governance",
++    "0x1::aptos_hash",
++    "0x1::auth_data",
++    "0x1::bcs",
++    "0x1::bcs_stream",
++    "0x1::big_ordered_map",
++    "0x1::block",
++    "0x1::bls12381",
++    "0x1::bn254_algebra",
++    "0x1::chain_id",
++    "0x1::chain_status",
++    "0x1::chunky_dkg",
++    "0x1::chunky_dkg_config",
++    "0x1::chunky_dkg_config_seqnum",
++    "0x1::cmp",
++    "0x1::code",
++    "0x1::coin",
++    "0x1::comparator",
++    "0x1::confidential_amount",
++    "0x1::confidential_asset",
++    "0x1::confidential_balance",
++    "0x1::confidential_range_proofs",
++    "0x1::config_buffer",
++    "0x1::consensus_config",
++    "0x1::copyable_any",
++    "0x1::create_signer",
++    "0x1::crypto_algebra",
++    "0x1::decryption",
++    "0x1::delegation_pool",
++    "0x1::dispatchable_fungible_asset",
++    "0x1::dkg",
++    "0x1::ed25519",
++    "0x1::epoch_timeout_config",
++    "0x1::error",
++    "0x1::event",
++    "0x1::execution_config",
++    "0x1::features",
++    "0x1::federated_keyless",
++    "0x1::fixed_point32",
++    "0x1::fixed_point64",
++    "0x1::from_bcs",
++    "0x1::function_info",
++    "0x1::fungible_asset",
++    "0x1::gas_schedule",
++    "0x1::genesis",
++    "0x1::governance_proposal",
++    "0x1::guid",
++    "0x1::hash",
++    "0x1::init",
++    "0x1::jwk_consensus_config",
++    "0x1::jwks",
++    "0x1::keyless",
++    "0x1::keyless_account",
++    "0x1::math128",
++    "0x1::math64",
++    "0x1::math_fixed64",
++    "0x1::mem",
++    "0x1::multi_ed25519",
++    "0x1::multi_key",
++    "0x1::multisig_account",
++    "0x1::nonce_validation",
++    "0x1::object",
++    "0x1::option",
++    "0x1::optional_aggregator",
++    "0x1::ordered_map",
++    "0x1::pool_u64",
++    "0x1::pool_u64_unbound",
++    "0x1::primary_fungible_store",
++    "0x1::randomness",
++    "0x1::randomness_api_v0_config",
++    "0x1::randomness_config",
++    "0x1::randomness_config_seqnum",
++    "0x1::reconfiguration",
++    "0x1::reconfiguration_state",
++    "0x1::reconfiguration_with_dkg",
++    "0x1::reflect",
++    "0x1::resource_account",
++    "0x1::result",
++    "0x1::ristretto255",
++    "0x1::ristretto255_bulletproofs",
++    "0x1::ristretto255_pedersen",
++    "0x1::secp256k1",
++    "0x1::secp256r1",
++    "0x1::sigma_protocol",
++    "0x1::sigma_protocol_fiat_shamir",
++    "0x1::sigma_protocol_homomorphism",
++    "0x1::sigma_protocol_key_rotation",
++    "0x1::sigma_protocol_proof",
++    "0x1::sigma_protocol_registration",
++    "0x1::sigma_protocol_representation",
++    "0x1::sigma_protocol_representation_vec",
++    "0x1::sigma_protocol_statement",
++    "0x1::sigma_protocol_statement_builder",
++    "0x1::sigma_protocol_transfer",
++    "0x1::sigma_protocol_utils",
++    "0x1::sigma_protocol_withdraw",
++    "0x1::sigma_protocol_witness",
++    "0x1::signer",
++    "0x1::simple_map",
++    "0x1::single_key",
++    "0x1::smart_table",
++    "0x1::stake",
++    "0x1::staking_config",
++    "0x1::staking_contract",
++    "0x1::state_storage",
++    "0x1::storage_gas",
++    "0x1::storage_slots_allocator",
++    "0x1::string",
++    "0x1::string_utils",
++    "0x1::system_addresses",
++    "0x1::table",
++    "0x1::table_with_length",
++    "0x1::timestamp",
++    "0x1::transaction_context",
++    "0x1::transaction_fee",
++    "0x1::transaction_limits",
++    "0x1::transaction_validation",
++    "0x1::type_info",
++    "0x1::util",
++    "0x1::validator_consensus_info",
++    "0x1::vector",
++    "0x1::version",
++    "0x1::vesting",
++    "0x1::voting",
++    "0x5::bulk_order_types",
++    "0x5::order_book_types",
++    "0x5::order_match_types",
++    "0x5::single_order_types",
++    "0x7::bulk_order_book",
++    "0x7::bulk_order_utils",
++    "0x7::dead_mans_switch_operations",
++    "0x7::dead_mans_switch_tracker",
++    "0x7::market_clearinghouse_order_info",
++    "0x7::market_types",
++    "0x7::order_book",
++    "0x7::order_book_utils",
++    "0x7::order_id_generation",
++    "0x7::order_operations",
++    "0x7::order_placement",
++    "0x7::pending_order_book_index",
++    "0x7::pre_cancellation_tracker",
++    "0x7::price_time_index",
++    "0x7::single_order_book"
++  ]
++}
+diff --git a/sources/AptosExperimental/trading/market/market_bulk_order.spec.move b/sources/AptosExperimental/trading/market/market_bulk_order.spec.move
+index 2e2abbbc68..c06df8c915 100644
+--- a/sources/AptosExperimental/trading/market/market_bulk_order.spec.move
++++ b/sources/AptosExperimental/trading/market/market_bulk_order.spec.move
+@@ -1,209 +1,209 @@
+ spec aptos_experimental::market_bulk_order {
+ 
+-    spec cancel_bulk_order<M: copy + drop + store, R: copy + drop + store>(market: &mut 0x7::market_types::Market<M>, user: &signer, cancellation_reason: 0x7::market_types::OrderCancellationReason, callbacks: &0x7::market_types::MarketClearinghouseCallbacks<M, R>) {
+-        use 0x1::signer;
+-        pragma opaque = true, aborts_if_is_partial = true;
+-        ensures [inferred] ensures_of<cancel_bulk_order_internal<M, R>>(market, signer::address_of(user), cancellation_reason, callbacks, market);
+-    }
++                                                                                                                                                                                                                                                                          
++                        
++                                                          
++                                                                                                                                                  
++     
+ 
+ 
+-    spec cancel_bulk_order_internal<M: copy + drop + store, R: copy + drop + store>(market: &mut 0x7::market_types::Market<M>, user: address, cancellation_reason: 0x7::market_types::OrderCancellationReason, callbacks: &0x7::market_types::MarketClearinghouseCallbacks<M, R>) {
+-        use 0x1::option;
+-        use 0x5::bulk_order_types;
+-        use 0x7::order_book;
+-        use 0x7::market_types;
+-        pragma opaque = true, aborts_if_is_partial = true;
+-        ensures [inferred = sathard] ({
+-            let a = ..S1 |~ result_of<market_types::get_order_book_mut<M>>(market);
+-            market == update_field(market, order_book, a)
+-        });
+-        ensures [inferred = sathard] ({
+-            let (a_0,a_1,a_2,a_3) = {
+-                let b = {
+-                    let c = {
+-                        let d = {
+-                            let e = {
+-                                let f = ..S1 |~ result_of<market_types::get_order_book_mut<M>>(market);
+-                                ..S1 |~ result_of<market_types::get_order_book_mut<M>>(update_field(market, order_book, f))
+-                            };
+-                            ..S1 |~ result_of<market_types::get_order_book_mut<M>>(update_field(market, order_book, e))
+-                        };
+-                        ..S1 |~ result_of<market_types::get_order_book_mut<M>>(update_field(market, order_book, d))
+-                    };
+-                    S1..S2 |~ result_of<order_book::cancel_bulk_order<M>>(c, user)
+-                };
+-                S2..S3 |~ result_of<bulk_order_types::destroy_bulk_order<M>>(b)
+-            };
+-            {
+-                let (a_1_0,a_1_1,a_1_2,a_1_3,a_1_4,a_1_5,a_1_6) = S3..S4 |~ result_of<bulk_order_types::destroy_bulk_order_request<M>>(a_0);
+-                let b_1 = {
+-                    let c_1 = {
+-                        let d_1 = ..S1 |~ result_of<market_types::get_order_book_mut<M>>(market);
+-                        ..S1 |~ result_of<market_types::get_order_book_mut<M>>(update_field(market, order_book, d_1))
+-                    };
+-                    ..S1 |~ result_of<market_types::get_order_book_mut<M>>(update_field(market, order_book, c_1))
+-                };
+-                S4.. |~ ensures_of<market_types::emit_event_for_bulk_order_cancelled<M>>(update_field(market, order_book, b_1), a_1, a_1_1, user, a_1_2, a_1_3, a_1_4, a_1_5, option::some<market_types::OrderCancellationReason>(cancellation_reason))
+-            }
+-        });
+-        ensures [inferred = sathard] ({
+-            let (a_0,a_1,a_2,a_3,a_4,a_5,a_6) = {
+-                let (b_0,b_1,b_2,b_3) = {
+-                    let c = {
+-                        let d = {
+-                            let e = {
+-                                let f = {
+-                                    let a_1 = ..S1 |~ result_of<market_types::get_order_book_mut<M>>(market);
+-                                    ..S1 |~ result_of<market_types::get_order_book_mut<M>>(update_field(market, order_book, a_1))
+-                                };
+-                                ..S1 |~ result_of<market_types::get_order_book_mut<M>>(update_field(market, order_book, f))
+-                            };
+-                            ..S1 |~ result_of<market_types::get_order_book_mut<M>>(update_field(market, order_book, e))
+-                        };
+-                        S1..S2 |~ result_of<order_book::cancel_bulk_order<M>>(d, user)
+-                    };
+-                    S2..S3 |~ result_of<bulk_order_types::destroy_bulk_order<M>>(c)
+-                };
+-                S3..S4 |~ result_of<bulk_order_types::destroy_bulk_order_request<M>>(b_0)
+-            };
+-            forall x: u64: S4.. |~ x < len(a_3) ==> {
+-                let (b_1_0,b_1_1,b_1_2,b_1_3) = {
+-                    let c_1 = {
+-                        let d_1 = {
+-                            let e_1 = {
+-                                let f_1 = {
+-                                    let a_2 = ..S1 |~ result_of<market_types::get_order_book_mut<M>>(market);
+-                                    ..S1 |~ result_of<market_types::get_order_book_mut<M>>(update_field(market, order_book, a_2))
+-                                };
+-                                ..S1 |~ result_of<market_types::get_order_book_mut<M>>(update_field(market, order_book, f_1))
+-                            };
+-                            ..S1 |~ result_of<market_types::get_order_book_mut<M>>(update_field(market, order_book, e_1))
+-                        };
+-                        S1..S2 |~ result_of<order_book::cancel_bulk_order<M>>(d_1, user)
+-                    };
+-                    S2..S3 |~ result_of<bulk_order_types::destroy_bulk_order<M>>(c_1)
+-                };
+-                ensures_of<market_types::cleanup_bulk_order_at_price<M, R>>(callbacks, user, b_1_1, true, a_2[x], a_3[x])
+-            }
+-        });
+-        ensures [inferred = sathard] ({
+-            let (a_0,a_1,a_2,a_3,a_4,a_5,a_6) = {
+-                let (b_0,b_1,b_2,b_3) = {
+-                    let c = {
+-                        let d = {
+-                            let e = {
+-                                let f = {
+-                                    let a_1 = ..S1 |~ result_of<market_types::get_order_book_mut<M>>(market);
+-                                    ..S1 |~ result_of<market_types::get_order_book_mut<M>>(update_field(market, order_book, a_1))
+-                                };
+-                                ..S1 |~ result_of<market_types::get_order_book_mut<M>>(update_field(market, order_book, f))
+-                            };
+-                            ..S1 |~ result_of<market_types::get_order_book_mut<M>>(update_field(market, order_book, e))
+-                        };
+-                        S1..S2 |~ result_of<order_book::cancel_bulk_order<M>>(d, user)
+-                    };
+-                    S2..S3 |~ result_of<bulk_order_types::destroy_bulk_order<M>>(c)
+-                };
+-                S3..S4 |~ result_of<bulk_order_types::destroy_bulk_order_request<M>>(b_0)
+-            };
+-            forall x: u64: S4.. |~ x < len(a_5) ==> {
+-                let (b_1_0,b_1_1,b_1_2,b_1_3) = {
+-                    let c_1 = {
+-                        let d_1 = {
+-                            let e_1 = {
+-                                let f_1 = {
+-                                    let a_2 = ..S1 |~ result_of<market_types::get_order_book_mut<M>>(market);
+-                                    ..S1 |~ result_of<market_types::get_order_book_mut<M>>(update_field(market, order_book, a_2))
+-                                };
+-                                ..S1 |~ result_of<market_types::get_order_book_mut<M>>(update_field(market, order_book, f_1))
+-                            };
+-                            ..S1 |~ result_of<market_types::get_order_book_mut<M>>(update_field(market, order_book, e_1))
+-                        };
+-                        S1..S2 |~ result_of<order_book::cancel_bulk_order<M>>(d_1, user)
+-                    };
+-                    S2..S3 |~ result_of<bulk_order_types::destroy_bulk_order<M>>(c_1)
+-                };
+-                ensures_of<market_types::cleanup_bulk_order_at_price<M, R>>(callbacks, user, b_1_1, false, a_4[x], a_5[x])
+-            }
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let (a_0,a_1,a_2,a_3,a_4,a_5,a_6) = {
+-                let (b_0,b_1,b_2,b_3) = {
+-                    let c = {
+-                        let d = ..S1 |~ result_of<market_types::get_order_book_mut<M>>(market);
+-                        S1..S2 |~ result_of<order_book::cancel_bulk_order<M>>(d, user)
+-                    };
+-                    S2..S3 |~ result_of<bulk_order_types::destroy_bulk_order<M>>(c)
+-                };
+-                S3..S4 |~ result_of<bulk_order_types::destroy_bulk_order_request<M>>(b_0)
+-            };
+-            len(a_3) == 18446744073709551616
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let (a_0,a_1,a_2,a_3,a_4,a_5,a_6) = {
+-                let (b_0,b_1,b_2,b_3) = {
+-                    let c = {
+-                        let d = ..S1 |~ result_of<market_types::get_order_book_mut<M>>(market);
+-                        S1..S2 |~ result_of<order_book::cancel_bulk_order<M>>(d, user)
+-                    };
+-                    S2..S3 |~ result_of<bulk_order_types::destroy_bulk_order<M>>(c)
+-                };
+-                S3..S4 |~ result_of<bulk_order_types::destroy_bulk_order_request<M>>(b_0)
+-            };
+-            exists x: u64: x < len(a_3) && !in_range(a_3, x)
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let (a_0,a_1,a_2,a_3,a_4,a_5,a_6) = {
+-                let (b_0,b_1,b_2,b_3) = {
+-                    let c = {
+-                        let d = ..S1 |~ result_of<market_types::get_order_book_mut<M>>(market);
+-                        S1..S2 |~ result_of<order_book::cancel_bulk_order<M>>(d, user)
+-                    };
+-                    S2..S3 |~ result_of<bulk_order_types::destroy_bulk_order<M>>(c)
+-                };
+-                S3..S4 |~ result_of<bulk_order_types::destroy_bulk_order_request<M>>(b_0)
+-            };
+-            exists x: u64: x < len(a_3) && !in_range(a_2, x)
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let (a_0,a_1,a_2,a_3,a_4,a_5,a_6) = {
+-                let (b_0,b_1,b_2,b_3) = {
+-                    let c = {
+-                        let d = ..S1 |~ result_of<market_types::get_order_book_mut<M>>(market);
+-                        S1..S2 |~ result_of<order_book::cancel_bulk_order<M>>(d, user)
+-                    };
+-                    S2..S3 |~ result_of<bulk_order_types::destroy_bulk_order<M>>(c)
+-                };
+-                S3..S4 |~ result_of<bulk_order_types::destroy_bulk_order_request<M>>(b_0)
+-            };
+-            len(a_5) == 18446744073709551616
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let (a_0,a_1,a_2,a_3,a_4,a_5,a_6) = {
+-                let (b_0,b_1,b_2,b_3) = {
+-                    let c = {
+-                        let d = ..S1 |~ result_of<market_types::get_order_book_mut<M>>(market);
+-                        S1..S2 |~ result_of<order_book::cancel_bulk_order<M>>(d, user)
+-                    };
+-                    S2..S3 |~ result_of<bulk_order_types::destroy_bulk_order<M>>(c)
+-                };
+-                S3..S4 |~ result_of<bulk_order_types::destroy_bulk_order_request<M>>(b_0)
+-            };
+-            exists x: u64: x >= len(a_3) && x < len(a_5) && !in_range(a_5, x)
+-        });
+-        aborts_if [inferred = sathard] ({
+-            let (a_0,a_1,a_2,a_3,a_4,a_5,a_6) = {
+-                let (b_0,b_1,b_2,b_3) = {
+-                    let c = {
+-                        let d = ..S1 |~ result_of<market_types::get_order_book_mut<M>>(market);
+-                        S1..S2 |~ result_of<order_book::cancel_bulk_order<M>>(d, user)
+-                    };
+-                    S2..S3 |~ result_of<bulk_order_types::destroy_bulk_order<M>>(c)
+-                };
+-                S3..S4 |~ result_of<bulk_order_types::destroy_bulk_order_request<M>>(b_0)
+-            };
+-            exists x: u64: x >= len(a_3) && x < len(a_5) && !in_range(a_4, x)
+-        });
+-    }
++                                                                                                                                                                                                                                                                                   
++                        
++                                  
++                            
++                              
++                                                          
++                                       
++                                                                                   
++                                                         
++           
++                                       
++                                     
++                         
++                             
++                                 
++                                     
++                                                                                                       
++                                                                                                                           
++                              
++                                                                                                                       
++                          
++                                                                                                                   
++                      
++                                                                                  
++                  
++                                                                               
++              
++             
++                                                                                                                                            
++                           
++                               
++                                                                                                 
++                                                                                                                     
++                      
++                                                                                                                 
++                  
++                                                                                                                                                                                                                                                       
++             
++           
++                                       
++                                                 
++                                         
++                             
++                                 
++                                     
++                                         
++                                                                                                             
++                                                                                                                                 
++                                  
++                                                                                                                           
++                              
++                                                                                                                       
++                          
++                                                                                      
++                      
++                                                                                   
++                  
++                                                                                         
++              
++                                                     
++                                                 
++                               
++                                   
++                                       
++                                           
++                                                                                                             
++                                                                                                                                 
++                                  
++                                                                                                                             
++                              
++                                                                                                                         
++                          
++                                                                                        
++                      
++                                                                                     
++                  
++                                                                                                                         
++             
++           
++                                       
++                                                 
++                                         
++                             
++                                 
++                                     
++                                         
++                                                                                                             
++                                                                                                                                 
++                                  
++                                                                                                                           
++                              
++                                                                                                                       
++                          
++                                                                                      
++                      
++                                                                                   
++                  
++                                                                                         
++              
++                                                     
++                                                 
++                               
++                                   
++                                       
++                                           
++                                                                                                             
++                                                                                                                                 
++                                  
++                                                                                                                             
++                              
++                                                                                                                         
++                          
++                                                                                        
++                      
++                                                                                     
++                  
++                                                                                                                          
++             
++           
++                                         
++                                                 
++                                         
++                             
++                                                                                               
++                                                                                      
++                      
++                                                                                   
++                  
++                                                                                         
++              
++                                            
++           
++                                         
++                                                 
++                                         
++                             
++                                                                                               
++                                                                                      
++                      
++                                                                                   
++                  
++                                                                                         
++              
++                                                            
++           
++                                         
++                                                 
++                                         
++                             
++                                                                                               
++                                                                                      
++                      
++                                                                                   
++                  
++                                                                                         
++              
++                                                            
++           
++                                         
++                                                 
++                                         
++                             
++                                                                                               
++                                                                                      
++                      
++                                                                                   
++                  
++                                                                                         
++              
++                                            
++           
++                                         
++                                                 
++                                         
++                             
++                                                                                               
++                                                                                      
++                      
++                                                                                   
++                  
++                                                                                         
++              
++                                                                             
++           
++                                         
++                                                 
++                                         
++                             
++                                                                                               
++                                                                                      
++                      
++                                                                                   
++                  
++                                                                                         
++              
++                                                                             
++           
++     
+ 
+ }

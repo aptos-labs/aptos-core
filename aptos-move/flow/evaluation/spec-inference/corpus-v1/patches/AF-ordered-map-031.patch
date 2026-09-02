@@ -1,0 +1,58 @@
+diff --git a/.move-inference-task.json b/.move-inference-task.json
+new file mode 100644
+index 0000000000..da663a9a1f
+--- /dev/null
++++ b/.move-inference-task.json
+@@ -0,0 +1,29 @@
++{
++  "called_function_dependencies": [],
++  "granularity": "function",
++  "package_module_target": "0x1::ordered_map::iter_is_end",
++  "schema_version": 3,
++  "source_commit": "6d836beedc56fc70c54f3b3046d1d248d850c64b",
++  "source_path": "sources/AptosFramework/datastructures/ordered_map.move",
++  "spec_function_dependencies": [],
++  "target_functions": [
++    "iter_is_end"
++  ],
++  "task_id": "AF-ordered-map-031",
++  "transitive_called_function_dependencies": [],
++  "transitive_function_dependencies": [],
++  "transitive_module_dependencies": [
++    "0x1::bcs",
++    "0x1::big_ordered_map",
++    "0x1::cmp",
++    "0x1::error",
++    "0x1::fixed_point32",
++    "0x1::math64",
++    "0x1::mem",
++    "0x1::option",
++    "0x1::storage_slots_allocator",
++    "0x1::table",
++    "0x1::table_with_length",
++    "0x1::vector"
++  ]
++}
+diff --git a/sources/AptosFramework/datastructures/ordered_map.spec.move b/sources/AptosFramework/datastructures/ordered_map.spec.move
+index b1e2f6e67c..7a59a754bd 100644
+--- a/sources/AptosFramework/datastructures/ordered_map.spec.move
++++ b/sources/AptosFramework/datastructures/ordered_map.spec.move
+@@ -219,12 +219,12 @@ spec aptos_framework::ordered_map {
+             spec_contains_key(map, k) && spec_get(map, k) == old(spec_get(map, k));
+     }
+ 
+-    spec iter_is_end {
+-        pragma opaque;
+-        pragma verify = false;
+-        aborts_if false;
+-        ensures result <==> (self is IteratorPtr::End);
+-    }
++                      
++                      
++                              
++                        
++                                                       
++     
+ 
+     spec iter_borrow {
+         pragma opaque;

@@ -1,0 +1,32 @@
+{
+  "schema_version": 2,
+  "purpose": "Source/effect-aware simplification evidence for local single-order state updates.",
+  "package": "corpus/framework",
+  "target_body_proof_method": {
+    "description": "Select each target directly in the unchanged package. Keep pragma opaque: it affects callers and does not disable verification of the selected function body.",
+    "command": "target/debug/move-flow experiment prove --package corpus/framework --target <target> --timeout 60 --split-vcs-by-assert --output <artifact>",
+    "timeout_seconds": 60,
+    "opaque_preserved": true,
+    "legacy_evidence_note": "The recorded pass results predate this correction and used package copies that unnecessarily removed the selected target's opaque pragma. Those nonrecursive target-body obligations passed, but future evidence must use the command above."
+  },
+  "contracts": [
+    {
+      "target": "0x5::single_order_types::decrease_remaining_size_from_state",
+      "source": "sources/AptosTrading/orders/single_order_types.move",
+      "effects": "updates only OrderWithState.order.order_request.remaining_size",
+      "passed": true
+    },
+    {
+      "target": "0x5::single_order_types::increase_remaining_size_from_state",
+      "source": "sources/AptosTrading/orders/single_order_types.move",
+      "effects": "updates only OrderWithState.order.order_request.remaining_size",
+      "passed": true
+    },
+    {
+      "target": "0x5::single_order_types::set_remaining_size_from_state",
+      "source": "sources/AptosTrading/orders/single_order_types.move",
+      "effects": "updates only OrderWithState.order.order_request.remaining_size",
+      "passed": true
+    }
+  ]
+}

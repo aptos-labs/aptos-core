@@ -1,0 +1,1179 @@
+/// Defines feature flags for Aptos. Those are used in Aptos specific implementations of features in
+/// the Move stdlib, the Aptos stdlib, and the Aptos framework.
+///
+/// ============================================================================================
+/// Feature Flag Definitions
+///
+/// Each feature flag should come with documentation which justifies the need of the flag.
+/// Introduction of a new feature flag requires approval of framework owners. Be frugal when
+/// introducing new feature flags, as too many can make it hard to understand the code.
+///
+/// Each feature flag should come with a specification of a lifetime:
+///
+/// - a *transient* feature flag is only needed until a related code rollout has happened. This
+///   is typically associated with the introduction of new native Move functions, and is only used
+///   from Move code. The owner of this feature is obliged to remove it once this can be done.
+///
+/// - a *permanent* feature flag is required to stay around forever. Typically, those flags guard
+///   behavior in native code, and the behavior with or without the feature need to be preserved
+///   for playback.
+///
+/// Note that removing a feature flag still requires the function which tests for the feature
+/// (like `code_dependency_check_enabled` below) to stay around for compatibility reasons, as it
+/// is a public function. However, once the feature flag is disabled, those functions can constantly
+/// return true.
+module std::features {
+    use std::error;
+    use std::signer;
+    use std::vector;
+
+    const EINVALID_FEATURE: u64 = 1;
+    const EAPI_DISABLED: u64 = 2;
+    /// Deployed to production, and disabling is deprecated.
+    const EFEATURE_CANNOT_BE_DISABLED: u64 = 3;
+
+    // --------------------------------------------------------------------------------------------
+    // Code Publishing
+
+    /// Whether validation of package dependencies is enabled, and the related native function is
+    /// available. This is needed because of introduction of a new native function.
+    /// Lifetime: transient
+    const CODE_DEPENDENCY_CHECK: u64 = 1;
+
+    public fun code_dependency_check_enabled(): bool {
+        is_enabled(CODE_DEPENDENCY_CHECK)
+    }
+
+    /// Whether during upgrade compatibility checking, friend functions should be treated similar like
+    /// private functions.
+    /// Lifetime: permanent
+    const TREAT_FRIEND_AS_PRIVATE: u64 = 2;
+
+    public fun treat_friend_as_private(): bool {
+        is_enabled(TREAT_FRIEND_AS_PRIVATE)
+    }
+
+    /// Whether the new SHA2-512, SHA3-512 and RIPEMD-160 hash function natives are enabled.
+    /// This is needed because of the introduction of new native functions.
+    /// Lifetime: transient
+    const SHA_512_AND_RIPEMD_160_NATIVES: u64 = 3;
+
+    public fun get_sha_512_and_ripemd_160_feature(): u64 {
+        SHA_512_AND_RIPEMD_160_NATIVES
+    }
+
+    public fun sha_512_and_ripemd_160_enabled(): bool {
+        is_enabled(SHA_512_AND_RIPEMD_160_NATIVES)
+    }
+
+    /// Whether the new `aptos_stdlib::type_info::chain_id()` native for fetching the chain ID is enabled.
+    /// This is needed because of the introduction of a new native function.
+    /// Lifetime: transient
+    const APTOS_STD_CHAIN_ID_NATIVES: u64 = 4;
+
+    public fun get_aptos_stdlib_chain_id_feature(): u64 {
+        APTOS_STD_CHAIN_ID_NATIVES
+    }
+
+    public fun aptos_stdlib_chain_id_enabled(): bool {
+        is_enabled(APTOS_STD_CHAIN_ID_NATIVES)
+    }
+
+    /// Whether to allow the use of binary format version v6.
+    /// Lifetime: transient
+    const VM_BINARY_FORMAT_V6: u64 = 5;
+
+    public fun get_vm_binary_format_v6(): u64 {
+        VM_BINARY_FORMAT_V6
+    }
+
+    public fun allow_vm_binary_format_v6(): bool {
+        is_enabled(VM_BINARY_FORMAT_V6)
+    }
+
+    #[deprecated]
+    /// Deprecated feature
+    public fun get_collect_and_distribute_gas_fees_feature(): u64 {
+        abort error::invalid_argument(EINVALID_FEATURE)
+    }
+
+    #[deprecated]
+    public fun collect_and_distribute_gas_fees(): bool {
+        false
+    }
+
+    /// Whether the new `aptos_stdlib::multi_ed25519::public_key_validate_internal_v2()` native is enabled.
+    /// This is needed because of the introduction of a new native function.
+    /// Lifetime: transient
+    const MULTI_ED25519_PK_VALIDATE_V2_NATIVES: u64 = 7;
+
+    public fun multi_ed25519_pk_validate_v2_feature(): u64 {
+        MULTI_ED25519_PK_VALIDATE_V2_NATIVES
+    }
+
+    public fun multi_ed25519_pk_validate_v2_enabled(): bool {
+        is_enabled(MULTI_ED25519_PK_VALIDATE_V2_NATIVES)
+    }
+
+    /// Whether the new BLAKE2B-256 hash function native is enabled.
+    /// This is needed because of the introduction of new native function(s).
+    /// Lifetime: transient
+    const BLAKE2B_256_NATIVE: u64 = 8;
+
+    public fun get_blake2b_256_feature(): u64 {
+        BLAKE2B_256_NATIVE
+    }
+
+    public fun blake2b_256_enabled(): bool {
+        is_enabled(BLAKE2B_256_NATIVE)
+    }
+
+    /// Whether resource groups are enabled.
+    /// This is needed because of new attributes for structs and a change in storage representation.
+    const RESOURCE_GROUPS: u64 = 9;
+
+    public fun get_resource_groups_feature(): u64 {
+        RESOURCE_GROUPS
+    }
+
+    public fun resource_groups_enabled(): bool {
+        is_enabled(RESOURCE_GROUPS)
+    }
+
+    /// Whether multisig accounts (different from accounts with multi-ed25519 auth keys) are enabled.
+    const MULTISIG_ACCOUNTS: u64 = 10;
+
+    public fun get_multisig_accounts_feature(): u64 {
+        MULTISIG_ACCOUNTS
+    }
+
+    public fun multisig_accounts_enabled(): bool {
+        is_enabled(MULTISIG_ACCOUNTS)
+    }
+
+    /// Whether delegation pools are enabled.
+    /// Lifetime: transient
+    const DELEGATION_POOLS: u64 = 11;
+
+    public fun get_delegation_pools_feature(): u64 {
+        DELEGATION_POOLS
+    }
+
+    public fun delegation_pools_enabled(): bool {
+        is_enabled(DELEGATION_POOLS)
+    }
+
+    /// Whether generic algebra basic operation support in `crypto_algebra.move` are enabled.
+    ///
+    /// Lifetime: permanent
+    const CRYPTOGRAPHY_ALGEBRA_NATIVES: u64 = 12;
+
+    public fun get_cryptography_algebra_natives_feature(): u64 {
+        CRYPTOGRAPHY_ALGEBRA_NATIVES
+    }
+
+    public fun cryptography_algebra_enabled(): bool {
+        is_enabled(CRYPTOGRAPHY_ALGEBRA_NATIVES)
+    }
+
+    /// Whether the generic algebra implementation for BLS12381 operations are enabled.
+    ///
+    /// Lifetime: transient
+    const BLS12_381_STRUCTURES: u64 = 13;
+
+    public fun get_bls12_381_strutures_feature(): u64 {
+        BLS12_381_STRUCTURES
+    }
+
+    public fun bls12_381_structures_enabled(): bool {
+        is_enabled(BLS12_381_STRUCTURES)
+    }
+
+    /// Whether native_public_key_validate aborts when a public key of the wrong length is given
+    /// Lifetime: ephemeral
+    const ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH: u64 = 14;
+
+    /// Whether struct constructors are enabled
+    ///
+    /// Lifetime: transient
+    const STRUCT_CONSTRUCTORS: u64 = 15;
+
+    /// Whether reward rate decreases periodically.
+    /// Lifetime: transient
+    const PERIODICAL_REWARD_RATE_DECREASE: u64 = 16;
+
+    public fun get_periodical_reward_rate_decrease_feature(): u64 {
+        PERIODICAL_REWARD_RATE_DECREASE
+    }
+
+    public fun periodical_reward_rate_decrease_enabled(): bool {
+        is_enabled(PERIODICAL_REWARD_RATE_DECREASE)
+    }
+
+    /// Whether enable paritial governance voting on aptos_governance.
+    /// Lifetime: transient
+    const PARTIAL_GOVERNANCE_VOTING: u64 = 17;
+
+    public fun get_partial_governance_voting(): u64 {
+        PARTIAL_GOVERNANCE_VOTING
+    }
+
+    public fun partial_governance_voting_enabled(): bool {
+        is_enabled(PARTIAL_GOVERNANCE_VOTING)
+    }
+
+    /// Charge invariant violation error.
+    /// Lifetime: transient
+    const CHARGE_INVARIANT_VIOLATION: u64 = 20;
+
+    /// Whether enable paritial governance voting on delegation_pool.
+    /// Lifetime: transient
+    const DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING: u64 = 21;
+
+    public fun get_delegation_pool_partial_governance_voting(): u64 {
+        DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING
+    }
+
+    public fun delegation_pool_partial_governance_voting_enabled(): bool {
+        is_enabled(DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING)
+    }
+
+    /// Whether alternate gas payer is supported
+    /// Lifetime: transient
+    const FEE_PAYER_ENABLED: u64 = 22;
+
+    public fun fee_payer_enabled(): bool {
+        is_enabled(FEE_PAYER_ENABLED)
+    }
+
+    /// Whether enable MOVE functions to call create_auid method to create AUIDs.
+    /// Lifetime: transient
+    const APTOS_UNIQUE_IDENTIFIERS: u64 = 23;
+
+    public fun get_auids(): u64 {
+        error::invalid_argument(EFEATURE_CANNOT_BE_DISABLED)
+    }
+
+    public fun auids_enabled(): bool {
+        true
+    }
+
+    /// Whether the Bulletproofs zero-knowledge range proof module is enabled, and the related native function is
+    /// available. This is needed because of the introduction of a new native function.
+    /// Lifetime: transient
+    const BULLETPROOFS_NATIVES: u64 = 24;
+
+    public fun get_bulletproofs_feature(): u64 {
+        BULLETPROOFS_NATIVES
+    }
+
+    public fun bulletproofs_enabled(): bool {
+        is_enabled(BULLETPROOFS_NATIVES)
+    }
+
+    /// Fix the native formatter for signer.
+    /// Lifetime: transient
+    const SIGNER_NATIVE_FORMAT_FIX: u64 = 25;
+
+    public fun get_signer_native_format_fix_feature(): u64 {
+        SIGNER_NATIVE_FORMAT_FIX
+    }
+
+    public fun signer_native_format_fix_enabled(): bool {
+        is_enabled(SIGNER_NATIVE_FORMAT_FIX)
+    }
+
+    /// Whether emit function in `event.move` are enabled for module events.
+    ///
+    /// Lifetime: transient
+    const MODULE_EVENT: u64 = 26;
+
+    public fun get_module_event_feature(): u64 {
+        MODULE_EVENT
+    }
+
+    public fun module_event_enabled(): bool {
+        is_enabled(MODULE_EVENT)
+    }
+
+    /// Whether the fix for a counting bug in the script path of the signature checker pass is enabled.
+    /// Lifetime: transient
+    const SIGNATURE_CHECKER_V2_SCRIPT_FIX: u64 = 29;
+
+    public fun get_aggregator_v2_api_feature(): u64 {
+        abort error::invalid_argument(EFEATURE_CANNOT_BE_DISABLED)
+    }
+
+    public fun aggregator_v2_api_enabled(): bool {
+        true
+    }
+
+    #[deprecated]
+    public fun get_aggregator_snapshots_feature(): u64 {
+        abort error::invalid_argument(EINVALID_FEATURE)
+    }
+
+    #[deprecated]
+    public fun aggregator_snapshots_enabled(): bool {
+        abort error::invalid_argument(EINVALID_FEATURE)
+    }
+
+    /// Whether the automatic creation of accounts is enabled for sponsored transactions.
+    /// Lifetime: transient
+    const SPONSORED_AUTOMATIC_ACCOUNT_CREATION: u64 = 34;
+
+    public fun get_sponsored_automatic_account_creation(): u64 {
+        SPONSORED_AUTOMATIC_ACCOUNT_CREATION
+    }
+
+    public fun sponsored_automatic_account_creation_enabled(): bool {
+        is_enabled(SPONSORED_AUTOMATIC_ACCOUNT_CREATION)
+    }
+
+    const FEE_PAYER_ACCOUNT_OPTIONAL: u64 = 35;
+
+    public fun get_concurrent_token_v2_feature(): u64 {
+        error::invalid_argument(EFEATURE_CANNOT_BE_DISABLED)
+    }
+
+    public fun concurrent_token_v2_enabled(): bool {
+        true
+    }
+
+    #[deprecated]
+    public fun get_concurrent_assets_feature(): u64 {
+        abort error::invalid_argument(EFEATURE_CANNOT_BE_DISABLED)
+    }
+
+    #[deprecated]
+    public fun concurrent_assets_enabled(): bool {
+        abort error::invalid_argument(EFEATURE_CANNOT_BE_DISABLED)
+    }
+
+    /// Whether allow changing beneficiaries for operators.
+    /// Lifetime: transient
+    const OPERATOR_BENEFICIARY_CHANGE: u64 = 39;
+
+    public fun get_operator_beneficiary_change_feature(): u64 {
+        OPERATOR_BENEFICIARY_CHANGE
+    }
+
+    public fun operator_beneficiary_change_enabled(): bool {
+        is_enabled(OPERATOR_BENEFICIARY_CHANGE)
+    }
+
+    /// Whether the operator commission rate change in delegation pool is enabled.
+    /// Lifetime: transient
+    const COMMISSION_CHANGE_DELEGATION_POOL: u64 = 42;
+
+    public fun get_commission_change_delegation_pool_feature(): u64 {
+        COMMISSION_CHANGE_DELEGATION_POOL
+    }
+
+    public fun commission_change_delegation_pool_enabled(): bool {
+        is_enabled(COMMISSION_CHANGE_DELEGATION_POOL)
+    }
+
+    /// Whether the generic algebra implementation for BN254 operations are enabled.
+    ///
+    /// Lifetime: transient
+    const BN254_STRUCTURES: u64 = 43;
+
+    public fun get_bn254_strutures_feature(): u64 {
+        BN254_STRUCTURES
+    }
+
+    public fun bn254_structures_enabled(): bool {
+        is_enabled(BN254_STRUCTURES)
+    }
+
+    /// Deprecated by `aptos_framework::randomness_config::RandomnessConfig`.
+    const RECONFIGURE_WITH_DKG: u64 = 45;
+
+    public fun get_reconfigure_with_dkg_feature(): u64 {
+        RECONFIGURE_WITH_DKG
+    }
+
+    public fun reconfigure_with_dkg_enabled(): bool {
+        is_enabled(RECONFIGURE_WITH_DKG)
+    }
+
+    /// Whether the OIDB feature is enabled, possibly with the ZK-less verification mode.
+    ///
+    /// Lifetime: transient
+    const KEYLESS_ACCOUNTS: u64 = 46;
+
+    public fun get_keyless_accounts_feature(): u64 {
+        KEYLESS_ACCOUNTS
+    }
+
+    public fun keyless_accounts_enabled(): bool {
+        is_enabled(KEYLESS_ACCOUNTS)
+    }
+
+    /// Whether the ZK-less mode of the keyless accounts feature is enabled.
+    ///
+    /// Lifetime: transient
+    const KEYLESS_BUT_ZKLESS_ACCOUNTS: u64 = 47;
+
+    public fun get_keyless_but_zkless_accounts_feature(): u64 {
+        KEYLESS_BUT_ZKLESS_ACCOUNTS
+    }
+
+    public fun keyless_but_zkless_accounts_feature_enabled(): bool {
+        is_enabled(KEYLESS_BUT_ZKLESS_ACCOUNTS)
+    }
+
+    /// Deprecated by `aptos_framework::jwk_consensus_config::JWKConsensusConfig`.
+    const JWK_CONSENSUS: u64 = 49;
+
+    public fun get_jwk_consensus_feature(): u64 {
+        JWK_CONSENSUS
+    }
+
+    public fun jwk_consensus_enabled(): bool {
+        is_enabled(JWK_CONSENSUS)
+    }
+
+    /// Whether enable Fungible Asset creation
+    /// to create higher throughput concurrent variants.
+    /// Lifetime: transient
+    const CONCURRENT_FUNGIBLE_ASSETS: u64 = 50;
+
+    public fun get_concurrent_fungible_assets_feature(): u64 {
+        CONCURRENT_FUNGIBLE_ASSETS
+    }
+
+    public fun concurrent_fungible_assets_enabled(): bool {
+        is_enabled(CONCURRENT_FUNGIBLE_ASSETS)
+    }
+
+    #[deprecated]
+    public fun is_object_code_deployment_enabled(): bool {
+        true
+    }
+
+    /// Whether checking the maximum object nesting is enabled.
+    const MAX_OBJECT_NESTING_CHECK: u64 = 53;
+
+    public fun get_max_object_nesting_check_feature(): u64 {
+        MAX_OBJECT_NESTING_CHECK
+    }
+
+    public fun max_object_nesting_check_enabled(): bool {
+        is_enabled(MAX_OBJECT_NESTING_CHECK)
+    }
+
+    /// Whether keyless accounts support passkey-based ephemeral signatures.
+    ///
+    /// Lifetime: transient
+    const KEYLESS_ACCOUNTS_WITH_PASSKEYS: u64 = 54;
+
+    public fun get_keyless_accounts_with_passkeys_feature(): u64 {
+        KEYLESS_ACCOUNTS_WITH_PASSKEYS
+    }
+
+    public fun keyless_accounts_with_passkeys_feature_enabled(): bool {
+        is_enabled(KEYLESS_ACCOUNTS_WITH_PASSKEYS)
+    }
+
+    /// Whether the Multisig V2 enhancement feature is enabled.
+    ///
+    /// Lifetime: transient
+    const MULTISIG_V2_ENHANCEMENT: u64 = 55;
+
+    public fun get_multisig_v2_enhancement_feature(): u64 {
+        MULTISIG_V2_ENHANCEMENT
+    }
+
+    public fun multisig_v2_enhancement_feature_enabled(): bool {
+        is_enabled(MULTISIG_V2_ENHANCEMENT)
+    }
+
+    /// Whether delegators allowlisting for delegation pools is supported.
+    /// Lifetime: transient
+    const DELEGATION_POOL_ALLOWLISTING: u64 = 56;
+
+    public fun get_delegation_pool_allowlisting_feature(): u64 {
+        DELEGATION_POOL_ALLOWLISTING
+    }
+
+    public fun delegation_pool_allowlisting_enabled(): bool {
+        is_enabled(DELEGATION_POOL_ALLOWLISTING)
+    }
+
+    /// Whether aptos_framwork enables the behavior of module event migration.
+    ///
+    /// Lifetime: transient
+    const MODULE_EVENT_MIGRATION: u64 = 57;
+
+    public fun get_module_event_migration_feature(): u64 {
+        MODULE_EVENT_MIGRATION
+    }
+
+    public fun module_event_migration_enabled(): bool {
+        is_enabled(MODULE_EVENT_MIGRATION)
+    }
+
+    /// Whether the transaction context extension is enabled. This feature allows the module
+    /// `transaction_context` to provide contextual information about the user transaction.
+    ///
+    /// Lifetime: transient
+    const TRANSACTION_CONTEXT_EXTENSION: u64 = 59;
+
+    public fun get_transaction_context_extension_feature(): u64 {
+        TRANSACTION_CONTEXT_EXTENSION
+    }
+
+    public fun transaction_context_extension_enabled(): bool {
+        is_enabled(TRANSACTION_CONTEXT_EXTENSION)
+    }
+
+    /// Whether migration from coin to fungible asset feature is enabled.
+    ///
+    /// Lifetime: transient
+    const COIN_TO_FUNGIBLE_ASSET_MIGRATION: u64 = 60;
+
+    public fun get_coin_to_fungible_asset_migration_feature(): u64 {
+        COIN_TO_FUNGIBLE_ASSET_MIGRATION
+    }
+
+    public fun coin_to_fungible_asset_migration_feature_enabled(): bool {
+        is_enabled(COIN_TO_FUNGIBLE_ASSET_MIGRATION)
+    }
+
+    #[deprecated]
+    public fun get_primary_apt_fungible_store_at_user_address_feature(): u64 {
+        abort error::invalid_argument(EINVALID_FEATURE)
+    }
+
+    #[deprecated]
+    public fun primary_apt_fungible_store_at_user_address_enabled(): bool {
+        true
+    }
+
+    #[deprecated]
+    public fun aggregator_v2_is_at_least_api_enabled(): bool {
+        true
+    }
+
+    #[deprecated]
+    public fun get_object_native_derived_address_feature(): u64 {
+        abort error::invalid_argument(EINVALID_FEATURE)
+    }
+
+    #[deprecated]
+    public fun object_native_derived_address_enabled(): bool {
+        true
+    }
+
+    #[deprecated]
+    public fun get_dispatchable_fungible_asset_feature(): u64 {
+        abort error::invalid_argument(EINVALID_FEATURE)
+    }
+
+    #[deprecated]
+    public fun dispatchable_fungible_asset_enabled(): bool {
+        true
+    }
+
+    #[deprecated]
+    public fun get_new_accounts_default_to_fa_apt_store_feature(): u64 {
+        abort error::invalid_argument(EINVALID_FEATURE)
+    }
+
+    #[deprecated]
+    public fun new_accounts_default_to_fa_apt_store_enabled(): bool {
+        true
+    }
+
+    #[deprecated]
+    public fun get_operations_default_to_fa_apt_store_feature(): u64 {
+        abort error::invalid_argument(EINVALID_FEATURE)
+    }
+
+    #[deprecated]
+    public fun operations_default_to_fa_apt_store_enabled(): bool {
+        true
+    }
+
+    /// Whether enable concurent Fungible Balance
+    /// to create higher throughput concurrent variants.
+    /// Lifetime: transient
+    const CONCURRENT_FUNGIBLE_BALANCE: u64 = 67;
+
+    public fun get_concurrent_fungible_balance_feature(): u64 {
+        CONCURRENT_FUNGIBLE_BALANCE
+    }
+
+    public fun concurrent_fungible_balance_enabled(): bool {
+        is_enabled(CONCURRENT_FUNGIBLE_BALANCE)
+    }
+
+    /// Whether to default new Fungible Store to the concurrent variant.
+    /// Lifetime: transient
+    const DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE: u64 = 68;
+
+    public fun get_default_to_concurrent_fungible_balance_feature(): u64 {
+        DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE
+    }
+
+    public fun default_to_concurrent_fungible_balance_enabled(): bool {
+        is_enabled(DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE)
+    }
+
+    /// Whether the multisig v2 fix is enabled. Once enabled, the multisig transaction execution will explicitly
+    /// abort if the provided payload does not match the payload stored on-chain.
+    ///
+    /// Lifetime: transient
+    const ABORT_IF_MULTISIG_PAYLOAD_MISMATCH: u64 = 70;
+
+    public fun get_abort_if_multisig_payload_mismatch_feature(): u64 {
+        ABORT_IF_MULTISIG_PAYLOAD_MISMATCH
+    }
+
+    public fun abort_if_multisig_payload_mismatch_enabled(): bool {
+        is_enabled(ABORT_IF_MULTISIG_PAYLOAD_MISMATCH)
+    }
+
+    /// Whether the simulation enhancement is enabled. This enables the simulation without an authentication check,
+    /// the sponsored transaction simulation when the fee payer is set to 0x0, and the multisig transaction
+    /// simulation consistnet with the execution.
+    ///
+    /// Lifetime: transient
+    const TRANSACTION_SIMULATION_ENHANCEMENT: u64 = 78;
+
+    public fun get_transaction_simulation_enhancement_feature(): u64 {
+        TRANSACTION_SIMULATION_ENHANCEMENT
+    }
+
+    public fun transaction_simulation_enhancement_enabled(): bool {
+        is_enabled(TRANSACTION_SIMULATION_ENHANCEMENT)
+    }
+
+    const COLLECTION_OWNER: u64 = 79;
+
+    public fun get_collection_owner_feature(): u64 {
+        COLLECTION_OWNER
+    }
+
+    public fun is_collection_owner_enabled(): bool {
+        is_enabled(COLLECTION_OWNER)
+    }
+
+    const NATIVE_MEMORY_OPERATIONS: u64 = 80;
+
+    public fun get_native_memory_operations_feature(): u64 {
+        NATIVE_MEMORY_OPERATIONS
+    }
+
+    public fun is_native_memory_operations_enabled(): bool {
+        true
+    }
+
+    #[deprecated]
+    public fun get_permissioned_signer_feature(): u64 {
+        abort error::invalid_argument(EINVALID_FEATURE)
+    }
+
+    #[deprecated]
+    public fun is_permissioned_signer_enabled(): bool {
+        false
+    }
+
+    /// Whether the account abstraction is enabled.
+    ///
+    /// Lifetime: transient
+    const ACCOUNT_ABSTRACTION: u64 = 85;
+
+    public fun get_account_abstraction_feature(): u64 {
+        ACCOUNT_ABSTRACTION
+    }
+
+    public fun is_account_abstraction_enabled(): bool {
+        is_enabled(ACCOUNT_ABSTRACTION)
+    }
+
+    /// Whether bytecode version v8 is enabled.
+    /// Lifetime: transient
+    ///
+    /// We do not expect use from Move, so for now only for documentation purposes here
+    const VM_BINARY_FORMAT_V8: u64 = 86;
+
+    /// Whether the batch Bulletproofs native functions are available. This is needed because of the introduction of a new native function.
+    /// Lifetime: transient
+    const BULLETPROOFS_BATCH_NATIVES: u64 = 87;
+
+    public fun get_bulletproofs_batch_feature(): u64 {
+        BULLETPROOFS_BATCH_NATIVES
+    }
+
+    public fun bulletproofs_batch_enabled(): bool {
+        is_enabled(BULLETPROOFS_BATCH_NATIVES)
+    }
+
+    /// Whether the account abstraction is enabled.
+    ///
+    /// Lifetime: transient
+    const DERIVABLE_ACCOUNT_ABSTRACTION: u64 = 88;
+
+    public fun is_derivable_account_abstraction_enabled(): bool {
+        is_enabled(DERIVABLE_ACCOUNT_ABSTRACTION)
+    }
+
+    #[deprecated]
+    public fun is_domain_account_abstraction_enabled(): bool {
+        false
+    }
+
+    /// Whether new accounts default to the Fungible Asset store.
+    /// Lifetime: transient
+    const NEW_ACCOUNTS_DEFAULT_TO_FA_STORE: u64 = 90;
+
+    #[deprecated]
+    public fun get_new_accounts_default_to_fa_store_feature(): u64 {
+        abort error::invalid_argument(EINVALID_FEATURE)
+    }
+
+    #[deprecated]
+    public fun new_accounts_default_to_fa_store_enabled(): bool {
+        true
+    }
+
+    /// Lifetime: transient
+    const DEFAULT_ACCOUNT_RESOURCE: u64 = 91;
+
+    public fun get_default_account_resource_feature(): u64 {
+        DEFAULT_ACCOUNT_RESOURCE
+    }
+
+    public fun is_default_account_resource_enabled(): bool {
+        is_enabled(DEFAULT_ACCOUNT_RESOURCE)
+    }
+
+    /// If enabled, JWK consensus should run in per-key mode, where:
+    /// - The consensus is for key-level updates
+    ///   (e.g., "issuer A key 1 should be deleted", "issuer B key 2 should be upserted");
+    /// - transaction type `ValidatorTransaction::ObservedJWKUpdate` is reused;
+    /// - while a key-level update is mostly represented by a new type `KeyLevelUpdate` locally,
+    ///   For simplicity, it is represented by type `ProviderJWKs` (used to represent issuer-level update)
+    ///   in JWK Consensus messages, in validator transactions, and in Move.
+    const JWK_CONSENSUS_PER_KEY_MODE: u64 = 92;
+
+    public fun get_jwk_consensus_per_key_mode_feature(): u64 {
+        JWK_CONSENSUS_PER_KEY_MODE
+    }
+
+    public fun is_jwk_consensus_per_key_mode_enabled(): bool {
+        is_enabled(JWK_CONSENSUS_PER_KEY_MODE)
+    }
+
+    /// Whether orderless transactions are enabled.
+    /// Lifetime: transient
+    const ORDERLESS_TRANSACTIONS: u64 = 94;
+
+    public fun get_orderless_transactions_feature(): u64 {
+        ORDERLESS_TRANSACTIONS
+    }
+
+    public fun orderless_transactions_enabled(): bool {
+        is_enabled(ORDERLESS_TRANSACTIONS)
+    }
+
+    /// Whether to calculate the transaction fee for distribution.
+    const CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION: u64 = 96;
+
+    public fun get_calculate_transaction_fee_for_distribution_feature(): u64 {
+        CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION
+    }
+
+    public fun is_calculate_transaction_fee_for_distribution_enabled(): bool {
+        is_enabled(CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION)
+    }
+
+    /// Whether to distribute transaction fee to validators.
+    const DISTRIBUTE_TRANSACTION_FEE: u64 = 97;
+
+    public fun get_distribute_transaction_fee_feature(): u64 {
+        DISTRIBUTE_TRANSACTION_FEE
+    }
+
+    public fun is_distribute_transaction_fee_enabled(): bool {
+        is_enabled(DISTRIBUTE_TRANSACTION_FEE)
+    }
+
+    #[deprecated]
+    public fun get_monotonically_increasing_counter_feature(): u64 {
+        abort error::invalid_argument(EINVALID_FEATURE)
+    }
+
+    #[deprecated]
+    public fun is_monotonically_increasing_counter_enabled(): bool {
+        true
+    }
+
+    /// Whether function reflection is enabled.
+    const FUNCTION_REFLECTION: u64 = 105;
+
+    public fun get_function_reflection_feature(): u64 {
+        FUNCTION_REFLECTION
+    }
+
+    public fun is_function_reflection_enabled(): bool {
+        is_enabled(FUNCTION_REFLECTION)
+    }
+
+    /// Whether SLH-DSA-SHA2-128s signature scheme is enabled for transaction authentication.
+    /// Lifetime: transient
+    const SLH_DSA_SHA2_128S_SIGNATURE: u64 = 107;
+
+    public fun get_slh_dsa_sha2_128s_signature_feature(): u64 {
+        SLH_DSA_SHA2_128S_SIGNATURE
+    }
+
+    public fun slh_dsa_sha2_128s_signature_enabled(): bool {
+        is_enabled(SLH_DSA_SHA2_128S_SIGNATURE)
+    }
+
+    /// Whether the encrypted mempool feature is enabled.
+    const ENCRYPTED_TRANSACTIONS: u64 = 108;
+
+    public fun get_encrypted_transactions_feature(): u64 {
+        ENCRYPTED_TRANSACTIONS
+    }
+
+    public fun is_encrypted_transactions_enabled(): bool {
+        is_enabled(ENCRYPTED_TRANSACTIONS)
+    }
+
+    /// Whether multisig script payloads are enabled. Allows multisig accounts to
+    /// propose and execute Move script payloads, not just entry functions.
+    const MULTISIG_SCRIPT: u64 = 110;
+
+    public fun get_multisig_script_feature(): u64 {
+        MULTISIG_SCRIPT
+    }
+
+    public fun is_multisig_script_enabled(): bool {
+        is_enabled(MULTISIG_SCRIPT)
+    }
+
+    /// Whether the transaction limits feature is enabled. Allows transactions
+    /// to request higher execution/IO gas limits backed by staking voting power.
+    const TRANSACTION_LIMITS: u64 = 111;
+
+    public fun get_transaction_limits_feature(): u64 {
+        TRANSACTION_LIMITS
+    }
+
+    public fun is_transaction_limits_enabled(): bool {
+        is_enabled(TRANSACTION_LIMITS)
+    }
+
+    /// Whether the storage slot natives are enabled.
+    const STORAGE_SLOT_NATIVES: u64 = 113;
+
+    public fun is_storage_slot_natives_enabled(): bool {
+        is_enabled(STORAGE_SLOT_NATIVES)
+    }
+
+    /// Whether the multisig timelock feature is enabled.
+    const MULTISIG_TIMELOCK: u64 = 115;
+
+    public fun get_multisig_timelock_feature(): u64 {
+        MULTISIG_TIMELOCK
+    }
+
+    public fun is_multisig_timelock_enabled(): bool {
+        is_enabled(MULTISIG_TIMELOCK)
+    }
+
+    /// When enabled, per-block hot-state promotions are persisted through the block
+    /// epilogue: the promotion set is embedded into the block epilogue transaction
+    /// payload (`BlockEpiloguePayload::V2`), and every transaction output in the block
+    /// uses the V1 write-set format, which encodes hot-state changes in its serialized
+    /// writes.
+    /// Lifetime: permanent
+    const HOTNESS_IN_EPILOGUE: u64 = 116;
+
+    /// When enabled, execution assembles `TransactionInfoV1` instead of `TransactionInfoV0`.
+    /// Lifetime: permanent
+    const TRANSACTION_INFO_V1: u64 = 117;
+
+    /// Umbrella auth flag for the native-trading subsystem; the per-store
+    /// flags below gate the actual writes. Both must be on to write.
+    const TRADING_NATIVE: u64 = 118;
+
+    public fun get_trading_native_feature(): u64 {
+        TRADING_NATIVE
+    }
+
+    public fun is_trading_native_enabled(): bool {
+        is_enabled(TRADING_NATIVE)
+    }
+
+    /// Gates native-position writes.
+    const NATIVE_POSITION: u64 = 119;
+
+    public fun get_native_position_feature(): u64 {
+        NATIVE_POSITION
+    }
+
+    public fun is_native_position_enabled(): bool {
+        is_enabled(NATIVE_POSITION)
+    }
+
+    /// Gates native-orderbook writes.
+    const NATIVE_ORDERBOOK: u64 = 120;
+
+    public fun get_native_orderbook_feature(): u64 {
+        NATIVE_ORDERBOOK
+    }
+
+    public fun is_native_orderbook_enabled(): bool {
+        is_enabled(NATIVE_ORDERBOOK)
+    }
+
+    /// Gates native-collateral writes.
+    const NATIVE_COLLATERAL: u64 = 121;
+
+    public fun get_native_collateral_feature(): u64 {
+        NATIVE_COLLATERAL
+    }
+
+    public fun is_native_collateral_enabled(): bool {
+        is_enabled(NATIVE_COLLATERAL)
+    }
+
+    /// When enabled, execution computes the trading-native state roots and commits them to
+    /// `TransactionInfoV1`, so they are consensus-verified. Requires `TRANSACTION_INFO_V1`.
+    /// Covers the native-position tree today and is intended to cover the other trading-native
+    /// trees as they are added. Enabling it first commits the (empty-tree) roots to transaction
+    /// info; the actual Move-side writes to those trees are gated by separate flags.
+    /// Lifetime: permanent
+    const COMPUTE_TRADING_NATIVE_STATE_ROOTS: u64 = 122;
+
+    /// When enabled together with `TRANSACTION_INFO_V1`, execution populates
+    /// `TransactionInfoV1`'s hot state root hash, so it is committed to the ledger
+    /// accumulator. Requires `TRANSACTION_INFO_V1`.
+    /// Lifetime: permanent
+    const HOT_STATE_ROOT_IN_TXN_INFO: u64 = 123;
+
+    /// When enabled, the gas refund in the epilogue mints APT directly as a fungible asset
+    /// via the paired `MintRef` (stored in `transaction_fee::AptosFAMintCapabilities`), instead
+    /// of minting a coin and converting it. This avoids touching the legacy coin supply
+    /// aggregator (v1), reducing Block-STM contention on refund transactions.
+    /// Lifetime: transient
+    const GAS_REFUND_FA_MINT: u64 = 124;
+
+    public fun gas_refund_fa_mint_enabled(): bool {
+        is_enabled(GAS_REFUND_FA_MINT)
+    }
+
+    /// Whether `FunctionInfo`-based dispatch (dispatchable fungible assets and account
+    /// abstraction) runs via function values from `std::reflect` instead of the legacy
+    /// native dispatch machinery. Requires `FUNCTION_REFLECTION`.
+    /// Lifetime: transient
+    const FUNCTION_VALUE_DISPATCH: u64 = 125;
+
+    public fun get_function_value_dispatch_feature(): u64 {
+        FUNCTION_VALUE_DISPATCH
+    }
+
+    /// Requires function reflection, without which function-value dispatch stays disabled.
+    public fun is_function_value_dispatch_enabled(): bool {
+        is_enabled(FUNCTION_VALUE_DISPATCH) && is_enabled(FUNCTION_REFLECTION)
+    }
+
+    /// Whether lazy module initialization via `aptos_framework::init::internal_maybe_initialize`
+    /// is enabled. While disabled, that entry point aborts.
+    /// Lifetime: transient
+    const LAZY_MODULE_INITIALIZATION: u64 = 127;
+
+    public fun is_lazy_module_initialization_enabled(): bool {
+        is_enabled(LAZY_MODULE_INITIALIZATION)
+    }
+
+    // ============================================================================================
+    // Feature Flag Implementation
+
+    /// The provided signer has not a framework address.
+    const EFRAMEWORK_SIGNER_NEEDED: u64 = 1;
+
+    /// The enabled features, represented by a bitset stored on chain.
+    struct Features has key {
+        features: vector<u8>
+    }
+
+    /// This resource holds the feature vec updates received in the current epoch.
+    /// On epoch change, the updates take effect and this buffer is cleared.
+    struct PendingFeatures has key {
+        features: vector<u8>
+    }
+
+    /// Deprecated to prevent validator set changes during DKG.
+    ///
+    /// Genesis/tests should use `change_feature_flags_internal()` for feature vec initialization.
+    ///
+    /// Governance proposals should use `change_feature_flags_for_next_epoch()` to enable/disable features.
+    public fun change_feature_flags(
+        _framework: &signer, _enable: vector<u64>, _disable: vector<u64>
+    ) {
+        abort(error::invalid_state(EAPI_DISABLED))
+    }
+
+    /// Update feature flags directly. Only used in genesis/tests.
+    fun change_feature_flags_internal(
+        framework: &signer, enable: vector<u64>, disable: vector<u64>
+    ) {
+        assert!(
+            signer::address_of(framework) == @std,
+            error::permission_denied(EFRAMEWORK_SIGNER_NEEDED)
+        );
+        if (!exists<Features>(@std)) {
+            move_to<Features>(framework, Features { features: vector[] })
+        };
+        let features = &mut Features[@std].features;
+        // `for_each_ref` is not supported in verification since
+        // bit-vector integer mutation is unsupported (TODO(#20375)).
+        for (i in 0..enable.length()) {
+            set(features, enable[i], true);
+        };
+        for (i in 0..disable.length()) {
+            set(features, disable[i], false);
+        };
+    }
+
+    /// Enable and disable features for the next epoch.
+    public fun change_feature_flags_for_next_epoch(
+        framework: &signer, enable: vector<u64>, disable: vector<u64>
+    ) acquires PendingFeatures, Features {
+        assert!(
+            signer::address_of(framework) == @std,
+            error::permission_denied(EFRAMEWORK_SIGNER_NEEDED)
+        );
+
+        // Figure out the baseline feature vec that the diff will be applied to.
+        let new_feature_vec =
+            if (exists<PendingFeatures>(@std)) {
+                // If there is a buffered feature vec, use it as the baseline.
+                let PendingFeatures { features } = move_from<PendingFeatures>(@std);
+                features
+            } else if (exists<Features>(@std)) {
+                // Otherwise, use the currently effective feature flag vec as the baseline, if it exists.
+                Features[@std].features
+            } else {
+                // Otherwise, use an empty feature vec.
+                vector[]
+            };
+
+        // Apply the diff and save it to the buffer.
+        apply_diff(&mut new_feature_vec, enable, disable);
+        move_to(framework, PendingFeatures { features: new_feature_vec });
+    }
+
+    /// Apply all the pending feature flag changes. Should only be used at the end of a reconfiguration with DKG.
+    ///
+    /// While the scope is public, it can only be usd in system transactions like `block_prologue` and governance proposals,
+    /// who have permission to set the flag that's checked in `extract()`.
+    public fun on_new_epoch(framework: &signer) acquires Features, PendingFeatures {
+        ensure_framework_signer(framework);
+        if (exists<PendingFeatures>(@std)) {
+            let PendingFeatures { features } = move_from<PendingFeatures>(@std);
+            if (exists<Features>(@std)) {
+                Features[@std].features = features;
+            } else {
+                move_to(framework, Features { features })
+            }
+        }
+    }
+
+    #[view]
+    /// Check whether the feature is enabled.
+    public fun is_enabled(feature: u64): bool {
+        exists<Features>(@std) && contains(&Features[@std].features, feature)
+    }
+
+    /// Helper to include or exclude a feature flag.
+    fun set(features: &mut vector<u8>, feature: u64, include: bool) {
+        let byte_index = feature / 8;
+        let bit_mask = 1 << ((feature % 8) as u8);
+        while (features.length() <= byte_index) { features.push_back(0) };
+
+        if (include) features[byte_index] |= bit_mask
+        else features[byte_index] &= (0xff ^ bit_mask)
+    }
+
+    /// Helper to check whether a feature flag is enabled.
+    fun contains(features: &vector<u8>, feature: u64): bool {
+        let byte_index = feature / 8;
+        let bit_mask = 1 << ((feature % 8) as u8);
+        byte_index < features.length() && (features[byte_index] & bit_mask) != 0
+    }
+
+    fun apply_diff(
+        features: &mut vector<u8>, enable: vector<u64>, disable: vector<u64>
+    ) {
+        let i = 0;
+        while (i < enable.length()) {
+            set(features, enable[i], true);
+            i = i + 1;
+        };
+        let i = 0;
+        while (i < disable.length()) {
+            set(features, disable[i], false);
+            i = i + 1;
+        };
+    }
+
+    fun ensure_framework_signer(account: &signer) {
+        let addr = signer::address_of(account);
+        assert!(addr == @std, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
+    }
+
+    #[verify_only]
+    public fun change_feature_flags_for_verification(
+        framework: &signer, enable: vector<u64>, disable: vector<u64>
+    ) {
+        change_feature_flags_internal(framework, enable, disable)
+    }
+
+    #[test_only]
+    public fun change_feature_flags_for_testing(
+        framework: &signer, enable: vector<u64>, disable: vector<u64>
+    ) {
+        change_feature_flags_internal(framework, enable, disable)
+    }
+
+    #[test]
+    fun test_feature_sets() {
+        let features = vector[];
+        set(&mut features, 1, true);
+        set(&mut features, 5, true);
+        set(&mut features, 17, true);
+        set(&mut features, 23, true);
+        assert!(contains(&features, 1), 0);
+        assert!(contains(&features, 5), 1);
+        assert!(contains(&features, 17), 2);
+        assert!(contains(&features, 23), 3);
+        set(&mut features, 5, false);
+        set(&mut features, 17, false);
+        assert!(contains(&features, 1), 0);
+        assert!(!contains(&features, 5), 1);
+        assert!(!contains(&features, 17), 2);
+        assert!(contains(&features, 23), 3);
+    }
+
+    #[test(fx = @std)]
+    fun test_change_feature_txn(fx: signer) {
+        change_feature_flags_for_testing(&fx, vector[1, 9, 23], vector[]);
+        assert!(is_enabled(1), 1);
+        assert!(is_enabled(9), 2);
+        assert!(is_enabled(23), 3);
+        change_feature_flags_for_testing(&fx, vector[17], vector[9]);
+        assert!(is_enabled(1), 1);
+        assert!(!is_enabled(9), 2);
+        assert!(is_enabled(17), 3);
+        assert!(is_enabled(23), 4);
+    }
+}

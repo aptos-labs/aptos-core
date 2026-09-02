@@ -1,0 +1,22 @@
+{
+  "schema_version": 2,
+  "function": "0x1::code::publish_package",
+  "source_repair": {
+    "loops": [
+      "lazy deploy-owner recording",
+      "package scan / last matching package",
+      "upgrade reset"
+    ],
+    "status": "compiled"
+  },
+  "wp_inference": {
+    "passed": true,
+    "note": "A diagnostic-dump panic was repaired before this successful rerun."
+  },
+  "target_body_registry_contract_trial": {
+    "passed": false,
+    "timeout_seconds": 60,
+    "result": "package verification deadline exceeded",
+    "note": "This legacy trial unnecessarily removed opaque. A canonical rerun must target the body with opaque preserved. The compact registry model is not yet the committed contract: complete abort and forwarding behavior remains to be specified."
+  }
+}

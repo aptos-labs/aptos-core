@@ -1,0 +1,68 @@
+{
+  "schema_version": 2,
+  "purpose": "Source/effect-aware simplification evidence for read-only staking_contract dependency contracts.",
+  "package": "corpus/framework",
+  "target_body_proof_method": {
+    "description": "Select each target directly in the unchanged package. Keep pragma opaque: it affects callers and does not disable verification of the selected function body.",
+    "command": "target/debug/move-flow experiment prove --package corpus/framework --target <target> --timeout 60 --split-vcs-by-assert --output <artifact>",
+    "timeout_seconds": 60,
+    "opaque_preserved": true,
+    "legacy_evidence_note": "The recorded pass results predate this correction and used package copies that unnecessarily removed the selected target's opaque pragma. Those nonrecursive target-body obligations passed, but future evidence must use the command above."
+  },
+  "contracts": [
+    {
+      "target": "0x1::staking_contract::stake_pool_address",
+      "source": "sources/AptosFramework/staking_contract.move",
+      "effects": "read-only Store lookup",
+      "passed": true
+    },
+    {
+      "target": "0x1::staking_contract::last_recorded_principal",
+      "source": "sources/AptosFramework/staking_contract.move",
+      "effects": "read-only Store lookup",
+      "passed": true
+    },
+    {
+      "target": "0x1::staking_contract::commission_percentage",
+      "source": "sources/AptosFramework/staking_contract.move",
+      "effects": "read-only Store lookup",
+      "passed": true
+    },
+    {
+      "target": "0x1::staking_contract::pending_distribution_counts",
+      "source": "sources/AptosFramework/staking_contract.move",
+      "effects": "read-only Store lookup",
+      "passed": true
+    },
+    {
+      "target": "0x1::staking_contract::staking_contract_exists",
+      "source": "sources/AptosFramework/staking_contract.move",
+      "effects": "read-only Store membership query",
+      "passed": true
+    },
+    {
+      "target": "0x1::staking_contract::beneficiary_for_operator",
+      "source": "sources/AptosFramework/staking_contract.move",
+      "effects": "read-only optional global lookup",
+      "passed": true
+    },
+    {
+      "target": "0x1::staking_contract::create_resource_account_seed",
+      "source": "sources/AptosFramework/staking_contract.move",
+      "effects": "pure vector construction",
+      "passed": true
+    },
+    {
+      "target": "0x1::staking_contract::staker_address",
+      "source": "sources/AptosFramework/staking_contract.move",
+      "effects": "read-only optional global lookup",
+      "passed": true
+    },
+    {
+      "target": "0x1::staking_contract::pending_attribution_snapshot",
+      "source": "sources/AptosFramework/staking_contract.move",
+      "effects": "read-only Store lookup followed by pool_u64 balance calculation",
+      "passed": true
+    }
+  ]
+}

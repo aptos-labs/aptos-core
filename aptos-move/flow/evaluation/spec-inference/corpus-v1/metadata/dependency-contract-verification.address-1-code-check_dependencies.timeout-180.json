@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "stage": "prover",
+  "target": "0x1::code::check_dependencies",
+  "passed": false,
+  "diagnostics": [
+    "error: Boogie execution exceeded hard timeout of 185s\n  ┌─ <unknown>:1:1\n  │\n1 │ <unknown>\n  │ ^^^^^^^^^\n\n",
+    "package verification deadline exceeded"
+  ]
+}

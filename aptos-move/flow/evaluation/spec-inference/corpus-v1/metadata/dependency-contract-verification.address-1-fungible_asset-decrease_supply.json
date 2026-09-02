@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "stage": "prover",
+  "target": "0x1::fungible_asset::decrease_supply",
+  "passed": true,
+  "diagnostics": []
+}

@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "stage": "prover",
+  "target": "0x1::coin::register",
+  "passed": true,
+  "diagnostics": [
+    "warning: unused alias\n    ┌─ /tmp/coin-register.XATWtz/package/sources/AptosFramework/coin.spec.move:616:18\n    │\n616 │         use 0x1::account;\n    │                  ^^^^^^^ Unused 'use' of alias 'account'. Consider removing it\n\n",
+    "warning: generic type reflection in a function specification is not yet supported through behavioral predicates; leaving `aborts_of` uninterpreted; see https://github.com/aptos-labs/aptos-core/issues/20371\n    ┌─ /tmp/coin-register.XATWtz/package/sources/AptosFramework/coin.move:799:5\n    │  \n799 │ ╭     public fun is_account_registered<CoinType>(_account_addr: address): bool {\n800 │ │         assert!(\n801 │ │             is_coin_initialized<CoinType>(),\n802 │ │             error::invalid_argument(ECOIN_INFO_NOT_PUBLISHED)\n803 │ │         );\n804 │ │         true\n805 │ │     }\n    │ ╰─────^\n\nwarning: generic type reflection in a function specification is not yet supported through behavioral predicates; leaving `ensures_of` uninterpreted; see https://github.com/aptos-labs/aptos-core/issues/20371\n    ┌─ /tmp/coin-register.XATWtz/package/sources/AptosFramework/coin.move:799:5\n    │  \n799 │ ╭     public fun is_account_registered<CoinType>(_account_addr: address): bool {\n800 │ │         assert!(\n801 │ │             is_coin_initialized<CoinType>(),\n802 │ │             error::invalid_argument(ECOIN_INFO_NOT_PUBLISHED)\n803 │ │         );\n804 │ │         true\n805 │ │     }\n    │ ╰─────^\n\n"
+  ]
+}

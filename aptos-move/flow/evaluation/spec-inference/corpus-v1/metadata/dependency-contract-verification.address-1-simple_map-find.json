@@ -1,0 +1,10 @@
+{
+  "schema_version": 3,
+  "stage": "trusted_boundary",
+  "target": "0x1::simple_map::find",
+  "basis": "expert_assumption",
+  "target_body_proof": "not_supported",
+  "verified": false,
+  "rationale": "SimpleMap is intrinsic to the prover, which deliberately rejects selecting the implementation's data vector during body verification. The implementation is a bounded linear search; the complete opaque contract exposes exactly its caller-relevant map-membership result.",
+  "metadata": "trusted-verification-boundaries.json"
+}

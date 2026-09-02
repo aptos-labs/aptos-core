@@ -1,0 +1,163 @@
+diff --git a/.move-inference-task.json b/.move-inference-task.json
+new file mode 100644
+index 0000000000..15c46b43ab
+--- /dev/null
++++ b/.move-inference-task.json
+@@ -0,0 +1,76 @@
++{
++  "called_function_dependencies": [
++    "0x1::bcs::serialized_size",
++    "0x1::big_ordered_map::iter_is_end",
++    "0x1::big_ordered_map::validate_size_and_init_max_degrees",
++    "0x1::error::canonical",
++    "0x1::error::invalid_argument",
++    "0x1::ordered_map::iter_borrow_mut",
++    "0x1::storage_slots_allocator::borrow_mut"
++  ],
++  "granularity": "function",
++  "package_module_target": "0x1::big_ordered_map::iter_modify",
++  "schema_version": 3,
++  "source_commit": "6d836beedc56fc70c54f3b3046d1d248d850c64b",
++  "source_path": "sources/AptosFramework/datastructures/big_ordered_map.move",
++  "spec_function_dependencies": [
++    "0x1::bcs::serialize",
++    "0x1::error::$canonical",
++    "0x1::math64::$max",
++    "0x1::math64::$min",
++    "0x1::option::$borrow",
++    "0x1::option::$is_none",
++    "0x1::table_with_length::spec_contains",
++    "0x1::table_with_length::spec_get"
++  ],
++  "target_functions": [
++    "iter_modify"
++  ],
++  "task_id": "AF-big-ordered-map-051",
++  "transitive_called_function_dependencies": [
++    "0x1::bcs::serialized_size",
++    "0x1::big_ordered_map::iter_is_end",
++    "0x1::big_ordered_map::validate_size_and_init_max_degrees",
++    "0x1::error::canonical",
++    "0x1::error::invalid_argument",
++    "0x1::math64::max",
++    "0x1::math64::min",
++    "0x1::option::borrow_mut",
++    "0x1::ordered_map::iter_borrow_mut",
++    "0x1::storage_slots_allocator::borrow_mut",
++    "0x1::table::borrow_box_mut",
++    "0x1::table::borrow_mut",
++    "0x1::table_with_length::borrow_mut",
++    "0x1::vector::borrow_mut"
++  ],
++  "transitive_function_dependencies": [
++    "0x1::bcs::serialized_size",
++    "0x1::big_ordered_map::iter_is_end",
++    "0x1::big_ordered_map::validate_size_and_init_max_degrees",
++    "0x1::error::canonical",
++    "0x1::error::invalid_argument",
++    "0x1::math64::max",
++    "0x1::math64::min",
++    "0x1::option::borrow_mut",
++    "0x1::ordered_map::iter_borrow_mut",
++    "0x1::storage_slots_allocator::borrow_mut",
++    "0x1::table::borrow_box_mut",
++    "0x1::table::borrow_mut",
++    "0x1::table_with_length::borrow_mut",
++    "0x1::vector::borrow_mut"
++  ],
++  "transitive_module_dependencies": [
++    "0x1::bcs",
++    "0x1::cmp",
++    "0x1::error",
++    "0x1::fixed_point32",
++    "0x1::math64",
++    "0x1::mem",
++    "0x1::option",
++    "0x1::ordered_map",
++    "0x1::storage_slots_allocator",
++    "0x1::table",
++    "0x1::table_with_length",
++    "0x1::vector"
++  ]
++}
+diff --git a/sources/AptosFramework/datastructures/big_ordered_map.spec.move b/sources/AptosFramework/datastructures/big_ordered_map.spec.move
+index 1b5fe6abb6..b269aa33c0 100644
+--- a/sources/AptosFramework/datastructures/big_ordered_map.spec.move
++++ b/sources/AptosFramework/datastructures/big_ordered_map.spec.move
+@@ -708,41 +708,41 @@ spec aptos_framework::big_ordered_map {
+         pragma intrinsic;
+     }
+ 
+-    spec iter_modify {
+-        pragma opaque;
+-        pragma verify = false;
+-        // The closure's contract (`aborts_of`/`ensures_of` below) is only
+-        // established for inputs satisfying its precondition — the closure is
+-        // verified under `requires_of` — so importing it is sound only when
+-        // the caller establishes that precondition on the current value. The
+-        // end-iterator disjunct exempts calls that abort at the end-check
+-        // before the closure is ever invoked (`self.key` does not exist
+-        // there). Trivially true for closures without a `requires`. The
+-        // body's post-callback size validation is covered by the size
+-        // presumption above.
+-        requires iter_is_end(self, map) || requires_of<f>(spec_get(map, self.key));
+-        requires spec_iter_valid(self, map);
+-        aborts_if iter_is_end(self, map);
+-        aborts_if aborts_of<f>(spec_get(map, self.key));
+-        // A value modification is not a structural mutation: iterators stay valid.
+-        ensures spec_iter_preserved(map, old(map));
+-        // iter_modify mutates the value at self.key via the closure. Containment is
+-        // unchanged for every key; values for keys other than self.key are preserved;
+-        // the closure's contract relates the old value, the new value, and the result.
+-        ensures spec_contains_key(map, self.key);
+-        ensures spec_len(map) == spec_len(old(map));
+-        ensures spec_unchanged_except_at(map, self.key);
+-        ensures ensures_of<f>(old(spec_get(map, self.key)), result, spec_get(map, self.key));
+-        // A value write moves no keys, so every position survives. This has to
+-        // be stated positionally: equality against `spec_set` would not do it,
+-        // because equality on a map carrying ghosts is extensional (see
+-        // `$IsEqual` in the prelude), so it never produces the write term the
+-        // model's rank-preservation axiom triggers on. Same content as that
+-        // axiom, so no new trust.
+-        ensures forall i in 0..spec_len(map): spec_key_at(map, i) == spec_key_at(old(map), i);
+-        ensures forall k: K where spec_contains_key(old(map), k):
+-            spec_rank(map, k) == spec_rank(old(map), k);
+-    }
++                      
++                      
++                              
++                                                                          
++                                                                              
++                                                                            
++                                                                             
++                                                                          
++                                                                        
++                                                                        
++                                                                      
++                             
++                                                                                   
++                                            
++                                         
++                                                        
++                                                                                   
++                                                   
++                                                                                    
++                                                                                      
++                                                                                       
++                                                 
++                                                    
++                                                        
++                                                                                             
++                                                                               
++                                                                               
++                                                                        
++                                                                              
++                                                                            
++                                  
++                                                                                              
++                                                                 
++                                                        
++     
+ 
+     spec internal_find_with_path {
+         pragma opaque;

@@ -1,0 +1,11 @@
+{
+  "schema_version": 3,
+  "stage": "trusted_boundary",
+  "target": "0x1::ordered_map::iter_prev",
+  "basis": "expert_assumption",
+  "target_body_proof": "not_supported",
+  "verified": false,
+  "diagnostic_artifact": "dependency-contract-verification.address-1-ordered_map-iter_prev.intrinsic-map.json",
+  "rationale": "The prover rejects selecting OrderedMap.entries during body verification because OrderedMap is intrinsic. The opaque contract gives the exact predecessor iterator and abort behavior over the intrinsic map length.",
+  "metadata": "trusted-verification-boundaries.json"
+}

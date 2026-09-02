@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "stage": "prover",
+  "target": "0x1::ordered_map::internal_lower_bound",
+  "passed": false,
+  "diagnostics": [
+    "error: cannot select a field of an intrinsic map type in verified code\n    ┌─ /tmp/ordered-map-lower-bound-prove.rJLET1/package/sources/AptosFramework/datastructures/ordered_map.move:420:23\n    │\n420 │         let entries = &self.entries;\n    │                       ^^^^^^^^^^^^^\n\n",
+    "exiting with condition generation errors"
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "stage": "prover",
+  "target": "0x1::vesting::assert_active_vesting_contract",
+  "passed": true,
+  "diagnostics": []
+}

@@ -1,0 +1,1579 @@
+/// This module provides an implementation for an ordered map.
+///
+/// Keys point to values, and each key in the map must be unique.
+///
+/// Currently, one implementation is provided, backed by a single sorted vector.
+///
+/// That means that keys can be found within O(log N) time.
+/// Adds and removals take O(N) time, but the constant factor is small,
+/// as it does only O(log N) comparisons, and does efficient mem-copy with vector operations.
+///
+/// Additionally, it provides a way to lookup and iterate over sorted keys, making range query
+/// take O(log N + R) time (where R is number of elements in the range).
+///
+/// Most methods operate with OrderedMap being `self`.
+/// All methods that start with iter_*, operate with IteratorPtr being `self`.
+///
+/// Uses cmp::compare for ordering, which compares primitive types natively, and uses common
+/// lexicographical sorting for complex types.
+///
+/// Warning: All iterator functions need to be carefully used, because they are just pointers into the
+/// structure, and modification of the map invalidates them (without compiler being able to catch it).
+/// Type is also named IteratorPtr, so that Iterator is free to use later.
+/// Better guarantees would need future Move improvements that will allow references to be part of the struct,
+/// allowing cleaner iterator APIs.
+///
+/// That's why all functions returning iterators are prefixed with "internal_", to clarify nuances needed to make
+/// sure usage is correct.
+/// A set of inline utility methods is provided instead, to provide guaranteed valid usage to iterators.
+module aptos_framework::ordered_map {
+    friend aptos_framework::big_ordered_map;
+
+    #[test_only]
+    friend aptos_framework::ordered_map_test;
+
+    use std::vector;
+
+    use std::option::{Self, Option};
+    use std::cmp;
+    use std::error;
+
+    /// Map key already exists
+    const EKEY_ALREADY_EXISTS: u64 = 1;
+    /// Map key is not found
+    const EKEY_NOT_FOUND: u64 = 2;
+    // Trying to do an operation on an IteratorPtr that would go out of bounds
+    const EITER_OUT_OF_BOUNDS: u64 = 3;
+    /// New key used in replace_key_inplace doesn't respect the order
+    const ENEW_KEY_NOT_IN_ORDER: u64 = 4;
+
+    /// Individual entry holding (key, value) pair
+    struct Entry<K, V> has drop, copy, store {
+        key: K,
+        value: V
+    }
+
+    /// The OrderedMap datastructure.
+    enum OrderedMap<K, V> has drop, copy, store {
+        /// sorted-vector based implementation of OrderedMap
+        SortedVectorMap {
+            /// List of entries, sorted by key.
+            entries: vector<Entry<K, V>>
+        }
+    }
+
+    /// An iterator pointing to a valid position in an ordered map, or to the end.
+    ///
+    /// TODO: Once fields can be (mutable) references, this class will be deprecated.
+    enum IteratorPtr has copy, drop {
+        End,
+        Position {
+            /// The index of the iterator pointing to.
+            index: u64
+        }
+    }
+
+    /// Create a new empty OrderedMap, using default (SortedVectorMap) implementation.
+    public fun new<K, V>(): OrderedMap<K, V> {
+        OrderedMap::SortedVectorMap { entries: vector::empty() }
+    }
+
+    /// Create a OrderedMap from a vector of keys and values.
+    /// Aborts with EKEY_ALREADY_EXISTS if duplicate keys are passed in.
+    public fun new_from<K, V>(keys: vector<K>, values: vector<V>): OrderedMap<K, V> {
+        let map = new();
+        map.add_all(keys, values);
+        map
+    }
+
+    /// Number of elements in the map.
+    public fun length<K, V>(self: &OrderedMap<K, V>): u64 {
+        self.entries.length()
+    }
+
+    /// Whether map is empty.
+    public fun is_empty<K, V>(self: &OrderedMap<K, V>): bool {
+        self.entries.is_empty()
+    }
+
+    /// Add a key/value pair to the map.
+    /// Aborts with EKEY_ALREADY_EXISTS if key already exist.
+    public fun add<K, V>(self: &mut OrderedMap<K, V>, key: K, value: V) {
+        let len = self.entries.length();
+        let index = binary_search(&key, &self.entries, 0, len);
+
+        // key must not already be inside.
+        assert!(
+            index >= len || &self.entries[index].key != &key,
+            error::invalid_argument(EKEY_ALREADY_EXISTS)
+        );
+        self.entries.insert(index, Entry { key, value });
+    }
+
+    /// If the key doesn't exist in the map, inserts the key/value, and returns none.
+    /// Otherwise, updates the value under the given key, and returns the old value.
+    public fun upsert<K: drop, V>(self: &mut OrderedMap<K, V>, key: K, value: V): Option<V> {
+        let len = self.entries.length();
+        let index = binary_search(&key, &self.entries, 0, len);
+
+        if (index < len && &self.entries[index].key == &key) {
+            let Entry { key: _, value: old_value } =
+                self.entries.replace(index, Entry { key, value });
+            option::some(old_value)
+        } else {
+            self.entries.insert(index, Entry { key, value });
+            option::none()
+        }
+    }
+
+    /// Remove a key/value pair from the map.
+    /// Aborts with EKEY_NOT_FOUND if `key` doesn't exist.
+    public fun remove<K: drop, V>(self: &mut OrderedMap<K, V>, key: &K): V {
+        let len = self.entries.length();
+        let index = binary_search(key, &self.entries, 0, len);
+        assert!(index < len, error::invalid_argument(EKEY_NOT_FOUND));
+        let Entry { key: old_key, value } = self.entries.remove(index);
+        assert!(key == &old_key, error::invalid_argument(EKEY_NOT_FOUND));
+        value
+    }
+
+    /// Remove a key/value pair from the map.
+    /// Returns none if `key` doesn't exist.
+    public fun remove_or_none<K: drop, V>(
+        self: &mut OrderedMap<K, V>, key: &K
+    ): Option<V> {
+        let len = self.entries.length();
+        let index = binary_search(key, &self.entries, 0, len);
+        if (index < len && key == &self.entries[index].key) {
+            let Entry { key: _, value } = self.entries.remove(index);
+            option::some(value)
+        } else {
+            option::none()
+        }
+    }
+
+    /// Modifies element by calling modify_f if it exists, or calling add_f to add if it doesn't.
+    /// Returns true if element already existed.
+    public inline fun modify_or_add<K: copy, V>(
+        self: &mut OrderedMap<K, V>,
+        key: &K,
+        modify_f: |&mut V| has drop,
+        add_f: || V has drop
+    ): bool {
+        let exists = self.modify_if_present(key, |v| modify_f(v));
+        if (!exists) {
+            self.add(*key, add_f());
+        };
+        exists
+    }
+
+    /// Modifies element by calling modify_f if it exists.
+    /// Returns true if element already existed.
+    public inline fun modify_if_present<K, V>(
+        self: &mut OrderedMap<K, V>, key: &K, modify_f: |&mut V| has drop
+    ): bool {
+        let iter = self.internal_find(key);
+        if (iter.iter_is_end(self)) { false }
+        else {
+            modify_f(iter.iter_borrow_mut(self));
+            true
+        }
+    }
+
+    /// Returns whether map contains a given key.
+    public fun contains<K, V>(self: &OrderedMap<K, V>, key: &K): bool {
+        !self.internal_find(key).iter_is_end(self)
+    }
+
+    public fun borrow<K, V>(self: &OrderedMap<K, V>, key: &K): &V {
+        self.internal_find(key).iter_borrow(self)
+    }
+
+    public fun borrow_mut<K, V>(self: &mut OrderedMap<K, V>, key: &K): &mut V {
+        self.internal_find(key).iter_borrow_mut(self)
+    }
+
+    public fun get<K: drop + copy + store, V: copy + store>(
+        self: &OrderedMap<K, V>, key: &K
+    ): Option<V> {
+        let iter = self.internal_find(key);
+        if (iter.iter_is_end(self)) {
+            option::none()
+        } else {
+            option::some(*iter.iter_borrow(self))
+        }
+    }
+
+    public inline fun get_and_map<K: drop + copy + store, V: store, R>(
+        self: &OrderedMap<K, V>, key: &K, f: |&V| R has drop
+    ): Option<R> {
+        let iter = self.internal_find(key);
+        if (iter.iter_is_end(self)) {
+            option::none()
+        } else {
+            option::some(f(iter.iter_borrow(self)))
+        }
+    }
+
+    /// Changes the key, while keeping the same value attached to it
+    /// Aborts with EKEY_NOT_FOUND if `old_key` doesn't exist.
+    /// Aborts with ENEW_KEY_NOT_IN_ORDER if `new_key` doesn't keep the order `old_key` was in.
+    public(friend) fun replace_key_inplace<K: drop, V>(
+        self: &mut OrderedMap<K, V>, old_key: &K, new_key: K
+    ) {
+        let len = self.entries.length();
+        let index = binary_search(old_key, &self.entries, 0, len);
+        assert!(index < len, error::invalid_argument(EKEY_NOT_FOUND));
+
+        assert!(
+            old_key == &self.entries[index].key,
+            error::invalid_argument(EKEY_NOT_FOUND)
+        );
+
+        // check that after we update the key, order is going to be respected
+        if (index > 0) {
+            assert!(
+                cmp::compare(&self.entries[index - 1].key, &new_key).is_lt(),
+                error::invalid_argument(ENEW_KEY_NOT_IN_ORDER)
+            )
+        };
+
+        if (index + 1 < len) {
+            assert!(
+                cmp::compare(&new_key, &self.entries[index + 1].key).is_lt(),
+                error::invalid_argument(ENEW_KEY_NOT_IN_ORDER)
+            )
+        };
+
+        self.entries[index].key = new_key;
+    }
+
+    /// Add multiple key/value pairs to the map. The keys must not already exist.
+    /// Aborts with EKEY_ALREADY_EXISTS if key already exist, or duplicate keys are passed in.
+    public fun add_all<K, V>(
+        self: &mut OrderedMap<K, V>, keys: vector<K>, values: vector<V>
+    ) {
+        // TODO: Can be optimized, by sorting keys and values, and then creating map.
+        let len = keys.length();
+        assert!(len == values.length(), 0x20002);
+        keys.reverse();
+        values.reverse();
+        while (len > 0) {
+            self.add(keys.pop_back(), values.pop_back());
+            len = len - 1;
+        };
+        keys.destroy_empty();
+        values.destroy_empty();
+    }
+
+    /// Add multiple key/value pairs to the map, overwrites values if they exist already,
+    /// or if duplicate keys are passed in.
+    public fun upsert_all<K: drop, V: drop>(
+        self: &mut OrderedMap<K, V>, keys: vector<K>, values: vector<V>
+    ) {
+        // TODO: Can be optimized, by sorting keys and values, and then creating map.
+        let len = keys.length();
+        assert!(len == values.length(), 0x20002);
+        keys.reverse();
+        values.reverse();
+        while (len > 0) {
+            self.upsert(keys.pop_back(), values.pop_back());
+            len = len - 1;
+        };
+        keys.destroy_empty();
+        values.destroy_empty();
+    }
+
+    /// Takes all elements from `other` and adds them to `self`,
+    /// overwritting if any key is already present in self.
+    public fun append<K: drop, V: drop>(
+        self: &mut OrderedMap<K, V>, other: OrderedMap<K, V>
+    ) {
+        self.append_impl(other);
+    }
+
+    /// Takes all elements from `other` and adds them to `self`.
+    /// Aborts with EKEY_ALREADY_EXISTS if `other` has a key already present in `self`.
+    public fun append_disjoint<K, V>(
+        self: &mut OrderedMap<K, V>, other: OrderedMap<K, V>
+    ) {
+        let overwritten = self.append_impl(other);
+        assert!(overwritten.length() == 0, error::invalid_argument(EKEY_ALREADY_EXISTS));
+        overwritten.destroy_empty();
+    }
+
+    /// Takes all elements from `other` and adds them to `self`, returning list of entries in self that were overwritten.
+    fun append_impl<K, V>(
+        self: &mut OrderedMap<K, V>, other: OrderedMap<K, V>
+    ): vector<Entry<K, V>> {
+        let OrderedMap::SortedVectorMap { entries: other_entries } = other;
+        let overwritten = vector::empty();
+
+        if (other_entries.is_empty()) {
+            other_entries.destroy_empty();
+            return overwritten;
+        };
+
+        if (self.entries.is_empty()) {
+            self.entries.append(other_entries);
+            return overwritten;
+        };
+
+        // Optimization: if all elements in `other` are larger than all elements in `self`, we can just move them over.
+        if (cmp::compare(
+            &self.entries.borrow(self.entries.length() - 1).key,
+            &other_entries.borrow(0).key
+        ).is_lt()) {
+            self.entries.append(other_entries);
+            return overwritten;
+        };
+
+        // In O(n), traversing from the back, build reverse sorted result, and then reverse it back
+        let reverse_result = vector::empty();
+        let cur_i = self.entries.length() - 1;
+        let other_i = other_entries.length() - 1;
+
+        // after the end of the loop, other_entries is empty, and any leftover is in entries
+        loop {
+            let ord = cmp::compare(
+                &self.entries[cur_i].key, &other_entries[other_i].key
+            );
+            if (ord.is_gt()) {
+                reverse_result.push_back(self.entries.pop_back());
+                if (cur_i == 0) {
+                    // make other_entries empty, and rest in entries.
+                    // TODO cannot use mem::swap until it is public/released
+                    // mem::swap(&mut self.entries, &mut other_entries);
+                    self.entries.append(other_entries);
+                    break;
+                } else {
+                    cur_i -= 1;
+                };
+            } else {
+                // is_lt or is_eq
+                if (ord.is_eq()) {
+                    // we skip the entries one, and below put in the result one from other.
+                    overwritten.push_back(self.entries.pop_back());
+
+                    if (cur_i == 0) {
+                        // make other_entries empty, and rest in entries.
+                        // TODO cannot use mem::swap until it is public/released
+                        // mem::swap(&mut self.entries, &mut other_entries);
+                        self.entries.append(other_entries);
+                        break;
+                    } else {
+                        cur_i -= 1;
+                    };
+                };
+
+                reverse_result.push_back(other_entries.pop_back());
+                if (other_i == 0) {
+                    other_entries.destroy_empty();
+                    break;
+                } else {
+                    other_i -= 1;
+                };
+            };
+        };
+
+        self.entries.reverse_append(reverse_result);
+
+        overwritten
+    }
+
+    /// Splits the collection into two, such to leave `self` with `at` number of elements.
+    /// Returns a newly allocated map containing the elements in the range [at, len).
+    /// After the call, the original map will be left containing the elements [0, at).
+    public fun trim<K, V>(self: &mut OrderedMap<K, V>, at: u64): OrderedMap<K, V> {
+        let rest = self.entries.trim(at);
+
+        OrderedMap::SortedVectorMap { entries: rest }
+    }
+
+    public fun borrow_front<K, V>(self: &OrderedMap<K, V>): (&K, &V) {
+        let entry = self.entries.borrow(0);
+        (&entry.key, &entry.value)
+    }
+
+    public fun borrow_back<K, V>(self: &OrderedMap<K, V>): (&K, &V) {
+        let entry = self.entries.borrow(self.entries.length() - 1);
+        (&entry.key, &entry.value)
+    }
+
+    public fun pop_front<K, V>(self: &mut OrderedMap<K, V>): (K, V) {
+        let Entry { key, value } = self.entries.remove(0);
+        (key, value)
+    }
+
+    public fun pop_back<K, V>(self: &mut OrderedMap<K, V>): (K, V) {
+        let Entry { key, value } = self.entries.pop_back();
+        (key, value)
+    }
+
+    public fun prev_key<K: copy, V>(self: &OrderedMap<K, V>, key: &K): Option<K> {
+        let it = self.internal_lower_bound(key);
+        if (it.iter_is_begin(self)) {
+            option::none()
+        } else {
+            option::some(*it.iter_prev(self).iter_borrow_key(self))
+        }
+    }
+
+    public fun next_key<K: copy, V>(self: &OrderedMap<K, V>, key: &K): Option<K> {
+        let it = self.internal_lower_bound(key);
+        if (it.iter_is_end(self)) {
+            option::none()
+        } else {
+            let cur_key = it.iter_borrow_key(self);
+            if (key == cur_key) {
+                let it = it.iter_next(self);
+                if (it.iter_is_end(self)) {
+                    option::none()
+                } else {
+                    option::some(*it.iter_borrow_key(self))
+                }
+            } else {
+                option::some(*cur_key)
+            }
+        }
+    }
+
+    // TODO: see if it is more understandable if iterator points between elements,
+    // and there is iter_borrow_next and iter_borrow_prev, and provide iter_insert.
+    // This is called "cursor" in rust instead.
+
+    /// Warning: Marked as internal, as it is safer to utilize provided inline functions instead.
+    /// For direct usage of this method, check Warning at the top of the file corresponding to iterators.
+    ///
+    /// Returns an iterator pointing to the first element that is greater or equal to the provided
+    /// key, or an end iterator if such element doesn't exist.
+    public fun internal_lower_bound<K, V>(self: &OrderedMap<K, V>, key: &K): IteratorPtr {
+        let entries = &self.entries;
+        let len = entries.length();
+
+        let index = binary_search(key, entries, 0, len);
+        if (index == len) {
+            self.internal_new_end_iter()
+        } else {
+            new_iter(index)
+        }
+    }
+
+    /// Warning: Marked as internal, as it is safer to utilize provided inline functions instead.
+    /// For direct usage of this method, check Warning at the top of the file corresponding to iterators.
+    ///
+    /// Returns an iterator pointing to the element that equals to the provided key, or an end
+    /// iterator if the key is not found.
+    public fun internal_find<K, V>(self: &OrderedMap<K, V>, key: &K): IteratorPtr {
+        let internal_lower_bound = self.internal_lower_bound(key);
+        if (internal_lower_bound.iter_is_end(self)) {
+            internal_lower_bound
+        } else if (internal_lower_bound.iter_borrow_key(self) == key) {
+            internal_lower_bound
+        } else {
+            self.internal_new_end_iter()
+        }
+    }
+
+    /// Warning: Marked as internal, as it is safer to utilize provided inline functions instead.
+    /// For direct usage of this method, check Warning at the top of the file corresponding to iterators.
+    ///
+    /// Returns the begin iterator.
+    public fun internal_new_begin_iter<K, V>(self: &OrderedMap<K, V>): IteratorPtr {
+        if (self.is_empty()) {
+            return IteratorPtr::End;
+        };
+
+        new_iter(0)
+    }
+
+    /// Warning: Marked as internal, as it is safer to utilize provided inline functions instead.
+    /// For direct usage of this method, check Warning at the top of the file corresponding to iterators.
+    ///
+    /// Returns the end iterator.
+    public fun internal_new_end_iter<K, V>(self: &OrderedMap<K, V>): IteratorPtr {
+        IteratorPtr::End
+    }
+
+    // ========== Section for methods opearting on iterators ========
+    // Note: After any modifications to the map, do not use any of the iterators obtained beforehand.
+    // Operations on iterators after map is modified are unexpected/incorrect.
+
+    /// Returns the next iterator, or none if already at the end iterator.
+    /// Note: Requires that the map is not changed after the input iterator is generated.
+    public fun iter_next<K, V>(self: IteratorPtr, map: &OrderedMap<K, V>): IteratorPtr {
+        assert!(!self.iter_is_end(map), error::invalid_argument(EITER_OUT_OF_BOUNDS));
+
+        let index = self.index + 1;
+        if (index < map.entries.length()) {
+            new_iter(index)
+        } else {
+            map.internal_new_end_iter()
+        }
+    }
+
+    /// Returns the previous iterator, or none if already at the begin iterator.
+    /// Note: Requires that the map is not changed after the input iterator is generated.
+    public fun iter_prev<K, V>(self: IteratorPtr, map: &OrderedMap<K, V>): IteratorPtr {
+        assert!(!self.iter_is_begin(map), error::invalid_argument(EITER_OUT_OF_BOUNDS));
+
+        let index =
+            if (self is IteratorPtr::End) {
+                map.entries.length() - 1
+            } else {
+                self.index - 1
+            };
+
+        new_iter(index)
+    }
+
+    /// Returns whether the iterator is a begin iterator.
+    public fun iter_is_begin<K, V>(
+        self: &IteratorPtr, map: &OrderedMap<K, V>
+    ): bool {
+        if (self is IteratorPtr::End) {
+            map.is_empty()
+        } else {
+            self.index == 0
+        }
+    }
+
+    /// Returns true iff the iterator is a begin iterator from a non-empty collection.
+    /// (I.e. if iterator points to a valid element)
+    /// This method doesn't require having access to map, unlike iter_is_begin.
+    public fun iter_is_begin_from_non_empty(self: &IteratorPtr): bool {
+        if (self is IteratorPtr::End) { false }
+        else {
+            self.index == 0
+        }
+    }
+
+    /// Returns whether the iterator is an end iterator.
+    public fun iter_is_end<K, V>(
+        self: &IteratorPtr, _map: &OrderedMap<K, V>
+    ): bool {
+        self is IteratorPtr::End
+    }
+
+    /// Borrows the key given iterator points to.
+    /// Aborts with EITER_OUT_OF_BOUNDS if iterator is pointing to the end.
+    /// Note: Requires that the map is not changed after the input iterator is generated.
+    public fun iter_borrow_key<K, V>(
+        self: &IteratorPtr, map: &OrderedMap<K, V>
+    ): &K {
+        assert!(
+            !(self is IteratorPtr::End),
+            error::invalid_argument(EITER_OUT_OF_BOUNDS)
+        );
+
+        &map.entries.borrow(self.index).key
+    }
+
+    /// Borrows the value given iterator points to.
+    /// Aborts with EITER_OUT_OF_BOUNDS if iterator is pointing to the end.
+    /// Note: Requires that the map is not changed after the input iterator is generated.
+    public fun iter_borrow<K, V>(self: IteratorPtr, map: &OrderedMap<K, V>): &V {
+        assert!(
+            !(self is IteratorPtr::End),
+            error::invalid_argument(EITER_OUT_OF_BOUNDS)
+        );
+        &map.entries.borrow(self.index).value
+    }
+
+    /// Mutably borrows the value iterator points to.
+    /// Aborts with EITER_OUT_OF_BOUNDS if iterator is pointing to the end.
+    /// Note: Requires that the map is not changed after the input iterator is generated.
+    public fun iter_borrow_mut<K, V>(
+        self: IteratorPtr, map: &mut OrderedMap<K, V>
+    ): &mut V {
+        assert!(
+            !(self is IteratorPtr::End),
+            error::invalid_argument(EITER_OUT_OF_BOUNDS)
+        );
+        &mut map.entries.borrow_mut(self.index).value
+    }
+
+    /// Removes (key, value) pair iterator points to, returning the previous value.
+    /// Aborts with EITER_OUT_OF_BOUNDS if iterator is pointing to the end.
+    /// Note: Requires that the map is not changed after the input iterator is generated.
+    public fun iter_remove<K: drop, V>(
+        self: IteratorPtr, map: &mut OrderedMap<K, V>
+    ): V {
+        assert!(
+            !(self is IteratorPtr::End),
+            error::invalid_argument(EITER_OUT_OF_BOUNDS)
+        );
+
+        let Entry { key: _, value } = map.entries.remove(self.index);
+        value
+    }
+
+    /// Replaces the value iterator is pointing to, returning the previous value.
+    /// Aborts with EITER_OUT_OF_BOUNDS if iterator is pointing to the end.
+    /// Note: Requires that the map is not changed after the input iterator is generated.
+    public fun iter_replace<K: copy + drop, V>(
+        self: IteratorPtr, map: &mut OrderedMap<K, V>, value: V
+    ): V {
+        assert!(
+            !(self is IteratorPtr::End),
+            error::invalid_argument(EITER_OUT_OF_BOUNDS)
+        );
+
+        // TODO once mem::replace is public/released, update to:
+        // let entry = map.entries.borrow_mut(self.index);
+        // mem::replace(&mut entry.value, value)
+        let key = map.entries[self.index].key;
+        let Entry { key: _, value: prev_value } =
+            map.entries.replace(self.index, Entry { key, value });
+        prev_value
+    }
+
+    /// Add key/value pair to the map, at the iterator position (before the element at the iterator position).
+    /// Aborts with ENEW_KEY_NOT_IN_ORDER is key is not larger than the key before the iterator,
+    /// or smaller than the key at the iterator position.
+    public fun iter_add<K, V>(
+        self: IteratorPtr, map: &mut OrderedMap<K, V>, key: K, value: V
+    ) {
+        let len = map.entries.length();
+        let insert_index =
+            if (self is IteratorPtr::End) { len }
+            else {
+                self.index
+            };
+
+        if (insert_index > 0) {
+            assert!(
+                cmp::compare(&map.entries[insert_index - 1].key, &key).is_lt(),
+                error::invalid_argument(ENEW_KEY_NOT_IN_ORDER)
+            )
+        };
+
+        if (insert_index < len) {
+            assert!(
+                cmp::compare(&key, &map.entries[insert_index].key).is_lt(),
+                error::invalid_argument(ENEW_KEY_NOT_IN_ORDER)
+            )
+        };
+
+        map.entries.insert(insert_index, Entry { key, value });
+    }
+
+    /// Destroys empty map.
+    /// Aborts if `self` is not empty.
+    public fun destroy_empty<K, V>(self: OrderedMap<K, V>) {
+        let OrderedMap::SortedVectorMap { entries } = self;
+        // assert!(entries.is_empty(), E_NOT_EMPTY);
+        entries.destroy_empty();
+    }
+
+    // ========= Section with views and inline for-loop methods =======
+
+    /// Return all keys in the map. This requires keys to be copyable.
+    public fun keys<K: copy, V>(self: &OrderedMap<K, V>): vector<K> {
+        let keys = vector[];
+        let i = 0;
+        while (i < self.entries.length()) {
+            keys.push_back(self.entries[i].key);
+            i = i + 1;
+        };
+        keys
+    }
+
+    /// Return all values in the map. This requires values to be copyable.
+    public fun values<K, V: copy>(self: &OrderedMap<K, V>): vector<V> {
+        let values = vector[];
+        let i = 0;
+        while (i < self.entries.length()) {
+            values.push_back(self.entries[i].value);
+            i = i + 1;
+        };
+        values
+    }
+
+    /// Transform the map into two vectors with the keys and values respectively
+    /// Primarily used to destroy a map
+    public fun to_vec_pair<K, V>(self: OrderedMap<K, V>): (vector<K>, vector<V>) {
+        let keys: vector<K> = vector::empty();
+        let values: vector<V> = vector::empty();
+        let OrderedMap::SortedVectorMap { entries } = self;
+        entries.reverse();
+        while (!entries.is_empty()) {
+            let e = entries.pop_back();
+            let Entry { key, value } = e;
+            keys.push_back(key);
+            values.push_back(value);
+        };
+        entries.destroy_empty();
+        (keys, values)
+    }
+
+    /// For maps that cannot be dropped this is a utility to destroy them
+    /// using lambdas to destroy the individual keys and values.
+    public inline fun destroy<K, V>(self: OrderedMap<K, V>, dk: |K|, dv: |V|) {
+        let (keys, values) = self.to_vec_pair();
+        while (!keys.is_empty()) {
+            dk(keys.pop_back());
+        };
+        keys.destroy_empty();
+        while (!values.is_empty()) {
+            dv(values.pop_back());
+        };
+        values.destroy_empty();
+    }
+
+    /// Apply the function to each key-value pair in the map, consuming it.
+    public inline fun for_each<K, V>(self: OrderedMap<K, V>, f: |K, V|) {
+        let (keys, values) = self.to_vec_pair();
+        keys.reverse();
+        values.reverse();
+        while (!keys.is_empty()) {
+            f(keys.pop_back(), values.pop_back());
+        };
+        keys.destroy_empty();
+        values.destroy_empty();
+    }
+
+    /// Apply the function to a reference of each key-value pair in the map.
+    public inline fun for_each_ref<K, V>(self: &OrderedMap<K, V>, f: |&K, &V|) {
+        let iter = self.internal_new_begin_iter();
+        while (!iter.iter_is_end(self)) {
+            f(iter.iter_borrow_key(self), iter.iter_borrow(self));
+            iter = iter.iter_next(self);
+        }
+
+        // TODO: once move supports private functions update to:
+        // vector::for_each_ref(
+        //     &self.entries,
+        //     |entry| {
+        //         f(&entry.key, &entry.value)
+        //     }
+        // );
+    }
+
+    /// Apply the function to a mutable reference of each key-value pair in the map.
+    public inline fun for_each_mut<K: copy + drop, V>(
+        self: &mut OrderedMap<K, V>, f: |&K, &mut V|
+    ) {
+        let iter = self.internal_new_begin_iter();
+        while (!iter.iter_is_end(self)) {
+            let key = *iter.iter_borrow_key(self);
+            f(&key, iter.iter_borrow_mut(self));
+            iter = iter.iter_next(self);
+        }
+
+        // TODO: once move supports private functions udpate to:
+        // vector::for_each_mut(
+        //     &mut self.entries,
+        //     |entry| {
+        //         f(&mut entry.key, &mut entry.value)
+        //     }
+        // );
+    }
+
+    // ========= Section with private methods ===============
+    inline fun new_iter(index: u64): IteratorPtr {
+        IteratorPtr::Position { index: index }
+    }
+
+    // return index containing the key, or insert position.
+    // I.e. index of first element that has key larger or equal to the passed `key` argument.
+    fun binary_search<K, V>(
+        key: &K, entries: &vector<Entry<K, V>>, start: u64, end: u64
+    ): u64 {
+        let l = start;
+        let r = end;
+        while (l != r) {
+            let mid = l + ((r - l) >> 1);
+            let comparison = cmp::compare(&entries.borrow(mid).key, key);
+            if (comparison.is_lt()) {
+                l = mid + 1;
+            } else {
+                r = mid;
+            };
+        }
+
+        spec {
+            // These two equalities preserve the exact control-flow model even
+            // for malformed private-call ranges, which may abort before the
+            // normal binary-search bounds apply.
+            invariant spec_binary_search_aborts(key, entries, l, r)
+                == spec_binary_search_aborts(key, entries, start, end);
+            invariant spec_binary_search_result(key, entries, l, r)
+                == spec_binary_search_result(key, entries, start, end);
+            invariant start <= end && end <= entries.length() ==> start <= l;
+            invariant start <= end && end <= entries.length() ==> l <= r;
+            invariant start <= end && end <= entries.length() ==> r <= end;
+            // A reduced upper bound was observed not-less-than the query.
+            invariant start <= end
+                && end <= entries.length()
+                && r < end ==>
+                !cmp::is_lt(result_of<cmp::compare<K>> (entries[r].key, key));
+        };
+        l
+    }
+
+    // see if useful, and add
+    //
+    // public fun iter_num_below<K, V>(self: IteratorPtr, map: &OrderedMap<K, V>): u64 {
+    //     if (self.iter_is_end()) {
+    //         map.entries.length()
+    //     } else {
+    //         self.index
+    //     }
+    // }
+
+    spec module {
+        pragma verify = true;
+    }
+
+    // ================= Section for tests =====================
+
+    #[test_only]
+    public fun print_map<K, V>(self: &OrderedMap<K, V>) {
+        aptos_std::debug::print(&self.entries);
+    }
+
+    #[test_only]
+    public fun validate_ordered<K, V>(self: &OrderedMap<K, V>) {
+        let len = self.entries.length();
+        let i = 1;
+        while (i < len) {
+            assert!(
+                cmp::compare(
+                    &self.entries.borrow(i).key, &self.entries.borrow(i - 1).key
+                ).is_gt(),
+                1
+            );
+            i += 1;
+        };
+    }
+
+    #[test_only]
+    fun validate_iteration<K, V>(self: &OrderedMap<K, V>) {
+        let expected_num_elements = self.length();
+        let num_elements = 0;
+        let it = self.internal_new_begin_iter();
+        while (!it.iter_is_end(self)) {
+            num_elements += 1;
+            it = it.iter_next(self);
+        };
+        assert!(num_elements == expected_num_elements, 2);
+
+        let num_elements = 0;
+        let it = self.internal_new_end_iter();
+        while (!it.iter_is_begin(self)) {
+            it = it.iter_prev(self);
+            num_elements += 1;
+        };
+        assert!(num_elements == expected_num_elements, 3);
+    }
+
+    #[test_only]
+    public(friend) fun validate_map<K, V>(self: &OrderedMap<K, V>) {
+        self.validate_ordered();
+        self.validate_iteration();
+    }
+
+    #[verify_only]
+    fun test_verify_borrow_front_key() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let (key, value) = map.borrow_front();
+
+        spec {
+            assert keys[0] == 1;
+            assert vector::spec_contains(keys, 1);
+            assert spec_contains_key(map, key);
+            assert spec_get(map, key) == value;
+            assert key == (1 as u64);
+        };
+    }
+
+    #[verify_only]
+    fun test_verify_borrow_back_key() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let (key, value) = map.borrow_back();
+
+        spec {
+            assert keys[2] == 3;
+            assert vector::spec_contains(keys, 3);
+            assert spec_contains_key(map, key);
+            assert spec_get(map, key) == value;
+            assert key == (3 as u64);
+        };
+    }
+
+    #[verify_only]
+    fun test_verify_upsert() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+
+        spec {
+            assert spec_len(map) == 3;
+        };
+        let (_key, _value) = map.borrow_back();
+        let result_1 = map.upsert(4, 5);
+
+        spec {
+            assert spec_contains_key(map, 4);
+            assert spec_get(map, 4) == 5;
+            assert result_1.is_none();
+            assert spec_len(map) == 4;
+        };
+        let result_2 = map.upsert(4, 6);
+
+        spec {
+            assert spec_contains_key(map, 4);
+            assert spec_get(map, 4) == 6;
+            assert result_2.is_some();
+            assert result_2.borrow() == 5;
+        };
+
+        spec {
+            assert keys[0] == 1;
+            assert spec_contains_key(map, 1);
+            assert spec_get(map, 1) == 4;
+        };
+        let v = map.remove(&1);
+
+        spec {
+            assert v == 4;
+        };
+        map.remove(&2);
+        map.remove(&3);
+        map.remove(&4);
+
+        spec {
+            assert!spec_contains_key(map, 1);
+            assert!spec_contains_key(map, 2);
+            assert!spec_contains_key(map, 3);
+            assert!spec_contains_key(map, 4);
+            assert spec_len(map) == 0;
+        };
+        map.destroy_empty();
+    }
+
+    #[verify_only]
+    fun test_verify_next_key() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let result_1 = map.next_key(&3);
+
+        spec {
+            assert result_1.is_none();
+        };
+        let result_2 = map.next_key(&1);
+
+        spec {
+            assert keys[0] == 1;
+            assert spec_contains_key(map, 1);
+            assert keys[1] == 2;
+            assert spec_contains_key(map, 2);
+            assert result_2.is_some();
+            assert result_2.borrow() == 2;
+        };
+    }
+
+    #[verify_only]
+    fun test_verify_prev_key() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let result_1 = map.prev_key(&1);
+
+        spec {
+            assert result_1.is_none();
+        };
+        let result_2 = map.prev_key(&3);
+
+        spec {
+            assert keys[0] == 1;
+            assert spec_contains_key(map, 1);
+            assert keys[1] == 2;
+            assert spec_contains_key(map, 2);
+            assert result_2.is_some();
+        };
+    }
+
+    #[verify_only]
+    fun test_aborts_if_new_from_1(): OrderedMap<u64, u64> {
+        let keys: vector<u64> = vector[1, 2, 3, 1];
+        let values: vector<u64> = vector[4, 5, 6, 7];
+
+        spec {
+            assert keys[0] == 1;
+            assert keys[3] == 1;
+        };
+        let map = new_from(keys, values);
+        map
+    }
+
+    spec test_aborts_if_new_from_1 {
+        aborts_if true;
+    }
+
+    #[verify_only]
+    fun test_aborts_if_new_from_2(keys: vector<u64>, values: vector<u64>)
+        : OrderedMap<u64, u64> {
+        let map = new_from(keys, values);
+        map
+    }
+
+    spec test_aborts_if_new_from_2 {
+        aborts_if exists i in 0..len(keys), j in 0..len(keys) where i != j:
+            keys[i] == keys[j];
+        aborts_if len(keys) != len(values);
+    }
+
+    #[verify_only]
+    fun test_aborts_if_remove(map: &mut OrderedMap<u64, u64>) {
+        map.remove(&1);
+    }
+
+    spec test_aborts_if_remove {
+        aborts_if !spec_contains_key(map, 1);
+    }
+
+    #[verify_only]
+    fun test_verify_remove_or_none() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+
+        spec {
+            assert spec_len(map) == 3;
+        };
+        let (_key, _value) = map.borrow_back();
+
+        spec {
+            assert keys[0] == 1;
+            assert keys[1] == 2;
+            assert spec_contains_key(map, 1);
+            assert spec_contains_key(map, 2);
+        };
+        let result_1 = map.remove_or_none(&1);
+
+        spec {
+            assert spec_contains_key(map, 2);
+            assert spec_get(map, 2) == 5;
+            assert option::spec_is_some(result_1);
+            assert option::spec_borrow(result_1) == 4;
+            assert spec_len(map) == 2;
+            assert!spec_contains_key(map, 1);
+            assert!spec_contains_key(map, 4);
+        };
+        let result_2 = map.remove_or_none(&4);
+
+        spec {
+            assert spec_contains_key(map, 2);
+            assert spec_get(map, 2) == 5;
+            assert option::spec_is_none(result_2);
+            assert spec_len(map) == 2;
+            assert!spec_contains_key(map, 4);
+        };
+        map.remove(&2);
+        map.remove(&3);
+
+        spec {
+            assert!spec_contains_key(map, 1);
+            assert!spec_contains_key(map, 2);
+            assert!spec_contains_key(map, 3);
+            assert spec_len(map) == 0;
+        };
+        map.destroy_empty();
+    }
+
+    #[verify_only]
+    /// Witness-test support: derives the exact enumeration of a map holding
+    /// keys {1, 2, 3}, walking the stepwise assert ladder once; callers get
+    /// the facts from the ensures.
+    fun ground_enum_123(map: &OrderedMap<u64, u64>) {
+        // Also pulls in the key's cmp instantiation (gates the ascending axiom).
+        let (_fk, _fv) = map.borrow_front();
+
+        spec {
+            // Each contained key has an in-range rank that key_at inverts.
+            assert spec_rank(map, 1) >= 0
+                && spec_rank(map, 1) < 3
+                && spec_key_at(map, spec_rank(map, 1)) == (1 as u64);
+            assert spec_rank(map, 2) >= 0
+                && spec_rank(map, 2) < 3
+                && spec_key_at(map, spec_rank(map, 2)) == (2 as u64);
+            assert spec_rank(map, 3) >= 0
+                && spec_rank(map, 3) < 3
+                && spec_key_at(map, spec_rank(map, 3)) == (3 as u64);
+            // Ranks follow the key order; three distinct ordered positions
+            // in 0..3 pin them exactly, and with them the enumeration.
+            assert spec_rank(map, 1) < spec_rank(map, 2);
+            assert spec_rank(map, 2) < spec_rank(map, 3);
+            assert spec_rank(map, 1) == 0;
+            assert spec_rank(map, 2) == 1;
+            assert spec_rank(map, 3) == 2;
+            assert spec_key_at(map, 0) == (1 as u64);
+            assert spec_key_at(map, 1) == (2 as u64);
+            assert spec_key_at(map, 2) == (3 as u64);
+        };
+    }
+
+    spec ground_enum_123 {
+        requires spec_len(map) == 3;
+        requires spec_contains_key(map, 1);
+        requires spec_contains_key(map, 2);
+        requires spec_contains_key(map, 3);
+        ensures spec_rank(map, 1) == 0
+            && spec_rank(map, 2) == 1
+            && spec_rank(map, 3) == 2;
+        ensures spec_key_at(map, 0) == (1 as u64)
+            && spec_key_at(map, 1) == (2 as u64)
+            && spec_key_at(map, 2) == (3 as u64);
+    }
+
+    #[verify_only]
+    fun test_verify_enumeration_view() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[4, 5, 6];
+        let map = new_from(keys, values);
+        let (fk, _fv) = map.borrow_front();
+
+        spec {
+            // Materialize ground membership facts for the quantifiers.
+            assert keys[0] == 1;
+            assert keys[1] == 2;
+            assert keys[2] == 3;
+            assert vector::spec_contains(keys, 1);
+            assert vector::spec_contains(keys, 2);
+            assert vector::spec_contains(keys, 3);
+            assert spec_contains_key(map, 1);
+            assert spec_contains_key(map, 2);
+            assert spec_contains_key(map, 3);
+            assert spec_len(map) == 3;
+        };
+        ground_enum_123(&map);
+
+        spec {
+            // Cross-checks: the ordering API agrees, and values compose.
+            assert fk == (1 as u64);
+            assert fk == spec_key_at(map, 0);
+            assert spec_get(map, spec_key_at(map, 0)) == (4 as u64);
+        };
+    }
+
+    #[verify_only]
+    fun test_verify_pop_rank() {
+        let keys: vector<u64> = vector[1, 2, 3];
+        let values: vector<u64> = vector[10, 20, 30];
+        let map = new_from(keys, values);
+
+        spec {
+            // Materialize ground membership facts for the quantifiers.
+            assert keys[0] == 1;
+            assert keys[1] == 2;
+            assert keys[2] == 3;
+            assert vector::spec_contains(keys, 1);
+            assert vector::spec_contains(keys, 2);
+            assert vector::spec_contains(keys, 3);
+            assert spec_contains_key(map, 1);
+            assert spec_contains_key(map, 2);
+            assert spec_contains_key(map, 3);
+            assert spec_len(map) == 3;
+        };
+        ground_enum_123(&map);
+        let (k, v) = map.pop_front();
+
+        spec {
+            // Popped key had rank 0; survivors' ranks shift down by one
+            // (mirrors the big_ordered_map test on the non-ghost template branch).
+            assert k == (1 as u64);
+            assert v == (10 as u64);
+            assert spec_len(map) == 2;
+            assert spec_rank(map, 2) == 0;
+            assert spec_rank(map, 3) == 1;
+            assert spec_key_at(map, 0) == (2 as u64);
+            assert spec_key_at(map, 1) == (3 as u64);
+        };
+        let (k2, v2) = map.pop_back();
+
+        spec {
+            // Back border: the popped key had the last rank.
+            assert k2 == (3 as u64);
+            assert v2 == (30 as u64);
+            assert spec_len(map) == 1;
+            assert spec_key_at(map, 0) == (2 as u64);
+        };
+    }
+
+    #[verify_only]
+    fun test_verify_remove_shift_symbolic(
+        m: &mut OrderedMap<u64, u64>, k: u64
+    ) {
+        // Removal at an arbitrary rank, on the non-ghost template branch.
+        m.remove(&k);
+    }
+
+    spec test_verify_remove_shift_symbolic {
+        requires spec_contains_key(m, k);
+        aborts_if false;
+        ensures spec_len(m) == spec_len(old(m)) - 1;
+        ensures !spec_contains_key(m, k);
+        ensures forall i in 0..spec_len(m):
+            spec_key_at(m, i)
+                == spec_key_at(old(m), if (i < spec_rank(old(m), k)) i
+                else i + 1);
+        ensures forall i in 0..spec_len(m):
+            spec_get(m, spec_key_at(m, i)) == spec_get(old(m), spec_key_at(m, i));
+    }
+
+    #[verify_only]
+    fun test_verify_drain_symbolic(m: &mut OrderedMap<u64, u64>): u64 {
+        let count = 0u64;
+        while ({
+            spec {
+                invariant count + spec_len(m) == spec_len(old(m));
+                invariant forall i in 0..spec_len(m):
+                    spec_key_at(m, i) == spec_key_at(old(m), i + count);
+                invariant forall i in 0..spec_len(m):
+                    spec_get(m, spec_key_at(m, i)) == spec_get(old(m), spec_key_at(m, i));
+            };
+            !m.is_empty()
+        }) {
+            let (_k, _v) = m.pop_front();
+            count += 1;
+        };
+        count
+    }
+
+    spec test_verify_drain_symbolic {
+        aborts_if false;
+        ensures result == spec_len(old(m));
+        ensures spec_len(m) == 0;
+    }
+
+    #[verify_only]
+    fun test_verify_iter_collect_symbolic(m: &OrderedMap<u64, u64>): vector<u64> {
+        // A full iterator traversal of a symbolic map. OrderedMap's iterator is
+        // an index into the sorted entries, so the index is the position and the
+        // walk can be indexed by it directly.
+        let out = vector[];
+        let it = m.internal_new_begin_iter();
+        while ({
+            spec {
+                invariant len(out) <= spec_len(m);
+                invariant forall i in 0..len(out): out[i] == spec_key_at(m, i);
+                invariant !(it is IteratorPtr::End) ==>
+                    it.index == len(out) && it.index < spec_len(m);
+                invariant (it is IteratorPtr::End) ==>
+                    len(out) == spec_len(m);
+            };
+            !it.iter_is_end(m)
+        }) {
+            out.push_back(*it.iter_borrow_key(m));
+            it = it.iter_next(m);
+        };
+        out
+    }
+
+    spec test_verify_iter_collect_symbolic {
+        aborts_if false;
+        ensures len(result) == spec_len(m);
+        ensures forall i in 0..spec_len(m): result[i] == spec_key_at(m, i);
+    }
+
+    #[verify_only]
+    fun test_verify_iter_sum_symbolic(m: &OrderedMap<u64, u64>): u64 {
+        // The value-side walk: reads through iter_borrow land on the entry at
+        // the current position.
+        let sum = 0u64;
+        let it = m.internal_new_begin_iter();
+        let count = 0u64;
+        while ({
+            spec {
+                invariant count <= spec_len(m);
+                invariant !(it is IteratorPtr::End) ==>
+                    it.index == count && it.index < spec_len(m);
+                invariant sum == spec_om_sum_upto(m, count);
+                invariant (it is IteratorPtr::End) ==>
+                    count == spec_len(m);
+            };
+            !it.iter_is_end(m)
+        }) {
+            sum = sum + *it.iter_borrow(m);
+            it = it.iter_next(m);
+            count = count + 1;
+        };
+        sum
+    }
+
+    spec test_verify_iter_sum_symbolic {
+        // Aborts unspecified: the running u64 addition can overflow.
+        ensures result == spec_om_sum_upto(m, spec_len(m));
+    }
+
+    #[verify_only]
+    fun test_verify_iter_borrow_mut_symbolic(
+        m: &mut OrderedMap<u64, u64>, k: u64
+    ) {
+        // Writing through a position-based iterator: the borrow resolves the
+        // position to a key through the enumeration, so the write lands on that
+        // key and moves nothing.
+        let it = m.internal_find(&k);
+        let v = it.iter_borrow_mut(m);
+        *v = 7;
+    }
+
+    spec test_verify_iter_borrow_mut_symbolic {
+        pragma verify = true;
+        requires spec_contains_key(m, k);
+        aborts_if false;
+        ensures spec_get(m, k) == 7;
+        ensures spec_len(m) == spec_len(old(m));
+        ensures forall i in 0..spec_len(m): spec_key_at(m, i) == spec_key_at(old(m), i);
+        ensures forall k2: u64 where k2 != k && spec_contains_key(old(m), k2):
+            spec_get(m, k2) == old(spec_get(m, k2));
+    }
+
+    #[verify_only]
+    fun test_verify_iter_replace_symbolic(
+        m: &mut OrderedMap<u64, u64>, i: u64
+    ): u64 {
+        let it = IteratorPtr::Position { index: i };
+        it.iter_replace(m, 7)
+    }
+
+    spec test_verify_iter_replace_symbolic {
+        pragma verify = true;
+        requires i < spec_len(m);
+        aborts_if false;
+        ensures result == old(spec_get(m, spec_key_at(m, i)));
+        ensures spec_get(m, old(spec_key_at(m, i))) == 7;
+        ensures spec_len(m) == spec_len(old(m));
+        ensures forall j in 0..spec_len(m): spec_key_at(m, j) == spec_key_at(old(m), j);
+    }
+
+    #[verify_only]
+    fun test_verify_iter_remove_shift_at_position(
+        m: &mut OrderedMap<u64, u64>, i: u64
+    ): u64 {
+        let it = IteratorPtr::Position { index: i };
+        it.iter_remove(m)
+    }
+
+    spec test_verify_iter_remove_shift_at_position {
+        pragma verify = true;
+        requires i < spec_len(m);
+        aborts_if false;
+        ensures result == old(spec_get(m, spec_key_at(m, i)));
+        ensures spec_len(m) == spec_len(old(m)) - 1;
+        ensures !spec_contains_key(m, old(spec_key_at(m, i)));
+        ensures forall j in 0..i: spec_key_at(m, j) == spec_key_at(old(m), j);
+        ensures forall j in i..spec_len(m):
+            spec_key_at(m, j) == spec_key_at(old(m), j + 1);
+    }
+
+    #[verify_only]
+    fun test_verify_iter_add_append_symbolic(
+        m: &mut OrderedMap<u64, u64>, k: u64
+    ) {
+        // Appending at the end iterator, the shape a queue uses: the new key
+        // takes the last position and every existing position is undisturbed.
+        m.internal_new_end_iter().iter_add(m, k, 7);
+    }
+
+    spec test_verify_iter_add_append_symbolic {
+        pragma verify = true;
+        requires spec_len(m) == 0
+            || cmp::compare(spec_key_at(m, spec_len(m) - 1), k) == cmp::Ordering::Less;
+        aborts_if false;
+        ensures spec_len(m) == spec_len(old(m)) + 1;
+        ensures spec_get(m, k) == 7;
+        ensures spec_rank(m, k) == spec_len(old(m));
+        ensures forall j in 0..spec_len(old(m)):
+            spec_key_at(m, j) == spec_key_at(old(m), j);
+    }
+
+    #[verify_only]
+    fun test_verify_lower_bound_rank_symbolic(
+        m: &OrderedMap<u64, u64>, k: u64
+    ): IteratorPtr {
+        // For a key that is present, the search lands exactly on its position:
+        // the characterization is by comparison, so reaching the enumeration
+        // needs the ascending order the model supplies.
+        m.internal_lower_bound(&k)
+    }
+
+    spec test_verify_lower_bound_rank_symbolic {
+        pragma verify = true;
+        requires spec_contains_key(m, k);
+        aborts_if false;
+        ensures !(result is IteratorPtr::End);
+        ensures result.index == spec_rank(m, k);
+        ensures spec_key_at(m, result.index) == k;
+    }
+
+    #[verify_only]
+    fun test_verify_lower_bound_gap_symbolic(
+        m: &OrderedMap<u64, u64>, k: u64
+    ): IteratorPtr {
+        // For a key that is absent, it lands on the first larger key, so an
+        // insert there keeps the order — the `iter_add` precondition.
+        m.internal_lower_bound(&k)
+    }
+
+    spec test_verify_lower_bound_gap_symbolic {
+        pragma verify = true;
+        requires !spec_contains_key(m, k);
+        aborts_if false;
+        ensures !(result is IteratorPtr::End) ==>
+            cmp::compare(k, spec_key_at(m, result.index)) == cmp::Ordering::Less;
+        ensures !(result is IteratorPtr::End) && result.index > 0 ==>
+            cmp::compare(spec_key_at(m, result.index - 1), k) == cmp::Ordering::Less;
+        ensures (result is IteratorPtr::End) ==>
+            (
+                forall i in 0..spec_len(m):
+                    cmp::compare(spec_key_at(m, i), k) == cmp::Ordering::Less
+            );
+    }
+
+    #[verify_only]
+    fun test_verify_iter_add_middle_symbolic(
+        m: &mut OrderedMap<u64, u64>, i: u64, k: u64
+    ) {
+        // Inserting between two existing keys, which is the case an append
+        // cannot exercise: here the tail actually has to shift up.
+        let it = IteratorPtr::Position { index: i };
+        it.iter_add(m, k, 7);
+    }
+
+    spec test_verify_iter_add_middle_symbolic {
+        pragma verify = true;
+        requires i < spec_len(m);
+        requires i == 0
+            || cmp::compare(spec_key_at(m, i - 1), k) == cmp::Ordering::Less;
+        requires cmp::compare(k, spec_key_at(m, i)) == cmp::Ordering::Less;
+        aborts_if false;
+        ensures spec_len(m) == spec_len(old(m)) + 1;
+        ensures spec_get(m, k) == 7;
+        ensures spec_rank(m, k) == i;
+        ensures forall j in 0..i: spec_key_at(m, j) == spec_key_at(old(m), j);
+        ensures forall j in (i + 1)..spec_len(m):
+            spec_key_at(m, j) == spec_key_at(old(m), j - 1);
+    }
+
+    #[verify_only]
+    fun test_aborts_if_iter_add_out_of_order(
+        m: &mut OrderedMap<u64, u64>, k: u64
+    ) {
+        // A key that does not exceed the last one has no business at the end
+        // position; the body's ordering check rejects it, duplicates included.
+        m.internal_new_end_iter().iter_add(m, k, 7);
+    }
+
+    spec test_aborts_if_iter_add_out_of_order {
+        pragma verify = true;
+        requires spec_len(m) > 0;
+        requires cmp::compare(spec_key_at(m, spec_len(m) - 1), k) != cmp::Ordering::Less;
+        aborts_if true;
+    }
+
+    #[verify_only]
+    fun test_aborts_if_iter_remove_out_of_range(
+        m: &mut OrderedMap<u64, u64>, i: u64
+    ): u64 {
+        let it = IteratorPtr::Position { index: i };
+        it.iter_remove(m)
+    }
+
+    spec test_aborts_if_iter_remove_out_of_range {
+        pragma verify = true;
+        requires i >= spec_len(m);
+        aborts_if true;
+    }
+
+    #[verify_only]
+    fun test_verify_iter_borrow_mut_at_position(
+        m: &mut OrderedMap<u64, u64>, i: u64
+    ) {
+        // The borrow's positional meaning, stated directly: writing through the
+        // iterator at position `i` lands on the key sitting at `i`, and no other
+        // position is touched.
+        let it = IteratorPtr::Position { index: i };
+        *it.iter_borrow_mut(m) = 7;
+    }
+
+    spec test_verify_iter_borrow_mut_at_position {
+        pragma verify = true;
+        requires i < spec_len(m);
+        aborts_if false;
+        ensures spec_get(m, spec_key_at(old(m), i)) == 7;
+        ensures forall j in 0..spec_len(m): spec_key_at(m, j) == spec_key_at(old(m), j);
+        ensures forall j in 0..spec_len(m) where j != i:
+            spec_get(m, spec_key_at(m, j)) == old(spec_get(m, spec_key_at(m, j)));
+    }
+
+    #[verify_only]
+    fun test_aborts_if_iter_borrow_mut_end(m: &mut OrderedMap<u64, u64>) {
+        // No value at the end iterator.
+        let it = m.internal_new_end_iter();
+        *it.iter_borrow_mut(m) = 7;
+    }
+
+    spec test_aborts_if_iter_borrow_mut_end {
+        pragma verify = true;
+        aborts_if true;
+    }
+
+    #[verify_only]
+    fun test_aborts_if_iter_borrow_mut_out_of_range(
+        m: &mut OrderedMap<u64, u64>, i: u64
+    ) {
+        // Nor at a position past the last one — a stale iterator degrades to
+        // this once the map has shrunk under it.
+        let it = IteratorPtr::Position { index: i };
+        *it.iter_borrow_mut(m) = 7;
+    }
+
+    spec test_aborts_if_iter_borrow_mut_out_of_range {
+        pragma verify = true;
+        requires i >= spec_len(m);
+        aborts_if true;
+    }
+
+    #[verify_only]
+    fun test_verify_iter_walk_mut_symbolic(m: &mut OrderedMap<u64, u64>) {
+        // The mutate-while-traversing shape: a walk that writes each value in
+        // place. Positions have to survive every write for the walk's own
+        // invariant to hold, which is what the enumeration-backed borrow gives.
+        let it = m.internal_new_begin_iter();
+        let count = 0u64;
+        while ({
+            spec {
+                invariant count <= spec_len(m);
+                invariant spec_len(m) == spec_len(old(m));
+                invariant forall i in 0..spec_len(m):
+                    spec_key_at(m, i) == spec_key_at(old(m), i);
+                invariant !(it is IteratorPtr::End) ==>
+                    it.index == count && it.index < spec_len(m);
+                invariant (it is IteratorPtr::End) ==>
+                    count == spec_len(m);
+                invariant forall i in 0..count: spec_get(m, spec_key_at(m, i)) == 7;
+            };
+            !it.iter_is_end(m)
+        }) {
+            *it.iter_borrow_mut(m) = 7;
+            it = it.iter_next(m);
+            count = count + 1;
+        };
+    }
+
+    spec test_verify_iter_walk_mut_symbolic {
+        pragma verify = true;
+        aborts_if false;
+        ensures spec_len(m) == spec_len(old(m));
+        ensures forall i in 0..spec_len(m): spec_key_at(m, i) == spec_key_at(old(m), i);
+        ensures forall i in 0..spec_len(m): spec_get(m, spec_key_at(m, i)) == 7;
+    }
+}

@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "stage": "prover",
+  "target": "0x7::order_book_utils::new_default_big_ordered_map",
+  "passed": true,
+  "diagnostics": []
+}

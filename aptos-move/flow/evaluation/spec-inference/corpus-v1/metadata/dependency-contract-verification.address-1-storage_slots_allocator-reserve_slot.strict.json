@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "stage": "prover",
+  "target": "0x1::storage_slots_allocator::reserve_slot",
+  "passed": true,
+  "diagnostics": []
+}

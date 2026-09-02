@@ -1,0 +1,11 @@
+{
+  "schema_version": 3,
+  "stage": "trusted_boundary",
+  "target": "0x1::big_ordered_map::get_max_degree",
+  "basis": "expert_assumption",
+  "target_body_proof": "not_supported",
+  "verified": false,
+  "diagnostic_artifact": "dependency-contract-verification.address-1-big_ordered_map-get_max_degree.intrinsic-map.json",
+  "rationale": "The prover rejects selecting BigOrderedMap configuration fields during body verification because BigOrderedMap is intrinsic. The opaque contract gives the exact selected maximum degree.",
+  "metadata": "trusted-verification-boundaries.json"
+}

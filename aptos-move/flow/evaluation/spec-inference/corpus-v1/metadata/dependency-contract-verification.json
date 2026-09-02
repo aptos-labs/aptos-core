@@ -1,0 +1,42 @@
+{
+  "bottom_up_order": [],
+  "checks": [
+    {
+      "kind": "package_compile",
+      "output": "corpus/metadata/dependency-contract-verification.package.json",
+      "passed": true,
+      "stage": "check_package",
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "blocking_status_counts": {
+        "intrinsic_binding": 77,
+        "native_binding": 40,
+        "opaque_contract": 307,
+        "opaque_intrinsic_model_boundary": 28,
+        "opaque_trusted_assumption": 8,
+        "opaque_with_incomplete_modifies_contract": 4
+      },
+      "contract_report": "corpus/metadata/contract-report.json",
+      "kind": "dependency_contract_audit",
+      "output": "corpus/metadata/dependency-contract-audit.json",
+      "passed": false,
+      "stage": "contract_report",
+      "stderr": "",
+      "stdout": ""
+    }
+  ],
+  "contract_audit": "corpus/metadata/dependency-contract-audit.json",
+  "contract_report": "corpus/metadata/contract-report.json",
+  "inventory": "corpus/metadata/package-inventory.json",
+  "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus/manifest.json",
+  "move_flow": "/home/wrw/aptos-core/.worktrees/dev2/target/debug/move-flow",
+  "move_flow_sha256": "62beed55759cb0fcb5f09d0eab69055b6f24551445b9b52102a62109988defb5",
+  "package": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus/framework",
+  "package_tree_sha256": "a7355882d937b9a533fe8db4bbb9ab02220ad8286b2960e5231c81a56d47010b",
+  "passed": false,
+  "schema_version": 2,
+  "timeout_seconds": 60,
+  "trusted_boundaries": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus/metadata/trusted-verification-boundaries.json"
+}
