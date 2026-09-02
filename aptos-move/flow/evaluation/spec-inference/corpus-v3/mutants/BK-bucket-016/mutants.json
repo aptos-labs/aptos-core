@@ -1,0 +1,97 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 51,
+        "offset": 827,
+        "sha256": "f1ac2b3b5e6707d60d1faf3576f21c4a3aac2a3dacbf04c42ecf71b1bad62713"
+      },
+      "edit": {
+        "at": 13,
+        "kind": "substitute",
+        "length": 2,
+        "to": "<"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_bucket_index.move",
+      "mutant_id": "BK-bucket-016-strict-cutoff",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 13,
+        "offset": 865,
+        "sha256": "82f3f8f830845e429d0b4e6be58f08c53e428d11c42ad54099541240b921bf80"
+      },
+      "edit": {
+        "at": 2,
+        "kind": "substitute",
+        "length": 8,
+        "to": "return i + 1"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_bucket_index.move",
+      "mutant_id": "BK-bucket-016-returns-next",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 21,
+        "offset": 843,
+        "sha256": "b61445741774c9442e2deb9708689396cc783a03b57cb7c791362b37c296045b"
+      },
+      "edit": {
+        "at": 17,
+        "kind": "substitute",
+        "length": 3,
+        "to": "[i + 1]"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_bucket_index.move",
+      "mutant_id": "BK-bucket-016-index-past-end",
+      "obligation_category": "abort",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "009259c3dd4c4a477b67f6773538ba0cb82deb17b0493aa8e01335106c6158e4",
+  "schema_version": 1,
+  "task_id": "BK-bucket-016"
+}

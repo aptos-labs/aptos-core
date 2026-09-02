@@ -1,0 +1,38 @@
+--- a/sources/etna/extracted_work_units.move
++++ b/sources/etna/extracted_work_units.move
+@@ -70,0 +71,35 @@ module decibel_dex::extracted_work_units {
++
++    spec module {
++        /// The work units the call consumes: one validation for a maker order,
++        /// two per match for a taker order.
++        fun consumed(match_count: num): num {
++            if (match_count == 0) { POSITION_STATUS_WORK_UNITS }
++            else { match_count * ORDER_MATCH_WORK_UNITS }
++        }
++    }
++
++    spec consume_order_match_work_units {
++        pragma opaque;
++        // Both the amount and its doubling are formed in `u32`.
++        aborts_if [inferred] consumed(match_count) > MAX_U32;
++        aborts_if [inferred] 2 * consumed(match_count) > MAX_U32;
++        // Saturating, not underflowing: too small a budget goes to zero.
++        ensures [inferred] 2 * consumed(match_count) > old(self).amount
++            ==> self.amount == 0;
++        ensures [inferred] 2 * consumed(match_count) <= old(self).amount
++            ==> self.amount == old(self).amount - consumed(match_count);
++    }
++
++    spec get_max_order_placement_limit {
++        pragma opaque;
++        aborts_if [inferred] false;
++        // Clamped into `[1, max_value]`: the floor of one means a budget too
++        // small for a single order still admits one.
++        ensures [inferred] self.amount / POSITION_STATUS_WORK_UNITS == 0
++            ==> result == 1;
++        ensures [inferred] self.amount / POSITION_STATUS_WORK_UNITS > max_value
++            ==> result == max_value;
++        ensures [inferred] self.amount / POSITION_STATUS_WORK_UNITS != 0
++            && self.amount / POSITION_STATUS_WORK_UNITS <= max_value
++            ==> result == self.amount / POSITION_STATUS_WORK_UNITS;
++    }

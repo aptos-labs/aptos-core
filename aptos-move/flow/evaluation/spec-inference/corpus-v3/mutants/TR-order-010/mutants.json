@@ -1,0 +1,97 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 33,
+        "offset": 1006,
+        "sha256": "53e78fe951e5ea4cb82c31b3627454ba96ba4fdc445a4f97a69f2005bcc9f2c0"
+      },
+      "edit": {
+        "at": 15,
+        "kind": "substitute",
+        "length": 1,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-order-010-descending-not-strict",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 33,
+        "offset": 1130,
+        "sha256": "d07681efcd12cfadcd07fd437db47d87d9d63b8855fb561cc30afdeb895820d6"
+      },
+      "edit": {
+        "at": 15,
+        "kind": "substitute",
+        "length": 1,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-order-010-ascending-not-strict",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 97,
+        "offset": 818,
+        "sha256": "01e76e9629c25ed3f88ee37969184628736b322ca75ae46e83f7117f469b38d2"
+      },
+      "edit": {
+        "at": 0,
+        "kind": "substitute",
+        "length": 97,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-order-010-drop-empty-guard",
+      "obligation_category": "abort",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "9453849e4188123b2b49a27f5be676ddb1344a24c7a6758b2013d4421f673c06",
+  "schema_version": 2,
+  "task_id": "TR-order-010"
+}

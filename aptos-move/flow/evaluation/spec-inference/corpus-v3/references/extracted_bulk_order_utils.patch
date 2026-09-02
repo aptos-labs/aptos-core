@@ -1,0 +1,55 @@
+--- a/sources/trading/extracted_bulk_order_utils.move
++++ b/sources/trading/extracted_bulk_order_utils.move
+@@ -32,0 +33,6 @@ module aptos_experimental::extracted_bulk_order_utils {
++        } spec {
++            invariant len(prices) > 0;
++            invariant i <= len(prices) - 1;
++            invariant forall j: u64 where j < i:
++                if (is_descending) { prices[j] > prices[j + 1] }
++                else { prices[j] < prices[j + 1] };
+@@ -51,0 +58,3 @@ module aptos_experimental::extracted_bulk_order_utils {
++            } spec {
++                invariant i <= len(prices);
++                invariant forall j: u64 where j < i: !stops_at(prices, best_price, is_bid, j);
+@@ -55,0 +65,41 @@ module aptos_experimental::extracted_bulk_order_utils {
++
++    spec module {
++        /// The strict adjacent ordering the scan checks. A pair is compared in
++        /// one direction only, so this is strict in both cases: equal
++        /// neighbours are rejected.
++        fun strictly_ordered(prices: vector<u64>, is_descending: bool): bool {
++            forall j: u64 where j + 1 < len(prices):
++                if (is_descending) { prices[j] > prices[j + 1] }
++                else { prices[j] < prices[j + 1] }
++        }
++
++        /// Where the search stops: the first level that no longer crosses.
++        fun stops_at(
++            prices: vector<u64>, best: u64, is_bid: bool, j: num
++        ): bool {
++            if (is_bid) { prices[j] < best } else { prices[j] > best }
++        }
++    }
++
++    spec validate_price_ordering {
++        pragma opaque;
++        // The `length() - 1` would underflow on an empty vector; the early
++        // return is what keeps this total.
++        aborts_if [inferred] false;
++        ensures [inferred] result == strictly_ordered(prices, is_descending);
++    }
++
++    spec discard_price_crossing_levels {
++        pragma opaque;
++        aborts_if [inferred] false;
++        ensures [inferred] std::option::spec_is_none(best_price) ==> result == 0;
++        // The least non-crossing index, stated as a prefix fact plus the
++        // stopping fact -- the result is not a fold of the vector.
++        ensures [inferred] std::option::spec_is_some(best_price) ==> (
++            result <= len(prices)
++                && (forall j: u64 where j < result:
++                        !stops_at(prices, std::option::spec_borrow(best_price), is_bid, j))
++                && (result < len(prices) ==>
++                        stops_at(prices, std::option::spec_borrow(best_price), is_bid, result))
++        );
++    }

@@ -1,0 +1,98 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 63,
+        "offset": 3862,
+        "sha256": "a37d9246d3ebc73a31060950859bd0aabe981d6f439ec96283a03beaba16ed02"
+      },
+      "edit": {
+        "at": 47,
+        "kind": "substitute",
+        "length": 7,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/etna/vault_share_math.move",
+      "mutant_id": "VS-fees-001-profit-from-last-nav",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 84,
+        "offset": 3989,
+        "sha256": "c6fea5e311f15bf79e7b66e6c4b62a944ad5a61c3365153839698c0994ba75dd"
+      },
+      "edit": {
+        "a_length": 23,
+        "at": 36,
+        "b_length": 23,
+        "kind": "swap",
+        "separator_length": 2
+      },
+      "essential": true,
+      "file": "sources/etna/vault_share_math.move",
+      "mutant_id": "VS-fees-001-fee-rate-inverted",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 67,
+        "offset": 3326,
+        "sha256": "a8a150caa2f914a69a1f5834efa6bd99bef3de052f9aba4a4e2acdaa9702bca3"
+      },
+      "edit": {
+        "at": 0,
+        "kind": "substitute",
+        "length": 67,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/etna/vault_share_math.move",
+      "mutant_id": "VS-fees-001-drop-zero-share-guard",
+      "obligation_category": "abort",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "6e5d76f09040b3324ab79d8684bcf22a147744055c01e56d39050a0997c6f426",
+  "schema_version": 2,
+  "task_id": "VS-fees-001"
+}

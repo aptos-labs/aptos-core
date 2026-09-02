@@ -1,0 +1,98 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 40,
+        "offset": 6406,
+        "sha256": "1a307f8b10fb2bcdb7a2ab4ab92f6de6c6b5b987ea1507ae6918be48fc878049"
+      },
+      "edit": {
+        "a_length": 14,
+        "at": 9,
+        "b_length": 14,
+        "kind": "swap",
+        "separator_length": 2
+      },
+      "essential": true,
+      "file": "sources/etna/vault_share_math.move",
+      "mutant_id": "VS-redeem-004-swap-tuple",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 83,
+        "offset": 6106,
+        "sha256": "10b46b85d68b2c073142ed49423e9a4bb985172b46d2db64c79cda3b97a76468"
+      },
+      "edit": {
+        "at": 81,
+        "kind": "substitute",
+        "length": 0,
+        "to": " + 1"
+      },
+      "essential": true,
+      "file": "sources/etna/vault_share_math.move",
+      "mutant_id": "VS-redeem-004-fee-base",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 56,
+        "offset": 5887,
+        "sha256": "9c9859400cf7604d571f24da2280285e14778456cd713def882528f0bbdd4a26"
+      },
+      "edit": {
+        "at": 26,
+        "kind": "substitute",
+        "length": 0,
+        "to": " && shares == 0"
+      },
+      "essential": true,
+      "file": "sources/etna/vault_share_math.move",
+      "mutant_id": "VS-redeem-004-widen-nav-guard",
+      "obligation_category": "abort",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "6e5d76f09040b3324ab79d8684bcf22a147744055c01e56d39050a0997c6f426",
+  "schema_version": 2,
+  "task_id": "VS-redeem-004"
+}

@@ -1,0 +1,97 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 42,
+        "offset": 1229,
+        "sha256": "c8e3e8af86820ba008654913c80d88cd5f6557fb2567761e5a4bfb340bdcf9ee"
+      },
+      "edit": {
+        "at": 4,
+        "kind": "substitute",
+        "length": 21,
+        "to": "0"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_work_units.move",
+      "mutant_id": "WU-consume-023-underflows-instead",
+      "obligation_category": "abort",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 47,
+        "offset": 1854,
+        "sha256": "6289d10daf3cf6921976b4ef8a4b89b2dc4f572a0a24f891bac41d6a0123b8d5"
+      },
+      "edit": {
+        "at": 0,
+        "kind": "substitute",
+        "length": 26,
+        "to": "ORDER_MATCH_WORK_UNITS"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_work_units.move",
+      "mutant_id": "WU-consume-023-maker-cost-doubled",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 33,
+        "offset": 1330,
+        "sha256": "f7e4a60e817d73a32adb01f8a2b774b5e16368927458129213a1f8a96e00bdbe"
+      },
+      "edit": {
+        "at": 12,
+        "kind": "substitute",
+        "length": 20,
+        "to": "-= 2 * amount_to_consume"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_work_units.move",
+      "mutant_id": "WU-consume-023-consumes-double",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "890b37cc43b82b68ac92e8e487d520f5384e4d759daf3017be50df3ae19996eb",
+  "schema_version": 1,
+  "task_id": "WU-consume-023"
+}

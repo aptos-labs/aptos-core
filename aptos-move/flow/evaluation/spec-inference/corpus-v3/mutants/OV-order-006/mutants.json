@@ -1,0 +1,98 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 34,
+        "offset": 922,
+        "sha256": "57164885d7b42e47e61f7256f1d59009c72c867d7f4118a77822b389312066d3"
+      },
+      "edit": {
+        "at": 23,
+        "kind": "substitute",
+        "length": 1,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_order_validation.move",
+      "mutant_id": "OV-order-006-upper-bound-strict",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 36,
+        "offset": 814,
+        "sha256": "5d72544fca7b90cb8589b708ff62d3fa22a8812ec177d0b26341cde839d1eb2b"
+      },
+      "edit": {
+        "at": 23,
+        "kind": "substitute",
+        "length": 3,
+        "to": "tick"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_order_validation.move",
+      "mutant_id": "OV-order-006-lot-uses-tick",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 61,
+        "offset": 789,
+        "sha256": "a6cf9af847ede4ed1356315c715139903e30614465eb23bf9c8a966065f2bb75"
+      },
+      "edit": {
+        "a_length": 17,
+        "at": 8,
+        "b_length": 21,
+        "kind": "swap",
+        "separator_length": 15
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_order_validation.move",
+      "mutant_id": "OV-order-006-reorder-guards",
+      "obligation_category": "abort",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "584fb3f5cd3e9141f0fa83f3096f355cf66ebb78979939ee982845dc549e1dab",
+  "schema_version": 2,
+  "task_id": "OV-order-006"
+}

@@ -1,0 +1,97 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 22,
+        "offset": 866,
+        "sha256": "740ad9b16f2d684302b74f7d962d2a6fd4c6dcdf2bc4f004e087f4c4511835ac"
+      },
+      "edit": {
+        "at": 14,
+        "kind": "substitute",
+        "length": 1,
+        "to": "<"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_minmax.move",
+      "mutant_id": "MM-max-014-computes-min",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 34,
+        "offset": 781,
+        "sha256": "3e67087cdc33d6dbb3d0f0691ba2b11fe15c5528effd09d01cee474d514c4e68"
+      },
+      "edit": {
+        "at": 28,
+        "kind": "substitute",
+        "length": 5,
+        "to": "i = 1"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_minmax.move",
+      "mutant_id": "MM-max-014-skips-first",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 15,
+        "offset": 781,
+        "sha256": "11b0210d593339fbcd734abd37445aad3e97208143a19c56497154c8a2b96065"
+      },
+      "edit": {
+        "at": 10,
+        "kind": "substitute",
+        "length": 4,
+        "to": "values[0]"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_minmax.move",
+      "mutant_id": "MM-max-014-empty-aborts",
+      "obligation_category": "abort",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "15d1ced39d9f97010a3d1a4c79c41b8d8a8cba565cd95c3b914b3ca3b9a6f1bf",
+  "schema_version": 1,
+  "task_id": "MM-max-014"
+}

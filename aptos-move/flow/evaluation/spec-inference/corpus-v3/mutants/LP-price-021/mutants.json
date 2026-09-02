@@ -1,0 +1,97 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 56,
+        "offset": 1151,
+        "sha256": "931eb5b0676865fc0037cb5f3991fe14f523a07f8070d3c9edc184778e56addb"
+      },
+      "edit": {
+        "at": 18,
+        "kind": "substitute",
+        "length": 38,
+        "to": "maintenance_margin_leverage_multiplier"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_liquidation_price.move",
+      "mutant_id": "LP-price-021-branches-crossed",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 56,
+        "offset": 1379,
+        "sha256": "69d230c4aaa8b8baa6f5b0683a1482b3fbd6302e2a7b6f1fc47ca6a5147fb64b"
+      },
+      "edit": {
+        "at": 11,
+        "kind": "substitute",
+        "length": 1,
+        "to": "+"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_liquidation_price.move",
+      "mutant_id": "LP-price-021-adds-instead-of-scaling",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 71,
+        "offset": 1225,
+        "sha256": "868942a7d3f736741e0ff135a4e05488256d222d1555af4d36259c9d8e6ce88c"
+      },
+      "edit": {
+        "at": 0,
+        "kind": "substitute",
+        "length": 28,
+        "to": "((market_max_leverage as u64) + 1)"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_liquidation_price.move",
+      "mutant_id": "LP-price-021-zero-leverage-guarded",
+      "obligation_category": "abort",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "e712137c491fd17ef0868accb4c927b0041b4ae38ac633f6d4f00d7ee3334045",
+  "schema_version": 1,
+  "task_id": "LP-price-021"
+}

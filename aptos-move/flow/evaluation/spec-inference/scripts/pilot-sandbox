@@ -1,0 +1,14 @@
+#!/usr/bin/python3
+"""Repository-local entry point for the Phase 4 sandbox policy."""
+
+from pathlib import Path
+import sys
+
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from harness.pilot_sandbox import main  # noqa: E402
+
+
+if __name__ == "__main__":
+    main()

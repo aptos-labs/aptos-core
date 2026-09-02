@@ -1,0 +1,97 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 95,
+        "offset": 1707,
+        "sha256": "1e6cf55f44316d972da0153bf46c07e18b21a69b33509fac8aed91ebeb57ddd8"
+      },
+      "edit": {
+        "at": 93,
+        "kind": "substitute",
+        "length": 0,
+        "to": "    break;\n            "
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_tier_lookup.move",
+      "mutant_id": "UC-leverage-009-first-match-wins",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 31,
+        "offset": 1719,
+        "sha256": "3f0e011b03b342d6b68101f8ae6c397350464d623c6c5b83c65874f6e5509eff"
+      },
+      "edit": {
+        "at": 16,
+        "kind": "substitute",
+        "length": 1,
+        "to": ">"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_tier_lookup.move",
+      "mutant_id": "UC-leverage-009-rank-compare-loose",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 98,
+        "offset": 1652,
+        "sha256": "3c2f886d3d12edbf48f00fe0322437af2d1d6040a46a26cd22cee1f8ff8d2eca"
+      },
+      "edit": {
+        "at": 18,
+        "kind": "substitute",
+        "length": 0,
+        "to": "="
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_tier_lookup.move",
+      "mutant_id": "UC-leverage-009-scan-past-end-leverage",
+      "obligation_category": "abort",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "2503a3b897af4095958c2f73792ef2a9d879983c1f7a095f35b5757ed51157ef",
+  "schema_version": 2,
+  "task_id": "UC-leverage-009"
+}
