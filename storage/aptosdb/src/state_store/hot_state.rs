@@ -71,6 +71,13 @@ where
         self.inner.remove(key)
     }
 
+    fn replace(&self, map: DashMap<K, V>) {
+        self.inner.clear();
+        for (key, value) in map {
+            self.inner.insert(key, value);
+        }
+    }
+
     fn len(&self) -> usize {
         self.inner.len()
     }
@@ -153,6 +160,12 @@ enum CommitMsg {
         state: State,
         ack: Sender<()>,
     },
+    /// Sent by `reset_base_shards` to replace the base DashMaps' contents on the Committer
+    /// thread. Like `HackReset`, only valid when no commits are in flight.
+    ResetBase {
+        shards: [DashMap<HashValue, StateSlot>; NUM_STATE_SHARDS],
+        ack: Sender<()>,
+    },
 }
 
 /// Bundles the committed `State` with a `HotStateView` that is consistent with it.
@@ -228,6 +241,25 @@ impl HotState {
         ack_rx
             .recv()
             .expect("Failed to receive reset ack from hot state committer.");
+    }
+
+    /// Replaces the base DashMaps' contents with `shards`. Blocks until the Committer has done
+    /// so. Must be followed by `hack_reset` with the matching `State`, which re-validates the
+    /// LRU metadata against the new contents.
+    pub(crate) fn reset_base_shards(
+        &self,
+        shards: [DashMap<HashValue, StateSlot>; NUM_STATE_SHARDS],
+    ) {
+        let (ack_tx, ack_rx) = std::sync::mpsc::channel();
+        self.commit_tx
+            .send(CommitMsg::ResetBase {
+                shards,
+                ack: ack_tx,
+            })
+            .expect("Failed to send base reset to hot state committer.");
+        ack_rx
+            .recv()
+            .expect("Failed to receive base reset ack from hot state committer.");
     }
 
     pub fn get_committed(&self) -> (Arc<dyn HotStateView>, State) {
@@ -478,6 +510,17 @@ impl Committer {
                     );
                     self.handle_reset(state, ack);
                 },
+                Ok(CommitMsg::ResetBase { shards, ack }) => {
+                    assert!(
+                        self.rx.try_recv().is_err(),
+                        "ResetBase must be the only message in the channel — \
+                         reset_base_shards is only valid when no commits are in flight."
+                    );
+                    for (shard, loaded) in self.base.shards.iter().zip(shards) {
+                        shard.replace(loaded);
+                    }
+                    let _ = ack.send(());
+                },
                 Err(RecvTimeoutError::Timeout) => {
                     self.try_merge();
                 },
@@ -494,10 +537,10 @@ impl Committer {
                     n_backlog += 1;
                     ret = state;
                 },
-                CommitMsg::HackReset { .. } => {
+                CommitMsg::HackReset { .. } | CommitMsg::ResetBase { .. } => {
                     unreachable!(
-                        "HackReset must not appear alongside Commit messages — \
-                         hack_reset is only valid when no commits are in flight."
+                        "Reset messages must not appear alongside Commit messages — \
+                         resets are only valid when no commits are in flight."
                     );
                 },
             }
