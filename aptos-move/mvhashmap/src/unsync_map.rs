@@ -10,17 +10,20 @@ use aptos_aggregator::types::DelayedFieldValue;
 use aptos_types::{
     block_executor::value::SpeculativeValue,
     error::{code_invariant_error, PanicError},
+    state_store::state_key::StateKey,
     vm::modules::AptosModuleExtension,
 };
 use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
+use bytes::Bytes;
+use mono_move_runtime::SharedArena;
 use move_binary_format::{file_format::CompiledScript, CompiledModule};
-use move_core_types::language_storage::ModuleId;
+use move_core_types::language_storage::{ModuleId, StructTag};
 use move_vm_runtime::{Module, Script};
 use move_vm_types::code::{ModuleCache, ModuleCode, UnsyncModuleCache, UnsyncScriptCache};
 use serde::Serialize;
 use std::{
     cell::RefCell,
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     fmt::Debug,
     hash::Hash,
     sync::{
@@ -28,6 +31,10 @@ use std::{
         Arc,
     },
 };
+
+/// A resource group's current members. [`None`] if the group does not exist
+/// in storage.
+type ResourceGroupEntry = Option<BTreeMap<StructTag, Bytes>>;
 
 /// UnsyncMap is designed to mimic the functionality of MVHashMap for sequential execution.
 /// In this case only the latest recorded version is relevant, simplifying the implementation.
@@ -43,20 +50,20 @@ pub struct UnsyncMap<K, T, V, I> {
 
     total_base_resource_size: AtomicU64,
     total_base_delayed_field_size: AtomicU64,
-}
 
-impl<K, T, V, I> Default for UnsyncMap<K, T, V, I> {
-    fn default() -> Self {
-        Self {
-            resource_map: RefCell::new(HashMap::new()),
-            module_cache: UnsyncModuleCache::empty(),
-            script_cache: UnsyncScriptCache::empty(),
-            group_cache: RefCell::new(HashMap::new()),
-            delayed_field_map: RefCell::new(HashMap::new()),
-            total_base_resource_size: AtomicU64::new(0),
-            total_base_delayed_field_size: AtomicU64::new(0),
-        }
-    }
+    /// The arena that holds flat values MonoMove uses, converted from storage
+    /// BCS format. Transactions obtain pointers to this arena on reads. This
+    /// arena is per-block and append only. It is never reset and is simply
+    /// dropped together with the map.
+    ///
+    /// Set to [`None`] if MonoMove is not used.
+    arena: Option<RefCell<Arc<SharedArena>>>,
+    /// Current members of each resource group touched this block, initialized
+    /// from storage on the first touch and then overwritten when transaction
+    /// commits.
+    // TODO(perf): consider using interned type and an unordered map here.
+    // TODO(cleanup): unify with grpup cache used by V1 VM.
+    groups: RefCell<HashMap<StateKey, ResourceGroupEntry>>,
 }
 
 impl<K, T, V, I> UnsyncMap<K, T, V, I>
@@ -66,8 +73,34 @@ where
     V: SpeculativeValue,
     I: Hash + Clone + Copy + Eq,
 {
+    /// Size of arena used by MonoMove to deserialize BCS values from storage
+    /// into MonoMove memory representation.
+    // TODO(completeness): make this configurable, rewrite arena so it can grow
+    // dynamically.
+    const RESOURCE_ARENA_BYTES: usize = 64 * 1024 * 1024;
+
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            resource_map: RefCell::new(HashMap::new()),
+            module_cache: UnsyncModuleCache::empty(),
+            script_cache: UnsyncScriptCache::empty(),
+            group_cache: RefCell::new(HashMap::new()),
+            delayed_field_map: RefCell::new(HashMap::new()),
+            total_base_resource_size: AtomicU64::new(0),
+            total_base_delayed_field_size: AtomicU64::new(0),
+            arena: None,
+            groups: RefCell::new(HashMap::new()),
+        }
+    }
+
+    pub fn with_mono_move_arena(mut self, enabled: bool) -> Self {
+        if enabled {
+            #[allow(clippy::arc_with_non_send_sync)]
+            let arena = Arc::new(SharedArena::new(Self::RESOURCE_ARENA_BYTES));
+            self.arena = Some(RefCell::new(arena));
+        }
+        self
     }
 
     /// Returns the module cache for this [UnsyncMap].
@@ -280,6 +313,31 @@ where
             Ordering::Relaxed,
         );
         self.delayed_field_map.borrow_mut().insert(id, value);
+    }
+
+    /// Returns the reference to the MonoMove arena.
+    pub fn resource_arena(&self) -> Option<Arc<SharedArena>> {
+        self.arena.as_ref().map(|arena| arena.borrow().clone())
+    }
+
+    /// Returns the group if exists in the cache.
+    pub fn get_group(&self, key: &StateKey) -> Option<ResourceGroupEntry> {
+        self.groups.borrow().get(key).cloned()
+    }
+
+    /// Returns the group member's bytes if the group is cached. The outer
+    /// option tells whether the group is cached, the inner one whether it has
+    /// this member.
+    pub fn get_group_member(&self, key: &StateKey, tag: &StructTag) -> Option<Option<Bytes>> {
+        self.groups
+            .borrow()
+            .get(key)
+            .map(|entry| entry.as_ref().and_then(|members| members.get(tag).cloned()))
+    }
+
+    /// Initializes or overwrites the group.
+    pub fn insert_group(&self, key: StateKey, members: ResourceGroupEntry) {
+        self.groups.borrow_mut().insert(key, members);
     }
 }
 
