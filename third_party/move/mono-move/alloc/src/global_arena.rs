@@ -72,6 +72,13 @@ unsafe impl<T: ?Sized + Sync> Send for GlobalArenaPtr<T> {}
 // `Sync` when T is also `Sync`.
 unsafe impl<T: ?Sized + Sync> Sync for GlobalArenaPtr<T> {}
 
+// TODO(security): Debug derivation is not safe! Remove before production.
+impl<T: ?Sized> std::fmt::Debug for GlobalArenaPtr<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "GlobalArenaPtr({:p})", self.as_raw_ptr())
+    }
+}
+
 // Can be duplicated with bitwise copy.
 impl<T: ?Sized> Copy for GlobalArenaPtr<T> {}
 
