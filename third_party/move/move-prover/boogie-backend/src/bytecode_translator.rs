@@ -8236,7 +8236,7 @@ impl FunctionTranslator<'_> {
                             &mut || dst_value.clone(),
                             &get_path_index,
                             src_value,
-                            &[edge.to_owned()],
+                            std::slice::from_ref(edge),
                             0,
                             &root_ty,
                             root_bv_flag,
