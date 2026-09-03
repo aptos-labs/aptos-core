@@ -1,0 +1,106 @@
+name: "mono-move-e2e-perf"
+on:
+  workflow_dispatch:
+    inputs:
+      RUNNER_NAME:
+        required: false
+        type: string
+        default: benchmark-c3d-60
+      REPEATS:
+        required: false
+        type: string
+        default: "3"
+      NUM_BLOCKS_PER_TEST:
+        required: false
+        type: string
+        default: "30"
+      SELF_COMPARE:
+        description: "Run legacy against legacy; every ratio should come out at 1.00x"
+        required: false
+        type: boolean
+        default: false
+      BUILD:
+        required: false
+        type: choice
+        options: [release, performance]
+        default: release
+  # Untrusted PR code runs on a self-hosted runner. Restricted to same-repo PRs
+  # with the `mono-move-e2e-perf` label (forks excluded below); re-runs on each
+  # push so a fix shows new numbers.
+  pull_request:
+    types: [labeled, opened, synchronize, reopened]
+
+concurrency:
+  group: mono-move-e2e-perf-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write # Post the sticky report comment.
+
+jobs:
+  # This job name is what the Humio calibration query filters on. Renaming it
+  # silently empties the calibration history; keep it in sync with JOB_NAME in
+  # testsuite/mono_move/e2e-perf/calibrate_e2e_perf_test.py.
+  mono-move-e2e-perf:
+    # Dispatch, or a same-repo (non-fork) PR carrying the label.
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (
+        contains(github.event.pull_request.labels.*.name, 'mono-move-e2e-perf') &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      )
+    # Bands are machine-specific, so the runner label has to stay pinned.
+    runs-on: benchmark-c3d-60
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
+      - name: Install python dependencies
+        run: TABULATE_INSTALL=lib-only pip install tabulate
+
+      - name: Run mono-move e2e performance comparison
+        id: perf
+        env:
+          RUN_SOURCE: ci
+          RUNNER_NAME: ${{ inputs.RUNNER_NAME || 'benchmark-c3d-60' }}
+          REPEATS: ${{ inputs.REPEATS || '3' }}
+          NUM_BLOCKS_PER_TEST: ${{ inputs.NUM_BLOCKS_PER_TEST || '30' }}
+          SELF_COMPARE: ${{ inputs.SELF_COMPARE && '1' || '' }}
+          BUILD: ${{ inputs.BUILD || 'release' }}
+          REPORT_PATH: ${{ runner.temp }}/mono-move-e2e-perf.md
+        run: |
+          set +e
+          python3 testsuite/mono_move/e2e-perf/run_e2e_perf_test.py
+          code=$?
+          if [ ! -f "$REPORT_PATH" ]; then
+            printf '### mono-move e2e performance\n\nThe run produced no report (build or runtime error). See job logs.\n' \
+              > "$REPORT_PATH"
+          fi
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+
+      - name: Write step summary
+        if: always()
+        run: cat "${{ runner.temp }}/mono-move-e2e-perf.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post sticky PR comment
+        # A read-only token cannot comment; don't fail the job over it.
+        continue-on-error: true
+        if: ${{ always() && github.event.number != null }}
+        uses: marocchino/sticky-pull-request-comment@39c5b5dc7717447d0cba270cd115037d32d28443 # pin@39c5b5dc7717447d0cba270cd115037d32d2844
+        with:
+          header: mono-move-e2e-perf
+          recreate: true
+          path: ${{ runner.temp }}/mono-move-e2e-perf.md
+
+      - name: Fail on regression or unsupported workload
+        if: ${{ steps.perf.outputs.exit_code != '0' }}
+        run: |
+          echo "mono-move e2e performance run failed. See the report above." >&2
+          exit 1

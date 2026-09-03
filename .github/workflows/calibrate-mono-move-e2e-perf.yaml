@@ -1,0 +1,71 @@
+name: "calibrate-mono-move-e2e-perf"
+
+on:
+  # Dispatch only for now. mono-move-e2e-perf is report-only, so it has no
+  # failure to trigger on. Add a `workflow_run: [completed]` failure trigger,
+  # mirroring calibrate-execution-performance.yaml, when the first workload
+  # flips to blocking=True.
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Only look at runs from this branch; defaults to main"
+        required: false
+        type: string
+      time-interval:
+        description: "Humio lookback window"
+        required: false
+        type: string
+        default: "60h"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  calibrate:
+    runs-on: 2cpu-gh-ubuntu24-x64
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run mono-move e2e performance calibration
+        env:
+          HUMIO_READ_TOKEN: ${{ secrets.HUMIO_READ_TOKEN }}
+        run: |
+          python3 testsuite/mono_move/e2e-perf/calibrate_e2e_perf_test.py \
+            ${{ inputs.branch && format('--branch {0}', inputs.branch) || '' }} \
+            --time-interval "${{ inputs.time-interval || '60h' }}"
+
+      - name: Create Pull Request
+        id: create-pr
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # pin@v8
+        with:
+          token: ${{ secrets.APTOS_BOT_PAT }}
+          branch: auto/calibrate-mono-move-e2e-perf
+          base: main
+          title: "[ci] Calibrate mono-move e2e performance speedups"
+          body: |
+            Auto-generated calibration update for the mono-move e2e performance job.
+
+            Updates:
+            - `testsuite/mono_move/e2e-perf/e2e_perf_speedup.tsv`
+            - `testsuite/mono_move/e2e-perf/e2e_perf_speedup_changelog.md`
+
+            The changelog entry shows each workload's speedup as `old -> new`, so the
+            diff is readable without opening the .tsv.
+          commit-message: "[ci] Calibrate mono-move e2e performance speedups"
+          # No add-paths: the changelog is written only when the .tsv is rewritten,
+          # so a run that recalibrates nothing produces no diff and opens no PR.
+
+      - name: Log PR URL
+        if: ${{ steps.create-pr.outputs.pull-request-number }}
+        run: |
+          echo "### Calibration PR Created" >> $GITHUB_STEP_SUMMARY
+          echo "- [View Pull Request](${{ steps.create-pr.outputs.pull-request-url }})" >> $GITHUB_STEP_SUMMARY
