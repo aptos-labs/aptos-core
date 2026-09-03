@@ -59,6 +59,7 @@ pub struct SecretShareManager {
     reliable_broadcast: Arc<ReliableBroadcast<SecretShareMessage, ExponentialBackoff>>,
     network_sender: Arc<NetworkSender>,
     secret_share_storage: Arc<dyn SecretShareStorage>,
+    retention_rounds: Round,
     secret_share_request_delay_ms: u64,
 
     // local channel received from dec_store
@@ -80,6 +81,8 @@ impl SecretShareManager {
         outgoing_blocks: Sender<OrderedBlocks>,
         network_sender: Arc<NetworkSender>,
         secret_share_storage: Arc<dyn SecretShareStorage>,
+        highest_committed_round: Round,
+        retention_rounds: Round,
         bounded_executor: BoundedExecutor,
         rb_config: &ReliableBroadcastConfig,
         secret_share_request_delay_ms: u64,
@@ -109,6 +112,16 @@ impl SecretShareManager {
             error!(
                 epoch = epoch_state.epoch,
                 "Failed to prune old secret shares at epoch start: {error}"
+            );
+        }
+        let oldest_retained_round = highest_committed_round.saturating_sub(retention_rounds);
+        if let Err(error) =
+            secret_share_storage.prune_before_round(epoch_state.epoch, oldest_retained_round)
+        {
+            error!(
+                epoch = epoch_state.epoch,
+                oldest_retained_round = oldest_retained_round,
+                "Failed to prune expired secret shares at epoch start: {error}"
             );
         }
         let loaded_self_shares = secret_share_storage
@@ -152,6 +165,7 @@ impl SecretShareManager {
             reliable_broadcast,
             network_sender,
             secret_share_storage,
+            retention_rounds,
             secret_share_request_delay_ms,
 
             decision_rx,
@@ -255,6 +269,7 @@ impl SecretShareManager {
         }
         self.recovered_self_shares
             .insert(storage_key(share.metadata()), share.clone());
+        self.prune_expired_self_shares(round);
 
         let metadata = share.metadata().clone();
         {
@@ -279,6 +294,22 @@ impl SecretShareManager {
             warn!(
                 round = round,
                 "Secret share item not found for round {}", round
+            );
+        }
+    }
+
+    fn prune_expired_self_shares(&mut self, latest_round: Round) {
+        let oldest_retained_round = latest_round.saturating_sub(self.retention_rounds);
+        self.recovered_self_shares
+            .retain(|_, share| share.round() >= oldest_retained_round);
+        if let Err(error) = self
+            .secret_share_storage
+            .prune_before_round(self.epoch_state.epoch, oldest_retained_round)
+        {
+            error!(
+                epoch = self.epoch_state.epoch,
+                oldest_retained_round = oldest_retained_round,
+                "Failed to prune expired secret shares: {error}"
             );
         }
     }
@@ -660,12 +691,29 @@ mod tests {
         fn prune_before_epoch(&self, _epoch: u64) -> anyhow::Result<()> {
             Ok(())
         }
+
+        fn prune_before_round(&self, _epoch: u64, _round: Round) -> anyhow::Result<()> {
+            Ok(())
+        }
     }
 
     fn make_manager(
         ctx: &TestContext,
         local_index: usize,
         storage: Arc<dyn SecretShareStorage>,
+    ) -> (
+        SecretShareManager,
+        aptos_channel::Receiver<(Author, ProtocolId), PeerManagerRequest>,
+    ) {
+        make_manager_with_retention(ctx, local_index, storage, 0, 120)
+    }
+
+    fn make_manager_with_retention(
+        ctx: &TestContext,
+        local_index: usize,
+        storage: Arc<dyn SecretShareStorage>,
+        highest_committed_round: Round,
+        retention_rounds: Round,
     ) -> (
         SecretShareManager,
         aptos_channel::Receiver<(Author, ProtocolId), PeerManagerRequest>,
@@ -715,6 +763,8 @@ mod tests {
             outgoing_blocks,
             network_sender,
             storage,
+            highest_committed_round,
+            retention_rounds,
             bounded_executor,
             &ReliableBroadcastConfig::default(),
             1_000_000,
@@ -800,6 +850,37 @@ mod tests {
                 .await
                 .is_err()
         );
+    }
+
+    #[tokio::test]
+    async fn test_retention_prunes_storage_and_recovery_cache() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let storage = Arc::new(InMemorySecretShareStorage::new());
+        let old_metadata = create_metadata(ctx.epoch, 10);
+        let boundary_metadata = create_metadata(ctx.epoch, 20);
+        storage
+            .save_self_share(&create_secret_share(&ctx, 0, &old_metadata))
+            .unwrap();
+        storage
+            .save_self_share(&create_secret_share(&ctx, 0, &boundary_metadata))
+            .unwrap();
+
+        let (manager, _) = make_manager_with_retention(&ctx, 0, storage.clone(), 30, 10);
+
+        let recovered = storage
+            .load_self_shares(ctx.epoch)
+            .unwrap()
+            .into_iter()
+            .collect::<anyhow::Result<Vec<_>>>()
+            .unwrap();
+        assert_eq!(recovered.len(), 1);
+        assert_eq!(recovered[0].metadata(), &boundary_metadata);
+        assert!(!manager
+            .recovered_self_shares
+            .contains_key(&storage_key(&old_metadata)));
+        assert!(manager
+            .recovered_self_shares
+            .contains_key(&storage_key(&boundary_metadata)));
     }
 
     #[tokio::test]
