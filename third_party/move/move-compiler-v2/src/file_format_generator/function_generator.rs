@@ -52,6 +52,9 @@ pub struct FunctionGenerator<'a> {
     stack: Vec<(TempIndex, bool)>,
     /// The locals which have been used so far. This contains the parameters of the function.
     locals: Vec<Type>,
+    /// Scratch-local pairs keyed by the type to which both equality operands are coerced.
+    /// Each pair ensures that `Eq` or `Neq` receives operands with exactly the same type.
+    equality_scratch: BTreeMap<Type, (FF::LocalIndex, FF::LocalIndex)>,
     /// A map from branching labels to information about them.
     label_info: BTreeMap<Label, LabelInfo>,
     /// A map from code offset to spec blocks associated with them
@@ -145,6 +148,7 @@ impl<'a> FunctionGenerator<'a> {
                 temps: Default::default(),
                 stack: vec![],
                 locals: vec![],
+                equality_scratch: Default::default(),
                 label_info: Default::default(),
                 spec_blocks: BTreeMap::new(),
                 code: vec![],
@@ -162,7 +166,8 @@ impl<'a> FunctionGenerator<'a> {
                 .get_extension::<Options>()
                 .expect("Options is available");
             if options.experiment_on(Experiment::PEEPHOLE_OPTIMIZATION) {
-                let transformed_code_chunk = peephole_optimizer::optimize(&code.code);
+                let transformed_code_chunk =
+                    peephole_optimizer::optimize(&code.code, fun_gen.protected_locals());
                 // Fix the source map for the optimized code.
                 fun_gen
                     .genr
@@ -659,6 +664,8 @@ impl<'a> FunctionGenerator<'a> {
         self.locals = (0..ctx.fun.get_parameter_count())
             .map(|temp| ctx.temp_type(temp).to_owned())
             .collect();
+        // Reset cached indices whenever the local table is rebuilt.
+        self.equality_scratch.clear();
 
         // Walk the bytecode
         let bytecode = ctx.fun.get_bytecode();
@@ -1193,8 +1200,8 @@ impl<'a> FunctionGenerator<'a> {
             Operation::Ge => self.gen_builtin(ctx, dest, FF::Bytecode::Ge, source),
             Operation::Or => self.gen_builtin(ctx, dest, FF::Bytecode::Or, source),
             Operation::And => self.gen_builtin(ctx, dest, FF::Bytecode::And, source),
-            Operation::Eq => self.gen_builtin(ctx, dest, FF::Bytecode::Eq, source),
-            Operation::Neq => self.gen_builtin(ctx, dest, FF::Bytecode::Neq, source),
+            Operation::Eq => self.gen_equality(ctx, dest, FF::Bytecode::Eq, source),
+            Operation::Neq => self.gen_equality(ctx, dest, FF::Bytecode::Neq, source),
             Operation::Negate => self.gen_builtin(ctx, dest, FF::Bytecode::Negate, source),
 
             Operation::TraceLocal(_)
@@ -1774,6 +1781,104 @@ impl<'a> FunctionGenerator<'a> {
         self.abstract_push_result(ctx, dest);
     }
 
+    /// Generates `Eq` or `Neq` after normalizing the operand types.
+    fn gen_equality(
+        &mut self,
+        ctx: &BytecodeContext,
+        dest: &[TempIndex],
+        bc: FF::Bytecode,
+        source: &[TempIndex],
+    ) {
+        let coercion = self.equality_coercion(ctx, source);
+        self.gen_builtin_with_prelude(ctx, dest, bc, source, coercion)
+    }
+
+    /// Returns a prelude that normalizes both `Eq` or `Neq` operands to their equality join.
+    ///
+    /// The verifier gives `PackClosure` its precise derived abilities and requires equality
+    /// operands to have identical types. An operand can therefore reach this point with a wider
+    /// file-format type than the compiler assigned it. Round-tripping both operands through
+    /// scratch locals typed as the join uses `StLoc` assignability to accept each value and
+    /// `MoveLoc` to restore the exact join type.
+    ///
+    /// Whenever either operand can widen, both are normalized because detecting only actual
+    /// mismatches would duplicate the verifier's ability derivation. This adds one
+    /// `StLoc`/`MoveLoc` pair per operand.
+    fn equality_coercion(
+        &mut self,
+        ctx: &BytecodeContext,
+        source: &[TempIndex],
+    ) -> Vec<FF::Bytecode> {
+        let fun_ctx = ctx.fun_ctx;
+        let [lhs, rhs] = source else {
+            fun_ctx.internal_error("equality expects two operands");
+            return vec![];
+        };
+        let (lhs_ty, rhs_ty) = (fun_ctx.temp_type(*lhs), fun_ctx.temp_type(*rhs));
+        if !can_widen_abilities(lhs_ty) && !can_widen_abilities(rhs_ty) {
+            return vec![];
+        }
+        let Some(join_ty) = equality_join(lhs_ty, rhs_ty) else {
+            let display_ctx = fun_ctx.fun.func_env.get_type_display_ctx();
+            fun_ctx.internal_error(format!(
+                "no common type for comparing `{}` with `{}`",
+                lhs_ty.display(&display_ctx),
+                rhs_ty.display(&display_ctx)
+            ));
+            return vec![];
+        };
+        let (lhs_local, rhs_local) = self.equality_scratch_locals(fun_ctx, join_ty);
+        vec![
+            FF::Bytecode::StLoc(rhs_local),
+            FF::Bytecode::StLoc(lhs_local),
+            FF::Bytecode::MoveLoc(lhs_local),
+            FF::Bytecode::MoveLoc(rhs_local),
+        ]
+    }
+
+    /// Returns reusable scratch locals of type `ty`. Each comparison moves both values out,
+    /// leaving the pair available for the next comparison.
+    fn equality_scratch_locals(
+        &mut self,
+        ctx: &FunctionContext,
+        ty: Type,
+    ) -> (FF::LocalIndex, FF::LocalIndex) {
+        if let Some(locals) = self.equality_scratch.get(&ty) {
+            return *locals;
+        }
+        let locals = (
+            self.new_scratch_local(ctx, ty.clone()),
+            self.new_scratch_local(ctx, ty.clone()),
+        );
+        self.equality_scratch.insert(ty, locals);
+        locals
+    }
+
+    /// Allocates a scratch local with no stackless temporary. Non-parameter locals are positional
+    /// in the source map, so each scratch local needs a placeholder entry to preserve subsequent
+    /// names. The `tmp#$` marker identifies it as compiler-generated.
+    fn new_scratch_local(&mut self, ctx: &FunctionContext, ty: Type) -> FF::LocalIndex {
+        let local = self.new_local(ctx, ty);
+        let name = ctx
+            .module
+            .env
+            .symbol_pool()
+            .make(&format!("tmp#${}", local));
+        self.genr
+            .source_map
+            .add_local_mapping(ctx.def_idx, ctx.module.source_name(name, &ctx.loc))
+            .expect(SOURCE_MAP_OK);
+        local
+    }
+
+    /// Returns the scratch locals whose coercion round-trips must survive peephole optimization.
+    fn protected_locals(&self) -> BTreeSet<FF::LocalIndex> {
+        self.equality_scratch
+            .values()
+            .flat_map(|(lhs_local, rhs_local)| [*lhs_local, *rhs_local])
+            .collect()
+    }
+
     /// Generate code for a general builtin instruction.
     fn gen_builtin(
         &mut self,
@@ -1782,7 +1887,23 @@ impl<'a> FunctionGenerator<'a> {
         bc: FF::Bytecode,
         source: &[TempIndex],
     ) {
+        self.gen_builtin_with_prelude(ctx, dest, bc, source, vec![])
+    }
+
+    /// Generates a builtin, inserting `prelude` after its arguments are pushed. The prelude must
+    /// preserve the operand count and order.
+    fn gen_builtin_with_prelude(
+        &mut self,
+        ctx: &BytecodeContext,
+        dest: &[TempIndex],
+        bc: FF::Bytecode,
+        source: &[TempIndex],
+        prelude: Vec<FF::Bytecode>,
+    ) {
         self.abstract_push_args(ctx, source, None);
+        for instr in prelude {
+            self.emit(instr)
+        }
         self.emit(bc);
         self.abstract_pop_n(ctx, source.len());
         self.abstract_push_result(ctx, dest)
@@ -2171,6 +2292,53 @@ impl<'a> FunctionGenerator<'a> {
                 idx
             }
         }
+    }
+}
+
+/// Returns whether `ty` has a form whose bytecode assignability can weaken function abilities.
+/// This includes function types and immutable references recursively; every other type position
+/// requires equality.
+fn can_widen_abilities(ty: &Type) -> bool {
+    match ty {
+        Type::Fun(..) => true,
+        Type::Reference(ReferenceKind::Immutable, target_ty) => can_widen_abilities(target_ty),
+        Type::Primitive(_)
+        | Type::Tuple(_)
+        | Type::Vector(_)
+        | Type::Struct(..)
+        | Type::TypeParameter(_)
+        | Type::Reference(ReferenceKind::Mutable, _)
+        | Type::TypeDomain(_)
+        | Type::ResourceDomain(..)
+        | Type::StateDomain
+        | Type::Error
+        | Type::Var(_) => false,
+    }
+}
+
+/// Returns a common target type to which both operands are bytecode-assignable, or `None` if none
+/// exists. Function signatures must match and their abilities are intersected; immutable
+/// references recurse; all other types must be equal. If both operands support equality, the
+/// function ability intersection retains `drop`.
+fn equality_join(ty1: &Type, ty2: &Type) -> Option<Type> {
+    match (ty1, ty2) {
+        (Type::Fun(args1, result1, abilities1), Type::Fun(args2, result2, abilities2))
+            if args1 == args2 && result1 == result2 =>
+        {
+            Some(Type::Fun(
+                args1.clone(),
+                result1.clone(),
+                abilities1.intersect(*abilities2),
+            ))
+        },
+        (
+            Type::Reference(ReferenceKind::Immutable, target_ty1),
+            Type::Reference(ReferenceKind::Immutable, target_ty2),
+        ) => Some(Type::Reference(
+            ReferenceKind::Immutable,
+            Box::new(equality_join(target_ty1, target_ty2)?),
+        )),
+        _ => (ty1 == ty2).then(|| ty1.clone()),
     }
 }
 

@@ -3,7 +3,8 @@
 
 //! This module contains setup for basic block peephole optimizers.
 
-use move_binary_format::file_format::{Bytecode, CodeOffset};
+use move_binary_format::file_format::{Bytecode, CodeOffset, LocalIndex};
+use std::collections::BTreeSet;
 
 /// A contiguous chunk of bytecode that may have been transformed from some
 /// other "original" contiguous chunk of bytecode.
@@ -76,6 +77,9 @@ pub trait BasicBlockOptimizer {
 
 /// An optimizer for a window of bytecode within a basic block.
 /// The window is always a suffix of a basic block.
+///
+/// Implementations need not inspect protected locals: `WindowProcessor` rejects
+/// transformations that consume an instruction accessing one.
 pub trait WindowOptimizer {
     /// Given a `window` of bytecode, return a tuple containing:
     ///   1. an optimized version of a non-empty prefix of the `window`. [*]
@@ -88,7 +92,11 @@ pub trait WindowOptimizer {
 }
 
 /// A processor to perform window optimizations of a particular style on a basic block.
-pub struct WindowProcessor<T: WindowOptimizer>(T);
+pub struct WindowProcessor<T: WindowOptimizer> {
+    optimizer: T,
+    /// Locals whose accesses no window transformation may consume.
+    protected_locals: BTreeSet<LocalIndex>,
+}
 
 impl<T: WindowOptimizer> BasicBlockOptimizer for WindowProcessor<T> {
     fn optimize(&self, block: &[Bytecode]) -> TransformedCodeChunk {
@@ -102,9 +110,18 @@ impl<T: WindowOptimizer> BasicBlockOptimizer for WindowProcessor<T> {
 }
 
 impl<T: WindowOptimizer> WindowProcessor<T> {
-    /// Create a new `WindowProcessor` with the given `optimizer`.
-    pub fn new(optimizer: T) -> Self {
-        Self(optimizer)
+    /// Creates a processor for `optimizer` that preserves accesses to `protected_locals`.
+    pub fn new(optimizer: T, protected_locals: BTreeSet<LocalIndex>) -> Self {
+        Self {
+            optimizer,
+            protected_locals,
+        }
+    }
+
+    /// Returns whether `bc` accesses a protected local.
+    fn is_protected(&self, bc: &Bytecode) -> bool {
+        bc.local_index()
+            .is_some_and(|local| self.protected_locals.contains(&local))
     }
 
     /// Run a single pass of the window peephole optimization on the given basic `block`.
@@ -115,8 +132,14 @@ impl<T: WindowOptimizer> WindowProcessor<T> {
         let mut left = 0;
         while left < block.len() {
             let window = &block[left..];
-            if let Some((optimized_window, consumed)) = self.0.optimize_window(window) {
-                debug_assert!(consumed != 0);
+            let optimized = self
+                .optimizer
+                .optimize_window(window)
+                .filter(|(_, consumed)| {
+                    debug_assert!(*consumed != 0 && *consumed <= window.len());
+                    !window[..*consumed].iter().any(|bc| self.is_protected(bc))
+                });
+            if let Some((optimized_window, consumed)) = optimized {
                 new_block.extend(optimized_window, left as CodeOffset);
                 left += consumed;
                 changed = true;
