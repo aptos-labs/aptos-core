@@ -44,7 +44,7 @@ from .mutants import (
     run_mutant_cases,
     score_mutants,
 )
-from .compatibility import tool_executables
+from .compatibility import changed_stages, tool_executables
 from .materialize import materialize_task
 
 
@@ -583,12 +583,7 @@ class Controller:
         expected_stages = self.run.spec.stage_executables
         if expected_stages:
             actual_stages = tool_executables(self.config)
-            changed = sorted(
-                name
-                for name in set(expected_stages) | set(actual_stages)
-                if _stage_identity(expected_stages.get(name))
-                != _stage_identity(actual_stages.get(name))
-            )
+            changed = changed_stages(expected_stages, actual_stages)
             if changed:
                 raise ValueError(
                     "stage executable(s) changed since the round was scheduled "
@@ -957,24 +952,6 @@ def _task_mutants(root: Path | None, task_id: str, label: str = "mutant") -> Pat
     if not load_object(manifest).get("mutants"):
         raise SystemExit(f"{label} manifest lists no mutants: {manifest}")
     return manifest
-
-
-def _stage_identity(entry: dict[str, Any] | None) -> dict[str, Any]:
-    """What a stage runs, as opposed to where it is.
-
-    A stage is a command, not a file: `render_command` executes the whole
-    argument vector, and `tool_executables` hashes every argument that resolves
-    to one for that reason. Comparing the top-level digest alone would accept a
-    `["python3", "wrapper.py"]` stage whose wrapper was rewritten under an
-    unchanged interpreter.
-
-    So everything the record carries is compared except `path`, which says only
-    where the build was found -- relocating one does not change what it decides,
-    and refusing on it would reject a legitimate round. Subtracting the one
-    irrelevant key rather than listing the relevant ones means a field added to
-    the record later is compared by default, which is the safe direction.
-    """
-    return {key: value for key, value in (entry or {}).items() if key != "path"}
 
 
 def _require_disjoint_from_scoring(run_spec: Any, refutation: Path | None) -> None:

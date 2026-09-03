@@ -830,6 +830,74 @@ class ReferencePatchTest(unittest.TestCase):
         )
 
 
+class ScoringApparatusTest(unittest.TestCase):
+    """Scoring is the other half of "this run used the apparatus it declared".
+
+    A run refuses to execute against an apparatus it did not schedule.
+    `strict_success` is decided afterwards, by a compile and a prover invoked
+    from the live configuration, so a solver or stage command replaced since
+    the round ran would produce a number attributed to the scheduled apparatus
+    and measured by a different one.
+    """
+
+    def setUp(self) -> None:
+        self.root = Path(tempfile.mkdtemp())
+        (self.root / "runs" / "r1").mkdir(parents=True)
+
+    def _config(self):
+        from harness.config import ExperimentConfig
+
+        return ExperimentConfig(
+            schema_version=1, claude_code_version="0.0.0",
+            feedback_level="acceptance", max_output_tokens=1,
+            operational_timeout_seconds=1,
+            model="m", effort="high", provider_base_url="http://x",
+            claude_agent_sdk_version="0.0.0", source_commit="c",
+            max_wall_seconds=1, max_controller_turns=1,
+            max_model_turns_per_controller_turn=1, eventual_timeout_seconds=1,
+            infrastructure_retries=0, allowed_builtin_tools=[],
+            denied_builtin_tools=[], compile_command=["true"],
+            prove_command=["true"], inference_command=["true"],
+            check_candidate_command=["true"],
+        )
+
+    def _score(self, record_extra: dict) -> str:
+        from harness.score_round import score_round
+
+        (self.root / "runs" / "r1" / "run.json").write_text(
+            json.dumps({
+                "run_id": "r1", "task_id": "T", "target": "m::f",
+                "package_relpath": "pkg",
+                "mutant_manifest_sha256": NO_MUTANTS,
+                "result": {"eventual_judge": {"state": "operational_success"}},
+                **record_extra,
+            }),
+            encoding="utf-8",
+        )
+        try:
+            asyncio.run(score_round(
+                config=self._config(), round_dir=self.root,
+                mutants_root=self.root / "mutants", timeout_seconds=1,
+            ))
+        except ValueError as error:
+            return str(error)
+        return ""
+
+    def test_a_different_experiment_configuration_cannot_score_the_run(self) -> None:
+        message = self._score({"config_sha256": "f" * 64})
+        self.assertIn("must be measured by the apparatus", message)
+
+    def test_a_replaced_solver_cannot_score_the_run(self) -> None:
+        message = self._score({"stage_executables": {"z3": {"sha256": "f" * 64}}})
+        self.assertIn("stage executable(s) changed", message)
+        self.assertIn("z3", message)
+
+    def test_a_run_that_pinned_nothing_is_still_scorable(self) -> None:
+        # Rounds recorded before the apparatus was pinned stay scorable, as
+        # they stay runnable on the controller side.
+        self.assertEqual("", self._score({}))
+
+
 class CorrectedScoringManifestTest(unittest.TestCase):
     """Replacing the scored set replaces one side of the disjointness check.
 

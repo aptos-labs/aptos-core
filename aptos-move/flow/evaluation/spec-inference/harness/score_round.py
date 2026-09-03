@@ -15,13 +15,53 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from .artifacts import load_object, sha256_file, write_json
+from .artifacts import canonical_json, load_object, sha256_file, write_json
+from .compatibility import changed_stages, tool_executables
 from .config import ExperimentConfig
 from .mutants import NO_MUTANTS, overlapping_mutations, score_mutants
+
+
+def _require_scoring_apparatus_agrees(
+    config: ExperimentConfig, record: dict[str, Any], run_id: str
+) -> None:
+    """Refuse to measure a run with an apparatus it did not run under.
+
+    A run refuses to execute against an apparatus it did not schedule. Scoring
+    is the other half of that claim and was not making it: `strict_success` is
+    decided here, by a compile and a prover invoked from the live
+    configuration, and a solver or a stage command replaced since the round ran
+    would produce a number attributed to the scheduled apparatus and measured
+    by a different one.
+
+    A record that pins nothing is left alone, as the controller leaves one:
+    rounds scheduled before the apparatus was pinned stay scorable. What must
+    not pass is a record that pins something and disagrees.
+    """
+    expected_config = record.get("config_sha256")
+    if expected_config is not None:
+        actual_config = hashlib.sha256(canonical_json(asdict(config))).hexdigest()
+        if actual_config != expected_config:
+            raise ValueError(
+                f"run {run_id} ran under experiment configuration "
+                f"{expected_config} but scoring was given {actual_config}: a "
+                "strict-success result must be measured by the apparatus that "
+                "produced the run"
+            )
+    expected_stages = record.get("stage_executables")
+    if expected_stages:
+        changed = changed_stages(expected_stages, tool_executables(config))
+        if changed:
+            raise ValueError(
+                f"stage executable(s) changed since run {run_id} was recorded "
+                f"({', '.join(changed)}): a verdict from one toolchain cannot "
+                "be scored as a result from another"
+            )
 
 
 async def score_round(
@@ -56,6 +96,7 @@ async def score_round(
         # records one for every run. Reporting the judge state as the terminal
         # status made a compile failure, a timeout and an exhausted budget
         # indistinguishable in the round's own scoring record.
+        _require_scoring_apparatus_agrees(config, record, run_id)
         result = record.get("result") or {}
         judge = result.get("eventual_judge") or {}
         status = judge.get("state")

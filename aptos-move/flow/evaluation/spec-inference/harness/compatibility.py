@@ -166,6 +166,42 @@ def _stage_result(result: Any, stage_report: dict[str, Any] | None) -> dict[str,
     return {**asdict(result), "stage_report": stage_report}
 
 
+def stage_identity(entry: dict[str, Any] | None) -> dict[str, Any]:
+    """What a stage runs, as opposed to where it is.
+
+    A stage is a command, not a file: `render_command` executes the whole
+    argument vector, and `tool_executables` hashes every argument that resolves
+    to one for that reason. Comparing the top-level digest alone would accept a
+    `["python3", "wrapper.py"]` stage whose wrapper was rewritten under an
+    unchanged interpreter.
+
+    Everything the record carries is compared except `path`, which says only
+    where a build was found -- relocating one does not change what it decides.
+    Subtracting the one irrelevant key rather than listing the relevant ones
+    means a field added to the record later is compared by default, which is
+    the safe direction.
+    """
+    return {key: value for key, value in (entry or {}).items() if key != "path"}
+
+
+def changed_stages(
+    expected: dict[str, dict[str, Any]], actual: dict[str, dict[str, Any]]
+) -> list[str]:
+    """The stages that differ between two recorded apparatus identities.
+
+    Named once because it is asked twice: a run refuses to execute against an
+    apparatus it did not schedule, and post-round scoring refuses to measure
+    with one. A stage present on one side and absent on the other counts as
+    changed -- an absent backend is not an unchanged one, and whatever the
+    environment resolves next would silently take its place.
+    """
+    return sorted(
+        name
+        for name in set(expected) | set(actual)
+        if stage_identity(expected.get(name)) != stage_identity(actual.get(name))
+    )
+
+
 def tool_executables(config: ExperimentConfig) -> dict[str, dict[str, Any]]:
     """Digest everything a screening stage actually runs.
 
