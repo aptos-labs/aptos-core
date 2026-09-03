@@ -12,18 +12,18 @@ pub mod reducible_pairs;
 use inefficient_loads::InefficientLoads;
 use move_binary_format::{
     control_flow_graph::{ControlFlowGraph, VMControlFlowGraph},
-    file_format::{Bytecode, CodeOffset},
+    file_format::{Bytecode, CodeOffset, LocalIndex},
 };
 use optimizers::{BasicBlockOptimizer, TransformedCodeChunk, WindowProcessor};
 use reducible_pairs::ReduciblePairs;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
-/// Pre-requisite: `code` should not have spec block associations.
-/// Run peephole optimizers on the given `code`, possibly modifying it.
-/// Returns the optimized code, along with mapping to original offsets
-/// in `code`.
-pub fn optimize(code: &[Bytecode]) -> TransformedCodeChunk {
-    BasicBlockOptimizerPipeline::default().optimize(code)
+/// Runs peephole optimizers on `code` and returns the optimized code with its original offsets.
+///
+/// `code` must have no spec-block associations. Window optimizers preserve every instruction
+/// that accesses a protected local.
+pub fn optimize(code: &[Bytecode], protected_locals: BTreeSet<LocalIndex>) -> TransformedCodeChunk {
+    BasicBlockOptimizerPipeline::new(protected_locals).optimize(code)
 }
 
 /// A pipeline of basic block optimizers.
@@ -33,12 +33,15 @@ struct BasicBlockOptimizerPipeline {
 }
 
 impl BasicBlockOptimizerPipeline {
-    /// Default optimization pipeline of basic block optimizers.
-    pub fn default() -> Self {
+    /// Builds the standard optimizer pipeline with the specified protected locals.
+    pub fn new(protected_locals: BTreeSet<LocalIndex>) -> Self {
         Self {
             optimizers: vec![
-                Box::new(WindowProcessor::new(ReduciblePairs)),
-                Box::new(WindowProcessor::new(InefficientLoads)),
+                Box::new(WindowProcessor::new(
+                    ReduciblePairs,
+                    protected_locals.clone(),
+                )),
+                Box::new(WindowProcessor::new(InefficientLoads, protected_locals)),
             ],
         }
     }
@@ -122,7 +125,7 @@ mod tests {
 
     #[test]
     fn test_basic_block_optimizer_pipeline() {
-        let pipeline = BasicBlockOptimizerPipeline::default();
+        let pipeline = BasicBlockOptimizerPipeline::new(BTreeSet::new());
         use Bytecode::*;
         // Below, we handcraft a scenario where multiple peephole optimizations can be applied,
         // in multiple passes, including merging basic blocks multiple times.
@@ -168,5 +171,93 @@ mod tests {
             vec![0, 1, 2, 3, 16, 17, 18, 19, 22],
         );
         assert!(optimized_code_chunk == expected_code_chunk);
+    }
+
+    #[test]
+    fn test_protected_locals_keep_their_round_trip() {
+        use Bytecode::*;
+        // The `Eq` prelude uses protected locals 4 and 5; local 3 is an unprotected control.
+        let code = vec![
+            MoveLoc(1), // 0
+            MoveLoc(2), // 1
+            StLoc(5),   // 2
+            StLoc(4),   // 3
+            MoveLoc(4), // 4
+            MoveLoc(5), // 5
+            Eq,         // 6
+            StLoc(3),   // 7
+            MoveLoc(3), // 8
+            Ret,        // 9
+        ];
+        let protected = BasicBlockOptimizerPipeline::new(BTreeSet::from([4, 5])).optimize(&code);
+        let expected_protected = TransformedCodeChunk::new(
+            vec![
+                MoveLoc(1),
+                MoveLoc(2),
+                StLoc(5),
+                StLoc(4),
+                MoveLoc(4),
+                MoveLoc(5),
+                Eq,
+                Ret,
+            ],
+            vec![0, 1, 2, 3, 4, 5, 6, 9],
+        );
+        assert!(protected == expected_protected);
+        // With no protected locals, both round-trips are removed.
+        let unprotected = BasicBlockOptimizerPipeline::new(BTreeSet::new()).optimize(&code);
+        let expected_unprotected =
+            TransformedCodeChunk::new(vec![MoveLoc(1), MoveLoc(2), Eq, Ret], vec![0, 1, 6, 9]);
+        assert!(unprotected == expected_unprotected);
+    }
+
+    #[test]
+    fn test_protected_locals_block_inefficient_loads() {
+        use Bytecode::*;
+        // `InefficientLoads` moves the constant load past `sequence`. Reject the transformation
+        // if either the destination or a local accessed by `sequence` is protected.
+        let stores_to_protected = vec![
+            LdU64(7),   // 0
+            StLoc(4),   // 1
+            Nop,        // 2
+            MoveLoc(4), // 3
+            Ret,        // 4
+        ];
+        let protected =
+            BasicBlockOptimizerPipeline::new(BTreeSet::from([4])).optimize(&stores_to_protected);
+        assert!(protected == TransformedCodeChunk::make_from(&stores_to_protected));
+        let unprotected =
+            BasicBlockOptimizerPipeline::new(BTreeSet::new()).optimize(&stores_to_protected);
+        let expected_unprotected =
+            TransformedCodeChunk::new(vec![Nop, LdU64(7), Ret], vec![2, 0, 4]);
+        assert!(unprotected == expected_unprotected);
+
+        // The `sequence` contains an `Eq` coercion on protected locals 4 and 5, while the load
+        // targets unprotected local 1.
+        let coercion_in_sequence = vec![
+            LdU64(7),   // 0
+            StLoc(1),   // 1
+            MoveLoc(2), // 2
+            MoveLoc(3), // 3
+            StLoc(5),   // 4
+            StLoc(4),   // 5
+            MoveLoc(4), // 6
+            MoveLoc(5), // 7
+            Eq,         // 8
+            Pop,        // 9
+            MoveLoc(1), // 10
+            Ret,        // 11
+        ];
+        let protected = BasicBlockOptimizerPipeline::new(BTreeSet::from([4, 5]))
+            .optimize(&coercion_in_sequence);
+        assert!(protected == TransformedCodeChunk::make_from(&coercion_in_sequence));
+        // Without protection the coercion is removed and the load then sinks past `sequence`.
+        let unprotected =
+            BasicBlockOptimizerPipeline::new(BTreeSet::new()).optimize(&coercion_in_sequence);
+        let expected_unprotected =
+            TransformedCodeChunk::new(vec![MoveLoc(2), MoveLoc(3), Eq, Pop, LdU64(7), Ret], vec![
+                2, 3, 8, 9, 0, 11,
+            ]);
+        assert!(unprotected == expected_unprotected);
     }
 }

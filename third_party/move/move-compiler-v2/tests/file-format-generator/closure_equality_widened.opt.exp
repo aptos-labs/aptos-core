@@ -1,0 +1,152 @@
+
+============ disassembled file-format ==================
+// Bytecode version v10
+module 0xc0ffee::m
+struct CopyDropStore has copy + drop + store
+  x: u64
+
+struct DropStore has drop + store
+  x: u64
+
+// Function definition at index 0
+#[persistent] public fun both_widened(l0: DropStore, l1: CopyDropStore): bool
+    local l2: |u64|u64 has drop
+    local l3: |u64|u64 has drop
+    local l4: |u64|u64 has drop
+    local l5: |u64|u64 has drop
+    move_loc l0
+    pack_closure with_capture, 1
+    move_loc l1
+    pack_closure with_copy_capture, 1
+    st_loc l5
+    // @5
+    st_loc l4
+    move_loc l4
+    move_loc l5
+    eq
+    ret
+
+// Function definition at index 1
+#[persistent] public fun differently_declared(l0: |u64|u64 has copy + drop + store, l1: |u64|u64 has drop): bool
+    local l2: |u64|u64 has drop
+    local l3: |u64|u64 has drop
+    move_loc l1
+    move_loc l0
+    st_loc l3
+    st_loc l2
+    move_loc l2
+    // @5
+    move_loc l3
+    eq
+    ret
+
+// Function definition at index 2
+#[persistent] public fun differently_declared_neq(l0: |u64|u64 has copy + drop + store, l1: |u64|u64 has drop): bool
+    local l2: |u64|u64 has drop
+    local l3: |u64|u64 has drop
+    move_loc l1
+    move_loc l0
+    st_loc l3
+    st_loc l2
+    move_loc l2
+    // @5
+    move_loc l3
+    neq
+    ret
+
+// Function definition at index 3
+#[persistent] public fun plain(l0: u64, l1: u64): bool
+    move_loc l0
+    move_loc l1
+    eq
+    ret
+
+// Function definition at index 4
+#[persistent] public fun ref_compare(l0: &|u64|u64 has copy + drop + store, l1: &|u64|u64 has drop): bool
+    local l2: &|u64|u64 has drop
+    local l3: &|u64|u64 has drop
+    move_loc l1
+    move_loc l0
+    st_loc l3
+    st_loc l2
+    move_loc l2
+    // @5
+    move_loc l3
+    eq
+    ret
+
+// Function definition at index 5
+#[persistent] public fun reuses_scratch(l0: |u64|u64 has copy + drop + store, l1: |u64|u64 has drop, l2: |u64|u64 has drop): bool
+    local l3: |u64|u64 has drop
+    local l4: |u64|u64 has drop
+    move_loc l1
+    copy_loc l0
+    st_loc l4
+    st_loc l3
+    move_loc l3
+    // @5
+    move_loc l4
+    eq
+    br_false l0
+    move_loc l2
+    move_loc l0
+    // @10
+    st_loc l4
+    st_loc l3
+    move_loc l3
+    move_loc l4
+    eq
+    // @15
+    ret
+l0: ld_false
+    ret
+
+// Function definition at index 6
+#[persistent] public fun same_operand(l0: |u64|u64 has copy + drop): bool
+    local l1: |u64|u64 has copy + drop
+    local l2: |u64|u64 has copy + drop
+    copy_loc l0
+    move_loc l0
+    st_loc l2
+    st_loc l1
+    move_loc l1
+    // @5
+    move_loc l2
+    eq
+    ret
+
+// Function definition at index 7
+#[persistent] public fun widened_producer(l0: DropStore, l1: |u64|u64 has drop): bool
+    local l2: |u64|u64 has drop
+    local l3: |u64|u64 has drop
+    move_loc l0
+    pack_closure with_capture, 1
+    move_loc l1
+    st_loc l3
+    st_loc l2
+    // @5
+    move_loc l2
+    move_loc l3
+    eq
+    ret
+
+// Function definition at index 8
+#[persistent] public fun with_capture(l0: DropStore, l1: u64): u64
+    move_loc l0
+    unpack DropStore
+    move_loc l1
+    add
+    ret
+
+// Function definition at index 9
+#[persistent] public fun with_copy_capture(l0: CopyDropStore, l1: u64): u64
+    borrow_loc l0
+    borrow_field CopyDropStore, x
+    read_ref
+    move_loc l1
+    add
+    // @5
+    ret
+
+
+============ bytecode verification succeeded ========
