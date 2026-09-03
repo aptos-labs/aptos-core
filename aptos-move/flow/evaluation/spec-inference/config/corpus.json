@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "quotas": {
+    "aptos-move/framework/aptos-framework": {"function": 16, "module": 4},
+    "aptos-move/framework/aptos-experimental": {"function": 8, "module": 2}
+  },
+  "minimum_feature_counts": {
+    "loop": 6,
+    "higher-order": 3,
+    "mutable-reference": 6,
+    "global-state": 8,
+    "multiple-calls": 8,
+    "arithmetic-abort": 6,
+    "small": 6,
+    "medium": 10,
+    "large": 6,
+    "deep-calls": 6
+  },
+  "maximum_functions_per_module": 2,
+  "compatibility_threshold_seconds": 40,
+  "selection_seed_suffix": "move-inference-corpus-v1"
+}

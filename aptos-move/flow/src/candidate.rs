@@ -252,6 +252,10 @@ pub enum CandidateState {
     /// Edit scope or runtime code, not the specification.
     PolicyViolation,
     ForbiddenWeakening,
+    /// The specification neither weakens nor edits out of scope; it is simply
+    /// missing a contract category the task requires. The repair is to add a
+    /// clause, which is the opposite of what a weakening diagnosis asks for.
+    IncompleteContract,
     ProverFailure,
     ProverTimeout,
     /// The prover could not run at all: no obligation was checked, so the
@@ -266,6 +270,7 @@ impl CandidateState {
             Self::CompileFailure => "compile_failure",
             Self::PolicyViolation => "policy_violation",
             Self::ForbiddenWeakening => "forbidden_weakening",
+            Self::IncompleteContract => "incomplete_contract",
             Self::ProverFailure => "prover_failure",
             Self::ProverTimeout => "prover_timeout",
             Self::InfrastructureFailure => "infrastructure_failure",
@@ -1081,12 +1086,29 @@ pub(crate) fn conditions_of(function: &FunctionEnv<'_>) -> Vec<Condition> {
     if let Some(def) = function.get_def() {
         def.visit_post_order(&mut |exp| {
             if let ExpData::SpecBlock(_, inline) = exp {
-                conditions.extend(inline.conditions.iter().cloned());
+                // Inlining a call injects `assume`d marker conditions at the
+                // call site. They belong to the prover, not to the candidate:
+                // counting them would report an `unjustified_assumption` in
+                // whatever file the inlined callee lives in -- source the
+                // candidate never wrote and usually never changed -- and would
+                // let a marker stand in for real contract coverage.
+                conditions.extend(
+                    inline
+                        .conditions
+                        .iter()
+                        .filter(|condition| !is_inline_marker(&condition.exp))
+                        .cloned(),
+                );
             }
             true
         });
     }
     conditions
+}
+
+/// Whether a condition is one of the inliner's synthesised markers.
+fn is_inline_marker(exp: &Exp) -> bool {
+    matches!(exp.as_ref(), ExpData::Call(_, operation, _) if operation.is_inline_marker())
 }
 
 /// A `Violation` carrying only the position, for struct-update syntax.

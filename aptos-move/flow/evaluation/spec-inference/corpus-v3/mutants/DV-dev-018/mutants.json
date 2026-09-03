@@ -1,0 +1,97 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 15,
+        "offset": 793,
+        "sha256": "c66f3bbd12250b6cfee9c0bc5799e9523cd4da3de00b73584a57b4bcd27baa8d"
+      },
+      "edit": {
+        "at": 0,
+        "kind": "substitute",
+        "length": 14,
+        "to": "abort 7"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_deviation.move",
+      "mutant_id": "DV-dev-018-sentinel-becomes-abort",
+      "obligation_category": "abort",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 40,
+        "offset": 1128,
+        "sha256": "85145c5596fe7ed5f9e10597daf877f80252c16817ad3eeb89935dedd10c335b"
+      },
+      "edit": {
+        "at": 33,
+        "kind": "substitute",
+        "length": 6,
+        "to": "price2"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_deviation.move",
+      "mutant_id": "DV-dev-018-ratio-against-price2",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 24,
+        "offset": 1136,
+        "sha256": "84a2f7b1a223d81900d65c0ec7978345768512be91df7f5cda6bbae9ba9db51c"
+      },
+      "edit": {
+        "at": 18,
+        "kind": "substitute",
+        "length": 5,
+        "to": "1000"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_deviation.move",
+      "mutant_id": "DV-dev-018-wrong-scale",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "f01e825bc45cb57dfa4c6e871a5fc2d3fc4b81c54aa0e11f8f3f5af562107b63",
+  "schema_version": 1,
+  "task_id": "DV-dev-018"
+}

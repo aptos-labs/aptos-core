@@ -1,0 +1,23 @@
+--- a/sources/etna/extracted_median.move
++++ b/sources/etna/extracted_median.move
+@@ -19,0 +20,20 @@ module decibel_dex::extracted_median {
++
++    spec module {
++        fun min3(a: num, b: num, c: num): num {
++            if (a <= b) { if (a <= c) { a } else { c } }
++            else if (b <= c) { b } else { c }
++        }
++
++        fun max3(a: num, b: num, c: num): num {
++            if (a >= b) { if (a >= c) { a } else { c } }
++            else if (b >= c) { b } else { c }
++        }
++    }
++
++    spec get_median_price {
++        pragma opaque;
++        aborts_if [inferred] false;
++        // The middle value, stated as the total minus the extremes rather than
++        // by restating the branch structure of the body.
++        ensures [inferred] result == a + b + c - min3(a, b, c) - max3(a, b, c);
++    }

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Move specification-inference corpus provenance",
+  "type": "object",
+  "required": ["schema_version", "source_commit", "selection_seed", "records"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "source_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "selection_seed": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "corpus_status": {"enum": ["selected", "prepared", "screened", "screen_failed"]},
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "task_id",
+          "source_root",
+          "source_path",
+          "package_module_target",
+          "granularity",
+          "selection_status",
+          "selection_or_exclusion_reason"
+        ]
+      }
+    }
+  },
+  "additionalProperties": true
+}

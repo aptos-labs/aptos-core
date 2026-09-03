@@ -1,0 +1,97 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 60,
+        "offset": 5685,
+        "sha256": "ee1b45bfb3e7a88dc26c64df1ff5a6a16043c3c97dc8d744fe7ab872bb0c75ae"
+      },
+      "edit": {
+        "at": 40,
+        "kind": "substitute",
+        "length": 19,
+        "to": "shares, current_nav"
+      },
+      "essential": true,
+      "file": "sources/etna/vault_share_math.move",
+      "mutant_id": "VS-shares-002-nav-per-share-inverted",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 64,
+        "offset": 5621,
+        "sha256": "81b0b45da1c0f9d6c7658b9dcac7e0fb5a2260927da1f7ed80dd17c2522f7da0"
+      },
+      "edit": {
+        "at": 0,
+        "kind": "substitute",
+        "length": 64,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/etna/vault_share_math.move",
+      "mutant_id": "VS-shares-002-drop-share-count-assert",
+      "obligation_category": "abort",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 63,
+        "offset": 5621,
+        "sha256": "9b12153a0aa90859b6b67e0f03f1f858045b152c34b6325a2a567e24f64142cd"
+      },
+      "edit": {
+        "at": 32,
+        "kind": "substitute",
+        "length": 1,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/etna/vault_share_math.move",
+      "mutant_id": "VS-shares-002-share-count-assert-strict",
+      "obligation_category": "abort",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "6e5d76f09040b3324ab79d8684bcf22a147744055c01e56d39050a0997c6f426",
+  "schema_version": 2,
+  "task_id": "VS-shares-002"
+}

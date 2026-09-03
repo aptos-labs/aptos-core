@@ -1,0 +1,97 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 21,
+        "offset": 975,
+        "sha256": "b4d9e49db1e92914a43bd24588346ecd02c77c2ae0c5a03b2cec8bedbf8360b5"
+      },
+      "edit": {
+        "at": 13,
+        "kind": "substitute",
+        "length": 1,
+        "to": "<"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_tier_leverage.move",
+      "mutant_id": "TL-lev-020-computes-min",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 34,
+        "offset": 654,
+        "sha256": "3e67087cdc33d6dbb3d0f0691ba2b11fe15c5528effd09d01cee474d514c4e68"
+      },
+      "edit": {
+        "at": 28,
+        "kind": "substitute",
+        "length": 5,
+        "to": "i = 1"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_tier_leverage.move",
+      "mutant_id": "TL-lev-020-skips-first",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 41,
+        "offset": 827,
+        "sha256": "d7cec2b392e683a89e7a187ce9d9cf5363e0832fb74434feb5bb3adaaa43320b"
+      },
+      "edit": {
+        "at": 9,
+        "kind": "substitute",
+        "length": 2,
+        "to": "<"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_tier_leverage.move",
+      "mutant_id": "TL-lev-020-guard-strict",
+      "obligation_category": "abort",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "54b97d073ee879b08d621b5c0dd14d5ed9b8df397ecab1f9fd39b8c7a822a5d8",
+  "schema_version": 1,
+  "task_id": "TL-lev-020"
+}

@@ -1,0 +1,6 @@
+package/sources/
+package/build/
+references/build/
+mutants/references/
+.etna/
+inspect/

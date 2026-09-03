@@ -1,0 +1,31 @@
+.venv/
+uv.lock
+*.egg-info/
+__pycache__/
+evaluation-artifacts/
+sandbox/landlock-exec
+
+# Iterative corpus-construction scratch.  The canonical state is represented by
+# corpus-v1/{manifest,metadata/{candidate-inventory,package-inventory,selection,
+# contract-report,dependency-contract-report,dependency-contract-audit}.json}.
+corpus-v1/metadata/dependency-inference*/
+corpus-v1/metadata/dependency-spec-inference*.json
+corpus-v1/metadata/dependency-contract-*.after-*.json
+corpus-v1/metadata/dependency-contract-*.before.json
+corpus-v1/metadata/dependency-contract-*.partial-generation.json
+corpus-v1/metadata/dependency-contract-*.pre-cleanup.json
+corpus-v1/metadata/dependency-contract-*.with-recursive-overrides.json
+corpus-v1/metadata/opaque-contract-preparation.json
+corpus-v1/metadata/opaque-dependencies*.json
+corpus-v1/metadata/opaque-dependency-contracts.json
+corpus-v1/metadata/package-inventory.after-preparation.json
+corpus-v1/metadata/reset-reference-specs.json
+corpus-v1/metadata/restored-reference-contracts*.json
+corpus-v1/metadata/unused-alias-cleanup.json
+corpus-v1/shared-package-compile.after-*.json
+corpus-v1/shared-package-compile.partial-generation.json
+corpus-v1/shared-package-compile.pre-cleanup.json
+corpus-v1/shared-package-compile.with-recursive-overrides.json
+rendered-plugins/
+arxiv/
+sandbox/landlock-exec

@@ -1,0 +1,97 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 52,
+        "offset": 488,
+        "sha256": "ea2db0a8a65a0e2df0bc130f481940d1979bfc7ad782857d0844c2861382852e"
+      },
+      "edit": {
+        "at": 12,
+        "kind": "substitute",
+        "length": 5,
+        "to": "{ a }"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_median.move",
+      "mutant_id": "MD-median-015-returns-a",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 52,
+        "offset": 593,
+        "sha256": "680304043ec638ac595ebc6a49977b0b1270abbade9feee84283db2c141d93c4"
+      },
+      "edit": {
+        "at": 12,
+        "kind": "substitute",
+        "length": 5,
+        "to": "{ c }"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_median.move",
+      "mutant_id": "MD-median-015-returns-extreme",
+      "obligation_category": "normal-result",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 45,
+        "offset": 518,
+        "sha256": "248e20eb8411e885076cc943b6de93267a75b85a9a6695a2dc087343ed4fd529"
+      },
+      "edit": {
+        "at": 40,
+        "kind": "substitute",
+        "length": 5,
+        "to": "{ a - c }"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_median.move",
+      "mutant_id": "MD-median-015-underflows",
+      "obligation_category": "abort",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before the round from the target sources; validated as essential against a complete reference specification",
+          "reviewer": "wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "d0934e728fad19a1f41071cb7825c5b941eb821e6f4dd9a0666b7a5d91eb4366",
+  "schema_version": 1,
+  "task_id": "MD-median-015"
+}

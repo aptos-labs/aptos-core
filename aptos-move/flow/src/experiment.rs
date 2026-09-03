@@ -2351,9 +2351,14 @@ pub fn evaluate_candidate(config: &CandidateCheckConfig) -> Result<CandidateVerd
         .with_conditions(conditions, unattached));
     }
     if !policy.contract_coverage.passed {
+        // Coverage is a different failure from weakening: nothing here was
+        // weakened and nothing was edited out of scope -- the contract simply
+        // does not yet say what the task requires. Reporting it as a weakening
+        // told the author to repair locations that do not exist, and made a
+        // second incomplete attempt end the run as a repeated policy breach.
         let diagnostics = PolicyReport::format_violations(&policy.contract_coverage.violations);
         return Ok(CandidateVerdict::new(
-            CandidateState::ForbiddenWeakening,
+            CandidateState::IncompleteContract,
             diagnostics,
             compile,
             implementation,
