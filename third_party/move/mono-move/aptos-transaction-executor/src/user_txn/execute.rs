@@ -5,7 +5,7 @@
 //! session hosting the prologue, the payload, and the epilogue.
 
 use super::{
-    args::call_entry_function,
+    entry_func::call_entry_function,
     metadata::TxnMetadata,
     pre_execution_checks::PreExecutionChecker,
     validation::{run_epilogue, run_prologue, ValidationSigners},
@@ -210,11 +210,6 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         entry: &EntryFunction,
         ty_args: InternedTypeList,
     ) -> Result<(), MoveExecutionFailure> {
-        // TODO(security, completeness): entry-function validation -- `entry`
-        // visibility, no return values, allowed argument types, and constructed
-        // arguments (`String`, `Object<T>`, `Option<..>`) from
-        // `transaction_arg_validation`.
-
         // TODO(completeness): multi-agent transactions are untested.
         let status = call_entry_function(
             self.guard,

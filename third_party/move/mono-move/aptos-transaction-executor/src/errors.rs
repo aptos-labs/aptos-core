@@ -112,11 +112,21 @@ pub enum ExecutionStatus {
     },
 }
 
-/// Why a transaction's arguments were rejected.
+/// Why a transaction's call was rejected: the function is not one a
+/// transaction may call, or the arguments do not fit it. In the order they are
+/// checked.
 #[derive(Debug)]
 pub enum InvalidArguments {
+    /// The function is a native, which a transaction may not call directly.
+    NativeEntryFunction,
+    /// The function is not an `entry` function.
+    NotEntryFunction,
+    /// The function returns values.
+    ReturnsValues,
     /// A signer parameter follows a non-signer one.
     SignerAfterArgument,
+    /// A parameter has a type a transaction argument cannot fill.
+    DisallowedParameterType,
     /// The argument count does not match the function's parameters.
     ArgumentCountMismatch,
     /// The signer count does not match the function's signer parameters.

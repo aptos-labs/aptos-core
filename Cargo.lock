@@ -12951,6 +12951,7 @@ dependencies = [
  "mono-move-natives",
  "mono-move-output",
  "mono-move-runtime",
+ "move-binary-format",
  "move-core-types",
  "move-value-view",
  "serde",

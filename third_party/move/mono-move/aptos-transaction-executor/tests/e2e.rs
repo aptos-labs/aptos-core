@@ -411,6 +411,169 @@ fn extra_signers_rejected_like_v1() {
     // writes v2 lacks.
 }
 
+/// A transaction from `sender` calling `<address>::<module>::<function>` with
+/// no type arguments and the given BCS-encoded arguments.
+fn call_txn(
+    sender: &AccountData,
+    address: move_core_types::account_address::AccountAddress,
+    module: &str,
+    function: &str,
+    args: Vec<Vec<u8>>,
+) -> SignedTransaction {
+    use aptos_types::transaction::{EntryFunction, TransactionPayload};
+    use move_core_types::{identifier::Identifier, language_storage::ModuleId};
+
+    sender
+        .account()
+        .transaction()
+        .payload(TransactionPayload::EntryFunction(EntryFunction::new(
+            ModuleId::new(address, Identifier::new(module).unwrap()),
+            Identifier::new(function).unwrap(),
+            vec![],
+            args,
+        )))
+        .sequence_number(10)
+        .gas_unit_price(100)
+        .max_gas_amount(1_000_000)
+        .sign()
+}
+
+/// Asserts that v1 keeps `txn` with the miscellaneous error `code`, and that
+/// v2 agrees on the status and, modulo gas, on the output.
+fn assert_kept_with_code_like_v1(
+    fx: &FakeExecutor,
+    sender: &AccountData,
+    txn: SignedTransaction,
+    code: StatusCode,
+) {
+    let v1_output = fx.execute_transaction(txn.clone());
+    assert_eq!(
+        v1_output.status(),
+        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(code))),
+        "v1 did not keep the transaction with {code:?}"
+    );
+
+    let v2_output = execute_v2(fx.get_state_view(), &txn);
+    assert_eq!(v2_output.status(), v1_output.status());
+
+    compare_outputs(&v1_output, &v2_output, *sender.address());
+}
+
+/// Entry functions with signatures a transaction may not call. Assembled from
+/// MASM, since the framework has none and the Move compiler would refuse some.
+const UNCALLABLE_ENTRY_FUNCTIONS: &str = r#"
+module 0xcafe::uncallable
+
+entry public fun returns_value(): u64
+    ld_u64 0
+    ret
+
+entry public fun takes_ref(x: &u64)
+    ret
+
+entry public fun signer_after_arg(x: u64, s: &signer)
+    ret
+"#;
+
+/// Publishes `UNCALLABLE_ENTRY_FUNCTIONS` straight into `fx`'s state,
+/// returning the module's address.
+fn publish_uncallable_module(
+    fx: &mut FakeExecutor,
+) -> move_core_types::account_address::AccountAddress {
+    let (module, blob) =
+        aptos_language_e2e_tests::compile::compile_module(UNCALLABLE_ENTRY_FUNCTIONS);
+    fx.add_module(&module.self_id(), blob.into_inner());
+    *module.self_id().address()
+}
+
+/// A public function that is not `entry` is refused like on v1.
+#[test]
+fn non_entry_function_rejected_like_v1() {
+    use move_core_types::account_address::AccountAddress;
+
+    let (fx, alice, bob) = setup();
+    let txn = call_txn(
+        &alice,
+        AccountAddress::ONE,
+        "aptos_governance",
+        "assert_proposal_expiration",
+        vec![
+            bcs::to_bytes(bob.address()).unwrap(),
+            bcs::to_bytes(&0u64).unwrap(),
+        ],
+    );
+    assert_kept_with_code_like_v1(
+        &fx,
+        &alice,
+        txn,
+        StatusCode::EXECUTE_ENTRY_FUNCTION_CALLED_ON_NON_ENTRY_FUNCTION,
+    );
+}
+
+/// An entry function that returns values is refused like on v1.
+#[test]
+fn returning_function_rejected_like_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_uncallable_module(&mut fx);
+    let txn = call_txn(&alice, address, "uncallable", "returns_value", vec![]);
+    assert_kept_with_code_like_v1(
+        &fx,
+        &alice,
+        txn,
+        StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
+    );
+}
+
+/// An entry function with a reference parameter is refused like on v1.
+#[test]
+fn reference_parameter_rejected_like_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_uncallable_module(&mut fx);
+    let txn = call_txn(&alice, address, "uncallable", "takes_ref", vec![
+        bcs::to_bytes(&0u64).unwrap(),
+    ]);
+    assert_kept_with_code_like_v1(
+        &fx,
+        &alice,
+        txn,
+        StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
+    );
+}
+
+/// An entry function whose signer parameter follows another parameter is
+/// refused like on v1.
+#[test]
+fn signer_after_argument_rejected_like_v1() {
+    let (mut fx, alice, _bob) = setup();
+    let address = publish_uncallable_module(&mut fx);
+    let txn = call_txn(&alice, address, "uncallable", "signer_after_arg", vec![
+        bcs::to_bytes(&0u64).unwrap(),
+    ]);
+    assert_kept_with_code_like_v1(
+        &fx,
+        &alice,
+        txn,
+        StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
+    );
+}
+
+/// A native function is refused like on v1.
+#[test]
+fn native_function_rejected_like_v1() {
+    use move_core_types::account_address::AccountAddress;
+
+    let (fx, alice, _bob) = setup();
+    let txn = call_txn(&alice, AccountAddress::ONE, "hash", "sha2_256", vec![
+        bcs::to_bytes(&vec![1u8, 2, 3]).unwrap(),
+    ]);
+    assert_kept_with_code_like_v1(
+        &fx,
+        &alice,
+        txn,
+        StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED,
+    );
+}
+
 /// Transactions violating the pre-execution gas bounds expressible by the
 /// fixture's gas schedule are discarded with the same status code as V1,
 /// before touching any state.

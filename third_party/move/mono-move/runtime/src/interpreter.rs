@@ -43,9 +43,9 @@ use mono_move_core::{
     },
     CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex, FrameOffset, Function,
     FunctionRef, GasMeter, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy,
-    LayoutProvider, MicroOp, PackClosureOp, ResourceProvider, ShiftOperand, VMInternalError,
-    VMResult, VecPackOp, VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
-    CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
+    LayoutProvider, MicroOp, PackClosureOp, PreparedModule, ResourceProvider, ShiftOperand,
+    VMInternalError, VMResult, VecPackOp, VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED,
+    CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
     CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
     FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
@@ -450,17 +450,26 @@ impl<'guard> InterpreterContext<'guard> {
         Ok(unsafe { ptr.as_ref_unchecked() })
     }
 
+    /// The module `func` was loaded from.
+    pub fn module_of(&self, func: &Function) -> VMResult<&'guard PreparedModule> {
+        self.prepared_module(func.module_id)
+    }
+
+    /// A module some loaded function came from. Loading the function loaded
+    /// its module into the read set, so a miss is an invariant violation.
+    fn prepared_module(&self, module_id: InternedModuleId) -> VMResult<&'guard PreparedModule> {
+        let arena_ref = self.loader.guard().arena_ref_for_module_id(module_id);
+        Ok(&self.read_set.get_loaded(arena_ref)?.ir().module)
+    }
+
     /// Resolve a constant from `module_id`'s constant pool, returning its
-    /// interned type and BCS bytes. The calling function was loaded from
-    /// `module_id`, so the module is always present and loaded in the read
-    /// set; a missing or not-yet-loaded entry is an invariant violation.
+    /// interned type and BCS bytes.
     fn load_constant(
         &self,
         module_id: InternedModuleId,
         idx: ConstantPoolIndex,
     ) -> VMResult<(InternedType, &'guard [u8])> {
-        let arena_ref = self.loader.guard().arena_ref_for_module_id(module_id);
-        let module = &self.read_set.get_loaded(arena_ref)?.ir().module;
+        let module = self.prepared_module(module_id)?;
         Ok((
             module.interned_constant_type_at(idx),
             module.constant_data_at(idx),
