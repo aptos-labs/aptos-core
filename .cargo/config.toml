@@ -22,7 +22,6 @@ xclippy = [
   # New/expanded lints surfaced by the Rust 1.98 upgrade, suppressed to keep the
   # toolchain bump mechanical. TODO: clean these up separately.
   "-Aclippy::chunks_exact_to_as_chunks",
-  "-Aclippy::drain_collect",
   "-Aclippy::explicit_counter_loop",
   "-Aclippy::extra_unused_lifetimes",
   "-Aclippy::manual_checked_ops",
