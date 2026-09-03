@@ -1,0 +1,16 @@
+{
+ "TR-cancel-026": [
+  {"mutant_id": "TR-cancel-026-absent-returns-one", "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "0 // Price not found", "replace": "0", "with": "1",
+   "obligation_category": "normal-result",
+   "rationale": "The not-found sentinel changes, so absence is reported as a cancelled size of one."},
+  {"mutant_id": "TR-cancel-026-strides-by-two", "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "i = i + 1;", "replace": "1", "with": "2",
+   "obligation_category": "normal-result",
+   "rationale": "Every other level is skipped, so a match at an odd index is missed."},
+  {"mutant_id": "TR-cancel-026-removes-at-front", "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "prices.remove(i);", "replace": "remove(i)", "with": "remove(0)",
+   "obligation_category": "normal-result",
+   "rationale": "The price vector loses its first level instead of the matching one."}
+ ]
+}

@@ -1,0 +1,99 @@
+{
+ "mutants": [
+  {
+   "anchor": {
+    "length": 24,
+    "offset": 5637,
+    "sha256": "d58d8c8b4705dc1e020af9e57762c2d304f0e344874ea4a73be505374b84a148"
+   },
+   "edit": {
+    "at": 0,
+    "kind": "substitute",
+    "length": 24,
+    "to": "shares >= current_shares"
+   },
+   "essential": true,
+   "file": "sources/etna/vault_share_math.move",
+   "mutant_id": "VS-shares-002-assert-operands-reversed",
+   "obligation_category": "abort",
+   "rationale": "Redeeming less than the outstanding total now aborts, and over-redemption does not.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 44,
+    "offset": 5701,
+    "sha256": "c39474c551674b1d53ed5739ac7379e46ac5f1712f776825ffcea047982aac8a"
+   },
+   "edit": {
+    "at": 16,
+    "kind": "substitute",
+    "length": 27,
+    "to": "current_nav, shares"
+   },
+   "essential": true,
+   "file": "sources/etna/vault_share_math.move",
+   "mutant_id": "VS-shares-002-denominator-is-shares",
+   "obligation_category": "normal-result",
+   "rationale": "Dividing by the redeemed amount returns the whole NAV regardless of ownership.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 44,
+    "offset": 5701,
+    "sha256": "c39474c551674b1d53ed5739ac7379e46ac5f1712f776825ffcea047982aac8a"
+   },
+   "edit": {
+    "at": 0,
+    "kind": "substitute",
+    "length": 15,
+    "to": "mul_div(current_shares,"
+   },
+   "essential": true,
+   "file": "sources/etna/vault_share_math.move",
+   "mutant_id": "VS-shares-002-numerator-is-total",
+   "obligation_category": "normal-result",
+   "rationale": "Every redemption is valued as if the whole vault were redeemed.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  }
+ ],
+ "reference_sha256": "4a10ea8eab2a1d9e0d931032a59ef200a844258108fde81ff4fe86308e3d5b33",
+ "task_id": "VS-shares-002"
+}

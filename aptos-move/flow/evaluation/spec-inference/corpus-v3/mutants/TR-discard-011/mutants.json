@@ -3,7 +3,7 @@
     {
       "anchor": {
         "length": 39,
-        "offset": 1630,
+        "offset": 1938,
         "sha256": "7deba4d72af0ef7889e81ccb26638e22ebc70892f6d3a5fcd111f8e0d7b6844e"
       },
       "edit": {
@@ -33,7 +33,7 @@
     {
       "anchor": {
         "length": 47,
-        "offset": 1713,
+        "offset": 2021,
         "sha256": "c263a09b50da048d5ebb661712b00af7d5eeb4cfab37388ef61be2d209517e11"
       },
       "edit": {
@@ -63,7 +63,7 @@
     {
       "anchor": {
         "length": 97,
-        "offset": 1572,
+        "offset": 1880,
         "sha256": "c040aa3d597e4dc99839d7fdf2b8fcb5a40f14b82c0f6eba1a2a4c0c00ca621b"
       },
       "edit": {
@@ -91,7 +91,7 @@
       }
     }
   ],
-  "reference_sha256": "9453849e4188123b2b49a27f5be676ddb1344a24c7a6758b2013d4421f673c06",
+  "reference_sha256": "f8f88b4b2ed1aaa7eac9b05c932174dab1955311fe121b9cdf32b0deb0e62ada",
   "schema_version": 2,
   "task_id": "TR-discard-011"
 }

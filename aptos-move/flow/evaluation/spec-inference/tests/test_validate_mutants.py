@@ -24,6 +24,32 @@ def _ok(stdout: str = "") -> CommandResult:
     )
 
 
+class ModuleShapeTest(unittest.TestCase):
+    """Every definition must precede the script entrypoint.
+
+    A `def` below `if __name__ == "__main__": main()` exists when the module is
+    imported -- so a unit test sees it -- and does not exist when the module is
+    run as a script, which is how the harness invokes it. That is how a guard
+    shipped here could never once have executed.
+    """
+
+    def test_no_definition_follows_the_entrypoint(self) -> None:
+        import inspect
+
+        from harness import validate_mutants
+
+        source = inspect.getsource(validate_mutants).split("\n")
+        entry = next(
+            i for i, line in enumerate(source) if line.startswith('if __name__ ==')
+        )
+        late = [
+            line.split("(")[0]
+            for line in source[entry:]
+            if line.startswith("def ") or line.startswith("async def ")
+        ]
+        self.assertEqual([], late, "these are undefined when run as a script")
+
+
 class ReferenceVacuityTest(unittest.IsolatedAsyncioTestCase):
     """Essentiality rests on the reference not being vacuous.
 

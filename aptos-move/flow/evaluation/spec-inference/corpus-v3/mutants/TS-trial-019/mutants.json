@@ -91,7 +91,7 @@
       }
     }
   ],
-  "reference_sha256": "a72c1cc1fa74d356664742f6d8a83d5f4c0745a9d5614e9492cb839d1d67bead",
+  "reference_sha256": "786b520be97be0e7d9b21f6962ed039aa707d81b5bd3786c8993ff3183f65942",
   "schema_version": 1,
   "task_id": "TS-trial-019"
 }

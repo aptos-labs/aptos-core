@@ -19,9 +19,9 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .artifacts import sha256_file, write_json
+from .artifacts import load_object, sha256_file, write_json
 from .config import ExperimentConfig
-from .mutants import NO_MUTANTS, score_mutants
+from .mutants import NO_MUTANTS, overlapping_mutations, score_mutants
 
 
 async def score_round(
@@ -93,6 +93,33 @@ async def score_round(
                     )
                 entry["scheduled_mutant_manifest_sha256"] = mutant_digest
                 entry["scored_mutant_manifest_sha256"] = scored_digest
+                # The scheduler proved the refutation set disjoint from the
+                # *scheduled* scoring set. Replacing that set replaces one side
+                # of the comparison, so the guarantee does not carry over: a
+                # corrected manifest that happens to contain a mutation this
+                # run was shown would credit "the contract is complete" for
+                # what was really "the agent can act on feedback". Same
+                # relation, re-checked against the set actually being scored.
+                shown = record.get("refutation_mutant_identities")
+                if shown is None:
+                    raise ValueError(
+                        f"run {run_id} records no refutation identities, so a "
+                        f"corrected mutant set for {task_id} cannot be shown "
+                        "disjoint from what the run was shown; rerun the round "
+                        "with a current controller build"
+                    )
+                repeated = overlapping_mutations(
+                    load_object(manifest)["mutants"],
+                    set(shown),
+                    artifact / "baseline" / record["package_relpath"],
+                )
+                if repeated:
+                    raise ValueError(
+                        f"corrected mutant set for {task_id} repeats mutation(s) "
+                        f"run {run_id} was shown during refutation "
+                        f"({', '.join(repeated)}): a contract repaired against a "
+                        "mutant it was shown cannot then be measured by it"
+                    )
             # A run that cannot be scored is recorded as such rather than
             # aborting the round: one candidate whose own proof does not
             # reproduce at this timeout says nothing about the other cells, and
@@ -179,9 +206,20 @@ async def _score_pending(
                 entry["detail"] = f"{type(error).__name__}: {error}"
             else:
                 write_json(candidate.parent / "mutation-score.json", score)
-                entry["outcome"] = "scored"
                 entry["mutation_adequacy"] = score["mutation_adequacy"]
-                entry["strict_success"] = score["killed"] == score["essential_mutants"]
+                # A mutant that reached no verdict is not a mutant the contract
+                # failed to kill. Scoring it as one reports an infrastructure
+                # failure as evidence against the specification, so the run is
+                # marked unmeasured rather than unsuccessful.
+                if score.get("inconclusive"):
+                    entry["outcome"] = "inconclusive"
+                    entry["inconclusive"] = score["inconclusive"]
+                    entry["strict_success"] = False
+                else:
+                    entry["outcome"] = "scored"
+                    entry["strict_success"] = (
+                        score["killed"] == score["essential_mutants"]
+                    )
 
     await asyncio.gather(*(score_one(*item) for item in pending))
 

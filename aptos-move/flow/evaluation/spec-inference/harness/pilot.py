@@ -9,6 +9,8 @@ import json
 import os
 import random
 import shutil
+import subprocess
+import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from collections.abc import Mapping, Sequence
@@ -16,8 +18,9 @@ from typing import Any
 
 from .identifiers import require_plain_name
 from .artifacts import canonical_json, sha256_file, tree_hash, write_json
+from .compatibility import tool_executables
 from .config import ExperimentConfig, FEEDBACK_LEVELS, RunSpec
-from .mutants import NO_MUTANTS
+from .mutants import NO_MUTANTS, mutation_fingerprint
 from .schedule import ARMS
 
 
@@ -92,6 +95,17 @@ def build_pilot(
     controller_harness_sha256 = tree_hash(evaluation_root / "harness")
     controller_prompts_sha256 = tree_hash(evaluation_root / "prompts")
     move_flow_sha256 = _move_flow_sha256()
+    if move_flow_sha256 is None:
+        # Every downstream check treats a null digest as "nothing to compare":
+        # the screening comparison skips, the run spec records null, and the
+        # controller's runtime binary check skips too. A round whose apparatus
+        # cannot be identified is therefore pinned to nothing at all, so it is
+        # refused here rather than recorded as verified.
+        raise ValueError(
+            "move-flow is not on PATH, so the round cannot record which build "
+            "it runs against; install it before scheduling"
+        )
+    source_commit_provenance = _source_commit_durability(source_commit)
     snapshots_dir = output_dir / "snapshots"
     patches_dir = output_dir / "patches"
     runs_dir = output_dir / "runs"
@@ -119,9 +133,25 @@ def build_pilot(
         }
         for level, arm_plugins in plugins.items()
     }
-    tasks = _corpus_tasks(corpus_manifest, snapshots_dir, patches_dir, task_names)
+    # Resolved once: the same identities clear the screening evidence and are
+    # stated on every run, so a round cannot be admitted against one toolchain
+    # and executed against another.
+    stage_executables = tool_executables(config)
+    tasks = _corpus_tasks(
+        corpus_manifest,
+        snapshots_dir,
+        patches_dir,
+        task_names,
+        # What this round will run with, so evidence from another apparatus
+        # cannot clear it.
+        {
+            "move_flow_sha256": move_flow_sha256,
+            "experiment_config_sha256": config_sha256,
+            "stage_executables": stage_executables,
+        },
+    )
 
-    mutant_digests = _resolve_mutant_manifests(tasks, mutants_root)
+    mutant_digests, mutant_fingerprints = _resolve_mutant_manifests(tasks, mutants_root)
 
     seed = hashlib.sha256(
         (source_commit + "\0unscored-pilot\0" + require_plain_name(round_id, "round_id")).encode()
@@ -167,6 +197,11 @@ def build_pilot(
                 "plugin_tree_sha256": plugin_records[level][arm]["tree_sha256"],
                 "initial_tree_sha256": task["initial_tree_sha256"],
                 "mutant_manifest_sha256": mutant_digests[task["task_id"]],
+                # Opaque identities of the scored mutations, so a run can
+                # refuse a refutation set that overlaps them without the
+                # scored mutations being present where the session can read.
+                "mutant_identities": mutant_fingerprints.get(task["task_id"], []),
+                "stage_executables": stage_executables,
                 "experiment_config_sha256": config_sha256,
                 "controller_harness_sha256": controller_harness_sha256,
                 "move_flow_sha256": move_flow_sha256,
@@ -185,6 +220,7 @@ def build_pilot(
         "pilot_status": "scheduled_development_round",
         "round_id": round_id,
         "source_commit": source_commit,
+        "source_commit_provenance": source_commit_provenance,
         "experiment_config_sha256": config_sha256,
         "controller_harness_sha256": controller_harness_sha256,
         "controller_prompts_sha256": controller_prompts_sha256,
@@ -283,6 +319,7 @@ def _corpus_tasks(
     snapshots_dir: Path,
     patches_dir: Path,
     sample_ids: Sequence[str] | None,
+    apparatus: dict[str, str | None] | None = None,
 ) -> list[dict[str, Any]]:
     """Schedule tasks from a corpus manifest.
 
@@ -321,6 +358,9 @@ def _corpus_tasks(
     if not (package / "Move.toml").is_file():
         raise FileNotFoundError(package / "Move.toml")
     _require_committed_corpus(package, manifest.get("generated_file_sha256"))
+    # After the corpus-integrity check: both notice a package that moved, and
+    # that one names the files, which is the more useful answer.
+    _require_screening_agrees(manifest_path, records, apparatus)
     snapshot = snapshots_dir / "corpus"
     if snapshot.exists():
         shutil.rmtree(snapshot)
@@ -498,9 +538,170 @@ def plugins_from_file(path: Path) -> dict[str, dict[str, Path]]:
     return result
 
 
+def _source_commit_durability(commit: str) -> dict[str, Any]:
+    """Say whether `commit` will still exist once the branch is gone.
+
+    A round records `source_commit` so the apparatus it ran can be fetched
+    later. aptos-core squash-merges, so a branch tip collapses into a new SHA
+    and the branch is deleted: a pre-merge commit is reachable while the pull
+    request is open and dangling afterwards. The content hashes beside it stay
+    valid either way -- they hash the tree, not git -- but they describe
+    content that nobody can retrieve once the pointer dies.
+
+    A pilot legitimately runs before its apparatus lands, so this records the
+    answer rather than refusing. What must not happen is a round whose results
+    are published believing its provenance resolves.
+    """
+    reachable: list[str] = []
+    for ref in ("upstream/main", "origin/main", "main"):
+        probe = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", commit, ref],
+            capture_output=True,
+            cwd=Path(__file__).resolve().parent.parent,
+        )
+        if probe.returncode == 0:
+            reachable.append(ref)
+    return {
+        "commit": commit,
+        "landed_on": reachable,
+        # Durable means: reachable from a mainline branch, so it survives the
+        # deletion of whatever branch proposed it.
+        "durable": bool(reachable),
+    }
+
+
+def _require_screening_agrees(
+    manifest_path: Path,
+    records: list[dict[str, Any]],
+    apparatus: dict[str, str | None] | None = None,
+) -> None:
+    """Refuse to schedule a task the screening report does not clear.
+
+    `screening_status` is a field, and a field can be edited or simply added;
+    the screen's report is the measurement. The scheduler reads the field, so
+    when the two disagree -- or when the field describes a task the screen
+    never covered -- an unmeasured target enters the round and its result is
+    read as a specification outcome.
+
+    So this asks for positive evidence rather than the absence of a complaint:
+    every task about to be scheduled must appear in the report as passing, and
+    the report must describe the package as it is now. Note that a record added
+    since the last screen does not change the package tree, so the tree digest
+    alone would not notice it.
+
+    Enforcement lives here rather than in the screen. Having the screen rewrite
+    `screening_status` would make one flaky prover timeout permanently demote a
+    task -- the screen only looks at records already marked `ready`, so nothing
+    would ever re-screen it -- and would leave `round_selection` contradicting
+    the manifest.
+    """
+    summary_path = manifest_path.parent / "screening" / "summary.json"
+    if not summary_path.is_file():
+        raise ValueError(
+            f"no screening report at {summary_path}; a round cannot be scheduled "
+            "from a manifest whose readiness has no evidence behind it"
+        )
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    package = manifest_path.parent / "package"
+    if package.is_dir() and summary.get("package_tree_sha256") != tree_hash(package):
+        raise ValueError(
+            f"{summary_path} screened a different corpus tree than the one being "
+            "scheduled; re-run screening before scheduling a round"
+        )
+    # Keyed by task *and* target: a record can be repointed at a different
+    # target without changing the package tree, and evidence for the target
+    # that was screened says nothing about the one that would now run.
+    # `apparatus_ok` is recorded by the screen that distinguishes WP declining
+    # from WP failing to run. A result without it was produced by an earlier
+    # screen, so its `passed` does not mean what this check reads it to mean --
+    # and the package digest cannot notice, since the logic changed and the
+    # corpus did not.
+    stale = [
+        result["task_id"]
+        for result in summary.get("results") or ()
+        if result.get("passed") and "apparatus_ok" not in result
+    ]
+    if stale:
+        raise ValueError(
+            f"{summary_path} predates the apparatus check and cannot clear "
+            + ", ".join(sorted(stale))
+            + "; re-run screening before scheduling a round"
+        )
+    # Screening runs the prover and WP, so a target cleared under one binary or
+    # configuration was not cleared under another. The corpus digest cannot see
+    # that: the apparatus changed and the corpus did not.
+    if apparatus:
+        tools = summary.get("tools") or {}
+        for field, scheduled in apparatus.items():
+            if field == "stage_executables":
+                continue
+            recorded = tools.get(field)
+            if recorded is None:
+                raise ValueError(
+                    f"{summary_path} does not record {field}, so it cannot show "
+                    "which apparatus screened these targets; re-run screening"
+                )
+            if scheduled is None:
+                raise ValueError(
+                    f"the round does not know its own {field}, so screening "
+                    "evidence cannot be checked against it"
+                )
+            if recorded != scheduled:
+                raise ValueError(
+                    f"{summary_path} screened with {field} {recorded[:16]} but the "
+                    f"round is scheduled with {scheduled[:16]}; re-run screening "
+                    "before scheduling a round"
+                )
+    cleared = {
+        (result["task_id"], result.get("target"))
+        for result in summary.get("results") or ()
+        if result.get("passed") and result.get("apparatus_ok")
+    }
+    claimed = {
+        (record["task_id"], record.get("target"))
+        for record in records
+        if record.get("screening_status", "ready") == "ready"
+    }
+    # A reference proof is about a generated, gitignored tree, so evidence that
+    # records only a boolean and a path cannot be tied to the content it
+    # proved. Requiring the digest makes the evidence self-identifying and
+    # refuses reports written before it was recorded. Whether that tree still
+    # matches is `build_references.py --verify`'s job: it is not what the round
+    # runs, so the scheduler does not require it to be present.
+    # Screening drives the compile, inference and prove commands as well as the
+    # checker, and the config may point them at different executables. A round
+    # cleared under one toolchain was not cleared under another.
+    if apparatus and apparatus.get("stage_executables") is not None:
+        recorded_stages = (summary.get("tools") or {}).get("stage_executables")
+        if recorded_stages is None:
+            raise ValueError(
+                f"{summary_path} records no stage executables, so the toolchain "
+                "that screened these targets is unknown; re-run screening"
+            )
+        if recorded_stages != apparatus["stage_executables"]:
+            raise ValueError(
+                f"{summary_path} screened with a different toolchain than the "
+                "round is scheduled with; re-run screening"
+            )
+    for result in summary.get("results") or ():
+        if result.get("passed") and not result.get("reference_sha256"):
+            raise ValueError(
+                f"{summary_path} records no reference digest for "
+                f"{result['task_id']}, so its solvability evidence cannot be "
+                "tied to the reference that produced it; re-run screening"
+            )
+    unevidenced = sorted(task for task, _ in claimed - cleared)
+    if unevidenced:
+        raise ValueError(
+            "marked ready but not cleared by the screening report "
+            f"({summary_path.name}) for the target they now name: "
+            + ", ".join(unevidenced)
+        )
+
+
 def _resolve_mutant_manifests(
     tasks: Sequence[Mapping[str, Any]], mutants_root: Path | None
-) -> dict[str, str]:
+) -> tuple[dict[str, str], dict[str, list[str]]]:
     """Map each task to the digest of its hidden mutant manifest.
 
     Without `mutants_root` every task takes the all-zero sentinel, which the
@@ -510,8 +711,9 @@ def _resolve_mutant_manifests(
     for an apparatus reason and look like a specification result.
     """
     if mutants_root is None:
-        return {task["task_id"]: NO_MUTANTS for task in tasks}
+        return {task["task_id"]: NO_MUTANTS for task in tasks}, {}
     digests: dict[str, str] = {}
+    fingerprints: dict[str, list[str]] = {}
     missing: list[str] = []
     for task in tasks:
         manifest = mutants_root / task["task_id"] / "mutants.json"
@@ -522,12 +724,18 @@ def _resolve_mutant_manifests(
             missing.append(task["task_id"])
             continue
         digests[task["task_id"]] = sha256_file(manifest)
+        cases = json.loads(manifest.read_text(encoding="utf-8"))["mutants"]
+        # Against the snapshot the round will actually run, so the identity is
+        # computed from the same text at schedule time and at run time.
+        fingerprints[task["task_id"]] = sorted(
+            mutation_fingerprint(case, Path(task["snapshot"])) for case in cases
+        )
     if missing:
         raise FileNotFoundError(
             "strict scoring needs TASK_ID/mutants.json under "
             f"{mutants_root} for every task; missing or empty: {', '.join(sorted(missing))}"
         )
-    return digests
+    return digests, fingerprints
 
 
 def _parse_replicates(value: str) -> int | Mapping[str, int]:
@@ -582,16 +790,30 @@ def main() -> None:
         task_names=args.tasks,
         mutants_root=args.mutants_root.resolve() if args.mutants_root else None,
     )
+    provenance = result["source_commit_provenance"]
     print(
         json.dumps(
             {
                 "blocks": result["blocks"],
                 "runs": result["runs"],
                 "scoring_mode": result["scoring_mode"],
+                "source_commit_durable": provenance["durable"],
             },
             sort_keys=True,
         )
     )
+    if not provenance["durable"]:
+        # Not fatal: a pilot runs before its apparatus lands. But a round whose
+        # results get published needs a commit that outlives its branch, and
+        # this repository squash-merges, so a branch tip will not.
+        print(
+            f"warning: source commit {provenance['commit'][:12]} is on no mainline "
+            "branch. It stops resolving once its branch is squash-merged and "
+            "deleted, so this round's apparatus could not be fetched later. "
+            "Fine for a pilot; reschedule a round whose results are published "
+            "against the landed commit.",
+            file=sys.stderr,
+        )
 
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@
   "UC-leverage-009": "redundant with UC-credits-008 on ['enum-variant', 'last-match', 'loops']",
   "WU-limit-024": "redundant with LP-price-021 on ['arithmetic_or_abort', 'branches']"
  },
- "loops": 8,
+ "loops": 9,
  "max_guessable": 2,
  "modules": 12,
  "near_duplicate_targets": [
@@ -37,6 +37,7 @@
   "QP-part-025",
   "SM-select-022",
   "TL-lev-020",
+  "TR-cancel-026",
   "TR-discard-011",
   "TR-order-010",
   "TS-trial-019",
@@ -47,16 +48,17 @@
   "VS-shares-002",
   "WU-consume-023"
  ],
- "size": 16,
+ "size": 17,
  "source_similarity_threshold": 0.5,
- "strata_covered": 32,
+ "strata_covered": 34,
  "strata_lost": [],
- "strata_total": 32,
+ "strata_total": 34,
  "unique_stratum_carriers": [
   "OV-order-006",
   "QP-part-025",
   "SM-select-022",
   "TL-lev-020",
+  "TR-cancel-026",
   "TR-discard-011",
   "TR-order-010",
   "TS-trial-019",

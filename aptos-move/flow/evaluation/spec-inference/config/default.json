@@ -56,7 +56,7 @@
  "max_controller_turns": 6,
  "max_model_turns_per_controller_turn": 60,
  "max_output_tokens": 100000,
- "max_wall_seconds": 2700,
+ "max_wall_seconds": 3600,
  "model": "glm-5.3[1m]",
  "operational_timeout_seconds": 40,
  "prove_command": [

@@ -1,0 +1,99 @@
+{
+ "mutants": [
+  {
+   "anchor": {
+    "length": 32,
+    "offset": 1942,
+    "sha256": "c041afea2391ce4f49af23af6087a2c8d4c0d5b77cae8c4604f1993dab524036"
+   },
+   "edit": {
+    "at": 0,
+    "kind": "substitute",
+    "length": 9,
+    "to": "!is_bid &&"
+   },
+   "essential": true,
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "mutant_id": "TR-discard-011-bid-guard-inverted",
+   "obligation_category": "normal-result",
+   "rationale": "The bid test applies to asks, so crossing levels are counted on the wrong side.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 27,
+    "offset": 1796,
+    "sha256": "ed7eeaeefd6835d639ffecb5103cacc630e4fecc5e107bb84c117b468ab55eed"
+   },
+   "edit": {
+    "at": 15,
+    "kind": "substitute",
+    "length": 7,
+    "to": "is_none"
+   },
+   "essential": true,
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "mutant_id": "TR-discard-011-treats-none-as-some",
+   "obligation_category": "abort",
+   "rationale": "An absent best price is unwrapped, so the no-reference case aborts instead of returning zero.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 46,
+    "offset": 1777,
+    "sha256": "bf7d1372cd029a3594082f8d4f8991de2d753938267a32e9591deeefd509ad97"
+   },
+   "edit": {
+    "at": 0,
+    "kind": "substitute",
+    "length": 10,
+    "to": "let i = 1;"
+   },
+   "essential": true,
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "mutant_id": "TR-discard-011-starts-past-first-level",
+   "obligation_category": "normal-result",
+   "rationale": "The first level is skipped, so a crossing level at index zero is not discarded.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  }
+ ],
+ "reference_sha256": "f8f88b4b2ed1aaa7eac9b05c932174dab1955311fe121b9cdf32b0deb0e62ada",
+ "task_id": "TR-discard-011"
+}

@@ -91,7 +91,7 @@
       }
     }
   ],
-  "reference_sha256": "125c7438527597e7f30cbdf11cf071dd3b1d30846937366c4fda81fa52d600d8",
+  "reference_sha256": "3b6176321b4f7a749f49212669df7936470232b806111f5918a7f07ced790c22",
   "schema_version": 1,
   "task_id": "SM-select-022"
 }

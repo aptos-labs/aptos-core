@@ -65,9 +65,27 @@ class RoundSelectionTest(unittest.TestCase):
         )
 
     def test_no_sample_is_removed_by_selecting(self) -> None:
-        # Held-back tasks stay in the corpus for a later round.
+        # Held-back tasks stay in the corpus for a later round. The count is
+        # whatever the corpus currently holds -- pinning a literal here makes
+        # adding a task look like a selection defect, which is the opposite of
+        # what this case is for. What must hold is that selecting partitions
+        # the records and drops none of them.
         records = self.manifest["records"]
-        self.assertEqual(25, len(records))
+        eligible = [r for r in records if r["screening_status"] == "ready"]
+        self.assertEqual(
+            len(eligible),
+            len(self.recorded["selected"]) + len(self.recorded["held_back"]),
+            "every ready record must be either selected or held back",
+        )
+        # A record that never screened ready is not a selection decision: it is
+        # out for a corpus reason, and selecting must not quietly adopt it.
+        self.assertTrue(
+            all(
+                r["round_selection"] == "not_ready"
+                for r in records
+                if r["screening_status"] != "ready"
+            )
+        )
         labelled = {r["task_id"]: r["round_selection"] for r in records}
         self.assertEqual(
             set(self.recorded["selected"]),

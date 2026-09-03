@@ -11,6 +11,7 @@ import os
 import shutil
 import subprocess
 import time
+import dataclasses
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -19,20 +20,30 @@ from .agent import AgentSession, AgentTurn, ClaudeAgentSession, FakeAgentSession
 from .boogie_proxy import BoogieProxy
 from .artifacts import (
     JsonlWriter,
+    canonical_json,
     copy_final_tree,
     copy_snapshot,
+    load_object,
     sha256_file,
     tree_hash,
     workspace_diff,
     write_json,
-    canonical_json,
 )
 from .config import ARM_TO_TACTIC, ExperimentConfig, ResolvedRunSpec, RunSpec
 from .credentials import redact_tree
 from .identifiers import resolve_within
 from .judge import Judge, JudgeResult
 from .state_machine import ConversationPolicy
-from .mutants import score_mutants
+from .mutants import (
+    NO_MUTANTS,
+    mutation_fingerprint,
+    inconclusive_mutants,
+    overlapping_mutations,
+    reached_a_verdict,
+    run_mutant_cases,
+    score_mutants,
+)
+from .compatibility import tool_executables
 from .materialize import materialize_task
 
 
@@ -52,6 +63,7 @@ class Controller:
         agent_kind: str,
         fake_script: Path | None,
         hidden_mutants: Path | None,
+        refutation_mutants: Path | None = None,
     ):
         self.config = config
         self.run = run
@@ -60,6 +72,11 @@ class Controller:
         self.agent_kind = agent_kind
         self.fake_script = fake_script
         self.hidden_mutants = hidden_mutants
+        #: Mutants used as *feedback* during the run, as opposed to
+        #: `hidden_mutants`, which score it afterwards. Never the same set: a
+        #: contract repaired against a mutant it was shown cannot also be
+        #: measured by it.
+        self.refutation_mutants = refutation_mutants
         self.workspace_root = artifact_dir / "workspace"
         self.baseline_root = artifact_dir / "baseline"
         self.plugin_dir = artifact_dir / "plugin"
@@ -181,6 +198,29 @@ class Controller:
                                     self.run.spec.required_contract_categories,
                                     previous_hash,
                                 )
+                            # A verifying contract may still be too weak: the
+                            # loop otherwise stops the moment the prover is
+                            # satisfied, which is exactly when an
+                            # under-specified contract looks finished. Refuting
+                            # it against the mutant set turns "it verifies" into
+                            # "it verifies and rejects what it should". Scored
+                            # here in the controller's own space -- the set is
+                            # never mounted where the session can read it.
+                            # Naming the unconstrained obligation categories is
+                            # acceptance-level feedback: it tells the session
+                            # which of the task's required categories its
+                            # contract fails to pin. A control arm is defined by
+                            # receiving compiler and prover answers only, so
+                            # refuting there would give the baseline the
+                            # treatment and make the comparison meaningless.
+                            if (
+                                final_judge.state == "operational_success"
+                                and self.refutation_mutants is not None
+                                and self._feedback_level() != "baseline"
+                            ):
+                                final_judge = await self._refute(
+                                    final_judge, controller_events, controller_turn
+                                )
                             write_json(
                                 self.artifact_dir
                                 / f"judge-attempt-{attempts}-turn-{controller_turn}.json",
@@ -292,6 +332,112 @@ class Controller:
         self._finalize(result)
         return result
 
+    async def _refute(
+        self,
+        judge: JudgeResult,
+        controller_events: JsonlWriter,
+        controller_turn: int,
+    ) -> JudgeResult:
+        """Downgrade an accepted candidate that fails to reject a mutant."""
+        cases = load_object(self.refutation_mutants)["mutants"]
+        # Refutation runs after the turn's judge, so the loop's wall check is
+        # already behind it: without a bound here a cell can finish its budget
+        # inside the mutant proofs and still record a success, which puts the
+        # round's own runtime measurement outside the budget it declares.
+        remaining = self.config.max_wall_seconds - self._wall_seconds()
+        budget = min(self._eventual_timeout(), max(0, int(remaining / max(1, len(cases)))))
+        if budget <= 0:
+            # No budget is not a verdict. Saying so is what keeps an unmeasured
+            # candidate from being confirmed by default.
+            controller_events.emit(
+                "refutation",
+                controller_turn=controller_turn,
+                killed=0,
+                total=len(cases),
+                survived=[],
+                inconclusive=[case["mutant_id"] for case in cases],
+            )
+            return dataclasses.replace(
+                judge,
+                state="infrastructure_failure",
+                diagnostics=(
+                    "no wall budget left to refute the candidate, so it could "
+                    "not be confirmed"
+                ),
+            )
+        results = await run_mutant_cases(
+            self.config,
+            self.package,
+            self.baseline_package,
+            self.run.spec.target,
+            cases,
+            budget,
+        )
+        # Bounding each case is not bounding the run: the cases are sequential
+        # and every command carries its own watchdog, so the total can overrun.
+        overran = self._wall_seconds() >= self.config.max_wall_seconds
+        survived = [r for r in results if r["outcome"] == "survived"]
+        # A mutant that timed out, failed to compile or crashed the prover
+        # produced no verdict. It is neither killed nor survived, so counting
+        # it as neither means an all-inconclusive refutation leaves `survived`
+        # empty -- and confirming the candidate on that basis would report "no
+        # counterexample found" as "no counterexample exists".
+        inconclusive = [r for r in results if not reached_a_verdict(r)]
+        controller_events.emit(
+            "refutation",
+            controller_turn=controller_turn,
+            killed=sum(1 for r in results if r["killed"]),
+            total=len(results),
+            survived=[r["mutant_id"] for r in survived],
+            inconclusive=[r["mutant_id"] for r in inconclusive],
+            overran_budget=overran,
+        )
+        # An overrun matters for whether the candidate can be *confirmed*, not
+        # for a counterexample already found: a survivor is a verdict whatever
+        # the clock did. Discarding it would drop the obligation categories the
+        # session needs, and make a spent run-wide budget look retryable.
+        if not survived and overran:
+            return dataclasses.replace(
+                judge,
+                state="infrastructure_failure",
+                diagnostics=(
+                    "refutation ran past the run's wall budget, so the candidate "
+                    "was not confirmed within the time the round declares"
+                ),
+            )
+        if not survived and inconclusive:
+            # Not a verdict on the specification, so not a specification state:
+            # the round could not measure this cell.
+            return dataclasses.replace(
+                judge,
+                state="infrastructure_failure",
+                diagnostics=(
+                    "refutation reached no verdict for "
+                    f"{len(inconclusive)} of {len(results)} mutants "
+                    f"({', '.join(sorted({r['outcome'] for r in inconclusive}))}), "
+                    "so the candidate could not be confirmed"
+                ),
+            )
+        if not survived:
+            return judge
+        # The category, not the mutant's name: `lost-element` states the defect
+        # and would hand over the missing clause. The obligation it belongs to
+        # says where to look without saying what to write.
+        categories = sorted({
+            next((c["obligation_category"] for c in cases if c["mutant_id"] == r["mutant_id"]), "unknown")
+            for r in survived
+        })
+        return dataclasses.replace(
+            judge,
+            state="weak_contract",
+            diagnostics=(
+                f"{len(survived)} of {len(results)} refutations survive this "
+                f"contract: an implementation that violates the intended "
+                f"behaviour still satisfies it. Obligation categories left "
+                f"unconstrained: {', '.join(categories)}."
+            ),
+        )
+
     def _eventual_timeout(self) -> int:
         """Solver budget for judging this run.
 
@@ -362,6 +508,14 @@ class Controller:
             ),
             "plugin_manifest": plugin_manifest,
             "move_flow": move_flow,
+            # What this run was *shown*. The scheduler proved it disjoint from
+            # the scheduled scoring set, but a set corrected after the round
+            # replaces that side of the comparison, and the replacement has
+            # never been compared to anything. Recording the fingerprints lets
+            # scoring re-check the relation instead of inheriting a guarantee
+            # about a manifest it is no longer using. Opaque hashes, so the
+            # refuted mutations still exist nowhere a session can read.
+            "refutation_mutant_identities": self._refutation_identities(),
         }
         if (
             self.run.spec.experiment_config_sha256 is not None
@@ -372,6 +526,15 @@ class Controller:
                 "run manifest and experiment configuration hash disagree"
             )
         write_json(self.artifact_dir / "run.json", run_record)
+
+    def _refutation_identities(self) -> list[str]:
+        """Fingerprints of the mutations this run may be shown, if any."""
+        if self.refutation_mutants is None:
+            return []
+        return sorted(
+            mutation_fingerprint(case, self.run.shared_package)
+            for case in load_object(self.refutation_mutants)["mutants"]
+        )
 
     def _initial_prompt(self) -> str:
         """Activate the selected plugin skill, then state the arm-blind task.
@@ -410,6 +573,26 @@ class Controller:
                 raise ValueError(
                     "move-flow binary changed since the round was scheduled: "
                     f"expected {expected_binary}, mounted {actual}"
+                )
+        # The solvers are the third thing this run measures with, and the one
+        # named by environment rather than mounted: `BOOGIE_EXE` and `Z3_EXE`
+        # are resolved at launch, so a backend upgraded between scheduling and
+        # execution changes what "proved" means while the harness and
+        # `move-flow` digests both still agree.
+        expected_stages = self.run.spec.stage_executables
+        if expected_stages:
+            actual_stages = tool_executables(self.config)
+            changed = sorted(
+                name
+                for name in set(expected_stages) | set(actual_stages)
+                if _stage_identity(expected_stages.get(name))
+                != _stage_identity(actual_stages.get(name))
+            )
+            if changed:
+                raise ValueError(
+                    "stage executable(s) changed since the round was scheduled "
+                    f"({', '.join(changed)}): a verdict from one toolchain "
+                    "cannot be reported as a result from another"
                 )
 
     def _feedback_level(self) -> str:
@@ -759,6 +942,78 @@ async def _send_with_wall_deadline(
         raise TimeoutError from error
 
 
+def _task_mutants(root: Path | None, task_id: str, label: str = "mutant") -> Path | None:
+    """The task's manifest under a mutant root, or `None` when unset."""
+    if root is None:
+        return None
+    manifest = root.resolve() / task_id / "mutants.json"
+    if not manifest.is_file():
+        raise SystemExit(f"{label} manifest not found: {manifest}")
+    # An empty set refutes nothing: it finds no survivor and no inconclusive
+    # result, so the candidate is confirmed having been tested against
+    # nothing. Asking for a refutation root and getting silence is the one
+    # reading that must not be available.
+    if not load_object(manifest).get("mutants"):
+        raise SystemExit(f"{label} manifest lists no mutants: {manifest}")
+    return manifest
+
+
+def _stage_identity(entry: dict[str, Any] | None) -> dict[str, Any]:
+    """What a stage runs, as opposed to where it is.
+
+    A stage is a command, not a file: `render_command` executes the whole
+    argument vector, and `tool_executables` hashes every argument that resolves
+    to one for that reason. Comparing the top-level digest alone would accept a
+    `["python3", "wrapper.py"]` stage whose wrapper was rewritten under an
+    unchanged interpreter.
+
+    So everything the record carries is compared except `path`, which says only
+    where the build was found -- relocating one does not change what it decides,
+    and refusing on it would reject a legitimate round. Subtracting the one
+    irrelevant key rather than listing the relevant ones means a field added to
+    the record later is compared by default, which is the safe direction.
+    """
+    return {key: value for key, value in (entry or {}).items() if key != "path"}
+
+
+def _require_disjoint_from_scoring(run_spec: Any, refutation: Path | None) -> None:
+    """Refuse a refutation set that overlaps the one this round is scored on.
+
+    A contract repaired against a mutant it was shown cannot then be measured
+    by it: the round would report "the contract is complete" when what it
+    observed was "the agent can act on feedback".
+
+    Comparing the two root paths, or the two manifests' digests, catches only
+    the exact repeat -- a copy at another path, or a manifest mixing one scored
+    mutation in with others, defeats both while post-round scoring still
+    accepts the original by its recorded digest. The scheduled per-mutation
+    fingerprints are the relation that actually holds, and they subsume the
+    weaker checks, so this is the only one. They are opaque, so the scored
+    mutations still never exist anywhere the session can read.
+    """
+    if refutation is None or run_spec.spec.mutant_manifest_sha256 == NO_MUTANTS:
+        return
+    if not run_spec.spec.mutant_identities:
+        # A scored manifest with no recorded identities cannot be checked, and
+        # the scheduler does not produce that state -- so it means the round
+        # was built by something older, not that there is nothing to compare.
+        raise SystemExit(
+            "run spec records a scoring manifest but no mutant identities, so an "
+            "overlapping refutation set could not be detected; reschedule the "
+            "round with a current pilot build"
+        )
+    overlap = overlapping_mutations(
+        load_object(refutation)["mutants"],
+        set(run_spec.spec.mutant_identities),
+        run_spec.shared_package,
+    )
+    if overlap:
+        raise SystemExit(
+            f"{refutation} repeats mutation(s) this round is scored on "
+            f"({', '.join(overlap)}): a contract repaired against a mutant it "
+            "was shown cannot then be measured by it"
+        )
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=Path, required=True)
@@ -766,6 +1021,13 @@ def main() -> None:
     parser.add_argument("--artifacts", type=Path, required=True)
     parser.add_argument("--agent", choices=("claude", "fake"), default="claude")
     parser.add_argument("--fake-script", type=Path)
+    parser.add_argument(
+        "--refutation-mutants-root",
+        type=Path,
+        help="directory of TASK_ID/mutants.json used as feedback during the run: "
+        "an accepted candidate that fails to reject one is sent back. Must not be "
+        "the set the round is scored on -- see --hidden-mutants-root.",
+    )
     parser.add_argument(
         "--hidden-mutants-root",
         type=Path,
@@ -804,15 +1066,15 @@ def main() -> None:
     run_spec = RunSpec.load(args.run.resolve()).resolve_paths(args.run.resolve())
     hidden_mutants = None
     if args.hidden_mutants_root is not None:
-        if run_spec.spec.mutant_manifest_sha256 == "0" * 64:
+        if run_spec.spec.mutant_manifest_sha256 == NO_MUTANTS:
             raise SystemExit(
                 "run has no mutant set; omit --hidden-mutants-root for core scoring"
             )
-        hidden_mutants = (
-            args.hidden_mutants_root.resolve() / run_spec.spec.task_id / "mutants.json"
+        hidden_mutants = _task_mutants(
+            args.hidden_mutants_root, run_spec.spec.task_id, "hidden mutant"
         )
-        if not hidden_mutants.is_file():
-            raise SystemExit(f"hidden mutant manifest not found: {hidden_mutants}")
+    refutation_mutants = _task_mutants(args.refutation_mutants_root, run_spec.spec.task_id)
+    _require_disjoint_from_scoring(run_spec, refutation_mutants)
     base = Path(__file__).resolve().parent.parent
     controller = Controller(
         config,
@@ -822,6 +1084,7 @@ def main() -> None:
         args.agent,
         args.fake_script.resolve() if args.fake_script else None,
         hidden_mutants,
+        refutation_mutants,
     )
     result = asyncio.run(controller.run_experiment())
     print(json.dumps(result, sort_keys=True))

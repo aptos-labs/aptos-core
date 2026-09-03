@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import json
 import re
+import os
 import shutil
 import tempfile
 from dataclasses import asdict
@@ -165,19 +166,50 @@ def _stage_result(result: Any, stage_report: dict[str, Any] | None) -> dict[str,
     return {**asdict(result), "stage_report": stage_report}
 
 
-def tool_executables(config: ExperimentConfig) -> dict[str, dict[str, str]]:
-    result = {}
+def tool_executables(config: ExperimentConfig) -> dict[str, dict[str, Any]]:
+    """Digest everything a screening stage actually runs.
+
+    `render_command` executes the whole configured argument vector, so hashing
+    only its first word identifies the interpreter and not the program: a
+    `["python3", "wrapper.py"]` stage would keep its recorded identity while
+    the wrapper is rewritten underneath it. Every argument that resolves to a
+    file is hashed for the same reason.
+
+    The prover backends are named by environment rather than by the command, so
+    they are recorded alongside: a screening verdict is a claim about what
+    Boogie and Z3 decided, and swapping either changes what "proved" meant.
+    """
+    result: dict[str, dict[str, Any]] = {}
     for name, command in (
         ("compile", config.compile_command),
         ("wp_inference", config.inference_command),
         ("enriched_compile", config.compile_command),
         ("prover", config.prove_command),
     ):
-        resolved = shutil.which(command[0])
+        # A stage may be unconfigured, in which case there is no executable to
+        # identify -- rather than an executable that failed to resolve.
+        resolved = shutil.which(command[0]) if command else None
         if resolved is None:
             continue
         path = Path(resolved).resolve()
-        result[name] = {"path": str(path), "sha256": sha256_file(path)}
+        entry: dict[str, Any] = {"path": str(path), "sha256": sha256_file(path)}
+        # Later arguments that name a file are part of what runs.
+        arguments = {}
+        for argument in command[1:]:
+            candidate = Path(argument)
+            if candidate.is_file():
+                arguments[argument] = sha256_file(candidate.resolve())
+        if arguments:
+            entry["arguments"] = arguments
+        result[name] = entry
+    for name, variable, fallback in (
+        ("boogie", "BOOGIE_EXE", "boogie"),
+        ("z3", "Z3_EXE", "z3"),
+    ):
+        located = os.environ.get(variable) or shutil.which(fallback)
+        if located and Path(located).is_file():
+            path = Path(located).resolve()
+            result[name] = {"path": str(path), "sha256": sha256_file(path)}
     return result
 
 

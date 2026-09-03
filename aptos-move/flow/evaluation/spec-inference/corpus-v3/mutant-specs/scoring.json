@@ -1,0 +1,466 @@
+{
+ "BA-base-012": [
+  {
+   "mutant_id": "BA-base-012-overflow-guard-strict",
+   "file": "sources/etna/extracted_base_math.move",
+   "anchor": "assert!(total <= MAX_U64, E_BASE_BALANCE_OVERFLOW);",
+   "replace": "<=",
+   "with": "<",
+   "obligation_category": "abort",
+   "rationale": "A sum of exactly MAX_U64 is representable and must not abort. Pins the overflow boundary."
+  },
+  {
+   "mutant_id": "BA-base-012-accumulator-starts-at-one",
+   "file": "sources/etna/extracted_base_math.move",
+   "anchor": "let total: u128 = 0;",
+   "replace": "0",
+   "with": "1",
+   "obligation_category": "normal-result",
+   "rationale": "Every result is one too large. Requires naming the accumulated value, not just bounding it."
+  },
+  {
+   "mutant_id": "BA-base-012-keeps-last-only",
+   "file": "sources/etna/extracted_base_math.move",
+   "anchor": "total += ask_sizes[i] as u128;",
+   "replace": "+=",
+   "with": "=",
+   "obligation_category": "normal-result",
+   "rationale": "Assignment instead of accumulation returns the final element rather than the sum."
+  }
+ ],
+ "LP-price-021": [
+  {
+   "mutant_id": "LP-price-021-backstop-numerator-uses-divisor",
+   "file": "sources/etna/extracted_liquidation_price.move",
+   "anchor": "mark_price * self.backstop_margin_maintenance_multiplier",
+   "replace": "backstop_margin_maintenance_multiplier",
+   "with": "backstop_margin_maintenance_divisor",
+   "obligation_category": "normal-result",
+   "rationale": "Backstop branch scales by the wrong config field."
+  },
+  {
+   "mutant_id": "LP-price-021-drops-maintenance-divisor",
+   "file": "sources/etna/extracted_liquidation_price.move",
+   "anchor": "(market_max_leverage as u64) * self.maintenance_margin_leverage_divisor",
+   "replace": " * self.maintenance_margin_leverage_divisor",
+   "with": "",
+   "obligation_category": "normal-result",
+   "rationale": "Non-backstop denominator loses its divisor entirely."
+  },
+  {
+   "mutant_id": "LP-price-021-branch-inverted",
+   "file": "sources/etna/extracted_liquidation_price.move",
+   "anchor": "if (is_backstop) {",
+   "replace": "is_backstop",
+   "with": "!is_backstop",
+   "obligation_category": "normal-result",
+   "rationale": "Each caller gets the other mode's price; a contract must tie the result to the flag."
+  }
+ ],
+ "MM-min-013": [
+  {
+   "mutant_id": "MM-min-013-seed-zero",
+   "file": "sources/etna/extracted_minmax.move",
+   "anchor": "let min = values[0];",
+   "replace": "values[0]",
+   "with": "0",
+   "obligation_category": "normal-result",
+   "rationale": "Seeding at zero makes the result always zero, and removes the empty-vector abort."
+  },
+  {
+   "mutant_id": "MM-min-013-compares-previous",
+   "file": "sources/etna/extracted_minmax.move",
+   "anchor": "min = values[i];",
+   "replace": "values[i]",
+   "with": "values[i - 1]",
+   "obligation_category": "normal-result",
+   "rationale": "Stores the element before the one that compared smaller."
+  },
+  {
+   "mutant_id": "MM-min-013-seed-last-skips-first",
+   "file": "sources/etna/extracted_minmax.move",
+   "anchor": "let min = values[0];",
+   "replace": "values[0]",
+   "with": "values[values.length() - 1]",
+   "obligation_category": "normal-result",
+   "rationale": "The first element never participates, so a unique minimum at index 0 is missed."
+  }
+ ],
+ "OV-order-006": [
+  {
+   "mutant_id": "OV-order-006-min-size-strict",
+   "file": "sources/etna/extracted_order_validation.move",
+   "anchor": "size >= min_size",
+   "replace": ">=",
+   "with": ">",
+   "obligation_category": "normal-result",
+   "rationale": "An order exactly at the minimum size is rejected."
+  },
+  {
+   "mutant_id": "OV-order-006-min-price-strict",
+   "file": "sources/etna/extracted_order_validation.move",
+   "anchor": "price >= min_price",
+   "replace": ">=",
+   "with": ">",
+   "obligation_category": "normal-result",
+   "rationale": "An order exactly at the minimum price is rejected."
+  },
+  {
+   "mutant_id": "OV-order-006-tick-modulus-shifted",
+   "file": "sources/etna/extracted_order_validation.move",
+   "anchor": "price % tick_size == 0",
+   "replace": "tick_size",
+   "with": "(tick_size - 1)",
+   "obligation_category": "abort",
+   "rationale": "A tick size of one now divides by zero, changing where the function aborts."
+  }
+ ],
+ "QP-part-025": [
+  {
+   "mutant_id": "QP-part-025-store-starts-at-one",
+   "file": "sources/etna/lomuto_partition.move",
+   "anchor": "let store = 0;",
+   "replace": "0",
+   "with": "1",
+   "obligation_category": "normal-result",
+   "rationale": "The store cursor starts past the front, so the returned index and layout are both wrong."
+  },
+  {
+   "mutant_id": "QP-part-025-last-index-off-by-one",
+   "file": "sources/etna/lomuto_partition.move",
+   "anchor": "let last = values.length() - 1;",
+   "replace": " - 1",
+   "with": "",
+   "obligation_category": "abort",
+   "rationale": "Treating the length as the last index indexes out of bounds."
+  },
+  {
+   "mutant_id": "QP-part-025-final-swap-uses-pivot",
+   "file": "sources/etna/lomuto_partition.move",
+   "anchor": "values.swap(store, last);",
+   "replace": "last",
+   "with": "pivot",
+   "obligation_category": "normal-result",
+   "rationale": "The closing swap targets the original pivot slot instead of the parked one."
+  }
+ ],
+ "SM-select-022": [
+  {
+   "mutant_id": "SM-select-022-returns-start-value",
+   "file": "sources/etna/selection_machine.move",
+   "anchor": "Outcome::Accepted { value, draws: i }",
+   "replace": "value,",
+   "with": "value: start,",
+   "obligation_category": "normal-result",
+   "rationale": "Reports the seed rather than the admissible value that was found."
+  },
+  {
+   "mutant_id": "SM-select-022-skips-seed-candidate",
+   "file": "sources/etna/selection_machine.move",
+   "anchor": "let value = start;",
+   "replace": "start",
+   "with": "next(start)",
+   "obligation_category": "normal-result",
+   "rationale": "The seed is never tested for admissibility."
+  },
+  {
+   "mutant_id": "SM-select-022-one-round-short",
+   "file": "sources/etna/selection_machine.move",
+   "anchor": "while (i < rounds) {",
+   "replace": "rounds",
+   "with": "rounds - 1",
+   "obligation_category": "abort",
+   "rationale": "Loses the final round, and a zero round count now underflows."
+  }
+ ],
+ "TL-lev-020": [
+  {
+   "mutant_id": "TL-lev-020-guard-checks-running-max",
+   "file": "sources/etna/extracted_tier_leverage.move",
+   "anchor": "leverage <= (market_max_leverage as u64)",
+   "replace": "leverage <=",
+   "with": "max <=",
+   "obligation_category": "abort",
+   "rationale": "Each iteration validates the previous maximum, so the last tier is never checked."
+  },
+  {
+   "mutant_id": "TL-lev-020-seed-one",
+   "file": "sources/etna/extracted_tier_leverage.move",
+   "anchor": "let max = 0u64;",
+   "replace": "0u64",
+   "with": "1u64",
+   "obligation_category": "normal-result",
+   "rationale": "An empty or all-zero tier list yields one instead of zero."
+  },
+  {
+   "mutant_id": "TL-lev-020-strides-by-two",
+   "file": "sources/etna/extracted_tier_leverage.move",
+   "anchor": "i += 1;",
+   "replace": "1",
+   "with": "2",
+   "obligation_category": "normal-result",
+   "rationale": "Half the tiers are neither validated nor considered for the maximum."
+  }
+ ],
+ "TR-discard-011": [
+  {
+   "mutant_id": "TR-discard-011-bid-guard-inverted",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "is_bid && prices[i] < best_price",
+   "replace": "is_bid &&",
+   "with": "!is_bid &&",
+   "obligation_category": "normal-result",
+   "rationale": "The bid test applies to asks, so crossing levels are counted on the wrong side."
+  },
+  {
+   "mutant_id": "TR-discard-011-treats-none-as-some",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "if (best_price.is_some()) {",
+   "replace": "is_some",
+   "with": "is_none",
+   "obligation_category": "abort",
+   "rationale": "An absent best price is unwrapped, so the no-reference case aborts instead of returning zero."
+  },
+  {
+   "mutant_id": "TR-discard-011-starts-past-first-level",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "let i = 0;\n        if (best_price.is_some()) {",
+   "replace": "let i = 0;",
+   "with": "let i = 1;",
+   "obligation_category": "normal-result",
+   "rationale": "The first level is skipped, so a crossing level at index zero is not discarded."
+  }
+ ],
+ "TR-order-010": [
+  {
+   "mutant_id": "TR-order-010-reads-past-last-pair",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "while (i < prices.length() - 1)",
+   "replace": " - 1",
+   "with": "",
+   "obligation_category": "abort",
+   "rationale": "The final iteration indexes one past the end."
+  },
+  {
+   "mutant_id": "TR-order-010-direction-inverted",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "if (is_descending) {",
+   "replace": "is_descending",
+   "with": "!is_descending",
+   "obligation_category": "normal-result",
+   "rationale": "Ascending and descending checks are exchanged."
+  },
+  {
+   "mutant_id": "TR-order-010-descending-requires-ascending",
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "anchor": "if (prices[i] <= prices[i + 1]) {",
+   "replace": "<=",
+   "with": ">=",
+   "obligation_category": "normal-result",
+   "rationale": "The descending branch accepts only ascending sequences."
+  }
+ ],
+ "TS-trial-019": [
+  {
+   "mutant_id": "TS-trial-019-overflow-guard-strict",
+   "file": "sources/etna/extracted_trial_size.move",
+   "anchor": "size_u128 <= 18_446_744_073_709_551_615",
+   "replace": "<=",
+   "with": "<",
+   "obligation_category": "abort",
+   "rationale": "A size of exactly u64::MAX is representable and must not abort."
+  },
+  {
+   "mutant_id": "TS-trial-019-divides-by-size-decimals",
+   "file": "sources/etna/extracted_trial_size.move",
+   "anchor": "* (size_decimals_pow10 as u128)",
+   "replace": "*",
+   "with": "/",
+   "obligation_category": "normal-result",
+   "rationale": "The decimal scale divides instead of multiplying."
+  },
+  {
+   "mutant_id": "TS-trial-019-bps-numerator-divides",
+   "file": "sources/etna/extracted_trial_size.move",
+   "anchor": "* (BPS_DENOM as u128)",
+   "replace": "*",
+   "with": "/",
+   "obligation_category": "normal-result",
+   "rationale": "The basis-point scale divides in the numerator instead of multiplying."
+  }
+ ],
+ "UC-credits-008": [
+  {
+   "mutant_id": "UC-credits-008-duration-boundary-strict",
+   "file": "sources/etna/extracted_tier_lookup.move",
+   "anchor": "if (days >= t.duration_days) {",
+   "replace": ">=",
+   "with": ">",
+   "obligation_category": "normal-result",
+   "rationale": "A duration exactly equal to a tier threshold no longer qualifies for it."
+  },
+  {
+   "mutant_id": "UC-credits-008-rank-from-credits",
+   "file": "sources/etna/extracted_tier_lookup.move",
+   "anchor": "result_tier_rank = t.tier_rank;",
+   "replace": "t.tier_rank",
+   "with": "t.credits",
+   "obligation_category": "normal-result",
+   "rationale": "The returned rank carries the credit count."
+  },
+  {
+   "mutant_id": "UC-credits-008-default-credits-one",
+   "file": "sources/etna/extracted_tier_lookup.move",
+   "anchor": "let result_credits = 0u8;",
+   "replace": "0u8",
+   "with": "1u8",
+   "obligation_category": "normal-result",
+   "rationale": "A duration matching no tier yields one credit instead of none."
+  }
+ ],
+ "VS-contrib-003": [
+  {
+   "mutant_id": "VS-contrib-003-first-contribution-test-inverted",
+   "file": "sources/etna/vault_share_math.move",
+   "anchor": "if (current_shares == 0) {",
+   "replace": "== 0",
+   "with": "> 0",
+   "obligation_category": "normal-result",
+   "rationale": "The bootstrap path is taken for established vaults and vice versa."
+  },
+  {
+   "mutant_id": "VS-contrib-003-reduction-shares-one",
+   "file": "sources/etna/vault_share_math.move",
+   "anchor": "let reduction_shares = 0;",
+   "replace": "0",
+   "with": "1",
+   "obligation_category": "normal-result",
+   "rationale": "The second tuple element is one when no fee reduction applies."
+  },
+  {
+   "mutant_id": "VS-contrib-003-bootstrap-test-uses-nav",
+   "file": "sources/etna/vault_share_math.move",
+   "anchor": "if (current_shares == 0) {",
+   "replace": "current_shares",
+   "with": "current_nav",
+   "obligation_category": "normal-result",
+   "rationale": "The bootstrap test reads NAV, so a share-less vault with a NAV returns zero shares instead of the contributed assets."
+  }
+ ],
+ "VS-fees-001": [
+  {
+   "mutant_id": "VS-fees-001-zero-rate-test-inverted",
+   "file": "sources/etna/vault_share_math.move",
+   "anchor": "if (self.fee_config.fee_bps == 0",
+   "replace": "== 0",
+   "with": "!= 0",
+   "obligation_category": "normal-result",
+   "rationale": "Vaults with a fee return zero and fee-free vaults compute a fee."
+  },
+  {
+   "mutant_id": "VS-fees-001-value-increase-reversed",
+   "file": "sources/etna/vault_share_math.move",
+   "anchor": "current_nav - scaled_last_nav",
+   "replace": "current_nav - scaled_last_nav",
+   "with": "scaled_last_nav - current_nav",
+   "obligation_category": "abort",
+   "rationale": "The gain is computed backwards, so the subtraction underflows on the profitable path."
+  },
+  {
+   "mutant_id": "VS-fees-001-scaling-ratio-inverted",
+   "file": "sources/etna/vault_share_math.move",
+   "anchor": "mul_div(last_nav, current_shares, last_shares)",
+   "replace": "current_shares, last_shares",
+   "with": "last_shares, current_shares",
+   "obligation_category": "normal-result",
+   "rationale": "The last NAV is rescaled by the reciprocal share ratio."
+  }
+ ],
+ "VS-redeem-004": [
+  {
+   "mutant_id": "VS-redeem-004-empty-test-uses-shares",
+   "file": "sources/etna/vault_share_math.move",
+   "anchor": "if (vault_nav == 0) {",
+   "replace": "vault_nav",
+   "with": "vault_shares",
+   "obligation_category": "abort",
+   "rationale": "A zero-NAV vault proceeds to divide, and a zero-share vault short-circuits instead."
+  },
+  {
+   "mutant_id": "VS-redeem-004-user-shares-added",
+   "file": "sources/etna/vault_share_math.move",
+   "anchor": "let shares_for_user = shares - shares_for_fee;",
+   "replace": " - ",
+   "with": " + ",
+   "obligation_category": "normal-result",
+   "rationale": "The fee share is credited to the user rather than withheld."
+  },
+  {
+   "mutant_id": "VS-redeem-004-fee-ratio-inverted",
+   "file": "sources/etna/vault_share_math.move",
+   "anchor": "mul_div(shares, fee_for_total_nav, vault_nav)",
+   "replace": "fee_for_total_nav, vault_nav",
+   "with": "vault_nav, fee_for_total_nav",
+   "obligation_category": "abort",
+   "rationale": "Dividing by the fee makes a zero fee a division by zero."
+  }
+ ],
+ "VS-shares-002": [
+  {
+   "mutant_id": "VS-shares-002-assert-operands-reversed",
+   "file": "sources/etna/vault_share_math.move",
+   "anchor": "current_shares >= shares",
+   "replace": "current_shares >= shares",
+   "with": "shares >= current_shares",
+   "obligation_category": "abort",
+   "rationale": "Redeeming less than the outstanding total now aborts, and over-redemption does not."
+  },
+  {
+   "mutant_id": "VS-shares-002-denominator-is-shares",
+   "file": "sources/etna/vault_share_math.move",
+   "anchor": "mul_div(shares, current_nav, current_shares)",
+   "replace": "current_nav, current_shares",
+   "with": "current_nav, shares",
+   "obligation_category": "normal-result",
+   "rationale": "Dividing by the redeemed amount returns the whole NAV regardless of ownership."
+  },
+  {
+   "mutant_id": "VS-shares-002-numerator-is-total",
+   "file": "sources/etna/vault_share_math.move",
+   "anchor": "mul_div(shares, current_nav, current_shares)",
+   "replace": "mul_div(shares,",
+   "with": "mul_div(current_shares,",
+   "obligation_category": "normal-result",
+   "rationale": "Every redemption is valued as if the whole vault were redeemed."
+  }
+ ],
+ "WU-consume-023": [
+  {
+   "mutant_id": "WU-consume-023-match-test-inverted",
+   "file": "sources/etna/extracted_work_units.move",
+   "anchor": "if (match_count == 0) {",
+   "replace": "== 0",
+   "with": "!= 0",
+   "obligation_category": "normal-result",
+   "rationale": "The status cost and the per-match cost are exchanged."
+  },
+  {
+   "mutant_id": "WU-consume-023-threshold-undoubled",
+   "file": "sources/etna/extracted_work_units.move",
+   "anchor": "if (2 * amount_to_consume > self.amount) {",
+   "replace": "2 * amount_to_consume",
+   "with": "amount_to_consume",
+   "obligation_category": "normal-result",
+   "rationale": "The reserve threshold that decides between zeroing and subtracting is halved."
+  },
+  {
+   "mutant_id": "WU-consume-023-match-cost-added",
+   "file": "sources/etna/extracted_work_units.move",
+   "anchor": "match_count * ORDER_MATCH_WORK_UNITS",
+   "replace": "*",
+   "with": "+",
+   "obligation_category": "normal-result",
+   "rationale": "Per-match cost is added rather than scaled by the match count."
+  }
+ ]
+}

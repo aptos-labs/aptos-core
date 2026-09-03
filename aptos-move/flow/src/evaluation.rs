@@ -175,6 +175,19 @@ impl EvaluationConfig {
         !self.evaluation_mode || self.feedback_level.acceptance_check_enabled()
     }
 
+    /// Whether an uninvariant loop is an error rather than a warning.
+    ///
+    /// WP drops the conditions a loop havoc left unconstrained and emits an
+    /// empty `aborts_if_is_partial` contract, with the reason in a warning.
+    /// That is the right default: a person reading the warning can still use
+    /// what WP derived. A measured round cannot, because the empty contract
+    /// compiles and verifies, so anything that only asks whether the prover
+    /// succeeded cannot tell it from a complete specification -- which is the
+    /// exact failure the study exists to detect.
+    pub fn uninvariant_loop_is_error(self) -> bool {
+        self.evaluation_mode
+    }
+
     /// Whether the transaction-replay tool is served.
     ///
     /// Not in an evaluation session. Replay reaches an arbitrary REST endpoint

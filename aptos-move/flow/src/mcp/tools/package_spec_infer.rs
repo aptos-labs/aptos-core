@@ -76,6 +76,7 @@ impl FlowSession {
         let telemetry_package = self.resolve_package_path(&params.package_path);
         let telemetry_filter = filter.clone();
         let evidence_depth = Some(LOOP_INVARIANT_EVIDENCE_DEPTH);
+        let uninvariant_loop_is_error = self.evaluation().uninvariant_loop_is_error();
 
         let tool_timeout = self.tool_timeout();
         let wrote_files = Arc::new(AtomicBool::new(false));
@@ -121,6 +122,10 @@ impl FlowSession {
                 // condition, so it rides with the failure classification rung.
                 // Inference overwrites the prover field from this one.
                 options.inference.loop_invariant_evidence = evidence_depth;
+                // In a measured round an uninvariant loop must fail rather
+                // than yield an empty contract that verifies; see
+                // `EvaluationConfig::uninvariant_loop_is_error`.
+                options.prover.uninvariant_loop_is_error = uninvariant_loop_is_error;
                 options.output_path = temp_dir
                     .path()
                     .join("output.bpl")

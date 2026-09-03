@@ -114,6 +114,18 @@ pub fn render_all(
                 "{} does not call frontmatter(name=..., description=...)",
                 out_path.display()
             );
+            // Calling frontmatter() is not enough: the block only parses at the
+            // very start of the file. Anything emitted ahead of it -- a newline
+            // from a leading Tera tag, say -- leaves the file without metadata,
+            // and the platform then skips the skill or agent without an error.
+            anyhow::ensure!(
+                rendered.starts_with("---\n"),
+                "{} does not begin with its frontmatter block; \
+                 the first line is {:?}. Frontmatter parses only at line 1, so \
+                 this file would be silently ignored.",
+                out_path.display(),
+                rendered.lines().next().unwrap_or_default()
+            );
         }
 
         results.push((out_path, rendered));
@@ -127,7 +139,11 @@ pub fn render_all(
 fn normalize_markdown_spacing(content: &str) -> String {
     let mut output = String::with_capacity(content.len());
     let mut open_fence: Option<(char, usize)> = None;
-    let mut previous_blank = false;
+    // Start-of-document counts as blank, so a leading blank line is dropped as
+    // the redundant whitespace it is. A template whose first line is a Tera
+    // control tag (`{% if ... %}`) emits one, which would push a skill's YAML
+    // frontmatter off line 1 and make the whole skill fail to register.
+    let mut previous_blank = true;
 
     for line in content.lines() {
         let fence = markdown_fence(line);
@@ -450,6 +466,26 @@ mod tests {
     }
 
     #[test]
+    fn test_normalize_markdown_spacing_drops_leading_blank_lines() {
+        // A template whose first line is a Tera control tag renders a leading
+        // newline. Frontmatter parses only at line 1, so keeping it makes the
+        // skill unregistrable -- and nothing reports an error.
+        assert_eq!(
+            normalize_markdown_spacing("\n---\nname: x\n"),
+            "---\nname: x\n"
+        );
+        assert_eq!(
+            normalize_markdown_spacing("\n\n\n---\nname: x\n"),
+            "---\nname: x\n"
+        );
+        // Content that already starts correctly is untouched.
+        assert_eq!(
+            normalize_markdown_spacing("---\nname: x\n"),
+            "---\nname: x\n"
+        );
+    }
+
+    #[test]
     fn test_render_with_variable() {
         let mut context = tera::Context::new();
         context.insert("platform", "claude");
@@ -520,6 +556,22 @@ mod tests {
                 paths.iter().any(|p| p.starts_with(dir)),
                 "should find files under {dir}/"
             );
+        }
+
+        // Every skill and agent must lead with its frontmatter block. The
+        // platform parses it only at line 1 and otherwise skips the file in
+        // silence, so a stray leading newline removes a whole skill without
+        // any build or runtime error. `render_all` enforces this, and this
+        // case pins it against the real content tree.
+        for (path, body) in &files {
+            if path.starts_with("skills") || path.starts_with("agents") {
+                assert!(
+                    body.starts_with("---\n"),
+                    "{} must begin with frontmatter, found {:?}",
+                    path.display(),
+                    body.lines().next().unwrap_or_default()
+                );
+            }
         }
 
         // Verify that templates/ partials are NOT in the output.

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 from .artifacts import load_object
 from typing import Any
@@ -100,6 +100,16 @@ class RunSpec:
     # otherwise force the whole round to run at its timeout, which hides the
     # cost in an aggregate instead of recording it against the task.
     prove_timeout_seconds: int | None = None
+    #: Opaque identities of the mutations this round is scored on, so a run
+    #: can refuse a refutation set that overlaps them without the scored
+    #: mutations being present where the session can read them.
+    mutant_identities: list[str] = field(default_factory=list)
+    #: Digests of what each stage actually runs, Boogie and Z3 included. The
+    #: harness and `move-flow` are named separately above because they are one
+    #: file each; a stage is a command, and the solvers are resolved from the
+    #: environment at launch, so replacing either changes what "proved" meant
+    #: without changing anything the other two identities cover.
+    stage_executables: dict[str, dict] = field(default_factory=dict)
 
     @classmethod
     def load(cls, path: Path) -> "RunSpec":

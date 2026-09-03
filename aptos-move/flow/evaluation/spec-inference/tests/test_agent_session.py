@@ -26,6 +26,58 @@ def _result(session_id: str = "session-1") -> ResultMessage:
     )
 
 
+class _ClientThatThinks:
+    """The SDK reports extended thinking as one event per token."""
+
+    def __init__(self, tokens: int = 500) -> None:
+        self.tokens = tokens
+
+    async def query(self, prompt: str) -> None:
+        return None
+
+    async def receive_response(self):
+        yield SystemMessage(
+            subtype="init",
+            data={"model": "glm-5.3[1m]", "claude_code_version": "2.1.258"},
+        )
+        for n in range(1, self.tokens + 1):
+            yield SystemMessage(
+                subtype="thinking_tokens",
+                data={"estimated_tokens": n, "estimated_tokens_delta": 1},
+            )
+        yield _result()
+
+    async def get_mcp_status(self):
+        return {"mcpServers": [{"name": "move-flow", "status": "connected", "tools": []}]}
+
+
+class ThinkingTokenLoggingTest(unittest.IsolatedAsyncioTestCase):
+    """Per-token thinking events must not each become a transcript line.
+
+    On one hard cell they were 38,270 lines and 14.7 MB of a 16 MB file, each
+    costing a redaction walk, a serialize and a flush in the hot path.
+    """
+
+    async def test_the_transcript_records_one_line_not_one_per_token(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            log = Path(temporary) / "events.jsonl"
+            with JsonlWriter(log) as event_log:
+                session = ClaudeAgentSession.__new__(ClaudeAgentSession)
+                session._client = _ClientThatThinks(tokens=500)
+                session._event_log = event_log
+                session._mcp_status = None
+                session._system_init = None
+                await session.send("infer")
+            lines = [json.loads(l) for l in log.read_text(encoding="utf-8").splitlines()]
+
+        thinking = [e for e in lines if e["event"] == "thinking_tokens"]
+        messages = [e for e in lines if e["event"] == "claude_message"]
+        self.assertEqual(1, len(thinking), "one summary line, not one per token")
+        self.assertEqual(500, thinking[0]["estimated_tokens"])
+        # init and result survive; the 500 thinking events do not.
+        self.assertEqual(2, len(messages))
+
+
 class _ClientAnnouncingInitOnce:
     """The SDK's actual shape: `system/init` is emitted once, at startup."""
 

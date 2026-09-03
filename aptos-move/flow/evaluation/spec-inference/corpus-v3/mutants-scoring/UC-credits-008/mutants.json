@@ -1,0 +1,99 @@
+{
+ "mutants": [
+  {
+   "anchor": {
+    "length": 30,
+    "offset": 1181,
+    "sha256": "3fe2605c767492c75c83569d2587a1178bc7e5242497af5d7505d1ecc5fb1963"
+   },
+   "edit": {
+    "at": 9,
+    "kind": "substitute",
+    "length": 2,
+    "to": ">"
+   },
+   "essential": true,
+   "file": "sources/etna/extracted_tier_lookup.move",
+   "mutant_id": "UC-credits-008-duration-boundary-strict",
+   "obligation_category": "normal-result",
+   "rationale": "A duration exactly equal to a tier threshold no longer qualifies for it.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 31,
+    "offset": 1272,
+    "sha256": "09540b805d98112a28f3247229c17f80132c18696458bf0b2ea63ce5c6f45eb0"
+   },
+   "edit": {
+    "at": 19,
+    "kind": "substitute",
+    "length": 11,
+    "to": "t.credits"
+   },
+   "essential": true,
+   "file": "sources/etna/extracted_tier_lookup.move",
+   "mutant_id": "UC-credits-008-rank-from-credits",
+   "obligation_category": "normal-result",
+   "rationale": "The returned rank carries the credit count.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 25,
+    "offset": 965,
+    "sha256": "339fb9d5561e169df6833ed2b94fd42bdef914f6b1eaffedfa0179532ee733ec"
+   },
+   "edit": {
+    "at": 21,
+    "kind": "substitute",
+    "length": 3,
+    "to": "1u8"
+   },
+   "essential": true,
+   "file": "sources/etna/extracted_tier_lookup.move",
+   "mutant_id": "UC-credits-008-default-credits-one",
+   "obligation_category": "normal-result",
+   "rationale": "A duration matching no tier yields one credit instead of none.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  }
+ ],
+ "reference_sha256": "fe7f28a8cb579c41b3167c0849bc543a94f6ccdb12cea6f964b2b7c9ff7287b4",
+ "task_id": "UC-credits-008"
+}

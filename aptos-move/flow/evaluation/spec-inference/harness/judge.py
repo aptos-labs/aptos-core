@@ -30,6 +30,9 @@ VERDICT_STATES = {
     # repair is to add a clause. Collapsing it into `forbidden_weakening` gave
     # the opposite instruction and spent the repeated-breach stop rule on it.
     "incomplete_contract": "incomplete_contract",
+    # Not produced by the candidate check: the controller downgrades an
+    # accepted candidate to this when a refutation survives it.
+    "weak_contract": "weak_contract",
     "prover_failure": "prover_failure",
     "prover_timeout": "prover_timeout",
 }

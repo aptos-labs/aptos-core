@@ -32,10 +32,16 @@ def collect_run(artifact: Path) -> dict[str, Any] | None:
     # per controller turn counts the same inference repeatedly, and the error
     # grows with turn count. See DESIGN.md section 5, "Measuring cost".
     session_usage: dict[str, dict[str, Any]] = {}
+    # How often refutation gave a contract "another life": collected in the
+    # same walk, since the stream is the largest file this reads.
+    refutations: list[dict[str, Any]] = []
     events = artifact / "controller-events.jsonl"
     if events.is_file():
         for line in events.read_text(encoding="utf-8").splitlines():
             event = json.loads(line)
+            if event.get("event") == "refutation":
+                refutations.append(event)
+                continue
             if event.get("event") != "agent_result":
                 continue
             controller_turns += 1
@@ -61,6 +67,24 @@ def collect_run(artifact: Path) -> dict[str, Any] | None:
             for item in event["message"].get("content") or []:
                 if isinstance(item, dict) and item.get("name"):
                     tools[item["name"]] += 1
+
+    refutation = {
+        "runs": len(refutations),
+        # The extra lives themselves.
+        "downgrades": sum(1 for event in refutations if event.get("survived")),
+        "killed_by_turn": [
+            f"{event.get('killed')}/{event.get('total')}" for event in refutations
+        ],
+        # An inconclusive mutant is not a killed one. Reading convergence from
+        # the absence of survivors counts a final refutation that reached no
+        # verdict as a contract that rejected everything.
+        "inconclusive": sum(
+            1 for event in refutations if event.get("inconclusive")
+        ),
+        "converged": bool(refutations)
+        and not refutations[-1].get("survived")
+        and not refutations[-1].get("inconclusive"),
+    } if refutations else None
 
     mutation = None
     score_path = artifact / "mutation-score.json"
@@ -110,6 +134,7 @@ def collect_run(artifact: Path) -> dict[str, Any] | None:
             for name, count in sorted(tools.items())
         },
         "final_report": report,
+        "refutation": refutation,
         "mutation": mutation,
     }
 

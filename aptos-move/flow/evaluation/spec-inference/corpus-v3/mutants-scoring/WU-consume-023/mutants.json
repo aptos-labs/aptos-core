@@ -1,0 +1,99 @@
+{
+ "mutants": [
+  {
+   "anchor": {
+    "length": 23,
+    "offset": 1762,
+    "sha256": "2e23b5ff14d579c6581826b75f20a65aaa77e0d3b6afd70f502290ce8f6f2a9e"
+   },
+   "edit": {
+    "at": 16,
+    "kind": "substitute",
+    "length": 4,
+    "to": "!= 0"
+   },
+   "essential": true,
+   "file": "sources/etna/extracted_work_units.move",
+   "mutant_id": "WU-consume-023-match-test-inverted",
+   "obligation_category": "normal-result",
+   "rationale": "The status cost and the per-match cost are exchanged.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 42,
+    "offset": 1229,
+    "sha256": "c8e3e8af86820ba008654913c80d88cd5f6557fb2567761e5a4bfb340bdcf9ee"
+   },
+   "edit": {
+    "at": 4,
+    "kind": "substitute",
+    "length": 21,
+    "to": "amount_to_consume"
+   },
+   "essential": true,
+   "file": "sources/etna/extracted_work_units.move",
+   "mutant_id": "WU-consume-023-threshold-undoubled",
+   "obligation_category": "normal-result",
+   "rationale": "The reserve threshold that decides between zeroing and subtracting is halved.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 36,
+    "offset": 1971,
+    "sha256": "ee24b8ec90bd3b14b95ef787892a8b0dd483657d5439b09c377d774f8b600965"
+   },
+   "edit": {
+    "at": 12,
+    "kind": "substitute",
+    "length": 1,
+    "to": "+"
+   },
+   "essential": true,
+   "file": "sources/etna/extracted_work_units.move",
+   "mutant_id": "WU-consume-023-match-cost-added",
+   "obligation_category": "normal-result",
+   "rationale": "Per-match cost is added rather than scaled by the match count.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  }
+ ],
+ "reference_sha256": "01ab3f47ae36f1b1936c25fa838c83bcc922e8fde9528c46ee4b019299fb652d",
+ "task_id": "WU-consume-023"
+}

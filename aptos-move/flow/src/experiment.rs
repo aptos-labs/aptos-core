@@ -1510,6 +1510,12 @@ fn infer_package(args: &PackageTargetArgs) -> Result<()> {
     };
     options.prover.dump_bytecode = args.dump_bytecode;
     options.prover.dump_cfg = args.dump_bytecode;
+    // Screening asks whether WP's unaided output verifies. An uninvariant loop
+    // makes WP drop what it could not constrain and emit an empty
+    // `aborts_if_is_partial` contract, which verifies -- so as a warning this
+    // reads as a target WP handled, when WP in fact declined. The screen is the
+    // one consumer that must not be able to miss it.
+    options.prover.uninvariant_loop_is_error = true;
     options.output_path = if args.dump_bytecode {
         dump_dir.join("output.bpl")
     } else {
