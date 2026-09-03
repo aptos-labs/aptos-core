@@ -224,6 +224,7 @@ impl SecretShareManager {
                     round = round,
                     "Self-share derive returned None (no encrypted txns), resolving round"
                 );
+                self.prune_expired_self_shares(round);
                 if let Some(item) = self.block_queue.item_mut(round) {
                     item.resolve_round_without_key(round);
                 }
@@ -303,8 +304,12 @@ impl SecretShareManager {
 
     fn prune_expired_self_shares(&mut self, latest_round: Round) {
         let oldest_retained_round = latest_round.saturating_sub(self.retention_rounds);
+        let previous_len = self.recovered_self_shares.len();
         self.recovered_self_shares
             .retain(|_, recovered| recovered.share.round() >= oldest_retained_round);
+        if self.recovered_self_shares.len() == previous_len {
+            return;
+        }
         if let Err(error) = self
             .secret_share_storage
             .prune_before_round(self.epoch_state.epoch, oldest_retained_round)
@@ -365,14 +370,17 @@ impl SecretShareManager {
 
     fn process_reset(&mut self, request: ResetRequest) {
         let ResetRequest { tx, signal } = request;
-        let target_round = match signal {
-            ResetSignal::Stop => 0,
-            ResetSignal::TargetRound(round) => round,
+        let (target_round, stop) = match signal {
+            ResetSignal::Stop => (0, true),
+            ResetSignal::TargetRound(round) => (round, false),
         };
+        if !stop {
+            self.prune_expired_self_shares(target_round);
+        }
         self.block_queue = BlockQueue::new();
         self.pending_derives = FuturesUnordered::new();
         self.secret_share_store.lock().reset(target_round);
-        self.stop = matches!(signal, ResetSignal::Stop);
+        self.stop = stop;
         let _ = tx.send(ResetAck::default());
     }
 
@@ -917,6 +925,47 @@ mod tests {
         assert!(manager
             .recovered_self_shares
             .contains_key(&storage_key(&boundary_metadata)));
+    }
+
+    #[tokio::test]
+    async fn test_no_share_round_advances_retention() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let storage = Arc::new(InMemorySecretShareStorage::new());
+        let metadata = create_metadata(ctx.epoch, 10);
+        storage
+            .save_self_share(&create_secret_share(&ctx, 0, &metadata))
+            .unwrap();
+        let (mut manager, _) = make_manager_with_retention(&ctx, 0, storage.clone(), 10, 10);
+
+        manager.process_completed_derive(21, Ok(None));
+
+        assert!(storage.load_self_shares(ctx.epoch).unwrap().is_empty());
+        assert!(!manager
+            .recovered_self_shares
+            .contains_key(&storage_key(&metadata)));
+    }
+
+    #[tokio::test]
+    async fn test_target_round_reset_advances_retention() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let storage = Arc::new(InMemorySecretShareStorage::new());
+        let metadata = create_metadata(ctx.epoch, 10);
+        storage
+            .save_self_share(&create_secret_share(&ctx, 0, &metadata))
+            .unwrap();
+        let (mut manager, _) = make_manager_with_retention(&ctx, 0, storage.clone(), 10, 10);
+        let (tx, rx) = oneshot::channel();
+
+        manager.process_reset(ResetRequest {
+            tx,
+            signal: ResetSignal::TargetRound(21),
+        });
+        rx.await.unwrap();
+
+        assert!(storage.load_self_shares(ctx.epoch).unwrap().is_empty());
+        assert!(!manager
+            .recovered_self_shares
+            .contains_key(&storage_key(&metadata)));
     }
 
     #[tokio::test]
