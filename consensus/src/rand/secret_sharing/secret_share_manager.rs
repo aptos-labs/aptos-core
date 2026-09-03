@@ -51,6 +51,11 @@ pub type Receiver<T> = UnboundedReceiver<T>;
 type PendingDeriveFut =
     Pin<Box<dyn Future<Output = (Round, TaskResult<SecretShareResult>)> + Send>>;
 
+struct RecoveredSelfShare {
+    share: SecretShare,
+    verified: bool,
+}
+
 pub struct SecretShareManager {
     author: Author,
     epoch_state: Arc<EpochState>,
@@ -68,7 +73,7 @@ pub struct SecretShareManager {
     outgoing_blocks: Sender<OrderedBlocks>,
     // local state
     secret_share_store: Arc<Mutex<SecretShareStore>>,
-    recovered_self_shares: HashMap<SecretShareKey, SecretShare>,
+    recovered_self_shares: HashMap<SecretShareKey, RecoveredSelfShare>,
     block_queue: BlockQueue,
     pending_derives: FuturesUnordered<PendingDeriveFut>,
 }
@@ -146,15 +151,10 @@ impl SecretShareManager {
                 );
                 continue;
             }
-            if let Err(error) = verifier.verify(&share, &author) {
-                error!(
-                    epoch = share.epoch(),
-                    round = share.round(),
-                    "Ignoring cryptographically invalid persisted secret share: {error}"
-                );
-                continue;
-            }
-            recovered_self_shares.insert(storage_key(share.metadata()), share);
+            recovered_self_shares.insert(storage_key(share.metadata()), RecoveredSelfShare {
+                share,
+                verified: false,
+            });
         }
 
         Self {
@@ -268,7 +268,10 @@ impl SecretShareManager {
             return;
         }
         self.recovered_self_shares
-            .insert(storage_key(share.metadata()), share.clone());
+            .insert(storage_key(share.metadata()), RecoveredSelfShare {
+                share: share.clone(),
+                verified: false,
+            });
         self.prune_expired_self_shares(round);
 
         let metadata = share.metadata().clone();
@@ -301,7 +304,7 @@ impl SecretShareManager {
     fn prune_expired_self_shares(&mut self, latest_round: Round) {
         let oldest_retained_round = latest_round.saturating_sub(self.retention_rounds);
         self.recovered_self_shares
-            .retain(|_, share| share.round() >= oldest_retained_round);
+            .retain(|_, recovered| recovered.share.round() >= oldest_retained_round);
         if let Err(error) = self
             .secret_share_storage
             .prune_before_round(self.epoch_state.epoch, oldest_retained_round)
@@ -312,6 +315,35 @@ impl SecretShareManager {
                 "Failed to prune expired secret shares: {error}"
             );
         }
+    }
+
+    fn get_recovered_self_share(&mut self, metadata: &SecretShareMetadata) -> Option<SecretShare> {
+        let key = storage_key(metadata);
+        let verification_error = {
+            let recovered = self.recovered_self_shares.get_mut(&key)?;
+            if recovered.share.metadata() != metadata {
+                return None;
+            }
+            if recovered.verified {
+                return Some(recovered.share.clone());
+            }
+            match self.verifier.verify(&recovered.share, &self.author) {
+                Ok(()) => {
+                    recovered.verified = true;
+                    return Some(recovered.share.clone());
+                },
+                Err(error) => error,
+            }
+        };
+
+        self.recovered_self_shares.remove(&key);
+        error!(
+            epoch = metadata.epoch,
+            round = metadata.round,
+            block_id = metadata.block_id,
+            "Rejecting cryptographically invalid persisted secret share: {verification_error}"
+        );
+        None
     }
 
     fn process_ready_blocks(&mut self, ready_blocks: Vec<OrderedBlocks>) {
@@ -550,11 +582,7 @@ impl SecretShareManager {
                     return;
                 }
 
-                let recovered_share = self
-                    .recovered_self_shares
-                    .get(&storage_key(request.metadata()))
-                    .filter(|share| share.metadata() == request.metadata())
-                    .cloned();
+                let recovered_share = self.get_recovered_self_share(request.metadata());
                 if let Some(share) = recovered_share {
                     self.process_response(
                         protocol,
@@ -813,8 +841,16 @@ mod tests {
                 .recovered_self_shares
                 .get(&storage_key(&metadata))
                 .unwrap()
+                .share
                 .metadata(),
             &metadata
+        );
+        assert!(
+            !manager
+                .recovered_self_shares
+                .get(&storage_key(&metadata))
+                .unwrap()
+                .verified
         );
         assert!(manager
             .secret_share_store
@@ -915,6 +951,13 @@ mod tests {
         let (request, response) = request_rpc(metadata.clone());
         manager.handle_incoming_msg(request);
         assert!(response.await.unwrap().is_ok());
+        assert!(
+            manager
+                .recovered_self_shares
+                .get(&storage_key(&metadata))
+                .unwrap()
+                .verified
+        );
     }
 
     #[tokio::test]
@@ -929,10 +972,24 @@ mod tests {
             .secret_share_store
             .lock()
             .update_highest_known_round(metadata.round);
+        assert!(
+            !manager
+                .recovered_self_shares
+                .get(&storage_key(&metadata))
+                .unwrap()
+                .verified
+        );
         let (request_1, response_1) = request_rpc(metadata.clone());
-        let (request_2, response_2) = request_rpc(metadata.clone());
-
         manager.handle_incoming_msg(request_1);
+        assert!(
+            manager
+                .recovered_self_shares
+                .get(&storage_key(&metadata))
+                .unwrap()
+                .verified
+        );
+
+        let (request_2, response_2) = request_rpc(metadata.clone());
         manager.handle_incoming_msg(request_2);
 
         for response in [response_1, response_2] {
@@ -975,9 +1032,15 @@ mod tests {
             .secret_share_store
             .lock()
             .update_highest_known_round(metadata.round);
+        assert!(manager
+            .recovered_self_shares
+            .contains_key(&storage_key(&metadata)));
         let (request, response) = request_rpc(metadata.clone());
         manager.handle_incoming_msg(request);
         assert!(response.await.is_err());
+        assert!(!manager
+            .recovered_self_shares
+            .contains_key(&storage_key(&metadata)));
 
         let forged_storage = Arc::new(InMemorySecretShareStorage::new());
         forged_storage
