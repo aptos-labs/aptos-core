@@ -14,7 +14,7 @@ use aptos_types::{
     block_executor::partitioner::{ExecutableBlock, ExecutableTransactions},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo,
-        AuxiliaryInfoTrait, Transaction,
+        AuxiliaryInfoTrait, Transaction, Version,
     },
 };
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
@@ -30,6 +30,9 @@ pub const SIG_VERIFY_RAYON_MIN_THRESHOLD: usize = 32;
 pub(crate) struct BlockPreparationStage {
     /// Number of blocks processed
     num_blocks_processed: usize,
+    /// Version this pipeline started at, mixed into derived block ids so that
+    /// two pipelines in the same process cannot derive the same id.
+    start_version: Version,
     /// Pool of theads for signature verification
     sig_verify_pool: rayon::ThreadPool,
     /// When execution sharding is enabled, number of executor shards
@@ -43,6 +46,7 @@ impl BlockPreparationStage {
         num_sig_verify_threads: usize,
         num_shards: usize,
         partitioner_config: &dyn PartitionerConfig,
+        start_version: Version,
     ) -> Self {
         let maybe_partitioner = if num_shards == 0 {
             None
@@ -59,6 +63,7 @@ impl BlockPreparationStage {
         Self {
             num_executor_shards: num_shards,
             num_blocks_processed: 0,
+            start_version,
             maybe_partitioner,
             sig_verify_pool,
         }
@@ -71,7 +76,15 @@ impl BlockPreparationStage {
             self.num_blocks_processed,
             txns.len()
         );
-        let block_id = HashValue::random();
+        // Derived rather than drawn from entropy, so two runs over the same
+        // transactions reach the same state.
+        let block_id = HashValue::sha3_256_of(
+            &[
+                self.start_version.to_le_bytes(),
+                (self.num_blocks_processed as u64).to_le_bytes(),
+            ]
+            .concat(),
+        );
 
         let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
             self.sig_verify_pool.install(|| {
