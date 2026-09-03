@@ -260,13 +260,12 @@ impl SecretShareManager {
         }
 
         if let Err(error) = self.secret_share_storage.save_self_share(&share) {
-            error!(
-                epoch = share.epoch(),
-                round = round,
-                block_id = share.metadata().block_id,
-                "CRITICAL: Failed to persist self secret share: {error}"
+            panic!(
+                "Failed to persist self secret share for epoch {}, round {}, block {}: {error}",
+                share.epoch(),
+                round,
+                share.metadata().block_id,
             );
-            return;
         }
         self.recovered_self_shares
             .insert(storage_key(share.metadata()), RecoveredSelfShare {
@@ -880,8 +879,11 @@ mod tests {
             .lock()
             .update_highest_known_round(metadata.round);
 
-        manager.process_completed_derive(metadata.round, Ok(Some(share)));
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            manager.process_completed_derive(metadata.round, Ok(Some(share)));
+        }));
 
+        assert!(result.is_err());
         assert!(manager
             .secret_share_store
             .lock()
