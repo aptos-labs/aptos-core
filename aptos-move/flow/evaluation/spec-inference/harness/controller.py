@@ -39,6 +39,7 @@ from .mutants import (
     mutation_fingerprint,
     inconclusive_mutants,
     overlapping_mutations,
+    refutation_confirms,
     reached_a_verdict,
     run_mutant_cases,
     score_mutants,
@@ -418,7 +419,7 @@ class Controller:
                     "so the candidate could not be confirmed"
                 ),
             )
-        if not survived:
+        if refutation_confirms(survived, inconclusive, overran):
             return judge
         # The category, not the mutant's name: `lost-element` states the defect
         # and would hand over the missing clause. The obligation it belongs to

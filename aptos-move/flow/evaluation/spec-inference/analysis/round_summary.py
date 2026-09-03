@@ -14,6 +14,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from harness.mutants import refutation_confirms
+
 FLOW_TOOL_PREFIX = "mcp__move-flow__move_package_"
 
 
@@ -81,9 +83,16 @@ def collect_run(artifact: Path) -> dict[str, Any] | None:
         "inconclusive": sum(
             1 for event in refutations if event.get("inconclusive")
         ),
+        # The same rule the controller confirmed the run by, not a restatement
+        # of part of it: a pass that ran past the wall budget was returned as an
+        # infrastructure failure, and reporting it as converged would credit a
+        # cell the round refused.
         "converged": bool(refutations)
-        and not refutations[-1].get("survived")
-        and not refutations[-1].get("inconclusive"),
+        and refutation_confirms(
+            refutations[-1].get("survived") or [],
+            refutations[-1].get("inconclusive") or [],
+            bool(refutations[-1].get("overran_budget")),
+        ),
     } if refutations else None
 
     mutation = None

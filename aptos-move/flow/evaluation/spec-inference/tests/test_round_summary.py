@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import itertools
 import json
 import tempfile
 import unittest
@@ -117,12 +118,27 @@ class RefutationConvergenceTest(unittest.TestCase):
     """
 
     def _converged(self, last_event: dict) -> bool:
-        refutations = [last_event]
-        return (
-            bool(refutations)
-            and not refutations[-1].get("survived")
-            and not refutations[-1].get("inconclusive")
-        )
+        """Through `collect_run`, not through a copy of its rule.
+
+        This helper used to restate the predicate it was checking, so it agreed
+        with the summary by construction and could not have caught the summary
+        drifting from the controller -- which is the very thing that happened.
+        """
+        with tempfile.TemporaryDirectory() as temporary:
+            artifact = Path(temporary)
+            (artifact / "controller-events.jsonl").write_text(
+                json.dumps({"event": "refutation", **last_event}) + "\n",
+                encoding="utf-8",
+            )
+            (artifact / "run.json").write_text(
+                json.dumps({
+                    "run_id": "r", "task_id": "t", "arm": "agent_only",
+                    "target": "0x1::m::f",
+                    "result": {"terminal_status": "operational_success"},
+                }),
+                encoding="utf-8",
+            )
+            return round_summary.collect_run(artifact)["refutation"]["converged"]
 
     def test_all_killed_converges(self) -> None:
         self.assertTrue(self._converged({"killed": 3, "total": 3, "survived": [], "inconclusive": []}))
@@ -133,9 +149,45 @@ class RefutationConvergenceTest(unittest.TestCase):
     def test_an_inconclusive_mutant_does_not_converge(self) -> None:
         self.assertFalse(self._converged({"killed": 2, "total": 3, "survived": [], "inconclusive": ["m"]}))
 
-    def test_the_summary_reports_the_same_rule(self) -> None:
-        source = (Path(__file__).resolve().parent.parent / "analysis" / "round_summary.py").read_text(encoding="utf-8")
-        self.assertIn('not refutations[-1].get("inconclusive")', source)
+    def test_a_pass_that_overran_the_budget_has_not_converged(self) -> None:
+        # The controller returns `infrastructure_failure` for exactly this
+        # event, so reporting it as converged credits a cell the round refused.
+        self.assertFalse(self._converged({
+            "killed": 3, "total": 3, "survived": [], "inconclusive": [],
+            "overran_budget": True,
+        }))
+
+    def test_a_round_recorded_before_the_field_existed_still_reads(self) -> None:
+        # An older event carries no `overran_budget`; absent is not overrun.
+        self.assertTrue(self._converged({
+            "killed": 3, "total": 3, "survived": [], "inconclusive": [],
+        }))
+
+    def test_the_summary_agrees_with_the_controller_on_every_case(self) -> None:
+        """The invariant, checked by behaviour rather than by grepping source.
+
+        This assertion used to look for the predicate's text inside
+        `round_summary.py`. That passes as long as the words are present, which
+        says nothing about whether the summary decides what the controller
+        decided -- and the summary had in fact grown a third condition behind
+        the controller's back. Comparing outcomes catches that; comparing
+        source did not.
+        """
+        from harness.mutants import refutation_confirms
+
+        for survived, inconclusive, overran in itertools.product(
+            ([], ["m"]), ([], ["n"]), (False, True)
+        ):
+            event = {
+                "killed": 1, "total": 2,
+                "survived": survived, "inconclusive": inconclusive,
+                "overran_budget": overran,
+            }
+            with self.subTest(survived=survived, inconclusive=inconclusive, overran=overran):
+                self.assertEqual(
+                    refutation_confirms(survived, inconclusive, overran),
+                    self._converged(event),
+                )
 
 if __name__ == "__main__":
     unittest.main()

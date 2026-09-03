@@ -390,6 +390,25 @@ def _mutation_identity(case: dict[str, Any]) -> tuple[str, str, str]:
     )
 
 
+def refutation_confirms(
+    survived: list, inconclusive: list, overran_budget: bool
+) -> bool:
+    """Whether a refutation pass confirms the candidate.
+
+    Three things have to hold, and they are easy to state as two. A survivor is
+    a counterexample. A mutant that reached no verdict is not one the contract
+    killed, so confirming on its absence would report "no counterexample found"
+    as "no counterexample exists". And a pass that ran past the round's wall
+    budget did not confirm anything within the time the round declares.
+
+    Named once because it is decided twice: the controller judges a live run
+    from its results, and the summary reads the event that run emitted. Those
+    two restating the same rule is how they came to disagree, with the summary
+    reporting convergence for a cell the controller had refused.
+    """
+    return not survived and not inconclusive and not overran_budget
+
+
 def overlapping_mutations(
     cases: list[dict], identities: set[str], package: Path
 ) -> list[str]:
