@@ -25,10 +25,9 @@ above this crate.
 Still open before the transaction executor can be wired to the block
 coordinator:
 
-- Entry-function validation: `entry` visibility, no return values, admissible
-  argument types, constructed arguments. Without the visibility check a signed
-  payload naming any loadable function runs it. See the `TODO(security,
-  completeness)` in `user_txn/execute.rs`.
+- Constructed arguments: `String` arguments are not checked for valid UTF-8
+  and `Object<T>` arguments are not checked to exist. See the `TODO(security,
+  completeness)` in `user_txn/args.rs`.
 - Multi-agent transactions are untested.
 
 ## Conventions
