@@ -1548,8 +1548,8 @@ impl StateStore {
         expected_root_hash: HashValue,
     ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, StateValue>>> {
         Ok(Box::new(StateSnapshotRestore::new(
-            &self.state_merkle_db,
-            self,
+            Arc::clone(&self.state_merkle_db),
+            Arc::clone(self),
             version,
             expected_root_hash,
             false, /* async_commit */
