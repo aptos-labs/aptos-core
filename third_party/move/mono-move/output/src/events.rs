@@ -4,10 +4,26 @@
 //! MonoMove event store → Aptos [`ContractEvent`]s.
 
 use crate::error::OutputError;
-use aptos_types::{contract_event::ContractEvent, event::EventKey};
+use aptos_types::{
+    account_config::{NEW_EPOCH_EVENT_MOVE_TYPE_TAG, NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG},
+    contract_event::ContractEvent,
+    event::EventKey,
+};
 use mono_move_core::{type_tag_of, value_layout::LayoutProvider, VMInternalError, VMResult};
 use mono_move_natives::{EventKind, EventStore};
 use mono_move_runtime::{serialize, SessionEffects};
+
+/// Whether the effects emitted a reconfiguration (new-epoch) event. Only each
+/// event's type is inspected, not its payload, so no value is serialized.
+// TODO(perf): record on event emit or when processing gas cost for storage for all events.
+pub fn has_new_epoch_event(effects: &SessionEffects) -> VMResult<bool> {
+    let store = effects.extension::<EventStore>()?;
+    Ok(store.entries().iter().any(|entry| {
+        type_tag_of(entry.msg_ty).is_some_and(|tag| {
+            tag == *NEW_EPOCH_EVENT_MOVE_TYPE_TAG || tag == *NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG
+        })
+    }))
+}
 
 /// Materializes the emitted events into [`ContractEvent`]s, in emission order.
 /// The effects retain every backing allocation reachable from the event values;

@@ -58,7 +58,6 @@ use std::{
     cell::Ref,
     ptr::{null, NonNull},
 };
-use triomphe::Arc;
 
 /// Resolves the resource-group container a resource type belongs to from the
 /// read-set-pinned defining module, or [`None`] for an own storage slot.
@@ -163,15 +162,20 @@ pub struct SessionEffects {
     read_write_set: ResourceReadWriteSet,
     extensions: NativeExtensions,
     /// Owns the allocations referenced by the read-write set and extensions.
-    /// Not read directly: those hold raw pointers into it, so it only needs to
-    /// outlive them. Declared last because fields drop in declaration order.
-    _heap: Arc<FrozenHeap>,
+    /// Those hold raw pointers into it, so the heap only needs to outlive them.
+    /// Declared last because fields drop in declaration order.
+    heap: std::sync::Arc<FrozenHeap>,
 }
 
 impl SessionEffects {
     /// The transaction's global-storage read-write set.
     pub fn read_write_set(&self) -> &ResourceReadWriteSet {
         &self.read_write_set
+    }
+
+    /// Returns the frozen heap allocation backing the written values.
+    pub fn frozen_heap(&self) -> std::sync::Arc<FrozenHeap> {
+        self.heap.clone()
     }
 
     /// Immutable access to one of the transaction's native extensions.
@@ -466,7 +470,7 @@ impl<'guard> InterpreterContext<'guard> {
         SessionEffects {
             read_write_set: self.read_write_set,
             extensions: self.extensions,
-            _heap: Arc::new(FrozenHeap::new(self.heap)),
+            heap: std::sync::Arc::new(FrozenHeap::new(self.heap)),
         }
     }
 
