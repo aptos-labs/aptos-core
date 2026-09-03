@@ -243,7 +243,7 @@ proptest! {
         let store2 = &db2.state_store;
 
         let mut restore =
-            StateSnapshotRestore::new(&store2.state_merkle_db, store2, version, expected_root_hash, true /* async_commit */, StateSnapshotRestoreMode::Default).unwrap();
+            StateSnapshotRestore::new(Arc::clone(&store2.state_merkle_db), Arc::clone(store2), version, expected_root_hash, true /* async_commit */, StateSnapshotRestoreMode::Default).unwrap();
 
         let mut ordered_input: Vec<_> = input
             .into_iter()
@@ -342,7 +342,7 @@ proptest! {
 
         let store2 = &db2.state_store;
         let mut restore =
-            StateSnapshotRestore::new(&store2.state_merkle_db, store2, version, expected_root_hash, true, /* async_commit */ StateSnapshotRestoreMode::Default).unwrap();
+            StateSnapshotRestore::new(Arc::clone(&store2.state_merkle_db), Arc::clone(store2), version, expected_root_hash, true, /* async_commit */ StateSnapshotRestoreMode::Default).unwrap();
         let max_hash = HashValue::new([0xff; HashValue::LENGTH]);
         let dummy_state_key = StateKey::raw(&[]);
         let (top_levels_batch, sharded_batches, _) = store2.state_merkle_db.merklize_value_set(vec![(max_hash, Some(&(HashValue::random(), dummy_state_key)))], 0, None, None).unwrap();
@@ -393,7 +393,7 @@ proptest! {
         let db2 = AptosDB::new_for_test(&tmp_dir2);
         let store2 = &db2.state_store;
         let mut restore =
-            StateSnapshotRestore::new(&store2.state_merkle_db, store2, version, expected_root_hash, true, /* async_commit */ StateSnapshotRestoreMode::Default).unwrap();
+            StateSnapshotRestore::new(Arc::clone(&store2.state_merkle_db), Arc::clone(store2), version, expected_root_hash, true, /* async_commit */ StateSnapshotRestoreMode::Default).unwrap();
         let max_hash = HashValue::new([0xff; HashValue::LENGTH]);
         let dummy_state_key = StateKey::raw(&[]);
         let (top_levels_batch, sharded_batches, _) = store2.state_merkle_db.merklize_value_set(vec![(max_hash, Some(&(HashValue::random(), dummy_state_key)))], 0, None, None).unwrap();

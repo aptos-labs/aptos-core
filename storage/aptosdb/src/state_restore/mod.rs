@@ -135,8 +135,8 @@ pub struct StateSnapshotRestore<K, V> {
 
 impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
     pub fn new<T: 'static + TreeReader<K> + TreeWriter<K>, S: 'static + StateValueWriter<K, V>>(
-        tree_store: &Arc<T>,
-        value_store: &Arc<S>,
+        tree_store: Arc<T>,
+        value_store: Arc<S>,
         version: Version,
         expected_root_hash: HashValue,
         async_commit: bool,
@@ -144,13 +144,13 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
     ) -> Result<Self> {
         Ok(Self {
             tree_restore: Arc::new(Mutex::new(Some(JellyfishMerkleRestore::new(
-                Arc::clone(tree_store),
+                tree_store,
                 version,
                 expected_root_hash,
                 async_commit,
             )?))),
             kv_restore: Arc::new(Mutex::new(Some(StateValueRestore::new(
-                Arc::clone(value_store),
+                value_store,
                 version,
             )))),
             restore_mode,
@@ -158,20 +158,20 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
     }
 
     pub fn new_overwrite<T: 'static + TreeWriter<K>, S: 'static + StateValueWriter<K, V>>(
-        tree_store: &Arc<T>,
-        value_store: &Arc<S>,
+        tree_store: Arc<T>,
+        value_store: Arc<S>,
         version: Version,
         expected_root_hash: HashValue,
         restore_mode: StateSnapshotRestoreMode,
     ) -> Result<Self> {
         Ok(Self {
             tree_restore: Arc::new(Mutex::new(Some(JellyfishMerkleRestore::new_overwrite(
-                Arc::clone(tree_store),
+                tree_store,
                 version,
                 expected_root_hash,
             )?))),
             kv_restore: Arc::new(Mutex::new(Some(StateValueRestore::new(
-                Arc::clone(value_store),
+                value_store,
                 version,
             )))),
             restore_mode,

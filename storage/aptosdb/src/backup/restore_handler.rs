@@ -45,8 +45,8 @@ impl RestoreHandler {
         restore_mode: StateSnapshotRestoreMode,
     ) -> Result<StateSnapshotRestore<StateKey, StateValue>> {
         StateSnapshotRestore::new(
-            &self.state_store.state_merkle_db,
-            &self.state_store,
+            Arc::clone(&self.state_store.state_merkle_db),
+            Arc::clone(&self.state_store),
             version,
             expected_root_hash,
             true, /* async_commit */
