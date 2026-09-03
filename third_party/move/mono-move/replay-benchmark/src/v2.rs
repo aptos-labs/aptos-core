@@ -57,6 +57,7 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun
                 env.features(),
                 TransactionAuxiliaryData::default(),
             )
+            .map(|(output, _groups)| output)
             .map_err(|e| anyhow!("failed to materialize V2 output: {}", e))
     };
 
