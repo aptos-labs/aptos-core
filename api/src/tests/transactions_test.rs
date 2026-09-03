@@ -17,6 +17,9 @@ use aptos_crypto::{
 };
 use aptos_sdk::types::{AccountKey, LocalAccount};
 use aptos_transaction_filters::transaction_filter::TransactionFilter;
+use aptos_transaction_tracing::{
+    TransactionFilter as TracingFilter, TransactionStage, TransactionTraceStore,
+};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::aptos_test_root_address,
@@ -1140,6 +1143,77 @@ async fn test_get_pending_transaction_by_hash(
         .get("/transactions/by_hash/0xdadfeddcca7cb6396c735e9094c76c6e4e9cb3e3ef814730693aed59bd87b31d")
         .await;
     context.check_golden_output(not_found);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_submit_transaction_records_api_trace_stages() {
+    let mut context = new_test_context(current_function_name!());
+    let account = context.gen_account();
+    let txn = context.create_user_account(&account).await;
+    let txn_hash = txn.committed_hash();
+    let sender = txn.sender();
+
+    TransactionTraceStore::global().update_filter(TracingFilter::new(
+        true,
+        [sender].into_iter().collect(),
+        1.0,
+        1.0,
+    ));
+
+    context
+        .expect_status_code(202)
+        .post_bcs_txn("/transactions", bcs::to_bytes(&txn).unwrap())
+        .await;
+
+    let trace = TransactionTraceStore::global()
+        .get_trace(&txn_hash)
+        .expect("submitted transaction should have an active trace");
+    assert!(trace.insertion_time_usecs.is_some());
+    for stage in [
+        TransactionStage::ApiHandlerEnter,
+        TransactionStage::ApiTransactionDecoded,
+        TransactionStage::ApiMempoolSubmit,
+        TransactionStage::MempoolProcessStart,
+        TransactionStage::MempoolInsert,
+        TransactionStage::ApiMempoolAccepted,
+    ] {
+        assert!(
+            trace.has_stage(stage),
+            "missing API trace stage {:?}",
+            stage
+        );
+    }
+    let timestamp = |stage| {
+        trace
+            .stages
+            .iter()
+            .find(|record| record.stage == stage)
+            .expect("stage should exist")
+            .timestamp_usecs
+    };
+    assert!(
+        timestamp(TransactionStage::ApiHandlerEnter)
+            <= timestamp(TransactionStage::ApiTransactionDecoded)
+    );
+    assert!(
+        timestamp(TransactionStage::ApiTransactionDecoded)
+            <= timestamp(TransactionStage::ApiMempoolSubmit)
+    );
+    assert!(
+        timestamp(TransactionStage::ApiMempoolSubmit)
+            <= timestamp(TransactionStage::MempoolProcessStart)
+    );
+    assert!(
+        timestamp(TransactionStage::MempoolProcessStart)
+            <= timestamp(TransactionStage::MempoolInsert)
+    );
+    assert!(
+        timestamp(TransactionStage::MempoolInsert)
+            <= timestamp(TransactionStage::ApiMempoolAccepted)
+    );
+
+    TransactionTraceStore::global().finalize_trace(&txn_hash);
+    TransactionTraceStore::global().update_filter(TracingFilter::disabled());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

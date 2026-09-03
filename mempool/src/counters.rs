@@ -485,12 +485,23 @@ pub fn process_get_txn_latency_timer_client() -> HistogramTimer {
         .start_timer()
 }
 
+/// Fine-grained buckets for the txn-processing breakdown. The default Prometheus
+/// buckets start at 5ms, which collapses this metric's entire body (~1.4ms) into
+/// bucket 0 and makes P50-P99 unrecoverable. Dense through the sub-5ms working
+/// band, then geometric out to 500ms so the tail stays resolvable.
+const PROCESS_TXN_BREAKDOWN_BUCKETS: &[f64] = &[
+    0.0001, 0.00025, 0.0005, 0.00075, 0.001, 0.00125, 0.0015, 0.002, 0.0025, 0.003, 0.0035, 0.004,
+    0.0045, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01, 0.0125, 0.015, 0.02, 0.025, 0.03, 0.04, 0.05,
+    0.075, 0.1, 0.15, 0.2, 0.25, 0.5,
+];
+
 /// Tracks latency of different stages of txn processing (e.g. vm validation, storage read)
 pub static PROCESS_TXN_BREAKDOWN_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_mempool_process_txn_breakdown_latency",
         "Latency of different stages of processing txns in mempool",
-        &["portion"]
+        &["portion"],
+        PROCESS_TXN_BREAKDOWN_BUCKETS.to_vec()
     )
     .unwrap()
 });
