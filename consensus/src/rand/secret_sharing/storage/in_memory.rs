@@ -3,6 +3,7 @@
 
 use super::{storage_key, LoadedSecretShare, SecretShareKey, SecretShareStorage};
 use anyhow::{bail, ensure, Result};
+use aptos_consensus_types::common::Round;
 use aptos_infallible::Mutex;
 use aptos_types::secret_sharing::SecretShare;
 use std::collections::HashMap;
@@ -72,6 +73,16 @@ impl SecretShareStorage for InMemorySecretShareStorage {
         self.shares
             .lock()
             .retain(|(stored_epoch, _), _| *stored_epoch >= epoch);
+        Ok(())
+    }
+
+    fn prune_before_round(&self, epoch: u64, round: Round) -> Result<()> {
+        self.shares.lock().retain(|(stored_epoch, _), serialized| {
+            *stored_epoch != epoch
+                || bcs::from_bytes::<SecretShare>(serialized)
+                    .map(|share| share.round() >= round)
+                    .unwrap_or(true)
+        });
         Ok(())
     }
 }
