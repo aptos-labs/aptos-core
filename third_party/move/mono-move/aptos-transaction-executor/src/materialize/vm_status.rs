@@ -124,7 +124,15 @@ pub(crate) fn executed_vm_status(status: &ExecutionStatus) -> VMStatus {
         {
             VMStatus::error(
                 match reason {
-                    InvalidArguments::SignerAfterArgument => {
+                    InvalidArguments::NativeEntryFunction => {
+                        StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED
+                    },
+                    InvalidArguments::NotEntryFunction => {
+                        StatusCode::EXECUTE_ENTRY_FUNCTION_CALLED_ON_NON_ENTRY_FUNCTION
+                    },
+                    InvalidArguments::ReturnsValues
+                    | InvalidArguments::SignerAfterArgument
+                    | InvalidArguments::DisallowedParameterType => {
                         StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE
                     },
                     InvalidArguments::ArgumentCountMismatch => {
