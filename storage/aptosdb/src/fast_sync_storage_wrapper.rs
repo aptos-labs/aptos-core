@@ -12,7 +12,7 @@ use aptos_storage_interface::{
 };
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{hot_state::HotStateValue, state_key::StateKey, state_value::StateValue},
     transaction::{TransactionOutputListWithProofV2, Version},
 };
 use either::Either;
@@ -152,6 +152,31 @@ impl DbWriter for FastSyncStorageWrapper {
         }
         self.get_aptos_db_write_ref()
             .get_state_snapshot_receiver(version, expected_root_hash, kind)
+    }
+
+    fn get_hot_state_snapshot_receiver(
+        &self,
+        version: Version,
+        expected_root_hash: HashValue,
+    ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, HotStateValue>>> {
+        // TODO(HotState): Reconstruct the fast-sync status before resuming a later
+        // snapshot stage.
+        //
+        // `fast_sync_status` lives only in memory, starting at UNKNOWN, and the
+        // main-state receiver above is the only place that moves it to STARTED.
+        // That covers a single uninterrupted run, where hot state always follows
+        // main state.
+        //
+        // A restart in the middle of fast sync breaks that. The wrapper comes back
+        // with UNKNOWN (the main DB still reports synced version 0 until
+        // finalize_state_snapshot), so a restore resuming straight into the hot
+        // state stage gets `temporary_db_with_genesis` here. The hot JMT and KV
+        // rows would land in the throwaway DB, and HotStateSnapshotKvRestoreProgress
+        // would be read from there as well, quietly restarting from the first
+        // chunk. Deriving the status from the persisted progress at startup fixes
+        // both.
+        self.get_aptos_db_write_ref()
+            .get_hot_state_snapshot_receiver(version, expected_root_hash)
     }
 
     fn finalize_state_snapshot(
