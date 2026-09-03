@@ -350,7 +350,7 @@ impl EventSubscription {
 
     fn notify_subscriber_of_events(&mut self, version: Version) -> Result<(), Error> {
         let event_notification = EventNotification {
-            subscribed_events: self.event_buffer.drain(..).collect(),
+            subscribed_events: std::mem::take(&mut self.event_buffer),
             version,
         };
 
