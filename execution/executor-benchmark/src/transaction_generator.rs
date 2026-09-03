@@ -34,7 +34,7 @@ use chrono::Local;
 use indicatif::{ProgressBar, ProgressStyle};
 use itertools::Itertools;
 use move_core_types::{ident_str, language_storage::ModuleId};
-use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng, RngCore, SeedableRng};
+use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng, SeedableRng};
 use rayon::{
     iter::{IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator},
     ThreadPool, ThreadPoolBuilder,
@@ -164,6 +164,10 @@ impl BenchmarkTimestamp {
         self.epoch
     }
 
+    pub fn base_usecs(&self) -> u64 {
+        self.base_usecs
+    }
+
     /// Returns a transaction expiration timestamp in seconds.
     /// Uses `base_usecs/1_000_000 + 60` (60-second window).
     ///
@@ -188,18 +192,36 @@ impl BenchmarkTimestamp {
             timestamp_usecs
         );
 
-        let mut seed = vec![0u8; 32];
-        thread_rng().fill_bytes(&mut seed);
+        // Derived from (epoch, round) rather than drawn from entropy, so that two
+        // runs over the same transactions reach the same state. The randomness
+        // seed still differs from block to block, which is all a benchmark needs.
+        let seed = HashValue::sha3_256_of(
+            &[
+                b"seed".as_slice(),
+                &self.epoch().to_le_bytes(),
+                &round.to_le_bytes(),
+            ]
+            .concat(),
+        );
+        let block_id = HashValue::sha3_256_of(
+            &[
+                b"block_id".as_slice(),
+                &self.epoch().to_le_bytes(),
+                &round.to_le_bytes(),
+            ]
+            .concat(),
+        );
+
         let randomness = Randomness::new(
             RandMetadata {
                 epoch: self.epoch(),
                 round,
             },
-            seed,
+            seed.to_vec(),
         );
 
         Transaction::BlockMetadataExt(BlockMetadataExt::new_v1(
-            HashValue::random(),
+            block_id,
             self.epoch(),
             round,
             get_genesis_validator_address(db),
