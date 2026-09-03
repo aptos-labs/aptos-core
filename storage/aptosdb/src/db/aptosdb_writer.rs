@@ -37,14 +37,14 @@ use aptos_types::transaction::TransactionAuxiliaryData;
 use aptos_types::{
     account_config::new_block_event_key,
     ledger_info::LedgerInfoWithSignatures,
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{hot_state::HotStateValue, state_key::StateKey, state_value::StateValue},
     transaction::{
         Transaction, TransactionInfo, TransactionOutput, TransactionOutputListWithProofV2, Version,
     },
     write_set::WriteSet,
 };
 use rayon::prelude::*;
-use std::{collections::HashMap, iter::Iterator, time::Instant};
+use std::{collections::HashMap, iter::Iterator, sync::Arc, time::Instant};
 
 impl DbWriter for AptosDB {
     fn pre_commit_ledger(&self, chunk: ChunkToCommit, sync_commit: bool) -> Result<()> {
@@ -139,6 +139,21 @@ impl DbWriter for AptosDB {
                     expected_root_hash,
                 )
             },
+        })
+    }
+
+    fn get_hot_state_snapshot_receiver(
+        &self,
+        version: Version,
+        expected_root_hash: HashValue,
+    ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, HotStateValue>>> {
+        gauged_api("get_hot_state_snapshot_receiver", || {
+            crate::hot_state_restore::get_hot_state_snapshot_receiver(
+                Arc::clone(&self.state_store.hot_state_kv_db),
+                Arc::clone(&self.state_store.hot_state_merkle_db),
+                version,
+                expected_root_hash,
+            )
         })
     }
 
