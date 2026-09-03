@@ -26,6 +26,7 @@ pub mod utils;
 #[cfg(feature = "db-debugger")]
 pub mod db_debugger;
 pub mod fast_sync_storage_wrapper;
+pub(crate) mod hot_state_restore;
 
 mod db_options;
 mod event_store;
