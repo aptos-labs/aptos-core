@@ -13,7 +13,7 @@ use crate::{
     heap::{
         deep_copy_or_gc, deserialize_or_gc,
         macros::{alloc_captured_data, alloc_obj, alloc_vec, gc_collect, grow_vec_ref},
-        AllocationError, Heap, TopFrame,
+        AllocationError, FrozenHeap, Heap, TopFrame,
     },
     invariant_violation,
     memory::{
@@ -42,15 +42,13 @@ use mono_move_core::{
     types::{view_type, view_type_list, InternedType, InternedTypeList, Type},
     CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex, DescriptorId,
     FrameOffset, Function, FunctionPtr, FunctionRef, GasMeter, IntBinaryOp, IntCastOp, IntNegateOp,
-    IntOperand, IntShiftOp, IntTy, LayoutProvider, MicroOp, PackClosureOp, ResourceProvider,
-    ShiftOperand, VMInternalError, VMResult, VecPackOp, VecUnpackOp,
-    CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET,
-    CAPTURED_DATA_VALUES_SIZE_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID,
-    CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET,
-    FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN,
-    OBJECT_HEADER_SIZE,
+    IntOperand, IntShiftOp, IntTy, MicroOp, PackClosureOp, ResourceProvider, ShiftOperand,
+    VMInternalError, VMResult, VecPackOp, VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED,
+    CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
+    CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
+    CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
+    FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
 };
-use mono_move_global_context::ExecutionGuard;
 use mono_move_loader::{Loader, ModuleReadSet};
 use move_core_types::{
     identifier::Identifier,
@@ -63,6 +61,7 @@ use std::{
     cell::Ref,
     ptr::{null, NonNull},
 };
+use triomphe::Arc;
 
 /// Resolves the resource-group container a resource type belongs to from the
 /// read-set-pinned defining module, or [`None`] for an own storage slot.
@@ -153,29 +152,26 @@ fn root_frame_base(stack: &MemoryRegion) -> *mut u8 {
 /// global-storage read-write set, and the native extensions (event store and
 /// friends).
 ///
-/// Read-write-set and extension entries point into the frozen heap, so the
-/// parts are only valid together. Read-write-set keys and some extension
-/// entries, notably emitted events, contain interned types backed by the global
-/// arena. Retaining the originating execution guard prevents arena-resetting
-/// maintenance while the effects exist and supplies the matching layout table
-/// during materialization. Retaining the exact resource provider used during
-/// execution keeps its external read allocations alive and lets materializers
-/// reject another provider whose pointer-keyed caches or state snapshot do not
-/// match these effects.
-pub struct SessionEffects<'guard> {
+/// Read-write-set writes and extension entries point into the owned frozen heap,
+/// so the parts are only valid together; the heap outlives them because it is
+/// the last field. Reads of values from other arenas carry their own pins
+/// (see [`StorageRead::ExternalHeap`](mono_move_core::StorageRead)). Read-write-set
+/// keys and some extension entries, notably emitted events, hold interned types
+/// backed by the global arena, so the block's `GlobalContext` must outlive these
+/// effects; nothing here borrows it, so that is a caller invariant.
+//
+// TODO(security): prove at compile time that the block's `GlobalContext` guard
+// is held.
+pub struct SessionEffects {
     read_write_set: ResourceReadWriteSet,
     extensions: NativeExtensions,
-    /// The guard whose layout table describes the effects' interned types.
-    guard: &'guard ExecutionGuard<'guard>,
-    /// The exact provider that supplied external reads during execution.
-    resource_provider: &'guard dyn ResourceProvider,
     /// Owns the allocations referenced by the read-write set and extensions.
     /// Not read directly: those hold raw pointers into it, so it only needs to
     /// outlive them. Declared last because fields drop in declaration order.
-    _heap: Heap,
+    _heap: Arc<FrozenHeap>,
 }
 
-impl<'guard> SessionEffects<'guard> {
+impl SessionEffects {
     /// The transaction's global-storage read-write set.
     pub fn read_write_set(&self) -> &ResourceReadWriteSet {
         &self.read_write_set
@@ -184,20 +180,6 @@ impl<'guard> SessionEffects<'guard> {
     /// Immutable access to one of the transaction's native extensions.
     pub fn extension<T: NativeExtension>(&self) -> VMResult<Ref<'_, T>> {
         self.extensions.get::<T>()
-    }
-
-    /// The originating layout provider for the effects' interned types.
-    #[inline]
-    pub fn layout_provider(&self) -> &impl LayoutProvider {
-        self.guard
-    }
-
-    /// Whether `provider` is the exact provider instance used during execution.
-    ///
-    /// Identity matters because storage keys and provider caches can contain
-    /// pointer-identified interned types.
-    pub fn originates_from_provider(&self, provider: &dyn ResourceProvider) -> bool {
-        std::ptr::addr_eq(self.resource_provider, provider)
     }
 }
 
@@ -478,19 +460,16 @@ impl<'guard> InterpreterContext<'guard> {
     }
 
     /// Consumes the context, returning the transaction's side effects for
-    /// publication. No execution can follow, so the heap is frozen and every
-    /// heap pointer inside the read-write set and extensions stays valid for
-    /// as long as the returned effects live. Retaining the originating guard
-    /// also prevents the global arena that owns their interned types from being
-    /// reset and supplies the matching layout table during materialization.
-    pub fn finish(self) -> SessionEffects<'guard> {
-        let guard = self.loader.guard();
+    /// publication. No execution can follow, so the heap is frozen: it moves
+    /// into an `Arc` and every heap pointer inside the read-write set and
+    /// extensions stays valid for as long as the returned effects live. The
+    /// effects no longer borrow the guard, so the caller must keep the global
+    /// arena that owns their interned types alive until the effects are dropped.
+    pub fn finish(self) -> SessionEffects {
         SessionEffects {
             read_write_set: self.read_write_set,
             extensions: self.extensions,
-            guard,
-            resource_provider: self.resource_provider,
-            _heap: self.heap,
+            _heap: Arc::new(FrozenHeap::new(self.heap)),
         }
     }
 
