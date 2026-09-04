@@ -37,7 +37,6 @@ use move_core_types::{
 };
 use std::{cell::RefCell, ptr::NonNull};
 use thiserror::Error;
-use triomphe::Arc;
 
 /// Default size of the provider's value arena. Occupancy is bounded by one
 /// materialization per distinct key read, so this fits any realistic use.
@@ -163,7 +162,7 @@ struct ProviderState {
     ///
     /// Here it is safe to use a non-cryptographic hasher because `StateKey` already
     /// gets hashed by its crypto digest.
-    groups: FxHashMap<StateKey, Option<Arc<GroupMembers>>>,
+    groups: FxHashMap<StateKey, Option<GroupMembers>>,
 }
 
 impl<'a, 'ctx, S: StateView> StateViewResourceProvider<'a, 'ctx, S> {
@@ -208,9 +207,10 @@ impl<'a, 'ctx, S: StateView> StateViewResourceProvider<'a, 'ctx, S> {
             Some(group_ty) => {
                 let tag = nominal_tag(group_ty)?;
                 let group_key = StateKey::resource_group(&key.address(), &tag);
+                let member_tag = nominal_tag(key.value_ty())?;
                 Ok(self
                     .group_members(&group_key)?
-                    .and_then(|members| members.get(&key.value_ty()).cloned()))
+                    .and_then(|members| members.get(&member_tag).cloned()))
             },
         }
     }
@@ -278,7 +278,10 @@ impl<S: StateView> ResourceProvider for StateViewResourceProvider<'_, '_, S> {
 impl<S: StateView> AptosDataProvider for StateViewResourceProvider<'_, '_, S> {
     /// Loaded from the state view on first access, caching absence as well so a
     /// missing group is read at most once.
-    fn group_members(&self, group_key: &StateKey) -> Result<Option<Arc<GroupMembers>>> {
+    // TODO(perf): Change read-API to be fine grained! We only need to get all members
+    //   for materialization on the write path where copy is needed. But read-path can
+    //   and should avoid full copies.
+    fn group_members(&self, group_key: &StateKey) -> Result<Option<GroupMembers>> {
         if let Some(members) = self.inner.borrow().groups.get(group_key) {
             return Ok(members.clone());
         }
@@ -287,7 +290,7 @@ impl<S: StateView> AptosDataProvider for StateViewResourceProvider<'_, '_, S> {
             .get_state_value(group_key)
             .map_err(|e| anyhow!("group read failed: {e}"))?
         {
-            Some(value) => Some(Arc::new(decode_group_members(value.bytes(), self.guard)?)),
+            Some(value) => Some(decode_group_members(value.bytes())?),
             None => None,
         };
         self.inner
