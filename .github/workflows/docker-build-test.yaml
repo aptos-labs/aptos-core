@@ -120,7 +120,7 @@ jobs:
     outputs:
       only_docs_changed: ${{ steps.determine_file_changes.outputs.only_docs_changed }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - name: Run the file change determinator
         id: determine_file_changes
         uses: ./.github/actions/file-change-determinator
@@ -132,7 +132,7 @@ jobs:
     outputs:
       run_framework_upgrade_test: ${{ steps.determine_test_targets.outputs.run_framework_upgrade_test }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           # Target determination must analyze the PR revision with full history.
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -303,7 +303,7 @@ jobs:
     runs-on: 2cpu-gh-ubuntu24-x64
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 1
           ref: ${{ github.ref }}

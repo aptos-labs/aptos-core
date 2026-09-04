@@ -23,7 +23,7 @@ jobs:
       run:
         shell: pwsh
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0 # Fetch all git history for accurate target determination

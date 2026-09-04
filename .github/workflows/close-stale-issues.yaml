@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: write # required by actions/stale v10 to create/delete its progress cache
   # contents: write # only for delete-branch option
   issues: write
   pull-requests: write
@@ -12,7 +13,7 @@ jobs:
   stale:
     runs-on: 2cpu-gh-ubuntu24-x64
     steps:
-      - uses: actions/stale@v6
+      - uses: actions/stale@1e223db275d687790206a7acac4d1a11bd6fe629 # v10.4.0
         with:
           days-before-stale: 45
           days-before-close: 15
