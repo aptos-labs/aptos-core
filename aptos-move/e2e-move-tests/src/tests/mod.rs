@@ -28,6 +28,7 @@ mod error_map;
 mod fee_payer;
 mod friends;
 mod function_caches;
+mod function_type_ability_bounds;
 mod function_value_depth;
 mod function_value_layout_dag;
 mod function_value_serialization_restriction;

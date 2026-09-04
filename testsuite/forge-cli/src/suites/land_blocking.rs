@@ -47,6 +47,11 @@ fn compatibility_test_features() -> Features {
     // feature is not enabled yet. When enabled, old and new binaries can
     // disagree on the hotness portion of transaction outputs.
     features.disable(FeatureFlag::HOTNESS_IN_EPILOGUE);
+    // The old binary's genesis panics on feature indices it does not know, so a
+    // flag must stay disabled here until the newest release branch has it.
+    // TODO: remove once `CHECK_FUNCTION_TYPE_ABILITIES` is on the newest
+    // `aptos-release-v*` branch (v1.50 cut).
+    features.disable(FeatureFlag::CHECK_FUNCTION_TYPE_ABILITIES);
     features
 }
 
