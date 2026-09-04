@@ -419,7 +419,29 @@ fn translate_type(maps: &NameMaps, ty: &move_model::ty::Type) -> Result<exchange
                 ReferenceKind::Mutable => exchange::Type::MutRef(inner),
             })
         },
+        Type::Fun(args, result, abilities) => Ok(exchange::Type::Fun(
+            translate_type_list(maps, args)?,
+            translate_type_list(maps, result)?,
+            ability_names(*abilities),
+        )),
         ty => bail!("unsupported type {:?}", ty),
+    }
+}
+
+/// Translates the argument or result position of a function type, which the
+/// exchange format spells as a list.
+///
+/// `move_model` writes such a position as a bare type at arity one and as a
+/// `Tuple` otherwise — `|T|` is `Fun(T, Tuple([]))`, `|&T, &V|` is
+/// `Fun(Tuple([&T, &V]), Tuple([]))`. This is the only place a `Tuple` is
+/// meaningful, which is why [`translate_type`] rejects it everywhere else.
+fn translate_type_list(maps: &NameMaps, ty: &move_model::ty::Type) -> Result<Vec<exchange::Type>> {
+    match ty {
+        move_model::ty::Type::Tuple(types) => types
+            .iter()
+            .map(|ty| translate_type(maps, ty))
+            .collect::<Result<Vec<_>>>(),
+        single => Ok(vec![translate_type(maps, single)?]),
     }
 }
 
