@@ -603,21 +603,22 @@ fn generate_fresh_spec_file(
     // by e.g. `use m::{T}`. Add only those missing module aliases. Blindly
     // copying every source import here would create duplicate aliases after
     // the two modules are merged.
-    let self_sym = env.symbol_pool().make("Self");
-    let existing_default_module_aliases: BTreeSet<_> = module
+    // Keyed by the name each import binds, not by module id: a use declaration
+    // the model did not resolve carries no module id, drops out of this set,
+    // and the alias is then emitted a second time -- a duplicate-alias error
+    // that stops the whole package compiling. The qualifier is what collides,
+    // so the qualifier is what is compared.
+    let pool = env.symbol_pool();
+    let existing_default_module_aliases: BTreeSet<String> = module
         .get_use_decls()
         .iter()
-        .filter(|declaration| {
-            // `use m;`, `use m as A;` and `use m::{Self, ..}` all bring the
-            // module name itself into scope; `use m::{T}` does not.
-            declaration.alias.is_some()
-                || declaration.members.is_empty()
-                || declaration
-                    .members
-                    .iter()
-                    .any(|(_, member, _)| *member == self_sym)
+        .filter(|declaration| declaration.binds_module_qualifier(pool))
+        .map(|declaration| {
+            let bound = declaration
+                .alias
+                .unwrap_or_else(|| declaration.module_name.name());
+            bound.display(pool).to_string()
         })
-        .filter_map(|declaration| declaration.module_id)
         .collect();
     let mut imported_modules = BTreeSet::new();
     for fun in module.get_functions() {
@@ -643,7 +644,15 @@ fn generate_fresh_spec_file(
         }
     }
     imported_modules.remove(&module.get_id());
-    imported_modules.retain(|mid| !existing_default_module_aliases.contains(mid));
+    imported_modules.retain(|mid| {
+        let name = env
+            .get_module(*mid)
+            .get_name()
+            .name()
+            .display(env.symbol_pool())
+            .to_string();
+        !existing_default_module_aliases.contains(&name)
+    });
     for imported in imported_modules {
         emitln!(
             sourcifier.writer(),

@@ -7,6 +7,7 @@
 
 use crate::{
     options::BoogieOptions,
+    process_group::ProcessGroupChild,
     timeout_analysis::{
         analyze_selected_seed, boogie_output_has_timeout, prover_log_pattern, RawTimeoutAnalysis,
     },
@@ -17,7 +18,7 @@ use log::debug;
 use regex::Regex;
 use std::{
     collections::BTreeMap,
-    process::Output,
+    process::{Output, Stdio},
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -348,10 +349,18 @@ impl ProverTask for RunBoogieWithSeeds {
             .get_boogie_command(task_id)
             .map_err(std::io::Error::other)?;
         debug!("running Boogie command with seed {}", task_id);
-        let process = Command::new(&args[0])
+        // Abandoning this future (deadline, lost seed race) kills Boogie's
+        // whole process group, solver included.
+        let mut command = Command::new(&args[0]);
+        command
             .args(&args[1..])
-            .kill_on_drop(true)
-            .output();
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        let process = async move {
+            ProcessGroupChild::spawn(&mut command)?
+                .wait_with_output()
+                .await
+        };
         let timeout_deadline = self
             .process_deadline
             .map(tokio::time::Instant::from_std)

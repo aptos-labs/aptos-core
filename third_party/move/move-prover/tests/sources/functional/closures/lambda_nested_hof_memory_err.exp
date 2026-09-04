@@ -1,5 +1,4 @@
 warning: WP could not characterize the aborts of `lambda_nested_hof_memory_err::__lambda__2__drive` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
-  = an emitted abort condition is flagged `vacuous` or `sathard`
   = an abort condition had no representable source-level spelling
    ┌─ tests/sources/functional/closures/lambda_nested_hof_memory_err.move:32:15
    │

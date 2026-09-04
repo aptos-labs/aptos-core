@@ -5,7 +5,7 @@
 
 use crate::{
     memory_instrumentation::Instrumenter, options::ProverOptions,
-    spec_inference::infer_loop_head_evidence,
+    spec_inference::infer_loop_head_evidence, verification_analysis,
 };
 use move_binary_format::file_format::CodeOffset;
 use move_model::{
@@ -77,6 +77,15 @@ pub struct LoopHeadObservation {
     pub facts: Vec<String>,
 }
 
+/// How many paths through the bounded DAG the loop-invariant evidence
+/// diagnostic may explore before it declines.
+///
+/// Evidence unrolls every loop in the function, so the path count grows as
+/// `(depth + 1)^loops`. The budget is what one function's diagnostic is worth,
+/// not a correctness bound: exceeding it produces a note explaining why no
+/// evidence is offered, and inference itself is unaffected.
+const MAX_BOUNDED_EVIDENCE_PATHS: usize = 512;
+
 pub struct LoopAnalysisProcessor {}
 
 impl LoopAnalysisProcessor {
@@ -100,9 +109,16 @@ impl FunctionTargetProcessor for LoopAnalysisProcessor {
             Ok((loops_with_invariants, loops_for_unrolling)) => {
                 let loops_without_invariants =
                     Self::loops_without_invariants(func_env, &data, &loops_with_invariants);
-                let loop_invariant_evidence = func_env
-                    .module_env
-                    .is_target()
+                // Evidence is a diagnostic about the function the caller asked
+                // about. `module_env.is_target()` only says the module is a
+                // target, so on a package where every module is a target that
+                // was every function with a loop -- `--target m::f` still paid
+                // for bounded evidence across the whole package.
+                // `verification_analysis` has already computed the per-function
+                // answer by this point in the pipeline.
+                let in_scope =
+                    verification_analysis::get_info(&FunctionTarget::new(func_env, &data)).verified;
+                let loop_invariant_evidence = (func_env.module_env.is_target() && in_scope)
                     .then(|| {
                         ProverOptions::get(func_env.module_env.env).loop_invariant_evidence_depth
                     })
@@ -260,24 +276,67 @@ impl LoopAnalysisProcessor {
         }
 
         let Ok((loops_for_transform, loops_for_unrolling)) =
-            fat_loop::build_loop_info_for_spec_with_forced_unroll(
+            fat_loop::build_loop_info_for_spec_with_forced_unroll_of(
                 &FunctionTarget::new(func_env, data),
                 targets,
                 depth,
+                // Only the loop being reported. Unrolling the others multiplies
+                // the paths through the bounded DAG -- `(depth + 1)^loops` --
+                // without saying anything more about this loop's heads, and it
+                // is what made a ten-loop function stop terminating.
+                Some(loop_info.header),
             )
         else {
             return unavailable(
                 "the isolated bounded loop analysis could not be built".to_string(),
             );
         };
-        if !loops_for_transform.fat_loops.is_empty() {
-            return unavailable(
-                "this function contains a loop that is summarized rather than unrolled".to_string(),
-            );
-        }
+        // Loops other than the one under report are summarized rather than
+        // unrolled, which is the point: their havoc leaves this loop's entry
+        // state unconstrained, so the facts below are weaker and still sound.
+        // Facts are emitted as guarded implications, and the diagnostic already
+        // states that bounded observations are not an invariant or a proof.
+        let summarized_loops = loops_for_transform.fat_loops.len();
         let unrolled_loops = loops_for_unrolling.fat_loops.len();
 
+        // Bounded evidence unrolls *every* loop in the function, not just the one
+        // being reported, so a function with `l` loops yields on the order of
+        // `(depth + 1)^l` paths through the bounded DAG -- and a full weakest
+        // precondition is then computed once per head over that DAG. At depth 3
+        // this is 4 paths for one loop and about a million for ten, which is the
+        // difference between a diagnostic and a hang.
+        //
+        // This is a diagnostic: it exists to suggest an invariant, and declining
+        // to guess costs the caller a note while spending the budget costs them
+        // the run. The estimate is made before any unrolling, because building
+        // the DAG is itself part of the blowup.
+        let estimated_paths = (depth + 1).saturating_pow(unrolled_loops as u32);
+        if estimated_paths > MAX_BOUNDED_EVIDENCE_PATHS {
+            return unavailable(format!(
+                "the function has {} unrollable loop(s), so bounded evidence would explore about {} paths at depth {} (budget {})",
+                unrolled_loops, estimated_paths, depth, MAX_BOUNDED_EVIDENCE_PATHS
+            ));
+        }
+
         let mut shadow = Self::transform(func_env, data.clone(), &loops_for_transform);
+        // `LoopUnrollingMark::back_edges` holds code offsets, and `transform` has
+        // just rewritten the body of every summarized loop, so offsets taken
+        // against the original code no longer address the same bytecodes -- the
+        // bridging pass would then redirect whatever now sits at that offset.
+        // Recompute the marks against the function that is actually unrolled.
+        // This only arises once some loops are summarized instead of unrolled;
+        // when every loop was unrolled, `transform` had nothing to rewrite.
+        let Ok((_, loops_for_unrolling)) = fat_loop::build_loop_info_for_spec_with_forced_unroll_of(
+            &FunctionTarget::new(func_env, &shadow),
+            targets,
+            depth,
+            Some(loop_info.header),
+        ) else {
+            return unavailable(
+                "the bounded loop analysis could not be rebuilt after loop summarization"
+                    .to_string(),
+            );
+        };
         let mut selected_heads = None;
         for (header, mark) in loops_for_unrolling.fat_loops {
             let (next, heads) = Self::unroll(func_env, shadow, &header, &mark);
@@ -294,6 +353,15 @@ impl LoopAnalysisProcessor {
         let mut heads = vec![];
         let mut partial_notes = vec![];
         let mut omitted_facts = 0;
+        let mut summarized_facts = 0;
+        if summarized_loops > 0 {
+            // Says why a fact is weaker than the reader might expect: another
+            // loop's havoc, not a gap in the analysis.
+            partial_notes.push(format!(
+                "{} other loop(s) in this function are summarized, so facts that depend on their results are unconstrained here",
+                summarized_loops
+            ));
+        }
         if loop_info.omitted_carried > 0 {
             partial_notes.push(format!(
                 "{} compiler-generated or memory loop target(s) were omitted from the source-level view",
@@ -333,6 +401,7 @@ impl LoopAnalysisProcessor {
             if observation.omitted_facts > 0 {
                 omitted_facts += observation.omitted_facts;
             }
+            summarized_facts += observation.summarized_facts;
             heads.push(LoopHeadObservation {
                 index: head_index,
                 facts: observation.facts,
@@ -342,6 +411,12 @@ impl LoopAnalysisProcessor {
             partial_notes.push(format!(
                 "{} fact(s) across the bounded heads used internal names or exceeded the display cap and were omitted",
                 omitted_facts
+            ));
+        }
+        if summarized_facts > 0 {
+            partial_notes.push(format!(
+                "{} fact(s) across the bounded heads depend on summarized loop state and were omitted",
+                summarized_facts
             ));
         }
         if unrolled_loops > 1 {

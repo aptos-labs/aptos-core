@@ -3,6 +3,7 @@
 
 //! Capture, replay, and interpretation support for solver timeout analysis.
 
+use crate::process_group::ProcessGroupChild;
 use codespan::{ColumnIndex, LineIndex};
 use move_model::{
     code_writer::CodeWriter,
@@ -274,14 +275,14 @@ async fn replay_capture(
             );
         },
     };
-    let child = Command::new(z3_exe)
+    let mut command = Command::new(z3_exe);
+    command
         .arg("-st")
         .arg(&replay_path)
         .stdout(Stdio::from(stdout_file))
-        .stderr(Stdio::from(stderr_file))
-        .kill_on_drop(true)
-        .spawn();
-    let mut child = match child {
+        .stderr(Stdio::from(stderr_file));
+    let child = ProcessGroupChild::spawn(&mut command);
+    let child = match child {
         Ok(child) => child,
         Err(err) => {
             log::debug!("cannot launch timeout-analysis Z3 replay: {}", err);
@@ -305,11 +306,7 @@ async fn replay_capture(
                 log::debug!("cannot wait for timeout-analysis Z3 replay: {}", err);
                 (false, false)
             },
-            Err(_) => {
-                let _ = child.kill().await;
-                let _ = child.wait().await;
-                (false, true)
-            },
+            Err(_) => (false, true),
         };
     let stdout = read_lossy(&stdout_path);
     let stderr = read_lossy(&stderr_path);

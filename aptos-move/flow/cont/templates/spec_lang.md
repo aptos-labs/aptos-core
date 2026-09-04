@@ -19,7 +19,9 @@ soft keyword, escape it as `spec @function_name { ... }`.
   `old(e)` for a pre-state value.
 - `modifies global<T>(addr)` is a frame declaration for global state the
   function may change. An opaque function that can mutate global resources
-  needs frames covering every such resource/address effect.
+  needs frames covering every such resource/address effect. A function that reads global
+  state without writing any has no frame to declare, and inventing a `modifies`
+  for it claims an effect the implementation does not have.
 
 ### Opaque and intrinsic functions
 

@@ -298,7 +298,7 @@ impl BoogieOptions {
     /// The derived process timeout is a watchdog for a wedged Boogie process,
     /// not another VC timeout. It includes parsing, type checking, inlining,
     /// and VC construction, none of which is covered by Boogie's `timeLimit`.
-    const MIN_PROCESS_TIMEOUT_SECS: u64 = 300;
+    const MIN_PROCESS_TIMEOUT_SECS: u64 = 180;
     const PROCESS_TIMEOUT_FACTOR: u64 = 4;
 
     /// Derive options based on other set options.

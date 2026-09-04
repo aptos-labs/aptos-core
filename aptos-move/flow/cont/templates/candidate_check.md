@@ -6,7 +6,8 @@
 `{{ tool(name="move_spec_check") }}` is how a specification is
 tested, whether it was inferred or written by hand. It compiles the package,
 verifies the target, rejects a contract that weakens itself -- verification
-disabled or skipped, a vacuous condition, a partial-abort pragma -- and
+disabled or skipped, a vacuous condition, a partial-abort pragma no callee
+justifies -- and
 reports an obligation category the contract leaves uncovered. Give it
 `package_path` and optionally `filter` to work on one module or function.
 

@@ -45,6 +45,12 @@ the callee contract and rerun. Complete the abort behavior before removing the
 pragma: deleting it alone turns an incomplete contract into a false claim of
 exactness, and the candidate check rejects either form.
 
+A contract that carries the pragma because a *callee's* contract is partial is
+the exception: there the abort condition does not exist to be stated, and the
+check admits it. That holds for a callee inference reported this way, or one
+the tree already carried -- not for a helper the session marked partial
+itself.
+
 A scope can also contain a helper with no specification of its own. Where the
 derived contract has to speak about that helper through a behavioral predicate
 (`result_of`, `aborts_of`), the prover rejects it and names the helper: a

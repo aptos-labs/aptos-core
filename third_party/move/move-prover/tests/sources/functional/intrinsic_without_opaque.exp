@@ -1,0 +1,12 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/intrinsic_without_opaque.move:37:9
+   │
+37 │         ensures result == x; // error: the specification of `bounded` does not say this
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/intrinsic_without_opaque.move:30: caller_expecting_the_body
+   =         x = <redacted>
+   =     at tests/sources/functional/intrinsic_without_opaque.move:31: caller_expecting_the_body
+   =         result = <redacted>
+   =     at tests/sources/functional/intrinsic_without_opaque.move:37: caller_expecting_the_body (spec)

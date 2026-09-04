@@ -73,4 +73,16 @@ found_version=$("$claude_build" --version 2>/dev/null | awk '{print $1}')
 }
 export CLAUDE_CODE_EXECUTABLE="$claude_build"
 
+# `--preflight` runs every check above and stops there: it answers whether this
+# wrapper can establish a session, without starting one. Preflight asks the
+# wrapper itself rather than re-deriving the answer, because the wrapper is
+# what a real cell runs through -- and it converts the credential and then
+# unsets the variable it came from, so a check that looked for that variable
+# from inside a wrapped process would see it already gone. Reports what it
+# resolved; never the credential.
+if [ "${1:-}" = "--preflight" ]; then
+    echo "with-glm-env: credential resolved; Claude Code $found_version at $claude_build; endpoint $ANTHROPIC_BASE_URL"
+    exit 0
+fi
+
 exec "$@"

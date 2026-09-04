@@ -30,6 +30,15 @@ spec module {
 ```
 
 Attach `proof { ... }` after a function spec or lemma.
+
+A lemma proof may apply the lemma itself, which is induction: the application
+must decrease the lemma's measure, by default the tuple of its integer
+parameters in declaration order, or as declared by `decreases e;` (one
+expression, or a tuple ordered lexicographically). `apply pow_pos(b, e - 1)`
+under `if (e > 0)` decreases `(b, e)`; an application at the same or a larger
+instance, or one that can descend below zero, fails with "does not decrease
+the measure". `forall ... apply` of a lemma from its own recursion group is
+rejected.
 {% if evaluation_mode %}
 Do not add `assume`, an axiom, or an unproved native helper: such constructs
 replace a proof obligation rather than solve it and are forbidden in evaluation

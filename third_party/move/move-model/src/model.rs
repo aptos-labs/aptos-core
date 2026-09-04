@@ -32,7 +32,6 @@ use crate::{
         DISABLE_INVARIANTS_IN_BODY_PRAGMA, FRIEND_PRAGMA, INTRINSIC_PRAGMA, OPAQUE_PRAGMA,
         VERIFY_PRAGMA,
     },
-    spec_derivation,
     symbol::{Symbol, SymbolPool},
     ty::{
         AbilityInference, AbilityInferer, NoUnificationContext, Type, TypeDisplayContext, Variance,
@@ -2074,7 +2073,11 @@ impl GlobalEnv {
         let used_modules = self.get_used_modules_from_bytecode(&module);
         let friend_modules = self.get_friend_modules_from_bytecode(&module);
 
-        // If use decls decls are empty, let's propagage them from the CompiledModule with aliases assigned
+        // If use decls are empty, let's propagate them from the CompiledModule with aliases
+        // assigned. Otherwise the module was built from source and already carries its own
+        // imports; keep them. They are the only record of which module names source actually
+        // bound, and bytecode cannot reconstruct that -- it lists what is referenced, not what
+        // was imported.
         let use_decls = if self.module_data[module_id.0 as usize].use_decls.is_empty() {
             // Map to keep track of aliases for used modules
             // key: module name (without address)
@@ -2115,7 +2118,7 @@ impl GlobalEnv {
                 })
                 .collect()
         } else {
-            vec![]
+            std::mem::take(&mut self.module_data[module_id.0 as usize].use_decls)
         };
         // If friend decls are empty, let's propagage them from the CompiledModule
         // Different from use decls, we allow friend modules that have not been added to the GlobalEnv
@@ -3641,6 +3644,46 @@ impl<'env> ModuleEnv<'env> {
         &self.data.use_decls
     }
 
+    /// Returns the modules whose name is bound as a qualifier by a `use`
+    /// declaration of this module.
+    ///
+    /// This is deliberately not `get_used_modules`. That set is the dependency
+    /// closure: once a compiled module is attached it is recomputed from
+    /// bytecode and holds every module referenced, whether or not source ever
+    /// imported it. Printing a type short because it is *referenced* produces a
+    /// qualifier that does not resolve; only an import can license the short
+    /// form.
+    pub fn get_use_bound_modules(&self) -> BTreeSet<ModuleId> {
+        let pool = self.env.symbol_pool();
+        self.data
+            .use_decls
+            .iter()
+            .filter(|ud| ud.binds_module_qualifier(pool))
+            .filter_map(|ud| self.resolve_use_decl_module(ud))
+            .collect()
+    }
+
+    /// Resolves the module a `use` declaration names.
+    ///
+    /// `UseDecl::module_id` is filled in during declaration analysis and stays
+    /// `None` whenever the target module had not been entered into the module
+    /// table yet, so it cannot be relied on on its own. The declaration also
+    /// keeps the address as written, which may be a named alias, so resolving by
+    /// name needs the alias map.
+    fn resolve_use_decl_module(&self, use_decl: &UseDecl) -> Option<ModuleId> {
+        if let Some(id) = use_decl.module_id {
+            return Some(id);
+        }
+        let name = &use_decl.module_name;
+        let addr = match name.addr() {
+            Address::Symbolic(alias) => Address::Numerical(self.env.resolve_address_alias(*alias)?),
+            addr @ Address::Numerical(_) => addr.clone(),
+        };
+        self.env
+            .find_module(&ModuleName::new(addr, name.name()))
+            .map(|m| m.get_id())
+    }
+
     /// Returns the friend declarations of this module.
     pub fn get_friend_decls(&self) -> &[FriendDecl] {
         &self.data.friend_decls
@@ -3847,7 +3890,7 @@ impl<'env> ModuleEnv<'env> {
     pub fn get_type_display_ctx(&self) -> TypeDisplayContext<'_> {
         TypeDisplayContext {
             module_name: Some(self.get_name().clone()),
-            used_modules: self.get_used_modules(false),
+            used_modules: self.get_use_bound_modules(),
             ..TypeDisplayContext::new(self.env)
         }
     }
@@ -5021,7 +5064,7 @@ impl NamedConstantEnv<'_> {
     pub fn get_type_display_ctx(&self) -> TypeDisplayContext<'_> {
         TypeDisplayContext {
             module_name: Some(self.module_env.get_name().clone()),
-            used_modules: self.module_env.get_used_modules(false),
+            used_modules: self.module_env.get_use_bound_modules(),
             ..TypeDisplayContext::new(self.module_env.env)
         }
     }
@@ -5798,8 +5841,35 @@ impl<'env> FunctionEnv<'env> {
     }
 
     /// Returns true if this function is opaque.
+    ///
+    /// `pragma intrinsic` on a function the prover does not actually implement
+    /// is opaque as well. The backend emits no body for an intrinsic, and an
+    /// unregistered one has no prelude procedure either, so a call site that
+    /// translated to a direct call named a procedure that was never declared
+    /// and Boogie failed to resolve it -- an internal error carrying no source
+    /// location, rather than a verdict. Having no body the prover can use is
+    /// what opaque means, so such a call goes through the specification. A
+    /// registered intrinsic is implemented and keeps its direct translation.
     pub fn is_opaque(&self) -> bool {
-        self.is_pragma_true(OPAQUE_PRAGMA, || false)
+        self.is_pragma_true(OPAQUE_PRAGMA, || self.is_unimplemented_intrinsic())
+    }
+
+    /// Whether this function declares `pragma intrinsic` without the prover
+    /// providing an implementation for it.
+    pub fn is_unimplemented_intrinsic(&self) -> bool {
+        self.is_pragma_true(INTRINSIC_PRAGMA, || false)
+            // A native intrinsic is implemented by the prelude by construction,
+            // a registered one by its intrinsic declaration, and `std::vector`'s
+            // by the prelude's templates. Each translates to a procedure that is
+            // declared somewhere; nothing else with the pragma does.
+            && !self.is_native()
+            && !crate::well_known::is_boogie_prelude_intrinsic(self)
+            && self
+                .module_env
+                .env
+                .intrinsics
+                .get_decl_for_move_fun(&self.get_qualified_id())
+                .is_none()
     }
 
     /// Return the visibility of this function
@@ -6241,33 +6311,13 @@ impl<'env> FunctionEnv<'env> {
                         },
                         // Behavioral predicate over a concrete closure target:
                         // its evaluator is defined over the target's memory.
-                        ExpData::Call(_, Operation::Behavior(..), args) => {
-                            if let Some(ExpData::Call(cid, Operation::Closure(mid, fid, _), _)) =
-                                args.first().map(|a| a.as_ref())
+                        ExpData::Call(_, Operation::Behavior(kind, _), args) => {
+                            if let Some(target) = ExpData::behavior_target_memory(env, *kind, args)
                             {
-                                let target_qid = mid.qualified(*fid);
-                                let target = env.get_function(target_qid);
-                                let inst = env.get_node_instantiation(*cid);
-                                used.extend(spec_derivation::behavioral_target_memory(
-                                    env, target_qid, &inst,
-                                ));
-                                old.extend(target.get_spec_old_memory_instantiated(&inst));
-                                // A target slot the instantiation leaves as a
-                                // type parameter has no struct head to resolve
-                                // against, so it stays generic in this caller
-                                // rather than being dropped.
-                                for (target_generic, out) in [
-                                    (target.get_spec_generic_used_memory(), &mut generic_used),
-                                    (target.get_spec_generic_old_memory(), &mut generic_old),
-                                ] {
-                                    for slot in target_generic.iter() {
-                                        if let Some(Type::TypeParameter(tp)) =
-                                            inst.get(*slot as usize).map(Type::skip_reference)
-                                        {
-                                            out.insert(*tp);
-                                        }
-                                    }
-                                }
+                                used.extend(target.used);
+                                generic_used.extend(target.generic_used);
+                                old.extend(target.old);
+                                generic_old.extend(target.generic_old);
                             }
                         },
                         _ => {},

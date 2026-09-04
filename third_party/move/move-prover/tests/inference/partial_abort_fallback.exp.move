@@ -16,7 +16,7 @@ module 0x42::partial_abort_fallback {
     }
     spec caller() {
         pragma opaque = true, aborts_if_is_partial = true;
-        ensures [inferred = sathard] ensures_of<maybe_abort>();
+        ensures [inferred] ensures_of<maybe_abort>();
     }
 
 }

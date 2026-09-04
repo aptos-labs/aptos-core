@@ -77,6 +77,7 @@ mod boogie_helpers;
 pub mod boogie_wrapper;
 pub mod bytecode_translator;
 pub mod options;
+mod process_group;
 mod prover_task_runner;
 mod spec_translator;
 mod timeout_analysis;

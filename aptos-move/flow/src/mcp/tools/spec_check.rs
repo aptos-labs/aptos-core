@@ -60,14 +60,7 @@ impl FlowSession {
             .baseline_path
             .as_ref()
             .map(|path| self.resolve_package_path(path));
-        // A per-VC budget beyond the tool's own deadline never helps the
-        // caller, and would let solver work the caller has already stopped
-        // waiting for outlive the response by that much.
-        let timeout = params
-            .timeout
-            .unwrap_or(DEFAULT_CHECK_TIMEOUT_SECS)
-            .min(self.tool_timeout().as_secs() as usize)
-            .max(1);
+        let timeout = params.timeout.unwrap_or(DEFAULT_CHECK_TIMEOUT_SECS).max(1);
         let telemetry = self.telemetry().clone();
         // Per-condition progress is what the `progress` feedback level adds.
         let report_conditions = self
@@ -78,43 +71,34 @@ impl FlowSession {
         // The check builds its own model rather than resolving through the
         // session cache, so it guards the manifest itself.
         self.refuse_remote_dependencies(std::path::Path::new(&package))?;
-        let tool_timeout = self.tool_timeout();
-        let verdict = tokio::time::timeout(
-            tool_timeout,
-            tokio::task::spawn_blocking(move || {
-                let config = match configured {
-                    // An evaluation task fixes the target and the contract
-                    // categories, so a candidate cannot relax its own criteria.
-                    Some(config_path) => {
-                        let config = CandidateCheckConfig::load(&config_path)?;
-                        anyhow::ensure!(
-                            config.package.canonicalize().ok()
-                                == std::path::Path::new(&package).canonicalize().ok(),
-                            "the candidate check is configured for a different package"
-                        );
-                        config
-                    },
-                    None => {
-                        let mut config = CandidateCheckConfig::for_package(
-                            std::path::Path::new(&package),
-                            filter.as_deref(),
-                            timeout,
-                        )?;
-                        config.baseline = baseline.map(std::path::PathBuf::from);
-                        config.report_conditions = report_conditions;
-                        config
-                    },
-                };
-                evaluate_candidate(&with_deadline(config, tool_timeout))
-            }),
-        )
+        // No tool-level deadline: the prover's watchdog bounds each run.
+        let verdict = tokio::task::spawn_blocking(move || {
+            let config = match configured {
+                // An evaluation task fixes the target and the contract
+                // categories, so a candidate cannot relax its own criteria.
+                Some(config_path) => {
+                    let config = CandidateCheckConfig::load(&config_path)?;
+                    anyhow::ensure!(
+                        config.package.canonicalize().ok()
+                            == std::path::Path::new(&package).canonicalize().ok(),
+                        "the candidate check is configured for a different package"
+                    );
+                    config
+                },
+                None => {
+                    let mut config = CandidateCheckConfig::for_package(
+                        std::path::Path::new(&package),
+                        filter.as_deref(),
+                        timeout,
+                    )?;
+                    config.baseline = baseline.map(std::path::PathBuf::from);
+                    config.report_conditions = report_conditions;
+                    config
+                },
+            };
+            evaluate_candidate(&config)
+        })
         .await
-        .map_err(|_| {
-            rmcp::ErrorData::internal_error(
-                format!("tool timeout ({}s exceeded)", tool_timeout.as_secs()),
-                None,
-            )
-        })?
         .map_err(|error| rmcp::ErrorData::internal_error(error.to_string(), None))?;
         match verdict {
             Ok(verdict) => {
@@ -146,14 +130,4 @@ impl FlowSession {
             ))])),
         }
     }
-}
-
-/// The tool answers within its deadline; the prover process must too, or the
-/// work outlives the answer.
-fn with_deadline(
-    mut config: CandidateCheckConfig,
-    tool_timeout: std::time::Duration,
-) -> CandidateCheckConfig {
-    config.process_deadline_seconds = Some(tool_timeout.as_secs().saturating_sub(1).max(1));
-    config
 }

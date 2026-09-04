@@ -712,6 +712,7 @@ nalgebra = "0.32"
 named-lock = "0.2.0"
 native-tls = "0.2.10"
 neptune = { version = "13.0.0", default-features = false }
+nix = { version = "0.29", features = ["signal"] }
 notify = "8.2.0"
 ntest = "0.9.3"
 num = "0.4.0"

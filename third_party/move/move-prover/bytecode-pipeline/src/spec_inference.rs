@@ -119,7 +119,7 @@ use move_model::{
     },
     pragmas::{
         ABORTS_IF_IS_PARTIAL_PRAGMA, CONDITION_INFERRED_PROP, CONDITION_INFERRED_SATHARD,
-        CONDITION_INFERRED_VACUOUS, INFERENCE_PRAGMA, OPAQUE_PRAGMA, VERIFY_PRAGMA,
+        CONDITION_INFERRED_VACUOUS, INFERENCE_PRAGMA, OPAQUE_PRAGMA,
     },
     sourcifier::Sourcifier,
     spec_derivation,
@@ -160,6 +160,8 @@ struct LoopEvidenceSeed {
 pub(crate) struct LoopHeadEvidence {
     pub facts: Vec<String>,
     pub omitted_facts: usize,
+    /// Facts that quantify over state a summarized loop left unconstrained.
+    pub summarized_facts: usize,
     pub incomplete: bool,
 }
 
@@ -988,22 +990,27 @@ fn report_uninvariant_loops(fun_env: &FunctionEnv, data: &FunctionData) {
         .map(|loops| loops.0.as_slice())
         .unwrap_or_default();
     if uninvariant.is_empty() {
-        // Weakest preconditions are exact without loops, so loop havoc is the
-        // only source of a `vacuous` condition. `sathard` has others, such as a
-        // top-level quantifier or an untrusted `result_of` carrier.
+        // Without loops, a `vacuous` condition has one other source: an
+        // opaque callee that returns `&mut` into state it does not model. The
+        // write-back through that reference then has no value, and the
+        // caller's post-state carries an unconstrained quantified variable --
+        // `big_ordered_map::iter_modify` through
+        // `storage_slots_allocator::borrow_mut` is the reference case. That
+        // is not a missing loop invariant and not a defect in the pass; the
+        // callee needs an intrinsic model or an exact write-back contract.
         if has_vacuous {
-            // The same severity as an uninvariant loop, and for a stronger
-            // reason: the condition is dropped either way, but here the
-            // inference pass is misbehaving rather than the source lacking an
-            // invariant. A consumer that only asks whether the prover
-            // succeeded would admit the target on a contract that was silently
-            // discarded.
+            // The same severity as an uninvariant loop: the condition is
+            // dropped either way, and a consumer that only asks whether the
+            // prover succeeded would admit the target on a contract that was
+            // silently discarded.
             fun_env.module_env.env.diag(
                 loop_severity,
                 &fun_env.get_loc(),
-                "bug: inference produced a `vacuous` condition for a function with no \
-                 uninvariant loop. Weakest preconditions are exact without loops, so this \
-                 is a defect in the inference pass rather than a missing loop invariant.",
+                "WP inferred a `vacuous` condition, but this function has no loop \
+                 without an invariant. A callee that returns `&mut` into state its \
+                 contract does not model leaves the write-back through that reference \
+                 unconstrained; give that callee an intrinsic model or an exact \
+                 write-back contract before relying on the inferred specification.",
             );
         }
         return;
@@ -1440,7 +1447,15 @@ pub(crate) fn infer_loop_head_evidence(
     let marker_prefix = format!("__loop_head_{}_", head_index);
     let mut facts = vec![];
     let mut omitted_facts = 0;
+    let mut summarized_facts = 0;
     for exp in state.ensures {
+        // A bounded head fact is a ground observation. A quantifier means the
+        // value flowed through the havoc of a summarized loop, and the fact
+        // says nothing about the head.
+        if contains_quantifier(&exp) {
+            summarized_facts += 1;
+            continue;
+        }
         let sourcifier = Sourcifier::new(fun_env.module_env.env, true);
         sourcifier.print_exp_for_fun_spec(fun_env, &exp);
         let mut rendered = sourcifier.result().trim().to_string();
@@ -1467,8 +1482,20 @@ pub(crate) fn infer_loop_head_evidence(
     LoopHeadEvidence {
         facts,
         omitted_facts,
+        summarized_facts,
         incomplete: run.incomplete,
     }
+}
+
+fn contains_quantifier(exp: &Exp) -> bool {
+    let mut found = false;
+    exp.visit_pre_order(&mut |e| {
+        if matches!(e, ExpData::Quant(..)) {
+            found = true;
+        }
+        !found
+    });
+    found
 }
 
 fn run_spec_inference_analysis(
@@ -3578,7 +3605,10 @@ fn has_untrusted_transparent_result_of(env: &GlobalEnv, exp: &Exp) -> bool {
             return true;
         };
         let callee = env.get_function((*module_id).qualified(*fun_id));
-        !callee.is_opaque() || callee.is_pragma_false(VERIFY_PRAGMA)
+        // Opacity is what makes the carrier the call's result witness; a
+        // `verify = false` opaque callee is a stated boundary whose contract
+        // the caller consumes like any other.
+        !callee.is_opaque()
     })
 }
 
@@ -5616,14 +5646,12 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         dests: &[TempIndex],
         mut_ref_srcs: &[(usize, TempIndex)],
     ) {
-        if let ExpData::Call(_, AstOp::Closure(module_id, fun_id, _), _) = fun_exp.as_ref()
-            && self
-                .global_env()
-                .get_function((*module_id).qualified(*fun_id))
-                .is_pragma_false(VERIFY_PRAGMA)
-        {
-            state.solver_hard = true;
-        }
+        // A `verify = false` callee is a stated boundary: the caller consumes
+        // its contract exactly as it consumes any opaque contract, and whether
+        // that body was proved is a separate obligation the audit tracks, so
+        // it does not make the caller's conditions solver-hard. An incomplete
+        // callee contract is handled where it matters: a partial abort
+        // characterization propagates `aborts_if_is_partial` to the caller.
         let pre_label = self.forward_label_at(offset);
         let call_post = state.post;
 

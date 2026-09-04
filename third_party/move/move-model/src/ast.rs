@@ -561,6 +561,40 @@ pub struct LemmaDecl {
     pub conditions: Vec<Condition>,
     pub properties: PropertyBag,
     pub proof: Option<Proof>,
+    /// Declared termination measure (`decreases`), if any.
+    pub decreases: Option<Vec<Exp>>,
+    /// Recursion group of the lemma within its module, if it is recursive.
+    pub recursion_group: Option<usize>,
+}
+
+impl LemmaDecl {
+    /// The termination measure: the declared one, or by default the integer
+    /// parameters in declaration order, each as a fresh temporary expression.
+    pub fn measure(&self, env: &GlobalEnv) -> Vec<Exp> {
+        if let Some(decreases) = &self.decreases {
+            return decreases.clone();
+        }
+        self.params
+            .iter()
+            .enumerate()
+            .filter(|(_, Parameter(_, ty, _))| ty.is_number())
+            .map(|(idx, Parameter(_, ty, loc))| {
+                ExpData::Temporary(env.new_node(loc.clone(), ty.clone()), idx).into_exp()
+            })
+            .collect()
+    }
+
+    /// Number of components of the effective measure.
+    pub fn measure_arity(&self) -> usize {
+        match &self.decreases {
+            Some(decreases) => decreases.len(),
+            None => self
+                .params
+                .iter()
+                .filter(|Parameter(_, ty, _)| ty.is_number())
+                .count(),
+        }
+    }
 }
 
 /// Id for lemma declarations.
@@ -890,6 +924,22 @@ pub struct UseDecl {
     pub members: Vec<(Loc, Symbol, Option<Symbol>)>,
 }
 
+impl UseDecl {
+    /// Whether this declaration binds the module name, or its alias, as a
+    /// qualifier that source can write. `use m;`, `use m as A;` and
+    /// `use m::{Self, ..}` do; `use m::T;` brings `T` into scope on its own and
+    /// leaves the qualifier unbound, so a type printed as `m::T` would not
+    /// resolve.
+    pub fn binds_module_qualifier(&self, pool: &SymbolPool) -> bool {
+        self.alias.is_some()
+            || self.members.is_empty()
+            || self
+                .members
+                .iter()
+                .any(|(_, member, _)| pool.string(*member).as_str() == "Self")
+    }
+}
+
 // =================================================================================================
 /// # Friend Declarations
 
@@ -1205,6 +1255,71 @@ pub enum VisitorPosition {
     BeforeElse,             // Before else clause of IfElse expression.
     PreSequenceValue,       // Before final expr in a Sequence (or before Post, if seq is empty)
     Post,                   // after visiting all subexpressions
+}
+
+/// Memory a behavioral predicate contributes to the specification that uses
+/// it. The predicate's evaluator is defined over the target function's own
+/// memory, so whatever carries the predicate -- a function specification or a
+/// spec function body -- must carry that memory, in both states.
+pub struct BehaviorTargetMemory {
+    pub used: BTreeSet<QualifiedInstId<StructId>>,
+    pub generic_used: BTreeSet<u16>,
+    pub old: BTreeSet<QualifiedInstId<StructId>>,
+    pub generic_old: BTreeSet<u16>,
+}
+
+impl ExpData {
+    /// The memory a behavioral predicate call contributes, or `None` when its
+    /// target is not a concrete closure and so has no statically known memory.
+    ///
+    /// A target slot the instantiation leaves as a type parameter has no
+    /// struct head to resolve against, so it stays generic in the caller
+    /// rather than being dropped.
+    ///
+    /// `aborts_of` and `requires_of` are pre-state predicates: their evaluator
+    /// reads the target's memory in the state the spec function is evaluated
+    /// in, and that is what the function's ordinary memory parameter already
+    /// is. Only the post-state kinds observe the target's old state, so only
+    /// they make the spec function two-state.
+    pub fn behavior_target_memory(
+        env: &GlobalEnv,
+        kind: BehaviorKind,
+        args: &[Exp],
+    ) -> Option<BehaviorTargetMemory> {
+        let ExpData::Call(closure_id, Operation::Closure(mid, fid, _), _) = args.first()?.as_ref()
+        else {
+            return None;
+        };
+        let target_qid = mid.qualified(*fid);
+        let target = env.get_function(target_qid);
+        let inst = env.get_node_instantiation(*closure_id);
+        let still_generic = |slots: &BTreeSet<u16>| {
+            slots
+                .iter()
+                .filter_map(
+                    |slot| match inst.get(*slot as usize).map(Type::skip_reference) {
+                        Some(Type::TypeParameter(tp)) => Some(*tp),
+                        _ => None,
+                    },
+                )
+                .collect()
+        };
+        let two_state = kind.is_two_state();
+        Some(BehaviorTargetMemory {
+            used: crate::spec_derivation::behavioral_target_memory(env, target_qid, &inst),
+            generic_used: still_generic(&target.get_spec_generic_used_memory()),
+            old: if two_state {
+                target.get_spec_old_memory_instantiated(&inst)
+            } else {
+                BTreeSet::new()
+            },
+            generic_old: if two_state {
+                still_generic(&target.get_spec_generic_old_memory())
+            } else {
+                BTreeSet::new()
+            },
+        })
+    }
 }
 
 impl ExpData {
@@ -1642,6 +1757,12 @@ impl ExpData {
                     }
                     result.extend(concrete.into_iter().map(|mem| (mem, label)));
                 },
+                Call(_, Behavior(kind, range), args) => {
+                    if let Some(target) = Self::behavior_target_memory(env, *kind, args) {
+                        let label = range.post.or(range.pre);
+                        result.extend(target.used.into_iter().map(|mem| (mem, label)));
+                    }
+                },
                 _ => {},
             }
             true // keep going
@@ -1695,6 +1816,11 @@ impl ExpData {
                     let (mid, sid, sinst) = inst[0].require_struct();
                     result.insert(mid.qualified_inst(sid, sinst.to_owned()));
                 },
+                Call(_, Behavior(kind, _), args) => {
+                    if let Some(target) = Self::behavior_target_memory(env, *kind, args) {
+                        result.extend(target.used);
+                    }
+                },
                 _ => {},
             }
             true // keep going
@@ -1710,23 +1836,31 @@ impl ExpData {
     pub fn directly_generic_used_memory(&self, env: &GlobalEnv) -> BTreeSet<u16> {
         let mut result = BTreeSet::new();
         self.visit_post_order(&mut |e: &ExpData| {
-            if let ExpData::Call(id, Operation::SpecFunction(mid, fid, _), _) = e {
-                let inst = &env.get_node_instantiation(*id);
-                let module = env.get_module(*mid);
-                let fun = module.get_spec_fun(*fid);
-                if Self::is_object_spec_exists_at(env, *mid, *fid) {
-                    if let Some(Type::TypeParameter(type_param)) = inst.first() {
-                        result.insert(*type_param);
-                    }
-                } else {
-                    for type_param in &fun.generic_used_memory {
-                        if let Some(Type::TypeParameter(enclosing_param)) =
-                            inst.get(*type_param as usize)
-                        {
-                            result.insert(*enclosing_param);
+            match e {
+                ExpData::Call(id, Operation::SpecFunction(mid, fid, _), _) => {
+                    let inst = &env.get_node_instantiation(*id);
+                    let module = env.get_module(*mid);
+                    let fun = module.get_spec_fun(*fid);
+                    if Self::is_object_spec_exists_at(env, *mid, *fid) {
+                        if let Some(Type::TypeParameter(type_param)) = inst.first() {
+                            result.insert(*type_param);
+                        }
+                    } else {
+                        for type_param in &fun.generic_used_memory {
+                            if let Some(Type::TypeParameter(enclosing_param)) =
+                                inst.get(*type_param as usize)
+                            {
+                                result.insert(*enclosing_param);
+                            }
                         }
                     }
-                }
+                },
+                ExpData::Call(_, Operation::Behavior(kind, _), args) => {
+                    if let Some(target) = Self::behavior_target_memory(env, *kind, args) {
+                        result.extend(target.generic_used);
+                    }
+                },
+                _ => {},
             }
             true
         });
@@ -1775,6 +1909,19 @@ impl ExpData {
                         }
                     }
                 },
+                // The target's own pre-state reads are pre-state reads here
+                // whether or not the predicate sits under `old(..)`; under
+                // `old(..)` its whole footprint is.
+                ExpData::Call(_, Operation::Behavior(kind, _), args)
+                    if matches!(pos, VisitorPosition::Pre) =>
+                {
+                    if let Some(target) = Self::behavior_target_memory(env, *kind, args) {
+                        result.extend(target.old);
+                        if in_old_depth > 0 {
+                            result.extend(target.used);
+                        }
+                    }
+                },
                 _ => {},
             }
             true
@@ -1812,6 +1959,16 @@ impl ExpData {
                             inst.get(slot as usize).map(Type::skip_reference)
                         {
                             result.insert(*type_param);
+                        }
+                    }
+                },
+                ExpData::Call(_, Operation::Behavior(kind, _), args)
+                    if matches!(pos, VisitorPosition::Pre) =>
+                {
+                    if let Some(target) = Self::behavior_target_memory(env, *kind, args) {
+                        result.extend(target.generic_old);
+                        if in_old_depth > 0 {
+                            result.extend(target.generic_used);
                         }
                     }
                 },

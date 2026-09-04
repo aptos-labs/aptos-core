@@ -1019,7 +1019,10 @@ class CorrectedScoringManifestTest(unittest.TestCase):
         )
         try:
             asyncio.run(score_round(
-                config=None,  # never reached: the guard runs before scoring
+                # A real configuration: the live apparatus is measured once
+                # before the per-run loop, so this is read even when the guard
+                # it feeds skips a record that pins nothing.
+                config=ScoringApparatusTest._config(self),
                 round_dir=self.root,
                 mutants_root=self.root / "mutants",
                 timeout_seconds=1,
@@ -1059,7 +1062,7 @@ class CorrectedScoringManifestTest(unittest.TestCase):
 
         with self.assertRaises(ValueError) as raised:
             asyncio.run(score_round(
-                config=None, round_dir=self.root,
+                config=ScoringApparatusTest._config(self), round_dir=self.root,
                 mutants_root=self.root / "mutants",
                 timeout_seconds=1, allow_corrected_mutants=True,
             ))
