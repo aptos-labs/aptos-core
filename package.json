@@ -16,6 +16,6 @@
   },
   "dependencies": {
     "@actions/core": "^3.0.1",
-    "toml": "^3.0.0"
+    "toml": "^4.2.0"
   }
 }
