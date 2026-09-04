@@ -12,7 +12,7 @@ use crate::{
 };
 use anyhow::Context;
 use backoff::{future::retry, ExponentialBackoff};
-use futures::FutureExt;
+use futures::{FutureExt, StreamExt};
 use image::ImageFormat;
 use reqwest::Client;
 use serde_json::Value;
@@ -63,10 +63,26 @@ impl JSONParser {
                     .await
                     .context("Failed to get JSON")?;
 
-                let parsed_json = response
-                    .json::<Value>()
-                    .await
-                    .context("Failed to parse JSON")?;
+                // The size check above uses the HEAD Content-Length, which the
+                // origin controls and can omit or understate. Cap the body as it
+                // streams so the GET can't exceed max_file_size_bytes.
+                let mut body = Vec::new();
+                let mut stream = response.bytes_stream();
+                while let Some(chunk) = stream.next().await {
+                    let chunk = chunk.context("Failed to get JSON")?;
+                    if body.len() + chunk.len() > max_file_size_bytes as usize {
+                        // The outer retry match arm records the failure metric, so
+                        // don't increment here or a single oversize body counts twice.
+                        return Err(backoff::Error::permanent(anyhow::anyhow!(
+                            "JSON parser received file exceeding {} bytes, skipping",
+                            max_file_size_bytes
+                        )));
+                    }
+                    body.extend_from_slice(&chunk);
+                }
+
+                let parsed_json: Value =
+                    serde_json::from_slice(&body).context("Failed to parse JSON")?;
 
                 let raw_image_uri = parsed_json["image"].as_str().map(|s| s.to_string());
                 let raw_animation_uri =
