@@ -5,7 +5,7 @@
 //! from modules outside `std`: constructing `Some`/`None`, testing variants with `is`,
 //! matching, and selecting/mutating the variant field.
 
-use crate::{assert_success, tests::common, MoveHarness};
+use crate::{assert_success, run_mono_move, tests::common, MoveHarness};
 use aptos_framework::BuildOptions;
 use aptos_package_builder::PackageBuilder;
 use aptos_types::{
@@ -111,6 +111,7 @@ module 0xCAFE::public_option_test {
 }
 "#;
 
+#[run_mono_move(should_fail = "MonoMove does not validate or construct entry function arguments")]
 #[test]
 fn test_public_option_cross_module() {
     let mut h = MoveHarness::new();

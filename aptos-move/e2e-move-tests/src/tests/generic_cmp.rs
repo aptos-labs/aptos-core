@@ -4,11 +4,12 @@
 //! Transactional tests for comparison operations, Lt/Le/Ge/Gt, over non-integer types,
 //! introduced in Move language version 2.2 and onwards.
 
-use crate::{assert_success, tests::common, MoveHarness};
+use crate::{assert_success, run_mono_move, tests::common, MoveHarness};
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_language_e2e_tests::account::TransactionBuilder;
 use aptos_types::{account_address::AccountAddress, transaction::Script};
 
+#[run_mono_move(should_fail = "MonoMove does not implement cmp::compare on function values")]
 #[test]
 fn function_generic_cmp() {
     let mut h = MoveHarness::new();
@@ -121,6 +122,7 @@ fn function_generic_cmp() {
 }
 
 /// Special case of comparing two signers
+#[run_mono_move(should_fail = "MonoMove does not support script payloads")]
 #[test]
 fn function_signer_cmp() {
     let mut h = MoveHarness::new();

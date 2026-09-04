@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{assert_success, assert_vm_status, tests::common, MoveHarness};
+use crate::{assert_success, assert_vm_status, run_mono_move, tests::common, MoveHarness};
 use aptos_framework::BuildOptions;
 use aptos_language_e2e_tests::executor::FakeExecutor;
 use aptos_transaction_simulation::Account;
@@ -38,6 +38,7 @@ fn initialize(h: &mut MoveHarness) {
     assert_success!(status);
 }
 
+#[run_mono_move]
 #[test]
 fn test_function_value_is_applied_to_aggregator() {
     let mut h = MoveHarness::new_with_executor(FakeExecutor::from_head_genesis().set_parallel());
@@ -79,6 +80,7 @@ fn test_function_value_is_applied_to_aggregator() {
     assert_counter_value_eq(&h, &acc, value);
 }
 
+#[run_mono_move(should_fail = "MonoMove cannot serialize function values into the write set")]
 #[test]
 fn test_function_value_captures_aggregator_is_not_storable() {
     let mut h = MoveHarness::new_with_executor(FakeExecutor::from_head_genesis().set_parallel());
@@ -111,6 +113,7 @@ fn test_function_value_captures_aggregator_is_not_storable() {
     assert!(!exists);
 }
 
+#[run_mono_move(should_fail = "MonoMove cannot serialize function values into the write set")]
 #[test]
 fn test_function_value_uses_aggregator_is_storable() {
     let mut h = MoveHarness::new_with_executor(FakeExecutor::from_head_genesis().set_parallel());
@@ -134,6 +137,9 @@ fn test_function_value_uses_aggregator_is_storable() {
     assert_success!(status);
 }
 
+#[run_mono_move(
+    should_fail = "MonoMove does not create delayed fields, so capturing one cannot fail"
+)]
 #[test]
 fn test_function_value_captures_aggregator() {
     let mut h = MoveHarness::new_with_executor(FakeExecutor::from_head_genesis());

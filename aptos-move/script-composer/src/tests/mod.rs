@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{CallArgument, TransactionComposer};
-use aptos_move_e2e_test_harness::MoveHarness;
+use aptos_move_e2e_test_harness::{run_mono_move, MoveHarness};
 use aptos_types::{
     state_store::state_key::StateKey,
     transaction::{ExecutionStatus, TransactionStatus},
@@ -21,6 +21,7 @@ fn load_module(builder: &mut TransactionComposer, harness: &MoveHarness, module_
     builder.insert_module(CompiledModule::deserialize(&bytes).unwrap());
 }
 
+#[run_mono_move(should_fail = "MonoMove does not support script payloads")]
 #[test]
 fn simple_builder() {
     let mut h = MoveHarness::new();
@@ -64,6 +65,7 @@ fn simple_builder() {
     );
 }
 
+#[run_mono_move(should_fail = "MonoMove does not support script payloads")]
 #[test]
 fn chained_deposit() {
     let mut h = MoveHarness::new();
@@ -230,6 +232,7 @@ fn chained_deposit_invalid_copy() {
         .is_err());
 }
 
+#[run_mono_move(should_fail = "MonoMove does not support script payloads")]
 #[test]
 fn test_module() {
     let mut h = MoveHarness::new();

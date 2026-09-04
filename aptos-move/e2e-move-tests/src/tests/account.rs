@@ -1,10 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{assert_success, MoveHarness};
+use crate::{assert_success, run_mono_move, MoveHarness};
 use aptos_cached_packages::aptos_stdlib::aptos_account_transfer;
 use aptos_language_e2e_tests::account::Account;
 
+#[run_mono_move]
 #[test]
 fn non_existent_sender() {
     let mut h = MoveHarness::new();

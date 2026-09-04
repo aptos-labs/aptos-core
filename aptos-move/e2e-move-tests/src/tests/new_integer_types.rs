@@ -1,11 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{assert_success, MoveHarness};
+use crate::{assert_success, run_mono_move, MoveHarness};
 use aptos_package_builder::PackageBuilder;
 use aptos_types::account_address::AccountAddress;
 use move_core_types::{int256::U256, value::MoveValue};
 
+#[run_mono_move]
 #[test]
 fn use_new_integer_types() {
     let mut h = MoveHarness::new();
@@ -40,6 +41,7 @@ module 0xcafe::test {
     ));
 }
 
+#[run_mono_move]
 #[test]
 fn new_integer_types_as_txn_arguments() {
     let mut h = MoveHarness::new();

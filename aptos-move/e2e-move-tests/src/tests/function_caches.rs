@@ -4,13 +4,14 @@
 //! Tests that interpreter caches frees all allocated data structures for recursively called
 //! functions.
 
-use crate::{assert_success, tests::common, MoveHarness};
+use crate::{assert_success, run_mono_move, tests::common, MoveHarness};
 use aptos_framework::BuildOptions;
 use aptos_package_builder::PackageBuilder;
 use aptos_transaction_simulation::Account;
 use aptos_types::transaction::TransactionStatus;
 use move_core_types::account_address::AccountAddress;
 
+#[run_mono_move]
 #[test]
 fn test_function_caches_for_recursive_functions_do_not_leak_memory() {
     let mut h = MoveHarness::new();

@@ -8,7 +8,7 @@
 //! number), since a signed proof embedding the sequence number would stay valid and could be
 //! replayed.
 
-use crate::MoveHarness;
+use crate::{run_mono_move, MoveHarness};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::SigningKey;
 use aptos_language_e2e_tests::account::Account;
@@ -104,6 +104,7 @@ fn assert_aborted_with_other_code(status: &TransactionStatus) {
 
 /// A valid signer capability offer proof is rejected when submitted in an orderless
 /// transaction, and the very same proof succeeds in a sequence-number transaction.
+#[run_mono_move(should_fail = "MonoMove does not implement the transaction_context::is_multisig_payload_txn_internal native that account.move's sequence-number proof guard calls")]
 #[test]
 fn offer_signer_capability_rejected_in_orderless_txn() {
     let mut harness = MoveHarness::new();
@@ -153,6 +154,7 @@ fn offer_signer_capability_rejected_in_orderless_txn() {
     );
 }
 
+#[run_mono_move(should_fail = "MonoMove does not implement the transaction_context::is_multisig_payload_txn_internal native that account.move's sequence-number proof guard calls")]
 #[test]
 fn offer_rotation_capability_rejected_in_orderless_txn() {
     let mut harness = MoveHarness::new();
@@ -177,6 +179,7 @@ fn offer_rotation_capability_rejected_in_orderless_txn() {
     assert_aborted_with_other_code(&status);
 }
 
+#[run_mono_move(should_fail = "MonoMove does not implement the transaction_context::is_multisig_payload_txn_internal native that account.move's sequence-number proof guard calls")]
 #[test]
 fn rotate_authentication_key_rejected_in_orderless_txn() {
     let mut harness = MoveHarness::new();
@@ -198,6 +201,7 @@ fn rotate_authentication_key_rejected_in_orderless_txn() {
     assert_aborted_with_other_code(&status);
 }
 
+#[run_mono_move(should_fail = "MonoMove does not implement the transaction_context::is_multisig_payload_txn_internal native that account.move's sequence-number proof guard calls")]
 #[test]
 fn rotate_authentication_key_with_rotation_capability_rejected_in_orderless_txn() {
     let mut harness = MoveHarness::new();
@@ -221,6 +225,7 @@ fn rotate_authentication_key_with_rotation_capability_rejected_in_orderless_txn(
 /// `multisig_account::create_with_existing_account` is callable by anyone holding a signed
 /// creation message for the target account, so a captured message must not be executable from
 /// an orderless transaction.
+#[run_mono_move(should_fail = "MonoMove does not implement the transaction_context::is_multisig_payload_txn_internal native that account.move's sequence-number proof guard calls")]
 #[test]
 fn multisig_create_with_existing_account_rejected_in_orderless_txn() {
     let mut harness = MoveHarness::new();
@@ -245,6 +250,7 @@ fn multisig_create_with_existing_account_rejected_in_orderless_txn() {
     assert_aborted_with_other_code(&status);
 }
 
+#[run_mono_move(should_fail = "MonoMove does not implement the transaction_context::is_multisig_payload_txn_internal native that account.move's sequence-number proof guard calls")]
 #[test]
 fn multisig_create_with_existing_account_and_revoke_auth_key_rejected_in_orderless_txn() {
     let mut harness = MoveHarness::new();
@@ -269,6 +275,7 @@ fn multisig_create_with_existing_account_and_revoke_auth_key_rejected_in_orderle
     assert_aborted_with_other_code(&status);
 }
 
+#[run_mono_move(should_fail = "MonoMove does not implement the transaction_context::is_multisig_payload_txn_internal native that account.move's sequence-number proof guard calls")]
 #[test]
 fn upsert_ed25519_backup_key_rejected_in_orderless_txn() {
     let mut harness = MoveHarness::new();
@@ -290,6 +297,7 @@ fn upsert_ed25519_backup_key_rejected_in_orderless_txn() {
 /// A proof is replayable inside a multisig payload because the proof-bearing account's sequence
 /// number does not advance when the inner payload executes. The guard must reject proof-bearing
 /// account operations before signature verification when invoked through a multisig transaction.
+#[run_mono_move(should_fail = "MonoMove does not support multisig payloads")]
 #[test]
 fn offer_rotation_capability_rejected_in_multisig_payload() {
     let mut harness = MoveHarness::new();

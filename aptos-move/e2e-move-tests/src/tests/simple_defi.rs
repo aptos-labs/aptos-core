@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{assert_success, tests::common, MoveHarness};
+use crate::{assert_success, run_mono_move, tests::common, MoveHarness};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_language_e2e_tests::account::Account;
@@ -26,6 +26,7 @@ const CHLOE_COIN_STRUCT_STRING: &str =
 const EXCHANGE_FROM_FUNCTION: &str = "exchange_from_entry";
 const EXCHANGE_TO_FUNCTION: &str = "exchange_to_entry";
 
+#[run_mono_move]
 #[test]
 fn exchange_e2e_test() {
     let mut h = MoveHarness::new();
@@ -49,14 +50,16 @@ fn exchange_e2e_test() {
         .expect("extracting package metadata must succeed");
 
     // create the resource account and publish the code under the resource account's address
-    let result = h.run_transaction_payload(
-        &origin_account,
-        aptos_stdlib::resource_account_create_resource_account_and_publish_package(
-            vec![],
-            bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
-            code,
-        ),
-    );
+    let result = h.without_mono_move(|h| {
+        h.run_transaction_payload(
+            &origin_account,
+            aptos_stdlib::resource_account_create_resource_account_and_publish_package(
+                vec![],
+                bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
+                code,
+            ),
+        )
+    });
     assert_success!(result);
 
     // verify that we store the signer cap within the module

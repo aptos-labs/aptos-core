@@ -1,11 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{assert_success, tests::common, MoveHarness};
-use aptos_framework::BuiltPackage;
+use crate::{assert_success, run_mono_move, tests::common, MoveHarness};
 use aptos_types::account_address::create_resource_address;
 use move_core_types::account_address::AccountAddress;
 
+#[run_mono_move]
 #[test]
 // Test the txn argument works as expected
 fn test_nft_dao_txn_arguments() {
@@ -18,24 +18,10 @@ fn test_nft_dao_txn_arguments() {
         .named_addresses
         .insert("dao_platform".to_string(), *acc.address());
 
-    // build the package from our example code
-    let package = BuiltPackage::build(
-        common::test_dir_path("../../../move-examples/dao/nft_dao"),
-        build_options,
-    )
-    .expect("building package must succeed");
-
-    let code = package.extract_code();
-    let metadata = package
-        .extract_metadata()
-        .expect("extracting package metadata must succeed");
-
-    let result = h.run_transaction_payload(
+    let result = h.publish_package_with_options(
         &acc,
-        aptos_cached_packages::aptos_stdlib::code_publish_package_txn(
-            bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
-            code,
-        ),
+        &common::test_dir_path("../../../move-examples/dao/nft_dao"),
+        build_options,
     );
     assert_success!(result);
     // setup NFT creation and distribution for testing

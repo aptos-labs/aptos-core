@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{assert_success, tests::common, MoveHarness};
+use crate::{assert_success, run_mono_move, tests::common, MoveHarness};
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_types::{
     account_address::AccountAddress,
@@ -132,6 +132,7 @@ fn fail_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<Vec<u8>>, Closure)>
     }
 }
 
+#[run_mono_move]
 #[test]
 fn constructor_args_good() {
     let tests = vec![
@@ -204,6 +205,7 @@ fn constructor_args_good() {
     success(&mut h, tests);
 }
 
+#[run_mono_move]
 #[test]
 fn view_constructor_args() {
     let tests = vec![
@@ -251,6 +253,7 @@ fn constructor_args_option_private_struct_compiles() {
     );
 }
 
+#[run_mono_move(should_fail = "MonoMove does not validate or construct entry function arguments")]
 #[test]
 fn constructor_args_bad_runtime() {
     let good: &[u8] = "a".as_bytes();

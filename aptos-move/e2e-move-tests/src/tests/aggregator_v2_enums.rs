@@ -3,6 +3,7 @@
 
 use crate::{
     aggregator_v2::AggV2TestHarness,
+    run_mono_move,
     tests::{aggregator_v2::AggregatorMode, common},
 };
 use aptos_framework::BuildOptions;
@@ -31,6 +32,9 @@ enum Counter {
     Integer(Integer),
 }
 
+#[run_mono_move(
+    should_fail = "MonoMove cannot publish a module inside a block, and this test publishes through `run_block` rather than the harness publish helper"
+)]
 #[test]
 fn test_aggregators_in_enums() {
     let mut h = make_harness(155);

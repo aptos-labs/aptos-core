@@ -3341,6 +3341,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "clap 4.5.60",
+ "mono-move-testsuite",
  "move-model",
  "move-package",
  "move-prover",

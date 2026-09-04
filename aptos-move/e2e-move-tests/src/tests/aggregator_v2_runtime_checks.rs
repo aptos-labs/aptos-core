@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{assert_success, tests::common, MoveHarness};
+use crate::{assert_success, run_mono_move, tests::common, MoveHarness};
 use aptos_language_e2e_tests::account::Account;
 use aptos_types::{
     on_chain_config::FeatureFlag,
@@ -139,6 +139,9 @@ fn test_string_utils(h: &mut MoveHarness, acc: &Account) {
     });
 }
 
+#[run_mono_move(
+    should_fail = "MonoMove does not create delayed fields, so the runtime checks never fire"
+)]
 #[test]
 fn run_all_tests() {
     let mut h = MoveHarness::new();
