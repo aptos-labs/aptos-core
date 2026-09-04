@@ -2044,6 +2044,7 @@ dependencies = [
  "once_cell",
  "regex",
  "serde",
+ "serde_json",
  "tempfile",
  "toml 0.7.8",
 ]
