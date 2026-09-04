@@ -623,14 +623,17 @@ fn import_source(
         added_id == module_id,
         "model assigned an unexpected module id"
     );
-    // A dependency contributes declarations only: its bodies are not compiled,
-    // so they are neither translated nor entered into the target holder. This
-    // is what lets an interface-only module — one with empty `blocks` — be
-    // supplied as a dependency while a target still requires code.
-    if !source.is_target {
-        return Ok(());
-    }
     for (decl, fun_id) in xir.functions.iter().zip(&function_ids) {
+        // An interface-only declaration carries no body, so there is nothing
+        // to translate and no target to create. Gate on the body rather than
+        // on target status: a `.lean` dependency is a real module whose bodies
+        // downstream whole-program analyses still follow.
+        //
+        // Natives are bodyless too but keep their (empty) target, as they did
+        // before interfaces existed.
+        if decl.blocks.is_empty() && !decl.is_native {
+            continue;
+        }
         let qid = module_id.qualified(*fun_id);
         let data = translate_function(
             env,
@@ -675,6 +678,13 @@ fn add_transitive_callee_targets(
         }
         let function = env.get_function(id);
         if function.is_excluded_from_bytecode_gen() {
+            continue;
+        }
+        // A callee reached here is not already a target. If it also has no AST
+        // definition and is not native, it came from a declaration-only
+        // dependency: there is no body to generate, and synthesizing an empty
+        // one would produce a target whose CFG cannot be built.
+        if function.get_def().is_none() && !function.is_native() {
             continue;
         }
         let data = crate::bytecode_generator::generate_bytecode(env, id);
