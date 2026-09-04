@@ -56,12 +56,12 @@ MONO_MOVE_FLAG = "ENABLE_MONO_MOVE"
 # reported as noisy and can never be a regression.
 NOISY_SPREAD = 0.10
 
-# The throughput metrics the verdict rests on. Deliberately excludes the short
-# pipeline stages: signature verification and commit take single-digit
-# milliseconds per block, so their run-to-run spread is tens of percent even
-# when two identical runs are compared. Judging noise on those would mark every
-# workload noisy forever.
-VERDICT_METRICS = ["total", "execution", "inner_block_executor"]
+# The throughput metrics the verdict rests on. Only the two that measure Move
+# execution itself. Everything else in the pipeline is disk bound and swings by
+# tens of percent between two identical runs on a shared runner, so judging
+# noise on it would mark most workloads noisy forever. Those metrics are still
+# reported and calibrated, they just do not veto a verdict.
+VERDICT_METRICS = ["execution", "inner_block_executor"]
 
 # Signature verification is the only stage that neither runs Move code nor scales
 # with output size, so it is the only one that has to sit near 1.00x. Ledger
