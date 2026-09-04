@@ -16,6 +16,8 @@ pub mod options;
 pub mod pipeline;
 pub mod plan_builder;
 pub mod xir;
+pub mod xir_export;
+pub mod xir_interface_generator;
 
 use crate::{
     diagnostics::Emitter,
@@ -203,11 +205,26 @@ fn import_and_check_xir(
         .map(|index| env.get_module(ModuleId::new(index)).get_loc().file_id())
         .collect();
     let first_diag = env.diag_count(Severity::Help);
-    run_stackless_bytecode_pipeline(
-        env,
-        stackless_bytecode_check_pipeline(options),
-        &mut xir_targets,
-    );
+    // `env_check_and_transform_pipeline` ran before this import, so its
+    // declaration checks never saw these modules. Those that read struct or
+    // function declarations are rerun here; what they report again about Move
+    // modules is dropped below. The rest read the AST, which XIR has none of.
+    if options.experiment_on(Experiment::NATIVE_CHECK) {
+        native_checker::check_for_native_functions_and_structs(env);
+    }
+    if options.experiment_on(Experiment::RECURSIVE_TYPE_CHECK) {
+        recursive_struct_checker::check_recursive_struct(env);
+    }
+    if options.experiment_on(Experiment::UNUSED_STRUCT_PARAMS_CHECK) {
+        unused_params_checker::unused_params_checker(env);
+    }
+    if !env.has_errors() {
+        run_stackless_bytecode_pipeline(
+            env,
+            stackless_bytecode_check_pipeline(options),
+            &mut xir_targets,
+        );
+    }
     env.retain_diags_since(first_diag, |diag| {
         diag.severity >= Severity::Error
             || diag
@@ -338,6 +355,16 @@ pub fn run_move_compiler_to_model(mut options: Options) -> anyhow::Result<Global
 /// fails not on context checking errors, but possibly on i/o errors.
 pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
     info!("type checking");
+    // XIR dependencies are lowered to Move source and joined to the ordinary
+    // dependencies: name resolution runs off parsed source, so an interface
+    // has to reach the front end that way. `generated` owns the directory and
+    // may be dropped once the model builder has read the files, which it has
+    // by the time it returns — the text is copied into the env.
+    let generated =
+        xir_interface_generator::generate_dependency_sources(&options.xir_dependencies)?;
+    let mut dependencies = options.dependencies.clone();
+    dependencies.extend(generated.paths.iter().cloned());
+
     // Run the model builder, which performs context checking.
     let addrs = move_model::parse_addresses_from_options(options.named_address_mapping.clone())?;
     let mut env = move_model::run_model_builder_in_compiler_mode(
@@ -350,7 +377,7 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
             address_map: addrs.clone(),
         },
         vec![PackageInfo {
-            sources: options.dependencies.clone(),
+            sources: dependencies,
             address_map: addrs.clone(),
         }],
         options.skip_attribute_checks,
@@ -362,6 +389,7 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
         options.language_version.unwrap_or_default(),
         options.compile_test_code,
         options.compile_verify_code,
+        generated.interface_dependencies(),
     )?;
     // Store address aliases
     let map = addrs
@@ -373,6 +401,14 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
         env.treat_everything_as_target(true);
     }
     env.set_verify_mode(options.compile_verify_code);
+    // The generated source declares interface functions `native`, so their
+    // callees have to be restored from the interfaces themselves.
+    let interfaces = generated
+        .sources
+        .iter()
+        .map(|source| source.module().clone())
+        .collect::<Vec<_>>();
+    xir::apply_interface_call_graphs(&mut env, &interfaces)?;
     // Store options in env, for later access
     env.set_extension(options);
     Ok(env)

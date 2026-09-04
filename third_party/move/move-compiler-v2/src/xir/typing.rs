@@ -136,15 +136,16 @@ impl FunctionTranslator<'_> {
             | Oper::Sub(width)
             | Oper::Mul(width)
             | Oper::Div(width)
-            | Oper::Mod(width)
-            | Oper::BitAnd(width)
-            | Oper::BitOr(width)
-            | Oper::BitXor(width) => {
+            | Oper::Mod(width) => {
                 let ty = int_type(*width);
                 (vec![ty.clone(), ty.clone()], vec![ty])
             },
+            Oper::BitAnd(width) | Oper::BitOr(width) | Oper::BitXor(width) => {
+                let ty = unsigned_type(*width, oper)?;
+                (vec![ty.clone(), ty.clone()], vec![ty])
+            },
             Oper::Shl(width) | Oper::Shr(width) => {
-                let ty = int_type(*width);
+                let ty = unsigned_type(*width, oper)?;
                 (vec![ty.clone(), int_type(IntType::U8)], vec![ty])
             },
             Oper::Cast(target) => {
@@ -739,6 +740,16 @@ fn int_type(width: IntType) -> Type {
     })
 }
 
+/// Bitwise operations and shifts are defined only on unsigned integers.
+fn unsigned_type(width: IntType, oper: &Oper) -> Result<Type> {
+    let ty = int_type(width);
+    ensure!(
+        ty.is_unsigned_int(),
+        "{oper:?}: only unsigned integers take this operation"
+    );
+    Ok(ty)
+}
+
 fn bool_type() -> Type {
     Type::Primitive(PrimitiveType::Bool)
 }
@@ -776,7 +787,9 @@ mod tests {
     /// | 26    | `GE<u64>`       | 27    | `&GE<u64>`        |
     /// | 28    | `R<u64>`        | 29    | `&R<u64>`         |
     /// | 30    | `&mut E`        | 31    | `&mut GE<u64>`    |
-    /// | 32    | `&G<u64>`       |       |                   |
+    /// | 32    | `&G<u64>`       | 33    | `fn(bool): u64`   |
+    /// | 34    | `fn(u64, bool): u64` | 35    | `fn(u64): u64`    |
+    /// | 36    | `i64`           |       |                   |
     ///
     /// Structs: 0 `BalanceValue { value: u64 }`, 1 `Balance { balance }` (the
     /// golden module), 2 `G<T> { x: T }`, 3 `enum E { A(u64), B(bool) }`,
@@ -788,6 +801,8 @@ mod tests {
         )
         .unwrap();
         let mut module: XirModule = serde_json::from_str(&golden).unwrap();
+        // The golden file is an old version; the locals added below are not.
+        module.version = move_model_exchange::XIR_VERSION;
         let copy_drop = || vec!["copy".to_owned(), "drop".to_owned()];
         let field = |ty: Ty| Field {
             name: "x".to_owned(),
@@ -937,6 +952,8 @@ mod tests {
                 "drop".to_owned()
             ]),
             Ty::Function(vec![Ty::U64], vec![Ty::U64], vec!["drop".to_owned()]),
+            // 36
+            Ty::I64,
         ];
         module.functions = vec![
             function("f", vec![], 0, locals, returns, instrs, term),
@@ -1029,6 +1046,23 @@ mod tests {
             (true, call(&[0], Oper::Cast(IntType::U64), &[2])),
             (false, call(&[2], Oper::Cast(IntType::U8), &[3])),
             (false, call(&[0], Oper::Cast(IntType::U8), &[0])),
+        ]);
+    }
+
+    /// Signed integers take arithmetic, but not bitwise operations or shifts,
+    /// which Move defines only on unsigned integers.
+    #[test]
+    fn signed_integers() {
+        check(vec![
+            (true, call(&[36], Oper::Add(IntType::I64), &[36, 36])),
+            (true, call(&[36], Oper::Div(IntType::I64), &[36, 36])),
+            (false, call(&[36], Oper::BitAnd(IntType::I64), &[36, 36])),
+            (false, call(&[36], Oper::BitOr(IntType::I64), &[36, 36])),
+            (false, call(&[36], Oper::BitXor(IntType::I64), &[36, 36])),
+            (false, call(&[36], Oper::Shl(IntType::I64), &[36, 2])),
+            (false, call(&[36], Oper::Shr(IntType::I64), &[36, 2])),
+            (true, call(&[0], Oper::Cast(IntType::U64), &[36])),
+            (true, call(&[36], Oper::Cast(IntType::I64), &[0])),
         ]);
     }
 

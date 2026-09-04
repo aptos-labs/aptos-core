@@ -128,6 +128,13 @@ pub enum ClausePos {
 }
 
 /// The typing context of one function's specification.
+///
+/// **Assumes a closed module.** Resource ids are bounds-checked against
+/// `structs.len()`, so any id past the end is reported as undeclared. That is
+/// correct for [`crate::Module`], which has no external-declaration table. It
+/// would *not* be correct for a format where out-of-range ids index an external
+/// table; such a format must supply the combined count here, or not use this
+/// checker.
 pub struct SpecCheckCtx<'a> {
     pub structs: &'a [Struct],
     /// Declared types of all locals (parameters first).

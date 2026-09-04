@@ -10,7 +10,7 @@ use crate::{
     builder::model_builder::ModelBuilder,
     metadata::LanguageVersion,
     model::{FunId, GlobalEnv, Loc, ModuleId, StructId},
-    options::ModelBuilderOptions,
+    options::{ModelBuilderOptions, ModuleRef},
 };
 use builder::module_builder::ModuleBuilder;
 use codespan::ByteIndex;
@@ -84,6 +84,7 @@ pub fn run_model_builder_in_compiler_mode(
     language_version: LanguageVersion,
     compile_test_code: bool,
     compile_verify_code: bool,
+    extra_dependencies: Vec<(ModuleRef, ModuleRef)>,
 ) -> anyhow::Result<GlobalEnv> {
     let to_package_paths = |PackageInfo {
                                 sources,
@@ -100,6 +101,7 @@ pub fn run_model_builder_in_compiler_mode(
         ModelBuilderOptions {
             language_version,
             compile_for_testing: compile_test_code,
+            extra_dependencies,
         },
         Flags::model_compilation()
             .set_skip_attribute_checks(skip_attribute_checks)
@@ -267,13 +269,19 @@ pub fn run_model_builder_with_options_and_compilation_flags<
         ImplicitModuleDeps::new(well_known::STRING_UTILS_MODULE),
         ImplicitModuleDeps::new(well_known::SIGNER_MODULE),
     ];
+    let extra = extra_dependencies(&env, &expansion_ast.modules);
     for (_, mident, mdef) in &expansion_ast.modules {
         let src_file_hash = mdef.loc.file_hash();
         if !dep_files.contains(&src_file_hash) {
-            collect_related_modules_recursive(mident, &expansion_ast.modules, &mut visited_modules);
+            collect_related_modules_recursive(
+                mident,
+                &expansion_ast.modules,
+                &extra,
+                &mut visited_modules,
+            );
         }
         for implicit_module in &mut implicit_modules {
-            implicit_module.process(mident, &expansion_ast.modules);
+            implicit_module.process(mident, &expansion_ast.modules, &extra);
         }
     }
     for sdef in expansion_ast.scripts.values() {
@@ -283,6 +291,7 @@ pub fn run_model_builder_with_options_and_compilation_flags<
                 collect_related_modules_recursive(
                     mident,
                     &expansion_ast.modules,
+                    &extra,
                     &mut visited_modules,
                 );
             }
@@ -528,18 +537,52 @@ impl<'a> ImplicitModuleDeps<'a> {
         &mut self,
         mident: &ModuleIdent_,
         modules: &UniqueMap<ModuleIdent, E::ModuleDefinition>,
+        extra: &BTreeMap<ModuleIdent_, Vec<ModuleIdent_>>,
     ) {
         if !self.seen && self.is_target_module(*mident) {
             self.seen = true;
             // Collect the module and its dependencies.
-            collect_related_modules_recursive(mident, modules, &mut self.dep_closure);
+            collect_related_modules_recursive(mident, modules, extra, &mut self.dep_closure);
         }
     }
+}
+
+/// The options' extra dependencies between modules of `modules`. An edge to or
+/// from a module that is not there is dropped.
+fn extra_dependencies(
+    env: &GlobalEnv,
+    modules: &UniqueMap<ModuleIdent, E::ModuleDefinition>,
+) -> BTreeMap<ModuleIdent_, Vec<ModuleIdent_>> {
+    let edges = env
+        .get_extension::<ModelBuilderOptions>()
+        .map(|options| options.extra_dependencies.clone())
+        .unwrap_or_default();
+    let mut extra: BTreeMap<ModuleIdent_, Vec<ModuleIdent_>> = BTreeMap::new();
+    if edges.is_empty() {
+        return extra;
+    }
+    let by_name: BTreeMap<ModuleRef, ModuleIdent_> = modules
+        .key_cloned_iter()
+        .map(|(mident, _)| {
+            let module = (
+                mident.value.address.into_addr_bytes().into_inner(),
+                mident.value.module.0.value.as_str().to_owned(),
+            );
+            (module, mident.value)
+        })
+        .collect();
+    for (from, to) in edges {
+        if let (Some(from), Some(to)) = (by_name.get(&from), by_name.get(&to)) {
+            extra.entry(*from).or_default().push(*to);
+        }
+    }
+    extra
 }
 
 fn collect_related_modules_recursive<'a>(
     mident: &'a ModuleIdent_,
     modules: &'a UniqueMap<ModuleIdent, E::ModuleDefinition>,
+    extra: &BTreeMap<ModuleIdent_, Vec<ModuleIdent_>>,
     visited_modules: &mut BTreeSet<ModuleIdent_>,
 ) {
     if visited_modules.contains(mident) {
@@ -547,8 +590,13 @@ fn collect_related_modules_recursive<'a>(
     }
     let mdef = modules.get_(mident).unwrap();
     visited_modules.insert(*mident);
-    for (_, next_mident, _) in &mdef.immediate_neighbors {
-        collect_related_modules_recursive(next_mident, modules, visited_modules);
+    let neighbors = mdef
+        .immediate_neighbors
+        .key_cloned_iter()
+        .map(|(next, _)| next.value);
+    let extra_neighbors = extra.get(mident).into_iter().flatten().copied();
+    for next_mident in neighbors.chain(extra_neighbors).collect::<Vec<_>>() {
+        collect_related_modules_recursive(&next_mident, modules, extra, visited_modules);
     }
 }
 

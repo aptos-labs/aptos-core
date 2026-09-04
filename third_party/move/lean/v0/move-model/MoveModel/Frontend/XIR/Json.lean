@@ -262,6 +262,8 @@ private partial def encodeAttributeArg : AttributeArg → Json
         Json.mkObj [("name", .str path), ("args", arr (args.map encodeAttributeArg))]
   | .num value => Json.mkObj [("num", .str (toString value))]
   | .bool value => Json.mkObj [("bool", .bool value)]
+  | .assign name value =>
+      Json.mkObj [("assign", .str name), ("value", encodeAttributeArg value)]
 
 private def encodeAttribute (decl : Attribute) : Json :=
   if decl.args.isEmpty then Json.mkObj [("name", .str decl.name)] else
@@ -333,6 +335,9 @@ private def localNameFields (localNames : List (Option String)) : List (String �
     | some name => .str name
     | none => .null)]
 
+private def callsFields (calls : List Nat) : List (String × Json) :=
+  if calls.isEmpty then [] else [("calls", encodeNats calls)]
+
 private def encodeFun (decl : MFun) (info : FunMeta) : JsonResult Json := do
   unless decl.name = info.name do
     throw s!"function body `{decl.name}` does not match metadata `{info.name}`"
@@ -353,7 +358,7 @@ private def encodeFun (decl : MFun) (info : FunMeta) : JsonResult Json := do
     ("loops", arr (← decl.loops.mapM encodeLoop)),
     ("spec", ← encodeContract decl.spec)
   ] ++ attributeFields info.attributes ++ localNameFields info.localNames ++
-    sourceMapFields info.sourceMap
+    sourceMapFields info.sourceMap ++ callsFields info.calls
 
 private def encodeDialect : Dialect → String
   | .stackless => "stackless"
@@ -393,7 +398,7 @@ def MModule.toJson (module : MModule) : JsonResult Json := do
     encodeFun decl info
   let fields := [
     ("schema", .str "move-xir-module"),
-    ("version", nat 7),
+    ("version", nat 9),
     ("module", Json.mkObj [
       ("address", .str (encodeAddress module.address)),
       ("name", .str module.name),
@@ -474,6 +479,13 @@ private partial def decodeAttributeArg (json : Json) :
   | .error _ =>
   match json.getObjVal? "bool" with
   | .ok value => return .bool (← value.getBool?)
+  | .error _ =>
+  -- `{assign, value}`, keyed disjointly from `name` precisely so that the
+  -- probes above cannot half-read it and drop the value.
+  match json.getObjVal? "assign" with
+  | .ok nameJson =>
+      return .assign (← nameJson.getStr?)
+        (← decodeAttributeArg (← json.getObjVal? "value"))
   | .error _ => throw "unknown attribute argument"
 
 private def decodeAttribute (json : Json) : JsonResult Attribute := do
@@ -521,6 +533,88 @@ private def decodeLocalNames (json : Json) : JsonResult (List (Option String)) :
     | .null => pure none
     | value => return some (← value.getStr?)
 
+/-- Whether `json` has an object key `key` at any depth. -/
+private partial def hasKey (key : String) : Json → Bool
+  | .obj fields => fields.foldl (fun found k v => found || k == key || hasKey key v) false
+  | .arr items => items.any (hasKey key)
+  | _ => false
+
+/-- Whether `json` has a function type at any depth. Its key `function` is also
+the key of a call, `{"function": id}`; only the type's value is an array. -/
+private partial def hasFunctionType : Json → Bool
+  | .obj fields => fields.foldl (fun found k v =>
+      found || (k == "function" && (v matches .arr _)) || hasFunctionType v) false
+  | .arr items => items.any hasFunctionType
+  | _ => false
+
+/-- Whether `json` calls a closure operation at any depth: the operation of
+`{"call": [dsts, op, srcs]}` is `"invoke"`, `{"closure": ..}` or
+`{"closure_inst": ..}`. Matched only there, since a name may be `invoke`. -/
+private partial def hasClosure : Json → Bool
+  | .obj fields => fields.foldl (fun found k v =>
+      found || (k == "call" && isClosureCall v) || hasClosure v) false
+  | .arr items => items.any hasClosure
+  | _ => false
+where
+  isClosureCall : Json → Bool
+    | .arr #[_, .str "invoke", _] => true
+    | .arr #[_, .obj op, _] =>
+      op.foldl (fun found k _ => found || k == "closure" || k == "closure_inst") false
+    | _ => false
+
+/-- Whether a struct declares a positional field, named by its index (`0`). -/
+private def hasPositionalField (decl : Json) : Bool :=
+  let fieldsOf (j : Json) : Array Json := match j.getObjVal? "fields" with
+    | .ok (.arr fs) => fs
+    | _ => #[]
+  let variants : Array Json := match decl.getObjVal? "variants" with
+    | .ok (.arr vs) => vs
+    | _ => #[]
+  (fieldsOf decl ++ variants.flatMap fieldsOf).any fun field =>
+    match field.getObjVal? "name" with
+    | .ok (.str name) => !name.isEmpty && name.all Char.isDigit
+    | _ => false
+
+/-- Whether an optional field is present and not empty. -/
+private def present (json : Json) (key : String) : Bool :=
+  match json.getObjVal? key with
+  | .ok .null => false
+  | .ok (.arr items) => !items.isEmpty
+  | .ok _ => true
+  | .error _ => false
+
+/-- Rejects a field newer than the version the document declares, as the Rust
+reader does (`XirModule::check_fields_against_version`). -/
+private def checkFieldsAgainstVersion (version : Nat) (json : Json)
+    (structs functions : Array Json) : JsonResult Unit := do
+  let require (introduced : Nat) (field : String) : JsonResult Unit :=
+    if version < introduced then
+      throw s!"`{field}` arrived in XIR version {introduced}, but this document declares version {version}"
+    else pure ()
+  -- In the order of the Rust gate.
+  let declarations := structs ++ functions
+  if present json "friends" then require 9 "friends"
+  if structs.any fun s => match s.getObjVal? "visibility" with
+      | .ok (.str v) => v != "private"
+      | _ => false then
+    require 7 "visibility"
+  let attributes := declarations.filterMap fun d => (d.getObjVal? "attributes").toOption
+  if attributes.any (hasKey "assign") then require 9 "assign"
+  if structs.any hasPositionalField then require 9 "positional field names"
+  if declarations.any hasFunctionType then require 8 "fun"
+  if functions.any hasClosure then require 8 "closure operations"
+  if present json "external_structs" then require 6 "external_structs"
+  for f in functions do
+    if present f "calls" then require 9 "calls"
+    -- Without a body, the recorded calls are all there is of what a function
+    -- reaches.
+    let native := match f.getObjVal? "is_native" with
+      | .ok (.bool value) => value
+      | _ => false
+    if !native && !present f "blocks" then require 9 "functions without a body"
+    if present f "local_names" then require 5 "local_names"
+    if present f "source_map" then require 4 "source_map"
+
 /-- Decode schema-versioned deployable XIR JSON.  The body decoder is shared
 with the established exchange-v5 format, while module metadata is checked
 separately. -/
@@ -529,7 +623,7 @@ def decodeMModule (text : String) : JsonResult MModule := do
   let schema ← (← json.getObjVal? "schema").getStr?
   unless schema = "move-xir-module" do throw s!"unsupported XIR schema `{schema}`"
   let version ← (← json.getObjVal? "version").getNat?
-  unless version = 3 || version = 4 || version = 5 || version = 6 || version = 7 do
+  unless version = 3 || version = 4 || version = 5 || version = 6 || version = 7 || version = 8 || version = 9 do
     throw s!"unsupported XIR schema version {version}"
   let moduleJson ← json.getObjVal? "module"
   let address ← decodeAddress (← (← moduleJson.getObjVal? "address").getStr?)
@@ -546,8 +640,9 @@ def decodeMModule (text : String) : JsonResult MModule := do
   let friendsJson ← match json.getObjVal? "friends" with
     | .ok value => value.getArr?
     | .error _ => pure #[]
+  checkFieldsAgainstVersion version json structsJson functionsJson
   let legacy := Json.mkObj [
-    ("version", nat 10),
+    ("version", nat 11),
     ("structs", .arr structsJson),
     ("funs", .arr functionsJson)
   ]
@@ -587,6 +682,9 @@ def decodeMModule (text : String) : JsonResult MModule := do
       attributes := ← decodeAttributes functionJson
       localNames := ← decodeLocalNames functionJson
       sourceMap := ← decodeSourceMap functionJson
+      calls := ← match functionJson.getObjVal? "calls" with
+        | .ok value => decodeNatArray value
+        | .error _ => pure []
     } : FunMeta)
   let externalFuns ← externalFunsJson.toList.mapM fun functionJson => do
     return ({

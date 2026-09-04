@@ -23,7 +23,7 @@ use move_core_types::{
     identifier::Identifier,
 };
 use move_model::{
-    ast::{Address, Attribute, AttributeValue, ModuleName, Value},
+    ast::{Address, Attribute, AttributeValue, FriendDecl, ModuleName, Value},
     metadata::lang_feature_versions::LANGUAGE_VERSION_FOR_PUBLIC_STRUCT,
     model::{
         FieldData, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId, StructId,
@@ -64,8 +64,29 @@ pub struct XirSource {
     is_target: bool,
 }
 
+impl XirSource {
+    /// The validated module this source parsed to.
+    pub fn module(&self) -> &XirModule {
+        &self.module
+    }
+}
+
+/// Parses XIR to be *compiled*: every non-native function must have a body.
 pub fn parse_source(path: PathBuf, text: String, json: &str) -> Result<XirSource> {
     parse_source_with_target(path, text, json, true)
+}
+
+/// Parses XIR that describes a *dependency* rather than a compilation target,
+/// which is what [`crate::xir_export::export_interface`] produces: signatures,
+/// types and attributes, with function bodies omitted.
+///
+/// Takes no source text, and so does not check source-map spans. An interface
+/// is consumed for its declarations; any spans in it index a text this caller
+/// does not hold, which makes them unusable rather than invalid. Checking them
+/// against the empty string would reject every non-zero span — that is, every
+/// source map a producer such as Lean emits for a non-native function.
+pub fn parse_interface(path: PathBuf, json: &str) -> Result<XirSource> {
+    parse_xir(path, String::new(), json, false, /*check_spans*/ false)
 }
 
 pub(crate) fn parse_source_with_target(
@@ -74,10 +95,22 @@ pub(crate) fn parse_source_with_target(
     json: &str,
     is_target: bool,
 ) -> Result<XirSource> {
+    parse_xir(path, text, json, is_target, /*check_spans*/ true)
+}
+
+fn parse_xir(
+    path: PathBuf,
+    text: String,
+    json: &str,
+    is_target: bool,
+    check_spans: bool,
+) -> Result<XirSource> {
     let module: XirModule = serde_json::from_str(json)
         .with_context(|| format!("invalid XIR from `{}`", path.display()))?;
-    validate(&module)?;
-    validate_source_maps(&module, &text)?;
+    validate(&module, is_target)?;
+    if check_spans {
+        validate_source_maps(&module, &text)?;
+    }
     Ok(XirSource {
         path,
         text,
@@ -145,7 +178,10 @@ fn loc_for_span(fallback: &Loc, span: Option<XirSourceSpan>) -> Loc {
         .unwrap_or_else(|| fallback.clone())
 }
 
-fn validate(module: &XirModule) -> Result<()> {
+/// Validates a module. `is_target` distinguishes a module being *compiled*
+/// from one supplied as a *dependency*: a dependency contributes only its
+/// declaration surface, so its functions may legitimately carry no body.
+fn validate(module: &XirModule, is_target: bool) -> Result<()> {
     module.check_version().map_err(anyhow::Error::msg)?;
     ensure!(
         module.module.dialect == XirDialect::Stackless,
@@ -154,9 +190,20 @@ fn validate(module: &XirModule) -> Result<()> {
     AccountAddress::from_hex_literal(&module.module.address)
         .with_context(|| format!("invalid module address `{}`", module.module.address))?;
     valid_identifier("module", &module.module.name)?;
+    for friend in &module.friends {
+        AccountAddress::from_hex_literal(&friend.address)
+            .with_context(|| format!("invalid friend address `{}`", friend.address))?;
+        valid_identifier("friend module", &friend.module)?;
+    }
     let mut struct_names = BTreeSet::new();
     for decl in &module.structs {
         valid_identifier("struct", &decl.name)?;
+        decl.abilities.iter().try_for_each(|a| valid_ability(a))?;
+        decl.attributes.iter().try_for_each(valid_attribute)?;
+        for param in &decl.type_parameters {
+            valid_identifier("type parameter", &param.name)?;
+            param.abilities.iter().try_for_each(|a| valid_ability(a))?;
+        }
         ensure!(
             struct_names.insert(&decl.name),
             "duplicate struct `{}`",
@@ -164,7 +211,7 @@ fn validate(module: &XirModule) -> Result<()> {
         );
         let mut field_names = BTreeSet::new();
         for field in &decl.fields {
-            valid_identifier("field", &field.name)?;
+            valid_field_name(&field.name)?;
             ensure!(
                 field_names.insert(&field.name),
                 "duplicate field `{}` in struct `{}`",
@@ -179,7 +226,9 @@ fn validate(module: &XirModule) -> Result<()> {
         }
         if let Some(variants) = &decl.variants {
             for variant in variants {
+                valid_identifier("variant", &variant.name)?;
                 for field in &variant.fields {
+                    valid_field_name(&field.name)?;
                     validate_type_parameters(
                         &field.ty,
                         decl.type_parameters.len(),
@@ -192,6 +241,11 @@ fn validate(module: &XirModule) -> Result<()> {
     let mut function_names = BTreeSet::new();
     for decl in &module.functions {
         valid_identifier("function", &decl.name)?;
+        decl.attributes.iter().try_for_each(valid_attribute)?;
+        for param in &decl.type_parameters {
+            valid_identifier("type parameter", &param.name)?;
+            param.abilities.iter().try_for_each(|a| valid_ability(a))?;
+        }
         ensure!(
             function_names.insert(&decl.name),
             "duplicate function `{}`",
@@ -202,12 +256,16 @@ fn validate(module: &XirModule) -> Result<()> {
             "function `{}` has more parameters than locals",
             decl.name
         );
-        if !decl.is_native {
+        // A compilation target must have code to compile; a dependency need
+        // only declare its interface. Natives are bodyless in either role.
+        if decl.blocks.is_empty() {
             ensure!(
-                !decl.blocks.is_empty(),
+                decl.is_native || !is_target,
                 "function `{}` has no blocks",
                 decl.name
             );
+        } else {
+            // Code that is present is translated, whatever the module's role.
             ensure!(
                 decl.entry < decl.blocks.len(),
                 "entry block is out of range in `{}`",
@@ -231,6 +289,8 @@ fn validate(module: &XirModule) -> Result<()> {
             decl.local_names.len(),
             decl.locals.len()
         );
+        // Any non-empty name: Lean producers write names such as `x'`. The
+        // interface generator renders only names that are plain identifiers.
         for name in decl.local_names.iter().flatten() {
             ensure!(
                 !name.is_empty(),
@@ -292,7 +352,16 @@ fn validate_type_parameters(ty: &Ty, count: usize, owner: &str) -> Result<()> {
         Ty::Vector(element) | Ty::Ref(element) | Ty::MutRef(element) => {
             validate_type_parameters(element, count, owner)?;
         },
-        Ty::Function(params, results, _) => {
+        Ty::Function(params, results, abilities) => {
+            // The interface generator writes these into Move source.
+            abilities
+                .iter()
+                .try_for_each(|ability| valid_ability(ability))?;
+            ensure!(
+                parse_ability_set(abilities)?.is_valid_for_function_type(),
+                "a function type cannot have the abilities `{}`",
+                abilities.join(", ")
+            );
             for ty in params.iter().chain(results) {
                 validate_type_parameters(ty, count, owner)?;
             }
@@ -323,40 +392,98 @@ fn validate_operation_type_parameters(
     count: usize,
     function: &str,
 ) -> Result<()> {
-    let args = match operation {
-        Oper::PackInst(args)
-        | Oper::UnpackInst(args)
-        | Oper::PackVariantInst(_, args)
-        | Oper::UnpackVariantInst(_, args)
-        | Oper::TestVariantInst(_, args)
-        | Oper::GetFieldInst(_, args)
-        | Oper::GetGlobalInst(_, args)
-        | Oper::MoveToInst(_, args)
-        | Oper::MoveFromInst(_, args)
-        | Oper::ExistsInst(_, args)
-        | Oper::FunctionInst(_, args)
-        | Oper::ClosureInst(_, _, args)
-        | Oper::BorrowFieldInst(_, args)
-        | Oper::BorrowGlobalInst(_, args)
-        | Oper::BorrowVariantFieldInst(_, _, args)
-        | Oper::TestVariantRefInst(_, args) => args,
-        _ => return Ok(()),
-    };
-    for arg in args {
+    for arg in operation.type_arguments() {
         validate_type_parameters(arg, count, &format!("function `{function}` operation"))?;
     }
     Ok(())
 }
 
+/// A field name is an identifier, or a decimal index for a field of a
+/// positional struct — `struct Homomorphism<phantom P>(|&Statement<P>| Rep)`,
+/// whose one field `move-model` names `0`. Consumers address fields by their
+/// offset, so the name is documentation, but keeping the model's spelling
+/// makes the round trip exact.
+fn valid_field_name(name: &str) -> Result<()> {
+    if !name.is_empty() && name.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Ok(());
+    }
+    valid_identifier("field", name)
+}
+
+/// Every name below is rendered into generated Move source by
+/// [`crate::xir_interface_generator`], so each must be a *single token* in the
+/// position it lands in.
+///
+/// This is not hygiene. A type parameter named `T, U` is one string, so the
+/// document is consistent by every other rule here, but it renders as two
+/// type parameters. Local names are not checked here: the generator renders
+/// a parameter's name only when it is a plain identifier.
 fn valid_identifier(kind: &str, name: &str) -> Result<()> {
     Identifier::new(name)
         .map(|_| ())
         .with_context(|| format!("invalid {kind} identifier `{name}`"))
 }
 
+/// An ability is written into a `has` clause and a type parameter constraint,
+/// so it is checked against the closed set rather than as an identifier.
+fn valid_ability(name: &str) -> Result<()> {
+    ensure!(
+        matches!(name, "copy" | "drop" | "store" | "key"),
+        "invalid ability `{name}`"
+    );
+    Ok(())
+}
+
+/// A dotted or `::`-qualified path, as attributes use — `lint.skip`,
+/// `aptos_framework::object::ObjectGroup`. Every segment must be an
+/// identifier, or an address where one is allowed.
+fn valid_name_path(kind: &str, path: &str) -> Result<()> {
+    for segment in path.split("::").flat_map(|part| part.split('.')) {
+        if AccountAddress::from_hex_literal(segment).is_ok() {
+            continue;
+        }
+        valid_identifier(kind, segment)?;
+    }
+    Ok(())
+}
+
+fn valid_attribute(attribute: &XirAttribute) -> Result<()> {
+    valid_name_path("attribute", &attribute.name)?;
+    attribute.args.iter().try_for_each(valid_attribute_arg)
+}
+
+fn valid_attribute_arg(arg: &XirAttributeArg) -> Result<()> {
+    match arg {
+        XirAttributeArg::Name { name, args } => {
+            valid_name_path("attribute argument", name)?;
+            args.iter().try_for_each(valid_attribute_arg)?;
+        },
+        XirAttributeArg::Assign { assign, value } => {
+            valid_identifier("attribute argument", assign)?;
+            valid_attribute_arg(value)?;
+        },
+        // Rendered verbatim, so a value carrying punctuation would escape the
+        // argument list the same way a name would.
+        XirAttributeArg::Num { value } => ensure!(
+            !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()),
+            "invalid numeric attribute argument `{value}`"
+        ),
+        XirAttributeArg::Bool { .. } => {},
+    }
+    Ok(())
+}
+
 pub fn import_sources(
     env: &mut GlobalEnv,
     sources: &[XirSource],
+    targets: &mut FunctionTargetsHolder,
+) -> Result<()> {
+    import_source_refs(env, &sources.iter().collect::<Vec<_>>(), targets)
+}
+
+fn import_source_refs(
+    env: &mut GlobalEnv,
+    sources: &[&XirSource],
     targets: &mut FunctionTargetsHolder,
 ) -> Result<()> {
     if sources.is_empty() {
@@ -378,7 +505,7 @@ pub fn import_sources(
                 .join(", ");
             bail!("unresolved or cyclic XIR module dependencies: {blocked}")
         };
-        let source = &sources[index];
+        let source = sources[index];
         import_source(env, source, targets)
             .with_context(|| format!("loading XIR from `{}`", source.path.display()))?;
         imported[index] = true;
@@ -388,6 +515,8 @@ pub fn import_sources(
     Ok(())
 }
 
+/// Whether every module this one references — for calls *and* for types — is
+/// already loaded, so import ordering can pick a module that is ready.
 fn external_modules_available(env: &GlobalEnv, xir: &XirModule) -> bool {
     let available = |address: &str, module: &str| {
         let Ok(address) = AccountAddress::from_hex_literal(address) else {
@@ -520,6 +649,15 @@ fn model_attribute_apply(
                     XirAttributeArg::Name { name, args } => {
                         model_attribute_apply(env, loc, name, args)
                     },
+                    XirAttributeArg::Assign { assign, value } => {
+                        let symbol = env.symbol_pool().make(assign);
+                        let value = model_attribute_value(env, loc, assign, value)?;
+                        Ok(Attribute::Assign(
+                            env.new_node(loc.clone(), Type::Tuple(vec![])),
+                            symbol,
+                            value,
+                        ))
+                    },
                     XirAttributeArg::Num { .. } | XirAttributeArg::Bool { .. } => {
                         bail!("attribute `{name}` has an unnamed literal argument")
                     },
@@ -529,11 +667,60 @@ fn model_attribute_apply(
     }
 }
 
+/// Translates the right-hand side of an attribute assignment. Inverse of
+/// `xir_export::export_attribute_value`: a name path is split at its last
+/// `::` back into an optional module qualifier and a symbol.
+fn model_attribute_value(
+    env: &mut GlobalEnv,
+    loc: &Loc,
+    name: &str,
+    value: &XirAttributeArg,
+) -> Result<AttributeValue> {
+    let node_id = env.new_node(loc.clone(), Type::Tuple(vec![]));
+    match value {
+        XirAttributeArg::Num { value } => Ok(AttributeValue::Value(
+            node_id,
+            Value::Number(value.parse()?),
+        )),
+        XirAttributeArg::Bool { value } => Ok(AttributeValue::Value(node_id, Value::Bool(*value))),
+        XirAttributeArg::Name { name: path, args } => {
+            ensure!(
+                args.is_empty(),
+                "attribute `{name}` is assigned `{path}`, which cannot take arguments"
+            );
+            let (module_name, symbol) = match path.rfind("::") {
+                Some(split) => {
+                    let (module_path, symbol) = (&path[..split], &path[split + 2..]);
+                    let split = module_path.rfind("::").with_context(|| {
+                        format!(
+                            "attribute `{name}` is assigned `{path}`, which is not a \
+                                 module-qualified name"
+                        )
+                    })?;
+                    let address = AccountAddress::from_hex_literal(&module_path[..split])
+                        .with_context(|| format!("invalid address in attribute value `{path}`"))?;
+                    let module_name = ModuleName::new(
+                        Address::Numerical(address),
+                        env.symbol_pool().make(&module_path[split + 2..]),
+                    );
+                    (Some(module_name), symbol)
+                },
+                None => (None, path.as_str()),
+            };
+            let symbol = env.symbol_pool().make(symbol);
+            Ok(AttributeValue::Name(node_id, module_name, symbol))
+        },
+        XirAttributeArg::Assign { assign, .. } => {
+            bail!("attribute `{name}` is assigned the assignment `{assign}`, which has no meaning")
+        },
+    }
+}
+
 fn import_source(
     env: &mut GlobalEnv,
     source: &XirSource,
     targets: &mut FunctionTargetsHolder,
-) -> Result<()> {
+) -> Result<ModuleId> {
     let xir = &source.module;
     let address = AccountAddress::from_hex_literal(&xir.module.address)?;
     let module_symbol = env.symbol_pool().make(&xir.module.name);
@@ -768,18 +955,61 @@ fn import_source(
         });
     }
 
+    // Friend targets need not be loaded: a module may grant access to one that
+    // is absent from this compilation, so resolve the id where possible and
+    // keep the name either way.
+    let friends = xir
+        .friends
+        .iter()
+        .map(|reference| {
+            let address =
+                AccountAddress::from_hex_literal(&reference.address).with_context(|| {
+                    format!("invalid friend module address `{}`", reference.address)
+                })?;
+            valid_identifier("friend module", &reference.module)?;
+            let name = ModuleName::new(
+                Address::Numerical(address),
+                env.symbol_pool().make(&reference.module),
+            );
+            let module_id = env.find_module(&name).map(|module| module.get_id());
+            Ok(FriendDecl {
+                loc: loc.clone(),
+                module_name: name,
+                module_id,
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+
     let added_id = env.load_xir_module(ModelXirModuleData {
         loc,
         name: module_name,
         structs,
         functions,
+        friends,
     })?;
     ensure!(
         added_id == module_id,
         "model assigned an unexpected module id"
     );
     env.add_package_friends(module_id);
+    // A friend usually calls the module that grants it access, so it loads
+    // after it. Resolve those grants now, before translation checks its calls.
+    let loaded = env
+        .get_modules()
+        .map(|module| module.get_id())
+        .collect::<Vec<_>>();
+    env.resolve_xir_friend_declarations(&loaded);
     for (decl, fun_id) in xir.functions.iter().zip(&function_ids) {
+        // An interface-only declaration carries no body, so there is nothing
+        // to translate and no target to create. Gate on the body rather than
+        // on target status: a `.lean` dependency is a real module whose bodies
+        // downstream whole-program analyses still follow.
+        //
+        // Natives are bodyless too but keep their (empty) target, as they did
+        // before interfaces existed.
+        if decl.blocks.is_empty() && !decl.is_native {
+            continue;
+        }
         let qid = module_id.qualified(*fun_id);
         let data = translate_function(
             env,
@@ -812,7 +1042,7 @@ fn import_source(
         targets.insert_target_data(&qid, FunctionVariant::Baseline, data);
     }
     add_transitive_callee_targets(env, module_id, targets);
-    Ok(())
+    Ok(module_id)
 }
 
 /// XIR is imported after the ordinary Move stackless-bytecode generation pass.
@@ -842,6 +1072,13 @@ fn add_transitive_callee_targets(
         }
         let function = env.get_function(id);
         if function.is_excluded_from_bytecode_gen() {
+            continue;
+        }
+        // A callee reached here is not already a target. If it also has no AST
+        // definition and is not native, it came from a declaration-only
+        // dependency: there is no body to generate, and synthesizing an empty
+        // one would produce a target whose CFG cannot be built.
+        if function.get_def().is_none() && !function.is_native() {
             continue;
         }
         let data = crate::bytecode_generator::generate_bytecode(env, id);
@@ -916,9 +1153,12 @@ fn model_type(ty: &Ty, scope: &StructScope) -> Result<Type> {
         Ty::U64 => Type::Primitive(PrimitiveType::U64),
         Ty::U128 => Type::Primitive(PrimitiveType::U128),
         Ty::U256 => Type::Primitive(PrimitiveType::U256),
-        Ty::I8 | Ty::I16 | Ty::I32 | Ty::I64 | Ty::I128 | Ty::I256 => {
-            bail!("signed integer types are not representable in the move-model type system")
-        },
+        Ty::I8 => Type::Primitive(PrimitiveType::I8),
+        Ty::I16 => Type::Primitive(PrimitiveType::I16),
+        Ty::I32 => Type::Primitive(PrimitiveType::I32),
+        Ty::I64 => Type::Primitive(PrimitiveType::I64),
+        Ty::I128 => Type::Primitive(PrimitiveType::I128),
+        Ty::I256 => Type::Primitive(PrimitiveType::I256),
         Ty::Address => Type::Primitive(PrimitiveType::Address),
         Ty::Signer => Type::Primitive(PrimitiveType::Signer),
         Ty::TypeParameter(index) => {
@@ -1034,6 +1274,99 @@ fn function_at(
     Ok(module.get_id().qualified(function.get_id()))
 }
 
+/// Records interface functions' callees in the model.
+///
+/// An interface reaches the front end as generated source declaring every
+/// function `native`, so no calls are derived from it. Analyses that walk the
+/// call graph across a dependency — Aptos rejects a public function that can
+/// reach `0x1::randomness` that way — would otherwise stop at the boundary.
+pub fn apply_interface_call_graphs(env: &mut GlobalEnv, modules: &[XirModule]) -> Result<()> {
+    for xir in modules {
+        let Some(module_id) = interface_module_id(env, &xir.module.address, &xir.module.name)
+        else {
+            continue;
+        };
+        for decl in &xir.functions {
+            let called = decl.called_ids();
+            if called.is_empty() {
+                continue;
+            }
+            let fun_id = interface_fun_id(env, module_id, &decl.name).with_context(|| {
+                format!("`{}` is missing from the generated interface", decl.name)
+            })?;
+            let callees = called
+                .iter()
+                .map(|id| interface_callee(env, xir, module_id, *id))
+                .collect::<Result<BTreeSet<_>>>()
+                .with_context(|| format!("resolving the callees of `{}`", decl.name))?;
+            // An interface records calls only, so it uses what it calls.
+            env.set_xir_used_functions(module_id.qualified(fun_id), callees.clone(), callees);
+        }
+    }
+    Ok(())
+}
+
+fn interface_module_id(env: &GlobalEnv, address: &str, module: &str) -> Option<ModuleId> {
+    let address = AccountAddress::from_hex_literal(address).ok()?;
+    let name = ModuleName::new(Address::Numerical(address), env.symbol_pool().make(module));
+    Some(env.find_module(&name)?.get_id())
+}
+
+fn interface_fun_id(env: &GlobalEnv, module_id: ModuleId, name: &str) -> Option<FunId> {
+    env.get_module(module_id)
+        .find_function(env.symbol_pool().make(name))
+        .map(|fun| fun.get_id())
+}
+
+/// Resolves a call id under the local-then-`external_functions` convention.
+///
+/// Every recorded edge must resolve. Dropping one is not neutral: analyses
+/// follow this graph to decide things like whether a public function can reach
+/// `0x1::randomness`, and the *deployed* dependency still makes the call
+/// whatever this build happens to have loaded. A missing edge therefore yields
+/// a weaker answer than the source build gives, silently.
+///
+/// An absent callee module means the build does not contain the closure this
+/// interface names — the package system supplies it via transitive
+/// dependencies — so it is reported rather than skipped.
+fn interface_callee(
+    env: &GlobalEnv,
+    xir: &XirModule,
+    module_id: ModuleId,
+    id: usize,
+) -> Result<QualifiedId<FunId>> {
+    let (owner, name) = match xir.functions.get(id) {
+        Some(decl) => (module_id, decl.name.clone()),
+        None => {
+            let reference = xir
+                .external_functions
+                .get(id - xir.functions.len())
+                .with_context(|| format!("call id {id} is outside the function tables"))?;
+            let owner = interface_module_id(env, &reference.address, &reference.module)
+                .with_context(|| {
+                    format!(
+                        "`{}::{}` is called by this interface but is not in the build; \
+                         supply its interface too (loaded: {:?})",
+                        reference.address,
+                        reference.module,
+                        env.get_modules()
+                            .map(|module| module.get_full_name_str())
+                            .take(8)
+                            .collect::<Vec<_>>()
+                    )
+                })?;
+            (owner, reference.function.clone())
+        },
+    };
+    let fun_id = interface_fun_id(env, owner, &name).with_context(|| {
+        format!(
+            "`{name}` is missing from `{}`, which is loaded: the interface and the module disagree",
+            env.get_module(owner).get_full_name_str()
+        )
+    })?;
+    Ok(owner.qualified(fun_id))
+}
+
 /// The functions a declaration uses and, among them, those it calls; a
 /// closure's target is used without being called.
 fn used_functions(
@@ -1046,6 +1379,10 @@ fn used_functions(
     // The explicit uses; the translated code adds the calls it lowers to.
     let mut used = BTreeSet::new();
     let mut called = BTreeSet::new();
+    // An interface has no blocks and records its call graph explicitly.
+    for id in &decl.calls {
+        called.insert(function_at(env, xir, module_id, functions, *id)?);
+    }
     for block in &decl.blocks {
         for instr in &block.instrs {
             match instr {
@@ -1090,11 +1427,17 @@ fn int_type_of(ty: &Type) -> Option<IntType> {
     }
 }
 
+/// Resolves a resource id used by a *global storage* operation. Move requires
+/// the type of `move_to`/`move_from`/`borrow_global`/`exists` to be declared in
+/// the acting module, so only local ids are valid here — an id reaching into
+/// [`XirModule::external_structs`] is a genuine error, not a lookup miss.
 fn struct_at(structs: &[StructId], id: usize, function: &str) -> Result<StructId> {
-    structs
-        .get(id)
-        .copied()
-        .with_context(|| format!("struct id {id} is out of range in `{function}`"))
+    structs.get(id).copied().with_context(|| {
+        format!(
+            "struct id {id} is out of range in `{function}`; global storage operations \
+             require a type declared in this module"
+        )
+    })
 }
 
 fn translate_function(
@@ -1259,6 +1602,8 @@ struct FunctionTranslator<'a> {
     env: &'a GlobalEnv,
     xir: &'a XirModule,
     module_id: ModuleId,
+    /// Locally declared structs, for global-storage operations, which Move
+    /// requires to target a type of the acting module.
     struct_ids: &'a [StructId],
     external_struct_ids: &'a [QualifiedId<StructId>],
     struct_arities: &'a [usize],
@@ -1815,14 +2160,12 @@ impl FunctionTranslator<'_> {
                     IntType::U64 => StacklessOperation::CastU64,
                     IntType::U128 => StacklessOperation::CastU128,
                     IntType::U256 => StacklessOperation::CastU256,
-                    IntType::I8
-                    | IntType::I16
-                    | IntType::I32
-                    | IntType::I64
-                    | IntType::I128
-                    | IntType::I256 => {
-                        bail!("signed integer casts are not representable in stackless bytecode")
-                    },
+                    IntType::I8 => StacklessOperation::CastI8,
+                    IntType::I16 => StacklessOperation::CastI16,
+                    IntType::I32 => StacklessOperation::CastI32,
+                    IntType::I64 => StacklessOperation::CastI64,
+                    IntType::I128 => StacklessOperation::CastI128,
+                    IntType::I256 => StacklessOperation::CastI256,
                 }
             },
             Oper::Not => {
@@ -2667,6 +3010,24 @@ fn stackless_constant(constant: &Constant, ty: &Type) -> Result<StacklessConstan
                 Type::Primitive(PrimitiveType::U256) => {
                     StacklessConstant::U256(value.parse::<ethnum::U256>().with_context(parse_err)?)
                 },
+                Type::Primitive(PrimitiveType::I8) => {
+                    StacklessConstant::I8(value.parse().with_context(parse_err)?)
+                },
+                Type::Primitive(PrimitiveType::I16) => {
+                    StacklessConstant::I16(value.parse().with_context(parse_err)?)
+                },
+                Type::Primitive(PrimitiveType::I32) => {
+                    StacklessConstant::I32(value.parse().with_context(parse_err)?)
+                },
+                Type::Primitive(PrimitiveType::I64) => {
+                    StacklessConstant::I64(value.parse().with_context(parse_err)?)
+                },
+                Type::Primitive(PrimitiveType::I128) => {
+                    StacklessConstant::I128(value.parse().with_context(parse_err)?)
+                },
+                Type::Primitive(PrimitiveType::I256) => {
+                    StacklessConstant::I256(value.parse::<ethnum::I256>().with_context(parse_err)?)
+                },
                 other => bail!("integer constant loaded into non-integer type {other:?}"),
             }
         },
@@ -2697,6 +3058,7 @@ fn arity(
 mod tests {
     use super::*;
     use crate::Options;
+    use move_model_exchange::XirModuleRef;
     use std::fs;
 
     fn account_golden() -> String {
@@ -2740,6 +3102,652 @@ mod tests {
             panic!("expected module")
         };
         move_bytecode_verifier::verify_module(&module.module).unwrap();
+    }
+
+    /// A module declaring one struct and, optionally, one bodyless function
+    /// taking a type from `external`.
+    fn v6_module(name: &str, external: Option<(&str, &str)>, with_body: bool) -> XirModule {
+        let external_structs = match external {
+            Some((module, ty)) => serde_json::json!([
+                {"address": "0x42", "module": module, "name": ty}
+            ]),
+            None => serde_json::json!([]),
+        };
+        // Local struct is id 0; the external type, when present, is id 1.
+        let (param_ty, blocks) = if external.is_some() {
+            (serde_json::json!({"struct": 1}), with_body)
+        } else {
+            (serde_json::json!({"struct": 0}), with_body)
+        };
+        let body = if blocks {
+            serde_json::json!([{"instrs": [], "term": {"ret": []}}])
+        } else {
+            serde_json::json!([])
+        };
+        serde_json::from_value(serde_json::json!({
+            "schema": move_model_exchange::XIR_SCHEMA,
+            "version": move_model_exchange::XIR_VERSION,
+            "module": {"address": "0x42", "name": name, "dialect": "stackless"},
+            "friends": [{"address": "0x42", "module": "buddy"}],
+            "structs": [{
+                "name": "Local", "visibility": "public",
+                "abilities": ["drop"],
+                "fields": [{"name": "v", "ty": "u64"}],
+            }],
+            "functions": [{
+                "name": "takes", "visibility": "public", "is_entry": false,
+                "is_native": false, "acquires": [], "params": 1,
+                "locals": [param_ty], "returns": [],
+                "blocks": body, "entry": 0, "loops": [],
+                "spec": {"requires": [], "modifies": [], "ensures": [], "aborts_if": []},
+            }],
+            "external_structs": external_structs,
+        }))
+        .unwrap()
+    }
+
+    fn source_of(module: &XirModule, is_target: bool) -> XirSource {
+        parse_source_with_target(
+            PathBuf::from("test.xir.json"),
+            String::new(),
+            &serde_json::to_string(module).unwrap(),
+            is_target,
+        )
+        .unwrap()
+    }
+
+    /// A type from another module resolves through `external_structs` to that
+    /// module's struct, not to a local one.
+    #[test]
+    fn external_structs_resolve_to_the_declaring_module() {
+        let provider = source_of(&v6_module("provider", None, true), true);
+        let consumer = source_of(
+            &v6_module("consumer", Some(("provider", "Local")), true),
+            true,
+        );
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        import_sources(&mut env, &[provider, consumer], &mut targets).unwrap();
+
+        let pool = env.symbol_pool();
+        let find = |name: &str| {
+            env.find_module(&ModuleName::new(
+                Address::Numerical(AccountAddress::from_hex_literal("0x42").unwrap()),
+                pool.make(name),
+            ))
+            .unwrap()
+        };
+        let provider_id = find("provider").get_id();
+        let consumer_env = find("consumer");
+        let function = consumer_env
+            .find_function(pool.make("takes"))
+            .expect("consumer has `takes`");
+        let Type::Struct(module_id, _, _) = function.get_parameter_types()[0].clone() else {
+            panic!("expected a struct parameter")
+        };
+        assert_eq!(
+            module_id, provider_id,
+            "the parameter type must resolve to the declaring module"
+        );
+    }
+
+    /// Import ordering accounts for type dependencies, not just calls: the
+    /// consumer is listed first but must be imported after its provider.
+    #[test]
+    fn import_order_respects_external_type_dependencies() {
+        let consumer = source_of(
+            &v6_module("consumer", Some(("provider", "Local")), true),
+            true,
+        );
+        let provider = source_of(&v6_module("provider", None, true), true);
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        import_sources(&mut env, &[consumer, provider], &mut targets).unwrap();
+        assert_eq!(env.get_module_count(), 2);
+    }
+
+    #[test]
+    fn rejects_unresolvable_external_type() {
+        let consumer = source_of(
+            &v6_module("consumer", Some(("missing", "Local")), true),
+            true,
+        );
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        let error = import_sources(&mut env, &[consumer], &mut targets).unwrap_err();
+        assert!(format!("{error:#}").contains("unresolved or cyclic"));
+    }
+
+    /// A dependency contributes declarations only: no bodies are translated,
+    /// so a bodyless interface module is accepted and produces no targets.
+    #[test]
+    fn bodyless_module_imports_as_a_dependency_only() {
+        let dependency = source_of(&v6_module("iface", None, false), false);
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        import_sources(&mut env, &[dependency], &mut targets).unwrap();
+        assert_eq!(env.get_module_count(), 1);
+        assert_eq!(
+            targets.get_funs().count(),
+            0,
+            "a dependency must not enter the target holder"
+        );
+    }
+
+    /// The same module supplied as a compilation target is rejected: a target
+    /// must have code to compile.
+    #[test]
+    fn rejects_bodyless_module_supplied_as_a_target() {
+        let error = parse_source_with_target(
+            PathBuf::from("iface.xir.json"),
+            String::new(),
+            &serde_json::to_string(&v6_module("iface", None, false)).unwrap(),
+            true,
+        )
+        .err()
+        .expect("a bodyless target must be rejected");
+        assert!(format!("{error:#}").contains("has no blocks"));
+    }
+
+    #[test]
+    fn friends_and_struct_visibility_reach_the_model() {
+        let source = source_of(&v6_module("m", None, true), true);
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        import_sources(&mut env, &[source], &mut targets).unwrap();
+        let module = env.get_modules().next().unwrap();
+        let friends = module.get_friend_decls();
+        assert_eq!(friends.len(), 1, "the friend declaration must be recorded");
+        assert_eq!(
+            env.symbol_pool()
+                .string(friends[0].module_name.name())
+                .as_str(),
+            "buddy"
+        );
+        let struct_env = module.get_structs().next().unwrap();
+        assert_eq!(struct_env.get_visibility(), MoveVisibility::Public);
+    }
+
+    /// A friend declaration must reach `friend_modules`, not just
+    /// `friend_decls`.
+    ///
+    /// These are two different things and only the former is serialized:
+    /// `module_generator.rs` builds the bytecode's friend list from
+    /// `ModuleEnv::get_friend_modules()`. Source modules get that set filled by
+    /// `check_and_update_friend_info` at the end of the model builder, which an
+    /// XIR module is added too late to participate in — so without resolving
+    /// them in the loader, an XIR target compiles to bytecode with no friends
+    /// at all, silently revoking access from its declared friend modules.
+    #[test]
+    fn friend_declarations_resolve_to_module_ids() {
+        // Here `buddy` happens to load first, so the grant resolves during the
+        // load itself. The reverse order is covered by
+        // `friend_grants_survive_when_the_friend_loads_later`.
+        let buddy = source_of(&v6_module("buddy", None, true), true);
+        let m = source_of(&v6_module("m", None, true), true);
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        import_sources(&mut env, &[buddy, m], &mut targets).unwrap();
+
+        let buddy_id = env
+            .get_modules()
+            .find(|module| env.symbol_pool().string(module.get_name().name()).as_str() == "buddy")
+            .expect("buddy was loaded")
+            .get_id();
+        let m = env
+            .get_modules()
+            .find(|module| env.symbol_pool().string(module.get_name().name()).as_str() == "m")
+            .expect("m was loaded");
+
+        assert!(
+            m.get_friend_modules().contains(&buddy_id),
+            "the friend must reach the set that file-format generation reads"
+        );
+        assert_eq!(
+            m.get_friend_decls()[0].module_id,
+            Some(buddy_id),
+            "the declaration must also carry the resolved id"
+        );
+    }
+
+    /// A grant survives when the friend module loads *after* the grantor.
+    ///
+    /// This is the only order the dependency sort can produce whenever the
+    /// friend actually uses what it was granted: the friend refers to the
+    /// granting module, so the grantor loads first, and the friend is absent
+    /// at the moment the grant would be resolved. Resolving grants only at
+    /// load time therefore drops them in exactly the configuration friend
+    /// declarations exist for — and drops them silently, since an absent
+    /// friend is deliberately not an error.
+    #[test]
+    fn friend_grants_survive_when_the_friend_loads_later() {
+        let mut grantor = v6_module("provider", None, true);
+        grantor.friends = vec![XirModuleRef {
+            address: "0x42".to_owned(),
+            module: "consumer".to_owned(),
+        }];
+        // Naming a type from `provider` forces `consumer` to load second.
+        let consumer = v6_module("consumer", Some(("provider", "Local")), true);
+
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        import_sources(
+            &mut env,
+            &[source_of(&grantor, true), source_of(&consumer, true)],
+            &mut targets,
+        )
+        .unwrap();
+
+        let id_of = |name: &str| {
+            env.get_modules()
+                .find(|module| env.symbol_pool().string(module.get_name().name()).as_str() == name)
+                .unwrap_or_else(|| panic!("`{name}` was loaded"))
+                .get_id()
+        };
+        let consumer_id = id_of("consumer");
+        let provider = env.get_module(id_of("provider"));
+        assert!(
+            provider.get_friend_modules().contains(&consumer_id),
+            "the grant must reach the set file-format generation reads, even though \
+             the friend loaded after the grantor"
+        );
+        assert_eq!(
+            provider.get_friend_decls()[0].module_id,
+            Some(consumer_id),
+            "the declaration must also carry the resolved id"
+        );
+    }
+
+    /// A native function outside a special address reaches bytecode generation
+    /// unchecked when it arrives as an XIR *target*.
+    ///
+    /// `native_checker` rejects this for Move sources, but it runs inside
+    /// `env_check_and_transform_pipeline`, and `lib.rs` imports XIR targets
+    /// *after* that pipeline has finished. Nothing reapplies it.
+    ///
+    /// This pins down which fix is needed. The module is a primary target and
+    /// the rule fires the moment anything runs it, so the gap is the ordering
+    /// alone — not a missing target flag.
+    #[test]
+    fn a_native_function_in_an_xir_target_is_only_checked_if_the_rule_is_run() {
+        let mut module = v6_module("natives", None, false);
+        module.functions[0].is_native = true;
+
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        import_sources(&mut env, &[source_of(&module, true)], &mut targets).unwrap();
+
+        // The fixture's address is not special, which is what the rule keys on.
+        assert!(!AccountAddress::from_hex_literal("0x42")
+            .unwrap()
+            .is_special());
+        assert!(
+            env.get_modules().any(|module| module.is_primary_target()),
+            "an XIR target must be a primary target for the rule to apply"
+        );
+        assert!(!env.has_errors(), "importing alone reports nothing");
+
+        crate::env_pipeline::native_checker::check_for_native_functions_and_structs(&mut env);
+        assert!(
+            env.has_errors(),
+            "the rule applies to an XIR target; only the pipeline ordering keeps it from running"
+        );
+    }
+
+    /// The XIR transcription of `tests/checking/visibility-checker/
+    /// call_private_function.move`, which the source path rejects with
+    /// "function `0xdeadbeef::M::foo` is private to module `0xdeadbeef::M`".
+    ///
+    /// `M::foo` takes the given visibility, and declares `N` a friend when
+    /// `grant_friend`; `N::calls_foo` calls it through `external_functions`.
+    fn m_and_n(visibility: &str, grant_friend: bool) -> (XirModule, XirModule) {
+        let friends = if grant_friend {
+            serde_json::json!([{"address": "0xdeadbeef", "module": "N"}])
+        } else {
+            serde_json::json!([])
+        };
+        // module 0xdeadbeef::M { fun foo(): u64 { 1 } }
+        let m = serde_json::from_value(serde_json::json!({
+            "schema": move_model_exchange::XIR_SCHEMA,
+            "version": move_model_exchange::XIR_VERSION,
+            "module": {"address": "0xdeadbeef", "name": "M", "dialect": "stackless"},
+            "friends": friends,
+            "structs": [],
+            "functions": [{
+                "name": "foo", "visibility": visibility, "is_entry": false,
+                "is_native": false, "acquires": [], "params": 0,
+                "locals": ["u64"], "returns": ["u64"],
+                "blocks": [{
+                    "instrs": [{"load": [0, {"num": "1"}]}],
+                    "term": {"ret": [0]},
+                }],
+                "entry": 0, "loops": [],
+                "spec": {"requires": [], "modifies": [], "ensures": [], "aborts_if": []},
+            }],
+        }))
+        .unwrap();
+        // module 0xdeadbeef::N { fun calls_foo(): u64 { 0xdeadbeef::M::foo() } }
+        //
+        // `N` declares one function, so local ids end at 0 and the external
+        // callee `M::foo` is id 1.
+        let n = serde_json::from_value(serde_json::json!({
+            "schema": move_model_exchange::XIR_SCHEMA,
+            "version": move_model_exchange::XIR_VERSION,
+            "module": {"address": "0xdeadbeef", "name": "N", "dialect": "stackless"},
+            "structs": [],
+            "functions": [{
+                "name": "calls_foo", "visibility": "private", "is_entry": false,
+                "is_native": false, "acquires": [], "params": 0,
+                "locals": ["u64"], "returns": ["u64"],
+                "blocks": [{
+                    "instrs": [{"call": [[0], {"function": 1}, []]}],
+                    "term": {"ret": [0]},
+                }],
+                "entry": 0, "loops": [],
+                "spec": {"requires": [], "modifies": [], "ensures": [], "aborts_if": []},
+            }],
+            "external_functions": [
+                {"address": "0xdeadbeef", "module": "M", "function": "foo"}
+            ],
+        }))
+        .unwrap();
+        (m, n)
+    }
+
+    /// An XIR target gets the same answer as Move source when it calls a
+    /// function it may not see.
+    ///
+    /// Without the check, this compiles to verified bytecode and is rejected
+    /// only by `dependencies::verify_module` — at publication.
+    #[test]
+    fn an_xir_target_cannot_call_a_function_it_may_not_see() {
+        let import = |visibility: &str, grant_friend: bool| {
+            let (m, n) = m_and_n(visibility, grant_friend);
+            let mut env = GlobalEnv::new();
+            let mut targets = FunctionTargetsHolder::default();
+            import_sources(
+                &mut env,
+                &[source_of(&m, true), source_of(&n, true)],
+                &mut targets,
+            )
+            .err()
+            .map(|e| format!("{e:#}"))
+        };
+
+        assert!(
+            import("public", false).is_none(),
+            "a public callee is allowed"
+        );
+
+        let private = import("private", false).expect("a private callee is rejected");
+        assert!(
+            private.contains("`0xdeadbeef::M::foo` is private to module `0xdeadbeef::M`"),
+            "the error matches what the source path reports: {private}"
+        );
+
+        let stranger = import("friend", false).expect("an ungranted friend callee is rejected");
+        assert!(
+            stranger.contains("not a friend of `0xdeadbeef::M`"),
+            "the error says why: {stranger}"
+        );
+
+        // The grant is what makes this legal. `N` loads after `M`, whose grant
+        // to it resolves only then, so this pins the grant resolving before
+        // `N`'s calls are checked.
+        assert!(
+            import("friend", true).is_none(),
+            "a granted friend callee is allowed"
+        );
+    }
+
+    /// `fun f<T>() { f<Wrapper<T>>() }` grows its type argument without bound.
+    ///
+    /// The rule for this reads the AST, so it cannot be reapplied to XIR the
+    /// way the declaration rules are. This pins where the violation *is*
+    /// caught — the bytecode verifier — so the gap is recorded rather than
+    /// assumed closed.
+    #[test]
+    fn a_cyclic_instantiation_in_an_xir_target_reaches_the_bytecode_verifier() {
+        // module 0x42::C {
+        //     struct Wrapper<T> has drop { f: T }
+        //     fun f<T>() { f<Wrapper<T>>() }     // grows the type forever
+        // }
+        let module: XirModule = serde_json::from_value(serde_json::json!({
+            "schema": move_model_exchange::XIR_SCHEMA,
+            "version": move_model_exchange::XIR_VERSION,
+            "module": {"address": "0x42", "name": "C", "dialect": "stackless"},
+            "structs": [{
+                "name": "Wrapper", "visibility": "public",
+                "type_parameters": [{"name": "T"}],
+                "abilities": ["drop"],
+                "fields": [{"name": "f", "ty": {"type_parameter": 0}}],
+            }],
+            "functions": [{
+                "name": "f", "visibility": "public", "is_entry": false,
+                "is_native": false, "acquires": [], "params": 0,
+                "type_parameters": [{"name": "T"}],
+                "locals": [], "returns": [],
+                "blocks": [{
+                    "instrs": [{"call": [
+                        [],
+                        {"function_inst": [0, [{"struct_inst": [0, [{"type_parameter": 0}]]}]]},
+                        []
+                    ]}],
+                    "term": {"ret": []},
+                }],
+                "entry": 0, "loops": [],
+                "spec": {"requires": [], "modifies": [], "ensures": [], "aborts_if": []},
+            }],
+        }))
+        .unwrap();
+
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        import_sources(&mut env, &[source_of(&module, true)], &mut targets).unwrap();
+        assert!(!env.has_errors(), "importing alone reports nothing");
+
+        // Unlike the declaration rules, this one reads `get_def()`, so running
+        // it here reports nothing. That is why `lib.rs` does not call it.
+        crate::env_pipeline::cyclic_instantiation_checker::check_cyclic_instantiations(&env);
+        assert!(
+            !env.has_errors(),
+            "an AST rule cannot see a stackless module"
+        );
+
+        let options = Options::default();
+        env.set_extension(options.clone());
+        crate::run_stackless_bytecode_pipeline(
+            &env,
+            crate::stackless_bytecode_check_pipeline(&options),
+            &mut targets,
+        );
+        println!("after check pipeline={}", env.has_errors());
+        crate::run_stackless_bytecode_pipeline(
+            &env,
+            crate::stackless_bytecode_optimization_pipeline(&options),
+            &mut targets,
+        );
+        let units = crate::run_file_format_gen(&mut env, &targets);
+        assert!(!env.has_errors(), "the compiler itself reports nothing");
+        let legacy_move_compiler::compiled_unit::CompiledUnit::Module(unit) = &units[0] else {
+            panic!("expected a module")
+        };
+        assert_eq!(
+            move_bytecode_verifier::verify_module(&unit.module)
+                .err()
+                .map(|e| e.major_status()),
+            Some(move_core_types::vm_status::StatusCode::LOOP_IN_INSTANTIATION_GRAPH),
+            "the verifier is what rejects a cyclic instantiation"
+        );
+    }
+
+    /// `struct Foo { f: Foo }` — the source path calls this "cyclic data".
+    ///
+    /// Reads struct declarations, which XIR carries, so `lib.rs` reruns it
+    /// after import instead of needing a stackless rewrite.
+    #[test]
+    fn a_recursive_struct_in_an_xir_target_is_rejected() {
+        // module 0x42::M0 { struct Foo { f: Foo } }
+        let module: XirModule = serde_json::from_value(serde_json::json!({
+            "schema": move_model_exchange::XIR_SCHEMA,
+            "version": move_model_exchange::XIR_VERSION,
+            "module": {"address": "0x42", "name": "M0", "dialect": "stackless"},
+            "structs": [{
+                "name": "Foo", "visibility": "public",
+                "abilities": [],
+                "fields": [{"name": "f", "ty": {"struct": 0}}],
+            }],
+            "functions": [],
+        }))
+        .unwrap();
+
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        import_sources(&mut env, &[source_of(&module, true)], &mut targets).unwrap();
+        assert!(!env.has_errors(), "importing alone reports nothing");
+
+        crate::env_pipeline::recursive_struct_checker::check_recursive_struct(&env);
+        assert!(env.has_errors(), "the rule applies to an XIR target");
+
+        let mut out = codespan_reporting::term::termcolor::Buffer::no_color();
+        env.report_diag(&mut out, codespan_reporting::diagnostic::Severity::Error);
+        let diags = String::from_utf8_lossy(&out.into_inner()).into_owned();
+        assert!(
+            diags.contains("cyclic data")
+                && diags.contains("field `f` of `Foo` contains `Foo`, which forms a cycle"),
+            "the message is the one Move source gets: {diags}"
+        );
+    }
+
+    /// `struct S<T> { x: u64 }` — a non-phantom parameter no field uses.
+    ///
+    /// Reads struct declarations, so `lib.rs` reruns it after import. This one
+    /// reports a warning rather than an error, so it is the diagnostic that
+    /// has to be inspected, not `has_errors`.
+    #[test]
+    fn an_unused_struct_parameter_in_an_xir_target_is_rejected() {
+        let module: XirModule = serde_json::from_value(serde_json::json!({
+            "schema": move_model_exchange::XIR_SCHEMA,
+            "version": move_model_exchange::XIR_VERSION,
+            "module": {"address": "0x42", "name": "M1", "dialect": "stackless"},
+            "structs": [{
+                "name": "S", "visibility": "public",
+                "type_parameters": [{"name": "T"}],
+                "abilities": [],
+                "fields": [{"name": "x", "ty": "u64"}],
+            }],
+            "functions": [],
+        }))
+        .unwrap();
+
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        import_sources(&mut env, &[source_of(&module, true)], &mut targets).unwrap();
+        assert!(!env.has_errors(), "importing alone reports nothing");
+
+        crate::env_pipeline::unused_params_checker::unused_params_checker(&env);
+        let mut out = codespan_reporting::term::termcolor::Buffer::no_color();
+        env.report_diag(&mut out, codespan_reporting::diagnostic::Severity::Warning);
+        let diags = String::from_utf8_lossy(&out.into_inner()).into_owned();
+        assert!(
+            diags.contains("unused type parameter") && diags.contains("`T`"),
+            "the rule applies to an XIR target: {diags}"
+        );
+    }
+
+    /// Packing a struct another module owns is rejected, though Move source
+    /// accepts it for a `public` struct.
+    ///
+    /// `external_structs` resolves a foreign type in a *signature*, but
+    /// `struct_from_type` accepts only locally-owned types, so no operation can
+    /// touch the value. This pins the gap; the companion half is
+    /// `move_source_can_pack_a_foreign_public_struct` in `xir_differential.rs`.
+    #[test]
+    fn a_foreign_struct_cannot_be_packed() {
+        // module 0x42::M { public struct S has drop { x: u64 } }
+        let m: XirModule = serde_json::from_value(serde_json::json!({
+            "schema": move_model_exchange::XIR_SCHEMA,
+            "version": move_model_exchange::XIR_VERSION,
+            "module": {"address": "0x42", "name": "M", "dialect": "stackless"},
+            "structs": [{
+                "name": "S", "visibility": "public", "abilities": ["drop"],
+                "fields": [{"name": "x", "ty": "u64"}],
+            }],
+            "functions": [],
+        }))
+        .unwrap();
+        // module 0x42::N { public fun make(): M::S { M::S { x: 1 } } }
+        //
+        // `N` declares no structs, so struct id 0 is external_structs[0].
+        let n: XirModule = serde_json::from_value(serde_json::json!({
+            "schema": move_model_exchange::XIR_SCHEMA,
+            "version": move_model_exchange::XIR_VERSION,
+            "module": {"address": "0x42", "name": "N", "dialect": "stackless"},
+            "structs": [],
+            "functions": [{
+                "name": "make", "visibility": "public", "is_entry": false,
+                "is_native": false, "acquires": [], "params": 0,
+                "locals": [{"struct": 0}, "u64"], "returns": [{"struct": 0}],
+                "blocks": [{
+                    "instrs": [
+                        {"load": [1, {"num": "1"}]},
+                        {"call": [[0], "pack", [1]]},
+                    ],
+                    "term": {"ret": [0]},
+                }],
+                "entry": 0, "loops": [],
+                "spec": {"requires": [], "modifies": [], "ensures": [], "aborts_if": []},
+            }],
+            "external_structs": [{"address": "0x42", "module": "M", "name": "S"}],
+        }))
+        .unwrap();
+
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        let error = import_sources(
+            &mut env,
+            &[source_of(&m, true), source_of(&n, true)],
+            &mut targets,
+        )
+        .err()
+        .map(|e| format!("{e:#}"))
+        .expect("a foreign struct operation is rejected today");
+        assert!(
+            error.contains("is not a struct of this module"),
+            "the rejection comes from the type checker: {error}"
+        );
+    }
+
+    /// An unresolved friend is tolerated, unlike on the source path.
+    ///
+    /// XIR modules are loaded one at a time, and a friend is typically a
+    /// *dependent* that need not be present. Being lenient is safe because an
+    /// absent friend only withholds an access grant.
+    #[test]
+    fn an_absent_friend_is_not_an_error() {
+        let m = source_of(&v6_module("m", None, true), true);
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        import_sources(&mut env, &[m], &mut targets).unwrap();
+        let module = env.get_modules().next().unwrap();
+        assert_eq!(module.get_friend_decls().len(), 1);
+        assert!(module.get_friend_modules().is_empty());
+        assert!(!env.has_errors());
+    }
+
+    fn signed_golden() -> String {
+        fs::read_to_string(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/xir/signed.xir.json"),
+        )
+        .unwrap()
+    }
+
+    /// Signed integers reach verified bytecode: every width in a signature,
+    /// signed arithmetic, a negative `num` constant, and a signed cast.
+    #[test]
+    fn signed_integers_run_production_pipeline() {
+        let module: XirModule = serde_json::from_str(&signed_golden()).unwrap();
+        import_and_verify(module);
     }
 
     #[test]
@@ -3109,6 +4117,8 @@ mod tests {
     /// l8 `u256`, l9 `bool`, l10 `vector<u64>`, l11 `&u64`, l12 a struct.
     fn instruction_module(instr: Instr) -> XirModule {
         let mut module = account_module();
+        // Tests add fields newer than the golden document's version.
+        module.version = move_model_exchange::XIR_VERSION;
         let function = &mut module.functions[0];
         function.params = 0;
         function.locals = vec![
@@ -3390,6 +4400,102 @@ mod tests {
             })
             .collect();
         assert!(wrong.is_empty(), "{wrong:#?}");
+    }
+
+    /// The golden module at the current version, as an interface carries it.
+    fn interface_module() -> XirModule {
+        let mut module = account_module();
+        module.version = move_model_exchange::XIR_VERSION;
+        module
+    }
+
+    /// The error `module` is refused with as a `.lean` dependency, which keeps
+    /// its bodies, if any.
+    fn dependency_error(module: &XirModule) -> Option<String> {
+        let mut module = module.clone();
+        for function in &mut module.functions {
+            function.source_map = None;
+        }
+        parse_source_with_target(
+            PathBuf::from("dependency.xir.json"),
+            String::new(),
+            &serde_json::to_string(&module).unwrap(),
+            false,
+        )
+        .err()
+        .map(|error| format!("{error:#}"))
+    }
+
+    /// The error `module` is refused with as an interface, if any.
+    fn interface_error(module: &XirModule) -> Option<String> {
+        parse_interface(
+            PathBuf::from("dependency.xir.json"),
+            &serde_json::to_string(module).unwrap(),
+        )
+        .err()
+        .map(|error| format!("{error:#}"))
+    }
+
+    /// A function type's abilities are validated like any other, since the
+    /// interface generator writes them into Move source.
+    #[test]
+    fn a_function_type_has_only_known_abilities() {
+        let payload = || {
+            Ty::Function(vec![], vec![], vec![
+                "copy } fun injected(): u64 { abort 42; /*".to_owned(),
+            ])
+        };
+        let mut in_local = interface_module();
+        in_local.functions[0].locals.push(payload());
+        let mut in_field = interface_module();
+        in_field.structs[0].fields[0].ty = payload();
+        for module in [in_local, in_field] {
+            let error = interface_error(&module).expect("an unknown ability is refused");
+            assert!(error.contains("invalid ability"), "{error}");
+        }
+        // `key` is an ability, but not one a function type can have.
+        let with_abilities = |abilities: &[&str]| {
+            let mut module = interface_module();
+            for function in &mut module.functions {
+                function.blocks = vec![];
+            }
+            module.functions[0].locals.push(Ty::Function(
+                vec![],
+                vec![],
+                abilities.iter().map(|a| a.to_string()).collect(),
+            ));
+            interface_error(&module)
+        };
+        let key = with_abilities(&["key"]).expect("`key` is refused on a function type");
+        assert!(key.contains("function type"), "{key}");
+        assert_eq!(with_abilities(&["copy", "drop", "store"]), None);
+    }
+
+    /// A function without a body needs version 9, which records its calls;
+    /// an older interface would hide what its functions reach.
+    #[test]
+    fn an_interface_needs_the_version_that_records_calls() {
+        let mut module = interface_module();
+        for function in &mut module.functions {
+            function.blocks = vec![];
+        }
+        assert!(interface_error(&module).is_none());
+        module.version = 8;
+        let refused = interface_error(&module).expect("a version 8 interface is refused");
+        assert!(refused.contains("version 9"), "{refused}");
+    }
+
+    /// A dependency may omit bodies, but a body it does carry is translated,
+    /// so its entry block must exist.
+    #[test]
+    fn a_dependency_body_must_have_its_entry_block() {
+        let mut module = interface_module();
+        module.functions[0].entry = module.functions[0].blocks.len();
+        let error = dependency_error(&module).expect("an out-of-range entry block is refused");
+        assert!(error.contains("entry block is out of range"), "{error}");
+        // Without a body, there is nothing to translate.
+        module.functions[0].blocks = vec![];
+        assert!(dependency_error(&module).is_none());
     }
 
     /// A struct type has as many type arguments as its struct declares,
@@ -4404,6 +5510,46 @@ mod tests {
         );
     }
 
+    /// An interface carrying source spans is accepted, because it is parsed
+    /// without the text those spans index.
+    ///
+    /// A producer such as Lean emits a source map for every non-native
+    /// function. Validating those spans against the empty string that
+    /// `parse_interface` supplies would reject every non-zero one, so a
+    /// perfectly good module could not be used as an XIR dependency at all.
+    /// The same document is still checked when parsed as a compilation
+    /// *target*, where real source text is available.
+    #[test]
+    fn an_interface_with_source_spans_is_accepted() {
+        let mut module = account_module();
+        module.version = move_model_exchange::XIR_VERSION;
+        let function = &mut module.functions[0];
+        function.source_map = Some(move_model_exchange::XirFunctionSourceMap {
+            span: Some(XirSourceSpan { start: 0, end: 7 }),
+            blocks: function
+                .blocks
+                .iter()
+                .map(|block| move_model_exchange::XirBlockSourceMap {
+                    instrs: vec![None; block.instrs.len()],
+                    term: None,
+                })
+                .collect(),
+        });
+        let json = serde_json::to_string(&module).unwrap();
+
+        parse_interface(PathBuf::from("spans.xir.json"), &json)
+            .expect("an interface is parsed without the text its spans index");
+
+        // And the check still bites where the text is actually supplied.
+        let error = parse_source(PathBuf::from("spans.xir.json"), String::new(), &json)
+            .err()
+            .expect("a target with no text cannot satisfy a non-zero span");
+        assert!(
+            error.to_string().contains("outside the source text"),
+            "{error}"
+        );
+    }
+
     #[test]
     fn rejects_misaligned_or_out_of_bounds_source_maps() {
         let mut module = account_module();
@@ -4455,6 +5601,22 @@ mod tests {
         .err()
         .expect("misaligned local names should be rejected");
         assert!(error.to_string().contains("local names; expected"));
+    }
+
+    /// Lean producers write names that are not Move identifiers, such as `x'`.
+    /// A compilation target with such names reads, as it did before interfaces.
+    #[test]
+    fn a_target_reads_local_names_that_are_not_identifiers() {
+        let mut module = account_module();
+        module.version = move_model_exchange::XIR_VERSION;
+        let locals = module.functions[0].locals.len();
+        module.functions[0].local_names = (0..locals).map(|i| Some(format!("x{i}'"))).collect();
+        assert!(parse_source(
+            PathBuf::from("lean-names.xir.json"),
+            "source".to_owned(),
+            &serde_json::to_string(&module).unwrap(),
+        )
+        .is_ok());
     }
 
     #[test]

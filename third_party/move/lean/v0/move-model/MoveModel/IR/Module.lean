@@ -62,6 +62,14 @@ inductive AttributeArg where
   | name (path : String) (args : List AttributeArg)
   | num (value : Nat)
   | bool (value : Bool)
+  /-- `name = value`, as in `#[resource_group_member(group = 0x1::object::ObjectGroup)]`.
+
+  Move source has this form and Lean's attribute syntax does not, so nothing
+  here constructs one; it exists to carry an argument read from a Rust-produced
+  XIR module through to whatever is re-emitted. Without it such a module cannot
+  be decoded at all, which puts every framework module using
+  `resource_group_member` out of reach. -/
+  | assign (name : String) (value : AttributeArg)
   deriving BEq, Repr
 
 /-- A user-provided source attribute: a head name applied to positional
@@ -98,8 +106,9 @@ structure StructMeta where
   variantNames : Option (List (String × List String)) := none
   abilities : AbilitySet
   attributes : List Attribute := []
-  /-- Visibility of the type itself. Lean-authored types are private; a
-  decoded module keeps what the document says. -/
+  /-- Visibility of the type itself. A decoded module keeps what the document
+  says, with absent meaning private; a Lean-authored type takes it from its
+  `public` or `friend` modifier. -/
   visibility : Visibility := .private_
   deriving BEq, Repr
 
@@ -113,6 +122,9 @@ structure FunMeta where
   /-- User-facing local names aligned with the function's local indices. -/
   localNames : List (Option String) := []
   sourceMap : Option FunSourceMap := none
+  /-- Functions called directly, as XIR function ids. An interface has no
+  body, so this is the only record of its call graph. -/
+  calls : List Nat := []
   deriving BEq, Repr
 
 /-- A finite, deployable view of a semantic program. -/

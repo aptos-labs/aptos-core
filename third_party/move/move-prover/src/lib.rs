@@ -166,6 +166,7 @@ fn move_compiler_options(options: &Options, experiments: Vec<String>) -> move_co
         experiment_cache: Default::default(),
         sources: options.move_sources.clone(),
         sources_deps: vec![],
+        xir_dependencies: vec![],
         whole_program: false,
         compile_test_code: false,
         compile_verify_code: true,
