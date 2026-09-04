@@ -187,7 +187,7 @@ fn big_signature_test() {
 
     let res = verify_module_with_config_for_test(
         "big_signature_test",
-        &VerifierConfig::production(),
+        &VerifierConfig::production_testing(),
         &module,
     )
     .unwrap_err();
@@ -224,7 +224,7 @@ fn module_with_function_type_parameter(parameter: SignatureToken) -> CompiledMod
 fn verify_function_type_abilities(module: &CompiledModule) -> VMResult<()> {
     verify_module_with_config_for_test(
         "function_type_abilities",
-        &VerifierConfig::production(),
+        &VerifierConfig::production_testing(),
         module,
     )
 }
@@ -280,7 +280,7 @@ fn excess_function_type_abilities_verify_when_the_check_is_disabled() {
     let module = module_with_function_type_parameter(Function(vec![], vec![], AbilitySet::ALL));
     let config = VerifierConfig {
         check_function_type_abilities: false,
-        ..VerifierConfig::production()
+        ..VerifierConfig::production_testing()
     };
     verify_module_with_config_for_test("function_type_abilities", &config, &module).unwrap();
 }

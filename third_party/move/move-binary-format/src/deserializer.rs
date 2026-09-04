@@ -86,7 +86,7 @@ pub struct DeserializerConfig {
 }
 
 impl DeserializerConfig {
-    pub fn new(max_binary_format_version: u32, max_identifier_size: u64) -> Self {
+    pub const fn new(max_binary_format_version: u32, max_identifier_size: u64) -> Self {
         Self {
             max_binary_format_version,
             max_identifier_size,
@@ -96,10 +96,13 @@ impl DeserializerConfig {
 
 impl Default for DeserializerConfig {
     fn default() -> Self {
-        // Note that here version max is used as a default version, as this how
-        // it was previously defined in VM config.
-        Self::new(VERSION_MAX, IDENTIFIER_SIZE_MAX)
+        Self::DEFAULT
     }
+}
+
+impl DeserializerConfig {
+    /// The default configuration, usable in `const` contexts.
+    pub const DEFAULT: Self = Self::new(VERSION_MAX, IDENTIFIER_SIZE_MAX);
 }
 
 /// Table info: table type, offset where the table content starts from, count of bytes for
