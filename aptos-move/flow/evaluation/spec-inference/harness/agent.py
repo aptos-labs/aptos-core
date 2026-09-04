@@ -139,7 +139,19 @@ class ClaudeAgentSession:
         await self._client.query(prompt)
         result_message: Any | None = None
         announced_init = False
+        thinking_tokens = 0
         async for message in self._client.receive_response():
+            # The SDK reports extended thinking as one event per token. Logging
+            # each verbatim cost 14.7 MB of a 16 MB transcript on a single hard
+            # cell -- 38,270 lines carrying an incrementing counter -- plus a
+            # redaction walk, a serialize and a flush apiece, in the hot path of
+            # every turn. The count is kept and emitted once; the totals are in
+            # `ResultMessage.usage` regardless.
+            if isinstance(message, SystemMessage) and message.subtype == "thinking_tokens":
+                thinking_tokens = max(
+                    thinking_tokens, int(message.data.get("estimated_tokens") or 0)
+                )
+                continue
             normalized = redact_credentials(normalize_sdk_value(message))
             self._event_log.emit("claude_message", message=normalized)
             if isinstance(message, SystemMessage) and message.subtype == "init":
@@ -147,6 +159,8 @@ class ClaudeAgentSession:
                 announced_init = True
             if isinstance(message, ResultMessage):
                 result_message = message
+        if thinking_tokens:
+            self._event_log.emit("thinking_tokens", estimated_tokens=thinking_tokens)
         if result_message is None:
             raise RuntimeError("Claude Agent SDK response ended without ResultMessage")
         # The SDK can report an MCP server as `pending` immediately after

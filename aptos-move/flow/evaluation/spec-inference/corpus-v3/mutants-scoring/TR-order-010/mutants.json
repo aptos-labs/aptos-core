@@ -1,0 +1,99 @@
+{
+ "mutants": [
+  {
+   "anchor": {
+    "length": 31,
+    "offset": 1231,
+    "sha256": "692a025f49ef0767b78a58b811927b32b36dbd607b4f9b03d2864fd6e169551a"
+   },
+   "edit": {
+    "at": 26,
+    "kind": "substitute",
+    "length": 4,
+    "to": ""
+   },
+   "essential": true,
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "mutant_id": "TR-order-010-reads-past-last-pair",
+   "obligation_category": "abort",
+   "rationale": "The final iteration indexes one past the end.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 20,
+    "offset": 1277,
+    "sha256": "fd6ac4f82ef495cba1a328868928bbed5cc5b6443dd2fe70d70cbe345a3a82d4"
+   },
+   "edit": {
+    "at": 4,
+    "kind": "substitute",
+    "length": 13,
+    "to": "!is_descending"
+   },
+   "essential": true,
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "mutant_id": "TR-order-010-direction-inverted",
+   "obligation_category": "normal-result",
+   "rationale": "Ascending and descending checks are exchanged.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 33,
+    "offset": 1314,
+    "sha256": "53e78fe951e5ea4cb82c31b3627454ba96ba4fdc445a4f97a69f2005bcc9f2c0"
+   },
+   "edit": {
+    "at": 14,
+    "kind": "substitute",
+    "length": 2,
+    "to": ">="
+   },
+   "essential": true,
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "mutant_id": "TR-order-010-descending-requires-ascending",
+   "obligation_category": "normal-result",
+   "rationale": "The descending branch accepts only ascending sequences.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  }
+ ],
+ "reference_sha256": "f8f88b4b2ed1aaa7eac9b05c932174dab1955311fe121b9cdf32b0deb0e62ada",
+ "task_id": "TR-order-010"
+}

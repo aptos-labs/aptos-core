@@ -958,6 +958,15 @@ fn drop_vacuous_conditions(fun_env: &FunctionEnv) {
 }
 
 fn report_uninvariant_loops(fun_env: &FunctionEnv, data: &FunctionData) {
+    // An uninvariant loop makes WP drop what it could not constrain, leaving a
+    // contract that is empty but well formed. Whether that is a warning or an
+    // error depends on who reads it: a person can weigh a partial result, an
+    // automated consumer cannot tell it from a complete one.
+    let loop_severity = if ProverOptions::get(fun_env.module_env.env).uninvariant_loop_is_error {
+        Severity::Error
+    } else {
+        Severity::Warning
+    };
     let pool = fun_env.module_env.env.symbol_pool();
     let inferred_sym = pool.make(CONDITION_INFERRED_PROP);
     let vacuous_sym = pool.make(CONDITION_INFERRED_VACUOUS);
@@ -983,8 +992,14 @@ fn report_uninvariant_loops(fun_env: &FunctionEnv, data: &FunctionData) {
         // only source of a `vacuous` condition. `sathard` has others, such as a
         // top-level quantifier or an untrusted `result_of` carrier.
         if has_vacuous {
+            // The same severity as an uninvariant loop, and for a stronger
+            // reason: the condition is dropped either way, but here the
+            // inference pass is misbehaving rather than the source lacking an
+            // invariant. A consumer that only asks whether the prover
+            // succeeded would admit the target on a contract that was silently
+            // discarded.
             fun_env.module_env.env.diag(
-                Severity::Warning,
+                loop_severity,
                 &fun_env.get_loc(),
                 "bug: inference produced a `vacuous` condition for a function with no \
                  uninvariant loop. Weakest preconditions are exact without loops, so this \
@@ -996,14 +1011,14 @@ fn report_uninvariant_loops(fun_env: &FunctionEnv, data: &FunctionData) {
     for loop_info in uninvariant {
         let (severity, message) = if has_vacuous {
             (
-                Severity::Warning,
+                loop_severity,
                 "WP inferred `vacuous` conditions after this loop without an invariant. \
                  The loop havoc left part of the inferred condition unconstrained. \
                  Add a loop invariant before relying on the inferred specification.",
             )
         } else if loop_info.is_inlined {
             (
-                Severity::Warning,
+                loop_severity,
                 "WP inferred `sathard` conditions after this loop without an invariant. \
                  The loop came from inline expansion: if it is an inline higher-order \
                  iterator, express its accumulator with a `folds_of` loop invariant. \
@@ -1012,7 +1027,7 @@ fn report_uninvariant_loops(fun_env: &FunctionEnv, data: &FunctionData) {
             )
         } else {
             (
-                Severity::Warning,
+                loop_severity,
                 "WP inferred `sathard` conditions after this loop without an invariant. \
              Add ordinary loop invariants, or, when the iteration is naturally a \
              fold, consider an inline higher-order iterator with a `folds_of` \

@@ -1,0 +1,99 @@
+{
+ "mutants": [
+  {
+   "anchor": {
+    "length": 21,
+    "offset": 5895,
+    "sha256": "253873d886aea30434a59d6ee542a714093296e753508ddba89d0c94b1fc434b"
+   },
+   "edit": {
+    "at": 4,
+    "kind": "substitute",
+    "length": 9,
+    "to": "vault_shares"
+   },
+   "essential": true,
+   "file": "sources/etna/vault_share_math.move",
+   "mutant_id": "VS-redeem-004-empty-test-uses-shares",
+   "obligation_category": "abort",
+   "rationale": "A zero-NAV vault proceeds to divide, and a zero-share vault short-circuits instead.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 46,
+    "offset": 6198,
+    "sha256": "f2de7eaaaa7206c1dbe04ea9da7c7b931685b6d7535d528dfe871959e913ad3a"
+   },
+   "edit": {
+    "at": 28,
+    "kind": "substitute",
+    "length": 3,
+    "to": " + "
+   },
+   "essential": true,
+   "file": "sources/etna/vault_share_math.move",
+   "mutant_id": "VS-redeem-004-user-shares-added",
+   "obligation_category": "normal-result",
+   "rationale": "The fee share is credited to the user rather than withheld.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 45,
+    "offset": 6143,
+    "sha256": "5ad9d41bbd922e209d87e44054079190ea104baabffcf21b4ebac8b864413d79"
+   },
+   "edit": {
+    "at": 16,
+    "kind": "substitute",
+    "length": 28,
+    "to": "vault_nav, fee_for_total_nav"
+   },
+   "essential": true,
+   "file": "sources/etna/vault_share_math.move",
+   "mutant_id": "VS-redeem-004-fee-ratio-inverted",
+   "obligation_category": "abort",
+   "rationale": "Dividing by the fee makes a zero fee a division by zero.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  }
+ ],
+ "reference_sha256": "4a10ea8eab2a1d9e0d931032a59ef200a844258108fde81ff4fe86308e3d5b33",
+ "task_id": "VS-redeem-004"
+}

@@ -12,7 +12,9 @@ from pathlib import Path
 from harness.artifacts import sha256_file
 from harness.config import ExperimentConfig, RunSpec
 from harness.mutants import NO_MUTANTS
+from harness.pilot import _source_commit_durability
 from harness.pilot import (
+    _move_flow_sha256,
     _balanced_arm_orders,
     _require_committed_corpus,
     _resolve_mutant_manifests,
@@ -37,6 +39,72 @@ TOY_TASKS: tuple[dict[str, object], ...] = (
     {"name": "transfer", "target": "0x42::loops::transfer", "categories": ["abort", "state-transition", "frame"]},
     {"name": "vault", "target": "0x42::vault::withdraw", "categories": ["normal-result", "abort", "state-transition", "frame"]},
 )
+
+
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def _stage_executables(config_path: Path | None) -> dict:
+    """The toolchain digests the scheduler will compare against.
+
+    A fixture may write its report before the round's config exists; the
+    commands come from the same defaults either way, so the digests match what
+    the scheduler computes.
+    """
+    from harness.compatibility import tool_executables
+    from harness.config import ExperimentConfig
+
+    if config_path is not None:
+        return tool_executables(ExperimentConfig.load(config_path))
+    return tool_executables(
+        ExperimentConfig.load(ROOT / "config" / "default.json")
+    )
+
+
+def _config_sha256(config_path: Path | None) -> str | None:
+    """The digest the scheduler will compute for this experiment config."""
+    if config_path is None:
+        return None
+    from harness.artifacts import canonical_json
+    from harness.config import ExperimentConfig
+
+    return hashlib.sha256(
+        canonical_json(asdict(ExperimentConfig.load(config_path)))
+    ).hexdigest()
+
+
+def _write_screening_report(
+    corpus_root: Path, records: list[dict], config_path: Path | None = None
+) -> None:
+    """Evidence for the fixture, matching what `screen_v3` writes.
+
+    Scheduling requires positive clearance, so a fixture corpus needs a report
+    like a real one; omitting it would only be testing the guard's refusal.
+    """
+    from harness.artifacts import tree_hash
+
+    screening = corpus_root / "screening"
+    screening.mkdir(parents=True, exist_ok=True)
+    (screening / "summary.json").write_text(
+        json.dumps({
+            "package_tree_sha256": tree_hash(corpus_root / "package"),
+            # The scheduler compares these against what the round will run.
+            "tools": {
+                "move_flow_sha256": _move_flow_sha256(),
+                "stage_executables": _stage_executables(config_path),
+                "experiment_config_sha256": _config_sha256(config_path),
+            },
+            "results": [
+                {"task_id": r["task_id"], "target": r.get("target"), "passed": True,
+                 "apparatus_ok": True,
+                 "reference_sha256": "d" * 64}
+                for r in records
+                if r.get("screening_status", "ready") == "ready"
+            ],
+        }),
+        encoding="utf-8",
+    )
 
 
 class PilotScheduleTest(unittest.TestCase):
@@ -67,7 +135,7 @@ class PilotScheduleTest(unittest.TestCase):
             )
 
     @staticmethod
-    def _corpus(root: Path) -> Path:
+    def _corpus(root: Path, config_path: Path | None = None) -> Path:
         """A minimal corpus: one package and one record per toy task."""
         corpus = root / "toy-corpus"
         package = corpus / "package"
@@ -98,6 +166,11 @@ class PilotScheduleTest(unittest.TestCase):
                 }
             ),
             encoding="utf-8",
+        )
+        _write_screening_report(
+            manifest.parent,
+            json.loads(manifest.read_text(encoding="utf-8"))["records"],
+            config_path,
         )
         return manifest
 
@@ -145,6 +218,14 @@ class PilotScheduleTest(unittest.TestCase):
         )
         config_path = root / "config.json"
         config_path.write_text(json.dumps(asdict(config)), encoding="utf-8")
+        # Rewritten now that the config exists: the scheduler compares the
+        # screening apparatus against the one the round will run with, so the
+        # fixture has to record the same digests rather than waive them.
+        _write_screening_report(
+            corpus_manifest.parent,
+            json.loads(corpus_manifest.read_text(encoding="utf-8"))["records"],
+            config_path,
+        )
         return corpus_manifest, {"acceptance": plugins}, config_path, commit
 
     def test_single_replicate_round_is_scheduled_and_readable(self) -> None:
@@ -213,6 +294,12 @@ class PilotScheduleTest(unittest.TestCase):
                 self.assertEqual(
                     spec.plugin_manifest_sha256,
                     sha256_file((path.parent / spec.plugin_dir) / "move-flow-manifest.json"),
+                )
+                # Every run states the toolchain it was scheduled against, or
+                # the controller's runtime comparison has nothing to compare
+                # and a solver upgrade mid-round goes unnoticed.
+                self.assertEqual(
+                    _stage_executables(config_path), spec.stage_executables
                 )
             self.assertEqual(expected_runs, len(session_keys))
 
@@ -337,7 +424,7 @@ class CorpusRoundTest(unittest.TestCase):
     """A round may be scheduled from a corpus manifest of shared-package targets."""
 
     @staticmethod
-    def _corpus(root: Path) -> Path:
+    def _corpus(root: Path, config_path: Path | None = None) -> Path:
         package = root / "corpus" / "package"
         (package / "sources").mkdir(parents=True)
         (package / "Move.toml").write_text(
@@ -372,13 +459,18 @@ class CorpusRoundTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        _write_screening_report(
+            manifest.parent,
+            json.loads(manifest.read_text(encoding="utf-8"))["records"],
+            config_path,
+        )
         return manifest
 
     def test_every_sample_shares_one_package(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             _, plugins, config_path, commit = PilotScheduleTest._inputs(root)
-            manifest = self._corpus(root)
+            manifest = self._corpus(root, config_path)
 
             built = build_pilot(
                 manifest, plugins, root / "round", commit, config_path,
@@ -415,13 +507,14 @@ class CorpusRoundTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             _, plugins, config_path, commit = PilotScheduleTest._inputs(root)
-            manifest = self._corpus(root)
+            manifest = self._corpus(root, config_path)
             source = root / "corpus" / "package" / "sources" / "m.move"
             record = json.loads(manifest.read_text(encoding="utf-8"))
             record["generated_file_sha256"] = {
                 "m.move": hashlib.sha256(source.read_bytes()).hexdigest()
             }
             manifest.write_text(json.dumps(record), encoding="utf-8")
+            _write_screening_report(manifest.parent, record["records"], config_path)
 
             built = build_pilot(
                 manifest, plugins, root / "round", commit, config_path,
@@ -444,11 +537,12 @@ class CorpusRoundTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             _, plugins, config_path, commit = PilotScheduleTest._inputs(root)
-            manifest = self._corpus(root)
+            manifest = self._corpus(root, config_path)
             record = json.loads(manifest.read_text(encoding="utf-8"))
             record["records"][0]["screening_status"] = "blocked_signed_div"
             record["records"][1]["screening_status"] = "ready"
             manifest.write_text(json.dumps(record), encoding="utf-8")
+            _write_screening_report(manifest.parent, record["records"], config_path)
 
             built = build_pilot(
                 manifest, plugins, root / "round", commit, config_path,
@@ -461,11 +555,12 @@ class CorpusRoundTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             _, plugins, config_path, commit = PilotScheduleTest._inputs(root)
-            manifest = self._corpus(root)
+            manifest = self._corpus(root, config_path)
             record = json.loads(manifest.read_text(encoding="utf-8"))
             blocked = record["records"][0]["task_id"]
             record["records"][0]["screening_status"] = "blocked_signed_div"
             manifest.write_text(json.dumps(record), encoding="utf-8")
+            _write_screening_report(manifest.parent, record["records"], config_path)
 
             # Naming it explicitly must not be a way around the screen.
             with self.assertRaisesRegex(ValueError, "not cleared by screening"):
@@ -478,7 +573,7 @@ class CorpusRoundTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             _, plugins, config_path, commit = PilotScheduleTest._inputs(root)
-            manifest = self._corpus(root)
+            manifest = self._corpus(root, config_path)
 
             with self.assertRaisesRegex(ValueError, "unknown corpus sample"):
                 build_pilot(
@@ -700,15 +795,19 @@ class MutantManifestResolution(unittest.TestCase):
     """A round declares its scoring mode when it is scheduled."""
 
     def test_without_a_root_every_task_takes_the_sentinel(self) -> None:
-        digests = _resolve_mutant_manifests([{"task_id": "a"}, {"task_id": "b"}], None)
+        digests, fingerprints = _resolve_mutant_manifests([{"task_id": "a"}, {"task_id": "b"}], None)
         self.assertEqual(digests, {"a": NO_MUTANTS, "b": NO_MUTANTS})
+        self.assertEqual({}, fingerprints)
 
     def test_a_task_without_a_manifest_fails_the_round(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             _write_mutants(root / "a", ["m1"])
             with self.assertRaises(FileNotFoundError) as caught:
-                _resolve_mutant_manifests([{"task_id": "a"}, {"task_id": "b"}], root)
+                _resolve_mutant_manifests(
+                [{"task_id": t, "snapshot": str(_mutant_package(root))} for t in ("a", "b")],
+                root,
+            )
             self.assertIn("b", str(caught.exception))
 
     def test_an_empty_manifest_does_not_count_as_a_mutant_set(self) -> None:
@@ -717,22 +816,51 @@ class MutantManifestResolution(unittest.TestCase):
             _write_mutants(root / "a", ["m1"])
             _write_mutants(root / "b", [])
             with self.assertRaises(FileNotFoundError):
-                _resolve_mutant_manifests([{"task_id": "a"}, {"task_id": "b"}], root)
+                _resolve_mutant_manifests(
+                [{"task_id": t, "snapshot": str(_mutant_package(root))} for t in ("a", "b")],
+                root,
+            )
 
     def test_a_complete_root_binds_each_task_to_its_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             _write_mutants(root / "a", ["m1"])
             _write_mutants(root / "b", ["m2"])
-            digests = _resolve_mutant_manifests([{"task_id": "a"}, {"task_id": "b"}], root)
+            digests, fingerprints = _resolve_mutant_manifests(
+                [{"task_id": t, "snapshot": str(_mutant_package(root))} for t in ("a", "b")],
+                root,
+            )
             self.assertEqual(digests["a"], sha256_file(root / "a" / "mutants.json"))
             self.assertNotEqual(digests["a"], digests["b"])
 
 
+MUTANT_SOURCE = "module m { fun f(): u64 { 1 } }\n"
+
+
+def _mutant_package(root: Path) -> Path:
+    """A package the fixture mutants can be anchored against."""
+    package = root / "snapshot"
+    (package / "sources").mkdir(parents=True, exist_ok=True)
+    (package / "sources" / "m.move").write_text(MUTANT_SOURCE, encoding="utf-8")
+    return package
+
+
 def _write_mutants(directory: Path, mutant_ids: list[str]) -> None:
     directory.mkdir(parents=True)
+    offset = MUTANT_SOURCE.index("1")
     (directory / "mutants.json").write_text(
-        json.dumps({"mutants": [{"mutant_id": name} for name in mutant_ids]}),
+        json.dumps({"mutants": [
+            {
+                "mutant_id": name,
+                "file": "sources/m.move",
+                "anchor": {
+                    "offset": offset, "length": 1,
+                    "sha256": hashlib.sha256(b"1").hexdigest(),
+                },
+                "edit": {"at": 0, "kind": "substitute", "length": 1, "to": "2"},
+            }
+            for name in mutant_ids
+        ]}),
         encoding="utf-8",
     )
 
@@ -746,3 +874,34 @@ class BalancedOrderTest(unittest.TestCase):
         self.assertEqual(6, len(counts))
         self.assertEqual({5}, set(counts.values()))
 
+class SourceCommitProvenanceTest(unittest.TestCase):
+    """A round records the commit its apparatus can be fetched from.
+
+    aptos-core squash-merges onto a linear main, so a branch tip is rewritten
+    on landing -- new message, new parent, new SHA -- and becomes unreachable
+    once the branch is deleted. The tree hashes recorded beside it stay
+    correct, but they describe content nobody can retrieve. A pilot may run
+    before its apparatus lands; a published round may not.
+    """
+
+    def test_a_landed_commit_is_durable(self) -> None:
+        # The corpus's own provenance commit, a squash on main.
+        result = _source_commit_durability("893d1ffea49dcfa933f0421b19fc6e31a9c808ab")
+        if not result["landed_on"]:
+            self.skipTest("mainline refs unavailable in this checkout")
+        self.assertTrue(result["durable"])
+
+    def test_an_unknown_commit_is_not_durable(self) -> None:
+        # A well-formed SHA that no branch contains stands in for a branch tip
+        # that has not landed.
+        result = _source_commit_durability("0" * 40)
+        self.assertFalse(result["durable"])
+        self.assertEqual([], result["landed_on"])
+
+    def test_the_probe_reports_which_refs_contain_it(self) -> None:
+        result = _source_commit_durability("893d1ffea49dcfa933f0421b19fc6e31a9c808ab")
+        if not result["landed_on"]:
+            self.skipTest("mainline refs unavailable in this checkout")
+        # Durability is exactly "some mainline branch contains it", so the
+        # record names them rather than asserting a bare boolean.
+        self.assertTrue(all(ref.endswith("main") for ref in result["landed_on"]))

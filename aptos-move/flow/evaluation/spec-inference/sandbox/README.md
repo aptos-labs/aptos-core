@@ -165,6 +165,19 @@ agent never holds the credential at all — the same shape as the Boogie proxy.
 and the parent launcher strips any host-provided value, so only a controller
 running inside the policy can pass the real-run guard.
 
+## Refutation mutants: a known leak risk
+
+A round may pass `--refutation-mutants-root`, and the controller then sends back
+a contract that verifies but fails to reject a mutant. Refuting needs those
+mutants inside the namespace, and the agent shares it -- so they are withheld
+only by the agent's Landlock ruleset, the same mechanism that already withholds
+the prompts, the task patch and the pristine package.
+
+That is weaker than the treatment of the scoring set, which is never mounted at
+all. So the set passed here must never be the set the round is scored on:
+`harness.controller` refuses when the two roots are equal, and `score_round`
+runs afterwards, outside this sandbox, against its own set.
+
 ## What preflight proves
 
 The wrapper requires **Landlock ABI 3 or later** and refuses to start

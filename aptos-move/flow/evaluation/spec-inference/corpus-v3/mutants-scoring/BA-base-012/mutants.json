@@ -1,0 +1,99 @@
+{
+ "mutants": [
+  {
+   "anchor": {
+    "length": 51,
+    "offset": 1053,
+    "sha256": "9a7582f39174552437d0c5258d397ebea6f0fee688fd24d264f0bdbd8f2f0f34"
+   },
+   "edit": {
+    "at": 14,
+    "kind": "substitute",
+    "length": 2,
+    "to": "<"
+   },
+   "essential": true,
+   "file": "sources/etna/extracted_base_math.move",
+   "mutant_id": "BA-base-012-overflow-guard-strict",
+   "obligation_category": "abort",
+   "rationale": "A sum of exactly MAX_U64 is representable and must not abort. Pins the overflow boundary.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 20,
+    "offset": 927,
+    "sha256": "46ea36933008f6bc15241535e912968dafc60ea327967cf7798be52dbbe6606f"
+   },
+   "edit": {
+    "at": 18,
+    "kind": "substitute",
+    "length": 1,
+    "to": "1"
+   },
+   "essential": true,
+   "file": "sources/etna/extracted_base_math.move",
+   "mutant_id": "BA-base-012-accumulator-starts-at-one",
+   "obligation_category": "normal-result",
+   "rationale": "Every result is one too large. Requires naming the accumulated value, not just bounding it.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 30,
+    "offset": 1003,
+    "sha256": "dde09feb76600fbb7844d5d9d6c32d640db568c01cff4b681c82362dd0b48064"
+   },
+   "edit": {
+    "at": 6,
+    "kind": "substitute",
+    "length": 2,
+    "to": "="
+   },
+   "essential": true,
+   "file": "sources/etna/extracted_base_math.move",
+   "mutant_id": "BA-base-012-keeps-last-only",
+   "obligation_category": "normal-result",
+   "rationale": "Assignment instead of accumulation returns the final element rather than the sum.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  }
+ ],
+ "reference_sha256": "f811b4e8e196c2bc6f1b0738b9c8a0d5aa77283dae871916a7376e491a3e8c58",
+ "task_id": "BA-base-012"
+}

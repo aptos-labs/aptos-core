@@ -39,12 +39,13 @@
   "etna/lomuto_partition.move": "0ae7ec80e2670cf90375bfa220ca232c3639abdfa58f905bed22f2e8374df114",
   "etna/selection_machine.move": "2e98b971c100b8f4716e0e29d72fb928fe958a9e31e6131333ec104b3fd5f470",
   "etna/vault_share_math.move": "c31fda52de99f2ff7a8a45403ac04510dde18914fcf8fd4d26b1d9710451aedd",
-  "trading/extracted_bulk_order_utils.move": "0571ab384ea55273f6e28cf2c33bc4380954652e5cae7f8f714a385adc255acc"
+  "trading/extracted_bulk_order_utils.move": "06cdf009c147108e17e563ec86d3491d885bf9a199485f349248f8da8ee28e57"
  },
  "provenance": {
   "aptos_core": {
-   "commit": "3e9a22203f8dc55ea3369b8afa9696b3fc05637d",
-   "tracked_modifications": true
+   "commit": "5dac57695ecc6bf122ea64794e58b6ae3ca68f7c",
+   "reconstructible": true,
+   "tracked_modifications": false
   },
   "etna": {
    "commit": "dd23678f980266360e050037fb78317b13753068",
@@ -53,6 +54,7 @@
  },
  "records": [
   {
+   "canonical_algorithm": false,
    "feature_strata": [
     "loops",
     "arithmetic_or_abort",
@@ -75,6 +77,7 @@
    "why": "The contract cannot be stated from an invariant alone. Naming the accumulated value needs a recursive spec function, and ruling out a `u128` overflow of the accumulator before the assert needs a monotonicity lemma proved by recursive `apply` -- induction the solver does not perform. Omitting the lemma's `y <= len(sizes)` side condition, or instantiating it at one point instead of with `forall ... apply`, each fails with a distinct fast error. The accumulation is linear on purpose: the reference proves in 0.7s, so the reasoning is the difficulty rather than the solver time."
   },
   {
+   "canonical_algorithm": false,
    "feature_strata": [
     "loops",
     "branches",
@@ -96,6 +99,7 @@
    "why": "An early `return` makes the result the *least* admitting index, not just some admitting index. The contract needs a prefix fact plus the stopping fact; the weaker reading is satisfied by a different function."
   },
   {
+   "canonical_algorithm": false,
    "feature_strata": [
     "branches",
     "arithmetic_or_abort"
@@ -116,6 +120,7 @@
    "why": "A zero price returns a sentinel rather than aborting, so a contract treating the degenerate input as an abort is wrong; the ratio itself can still overflow the `u64` result."
   },
   {
+   "canonical_algorithm": false,
    "feature_strata": [
     "branches",
     "arithmetic_or_abort"
@@ -136,6 +141,7 @@
    "why": "A two-branch ceiling ratio whose divisor is `market_max_leverage * divisor`, so a zero leverage aborts -- a case the source never mentions and which is easy to miss when writing the contract from the arithmetic. Both products can also leave `u64`."
   },
   {
+   "canonical_algorithm": false,
    "feature_strata": [
     "branches"
    ],
@@ -155,6 +161,7 @@
    "why": "A total function over three values: no loop, no arithmetic, no abort. A floor case and a control -- if this fails, the apparatus is at fault rather than the task."
   },
   {
+   "canonical_algorithm": false,
    "feature_strata": [
     "loops",
     "accumulator"
@@ -175,6 +182,7 @@
    "why": "The same loop shape as its twin with the accumulator started at zero, so an empty vector returns rather than aborts. Taken as a pair, a specification that does not distinguish the two is wrong about one."
   },
   {
+   "canonical_algorithm": false,
    "feature_strata": [
     "loops",
     "accumulator",
@@ -196,6 +204,7 @@
    "why": "Reads `values[0]` before the loop, so it aborts on an empty vector -- the opposite of its twin. The result needs a recursive minimum over the scanned prefix; a contract that only bounds the result below is satisfied by a different function."
   },
   {
+   "canonical_algorithm": false,
    "feature_strata": [
     "conjunction",
     "modulo",
@@ -217,6 +226,7 @@
    "why": "Abort-freedom rests on `lot_size` and `tick_size` being non-zero, an invariant set at market registration and invisible here. A contract claiming `aborts_if false` without a precondition is wrong."
   },
   {
+   "canonical_algorithm": false,
    "feature_strata": [
     "signed",
     "truncation-toward-zero",
@@ -239,6 +249,7 @@
    "why": "Permanently excluded, not deferred. A complete contract does not verify: the range `aborts_if` is reported as not aborting and the `ensures` does not hold. Rounding and the narrowing cast were both probed and are modelled correctly, so the defect is in the composition -- see `blockers/signed-div-narrowing.move` for what has been ruled out. It is a prover-side defect rather than a property of the target, so the target returns only if the defect is fixed; the corpus does not wait on it."
   },
   {
+   "canonical_algorithm": true,
    "feature_strata": [
     "loops",
     "mutable-reference",
@@ -263,6 +274,7 @@
    "why": "The only target that rearranges its input in place, and the quicksort case. The pivot value must be followed through two swaps to say where it ends up, and the loop invariant holds three regions at once: the strict prefix, the scanned suffix, and the pivot parked at the end. Saying the result is a rearrangement and not a rewrite needs a counting specification function, a swap lemma proved by segments, and an entry-point instantiation whose trigger is the double update the prover encodes `vector::swap` as; the direct `forall`/`exists` containment, a bare recursive count, and even a sum proxy all exhaust the solver. Neither abort is stated in the source: `length() - 1` underflows on an empty vector and the first swap rejects an out-of-range pivot. Authored rather than extracted: Etna has no sorting code."
   },
   {
+   "canonical_algorithm": false,
    "feature_strata": [
     "loop",
     "accumulator",
@@ -285,6 +297,7 @@
    "why": "Floors each level independently before summing, so the result is sum(floor(p*s/m)) and not floor(sum(p*s)/m); the two differ whenever any level has a remainder. WP alone yields a vacuous ensures and four sathard aborts, so the loop invariant must be discovered. Its accumulation loop needs a recursive helper whose proof sits at the solver boundary: it was the only unscorable run of corpus-v3-pilot-002 at 90s and the false timeout of pilot-001 at 40s. Blocked: a complete contract needs a recursive spec function plus a monotonicity lemma, and the per-level `p * s / m` term makes the resulting proof nonlinear -- the replay reports ~117k quantifier instantiations and it does not discharge at any budget tried up to 240s. Kept as the record of why the selection criterion prefers linear accumulation; `BA-base-012` exercises the same reasoning in under a second."
   },
   {
+   "canonical_algorithm": false,
    "feature_strata": [
     "higher_order",
     "function_values",
@@ -308,6 +321,7 @@
    "why": "The only target with function values. Both the continuation and the admissibility test arrive as parameters, so the contract cannot be stated without `result_of` and `aborts_of` over them, and the state after k draws needs a recursive specification function over a function value. Authored rather than extracted: Etna has no function-valued code, so without it the benchmark cannot exercise this at all."
   },
   {
+   "canonical_algorithm": false,
    "feature_strata": [
     "branches",
     "arithmetic_or_abort"
@@ -328,6 +342,7 @@
    "why": "Two chained percentage reductions in `u128`. Each `100 - pct` underflows above 100, so the function aborts on inputs the source neither guards nor mentions -- a direct probe of whether unstated aborts get found."
   },
   {
+   "canonical_algorithm": false,
    "feature_strata": [
     "loops",
     "accumulator",
@@ -350,6 +365,32 @@
    "why": "The abort is universally quantified over the vector while the result is an accumulated maximum. Neither states the other, so the contract needs both a quantifier and a recursive maximum."
   },
   {
+   "canonical_algorithm": false,
+   "feature_strata": [
+    "loop",
+    "linear-search",
+    "mutable-reference",
+    "in-place",
+    "coupled-vectors",
+    "abort"
+   ],
+   "function": "cancel_at_price_level",
+   "guessability": "hard",
+   "has_loop": true,
+   "module": "aptos_experimental::extracted_bulk_order_utils",
+   "provenance": "aptos_experimental",
+   "required_contract_categories": [
+    "normal-result",
+    "abort"
+   ],
+   "round_selection": "selected",
+   "screening_status": "ready",
+   "target": "aptos_experimental::extracted_bulk_order_utils::cancel_at_price_level",
+   "task_id": "TR-cancel-026",
+   "why": "Deletes one price level from two vectors that must move in lockstep. The result is the size at the first matching price, and zero when nothing matches -- a value a genuine zero-size level also produces, so the contract cannot read the result alone. Both vectors are shortened at the same index, which needs a removal characterization of each rather than a length fact. The abort is unstated and comes from the extraction: upstream reaches both vectors through the bulk order, where equal length is structural, so nothing in this body says `sizes` is as long as `prices` and the read at `sizes[i]` aborts when it is not."
+  },
+  {
+   "canonical_algorithm": false,
    "feature_strata": [
     "loop",
     "bounded-search",
@@ -372,6 +413,7 @@
    "why": "Bounded search stopping at the first non-crossing level. The contract must say both what was found and that nothing earlier qualified."
   },
   {
+   "canonical_algorithm": false,
    "feature_strata": [
     "loop",
     "adjacent-pair",
@@ -394,6 +436,7 @@
    "why": "Adjacent-pair scan with an early return. WP infers a top-level quantifier and marks it sathard, so the contract must be restated in a form the solver can use."
   },
   {
+   "canonical_algorithm": false,
    "feature_strata": [
     "arithmetic_or_abort",
     "cast"
@@ -414,6 +457,7 @@
    "why": "A four-way `u128` product over a product divisor, truncating. Beyond the two named asserts it aborts on a `u64` addition and on either `u128` product leaving range -- three aborts the source never mentions, before the range check it does state."
   },
   {
+   "canonical_algorithm": false,
    "feature_strata": [
     "loop",
     "last-match",
@@ -436,6 +480,7 @@
    "why": "The scan never breaks, so the result is the LAST qualifying tier, not the first. Three accumulators move together. WP errors on a vacuous condition and supplies bounded evidence."
   },
   {
+   "canonical_algorithm": false,
    "feature_strata": [
     "loop",
     "last-match",
@@ -457,6 +502,7 @@
    "why": "Same last-match-wins shape with a single accumulator; the simpler member of the pair, so the two can be compared."
   },
   {
+   "canonical_algorithm": false,
    "feature_strata": [
     "branches",
     "tuple-result",
@@ -479,6 +525,7 @@
    "why": "Tuple result with a zero-shares fast path and an insolvency assert."
   },
   {
+   "canonical_algorithm": false,
    "feature_strata": [
     "branches",
     "enum-variant",
@@ -501,6 +548,7 @@
    "why": "Five guarded returns and a cross-multiplied u128 ratio test. The fee is bounded by the value increase, which is the fact its callers need."
   },
   {
+   "canonical_algorithm": false,
    "feature_strata": [
     "composition",
     "tuple-result",
@@ -523,6 +571,7 @@
    "why": "FLAGSHIP. Calls both other helpers. Freedom from underflow at `shares - shares_for_fee` holds only because the fee is bounded by the NAV -- established in the callee's contract, invisible in this body. WP leaves the obligation open, so it cannot be guessed from the caller."
   },
   {
+   "canonical_algorithm": false,
    "feature_strata": [
     "assert",
     "mul-div"
@@ -543,6 +592,7 @@
    "why": "Small by design: the composition partner whose contract the flagship must consume rather than re-derive."
   },
   {
+   "canonical_algorithm": false,
    "feature_strata": [
     "mutable_references",
     "state-transition",
@@ -564,6 +614,7 @@
    "why": "Mutates through a `&mut` and saturates to zero rather than underflowing, so the contract is a state transition rather than a value. Its `u32` arithmetic still overflows twice over -- forming the amount and doubling it -- and the source guards neither."
   },
   {
+   "canonical_algorithm": false,
    "feature_strata": [
     "branches",
     "arithmetic_or_abort"

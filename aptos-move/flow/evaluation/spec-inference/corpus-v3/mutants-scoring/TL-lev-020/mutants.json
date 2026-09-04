@@ -1,0 +1,99 @@
+{
+ "mutants": [
+  {
+   "anchor": {
+    "length": 40,
+    "offset": 827,
+    "sha256": "4f23b00368e7037024665de914bacaf99a5b138e56d06766ad59a11cf9da6699"
+   },
+   "edit": {
+    "at": 0,
+    "kind": "substitute",
+    "length": 11,
+    "to": "max <="
+   },
+   "essential": true,
+   "file": "sources/etna/extracted_tier_leverage.move",
+   "mutant_id": "TL-lev-020-guard-checks-running-max",
+   "obligation_category": "abort",
+   "rationale": "Each iteration validates the previous maximum, so the last tier is never checked.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 15,
+    "offset": 654,
+    "sha256": "11b0210d593339fbcd734abd37445aad3e97208143a19c56497154c8a2b96065"
+   },
+   "edit": {
+    "at": 10,
+    "kind": "substitute",
+    "length": 4,
+    "to": "1u64"
+   },
+   "essential": true,
+   "file": "sources/etna/extracted_tier_leverage.move",
+   "mutant_id": "TL-lev-020-seed-one",
+   "obligation_category": "normal-result",
+   "rationale": "An empty or all-zero tier list yields one instead of zero.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 7,
+    "offset": 1056,
+    "sha256": "48eb3131a719861c35d447570694c3317f8d5dbe339741a8c9991c23bd30112f"
+   },
+   "edit": {
+    "at": 5,
+    "kind": "substitute",
+    "length": 1,
+    "to": "2"
+   },
+   "essential": true,
+   "file": "sources/etna/extracted_tier_leverage.move",
+   "mutant_id": "TL-lev-020-strides-by-two",
+   "obligation_category": "normal-result",
+   "rationale": "Half the tiers are neither validated nor considered for the maximum.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  }
+ ],
+ "reference_sha256": "139ec10b116f624600a9609d8dbcb7bd36e34cc43954c782135dcb3ce425abac",
+ "task_id": "TL-lev-020"
+}

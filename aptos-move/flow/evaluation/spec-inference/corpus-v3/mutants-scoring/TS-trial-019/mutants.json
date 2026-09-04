@@ -1,0 +1,99 @@
+{
+ "mutants": [
+  {
+   "anchor": {
+    "length": 39,
+    "offset": 1129,
+    "sha256": "c7d318a18e8e8a9a72ff293cc7c36623d157432f5c690ef89b160857a9f81e0e"
+   },
+   "edit": {
+    "at": 10,
+    "kind": "substitute",
+    "length": 2,
+    "to": "<"
+   },
+   "essential": true,
+   "file": "sources/etna/extracted_trial_size.move",
+   "mutant_id": "TS-trial-019-overflow-guard-strict",
+   "obligation_category": "abort",
+   "rationale": "A size of exactly u64::MAX is representable and must not abort.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 31,
+    "offset": 963,
+    "sha256": "882942d54095f74006711a8d96597eecca6b3b7f40d8d60dbc741fbdc47d93ea"
+   },
+   "edit": {
+    "at": 0,
+    "kind": "substitute",
+    "length": 1,
+    "to": "/"
+   },
+   "essential": true,
+   "file": "sources/etna/extracted_trial_size.move",
+   "mutant_id": "TS-trial-019-divides-by-size-decimals",
+   "obligation_category": "normal-result",
+   "rationale": "The decimal scale divides instead of multiplying.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 21,
+    "offset": 995,
+    "sha256": "200e236536469bd6e7b8e06ce9935d9bed9d842cd87861002b9557e3d6b0a7b0"
+   },
+   "edit": {
+    "at": 0,
+    "kind": "substitute",
+    "length": 1,
+    "to": "/"
+   },
+   "essential": true,
+   "file": "sources/etna/extracted_trial_size.move",
+   "mutant_id": "TS-trial-019-bps-numerator-divides",
+   "obligation_category": "normal-result",
+   "rationale": "The basis-point scale divides in the numerator instead of multiplying.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  }
+ ],
+ "reference_sha256": "786b520be97be0e7d9b21f6962ed039aa707d81b5bd3786c8993ff3183f65942",
+ "task_id": "TS-trial-019"
+}

@@ -1,0 +1,99 @@
+{
+ "mutants": [
+  {
+   "anchor": {
+    "length": 32,
+    "offset": 2921,
+    "sha256": "6ac0b2c41ce69c7ae6d8f419089b5a6561aa6a1e8f3adfaa7d014c65b2a1eacd"
+   },
+   "edit": {
+    "at": 28,
+    "kind": "substitute",
+    "length": 4,
+    "to": "!= 0"
+   },
+   "essential": true,
+   "file": "sources/etna/vault_share_math.move",
+   "mutant_id": "VS-fees-001-zero-rate-test-inverted",
+   "obligation_category": "normal-result",
+   "rationale": "Vaults with a fee return zero and fee-free vaults compute a fee.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 29,
+    "offset": 3895,
+    "sha256": "efe14d98fcf277bb7c23bebee02df6055768e357fc670cde3be21b7175c241f6"
+   },
+   "edit": {
+    "at": 0,
+    "kind": "substitute",
+    "length": 29,
+    "to": "scaled_last_nav - current_nav"
+   },
+   "essential": true,
+   "file": "sources/etna/vault_share_math.move",
+   "mutant_id": "VS-fees-001-value-increase-reversed",
+   "obligation_category": "abort",
+   "rationale": "The gain is computed backwards, so the subtraction underflows on the profitable path.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 46,
+    "offset": 3814,
+    "sha256": "b3d5f11b9bb19e3850084d15bf3fb3d29bbd2323b2407d49e905025427263ed1"
+   },
+   "edit": {
+    "at": 18,
+    "kind": "substitute",
+    "length": 27,
+    "to": "last_shares, current_shares"
+   },
+   "essential": true,
+   "file": "sources/etna/vault_share_math.move",
+   "mutant_id": "VS-fees-001-scaling-ratio-inverted",
+   "obligation_category": "normal-result",
+   "rationale": "The last NAV is rescaled by the reciprocal share ratio.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  }
+ ],
+ "reference_sha256": "4a10ea8eab2a1d9e0d931032a59ef200a844258108fde81ff4fe86308e3d5b33",
+ "task_id": "VS-fees-001"
+}

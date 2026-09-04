@@ -24,6 +24,7 @@ async def run_pilot(
     sandbox_wrapper: Path,
     concurrency: int,
     report_path: Path,
+    refutation_mutants_root: Path | None = None,
 ) -> dict[str, Any]:
     if concurrency < 1:
         raise ValueError("concurrency must be positive")
@@ -45,11 +46,11 @@ async def run_pilot(
         )
 
     def launch_command(manifest: Path) -> list[str]:
-        # Hidden mutants never enter this command. The agent shares the
-        # wrapper's mount namespace, so anything the controller could read here
-        # the agent could read too. Strict scoring runs after the round, in
-        # `harness.score_round`, against the finished workspaces.
-        return [
+        # The scoring set never enters this command: the agent shares the
+        # wrapper's namespace, so only Landlock separates it from what the
+        # controller can read. `score_round` runs afterwards, outside. A
+        # *refutation* set may be passed, and must be a different set.
+        command = [
             str(sandbox_wrapper),
             sys.executable,
             "-m",
@@ -62,6 +63,9 @@ async def run_pilot(
             str(artifacts_dir),
             "--skip-hidden-scoring",
         ]
+        if refutation_mutants_root is not None:
+            command += ["--refutation-mutants-root", str(refutation_mutants_root)]
+        return command
 
     report = await dispatch_round(
         [(RunSpec.load(path).run_id, path) for path in run_paths],
@@ -87,6 +91,13 @@ def main() -> None:
     parser.add_argument("--sandbox-wrapper", type=Path, required=True)
     parser.add_argument("--concurrency", type=int, required=True)
     parser.add_argument("--report", type=Path, required=True)
+    parser.add_argument(
+        "--refutation-mutants-root",
+        type=Path,
+        help="mutants the controller refutes an accepted contract against, sending "
+        "a too-weak one back. Mounted in the agent's namespace and withheld only by "
+        "Landlock, so never pass the set the round is scored on.",
+    )
     args = parser.parse_args()
     wrapper = args.sandbox_wrapper.resolve()
     if not wrapper.is_file() or not os.access(wrapper, os.X_OK):
@@ -99,6 +110,7 @@ def main() -> None:
             wrapper,
             args.concurrency,
             args.report.resolve(),
+            args.refutation_mutants_root.resolve() if args.refutation_mutants_root else None,
         )
     )
     print(json.dumps({"complete": result["complete"], "runs": len(result["results"])}))

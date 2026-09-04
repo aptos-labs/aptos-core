@@ -1,0 +1,99 @@
+{
+ "mutants": [
+  {
+   "anchor": {
+    "length": 20,
+    "offset": 510,
+    "sha256": "acd8d286517bd05290e8e014b216bcfdd13a050029b055a0aa3dd747cfbdc5e4"
+   },
+   "edit": {
+    "at": 10,
+    "kind": "substitute",
+    "length": 9,
+    "to": "0"
+   },
+   "essential": true,
+   "file": "sources/etna/extracted_minmax.move",
+   "mutant_id": "MM-min-013-seed-zero",
+   "obligation_category": "normal-result",
+   "rationale": "Seeding at zero makes the result always zero, and removes the empty-vector abort.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 16,
+    "offset": 639,
+    "sha256": "aff1fb0c73098f7b5adb7b7a513d47b56daf6b7c417076f326dffa63b556d1c8"
+   },
+   "edit": {
+    "at": 6,
+    "kind": "substitute",
+    "length": 9,
+    "to": "values[i - 1]"
+   },
+   "essential": true,
+   "file": "sources/etna/extracted_minmax.move",
+   "mutant_id": "MM-min-013-compares-previous",
+   "obligation_category": "normal-result",
+   "rationale": "Stores the element before the one that compared smaller.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 20,
+    "offset": 510,
+    "sha256": "acd8d286517bd05290e8e014b216bcfdd13a050029b055a0aa3dd747cfbdc5e4"
+   },
+   "edit": {
+    "at": 10,
+    "kind": "substitute",
+    "length": 9,
+    "to": "values[values.length() - 1]"
+   },
+   "essential": true,
+   "file": "sources/etna/extracted_minmax.move",
+   "mutant_id": "MM-min-013-seed-last-skips-first",
+   "obligation_category": "normal-result",
+   "rationale": "The first element never participates, so a unique minimum at index 0 is missed.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  }
+ ],
+ "reference_sha256": "17153b472778c5fa28c9d5275acbe1f9a3c77fb5db5a316b573444a45f83b87c",
+ "task_id": "MM-min-013"
+}

@@ -10,9 +10,11 @@ import shutil
 import tempfile
 from dataclasses import asdict
 from difflib import SequenceMatcher
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+from collections.abc import Mapping, Sequence
 from typing import Any
 
+from .identifiers import resolve_within
 from .artifacts import copy_snapshot, load_object, sha256_file, tree_hash, write_json
 from .config import ExperimentConfig
 from .judge import render_command, run_command
@@ -38,7 +40,10 @@ async def score_mutants(
         raise ValueError("at least three independently reviewed essential mutants are required")
     # Three entries have to be three mutations. Copies of one approved mutant
     # would each count a kill while exercising a single obligation.
-    if len({_mutation_identity(case) for case in approved}) < 3:
+    # By canonical identity, not by the fields describing it: three anchors
+    # around one change have three raw identities and one effect, and the
+    # threshold exists to require three *changes*.
+    if len({mutation_fingerprint(case, baseline) for case in approved}) < 3:
         raise ValueError(
             "at least three distinct essential mutants are required; repeated "
             "mutations of the same code do not count separately"
@@ -77,6 +82,7 @@ async def score_mutants(
         config, package, baseline, target, approved, timeout_seconds
     )
     killed_count = sum(result["killed"] for result in results)
+    inconclusive = inconclusive_mutants(results)
     return {
         "schema_version": 1,
         "target": target,
@@ -84,7 +90,16 @@ async def score_mutants(
         "mutant_manifest_sha256": sha256_file(mutant_manifest),
         "essential_mutants": len(results),
         "killed": killed_count,
-        "mutation_adequacy": killed_count / len(results),
+        # Over the mutants that reached a verdict. Dividing by every result
+        # counts a prover timeout against the contract, which reports an
+        # infrastructure failure as evidence about the specification.
+        "measured": len(results) - len(inconclusive),
+        "inconclusive": inconclusive,
+        "mutation_adequacy": (
+            killed_count / (len(results) - len(inconclusive))
+            if len(results) > len(inconclusive)
+            else None
+        ),
         "clean": {"compile": asdict(clean_compile), "prover": asdict(clean_prover)},
         "results": results,
     }
@@ -314,6 +329,25 @@ _INFRASTRUCTURE_MARKERS = (
 _SOLVER_EXHAUSTION_MARKER = "out of resources/timeout"
 
 
+#: The outcomes that are verdicts about the mutant. Everything else
+#: `classify_prover_outcome` can return -- `prover_timeout`,
+#: `compile_failure`, `infrastructure_failure`, `unclassified_prover_failure`
+#: -- says the mutant was not measured, which is neither a kill nor a survival.
+#: Kept beside the producer so adding an outcome forces a decision here rather
+#: than being silently classified by whichever call site spells the tuple.
+CONCLUSIVE_OUTCOMES = frozenset({"killed", "survived"})
+
+
+def reached_a_verdict(result: Mapping[str, Any]) -> bool:
+    """Whether this mutant was actually measured."""
+    return result.get("outcome") in CONCLUSIVE_OUTCOMES
+
+
+def inconclusive_mutants(results: Sequence[Mapping[str, Any]]) -> list[str]:
+    """The mutants that reached no verdict, for reporting."""
+    return [r["mutant_id"] for r in results if not reached_a_verdict(r)]
+
+
 def classify_prover_outcome(result: Any, report: dict[str, Any] | None) -> str:
     """What a prover run against a mutant established.
 
@@ -356,6 +390,96 @@ def _mutation_identity(case: dict[str, Any]) -> tuple[str, str, str]:
     )
 
 
+def refutation_confirms(
+    survived: list, inconclusive: list, overran_budget: bool
+) -> bool:
+    """Whether a refutation pass confirms the candidate.
+
+    Three things have to hold, and they are easy to state as two. A survivor is
+    a counterexample. A mutant that reached no verdict is not one the contract
+    killed, so confirming on its absence would report "no counterexample found"
+    as "no counterexample exists". And a pass that ran past the round's wall
+    budget did not confirm anything within the time the round declares.
+
+    Named once because it is decided twice: the controller judges a live run
+    from its results, and the summary reads the event that run emitted. Those
+    two restating the same rule is how they came to disagree, with the summary
+    reporting convergence for a cell the controller had refused.
+    """
+    return not survived and not inconclusive and not overran_budget
+
+
+def overlapping_mutations(
+    cases: list[dict], identities: set[str], package: Path
+) -> list[str]:
+    """The mutations in `cases` that `identities` already contains.
+
+    The relation between a refutation set and a scoring set, in one place:
+    it is checked when the round is scheduled and again whenever the scored
+    set is replaced, and those two must not be able to disagree about what
+    overlap means. Fingerprints rather than manifest digests or root paths --
+    a copy at another path, or a manifest mixing one scored mutation in with
+    others, defeats those while naming the same mutation.
+    """
+    return sorted(
+        case["mutant_id"]
+        for case in cases
+        if mutation_fingerprint(case, package) in identities
+    )
+
+
+def mutation_fingerprint(case: dict[str, Any], package: Path) -> str:
+    """An opaque identity for one mutation, canonical on its effect.
+
+    Overlap between the shown set and the scored set has to be detectable
+    without the scored mutations being present where the session can reach
+    them, so what is compared is a hash.
+
+    It is computed from the text the mutation produces, not from the fields
+    that describe it, because several encodings denote one change. The anchor
+    only locates the edit, so a wider anchor with a compensating `at` is the
+    same substitution; and a `swap` is a partition of the anchored region, so
+    `aabb` becomes `bbaa` under both `(a=2, sep=0, b=2)` and `(a=1, sep=1,
+    b=2)`. Hashing the parameters would give one mutation several identities,
+    and an overlap check would not see them as the same.
+
+    `package` is the pristine tree the mutants were authored against;
+    `_anchored_fragment` verifies the anchor still describes it, so a
+    fingerprint is never computed from a fragment that has moved.
+    """
+    source = resolve_within(package, case["file"], "mutant file").read_text(
+        encoding="utf-8"
+    )
+    offset, fragment = _anchored_fragment(source, case)
+    mutated = _mutate(fragment, case["edit"], case.get("mutant_id", "?"))
+    # The minimal span that actually differs. Trimming the shared prefix and
+    # suffix is what makes the identity independent of how much surrounding
+    # text the anchor happened to include, as well as of which partition a
+    # `swap` used to reach the same rearrangement.
+    prefix = 0
+    while (
+        prefix < len(fragment)
+        and prefix < len(mutated)
+        and fragment[prefix] == mutated[prefix]
+    ):
+        prefix += 1
+    suffix = 0
+    while (
+        suffix < len(fragment) - prefix
+        and suffix < len(mutated) - prefix
+        and fragment[len(fragment) - 1 - suffix] == mutated[len(mutated) - 1 - suffix]
+    ):
+        suffix += 1
+    canonical = {
+        "file": PurePosixPath(str(case["file"])).as_posix().replace("/./", "/"),
+        "offset": offset + prefix,
+        "replaced": len(fragment) - prefix - suffix,
+        "becomes": mutated[prefix:len(mutated) - suffix],
+    }
+    return hashlib.sha256(
+        json.dumps(canonical, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+
 def _approved(case: dict[str, Any]) -> bool:
     """Whether a mutant may be scored against.
 
@@ -368,6 +492,16 @@ def _approved(case: dict[str, Any]) -> bool:
     make — that the mutant set was authored before the round and without
     reference to any arm's output — so one recorded approval remains required.
     """
+    validated_now = case.get("validated") or {}
+    if validated_now.get("inconclusive"):
+        # Validation reached no verdict, so this mutant's essentiality is
+        # unestablished. Treating it as non-essential silently shrinks the
+        # scoring set, and the candidate then reaches strict success by killing
+        # only what is left.
+        raise SystemExit(
+            f"mutant {case.get('mutant_id')} has no validation verdict; "
+            "re-run harness.validate_mutants before scoring against this set"
+        )
     reviews = case.get("reviews", [])
     reviewers = {review.get("reviewer") for review in reviews if review.get("approved") is True}
     validated = case.get("validated") or {}

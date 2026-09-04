@@ -17,6 +17,17 @@ strength is measurable.
 
 ## Targets
 
+A task id is `FAMILY-tag-NNN`: a two-letter code for the module the target
+comes from, a short tag distinguishing targets within it, and a corpus-wide
+ordinal. `LP-price-021` is `get_liquidation_price` in
+`extracted_liquidation_price`, the twenty-first task. The ordinals run 001–025
+without gaps and were assigned module by module as the corpus was assembled, so
+adjacent numbers share a family — `VS-fees-001` through `VS-redeem-004` are the
+four `vault_share_math` targets. The number carries no other meaning: it is not
+a difficulty, a rank, or an ordering the round respects. Ids are stable and
+appear in every schedule, artifact and metadata file, so they are not renumbered
+when a task is held back or excluded.
+
 Every target proves in about a second once specified, which keeps mutation
 scoring affordable — it re-proves each target once per mutant. Nineteen are
 `hard`; four are kept `guessable` as controls that tell an apparatus failure
@@ -84,6 +95,51 @@ every refutation takes about a second.
 
 ### Blocked
 
+## What `wp_hard` means
+
+`wp_hard` records that WP alone does not reach a verifying contract. It is a
+property of the task, not a defect: a target WP already solves would keep the
+easy member of every family.
+
+Reading it needs one piece of context. When a loop has no invariant, the havoc
+leaves part of the inferred condition unconstrained, so WP drops those clauses
+and emits an empty contract carrying `aborts_if_is_partial`. That contract
+compiles and verifies. Outside this study the accompanying diagnostic is a
+warning, which is right: a person can still use what WP derived. For anything
+that only asks whether the prover succeeded it is not, because an empty
+contract is indistinguishable from a complete one -- and every loop target was
+consequently recorded as `wp_hard: false`, labelling the corpus's hardest
+targets as the ones WP handled.
+
+`ProverOptions::uninvariant_loop_is_error` makes that diagnostic an error
+instead. `move-flow experiment infer` sets it always, since screening is the
+consumer that must not miss it, and an evaluation session sets it through
+`EvaluationConfig::uninvariant_loop_is_error`, so an arm cannot mistake an
+empty contract for a finished one either. Ordinary Flow use is unchanged.
+
+## A WP artefact on three targets
+
+Unaided WP inference emits an unprovable `sathard` clause on `VS-shares-002`,
+`LP-price-021` and `TS-trial-019`: a normal-return `ensures` for a path that
+aborts, duplicating an `aborts_if` beside it. See
+[#20490](https://github.com/aptos-labs/aptos-core/issues/20490) for the
+mechanism and for why the candidate fix was not taken.
+
+What it means here:
+
+- It is not solver difficulty, despite `sathard`, and not a loop -- all three
+  targets are loop-free.
+- It is not a broken task. All three prove against their references, so
+  admission is decided on well-formedness and a verifying reference, with
+  WP-hardness recorded as a task property.
+- Both hybrid arms receive it, and deleting a `sathard` clause to make a proof
+  pass is forbidden, so sessions on these three should be read with that in
+  mind.
+
+`VS-redeem-004` also carries `sathard` clauses and is not an instance: its
+clauses carry `result_of` over sibling calls, the composition difficulty
+described above.
+
 ## Provenance
 
 Etna is exported from a pinned commit, but the vendored standard library and
@@ -143,6 +199,37 @@ contract strength.
 A mutant stores an offset, a length and a SHA-256 into the generated file rather
 than the code it rewrites, plus a minimal edit. Mutants and references are
 authored **before** a round and without seeing any arm's output.
+
+### Two disjoint sets: refutation and scoring
+
+Refutation feeds surviving mutants back to the agent as a failure, which turns
+the mutant set into training material. Scoring an arm on the same set would be
+scoring it on what it was told, so there are two sets and they never overlap:
+
+| set | path | role |
+|---|---|---|
+| refutation | [`mutants/`](mutants/) | shown to the agent, as *categories* only — the extra life |
+| scoring | [`mutants-scoring/`](mutants-scoring/) | held out; the strict-success score |
+
+`harness.controller` refuses a run whose two roots resolve equal, and
+`author_mutants.py --disjoint-from` refuses a scoring mutant that repeats a
+refutation mutant's file, offset and edit. Pass the scoring root at
+**schedule** time (`harness.pilot --mutants-root`) so its digest is part of the
+recorded apparatus identity, and the refutation root at **launch** time
+(`harness.pilot_run --refutation-mutants-root`). Without `--mutants-root` a
+round runs `scoring_mode: core`, where `strict_success` is false by
+construction and says nothing about the contract.
+
+The scoring set is authored from readable edit descriptions in
+[`mutant-specs/scoring.json`](mutant-specs/scoring.json); `author_mutants.py`
+computes the offsets and digests and rejects an anchor that does not occur
+exactly once in its file.
+
+Two first drafts were dropped for the reason stated above -- abort codes are out
+of scope. Both weakened a guard from `x > 0` to `x >= 0`; the zero then reached
+a division and the function still aborted, so only the abort *code* changed and
+a complete contract could not observe the difference. `validate_mutants`
+recorded them `survived`, and they were replaced by observable edits.
 
 ## References
 
@@ -220,9 +307,21 @@ package itself cannot be redistributed without one.
 
 ## What is left before the full run
 
-Nothing. The corpus, its references and its mutants are complete and
-reproducible; what remains is a decision about round size rather than work on
-the corpus.
+The corpus, its references and both mutant sets are complete and reproducible.
+The refutation mechanism made two apparatus changes necessary, and both are in
+place:
+
+- A **held-out scoring set** ([`mutants-scoring/`](mutants-scoring/)), because
+  refutation turns the set it shows the agent into training material. Schedule
+  with `--mutants-root corpus-v3/mutants-scoring`; a round scheduled without it
+  runs `scoring_mode: core`, where `strict_success` is false for an apparatus
+  reason rather than a specification one.
+- A **larger wall budget**. Refutation makes a third controller turn ordinary,
+  and at `max_wall_seconds: 2700` a third of the `pilot-qp-ref3` cells were cut
+  off mid-repair -- scored as failures, which would have read as refutation
+  hurting the arm. `config/default.json` now allows 3600.
+
+What remains is a decision about round size rather than work on the corpus.
 
 Two things are deliberately not on this list. `PN-pnl-005` is permanently
 excluded rather than deferred — its blocker is a prover defect, not a property

@@ -1,0 +1,99 @@
+{
+ "mutants": [
+  {
+   "anchor": {
+    "length": 37,
+    "offset": 1079,
+    "sha256": "67c92838c8d6f4b826e57efd01187f25d81f0bc29d3c490c30ccf1084aaa0d4b"
+   },
+   "edit": {
+    "at": 20,
+    "kind": "substitute",
+    "length": 6,
+    "to": "value: start,"
+   },
+   "essential": true,
+   "file": "sources/etna/selection_machine.move",
+   "mutant_id": "SM-select-022-returns-start-value",
+   "obligation_category": "normal-result",
+   "rationale": "Reports the seed rather than the admissible value that was found.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 18,
+    "offset": 952,
+    "sha256": "8f29674178faa3ee3d1ecf34c3fda30d196acca9f94bf165ad790d00b0621f64"
+   },
+   "edit": {
+    "at": 12,
+    "kind": "substitute",
+    "length": 5,
+    "to": "next(start)"
+   },
+   "essential": true,
+   "file": "sources/etna/selection_machine.move",
+   "mutant_id": "SM-select-022-skips-seed-candidate",
+   "obligation_category": "normal-result",
+   "rationale": "The seed is never tested for admissibility.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 20,
+    "offset": 998,
+    "sha256": "1a4900933d9d70a8a81596d8c0186f673073b0353d9bf3cd2b4592e7b4e68ce2"
+   },
+   "edit": {
+    "at": 11,
+    "kind": "substitute",
+    "length": 6,
+    "to": "rounds - 1"
+   },
+   "essential": true,
+   "file": "sources/etna/selection_machine.move",
+   "mutant_id": "SM-select-022-one-round-short",
+   "obligation_category": "abort",
+   "rationale": "Loses the final round, and a zero round count now underflows.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  }
+ ],
+ "reference_sha256": "3b6176321b4f7a749f49212669df7936470232b806111f5918a7f07ced790c22",
+ "task_id": "SM-select-022"
+}

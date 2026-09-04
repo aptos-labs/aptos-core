@@ -91,6 +91,18 @@ pub struct ProverOptions {
     /// Do not add `pragma opaque` to inferred specs.
     #[arg(long)]
     pub no_inference_opaque: bool,
+    /// Report a loop without an invariant that leaves inferred conditions
+    /// untrusted as an error rather than a warning.
+    ///
+    /// The default is a warning: ordinary use still wants whatever WP could
+    /// derive, and the caller decides what to do about the gap. That is the
+    /// wrong default when the inferred specification is consumed
+    /// automatically, because WP drops the untrusted clauses and emits an
+    /// empty `aborts_if_is_partial` contract -- which compiles and verifies,
+    /// and so is indistinguishable from a complete one to anything that only
+    /// checks whether the prover succeeded.
+    #[arg(long)]
+    pub uninvariant_loop_is_error: bool,
     /// Optional names of native methods (qualified with module name, e.g., m::foo) implementing
     /// mutable borrow semantics
     #[arg(skip)]
@@ -127,6 +139,7 @@ impl Default for ProverOptions {
             loop_invariant_evidence_depth: None,
             no_infer_lambda_specs: false,
             no_inference_opaque: false,
+            uninvariant_loop_is_error: false,
             borrow_natives: vec![],
             verify_exclude: vec![],
             inline_spec_lets: false,

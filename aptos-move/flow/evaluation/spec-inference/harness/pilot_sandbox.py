@@ -76,6 +76,9 @@ class Launch:
     z3: Path
     landlock: Path
     feedback_level: str
+    #: Mutants the controller refutes an accepted contract against, mounted for
+    #: the controller and withheld from the agent by its Landlock ruleset.
+    refutation_mutants: Path | None = None
 
 
 def main() -> None:
@@ -401,6 +404,7 @@ def parse_launch(argv: list[str]) -> Launch:
     parser.add_argument("--run", type=Path, required=True)
     parser.add_argument("--artifacts", type=Path, required=True)
     parser.add_argument("--skip-hidden-scoring", action="store_true")
+    parser.add_argument("--refutation-mutants-root", type=Path)
     args = parser.parse_args(argv[3:])
     if not args.skip_hidden_scoring:
         raise SystemExit("the unscored pilot must use --skip-hidden-scoring")
@@ -448,6 +452,14 @@ def parse_launch(argv: list[str]) -> Launch:
         ),
     )
 
+    refutation_mutants = None
+    if args.refutation_mutants_root is not None:
+        refutation_mutants = args.refutation_mutants_root.resolve()
+        if not refutation_mutants.is_dir():
+            raise SystemExit(f"refutation mutant root is not a directory: {refutation_mutants}")
+        _require_confined_mount(
+            refutation_mutants, (resolved_run.plugin_dir, resolved_run.shared_package)
+        )
     move_flow = _required_executable("move-flow")
     claude = _required_executable("claude", preserve_lookup_path=True)
     landlock = _required_landlock(evaluation_root)
@@ -475,6 +487,7 @@ def parse_launch(argv: list[str]) -> Launch:
         boogie_client=boogie_client,
         z3=z3,
         landlock=landlock,
+        refutation_mutants=refutation_mutants,
     )
 
 
@@ -554,6 +567,42 @@ def _required_landlock(evaluation_root: Path) -> Path:
         )
     return binary.resolve()
 
+
+def _require_confined_mount(root: Path, agent_readable: tuple[Path, ...] = ()) -> None:
+    """Refuse a mount that would shadow the sandbox's own filesystem.
+
+    A bind mount is placed at its own absolute path, into a namespace that has
+    already put a tmpfs at `/tmp` and granted the agent read access to the
+    toolchain. A root at `/tmp`, `/opt` or any of their parents would therefore
+    replace the isolated view with the host tree, which the agent can read and
+    send onward.
+
+    Containment in the evaluation directory is the whole of the check: every
+    such path is either at or above a directory the sandbox establishes, and so
+    outside the evaluation tree. Enumerating the sandbox's own mounts here as
+    well would be a second, hand-maintained copy of `build_bwrap_command` and
+    `agent_landlock_paths` -- and it had already fallen behind them.
+    """
+    evaluation_root = Path(__file__).resolve().parent.parent
+    if not root.is_relative_to(evaluation_root):
+        raise SystemExit(
+            f"refutation mutant root {root} is outside {evaluation_root}; a mount "
+            "is placed at its own absolute path, so a root elsewhere would shadow "
+            "part of the sandbox's own filesystem rather than add to it"
+        )
+    # Inside the evaluation tree is necessary but not sufficient: the plugin
+    # directory and the workspace are inside it too, and the agent reads both.
+    # A root nested under either would be mounted where `Read` and `Glob` reach
+    # it, handing over the mutations that the category-only feedback exists to
+    # withhold.
+    for readable in agent_readable:
+        readable = Path(readable).resolve()
+        if root == readable or root.is_relative_to(readable):
+            raise SystemExit(
+                f"refutation mutant root {root} is inside {readable}, which the "
+                "agent can read; the mutants would be legible to the session "
+                "that the categories are meant to keep them from"
+            )
 
 def _required_executable(name: str, preserve_lookup_path: bool = False) -> Path:
     value = shutil.which(name)
@@ -674,6 +723,12 @@ def build_bwrap_command(launch: Launch, staging: Path) -> list[str]:
     mount(launch.shared_package)
     mount(launch.task_patch)
     mount(launch.plugin)
+    # KNOWN LEAK RISK: refutation needs these inside the namespace the agent
+    # shares, so only its Landlock ruleset withholds them -- one mechanism where
+    # scoring material had two. Never mount the set the round is scored on;
+    # `harness.controller` refuses if the two roots are equal.
+    if launch.refutation_mutants is not None:
+        mount(launch.refutation_mutants)
     mount(staging, launch.artifacts, writable=True)
     if launch.python_root is not None:
         mount(launch.python_root)
