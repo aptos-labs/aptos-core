@@ -64,6 +64,13 @@ impl std::fmt::Display for ApiError {
 
 impl std::error::Error for ApiError {}
 
+/// The stable wire metadata for an [`ApiError`], produced by [`ApiError::info`].
+struct ErrorInfo {
+    code: u32,
+    retriable: bool,
+    message: &'static str,
+}
+
 impl ApiError {
     /// Returns every single API errors so the messages can be returned
     pub fn all() -> Vec<ApiError> {
@@ -108,109 +115,102 @@ impl ApiError {
         ]
     }
 
-    /// All errors are required to have a code.  These are just in order that they were added, and no specific grouping.
-    pub fn code(&self) -> u32 {
+    /// The stable, wire-facing metadata for an error: its numeric `code`, whether
+    /// upstreams may `retriable`-retry, and the fixed `message`.
+    ///
+    /// This is the SINGLE SOURCE OF TRUTH (BC-3): `code()`, `retriable()`, and
+    /// `message()` are thin accessors over this table so they can never disagree.
+    /// Codes are permanent and must not change; see docs/SPEC_DEVIATIONS.md §9.
+    fn info(&self) -> ErrorInfo {
         use ApiError::*;
-        match self {
-            TransactionIsPending => 1,
-            NetworkIdentifierMismatch => 2,
-            ChainIdMismatch => 3,
-            DeserializationFailed(_) => 4,
-            InvalidTransferOperations(_) => 5,
-            InvalidSignatureType => 6,
-            InvalidMaxGasFees => 7,
-            MaxGasFeeTooLow(_) => 8,
-            InvalidGasMultiplier => 9,
-            InvalidOperations(_) => 10,
-            MissingPayloadMetadata => 11,
-            UnsupportedCurrency(_) => 12,
-            UnsupportedSignatureCount(_) => 13,
-            NodeIsOffline => 14,
-            TransactionParseError(_) => 15,
-            GasEstimationFailed(_) => 16,
-            InternalError(_) => 17,
-            AccountNotFound(_) => 18,
-            ResourceNotFound(_) => 19,
-            ModuleNotFound(_) => 20,
-            StructFieldNotFound(_) => 21,
-            VersionNotFound(_) => 22,
-            TransactionNotFound(_) => 23,
-            TableItemNotFound(_) => 24,
-            BlockNotFound(_) => 25,
-            VersionPruned(_) => 26,
-            BlockPruned(_) => 27,
-            InvalidInput(_) => 28,
-            InvalidTransactionUpdate(_) => 29,
-            SequenceNumberTooOld(_) => 30,
-            VmError(_) => 31,
-            MempoolIsFull(_) => 32,
-            CoinTypeFailedToBeFetched(_) => 33,
-            StateValueNotFound(_) => 34,
-            RejectedByFilter(_) => 35,
-            RateLimited(_) => 36,
+        // (code, retriable, message)
+        let (code, retriable, message) = match self {
+            TransactionIsPending => (1, false, "Transaction is pending"),
+            NetworkIdentifierMismatch => (2, false, "Network identifier doesn't match"),
+            ChainIdMismatch => (3, false, "Chain Id doesn't match"),
+            DeserializationFailed(_) => (4, false, "Deserialization failed"),
+            InvalidTransferOperations(_) => (5, false, "Invalid operations for a transfer"),
+            InvalidSignatureType => (6, false, "Invalid signature type"),
+            InvalidMaxGasFees => (7, false, "Invalid max gas fee"),
+            MaxGasFeeTooLow(_) => (
+                8,
+                false,
+                "Max fee is lower than the estimated cost of the transaction",
+            ),
+            InvalidGasMultiplier => (9, false, "Invalid gas multiplier"),
+            InvalidOperations(_) => (10, false, "Invalid operations"),
+            MissingPayloadMetadata => (11, false, "Payload metadata is missing"),
+            UnsupportedCurrency(_) => (12, false, "Currency is unsupported"),
+            UnsupportedSignatureCount(_) => (13, false, "Number of signatures is not supported"),
+            // BC-1: fixed from "...because he's offline".
+            NodeIsOffline => (14, false, "This API is unavailable because the node is offline"),
+            TransactionParseError(_) => (15, false, "Transaction failed to parse"),
+            GasEstimationFailed(_) => (16, true, "Gas estimation failed"),
+            InternalError(_) => (17, false, "Internal error"),
+            AccountNotFound(_) => (18, true, "Account not found"),
+            ResourceNotFound(_) => (19, false, "Resource not found"),
+            ModuleNotFound(_) => (20, false, "Module not found"),
+            StructFieldNotFound(_) => (21, false, "Struct field not found"),
+            VersionNotFound(_) => (22, false, "Version not found"),
+            TransactionNotFound(_) => (23, false, "Transaction not found"),
+            TableItemNotFound(_) => (24, false, "Table item not found"),
+            // BC-1: fixed from "Block is missing events".
+            BlockNotFound(_) => (25, true, "Block not found"),
+            VersionPruned(_) => (26, false, "Version pruned"),
+            BlockPruned(_) => (27, false, "Block pruned"),
+            InvalidInput(_) => (28, false, "Invalid input"),
+            InvalidTransactionUpdate(_) => (
+                29,
+                false,
+                "Invalid transaction update.  Can only update gas unit price",
+            ),
+            SequenceNumberTooOld(_) => (
+                30,
+                false,
+                "Sequence number too old.  Please create a new transaction with an updated sequence number",
+            ),
+            VmError(_) => (31, false, "Transaction submission failed due to VM error"),
+            MempoolIsFull(_) => (32, true, "Mempool is full all accounts"),
+            // BC-1: fixed from "Faileed to retrieve...".
+            CoinTypeFailedToBeFetched(_) => (
+                33,
+                true,
+                "Failed to retrieve the coin type information, please retry",
+            ),
+            StateValueNotFound(_) => (34, false, "StateValue not found."),
+            RejectedByFilter(_) => (
+                35,
+                false,
+                "Transaction was rejected by the transaction filter",
+            ),
+            RateLimited(_) => (36, true, "Rate limited"),
+        };
+        ErrorInfo {
+            code,
+            retriable,
+            message,
         }
     }
 
-    /// Retriable errors will allow for Rosetta upstreams to retry.  These are only for temporary
-    /// state blockers.  Note, there is a possibility that some of these could be retriable forever (e.g. an account is never created).
-    pub fn retriable(&self) -> bool {
-        use ApiError::*;
-        matches!(
-            self,
-            AccountNotFound(_)
-                | BlockNotFound(_)
-                | MempoolIsFull(_)
-                | GasEstimationFailed(_)
-                | CoinTypeFailedToBeFetched(_)
-                | RateLimited(_)
-        )
+    /// The stable numeric code for this error (permanent; see SPEC_DEVIATIONS §9).
+    pub fn code(&self) -> u32 {
+        self.info().code
     }
 
-    /// All Rosetta errors must be 500s (and retriable tells you if it's actually retriable)
+    /// Whether Rosetta upstreams may retry.  Only temporary/state blockers are
+    /// retriable (e.g. an account not yet created, a full mempool).
+    pub fn retriable(&self) -> bool {
+        self.info().retriable
+    }
+
+    /// All Rosetta errors are HTTP 500; `retriable()` says whether a retry helps.
     pub fn status_code(&self) -> StatusCode {
         StatusCode::INTERNAL_SERVER_ERROR
     }
 
-    /// This value must be fixed, so it's all static strings
+    /// The fixed, wire-facing message for this error.  Stable per code.
     pub fn message(&self) -> &'static str {
-        match self {
-            ApiError::TransactionIsPending => "Transaction is pending",
-            ApiError::NetworkIdentifierMismatch => "Network identifier doesn't match",
-            ApiError::ChainIdMismatch => "Chain Id doesn't match",
-            ApiError::DeserializationFailed(_) => "Deserialization failed",
-            ApiError::InvalidTransferOperations(_) => "Invalid operations for a transfer",
-            ApiError::AccountNotFound(_) => "Account not found",
-            ApiError::InvalidSignatureType => "Invalid signature type",
-            ApiError::InvalidMaxGasFees => "Invalid max gas fee",
-            ApiError::MaxGasFeeTooLow(_) => "Max fee is lower than the estimated cost of the transaction",
-            ApiError::InvalidGasMultiplier => "Invalid gas multiplier",
-            ApiError::InvalidOperations(_) => "Invalid operations",
-            ApiError::MissingPayloadMetadata => "Payload metadata is missing",
-            ApiError::UnsupportedCurrency(_) => "Currency is unsupported",
-            ApiError::UnsupportedSignatureCount(_) => "Number of signatures is not supported",
-            ApiError::NodeIsOffline => "This API is unavailable for the node because he's offline",
-            ApiError::BlockNotFound(_) => "Block is missing events",
-            ApiError::StateValueNotFound(_) => "StateValue not found.",
-            ApiError::TransactionParseError(_) => "Transaction failed to parse",
-            ApiError::InternalError(_) => "Internal error",
-            ApiError::CoinTypeFailedToBeFetched(_) => "Faileed to retrieve the coin type information, please retry",
-            ApiError::ResourceNotFound(_) => "Resource not found",
-            ApiError::ModuleNotFound(_) => "Module not found",
-            ApiError::StructFieldNotFound(_) => "Struct field not found",
-            ApiError::VersionNotFound(_) => "Version not found",
-            ApiError::TransactionNotFound(_) => "Transaction not found",
-            ApiError::TableItemNotFound(_) => "Table item not found",
-            ApiError::VersionPruned(_) => "Version pruned",
-            ApiError::BlockPruned(_) => "Block pruned",
-            ApiError::InvalidInput(_) => "Invalid input",
-            ApiError::InvalidTransactionUpdate(_) => "Invalid transaction update.  Can only update gas unit price",
-            ApiError::SequenceNumberTooOld(_) => "Sequence number too old.  Please create a new transaction with an updated sequence number",
-            ApiError::VmError(_) => "Transaction submission failed due to VM error",
-            ApiError::MempoolIsFull(_) => "Mempool is full all accounts",
-            ApiError::GasEstimationFailed(_) => "Gas estimation failed",
-            ApiError::RejectedByFilter(_) => "Transaction was rejected by the transaction filter",
-            ApiError::RateLimited(_) => "Rate limited",
-        }
+        self.info().message
     }
 
     /// Details are optional, but give more details for each error message
@@ -302,8 +302,10 @@ impl From<RestError> for ApiError {
                 AptosErrorCode::VersionPruned => ApiError::VersionPruned(Some(err.error.message)),
                 AptosErrorCode::BlockPruned => ApiError::BlockPruned(Some(err.error.message)),
                 AptosErrorCode::InvalidInput => ApiError::InvalidInput(Some(err.error.message)),
+                // BC-2: was incorrectly mapped to InvalidInput (code 28); now maps
+                // to the matching InvalidTransactionUpdate (code 29).
                 AptosErrorCode::InvalidTransactionUpdate => {
-                    ApiError::InvalidInput(Some(err.error.message))
+                    ApiError::InvalidTransactionUpdate(Some(err.error.message))
                 },
                 AptosErrorCode::SequenceNumberTooOld => {
                     ApiError::SequenceNumberTooOld(Some(err.error.message))

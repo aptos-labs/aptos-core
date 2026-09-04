@@ -7,6 +7,7 @@ use crate::{
         BlockHash, Y2K_MS,
     },
     error::ApiResult,
+    node_client::NodeClient,
     types::{Block, BlockIdentifier, BlockRequest, BlockResponse, Transaction},
     RosettaContext,
 };
@@ -46,7 +47,7 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
         get_block_index_from_request(&server_context, request.block_identifier).await?;
 
     let (parent_transaction, block) = get_block_by_index(
-        server_context.block_cache()?.as_ref(),
+        server_context.block_retriever()?.as_ref(),
         block_index,
         server_context.chain_id,
     )
@@ -102,7 +103,7 @@ async fn build_block(
 
     // Ensure the transactions are sorted in order, this is required by Rosetta
     // NOTE: sorting may be pretty expensive, depending on the size of the block
-    transactions.sort_by(|first, second| first.metadata.version.0.cmp(&second.metadata.version.0));
+    transactions.sort_by_key(|txn| txn.metadata.version.0);
 
     Ok(Block {
         block_identifier,
@@ -114,14 +115,16 @@ async fn build_block(
 
 /// Retrieves a block by its index (block height)
 async fn get_block_by_index(
-    block_cache: &BlockRetriever,
+    block_retriever: &BlockRetriever,
     block_height: u64,
     chain_id: ChainId,
 ) -> ApiResult<(
     BlockIdentifier,
     aptos_rest_client::aptos_api_types::BcsBlock,
 )> {
-    let block = block_cache.get_block_by_height(block_height, true).await?;
+    let block = block_retriever
+        .get_block_by_height(block_height, true)
+        .await?;
 
     // For the genesis block, we populate parent_block_identifier with the
     // same genesis block. Refer to
@@ -130,7 +133,7 @@ async fn get_block_by_index(
         Ok((BlockIdentifier::from_block(&block, chain_id), block))
     } else {
         // Retrieve the previous block's identifier
-        let prev_block = block_cache
+        let prev_block = block_retriever
             .get_block_by_height(block_height - 1, false)
             .await?;
         let prev_block_id = BlockIdentifier::from_block(&prev_block, chain_id);
@@ -164,15 +167,18 @@ impl BlockInfo {
     }
 }
 
-/// A cache of [`BlockInfo`] to allow us to keep track of the block boundaries
+/// Fetches blocks (and their boundaries) from the node by height.
+///
+/// Despite the historical `block_cache` naming this replaced, this performs no
+/// caching -- every call hits the node. See docs/BEHAVIOR_CHANGES.md BC-4.
 #[derive(Debug)]
 pub struct BlockRetriever {
     page_size: u16,
-    rest_client: Arc<aptos_rest_client::Client>,
+    rest_client: Arc<dyn NodeClient>,
 }
 
 impl BlockRetriever {
-    pub fn new(page_size: u16, rest_client: Arc<aptos_rest_client::Client>) -> Self {
+    pub fn new(page_size: u16, rest_client: Arc<dyn NodeClient>) -> Self {
         BlockRetriever {
             page_size,
             rest_client,
