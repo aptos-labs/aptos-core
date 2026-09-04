@@ -14,7 +14,8 @@ struct FuzzData {
     b: TypeTag,
 }
 
-/// Validates that all identifiers are valid Move identifiers and contains valid ability sets
+/// Returns whether every identifier is valid and every function ability set contains only defined
+/// bits.
 fn is_valid_type_tag(type_tag: &TypeTag) -> bool {
     match type_tag {
         TypeTag::Struct(struct_tag) => {
@@ -24,7 +25,9 @@ fn is_valid_type_tag(type_tag: &TypeTag) -> bool {
         },
         TypeTag::Vector(inner_type_tag) => is_valid_type_tag(inner_type_tag),
         TypeTag::Function(function_tag) => {
-            function_tag.abilities.into_u8() <= AbilitySet::ALL.into_u8()
+            // Undefined ability bits survive `TypeTag` decoding but are omitted from canonical
+            // strings, so exclude them from the injectivity property below.
+            function_tag.abilities.is_subset(AbilitySet::ALL)
                 && function_tag
                     .args
                     .iter()
