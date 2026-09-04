@@ -378,6 +378,12 @@ fn translate_type(maps: &NameMaps, ty: &move_model::ty::Type) -> Result<exchange
         Type::Primitive(PrimitiveType::U64) => Ok(exchange::Type::U64),
         Type::Primitive(PrimitiveType::U128) => Ok(exchange::Type::U128),
         Type::Primitive(PrimitiveType::U256) => Ok(exchange::Type::U256),
+        Type::Primitive(PrimitiveType::I8) => Ok(exchange::Type::I8),
+        Type::Primitive(PrimitiveType::I16) => Ok(exchange::Type::I16),
+        Type::Primitive(PrimitiveType::I32) => Ok(exchange::Type::I32),
+        Type::Primitive(PrimitiveType::I64) => Ok(exchange::Type::I64),
+        Type::Primitive(PrimitiveType::I128) => Ok(exchange::Type::I128),
+        Type::Primitive(PrimitiveType::I256) => Ok(exchange::Type::I256),
         Type::Primitive(PrimitiveType::Address) => Ok(exchange::Type::Address),
         Type::Primitive(PrimitiveType::Signer) => Ok(exchange::Type::Signer),
         Type::TypeParameter(index) => Ok(exchange::Type::TypeParameter(*index as usize)),
@@ -782,6 +788,14 @@ fn constant_value(cons: &Constant) -> Result<exchange::Value> {
         Constant::U64(x) => Ok(exchange::Value::Num(x.to_string())),
         Constant::U128(x) => Ok(exchange::Value::Num(x.to_string())),
         Constant::U256(x) => Ok(exchange::Value::Num(x.to_string())),
+        // Signed constants share the one `num` form; the sign is part of the
+        // decimal string and the declared local type supplies the width.
+        Constant::I8(x) => Ok(exchange::Value::Num(x.to_string())),
+        Constant::I16(x) => Ok(exchange::Value::Num(x.to_string())),
+        Constant::I32(x) => Ok(exchange::Value::Num(x.to_string())),
+        Constant::I64(x) => Ok(exchange::Value::Num(x.to_string())),
+        Constant::I128(x) => Ok(exchange::Value::Num(x.to_string())),
+        Constant::I256(x) => Ok(exchange::Value::Num(x.to_string())),
         Constant::Address(Address::Numerical(a)) => {
             Ok(exchange::Value::Address(a.to_hex_literal()))
         },
@@ -804,6 +818,12 @@ fn int_width(locals: &[exchange::Type], local: usize) -> Result<exchange::IntTyp
         Some(exchange::Type::U64) => Ok(exchange::IntType::U64),
         Some(exchange::Type::U128) => Ok(exchange::IntType::U128),
         Some(exchange::Type::U256) => Ok(exchange::IntType::U256),
+        Some(exchange::Type::I8) => Ok(exchange::IntType::I8),
+        Some(exchange::Type::I16) => Ok(exchange::IntType::I16),
+        Some(exchange::Type::I32) => Ok(exchange::IntType::I32),
+        Some(exchange::Type::I64) => Ok(exchange::IntType::I64),
+        Some(exchange::Type::I128) => Ok(exchange::IntType::I128),
+        Some(exchange::Type::I256) => Ok(exchange::IntType::I256),
         other => bail!("integer operation on non-integer local {local}: {other:?}"),
     }
 }
@@ -859,6 +879,12 @@ fn translate_call(
         CastU64 => simple(exchange::Oper::Cast(exchange::IntType::U64)),
         CastU128 => simple(exchange::Oper::Cast(exchange::IntType::U128)),
         CastU256 => simple(exchange::Oper::Cast(exchange::IntType::U256)),
+        CastI8 => simple(exchange::Oper::Cast(exchange::IntType::I8)),
+        CastI16 => simple(exchange::Oper::Cast(exchange::IntType::I16)),
+        CastI32 => simple(exchange::Oper::Cast(exchange::IntType::I32)),
+        CastI64 => simple(exchange::Oper::Cast(exchange::IntType::I64)),
+        CastI128 => simple(exchange::Oper::Cast(exchange::IntType::I128)),
+        CastI256 => simple(exchange::Oper::Cast(exchange::IntType::I256)),
         Lt => simple(exchange::Oper::Lt),
         Le => simple(exchange::Oper::Le),
         Eq => simple(exchange::Oper::Eq),
@@ -885,6 +911,26 @@ fn translate_call(
                 srcs.to_vec(),
             ));
             exchange::Instr::Call(dsts.to_vec(), exchange::Oper::Not, vec![tmp])
+        },
+        Negate => {
+            // The format has no `neg`; normalize to `0 - x`, as `gt`/`ge` and
+            // `neq` are normalized.  Abort behavior is identical: Move aborts on
+            // `-MIN` as "negated result too large", and `0 - MIN` overflows the
+            // same range check.
+            let width = int_width(locals, dsts[0])?;
+            let zero_ty = locals
+                .get(dsts[0])
+                .cloned()
+                .ok_or_else(|| anyhow!("negation result local {} is undeclared", dsts[0]))?;
+            let tmp = locals.len();
+            locals.push(zero_ty);
+            instrs.push(exchange::Instr::Load(
+                tmp,
+                exchange::Value::Num("0".to_string()),
+            ));
+            exchange::Instr::Call(dsts.to_vec(), exchange::Oper::Sub(width), vec![
+                tmp, srcs[0],
+            ])
         },
         Pack(_, _, tys) => {
             let tys = type_args(tys)?;

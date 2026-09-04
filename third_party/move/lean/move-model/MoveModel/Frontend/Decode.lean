@@ -10,7 +10,7 @@ import MoveModel.Frontend.XIR
 This module decodes the JSON produced by `aptos move exchange` into an
 `MProgram`.
 
-The serde-annotated Rust types in `move-model-exchange` define version 7 of
+The serde-annotated Rust types in `move-model-exchange` define version 11 of
 the schema.  Struct fields use snake_case names.  Enums use external tags: a
 unit variant is a string such as `"add"`, while variants with data are
 single-key objects such as `{"move_from": 0}` or
@@ -402,7 +402,7 @@ private def decodeStruct (j : Json) : Dec MStruct := do
 def decodeMProgram (s : String) : Dec MProgram := do
   let j ← Json.parse s
   let version ← decodeNat (← j.getObjVal? "version")
-  if version ≠ 10 then
+  if version ≠ 11 then
     throw s!"unsupported exchange schema version {version}"
   pure {
     structs := ← (← (← j.getObjVal? "structs").getArr?).toList.mapM decodeStruct

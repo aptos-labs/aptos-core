@@ -19,7 +19,7 @@ use move_core_types::{
     identifier::Identifier,
 };
 use move_model::{
-    ast::{Address, Attribute, AttributeValue, ModuleName, Value},
+    ast::{Address, Attribute, AttributeValue, FriendDecl, ModuleName, Value},
     model::{
         FieldData, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId, StructId,
         TypeParameter, TypeParameterKind,
@@ -70,7 +70,7 @@ pub(crate) fn parse_source_with_target(
 ) -> Result<XirSource> {
     let module: XirModule = serde_json::from_str(json)
         .with_context(|| format!("invalid XIR from `{}`", path.display()))?;
-    validate(&module)?;
+    validate(&module, is_target)?;
     validate_source_maps(&module, &text)?;
     Ok(XirSource {
         path,
@@ -139,7 +139,10 @@ fn loc_for_span(fallback: &Loc, span: Option<XirSourceSpan>) -> Loc {
         .unwrap_or_else(|| fallback.clone())
 }
 
-fn validate(module: &XirModule) -> Result<()> {
+/// Validates a module. `is_target` distinguishes a module being *compiled*
+/// from one supplied as a *dependency*: a dependency contributes only its
+/// declaration surface, so its functions may legitimately carry no body.
+fn validate(module: &XirModule, is_target: bool) -> Result<()> {
     module.check_version().map_err(anyhow::Error::msg)?;
     ensure!(
         module.module.dialect == XirDialect::Stackless,
@@ -196,7 +199,9 @@ fn validate(module: &XirModule) -> Result<()> {
             "function `{}` has more parameters than locals",
             decl.name
         );
-        if !decl.is_native {
+        // A compilation target must have code to compile; a dependency need
+        // only declare its interface. Natives are bodyless in either role.
+        if !decl.is_native && is_target {
             ensure!(
                 !decl.blocks.is_empty(),
                 "function `{}` has no blocks",
@@ -279,6 +284,10 @@ fn validate_type_parameters(ty: &Ty, count: usize, owner: &str) -> Result<()> {
         },
         Ty::Vector(element) | Ty::Ref(element) | Ty::MutRef(element) => {
             validate_type_parameters(element, count, owner)?;
+        },
+        Ty::Fun(args, result, _) => {
+            validate_type_parameters(args, count, owner)?;
+            validate_type_parameters(result, count, owner)?;
         },
         Ty::Bool
         | Ty::U8
@@ -368,17 +377,23 @@ pub fn import_sources(
     Ok(())
 }
 
+/// Whether every module this one references — for calls *and* for types — is
+/// already loaded, so import ordering can pick a module that is ready.
 fn external_modules_available(env: &GlobalEnv, xir: &XirModule) -> bool {
-    xir.external_functions.iter().all(|reference| {
-        let Ok(address) = AccountAddress::from_hex_literal(&reference.address) else {
+    let loaded = |address: &str, module: &str| {
+        let Ok(address) = AccountAddress::from_hex_literal(address) else {
             return false;
         };
-        let name = ModuleName::new(
-            Address::Numerical(address),
-            env.symbol_pool().make(&reference.module),
-        );
+        let name = ModuleName::new(Address::Numerical(address), env.symbol_pool().make(module));
         env.find_module(&name).is_some()
-    })
+    };
+    xir.external_functions
+        .iter()
+        .all(|reference| loaded(&reference.address, &reference.module))
+        && xir
+            .external_types
+            .iter()
+            .all(|reference| loaded(&reference.address, &reference.module))
 }
 
 fn model_attribute(env: &mut GlobalEnv, loc: &Loc, attribute: &XirAttribute) -> Result<Attribute> {
@@ -457,6 +472,7 @@ fn import_source(
         .iter()
         .map(|decl| FunId::new(env.symbol_pool().make(&decl.name)))
         .collect::<Vec<_>>();
+    let struct_refs = struct_references(env, xir, module_id, &struct_ids)?;
 
     let mut structs = vec![];
     for (decl, struct_id) in xir.structs.iter().zip(&struct_ids) {
@@ -468,7 +484,7 @@ fn import_source(
                 loc: loc.clone(),
                 offset,
                 variant: None,
-                ty: model_type(&field.ty, module_id, &struct_ids)?,
+                ty: model_type(&field.ty, &struct_refs)?,
                 is_ghost: false,
                 init: None,
             });
@@ -491,7 +507,7 @@ fn import_source(
                         loc: loc.clone(),
                         offset,
                         variant: Some(variant_symbol),
-                        ty: model_type(&field.ty, module_id, &struct_ids)?,
+                        ty: model_type(&field.ty, &struct_refs)?,
                         is_ghost: false,
                         init: None,
                     });
@@ -505,7 +521,7 @@ fn import_source(
             type_parameters: model_type_parameters(env, &loc, &decl.type_parameters)?,
             fields,
             variants,
-            visibility: MoveVisibility::Private,
+            visibility: move_visibility(&decl.visibility),
         });
     }
 
@@ -515,7 +531,7 @@ fn import_source(
         let local_types = decl
             .locals
             .iter()
-            .map(|ty| model_type(ty, module_id, &struct_ids))
+            .map(|ty| model_type(ty, &struct_refs))
             .collect::<Result<Vec<_>>>()?;
         let params = local_types
             .iter()
@@ -538,7 +554,7 @@ fn import_source(
         let returns = Type::tuple(
             decl.returns
                 .iter()
-                .map(|ty| model_type(ty, module_id, &struct_ids))
+                .map(|ty| model_type(ty, &struct_refs))
                 .collect::<Result<Vec<_>>>()?,
         );
         let acquired = decl
@@ -570,19 +586,62 @@ fn import_source(
         });
     }
 
+    // Friend targets need not be loaded: a module may grant access to one that
+    // is absent from this compilation, so resolve the id where possible and
+    // keep the name either way.
+    let friends = xir
+        .module
+        .friends
+        .iter()
+        .map(|reference| {
+            let address =
+                AccountAddress::from_hex_literal(&reference.address).with_context(|| {
+                    format!("invalid friend module address `{}`", reference.address)
+                })?;
+            valid_identifier("friend module", &reference.module)?;
+            let name = ModuleName::new(
+                Address::Numerical(address),
+                env.symbol_pool().make(&reference.module),
+            );
+            let module_id = env.find_module(&name).map(|module| module.get_id());
+            Ok(FriendDecl {
+                loc: loc.clone(),
+                module_name: name,
+                module_id,
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+
     let added_id = env.load_xir_module(ModelXirModuleData {
         loc,
         name: module_name,
         structs,
         functions,
+        friends,
     })?;
     ensure!(
         added_id == module_id,
         "model assigned an unexpected module id"
     );
+    // A dependency contributes declarations only: its bodies are not compiled,
+    // so they are neither translated nor entered into the target holder. This
+    // is what lets an interface-only module — one with empty `blocks` — be
+    // supplied as a dependency while a target still requires code.
+    if !source.is_target {
+        return Ok(());
+    }
     for (decl, fun_id) in xir.functions.iter().zip(&function_ids) {
         let qid = module_id.qualified(*fun_id);
-        let data = translate_function(env, xir, module_id, &struct_ids, &function_ids, decl, qid)?;
+        let data = translate_function(
+            env,
+            xir,
+            module_id,
+            &struct_ids,
+            &struct_refs,
+            &function_ids,
+            decl,
+            qid,
+        )?;
         targets.insert_target_data(&qid, FunctionVariant::Baseline, data);
     }
     add_transitive_callee_targets(env, module_id, targets);
@@ -681,7 +740,17 @@ fn move_visibility(visibility: &XirVisibility) -> MoveVisibility {
     }
 }
 
-fn model_type(ty: &Ty, module_id: ModuleId, structs: &[StructId]) -> Result<Type> {
+/// Translates an XIR type. `structs` is the combined reference table from
+/// [`struct_references`]: local declarations first, then external ones, so a
+/// resource id resolves to its defining module without the type itself
+/// distinguishing local from foreign.
+fn model_type(ty: &Ty, structs: &[QualifiedId<StructId>]) -> Result<Type> {
+    let resolve = |id: &usize, kind: &str| -> Result<QualifiedId<StructId>> {
+        structs
+            .get(*id)
+            .copied()
+            .with_context(|| format!("{kind} id {id} is outside the local and external tables"))
+    };
     Ok(match ty {
         Ty::Bool => Type::Primitive(PrimitiveType::Bool),
         Ty::U8 => Type::Primitive(PrimitiveType::U8),
@@ -690,9 +759,12 @@ fn model_type(ty: &Ty, module_id: ModuleId, structs: &[StructId]) -> Result<Type
         Ty::U64 => Type::Primitive(PrimitiveType::U64),
         Ty::U128 => Type::Primitive(PrimitiveType::U128),
         Ty::U256 => Type::Primitive(PrimitiveType::U256),
-        Ty::I8 | Ty::I16 | Ty::I32 | Ty::I64 | Ty::I128 | Ty::I256 => {
-            bail!("signed integer types are not representable in the move-model type system")
-        },
+        Ty::I8 => Type::Primitive(PrimitiveType::I8),
+        Ty::I16 => Type::Primitive(PrimitiveType::I16),
+        Ty::I32 => Type::Primitive(PrimitiveType::I32),
+        Ty::I64 => Type::Primitive(PrimitiveType::I64),
+        Ty::I128 => Type::Primitive(PrimitiveType::I128),
+        Ty::I256 => Type::Primitive(PrimitiveType::I256),
         Ty::Address => Type::Primitive(PrimitiveType::Address),
         Ty::Signer => Type::Primitive(PrimitiveType::Signer),
         Ty::TypeParameter(index) => {
@@ -702,46 +774,47 @@ fn model_type(ty: &Ty, module_id: ModuleId, structs: &[StructId]) -> Result<Type
             );
             Type::TypeParameter(*index as u16)
         },
-        Ty::Struct(id) => Type::Struct(
-            module_id,
-            *structs
-                .get(*id)
-                .with_context(|| format!("struct id {id} is out of range"))?,
-            vec![],
+        Ty::Struct(id) => {
+            let qid = resolve(id, "struct")?;
+            Type::Struct(qid.module_id, qid.id, vec![])
+        },
+        Ty::StructInst(id, args) => {
+            let qid = resolve(id, "struct")?;
+            Type::Struct(
+                qid.module_id,
+                qid.id,
+                args.iter()
+                    .map(|arg| model_type(arg, structs))
+                    .collect::<Result<Vec<_>>>()?,
+            )
+        },
+        Ty::Enum(id) => {
+            let qid = resolve(id, "enum")?;
+            Type::Struct(qid.module_id, qid.id, vec![])
+        },
+        Ty::EnumInst(id, args) => {
+            let qid = resolve(id, "enum")?;
+            Type::Struct(
+                qid.module_id,
+                qid.id,
+                args.iter()
+                    .map(|arg| model_type(arg, structs))
+                    .collect::<Result<Vec<_>>>()?,
+            )
+        },
+        Ty::Fun(args, result, abilities) => Type::Fun(
+            Box::new(model_type(args, structs)?),
+            Box::new(model_type(result, structs)?),
+            parse_ability_set(abilities).context("on a function type")?,
         ),
-        Ty::StructInst(id, args) => Type::Struct(
-            module_id,
-            *structs
-                .get(*id)
-                .with_context(|| format!("struct id {id} is out of range"))?,
-            args.iter()
-                .map(|arg| model_type(arg, module_id, structs))
-                .collect::<Result<Vec<_>>>()?,
-        ),
-        Ty::Enum(id) => Type::Struct(
-            module_id,
-            *structs
-                .get(*id)
-                .with_context(|| format!("enum id {id} is out of range"))?,
-            vec![],
-        ),
-        Ty::EnumInst(id, args) => Type::Struct(
-            module_id,
-            *structs
-                .get(*id)
-                .with_context(|| format!("enum id {id} is out of range"))?,
-            args.iter()
-                .map(|arg| model_type(arg, module_id, structs))
-                .collect::<Result<Vec<_>>>()?,
-        ),
-        Ty::Vector(element) => Type::Vector(Box::new(model_type(element, module_id, structs)?)),
+        Ty::Vector(element) => Type::Vector(Box::new(model_type(element, structs)?)),
         Ty::Ref(referent) => Type::Reference(
             ReferenceKind::Immutable,
-            Box::new(model_type(referent, module_id, structs)?),
+            Box::new(model_type(referent, structs)?),
         ),
         Ty::MutRef(referent) => Type::Reference(
             ReferenceKind::Mutable,
-            Box::new(model_type(referent, module_id, structs)?),
+            Box::new(model_type(referent, structs)?),
         ),
     })
 }
@@ -822,11 +895,56 @@ fn called_functions(
     Ok(called)
 }
 
+/// Resolves a resource id used by a *global storage* operation. Move requires
+/// the type of `move_to`/`move_from`/`borrow_global`/`exists` to be declared in
+/// the acting module, so only local ids are valid here — an id reaching into
+/// [`XirModule::external_types`] is a genuine error, not a lookup miss.
 fn struct_at(structs: &[StructId], id: usize, function: &str) -> Result<StructId> {
-    structs
-        .get(id)
-        .copied()
-        .with_context(|| format!("struct id {id} is out of range in `{function}`"))
+    structs.get(id).copied().with_context(|| {
+        format!(
+            "struct id {id} is out of range in `{function}`; global storage operations \
+             require a type declared in this module"
+        )
+    })
+}
+
+/// Every type this module can name, in one index space: local declarations
+/// first, then [`XirModule::external_types`]. This mirrors a bytecode struct
+/// handle table, which likewise holds local and foreign entries under one
+/// index with each entry naming its defining module.
+fn struct_references(
+    env: &GlobalEnv,
+    xir: &XirModule,
+    module_id: ModuleId,
+    struct_ids: &[StructId],
+) -> Result<Vec<QualifiedId<StructId>>> {
+    let mut refs: Vec<QualifiedId<StructId>> = struct_ids
+        .iter()
+        .map(|id| module_id.qualified(*id))
+        .collect();
+    for reference in &xir.external_types {
+        let address = AccountAddress::from_hex_literal(&reference.address)?;
+        let module_name = ModuleName::new(
+            Address::Numerical(address),
+            env.symbol_pool().make(&reference.module),
+        );
+        let module = env.find_module(&module_name).with_context(|| {
+            format!(
+                "external module `{}::{}` is not loaded",
+                reference.address, reference.module
+            )
+        })?;
+        let struct_env = module
+            .find_struct(env.symbol_pool().make(&reference.name))
+            .with_context(|| {
+                format!(
+                    "external module `{}::{}` has no type `{}`",
+                    reference.address, reference.module, reference.name
+                )
+            })?;
+        refs.push(module.get_id().qualified(struct_env.get_id()));
+    }
+    Ok(refs)
 }
 
 fn translate_function(
@@ -834,6 +952,7 @@ fn translate_function(
     xir: &XirModule,
     module_id: ModuleId,
     struct_ids: &[StructId],
+    struct_refs: &[QualifiedId<StructId>],
     function_ids: &[FunId],
     decl: &FunctionDecl,
     qid: QualifiedId<FunId>,
@@ -844,6 +963,7 @@ fn translate_function(
         xir,
         module_id,
         struct_ids,
+        struct_refs,
         function_ids,
         decl,
         loc: func_env.get_loc(),
@@ -853,7 +973,7 @@ fn translate_function(
         local_types: decl
             .locals
             .iter()
-            .map(|ty| model_type(ty, module_id, struct_ids))
+            .map(|ty| model_type(ty, struct_refs))
             .collect::<Result<Vec<_>>>()?,
         next_attr: 0,
         next_label: decl.blocks.len(),
@@ -912,7 +1032,7 @@ fn translate_function(
     let result_type = Type::tuple(
         decl.returns
             .iter()
-            .map(|ty| model_type(ty, module_id, struct_ids))
+            .map(|ty| model_type(ty, struct_refs))
             .collect::<Result<Vec<_>>>()?,
     );
     let acquires = decl
@@ -979,7 +1099,11 @@ struct FunctionTranslator<'a> {
     env: &'a GlobalEnv,
     xir: &'a XirModule,
     module_id: ModuleId,
+    /// Locally declared structs, for global-storage operations, which Move
+    /// requires to target a type of the acting module.
     struct_ids: &'a [StructId],
+    /// Local and external structs in one index space, for type positions.
+    struct_refs: &'a [QualifiedId<StructId>],
     function_ids: &'a [FunId],
     decl: &'a FunctionDecl,
     loc: Loc,
@@ -1503,14 +1627,12 @@ impl FunctionTranslator<'_> {
                     IntType::U64 => StacklessOperation::CastU64,
                     IntType::U128 => StacklessOperation::CastU128,
                     IntType::U256 => StacklessOperation::CastU256,
-                    IntType::I8
-                    | IntType::I16
-                    | IntType::I32
-                    | IntType::I64
-                    | IntType::I128
-                    | IntType::I256 => {
-                        bail!("signed integer casts are not representable in stackless bytecode")
-                    },
+                    IntType::I8 => StacklessOperation::CastI8,
+                    IntType::I16 => StacklessOperation::CastI16,
+                    IntType::I32 => StacklessOperation::CastI32,
+                    IntType::I64 => StacklessOperation::CastI64,
+                    IntType::I128 => StacklessOperation::CastI128,
+                    IntType::I256 => StacklessOperation::CastI256,
                 }
             },
             Oper::Not => {
@@ -1701,7 +1823,7 @@ impl FunctionTranslator<'_> {
 
     fn type_args(&self, args: &[Ty]) -> Result<Vec<Type>> {
         args.iter()
-            .map(|arg| model_type(arg, self.module_id, self.struct_ids))
+            .map(|arg| model_type(arg, self.struct_refs))
             .collect()
     }
 
@@ -2250,6 +2372,24 @@ fn stackless_constant(constant: &Constant, ty: &Type) -> Result<StacklessConstan
                 Type::Primitive(PrimitiveType::U256) => {
                     StacklessConstant::U256(value.parse::<ethnum::U256>().with_context(parse_err)?)
                 },
+                Type::Primitive(PrimitiveType::I8) => {
+                    StacklessConstant::I8(value.parse().with_context(parse_err)?)
+                },
+                Type::Primitive(PrimitiveType::I16) => {
+                    StacklessConstant::I16(value.parse().with_context(parse_err)?)
+                },
+                Type::Primitive(PrimitiveType::I32) => {
+                    StacklessConstant::I32(value.parse().with_context(parse_err)?)
+                },
+                Type::Primitive(PrimitiveType::I64) => {
+                    StacklessConstant::I64(value.parse().with_context(parse_err)?)
+                },
+                Type::Primitive(PrimitiveType::I128) => {
+                    StacklessConstant::I128(value.parse().with_context(parse_err)?)
+                },
+                Type::Primitive(PrimitiveType::I256) => {
+                    StacklessConstant::I256(value.parse::<ethnum::I256>().with_context(parse_err)?)
+                },
                 other => bail!("integer constant loaded into non-integer type {other:?}"),
             }
         },
@@ -2323,6 +2463,187 @@ mod tests {
             panic!("expected module")
         };
         move_bytecode_verifier::verify_module(&module.module).unwrap();
+    }
+
+    /// A module declaring one struct and, optionally, one bodyless function
+    /// taking a type from `external`.
+    fn v6_module(name: &str, external: Option<(&str, &str)>, with_body: bool) -> XirModule {
+        let external_types = match external {
+            Some((module, ty)) => serde_json::json!([
+                {"address": "0x42", "module": module, "name": ty}
+            ]),
+            None => serde_json::json!([]),
+        };
+        // Local struct is id 0; the external type, when present, is id 1.
+        let (param_ty, blocks) = if external.is_some() {
+            (serde_json::json!({"struct": 1}), with_body)
+        } else {
+            (serde_json::json!({"struct": 0}), with_body)
+        };
+        let body = if blocks {
+            serde_json::json!([{"instrs": [], "term": {"ret": []}}])
+        } else {
+            serde_json::json!([])
+        };
+        serde_json::from_value(serde_json::json!({
+            "schema": move_model_exchange::XIR_SCHEMA,
+            "version": move_model_exchange::XIR_VERSION,
+            "module": {
+                "address": "0x42", "name": name, "dialect": "stackless",
+                "friends": [{"address": "0x42", "module": "buddy"}],
+            },
+            "structs": [{
+                "name": "Local", "visibility": "public",
+                "abilities": ["drop"],
+                "fields": [{"name": "v", "ty": "u64"}],
+            }],
+            "functions": [{
+                "name": "takes", "visibility": "public", "is_entry": false,
+                "is_native": false, "acquires": [], "params": 1,
+                "locals": [param_ty], "returns": [],
+                "blocks": body, "entry": 0, "loops": [],
+                "spec": {"requires": [], "modifies": [], "ensures": [], "aborts_if": []},
+            }],
+            "external_types": external_types,
+        }))
+        .unwrap()
+    }
+
+    fn source_of(module: &XirModule, is_target: bool) -> XirSource {
+        parse_source_with_target(
+            PathBuf::from("test.xir.json"),
+            String::new(),
+            &serde_json::to_string(module).unwrap(),
+            is_target,
+        )
+        .unwrap()
+    }
+
+    /// A type from another module resolves through `external_types` to that
+    /// module's struct, not to a local one.
+    #[test]
+    fn external_types_resolve_to_the_declaring_module() {
+        let provider = source_of(&v6_module("provider", None, true), true);
+        let consumer = source_of(
+            &v6_module("consumer", Some(("provider", "Local")), true),
+            true,
+        );
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        import_sources(&mut env, &[provider, consumer], &mut targets).unwrap();
+
+        let pool = env.symbol_pool();
+        let find = |name: &str| {
+            env.find_module(&ModuleName::new(
+                Address::Numerical(AccountAddress::from_hex_literal("0x42").unwrap()),
+                pool.make(name),
+            ))
+            .unwrap()
+        };
+        let provider_id = find("provider").get_id();
+        let consumer_env = find("consumer");
+        let function = consumer_env
+            .find_function(pool.make("takes"))
+            .expect("consumer has `takes`");
+        let Type::Struct(module_id, _, _) = function.get_parameter_types()[0].clone() else {
+            panic!("expected a struct parameter")
+        };
+        assert_eq!(
+            module_id, provider_id,
+            "the parameter type must resolve to the declaring module"
+        );
+    }
+
+    /// Import ordering accounts for type dependencies, not just calls: the
+    /// consumer is listed first but must be imported after its provider.
+    #[test]
+    fn import_order_respects_external_type_dependencies() {
+        let consumer = source_of(
+            &v6_module("consumer", Some(("provider", "Local")), true),
+            true,
+        );
+        let provider = source_of(&v6_module("provider", None, true), true);
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        import_sources(&mut env, &[consumer, provider], &mut targets).unwrap();
+        assert_eq!(env.get_module_count(), 2);
+    }
+
+    #[test]
+    fn rejects_unresolvable_external_type() {
+        let consumer = source_of(
+            &v6_module("consumer", Some(("missing", "Local")), true),
+            true,
+        );
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        let error = import_sources(&mut env, &[consumer], &mut targets).unwrap_err();
+        assert!(format!("{error:#}").contains("unresolved or cyclic"));
+    }
+
+    /// A dependency contributes declarations only: no bodies are translated,
+    /// so a bodyless interface module is accepted and produces no targets.
+    #[test]
+    fn bodyless_module_imports_as_a_dependency_only() {
+        let dependency = source_of(&v6_module("iface", None, false), false);
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        import_sources(&mut env, &[dependency], &mut targets).unwrap();
+        assert_eq!(env.get_module_count(), 1);
+        assert_eq!(
+            targets.get_funs().count(),
+            0,
+            "a dependency must not enter the target holder"
+        );
+    }
+
+    /// The same module supplied as a compilation target is rejected: a target
+    /// must have code to compile.
+    #[test]
+    fn rejects_bodyless_module_supplied_as_a_target() {
+        let error = parse_source_with_target(
+            PathBuf::from("iface.xir.json"),
+            String::new(),
+            &serde_json::to_string(&v6_module("iface", None, false)).unwrap(),
+            true,
+        )
+        .err()
+        .expect("a bodyless target must be rejected");
+        assert!(format!("{error:#}").contains("has no blocks"));
+    }
+
+    #[test]
+    fn friends_and_struct_visibility_reach_the_model() {
+        let source = source_of(&v6_module("m", None, true), true);
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        import_sources(&mut env, &[source], &mut targets).unwrap();
+        let module = env.get_modules().next().unwrap();
+        let friends = module.get_friend_decls();
+        assert_eq!(friends.len(), 1, "the friend declaration must be recorded");
+        assert_eq!(
+            env.symbol_pool()
+                .string(friends[0].module_name.name())
+                .as_str(),
+            "buddy"
+        );
+        let struct_env = module.get_structs().next().unwrap();
+        assert_eq!(struct_env.get_visibility(), MoveVisibility::Public);
+    }
+
+    fn signed_golden() -> String {
+        fs::read_to_string(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/xir/signed.xir.json"),
+        )
+        .unwrap()
+    }
+
+    /// Signed integers reach verified bytecode: every width in a signature,
+    /// signed arithmetic, a negative `num` constant, and a signed cast.
+    #[test]
+    fn signed_integers_run_production_pipeline() {
+        let module: XirModule = serde_json::from_str(&signed_golden()).unwrap();
+        import_and_verify(module);
     }
 
     #[test]

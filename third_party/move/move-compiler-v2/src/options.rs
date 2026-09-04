@@ -89,6 +89,13 @@ pub struct Options {
     #[clap(skip)]
     pub sources_deps: Vec<String>,
 
+    /// Dependencies supplied as XIR interface documents rather than source or
+    /// bytecode. Each path is a `.xir.json` file whose declarations are
+    /// registered in the model without being compiled — its function bodies,
+    /// if any, are ignored. Unlike `sources_deps` these are never targets.
+    #[clap(skip)]
+    pub xir_dependencies: Vec<String>,
+
     /// Whether to compile everything, including dependencies.
     #[clap(long)]
     pub whole_program: bool,
