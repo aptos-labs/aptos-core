@@ -3,7 +3,11 @@
 // Parts of the file are Copyright (c) Aptos Foundation
 // All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::env::read_bool_env_var;
+use crate::{
+    env::read_bool_env_var,
+    files::{extension_equals, LEAN_EXTENSION, MOVE_ASM_EXTENSION, MOVE_EXTENSION},
+};
+use std::path::{Path, PathBuf};
 
 /// Extension for raw output files
 pub const OUT_EXT: &str = "out";
@@ -12,6 +16,24 @@ pub const EXP_EXT: &str = "exp";
 
 pub fn get_compiler_exp_extension() -> &'static str {
     EXP_EXT
+}
+
+/// Returns the baseline path for `path`, using `suffix` or [`EXP_EXT`].
+///
+/// A recognized source extension is replaced, so `foo.move` becomes `foo.exp`.
+/// Other extensions are preserved, so `foo.decompiled` becomes
+/// `foo.decompiled.exp`.
+pub fn add_exp_suffix(path: &Path, suffix: Option<&str>) -> PathBuf {
+    const SOURCE_EXTENSIONS: &[&str] = &[MOVE_EXTENSION, MOVE_ASM_EXTENSION, LEAN_EXTENSION];
+    let suffix = suffix.unwrap_or(EXP_EXT);
+    if SOURCE_EXTENSIONS
+        .iter()
+        .any(|extension| extension_equals(path, extension))
+    {
+        path.with_extension(suffix)
+    } else {
+        PathBuf::from(format!("{}.{}", path.display(), suffix))
+    }
 }
 
 /// If any of these env vars is set, the test harness should overwrite
