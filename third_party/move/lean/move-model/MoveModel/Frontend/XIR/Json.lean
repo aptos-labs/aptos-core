@@ -526,7 +526,7 @@ def decodeMModule (text : String) : JsonResult MModule := do
     | .ok value => value.getArr?
     | .error _ => pure #[]
   let legacy := Json.mkObj [
-    ("version", nat 10),
+    ("version", nat 11),
     ("structs", .arr structsJson),
     ("funs", .arr functionsJson)
   ]
