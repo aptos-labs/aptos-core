@@ -17,7 +17,7 @@ use aptos_data_streaming_service::{
 use aptos_executor_types::{ChunkCommitNotification, ChunkExecutorTrait};
 use aptos_storage_interface::{
     chunk_to_commit::ChunkToCommit, DbReader, DbReaderWriter, DbWriter, LedgerSummary, Result,
-    StateKind, StateSnapshotReceiver,
+    SnapshotKind, StateKind, StateSnapshotReceiver,
 };
 use aptos_types::{
     epoch_change::EpochChangeProof,
@@ -29,6 +29,7 @@ use aptos_types::{
     },
     state_proof::StateProof,
     state_store::{
+        hot_state::{HotStateValue, HotStateValueChunkWithProof},
         state_key::StateKey,
         state_value::{StateValue, StateValueChunkWithProof},
     },
@@ -291,6 +292,12 @@ mock! {
             kind: StateKind,
         ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, StateValue>>>;
 
+        fn get_hot_state_snapshot_receiver(
+            &self,
+            version: Version,
+            expected_root_hash: HashValue,
+        ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, HotStateValue>>>;
+
         fn finalize_state_snapshot(
             &self,
             version: Version,
@@ -314,18 +321,18 @@ mock! {
         fn is_snapshot_sync_complete(
             &self,
             target_ledger_info: &LedgerInfoWithSignatures,
-            kind: StateKind,
+            kind: SnapshotKind,
         ) -> Result<bool, Error>;
 
         fn get_last_persisted_index(
             &self,
             target_ledger_info: &LedgerInfoWithSignatures,
-            kind: StateKind,
+            kind: SnapshotKind,
         ) -> Result<u64, Error>;
 
         fn previous_snapshot_sync_target(
             &self,
-            kind: StateKind,
+            kind: SnapshotKind,
         ) -> Result<Option<LedgerInfoWithSignatures>, Error>;
 
         fn update_last_persisted_index(
@@ -333,7 +340,7 @@ mock! {
             target_ledger_info: &LedgerInfoWithSignatures,
             last_persisted_index: u64,
             snapshot_sync_completed: bool,
-            kind: StateKind,
+            kind: SnapshotKind,
         ) -> Result<(), Error>;
     }
 
@@ -354,6 +361,18 @@ mock! {
     }
 }
 
+// This automatically creates a MockHotSnapshotReceiver.
+mock! {
+    pub HotSnapshotReceiver {}
+    impl StateSnapshotReceiver<StateKey, HotStateValue> for HotSnapshotReceiver {
+        fn add_chunk(&mut self, chunk: Vec<(StateKey, HotStateValue)>, proof: SparseMerkleRangeProof) -> Result<()>;
+
+        fn finish(self) -> Result<()>;
+
+        fn finish_box(self: Box<Self>) -> Result<()>;
+    }
+}
+
 // This automatically creates a MockStreamingClient.
 mock! {
     pub StreamingClient {}
@@ -363,7 +382,7 @@ mock! {
             &self,
             version: Version,
             start_index: Option<u64>,
-            state_kind: StateKind,
+            snapshot_kind: SnapshotKind,
         ) -> AnyhowResult<DataStreamListener, aptos_data_streaming_service::error::Error>;
 
         async fn get_all_epoch_ending_ledger_infos(
@@ -453,7 +472,7 @@ mock! {
             &mut self,
             target_ledger_info: LedgerInfoWithSignatures,
             expected_root: HashValue,
-            kind: StateKind,
+            kind: SnapshotKind,
         ) -> AnyhowResult<JoinHandle<()>, crate::error::Error>;
 
         fn pending_storage_data(&self) -> bool;
@@ -466,6 +485,12 @@ mock! {
             &mut self,
             notification_id: NotificationId,
             state_value_chunk_with_proof: StateValueChunkWithProof,
+        ) -> AnyhowResult<(), crate::error::Error>;
+
+        async fn save_hot_state_values(
+            &mut self,
+            notification_id: NotificationId,
+            hot_state_value_chunk_with_proof: HotStateValueChunkWithProof,
         ) -> AnyhowResult<(), crate::error::Error>;
 
         async fn finalize_fast_sync(
