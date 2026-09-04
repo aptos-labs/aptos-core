@@ -88,43 +88,48 @@ pub struct VMConfig {
 
 impl Default for VMConfig {
     fn default() -> Self {
-        Self {
-            verifier_config: VerifierConfig::default(),
-            deserializer_config: DeserializerConfig::default(),
-            paranoid_type_checks: false,
-            legacy_check_invariant_in_swap_loc: false,
-            max_value_nest_depth: Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH),
-            layout_max_size: 512,
-            layout_max_depth: 128,
-            type_max_cost: 0,
-            type_base_cost: 0,
-            type_byte_cost: 0,
-            delayed_field_optimization_enabled: false,
-            ty_builder: TypeBuilder::with_limits(128, 20, true, true),
-            enable_function_caches: true,
-            enable_lazy_loading: true,
-            enable_depth_checks: true,
-            optimize_trusted_code: false,
-            paranoid_ref_checks: false,
-            enable_enum_option: true,
-            enable_layout_caches: true,
-            propagate_dependency_limit_error: true,
-            enable_framework_for_option: true,
-            enable_function_caches_for_native_dynamic_dispatch: true,
-            enable_debugging: false,
-            enable_closure_depth_check: true,
-            enable_struct_layout_local_cache: true,
-            check_depth_on_type_counts: true,
-            enable_public_struct_args: true,
-            include_closure_mask_in_cmp: true,
-            revalidate_resolved_closures: true,
-        }
+        Self::DEFAULT
     }
 }
 
 impl VMConfig {
+    /// The default configuration, usable in `const` contexts.
+    pub const DEFAULT: Self = Self {
+        verifier_config: VerifierConfig::DEFAULT,
+        deserializer_config: DeserializerConfig::DEFAULT,
+        paranoid_type_checks: false,
+        legacy_check_invariant_in_swap_loc: false,
+        max_value_nest_depth: Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH),
+        layout_max_size: 512,
+        layout_max_depth: 128,
+        type_max_cost: 0,
+        type_base_cost: 0,
+        type_byte_cost: 0,
+        delayed_field_optimization_enabled: false,
+        ty_builder: TypeBuilder::with_limits(128, 20, true, true),
+        enable_function_caches: true,
+        enable_lazy_loading: true,
+        enable_depth_checks: true,
+        optimize_trusted_code: false,
+        paranoid_ref_checks: false,
+        enable_enum_option: true,
+        enable_layout_caches: true,
+        propagate_dependency_limit_error: true,
+        enable_framework_for_option: true,
+        enable_function_caches_for_native_dynamic_dispatch: true,
+        enable_debugging: false,
+        enable_closure_depth_check: true,
+        enable_struct_layout_local_cache: true,
+        check_depth_on_type_counts: true,
+        enable_public_struct_args: true,
+        include_closure_mask_in_cmp: true,
+        revalidate_resolved_closures: true,
+    };
+}
+
+impl VMConfig {
     /// Set the paranoid reference checks flag.
-    pub fn set_paranoid_ref_checks(self, enable: bool) -> Self {
+    pub const fn set_paranoid_ref_checks(self, enable: bool) -> Self {
         Self {
             paranoid_ref_checks: enable,
             ..self
@@ -132,10 +137,10 @@ impl VMConfig {
     }
 
     /// Default for use in tests.
-    pub fn default_for_test() -> Self {
+    pub const fn default_for_test() -> Self {
         Self {
             enable_debugging: true,
-            ..Self::default()
+            ..Self::DEFAULT
         }
     }
 }
