@@ -44,23 +44,12 @@ module 0xc0ffee::via_call {
 
 
 //# publish
-module 0xc0ffee::rigid {
-    public fun compare(p0: |u64|(u64) has copy + drop + store, p1: |u64|(u64) has drop): bool {
-        p1 == p0
-    }
-}
-
-
-//# publish
 module 0xc0ffee::shapes {
     struct CopyDropStore has copy, drop, store {
         x: u64,
     }
     struct DropStore has drop, store {
         x: u64,
-    }
-    fun differently_declared_neq(p0: |u64|(u64) has copy + drop + store, p1: |u64|(u64) has drop): bool {
-        p1 != p0
     }
     public fun inc(p0: u64): u64 {
         p0 + 1
@@ -70,23 +59,35 @@ module 0xc0ffee::shapes {
     }
     fun main() {
         assert!(same_operand(|x| inc(x)), 0);
-        let _v0: |u64|u64 has copy + drop + store = |x| inc(x);
-        let _v1: |u64|u64 has copy + drop + store = |x| inc2(x);
-        assert!(differently_declared_neq(_v0, _v1), 1);
-        let _v2: |u64|(u64) has drop = |x| lambda__1__main(x);
-        assert!((|x| lambda__2__main(x)) != _v2, 2);
-        let _v3: |u64|(u64) has copy + drop + store = |x| inc(x);
-        let _v4: |u64|(u64) has drop = |x| inc(x);
-        let _v5: |u64|(u64) has drop = |x| inc2(x);
-        let _v6 = &_v3;
-        let _v7 = &_v4;
-        assert!(ref_compare(_v6, _v7), 3);
-        let _v8 = &_v3;
-        let _v9 = &_v5;
-        if (ref_compare(_v8, _v9)) abort 4;
+        let _v0 = DropStore{x: 7};
+        let _v1 = DropStore{x: 7};
+        let _v2: |u64|u64 has drop + store = |x| with_capture(_v0, x);
+        if (widened_neq(_v1, _v2)) abort 1;
+        _v0 = DropStore{x: 8};
+        let _v3 = DropStore{x: 7};
+        let _v4: |u64|u64 has drop + store = |x| with_capture(_v0, x);
+        assert!(widened_neq(_v3, _v4), 6);
+        let _v5: |u64|(u64) has drop = |x| lambda__1__main(x);
+        assert!((|x| lambda__2__main(x)) != _v5, 2);
+        let _v6: |u64|(u64) has copy + drop + store = |x| inc(x);
+        let _v7: |u64|(u64) has drop = |x| inc(x);
+        let _v8: |u64|(u64) has drop = |x| inc2(x);
+        let _v9 = &_v6;
+        let _v10 = &_v7;
+        assert!(ref_compare(_v9, _v10), 3);
+        let _v11 = &_v6;
+        let _v12 = &_v8;
+        if (ref_compare(_v11, _v12)) abort 4;
     }
     fun same_operand(p0: |u64|(u64) has copy + drop): bool {
         p0 == p0
+    }
+    public fun with_capture(p0: DropStore, p1: u64): u64 {
+        let DropStore{x: _v0} = p0;
+        _v0 + p1
+    }
+    fun widened_neq(p0: DropStore, p1: |u64|(u64) has drop): bool {
+        (|x| with_capture(p0, x)) != p1
     }
     fun lambda__1__main(p0: u64): u64 {
         with_capture(DropStore{x: 7}, p0)
@@ -94,12 +95,8 @@ module 0xc0ffee::shapes {
     fun lambda__2__main(p0: u64): u64 {
         with_copy_capture(CopyDropStore{x: 7}, p0)
     }
-    fun ref_compare(p0: &|u64|(u64) has copy + drop + store, p1: &|u64|(u64) has drop): bool {
+    fun ref_compare(p0: &|u64|(u64) has drop, p1: &|u64|(u64) has drop): bool {
         p1 == p0
-    }
-    public fun with_capture(p0: DropStore, p1: u64): u64 {
-        let DropStore{x: _v0} = p0;
-        _v0 + p1
     }
     public fun with_copy_capture(p0: CopyDropStore, p1: u64): u64 {
         *&(&p0).x + p1

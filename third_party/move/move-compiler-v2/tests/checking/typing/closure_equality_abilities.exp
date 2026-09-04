@@ -1,0 +1,49 @@
+
+Diagnostics:
+error: cannot compare `|u64|u64 has copy + drop` with `|u64|u64 has drop`
+  ┌─ tests/checking/typing/closure_equality_abilities.move:6:9
+  │
+6 │         f == g
+  │         ^^^^^^
+  │
+  = function values are compared at identical types, including abilities
+
+error: cannot compare `|u64|u64 has drop` with `|u64|u64 has copy + drop`
+   ┌─ tests/checking/typing/closure_equality_abilities.move:10:9
+   │
+10 │         g == f
+   │         ^^^^^^
+   │
+   = function values are compared at identical types, including abilities
+
+error: cannot compare `|u64|u64 has drop` with `|u64|u64 has copy + drop`
+   ┌─ tests/checking/typing/closure_equality_abilities.move:14:9
+   │
+14 │         g != f
+   │         ^^^^^^
+   │
+   = function values are compared at identical types, including abilities
+
+error: cannot compare `|u64|u64 has copy + drop` with `|u64|u64 has drop + store`
+   ┌─ tests/checking/typing/closure_equality_abilities.move:19:9
+   │
+19 │         f == g
+   │         ^^^^^^
+   │
+   = function values are compared at identical types, including abilities
+
+error: cannot compare `&|u64|u64 has copy + drop` with `&|u64|u64 has drop`
+   ┌─ tests/checking/typing/closure_equality_abilities.move:24:9
+   │
+24 │         f == g
+   │         ^^^^^^
+   │
+   = function values are compared at identical types, including abilities
+
+error: cannot compare `&mut |u64|u64 has copy + drop` with `&mut |u64|u64 has drop`
+   ┌─ tests/checking/typing/closure_equality_abilities.move:28:9
+   │
+28 │         f == g
+   │         ^^^^^^
+   │
+   = function values are compared at identical types, including abilities

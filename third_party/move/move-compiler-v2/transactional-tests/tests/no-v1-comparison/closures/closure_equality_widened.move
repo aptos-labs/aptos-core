@@ -40,13 +40,6 @@ module 0xc0ffee::via_call {
 }
 
 //# publish
-module 0xc0ffee::rigid {
-    public fun compare(f: |u64|u64 has copy + drop + store, g: |u64|u64 has drop): bool {
-        g == f
-    }
-}
-
-//# publish
 module 0xc0ffee::shapes {
     struct DropStore has drop, store { x: u64 }
 
@@ -75,18 +68,21 @@ module 0xc0ffee::shapes {
     }
 
     // `!=` follows a separate generator arm and requires the same normalization.
-    fun differently_declared_neq(f: |u64|u64 has copy + drop + store, g: |u64|u64 has drop): bool {
-        g != f
+    fun widened_neq(d: DropStore, g: |u64|u64 has drop): bool {
+        (|y| with_capture(d, y)) != g
     }
 
-    // Exercises equality joining through immutable references.
-    fun ref_compare(f: &|u64|u64 has copy + drop + store, g: &|u64|u64 has drop): bool {
+    // Exercises equality normalization through immutable references.
+    fun ref_compare(f: &|u64|u64 has drop, g: &|u64|u64 has drop): bool {
         g == f
     }
 
     fun main() {
         assert!(same_operand(inc), 0);
-        assert!(differently_declared_neq(inc, inc2), 1);
+        let same = DropStore { x: 7 };
+        assert!(!widened_neq(DropStore { x: 7 }, |y| with_capture(same, y)), 1);
+        let other = DropStore { x: 8 };
+        assert!(widened_neq(DropStore { x: 7 }, |y| with_capture(other, y)), 6);
 
         // Both operands share a checked type but derive different ability sets.
         let lhs: |u64|u64 has drop = |y| with_capture(DropStore { x: 7 }, y);
