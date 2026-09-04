@@ -2,81 +2,52 @@
 
 //# publish
 module 0xc0ffee::m {
-    public fun inc(p0: u64): u64 {
-        p0 + 1
+    struct DropStore has drop, store {
+        x: u64,
     }
-    public fun inc2(p0: u64): u64 {
-        p0 + 2
+    fun lambda_first(p0: DropStore, p1: |u64|(u64) has drop): bool {
+        (|x| with_capture(p0, x)) == p1
     }
-    fun incomparable(p0: |u64|(u64) has copy + drop, p1: |u64|(u64) has drop + store): bool {
-        p0 == p1
+    public fun with_capture(p0: DropStore, p1: u64): u64 {
+        let DropStore{x: _v0} = p0;
+        _v0 + p1
     }
-    fun incomparable_mut_ref(p0: &mut |u64|(u64) has copy + drop, p1: &mut |u64|(u64) has drop + store): bool {
-        let _v0 = freeze(p0);
-        let _v1 = freeze(p1);
-        _v0 == _v1
+    fun lambda_first_neq(p0: DropStore, p1: |u64|(u64) has drop): bool {
+        (|x| with_capture(p0, x)) != p1
     }
-    fun incomparable_ref(p0: &|u64|(u64) has copy + drop, p1: &|u64|(u64) has drop + store): bool {
-        p0 == p1
+    fun lambda_second(p0: DropStore, p1: |u64|(u64) has drop): bool {
+        let _v0: |u64|(u64) has drop = |x| with_capture(p0, x);
+        p1 == _v0
     }
-    fun incomparable_swapped(p0: |u64|(u64) has copy + drop, p1: |u64|(u64) has drop + store): bool {
-        p1 == p0
+    fun lambda_second_neq(p0: DropStore, p1: |u64|(u64) has drop): bool {
+        let _v0: |u64|(u64) has drop = |x| with_capture(p0, x);
+        p1 != _v0
     }
     fun main() {
-        let _v0: |u64|u64 has copy + drop + store = |x| inc(x);
-        let _v1: |u64|u64 has copy + drop + store = |x| inc(x);
-        assert!(wide_first(_v0, _v1), 0);
-        let _v2: |u64|u64 has copy + drop + store = |x| inc(x);
-        let _v3: |u64|u64 has copy + drop + store = |x| inc(x);
-        assert!(narrow_first(_v2, _v3), 1);
-        let _v4: |u64|u64 has copy + drop + store = |x| inc(x);
-        let _v5: |u64|u64 has copy + drop + store = |x| inc2(x);
-        if (wide_first(_v4, _v5)) abort 2;
-        let _v6: |u64|u64 has copy + drop + store = |x| inc(x);
-        let _v7: |u64|u64 has copy + drop + store = |x| inc2(x);
-        if (narrow_first(_v6, _v7)) abort 3;
-        let _v8: |u64|u64 has copy + drop + store = |x| inc(x);
-        let _v9: |u64|u64 has copy + drop + store = |x| inc(x);
-        if (wide_first_neq(_v8, _v9)) abort 4;
-        let _v10: |u64|u64 has copy + drop + store = |x| inc(x);
-        let _v11: |u64|u64 has copy + drop + store = |x| inc2(x);
-        assert!(wide_first_neq(_v10, _v11), 5);
-        let _v12: |u64|u64 has copy + drop + store = |x| inc(x);
-        let _v13: |u64|u64 has copy + drop + store = |x| inc(x);
-        assert!(incomparable(_v12, _v13), 6);
-        let _v14: |u64|u64 has copy + drop + store = |x| inc(x);
-        let _v15: |u64|u64 has copy + drop + store = |x| inc(x);
-        assert!(incomparable_swapped(_v14, _v15), 7);
-        let _v16: |u64|u64 has copy + drop + store = |x| inc(x);
-        let _v17: |u64|u64 has copy + drop + store = |x| inc2(x);
-        if (incomparable(_v16, _v17)) abort 8;
-        let _v18: |u64|u64 has copy + drop + store = |x| inc(x);
-        let _v19: |u64|u64 has copy + drop + store = |x| inc2(x);
-        if (incomparable_swapped(_v18, _v19)) abort 9;
-        let _v20: |u64|(u64) has copy + drop = |x| inc(x);
-        let _v21: |u64|(u64) has drop + store = |x| inc(x);
-        let _v22: |u64|(u64) has drop + store = |x| inc2(x);
-        let _v23 = &_v20;
-        let _v24 = &_v21;
-        assert!(incomparable_ref(_v23, _v24), 10);
-        let _v25 = &_v20;
-        let _v26 = &_v22;
-        if (incomparable_ref(_v25, _v26)) abort 11;
-        let _v27 = &mut _v20;
-        let _v28 = &mut _v21;
-        assert!(incomparable_mut_ref(_v27, _v28), 12);
-        let _v29 = &mut _v20;
-        let _v30 = &mut _v22;
-        if (incomparable_mut_ref(_v29, _v30)) abort 13;
-    }
-    fun wide_first(p0: |u64|(u64) has copy + drop, p1: |u64|(u64) has drop): bool {
-        p0 == p1
-    }
-    fun narrow_first(p0: |u64|(u64) has copy + drop, p1: |u64|(u64) has drop): bool {
-        p1 == p0
-    }
-    fun wide_first_neq(p0: |u64|(u64) has copy + drop, p1: |u64|(u64) has drop): bool {
-        p0 != p1
+        let _v0 = DropStore{x: 7};
+        let _v1 = DropStore{x: 7};
+        let _v2: |u64|u64 has drop + store = |x| with_capture(_v0, x);
+        assert!(lambda_first(_v1, _v2), 0);
+        _v0 = DropStore{x: 7};
+        let _v3 = DropStore{x: 7};
+        let _v4: |u64|u64 has drop + store = |x| with_capture(_v0, x);
+        assert!(lambda_second(_v3, _v4), 1);
+        _v0 = DropStore{x: 8};
+        let _v5 = DropStore{x: 7};
+        let _v6: |u64|u64 has drop + store = |x| with_capture(_v0, x);
+        if (lambda_first(_v5, _v6)) abort 2;
+        _v0 = DropStore{x: 8};
+        let _v7 = DropStore{x: 7};
+        let _v8: |u64|u64 has drop + store = |x| with_capture(_v0, x);
+        if (lambda_second(_v7, _v8)) abort 3;
+        _v0 = DropStore{x: 7};
+        let _v9 = DropStore{x: 7};
+        let _v10: |u64|u64 has drop + store = |x| with_capture(_v0, x);
+        if (lambda_first_neq(_v9, _v10)) abort 4;
+        _v0 = DropStore{x: 8};
+        let _v11 = DropStore{x: 7};
+        let _v12: |u64|u64 has drop + store = |x| with_capture(_v0, x);
+        assert!(lambda_second_neq(_v11, _v12), 5);
     }
 }
 

@@ -17,19 +17,13 @@ module 0xc0ffee::m {
         (|y| with_capture(d, y)) == g
     }
 
-    // The operands have different declared ability sets.
-    public fun differently_declared(
-        f: |u64|u64 has copy + drop + store,
-        g: |u64|u64 has drop
-    ): bool {
-        g == f
+    // The lambda takes the other operand's type in either operand order.
+    public fun widened_second(d: DropStore, g: |u64|u64 has drop): bool {
+        g == (|y| with_capture(d, y))
     }
 
-    public fun differently_declared_neq(
-        f: |u64|u64 has copy + drop + store,
-        g: |u64|u64 has drop
-    ): bool {
-        g != f
+    public fun widened_neq(d: DropStore, g: |u64|u64 has drop): bool {
+        (|y| with_capture(d, y)) != g
     }
 
     // Both operands share the checked type `|u64|u64 has drop` but derive different abilities,
@@ -45,21 +39,29 @@ module 0xc0ffee::m {
         f == f
     }
 
-    // Exercises equality joining through immutable references.
-    public fun ref_compare(
-        f: &|u64|u64 has copy + drop + store,
-        g: &|u64|u64 has drop
-    ): bool {
-        g == f
+    // Exercises equality normalization through immutable references.
+    public fun ref_compare(d: DropStore, g: &|u64|u64 has drop): bool {
+        let lhs: |u64|u64 has drop = |y| with_capture(d, y);
+        &lhs == g
     }
 
     // Reuses one scratch-local pair across two comparisons with the same join type.
     public fun reuses_scratch(
-        f: |u64|u64 has copy + drop + store,
+        d: DropStore,
+        c: CopyDropStore,
         g: |u64|u64 has drop,
         h: |u64|u64 has drop
     ): bool {
-        (g == f) && (h == f)
+        ((|y| with_capture(d, y)) == g) && ((|y| with_copy_capture(c, y)) == h)
+    }
+
+    public fun inc(y: u64): u64 {
+        y + 1
+    }
+
+    // A function name used as a value takes the other operand's type, like a lambda.
+    public fun named_function(g: |u64|u64 has drop): bool {
+        inc == g
     }
 
     // A non-function comparison bypasses normalization and emits plain `Eq`.
