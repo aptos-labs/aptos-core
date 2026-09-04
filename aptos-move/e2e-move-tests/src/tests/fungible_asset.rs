@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{assert_success, tests::common, BlockSplit, MoveHarness, SUCCESS};
+use crate::{assert_success, run_mono_move, tests::common, BlockSplit, MoveHarness, SUCCESS};
 use aptos_cached_packages::aptos_stdlib::{aptos_account_batch_transfer, aptos_account_transfer};
 use aptos_language_e2e_tests::{
     account::Account,
@@ -35,6 +35,7 @@ pub static OBJ_GROUP_TAG: Lazy<StructTag> = Lazy::new(|| StructTag {
     name: Identifier::new("ObjectGroup").unwrap(),
     type_args: vec![],
 });
+#[run_mono_move]
 #[test]
 fn test_basic_fungible_token() {
     let mut h = MoveHarness::new();
