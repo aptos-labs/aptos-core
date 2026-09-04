@@ -467,3 +467,17 @@ fn fee_related_keys(fee_payer: AccountAddress) -> Vec<StateKey> {
         StateKey::resource_group(&AccountAddress::TEN, &object_group),
     ]
 }
+
+#[test]
+fn mono_move_env_reaches_genesis() {
+    use aptos_transaction_simulation::SimulationStateStore;
+
+    let harness = MoveHarness::new();
+    let features = harness.executor.state_store().get_features().unwrap();
+    assert_eq!(
+        features.is_mono_move_enabled(),
+        aptos_types::on_chain_config::mono_move_env_enabled(),
+        "genesis features disagree with {}",
+        aptos_types::on_chain_config::MONO_MOVE_ENV
+    );
+}
