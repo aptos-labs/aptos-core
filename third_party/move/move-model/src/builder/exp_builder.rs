@@ -5400,17 +5400,22 @@ impl ExpTranslator<'_, '_, '_> {
             // Remember whether this function has variance in function arguments
             let is_inline =
                 matches!(cand, AnyFunEntry::UserFun(f) if f.kind == FunctionKind::Inline);
+            let variance = self.type_variance_if_inline(is_inline);
 
+            if cand.is_equality() {
+                self.bind_equality_operand_join(
+                    variance,
+                    &arg_types[0],
+                    &arg_types[1],
+                    &params[0].1.instantiate(&instantiation),
+                );
+            }
             // Process arguments
             let mut success = true;
             for (i, arg_ty) in arg_types.iter().enumerate() {
                 let instantiated = params[i].1.instantiate(&instantiation);
-                let result = self.unify_types(
-                    self.type_variance_if_inline(is_inline),
-                    WideningOrder::LeftToRight,
-                    arg_ty,
-                    &instantiated,
-                );
+                let result =
+                    self.unify_types(variance, WideningOrder::LeftToRight, arg_ty, &instantiated);
                 if let Err(err) = result {
                     let arg_loc = if i < translated_args.len() {
                         Some(
@@ -5565,6 +5570,48 @@ impl ExpTranslator<'_, '_, '_> {
                 }
                 self.new_error_exp()
             },
+        }
+    }
+
+    /// The shared type parameter of `==` and `!=` is bound to the operand types' join so widening
+    /// does not depend on operand order. For function types, the join intersects their ability sets.
+    /// If joining or binding fails, the substitution is restored and per-operand unification
+    /// reports the mismatch.
+    fn bind_equality_operand_join(
+        &mut self,
+        variance: Variance,
+        lhs_ty: &Type,
+        rhs_ty: &Type,
+        param_ty: &Type,
+    ) {
+        // Function abilities are the only type position at which comparable operands differ.
+        if !lhs_ty.skip_reference().is_function() && !rhs_ty.skip_reference().is_function() {
+            return;
+        }
+        if lhs_ty == rhs_ty {
+            // The join is the operand type itself, which the per-operand unification binds.
+            return;
+        }
+        // Reference operands are compared frozen, so join the frozen types.
+        let freeze = |ty: &Type| match ty {
+            Type::Reference(ReferenceKind::Mutable, inner) => {
+                Type::Reference(ReferenceKind::Immutable, inner.clone())
+            },
+            _ => ty.clone(),
+        };
+        let saved_subs = self.subs.clone();
+        let bound = self
+            .unify_types(
+                variance,
+                WideningOrder::Join,
+                &freeze(lhs_ty),
+                &freeze(rhs_ty),
+            )
+            .and_then(|joined| {
+                self.unify_types(variance, WideningOrder::LeftToRight, &joined, param_ty)
+            });
+        if bound.is_err() {
+            self.subs = saved_subs;
         }
     }
 

@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: value of type `|u64|u64 has copy + store` does not have the `drop` ability
+  ┌─ tests/ability-check/closure_equality_no_drop.move:6:9
+  │
+6 │         f == g
+  │         ^^^^^^ operator drops value here (consider borrowing the argument)
