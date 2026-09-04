@@ -13350,7 +13350,7 @@ dependencies = [
  "itertools 0.13.0",
  "libtest-mimic",
  "move-compiler-v2",
- "move-model",
+ "move-transactional-test-matrix",
  "move-transactional-test-runner",
  "walkdir",
 ]
@@ -13830,6 +13830,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "move-transactional-test-matrix"
+version = "0.1.0"
+dependencies = [
+ "move-bytecode-verifier",
+ "move-command-line-common",
+ "move-compiler-v2",
+ "move-model",
+ "move-vm-runtime",
+ "walkdir",
+]
+
+[[package]]
 name = "move-transactional-test-runner"
 version = "0.1.0"
 dependencies = [
@@ -13999,12 +14011,8 @@ dependencies = [
  "datatest-stable",
  "fail",
  "libtest-mimic",
- "move-bytecode-verifier",
- "move-model",
+ "move-transactional-test-matrix",
  "move-transactional-test-runner",
- "move-vm-runtime",
- "once_cell",
- "walkdir",
 ]
 
 [[package]]

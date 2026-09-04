@@ -4,7 +4,10 @@
 // All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    framework::{merge_output, run_test_impl, CompiledState, MoveTestAdapter},
+    framework::{
+        merge_output, run_test_impl, run_test_impl_with_baseline, BaselineTarget, CompiledState,
+        MoveTestAdapter,
+    },
     tasks::{EmptyCommand, InitCommand, SyntaxChoice, TaskInput},
 };
 use anyhow::{anyhow, bail, Result};
@@ -693,11 +696,14 @@ impl TestRunConfig {
         Self {
             language_version,
             experiments,
+            // `optimize_trusted_code` stays at its `false` default: tests trust
+            // no code, so framework frames are paranoid-checked like any other.
+            // The move-vm suite's matrix entries set it to `true` because that
+            // corpus is where trusted-code skipping itself is tested.
             vm_config: VMConfig {
                 verifier_config: VerifierConfig::production(),
                 paranoid_type_checks: true,
                 enable_enum_option: false,
-                enable_debugging: true,
                 ..VMConfig::default_for_test()
             },
             echo: true,
@@ -770,4 +776,15 @@ pub fn run_test_with_config_and_exp_suffix(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let v2_lib = precompiled_v2_stdlib();
     run_test_impl::<SimpleVMTestAdapter>(config, path, v2_lib, exp_suffix)
+}
+
+/// Runs a test against an explicit [`BaselineTarget`], including its update
+/// policy.
+pub fn run_test_with_config_and_baseline(
+    config: TestRunConfig,
+    path: &Path,
+    baseline: &BaselineTarget,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let v2_lib = precompiled_v2_stdlib();
+    run_test_impl_with_baseline::<SimpleVMTestAdapter>(config, path, v2_lib, baseline)
 }

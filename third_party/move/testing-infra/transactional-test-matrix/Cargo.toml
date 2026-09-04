@@ -1,0 +1,16 @@
+[package]
+name = "move-transactional-test-matrix"
+version = "0.1.0"
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+description = "Shared corpus/config matrix for the Move transactional test suites"
+publish = false
+edition = { workspace = true }
+license = "Apache-2.0"
+
+[dependencies]
+move-bytecode-verifier = { workspace = true }
+move-command-line-common = { workspace = true }
+move-compiler-v2 = { workspace = true }
+move-model = { workspace = true }
+move-vm-runtime = { workspace = true }
+walkdir = { workspace = true }

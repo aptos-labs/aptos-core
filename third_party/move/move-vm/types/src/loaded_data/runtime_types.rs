@@ -1076,7 +1076,7 @@ pub struct TypeBuilder {
 }
 
 impl TypeBuilder {
-    pub fn with_limits(
+    pub const fn with_limits(
         max_ty_size: u64,
         max_ty_depth: u64,
         check_depth_on_type_counts_v2: bool,

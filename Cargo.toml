@@ -258,6 +258,7 @@ members = [
     "third_party/move/move-vm/transactional-tests",
     "third_party/move/move-vm/types",
     "third_party/move/shared-dsa",
+    "third_party/move/testing-infra/transactional-test-matrix",
     "third_party/move/testing-infra/transactional-test-runner",
     "third_party/move/tools/move-abigen",
     "third_party/move/tools/move-asm",
@@ -947,6 +948,7 @@ move-stackless-bytecode = { path = "third_party/move/move-model/bytecode" }
 move-stackless-bytecode-test-utils = { path = "third_party/move/move-model/bytecode-test-utils" }
 move-symbol-pool = { path = "third_party/move/move-symbol-pool" }
 move-table-extension = { path = "third_party/move/extensions/move-table-extension" }
+move-transactional-test-matrix = { path = "third_party/move/testing-infra/transactional-test-matrix" }
 move-transactional-test-runner = { path = "third_party/move/testing-infra/transactional-test-runner" }
 move-unit-test = { path = "third_party/move/tools/move-unit-test", features = [
     "table-extension",
