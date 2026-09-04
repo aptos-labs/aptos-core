@@ -71,7 +71,7 @@ fn test_variant_name() {
 
     let result = verify_module_with_config_for_test_with_version(
         "test_variant_name",
-        &VerifierConfig::production(),
+        &VerifierConfig::production_testing(),
         &cm,
         Some(VERSION_7),
     );
