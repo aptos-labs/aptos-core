@@ -1,0 +1,99 @@
+{
+ "mutants": [
+  {
+   "anchor": {
+    "length": 56,
+    "offset": 1151,
+    "sha256": "931eb5b0676865fc0037cb5f3991fe14f523a07f8070d3c9edc184778e56addb"
+   },
+   "edit": {
+    "at": 18,
+    "kind": "substitute",
+    "length": 38,
+    "to": "backstop_margin_maintenance_divisor"
+   },
+   "essential": true,
+   "file": "sources/etna/extracted_liquidation_price.move",
+   "mutant_id": "LP-price-021-backstop-numerator-uses-divisor",
+   "obligation_category": "normal-result",
+   "rationale": "Backstop branch scales by the wrong config field.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 71,
+    "offset": 1453,
+    "sha256": "e99875fac08d27020937bc87162b99a1c4ca6ada69ffd3124a23c5d4d460c899"
+   },
+   "edit": {
+    "at": 28,
+    "kind": "substitute",
+    "length": 43,
+    "to": ""
+   },
+   "essential": true,
+   "file": "sources/etna/extracted_liquidation_price.move",
+   "mutant_id": "LP-price-021-drops-maintenance-divisor",
+   "obligation_category": "normal-result",
+   "rationale": "Non-backstop denominator loses its divisor entirely.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 18,
+    "offset": 1081,
+    "sha256": "f8af423d6554d7f40476bc17037c835fa36eb8867895c848fbe67845d57353e7"
+   },
+   "edit": {
+    "at": 4,
+    "kind": "substitute",
+    "length": 11,
+    "to": "!is_backstop"
+   },
+   "essential": true,
+   "file": "sources/etna/extracted_liquidation_price.move",
+   "mutant_id": "LP-price-021-branch-inverted",
+   "obligation_category": "normal-result",
+   "rationale": "Each caller gets the other mode's price; a contract must tie the result to the flag.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  }
+ ],
+ "reference_sha256": "06d5dac78cacd835b3e636220fdae66cbeb7fa8f7c6844f9ad48926727ed80cc",
+ "task_id": "LP-price-021"
+}

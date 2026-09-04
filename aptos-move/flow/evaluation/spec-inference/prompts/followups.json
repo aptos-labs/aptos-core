@@ -2,6 +2,7 @@
  "compile_failure": "The package does not compile. Fix these diagnostics and continue:\n{diagnostics}",
  "forbidden_weakening": "The result contains a forbidden verification weakening or out-of-scope runtime edit. Repair the exact locations below without weakening the requested contract, then continue:\n{diagnostics}",
  "incomplete_contract": "The specification is incomplete: the task requires contract categories that it does not yet state. Add the missing clauses for the categories named below, then continue:\n{diagnostics}",
+ "weak_contract": "The specification verifies, but it is too weak: an implementation that violates the intended behaviour still satisfies it, so a caller verified against this contract could not rule that behaviour out. Strengthen it until it does, then continue:\n{diagnostics}",
  "prover_failure": "Verification has not succeeded. Use these diagnostics to correct the specification without weakening it:\n{diagnostics}",
  "prover_timeout": "Verification timed out for {target}. Strengthen or restructure proof support without weakening the contract, then continue.",
  "no_progress": "Use your best judgment from the source, preserve all legal behavior, and continue the requested inference workflow."

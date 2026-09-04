@@ -18,6 +18,7 @@ from unittest.mock import patch
 
 from harness.artifacts import tree_hash
 from harness.config import ExperimentConfig, ResolvedRunSpec, RunSpec
+from harness import controller as controller_module
 from harness.controller import Controller
 
 
@@ -470,3 +471,50 @@ class ApparatusIdentityTest(unittest.TestCase):
     def test_a_round_that_pins_nothing_is_still_allowed(self) -> None:
         # Rounds scheduled before the apparatus was pinned stay runnable.
         self._controller()._validate_apparatus_identity("0" * 64, {"sha256": "0" * 64})
+
+    def _with_stages(self, scheduled: dict, mounted: dict) -> Controller:
+        controller = self._controller(stage_executables=scheduled)
+        controller.config = object()
+        self.enterContext(
+            patch.object(
+                controller_module, "tool_executables", lambda _config: mounted
+            )
+        )
+        return controller
+
+    def test_an_upgraded_solver_stops_the_run(self) -> None:
+        # The solvers are resolved from `BOOGIE_EXE`/`Z3_EXE` at launch rather
+        # than mounted, so a backend replaced between scheduling and execution
+        # leaves the harness and `move-flow` digests both agreeing.
+        controller = self._with_stages(
+            {"boogie": {"sha256": "a" * 64}, "z3": {"sha256": "b" * 64}},
+            {"boogie": {"sha256": "a" * 64}, "z3": {"sha256": "c" * 64}},
+        )
+        with self.assertRaisesRegex(ValueError, r"stage executable\(s\) changed.*z3"):
+            controller._validate_apparatus_identity("0" * 64, {"sha256": "0" * 64})
+
+    def test_a_solver_moved_to_another_path_is_the_same_toolchain(self) -> None:
+        # Compared by digest: relocating a build does not change what it
+        # decides, and failing on the path would refuse a legitimate round.
+        controller = self._with_stages(
+            {"z3": {"path": "/old/z3", "sha256": "b" * 64}},
+            {"z3": {"path": "/new/z3", "sha256": "b" * 64}},
+        )
+        controller._validate_apparatus_identity("0" * 64, {"sha256": "0" * 64})
+
+    def test_a_rewritten_wrapper_stops_the_run(self) -> None:
+        # A stage is a command, not a file: the whole argument vector runs, so
+        # an unchanged interpreter over a rewritten script is a changed stage.
+        controller = self._with_stages(
+            {"prover": {"sha256": "a" * 64, "arguments": {"w.py": "b" * 64}}},
+            {"prover": {"sha256": "a" * 64, "arguments": {"w.py": "c" * 64}}},
+        )
+        with self.assertRaisesRegex(ValueError, r"stage executable\(s\) changed.*prover"):
+            controller._validate_apparatus_identity("0" * 64, {"sha256": "0" * 64})
+
+    def test_a_stage_that_disappeared_stops_the_run(self) -> None:
+        # An absent backend is not an unchanged one; scoring would fall back to
+        # whatever the environment resolves next.
+        controller = self._with_stages({"boogie": {"sha256": "a" * 64}}, {})
+        with self.assertRaisesRegex(ValueError, r"stage executable\(s\) changed.*boogie"):
+            controller._validate_apparatus_identity("0" * 64, {"sha256": "0" * 64})

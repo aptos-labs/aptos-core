@@ -1,0 +1,99 @@
+{
+ "mutants": [
+  {
+   "anchor": {
+    "length": 16,
+    "offset": 798,
+    "sha256": "d17131d688ead62450df8e26e9020c441102ad0c756f07a6c2fe09ba11c4b409"
+   },
+   "edit": {
+    "at": 5,
+    "kind": "substitute",
+    "length": 2,
+    "to": ">"
+   },
+   "essential": true,
+   "file": "sources/etna/extracted_order_validation.move",
+   "mutant_id": "OV-order-006-min-size-strict",
+   "obligation_category": "normal-result",
+   "rationale": "An order exactly at the minimum size is rejected.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 18,
+    "offset": 904,
+    "sha256": "1502d32158535c56b0e028ca4f78960f595dc0045157986514ed426d170ce702"
+   },
+   "edit": {
+    "at": 6,
+    "kind": "substitute",
+    "length": 2,
+    "to": ">"
+   },
+   "essential": true,
+   "file": "sources/etna/extracted_order_validation.move",
+   "mutant_id": "OV-order-006-min-price-strict",
+   "obligation_category": "normal-result",
+   "rationale": "An order exactly at the minimum price is rejected.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 22,
+    "offset": 866,
+    "sha256": "75ff3ba4dbf94fe7852c5165b716b68709ea36944474704f73d913fae56ab8d5"
+   },
+   "edit": {
+    "at": 8,
+    "kind": "substitute",
+    "length": 9,
+    "to": "(tick_size - 1)"
+   },
+   "essential": true,
+   "file": "sources/etna/extracted_order_validation.move",
+   "mutant_id": "OV-order-006-tick-modulus-shifted",
+   "obligation_category": "abort",
+   "rationale": "A tick size of one now divides by zero, changing where the function aborts.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  }
+ ],
+ "reference_sha256": "4f3662f819457a6ebe6a995a9b3bd3bc145f4c8d5af7f7386d5d76b62e92aff4",
+ "task_id": "OV-order-006"
+}

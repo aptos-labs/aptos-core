@@ -90,10 +90,23 @@ cell was scheduled with, and the round's `config.json` is a copy of
 **3. Schedule.** Samples whose `screening_status` is not `ready` are dropped;
 naming one explicitly is an error, not an override.
 
+`--source-commit` must be a commit that will still exist when someone reads the
+results. aptos-core squash-merges onto a linear `main`: landing rewrites the
+message and the parent, so a branch tip becomes a different SHA and is
+unreachable once its branch is deleted -- and a one-commit branch is no
+exception. The scheduler records `source_commit_provenance` in the manifest and
+warns when the commit is on no mainline branch. A pilot may schedule against an
+unlanded commit; **a round whose report is checked in must be scheduled against
+the landed commit**, as the corpus itself is (`provenance.aptos_core.commit`).
+
+The content hashes are unaffected either way -- they hash the tree, not git --
+so a round scheduled before landing still verifies afterwards. What a
+non-durable commit costs is the ability to *fetch* the apparatus later.
+
 ```text
 move-inference-pilot \
   --corpus-manifest corpus-v3/manifest.json \
-  --mutants-root corpus-v3/mutants \
+  --mutants-root corpus-v3/mutants-scoring \
   --plugins ROUND/plugins.json \
   --output-dir ROUND/schedule \
   --source-commit COMMIT \
@@ -105,6 +118,19 @@ move-inference-pilot \
 `--mutants-root` turns on strict scoring and requires a manifest per scheduled
 task, so a round cannot fall back to core scoring in silence.
 
+It takes the **held-out** set, `corpus-v3/mutants-scoring`. The other set,
+`corpus-v3/mutants`, is what refutation shows the agent, and it is passed at
+launch instead:
+
+```text
+move-inference-run-pilot ... --refutation-mutants-root $PWD/corpus-v3/mutants
+```
+
+Scoring an arm on the set it was shown would score it on what it was told, so
+the controller refuses a run whose two roots resolve equal. Omit the refutation
+root to run without the mechanism; omit `--mutants-root` and the round cannot
+report strict success at all.
+
 A round may run a subset. Which subset is a corpus decision, made from the
 corpus's own description of each task -- never from an arm's behaviour --
 by `corpus-v3/select_round.py`, and recorded both as `round_selection` on every
@@ -114,6 +140,36 @@ stay in the corpus for a later round. Schedule the recorded selection with:
 ```text
 --tasks $(python3 -c "import json;print(' '.join(json.load(open('corpus-v3/metadata/selection.json'))['selected']))")
 ```
+
+### What to measure
+
+Success saturates. Across `pilot-qp-skill1` and `pilot-loop-001`, 24 consecutive
+cells reached both operational and strict success -- every arm, every replicate,
+on both a canonical target and an extracted one. A round scored only on success
+would report that all three arms work and separate nothing.
+
+Cost does not saturate. In `pilot-loop-001` the arms differ in output tokens
+while being indistinguishable in outcome:
+
+| arm | mean output tokens (n=6) | CV | vs `agent_only` |
+|---|---:|---:|---:|
+| `agent_only` | 35,692 | 60% | 1.00x |
+| `hybrid_guided` | 27,409 | 36% | 0.77x |
+| `hybrid_flexible` | 33,119 | 52% | 0.93x |
+
+The spread matters as much as the mean: a prescribed workflow bounds the tail
+(CV 36% against 60%), which is what to expect if its value is preventing
+flailing rather than accelerating success. The effect is also target-specific
+and reverses -- `hybrid_guided` costs 0.61x on `QP-part-025` and 1.06x on
+`TR-cancel-026` -- so report per task before pooling.
+
+Two consequences for round size. None of these gaps is significant at three
+replicates: with CVs of 30-60%, detecting a 25% difference in mean tokens at
+80% power needs roughly **8-10 replicates per task-arm cell**, not 3. And what
+predicts cost best is not the arm but whether the contract needs auxiliary spec
+functions: `QP-part-025` needs recursive `sweep`/`partitioned` helpers and costs
+2-3x `TR-cancel-026`, which admits a direct quantified characterization with
+none.
 
 **4. Preflight, execute, audit.** Real sessions run only inside the sandbox.
 

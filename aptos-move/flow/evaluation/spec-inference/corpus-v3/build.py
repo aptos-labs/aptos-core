@@ -286,9 +286,14 @@ TRADING_HEADER = """// Copied from this repository's own `aptos-experimental` tr
 // Extracted rather than depended upon because the origin declares friends this
 // package does not have. Both bodies are copied unchanged.
 //
-// Two different loop shapes: an adjacent-pair scan with an early return, and a
-// bounded search that stops at the first non-crossing level. Neither result is
+// Three loop shapes: an adjacent-pair scan with an early return, a bounded
+// search that stops at the first non-crossing level, and a linear search that
+// deletes from two coupled vectors at the found index. None of the results is
 // a fold, so a `folds_of` invariant does not apply -- each needs a prefix fact.
+//
+// `cancel_at_price_level` upstream reaches its two vectors through the bulk
+// order; here they are parameters, which is what makes the coupling explicit
+// rather than a structural invariant of a type this package does not have.
 module aptos_experimental::extracted_bulk_order_utils {
     use std::option::Option;
 """
@@ -306,7 +311,34 @@ def build_trading(_etna: Path) -> str:
         r"^\s*fun discard_price_crossing_levels\b",
     ):
         parts.append(block(text, pattern))
+    parts.append(_lift_cancel_at_price_level(text))
     return "\n\n".join(parts) + "\n}\n"
+
+
+def _lift_cancel_at_price_level(text: str) -> str:
+    """`cancel_at_price_level` with the two price-level vectors lifted out.
+
+    Upstream takes the bulk order and reaches `prices` and `sizes` through it,
+    so the two vectors are the same length by construction of a type this
+    package does not vendor. Passing them separately keeps the body identical
+    while making that coupling a proof obligation rather than an assumption --
+    which is the point of the target: nothing here says `sizes` is as long as
+    `prices`, and the read at `sizes[i]` aborts when it is not.
+    """
+    body = block(text, r"^\s*public\(friend\) fun cancel_at_price_level\b")
+    body = body.replace(
+        "    public(friend) fun cancel_at_price_level<M: store + copy + drop>(\n"
+        "        order: &mut BulkOrder<M>, price: u64, is_bid: bool\n"
+        "    ): u64 {\n"
+        "        let (prices, sizes) =\n"
+        "            order.get_order_request_mut().get_prices_and_sizes_mut(is_bid);\n",
+        "    fun cancel_at_price_level(\n"
+        "        prices: &mut vector<u64>, sizes: &mut vector<u64>, price: u64\n"
+        "    ): u64 {\n",
+    )
+    if "BulkOrder" in body or "get_prices_and_sizes_mut" in body:
+        raise SystemExit("cancel_at_price_level extraction did not apply cleanly")
+    return body
 
 
 

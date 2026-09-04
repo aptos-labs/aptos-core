@@ -91,7 +91,7 @@
       }
     }
   ],
-  "reference_sha256": "86522f532e90892efd17654893cff9d8b23c9e33520262f6ca3c740fd0be7cfa",
+  "reference_sha256": "bad2e7e95e052ec0d7f340bc8073e7dffb7099e6f80bccf3a94e07f773c95fe1",
   "schema_version": 1,
   "task_id": "TF-taker-017"
 }

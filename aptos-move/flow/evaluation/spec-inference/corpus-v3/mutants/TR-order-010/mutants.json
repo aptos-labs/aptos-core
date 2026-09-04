@@ -3,7 +3,7 @@
     {
       "anchor": {
         "length": 33,
-        "offset": 1006,
+        "offset": 1314,
         "sha256": "53e78fe951e5ea4cb82c31b3627454ba96ba4fdc445a4f97a69f2005bcc9f2c0"
       },
       "edit": {
@@ -33,7 +33,7 @@
     {
       "anchor": {
         "length": 33,
-        "offset": 1130,
+        "offset": 1438,
         "sha256": "d07681efcd12cfadcd07fd437db47d87d9d63b8855fb561cc30afdeb895820d6"
       },
       "edit": {
@@ -63,7 +63,7 @@
     {
       "anchor": {
         "length": 97,
-        "offset": 818,
+        "offset": 1126,
         "sha256": "01e76e9629c25ed3f88ee37969184628736b322ca75ae46e83f7117f469b38d2"
       },
       "edit": {
@@ -91,7 +91,7 @@
       }
     }
   ],
-  "reference_sha256": "9453849e4188123b2b49a27f5be676ddb1344a24c7a6758b2013d4421f673c06",
+  "reference_sha256": "f8f88b4b2ed1aaa7eac9b05c932174dab1955311fe121b9cdf32b0deb0e62ada",
   "schema_version": 2,
   "task_id": "TR-order-010"
 }

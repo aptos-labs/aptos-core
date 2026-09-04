@@ -35,6 +35,7 @@ class ConversationPolicyTest(unittest.TestCase):
             "compile_failure",
             "forbidden_weakening",
             "incomplete_contract",
+            "weak_contract",
             "prover_failure",
             "prover_timeout",
             "no_progress",
@@ -57,6 +58,16 @@ class ConversationPolicyTest(unittest.TestCase):
         second = self.policy.decide(result("forbidden_weakening"), "target", 1)
         self.assertEqual("continue", first.action)
         self.assertEqual("repeated_forbidden_weakening", second.terminal_status)
+
+    def test_a_weak_contract_continues_rather_than_stopping(self) -> None:
+        # A verifying contract that a refutation survives is an ordinary repair
+        # loop: the agent has to strengthen it, not undo a policy breach.
+        first = self.policy.decide(result("weak_contract"), "target", 0)
+        second = self.policy.decide(result("weak_contract"), "target", 1)
+        self.assertEqual("continue", first.action)
+        self.assertEqual("continue", second.action)
+        self.assertIsNone(second.terminal_status)
+        self.assertIn("too weak", second.prompt)
 
     def test_a_repeatedly_incomplete_contract_is_not_a_repeated_breach(self) -> None:
         # An incomplete contract is an ordinary repair loop: the author has to

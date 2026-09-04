@@ -91,7 +91,7 @@
       }
     }
   ],
-  "reference_sha256": "e712137c491fd17ef0868accb4c927b0041b4ae38ac633f6d4f00d7ee3334045",
+  "reference_sha256": "06d5dac78cacd835b3e636220fdae66cbeb7fa8f7c6844f9ad48926727ed80cc",
   "schema_version": 1,
   "task_id": "LP-price-021"
 }

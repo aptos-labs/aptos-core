@@ -1,0 +1,99 @@
+{
+ "mutants": [
+  {
+   "anchor": {
+    "length": 26,
+    "offset": 4288,
+    "sha256": "ccbeb652559c2f88a907636cff678bb0a68475eb578afb75bc1e4822b87ee64e"
+   },
+   "edit": {
+    "at": 19,
+    "kind": "substitute",
+    "length": 4,
+    "to": "> 0"
+   },
+   "essential": true,
+   "file": "sources/etna/vault_share_math.move",
+   "mutant_id": "VS-contrib-003-first-contribution-test-inverted",
+   "obligation_category": "normal-result",
+   "rationale": "The bootstrap path is taken for established vaults and vice versa.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 25,
+    "offset": 5403,
+    "sha256": "049fee5fc747ec68d86428ffd33bb2b87e4d1b762bebbcf46a2be84fc6153927"
+   },
+   "edit": {
+    "at": 23,
+    "kind": "substitute",
+    "length": 1,
+    "to": "1"
+   },
+   "essential": true,
+   "file": "sources/etna/vault_share_math.move",
+   "mutant_id": "VS-contrib-003-reduction-shares-one",
+   "obligation_category": "normal-result",
+   "rationale": "The second tuple element is one when no fee reduction applies.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 26,
+    "offset": 4288,
+    "sha256": "ccbeb652559c2f88a907636cff678bb0a68475eb578afb75bc1e4822b87ee64e"
+   },
+   "edit": {
+    "at": 4,
+    "kind": "substitute",
+    "length": 14,
+    "to": "current_nav"
+   },
+   "essential": true,
+   "file": "sources/etna/vault_share_math.move",
+   "mutant_id": "VS-contrib-003-bootstrap-test-uses-nav",
+   "obligation_category": "normal-result",
+   "rationale": "The bootstrap test reads NAV, so a share-less vault with a NAV returns zero shares instead of the contributed assets.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  }
+ ],
+ "reference_sha256": "4a10ea8eab2a1d9e0d931032a59ef200a844258108fde81ff4fe86308e3d5b33",
+ "task_id": "VS-contrib-003"
+}

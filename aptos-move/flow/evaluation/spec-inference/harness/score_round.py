@@ -15,13 +15,67 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from .artifacts import sha256_file, write_json
+from .artifacts import canonical_json, load_object, sha256_file, tree_hash, write_json
+from .compatibility import changed_stages, tool_executables
 from .config import ExperimentConfig
-from .mutants import NO_MUTANTS, score_mutants
+from .mutants import NO_MUTANTS, overlapping_mutations, score_mutants
+
+
+def _require_scoring_apparatus_agrees(
+    config: ExperimentConfig, record: dict[str, Any], run_id: str
+) -> None:
+    """Refuse to measure a run with an apparatus it did not run under.
+
+    A run refuses to execute against an apparatus it did not schedule. Scoring
+    is the other half of that claim and was not making it: `strict_success` is
+    decided here, by a compile and a prover invoked from the live
+    configuration, and a solver or a stage command replaced since the round ran
+    would produce a number attributed to the scheduled apparatus and measured
+    by a different one.
+
+    A record that pins nothing is left alone, as the controller leaves one:
+    rounds scheduled before the apparatus was pinned stay scorable. What must
+    not pass is a record that pins something and disagrees.
+    """
+    expected_config = record.get("config_sha256")
+    if expected_config is not None:
+        actual_config = hashlib.sha256(canonical_json(asdict(config))).hexdigest()
+        if actual_config != expected_config:
+            raise ValueError(
+                f"run {run_id} ran under experiment configuration "
+                f"{expected_config} but scoring was given {actual_config}: a "
+                "strict-success result must be measured by the apparatus that "
+                "produced the run"
+            )
+    # The scoring code is part of the apparatus, not a neutral observer of it:
+    # how a mutation is applied, when a result counts as killed, and what
+    # `strict_success` requires all live in this tree. A run pins the harness it
+    # ran under for the same reason, and scoring reads the same pin.
+    expected_harness = record.get("controller_harness_sha256")
+    if expected_harness is not None:
+        actual_harness = tree_hash(Path(__file__).resolve().parent)
+        if actual_harness != expected_harness:
+            raise ValueError(
+                f"harness changed since run {run_id} was recorded: expected "
+                f"{expected_harness}, scoring with {actual_harness}; how a "
+                "mutation is applied and classified is part of what a "
+                "strict-success result claims"
+            )
+    expected_stages = record.get("stage_executables")
+    if expected_stages:
+        changed = changed_stages(expected_stages, tool_executables(config))
+        if changed:
+            raise ValueError(
+                f"stage executable(s) changed since run {run_id} was recorded "
+                f"({', '.join(changed)}): a verdict from one toolchain cannot "
+                "be scored as a result from another"
+            )
 
 
 async def score_round(
@@ -56,6 +110,7 @@ async def score_round(
         # records one for every run. Reporting the judge state as the terminal
         # status made a compile failure, a timeout and an exhausted budget
         # indistinguishable in the round's own scoring record.
+        _require_scoring_apparatus_agrees(config, record, run_id)
         result = record.get("result") or {}
         judge = result.get("eventual_judge") or {}
         status = judge.get("state")
@@ -93,6 +148,33 @@ async def score_round(
                     )
                 entry["scheduled_mutant_manifest_sha256"] = mutant_digest
                 entry["scored_mutant_manifest_sha256"] = scored_digest
+                # The scheduler proved the refutation set disjoint from the
+                # *scheduled* scoring set. Replacing that set replaces one side
+                # of the comparison, so the guarantee does not carry over: a
+                # corrected manifest that happens to contain a mutation this
+                # run was shown would credit "the contract is complete" for
+                # what was really "the agent can act on feedback". Same
+                # relation, re-checked against the set actually being scored.
+                shown = record.get("refutation_mutant_identities")
+                if shown is None:
+                    raise ValueError(
+                        f"run {run_id} records no refutation identities, so a "
+                        f"corrected mutant set for {task_id} cannot be shown "
+                        "disjoint from what the run was shown; rerun the round "
+                        "with a current controller build"
+                    )
+                repeated = overlapping_mutations(
+                    load_object(manifest)["mutants"],
+                    set(shown),
+                    artifact / "baseline" / record["package_relpath"],
+                )
+                if repeated:
+                    raise ValueError(
+                        f"corrected mutant set for {task_id} repeats mutation(s) "
+                        f"run {run_id} was shown during refutation "
+                        f"({', '.join(repeated)}): a contract repaired against a "
+                        "mutant it was shown cannot then be measured by it"
+                    )
             # A run that cannot be scored is recorded as such rather than
             # aborting the round: one candidate whose own proof does not
             # reproduce at this timeout says nothing about the other cells, and
@@ -179,9 +261,20 @@ async def _score_pending(
                 entry["detail"] = f"{type(error).__name__}: {error}"
             else:
                 write_json(candidate.parent / "mutation-score.json", score)
-                entry["outcome"] = "scored"
                 entry["mutation_adequacy"] = score["mutation_adequacy"]
-                entry["strict_success"] = score["killed"] == score["essential_mutants"]
+                # A mutant that reached no verdict is not a mutant the contract
+                # failed to kill. Scoring it as one reports an infrastructure
+                # failure as evidence against the specification, so the run is
+                # marked unmeasured rather than unsuccessful.
+                if score.get("inconclusive"):
+                    entry["outcome"] = "inconclusive"
+                    entry["inconclusive"] = score["inconclusive"]
+                    entry["strict_success"] = False
+                else:
+                    entry["outcome"] = "scored"
+                    entry["strict_success"] = (
+                        score["killed"] == score["essential_mutants"]
+                    )
 
     await asyncio.gather(*(score_one(*item) for item in pending))
 

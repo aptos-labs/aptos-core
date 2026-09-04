@@ -24,7 +24,7 @@ from typing import Any
 from .artifacts import tree_hash, write_json
 from .config import ExperimentConfig
 from .judge import render_command, run_command
-from .mutants import run_mutant_cases
+from .mutants import reached_a_verdict, run_mutant_cases
 
 
 async def validate_mutants(
@@ -102,7 +102,17 @@ async def validate_mutants(
     # the strict scores. The authoritative comparator is the one the judge
     # uses, rather than a second implementation of the same question.
     await _require_reference_implementation(
-        config, reference, baseline, target, Path(scratch), timeout_seconds
+        config,
+        reference,
+        baseline,
+        target,
+        Path(scratch),
+        timeout_seconds,
+        # The checker requires at least one category, and the mutants name the
+        # ones this reference has to cover: each probes an obligation the
+        # contract must state to kill it. Only `implementation.equal` is read
+        # from the verdict, but the categories have to be honest anyway.
+        sorted({case["obligation_category"] for case in cases if case.get("obligation_category")}),
     )
     results = await run_mutant_cases(
         config, reference, baseline, target, cases, timeout_seconds
@@ -116,7 +126,16 @@ async def validate_mutants(
         validated["compiles"] = result["outcome"] != "compile_failure"
         validated["killed_by_reference"] = result["killed"]
         validated["outcome"] = result["outcome"]
+        # `killed` and `survived` are verdicts about the mutant; a timeout,
+        # a compile failure or a prover crash is not. Recording an unmeasured
+        # mutant as non-essential drops it from the scoring set silently, and a
+        # weak contract then reaches strict success by killing what is left.
         case["essential"] = result["killed"]
+        # Written every time, not only when true: `_approved` refuses a case
+        # carrying this flag, so a run that only ever set it would leave the
+        # mutant permanently unscorable and make the recovery this tool names
+        # -- re-running validation -- impossible.
+        validated["inconclusive"] = not reached_a_verdict(result)
     # The whole reference tree, not its `Move.toml`: every reference package is
     # a copy of the same corpus package with one module swapped, so hashing the
     # manifest file gives every reference the same digest and identifies
@@ -125,7 +144,13 @@ async def validate_mutants(
     manifest["reference_sha256"] = tree_hash(reference)
     write_json(mutant_manifest, manifest)
     killed = sum(1 for case in cases if case["essential"])
+    inconclusive = [
+        case["mutant_id"]
+        for case in cases
+        if case.get("validated", {}).get("inconclusive")
+    ]
     return {
+        "inconclusive": inconclusive,
         "schema_version": 1,
         "target": target,
         "manifest": str(mutant_manifest),
@@ -168,10 +193,16 @@ def main() -> None:
         )
     )
     print(json.dumps({k: v for k, v in summary.items() if k != "results"}, sort_keys=True))
-
-
-if __name__ == "__main__":
-    main()
+    if summary["inconclusive"]:
+        # Exit non-zero rather than leaving a quietly smaller scoring set: the
+        # manifest is written either way, so the evidence is kept and the run
+        # can be repeated against the same reference.
+        raise SystemExit(
+            "no verdict for "
+            + ", ".join(summary["inconclusive"])
+            + "; their essentiality is unestablished and they would be dropped "
+            "from scoring. Re-run once the prover can reach a verdict."
+        )
 
 
 async def _require_reference_implementation(
@@ -181,6 +212,7 @@ async def _require_reference_implementation(
     target: str,
     scratch: Path,
     timeout_seconds: int,
+    required_contract_categories: list[str],
 ) -> None:
     """Refuse a reference whose executable code differs from the baseline."""
     check_config = scratch / "reference-implementation.json"
@@ -192,8 +224,11 @@ async def _require_reference_implementation(
             "baseline": str(baseline),
             "package": str(reference),
             "target": target,
-            "allowed_edit_paths": [],
-            "required_contract_categories": [],
+            # The reference adds specification to the target's own source file.
+            # `implementation.equal` is what enforces that nothing executable
+            # changed; this only has to admit the file it writes to.
+            "allowed_edit_paths": ["sources/**/*.move"],
+            "required_contract_categories": required_contract_categories,
             "timeout_seconds": timeout_seconds,
             "enforce_edit_policy": True,
         },
@@ -224,3 +259,7 @@ async def _require_reference_implementation(
             "reference implementation differs from the baseline, so it cannot "
             f"certify which mutants are essential: {changed or 'see verdict'}"
         )
+
+
+if __name__ == "__main__":
+    main()

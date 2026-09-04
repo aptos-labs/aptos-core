@@ -1,0 +1,99 @@
+{
+ "mutants": [
+  {
+   "anchor": {
+    "length": 14,
+    "offset": 841,
+    "sha256": "c3f926fc7b9e6a926e527726d4db228d4a1bfb63ccb64bc1a7480acc56f35fde"
+   },
+   "edit": {
+    "at": 12,
+    "kind": "substitute",
+    "length": 1,
+    "to": "1"
+   },
+   "essential": true,
+   "file": "sources/etna/lomuto_partition.move",
+   "mutant_id": "QP-part-025-store-starts-at-one",
+   "obligation_category": "normal-result",
+   "rationale": "The store cursor starts past the front, so the returned index and layout are both wrong.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 31,
+    "offset": 737,
+    "sha256": "99a92b98989a639f3fb09ddc31df9d1e54f2885f43b5f65822a66979d65ee107"
+   },
+   "edit": {
+    "at": 26,
+    "kind": "substitute",
+    "length": 4,
+    "to": ""
+   },
+   "essential": true,
+   "file": "sources/etna/lomuto_partition.move",
+   "mutant_id": "QP-part-025-last-index-off-by-one",
+   "obligation_category": "abort",
+   "rationale": "Treating the length as the last index indexes out of bounds.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 25,
+    "offset": 1056,
+    "sha256": "3ed6137dc9a5cf0b994e9ffd64cff0c6d5e52b1ad4b968967120a9f466f4aff3"
+   },
+   "edit": {
+    "at": 19,
+    "kind": "substitute",
+    "length": 4,
+    "to": "pivot"
+   },
+   "essential": true,
+   "file": "sources/etna/lomuto_partition.move",
+   "mutant_id": "QP-part-025-final-swap-uses-pivot",
+   "obligation_category": "normal-result",
+   "rationale": "The closing swap targets the original pivot slot instead of the parked one.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  }
+ ],
+ "reference_sha256": "3c0a44e84831419beb7cb323b05603098e5c3db7592780447461e1feeca85652",
+ "task_id": "QP-part-025"
+}

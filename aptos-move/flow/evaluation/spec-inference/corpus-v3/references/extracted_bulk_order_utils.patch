@@ -1,17 +1,22 @@
 --- a/sources/trading/extracted_bulk_order_utils.move
 +++ b/sources/trading/extracted_bulk_order_utils.move
-@@ -32,0 +33,6 @@ module aptos_experimental::extracted_bulk_order_utils {
+@@ -37,0 +38,6 @@
 +        } spec {
 +            invariant len(prices) > 0;
 +            invariant i <= len(prices) - 1;
 +            invariant forall j: u64 where j < i:
 +                if (is_descending) { prices[j] > prices[j + 1] }
 +                else { prices[j] < prices[j + 1] };
-@@ -51,0 +58,3 @@ module aptos_experimental::extracted_bulk_order_utils {
+@@ -56,0 +63,3 @@
 +            } spec {
 +                invariant i <= len(prices);
 +                invariant forall j: u64 where j < i: !stops_at(prices, best_price, is_bid, j);
-@@ -55,0 +65,41 @@ module aptos_experimental::extracted_bulk_order_utils {
+@@ -74,0 +84,3 @@
++        } spec {
++            invariant i <= len(prices);
++            invariant forall j: num where 0 <= j && j < i: prices[j] != price;
+@@ -76,0 +89,81 @@
++    }
 +
 +    spec module {
 +        /// The strict adjacent ordering the scan checks. A pair is compared in
@@ -28,6 +33,16 @@
 +            prices: vector<u64>, best: u64, is_bid: bool, j: num
 +        ): bool {
 +            if (is_bid) { prices[j] < best } else { prices[j] > best }
++        }
++
++        /// Whether any level carries `price`.
++        fun has_price(prices: vector<u64>, price: u64): bool {
++            exists j in 0..len(prices): prices[j] == price
++        }
++
++        /// The least index carrying `price`. Only meaningful when one does.
++        fun first_index(prices: vector<u64>, price: u64): num {
++            choose min j in 0..len(prices) where prices[j] == price
 +        }
 +    }
 +
@@ -53,3 +68,32 @@
 +                        stops_at(prices, std::option::spec_borrow(best_price), is_bid, result))
 +        );
 +    }
++
++    spec cancel_at_price_level {
++        pragma opaque;
++        // Nothing in this body says `sizes` is as long as `prices`. Upstream
++        // both come from the bulk order and are built together; passed
++        // separately, the read at the found level can be out of range.
++        aborts_if [inferred] has_price(prices, price)
++            && first_index(prices, price) >= len(sizes);
++
++        // No match: both vectors keep their contents and the result is zero --
++        // which a genuine zero-size level also returns, so absence cannot be
++        // read out of the result alone.
++        ensures [inferred] !has_price(old(prices), price) ==> (
++            result == 0 && prices == old(prices) && sizes == old(sizes)
++        );
++
++        // A match at the least such index: both vectors lose exactly that
++        // index and nothing else moves.
++        ensures [inferred] has_price(old(prices), price) ==> (
++            result == old(sizes)[first_index(old(prices), price)]
++                && len(prices) == len(old(prices)) - 1
++                && len(sizes) == len(old(sizes)) - 1
++                && (forall j: num where 0 <= j && j < first_index(old(prices), price):
++                        prices[j] == old(prices)[j] && sizes[j] == old(sizes)[j])
++                && (forall j: num where first_index(old(prices), price) <= j && j < len(prices):
++                        prices[j] == old(prices)[j + 1])
++                && (forall j: num where first_index(old(prices), price) <= j && j < len(sizes):
++                        sizes[j] == old(sizes)[j + 1])
++        );

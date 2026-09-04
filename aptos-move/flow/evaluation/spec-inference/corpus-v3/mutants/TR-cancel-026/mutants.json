@@ -1,0 +1,99 @@
+{
+ "mutants": [
+  {
+   "anchor": {
+    "length": 66,
+    "offset": 2542,
+    "sha256": "934667b78a8edc18afc96313c0609970f86a542a50348a9bb356034bf5939743"
+   },
+   "edit": {
+    "at": 33,
+    "kind": "substitute",
+    "length": 33,
+    "to": ""
+   },
+   "essential": true,
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "mutant_id": "TR-cancel-026-price-removed-alone",
+   "obligation_category": "normal-result",
+   "rationale": "Only the price level is removed, so the two vectors fall out of step and every later size belongs to the wrong price.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 30,
+    "offset": 2511,
+    "sha256": "62714f4986eaf747f638f95c50bcbfb76532261eb1bca47b6309633876295301"
+   },
+   "edit": {
+    "at": 21,
+    "kind": "substitute",
+    "length": 8,
+    "to": "prices[i]"
+   },
+   "essential": true,
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "mutant_id": "TR-cancel-026-returns-the-price",
+   "obligation_category": "normal-result",
+   "rationale": "Returns the price of the cancelled level rather than its size.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  },
+  {
+   "anchor": {
+    "length": 67,
+    "offset": 2375,
+    "sha256": "080aacb8b05755a3f96e42e36a1a6e83d2b3a605ca9570d077b2075dd909eb18"
+   },
+   "edit": {
+    "at": 7,
+    "kind": "substitute",
+    "length": 19,
+    "to": "i <= prices.length()"
+   },
+   "essential": true,
+   "file": "sources/trading/extracted_bulk_order_utils.move",
+   "mutant_id": "TR-cancel-026-scans-past-end",
+   "obligation_category": "abort",
+   "rationale": "One iteration too many indexes past the end when no level matches.",
+   "reviews": [
+    {
+     "approved": true,
+     "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+     "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+    }
+   ],
+   "validated": {
+    "applies": true,
+    "compiles": true,
+    "killed_by_reference": true,
+    "outcome": "killed"
+   }
+  }
+ ],
+ "reference_sha256": "f8f88b4b2ed1aaa7eac9b05c932174dab1955311fe121b9cdf32b0deb0e62ada",
+ "task_id": "TR-cancel-026"
+}
