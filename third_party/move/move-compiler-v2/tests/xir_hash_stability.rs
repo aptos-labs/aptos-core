@@ -14,21 +14,23 @@
 //! a stale build, which is the failure this digest exists to prevent.
 
 use move_compiler_v2::{run_checker, xir_export, xir_hash, Options};
-use move_model::metadata::{CompilerVersion, LanguageVersion};
-use std::{collections::BTreeMap, fs, path::Path};
+use move_model::{
+    metadata::{CompilerVersion, LanguageVersion},
+    model::GlobalEnv,
+};
+use std::{collections::BTreeMap, fs};
 
-/// Compiles `sources` (name → text) in a fresh directory under `prefix` and
-/// returns each target module's interface hash, keyed by module name.
-fn hashes_of(prefix: &str, sources: &BTreeMap<&str, &str>) -> BTreeMap<String, String> {
+/// Compiles `sources` (name → text) in a fresh directory under `prefix`,
+/// asserting the build is clean.
+///
+/// The directory is dropped on return, which is safe: `run_checker` has already
+/// copied each file's text into the `GlobalEnv`, so diagnostics still render.
+fn checked_env(prefix: &str, sources: &BTreeMap<&str, &str>) -> GlobalEnv {
     let dir = tempfile::Builder::new().prefix(prefix).tempdir().unwrap();
-    hashes_in(dir.path(), sources)
-}
-
-fn hashes_in(dir: &Path, sources: &BTreeMap<&str, &str>) -> BTreeMap<String, String> {
     let paths = sources
         .iter()
         .map(|(name, text)| {
-            let path = dir.join(name);
+            let path = dir.path().join(name);
             fs::write(&path, text).unwrap();
             path.to_string_lossy().into_owned()
         })
@@ -52,7 +54,12 @@ fn hashes_in(dir: &Path, sources: &BTreeMap<&str, &str>) -> BTreeMap<String, Str
         "compiling failed:\n{}",
         String::from_utf8_lossy(&diagnostics.into_inner())
     );
+    env
+}
 
+/// Each target module's interface hash, keyed by module name.
+fn hashes_of(prefix: &str, sources: &BTreeMap<&str, &str>) -> BTreeMap<String, String> {
+    let env = checked_env(prefix, sources);
     env.get_modules()
         .filter(|module| module.is_primary_target())
         .map(|module| {
@@ -183,24 +190,7 @@ fn source_declaration_order_does_not_reach_the_export() {
 
 /// The exported interface of `0xcafe::lib`, as JSON, before canonicalization.
 fn raw_export(prefix: &str, sources: &BTreeMap<&str, &str>) -> String {
-    let dir = tempfile::Builder::new().prefix(prefix).tempdir().unwrap();
-    let paths = sources
-        .iter()
-        .map(|(name, text)| {
-            let path = dir.path().join(name);
-            fs::write(&path, text).unwrap();
-            path.to_string_lossy().into_owned()
-        })
-        .collect::<Vec<_>>();
-    let env = run_checker(Options {
-        sources: paths,
-        language_version: Some(LanguageVersion::latest_stable()),
-        compiler_version: Some(CompilerVersion::latest_stable()),
-        skip_attribute_checks: true,
-        ..Options::default()
-    })
-    .unwrap();
-    assert!(!env.has_errors());
+    let env = checked_env(prefix, sources);
     let module = env
         .get_modules()
         .find(|module| module.get_full_name_str() == "0xcafe::lib")
@@ -246,6 +236,32 @@ fn implementation_changes_do_not_move_the_hash() {
             "changing {label} moved the interface hash"
         );
     }
+}
+
+/// Changing *which* function a public function calls moves the hash.
+///
+/// The call graph is interface: a dependent follows it transitively to decide
+/// things like whether a public function can reach `0x1::randomness`. If a new
+/// callee left the hash alone, a cached dependent would keep the verdict it
+/// reached against the old one.
+#[test]
+fn a_changed_callee_moves_the_hash() {
+    let baseline_hashes = hashes_of("xir-hash-callee-base", &baseline());
+
+    // `peek` calls `lib::internal`; point it at `lib::scale`. Both are already
+    // callable from `other`, and `peek`'s own signature is untouched, so the
+    // call edge is the only thing that differs.
+    let edited = OTHER.replace("0xcafe::lib::internal()", "0xcafe::lib::scale(1)");
+    let edited_hashes = hashes_of(
+        "xir-hash-callee-edit",
+        &BTreeMap::from([("lib.move", LIB), ("other.move", edited.as_str())]),
+    );
+
+    assert_ne!(
+        baseline_hashes.get("0xcafe::other"),
+        edited_hashes.get("0xcafe::other"),
+        "changing a public function's callee must move the interface hash"
+    );
 }
 
 /// Editing the API does move it.

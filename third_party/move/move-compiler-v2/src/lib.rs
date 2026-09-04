@@ -17,6 +17,8 @@ pub mod pipeline;
 pub mod plan_builder;
 pub mod xir;
 pub mod xir_export;
+pub mod xir_hash;
+pub mod xir_interface_generator;
 
 use crate::{
     diagnostics::Emitter,
@@ -149,6 +151,29 @@ where
     if !leaner_elaboration.modules.is_empty() {
         let mut xir_targets = FunctionTargetsHolder::default();
         leaner::import_sources(&mut env, &leaner_elaboration.modules, &mut xir_targets)?;
+        // `env_check_and_transform_pipeline` ran before this import, so its
+        // *declaration* checks never saw these modules — only its AST
+        // transforms are genuinely inapplicable to already-stackless XIR.
+        // Move targets passed it and are clean, so this adds no duplicates.
+        //
+        // Every declaration check that reads struct or function declarations
+        // is reapplied below. The rest read `get_def()`, the AST, which XIR
+        // has none of, so running them here would report nothing:
+        // `check_cyclic_instantiations` and the two access checks are AST-only
+        // — `xir::import_sources` carries a stackless access check instead —
+        // and the pattern and match-coverage checks describe a surface syntax
+        // XIR cannot express, since it carries variant *operations* rather
+        // than patterns.
+        if options.experiment_on(Experiment::NATIVE_CHECK) {
+            native_checker::check_for_native_functions_and_structs(&mut env);
+        }
+        if options.experiment_on(Experiment::RECURSIVE_TYPE_CHECK) {
+            recursive_struct_checker::check_recursive_struct(&env);
+        }
+        if options.experiment_on(Experiment::UNUSED_STRUCT_PARAMS_CHECK) {
+            unused_params_checker::unused_params_checker(&env);
+        }
+        check_errors(&env, emitter, "Leaner declaration checks failed")?;
         run_stackless_bytecode_pipeline(
             &env,
             stackless_bytecode_check_pipeline(&options),
@@ -314,6 +339,16 @@ pub fn run_move_compiler_to_model(mut options: Options) -> anyhow::Result<Global
 /// fails not on context checking errors, but possibly on i/o errors.
 pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
     info!("type checking");
+    // XIR dependencies are lowered to Move source and joined to the ordinary
+    // dependencies: name resolution runs off parsed source, so an interface
+    // has to reach the front end that way. `generated` owns the directory and
+    // may be dropped once the model builder has read the files, which it has
+    // by the time it returns — the text is copied into the env.
+    let generated =
+        xir_interface_generator::generate_dependency_sources(&options.xir_dependencies)?;
+    let mut dependencies = options.dependencies.clone();
+    dependencies.extend(generated.paths.iter().cloned());
+
     // Run the model builder, which performs context checking.
     let addrs = move_model::parse_addresses_from_options(options.named_address_mapping.clone())?;
     let mut env = move_model::run_model_builder_in_compiler_mode(
@@ -326,7 +361,7 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
             address_map: addrs.clone(),
         },
         vec![PackageInfo {
-            sources: options.dependencies.clone(),
+            sources: dependencies,
             address_map: addrs.clone(),
         }],
         options.skip_attribute_checks,
@@ -349,6 +384,18 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
         env.treat_everything_as_target(true);
     }
     env.set_verify_mode(options.compile_verify_code);
+    // The generated source declares interface functions `native`, so their
+    // callees have to be restored from the interfaces themselves — after
+    // re-adding any interface the model pruned, since an edge can only resolve
+    // to a module that is present.
+    let mut interface_targets = FunctionTargetsHolder::default();
+    xir::import_absent_interfaces(&mut env, &generated.sources, &mut interface_targets)?;
+    let interfaces = generated
+        .sources
+        .iter()
+        .map(|source| source.module().clone())
+        .collect::<Vec<_>>();
+    xir::apply_interface_call_graphs(&mut env, &interfaces)?;
     // Store options in env, for later access
     env.set_extension(options);
     Ok(env)

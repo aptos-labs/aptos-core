@@ -21,8 +21,8 @@ use move_core_types::{
 use move_model::{
     ast::{Address, Attribute, AttributeValue, FriendDecl, ModuleName, Value},
     model::{
-        FieldData, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId, StructId,
-        TypeParameter, TypeParameterKind,
+        FieldData, FunId, FunctionEnv, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter,
+        QualifiedId, StructId, TypeParameter, TypeParameterKind,
     },
     ty::{PrimitiveType, ReferenceKind, Type},
     xir_loader::{
@@ -58,8 +58,29 @@ pub struct XirSource {
     is_target: bool,
 }
 
+impl XirSource {
+    /// The validated module this source parsed to.
+    pub fn module(&self) -> &XirModule {
+        &self.module
+    }
+}
+
+/// Parses XIR to be *compiled*: every non-native function must have a body.
 pub fn parse_source(path: PathBuf, text: String, json: &str) -> Result<XirSource> {
     parse_source_with_target(path, text, json, true)
+}
+
+/// Parses XIR that describes a *dependency* rather than a compilation target,
+/// which is what [`crate::xir_export::export_interface`] produces: signatures,
+/// types and attributes, with function bodies omitted.
+///
+/// Takes no source text, and so does not check source-map spans. An interface
+/// is consumed for its declarations; any spans in it index a text this caller
+/// does not hold, which makes them unusable rather than invalid. Checking them
+/// against the empty string would reject every non-zero span — that is, every
+/// source map a producer such as Lean emits for a non-native function.
+pub fn parse_interface(path: PathBuf, json: &str) -> Result<XirSource> {
+    parse_xir(path, String::new(), json, false, /*check_spans*/ false)
 }
 
 pub(crate) fn parse_source_with_target(
@@ -68,10 +89,22 @@ pub(crate) fn parse_source_with_target(
     json: &str,
     is_target: bool,
 ) -> Result<XirSource> {
+    parse_xir(path, text, json, is_target, /*check_spans*/ true)
+}
+
+fn parse_xir(
+    path: PathBuf,
+    text: String,
+    json: &str,
+    is_target: bool,
+    check_spans: bool,
+) -> Result<XirSource> {
     let module: XirModule = serde_json::from_str(json)
         .with_context(|| format!("invalid XIR from `{}`", path.display()))?;
     validate(&module, is_target)?;
-    validate_source_maps(&module, &text)?;
+    if check_spans {
+        validate_source_maps(&module, &text)?;
+    }
     Ok(XirSource {
         path,
         text,
@@ -151,9 +184,20 @@ fn validate(module: &XirModule, is_target: bool) -> Result<()> {
     AccountAddress::from_hex_literal(&module.module.address)
         .with_context(|| format!("invalid module address `{}`", module.module.address))?;
     valid_identifier("module", &module.module.name)?;
+    for friend in &module.friends {
+        AccountAddress::from_hex_literal(&friend.address)
+            .with_context(|| format!("invalid friend address `{}`", friend.address))?;
+        valid_identifier("friend module", &friend.module)?;
+    }
     let mut struct_names = BTreeSet::new();
     for decl in &module.structs {
         valid_identifier("struct", &decl.name)?;
+        decl.abilities.iter().try_for_each(|a| valid_ability(a))?;
+        decl.attributes.iter().try_for_each(valid_attribute)?;
+        for param in &decl.type_parameters {
+            valid_identifier("type parameter", &param.name)?;
+            param.abilities.iter().try_for_each(|a| valid_ability(a))?;
+        }
         ensure!(
             struct_names.insert(&decl.name),
             "duplicate struct `{}`",
@@ -161,7 +205,7 @@ fn validate(module: &XirModule, is_target: bool) -> Result<()> {
         );
         let mut field_names = BTreeSet::new();
         for field in &decl.fields {
-            valid_identifier("field", &field.name)?;
+            valid_field_name(&field.name)?;
             ensure!(
                 field_names.insert(&field.name),
                 "duplicate field `{}` in struct `{}`",
@@ -176,7 +220,9 @@ fn validate(module: &XirModule, is_target: bool) -> Result<()> {
         }
         if let Some(variants) = &decl.variants {
             for variant in variants {
+                valid_identifier("variant", &variant.name)?;
                 for field in &variant.fields {
+                    valid_field_name(&field.name)?;
                     validate_type_parameters(
                         &field.ty,
                         decl.type_parameters.len(),
@@ -189,6 +235,11 @@ fn validate(module: &XirModule, is_target: bool) -> Result<()> {
     let mut function_names = BTreeSet::new();
     for decl in &module.functions {
         valid_identifier("function", &decl.name)?;
+        decl.attributes.iter().try_for_each(valid_attribute)?;
+        for param in &decl.type_parameters {
+            valid_identifier("type parameter", &param.name)?;
+            param.abilities.iter().try_for_each(|a| valid_ability(a))?;
+        }
         ensure!(
             function_names.insert(&decl.name),
             "duplicate function `{}`",
@@ -231,11 +282,8 @@ fn validate(module: &XirModule, is_target: bool) -> Result<()> {
             decl.locals.len()
         );
         for name in decl.local_names.iter().flatten() {
-            ensure!(
-                !name.is_empty(),
-                "function `{}` has an empty local name",
-                decl.name
-            );
+            valid_identifier("local", name)
+                .with_context(|| format!("in function `{}`", decl.name))?;
         }
         for ty in decl.locals.iter().chain(&decl.returns) {
             validate_type_parameters(
@@ -291,9 +339,10 @@ fn validate_type_parameters(ty: &Ty, count: usize, owner: &str) -> Result<()> {
         Ty::Vector(element) | Ty::Ref(element) | Ty::MutRef(element) => {
             validate_type_parameters(element, count, owner)?;
         },
-        Ty::Fun(args, result, _) => {
-            validate_type_parameters(args, count, owner)?;
-            validate_type_parameters(result, count, owner)?;
+        Ty::Fun(args, results, _) => {
+            for ty in args.iter().chain(results) {
+                validate_type_parameters(ty, count, owner)?;
+            }
         },
         Ty::Bool
         | Ty::U8
@@ -345,10 +394,104 @@ fn validate_operation_type_parameters(
     Ok(())
 }
 
+/// A field name is an identifier, or a decimal index for a field of a
+/// positional struct — `struct Homomorphism<phantom P>(|&Statement<P>| Rep)`,
+/// whose one field `move-model` names `0`. Consumers address fields by their
+/// offset, so the name is documentation, but keeping the model's spelling
+/// makes the round trip exact.
+fn valid_field_name(name: &str) -> Result<()> {
+    if !name.is_empty() && name.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Ok(());
+    }
+    valid_identifier("field", name)
+}
+
+/// Every name below is rendered into generated Move source by
+/// [`crate::xir_interface_generator`], so each must be a *single token* in the
+/// position it lands in.
+///
+/// This is not hygiene. A local name of `x: u64, y` is one string, and the
+/// count still matches `locals`, so the document is consistent by every other
+/// rule here — but it renders as two parameters, and a dependent then compiles
+/// against a signature neither the document nor the real module declares.
 fn valid_identifier(kind: &str, name: &str) -> Result<()> {
     Identifier::new(name)
         .map(|_| ())
         .with_context(|| format!("invalid {kind} identifier `{name}`"))
+}
+
+/// An ability is written into a `has` clause and a type parameter constraint,
+/// so it is checked against the closed set rather than as an identifier.
+fn valid_ability(name: &str) -> Result<()> {
+    ensure!(
+        matches!(name, "copy" | "drop" | "store" | "key"),
+        "invalid ability `{name}`"
+    );
+    Ok(())
+}
+
+/// A dotted or `::`-qualified path, as attributes use — `lint.skip`,
+/// `aptos_framework::object::ObjectGroup`. Every segment must be an
+/// identifier, or an address where one is allowed.
+fn valid_name_path(kind: &str, path: &str) -> Result<()> {
+    for segment in path.split("::").flat_map(|part| part.split('.')) {
+        if AccountAddress::from_hex_literal(segment).is_ok() {
+            continue;
+        }
+        valid_identifier(kind, segment)?;
+    }
+    Ok(())
+}
+
+fn valid_attribute(attribute: &XirAttribute) -> Result<()> {
+    valid_name_path("attribute", &attribute.name)?;
+    attribute.args.iter().try_for_each(valid_attribute_arg)
+}
+
+fn valid_attribute_arg(arg: &XirAttributeArg) -> Result<()> {
+    match arg {
+        XirAttributeArg::Name { name, args } => {
+            valid_name_path("attribute argument", name)?;
+            args.iter().try_for_each(valid_attribute_arg)?;
+        },
+        XirAttributeArg::Assign { assign, value } => {
+            valid_identifier("attribute argument", assign)?;
+            valid_attribute_arg(value)?;
+        },
+        // Rendered verbatim, so a value carrying punctuation would escape the
+        // argument list the same way a name would.
+        XirAttributeArg::Num { value } => ensure!(
+            !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()),
+            "invalid numeric attribute argument `{value}`"
+        ),
+        XirAttributeArg::Bool { .. } => {},
+    }
+    Ok(())
+}
+
+/// Registers the declarations of interfaces the model does not already have.
+///
+/// An interface reaches the front end as generated Move source, and the model
+/// keeps a dependency module only when something references it. Functions are
+/// rendered `native`, so a module reached only by a *call* is named nowhere in
+/// that text and is dropped — taking the call-graph edges into it with it.
+///
+/// Re-adding those modules declaration-only keeps
+/// [`apply_interface_call_graphs`] able to resolve every edge. Modules the
+/// model kept are skipped, so this never competes with the parsed source.
+pub fn import_absent_interfaces(
+    env: &mut GlobalEnv,
+    sources: &[XirSource],
+    targets: &mut FunctionTargetsHolder,
+) -> Result<()> {
+    let absent = sources
+        .iter()
+        .filter(|source| {
+            let module = &source.module().module;
+            interface_module_id(env, &module.address, &module.name).is_none()
+        })
+        .collect::<Vec<_>>();
+    import_source_refs(env, &absent, targets)
 }
 
 pub fn import_sources(
@@ -356,10 +499,19 @@ pub fn import_sources(
     sources: &[XirSource],
     targets: &mut FunctionTargetsHolder,
 ) -> Result<()> {
+    import_source_refs(env, &sources.iter().collect::<Vec<_>>(), targets)
+}
+
+fn import_source_refs(
+    env: &mut GlobalEnv,
+    sources: &[&XirSource],
+    targets: &mut FunctionTargetsHolder,
+) -> Result<()> {
     if sources.is_empty() {
         return Ok(());
     }
     let mut imported = vec![false; sources.len()];
+    let mut imported_ids = Vec::with_capacity(sources.len());
     let mut imported_count = 0;
     while imported_count < sources.len() {
         let ready = sources.iter().enumerate().find_map(|(index, source)| {
@@ -375,14 +527,80 @@ pub fn import_sources(
                 .join(", ");
             bail!("unresolved or cyclic XIR module dependencies: {blocked}")
         };
-        let source = &sources[index];
-        import_source(env, source, targets)
+        let source = sources[index];
+        let module_id = import_source(env, source, targets)
             .with_context(|| format!("loading XIR from `{}`", source.path.display()))?;
+        imported_ids.push(module_id);
         imported[index] = true;
         imported_count += 1;
     }
+    // Friend grants are resolved only now, because a friend is usually a
+    // dependent: it calls the granting module, so the sort above must load the
+    // grantor first, leaving the friend unresolvable at that point. See
+    // `GlobalEnv::resolve_xir_friend_declarations`.
+    env.resolve_xir_friend_declarations(&imported_ids);
+    // Only now, for the same reason: a friend grant resolved just above can be
+    // what makes a call legal, and calls are resolved during the loop.
+    check_call_visibility(env, &imported_ids)?;
     env.set_function_size_estimates(targets.compute_function_size_estimates());
     Ok(())
+}
+
+/// Rejects calls a module is not allowed to make.
+///
+/// Only modules being compiled are checked. An interface's recorded calls are
+/// call-graph metadata for analyses rather than emitted code, and describe
+/// reachability that legitimately passes through functions the interface itself
+/// does not offer.
+fn check_call_visibility(env: &GlobalEnv, modules: &[ModuleId]) -> Result<()> {
+    for module_id in modules {
+        let module = env.get_module(*module_id);
+        if !module.is_primary_target() {
+            continue;
+        }
+        for caller in module.get_functions() {
+            let Some(callees) = caller.get_called_functions() else {
+                continue;
+            };
+            for callee in callees {
+                check_callee_is_visible(*module_id, &env.get_function(*callee)).with_context(
+                    || format!("called from `{}`", caller.get_full_name_with_address()),
+                )?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Rejects a cross-module call the caller is not allowed to make.
+///
+/// Resolution is not permission: `function_at` answers whether a name resolves,
+/// and the source path asks the separate question in `function_checker` by
+/// walking the AST — which stackless XIR does not have. The rule mirrors
+/// `dependencies::verify_module`, which would otherwise reject the call as
+/// `LOOKUP_FAILED` once the module is published.
+fn check_callee_is_visible(caller: ModuleId, callee: &FunctionEnv) -> Result<()> {
+    if callee.module_env.get_id() == caller {
+        return Ok(());
+    }
+    let name = callee.get_full_name_with_address();
+    let owner = callee.module_env.get_full_name_str();
+    match callee.visibility() {
+        MoveVisibility::Public => Ok(()),
+        MoveVisibility::Private => bail!("function `{name}` is private to module `{owner}`"),
+        // `public(package)` is friend visibility plus generated friend
+        // declarations, so both reach here and both are satisfied by one.
+        MoveVisibility::Friend if callee.module_env.has_friend(&caller) => Ok(()),
+        MoveVisibility::Friend => bail!(
+            "{} function `{name}` cannot be called from a module that `{owner}` \
+             does not declare as a friend",
+            if callee.has_package_visibility() {
+                "package"
+            } else {
+                "friend"
+            }
+        ),
+    }
 }
 
 /// Whether every module this one references — for calls *and* for types — is
@@ -490,6 +708,15 @@ fn model_attribute_apply(
                     XirAttributeArg::Name { name, args } => {
                         model_attribute_apply(env, loc, name, args)
                     },
+                    XirAttributeArg::Assign { assign, value } => {
+                        let symbol = env.symbol_pool().make(assign);
+                        let value = model_attribute_value(env, loc, assign, value)?;
+                        Ok(Attribute::Assign(
+                            env.new_node(loc.clone(), Type::Tuple(vec![])),
+                            symbol,
+                            value,
+                        ))
+                    },
                     XirAttributeArg::Num { .. } | XirAttributeArg::Bool { .. } => {
                         bail!("attribute `{name}` has an unnamed literal argument")
                     },
@@ -499,11 +726,60 @@ fn model_attribute_apply(
     }
 }
 
+/// Translates the right-hand side of an attribute assignment. Inverse of
+/// `xir_export::export_attribute_value`: a name path is split at its last
+/// `::` back into an optional module qualifier and a symbol.
+fn model_attribute_value(
+    env: &mut GlobalEnv,
+    loc: &Loc,
+    name: &str,
+    value: &XirAttributeArg,
+) -> Result<AttributeValue> {
+    let node_id = env.new_node(loc.clone(), Type::Tuple(vec![]));
+    match value {
+        XirAttributeArg::Num { value } => Ok(AttributeValue::Value(
+            node_id,
+            Value::Number(value.parse()?),
+        )),
+        XirAttributeArg::Bool { value } => Ok(AttributeValue::Value(node_id, Value::Bool(*value))),
+        XirAttributeArg::Name { name: path, args } => {
+            ensure!(
+                args.is_empty(),
+                "attribute `{name}` is assigned `{path}`, which cannot take arguments"
+            );
+            let (module_name, symbol) = match path.rfind("::") {
+                Some(split) => {
+                    let (module_path, symbol) = (&path[..split], &path[split + 2..]);
+                    let split = module_path.rfind("::").with_context(|| {
+                        format!(
+                            "attribute `{name}` is assigned `{path}`, which is not a \
+                                 module-qualified name"
+                        )
+                    })?;
+                    let address = AccountAddress::from_hex_literal(&module_path[..split])
+                        .with_context(|| format!("invalid address in attribute value `{path}`"))?;
+                    let module_name = ModuleName::new(
+                        Address::Numerical(address),
+                        env.symbol_pool().make(&module_path[split + 2..]),
+                    );
+                    (Some(module_name), symbol)
+                },
+                None => (None, path.as_str()),
+            };
+            let symbol = env.symbol_pool().make(symbol);
+            Ok(AttributeValue::Name(node_id, module_name, symbol))
+        },
+        XirAttributeArg::Assign { assign, .. } => {
+            bail!("attribute `{name}` is assigned the assignment `{assign}`, which has no meaning")
+        },
+    }
+}
+
 fn import_source(
     env: &mut GlobalEnv,
     source: &XirSource,
     targets: &mut FunctionTargetsHolder,
-) -> Result<()> {
+) -> Result<ModuleId> {
     let xir = &source.module;
     let address = AccountAddress::from_hex_literal(&xir.module.address)?;
     let module_symbol = env.symbol_pool().make(&xir.module.name);
@@ -590,6 +866,11 @@ fn import_source(
             fields,
             variants,
             visibility: move_visibility(&decl.visibility),
+            attributes: decl
+                .attributes
+                .iter()
+                .map(|attribute| model_attribute(env, &loc, attribute))
+                .collect::<Result<Vec<_>>>()?,
         });
     }
 
@@ -658,7 +939,6 @@ fn import_source(
     // is absent from this compilation, so resolve the id where possible and
     // keep the name either way.
     let friends = xir
-        .module
         .friends
         .iter()
         .map(|reference| {
@@ -716,7 +996,7 @@ fn import_source(
         targets.insert_target_data(&qid, FunctionVariant::Baseline, data);
     }
     add_transitive_callee_targets(env, module_id, targets);
-    Ok(())
+    Ok(module_id)
 }
 
 /// XIR is imported after the ordinary Move stackless-bytecode generation pass.
@@ -818,6 +1098,18 @@ fn move_visibility(visibility: &XirVisibility) -> MoveVisibility {
     }
 }
 
+/// Translates the argument or result position of a function type, which XIR
+/// spells as a list and `move_model` as a bare type at arity one and a `Tuple`
+/// otherwise. Inverse of `xir_export::export_type_list`.
+fn model_type_list(types: &[Ty], scope: &StructScope) -> Result<Type> {
+    Ok(Type::tuple(
+        types
+            .iter()
+            .map(|ty| model_type(ty, scope))
+            .collect::<Result<Vec<_>>>()?,
+    ))
+}
+
 fn model_type(ty: &Ty, scope: &StructScope) -> Result<Type> {
     Ok(match ty {
         Ty::Bool => Type::Primitive(PrimitiveType::Bool),
@@ -870,11 +1162,12 @@ fn model_type(ty: &Ty, scope: &StructScope) -> Result<Type> {
                     .collect::<Result<Vec<_>>>()?,
             )
         },
-        // Kept from this branch: upstream's `model_type` has no function-type
-        // arm, so taking its side wholesale would drop `Type::Fun` support.
-        Ty::Fun(args, result, abilities) => Type::Fun(
-            Box::new(model_type(args, scope)?),
-            Box::new(model_type(result, scope)?),
+        // Upstream's `model_type` has no function-type arm; this one is from
+        // the branch. Argument and result are *lists* in XIR and a bare type
+        // or `Tuple` in the model, which `model_type_list` reconciles.
+        Ty::Fun(args, results, abilities) => Type::Fun(
+            Box::new(model_type_list(args, scope)?),
+            Box::new(model_type_list(results, scope)?),
             parse_ability_set(abilities).context("on a function type")?,
         ),
         Ty::Vector(element) => Type::Vector(Box::new(model_type(element, scope)?)),
@@ -927,6 +1220,98 @@ fn function_at(
     Ok(module.get_id().qualified(function.get_id()))
 }
 
+/// Records interface functions' callees in the model.
+///
+/// An interface reaches the front end as generated source declaring every
+/// function `native`, so no calls are derived from it. Analyses that walk the
+/// call graph across a dependency — Aptos rejects a public function that can
+/// reach `0x1::randomness` that way — would otherwise stop at the boundary.
+pub fn apply_interface_call_graphs(env: &mut GlobalEnv, modules: &[XirModule]) -> Result<()> {
+    for xir in modules {
+        let Some(module_id) = interface_module_id(env, &xir.module.address, &xir.module.name)
+        else {
+            continue;
+        };
+        for decl in &xir.functions {
+            if decl.calls.is_empty() {
+                continue;
+            }
+            let fun_id = interface_fun_id(env, module_id, &decl.name).with_context(|| {
+                format!("`{}` is missing from the generated interface", decl.name)
+            })?;
+            let callees = decl
+                .calls
+                .iter()
+                .map(|id| interface_callee(env, xir, module_id, *id))
+                .collect::<Result<BTreeSet<_>>>()
+                .with_context(|| format!("resolving the callees of `{}`", decl.name))?;
+            env.set_called_functions(module_id.qualified(fun_id), callees);
+        }
+    }
+    Ok(())
+}
+
+fn interface_module_id(env: &GlobalEnv, address: &str, module: &str) -> Option<ModuleId> {
+    let address = AccountAddress::from_hex_literal(address).ok()?;
+    let name = ModuleName::new(Address::Numerical(address), env.symbol_pool().make(module));
+    Some(env.find_module(&name)?.get_id())
+}
+
+fn interface_fun_id(env: &GlobalEnv, module_id: ModuleId, name: &str) -> Option<FunId> {
+    env.get_module(module_id)
+        .find_function(env.symbol_pool().make(name))
+        .map(|fun| fun.get_id())
+}
+
+/// Resolves a call id under the local-then-`external_functions` convention.
+///
+/// Every recorded edge must resolve. Dropping one is not neutral: analyses
+/// follow this graph to decide things like whether a public function can reach
+/// `0x1::randomness`, and the *deployed* dependency still makes the call
+/// whatever this build happens to have loaded. A missing edge therefore yields
+/// a weaker answer than the source build gives, silently.
+///
+/// An absent callee module means the build does not contain the closure this
+/// interface names — the package system supplies it via transitive
+/// dependencies — so it is reported rather than skipped.
+fn interface_callee(
+    env: &GlobalEnv,
+    xir: &XirModule,
+    module_id: ModuleId,
+    id: usize,
+) -> Result<QualifiedId<FunId>> {
+    let (owner, name) = match xir.functions.get(id) {
+        Some(decl) => (module_id, decl.name.clone()),
+        None => {
+            let reference = xir
+                .external_functions
+                .get(id - xir.functions.len())
+                .with_context(|| format!("call id {id} is outside the function tables"))?;
+            let owner = interface_module_id(env, &reference.address, &reference.module)
+                .with_context(|| {
+                    format!(
+                        "`{}::{}` is called by this interface but is not in the build; \
+                         supply its interface too (loaded: {:?})",
+                        reference.address,
+                        reference.module,
+                        env.get_modules()
+                            .map(|module| module.get_full_name_str())
+                            .take(8)
+                            .collect::<Vec<_>>()
+                    )
+                })?;
+            (owner, reference.function.clone())
+        },
+    };
+    let fun_id = interface_fun_id(env, owner, &name).with_context(|| {
+        format!(
+            "`{name}` is missing from `{}`, which is loaded: the interface and the module disagree",
+            env.get_module(owner).get_full_name_str()
+        )
+    })?;
+    Ok(owner.qualified(fun_id))
+}
+
 fn called_functions(
     env: &GlobalEnv,
     xir: &XirModule,
@@ -935,6 +1320,10 @@ fn called_functions(
     functions: &[FunId],
 ) -> Result<BTreeSet<QualifiedId<FunId>>> {
     let mut called = BTreeSet::new();
+    // An interface has no blocks and records its call graph explicitly.
+    for id in &decl.calls {
+        called.insert(function_at(env, xir, module_id, functions, *id)?);
+    }
     let mut uses_generic_comparison = false;
     for block in &decl.blocks {
         for instr in &block.instrs {
@@ -2508,6 +2897,7 @@ fn arity(
 mod tests {
     use super::*;
     use crate::Options;
+    use move_model_exchange::XirModuleRef;
     use std::fs;
 
     fn account_golden() -> String {
@@ -2576,10 +2966,8 @@ mod tests {
         serde_json::from_value(serde_json::json!({
             "schema": move_model_exchange::XIR_SCHEMA,
             "version": move_model_exchange::XIR_VERSION,
-            "module": {
-                "address": "0x42", "name": name, "dialect": "stackless",
-                "friends": [{"address": "0x42", "module": "buddy"}],
-            },
+            "module": {"address": "0x42", "name": name, "dialect": "stackless"},
+            "friends": [{"address": "0x42", "module": "buddy"}],
             "structs": [{
                 "name": "Local", "visibility": "public",
                 "abilities": ["drop"],
@@ -2717,6 +3105,473 @@ mod tests {
         );
         let struct_env = module.get_structs().next().unwrap();
         assert_eq!(struct_env.get_visibility(), MoveVisibility::Public);
+    }
+
+    /// A friend declaration must reach `friend_modules`, not just
+    /// `friend_decls`.
+    ///
+    /// These are two different things and only the former is serialized:
+    /// `module_generator.rs` builds the bytecode's friend list from
+    /// `ModuleEnv::get_friend_modules()`. Source modules get that set filled by
+    /// `check_and_update_friend_info` at the end of the model builder, which an
+    /// XIR module is added too late to participate in — so without resolving
+    /// them in the loader, an XIR target compiles to bytecode with no friends
+    /// at all, silently revoking access from its declared friend modules.
+    #[test]
+    fn friend_declarations_resolve_to_module_ids() {
+        // Here `buddy` happens to load first, so the grant resolves during the
+        // load itself. The reverse order is covered by
+        // `friend_grants_survive_when_the_friend_loads_later`.
+        let buddy = source_of(&v6_module("buddy", None, true), true);
+        let m = source_of(&v6_module("m", None, true), true);
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        import_sources(&mut env, &[buddy, m], &mut targets).unwrap();
+
+        let buddy_id = env
+            .get_modules()
+            .find(|module| env.symbol_pool().string(module.get_name().name()).as_str() == "buddy")
+            .expect("buddy was loaded")
+            .get_id();
+        let m = env
+            .get_modules()
+            .find(|module| env.symbol_pool().string(module.get_name().name()).as_str() == "m")
+            .expect("m was loaded");
+
+        assert!(
+            m.get_friend_modules().contains(&buddy_id),
+            "the friend must reach the set that file-format generation reads"
+        );
+        assert_eq!(
+            m.get_friend_decls()[0].module_id,
+            Some(buddy_id),
+            "the declaration must also carry the resolved id"
+        );
+    }
+
+    /// A grant survives when the friend module loads *after* the grantor.
+    ///
+    /// This is the only order the dependency sort can produce whenever the
+    /// friend actually uses what it was granted: the friend refers to the
+    /// granting module, so the grantor loads first, and the friend is absent
+    /// at the moment the grant would be resolved. Resolving grants only at
+    /// load time therefore drops them in exactly the configuration friend
+    /// declarations exist for — and drops them silently, since an absent
+    /// friend is deliberately not an error.
+    #[test]
+    fn friend_grants_survive_when_the_friend_loads_later() {
+        let mut grantor = v6_module("provider", None, true);
+        grantor.friends = vec![XirModuleRef {
+            address: "0x42".to_owned(),
+            module: "consumer".to_owned(),
+        }];
+        // Naming a type from `provider` forces `consumer` to load second.
+        let consumer = v6_module("consumer", Some(("provider", "Local")), true);
+
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        import_sources(
+            &mut env,
+            &[source_of(&grantor, true), source_of(&consumer, true)],
+            &mut targets,
+        )
+        .unwrap();
+
+        let id_of = |name: &str| {
+            env.get_modules()
+                .find(|module| env.symbol_pool().string(module.get_name().name()).as_str() == name)
+                .unwrap_or_else(|| panic!("`{name}` was loaded"))
+                .get_id()
+        };
+        let consumer_id = id_of("consumer");
+        let provider = env.get_module(id_of("provider"));
+        assert!(
+            provider.get_friend_modules().contains(&consumer_id),
+            "the grant must reach the set file-format generation reads, even though \
+             the friend loaded after the grantor"
+        );
+        assert_eq!(
+            provider.get_friend_decls()[0].module_id,
+            Some(consumer_id),
+            "the declaration must also carry the resolved id"
+        );
+    }
+
+    /// A native function outside a special address reaches bytecode generation
+    /// unchecked when it arrives as an XIR *target*.
+    ///
+    /// `native_checker` rejects this for Move sources, but it runs inside
+    /// `env_check_and_transform_pipeline`, and `lib.rs` imports XIR targets
+    /// *after* that pipeline has finished. Nothing reapplies it.
+    ///
+    /// This pins down which fix is needed. The module is a primary target and
+    /// the rule fires the moment anything runs it, so the gap is the ordering
+    /// alone — not a missing target flag.
+    #[test]
+    fn a_native_function_in_an_xir_target_is_only_checked_if_the_rule_is_run() {
+        let mut module = v6_module("natives", None, false);
+        module.functions[0].is_native = true;
+
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        import_sources(&mut env, &[source_of(&module, true)], &mut targets).unwrap();
+
+        // The fixture's address is not special, which is what the rule keys on.
+        assert!(!AccountAddress::from_hex_literal("0x42")
+            .unwrap()
+            .is_special());
+        assert!(
+            env.get_modules().any(|module| module.is_primary_target()),
+            "an XIR target must be a primary target for the rule to apply"
+        );
+        assert!(!env.has_errors(), "importing alone reports nothing");
+
+        crate::env_pipeline::native_checker::check_for_native_functions_and_structs(&mut env);
+        assert!(
+            env.has_errors(),
+            "the rule applies to an XIR target; only the pipeline ordering keeps it from running"
+        );
+    }
+
+    /// The XIR transcription of `tests/checking/visibility-checker/
+    /// call_private_function.move`, which the source path rejects with
+    /// "function `0xdeadbeef::M::foo` is private to module `0xdeadbeef::M`".
+    ///
+    /// `M::foo` takes the given visibility, and declares `N` a friend when
+    /// `grant_friend`; `N::calls_foo` calls it through `external_functions`.
+    fn m_and_n(visibility: &str, grant_friend: bool) -> (XirModule, XirModule) {
+        let friends = if grant_friend {
+            serde_json::json!([{"address": "0xdeadbeef", "module": "N"}])
+        } else {
+            serde_json::json!([])
+        };
+        // module 0xdeadbeef::M { fun foo(): u64 { 1 } }
+        let m = serde_json::from_value(serde_json::json!({
+            "schema": move_model_exchange::XIR_SCHEMA,
+            "version": move_model_exchange::XIR_VERSION,
+            "module": {"address": "0xdeadbeef", "name": "M", "dialect": "stackless"},
+            "friends": friends,
+            "structs": [],
+            "functions": [{
+                "name": "foo", "visibility": visibility, "is_entry": false,
+                "is_native": false, "acquires": [], "params": 0,
+                "locals": ["u64"], "returns": ["u64"],
+                "blocks": [{
+                    "instrs": [{"load": [0, {"num": "1"}]}],
+                    "term": {"ret": [0]},
+                }],
+                "entry": 0, "loops": [],
+                "spec": {"requires": [], "modifies": [], "ensures": [], "aborts_if": []},
+            }],
+        }))
+        .unwrap();
+        // module 0xdeadbeef::N { fun calls_foo(): u64 { 0xdeadbeef::M::foo() } }
+        //
+        // `N` declares one function, so local ids end at 0 and the external
+        // callee `M::foo` is id 1.
+        let n = serde_json::from_value(serde_json::json!({
+            "schema": move_model_exchange::XIR_SCHEMA,
+            "version": move_model_exchange::XIR_VERSION,
+            "module": {"address": "0xdeadbeef", "name": "N", "dialect": "stackless"},
+            "structs": [],
+            "functions": [{
+                "name": "calls_foo", "visibility": "private", "is_entry": false,
+                "is_native": false, "acquires": [], "params": 0,
+                "locals": ["u64"], "returns": ["u64"],
+                "blocks": [{
+                    "instrs": [{"call": [[0], {"function": 1}, []]}],
+                    "term": {"ret": [0]},
+                }],
+                "entry": 0, "loops": [],
+                "spec": {"requires": [], "modifies": [], "ensures": [], "aborts_if": []},
+            }],
+            "external_functions": [
+                {"address": "0xdeadbeef", "module": "M", "function": "foo"}
+            ],
+        }))
+        .unwrap();
+        (m, n)
+    }
+
+    /// An XIR target gets the same answer as Move source when it calls a
+    /// function it may not see.
+    ///
+    /// Without the check, this compiles to verified bytecode and is rejected
+    /// only by `dependencies::verify_module` — at publication.
+    #[test]
+    fn an_xir_target_cannot_call_a_function_it_may_not_see() {
+        let import = |visibility: &str, grant_friend: bool| {
+            let (m, n) = m_and_n(visibility, grant_friend);
+            let mut env = GlobalEnv::new();
+            let mut targets = FunctionTargetsHolder::default();
+            import_sources(
+                &mut env,
+                &[source_of(&m, true), source_of(&n, true)],
+                &mut targets,
+            )
+            .err()
+            .map(|e| format!("{e:#}"))
+        };
+
+        assert!(
+            import("public", false).is_none(),
+            "a public callee is allowed"
+        );
+
+        let private = import("private", false).expect("a private callee is rejected");
+        assert!(
+            private.contains("`0xdeadbeef::M::foo` is private to module `0xdeadbeef::M`"),
+            "the error matches what the source path reports: {private}"
+        );
+
+        let stranger = import("friend", false).expect("an ungranted friend callee is rejected");
+        assert!(
+            stranger.contains("does not declare as a friend"),
+            "the error says why: {stranger}"
+        );
+
+        // The grant is what makes this legal, and grants resolve only after
+        // every module is imported — so this also pins the check running late
+        // enough to see one.
+        assert!(
+            import("friend", true).is_none(),
+            "a granted friend callee is allowed"
+        );
+    }
+
+    /// `fun f<T>() { f<Wrapper<T>>() }` grows its type argument without bound.
+    ///
+    /// The rule for this reads the AST, so it cannot be reapplied to XIR the
+    /// way the declaration rules are. This pins where the violation *is*
+    /// caught — the bytecode verifier — so the gap is recorded rather than
+    /// assumed closed.
+    #[test]
+    fn a_cyclic_instantiation_in_an_xir_target_reaches_the_bytecode_verifier() {
+        // module 0x42::C {
+        //     struct Wrapper<T> has drop { f: T }
+        //     fun f<T>() { f<Wrapper<T>>() }     // grows the type forever
+        // }
+        let module: XirModule = serde_json::from_value(serde_json::json!({
+            "schema": move_model_exchange::XIR_SCHEMA,
+            "version": move_model_exchange::XIR_VERSION,
+            "module": {"address": "0x42", "name": "C", "dialect": "stackless"},
+            "structs": [{
+                "name": "Wrapper", "visibility": "public",
+                "type_parameters": [{"name": "T"}],
+                "abilities": ["drop"],
+                "fields": [{"name": "f", "ty": {"type_parameter": 0}}],
+            }],
+            "functions": [{
+                "name": "f", "visibility": "public", "is_entry": false,
+                "is_native": false, "acquires": [], "params": 0,
+                "type_parameters": [{"name": "T"}],
+                "locals": [], "returns": [],
+                "blocks": [{
+                    "instrs": [{"call": [
+                        [],
+                        {"function_inst": [0, [{"struct_inst": [0, [{"type_parameter": 0}]]}]]},
+                        []
+                    ]}],
+                    "term": {"ret": []},
+                }],
+                "entry": 0, "loops": [],
+                "spec": {"requires": [], "modifies": [], "ensures": [], "aborts_if": []},
+            }],
+        }))
+        .unwrap();
+
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        import_sources(&mut env, &[source_of(&module, true)], &mut targets).unwrap();
+        assert!(!env.has_errors(), "importing alone reports nothing");
+
+        // Unlike the declaration rules, this one reads `get_def()`, so running
+        // it here reports nothing. That is why `lib.rs` does not call it.
+        crate::env_pipeline::cyclic_instantiation_checker::check_cyclic_instantiations(&env);
+        assert!(
+            !env.has_errors(),
+            "an AST rule cannot see a stackless module"
+        );
+
+        let options = Options::default();
+        env.set_extension(options.clone());
+        crate::run_stackless_bytecode_pipeline(
+            &env,
+            crate::stackless_bytecode_check_pipeline(&options),
+            &mut targets,
+        );
+        println!("after check pipeline={}", env.has_errors());
+        crate::run_stackless_bytecode_pipeline(
+            &env,
+            crate::stackless_bytecode_optimization_pipeline(&options),
+            &mut targets,
+        );
+        let units = crate::run_file_format_gen(&mut env, &targets);
+        assert!(!env.has_errors(), "the compiler itself reports nothing");
+        let legacy_move_compiler::compiled_unit::CompiledUnit::Module(unit) = &units[0] else {
+            panic!("expected a module")
+        };
+        assert_eq!(
+            move_bytecode_verifier::verify_module(&unit.module)
+                .err()
+                .map(|e| e.major_status()),
+            Some(move_core_types::vm_status::StatusCode::LOOP_IN_INSTANTIATION_GRAPH),
+            "the verifier is what rejects a cyclic instantiation"
+        );
+    }
+
+    /// `struct Foo { f: Foo }` — the source path calls this "cyclic data".
+    ///
+    /// Reads struct declarations, which XIR carries, so `lib.rs` reruns it
+    /// after import instead of needing a stackless rewrite.
+    #[test]
+    fn a_recursive_struct_in_an_xir_target_is_rejected() {
+        // module 0x42::M0 { struct Foo { f: Foo } }
+        let module: XirModule = serde_json::from_value(serde_json::json!({
+            "schema": move_model_exchange::XIR_SCHEMA,
+            "version": move_model_exchange::XIR_VERSION,
+            "module": {"address": "0x42", "name": "M0", "dialect": "stackless"},
+            "structs": [{
+                "name": "Foo", "visibility": "public",
+                "abilities": [],
+                "fields": [{"name": "f", "ty": {"struct": 0}}],
+            }],
+            "functions": [],
+        }))
+        .unwrap();
+
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        import_sources(&mut env, &[source_of(&module, true)], &mut targets).unwrap();
+        assert!(!env.has_errors(), "importing alone reports nothing");
+
+        crate::env_pipeline::recursive_struct_checker::check_recursive_struct(&env);
+        assert!(env.has_errors(), "the rule applies to an XIR target");
+
+        let mut out = codespan_reporting::term::termcolor::Buffer::no_color();
+        env.report_diag(&mut out, codespan_reporting::diagnostic::Severity::Error);
+        let diags = String::from_utf8_lossy(&out.into_inner()).into_owned();
+        assert!(
+            diags.contains("cyclic data")
+                && diags.contains("field `f` of `Foo` contains `Foo`, which forms a cycle"),
+            "the message is the one Move source gets: {diags}"
+        );
+    }
+
+    /// `struct S<T> { x: u64 }` — a non-phantom parameter no field uses.
+    ///
+    /// Reads struct declarations, so `lib.rs` reruns it after import. This one
+    /// reports a warning rather than an error, so it is the diagnostic that
+    /// has to be inspected, not `has_errors`.
+    #[test]
+    fn an_unused_struct_parameter_in_an_xir_target_is_rejected() {
+        let module: XirModule = serde_json::from_value(serde_json::json!({
+            "schema": move_model_exchange::XIR_SCHEMA,
+            "version": move_model_exchange::XIR_VERSION,
+            "module": {"address": "0x42", "name": "M1", "dialect": "stackless"},
+            "structs": [{
+                "name": "S", "visibility": "public",
+                "type_parameters": [{"name": "T"}],
+                "abilities": [],
+                "fields": [{"name": "x", "ty": "u64"}],
+            }],
+            "functions": [],
+        }))
+        .unwrap();
+
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        import_sources(&mut env, &[source_of(&module, true)], &mut targets).unwrap();
+        assert!(!env.has_errors(), "importing alone reports nothing");
+
+        crate::env_pipeline::unused_params_checker::unused_params_checker(&env);
+        let mut out = codespan_reporting::term::termcolor::Buffer::no_color();
+        env.report_diag(&mut out, codespan_reporting::diagnostic::Severity::Warning);
+        let diags = String::from_utf8_lossy(&out.into_inner()).into_owned();
+        assert!(
+            diags.contains("unused type parameter") && diags.contains("`T`"),
+            "the rule applies to an XIR target: {diags}"
+        );
+    }
+
+    /// Packing a struct another module owns is rejected, though Move source
+    /// accepts it for a `public` struct.
+    ///
+    /// `external_structs` resolves a foreign type in a *signature*, but
+    /// `struct_from_type` accepts only locally-owned types, so no operation can
+    /// touch the value. This pins the gap; the companion half is
+    /// `move_source_can_pack_a_foreign_public_struct` in `xir_differential.rs`.
+    #[test]
+    fn a_foreign_struct_cannot_be_packed() {
+        // module 0x42::M { public struct S has drop { x: u64 } }
+        let m: XirModule = serde_json::from_value(serde_json::json!({
+            "schema": move_model_exchange::XIR_SCHEMA,
+            "version": move_model_exchange::XIR_VERSION,
+            "module": {"address": "0x42", "name": "M", "dialect": "stackless"},
+            "structs": [{
+                "name": "S", "visibility": "public", "abilities": ["drop"],
+                "fields": [{"name": "x", "ty": "u64"}],
+            }],
+            "functions": [],
+        }))
+        .unwrap();
+        // module 0x42::N { public fun make(): M::S { M::S { x: 1 } } }
+        //
+        // `N` declares no structs, so struct id 0 is external_structs[0].
+        let n: XirModule = serde_json::from_value(serde_json::json!({
+            "schema": move_model_exchange::XIR_SCHEMA,
+            "version": move_model_exchange::XIR_VERSION,
+            "module": {"address": "0x42", "name": "N", "dialect": "stackless"},
+            "structs": [],
+            "functions": [{
+                "name": "make", "visibility": "public", "is_entry": false,
+                "is_native": false, "acquires": [], "params": 0,
+                "locals": [{"struct": 0}, "u64"], "returns": [{"struct": 0}],
+                "blocks": [{
+                    "instrs": [
+                        {"load": [1, {"num": "1"}]},
+                        {"call": [[0], "pack", [1]]},
+                    ],
+                    "term": {"ret": [0]},
+                }],
+                "entry": 0, "loops": [],
+                "spec": {"requires": [], "modifies": [], "ensures": [], "aborts_if": []},
+            }],
+            "external_structs": [{"address": "0x42", "module": "M", "name": "S"}],
+        }))
+        .unwrap();
+
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        let error = import_sources(
+            &mut env,
+            &[source_of(&m, true), source_of(&n, true)],
+            &mut targets,
+        )
+        .err()
+        .map(|e| format!("{e:#}"))
+        .expect("a foreign struct operation is rejected today");
+        assert!(
+            error.contains("expected a local struct type"),
+            "the rejection comes from `struct_from_type`: {error}"
+        );
+    }
+
+    /// An unresolved friend is tolerated, unlike on the source path.
+    ///
+    /// XIR modules are loaded one at a time, and a friend is typically a
+    /// *dependent* that need not be present. Being lenient is safe because an
+    /// absent friend only withholds an access grant.
+    #[test]
+    fn an_absent_friend_is_not_an_error() {
+        let m = source_of(&v6_module("m", None, true), true);
+        let mut env = GlobalEnv::new();
+        let mut targets = FunctionTargetsHolder::default();
+        import_sources(&mut env, &[m], &mut targets).unwrap();
+        let module = env.get_modules().next().unwrap();
+        assert_eq!(module.get_friend_decls().len(), 1);
+        assert!(module.get_friend_modules().is_empty());
+        assert!(!env.has_errors());
     }
 
     fn signed_golden() -> String {
@@ -2918,6 +3773,46 @@ mod tests {
         assert_eq!(
             target.get_bytecode_loc(code[2].get_attr_id()).span(),
             Span::new(10, 20)
+        );
+    }
+
+    /// An interface carrying source spans is accepted, because it is parsed
+    /// without the text those spans index.
+    ///
+    /// A producer such as Lean emits a source map for every non-native
+    /// function. Validating those spans against the empty string that
+    /// `parse_interface` supplies would reject every non-zero one, so a
+    /// perfectly good module could not be used as an XIR dependency at all.
+    /// The same document is still checked when parsed as a compilation
+    /// *target*, where real source text is available.
+    #[test]
+    fn an_interface_with_source_spans_is_accepted() {
+        let mut module = account_module();
+        module.version = move_model_exchange::XIR_VERSION;
+        let function = &mut module.functions[0];
+        function.source_map = Some(move_model_exchange::XirFunctionSourceMap {
+            span: Some(XirSourceSpan { start: 0, end: 7 }),
+            blocks: function
+                .blocks
+                .iter()
+                .map(|block| move_model_exchange::XirBlockSourceMap {
+                    instrs: vec![None; block.instrs.len()],
+                    term: None,
+                })
+                .collect(),
+        });
+        let json = serde_json::to_string(&module).unwrap();
+
+        parse_interface(PathBuf::from("spans.xir.json"), &json)
+            .expect("an interface is parsed without the text its spans index");
+
+        // And the check still bites where the text is actually supplied.
+        let error = parse_source(PathBuf::from("spans.xir.json"), String::new(), &json)
+            .err()
+            .expect("a target with no text cannot satisfy a non-zero span");
+        assert!(
+            error.to_string().contains("outside the source text"),
+            "{error}"
         );
     }
 

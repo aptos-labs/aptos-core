@@ -419,15 +419,35 @@ fn translate_type(maps: &NameMaps, ty: &move_model::ty::Type) -> Result<exchange
                 ReferenceKind::Mutable => exchange::Type::MutRef(inner),
             })
         },
+        Type::Fun(args, result, abilities) => Ok(exchange::Type::Fun(
+            translate_type_list(maps, args)?,
+            translate_type_list(maps, result)?,
+            ability_names(*abilities),
+        )),
         ty => bail!("unsupported type {:?}", ty),
     }
 }
 
+/// Translates the argument or result position of a function type, which the
+/// exchange format spells as a list.
+///
+/// `move_model` writes such a position as a bare type at arity one and as a
+/// `Tuple` otherwise — `|T|` is `Fun(T, Tuple([]))`, `|&T, &V|` is
+/// `Fun(Tuple([&T, &V]), Tuple([]))`. This is the only place a `Tuple` is
+/// meaningful, which is why [`translate_type`] rejects it everywhere else.
+fn translate_type_list(maps: &NameMaps, ty: &move_model::ty::Type) -> Result<Vec<exchange::Type>> {
+    match ty {
+        move_model::ty::Type::Tuple(types) => types
+            .iter()
+            .map(|ty| translate_type(maps, ty))
+            .collect::<Result<Vec<_>>>(),
+        single => Ok(vec![translate_type(maps, single)?]),
+    }
+}
+
 fn ability_names(abilities: move_core_types::ability::AbilitySet) -> Vec<String> {
-    use move_core_types::ability::Ability;
-    [Ability::Copy, Ability::Drop, Ability::Store, Ability::Key]
-        .into_iter()
-        .filter(|ability| abilities.has_ability(*ability))
+    abilities
+        .iter()
         .map(|ability| ability.to_string())
         .collect()
 }
@@ -927,11 +947,10 @@ fn translate_call(
             // `neq` are normalized.  Abort behavior is identical: Move aborts on
             // `-MIN` as "negated result too large", and `0 - MIN` overflows the
             // same range check.
+            // `int_width` has already established that this local exists and
+            // is an integer, so indexing it cannot panic.
             let width = int_width(locals, dsts[0])?;
-            let zero_ty = locals
-                .get(dsts[0])
-                .cloned()
-                .ok_or_else(|| anyhow!("negation result local {} is undeclared", dsts[0]))?;
+            let zero_ty = locals[dsts[0]].clone();
             let tmp = locals.len();
             locals.push(zero_ty);
             instrs.push(exchange::Instr::Load(

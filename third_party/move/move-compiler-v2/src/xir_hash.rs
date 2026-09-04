@@ -19,7 +19,7 @@
 //! `SignatureToken` is. That is right about *types* and not the whole story.
 //!
 //! **Foreign type indices are a real hazard.** A `ResourceId` past the local
-//! table indexes `external_types`, which the exporter fills in *first-use*
+//! table indexes `external_structs`, which the exporter fills in *first-use*
 //! order, so the same dependency can land at a different index in a different
 //! build. Types are therefore rendered with foreign references resolved to
 //! `address::module::name`, never as an index.
@@ -153,6 +153,10 @@ pub struct CanonicalFunction {
     pub acquires: Vec<String>,
     /// Sorted.
     pub attributes: Vec<String>,
+    /// Sorted; the callees a dependent's transitive analyses follow. Excluded,
+    /// a newly added call to `0x1::randomness` would not move the hash and a
+    /// cached dependent would keep its old verdict.
+    pub calls: Vec<String>,
 }
 
 /// Builds the canonical projection.
@@ -217,12 +221,29 @@ impl<'a> Names<'a> {
         }
         let external = self
             .module
-            .external_types
+            .external_structs
             .get(id - self.module.structs.len())
             .with_context(|| format!("resource id {id} is outside the declaration tables"))?;
         Ok(format!(
             "{}::{}::{}",
             external.address, external.module, external.name
+        ))
+    }
+
+    /// Names a callee. Ids are positional, so the hash records the name a
+    /// reordered table would still agree on.
+    fn function(&self, id: usize) -> Result<String> {
+        if let Some(decl) = self.module.functions.get(id) {
+            return Ok(decl.name.clone());
+        }
+        let external = self
+            .module
+            .external_functions
+            .get(id - self.module.functions.len())
+            .with_context(|| format!("call id {id} is outside the function tables"))?;
+        Ok(format!(
+            "{}::{}::{}",
+            external.address, external.module, external.function
         ))
     }
 
@@ -322,6 +343,13 @@ impl<'a> Names<'a> {
             .collect::<Result<Vec<_>>>()?;
         acquires.sort();
         acquires.dedup();
+        let mut calls = decl
+            .calls
+            .iter()
+            .map(|id| self.function(*id))
+            .collect::<Result<Vec<_>>>()?;
+        calls.sort();
+        calls.dedup();
         Ok(CanonicalFunction {
             name: decl.name.clone(),
             visibility: visibility(decl.visibility),
@@ -332,6 +360,7 @@ impl<'a> Names<'a> {
             returns: self.ty_list(&decl.returns)?,
             acquires,
             attributes: attributes(&decl.attributes),
+            calls,
         })
     }
 }
@@ -425,7 +454,7 @@ mod tests {
                  "blocks": [], "entry": 0, "loops": [],
                  "spec": {"requires": [], "modifies": [], "ensures": [], "aborts_if": []}},
             ],
-            "external_types": [
+            "external_structs": [
                 {"address": "0x1", "module": "string", "name": "String"},
             ],
         })
@@ -474,7 +503,7 @@ mod tests {
 
     /// Nor on the index a foreign type happens to land at.
     ///
-    /// `external_types` is filled in first-use order during export, so the same
+    /// `external_structs` is filled in first-use order during export, so the same
     /// dependency can sit at a different index in a different build. Adding an
     /// unreferenced entry ahead of the referenced one shifts every id.
     #[test]
@@ -484,7 +513,7 @@ mod tests {
         let shifted = mutated(|value| {
             // Insert an unused external type first, then repoint every
             // reference from id 2 to id 3.
-            value["external_types"].as_array_mut().unwrap().insert(
+            value["external_structs"].as_array_mut().unwrap().insert(
                 0,
                 json!({"address": "0x1", "module": "option", "name": "Option"}),
             );
@@ -606,7 +635,7 @@ mod tests {
             (
                 "foreign type identity",
                 Box::new(|v: &mut Value| {
-                    v["external_types"][0] =
+                    v["external_structs"][0] =
                         json!({"address": "0x1", "module": "ascii", "name": "String"})
                 }),
             ),
@@ -660,7 +689,7 @@ mod tests {
             (
                 "an unreferenced foreign type",
                 Box::new(|v: &mut Value| {
-                    v["external_types"]
+                    v["external_structs"]
                         .as_array_mut()
                         .unwrap()
                         .push(json!({"address": "0x1", "module": "option", "name": "Option"}))

@@ -330,9 +330,11 @@ initialize movePackageAttr : Lean.TagAttribute ←
   Lean.registerTagAttribute `move_package
     "package-visible Move function" preserveMoveCall
 
-/-- Whether a declaration is a Move function of any visibility. -/
+/-- Whether a declaration is a Move function of any visibility. A type carries
+the same visibility markers, so it has to be excluded explicitly. -/
 def isMoveFunction (env : Environment) (name : Name) : Bool :=
   !moveInlineAttr.hasTag env name &&
+    !moveStructAttr.hasTag env name && !moveEnumAttr.hasTag env name &&
     (moveFunAttr.hasTag env name || movePublicAttr.hasTag env name ||
       moveFriendAttr.hasTag env name || movePackageAttr.hasTag env name ||
       moveEntryAttr.hasTag env name || moveNativeAttr.hasTag env name)

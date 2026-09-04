@@ -44,6 +44,13 @@ module Attributes where
   -- leave no user metadata behind.
   @[move_public] fun compatPublic (x : U64) : U64 := x
 
+  -- Type visibility travels the same route as a function's.
+  public struct Shared has Copy, Drop where
+    value : U64
+
+  struct Hidden has Copy, Drop where
+    value : U64
+
   def compiled : MoveModel.IR.Module := lowerToIR ``Tests.MovePrograms.Attributes
 
 namespace Attributes
@@ -52,6 +59,9 @@ open MoveModel.IR
 
 private def structAttributes (name : String) :=
   (compiled.structMeta? name).map (·.attributes)
+
+private def structVisibility (name : String) :=
+  (compiled.structMeta? name).map (·.visibility)
 
 private def funMeta (name : String) :=
   compiled.funMeta? name
@@ -71,6 +81,8 @@ private def funMeta (name : String) :=
 #guard (funMeta "compatPublic").map
     (fun info => (info.visibility, info.attributes)) ==
   some (.public_, [])
+#guard structVisibility "Shared" == some .public_
+#guard structVisibility "Hidden" == some .private_
 
 end Attributes
 

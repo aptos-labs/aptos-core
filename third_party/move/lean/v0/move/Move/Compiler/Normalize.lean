@@ -310,6 +310,13 @@ private def declaredAbilities (env : Environment) (name : Name) : LIR.AbilitySet
     store := moveStoreAttr.hasTag env name
     key := moveKeyAttr.hasTag env name }
 
+/-- Visibility of a Move type, from the same markers a function reads.
+`move_entry` does not apply to a type and is not consulted. -/
+private def structVisibility (env : Environment) (name : Name) : LIR.Visibility :=
+  if movePublicAttr.hasTag env name then .public_
+  else if moveFriendAttr.hasTag env name || movePackageAttr.hasTag env name then .friend_
+  else .private_
+
 private def compileStruct (env : Environment) (name : Name) : Except String LIR.StructDecl := do
   unless moveStructAttr.hasTag env name do
     throw s!"`{name}` is not annotated with `move_struct`"
@@ -344,6 +351,7 @@ private def compileStruct (env : Environment) (name : Name) : Except String LIR.
     abilities := abilities
     fields := fields
     attributes := Move.userAttributes env name
+    visibility := structVisibility env name
   }
 
 private def compileEnum (env : Environment) (name : Name) : Except String LIR.StructDecl := do
@@ -395,6 +403,7 @@ private def compileEnum (env : Environment) (name : Name) : Except String LIR.St
     fields := #[]
     variants := some variants
     attributes := Move.userAttributes env name
+    visibility := structVisibility env name
   }
 
 private def fvarArgs (args : Array (Arg .pure)) : Array FVarId :=
@@ -2456,8 +2465,11 @@ def declarationsInNamespace (env : Environment) (ns : Name) : Array Name × Arra
   -- A public inline helper also carries `move_public` for source visibility,
   -- but it is compile-time-only just like a private inline helper. Its body is
   -- forced into deployable callers by `always_inline`; never select the
-  -- declaration itself for Move output.
-  let functionNames := functionNames.filter fun name => !moveInlineAttr.hasTag env name
+  -- declaration itself for Move output. A `public` type carries the marker for
+  -- the same reason and is not a function either.
+  let functionNames := functionNames.filter fun name =>
+    !moveInlineAttr.hasTag env name && !moveStructAttr.hasTag env name &&
+      !moveEnumAttr.hasTag env name
   (structNames, functionNames)
 
 /-- Compile selected attributed Lean declarations to Leaner's named LIR. -/

@@ -391,6 +391,16 @@ private def dropPublicModifier
     TSyntax ``Lean.Parser.Command.declModifiers :=
   ⟨modifiers.raw.setArg 2 (mkNullNode)⟩
 
+/-- Translate a `public` modifier on a type item into `@[move_public]`, the
+same marker a function item uses. -/
+private def typeVisibilityMarkers
+    (modifiers : TSyntax ``Lean.Parser.Command.declModifiers) :
+    Array Name × TSyntax ``Lean.Parser.Command.declModifiers :=
+  if hasPublicModifier modifiers then
+    (#[`move_public], dropPublicModifier modifiers)
+  else
+    (#[], modifiers)
+
 private def isDoSeqSyntax (stx : Syntax) : Bool :=
   stx.isOfKind ``Lean.Parser.Term.doSeqIndent ||
     stx.isOfKind ``Lean.Parser.Term.doSeqBracketed
@@ -912,8 +922,9 @@ private def typeParamBoundCommands (declId signature : Syntax) :
 
 private def desugarPositionalStruct (stx : Syntax) : MacroM (Array Syntax) := do
   let (wellKnown, user) ← splitAttributeInstances stx[1]
-  let modifiers ← prependDeclarationAttributes (#[`move_struct] ++ wellKnown)
-    (← applyDocComment stx[0] ⟨stx[2]⟩)
+  let (visibility, base) := typeVisibilityMarkers (← applyDocComment stx[0] ⟨stx[2]⟩)
+  let modifiers ← prependDeclarationAttributes
+    (#[`move_struct] ++ visibility ++ wellKnown) base
   let types : Array (TSyntax `term) := stx[6].getSepArgs.map (⟨·⟩)
   let mut fields : Array (TSyntax ``Lean.Parser.Command.structSimpleBinder) := #[]
   for (type, index) in types.zipIdx do
@@ -1119,8 +1130,9 @@ private def desugarModuleItem (invariants : Array (Name × Array Syntax))
     return ← desugarPositionalStruct stx
   if stx.isOfKind ``moveStructItem then
     let (wellKnown, user) ← splitAttributeInstances stx[1]
-    let modifiers ← prependDeclarationAttributes (#[`move_struct] ++ wellKnown)
-      (← applyDocComment stx[0] ⟨stx[2]⟩)
+    let (visibility, base) := typeVisibilityMarkers (← applyDocComment stx[0] ⟨stx[2]⟩)
+    let modifiers ← prependDeclarationAttributes
+      (#[`move_struct] ++ visibility ++ wellKnown) base
     let signature ← normalizeTypeParameterBinders stx[5]
     let declared := stx[4][0].getId
     let invariant? := invariants.find? (·.1 == declared) |>.map (·.2)
@@ -1154,8 +1166,9 @@ private def desugarModuleItem (invariants : Array (Name × Array Syntax))
             Macro.throwErrorAt ctorName
               s!"Move enum variant `{spelled}` must be PascalCase; write `{initial.toUpper.toString ++ spelled.drop 1}`"
     let (wellKnown, user) ← splitAttributeInstances stx[1]
-    let modifiers ← prependDeclarationAttributes (#[`move_enum] ++ wellKnown)
-      (← applyDocComment stx[0] ⟨stx[2]⟩)
+    let (visibility, base) := typeVisibilityMarkers (← applyDocComment stx[0] ⟨stx[2]⟩)
+    let modifiers ← prependDeclarationAttributes
+      (#[`move_enum] ++ visibility ++ wellKnown) base
     let signature ← normalizeTypeParameterBinders stx[5]
     let declared := stx[4][0].getId
     let invariant? := invariants.find? (·.1 == declared) |>.map (·.2)
