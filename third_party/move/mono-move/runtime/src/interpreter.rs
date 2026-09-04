@@ -5,7 +5,10 @@
 //! and a bump-allocated heap with copying GC.
 
 use crate::{
-    error::{ArithOp, RuntimeError, RuntimeInvariantViolation, RuntimeStatus, Signedness, VecOp},
+    error::{
+        ArithOp, ReportedIntValue, RuntimeError, RuntimeInvariantViolation, RuntimeStatus,
+        Signedness, VecOp,
+    },
     global_storage::{EntryPtr, ResourceReadWriteSet},
     heap::{
         deep_copy_or_gc, deserialize_or_gc,
@@ -988,16 +991,43 @@ impl_int_arith!(
     ArithmeticUnderOverflow { op: ArithOp::Mul },
     checked_mul
 );
-impl_int_arith!(
-    exec_int_div,
-    DivisionByZeroOrOverflow { op: ArithOp::Div },
-    checked_div
-);
-impl_int_arith!(
-    exec_int_mod,
-    DivisionByZeroOrOverflow { op: ArithOp::Mod },
-    checked_rem
-);
+// Generates a division dispatcher. `checked_div` / `checked_rem` return
+// `None` both for a zero divisor and for signed `MIN / -1`; the divisor
+// tells the two apart.
+//
+// `#[rustfmt::skip]`: see [`impl_int_arith!`].
+#[rustfmt::skip]
+macro_rules! impl_int_div {
+    ($fn_name:ident, $op:expr, $method:ident) => {
+        /// # Safety
+        /// See [`exec_int_add`].
+        #[inline(never)]
+        unsafe fn $fn_name(fp: *mut u8, op: &IntBinaryOp) -> VMResult<()> {
+            unsafe {
+                macro_rules! exec {
+                    ($ty: ty,$_sign: tt,$rhs: expr) => {{
+                        let lhs_val: $ty = read_int::<$ty>(fp, op.lhs);
+                        let rhs_val: $ty = $rhs;
+                        let result: $ty = <$ty>::$method(lhs_val, rhs_val)
+                            .ok_or_else(|| {
+                                VMInternalError::new(if rhs_val == <$ty>::default() {
+                                    RuntimeError::DivisionByZero { op: $op }
+                                } else {
+                                    RuntimeError::DivisionOverflow { op: $op }
+                                })
+                            })?;
+                        write_int::<$ty>(fp, op.dst, result);
+                    }};
+                }
+                dispatch_int_operand!(fp, &op.rhs, exec);
+                Ok(())
+            }
+        }
+    };
+}
+
+impl_int_div!(exec_int_div, ArithOp::Div, checked_div);
+impl_int_div!(exec_int_mod, ArithOp::Mod, checked_rem);
 
 // Generates an `#[inline(never)]` bitwise dispatcher. Same shape as
 // [`impl_int_arith!`] but uses an infix `$bop` (one of `&`, `|`, `^`) and
@@ -1190,6 +1220,7 @@ unsafe fn exec_int_cast(fp: *mut u8, op: &IntCastOp) -> VMResult<()> {
                             RuntimeError::CastOutOfRange {
                                 from: op.from,
                                 to: op.to,
+                                value: ReportedIntValue::from(src_val),
                             }
                         })?;
                         write_int::<$dst_ty>(fp, op.dst, result);
@@ -1624,7 +1655,9 @@ impl InterpreterContext<'_> {
                             // bytes at `VEC_DATA_OFFSET`.
                             let data = vec_ptr.add(VEC_DATA_OFFSET);
                             String::from_utf8(std::slice::from_raw_parts(data, len).to_vec())
-                                .map_err(|_| RuntimeError::InvalidAbortMessage)?
+                                .map_err(|err| RuntimeError::InvalidAbortMessage {
+                                    cause: err.utf8_error(),
+                                })?
                         };
                         break RuntimeStatus::Aborted {
                             code,
@@ -1710,12 +1743,8 @@ impl InterpreterContext<'_> {
 
                     // Div / Mod
                     MicroOp::DivU64 { dst, lhs, rhs } => {
-                        checked_binop_u64(fp, dst, lhs, rhs, u64::checked_div).ok_or(
-                            RuntimeError::DivisionByZero {
-                                op: ArithOp::Div,
-                                ty: IntTy::U64,
-                            },
-                        )?
+                        checked_binop_u64(fp, dst, lhs, rhs, u64::checked_div)
+                            .ok_or(RuntimeError::DivisionByZero { op: ArithOp::Div })?
                     },
                     // INVARIANT: the verifier rejects `imm == 0`, so plain `s / imm`
                     // cannot trigger Rust's div-by-zero panic. Asserted below in
@@ -1728,12 +1757,8 @@ impl InterpreterContext<'_> {
                         imm_op_u64(fp, dst, src, imm, |s, i| s / i)
                     },
                     MicroOp::ModU64 { dst, lhs, rhs } => {
-                        checked_binop_u64(fp, dst, lhs, rhs, u64::checked_rem).ok_or(
-                            RuntimeError::DivisionByZero {
-                                op: ArithOp::Mod,
-                                ty: IntTy::U64,
-                            },
-                        )?
+                        checked_binop_u64(fp, dst, lhs, rhs, u64::checked_rem)
+                            .ok_or(RuntimeError::DivisionByZero { op: ArithOp::Mod })?
                     },
                     // INVARIANT: the verifier rejects `imm == 0`, so plain `s % imm`
                     // cannot trigger Rust's div-by-zero panic. Asserted below in

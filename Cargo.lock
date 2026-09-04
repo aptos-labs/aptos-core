@@ -13044,8 +13044,11 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4",
  "mono-move-core",
+ "mono-move-loader",
  "mono-move-natives",
  "mono-move-runtime",
+ "move-core-types",
+ "move-vm-types",
  "thiserror 1.0.69",
 ]
 

@@ -13,7 +13,7 @@ mod types;
 mod value_utils;
 mod verifier;
 
-pub use error::{RuntimeError, RuntimeStatus};
+pub use error::{ArithOp, GlobalStorageOp, ReportedIntValue, RuntimeError, RuntimeStatus, VecOp};
 pub use global_storage::{ResourceReadWriteSet, WriteClass};
 pub use heap::Heap;
 pub use interpreter::{InterpreterContext, SessionEffects};

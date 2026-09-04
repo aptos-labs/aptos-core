@@ -19,8 +19,7 @@ use aptos_types::{
     },
 };
 use mono_move_core::{ExecutionErrorKind, VMInternalError};
-use mono_move_loader::LoaderError;
-use mono_move_runtime::RuntimeError;
+use mono_move_output::v1_error::{self, V1Equivalent};
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
@@ -37,28 +36,61 @@ static ABORT_LOC_VALIDATION_MODULE: LazyLock<AbortLocation> = LazyLock::new(|| {
     ))
 });
 
-/// Converts a type-erased VM error into `VMStatus`: fine-grained for the
-/// error types with known legacy mappings, by public category otherwise.
+/// Converts a type-erased VM error into `VMStatus`.
+///
+/// Only reached after the prologue, where the transaction always commits and is
+/// charged, so every status below must be one that commits. Which code carries
+/// that is MonoMove's own choice; it need not be the one V1 reports.
 //
-// TODO(correctness): extend the downcast set as more subsystem error types
-// (verifier, deserializer, gas) need exact legacy codes.
-// TODO(cleanup): refactor comparison replay benchmark mapping
+// TODO(correctness): the result is always `VMStatus::Error`, never
+// `VMStatus::ExecutionFailure`, which additionally carries the location,
+// function, and code offset of the faulting instruction. Mono's errors do not
+// carry those yet.
 fn internal_error_to_status(err: &VMInternalError) -> VMStatus {
-    if let Some(err) = err.downcast_ref::<RuntimeError>() {
-        return runtime_error_to_status(err);
+    match v1_error::describe(err) {
+        // Built directly: `VMStatus::error` hardcodes the sub-status to `None`.
+        V1Equivalent::Described(info) => VMStatus::Error {
+            status_code: info.status,
+            sub_status: info.sub_status.known(),
+            // Mono's own text where V1 renders none. Not persisted: it surfaces
+            // in simulation responses and logs, and is the only report of
+            // allocation sizes and out-of-bounds indices.
+            message: Some(
+                info.message
+                    .text()
+                    .map_or_else(|| err.to_string(), str::to_owned),
+            ),
+        },
+
+        // V1 reports no failure, so there is no status to borrow. Charges
+        // anyway: this runs after the prologue, where the fee and sequence
+        // number are already committed, and a discarding code would drop them.
+        //
+        // TODO(correctness): reaching this means MonoMove cannot run an input V1
+        // runs. The replay benchmark reports it as a status mismatch, but
+        // production charges the sender and logs nothing.
+        V1Equivalent::NoV1Failure => {
+            VMStatus::error(StatusCode::UNKNOWN_RUNTIME_STATUS, Some(err.to_string()))
+        },
+
+        // Every code below commits and charges, including invariant violations,
+        // which V1 discards: the executor has already committed the fee, and a
+        // discarding code would drop it.
+        //
+        // TODO(correctness): four kinds collapse to `UNKNOWN_RUNTIME_STATUS`,
+        // which is persisted, so telling them apart later is a breaking change.
+        V1Equivalent::V1StatusUnknown => {
+            let code = match err.kind() {
+                ExecutionErrorKind::OutOfGas => StatusCode::OUT_OF_GAS,
+                ExecutionErrorKind::LinkingError => StatusCode::LINKER_ERROR,
+                ExecutionErrorKind::InvariantViolation
+                | ExecutionErrorKind::RuntimeLimitExceeded
+                | ExecutionErrorKind::InvalidOperation
+                | ExecutionErrorKind::Placeholder => StatusCode::UNKNOWN_RUNTIME_STATUS,
+            };
+            VMStatus::error(code, Some(err.to_string()))
+        },
     }
-    if let Some(err) = err.downcast_ref::<LoaderError>() {
-        return loader_error_to_status(err);
-    }
-    let code = match err.kind() {
-        ExecutionErrorKind::OutOfGas => StatusCode::OUT_OF_GAS,
-        ExecutionErrorKind::LinkingError => StatusCode::LINKER_ERROR,
-        ExecutionErrorKind::InvariantViolation => StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-        ExecutionErrorKind::RuntimeLimitExceeded
-        | ExecutionErrorKind::InvalidOperation
-        | ExecutionErrorKind::Placeholder => StatusCode::UNKNOWN_STATUS,
-    };
-    VMStatus::error(code, Some(err.to_string()))
 }
 
 /// Converts a discard reason into the `VMStatus` the transaction is rejected
@@ -105,7 +137,7 @@ pub(crate) fn executed_vm_status(status: &ExecutionStatus) -> VMStatus {
     match failure {
         // The fee payer failing to cover the fee is the one epilogue abort that
         // survives as the transaction's own; any other means the framework
-        // misbehaved, which the legacy VM reports as an unexpected error.
+        // misbehaved, which V1 reports as an unexpected error.
         MoveExecutionFailure::Abort {
             code,
             message,
@@ -141,12 +173,12 @@ fn unsupported_status(msg: &str) -> VMStatus {
     )
 }
 
-/// Mirrors the legacy VM's `convert_prologue_error`: recognized validation
-/// aborts map to their discard codes.
+/// Mirrors V1's `convert_prologue_error`: recognized validation aborts map to
+/// their discard codes.
 //
-// TODO(completeness): the legacy VM also recognizes aborts from
-// `transaction_limits` and the multisig account module. Neither is reachable
-// here yet, so they land in the unexpected-abort branch below.
+// TODO(completeness): V1 also recognizes aborts from `transaction_limits` and
+// the multisig account module. Neither is reachable here yet, so they land in
+// the unexpected-abort branch below.
 fn prologue_failure_to_status(failure: MoveExecutionFailure) -> VMStatus {
     let (code, message, location) = match failure {
         MoveExecutionFailure::Abort {
@@ -211,8 +243,8 @@ fn unexpected_validation_error(msg: &str, detail: String) -> VMStatus {
     )
 }
 
-/// The status of a failure the legacy mapping does not recognize: the framework
-/// misbehaved, which the legacy VM reports as an unexpected error.
+/// The status of a failure the V1 mapping does not recognize: the framework
+/// misbehaved, which V1 reports as an unexpected error.
 fn stage_failure_status(stage: &ExecutionStage, detail: &str) -> VMStatus {
     let what = match stage {
         ExecutionStage::Prologue => "prologue",
@@ -222,61 +254,4 @@ fn stage_failure_status(stage: &ExecutionStage, detail: &str) -> VMStatus {
         ExecutionStage::EpilogueRetry => "epilogue retry",
     };
     unexpected_validation_error(what, detail.to_string())
-}
-
-// TODO(correctness): the mapping is coarse; several kinds should be
-// `ExecutionFailure`, which needs the location, function and code offset the
-// legacy VM reports. Currently,`RuntimeError` carries none of those.
-fn runtime_error_to_status(err: &RuntimeError) -> VMStatus {
-    use RuntimeError as E;
-    let code = match err {
-        E::ArithmeticOverflow { .. }
-        | E::ArithmeticUnderflow { .. }
-        | E::DivisionByZero { .. }
-        | E::ShiftAmountOutOfRange { .. }
-        | E::ArithmeticUnderOverflow { .. }
-        | E::DivisionByZeroOrOverflow { .. }
-        | E::NegateMinOverflow { .. }
-        | E::CastOutOfRange { .. } => StatusCode::ARITHMETIC_ERROR,
-        E::PopFromEmptyVector
-        | E::VectorIndexOutOfBounds { .. }
-        | E::VecUnpackLengthMismatch { .. } => StatusCode::VECTOR_OPERATION_ERROR,
-        E::ResourceDoesNotExist { .. } => StatusCode::MISSING_DATA,
-        E::ResourceAlreadyExists { .. } => StatusCode::RESOURCE_ALREADY_EXISTS,
-        E::EnumVariantMismatch { .. } => StatusCode::TYPE_MISMATCH,
-        E::StackOverflow => StatusCode::CALL_STACK_OVERFLOW,
-        // Raised only by the runtime's own write-set builder, which this crate
-        // does not use (its drain goes through the provider).
-        E::StateKeyTypeTooDeep => StatusCode::TOO_MANY_TYPE_NODES,
-        E::OutOfHeapMemory { .. } | E::AllocationTooLarge { .. } | E::VecAllocSizeOverflow => {
-            StatusCode::MEMORY_LIMIT_EXCEEDED
-        },
-        E::InvalidAbortMessage
-        | E::AbortMessageTooLong { .. }
-        | E::BCSEof
-        | E::BCSInvalidUleb
-        | E::BCSSequenceTooLong { .. }
-        | E::BCSRemainingInput { .. }
-        | E::BCSInvalidBool { .. }
-        | E::BCSSignerNotDeserializable => StatusCode::UNKNOWN_STATUS,
-        E::Unsupported(_) | E::InvariantViolation(_) | E::ResourceProvider(_) => {
-            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
-        },
-    };
-    VMStatus::error(code, Some(format!("{}", err)))
-}
-
-fn loader_error_to_status(err: &LoaderError) -> VMStatus {
-    use LoaderError as L;
-    let code = match err {
-        // Kept (and charged) under the function-values feature, since a stale
-        // function value makes this reachable at runtime.
-        L::FunctionNotFound { .. } => StatusCode::FUNCTION_RESOLUTION_FAILURE,
-        L::ModuleNotFound { .. } | L::NativeFunctionNotLoadable { .. } => StatusCode::LINKER_ERROR,
-        L::LoweringSkipped { .. } => StatusCode::UNKNOWN_STATUS,
-        L::GlobalContext(_) | L::InvariantViolation(_) => {
-            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
-        },
-    };
-    VMStatus::error(code, Some(format!("{}", err)))
 }

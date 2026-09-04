@@ -33,10 +33,13 @@ use aptos_types::{
 };
 use aptos_vm::natives::aptos_natives;
 use aptos_vm_types::resolver::StateStorageView;
-use mono_move_core::native::NativeExtensions;
+use mono_move_core::{native::NativeExtensions, VMInternalError};
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_natives::EventStore;
-use mono_move_output::to_contract_events_from_store;
+use mono_move_output::{
+    to_contract_events_from_store,
+    v1_error::{self, V1Equivalent},
+};
 use move_binary_format::{errors::Location, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
@@ -60,8 +63,66 @@ use move_vm_types::{gas::UnmeteredGasMeter, loaded_data::runtime_types::Type};
 use std::{path::Path, sync::OnceLock};
 
 /// Execution output from a VM as a normalized display string.
-struct Output {
-    display: String,
+pub(crate) struct Output {
+    pub(crate) display: String,
+    pub(crate) parity: ParityOutcome,
+}
+
+/// A step's failure in the form `CHECK-ERROR-PARITY` compares, or why there is
+/// nothing to compare.
+pub(crate) enum ParityOutcome {
+    /// The step failed, and the failure can be stated in V1 terms.
+    Comparable(String),
+    /// The step failed, but the error has no V1 mapping to state it through.
+    Unmappable,
+    /// The step ended in a Move abort, which carries no VM error to state.
+    Aborted,
+    /// The step did not fail.
+    NoFailure,
+}
+
+impl Output {
+    fn success(display: String) -> Self {
+        Self {
+            display,
+            parity: ParityOutcome::NoFailure,
+        }
+    }
+
+    fn aborted(display: String) -> Self {
+        Self {
+            display,
+            parity: ParityOutcome::Aborted,
+        }
+    }
+}
+
+/// Renders a failure as the status, sub-status, and message V1 reports for it.
+/// Both VMs render through this, so `CHECK-ERROR-PARITY` compares like with
+/// like.
+fn render_v1_error(status: StatusCode, sub_status: Option<u64>, message: Option<&str>) -> String {
+    format!(
+        "{:?} | sub-status {} | {}",
+        status,
+        sub_status.map_or_else(|| "none".to_string(), |sub| sub.to_string()),
+        message.unwrap_or("no message"),
+    )
+}
+
+/// MonoMove's failure in V1 terms, when it can be stated in them at all.
+/// A failure that cannot be is not comparable with V1's.
+fn describe_v2_error_as_v1(err: &VMInternalError) -> ParityOutcome {
+    let V1Equivalent::Described(descriptor) = v1_error::describe(err) else {
+        return ParityOutcome::Unmappable;
+    };
+    if !descriptor.message.is_comparable() || !descriptor.sub_status.is_comparable() {
+        return ParityOutcome::Unmappable;
+    }
+    ParityOutcome::Comparable(render_v1_error(
+        descriptor.status,
+        descriptor.sub_status.known(),
+        descriptor.message.text(),
+    ))
 }
 
 /// A [`StateStorageView`] over empty storage that serves a fixed usage, for
@@ -127,7 +188,7 @@ fn render_execution_output(vals: &[String], events: &[String]) -> String {
     segments.join(" | ")
 }
 
-/// Renders the events emitted into the legacy VM's [`NativeEventContext`], in
+/// Renders the events emitted into the V1 VM's [`NativeEventContext`], in
 /// emission order, for cross-VM comparison.
 pub fn finalize_events_v1(extensions: &NativeContextExtensions) -> Vec<String> {
     render_contract_events(extensions.get::<NativeEventContext>().events_iter())
@@ -238,18 +299,21 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
                 // Run only the VM(s) a step actually checks (via `CHECK-V1` /
                 // `CHECK-V2`). This lets a step assert just one side — needed for
                 // natives one VM cannot run (e.g. `aggregator_v2`, which the
-                // legacy harness installs no extension for and would panic on).
+                // V1 harness installs no extension for and would panic on).
                 // `CHECK-GC-COUNT` inspects the V2 collector, so it also needs V2.
-                let needs_v1 = checks.iter().any(|c| matches!(c, Check::V1(..)));
+                // `CHECK-ERROR-PARITY` compares the two, so it needs both.
+                let needs_v1 = checks
+                    .iter()
+                    .any(|c| matches!(c, Check::V1(..) | Check::ErrorParity));
                 let needs_v2 = checks
                     .iter()
-                    .any(|c| matches!(c, Check::V2(..) | Check::GcCount(..)));
+                    .any(|c| matches!(c, Check::V2(..) | Check::GcCount(..) | Check::ErrorParity));
 
                 let v1 = needs_v1.then(|| {
                     execute_function_v1(&storage, &address, &module_name, &function_name, &args)
                 });
 
-                let (v2_display, v2_gc_count) = if needs_v2 {
+                let (v2_output, v2_gc_count) = if needs_v2 {
                     // V2 needs the arg/return kinds. Reuse V1's if it ran,
                     // otherwise load the function (without running it) to size them.
                     let (param_kinds, return_kinds) = match &v1 {
@@ -272,13 +336,15 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
                         &return_kinds,
                         heap_size,
                     );
-                    (v2_output.display, v2_gc_count)
+                    (v2_output, v2_gc_count)
                 } else {
-                    (String::new(), 0)
+                    (Output::success(String::new()), 0)
                 };
 
-                let v1_display = v1.map(|v| v.output.display).unwrap_or_default();
-                check_output(&checks, &v1_display, &v2_display, v2_gc_count)?;
+                let v1_output = v1
+                    .map(|v| v.output)
+                    .unwrap_or_else(|| Output::success(String::new()));
+                check_output(&checks, &v1_output, &v2_output, v2_gc_count)?;
             },
         }
     }
@@ -291,7 +357,7 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
     Ok(())
 }
 
-/// Native table for the legacy VM. This includes both the real Aptos production
+/// Native table for the V1 VM. This includes both the real Aptos production
 /// natives and some toy ones for tests.
 fn v1_native_table() -> NativeFunctionTable {
     let mut table = aptos_natives(
@@ -362,9 +428,9 @@ fn primitive_kinds(
     (param_kinds, return_kinds)
 }
 
-/// Loads a function via the legacy VM and returns its parameter and return
-/// kinds, without executing it. Used to size the V2 arg/return regions when the
-/// legacy VM is skipped for a step (no `CHECK-V1`/shared checks).
+/// Loads a function via the V1 VM and returns its parameter and return
+/// kinds, without executing it. Used to size the V2 arg/return regions when the V1
+/// VM is skipped for a step (no `CHECK-V1`/shared checks).
 fn load_signature_v1(
     storage: &InMemoryStorage,
     address: &AccountAddress,
@@ -396,7 +462,7 @@ fn load_signature_v1(
     )
 }
 
-/// Execute a function via legacy MoveVM and returns normalized output.
+/// Execute a function via the V1 VM and returns normalized output.
 fn execute_function_v1(
     storage: &InMemoryStorage,
     address: &AccountAddress,
@@ -489,9 +555,7 @@ fn execute_function_v1(
                 })
                 .collect::<Vec<_>>();
             let events = finalize_events_v1(&extensions);
-            Output {
-                display: render_execution_output(&vals, &events),
-            }
+            Output::success(render_execution_output(&vals, &events))
         },
         Err(err) if err.major_status() == StatusCode::ABORTED => {
             let code = err.sub_status().unwrap();
@@ -500,12 +564,20 @@ fn execute_function_v1(
                 Location::Script => "script".to_string(),
                 Location::Undefined => "undefined".to_string(),
             };
-            Output {
-                display: render_abort(code, err.message().map(String::as_str), &location),
-            }
+            Output::aborted(render_abort(
+                code,
+                err.message().map(String::as_str),
+                &location,
+            ))
         },
+        // V1 is the reference, so its own failure is the expected value.
         Err(err) => Output {
             display: format!("error: {}", err),
+            parity: ParityOutcome::Comparable(render_v1_error(
+                err.major_status(),
+                err.sub_status(),
+                err.message().map(String::as_str),
+            )),
         },
     };
     V1Output {
@@ -590,9 +662,19 @@ fn execute_function_v2(
         },
     );
 
-    let display = match outcome {
-        Err(err) => format!("error: {}", err),
-        Ok(RunResult::Error(err)) => format!("error: {}", err),
+    let output = match outcome {
+        // Setup failure (loading, lowering). `{:#}` renders the whole chain;
+        // the typed VM error, when there is one, is the source.
+        Err(err) => Output {
+            display: format!("error: {:#}", err),
+            parity: err
+                .downcast_ref::<VMInternalError>()
+                .map_or(ParityOutcome::Unmappable, describe_v2_error_as_v1),
+        },
+        Ok(RunResult::Error(err)) => Output {
+            display: format!("error: {}", err),
+            parity: describe_v2_error_as_v1(&err),
+        },
         Ok(RunResult::Aborted {
             code,
             message,
@@ -602,11 +684,13 @@ fn execute_function_v2(
                 AbortLocation::Module(module_id) => render_module_location(module_id),
                 AbortLocation::Script => "script".to_string(),
             };
-            render_abort(code, message.as_deref(), &location)
+            Output::aborted(render_abort(code, message.as_deref(), &location))
         },
-        Ok(RunResult::Success((vals, events))) => render_execution_output(&vals, &events),
+        Ok(RunResult::Success((vals, events))) => {
+            Output::success(render_execution_output(&vals, &events))
+        },
     };
-    (Output { display }, gc_count)
+    (output, gc_count)
 }
 
 /// Renders an abort outcome. Both VMs go through this so the abort location
