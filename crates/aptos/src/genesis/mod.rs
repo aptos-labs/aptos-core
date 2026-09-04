@@ -34,7 +34,9 @@ use aptos_genesis::{
 use aptos_logger::info;
 use aptos_types::{
     account_address::{AccountAddress, AccountAddressWithChecks},
-    on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig},
+    on_chain_config::{
+        mono_move_env_enabled, OnChainConsensusConfig, OnChainExecutionConfig, MONO_MOVE_ENV,
+    },
 };
 use aptos_vm_genesis::{default_gas_schedule, AccountBalance, EmployeePool};
 use async_trait::async_trait;
@@ -106,6 +108,13 @@ impl CliCommand<Vec<PathBuf>> for GenerateGenesis {
     }
 
     async fn execute(self) -> CliTypedResult<Vec<PathBuf>> {
+        // TODO(completeness): Remove when MonoMove is production-ready.
+        if mono_move_env_enabled() {
+            return Err(CliError::UnexpectedError(format!(
+                "{MONO_MOVE_ENV} is set; refusing to generate genesis"
+            )));
+        }
+
         let output_dir = dir_default_to_current(self.output_dir.clone())?;
         let genesis_file = output_dir.join(GENESIS_FILE);
         let waypoint_file = output_dir.join(WAYPOINT_FILE);
