@@ -169,6 +169,13 @@ fn publish_struct_descriptor_for(
     ty: InternedType,
     descriptors: &mut UnorderedMap<InternedType, DescriptorId>,
 ) -> VMResult<()> {
+    // `descriptors` keys vector and struct descriptors alike on the concrete
+    // type. A vector's entry is its `Vector` descriptor; overwriting it with a
+    // `Struct` one would drop the element stride, so the GC would trace only
+    // element 0 and `VecPack` / `VecPushBack` would fail verification.
+    if matches!(view_type(ty), Type::Vector { .. }) {
+        return Ok(());
+    }
     if let Some((size, _)) = ctx.size_and_align(ty)
         && let Ok(ptr_offsets) = type_pointer_offsets(ctx, ty)
     {

@@ -30,7 +30,7 @@ use mono_move_core::{
     types::{view_name, view_type_list, InternedType, InternedTypeList},
     DescriptorId, DescriptorProvider, ExecutionErrorKind, Function, GasMeter, LayoutProvider,
     ResourceProvider, VMResult, ENUM_DATA_OFFSET, FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE,
-    TRIVIAL_DESCRIPTOR_ID,
+    POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
 };
 use move_core_types::account_address::AccountAddress;
 use shared_dsa::UnorderedMap;
@@ -322,6 +322,64 @@ impl NativeContext for ProductionNativeContext<'_> {
             ) as *const Function;
             caller_caller.as_ref().map(|f| f.module_id)
         }
+    }
+
+    fn new_byte_vector_vector<'a>(
+        &'a self,
+        items: &[&[u8]],
+    ) -> VMResult<Vector<'a, Vector<'a, u8>>> {
+        if self.returns_started.get() {
+            return Err(native_invariant_violation(
+                "new_byte_vector_vector called after a return value was written".into(),
+            ));
+        }
+        if items.is_empty() {
+            // TODO(correctness): audit empty <=> null vector invariant
+            // SAFETY: passing `null` is always safe.
+            let handle = unsafe { self.pool.root_object(std::ptr::null_mut()) };
+            return Ok(Vector::from_handle(handle));
+        }
+
+        // Allocate the elements first. Each is rooted, so the GC that a later
+        // element's allocation may trigger relocates the earlier ones.
+        let inner = items
+            .iter()
+            .map(|bytes| self.new_byte_vector(bytes))
+            .collect::<VMResult<Vec<_>>>()?;
+
+        // SAFETY: `heap` and `rws` are distinct fields, so reborrowing both
+        // through `&self` at once is sound — at most one `&mut` per field is
+        // live (see the type-level aliasing rule).
+        let heap = unsafe { &mut **self.heap.get() };
+        let rws = unsafe { &mut **self.rws.get() };
+        let ptr = alloc_vec(
+            heap,
+            self.desc_provider,
+            rws,
+            &self.pool,
+            self.extensions,
+            self.frame_ptr,
+            TopFrame::Native(self.abi),
+            POINTER_VEC_DESCRIPTOR_ID,
+            8,
+            inner.len() as u64,
+        )?;
+        // The outer object's descriptor claims one pointer slot per element the
+        // moment it exists, so nothing may allocate before every slot is
+        // written; a GC in that window would trace uninitialized memory. The
+        // element pointers are read after `alloc_vec`, so they account for any
+        // relocation it caused.
+        //
+        // SAFETY: `ptr` is a fresh vector with room for `inner.len()` 8-byte
+        // elements, and no GC runs between here and these writes.
+        unsafe {
+            write_u64(ptr, VEC_LENGTH_OFFSET, inner.len() as u64);
+            for (i, elem) in inner.iter().enumerate() {
+                write_ptr(ptr, VEC_DATA_OFFSET + i * 8, elem.ptr());
+            }
+        }
+        // SAFETY: `ptr` is the data pointer of the freshly allocated vector.
+        Ok(Vector::from_handle(unsafe { self.pool.root_object(ptr) }))
     }
 
     fn new_vector_no_pointers<'a>(

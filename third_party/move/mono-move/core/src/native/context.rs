@@ -113,6 +113,14 @@ pub trait NativeContext {
         Ok(unsafe { vec.transmute_unchecked() })
     }
 
+    /// Allocates a `vector<vector<u8>>` on the VM heap holding one inner byte
+    /// vector per entry of `items`, and returns a handle to it. The vector and
+    /// its elements stay live for the rest of the native call.
+    fn new_byte_vector_vector<'a>(
+        &'a self,
+        items: &[&[u8]],
+    ) -> VMResult<Vector<'a, Vector<'a, u8>>>;
+
     /// Allocates a vector of the specified number of pointer-free elements on
     /// the heap, initialized from already packed in-frame element bytes. These
     /// bytes must be exactly `count * elem_size` bytes long.
