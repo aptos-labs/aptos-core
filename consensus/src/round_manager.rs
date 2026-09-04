@@ -113,6 +113,7 @@ impl UnverifiedEvent {
         max_batch_expiry_gap_usecs: u64,
         max_batch_txns: u64,
         max_batch_bytes: u64,
+        max_num_batch_entries: u64,
         encrypted_enabled: bool,
     ) -> Result<VerifiedEvent, VerifyError> {
         // Temporary: reject encrypted batches/PoS at the entry point until the
@@ -133,6 +134,7 @@ impl UnverifiedEvent {
                         opt_qs_v2_rx_enabled,
                         max_batch_txns,
                         max_batch_bytes,
+                        max_num_batch_entries,
                     )?;
                     counters::VERIFY_MSG
                         .with_label_values(&["proposal"])
@@ -150,6 +152,7 @@ impl UnverifiedEvent {
                         opt_qs_v2_rx_enabled,
                         max_batch_txns,
                         max_batch_bytes,
+                        max_num_batch_entries,
                     )?;
                     counters::VERIFY_MSG
                         .with_label_values(&["opt_proposal"])
@@ -2536,6 +2539,7 @@ mod reject_encrypted_tests {
                 u64::MAX, // max_batch_expiry_gap_usecs
                 1_000_000,
                 1_000_000,
+                1000,
                 true, // encrypted_enabled
             )
             .expect_err("must reject mixed-variant BatchMsgV2");
