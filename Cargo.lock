@@ -698,7 +698,9 @@ name = "aptos-bcs-utils"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bcs 0.1.4",
  "hex",
+ "serde",
 ]
 
 [[package]]
@@ -5005,6 +5007,7 @@ dependencies = [
  "ahash 0.8.12",
  "anyhow",
  "aptos-batch-encryption",
+ "aptos-bcs-utils",
  "aptos-bitvec",
  "aptos-crypto",
  "aptos-crypto-derive",
