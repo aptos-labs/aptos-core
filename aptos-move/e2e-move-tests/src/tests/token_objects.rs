@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{assert_success, tests::common, MoveHarness};
+use crate::{assert_success, run_mono_move, tests::common, MoveHarness};
 use aptos_language_e2e_tests::account::Account;
 use aptos_types::{
     account_address::{self, AccountAddress},
@@ -23,6 +23,7 @@ struct Token {
     mutation_events: EventHandle,
 }
 
+#[run_mono_move]
 #[test]
 fn test_basic_token() {
     let mut h = MoveHarness::new();

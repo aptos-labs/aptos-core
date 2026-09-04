@@ -4,7 +4,7 @@
 use crate::{tests::common, BlockSplit, SUCCESS};
 use aptos_crypto::HashValue;
 use aptos_language_e2e_tests::account::{Account, TransactionBuilder};
-use aptos_move_e2e_test_harness::{assert_abort, assert_success, MoveHarness};
+use aptos_move_e2e_test_harness::{assert_abort, assert_success, run_mono_move, MoveHarness};
 use aptos_types::{
     move_utils::MemberId,
     on_chain_config::FeatureFlag,
@@ -255,6 +255,7 @@ fn new_move_harness() -> MoveHarness {
     )
 }
 
+#[run_mono_move]
 #[test]
 fn test_transaction_context_sender() {
     let mut harness = new_move_harness();
@@ -264,6 +265,7 @@ fn test_transaction_context_sender() {
     assert_eq!(addr, AccountAddress::ONE);
 }
 
+#[run_mono_move]
 #[test]
 fn test_transaction_context_max_gas_amount() {
     let mut harness = new_move_harness();
@@ -273,6 +275,7 @@ fn test_transaction_context_max_gas_amount() {
     assert_eq!(max_gas_amount, 20000000);
 }
 
+#[run_mono_move]
 #[test]
 fn test_transaction_context_gas_unit_price() {
     let mut harness = new_move_harness();
@@ -282,6 +285,7 @@ fn test_transaction_context_gas_unit_price() {
     assert_eq!(max_gas_amount, 100);
 }
 
+#[run_mono_move]
 #[test]
 fn test_transaction_context_chain_id() {
     let mut harness = new_move_harness();
@@ -291,6 +295,7 @@ fn test_transaction_context_chain_id() {
     assert_eq!(chain_id, 4);
 }
 
+#[run_mono_move]
 #[test]
 fn test_transaction_context_is_encrypted_txn_false_for_normal_txn() {
     let mut harness = new_move_harness();
@@ -314,6 +319,7 @@ fn test_transaction_context_is_encrypted_txn_false_for_normal_txn() {
     assert!(!txn_ctx_store.is_encrypted_txn);
 }
 
+#[run_mono_move]
 #[test]
 fn test_transaction_context_is_encrypted_txn_true() {
     let mut harness = MoveHarness::new_with_features(
@@ -430,6 +436,7 @@ fn read_txn_ctx_store(harness: &MoveHarness, account: &Account) -> TransactionCo
         .unwrap()
 }
 
+#[run_mono_move]
 #[test]
 fn test_transaction_context_is_orderless_txn_false_for_seq_num_txn() {
     let mut harness = new_move_harness_with_orderless_txns_enabled();
@@ -447,6 +454,7 @@ fn test_transaction_context_is_orderless_txn_false_for_seq_num_txn() {
     assert!(!read_txn_ctx_store(&harness, &account).is_orderless_txn);
 }
 
+#[run_mono_move]
 #[test]
 fn test_transaction_context_is_orderless_txn_true_for_orderless_txn() {
     let mut harness = new_move_harness_with_orderless_txns_enabled();
@@ -459,6 +467,7 @@ fn test_transaction_context_is_orderless_txn_true_for_orderless_txn() {
     assert!(read_txn_ctx_store(&harness, &account).is_orderless_txn);
 }
 
+#[run_mono_move]
 #[test]
 fn test_seq_num_based_proof_runs_on_seq_num_txn() {
     let mut harness = new_move_harness_with_orderless_txns_enabled();
@@ -475,6 +484,7 @@ fn test_seq_num_based_proof_runs_on_seq_num_txn() {
     assert!(read_txn_ctx_store(&harness, &account).seq_num_proof_checked);
 }
 
+#[run_mono_move]
 #[test]
 fn test_seq_num_based_proof_aborts_on_orderless_txn() {
     let mut harness = new_move_harness_with_orderless_txns_enabled();
@@ -488,6 +498,7 @@ fn test_seq_num_based_proof_aborts_on_orderless_txn() {
     assert!(!read_txn_ctx_store(&harness, &account).seq_num_proof_checked);
 }
 
+#[run_mono_move]
 #[test]
 fn test_transaction_context_gas_payer_as_sender() {
     let mut harness = new_move_harness();
@@ -497,6 +508,7 @@ fn test_transaction_context_gas_payer_as_sender() {
     assert_eq!(gas_payer, *account.address());
 }
 
+#[run_mono_move]
 #[test]
 fn test_transaction_context_secondary_signers_empty() {
     let mut harness = new_move_harness();
@@ -507,6 +519,7 @@ fn test_transaction_context_secondary_signers_empty() {
     assert_eq!(secondary_signers, vec![]);
 }
 
+#[run_mono_move]
 #[test]
 fn test_transaction_context_gas_payer_as_separate_account() {
     let mut harness = new_move_harness();
@@ -551,6 +564,7 @@ fn test_transaction_context_gas_payer_as_separate_account() {
     assert_eq!(gas_payer, *bob.address());
 }
 
+#[run_mono_move]
 #[test]
 fn test_transaction_context_secondary_signers() {
     let mut harness = new_move_harness();
@@ -596,6 +610,7 @@ fn test_transaction_context_secondary_signers() {
     assert_eq!(secondary_signers, vec![*bob.address()]);
 }
 
+#[run_mono_move(should_fail = "MonoMove does not implement the entry_function_payload native")]
 #[test]
 fn test_transaction_context_entry_function_payload() {
     let mut harness = new_move_harness();
@@ -621,6 +636,7 @@ fn test_transaction_context_entry_function_payload() {
     ]);
 }
 
+#[run_mono_move(should_fail = "MonoMove does not support multisig payloads")]
 #[test]
 fn test_transaction_context_multisig_payload() {
     let mut harness = new_move_harness();
@@ -924,6 +940,7 @@ proptest! {
     }
 }
 
+#[run_mono_move]
 #[test]
 fn test_monotonically_increasing_counter_multiple_calls_same_transaction() {
     let mut harness = new_move_harness_with_mon_inc_counter_enabled();
@@ -950,6 +967,7 @@ fn test_monotonically_increasing_counter_multiple_calls_same_transaction() {
     assert!(txn_ctx_store.counter_values[2] > txn_ctx_store.counter_values[1]);
 }
 
+#[run_mono_move]
 #[test]
 fn test_monotonically_increasing_counter_single_call() {
     let mut harness = new_move_harness_with_mon_inc_counter_enabled();
@@ -973,6 +991,7 @@ fn test_monotonically_increasing_counter_single_call() {
     assert!(txn_ctx_store.counter_values[0] > 0);
 }
 
+#[run_mono_move]
 #[test]
 fn test_monotonically_increasing_counter_across_blocks_with_timestamp_advancement() {
     let mut harness = new_move_harness_with_mon_inc_counter_enabled();
@@ -1027,6 +1046,7 @@ fn test_monotonically_increasing_counter_across_blocks_with_timestamp_advancemen
     );
 }
 
+#[run_mono_move]
 #[test]
 fn test_monotonically_increasing_counter_format() {
     let mut harness = new_move_harness_with_mon_inc_counter_enabled();

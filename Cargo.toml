@@ -38,6 +38,7 @@ members = [
     "aptos-move/cli",
     "aptos-move/e2e-benchmark",
     "aptos-move/e2e-move-test-harness",
+    "aptos-move/e2e-move-test-harness-macros",
     "aptos-move/e2e-move-tests",
     "aptos-move/e2e-tests",
     "aptos-move/e2e-testsuite",
@@ -421,6 +422,7 @@ aptos-move-cli = { path = "aptos-move/cli" }
 aptos-move-debugger = { path = "aptos-move/aptos-debugger" }
 aptos-move-e2e-benchmark = { path = "aptos-move/e2e-benchmark" }
 aptos-move-e2e-test-harness = { path = "aptos-move/e2e-move-test-harness" }
+aptos-move-e2e-test-harness-macros = { path = "aptos-move/e2e-move-test-harness-macros" }
 aptos-move-examples = { path = "aptos-move/move-examples" }
 aptos-move-flow = { path = "aptos-move/flow" }
 aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
