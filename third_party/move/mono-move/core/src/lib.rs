@@ -47,7 +47,8 @@ pub use interner::{
 pub use move_binary_format::file_format::{ConstantPoolIndex, FunctionDefinitionIndex};
 pub use object_descriptor::{
     DescriptorProvider, ObjectDescriptor, ObjectDescriptorInner, ObjectDescriptorTable,
-    CLOSURE_DESCRIPTOR_ID, RESERVED_DESCRIPTOR_COUNT, TRIVIAL_DESCRIPTOR_ID,
+    CLOSURE_DESCRIPTOR_ID, POINTER_VEC_DESCRIPTOR_ID, RESERVED_DESCRIPTOR_COUNT,
+    TRIVIAL_DESCRIPTOR_ID,
 };
 pub use prepared_module::{
     intern_sig_token, intern_struct_tag, intern_type_tag, FieldTypes,

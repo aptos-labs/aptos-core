@@ -116,7 +116,7 @@ fun run() {
     4: SlotBorrow [24] <- &[8] @5
     5: StoreImm8 [40] <- #20 @6
     6: VecPushBack [24].push([40], size=8, desc=0) @7
-    7: PackClosure [16] <- func_ref=Unresolved(combine), mask=11, captured_desc=2, captured=[[0](1), [8](8)] @10
+    7: PackClosure [16] <- func_ref=Unresolved(combine), mask=11, captured_desc=3, captured=[[0](1), [8](8)] @10
     8: StoreImm8 [40] <- #100 @12
     9: CallClosure closure=[16], provided_args=[[40](8)] @14
     10: Move8 [40] <- [72] @14

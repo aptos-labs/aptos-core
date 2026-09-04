@@ -7,7 +7,7 @@ fun divergent_u128() {
   code:
     0: JumpIntCmp @14 [0] != u64 #0 gas_taken=41 gas_fallthrough=86 @1
     1: StoreImm16 [56] <- #9 @4
-    2: EnumNew [16] desc=2 tag #0 @6
+    2: EnumNew [16] desc=3 tag #0 @6
     3: HeapMoveTo [16]+8 <- [56] (size=16) @6
     4: HeapMoveTo8 [16]+24 <- [8] @6
     5: SlotBorrow [24] <- &[16] @8
@@ -20,7 +20,7 @@ fun divergent_u128() {
     12: EnumBorrowVariantFieldByTag [40] <- &(*[24]) by tag [Some(24), None] @20
     13: Jump @9 gas=80 @22
     14: AddU64Imm [80] <- [8] + #100 @25
-    15: EnumNew [16] desc=2 tag #1 @26
+    15: EnumNew [16] desc=3 tag #1 @26
     16: HeapMoveTo8 [16]+8 <- [80] @26
     17: Jump @5 gas=9 @28
   safe_point_layouts:
@@ -34,7 +34,7 @@ fun divergent_u8() {
   code:
     0: JumpIntCmp @14 [0] != u64 #0 gas_taken=41 gas_fallthrough=41 @1
     1: StoreImm1 [56] <- #9 @4
-    2: EnumNew [16] desc=3 tag #0 @6
+    2: EnumNew [16] desc=4 tag #0 @6
     3: HeapMoveTo [16]+8 <- [56] (size=1) @6
     4: HeapMoveTo8 [16]+16 <- [8] @6
     5: SlotBorrow [24] <- &[16] @8
@@ -47,7 +47,7 @@ fun divergent_u8() {
     12: EnumBorrowVariantFieldByTag [40] <- &(*[24]) by tag [Some(16), None] @20
     13: Jump @9 gas=80 @22
     14: AddU64Imm [64] <- [8] + #100 @25
-    15: EnumNew [16] desc=3 tag #1 @26
+    15: EnumNew [16] desc=4 tag #1 @26
     16: HeapMoveTo8 [16]+8 <- [64] @26
     17: Jump @5 gas=9 @28
   safe_point_layouts:
@@ -61,7 +61,7 @@ fun uniform_u128() {
   code:
     0: JumpIntCmp @9 [0] != u64 #0 gas_taken=93 gas_fallthrough=86 @1
     1: StoreImm16 [24] <- #1 @4
-    2: EnumNew [16] desc=4 tag #0 @6
+    2: EnumNew [16] desc=5 tag #0 @6
     3: HeapMoveTo [16]+8 <- [24] (size=16) @6
     4: HeapMoveTo8 [16]+24 <- [8] @6
     5: SlotBorrow [40] <- &[16] @8
@@ -70,7 +70,7 @@ fun uniform_u128() {
     8: Return @11
     9: StoreImm16 [24] <- #2 @12
     10: AddU64Imm [56] <- [8] + #1 @15
-    11: EnumNew [16] desc=4 tag #1 @16
+    11: EnumNew [16] desc=5 tag #1 @16
     12: HeapMoveTo [16]+8 <- [24] (size=16) @16
     13: HeapMoveTo8 [16]+24 <- [56] @16
     14: Jump @5 gas=61 @18
@@ -85,7 +85,7 @@ fun uniform_u8() {
   code:
     0: JumpIntCmp @9 [0] != u64 #0 gas_taken=48 gas_fallthrough=41 @1
     1: StoreImm1 [24] <- #1 @4
-    2: EnumNew [16] desc=5 tag #0 @6
+    2: EnumNew [16] desc=6 tag #0 @6
     3: HeapMoveTo [16]+8 <- [24] (size=1) @6
     4: HeapMoveTo8 [16]+16 <- [8] @6
     5: SlotBorrow [32] <- &[16] @8
@@ -94,7 +94,7 @@ fun uniform_u8() {
     8: Return @11
     9: StoreImm1 [24] <- #2 @12
     10: AddU64Imm [48] <- [8] + #1 @15
-    11: EnumNew [16] desc=5 tag #1 @16
+    11: EnumNew [16] desc=6 tag #1 @16
     12: HeapMoveTo [16]+8 <- [24] (size=1) @16
     13: HeapMoveTo8 [16]+16 <- [48] @16
     14: Jump @5 gas=61 @18
@@ -108,7 +108,7 @@ fun write_uniform() {
   entry_gas: 161
   code:
     0: StoreImm8 [32] <- #5 @0
-    1: EnumNew [8] desc=6 tag #0 @2
+    1: EnumNew [8] desc=7 tag #0 @2
     2: HeapMoveTo8 [8]+8 <- [32] @2
     3: HeapMoveTo8 [8]+16 <- [0] @2
     4: SlotBorrow [16] <- &[8] @4
