@@ -21,7 +21,7 @@ use aptos_language_e2e_tests::account::Account;
 use aptos_types::{
     account_config::{AccountResource, AggregatorV1Resource, CoinInfoResource},
     block_executor::{
-        config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
+        config::{BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
         transaction_slice_metadata::TransactionSliceMetadata,
     },
     chain_id::ChainId,
@@ -57,20 +57,18 @@ fn execute_and_get_hot_state_promotions(
     BTreeSet<StateKey>,
     BTreeSet<StateKey>,
 ) {
-    let config = BlockExecutorConfig {
-        local: BlockExecutorLocalConfig::default_with_concurrency_level(concurrency_level),
-        // The hot state accumulator requires `add_block_limit_outcome_onchain`;
-        // `with_features` turns on `hotness_in_epilogue` (in default features), which
-        // selects the V2 epilogue payload carrying `to_make_hot`.
-        onchain: BlockExecutorConfigFromOnchain::on_but_large_for_test()
-            .with_features(&Features::default()),
-    };
+    let local_config = BlockExecutorLocalConfig::default_with_concurrency_level(concurrency_level);
+    // The hot state accumulator requires `add_block_limit_outcome_onchain`;
+    // `with_features` turns on `hotness_in_epilogue` (in default features), which
+    // selects the V2 epilogue payload carrying `to_make_hot`.
+    let onchain_config =
+        BlockExecutorConfigFromOnchain::on_but_large_for_test().with_features(&Features::default());
     let txn_provider = DefaultTxnProvider::new_without_info(into_signature_verified_block(txns));
-    let block_output = AptosVMBlockExecutor::new()
-        .execute_block_with_config(
+    let block_output = AptosVMBlockExecutor::new_with_local_config(local_config)
+        .execute_block(
             &txn_provider,
             h.executor.get_state_view(),
-            config,
+            onchain_config,
             TransactionSliceMetadata::block(HashValue::zero(), HashValue::new([1; 32])),
         )
         .expect("Block execution should succeed");
