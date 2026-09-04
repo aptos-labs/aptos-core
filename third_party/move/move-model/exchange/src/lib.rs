@@ -84,7 +84,7 @@ pub const XIR_SCHEMA: &str = "move-xir-module";
 /// version 4 transports source spans for declarations and stackless code;
 /// version 5 adds user-facing local names; version 6 adds cross-module type
 /// references ([`XirModule::external_types`]), module-level friend
-/// declarations ([`XirModuleMetadata::friends`]), and type visibility
+/// declarations ([`XirModule::friends`]), and type visibility
 /// ([`XirStruct::visibility`]).
 pub const XIR_VERSION: u64 = 6;
 
@@ -179,6 +179,20 @@ pub struct XirModule {
     /// there is local.
     #[serde(default)]
     pub external_types: Vec<XirExternalType>,
+    /// Modules this one grants friend access to.
+    ///
+    /// Required because [`XirVisibility::Friend`] on a declaration says that
+    /// it *is* friend-visible, not *to whom*: friendship is granted by the
+    /// declaring module, so it cannot be reconstructed from per-declaration
+    /// visibility. This list is also where `public(package)` ends up — the
+    /// compiler erases that modifier into `Friend` plus synthesized entries
+    /// here, which is why no `Package` visibility variant is needed.
+    ///
+    /// Top level, beside the other module-wide tables and where the Lean
+    /// producer already emits it — not inside [`XirModuleMetadata`], which
+    /// holds only the module's identity.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub friends: Vec<XirModuleRef>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -226,16 +240,6 @@ pub struct XirModuleMetadata {
     pub address: String,
     pub name: String,
     pub dialect: XirDialect,
-    /// Modules this one grants friend access to.
-    ///
-    /// Required because [`XirVisibility::Friend`] on a declaration says that
-    /// it *is* friend-visible, not *to whom*: friendship is granted by the
-    /// declaring module, so it cannot be reconstructed from per-declaration
-    /// visibility. This list is also where `public(package)` ends up — the
-    /// compiler erases that modifier into `Friend` plus synthesized entries
-    /// here, which is why no `Package` visibility variant is needed.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub friends: Vec<XirModuleRef>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -254,7 +258,7 @@ pub struct XirStruct {
     ///
     /// Three variants suffice: `package` is source-level sugar that the
     /// compiler erases into `Friend` plus entries in
-    /// [`XirModuleMetadata::friends`], so no compiled artifact carries a
+    /// [`XirModule::friends`], so no compiled artifact carries a
     /// `package` notion. Defaults to `Private` so documents predating this
     /// field still deserialize.
     #[serde(default = "XirVisibility::private")]
@@ -334,9 +338,16 @@ pub struct XirAttribute {
     pub args: Vec<XirAttributeArg>,
 }
 
-/// One positional attribute argument: a name path (optionally instantiated,
-/// so it can denote a constant, function, or type), a `u64` constant (a
-/// decimal string, per the format conventions), or a boolean constant.
+/// One attribute argument: a name path (optionally instantiated, so it can
+/// denote a constant, function, or type), a `u64` constant (a decimal string,
+/// per the format conventions), a boolean constant, or an assignment of any of
+/// those to a name.
+///
+/// The assignment form uses the key `assign` rather than reusing `name`
+/// because consumers discriminate these shapes by probing for a key: an
+/// `{"name": ..., "value": ...}` encoding would be *silently* read as a bare
+/// name by any consumer that probes `name` first and stops, dropping the
+/// assigned value. A disjoint key makes an unsupported form a hard error.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum XirAttributeArg {
@@ -344,6 +355,19 @@ pub enum XirAttributeArg {
         name: String,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         args: Vec<XirAttributeArg>,
+    },
+    /// `{"assign": name, "value": argument}` — `name = value`, as in
+    /// `#[resource_group(scope = global)]` and
+    /// `#[resource_group_member(group = 0x1::object::ObjectGroup)]`.
+    ///
+    /// Produced by the interface exporter, which reads these from Move source.
+    /// The Lean producer neither emits nor accepts this form: its attribute
+    /// syntax has no assignment, so there is nothing for it to encode. Because
+    /// the key is disjoint it rejects the form outright rather than misreading
+    /// it.
+    Assign {
+        assign: String,
+        value: Box<XirAttributeArg>,
     },
     Num {
         #[serde(rename = "num")]
@@ -564,15 +588,20 @@ pub enum Type {
     Ref(Box<Type>),
     /// `{"mut_ref": type}` — mutable reference.
     MutRef(Box<Type>),
-    /// `{"fun": [args, result, [abilities]]}` — a Move function value type
-    /// (language version 2.2), mirroring `move_model::ty::Type::Fun`. Multiple
-    /// arguments or results are a tuple in the respective position.
+    /// `{"fun": [[arguments], [results], [abilities]]}` — a Move function
+    /// value type (language version 2.2), mirroring `move_model::ty::Type::Fun`.
+    ///
+    /// Arguments and results are *lists*, as they are on a function
+    /// declaration ([`XirFunction::returns`]), rather than a single type that
+    /// is a tuple when the arity is not one: the format has no tuple type, and
+    /// Move has no first-class one either. `|&T, &V|` is therefore
+    /// `Fun([ref T, ref V], [], _)`.
     ///
     /// Transported for declarations only, like the reference types above: a
     /// signature may name a function type even though this fragment models no
     /// closure, lambda, or invoke *operation*. Producers that cannot express
     /// those operations may still emit the type.
-    Fun(Box<Type>, Box<Type>, Vec<String>),
+    Fun(Vec<Type>, Vec<Type>, Vec<String>),
 }
 
 /// A declaration-scoped Move type parameter.
@@ -1271,6 +1300,42 @@ mod tests {
         assert_eq!(serde_json::to_value(&attribute).unwrap(), json);
     }
 
+    /// The assignment argument uses a key that no other argument shape has.
+    ///
+    /// This matters because the shapes are untagged: consumers tell them apart
+    /// by probing for a key. Had assignment been spelled `{"name": ...,
+    /// "value": ...}`, a consumer that probes `name` first and stops — which
+    /// both this `untagged` enum and the Lean decoder do — would read it as a
+    /// bare name and *silently drop the assigned value*. With a disjoint key,
+    /// a consumer that does not know the form fails loudly instead.
+    #[test]
+    fn assignment_argument_is_not_confusable_with_a_name() {
+        let json = json!({
+            "name": "resource_group_member",
+            "args": [{"assign": "group", "value": {"name": "0x1::object::ObjectGroup"}}]
+        });
+        let attribute: XirAttribute = serde_json::from_value(json.clone()).unwrap();
+        assert_eq!(attribute, XirAttribute {
+            name: "resource_group_member".to_string(),
+            args: vec![XirAttributeArg::Assign {
+                assign: "group".to_string(),
+                value: Box::new(XirAttributeArg::Name {
+                    name: "0x1::object::ObjectGroup".to_string(),
+                    args: vec![],
+                }),
+            }],
+        });
+        assert_eq!(serde_json::to_value(&attribute).unwrap(), json);
+
+        // A bare name is still a bare name: the two shapes do not collide in
+        // either direction.
+        let name: XirAttributeArg = serde_json::from_value(json!({"name": "group"})).unwrap();
+        assert_eq!(name, XirAttributeArg::Name {
+            name: "group".to_string(),
+            args: vec![],
+        });
+    }
+
     #[test]
     fn pretty_json_fill_layout() {
         let pretty = full_module().to_pretty_json();
@@ -1318,6 +1383,30 @@ mod tests {
 
     #[test]
     fn v6_additions_have_pinned_wire_shapes() {
+        // `friends` is a top-level field beside the other module-wide tables,
+        // not a member of `module`. `XirModule` denies unknown fields, so a
+        // producer placing it inside `module` — or a schema moving it there —
+        // would be rejected outright.
+        let module: XirModule = serde_json::from_value(json!({
+            "schema": XIR_SCHEMA,
+            "version": XIR_VERSION,
+            "module": {"address": "0x42", "name": "m", "dialect": "stackless"},
+            "structs": [],
+            "functions": [],
+            "friends": [{"address": "0x1", "module": "buddy"}],
+        }))
+        .unwrap();
+        assert_eq!(module.friends.len(), 1);
+        let encoded = serde_json::to_value(&module).unwrap();
+        assert!(
+            encoded["friends"].is_array(),
+            "friends must serialize at the top level"
+        );
+        assert!(
+            encoded["module"].get("friends").is_none(),
+            "friends must not be nested under `module`"
+        );
+
         assert_eq!(
             serde_json::to_value(XirExternalType {
                 address: "0x1".to_owned(),
@@ -1337,13 +1426,24 @@ mod tests {
         );
         // The function type is a tuple variant of arity three, so it wraps its
         // payload in an array; changing that arity changes the wire shape.
+        // Its argument and result positions are lists, so an arity other than
+        // one needs no tuple type: `|&T, &V|` has an empty result list.
         assert_eq!(
-            serde_json::to_value(Type::Fun(Box::new(Type::U64), Box::new(Type::Bool), vec![
+            serde_json::to_value(Type::Fun(vec![Type::U64], vec![Type::Bool], vec![
                 "copy".to_owned(),
                 "drop".to_owned()
             ],))
             .unwrap(),
-            json!({"fun": ["u64", "bool", ["copy", "drop"]]})
+            json!({"fun": [["u64"], ["bool"], ["copy", "drop"]]})
+        );
+        assert_eq!(
+            serde_json::to_value(Type::Fun(
+                vec![Type::Ref(Box::new(Type::U64)), Type::Bool],
+                vec![],
+                vec![]
+            ))
+            .unwrap(),
+            json!({"fun": [[{"ref": "u64"}, "bool"], [], []]})
         );
         assert_eq!(
             serde_json::to_value(XirVisibility::Friend).unwrap(),
@@ -1358,7 +1458,7 @@ mod tests {
         let module: XirModule = serde_json::from_value(xir_module_json(5)).unwrap();
         assert!(module.check_version().is_ok());
         assert!(module.external_types.is_empty());
-        assert!(module.module.friends.is_empty());
+        assert!(module.friends.is_empty());
         assert_eq!(module.structs[0].visibility, XirVisibility::Private);
     }
 

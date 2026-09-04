@@ -58,8 +58,23 @@ pub struct XirSource {
     is_target: bool,
 }
 
+impl XirSource {
+    /// The validated module this source parsed to.
+    pub fn module(&self) -> &XirModule {
+        &self.module
+    }
+}
+
+/// Parses XIR to be *compiled*: every non-native function must have a body.
 pub fn parse_source(path: PathBuf, text: String, json: &str) -> Result<XirSource> {
     parse_source_with_target(path, text, json, true)
+}
+
+/// Parses XIR that describes a *dependency* rather than a compilation target,
+/// which is what [`crate::xir_export::export_interface`] produces: signatures,
+/// types and attributes, with function bodies omitted.
+pub fn parse_interface(path: PathBuf, text: String, json: &str) -> Result<XirSource> {
+    parse_source_with_target(path, text, json, false)
 }
 
 pub(crate) fn parse_source_with_target(
@@ -161,7 +176,7 @@ fn validate(module: &XirModule, is_target: bool) -> Result<()> {
         );
         let mut field_names = BTreeSet::new();
         for field in &decl.fields {
-            valid_identifier("field", &field.name)?;
+            valid_field_name(&field.name)?;
             ensure!(
                 field_names.insert(&field.name),
                 "duplicate field `{}` in struct `{}`",
@@ -285,9 +300,10 @@ fn validate_type_parameters(ty: &Ty, count: usize, owner: &str) -> Result<()> {
         Ty::Vector(element) | Ty::Ref(element) | Ty::MutRef(element) => {
             validate_type_parameters(element, count, owner)?;
         },
-        Ty::Fun(args, result, _) => {
-            validate_type_parameters(args, count, owner)?;
-            validate_type_parameters(result, count, owner)?;
+        Ty::Fun(args, results, _) => {
+            for ty in args.iter().chain(results) {
+                validate_type_parameters(ty, count, owner)?;
+            }
         },
         Ty::Bool
         | Ty::U8
@@ -335,6 +351,18 @@ fn validate_operation_type_parameters(
         validate_type_parameters(arg, count, &format!("function `{function}` operation"))?;
     }
     Ok(())
+}
+
+/// A field name is an identifier, or a decimal index for a field of a
+/// positional struct — `struct Homomorphism<phantom P>(|&Statement<P>| Rep)`,
+/// whose one field `move-model` names `0`. Consumers address fields by their
+/// offset, so the name is documentation, but keeping the model's spelling
+/// makes the round trip exact.
+fn valid_field_name(name: &str) -> Result<()> {
+    if !name.is_empty() && name.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Ok(());
+    }
+    valid_identifier("field", name)
 }
 
 fn valid_identifier(kind: &str, name: &str) -> Result<()> {
@@ -427,12 +455,70 @@ fn model_attribute_apply(
                     XirAttributeArg::Name { name, args } => {
                         model_attribute_apply(env, loc, name, args)
                     },
+                    XirAttributeArg::Assign { assign, value } => {
+                        let symbol = env.symbol_pool().make(assign);
+                        let value = model_attribute_value(env, loc, assign, value)?;
+                        Ok(Attribute::Assign(
+                            env.new_node(loc.clone(), Type::Tuple(vec![])),
+                            symbol,
+                            value,
+                        ))
+                    },
                     XirAttributeArg::Num { .. } | XirAttributeArg::Bool { .. } => {
                         bail!("attribute `{name}` has an unnamed literal argument")
                     },
                 })
                 .collect::<Result<Vec<_>>>()?,
         )),
+    }
+}
+
+/// Translates the right-hand side of an attribute assignment. Inverse of
+/// `xir_export::export_attribute_value`: a name path is split at its last
+/// `::` back into an optional module qualifier and a symbol.
+fn model_attribute_value(
+    env: &mut GlobalEnv,
+    loc: &Loc,
+    name: &str,
+    value: &XirAttributeArg,
+) -> Result<AttributeValue> {
+    let node_id = env.new_node(loc.clone(), Type::Tuple(vec![]));
+    match value {
+        XirAttributeArg::Num { value } => Ok(AttributeValue::Value(
+            node_id,
+            Value::Number(value.parse()?),
+        )),
+        XirAttributeArg::Bool { value } => Ok(AttributeValue::Value(node_id, Value::Bool(*value))),
+        XirAttributeArg::Name { name: path, args } => {
+            ensure!(
+                args.is_empty(),
+                "attribute `{name}` is assigned `{path}`, which cannot take arguments"
+            );
+            let (module_name, symbol) = match path.rfind("::") {
+                Some(split) => {
+                    let (module_path, symbol) = (&path[..split], &path[split + 2..]);
+                    let split = module_path.rfind("::").with_context(|| {
+                        format!(
+                            "attribute `{name}` is assigned `{path}`, which is not a \
+                                 module-qualified name"
+                        )
+                    })?;
+                    let address = AccountAddress::from_hex_literal(&module_path[..split])
+                        .with_context(|| format!("invalid address in attribute value `{path}`"))?;
+                    let module_name = ModuleName::new(
+                        Address::Numerical(address),
+                        env.symbol_pool().make(&module_path[split + 2..]),
+                    );
+                    (Some(module_name), symbol)
+                },
+                None => (None, path.as_str()),
+            };
+            let symbol = env.symbol_pool().make(symbol);
+            Ok(AttributeValue::Name(node_id, module_name, symbol))
+        },
+        XirAttributeArg::Assign { assign, .. } => {
+            bail!("attribute `{name}` is assigned the assignment `{assign}`, which has no meaning")
+        },
     }
 }
 
@@ -522,6 +608,11 @@ fn import_source(
             fields,
             variants,
             visibility: move_visibility(&decl.visibility),
+            attributes: decl
+                .attributes
+                .iter()
+                .map(|attribute| model_attribute(env, &loc, attribute))
+                .collect::<Result<Vec<_>>>()?,
         });
     }
 
@@ -590,7 +681,6 @@ fn import_source(
     // is absent from this compilation, so resolve the id where possible and
     // keep the name either way.
     let friends = xir
-        .module
         .friends
         .iter()
         .map(|reference| {
@@ -750,6 +840,21 @@ fn move_visibility(visibility: &XirVisibility) -> MoveVisibility {
     }
 }
 
+/// Translates the argument or result position of a function type, which XIR
+/// spells as a list and `move_model` as a bare type at arity one and a `Tuple`
+/// otherwise. Inverse of `xir_export::export_type_list`.
+fn model_type_list(types: &[Ty], structs: &[QualifiedId<StructId>]) -> Result<Type> {
+    let mut types = types
+        .iter()
+        .map(|ty| model_type(ty, structs))
+        .collect::<Result<Vec<_>>>()?;
+    Ok(if types.len() == 1 {
+        types.pop().expect("length just checked")
+    } else {
+        Type::Tuple(types)
+    })
+}
+
 /// Translates an XIR type. `structs` is the combined reference table from
 /// [`struct_references`]: local declarations first, then external ones, so a
 /// resource id resolves to its defining module without the type itself
@@ -812,9 +917,9 @@ fn model_type(ty: &Ty, structs: &[QualifiedId<StructId>]) -> Result<Type> {
                     .collect::<Result<Vec<_>>>()?,
             )
         },
-        Ty::Fun(args, result, abilities) => Type::Fun(
-            Box::new(model_type(args, structs)?),
-            Box::new(model_type(result, structs)?),
+        Ty::Fun(args, results, abilities) => Type::Fun(
+            Box::new(model_type_list(args, structs)?),
+            Box::new(model_type_list(results, structs)?),
             parse_ability_set(abilities).context("on a function type")?,
         ),
         Ty::Vector(element) => Type::Vector(Box::new(model_type(element, structs)?)),
@@ -2498,10 +2603,8 @@ mod tests {
         serde_json::from_value(serde_json::json!({
             "schema": move_model_exchange::XIR_SCHEMA,
             "version": move_model_exchange::XIR_VERSION,
-            "module": {
-                "address": "0x42", "name": name, "dialect": "stackless",
-                "friends": [{"address": "0x42", "module": "buddy"}],
-            },
+            "module": {"address": "0x42", "name": name, "dialect": "stackless"},
+            "friends": [{"address": "0x42", "module": "buddy"}],
             "structs": [{
                 "name": "Local", "visibility": "public",
                 "abilities": ["drop"],

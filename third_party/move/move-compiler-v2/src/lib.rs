@@ -17,6 +17,7 @@ pub mod pipeline;
 pub mod plan_builder;
 pub mod xir;
 pub mod xir_export;
+pub mod xir_interface_generator;
 
 use crate::{
     diagnostics::Emitter,
@@ -314,6 +315,16 @@ pub fn run_move_compiler_to_model(mut options: Options) -> anyhow::Result<Global
 /// fails not on context checking errors, but possibly on i/o errors.
 pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
     info!("type checking");
+    // XIR dependencies are lowered to Move source and joined to the ordinary
+    // dependencies: name resolution runs off parsed source, so an interface
+    // has to reach the front end that way. `generated` owns the directory and
+    // may be dropped once the model builder has read the files, which it has
+    // by the time it returns — the text is copied into the env.
+    let generated =
+        xir_interface_generator::generate_dependency_sources(&options.xir_dependencies)?;
+    let mut dependencies = options.dependencies.clone();
+    dependencies.extend(generated.paths.iter().cloned());
+
     // Run the model builder, which performs context checking.
     let addrs = move_model::parse_addresses_from_options(options.named_address_mapping.clone())?;
     let mut env = move_model::run_model_builder_in_compiler_mode(
@@ -326,7 +337,7 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
             address_map: addrs.clone(),
         },
         vec![PackageInfo {
-            sources: options.dependencies.clone(),
+            sources: dependencies,
             address_map: addrs.clone(),
         }],
         options.skip_attribute_checks,

@@ -4371,6 +4371,7 @@ impl StructData {
     /// do not originate in the Move AST still initialize the model with the
     /// same abilities, fields, variants, and visibility invariants.
     #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new_runtime(
         name: Symbol,
         loc: Loc,
@@ -4380,6 +4381,7 @@ impl StructData {
         variants: Option<BTreeMap<Symbol, StructVariant>>,
         is_native: bool,
         visibility: Visibility,
+        attributes: Vec<Attribute>,
     ) -> Self {
         Self {
             abilities,
@@ -4389,6 +4391,7 @@ impl StructData {
             is_native,
             visibility,
             is_empty_struct: false,
+            attributes,
             ..Self::new(name, loc)
         }
     }

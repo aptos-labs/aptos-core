@@ -22,13 +22,15 @@ use anyhow::{bail, Context, Result};
 use move_binary_format::file_format::Visibility as MoveVisibility;
 use move_core_types::ability::{Ability, AbilitySet};
 use move_model::{
+    ast::{Attribute, AttributeValue, Value},
     model::{FunctionEnv, ModuleEnv, ModuleId, QualifiedId, StructEnv, StructId},
+    symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type},
 };
 use move_model_exchange::{
-    Field, Type as Ty, TypeParameter as TypeParameterDecl, Variant, XirDialect, XirExternalType,
-    XirFunction, XirModule, XirModuleMetadata, XirModuleRef, XirStruct, XirVisibility, XIR_SCHEMA,
-    XIR_VERSION,
+    Field, Type as Ty, TypeParameter as TypeParameterDecl, Variant, XirAttribute, XirAttributeArg,
+    XirDialect, XirExternalType, XirFunction, XirModule, XirModuleMetadata, XirModuleRef,
+    XirStruct, XirVisibility, XIR_SCHEMA, XIR_VERSION,
 };
 use std::collections::BTreeMap;
 
@@ -46,8 +48,7 @@ struct References<'env> {
 
 impl<'env> References<'env> {
     fn new(module: &'env ModuleEnv<'env>) -> Self {
-        let local_structs = module
-            .get_structs()
+        let local_structs = exported_structs(module)
             .enumerate()
             .map(|(index, struct_env)| (struct_env.get_id(), index))
             .collect();
@@ -157,12 +158,141 @@ fn export_type(refs: &mut References, ty: &Type) -> Result<Ty> {
             Ty::MutRef(Box::new(export_type(refs, referent)?))
         },
         Type::Fun(args, result, abilities) => Ty::Fun(
-            Box::new(export_type(refs, args)?),
-            Box::new(export_type(refs, result)?),
+            export_type_list(refs, args)?,
+            export_type_list(refs, result)?,
             ability_names(*abilities),
         ),
         other => bail!("type `{other:?}` has no XIR form"),
     })
+}
+
+/// Exports the argument or result position of a function type, which XIR
+/// spells as a list.
+///
+/// `move_model` writes such a position as a bare type at arity one and as a
+/// `Tuple` otherwise — `|T|` is `Fun(T, Tuple([]))`, `|&T, &V|` is
+/// `Fun(Tuple([&T, &V]), Tuple([]))`. This is the only place a `Tuple` is
+/// legitimate, which is why `export_type` rejects it everywhere else.
+fn export_type_list(refs: &mut References, ty: &Type) -> Result<Vec<Ty>> {
+    match ty {
+        Type::Tuple(types) => types
+            .iter()
+            .map(|ty| export_type(refs, ty))
+            .collect::<Result<Vec<_>>>(),
+        single => Ok(vec![export_type(refs, single)?]),
+    }
+}
+
+/// Translates model attributes, the inverse of `xir::model_attribute`.
+///
+/// A top-level attribute is a `{name, args}` object, so an assignment can only
+/// be spelled there by the reader's rule that a lone `num`/`bool` argument
+/// means assignment:
+///
+/// - `Apply(name, args)`                → `{name, args}`
+/// - `Assign(name, Value::Number|Bool)` → `{name, args: [num|bool]}`
+///
+/// In *argument* position both forms are available, and assignment always uses
+/// the explicit one — `{assign, value}` — including for literals. That keeps a
+/// single rule for reading a nested argument and is what lets an assigned
+/// *name* be represented at all, as in
+/// `#[resource_group_member(group = 0x1::object::ObjectGroup)]`, which the
+/// framework's extended checker requires to stay an `Assign`.
+fn export_attributes(module: &ModuleEnv, attributes: &[Attribute]) -> Result<Vec<XirAttribute>> {
+    attributes
+        .iter()
+        .map(|attribute| {
+            let (name, args) = export_attribute_parts(module, attribute)?;
+            Ok(XirAttribute { name, args })
+        })
+        .collect()
+}
+
+fn export_attribute_parts(
+    module: &ModuleEnv,
+    attribute: &Attribute,
+) -> Result<(String, Vec<XirAttributeArg>)> {
+    let pool = module.env.symbol_pool();
+    match attribute {
+        Attribute::Apply(_, name, args) => Ok((
+            pool.string(*name).to_string(),
+            args.iter()
+                .map(|arg| export_attribute_arg(module, arg))
+                .collect::<Result<Vec<_>>>()?,
+        )),
+        Attribute::Assign(_, name, AttributeValue::Value(_, value)) => {
+            let arg = match value {
+                Value::Number(number) => XirAttributeArg::Num {
+                    value: number.to_string(),
+                },
+                Value::Bool(flag) => XirAttributeArg::Bool { value: *flag },
+                other => bail!(
+                    "attribute `{}` has a value of an unsupported kind: {other:?}",
+                    pool.string(*name)
+                ),
+            };
+            Ok((pool.string(*name).to_string(), vec![arg]))
+        },
+        // A top-level `{name, args}` object has no slot for an assigned name;
+        // only argument position does. No framework attribute takes this
+        // shape, so it is reported rather than reshaped into an application,
+        // which the extended checker would not recognize.
+        Attribute::Assign(_, name, AttributeValue::Name(..)) => bail!(
+            "attribute `{}` is assigned a name at top level, which XIR represents \
+             only in argument position",
+            pool.string(*name)
+        ),
+    }
+}
+
+fn export_attribute_arg(module: &ModuleEnv, attribute: &Attribute) -> Result<XirAttributeArg> {
+    let pool = module.env.symbol_pool();
+    match attribute {
+        Attribute::Apply(_, name, args) => Ok(XirAttributeArg::Name {
+            name: pool.string(*name).to_string(),
+            args: args
+                .iter()
+                .map(|arg| export_attribute_arg(module, arg))
+                .collect::<Result<Vec<_>>>()?,
+        }),
+        Attribute::Assign(_, name, value) => Ok(XirAttributeArg::Assign {
+            assign: pool.string(*name).to_string(),
+            value: Box::new(export_attribute_value(module, *name, value)?),
+        }),
+    }
+}
+
+/// Translates the right-hand side of an attribute assignment. A name is
+/// rendered as a path so that its module qualifier survives; the reader splits
+/// it back at the last `::`.
+fn export_attribute_value(
+    module: &ModuleEnv,
+    name: Symbol,
+    value: &AttributeValue,
+) -> Result<XirAttributeArg> {
+    let pool = module.env.symbol_pool();
+    match value {
+        AttributeValue::Value(_, Value::Number(number)) => Ok(XirAttributeArg::Num {
+            value: number.to_string(),
+        }),
+        AttributeValue::Value(_, Value::Bool(flag)) => Ok(XirAttributeArg::Bool { value: *flag }),
+        AttributeValue::Value(_, other) => bail!(
+            "attribute `{}` has a value of an unsupported kind: {other:?}",
+            pool.string(name)
+        ),
+        AttributeValue::Name(_, module_name, symbol) => {
+            let symbol = pool.string(*symbol).to_string();
+            Ok(XirAttributeArg::Name {
+                name: match module_name {
+                    Some(module_name) => {
+                        format!("{}::{}", module_name.display_full(module.env), symbol)
+                    },
+                    None => symbol,
+                },
+                args: vec![],
+            })
+        },
+    }
 }
 
 fn export_type_parameters(
@@ -226,9 +356,7 @@ fn export_struct(refs: &mut References, struct_env: &StructEnv) -> Result<XirStr
         type_parameters: export_type_parameters(module, struct_env.get_type_parameters()),
         fields,
         variants,
-        // Attributes are model-internal `Attribute` values; an interface
-        // exporter that needs them must translate them explicitly.
-        attributes: vec![],
+        attributes: export_attributes(module, struct_env.get_attributes())?,
     })
 }
 
@@ -283,7 +411,7 @@ fn export_function(refs: &mut References, fun_env: &FunctionEnv) -> Result<XirFu
             ensures: vec![],
             modifies: vec![],
         },
-        attributes: vec![],
+        attributes: export_attributes(module, fun_env.get_attributes())?,
         source_map: None,
     })
 }
@@ -293,13 +421,31 @@ fn export_function(refs: &mut References, fun_env: &FunctionEnv) -> Result<XirFu
 /// Private functions are omitted: a dependent cannot call them, so they are
 /// not part of the surface it compiles against. Every struct is included,
 /// because a type may be named even where its constructor is not accessible.
+/// The structs that belong in an interface, in the declaration order that
+/// fixes their resource ids.
+///
+/// Ghost memory is excluded: a specification variable — `spec module { global
+/// supply<CoinType>: num; }` in `coin` — is represented in the model as a
+/// struct, but it has no runtime existence and its type is spec-only, so no
+/// dependent ever compiles against it.
+///
+/// [`References::new`] indexes the same sequence, so the filter must not be
+/// applied in one place and not the other: dropping a struct from the exported
+/// list alone would shift every id after it.
+fn exported_structs<'env>(
+    module: &'env ModuleEnv<'env>,
+) -> impl Iterator<Item = StructEnv<'env>> + 'env {
+    module
+        .get_structs()
+        .filter(|struct_env| !struct_env.is_ghost_memory())
+}
+
 pub fn export_interface(module: &ModuleEnv) -> Result<XirModule> {
     let pool = module.env.symbol_pool();
     let name = module.get_name();
     let mut refs = References::new(module);
 
-    let structs = module
-        .get_structs()
+    let structs = exported_structs(module)
         .map(|struct_env| {
             export_struct(&mut refs, &struct_env)
                 .with_context(|| format!("on struct `{}`", struct_env.get_full_name_str()))
@@ -331,10 +477,10 @@ pub fn export_interface(module: &ModuleEnv) -> Result<XirModule> {
             address: name.addr().expect_numerical().to_hex_literal(),
             name: pool.string(name.name()).to_string(),
             dialect: XirDialect::Stackless,
-            friends,
         },
         structs,
         functions,
+        friends,
         // Empty by construction: with no bodies there are no calls, so this
         // interface names no foreign functions. A full exporter would fill it.
         external_functions: vec![],
@@ -378,10 +524,8 @@ mod tests {
         serde_json::json!({
             "schema": XIR_SCHEMA,
             "version": XIR_VERSION,
-            "module": {
-                "address": "0x42", "name": name, "dialect": "stackless",
-                "friends": [{"address": "0x42", "module": "buddy"}],
-            },
+            "module": {"address": "0x42", "name": name, "dialect": "stackless"},
+            "friends": [{"address": "0x42", "module": "buddy"}],
             "structs": structs,
             "functions": functions,
         })
@@ -451,7 +595,7 @@ mod tests {
         assert_eq!(exported_struct.abilities, vec!["copy", "drop", "store"]);
         assert_eq!(exported_struct.type_parameters[0].name, "T");
         assert_eq!(exported_struct.fields[1].ty, Ty::I64);
-        assert_eq!(exported.module.friends.len(), 1);
+        assert_eq!(exported.friends.len(), 1);
 
         // The export re-imports as a dependency, bodies absent and all.
         let round_tripped = parse_source_with_target(
@@ -470,6 +614,173 @@ mod tests {
             0,
             "an interface is a dependency, not a compilation target"
         );
+    }
+
+    /// Attributes survive an interface export. This is the reason an
+    /// XIR-described dependency beats a `.mv` one: the binary loader never
+    /// reads `CompiledModule::metadata`, so annotations are lost there.
+    #[test]
+    fn attributes_survive_the_interface_export() {
+        let source = serde_json::json!({
+            "schema": XIR_SCHEMA,
+            "version": XIR_VERSION,
+            "module": {"address": "0x42", "name": "m", "dialect": "stackless"},
+            "structs": [{
+                "name": "Registry", "visibility": "public", "abilities": ["key"],
+                "fields": [{"name": "v", "ty": "u64"}],
+                "attributes": [{"name": "resource_group", "args": [
+                    {"name": "scope", "args": [{"name": "global", "args": []}]}
+                ]}],
+            }],
+            "functions": [{
+                "name": "act", "visibility": "public", "is_entry": true,
+                "is_native": false, "acquires": [], "params": 0,
+                "locals": [], "returns": [], "blocks": empty_body(), "entry": 0,
+                "loops": [],
+                "spec": {"requires": [], "modifies": [], "ensures": [], "aborts_if": []},
+                "attributes": [{"name": "randomness", "args": [{"num": "7"}]},
+                               {"name": "lint.skip", "args": []}],
+            }],
+        });
+
+        let env = model_of(&[source]);
+        let module = env.get_modules().next().unwrap();
+        let exported = export_interface(&module).unwrap();
+
+        assert_eq!(exported.structs[0].attributes.len(), 1);
+        assert_eq!(exported.structs[0].attributes[0].name, "resource_group");
+        assert_eq!(exported.structs[0].attributes[0].args, vec![
+            XirAttributeArg::Name {
+                name: "scope".to_owned(),
+                args: vec![XirAttributeArg::Name {
+                    name: "global".to_owned(),
+                    args: vec![],
+                }],
+            }
+        ]);
+
+        let function_attributes = &exported.functions[0].attributes;
+        assert_eq!(function_attributes.len(), 2);
+        // A lone numeric argument decodes as an assignment and must come back
+        // out in that same shape.
+        assert_eq!(function_attributes[0].name, "randomness");
+        assert_eq!(function_attributes[0].args, vec![XirAttributeArg::Num {
+            value: "7".to_owned()
+        }]);
+        assert_eq!(function_attributes[1].name, "lint.skip");
+        assert!(function_attributes[1].args.is_empty());
+    }
+
+    /// `#[resource_group_member(group = 0x1::object::ObjectGroup)]` and
+    /// `#[resource_group(scope = global)]` — the two shapes the framework
+    /// actually uses. Both must stay `Attribute::Assign` in the model, because
+    /// the extended checker matches on that; reshaping either into an
+    /// application would make the group membership invisible to it.
+    #[test]
+    fn assigned_names_round_trip_with_their_module_qualifier() {
+        let attributes = serde_json::json!([
+            {"name": "resource_group_member", "args": [
+                {"assign": "group", "value": {"name": "0x1::object::ObjectGroup"}}
+            ]},
+            {"name": "resource_group", "args": [
+                {"assign": "scope", "value": {"name": "global"}}
+            ]},
+        ]);
+        let source = serde_json::json!({
+            "schema": XIR_SCHEMA,
+            "version": XIR_VERSION,
+            "module": {"address": "0x42", "name": "m", "dialect": "stackless"},
+            "structs": [{
+                "name": "Member", "visibility": "public", "abilities": ["key"],
+                "fields": [{"name": "v", "ty": "u64"}],
+                "attributes": attributes.clone(),
+            }],
+            "functions": [],
+        });
+
+        let env = model_of(&[source]);
+        let module = env.get_modules().next().unwrap();
+
+        // The reader produced assignments, not applications.
+        let struct_env = module.get_structs().next().unwrap();
+        let pool = env.symbol_pool();
+        let group = match &struct_env.get_attributes()[0] {
+            Attribute::Apply(_, name, args) => {
+                assert_eq!(pool.string(*name).as_str(), "resource_group_member");
+                args[0].clone()
+            },
+            other => panic!("expected an application, got {other:?}"),
+        };
+        match &group {
+            Attribute::Assign(_, name, AttributeValue::Name(_, Some(module_name), value)) => {
+                assert_eq!(pool.string(*name).as_str(), "group");
+                assert_eq!(module_name.display_full(&env).to_string(), "0x1::object");
+                assert_eq!(pool.string(*value).as_str(), "ObjectGroup");
+            },
+            other => panic!("expected a module-qualified assignment, got {other:?}"),
+        }
+
+        // And exporting gives back exactly the shape we started from.
+        let exported = export_interface(&module).unwrap();
+        assert_eq!(
+            serde_json::to_value(&exported.structs[0].attributes).unwrap(),
+            attributes
+        );
+    }
+
+    /// A positional struct whose one field is a function type — the shape of
+    /// `sigma_protocol_homomorphism::Homomorphism`. Both parts were gaps: the
+    /// field is named `0`, which is not an identifier, and a function type's
+    /// argument list has arity two with an empty result.
+    #[test]
+    fn positional_fields_and_function_types_round_trip() {
+        let structs = serde_json::json!([{
+            "name": "Homomorphism", "visibility": "public", "abilities": ["copy", "drop"],
+            "type_parameters": [{"name": "P", "phantom": true}],
+            "fields": [{"name": "0", "ty": {"fun": [
+                [{"ref": {"struct_inst": [1, [{"type_parameter": 0}]]}}, {"ref": {"struct": 2}}],
+                [{"struct": 3}],
+                []
+            ]}}],
+        }, {
+            "name": "Statement", "visibility": "public", "abilities": ["drop"],
+            "type_parameters": [{"name": "P", "phantom": true}],
+            "fields": [{"name": "v", "ty": "u64"}],
+        }, {
+            "name": "Witness", "visibility": "public", "abilities": ["drop"],
+            "fields": [{"name": "v", "ty": "u64"}],
+        }, {
+            "name": "RepresentationVec", "visibility": "public", "abilities": ["drop"],
+            "fields": [{"name": "v", "ty": "u64"}],
+        }]);
+        let source = serde_json::json!({
+            "schema": XIR_SCHEMA,
+            "version": XIR_VERSION,
+            "module": {"address": "0x42", "name": "m", "dialect": "stackless"},
+            "structs": structs.clone(),
+            "functions": [],
+        });
+
+        let env = model_of(&[source]);
+        let module = env.get_modules().next().unwrap();
+
+        // The model has a genuine function type, with the two-argument list
+        // spelled as a tuple and the single result spelled bare.
+        let struct_env = module.get_structs().next().unwrap();
+        let field = struct_env.get_fields().next().unwrap();
+        match field.get_type() {
+            Type::Fun(args, result, _) => {
+                assert!(matches!(*args, Type::Tuple(ref types) if types.len() == 2));
+                assert!(matches!(*result, Type::Struct(..)));
+            },
+            other => panic!("expected a function type, got {other:?}"),
+        }
+
+        // Compared as values, not as JSON text: the two differ only in fields
+        // serde always writes but the input may omit (`variants: null`).
+        let exported = export_interface(&module).unwrap();
+        let expected: Vec<XirStruct> = serde_json::from_value(structs).unwrap();
+        assert_eq!(exported.structs, expected);
     }
 
     /// A type from another module is interned into `external_types` and

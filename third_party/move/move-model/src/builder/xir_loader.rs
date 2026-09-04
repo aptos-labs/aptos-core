@@ -39,6 +39,7 @@ pub struct XirStructData {
     pub fields: Vec<FieldData>,
     pub variants: Option<Vec<XirVariantData>>,
     pub visibility: Visibility,
+    pub attributes: Vec<Attribute>,
 }
 
 pub struct XirVariantData {
@@ -113,6 +114,7 @@ impl GlobalEnv {
                             variants,
                             false,
                             decl.visibility,
+                            decl.attributes,
                         ),
                     )
                     .is_none(),

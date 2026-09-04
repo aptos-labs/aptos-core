@@ -330,6 +330,9 @@ impl<'a> BinaryModuleLoader<'a> {
                     variants.clone(),
                     false,
                     Visibility::Private,
+                    // A `CompiledModule` carries attributes only in its metadata
+                    // section, which this loader does not read.
+                    vec![],
                 )
             });
 
