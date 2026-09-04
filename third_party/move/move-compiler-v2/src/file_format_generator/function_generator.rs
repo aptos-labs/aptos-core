@@ -24,7 +24,7 @@ use move_model::{
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     model::{
         FunId, FunctionEnv, Loc, ModuleId, NodeId, Parameter, QualifiedId, StructEnv, StructId,
-        TypeParameter, Visibility,
+        TypeParameter, Visibility, TEMPORARY_LOCAL_MARKER,
     },
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type},
@@ -664,8 +664,6 @@ impl<'a> FunctionGenerator<'a> {
         self.locals = (0..ctx.fun.get_parameter_count())
             .map(|temp| ctx.temp_type(temp).to_owned())
             .collect();
-        // Reset cached indices whenever the local table is rebuilt.
-        self.equality_scratch.clear();
 
         // Walk the bytecode
         let bytecode = ctx.fun.get_bytecode();
@@ -1329,7 +1327,8 @@ impl<'a> FunctionGenerator<'a> {
                             self.emit(FF::Bytecode::FreezeRef);
                             let (temp, _) = self.stack.pop().unwrap();
                             let ty = fun_ctx.temp_type(temp).skip_reference();
-                            let new_local = self.new_local(fun_ctx, ty.wrap_in_reference(false));
+                            let new_local =
+                                self.new_scratch_local(fun_ctx, ty.wrap_in_reference(false));
                             self.emit(FF::Bytecode::StLoc(new_local));
                             local_to_freeze = Some(new_local);
                         }
@@ -1790,7 +1789,13 @@ impl<'a> FunctionGenerator<'a> {
         source: &[TempIndex],
     ) {
         let coercion = self.equality_coercion(ctx, source);
-        self.gen_builtin_with_prelude(ctx, dest, bc, source, coercion)
+        self.abstract_push_args(ctx, source, None);
+        for instr in coercion {
+            self.emit(instr)
+        }
+        self.emit(bc);
+        self.abstract_pop_n(ctx, source.len());
+        self.abstract_push_result(ctx, dest)
     }
 
     /// Returns a prelude that normalizes both `Eq` or `Neq` operands to their equality join.
@@ -1856,14 +1861,14 @@ impl<'a> FunctionGenerator<'a> {
 
     /// Allocates a scratch local with no stackless temporary. Non-parameter locals are positional
     /// in the source map, so each scratch local needs a placeholder entry to preserve subsequent
-    /// names. The `tmp#$` marker identifies it as compiler-generated.
+    /// names. The marker identifies it as compiler-generated.
     fn new_scratch_local(&mut self, ctx: &FunctionContext, ty: Type) -> FF::LocalIndex {
         let local = self.new_local(ctx, ty);
         let name = ctx
             .module
             .env
             .symbol_pool()
-            .make(&format!("tmp#${}", local));
+            .make(&format!("{}{}", TEMPORARY_LOCAL_MARKER, local));
         self.genr
             .source_map
             .add_local_mapping(ctx.def_idx, ctx.module.source_name(name, &ctx.loc))
@@ -1887,23 +1892,7 @@ impl<'a> FunctionGenerator<'a> {
         bc: FF::Bytecode,
         source: &[TempIndex],
     ) {
-        self.gen_builtin_with_prelude(ctx, dest, bc, source, vec![])
-    }
-
-    /// Generates a builtin, inserting `prelude` after its arguments are pushed. The prelude must
-    /// preserve the operand count and order.
-    fn gen_builtin_with_prelude(
-        &mut self,
-        ctx: &BytecodeContext,
-        dest: &[TempIndex],
-        bc: FF::Bytecode,
-        source: &[TempIndex],
-        prelude: Vec<FF::Bytecode>,
-    ) {
         self.abstract_push_args(ctx, source, None);
-        for instr in prelude {
-            self.emit(instr)
-        }
         self.emit(bc);
         self.abstract_pop_n(ctx, source.len());
         self.abstract_push_result(ctx, dest)

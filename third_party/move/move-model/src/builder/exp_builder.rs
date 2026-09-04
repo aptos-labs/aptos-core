@@ -5400,17 +5400,27 @@ impl ExpTranslator<'_, '_, '_> {
             // Remember whether this function has variance in function arguments
             let is_inline =
                 matches!(cand, AnyFunEntry::UserFun(f) if f.kind == FunctionKind::Inline);
+            let variance = self.type_variance_if_inline(is_inline);
 
+            if cand.is_equality() && self.mode == ExpTranslationMode::Impl {
+                if let Err(diag) = self.unify_function_equality_operands(
+                    variance,
+                    &arg_types[0],
+                    &arg_types[1],
+                    &params[0].1.instantiate(&instantiation),
+                ) {
+                    outruled.push((cand, None, diag));
+                    // Restore substitution and continue with next cand
+                    self.subs = saved_subs;
+                    continue;
+                }
+            }
             // Process arguments
             let mut success = true;
             for (i, arg_ty) in arg_types.iter().enumerate() {
                 let instantiated = params[i].1.instantiate(&instantiation);
-                let result = self.unify_types(
-                    self.type_variance_if_inline(is_inline),
-                    WideningOrder::LeftToRight,
-                    arg_ty,
-                    &instantiated,
-                );
+                let result =
+                    self.unify_types(variance, WideningOrder::LeftToRight, arg_ty, &instantiated);
                 if let Err(err) = result {
                     let arg_loc = if i < translated_args.len() {
                         Some(
@@ -5566,6 +5576,60 @@ impl ExpTranslator<'_, '_, '_> {
                 self.new_error_exp()
             },
         }
+    }
+
+    /// Function values are compared at identical types: `==` and `!=` do not widen abilities,
+    /// unlike other positions. An operand whose type is still open, such as a lambda without
+    /// declared abilities, is fixed to the other operand's type. Mutable references are compared
+    /// frozen. Binds the type parameter to the common type, and returns the diagnostic when the
+    /// operand types cannot be made identical.
+    fn unify_function_equality_operands(
+        &mut self,
+        variance: Variance,
+        lhs_ty: &Type,
+        rhs_ty: &Type,
+        param_ty: &Type,
+    ) -> Result<(), (String, Vec<String>, Vec<(Loc, String)>)> {
+        if !lhs_ty.skip_reference().is_function() && !rhs_ty.skip_reference().is_function() {
+            return Ok(());
+        }
+        let freeze = |ty: &Type| match ty {
+            Type::Reference(ReferenceKind::Mutable, inner) => {
+                Type::Reference(ReferenceKind::Immutable, inner.clone())
+            },
+            _ => ty.clone(),
+        };
+        let saved_subs = self.subs.clone();
+        let Ok(common_ty) = self.unify_types(
+            Variance::NoVariance,
+            WideningOrder::LeftToRight,
+            &freeze(lhs_ty),
+            &freeze(rhs_ty),
+        ) else {
+            self.subs = saved_subs;
+            let display_ctx = self.type_display_context();
+            return Err((
+                format!(
+                    "cannot compare `{}` with `{}`",
+                    self.subs.specialize(lhs_ty).display(&display_ctx),
+                    self.subs.specialize(rhs_ty).display(&display_ctx)
+                ),
+                vec![
+                    "function values are compared at identical types, including abilities"
+                        .to_string(),
+                ],
+                vec![],
+            ));
+        };
+        // If the parameter cannot take the common type, as for a reference and the `(T, T)`
+        // overload, the per-operand unification reports it.
+        if self
+            .unify_types(variance, WideningOrder::LeftToRight, &common_ty, param_ty)
+            .is_err()
+        {
+            self.subs = saved_subs;
+        }
+        Ok(())
     }
 
     /// Adds conversions to the given arguments for the given resolved function entry. Currently

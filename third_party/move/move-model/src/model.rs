@@ -102,6 +102,9 @@ pub const SCRIPT_BYTECODE_FUN_NAME: &str = "<SELF>";
 /// A prefix used for structs which are backing specification ("ghost") memory.
 pub const GHOST_MEMORY_PREFIX: &str = "Ghost$";
 
+/// A marker in the source-map name of a local which identifies it as compiler-generated.
+pub const TEMPORARY_LOCAL_MARKER: &str = "tmp#$";
+
 // =================================================================================================
 /// # Locations
 
@@ -6308,7 +6311,7 @@ impl<'env> FunctionEnv<'env> {
                     // where <num> seems to be generated non-deterministically.
                     // Substitute this by a deterministic name which the backend accepts.
                     let clean_ident = if ident.contains("%#") {
-                        format!("tmp#${}", idx)
+                        format!("{}{}", TEMPORARY_LOCAL_MARKER, idx)
                     } else {
                         ident
                     };
@@ -6326,7 +6329,11 @@ impl<'env> FunctionEnv<'env> {
             return Some(true);
         }
         let name = self.get_local_name(idx);
-        Some(self.symbol_pool().string(name).contains("tmp#$"))
+        Some(
+            self.symbol_pool()
+                .string(name)
+                .contains(TEMPORARY_LOCAL_MARKER),
+        )
     }
 
     /// Gets the number of proper locals of this function, if there is a bytecode module attached.
