@@ -52,3 +52,6 @@ difference = { workspace = true }
 [[test]]
 name = "tests"
 harness = false
+
+[[test]]
+name = "baseline_target"
