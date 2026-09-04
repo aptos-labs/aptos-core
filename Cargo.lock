@@ -874,6 +874,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-code-validation"
+version = "0.1.0"
+dependencies = [
+ "aptos-types",
+ "move-binary-format",
+ "move-core-types",
+ "move-vm-runtime",
+ "move-vm-types",
+]
+
+[[package]]
 name = "aptos-collections"
 version = "0.1.0"
 
@@ -5142,6 +5153,7 @@ dependencies = [
  "aptos-aggregator",
  "aptos-block-executor",
  "aptos-block-partitioner",
+ "aptos-code-validation",
  "aptos-crypto",
  "aptos-experimental-runtimes",
  "aptos-framework-natives",
