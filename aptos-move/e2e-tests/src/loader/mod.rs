@@ -276,7 +276,7 @@ impl DependencyGraph {
             &node.name,
             &deps,
             node.self_value,
-        );
+        )?;
 
         let package = BuiltPackage::build(package_path, BuildOptions::default()).unwrap();
 
