@@ -16,6 +16,14 @@ pub type InternalGasPerAbstractValueUnit = GasQuantity<UnitDiv<InternalGasUnit, 
 
 pub type AbstractValueSizePerArg = GasQuantity<UnitDiv<AbstractValueUnit, Arg>>;
 
+/// Unit of the pseudo gas charged when the VM builds a type tag
+pub enum TypeTagPseudoGasUnit {}
+
+pub type NumTypeTagPseudoGasUnits = GasQuantity<TypeTagPseudoGasUnit>;
+
+pub type AbstractValueSizePerTypeTagPseudoGasUnit =
+    GasQuantity<UnitDiv<AbstractValueUnit, TypeTagPseudoGasUnit>>;
+
 /// Unit of (external) gas.
 pub enum GasUnit {}
 

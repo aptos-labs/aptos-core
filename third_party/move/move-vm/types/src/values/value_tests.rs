@@ -324,6 +324,10 @@ mod indexed_ref_tests {
         fn to_canonical_string(&self) -> String {
             unreachable!()
         }
+
+        fn ty_args_pseudo_gas_cost(&self) -> u64 {
+            0
+        }
     }
 
     fn test_locals_or_struct_fields() -> Vec<(bool, Value)> {

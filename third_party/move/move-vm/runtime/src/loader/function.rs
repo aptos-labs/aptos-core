@@ -7,7 +7,10 @@ use crate::{
     loader::{Module, Script},
     module_traversal::TraversalContext,
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
-    storage::{loader::traits::Loader, ty_layout_converter::LayoutConverter},
+    storage::{
+        loader::traits::Loader, ty_layout_converter::LayoutConverter,
+        ty_tag_converter::ty_tag_pseudo_gas_cost,
+    },
     RuntimeEnvironment,
 };
 use better_any::{Tid, TidAble, TidExt};
@@ -244,6 +247,10 @@ impl GenericFunctionPtr {
 #[derive(Clone, Tid)]
 pub(crate) struct LazyLoadedFunction {
     pub(crate) state: Rc<RefCell<LazyLoadedFunctionState>>,
+    /// Pseudo-gas cost of the function's type arguments. Kept outside the `RefCell` so that
+    /// reading it never takes a borrow: values are visited while `as_resolved` may hold a mutable
+    /// one. Re-resolution reuses the same type argument tags, so the memo stays valid.
+    pub(crate) ty_args_pseudo_gas_cost: u64,
 }
 
 #[derive(Clone)]
@@ -276,9 +283,26 @@ pub(crate) enum LazyLoadedFunctionState {
 }
 
 impl LazyLoadedFunction {
-    pub(crate) fn new_unresolved(data: SerializedFunctionData) -> Self {
+    pub(crate) fn ty_args_pseudo_gas_cost(
+        runtime_environment: &RuntimeEnvironment,
+        ty_args: &[TypeTag],
+    ) -> u64 {
+        let vm_config = runtime_environment.vm_config();
+        if !vm_config.meter_closure_ty_args {
+            return 0;
+        }
+        ty_args.iter().fold(0, |cost, ty_arg| {
+            cost.saturating_add(ty_tag_pseudo_gas_cost(ty_arg, vm_config))
+        })
+    }
+
+    pub(crate) fn new_unresolved(
+        data: SerializedFunctionData,
+        ty_args_pseudo_gas_cost: u64,
+    ) -> Self {
         Self {
             state: Rc::new(RefCell::new(LazyLoadedFunctionState::Unresolved { data })),
+            ty_args_pseudo_gas_cost,
         }
     }
 
@@ -335,6 +359,7 @@ impl LazyLoadedFunction {
             _ => None,
         };
 
+        let ty_args_pseudo_gas_cost = Self::ty_args_pseudo_gas_cost(runtime_environment, &ty_args);
         Ok(Self {
             state: Rc::new(RefCell::new(LazyLoadedFunctionState::Resolved {
                 fun,
@@ -343,6 +368,7 @@ impl LazyLoadedFunction {
                 captured_layouts,
                 module_hash,
             })),
+            ty_args_pseudo_gas_cost,
         })
     }
 
@@ -358,6 +384,7 @@ impl LazyLoadedFunction {
             .iter()
             .map(|t| runtime_environment.ty_to_ty_tag(t))
             .collect::<PartialVMResult<Vec<_>>>()?;
+        let ty_args_pseudo_gas_cost = Self::ty_args_pseudo_gas_cost(runtime_environment, &ty_args);
         Ok(Self {
             state: Rc::new(RefCell::new(LazyLoadedFunctionState::Resolved {
                 fun,
@@ -366,6 +393,7 @@ impl LazyLoadedFunction {
                 captured_layouts: Some(vec![]),
                 module_hash,
             })),
+            ty_args_pseudo_gas_cost,
         })
     }
 
@@ -607,6 +635,10 @@ impl AbstractFunction for LazyLoadedFunction {
 
     fn clone_dyn(&self) -> PartialVMResult<Box<dyn AbstractFunction>> {
         Ok(Box::new(self.clone()))
+    }
+
+    fn ty_args_pseudo_gas_cost(&self) -> u64 {
+        self.ty_args_pseudo_gas_cost
     }
 
     fn to_canonical_string(&self) -> String {

@@ -5,7 +5,7 @@ pub use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_gas_schedule::{
     gas_feature_versions::{
         RELEASE_V1_15, RELEASE_V1_30, RELEASE_V1_34, RELEASE_V1_38, RELEASE_V1_41, RELEASE_V1_42,
-        RELEASE_V1_45, RELEASE_V1_49,
+        RELEASE_V1_45, RELEASE_V1_49, RELEASE_V1_50,
     },
     AptosGasParameters,
 };
@@ -321,6 +321,11 @@ pub fn aptos_prod_vm_config(
         include_closure_mask_in_cmp: gas_feature_version >= RELEASE_V1_45,
         revalidate_resolved_closures: timed_features
             .is_enabled(TimedFeatureFlag::RevalidateResolvedClosures),
+        // The gas version check keeps the 1.50 parameters meaningful on a chain
+        // where the timed feature never activated.
+        meter_closure_ty_args: timed_features
+            .is_enabled(TimedFeatureFlag::MeterClosureTypeArguments)
+            || gas_feature_version >= RELEASE_V1_50,
     };
 
     // Note: if max_value_nest_depth changed, make sure the constant is in-sync. Do not remove this
