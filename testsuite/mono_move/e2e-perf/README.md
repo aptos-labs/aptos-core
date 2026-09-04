@@ -44,15 +44,16 @@ ratio is calibrated so a change in it shows up. A drop against the calibrated
 value means MonoMove skipped real work, and the speedup next to it is not a
 speedup.
 
-`order-book-no-matches1-market` is the one workload that does not fit. It sits at
-1.00x, and MonoMove writes about 30 bytes per transaction *more* than legacy
-rather than roughly 1 150 fewer. Netting out the fee it does not write, MonoMove
-produces around 1 180 bytes per transaction of extra state on this workload
-alone. It is also the workload with the largest reported speedup, so the two are
-worth reading together: until the write-set difference is explained, treat the
-order-book number as unverified rather than as MonoMove's best result. The
-differential replay harness in the `aptos-mono-move` crate compares write sets
-directly and is the right tool to settle it.
+Pulling the other way, MonoMove overapproximates its write set: a copy on write
+counts as a write, even where the value did not change. So the ratio balances the
+fee MonoMove skips against the extra slots it reports. On most workloads
+the fee dominates and the ratio lands below 1.00x. On
+`order-book-no-matches1-market` the overapproximation dominates instead, and the
+ratio comes out at 1.00x with MonoMove about 30 bytes per transaction above
+legacy. That is expected, not a discrepancy.
+
+It does mean the ratio bounds the real write set from above, so it catches
+MonoMove writing too little but says nothing about it writing too much.
 
 ## Running locally
 
