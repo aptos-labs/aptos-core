@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: cannot return `S<u8>` from a function with result type `S<u64>`
+  ┌─ tests/checking/specs/struct_type_arg_widening.move:9:41
+  │
+9 │     spec fun ret_param(y: u8): S<u64> { mk(y) }
+  │                                         ^^^^^
+
+error: cannot return `S<u256>` from a function with result type `S<u64>`
+   ┌─ tests/checking/specs/struct_type_arg_widening.move:11:62
+   │
+11 │     spec fun join_branches(c: bool, y: u64): S<u64> { if (c) mk(0) else mk(y) }
+   │                                                              ^^^^^
+
+error: cannot return `S<S<u8>>` from a function with result type `S<S<u64>>`
+   ┌─ tests/checking/specs/struct_type_arg_widening.move:13:41
+   │
+13 │     spec fun nested(y: u8): S<S<u64>> { mk(mk(y)) }
+   │                                         ^^^^^^^^^
