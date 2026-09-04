@@ -1312,3 +1312,20 @@ impl<P: DescriptorProvider + LayoutProvider + ?Sized> FunctionVerifier<'_, P> {
         }
     }
 }
+
+/// Panics with the verifier's findings unless `function` verifies cleanly.
+pub fn assert_verified<P: DescriptorProvider + LayoutProvider + ?Sized>(
+    function: &Function,
+    provider: &P,
+) {
+    let errors = verify_function(function, provider);
+    assert!(
+        errors.is_empty(),
+        "verification failed:\n{}",
+        errors
+            .iter()
+            .map(|e| format!("  {}", e))
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+}

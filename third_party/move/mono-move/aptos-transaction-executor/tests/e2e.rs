@@ -401,13 +401,10 @@ fn extra_signers_rejected_like_v1() {
     );
 
     let v2_output = execute_v2(fx.get_state_view(), &txn);
-    assert!(
-        matches!(
-            v2_output.status(),
-            TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(_))
-        ),
-        "v2 did not reject the signer-count mismatch: {:?}",
-        v2_output.status()
+    assert_eq!(
+        v2_output.status(),
+        v1_output.status(),
+        "v2 rejected the signer-count mismatch differently"
     );
 
     // Write sets are not compared: the gas divergence leaves v1 with fee

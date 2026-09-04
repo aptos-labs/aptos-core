@@ -4,8 +4,8 @@
 //! Converts the typed outcome taxonomy into `VMStatus`.
 
 use crate::errors::{
-    is_cant_pay_fee_abort, DiscardReason, ExecutionStage, ExecutionStatus, MoveExecutionFailure,
-    PreExecutionCheckFailure,
+    is_cant_pay_fee_abort, DiscardReason, ExecutionStage, ExecutionStatus, InvalidArguments,
+    MoveExecutionFailure, PreExecutionCheckFailure,
 };
 use aptos_types::{
     error::{split_canonical, INVALID_ARGUMENT, INVALID_STATE, OUT_OF_RANGE},
@@ -117,6 +117,29 @@ pub(crate) fn executed_vm_status(status: &ExecutionStatus) -> VMStatus {
                 message: message.clone(),
             }
         },
+        // Like the sibling arms: only the payload stage legitimately faults
+        // the transaction's arguments.
+        MoveExecutionFailure::InvalidArguments(reason)
+            if matches!(stage, ExecutionStage::Payload) =>
+        {
+            VMStatus::error(
+                match reason {
+                    InvalidArguments::SignerAfterArgument => {
+                        StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE
+                    },
+                    InvalidArguments::ArgumentCountMismatch => {
+                        StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH
+                    },
+                    InvalidArguments::SignerCountMismatch => {
+                        StatusCode::NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH
+                    },
+                    InvalidArguments::UndecodableArgument => {
+                        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT
+                    },
+                },
+                None,
+            )
+        },
         MoveExecutionFailure::RuntimeError(err) if matches!(stage, ExecutionStage::Payload) => {
             internal_error_to_status(err)
         },
@@ -156,6 +179,10 @@ fn prologue_failure_to_status(failure: MoveExecutionFailure) -> VMStatus {
         } => (code, message, location),
         MoveExecutionFailure::RuntimeError(err) => {
             return unexpected_validation_error("prologue", err.to_string())
+        },
+        // The prologue takes no payload arguments.
+        failure @ MoveExecutionFailure::InvalidArguments(_) => {
+            return unexpected_validation_error("prologue", format!("{failure:?}"))
         },
     };
     if location != *ABORT_LOC_VALIDATION_MODULE {

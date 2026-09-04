@@ -10,13 +10,14 @@ mod interpreter;
 pub(crate) mod memory;
 mod native_context;
 mod types;
-mod value_utils;
+mod value_cmp;
+mod value_conv;
 mod verifier;
 
 pub use error::{RuntimeError, RuntimeStatus};
 pub use global_storage::{ResourceReadWriteSet, WriteClass};
 pub use heap::Heap;
-pub use interpreter::{InterpreterContext, SessionEffects};
+pub use interpreter::{CallBuilder, InterpreterContext, InterpreterOptions, SessionEffects};
 pub use memory::{
     read_ptr, read_u32, read_u64, vec_elem_ptr, write_object_header, write_ptr, write_u32,
     write_u64, MemoryRegion,
@@ -27,5 +28,5 @@ pub use native_context::{
     ProductionNativeRegistry,
 };
 pub use types::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
-pub use value_utils::{deserialize_into, serialize};
-pub use verifier::{verify_function, verify_program, VerificationError};
+pub use value_conv::bcs::{deserialize_into, serialize};
+pub use verifier::{assert_verified, verify_function, verify_program, VerificationError};
