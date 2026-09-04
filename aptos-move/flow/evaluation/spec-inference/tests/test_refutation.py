@@ -830,6 +830,51 @@ class ReferencePatchTest(unittest.TestCase):
         )
 
 
+class ScreenStageVerdictTest(unittest.TestCase):
+    """A stage that died measured nothing, whichever stage it was.
+
+    The screen distinguishes a tool declining with a diagnosis from a tool
+    crashing, because `_failure_kind` lands both on `implementation_failure`.
+    That reasoning was applied to WP alone, so a prover that crashed on the
+    inferred source left the target recorded as screened and WP-hard.
+    """
+
+    def _ok(self, **stages) -> bool:
+        from harness.screen_v3 import apparatus_reached_a_verdict
+
+        return apparatus_reached_a_verdict(stages)
+
+    def test_a_crashed_prover_is_not_a_verdict(self) -> None:
+        self.assertFalse(self._ok(
+            compile={"returncode": 0},
+            wp_inference={"returncode": 0},
+            enriched_compile={"returncode": 0},
+            prover={"returncode": -11},
+        ))
+
+    def test_a_prover_that_declined_with_a_diagnosis_is_a_verdict(self) -> None:
+        # The WP-hard targets: the enriched proof legitimately fails, and says
+        # so. Four of the corpus's screened results are exactly this shape.
+        self.assertTrue(self._ok(
+            compile={"returncode": 0},
+            wp_inference={"returncode": 0},
+            enriched_compile={"returncode": 0},
+            prover={"returncode": 1, "stage_report": {"errors": 1}},
+        ))
+
+    def test_a_stage_that_never_ran_is_not_held_against_the_target(self) -> None:
+        # When WP declines there is nothing to recompile or prove.
+        self.assertTrue(self._ok(
+            compile={"returncode": 0},
+            wp_inference={"returncode": 1, "stage_report": {"errors": 1}},
+            enriched_compile=None,
+            prover=None,
+        ))
+
+    def test_a_crashed_compile_is_not_a_verdict(self) -> None:
+        self.assertFalse(self._ok(compile={"returncode": -9}))
+
+
 class ScoringApparatusTest(unittest.TestCase):
     """Scoring is the other half of "this run used the apparatus it declared".
 

@@ -162,15 +162,33 @@ def apparatus_reached_a_verdict(result: dict[str, Any]) -> bool:
     """
     if result.get("failure_kind") in ("infrastructure_failure", "compatibility_timeout"):
         return False
-    inference = result.get("wp_inference") or {}
-    returncode = inference.get("returncode")
+    # Every stage the screen ran, not only WP. A prover that dies on the
+    # inferred source says as little about the target as a WP that dies on the
+    # original, and `_failure_kind` lands both on `implementation_failure`;
+    # reading only the inference stage admitted a target whose enriched proof
+    # had crashed as a screened, WP-hard corpus member.
+    return all(
+        _stage_reached_a_verdict(result.get(stage))
+        for stage in ("compile", "wp_inference", "enriched_compile", "prover")
+    )
+
+
+def _stage_reached_a_verdict(stage: dict[str, Any] | None) -> bool:
+    """Whether one stage's exit says anything about the target.
+
+    Success is a verdict, and so is a non-zero exit carrying a stage report: a
+    tool that declines with a diagnosis has diagnosed something. A crash
+    arrives with neither, and `_failure_kind` cannot tell the two apart. A
+    negative return code is a signal, which is never a refusal.
+
+    A stage that did not run has no return code and is not held against the
+    target: when WP declines there is nothing to recompile or prove.
+    """
+    stage = stage or {}
+    returncode = stage.get("returncode")
     if returncode in (0, None):
         return True
-    # WP declining is a diagnosis and arrives with a stage report; a crash
-    # arrives with neither, and `_failure_kind` cannot tell the two apart --
-    # both land on `implementation_failure`. A negative return code is a
-    # signal, which is never a refusal.
-    return returncode > 0 and bool(inference.get("stage_report"))
+    return returncode > 0 and bool(stage.get("stage_report"))
 
 
 def is_well_formed(result: dict[str, Any]) -> bool:
