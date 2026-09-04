@@ -76,8 +76,11 @@ pub use loaded_module::{
 };
 mod module_cache;
 use module_cache::ModuleCache;
+mod script_cache;
 use mono_move_core::interner::{InternedFunctionRef, InternedIdentifier, InternedModuleId};
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
+use script_cache::ScriptCache;
+pub use script_cache::ScriptHash;
 
 mod types;
 pub use types::{
@@ -128,6 +131,8 @@ struct Context {
         ahash::RandomState,
     >,
     module_cache: ModuleCache,
+    /// Scripts loaded as modules, keyed by the hash of their bytes.
+    script_cache: ScriptCache,
     /// Published object descriptors.
     descriptors: Descriptors,
     /// Published type layouts (the type-driven walk shape, separate from the
@@ -342,6 +347,7 @@ impl GlobalContext {
                 type_lists: DashMap::default(),
                 function_refs: DashMap::default(),
                 module_cache: ModuleCache::new(),
+                script_cache: ScriptCache::new(),
                 descriptors: Descriptors::default(),
                 layouts: Layouts::default(),
             },
@@ -444,6 +450,21 @@ impl<'ctx> ExecutionGuard<'ctx> {
         // already in the cache, it is also alive (maintenance has not reset
         // caches).
         Ok(unsafe { ptr.as_ref_unchecked() })
+    }
+
+    /// Inserts a script loaded as a module into the cache, keyed by the hash
+    /// of the script's bytes.
+    pub fn insert_script(&self, hash: ScriptHash, module: Box<LoadedModule>) -> &LoadedModule {
+        let ptr = self.ctx.script_cache.insert(hash, module);
+        // SAFETY: as for `insert_module`.
+        unsafe { ptr.as_ref_unchecked() }
+    }
+
+    /// Looks up a cached script by the hash of its bytes.
+    pub fn get_script<'guard>(&'guard self, hash: &ScriptHash) -> Option<&'guard LoadedModule> {
+        let ptr = self.ctx.script_cache.get(hash)?;
+        // SAFETY: as for `get_module`.
+        Some(unsafe { ptr.as_ref_unchecked() })
     }
 
     /// Looks up a cached loaded module by its interned ID and returns a
@@ -981,6 +1002,7 @@ impl<'ctx> MaintenanceGuard<'ctx> {
             type_lists,
             function_refs,
             module_cache,
+            script_cache,
             descriptors,
             layouts,
         } = self.ctx;
@@ -998,6 +1020,7 @@ impl<'ctx> MaintenanceGuard<'ctx> {
         // alive, and it is safe to free the allocation behind the box.
         unsafe {
             module_cache.clear();
+            script_cache.clear();
         }
     }
 }

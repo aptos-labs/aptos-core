@@ -7,4 +7,5 @@ mod args;
 mod execute;
 mod metadata;
 mod pre_execution_checks;
+mod script;
 mod validation;

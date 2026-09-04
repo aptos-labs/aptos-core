@@ -33,7 +33,7 @@ use crate::{
 };
 use mono_move_core::{
     captured_values_size,
-    interner::{module_id_of, InternedIdentifier, InternedModuleId},
+    interner::{is_script_module_id, module_id_of, InternedIdentifier, InternedModuleId},
     native::{
         NativeABI, NativeExtension, NativeExtensions, NativeIdx, NativeName, NativeStatus,
         ObjectHandle, RootPool,
@@ -324,8 +324,10 @@ impl<'a> CallBuilder<'a, '_> {
 }
 
 /// Materializes the [`AbortLocation`] naming the module that raised an abort.
-// TODO(completeness): return `AbortLocation::Script` for script aborts.
 fn abort_location(module_id: InternedModuleId) -> AbortLocation {
+    if is_script_module_id(module_id) {
+        return AbortLocation::Script;
+    }
     AbortLocation::Module(module_id_of(module_id))
 }
 
@@ -349,14 +351,22 @@ fn locate_bytecode_failure(err: VMInternalError, regs: VMRegisters) -> VMInterna
     // SAFETY: `regs.func` points at the function that was executing, which the
     // execution guard keeps alive.
     let func = unsafe { regs.func.as_ref() };
-    let module = module_id_of(func.module_id);
-    let location = match func.code.origins().get(regs.pc) {
-        Some(&offset) => ErrorLocation::Instruction {
-            module,
-            function: func.def_idx,
-            offset,
-        },
-        None => ErrorLocation::Module(module),
+    let offset = func.code.origins().get(regs.pc).copied();
+    let location = if is_script_module_id(func.module_id) {
+        match offset {
+            Some(offset) => ErrorLocation::ScriptInstruction { offset },
+            None => ErrorLocation::Script,
+        }
+    } else {
+        let module = module_id_of(func.module_id);
+        match offset {
+            Some(offset) => ErrorLocation::Instruction {
+                module,
+                function: func.def_idx,
+                offset,
+            },
+            None => ErrorLocation::Module(module),
+        }
     };
     err.at(location)
 }
@@ -488,6 +498,20 @@ impl<'guard> InterpreterContext<'guard> {
             name,
             ty_args,
         )?;
+        // SAFETY: the function lives in an arena the guard keeps alive.
+        Ok(unsafe { ptr.as_ref_unchecked() })
+    }
+
+    /// Loads a script from its bytes and returns its `main` instantiated with
+    /// `ty_args`.
+    pub fn load_script(
+        &mut self,
+        code: &[u8],
+        ty_args: InternedTypeList,
+    ) -> VMResult<&'guard Function> {
+        let ptr =
+            self.loader
+                .load_script(&mut self.read_set, &mut self.gas_meter, code, ty_args)?;
         // SAFETY: the function lives in an arena the guard keeps alive.
         Ok(unsafe { ptr.as_ref_unchecked() })
     }

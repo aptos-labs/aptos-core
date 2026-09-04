@@ -23,16 +23,22 @@ use crate::{
     read_set::{ModuleRead, ModuleReadSet, ModuleState},
 };
 use mono_move_core::{
-    interner::{InternedIdentifier, InternedModuleId},
+    interner::{
+        script_module_id, view_module_id, InternedIdentifier, InternedModuleId, SCRIPT_MAIN,
+    },
     native::NativeResolver,
     types::{view_name, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
-    DescriptorId, FieldTypes, FrameOffset, Function, FunctionPtr, GasMeter, LayoutId,
+    DescriptorId, FieldTypes, FrameOffset, Function, FunctionPtr, GasMeter, Interner, LayoutId,
     LayoutProvider, ModuleId, ModuleProvider, VMInternalError, VMResult, ValueLayout,
 };
 use mono_move_global_context::{
     ArenaRef, ExecutionGuard, FunctionIrLookup, FunctionSlot, LoadedModule, LoadedModuleSlot,
-    ModuleMandatoryDependencies, ModuleSlot,
+    ModuleMandatoryDependencies, ModuleSlot, ScriptHash,
 };
+use move_binary_format::{
+    access::ScriptAccess, file_format::CompiledScript, module_script_conversion::script_into_module,
+};
+use move_bytecode_verifier::VerifierConfig;
 use shared_dsa::UnorderedSet;
 use specializer::{
     lower::context::{
@@ -251,6 +257,121 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         let (function, function_ms) =
             self.lower_function_with_ty_args(read_set, gas_meter, module, func_name, ty_args)?;
         Ok(module.set_instantiated_function(func_name, ty_args, function, function_ms))
+    }
+
+    /// Loads a script from its bytes and returns its `main` instantiated with
+    /// `ty_args`. A script is loaded as a module holding that one function,
+    /// under a module ID all scripts share, and cached by the hash of its
+    /// bytes. Its cost and its dependencies' loads are charged on every call.
+    ///
+    /// # Precondition
+    ///
+    /// No script has been loaded into this read-set yet.
+    pub fn load_script(
+        &self,
+        read_set: &mut ModuleReadSet<'guard>,
+        gas_meter: &mut GasMeter,
+        script_code: &[u8],
+        ty_args: InternedTypeList,
+    ) -> VMResult<FunctionPtr> {
+        let module_id = script_module_id(self.guard);
+        let id = self.guard.arena_ref_for_module_id(module_id);
+        read_set.record_pending_loading(id)?;
+
+        let hash = ScriptHash::of(script_code);
+        let module = match self.guard.get_script(&hash) {
+            Some(module) => {
+                // A miss loads the dependencies to link the script. A hit loads
+                // them too, so that gas and the read-set do not depend on cache
+                // warmth.
+                let script = &module.ir().module;
+                for &dependency in script.module_ids() {
+                    if dependency != script.id() {
+                        self.get_or_load_module(read_set, gas_meter, dependency)?;
+                    }
+                }
+                module
+            },
+            // TODO(perf): evaluate whether waiting for a concurrent insertion
+            // beats every thread verifying the script itself.
+            None => self.build_and_insert_script(read_set, gas_meter, hash, script_code)?,
+        };
+        read_set.record_ready_for_lowering(id, module)?;
+        gas_meter.charge(module.cost())?;
+
+        let main = view_module_id(module_id).name();
+        self.load_function(read_set, gas_meter, module_id, main, ty_args)
+    }
+
+    /// Deserializes, verifies, and links `script_code` against its
+    /// dependencies, then caches it as a module.
+    fn build_and_insert_script(
+        &self,
+        read_set: &mut ModuleReadSet<'guard>,
+        gas_meter: &mut GasMeter,
+        hash: ScriptHash,
+        script_code: &[u8],
+    ) -> VMResult<&'guard LoadedModule> {
+        // TODO(correctness): use the on-chain deserializer and verifier
+        // configs instead of the defaults.
+        let script = CompiledScript::deserialize(script_code).map_err(|err| {
+            VMInternalError::new(LoaderError::ScriptDeserializationFailed {
+                message: err.to_string(),
+            })
+        })?;
+        move_bytecode_verifier::verify_script(&script).map_err(|err| {
+            VMInternalError::new(LoaderError::ScriptVerificationFailed {
+                status: err.major_status(),
+            })
+        })?;
+        let dependencies = script
+            .immediate_dependencies_iter()
+            .map(|(address, name)| {
+                let module_id = self.guard.module_id_of(address, name);
+                self.get_or_load_module(read_set, gas_meter, module_id)
+            })
+            .collect::<VMResult<Vec<_>>>()?;
+        move_bytecode_verifier::dependencies::verify_script(
+            &VerifierConfig::default(),
+            &script,
+            dependencies
+                .iter()
+                .map(|dependency| &*dependency.ir().module),
+        )
+        .map_err(|err| {
+            VMInternalError::new(LoaderError::ScriptVerificationFailed {
+                status: err.major_status(),
+            })
+        })?;
+
+        // TODO(metering): placeholder cost model, as for modules.
+        let cost = script_code.len() as u64;
+        let module_ir =
+            specializer::destack(script_into_module(script, SCRIPT_MAIN.as_str()), self.guard)?;
+        let module = LoadedModule::new(
+            module_ir,
+            cost,
+            ModuleMandatoryDependencies::lazy_unset(),
+            self.guard,
+        )
+        .map_err(|e| VMInternalError::new(LoaderError::GlobalContext(e)))?;
+        Ok(self.guard.insert_script(hash, module))
+    }
+
+    /// Returns the module from the read-set, loading it first if this
+    /// transaction has not yet.
+    fn get_or_load_module(
+        &self,
+        read_set: &mut ModuleReadSet<'guard>,
+        gas_meter: &mut GasMeter,
+        module_id: InternedModuleId,
+    ) -> VMResult<&'guard LoadedModule> {
+        let id = self.guard.arena_ref_for_module_id(module_id);
+        match read_set.get(id) {
+            Some(ModuleRead::Loaded { module, .. }) => Ok(module),
+            Some(ModuleRead::Pending) => invariant_violation!(ReadSetEntryNotLoaded),
+            None => self.load_module(read_set, gas_meter, id),
+        }
     }
 
     /// Runs the lowering pipeline for a single function with the given
