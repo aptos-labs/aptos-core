@@ -312,6 +312,7 @@ dependencies = [
  "aptos-genesis",
  "aptos-github-client",
  "aptos-global-constants",
+ "aptos-governance-bundle",
  "aptos-indexer-grpc-server-framework",
  "aptos-indexer-processor-sdk",
  "aptos-keygen",
@@ -2244,6 +2245,19 @@ name = "aptos-global-constants"
 version = "0.1.0"
 
 [[package]]
+name = "aptos-governance-bundle"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "hex",
+ "serde",
+ "sha2 0.9.9",
+ "sha3 0.9.1",
+ "tempfile",
+ "toml 0.7.8",
+]
+
+[[package]]
 name = "aptos-id-generator"
 version = "0.1.0"
 
@@ -4006,6 +4020,7 @@ dependencies = [
  "aptos-cached-packages",
  "aptos-cli-common",
  "aptos-crypto",
+ "aptos-governance-bundle",
  "aptos-infallible",
  "aptos-move-cli",
  "aptos-release-builder",
@@ -4015,17 +4030,14 @@ dependencies = [
  "chrono",
  "clap 4.5.60",
  "git2 0.16.1",
- "hex",
  "move-command-line-common",
  "move-core-types",
  "move-model",
  "serde",
  "serde_json",
  "serde_yaml 0.8.26",
- "sha2 0.9.9",
  "tempfile",
  "tokio",
- "toml 0.7.8",
  "url",
 ]
 
@@ -18559,6 +18571,7 @@ dependencies = [
  "aptos-gas-schedule",
  "aptos-genesis",
  "aptos-global-constants",
+ "aptos-governance-bundle",
  "aptos-indexer-grpc-table-info",
  "aptos-infallible",
  "aptos-inspection-service",

@@ -4,7 +4,8 @@
 //! End-to-end: generate a (move-stdlib-only) bundle from the synthetic config,
 //! verify it, and check the expected file layout.
 
-use aptos_release_tool::{bundle, commands, init_core_path};
+use aptos_governance_bundle as bundle;
+use aptos_release_tool::{commands, init_core_path};
 use std::path::PathBuf;
 
 fn test_data_dir() -> PathBuf {

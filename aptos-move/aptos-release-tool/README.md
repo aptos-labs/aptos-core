@@ -9,9 +9,11 @@ and the design reference for the release process as a whole.
 ## Status: Partially implemented
 
 The bundle format and the `aptos-release-tool` CLI (`generate-bundle`,
-`verify-bundle`, `simulate`, `verify-framework-deployment`) are implemented. The
-GitHub Actions workflows that orchestrate the process (section 3.3) live in
-`internal-ops` and are added separately.
+`verify-bundle`, `simulate`, `deploy-testnet`, `verify-framework-deployment`) are
+implemented, as are the operator-side `aptos governance propose-bundle` and
+`execute-bundle` commands in the Aptos CLI (section 3.2). The GitHub Actions
+workflows that orchestrate the process (section 3.3) live in `internal-ops` and
+are added separately.
 
 ---
 
@@ -138,9 +140,13 @@ aptos-framework-v1.45.1/
 ├── gas/                                 # Present only when the release changes the gas schedule
 │   ├── old.json                         # Previous gas schedule snapshot
 │   └── new.json                         # New gas schedule snapshot
-├── scripts/                             # The proposal's multi-step governance scripts
+├── scripts/                             # The proposal's multi-step governance scripts (sources, for review)
 │   ├── 0-....move
 │   ├── 1-....move
+│   └── ...
+├── bytecode/                            # The compiled scripts, the artifacts actually submitted
+│   ├── 0-....mv
+│   ├── 1-....mv
 │   └── ...
 └── summary/                             # Human-reviewable change summaries
     ├── gas-schedule-changes.md          # Gas parameter diff with sign-off checkboxes
@@ -148,10 +154,16 @@ aptos-framework-v1.45.1/
 ```
 
 A bundle holds exactly one governance proposal — a framework release or an ad-hoc
-change — emitted as a single multi-step proposal whose steps are the numbered Move
-scripts under `scripts/`, with `metadata.json` holding the proposal's metadata.
-`config.yaml` is the exact release config the bundle was generated from, copied
-verbatim, so the bundle is self-describing.
+change — emitted as a single multi-step proposal whose steps are the numbered
+scripts under `bytecode/`, with `metadata.json` holding the proposal's metadata.
+The sources under `scripts/` are review material: each is stamped with the
+execution hash of its compiled counterpart, and nothing recompiles them at
+deployment time. `config.yaml` is the exact release config the bundle was
+generated from, copied verbatim, so the bundle is self-describing.
+
+The format is shared by `aptos-release-tool` and the Aptos CLI through the
+`aptos-governance-bundle` crate, so the manifest's `format_version` is a contract
+between binaries built at different times.
 
 The `summary/` directory contains auto-generated, human-readable summaries of key
 changes. These serve two purposes: (1) giving reviewers a quick overview without
@@ -256,7 +268,29 @@ fall back to running the same commands manually.
 | `generate-bundle` | Builds a complete bundle from a release config, and self-verifies it before returning. |
 | `verify-bundle` | Checks the bundle is internally self-consistent; `--require-signoff` also requires every summary checkbox to be ticked. |
 | `simulate` | Simulates the bundle's governance proposal against a network (reuses `aptos-release-builder`). |
+| `deploy-testnet` | Executes the bundle's proposal end to end on a test network: shrinks the voting period as root, proposes and votes as the validator, executes every step, restores the voting period. Refuses mainnet. |
 | `verify-framework-deployment` | Checks a deployed framework release on-chain against the bundle — currently the gas schedule only (bytecode verification is a TODO). |
+
+On mainnet, proposing and executing is done by node operators, who install the
+Aptos CLI rather than build this tool. The CLI therefore carries the two
+operator-facing commands, under `aptos governance`. Both verify the bundle the
+same way `verify-bundle` does and submit only the compiled scripts under
+`bytecode/`; signing uses the CLI's usual profiles, keys, and hardware wallets.
+
+| Command | What it does |
+|---------|-------------|
+| `propose-bundle` | Checks that `--metadata-url` serves the bundle's `metadata.json` and that the stake pool may propose, then creates the multi-step proposal for the first script's hash. |
+| `execute-bundle` | Executes the steps of an approved proposal that have not run yet, starting from the one the chain expects next, so a re-run after a failure resumes where it stopped. |
+
+```bash
+aptos governance propose-bundle --bundle "$BUNDLE_DIR" --pool-address "$POOL" \
+    --metadata-url "https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/framework-releases/$VERSION/metadata.json" \
+    --profile mainnet-voter
+
+# After the vote passes
+aptos governance execute-bundle --bundle "$BUNDLE_DIR" --proposal-id "$PROPOSAL_ID" \
+    --profile mainnet-executor
+```
 
 Example usage:
 
@@ -325,11 +359,11 @@ cherry-picked onto the release branch after testnet deployment (or after initial
 generation), the bundle must be regenerated; the PR branch name is deterministic, so
 regenerating updates the existing PR rather than opening a new one.
 
-#### Workflow 2: Deploy to Testnet (planned, not yet implemented)
+#### Workflow 2: Deploy to Testnet
 
 Takes a committed bundle, simulates it against testnet, and if successful, executes
-the full testnet release — including the governance proposal, framework tag, branch
-update, and post-deploy verification.
+the full testnet release — including the governance proposal (via `deploy-testnet`),
+framework tag, branch update, and post-deploy verification.
 
 ```yaml
 on:
@@ -442,17 +476,16 @@ How a release captain uses the three workflows to complete a full release cycle.
                    │
                    ▼
 ┌─────────────────────────────────────┐
-│ Coordinate with operator &          │
-│ Foundation (create on-chain         │
-│ proposal, initiate voting,          │
+│ Operator: aptos governance          │
+│ propose-bundle (voting opens,       │
 │ 3-day window)                       │
 └──────────────────┬──────────────────┘
                    │
                    ▼
 ┌─────────────────────────────────────┐
-│ Execute proposal (simulation runs   │
-│ before executing for real, verify   │
-│ on-chain after)                     │
+│ Operator: aptos governance          │
+│ execute-bundle; then                │
+│ verify-framework-deployment         │
 └──────────────────┬──────────────────┘
                    │
                    ▼
@@ -462,7 +495,8 @@ How a release captain uses the three workflows to complete a full release cycle.
 ```
 
 Note: mainnet deployment still involves manual coordination (operator, Foundation,
-voting). The automation covers artifact generation, simulation, and verification.
+voting). The automation covers artifact generation, simulation, and verification;
+the operator's two steps are single CLI commands that take the bundle as input.
 
 ---
 
@@ -507,11 +541,13 @@ is the same artifact regardless of whether CI or a human drives the process.
 2. Simulate against mainnet:
      simulate --bundle aptos-framework-v1.45.1 --network mainnet
 
-3. Coordinate with operator & Foundation (create on-chain proposal,
-   initiate voting, 3-day window)
+3. Operator creates the proposal from the merged bundle (voting opens, 3-day window):
+     aptos governance propose-bundle --bundle aptos-framework-v1.45.1 --pool-address <pool> \
+         --metadata-url <raw URL of the bundle's metadata.json in aptos-networks>
 
-4. Execute proposal (simulation runs before executing for real,
-   verify on-chain after)
+4. Operator executes the approved proposal, then anyone verifies on-chain:
+     aptos governance execute-bundle --bundle aptos-framework-v1.45.1 --proposal-id <id>
+     verify-framework-deployment --bundle aptos-framework-v1.45.1 --network mainnet
 
 5. Update mainnet branch (push-branch workflow in internal-ops)
 ```
@@ -527,8 +563,10 @@ files provide a clear review surface.
 
 ### Phase 1: Build new tooling alongside existing
 - Build a new CLI tool (separate from `aptos-release-builder`) with the new commands
-  (`generate-bundle`, `verify-bundle`, `simulate`, `verify-framework-deployment`), and
-  the three GitHub Actions workflows (generate, deploy-testnet, simulate)
+  (`generate-bundle`, `verify-bundle`, `simulate`, `deploy-testnet`,
+  `verify-framework-deployment`), the operator-side `propose-bundle` and
+  `execute-bundle` commands in the Aptos CLI, and the three GitHub Actions
+  workflows (generate, deploy-testnet, simulate)
 - Leave `aptos-release-builder` and existing workflows in place — ongoing releases
   continue to use the existing process without disruption
 
@@ -548,9 +586,10 @@ files provide a clear review surface.
    release artifacts, but the name is restrictive — it doesn't fit testnet-only
    releases. A rename of that repo could resolve this.
 
-2. **Operator coordination**: Can governance proposal submission be automated via
-   a GitHub workflow, or does it inherently require the operator? What does the
-   operator actually do that tooling can't?
+2. **Operator coordination**: Proposal submission requires the stake pool's voter
+   key, so it stays with the operator; `propose-bundle` and `execute-bundle`
+   reduce their part to two CLI commands. Whether execution could move to a
+   GitHub workflow (it needs only a funded account) is still open.
 
 3. **Sign-off enforcement**: Should summary checkboxes be enforced by tooling
    (`verify-bundle --require-signoff`) or by process (PR review)? Needs evaluation

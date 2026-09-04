@@ -1,8 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{bundle, config::BundleConfig, release, summary};
+use crate::{config::BundleConfig, release, summary};
 use anyhow::{Context, Result};
+use aptos_governance_bundle as bundle;
 use aptos_release_builder::{components::compile_script_and_hash, ExecutionMode};
 use aptos_types::on_chain_config::GasScheduleV2;
 use chrono::Utc;
@@ -60,31 +61,25 @@ async fn build_bundle(
     fs::copy(release_config_path, bundle_path.join(bundle::CONFIG_YAML))
         .context("failed to copy config into bundle")?;
 
-    // 5. Build and write the manifest (with checksums computed last).
+    // 5. Build and write the manifest, once every other file is in place.
     println!("Building manifest...");
-    let source = bundle::read_source_info(core_path)?;
-    let mut manifest = bundle::BundleManifest {
-        format_version: bundle::BUNDLE_FORMAT_VERSION,
-        bundle: bundle::BundleSection {
+    let source = read_source_info(core_path)?;
+    bundle::BundleManifest::new(
+        bundle_path,
+        bundle::BundleSection {
             name: config.name.clone(),
             created_at: Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
         },
-        source: bundle::SourceSection {
+        bundle::SourceSection {
             branch: source.branch,
             commit: source.commit,
         },
-        integrity: bundle::IntegritySection {
-            digest: String::new(),
-        },
-        checksums: Default::default(),
-    };
-    manifest.checksums = bundle::compute_checksums(bundle_path)?;
-    manifest.integrity.digest = manifest.compute_digest();
-    manifest.write(bundle_path)?;
+    )?
+    .write(bundle_path)?;
 
     // 6. Verify integrity before declaring success.
     println!("Verifying bundle integrity...");
-    crate::commands::verify::run(bundle_path, false)?;
+    crate::commands::verify_bundle::run(bundle_path, false)?;
     Ok(())
 }
 
@@ -173,4 +168,31 @@ async fn generate_scripts(config: &BundleConfig, bundle_path: &Path) -> Result<(
     )
     .with_context(|| format!("failed to write {}", metadata_path.display()))?;
     Ok(())
+}
+
+/// Git revision and branch the bundle is generated from, read from the working
+/// tree at `core_path`.
+struct SourceInfo {
+    commit: String,
+    branch: Option<String>,
+}
+
+/// Read the current commit and branch from the git repository containing
+/// `core_path`.
+fn read_source_info(core_path: &Path) -> Result<SourceInfo> {
+    let repo = git2::Repository::discover(core_path)
+        .with_context(|| format!("failed to open git repo at {}", core_path.display()))?;
+    let head = repo.head().context("failed to resolve git HEAD")?;
+    let commit = head
+        .peel_to_commit()
+        .context("failed to peel HEAD to a commit")?
+        .id()
+        .to_string();
+    // Only report an actual branch (a detached HEAD's shorthand is a commit hash).
+    let branch = if head.is_branch() {
+        head.shorthand().map(|s| s.to_string())
+    } else {
+        None
+    };
+    Ok(SourceInfo { commit, branch })
 }
