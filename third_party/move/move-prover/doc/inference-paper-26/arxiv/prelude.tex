@@ -1,3 +1,4 @@
+% !TEX root = main.tex
 \usepackage[T1]{fontenc}
 \usepackage{xcolor}
 \usepackage{listings}
@@ -13,18 +14,14 @@
 \usepackage{bbding}
 \usepackage{tabularx}
 \usepackage{enumitem}
-\usepackage{cite}
-\usepackage[compact]{titlesec}
-% IEEEtran.cls sets \citepunct to "], [", which produces "[A], [B]" for
-% \cite{A,B}. Override to a plain ", " so consecutive cites share one bracket.
-\renewcommand{\citepunct}{, }
+% Citations come from natbib, which the NeurIPS style loads; the driver passes
+% it [numbers,compress]. The style also fixes the page geometry, so do not
+% load geometry here.
 
-\hypersetup{colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue}
+% The NeurIPS style does not load hyperref itself; load it here and colorize.
+\usepackage[bookmarks,unicode,colorlinks=true,
+            linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
 \def\UrlFont{\rmfamily}
-
-% Tighten section/subsection vertical spacing for two-column layout.
-\titlespacing*{\section}{0pt}{1.2ex plus 0.2ex minus 0.2ex}{0.6ex plus 0.1ex}
-\titlespacing*{\subsection}{0pt}{0.8ex plus 0.1ex minus 0.1ex}{0.4ex plus 0.1ex}
 
 \newcommand{\Section}[1]{\section{#1}}
 \newcommand{\SubSection}[1]{\subsection{#1}}
@@ -54,14 +51,16 @@
     \end{figure}
 }
 
-% Full-width variant (spans both columns in the 2-column layout).
+% Full-width variant. In the one-column LNCS layout figure* is identical to
+% figure; the environment is kept so the body can be shared with the
+% two-column short version in ../v2.
 \newenvironment{WideFigure}{
     \begin{figure*}[!t]
 } {
     \end{figure*}
 }
 
-% Full-width table variant (spans both columns in the 2-column layout).
+% Full-width table variant, see WideFigure.
 \newenvironment{WideTable}{
     \begin{table*}[!t]
 } {
@@ -145,7 +144,7 @@
 
 %%%% Code
 
-% Keep IEEEtran's default Times font; do not override with charter.
+% Keep the LNCS default font; do not override with charter.
 %\usepackage[charter]{mathdesign}
 %\def\rmdefault{bch}
 %\def\ttdefault{blg}

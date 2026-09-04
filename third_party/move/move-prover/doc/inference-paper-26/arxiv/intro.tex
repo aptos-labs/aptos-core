@@ -1,0 +1,94 @@
+% !TEX root = main.tex
+\Section{Introduction}
+\label{sec:intro}
+
+A roadblock in program verification adoption is the \emph{cost of specification}.
+The properties developers want to establish are often high-level: that a call chain aborts only under stated preconditions, that an API entrypoint satisfies postconditions, that data is wellformed regarding an invariant, or that a resource cannot be accessed without required permissions.
+But to verify those properties developers have to write specifications for every single function in the system.
+
+Modern verifiers automatically abstract from imperative code using Dijkstra's weakest-precondition transformation (\WP)~\cite{dijkstra1975wp}.
+The problem is that \WP stops at loops:
+most loops require \emph{loop invariants}, which reduce them to an induction problem.  There is no general technique to synthesize loop invariants, even though there has been a lot of work in this area, going back to Cousot and Halbwachs \cite{CousotHalbwachs78}.
+Loop invariants have to be provided manually in realistic applications of program verification. The invariants are not only needed for the code which is target of verification, they are also needed for all dependencies, unless those themselves have fully specified function interfaces.
+
+Where the human is in the loop to solve tedious problems, LLMs are there to help. Specification inference via LLMs has been investigated as early as 2023
+\cite{PeiEtAl23, KamathEtAl23}. While the success rate in these early years wasn't high, LLMs have drastically improved since then. In the 2026 era of frontier models, it appears quite realistic to use a well-instructed agent to infer specifications, including loop invariants, specifically since the agent receives feedback from the verifier: the program must, by definition, conform to the inferred specification, and if not, a decent verifier will produce meaningful diagnosis.
+
+In this work we are going one step further: we supply the agent with a \WP tool which can infer precise, simplified specifications, provided loop invariants are given.
+The intended workflow is that the agent requests specs for a program, the tool comes back either with success, then the task is done, or with info about the missing loop invariants. The agent then asks the model to infer those invariants, and we loop back to the start.
+
+The most interesting question with such a setup is whether the capability to run \WP actually improves specification inference, and whether the overhead introduced by model/tool interaction is worth it.
+We investigate this question empirically by comparing pure agent and combined agent/\WP on a corpus of examples drawn out of a private codebase (the one for the perpetual trading system Decibel \cite{Decibel}).
+The fact that we choose a private codebase is methodologically important, as discussed later. The currency of comparison are tokens, as model we choose GLM-5.3 \cite{GLM53}, and as harness the Claude Code SDK.
+The results show that \WP based inference, at least with today's models, beats the agent-only approach on average by 45\% reduced token cost.
+
+The combination of agentic and mechanical inference as discussed here has been implemented in the Move Prover (\MVP).
+\MVP has been developed as part of the Libra/Diem project at Meta, targeting the Move smart contract language, and transitioned into Aptos Labs in 2022.
+The Move language has many similarities to Rust: safe reference semantics, linear types, algebraic data types, higher-order functions.
+Move has been used to specify and verify Diem's international payment system and also for critical components of the Aptos Blockchain
+\cite{ParkZGXGCLC24, AptosFrameworkBook}.
+The Prover supports pre/post conditions, abort conditions, state/data/loop invariants, and higher-order functions, in first-order predicate logic. It has an efficient encoding in SMT/z3 via Boogie, which has been described in \cite{DillGPQXZ22,GrieskampEtAl26HO}.
+For more details, see the Move book \cite{MoveOnAptosBook}.
+
+
+
+
+\endinput
+
+inference of a loop invariant.
+
+
+
+
+Finding loop invariants requires creativity, often based on pattern matching by recognizing familiar structures.
+
+
+that a global storage invariant is preserved.
+
+
+
+that funds are conserved across a transfer.
+While \MVP can verify unspecified callees by inlining their bodies, this does not scale: modular verification requires explicit per-function pre- and postcondition specifications.
+This detail is mechanical and tedious to write, dominates the cost of using a verifier, and is a significant barrier to wider adoption.
+
+
+The Move Prover (\MVP)~\cite{DillGPQXZ22} is a formal verification tool for Move smart contracts \cite{blackshear2020resources, MoveOnAptosBook}. Move, originally developed for the Libra/Diem blockchain, is a Rust-inspired language with a strong type system, linear types, Rust-style references, and a resource model that makes it suitable for safe smart contract programming. The Move Prover is based on a weakest-precondition calculus and supports modular verification of Move bytecode, including reasoning about references, global state, and higher-order functions.
+\MVP is evolved at Aptos~\cite{ParkZGXGCLC24, AptosFrameworkBook}, where it is used for formal verification of core protocol logic such as staking, metering, code deployment, and auxiliary data structures that underpin the framework.
+
+%  Recently, \MVP was extended to support Move's higher-order functions and dynamic dispatch ~\cite{grieskamp2025movehigherorder}, including behavioral predicates over function values and state labels naming intermediate memory states~\cite{GrieskampEtAl26HO}.
+%
+
+
+\emph{Specification inference} is a promising approach. Inference has a long history \cite{DaikonTSE01} and has gained steam again with LLMs \cite{PeiEtAl23, KamathEtAl23}.
+Coding agents like Claude Code \cite{ClaudeCode} open further avenues: they expose tools to the AI (e.g. via the Model Context Protocol, MCP) and provide a workflow in which AI and developers collaborate on code changes. And models are significantly more powerful than three years ago.
+
+This paper presents novel work on the combi
+
+
+of (a) mechanical spec inference via weakest-precondition analysis (\WP)~\cite{dijkstra1975wp,BL05} and (b) agentic inference guided by a set of skills (English instructions), integrated as a plugin into Claude Code \cite{ClaudeCodePlugins}.
+Our goal is a methodology in which AI, mechanical deduction, and users collaborate on writing and verifying Move specifications.
+This paper defines some of the building blocks toward that goal, focusing on spec inference.
+
+By reusing \MVP's reference-elimination pass~\cite{DillGPQXZ22} (also adopted by Aeneas~\cite{Aeneas}), \WP propagates over a reference-free intermediate form on which classical Dijkstra-style reasoning applies directly, and recovers abort conditions, modifies clauses, and consequence-style postconditions from the bytecode.
+
+However, the principal bottleneck of \WP-based inference is \emph{loop invariants}: backward propagation through a loop requires an inductive invariant that is in general not derivable from the loop body alone, and without it the rest of the inferred specification becomes vacuous.
+LLMs help here: they are good at the pattern recognition loop invariants demand --- spotting that a counter is monotone, that a sum is preserved, that an element stays in a sorted prefix --- and at proposing specifications in the idiom a human would use.
+
+Both signals are validated against the code by the prover; counter-examples feed back into the agent for refinement, and the user can intervene at any point.
+
+\Paragraph{Contributions} While primarily a tools paper with preliminary results, this work presents several novel ideas.
+As far as we know, previous work on LLM-based inference did not combine this approach with a mechanical component like \WP.
+Earlier inference work is also not integrated with an interactive coding agent that lets the user contribute.
+Moreover, our \WP algorithm benefits from reference elimination, as does our verification engine; this combination has not been described before, and the same approach extends to comparable verification engines for safe Rust (e.g. \cite{Aeneas}).
+
+\Paragraph{Outline}
+Sec.~\ref{sec:example} starts with a step-by-step example illustrating how the tool operates for the end user.
+Sec.~\ref{sec:wp} outlines \WP analysis for Move code in the presence of Rust-style references and their elimination by the Move prover via bytecode rewriting.
+In Sec.~\ref{sec:skills} we discuss the system of skills and prompts we have set up for inference and verification.
+Sec.~\ref{sec:conclusion} concludes with a discussion of related and future work.
+
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:
