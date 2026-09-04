@@ -44,6 +44,16 @@ ratio is calibrated so a change in it shows up. A drop against the calibrated
 value means MonoMove skipped real work, and the speedup next to it is not a
 speedup.
 
+`order-book-no-matches1-market` is the one workload that does not fit. It sits at
+1.00x, and MonoMove writes about 30 bytes per transaction *more* than legacy
+rather than roughly 1 150 fewer. Netting out the fee it does not write, MonoMove
+produces around 1 180 bytes per transaction of extra state on this workload
+alone. It is also the workload with the largest reported speedup, so the two are
+worth reading together: until the write-set difference is explained, treat the
+order-book number as unverified rather than as MonoMove's best result. The
+differential replay harness in the `aptos-mono-move` crate compares write sets
+directly and is the right tool to settle it.
+
 ## Running locally
 
 Small and fast, for checking the harness works:
@@ -95,10 +105,11 @@ runner type before trusting any band, and record the result here:
 | Apple M-series laptop | 2026-09-03 | 5 blocks, 3 repeats, 20k accounts | 0.7% | 3.6% |
 | `benchmark-c3d-60` | | | _(not yet measured)_ | |
 
-Both numbers cover `total`, `execution`, and `inner_block_executor` — the metrics
-the verdict rests on. Signature verification and commit take single-digit
-milliseconds per block, so their run-to-run spread is tens of percent even
-between two identical runs. They are reported but not judged.
+Both numbers cover `total`, `execution`, and `inner_block_executor`. The verdict
+itself rests on the last two only. Every other stage is disk bound or takes
+single-digit milliseconds per block, so its run-to-run spread reaches tens of
+percent between two identical runs. Those stages are reported and calibrated but
+do not decide a verdict.
 
 ## Calibration
 
