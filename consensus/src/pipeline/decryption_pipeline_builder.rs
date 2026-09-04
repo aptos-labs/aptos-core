@@ -23,8 +23,8 @@ use aptos_logger::{error, info, warn};
 use aptos_types::{
     decryption::{BlockTxnDecryptionKey, DecryptionPayload},
     secret_sharing::{
-        Ciphertext, DecryptionKey, EvalProof, SecretShare, SecretShareConfig, SecretShareMetadata,
-        SecretSharedKey,
+        Ciphertext, DecryptionKey, Digest, EvalProof, EvalProofsPromise, SecretShare,
+        SecretShareConfig, SecretShareMetadata, SecretSharedKey,
     },
     transaction::{
         encrypted_payload::{DecryptedPlaintext, DecryptionFailureReason, EncryptedPayload},
@@ -286,157 +286,73 @@ fn block_has_epoch_end_vtxn(block: &Block) -> bool {
     })
 }
 
-/// Validator path: derive key share, prepare ciphertexts, await the shared
-/// decryption key, and decrypt all encrypted transactions.
-async fn decrypt_validator_path(
-    encrypted_txns: Vec<SignedTransaction>,
-    regular_txns: Vec<SignedTransaction>,
+#[derive(Debug, Eq, PartialEq)]
+pub(crate) enum SecretShareSelection {
+    NoEncryptedTransactions,
+    TrustedSetupExhausted,
+    EpochEnd,
+    Selected {
+        batch_limited_len: usize,
+        selected_len: usize,
+    },
+}
+
+/// Selects the exact encrypted-transaction prefix used to derive a block's
+/// secret share. Recovery calls this same helper so batch/execute limits and
+/// the early-exit ordering cannot drift from the normal pipeline.
+pub(crate) fn select_encrypted_txns_for_secret_share(
     block: &Block,
-    author: Author,
     secret_share_config: &SecretShareConfig,
-    derived_self_key_share_tx: oneshot::Sender<Option<SecretShare>>,
-    secret_shared_key_rx: oneshot::Receiver<Option<SecretSharedKey>>,
+    encrypted_txns_len: usize,
     max_txns_from_block_to_execute: Option<u64>,
-    block_gas_limit: Option<u64>,
-    chained_round: Option<u64>,
-) -> TaskResult<DecryptionResult> {
-    // The round that keys the digest. Round-tracked mode uses the dense
-    // counter chained from the parent; legacy mode (the on-chain resource
-    // doesn't exist yet) uses the consensus round, matching older binaries
-    // bit-for-bit so mixed validator sets derive identical digests.
-    let digest_round = chained_round.unwrap_or_else(|| block.round());
-    // Short-circuit if no encrypted transactions: skip all crypto operations
-    if encrypted_txns.is_empty() {
-        let _ = derived_self_key_share_tx.send(None);
-        return Ok(DecryptionResult {
-            decrypted_txns: Vec::new(),
-            retry_txns: Vec::new(),
-            regular_txns,
-            max_txns_from_block_to_execute,
-            block_gas_limit,
-            outcome: no_key_outcome(chained_round),
-        });
+    digest_round: u64,
+) -> SecretShareSelection {
+    if encrypted_txns_len == 0 {
+        return SecretShareSelection::NoEncryptedTransactions;
     }
 
-    // Trusted setup capacity check. In round-tracked mode the dense counter
-    // is compared, so empty blocks no longer consume capacity; legacy mode
-    // still burns one slot per consensus round.
     let num_rounds = secret_share_config.digest_key().num_rounds();
     counters::TRUSTED_SETUP_NUM_ROUNDS.set(num_rounds as i64);
     if digest_round >= num_rounds as u64 {
-        error!(
-            "Block round {} digest_round {} >= trusted setup num_rounds {}; marking {} encrypted txns as TrustedSetupExhausted",
-            block.round(),
-            digest_round,
-            num_rounds,
-            encrypted_txns.len()
-        );
-        let _ = derived_self_key_share_tx.send(None);
-        let failed_txns = mark_txns_failed_decryption(
-            encrypted_txns,
-            DecryptionFailureReason::TrustedSetupExhausted,
-        );
-        return Ok(DecryptionResult {
-            decrypted_txns: failed_txns,
-            retry_txns: Vec::new(),
-            regular_txns,
-            max_txns_from_block_to_execute,
-            block_gas_limit,
-            outcome: no_key_outcome(chained_round),
-        });
+        return SecretShareSelection::TrustedSetupExhausted;
     }
 
-    // Decrypting txns that the VM will skip after a NewEpochEvent leaks sender
-    // intent. If the block carries an epoch-ending vtxn, mark every encrypted
-    // txn as retry without performing any crypto work.
     if block_has_epoch_end_vtxn(block) {
-        info!(
-            "Block {} has epoch-ending vtxn; marking {} encrypted txns as EpochEndRetry",
-            block.round(),
-            encrypted_txns.len()
-        );
-        let _ = derived_self_key_share_tx.send(None);
-        let retry_txns =
-            mark_txns_failed_decryption(encrypted_txns, DecryptionFailureReason::EpochEndRetry);
-        return Ok(DecryptionResult {
-            decrypted_txns: Vec::new(),
-            retry_txns,
-            regular_txns,
-            max_txns_from_block_to_execute,
-            block_gas_limit,
-            outcome: no_key_outcome(chained_round),
-        });
+        return SecretShareSelection::EpochEnd;
     }
 
-    let max_encrypted_txns = secret_share_config.digest_key().max_batch_size();
-    let (encrypted_txns, batch_limit_exceeded_txns) = if encrypted_txns.len() > max_encrypted_txns {
-        warn!(
-            "Block {} has {} encrypted txns exceeding batch limit {}; marking excess as BatchLimitReached",
-            block.round(),
-            encrypted_txns.len(),
-            max_encrypted_txns,
-        );
-        let mut all = encrypted_txns;
-        let exceeded = all.split_off(max_encrypted_txns);
-        let exceeded =
-            mark_txns_failed_decryption(exceeded, DecryptionFailureReason::BatchLimitReached);
-        (all, exceeded)
-    } else {
-        (encrypted_txns, Vec::new())
-    };
-
-    // Cap the encrypted partition at max_txns_from_block_to_execute. The cap is
-    // applied pre-shuffle here; prepare_block later concats [decrypted, regular]
-    // and truncates at the same limit, so this is a conservative optimization:
-    // it may over-mark txns that would have survived shuffle, but it never
-    // under-decrypts, since ExecuteBlockLimitReached is a Retry status.
-    let (encrypted_txns, execute_limit_exceeded_txns) = match max_txns_from_block_to_execute {
-        Some(max) if (encrypted_txns.len() as u64) > max => {
-            let max = max as usize;
-            warn!(
-                "Block {} has {} encrypted txns exceeding execute-block limit {}; marking excess as ExecuteBlockLimitReached",
-                block.round(),
-                encrypted_txns.len(),
-                max,
-            );
-            let mut all = encrypted_txns;
-            let exceeded = all.split_off(max);
-            let exceeded = mark_txns_failed_decryption(
-                exceeded,
-                DecryptionFailureReason::ExecuteBlockLimitReached,
-            );
-            (all, exceeded)
-        },
-        _ => (encrypted_txns, Vec::new()),
-    };
-
-    // If the cap left no encrypted txns to decrypt, short-circuit before crypto.
-    if encrypted_txns.is_empty() {
-        let _ = derived_self_key_share_tx.send(None);
-        let retry_txns = [batch_limit_exceeded_txns, execute_limit_exceeded_txns].concat();
-        return Ok(DecryptionResult {
-            decrypted_txns: Vec::new(),
-            retry_txns,
-            regular_txns,
-            max_txns_from_block_to_execute,
-            block_gas_limit,
-            outcome: no_key_outcome(chained_round),
-        });
+    let batch_limited_len =
+        encrypted_txns_len.min(secret_share_config.digest_key().max_batch_size());
+    let selected_len = max_txns_from_block_to_execute
+        .map(|max| batch_limited_len.min(max as usize))
+        .unwrap_or(batch_limited_len);
+    SecretShareSelection::Selected {
+        batch_limited_len,
+        selected_len,
     }
+}
 
+/// Computes the digest and self-share for an already selected, ordered slice
+/// of encrypted transactions. Both the live pipeline and reactive recovery use
+/// this function to guarantee byte-identical metadata and shares.
+pub(crate) async fn derive_secret_share(
+    encrypted_txns: &[SignedTransaction],
+    block: &Block,
+    author: Author,
+    secret_share_config: &SecretShareConfig,
+    digest_round: u64,
+) -> anyhow::Result<(Vec<Ciphertext>, Digest, EvalProofsPromise, SecretShare)> {
     let txn_ciphertexts: Vec<Ciphertext> = encrypted_txns
         .iter()
         .map(|txn| {
-            // TODO(ibalajiarun): Avoid clone and use reference instead
             txn.payload()
                 .as_encrypted_payload()
-                .expect("must be a encrypted txn")
+                .expect("selected transaction must be encrypted")
                 .ciphertext()
                 .clone()
         })
         .collect();
 
-    // Safe: TrustedSetupExhausted check above guarantees digest_round < num_rounds.
     let digest_key = secret_share_config.digest_key_arc();
     let (txn_ciphertexts, digest, proofs_promise) = tokio::task::spawn_blocking(move || {
         monitor!(
@@ -457,19 +373,162 @@ async fn decrypt_validator_path(
         block.id(),
         digest.clone(),
     );
-
     let derived_key_share = monitor!(
         "decryption_derive_key_share",
         FPTXWeighted::derive_decryption_key_share(secret_share_config.msk_share(), &digest)?
     );
-    if derived_self_key_share_tx
-        .send(Some(SecretShare::new(
-            author,
-            metadata.clone(),
-            derived_key_share,
-        )))
-        .is_err()
-    {
+    let share = SecretShare::new(author, metadata, derived_key_share);
+
+    Ok((txn_ciphertexts, digest, proofs_promise, share))
+}
+
+/// Validator path: derive key share, prepare ciphertexts, await the shared
+/// decryption key, and decrypt all encrypted transactions.
+async fn decrypt_validator_path(
+    encrypted_txns: Vec<SignedTransaction>,
+    regular_txns: Vec<SignedTransaction>,
+    block: &Block,
+    author: Author,
+    secret_share_config: &SecretShareConfig,
+    derived_self_key_share_tx: oneshot::Sender<Option<SecretShare>>,
+    secret_shared_key_rx: oneshot::Receiver<Option<SecretSharedKey>>,
+    max_txns_from_block_to_execute: Option<u64>,
+    block_gas_limit: Option<u64>,
+    chained_round: Option<u64>,
+) -> TaskResult<DecryptionResult> {
+    // The round that keys the digest. Round-tracked mode uses the dense
+    // counter chained from the parent; legacy mode (the on-chain resource
+    // doesn't exist yet) uses the consensus round, matching older binaries
+    // bit-for-bit so mixed validator sets derive identical digests.
+    let digest_round = chained_round.unwrap_or_else(|| block.round());
+    let selection = select_encrypted_txns_for_secret_share(
+        block,
+        secret_share_config,
+        encrypted_txns.len(),
+        max_txns_from_block_to_execute,
+        digest_round,
+    );
+    let (batch_limited_len, selected_len) = match selection {
+        SecretShareSelection::NoEncryptedTransactions => {
+            let _ = derived_self_key_share_tx.send(None);
+            return Ok(DecryptionResult {
+                decrypted_txns: Vec::new(),
+                retry_txns: Vec::new(),
+                regular_txns,
+                max_txns_from_block_to_execute,
+                block_gas_limit,
+                outcome: no_key_outcome(chained_round),
+            });
+        },
+        SecretShareSelection::TrustedSetupExhausted => {
+            let num_rounds = secret_share_config.digest_key().num_rounds();
+            error!(
+                "Block round {} digest_round {} >= trusted setup num_rounds {}; marking {} encrypted txns as TrustedSetupExhausted",
+                block.round(),
+                digest_round,
+                num_rounds,
+                encrypted_txns.len()
+            );
+            let _ = derived_self_key_share_tx.send(None);
+            let failed_txns = mark_txns_failed_decryption(
+                encrypted_txns,
+                DecryptionFailureReason::TrustedSetupExhausted,
+            );
+            return Ok(DecryptionResult {
+                decrypted_txns: failed_txns,
+                retry_txns: Vec::new(),
+                regular_txns,
+                max_txns_from_block_to_execute,
+                block_gas_limit,
+                outcome: no_key_outcome(chained_round),
+            });
+        },
+        SecretShareSelection::EpochEnd => {
+            info!(
+                "Block {} has epoch-ending vtxn; marking {} encrypted txns as EpochEndRetry",
+                block.round(),
+                encrypted_txns.len()
+            );
+            let _ = derived_self_key_share_tx.send(None);
+            let retry_txns =
+                mark_txns_failed_decryption(encrypted_txns, DecryptionFailureReason::EpochEndRetry);
+            return Ok(DecryptionResult {
+                decrypted_txns: Vec::new(),
+                retry_txns,
+                regular_txns,
+                max_txns_from_block_to_execute,
+                block_gas_limit,
+                outcome: no_key_outcome(chained_round),
+            });
+        },
+        SecretShareSelection::Selected {
+            batch_limited_len,
+            selected_len,
+        } => (batch_limited_len, selected_len),
+    };
+
+    let (encrypted_txns, batch_limit_exceeded_txns) = if encrypted_txns.len() > batch_limited_len {
+        warn!(
+            "Block {} has {} encrypted txns exceeding batch limit {}; marking excess as BatchLimitReached",
+            block.round(),
+            encrypted_txns.len(),
+            batch_limited_len,
+        );
+        let mut all = encrypted_txns;
+        let exceeded = all.split_off(batch_limited_len);
+        let exceeded =
+            mark_txns_failed_decryption(exceeded, DecryptionFailureReason::BatchLimitReached);
+        (all, exceeded)
+    } else {
+        (encrypted_txns, Vec::new())
+    };
+
+    // Cap the encrypted partition at max_txns_from_block_to_execute. The cap is
+    // applied pre-shuffle here; prepare_block later concats [decrypted, regular]
+    // and truncates at the same limit, so this is a conservative optimization:
+    // it may over-mark txns that would have survived shuffle, but it never
+    // under-decrypts, since ExecuteBlockLimitReached is a Retry status.
+    let (encrypted_txns, execute_limit_exceeded_txns) = if encrypted_txns.len() > selected_len {
+        warn!(
+                "Block {} has {} encrypted txns exceeding execute-block limit {}; marking excess as ExecuteBlockLimitReached",
+                block.round(),
+                encrypted_txns.len(),
+                selected_len,
+            );
+        let mut all = encrypted_txns;
+        let exceeded = all.split_off(selected_len);
+        let exceeded = mark_txns_failed_decryption(
+            exceeded,
+            DecryptionFailureReason::ExecuteBlockLimitReached,
+        );
+        (all, exceeded)
+    } else {
+        (encrypted_txns, Vec::new())
+    };
+
+    // If the cap left no encrypted txns to decrypt, short-circuit before crypto.
+    if encrypted_txns.is_empty() {
+        let _ = derived_self_key_share_tx.send(None);
+        let retry_txns = [batch_limit_exceeded_txns, execute_limit_exceeded_txns].concat();
+        return Ok(DecryptionResult {
+            decrypted_txns: Vec::new(),
+            retry_txns,
+            regular_txns,
+            max_txns_from_block_to_execute,
+            block_gas_limit,
+            outcome: no_key_outcome(chained_round),
+        });
+    }
+
+    let (txn_ciphertexts, digest, proofs_promise, share) = derive_secret_share(
+        &encrypted_txns,
+        block,
+        author,
+        secret_share_config,
+        digest_round,
+    )
+    .await?;
+    if derived_self_key_share_tx.send(Some(share)).is_err() {
         return Err(
             anyhow!("derived_self_key_share_tx receiver dropped, pipeline likely aborted").into(),
         );
@@ -968,6 +1027,60 @@ mod tests {
         }
     }
 
+    async fn assert_pipeline_and_recovery_share_match(chained_round: Option<u64>) {
+        let ctx = TestContext::new_with_capacity(vec![100], 8, 16);
+        let block = make_block(None);
+        let author = ctx.authors[0];
+        let encrypted = vec![make_encrypted_txn(), make_encrypted_txn()];
+        let digest_round = chained_round.unwrap_or_else(|| block.round());
+
+        let (_, _, _, recovered) = derive_secret_share(
+            &encrypted,
+            &block,
+            author,
+            &ctx.secret_share_config,
+            digest_round,
+        )
+        .await
+        .expect("recovery derivation should succeed");
+
+        let (share_tx, share_rx) = oneshot::channel();
+        let (key_tx, key_rx) = oneshot::channel();
+        let block_for_pipeline = block.clone();
+        let config = ctx.secret_share_config.clone();
+        let pipeline = tokio::spawn(async move {
+            decrypt_validator_path(
+                encrypted,
+                vec![],
+                &block_for_pipeline,
+                author,
+                &config,
+                share_tx,
+                key_rx,
+                None,
+                None,
+                chained_round,
+            )
+            .await
+        });
+        let pipeline_share = share_rx
+            .await
+            .expect("pipeline should deliver a share")
+            .expect("encrypted block should have a share");
+        key_tx
+            .send(None)
+            .expect("pipeline should still be waiting for a key");
+        pipeline
+            .await
+            .expect("pipeline task should not panic")
+            .expect("pipeline should handle a missing key");
+
+        assert_eq!(
+            bcs::to_bytes(&pipeline_share).unwrap(),
+            bcs::to_bytes(&recovered).unwrap()
+        );
+    }
+
     // ---------- Helper functions and metrics ----------
 
     #[test]
@@ -1116,6 +1229,41 @@ mod tests {
     }
 
     // ---------- decrypt_encrypted_txns_inner routing ----------
+
+    #[tokio::test]
+    async fn recovery_derives_identical_share_in_round_tracked_mode() {
+        assert_pipeline_and_recovery_share_match(Some(3)).await;
+    }
+
+    #[tokio::test]
+    async fn recovery_derives_identical_share_in_legacy_mode() {
+        assert_pipeline_and_recovery_share_match(None).await;
+    }
+
+    #[test]
+    fn dense_round_replay_consumes_only_nonempty_selected_blocks() {
+        let ctx = TestContext::new_with_capacity(vec![100], 8, 16);
+        let block = make_block(None);
+        let mut next_round = 4;
+        for encrypted_len in [0, 2, 0, 1] {
+            if matches!(
+                select_encrypted_txns_for_secret_share(
+                    &block,
+                    &ctx.secret_share_config,
+                    encrypted_len,
+                    None,
+                    next_round,
+                ),
+                SecretShareSelection::Selected {
+                    selected_len: 1..,
+                    ..
+                }
+            ) {
+                next_round += 1;
+            }
+        }
+        assert_eq!(next_round, 6);
+    }
 
     #[tokio::test]
     async fn routing_disabled_marks_config_unavailable() {
