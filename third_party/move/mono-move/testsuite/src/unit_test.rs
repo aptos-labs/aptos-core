@@ -29,7 +29,6 @@ use move_core_types::{
     value::MoveValue,
     vm_status::{AbortLocation, StatusCode},
 };
-use move_model::metadata::LanguageVersion;
 use move_package::BuildConfig;
 use move_unit_test::UnitTestingConfig;
 use std::{
@@ -44,16 +43,8 @@ const GAS_BUDGET: u64 = u64::MAX;
 
 pub fn run_package_unit_tests(
     pkg_path: &Path,
-    use_latest_language: bool,
+    build_config: BuildConfig,
 ) -> anyhow::Result<RunSummary> {
-    let mut build_config = BuildConfig::default();
-    if use_latest_language {
-        let language_version = LanguageVersion::latest();
-        let bytecode_version = language_version.infer_bytecode_version(None);
-        build_config.compiler_config.language_version = Some(language_version);
-        build_config.compiler_config.bytecode_version = Some(bytecode_version);
-    }
-
     let test_plan = move_unit_test::package_test::build_test_plan_for_package(
         pkg_path,
         build_config,

@@ -2,10 +2,11 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    assert_success, assert_vm_status,
+    assert_success, assert_vm_status, mono_move_test,
     resource_groups::{
         initialize, initialize_enabled_disabled_comparison, ResourceGroupsTestHarness,
     },
+    run_mono_move,
     tests::{aggregator_v2::arb_block_split, common},
     BlockSplit, MoveHarness, SUCCESS,
 };
@@ -86,9 +87,9 @@ fn arb_test_env_non_equivalent(num_txns: usize) -> BoxedStrategy<TestEnvConfig> 
 
 proptest! {
     #![proptest_config(ProptestConfig {
-        // Cases are expensive, few cases is enough.
-        // We will test a few more comprehensive tests more times, and the rest even fewer.
-        cases: if STRESSTEST_MODE { 1000 } else { 20 },
+        // Cases are expensive, few cases is enough. Halved from 20 because
+        // every case now runs its block twice, once per VM.
+        cases: if STRESSTEST_MODE { 1000 } else { 10 },
         result_cache: if STRESSTEST_MODE { prop::test_runner::noop_result_cache } else {prop::test_runner::basic_result_cache },
         .. ProptestConfig::default()
     })]
@@ -96,56 +97,60 @@ proptest! {
     #[test]
     fn proptest_resource_groups_1(test_env in arb_test_env(17)) {
         println!("Testing test_aggregator_lifetime {:?}", test_env);
-        let mut h = setup(test_env.executor_mode, test_env.resource_group_mode, 17);
+        mono_move_test::both(|| {
+            let mut h = setup(test_env.executor_mode, test_env.resource_group_mode, 17);
 
-        let txns = vec![
-            (SUCCESS, h.init_signer(vec![5,2,3])),
-            (SUCCESS, h.set_resource(4, "ABC".to_string(), 10)),
-            (SUCCESS, h.set_resource(2, "DEFG".to_string(), 20)),
-            (SUCCESS, h.unset_resource(3)),
-            (SUCCESS, h.set_resource(3, "GH".to_string(), 30)),
-            (SUCCESS, h.set_resource(4, "JKLMNO".to_string(), 40)),
-            (SUCCESS, h.set_and_check(2,  4, "MNOP".to_string(), 50, "JKLMNO".to_string(), 40)),
-            (SUCCESS, h.read_or_init(1)),
-            (SUCCESS, h.check(2, "MNOP".to_string(), 50)),
-            (SUCCESS, h.check(1, "init_name".to_string(), 5)),
-            (SUCCESS, h.unset_resource(1)),
-            (SUCCESS, h.set_3_group_members(1, 2, 3, "L".to_string(), 25)),
-            (SUCCESS, h.check(1, "L".to_string(), 25)),
-            (SUCCESS, h.unset_resource(3)),
-            (ENOT_EQUAL, h.check(2, "MNOP".to_string(), 50)),
-            (EINVALID_ARG, h.set_resource(5, "JKLI".to_string(), 40)),
-            (ERESOURCE_DOESNT_EXIST, h.check(3, "L".to_string(), 25)),
-        ];
-        h.run_block_in_parts_and_check(
-            test_env.block_split,
-            txns,
-        );
+            let txns = vec![
+                (SUCCESS, h.init_signer(vec![5,2,3])),
+                (SUCCESS, h.set_resource(4, "ABC".to_string(), 10)),
+                (SUCCESS, h.set_resource(2, "DEFG".to_string(), 20)),
+                (SUCCESS, h.unset_resource(3)),
+                (SUCCESS, h.set_resource(3, "GH".to_string(), 30)),
+                (SUCCESS, h.set_resource(4, "JKLMNO".to_string(), 40)),
+                (SUCCESS, h.set_and_check(2,  4, "MNOP".to_string(), 50, "JKLMNO".to_string(), 40)),
+                (SUCCESS, h.read_or_init(1)),
+                (SUCCESS, h.check(2, "MNOP".to_string(), 50)),
+                (SUCCESS, h.check(1, "init_name".to_string(), 5)),
+                (SUCCESS, h.unset_resource(1)),
+                (SUCCESS, h.set_3_group_members(1, 2, 3, "L".to_string(), 25)),
+                (SUCCESS, h.check(1, "L".to_string(), 25)),
+                (SUCCESS, h.unset_resource(3)),
+                (ENOT_EQUAL, h.check(2, "MNOP".to_string(), 50)),
+                (EINVALID_ARG, h.set_resource(5, "JKLI".to_string(), 40)),
+                (ERESOURCE_DOESNT_EXIST, h.check(3, "L".to_string(), 25)),
+            ];
+            h.run_block_in_parts_and_check(
+                test_env.block_split,
+                txns,
+            );
+        });
     }
 
     #[test]
     fn proptest_resource_groups_2(test_env in arb_test_env_non_equivalent(12)) {
         println!("Testing test_aggregator_lifetime {:?}", test_env);
-        let mut h = setup(test_env.executor_mode, test_env.resource_group_mode, 12);
+        mono_move_test::both(|| {
+            let mut h = setup(test_env.executor_mode, test_env.resource_group_mode, 12);
 
-        let txns = vec![
-            (SUCCESS, h.init_signer(vec![5,2,3])),
-            (SUCCESS, h.set_resource(4, "ABCDEF".to_string(), 10)),
-            (SUCCESS, h.set_resource(2, "DEF".to_string(), 20)),
-            (SUCCESS, h.read_or_init(4)),
-            (SUCCESS, h.set_resource(2, "XYZK".to_string(), 25)),
-            (ENOT_EQUAL, h.check(2, "DEF".to_string(), 20)),
-            (SUCCESS, h.check(2, "XYZK".to_string(), 25)),
-            (SUCCESS, h.set_resource(3, "GH".to_string(), 30)),
-            (SUCCESS, h.unset_resource(3)),
-            (ERESOURCE_DOESNT_EXIST, h.check(3, "LJH".to_string(), 25)),
-            (ERESOURCE_DOESNT_EXIST, h.set_and_check(2,  1, "MNO".to_string(), 50, "GH".to_string(), 30)),
-            (SUCCESS, h.check(2, "XYZK".to_string(), 25)),
-        ];
-        h.run_block_in_parts_and_check(
-            test_env.block_split,
-            txns,
-        );
+            let txns = vec![
+                (SUCCESS, h.init_signer(vec![5,2,3])),
+                (SUCCESS, h.set_resource(4, "ABCDEF".to_string(), 10)),
+                (SUCCESS, h.set_resource(2, "DEF".to_string(), 20)),
+                (SUCCESS, h.read_or_init(4)),
+                (SUCCESS, h.set_resource(2, "XYZK".to_string(), 25)),
+                (ENOT_EQUAL, h.check(2, "DEF".to_string(), 20)),
+                (SUCCESS, h.check(2, "XYZK".to_string(), 25)),
+                (SUCCESS, h.set_resource(3, "GH".to_string(), 30)),
+                (SUCCESS, h.unset_resource(3)),
+                (ERESOURCE_DOESNT_EXIST, h.check(3, "LJH".to_string(), 25)),
+                (ERESOURCE_DOESNT_EXIST, h.set_and_check(2,  1, "MNO".to_string(), 50, "GH".to_string(), 30)),
+                (SUCCESS, h.check(2, "XYZK".to_string(), 25)),
+            ];
+            h.run_block_in_parts_and_check(
+                test_env.block_split,
+                txns,
+            );
+        });
     }
 }
 
@@ -159,6 +164,7 @@ struct Secondary {
     value: u32,
 }
 
+#[run_mono_move]
 #[test_case(true)]
 #[test_case(false)]
 fn test_resource_groups(resource_group_charge_as_sum_enabled: bool) {

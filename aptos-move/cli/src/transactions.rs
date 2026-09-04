@@ -46,18 +46,6 @@ fn serialize_as_json<T: Serialize>(value: &T) -> CliTypedResult<serde_json::Valu
     serde_json::to_value(value).map_err(|err| CliError::UnexpectedError(err.to_string()))
 }
 
-#[cfg(test)]
-fn local_events_to_json(
-    state_view: &impl aptos_types::state_store::StateView,
-    events: &[(ContractEvent, Option<MoveTypeLayout>)],
-) -> CliTypedResult<serde_json::Value> {
-    let events = events
-        .iter()
-        .map(|(event, _layout)| event.clone())
-        .collect::<Vec<_>>();
-    local_contract_events_to_json(state_view, &events)
-}
-
 fn local_contract_events_to_json(
     state_view: &impl aptos_types::state_store::StateView,
     events: &[ContractEvent],
@@ -483,7 +471,7 @@ impl TxnOptions {
 
 #[cfg(test)]
 mod tests {
-    use super::{local_events_to_json, local_write_set_to_json, serialize_as_json};
+    use super::{local_contract_events_to_json, local_write_set_to_json, serialize_as_json};
     use aptos_cli_common::TransactionSummary;
     use aptos_crypto::HashValue;
     use aptos_transaction_simulation::EmptyStateView;
@@ -561,7 +549,7 @@ mod tests {
         .unwrap();
 
         let state_view = EmptyStateView;
-        let json = local_events_to_json(&state_view, &[(event, None)]).unwrap();
+        let json = local_contract_events_to_json(&state_view, &[event]).unwrap();
         let first = json.as_array().unwrap().first().unwrap();
         assert!(first.get("guid").is_some());
         assert_eq!(first.get("sequence_number").unwrap().as_str(), Some("7"));

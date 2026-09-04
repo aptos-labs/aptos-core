@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    assert_abort, assert_success,
+    assert_abort, assert_success, run_mono_move,
     tests::offer_rotation_capability::{offer_rotation_capability_v2, revoke_rotation_capability},
     MoveHarness,
 };
@@ -21,6 +21,7 @@ use aptos_types::{
 };
 use move_core_types::parser::parse_struct_tag;
 
+#[run_mono_move(should_fail = "MonoMove does not implement the transaction_context::is_multisig_payload_txn_internal native that account.move's sequence-number proof guard calls")]
 #[test]
 fn rotate_auth_key_ed25519_to_ed25519() {
     let mut harness = MoveHarness::new();
@@ -43,6 +44,7 @@ fn rotate_auth_key_ed25519_to_ed25519() {
     verify_originating_address(&mut harness, account2.auth_key(), *account1.address());
 }
 
+#[run_mono_move(should_fail = "MonoMove does not implement the transaction_context::is_multisig_payload_txn_internal native that account.move's sequence-number proof guard calls")]
 #[test]
 fn rotate_auth_key_ed25519_to_multi_ed25519() {
     let mut harness = MoveHarness::new();
@@ -67,6 +69,7 @@ fn rotate_auth_key_ed25519_to_multi_ed25519() {
     verify_originating_address(&mut harness, auth_key.to_vec(), *account1.address());
 }
 
+#[run_mono_move(should_fail = "MonoMove does not implement the transaction_context::is_multisig_payload_txn_internal native that account.move's sequence-number proof guard calls")]
 #[test]
 fn rotate_auth_key_twice() {
     let mut harness = MoveHarness::new();
@@ -104,6 +107,7 @@ fn rotate_auth_key_twice() {
     verify_originating_address(&mut harness, account1.auth_key(), *account1.address());
 }
 
+#[run_mono_move(should_fail = "MonoMove does not implement the transaction_context::is_multisig_payload_txn_internal native that account.move's sequence-number proof guard calls")]
 #[test]
 fn rotate_auth_key_with_rotation_capability_e2e() {
     let mut harness = MoveHarness::new();

@@ -10,7 +10,7 @@ use crate::{
     tests::common,
 };
 use aptos_cached_packages::aptos_stdlib;
-use aptos_move_e2e_test_harness::{assert_success, MoveHarness};
+use aptos_move_e2e_test_harness::{assert_success, run_mono_move, MoveHarness};
 use aptos_types::account_address::{default_stake_pool_address, AccountAddress};
 use once_cell::sync::Lazy;
 use std::collections::BTreeMap;
@@ -39,6 +39,7 @@ fn update_stake_amount_and_assert_with_errors(
     *stake_amount = get_stake_pool(harness, &validator_address).active;
 }
 
+#[run_mono_move]
 #[test]
 fn test_staking_end_to_end() {
     let mut harness = MoveHarness::new();
@@ -110,6 +111,7 @@ fn test_staking_end_to_end() {
     assert_eq!(stake_pool.inactive, 0);
 }
 
+#[run_mono_move(should_fail = "MonoMove does not support script payloads")]
 #[test]
 fn test_staking_rewards() {
     // Genesis starts with one validator with index 0
@@ -311,6 +313,7 @@ fn test_staking_rewards() {
     );
 }
 
+#[run_mono_move]
 #[test]
 fn test_staking_rewards_pending_inactive() {
     let mut harness = MoveHarness::new();
@@ -340,6 +343,7 @@ fn test_staking_rewards_pending_inactive() {
     );
 }
 
+#[run_mono_move]
 #[test]
 fn test_staking_contract() {
     let mut harness = MoveHarness::new();

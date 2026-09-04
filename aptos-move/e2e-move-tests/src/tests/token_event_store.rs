@@ -1,9 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::MoveHarness;
+use crate::{run_mono_move, MoveHarness};
 use aptos_cached_packages::aptos_stdlib::aptos_token_stdlib;
 
+#[run_mono_move]
 #[test]
 fn test_token_creation_with_token_events_store() {
     let mut h = MoveHarness::new();

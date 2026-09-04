@@ -8,8 +8,9 @@ use aptos_types::{
     on_chain_config::{aptos_test_feature_flags_genesis, Features, TimedFeaturesBuilder},
 };
 use aptos_vm::natives;
+use mono_move_testsuite::unit_test;
 use move_model::model::GlobalEnv;
-use move_package::{source_package::std_lib::StdVersion, CompilerConfig};
+use move_package::{source_package::std_lib::StdVersion, BuildConfig, CompilerConfig};
 use move_unit_test::{
     package_test::{run_move_unit_tests, UnitTestResult},
     test_validation, UnitTestingConfig,
@@ -35,24 +36,35 @@ fn configure_extended_checks_for_unit_test() {
     test_validation::set_validation_hook(Box::new(validate));
 }
 
+fn build_config(named_addr: BTreeMap<String, AccountAddress>) -> BuildConfig {
+    BuildConfig {
+        test_mode: true,
+        install_dir: Some(tempdir().unwrap().path().to_path_buf()),
+        override_std: Some(StdVersion::Local(get_local_framework_path())),
+        additional_named_addresses: named_addr,
+        compiler_config: CompilerConfig {
+            known_attributes: extended_checks::get_all_attribute_names().clone(),
+            ..Default::default()
+        },
+        ..Default::default()
+    }
+}
+
+/// Runs a package's unit tests on the V1 VM and then on MonoMove, from the
+/// same build configuration so that both see identical bytecode.
+///
+/// A test MonoMove cannot run yet is reported as unsupported and does not fail
+/// the run; only a test it runs and gets wrong is a failure.
 pub fn run_tests_for_pkg(
     path_to_pkg: impl Into<String>,
     named_addr: BTreeMap<String, AccountAddress>,
 ) {
     let pkg_path = path_in_crate(path_to_pkg);
+    let config = build_config(named_addr);
+
     let ok = run_move_unit_tests(
         &pkg_path,
-        move_package::BuildConfig {
-            test_mode: true,
-            install_dir: Some(tempdir().unwrap().path().to_path_buf()),
-            override_std: Some(StdVersion::Local(get_local_framework_path())),
-            additional_named_addresses: named_addr,
-            compiler_config: CompilerConfig {
-                known_attributes: extended_checks::get_all_attribute_names().clone(),
-                ..Default::default()
-            },
-            ..Default::default()
-        },
+        config.clone(),
         UnitTestingConfig::default(),
         // TODO(Gas): we may want to switch to non-zero costs in the future
         aptos_test_natives(),
@@ -66,6 +78,16 @@ pub fn run_tests_for_pkg(
     if ok.is_err() || ok.is_ok_and(|r| r == UnitTestResult::Failure) {
         panic!("move unit tests failed")
     }
+
+    let summary = unit_test::run_package_unit_tests(&pkg_path, config)
+        .unwrap_or_else(|err| panic!("failed to run MonoMove unit tests: {err}"));
+    println!("{}", summary.render());
+    assert!(
+        summary.failed.is_empty(),
+        "{} test(s) MonoMove ran but got wrong:\n{}",
+        summary.failed.len(),
+        summary.failed.join("\n"),
+    );
 }
 
 pub fn aptos_test_natives() -> NativeFunctionTable {
@@ -319,4 +341,79 @@ fn test_package_manager() {
         ),
     ]);
     run_tests_for_pkg("package_manager", named_address);
+}
+
+#[test]
+fn test_rewards_pool() {
+    test_common("rewards_pool");
+}
+
+#[test]
+fn test_ring_deque() {
+    test_common("ring_deque");
+}
+
+#[test]
+fn test_event() {
+    test_common("event");
+}
+
+#[test]
+fn test_tic_tac_toe() {
+    let named_address = BTreeMap::from([(
+        String::from("tic_tac_toe"),
+        AccountAddress::from_hex_literal("0xf00d").unwrap(),
+    )]);
+    run_tests_for_pkg("tic-tac-toe", named_address);
+}
+
+#[test]
+fn test_my_first_dapp() {
+    let named_address = BTreeMap::from([(
+        String::from("todolist_addr"),
+        AccountAddress::from_hex_literal("0xf00d").unwrap(),
+    )]);
+    run_tests_for_pkg("my_first_dapp/contract", named_address);
+}
+
+#[test]
+fn test_large_package_example() {
+    let named_address = BTreeMap::from([(
+        String::from("large_package_example"),
+        AccountAddress::from_hex_literal("0xf00d").unwrap(),
+    )]);
+    run_tests_for_pkg("large_packages/large_package_example", named_address);
+}
+
+#[test]
+fn test_struct_enum_args() {
+    let named_address = BTreeMap::from([(
+        String::from("struct_enum_tests"),
+        AccountAddress::from_hex_literal("0xf00d").unwrap(),
+    )]);
+    run_tests_for_pkg("cli-e2e-tests/struct-enum-args", named_address);
+}
+
+// `staking` and `bcs-stream` bind every address in their own manifest, so they
+// need nothing extra here.
+
+#[test]
+fn test_staking() {
+    run_tests_for_pkg("staking", BTreeMap::new());
+}
+
+#[test]
+fn test_bcs_stream() {
+    run_tests_for_pkg("bcs-stream", BTreeMap::new());
+}
+
+/// The tutorial steps that carry `#[test]` functions. The remaining steps are
+/// compile-only exercises.
+#[test]
+fn test_move_tutorial() {
+    for step in [
+        "step_2", "step_2_sol", "step_5", "step_5_sol", "step_6",
+    ] {
+        run_tests_for_pkg(format!("move-tutorial/{step}/basic_coin"), BTreeMap::new());
+    }
 }

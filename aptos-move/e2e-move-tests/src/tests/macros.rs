@@ -4,13 +4,14 @@
 //! Transactional tests for macros like `assert!`, `assert_eq!`, and `assert_ne!`
 //! introduced in Move language version 2.4 and onwards.
 
-use crate::{assert_success, tests::common, MoveHarness};
+use crate::{assert_success, run_mono_move, tests::common, MoveHarness};
 use aptos_framework::BuildOptions;
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{ExecutionStatus, TransactionStatus},
 };
 
+#[run_mono_move(should_fail = "MonoMove does not implement the string_utils::native_format_list native")]
 #[test]
 fn test_macros() {
     let mut h = MoveHarness::new();

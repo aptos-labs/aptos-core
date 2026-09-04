@@ -10,7 +10,7 @@
 //! Tests are grouped by the package they publish, so each package is compiled and published
 //! only once per group, dramatically reducing total test time.
 
-use crate::{assert_success, assert_vm_status, tests::common, MoveHarness};
+use crate::{assert_success, assert_vm_status, run_mono_move, tests::common, MoveHarness};
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_types::{account_address::AccountAddress, on_chain_config::FeatureFlag};
 use move_core_types::{
@@ -59,6 +59,7 @@ fn assert_publish_fails(path: std::path::PathBuf) {
 /// Publishes once, initializes once, then runs all sub-tests sequentially.
 ///
 /// Run with: RUST_MIN_STACK=104857600 cargo test -p e2e-move-tests -- public_struct_args
+#[run_mono_move(should_fail = "MonoMove does not validate or construct entry function arguments")]
 #[test]
 fn test_pack_default_features() {
     let mut h = setup_harness();
@@ -554,6 +555,7 @@ fn test_pack_default_features() {
 // ========================================================================================
 
 /// Tests that publish `pack` but disable `PUBLIC_STRUCT_ENUM_ARGS`.
+#[run_mono_move(should_fail = "MonoMove does not validate or construct entry function arguments")]
 #[test]
 fn test_pack_feature_disabled() {
     let mut h = setup_harness();
@@ -616,6 +618,7 @@ fn test_pack_feature_disabled() {
 
 /// Tests using the `phantom_validation` package.
 /// Publishes once, initializes once, then runs phantom type parameter sub-tests.
+#[run_mono_move]
 #[test]
 fn test_phantom_validation_package() {
     let mut h = setup_harness();
@@ -692,6 +695,7 @@ fn test_phantom_validation_package() {
 // ========================================================================================
 
 /// Tests using the `option_private_type` package. Stateless accept/reject tests.
+#[run_mono_move(should_fail = "MonoMove does not validate or construct entry function arguments")]
 #[test]
 fn test_option_private_type_package() {
     let mut h = setup_harness();
@@ -762,6 +766,7 @@ fn test_option_private_type_package() {
 // ========================================================================================
 
 /// Tests using the `negative_phantom_option` package. Stateless tests.
+#[run_mono_move(should_fail = "MonoMove does not validate or construct entry function arguments")]
 #[test]
 fn test_negative_phantom_option_package() {
     let mut h = setup_harness();
@@ -939,6 +944,7 @@ fn test_negative_phantom_option_package() {
 // ========================================================================================
 
 /// Tests using the `pair_type_params` package.
+#[run_mono_move(should_fail = "MonoMove does not validate or construct entry function arguments")]
 #[test]
 fn test_pair_type_params_package() {
     let mut h = setup_harness();
@@ -1032,6 +1038,7 @@ fn test_pair_type_params_package() {
 // ========================================================================================
 
 /// Test that generic container with private type argument is rejected at construction time.
+#[run_mono_move(should_fail = "MonoMove does not validate or construct entry function arguments")]
 #[test]
 fn test_generic_container_with_private_type_arg_rejected() {
     let mut h = setup_harness();
@@ -1060,6 +1067,7 @@ fn test_generic_container_with_private_type_arg_rejected() {
 
 /// Tests that a public copy struct with an `Option<PrivateT>` field is a valid transaction
 /// argument type, illustrating the full flow from extended checker through execution.
+#[run_mono_move(should_fail = "MonoMove does not validate or construct entry function arguments")]
 #[test]
 fn test_option_in_public_struct() {
     let mut h = setup_harness();

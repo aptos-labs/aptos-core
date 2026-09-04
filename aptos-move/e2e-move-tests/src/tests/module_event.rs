@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{assert_success, assert_vm_status, tests::common, MoveHarness};
+use crate::{assert_success, assert_vm_status, run_mono_move, tests::common, MoveHarness};
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_package_builder::PackageBuilder;
 use aptos_types::{
@@ -25,6 +25,7 @@ struct MyEvent {
     bytes: Vec<u64>,
 }
 
+#[run_mono_move]
 #[test]
 fn test_module_event_enabled() {
     let mut h = MoveHarness::new_with_features(vec![FeatureFlag::MODULE_EVENT], vec![]);
@@ -122,6 +123,7 @@ fn verify_module_event_upgrades() {
     assert_vm_status!(result, StatusCode::EVENT_METADATA_VALIDATION_ERROR);
 }
 
+#[run_mono_move(should_fail = "MonoMove does not support script payloads")]
 #[test]
 fn test_event_emission_not_allowed_in_scripts() {
     let mut h = MoveHarness::new();

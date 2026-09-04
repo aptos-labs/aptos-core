@@ -6,7 +6,7 @@
 //! Verifies that `public const` declarations compile and are accessible
 //! cross-module, with their values correctly inlined at the call site.
 
-use crate::{assert_success, MoveHarness};
+use crate::{assert_success, run_mono_move, MoveHarness};
 use aptos_language_e2e_tests::account::Account;
 use aptos_package_builder::PackageBuilder;
 use aptos_types::{account_address::AccountAddress, transaction::TransactionStatus};
@@ -35,6 +35,7 @@ fn publish(h: &mut MoveHarness, account: &Account, sources: &[(&str, &str)]) -> 
 
 /// Test that a module with public constants compiles, publishes, and can be
 /// consumed from another module with the correct values.
+#[run_mono_move]
 #[test]
 fn test_public_const_cross_module() {
     let mut h = MoveHarness::new();
@@ -92,6 +93,7 @@ fn test_public_const_cross_module() {
 
 /// Test that `package const` is accessible cross-module when both modules are compiled
 /// together in the same package.
+#[run_mono_move]
 #[test]
 fn test_package_const_cross_module() {
     let mut h = MoveHarness::new();

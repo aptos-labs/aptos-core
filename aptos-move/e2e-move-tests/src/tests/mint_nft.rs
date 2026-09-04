@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{assert_success, tests::common, MoveHarness};
+use crate::{assert_success, run_mono_move, tests::common, MoveHarness};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519Signature},
     SigningKey, ValidCryptoMaterialStringExt,
@@ -48,6 +48,7 @@ struct TokenStore {
     mutate_token_property_events: EventHandle,
 }
 
+#[run_mono_move]
 #[test]
 fn mint_nft_e2e() {
     let mut h = MoveHarness::new();
@@ -77,14 +78,16 @@ fn mint_nft_e2e() {
         .expect("extracting package metadata must succeed");
 
     // create the resource account and publish the module under the resource account's address
-    let result = h.run_transaction_payload(
-        &acc,
-        aptos_cached_packages::aptos_stdlib::resource_account_create_resource_account_and_publish_package(
-            vec![],
-            bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
-            code,
-        ),
-    );
+    let result = h.without_mono_move(|h| {
+        h.run_transaction_payload(
+            &acc,
+            aptos_cached_packages::aptos_stdlib::resource_account_create_resource_account_and_publish_package(
+                vec![],
+                bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
+                code,
+            ),
+        )
+    });
 
     assert_success!(result);
 

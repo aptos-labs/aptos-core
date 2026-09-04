@@ -3,7 +3,7 @@
 
 extern crate core;
 
-use crate::{assert_success, tests::common, MoveHarness};
+use crate::{assert_success, run_mono_move, tests::common, MoveHarness};
 use aptos_framework::BuildOptions;
 use aptos_types::{
     account_address::AccountAddress,
@@ -11,6 +11,7 @@ use aptos_types::{
 };
 use move_core_types::value::MoveValue;
 
+#[run_mono_move(should_fail = "MonoMove does not inject AbortInfo from the module error map")]
 #[test]
 fn error_map() {
     let mut h = MoveHarness::new();
@@ -54,6 +55,7 @@ fn error_map() {
 
 /// Tests that a single-argument `assert!` — which aborts with `UNSPECIFIED_ABORT_CODE` — does not
 /// incorrectly return abort info for a user-defined error constant that happens to have code 0.
+#[run_mono_move(should_fail = "MonoMove does not inject AbortInfo from the module error map")]
 #[test]
 fn error_map_unspecified_abort_code() {
     let mut h = MoveHarness::new();

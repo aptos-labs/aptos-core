@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{assert_success, tests::common, MoveHarness};
+use crate::{assert_success, run_mono_move, tests::common, MoveHarness};
 use aptos_language_e2e_tests::account::Account;
 use move_core_types::{account_address::AccountAddress, parser::parse_struct_tag};
 use serde::{Deserialize, Serialize};
@@ -61,6 +61,7 @@ fn setup(harness: &mut MoveHarness) -> Account {
     account
 }
 
+#[run_mono_move]
 #[test]
 fn test_chain_id_from_aptos_framework() {
     let mut harness = MoveHarness::new();
@@ -72,6 +73,7 @@ fn test_chain_id_from_aptos_framework() {
     );
 }
 
+#[run_mono_move]
 #[test]
 fn test_chain_id_from_type_info() {
     let mut harness = MoveHarness::new();

@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{assert_move_abort, assert_success, assert_vm_status, tests::common, MoveHarness};
+use crate::{
+    assert_move_abort, assert_success, assert_vm_status, run_mono_move, tests::common, MoveHarness,
+};
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{AbortInfo, TransactionStatus},
@@ -118,6 +120,7 @@ fn big_string_vec(first_dim: u64, second_dim: u64, base: &str) -> Vec<u8> {
     bcs::to_bytes(&outer).unwrap()
 }
 
+#[run_mono_move]
 #[test]
 fn string_args_good() {
     let mut tests = vec![];
@@ -302,6 +305,7 @@ fn string_args_good() {
     success(tests);
 }
 
+#[run_mono_move(should_fail = "MonoMove does not inject AbortInfo from the module error map")]
 #[test]
 fn string_args_bad_utf8() {
     let mut tests = vec![];
@@ -395,6 +399,7 @@ fn string_args_bad_utf8() {
     fail(tests);
 }
 
+#[run_mono_move(should_fail = "MonoMove does not validate or construct entry function arguments")]
 #[test]
 fn string_args_chopped() {
     let idx = 0u64;
@@ -418,6 +423,7 @@ fn string_args_chopped() {
     }
 }
 
+#[run_mono_move(should_fail = "MonoMove does not validate or construct entry function arguments")]
 #[test]
 fn string_args_bad_length() {
     // chop after bcs so length stays big but payload gets small basically a bogus input
@@ -567,6 +573,7 @@ fn string_args_bad_length() {
     fail(tests);
 }
 
+#[run_mono_move]
 #[test]
 fn string_args_non_generic_call() {
     let tests = vec![("0xcafe::test::non_generic_call", vec![(
@@ -577,6 +584,7 @@ fn string_args_non_generic_call() {
     success_generic(vec![], tests);
 }
 
+#[run_mono_move]
 #[test]
 fn string_args_generic_call() {
     let tests = vec![("0xcafe::test::generic_call", vec![(
@@ -595,6 +603,7 @@ fn string_args_generic_call() {
     success_generic(vec![string_type], tests);
 }
 
+#[run_mono_move]
 #[test]
 fn string_args_generic_instantiation() {
     let mut tests = vec![];
@@ -654,6 +663,7 @@ fn string_args_generic_instantiation() {
     success_generic(vec![string_type, address_type], tests);
 }
 
+#[run_mono_move(should_fail = "MonoMove does not validate or construct entry function arguments")]
 #[test]
 fn huge_string_args_are_not_allowed() {
     let mut tests = vec![];

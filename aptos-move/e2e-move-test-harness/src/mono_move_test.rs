@@ -4,7 +4,7 @@
 //! Runs a `#[run_mono_move]` test body twice, once per VM. Not meant to be
 //! called directly; see the macro's documentation.
 
-use std::{any::Any, cell::Cell, panic};
+use std::{any::Any, cell::Cell, panic, thread};
 
 thread_local! {
     /// Whether harnesses built on this thread should enable `ENABLE_MONO_MOVE`.
@@ -29,17 +29,8 @@ fn set_mono_move(enabled: bool) {
 ///
 /// `should_fail` marks a test known to fail under MonoMove; its reason is
 /// documentation and is never matched against the failure.
-pub fn run(name: &str, should_fail: Option<&str>, body: fn()) {
-    // The V1 pass is not caught: a failure here is an ordinary test failure and
-    // must look exactly like one.
-    set_mono_move(false);
-    body();
-
-    set_mono_move(true);
-    let result = panic::catch_unwind(body);
-    set_mono_move(false);
-
-    match (result, should_fail) {
+pub fn run(name: &str, should_fail: Option<&str>, body: &dyn Fn()) {
+    match (run_both_passes(body), should_fail) {
         (Ok(()), None) | (Err(_), Some(_)) => {},
         (Ok(()), Some(reason)) => panic!(
             "[MonoMove] `{name}` passed under MonoMove but is marked \
@@ -50,6 +41,42 @@ pub fn run(name: &str, should_fail: Option<&str>, body: fn()) {
             panic_message(payload.as_ref())
         ),
     }
+}
+
+/// Runs `body` on the V1 VM, and then, if that passed, on MonoMove.
+///
+/// For test bodies `#[run_mono_move]` cannot reach, above all those inside
+/// `proptest!`, which is a function-like macro with nowhere to hang an
+/// attribute. Two rules apply at every call site:
+///
+/// * Build the harness *inside* `body`. A harness built before the call runs
+///   the V1 VM in both passes and checks nothing.
+/// * Signal failure by panicking. `prop_assert!` returns an error instead,
+///   which the MonoMove pass would discard.
+#[track_caller]
+pub fn both(body: impl Fn()) {
+    let location = panic::Location::caller();
+    if let Err(payload) = run_both_passes(&body) {
+        panic!(
+            "[MonoMove] the body at {location} passed on the V1 VM but failed \
+             under MonoMove: {}",
+            panic_message(payload.as_ref())
+        );
+    }
+}
+
+fn run_both_passes(body: &dyn Fn()) -> thread::Result<()> {
+    // The V1 pass is not caught: a failure here is an ordinary test failure and
+    // must look exactly like one.
+    set_mono_move(false);
+    body();
+
+    set_mono_move(true);
+    // `body` may capture the test's arguments by reference, but it only reads
+    // and clones them, and a caught panic is always re-raised below.
+    let result = panic::catch_unwind(panic::AssertUnwindSafe(body));
+    set_mono_move(false);
+    result
 }
 
 fn panic_message(payload: &dyn Any) -> String {

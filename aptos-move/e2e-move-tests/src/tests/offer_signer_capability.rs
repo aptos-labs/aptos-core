@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{assert_success, MoveHarness};
+use crate::{assert_success, run_mono_move, MoveHarness};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::SigningKey;
 use aptos_types::{
@@ -21,6 +21,7 @@ struct SignerCapabilityOfferProofChallengeV2 {
     recipient_address: AccountAddress,
 }
 
+#[run_mono_move(should_fail = "MonoMove does not implement the transaction_context::is_multisig_payload_txn_internal native that account.move's sequence-number proof guard calls")]
 #[test]
 /// Tests Alice offering Bob a signer for her account.
 fn offer_signer_capability_v2() {

@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{assert_success, tests::common, MoveHarness};
+use crate::{assert_success, run_mono_move, tests::common, MoveHarness};
 use aptos_framework::BuiltPackage;
 use aptos_language_e2e_tests::account::TransactionBuilder;
 use aptos_types::{
@@ -11,6 +11,7 @@ use aptos_types::{
 };
 use move_core_types::{language_storage::TypeTag, value::MoveValue};
 
+#[run_mono_move(should_fail = "MonoMove does not support script payloads")]
 #[test]
 fn test_script_with_object_parameter() {
     let mut h = MoveHarness::new();
@@ -118,6 +119,7 @@ fn test_script_with_object_parameter() {
     assert!(status.is_discarded());
 }
 
+#[run_mono_move(should_fail = "MonoMove does not support script payloads")]
 #[test]
 fn test_script_with_type_parameter() {
     let mut h = MoveHarness::new();
@@ -147,6 +149,7 @@ fn test_script_with_type_parameter() {
     assert_success!(status);
 }
 
+#[run_mono_move(should_fail = "MonoMove does not support script payloads")]
 #[test]
 fn test_script_with_signer_parameter() {
     let mut h = MoveHarness::new();
@@ -186,6 +189,7 @@ fn test_script_with_signer_parameter() {
     );
 }
 
+#[run_mono_move(should_fail = "MonoMove does not support script payloads")]
 #[test]
 fn test_two_to_two_transfer() {
     let mut h = MoveHarness::new();

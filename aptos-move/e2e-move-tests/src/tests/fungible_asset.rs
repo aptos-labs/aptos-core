@@ -179,6 +179,7 @@ fn test_basic_fungible_token() {
 /// We do that by having an expensive transaction first (to make sure committed index isn't moved),
 /// and then create some new aggregators (concurrent balances for new accounts), and then have them issue
 /// transactions - so their balance is checked in prologue.
+#[run_mono_move]
 #[test]
 fn test_prologue_speculation() {
     let executor = FakeExecutor::from_head_genesis().set_executor_mode(ExecutorMode::ParallelOnly);

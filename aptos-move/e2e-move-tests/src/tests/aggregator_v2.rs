@@ -6,6 +6,7 @@ use crate::{
         initialize, initialize_enabled_disabled_comparison, AggV2TestHarness, AggregatorLocation,
         ElementType, StructType, UseType,
     },
+    mono_move_test, run_mono_move,
     tests::common,
     BlockSplit, SUCCESS,
 };
@@ -73,6 +74,7 @@ pub(crate) fn setup_allow_fallback(
 mod test_cases {
     use super::*;
 
+    #[run_mono_move(should_fail = "the 0x1::debug natives are not implemented in MonoMove")]
     #[test]
     fn test_snapshot_concat() {
         let mut h = setup(DEFAULT_EXECUTOR_MODE, AggregatorMode::BothComparison, 1);
@@ -80,6 +82,7 @@ mod test_cases {
         h.run_block_in_parts_and_check(BlockSplit::Whole, vec![(SUCCESS, txn)]);
     }
 
+    #[run_mono_move]
     #[test]
     fn test_aggregators_e2e() {
         println!("Testing test_aggregators_e2e");
@@ -251,41 +254,43 @@ fn arb_droppable_use_type() -> BoxedStrategy<UseType> {
 
 proptest! {
     #![proptest_config(ProptestConfig {
-        // Cases are expensive, few cases is enough.
-        // We will test a few more comprehensive tests more times, and the rest even fewer.
-        cases: if STRESSTEST_MODE { 1000 } else { 20 },
+        // Cases are expensive, few cases is enough. Halved from 20 because
+        // every case now runs its block twice, once per VM.
+        cases: if STRESSTEST_MODE { 1000 } else { 10 },
         result_cache: if STRESSTEST_MODE { prop::test_runner::noop_result_cache } else {prop::test_runner::basic_result_cache },
         .. ProptestConfig::default()
     })]
 
     #[test]
     fn test_aggregator_lifetime(test_env in arb_test_env(14), element_type in arb_agg_type(), use_type in arb_use_type()) {
-        println!("Testing test_aggregator_lifetime {:?}", test_env);
-        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 14);
+        mono_move_test::both(|| {
+            println!("Testing test_aggregator_lifetime {:?}", test_env);
+            let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 14);
 
-        let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
+            let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
-        let txns = vec![
-            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
-            (SUCCESS, h.new(&agg_loc, 1500)),
-            (SUCCESS, h.add(&agg_loc, 400)), // 400
-            (SUCCESS, h.materialize(&agg_loc)),
-            (SUCCESS, h.add(&agg_loc, 500)), // 900
-            (SUCCESS, h.check(&agg_loc, 900)),
-            (SUCCESS, h.materialize_and_add(&agg_loc, 600)), // 1500
-            (SUCCESS, h.materialize_and_sub(&agg_loc, 600)), // 900
-            (SUCCESS, h.check(&agg_loc, 900)),
-            (SUCCESS, h.sub_add(&agg_loc, 200, 300)), // 1000
-            (SUCCESS, h.check(&agg_loc, 1000)),
-            // These 2 transactions fail, and should have no side-effects.
-            (EAGGREGATOR_OVERFLOW, h.add_and_materialize(&agg_loc, 501)),
-            (EAGGREGATOR_UNDERFLOW, h.sub_and_materialize(&agg_loc, 1001)),
-            (SUCCESS, h.check(&agg_loc, 1000)),
-        ];
-        h.run_block_in_parts_and_check(
-            test_env.block_split,
-            txns,
-        );
+            let txns = vec![
+                (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
+                (SUCCESS, h.new(&agg_loc, 1500)),
+                (SUCCESS, h.add(&agg_loc, 400)), // 400
+                (SUCCESS, h.materialize(&agg_loc)),
+                (SUCCESS, h.add(&agg_loc, 500)), // 900
+                (SUCCESS, h.check(&agg_loc, 900)),
+                (SUCCESS, h.materialize_and_add(&agg_loc, 600)), // 1500
+                (SUCCESS, h.materialize_and_sub(&agg_loc, 600)), // 900
+                (SUCCESS, h.check(&agg_loc, 900)),
+                (SUCCESS, h.sub_add(&agg_loc, 200, 300)), // 1000
+                (SUCCESS, h.check(&agg_loc, 1000)),
+                // These 2 transactions fail, and should have no side-effects.
+                (EAGGREGATOR_OVERFLOW, h.add_and_materialize(&agg_loc, 501)),
+                (EAGGREGATOR_UNDERFLOW, h.sub_and_materialize(&agg_loc, 1001)),
+                (SUCCESS, h.check(&agg_loc, 1000)),
+            ];
+            h.run_block_in_parts_and_check(
+                test_env.block_split,
+                txns,
+            );
+        });
     }
 
     #[test]
@@ -296,55 +301,57 @@ proptest! {
         is_2_collocated in any::<bool>(),
         is_3_collocated in any::<bool>(),
     ) {
-        println!("Testing test_multiple_aggregators_and_collocation {:?}", test_env);
-        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 24);
-        let acc_2 = h.new_account_with_key_pair();
-        let acc_3 = h.new_account_with_key_pair();
+        mono_move_test::both(|| {
+            println!("Testing test_multiple_aggregators_and_collocation {:?}", test_env);
+            let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 24);
+            let acc_2 = h.new_account_with_key_pair();
+            let acc_3 = h.new_account_with_key_pair();
 
-        let mut idx_1 = 0;
-        let agg_1_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
-        let agg_2_loc = {
-            let (cur_acc, idx_2) = if is_2_collocated { idx_1 += 1; (h.account.address(), idx_1) } else { (acc_2.address(), 0)};
-            AggregatorLocation::new(*cur_acc, element_type, use_type, idx_2)
-        };
-        let agg_3_loc = {
-            let (cur_acc, idx_3) = if is_3_collocated { idx_1 += 1; (h.account.address(), idx_1) } else { (acc_3.address(), 0)};
-            AggregatorLocation::new(*cur_acc, element_type, use_type, idx_3)
-        };
-        println!("agg_1_loc: {:?}", agg_1_loc);
-        println!("agg_2_loc: {:?}", agg_2_loc);
-        println!("agg_3_loc: {:?}", agg_3_loc);
+            let mut idx_1 = 0;
+            let agg_1_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
+            let agg_2_loc = {
+                let (cur_acc, idx_2) = if is_2_collocated { idx_1 += 1; (h.account.address(), idx_1) } else { (acc_2.address(), 0)};
+                AggregatorLocation::new(*cur_acc, element_type, use_type, idx_2)
+            };
+            let agg_3_loc = {
+                let (cur_acc, idx_3) = if is_3_collocated { idx_1 += 1; (h.account.address(), idx_1) } else { (acc_3.address(), 0)};
+                AggregatorLocation::new(*cur_acc, element_type, use_type, idx_3)
+            };
+            println!("agg_1_loc: {:?}", agg_1_loc);
+            println!("agg_2_loc: {:?}", agg_2_loc);
+            println!("agg_3_loc: {:?}", agg_3_loc);
 
-        let txns = vec![
-            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
-            (SUCCESS, h.init(Some(&acc_2), use_type, element_type, StructType::Aggregator)),
-            (SUCCESS, h.init(Some(&acc_3), use_type, element_type, StructType::Aggregator)),
-            (SUCCESS, h.new_add(&agg_1_loc, 10, 5)),
-            (SUCCESS, h.new_add(&agg_2_loc, 10, 5)),
-            (SUCCESS, h.new_add(&agg_3_loc, 10, 5)),  // 5, 5, 5
-            (SUCCESS, h.add_2(&agg_1_loc, &agg_2_loc, 1, 1)), // 6, 6, 5
-            (SUCCESS, h.add_2(&agg_1_loc, &agg_3_loc, 1, 1)), // 7, 6, 6
-            (EAGGREGATOR_OVERFLOW, h.add(&agg_1_loc, 5)), // X
-            (SUCCESS, h.add_sub(&agg_1_loc, 3, 3)), // 7, 6, 6
-            (EAGGREGATOR_OVERFLOW, h.add_2(&agg_1_loc, &agg_2_loc, 3, 5)), // X
-            (SUCCESS, h.add_2(&agg_1_loc, &agg_2_loc, 3, 1)), // 10, 7, 6
-            (EAGGREGATOR_OVERFLOW, h.add_sub(&agg_1_loc, 3, 3)), // X
-            (SUCCESS, h.sub(&agg_1_loc, 3)), // 7, 7, 6
-            (SUCCESS, h.add_2(&agg_2_loc, &agg_3_loc, 2, 2)), // 7, 9, 8
-            (SUCCESS, h.check(&agg_2_loc, 9)),
-            (EAGGREGATOR_OVERFLOW, h.add_2(&agg_1_loc, &agg_2_loc, 1, 2)), // X
-            (SUCCESS, h.add_2(&agg_2_loc, &agg_3_loc, 1, 2)), // 7, 10, 10
-            (EAGGREGATOR_OVERFLOW, h.add(&agg_2_loc, 1)), // X
-            (EAGGREGATOR_OVERFLOW, h.add_and_materialize(&agg_3_loc, 1)), // X
-            (EAGGREGATOR_OVERFLOW, h.add_2(&agg_1_loc, &agg_2_loc, 1, 1)), // X
-            (SUCCESS, h.check(&agg_1_loc, 7)),
-            (SUCCESS, h.check(&agg_2_loc, 10)),
-            (SUCCESS, h.check(&agg_3_loc, 10)),
-        ];
-        h.run_block_in_parts_and_check(
-            test_env.block_split,
-            txns,
-        );
+            let txns = vec![
+                (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
+                (SUCCESS, h.init(Some(&acc_2), use_type, element_type, StructType::Aggregator)),
+                (SUCCESS, h.init(Some(&acc_3), use_type, element_type, StructType::Aggregator)),
+                (SUCCESS, h.new_add(&agg_1_loc, 10, 5)),
+                (SUCCESS, h.new_add(&agg_2_loc, 10, 5)),
+                (SUCCESS, h.new_add(&agg_3_loc, 10, 5)),  // 5, 5, 5
+                (SUCCESS, h.add_2(&agg_1_loc, &agg_2_loc, 1, 1)), // 6, 6, 5
+                (SUCCESS, h.add_2(&agg_1_loc, &agg_3_loc, 1, 1)), // 7, 6, 6
+                (EAGGREGATOR_OVERFLOW, h.add(&agg_1_loc, 5)), // X
+                (SUCCESS, h.add_sub(&agg_1_loc, 3, 3)), // 7, 6, 6
+                (EAGGREGATOR_OVERFLOW, h.add_2(&agg_1_loc, &agg_2_loc, 3, 5)), // X
+                (SUCCESS, h.add_2(&agg_1_loc, &agg_2_loc, 3, 1)), // 10, 7, 6
+                (EAGGREGATOR_OVERFLOW, h.add_sub(&agg_1_loc, 3, 3)), // X
+                (SUCCESS, h.sub(&agg_1_loc, 3)), // 7, 7, 6
+                (SUCCESS, h.add_2(&agg_2_loc, &agg_3_loc, 2, 2)), // 7, 9, 8
+                (SUCCESS, h.check(&agg_2_loc, 9)),
+                (EAGGREGATOR_OVERFLOW, h.add_2(&agg_1_loc, &agg_2_loc, 1, 2)), // X
+                (SUCCESS, h.add_2(&agg_2_loc, &agg_3_loc, 1, 2)), // 7, 10, 10
+                (EAGGREGATOR_OVERFLOW, h.add(&agg_2_loc, 1)), // X
+                (EAGGREGATOR_OVERFLOW, h.add_and_materialize(&agg_3_loc, 1)), // X
+                (EAGGREGATOR_OVERFLOW, h.add_2(&agg_1_loc, &agg_2_loc, 1, 1)), // X
+                (SUCCESS, h.check(&agg_1_loc, 7)),
+                (SUCCESS, h.check(&agg_2_loc, 10)),
+                (SUCCESS, h.check(&agg_3_loc, 10)),
+            ];
+            h.run_block_in_parts_and_check(
+                test_env.block_split,
+                txns,
+            );
+        });
     }
 }
 
@@ -359,98 +366,108 @@ proptest! {
 
     #[test]
     fn test_aggregator_underflow(test_env in arb_test_env(4)) {
-        println!("Testing test_aggregator_underflow {:?}", test_env);
-        let element_type = ElementType::U64;
-        let use_type = UseType::UseResourceType;
+        mono_move_test::both(|| {
+            println!("Testing test_aggregator_underflow {:?}", test_env);
+            let element_type = ElementType::U64;
+            let use_type = UseType::UseResourceType;
 
-        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 4);
+            let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 4);
 
-        let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
+            let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
-        let txns = vec![
-            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
-            (SUCCESS, h.new(&agg_loc, 600)),
-            (SUCCESS, h.add(&agg_loc, 400)),
-            // Value dropped below zero - abort with EAGGREGATOR_UNDERFLOW.
-            (EAGGREGATOR_UNDERFLOW, h.sub(&agg_loc, 500))
-        ];
-        h.run_block_in_parts_and_check(
-            test_env.block_split,
-            txns,
-        );
+            let txns = vec![
+                (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
+                (SUCCESS, h.new(&agg_loc, 600)),
+                (SUCCESS, h.add(&agg_loc, 400)),
+                // Value dropped below zero - abort with EAGGREGATOR_UNDERFLOW.
+                (EAGGREGATOR_UNDERFLOW, h.sub(&agg_loc, 500))
+            ];
+            h.run_block_in_parts_and_check(
+                test_env.block_split,
+                txns,
+            );
+        });
     }
 
     #[test]
     fn test_aggregator_materialize_underflow(test_env in arb_test_env(3)) {
-        println!("Testing test_aggregator_materialize_underflow {:?}", test_env);
-        let element_type = ElementType::U64;
-        let use_type = UseType::UseResourceType;
+        mono_move_test::both(|| {
+            println!("Testing test_aggregator_materialize_underflow {:?}", test_env);
+            let element_type = ElementType::U64;
+            let use_type = UseType::UseResourceType;
 
-        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 3);
+            let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 3);
 
-        let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
+            let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
-        let txns = vec![
-            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
-            (SUCCESS, h.new(&agg_loc, 600)),
-            // Underflow on materialized value leads to abort with EAGGREGATOR_UNDERFLOW.
-            (EAGGREGATOR_UNDERFLOW, h.materialize_and_sub(&agg_loc, 400)),
-        ];
+            let txns = vec![
+                (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
+                (SUCCESS, h.new(&agg_loc, 600)),
+                // Underflow on materialized value leads to abort with EAGGREGATOR_UNDERFLOW.
+                (EAGGREGATOR_UNDERFLOW, h.materialize_and_sub(&agg_loc, 400)),
+            ];
 
-        h.run_block_in_parts_and_check(
-            test_env.block_split,
-            txns,
-        );
+            h.run_block_in_parts_and_check(
+                test_env.block_split,
+                txns,
+            );
+        });
     }
 
     #[test]
     fn test_aggregator_overflow(test_env in arb_test_env(3)) {
-        println!("Testing test_aggregator_overflow {:?}", test_env);
-        let element_type = ElementType::U64;
-        let use_type = UseType::UseResourceType;
+        mono_move_test::both(|| {
+            println!("Testing test_aggregator_overflow {:?}", test_env);
+            let element_type = ElementType::U64;
+            let use_type = UseType::UseResourceType;
 
-        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 3);
+            let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 3);
 
-        let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
+            let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
-        let txns = vec![
-            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
-            (SUCCESS, h.new_add(&agg_loc, 600, 400)),
-            // Limit exceeded - abort with EAGGREGATOR_OVERFLOW.
-            (EAGGREGATOR_OVERFLOW, h.add(&agg_loc, 201))
-        ];
+            let txns = vec![
+                (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
+                (SUCCESS, h.new_add(&agg_loc, 600, 400)),
+                // Limit exceeded - abort with EAGGREGATOR_OVERFLOW.
+                (EAGGREGATOR_OVERFLOW, h.add(&agg_loc, 201))
+            ];
 
-        h.run_block_in_parts_and_check(
-            test_env.block_split,
-            txns,
-        );
+            h.run_block_in_parts_and_check(
+                test_env.block_split,
+                txns,
+            );
+        });
     }
 
     #[test]
     fn test_aggregator_materialize_overflow(test_env in arb_test_env(3)) {
-        println!("Testing test_aggregator_materialize_overflow {:?}", test_env);
-        let element_type = ElementType::U64;
-        let use_type = UseType::UseResourceType;
+        mono_move_test::both(|| {
+            println!("Testing test_aggregator_materialize_overflow {:?}", test_env);
+            let element_type = ElementType::U64;
+            let use_type = UseType::UseResourceType;
 
-        let mut h= setup(test_env.executor_mode, test_env.aggregator_execution_mode, 3);
+            let mut h= setup(test_env.executor_mode, test_env.aggregator_execution_mode, 3);
 
-        let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
+            let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
-        let txns = vec![
-            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
-            (SUCCESS, h.new(&agg_loc, 399)),
-            // Overflow on materialized value leads to abort with EAGGREGATOR_OVERFLOW.
-            (EAGGREGATOR_OVERFLOW, h.materialize_and_add(&agg_loc, 400)),
-        ];
+            let txns = vec![
+                (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
+                (SUCCESS, h.new(&agg_loc, 399)),
+                // Overflow on materialized value leads to abort with EAGGREGATOR_OVERFLOW.
+                (EAGGREGATOR_OVERFLOW, h.materialize_and_add(&agg_loc, 400)),
+            ];
 
-        h.run_block_in_parts_and_check(
-            test_env.block_split,
-            txns,
-        );
+            h.run_block_in_parts_and_check(
+                test_env.block_split,
+                txns,
+            );
+        });
     }
 
     #[test]
     fn test_aggregator_with_republish(test_env in arb_test_env(6), element_type in arb_agg_type(), use_type in arb_use_type()) {
+        // Not run under MonoMove: it cannot publish a module inside a block,
+        // so `republish` fails with a linker error.
         println!("Testing test_aggregator_with_republish {:?}", test_env);
         let mut h = setup_allow_fallback(test_env.executor_mode, test_env.aggregator_execution_mode, 3);
 
@@ -473,91 +490,97 @@ proptest! {
 
     #[test]
     fn test_aggregator_recreate(test_env in arb_test_env(13), element_type in arb_agg_type(), use_type in arb_droppable_use_type()) {
-        println!("Testing test_aggregator_recreate {:?}", test_env);
-        let mut h = setup_allow_fallback(test_env.executor_mode, test_env.aggregator_execution_mode, 13);
+        mono_move_test::both(|| {
+            println!("Testing test_aggregator_recreate {:?}", test_env);
+            let mut h = setup_allow_fallback(test_env.executor_mode, test_env.aggregator_execution_mode, 13);
 
-        let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
+            let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
-        let txns = vec![
-            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
-            (SUCCESS, h.new_add(&agg_loc, 10, 3)),
-            (SUCCESS, h.add(&agg_loc, 4)),
-            (SUCCESS, h.new_add(&agg_loc, 10, 3)),
-            (SUCCESS, h.add(&agg_loc, 4)),
-            (SUCCESS, h.delete(None, use_type, element_type, StructType::Aggregator)),
-            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
-            (SUCCESS, h.new_add(&agg_loc, 10, 3)),
-            (SUCCESS, h.add_delete(&agg_loc, 4)),
-            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
-            (SUCCESS, h.new_add(&agg_loc, 10, 5)),
-            (EAGGREGATOR_OVERFLOW, h.add_delete(&agg_loc, 7)),
-            (SUCCESS, h.add_delete(&agg_loc, 3)),
-        ];
+            let txns = vec![
+                (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
+                (SUCCESS, h.new_add(&agg_loc, 10, 3)),
+                (SUCCESS, h.add(&agg_loc, 4)),
+                (SUCCESS, h.new_add(&agg_loc, 10, 3)),
+                (SUCCESS, h.add(&agg_loc, 4)),
+                (SUCCESS, h.delete(None, use_type, element_type, StructType::Aggregator)),
+                (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
+                (SUCCESS, h.new_add(&agg_loc, 10, 3)),
+                (SUCCESS, h.add_delete(&agg_loc, 4)),
+                (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
+                (SUCCESS, h.new_add(&agg_loc, 10, 5)),
+                (EAGGREGATOR_OVERFLOW, h.add_delete(&agg_loc, 7)),
+                (SUCCESS, h.add_delete(&agg_loc, 3)),
+            ];
 
-        h.run_block_in_parts_and_check(
-            test_env.block_split,
-            txns,
-        );
+            h.run_block_in_parts_and_check(
+                test_env.block_split,
+                txns,
+            );
+        });
     }
 
     #[test]
     fn test_aggregator_snapshot(test_env in arb_test_env_non_equivalent(10)) {
-        println!("Testing test_aggregator_snapshot {:?}", test_env);
-        let element_type = ElementType::U64;
-        let use_type = UseType::UseResourceType;
+        mono_move_test::both(|| {
+            println!("Testing test_aggregator_snapshot {:?}", test_env);
+            let element_type = ElementType::U64;
+            let use_type = UseType::UseResourceType;
 
-        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 10);
+            let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 10);
 
-        let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
-        let snap_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
-        let derived_snap_loc = AggregatorLocation::new(*h.account.address(), ElementType::String, use_type, 0);
+            let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
+            let snap_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
+            let derived_snap_loc = AggregatorLocation::new(*h.account.address(), ElementType::String, use_type, 0);
 
-        let txns = vec![
-            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
-            (SUCCESS, h.init(None, use_type, element_type, StructType::Snapshot)),
-            (SUCCESS, h.init(None, use_type, ElementType::String, StructType::DerivedString)),
-            (SUCCESS, h.new_add(&agg_loc, 400, 100)),
-            (SUCCESS, h.snapshot(&agg_loc, &snap_loc)),
-            (SUCCESS, h.check_snapshot(&snap_loc, 100)),
-            (SUCCESS, h.read_snapshot(&agg_loc)),
-            (SUCCESS, h.add_and_read_snapshot_u128(&agg_loc, 100)),
-            (SUCCESS, h.concat(&snap_loc, &derived_snap_loc, "12", "13")),
-            (SUCCESS, h.check_derived(&derived_snap_loc, 1210013)),
-        ];
+            let txns = vec![
+                (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
+                (SUCCESS, h.init(None, use_type, element_type, StructType::Snapshot)),
+                (SUCCESS, h.init(None, use_type, ElementType::String, StructType::DerivedString)),
+                (SUCCESS, h.new_add(&agg_loc, 400, 100)),
+                (SUCCESS, h.snapshot(&agg_loc, &snap_loc)),
+                (SUCCESS, h.check_snapshot(&snap_loc, 100)),
+                (SUCCESS, h.read_snapshot(&agg_loc)),
+                (SUCCESS, h.add_and_read_snapshot_u128(&agg_loc, 100)),
+                (SUCCESS, h.concat(&snap_loc, &derived_snap_loc, "12", "13")),
+                (SUCCESS, h.check_derived(&derived_snap_loc, 1210013)),
+            ];
 
-        h.run_block_in_parts_and_check(
-            test_env.block_split,
-            txns,
-        );
+            h.run_block_in_parts_and_check(
+                test_env.block_split,
+                txns,
+            );
+        });
     }
 
     #[test]
     fn test_aggregator_is_at_least(test_env in arb_test_env_non_equivalent(10)) {
-        println!("Testing test_aggregator_is_at_least {:?}", test_env);
-        let element_type = ElementType::U64;
-        let use_type = UseType::UseResourceType;
+        mono_move_test::both(|| {
+            println!("Testing test_aggregator_is_at_least {:?}", test_env);
+            let element_type = ElementType::U64;
+            let use_type = UseType::UseResourceType;
 
-        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 10);
+            let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 10);
 
-        let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
+            let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
-        let txns = vec![
-            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
-            (SUCCESS, h.init(None, use_type, element_type, StructType::Snapshot)),
-            (SUCCESS, h.init(None, use_type, ElementType::String, StructType::DerivedString)),
-            (SUCCESS, h.new_add(&agg_loc, 400, 100)),
-            (SUCCESS, h.add(&agg_loc, 50)),
-            (SUCCESS, h.add(&agg_loc, 50)),
-            (SUCCESS, h.add_if_at_least(&agg_loc, 180, 50)),
-            (SUCCESS, h.sub(&agg_loc, 50)),
-            (SUCCESS, h.add_if_at_least(&agg_loc, 220, 50)),
-            (SUCCESS, h.check(&agg_loc, 200)),
-        ];
+            let txns = vec![
+                (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
+                (SUCCESS, h.init(None, use_type, element_type, StructType::Snapshot)),
+                (SUCCESS, h.init(None, use_type, ElementType::String, StructType::DerivedString)),
+                (SUCCESS, h.new_add(&agg_loc, 400, 100)),
+                (SUCCESS, h.add(&agg_loc, 50)),
+                (SUCCESS, h.add(&agg_loc, 50)),
+                (SUCCESS, h.add_if_at_least(&agg_loc, 180, 50)),
+                (SUCCESS, h.sub(&agg_loc, 50)),
+                (SUCCESS, h.add_if_at_least(&agg_loc, 220, 50)),
+                (SUCCESS, h.check(&agg_loc, 200)),
+            ];
 
-        h.run_block_in_parts_and_check(
-            test_env.block_split,
-            txns,
-        );
+            h.run_block_in_parts_and_check(
+                test_env.block_split,
+                txns,
+            );
+        });
     }
 }
 
@@ -620,6 +643,9 @@ fn test_aggregator_snapshot_equivalent_gas() {
 }
 
 // Table splits into multiple resources, so test is not as straightforward
+#[run_mono_move(
+    should_fail = "MonoMove does not create delayed fields, so the per-resource limit is never reached"
+)]
 #[test_case(UseType::UseResourceGroupType)]
 #[test_case(UseType::UseResourceType)]
 fn test_too_many_aggregators_in_a_resource(use_type: UseType) {

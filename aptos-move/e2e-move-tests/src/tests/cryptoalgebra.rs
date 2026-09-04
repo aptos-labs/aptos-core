@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{assert_success, tests::common, MoveHarness};
+use crate::{assert_success, run_mono_move, tests::common, MoveHarness};
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{ExecutionStatus, TransactionStatus},
@@ -19,6 +19,7 @@ fn crypto_algebra_type_tag_limit_exceeded(harness: &mut MoveHarness) -> Transact
     )
 }
 
+#[run_mono_move(should_fail = "crypto_algebra natives are not implemented in MonoMove")]
 #[test]
 fn crypto_algebra_type_tag_limit_exceeded_handled() {
     let mut h = MoveHarness::new();

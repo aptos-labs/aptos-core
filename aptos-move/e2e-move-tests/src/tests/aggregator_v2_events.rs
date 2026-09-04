@@ -3,6 +3,7 @@
 
 use crate::{
     aggregator_v2::AggV2TestHarness,
+    run_mono_move,
     tests::aggregator_v2::{AggregatorMode, EAGGREGATOR_OVERFLOW},
     BlockSplit, SUCCESS,
 };
@@ -152,6 +153,7 @@ macro_rules! increment_counter_emit_event {
     };
 }
 
+#[run_mono_move]
 #[test]
 fn test_events_with_snapshots() {
     for event_version in [1, 2] {
