@@ -5,7 +5,7 @@ fun left_u64() {
   frame_data_size: 56
   entry_gas: 43
   code:
-    0: EnumNew [8] desc=2 tag #0 @1
+    0: EnumNew [8] desc=3 tag #0 @1
     1: HeapMoveTo8 [8]+8 <- [0] @1
     2: SlotBorrow [16] <- &[8] @3
     3: EnumTestTag [32] <- (*[16]).tag == #0 @6
@@ -33,7 +33,7 @@ fun pick_variant() {
   code:
     0: JumpIntCmp @24 [0] != u64 #0 gas_taken=36 gas_fallthrough=15 @1
     1: StoreImm1 [32] <- #1 @4
-    2: EnumNew [8] desc=2 tag #1 @5
+    2: EnumNew [8] desc=3 tag #1 @5
     3: HeapMoveTo [8]+8 <- [32] (size=1) @5
     4: SlotBorrow [16] <- &[8] @7
     5: EnumTestTag [32] <- (*[16]).tag == #0 @10
@@ -55,7 +55,7 @@ fun pick_variant() {
     21: Return @26
     22: StoreImm8 [40] <- #14566554180833181697 @27
     23: Abort [40] @28
-    24: EnumNew [8] desc=2 tag #0 @30
+    24: EnumNew [8] desc=3 tag #0 @30
     25: HeapMoveTo8 [8]+8 <- [0] @30
     26: Jump @4 gas=9 @32
   safe_point_layouts:
@@ -67,7 +67,7 @@ fun swapped_right_u64() {
   frame_data_size: 56
   entry_gas: 43
   code:
-    0: EnumNew [8] desc=3 tag #1 @1
+    0: EnumNew [8] desc=4 tag #1 @1
     1: HeapMoveTo8 [8]+8 <- [0] @1
     2: SlotBorrow [16] <- &[8] @3
     3: EnumTestTag [32] <- (*[16]).tag == #0 @6
@@ -99,7 +99,7 @@ fun test_is_left() {
   code:
     0: JumpIntCmp @13 [0] != u64 #0 gas_taken=17 gas_fallthrough=36 @1
     1: StoreImm8 [16] <- #5 @4
-    2: EnumNew [8] desc=2 tag #0 @5
+    2: EnumNew [8] desc=3 tag #0 @5
     3: HeapMoveTo8 [8]+8 <- [16] @5
     4: SlotBorrow [24] <- &[8] @7
     5: EnumTestTag [40] <- (*[24]).tag == #0 @8
@@ -111,7 +111,7 @@ fun test_is_left() {
     11: Move8 [0] <- [16] @13
     12: Return @13
     13: StoreImm1 [40] <- #0 @14
-    14: EnumNew [8] desc=2 tag #1 @15
+    14: EnumNew [8] desc=3 tag #1 @15
     15: HeapMoveTo [8]+8 <- [40] (size=1) @15
     16: Jump @4 gas=9 @17
   safe_point_layouts:

@@ -292,11 +292,8 @@ impl<'a, V> Vector<'a, V> {
     ///
     /// Stale if GC runs -- it is the caller's responsibility to only use it in a transient
     /// manner.
-    ///
-    /// Note: currently private, but could be made public if needed. In that case, external
-    /// callers need to follow the same rule above.
     #[inline]
-    fn ptr(&self) -> *mut u8 {
+    pub fn ptr(&self) -> *mut u8 {
         self.handle.ptr()
     }
 

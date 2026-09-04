@@ -179,7 +179,7 @@ fun mk_e() {
     2: StoreImm1 [10] <- #7 @5
     3: Move(1) [12] <- [8] @7
     4: Move(1) [11] <- [10] @7
-    5: EnumNew [16] desc=2 tag #0 @8
+    5: EnumNew [16] desc=3 tag #0 @8
     6: HeapMoveTo [16]+8 <- [9] (size=1) @8
     7: HeapMoveTo [16]+9 <- [11] (size=2) @8
     8: Move8 [0] <- [16] @9
@@ -188,7 +188,7 @@ fun mk_e() {
     11: StoreImm1 [9] <- #7 @11
     12: Move(1) [12] <- [8] @13
     13: Move(1) [11] <- [9] @13
-    14: EnumNew [16] desc=2 tag #1 @14
+    14: EnumNew [16] desc=3 tag #1 @14
     15: HeapMoveTo [16]+8 <- [24] (size=2) @14
     16: HeapMoveTo [16]+10 <- [11] (size=2) @14
     17: Move8 [0] <- [16] @15
@@ -206,14 +206,14 @@ fun mk_u() {
     1: StoreImm1 [9] <- #7 @4
     2: Move(1) [11] <- [8] @6
     3: Move(1) [10] <- [9] @6
-    4: EnumNew [16] desc=3 tag #0 @7
+    4: EnumNew [16] desc=4 tag #0 @7
     5: HeapMoveTo [16]+8 <- [10] (size=2) @7
     6: Move8 [0] <- [16] @8
     7: Return @8
     8: StoreImm1 [9] <- #7 @9
     9: Move(1) [11] <- [8] @11
     10: Move(1) [10] <- [9] @11
-    11: EnumNew [16] desc=3 tag #1 @12
+    11: EnumNew [16] desc=4 tag #1 @12
     12: HeapMoveTo [16]+8 <- [10] (size=2) @12
     13: Move8 [0] <- [16] @13
     14: Return @13
@@ -272,7 +272,7 @@ fun run_read_f() {
   code:
     0: JumpIntCmp @8 [0] != u64 #0 gas_taken=37 gas_fallthrough=15 @1
     1: StoreImm1 [16] <- #1 @4
-    2: EnumNew [8] desc=4 tag #0 @5
+    2: EnumNew [8] desc=5 tag #0 @5
     3: HeapMoveTo [8]+8 <- [16] (size=1) @5
     4: SlotBorrow [56] <- &[8] @7
     5: CallIndirect 0x99::chained_variant_field_fusion::read_f @8
@@ -283,7 +283,7 @@ fun run_read_f() {
     10: StoreImm1 [18] <- #9 @12
     11: Move(1) [20] <- [18] @13
     12: Move(1) [19] <- [17] @13
-    13: EnumNew [8] desc=4 tag #1 @14
+    13: EnumNew [8] desc=5 tag #1 @14
     14: HeapMoveTo [8]+8 <- [16] (size=1) @14
     15: HeapMoveTo [8]+9 <- [19] (size=2) @14
     16: Jump @4 gas=74 @16

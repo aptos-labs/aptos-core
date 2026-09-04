@@ -209,11 +209,12 @@ impl Descriptors {
     }
 }
 
-/// Initial descriptor table: the two reserved entries.
+/// Returns the initial descriptor table with the reserved entries.
 fn initial_descriptors() -> boxcar::Vec<ObjectDescriptor> {
     let table = boxcar::Vec::new();
     table.push(ObjectDescriptor::trivial());
     table.push(ObjectDescriptor::closure());
+    table.push(ObjectDescriptor::pointer_vec());
     table
 }
 

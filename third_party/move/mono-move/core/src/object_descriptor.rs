@@ -4,11 +4,10 @@
 //! Object descriptors and the [`DescriptorProvider`] trait.
 //!
 //! An [`ObjectDescriptor`] tells the GC how to trace internal pointers
-//! within a single heap object. Two entries are reserved at fixed
-//! [`DescriptorId`] slots: `Trivial` (id `0`) and `Closure` (id `1`).
-//! Producers (the global context, tests) append user descriptors starting
-//! at [`RESERVED_DESCRIPTOR_COUNT`]; consumers (the runtime) look them up
-//! through a [`DescriptorProvider`].
+//! within a single heap object. A few entries are reserved at fixed
+//! [`DescriptorId`] slots. Producers (the global context, tests) append
+//! user descriptors starting at [`RESERVED_DESCRIPTOR_COUNT`]; consumers
+//! (the runtime) look them up through a [`DescriptorProvider`].
 
 use crate::DescriptorId;
 
@@ -100,6 +99,21 @@ impl ObjectDescriptor {
     /// descriptor. Producers install one of these at [`CLOSURE_DESCRIPTOR_ID`].
     pub const fn closure() -> Self {
         Self(ObjectDescriptorInner::Closure)
+    }
+
+    /// Construct the reserved pointer-vector descriptor: every element is a
+    /// single 8-byte heap pointer. Producers install one of these at
+    /// [`POINTER_VEC_DESCRIPTOR_ID`].
+    ///
+    /// The specializer independently publishes a structurally identical
+    /// descriptor for each `vector<T>` whose `T` is a lone pointer. That is
+    /// fine: the verifier and the GC both dispatch on descriptor shape, not
+    /// identity.
+    pub fn pointer_vec() -> Self {
+        Self(ObjectDescriptorInner::Vector {
+            elem_size: 8,
+            elem_pointer_offsets: vec![0],
+        })
     }
 
     /// Construct a [`Vector`](ObjectDescriptorInner::Vector) descriptor.
@@ -203,10 +217,13 @@ pub const TRIVIAL_DESCRIPTOR_ID: DescriptorId = DescriptorId(0);
 /// closure descriptor id of its own.
 pub const CLOSURE_DESCRIPTOR_ID: DescriptorId = DescriptorId(1);
 
-/// Number of reserved descriptors that every provider exposes (currently
-/// `Trivial` and `Closure`). User descriptors are assigned ids starting
-/// at this value.
-pub const RESERVED_DESCRIPTOR_COUNT: u32 = 2;
+/// Reserved descriptor slot for a vector of bare heap pointers
+/// (`Vector { elem_size: 8, elem_pointer_offsets: [0] }`).
+pub const POINTER_VEC_DESCRIPTOR_ID: DescriptorId = DescriptorId(2);
+
+/// Number of reserved descriptors that every provider exposes. User
+/// descriptors are assigned ids starting at this value.
+pub const RESERVED_DESCRIPTOR_COUNT: u32 = 3;
 
 // ---------------------------------------------------------------------------
 // DescriptorProvider
@@ -244,14 +261,18 @@ pub struct ObjectDescriptorTable {
     descriptors: Vec<ObjectDescriptor>,
 }
 
-// `len_without_is_empty`: the table always has the two reserved entries,
-// so `is_empty()` would be a tautological `false` — not worth providing.
+// `len_without_is_empty`: the table always has the reserved entries, so
+// `is_empty()` would be a tautological `false` — not worth providing.
 #[allow(clippy::len_without_is_empty)]
 impl ObjectDescriptorTable {
-    /// Fresh table containing only the two reserved entries.
+    /// Fresh table containing only the reserved entries.
     pub fn new() -> Self {
         Self {
-            descriptors: vec![ObjectDescriptor::trivial(), ObjectDescriptor::closure()],
+            descriptors: vec![
+                ObjectDescriptor::trivial(),
+                ObjectDescriptor::closure(),
+                ObjectDescriptor::pointer_vec(),
+            ],
         }
     }
 
@@ -353,7 +374,7 @@ mod tests {
     #[test]
     fn new_has_reserved_entries() {
         let t = ObjectDescriptorTable::new();
-        assert_eq!(t.len(), 2);
+        assert_eq!(t.len(), RESERVED_DESCRIPTOR_COUNT as usize);
         assert!(matches!(
             t.descriptor(TRIVIAL_DESCRIPTOR_ID).map(|d| d.inner()),
             Some(ObjectDescriptorInner::Trivial)
@@ -362,6 +383,13 @@ mod tests {
             t.descriptor(CLOSURE_DESCRIPTOR_ID).map(|d| d.inner()),
             Some(ObjectDescriptorInner::Closure)
         ));
+        assert!(matches!(
+            t.descriptor(POINTER_VEC_DESCRIPTOR_ID).map(|d| d.inner()),
+            Some(ObjectDescriptorInner::Vector {
+                elem_size: 8,
+                elem_pointer_offsets,
+            }) if elem_pointer_offsets.as_slice() == [0]
+        ));
     }
 
     #[test]
@@ -369,9 +397,9 @@ mod tests {
         let mut t = ObjectDescriptorTable::new();
         let a = t.push(ObjectDescriptor::new_vector(8, vec![0]).unwrap());
         let b = t.push(ObjectDescriptor::new_struct(16, vec![]).unwrap());
-        assert_eq!(a, DescriptorId(2));
-        assert_eq!(b, DescriptorId(3));
-        assert_eq!(t.len(), 4);
+        assert_eq!(a, DescriptorId(RESERVED_DESCRIPTOR_COUNT));
+        assert_eq!(b, DescriptorId(RESERVED_DESCRIPTOR_COUNT + 1));
+        assert_eq!(t.len(), RESERVED_DESCRIPTOR_COUNT as usize + 2);
     }
 
     fn err_msg<T>(r: anyhow::Result<T>) -> String {

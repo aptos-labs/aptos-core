@@ -9,7 +9,7 @@ use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     types::InternedType, Code, CodeOffset as CO, DescriptorId, DescriptorProvider, FrameLayoutInfo,
     FrameOffset as FO, Function, FunctionDefinitionIndex, LayoutId, LayoutProvider, MicroOp,
-    SortedSafePointEntries, ValueLayout,
+    SortedSafePointEntries, ValueLayout, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
 };
 use mono_move_runtime::{verify_function, ObjectDescriptor, ObjectDescriptorTable};
 
@@ -34,10 +34,9 @@ impl LayoutProvider for VerifierProvider {
     }
 }
 
+/// A table holding only the reserved descriptors.
 fn trivial_descriptors() -> VerifierProvider {
-    let mut t = ObjectDescriptorTable::new();
-    t.push(ObjectDescriptor::new_vector(8, vec![0]).unwrap());
-    VerifierProvider(t)
+    VerifierProvider(ObjectDescriptorTable::new())
 }
 
 /// A minimal well-formed function: one `Return`, param_and_local_sizes_sum 8.
@@ -100,7 +99,7 @@ fn valid_with_vec_and_pointer_slots() {
         VecNew { dst: FO(0) },
         SlotBorrow { dst: FO(16), local: FO(0) },
         StoreImm8 { dst: FO(8), imm: 42u64.to_le_bytes() },
-        VecPushBack { vec_ref: FO(16), elem: FO(8), elem_size: 8, descriptor_id: DescriptorId(2) },
+        VecPushBack { vec_ref: FO(16), elem: FO(8), elem_size: 8, descriptor_id: POINTER_VEC_DESCRIPTOR_ID },
         Return,
     ];
     let func = Function {
@@ -404,7 +403,7 @@ fn zero_elem_size_vec_push() {
                 vec_ref: FO(8),
                 elem: FO(24),
                 elem_size: 0,
-                descriptor_id: DescriptorId(0),
+                descriptor_id: TRIVIAL_DESCRIPTOR_ID,
             },
             Return,
         ]),
@@ -618,7 +617,7 @@ fn vec_pushback_func(descriptor_id: DescriptorId) -> Function {
 #[test]
 fn vec_pushback_accepts_trivial_descriptor() {
     // A pointer-free vector canonically uses the Trivial descriptor.
-    let func = vec_pushback_func(DescriptorId(0));
+    let func = vec_pushback_func(TRIVIAL_DESCRIPTOR_ID);
     let errors = verify_function(&func, &trivial_descriptors());
     assert!(errors.is_empty(), "errors: {:?}", errors);
 }
@@ -637,12 +636,11 @@ fn vec_pushback_rejects_non_vector_descriptor() {
 #[test]
 fn heap_new_rejects_vector_descriptor() {
     use MicroOp::*;
-    // trivial_descriptors() has Vector at index 2.
     let func = Function {
         code: Code::from_vec(vec![
             HeapNew {
                 dst: FO(0),
-                descriptor_id: DescriptorId(2),
+                descriptor_id: POINTER_VEC_DESCRIPTOR_ID,
             },
             Return,
         ]),

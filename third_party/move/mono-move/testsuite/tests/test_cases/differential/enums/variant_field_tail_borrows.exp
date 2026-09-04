@@ -125,7 +125,7 @@ fun mk() {
     2: StoreImm1 [10] <- #7 @5
     3: Move(1) [12] <- [8] @7
     4: Move(1) [11] <- [10] @7
-    5: EnumNew [16] desc=2 tag #0 @8
+    5: EnumNew [16] desc=3 tag #0 @8
     6: HeapMoveTo [16]+8 <- [9] (size=1) @8
     7: HeapMoveTo [16]+9 <- [11] (size=2) @8
     8: Move8 [0] <- [16] @9
@@ -134,7 +134,7 @@ fun mk() {
     11: StoreImm1 [9] <- #7 @11
     12: Move(1) [12] <- [8] @13
     13: Move(1) [11] <- [9] @13
-    14: EnumNew [16] desc=2 tag #1 @14
+    14: EnumNew [16] desc=3 tag #1 @14
     15: HeapMoveTo [16]+8 <- [24] (size=2) @14
     16: HeapMoveTo [16]+10 <- [11] (size=2) @14
     17: Move8 [0] <- [16] @15
