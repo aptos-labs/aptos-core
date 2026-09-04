@@ -62,6 +62,11 @@ build/
 .trace
 *.mvcov
 
+# move-fuzz run artifacts (generated drivers, VM traces, persistent state)
+.move-fuzz/
+third_party/move/tools/move-fuzz/tests/**/autogen/
+third_party/move/tools/move-fuzz/tests/**/cov.trace
+
 # Do not ignore the Move build output under the releases for DPN, core, and
 # experimental -- these are the release code.
 !aptos-move/framework/DPN/releases/artifacts/**

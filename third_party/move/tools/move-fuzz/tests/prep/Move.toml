@@ -1,0 +1,12 @@
+[package]
+name = "TestPrep"
+version = "1.0.0"
+upgrade_policy = "compatible"
+authors = []
+
+[addresses]
+test = '_'
+
+[dependencies]
+AptosFramework = { local = "../../../../../../aptos-move/framework/aptos-framework" }
+
