@@ -31,8 +31,9 @@ use crate::{
     monitor,
     network::{
         DeprecatedIncomingBlockRetrievalRequest, IncomingBatchRetrievalRequest,
-        IncomingBlockRetrievalRequest, IncomingDAGRequest, IncomingRandGenRequest,
-        IncomingRpcRequest, IncomingSecretShareRequest, NetworkReceivers, NetworkSender,
+        IncomingBlockRetrievalRequest, IncomingCommitRequest, IncomingDAGRequest,
+        IncomingRandGenRequest, IncomingRpcRequest, IncomingSecretShareRequest, NetworkReceivers,
+        NetworkSender,
     },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     payload_client::{
@@ -40,7 +41,7 @@ use crate::{
     },
     payload_manager::{DirectMempoolPayloadManager, TPayloadManager},
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
-    pipeline::execution_client::TExecutionClient,
+    pipeline::{commit_reliable_broadcast::CommitMessage, execution_client::TExecutionClient},
     quorum_store::{
         quorum_store_builder::{DirectMempoolInnerBuilder, InnerBuilder, QuorumStoreBuilder},
         quorum_store_coordinator::CoordinatorCommand,
@@ -71,6 +72,7 @@ use aptos_consensus_types::{
     block_retrieval::BlockRetrievalRequest,
     common::{Author, Round},
     epoch_retrieval::EpochRetrievalRequest,
+    pipeline::commit_decision::CommitDecision,
     proof_of_store::ProofCache,
     utils::PayloadTxnsSize,
 };
@@ -83,7 +85,10 @@ use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
-use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
+use aptos_network::{
+    application::interface::NetworkClient,
+    protocols::{network::Event, wire::handshake::v1::ProtocolId},
+};
 use aptos_safety_rules::{
     safety_rules_manager, Error, PersistentSafetyStorage, SafetyRulesManager,
 };
@@ -100,6 +105,7 @@ use aptos_types::{
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     jwks::SupportedOIDCProviders,
+    ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{
         ChunkyDKGConfigMoveStruct, ChunkyDKGConfigSeqNum, Features, LeaderReputationType,
         OnChainChunkyDKGConfig, OnChainConfigPayload, OnChainConfigProvider,
@@ -136,6 +142,11 @@ const PROPOSER_ELECTION_CACHING_WINDOW_ADDITION: usize = 3;
 /// Number of rounds we expect storage to be behind the proposer round,
 /// used for fetching data from DB.
 const PROPOSER_ROUND_BEHIND_STORAGE_BUFFER: usize = 30;
+/// How long we give the buffer manager to acknowledge an epoch change certificate handed to it by
+/// the epoch manager. The reply normally arrives within milliseconds (including when the certified
+/// block is not in the buffer at all); this is only a net against a wedged buffer manager, so that
+/// the epoch manager always makes it to the state sync fallback.
+const LOCAL_EPOCH_COMMIT_ACK_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[allow(clippy::large_enum_variant)]
 pub enum LivenessStorageData {
@@ -561,6 +572,74 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         }
     }
 
+    /// Hand a commit certificate for an epoch ending block to our own buffer manager and wait for
+    /// the buffer manager to acknowledge it, so that the shutdown that follows is ordered after
+    /// any commit the certificate triggers.
+    ///
+    /// A locally generated `EpochChangeProof` is only produced after persisting (see
+    /// `PersistingPhase`), so `initiate_new_epoch` could assume the certified state is durable
+    /// somewhere. A proof received from a peer carries no such guarantee: `pre_commit` deliberately
+    /// waits for the commit proof on reconfiguration blocks, so a quorum of commit votes can exist
+    /// while no validator has written the result to storage. Committing locally first restores that
+    /// assumption whenever we already have the block, and leaves state sync for the case where we
+    /// are genuinely behind.
+    ///
+    /// The buffer manager replies from within `process_commit_message`, on the same main loop
+    /// iteration that then drives the commit of a matching block all the way to persistence, and
+    /// its main loop is single threaded. Receiving the reply therefore guarantees that the `Stop`
+    /// reset sent by `shutdown_current_processor` below is served only after that commit
+    /// completes; we never have to watch storage ourselves. When the block is not in the buffer
+    /// (we are genuinely behind), the reply resolves just as promptly, so this never delays the
+    /// state sync fallback.
+    ///
+    /// Limitation: this is a best effort fast path, complete only for blocks the pipeline has
+    /// already executed. If the certificate arrives while the block is still queued for the
+    /// buffer manager or ordered-but-not-yet-executed, the buffer manager caches the certificate
+    /// (and still commits with it if execution finishes before the shutdown below is served), but
+    /// otherwise the block is aborted and we fall back to state sync as before this fast path
+    /// existed. Closing that gap requires the buffer manager to drain — finish committing a
+    /// certified epoch ending block — rather than abort on `Stop`, and, for blocks that never
+    /// reached the buffer, routing the certificate through the block store's commit certificate
+    /// machinery (`add_certs`), which can fetch, order, execute and commit without state sync.
+    async fn try_commit_epoch_ending_block_locally(&self, ledger_info: &LedgerInfoWithSignatures) {
+        // Only a certificate for the epoch we are currently running can match a block held by our
+        // pipeline, and only such a certificate is verifiable by the current epoch's validator set.
+        if ledger_info.ledger_info().epoch() != self.epoch() {
+            return;
+        }
+
+        let (response_sender, response_receiver) = oneshot::channel();
+        let request = IncomingCommitRequest {
+            req: CommitMessage::Decision(CommitDecision::new(ledger_info.clone())),
+            protocol: ProtocolId::ConsensusDirectSendCompressed,
+            response_sender,
+        };
+        if let Err(e) = self.execution_client.send_commit_msg(self.author, request) {
+            warn!(
+                error = ?e,
+                "[EpochManager] Failed to deliver the epoch change certificate to the local pipeline",
+            );
+            return;
+        }
+
+        // The sender side is dropped if the message is discarded anywhere along the way (e.g. the
+        // buffer manager is not running), which resolves the wait immediately.
+        match tokio::time::timeout(LOCAL_EPOCH_COMMIT_ACK_TIMEOUT, response_receiver).await {
+            Ok(Ok(_)) => info!(
+                version = ledger_info.ledger_info().version(),
+                "[EpochManager] The local pipeline acknowledged the epoch change certificate",
+            ),
+            Ok(Err(_)) => warn!(
+                version = ledger_info.ledger_info().version(),
+                "[EpochManager] The local pipeline dropped the epoch change certificate, falling back to state sync",
+            ),
+            Err(_) => warn!(
+                version = ledger_info.ledger_info().version(),
+                "[EpochManager] Timed out waiting for the local pipeline to acknowledge the epoch change certificate, falling back to state sync",
+            ),
+        }
+    }
+
     async fn initiate_new_epoch(&mut self, proof: EpochChangeProof) -> anyhow::Result<()> {
         let ledger_info = proof
             .verify(self.epoch_state())
@@ -569,6 +648,19 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             LogSchema::new(LogEvent::NewEpoch).epoch(ledger_info.ledger_info().next_block_epoch()),
             "Received verified epoch change",
         );
+
+        // Let the pipeline use the certificate before we tear it down: the block it certifies may
+        // be one we already executed but deliberately did not pre-commit. This is a no-op if we
+        // committed it already, and makes the state sync below a no-op if it succeeds.
+        //
+        // A proof can span several epochs, in which case `verify` above returns its last ledger
+        // info while `check_epoch` admitted it on the strength of its first. Only the first one
+        // certifies a block of the epoch we are running, so it is the only one our pipeline could
+        // be holding; we still sync to the last one below.
+        if let Some(current_epoch_ledger_info) = proof.ledger_info_with_sigs.first() {
+            self.try_commit_epoch_ending_block_locally(current_epoch_ledger_info)
+                .await;
+        }
 
         // shutdown existing processor first to avoid race condition with state sync.
         self.shutdown_current_processor().await;

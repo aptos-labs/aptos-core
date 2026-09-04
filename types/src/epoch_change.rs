@@ -289,4 +289,76 @@ mod tests {
         let proof_8 = EpochChangeProof::new(valid_ledger_info[..1].to_vec(), /* more */ false);
         assert!(proof_8.verify(&waypoint_for_3_to_4).is_err());
     }
+
+    /// `EpochChangeProof::epoch()` reports the *first* ledger info's epoch, while `verify()`
+    /// returns the *last*. For a multi-epoch proof (as produced by epoch retrieval for a node
+    /// several epochs behind) those disagree. Consumers that want the certificate for the epoch
+    /// they are currently running — e.g. to feed it to a still-live current-epoch pipeline — must
+    /// use the first ledger info, not `verify()`'s return value, which is a future epoch.
+    #[test]
+    fn epoch_and_verify_disagree_for_multi_epoch_proof() {
+        use crate::{ledger_info::LedgerInfo, validator_verifier::random_validator_verifier};
+        use aptos_crypto::hash::HashValue;
+
+        // Epoch-ending ledger infos for epochs 1..=5. Each is signed by its own validator set
+        // and carries the next epoch's validator set, so the proof chains verify.
+        let mut ledger_infos = vec![];
+        let mut verifiers = vec![];
+        let (mut signers, verifier) = random_validator_verifier(1, None, true);
+        let mut verifier = Arc::new(verifier);
+        for epoch in 1u64..=5 {
+            verifiers.push(verifier.clone());
+            let (next_signers, next_verifier) =
+                random_validator_verifier((epoch + 1) as usize, None, true);
+            let next_verifier = Arc::new(next_verifier);
+            let ledger_info = LedgerInfo::new(
+                BlockInfo::new(
+                    epoch,
+                    0,
+                    HashValue::zero(),
+                    HashValue::zero(),
+                    100 + epoch, // version
+                    0,
+                    Some(EpochState {
+                        epoch: epoch + 1,
+                        verifier: next_verifier.clone(),
+                    }),
+                ),
+                HashValue::zero(),
+            );
+            let partial_signatures = PartialSignatures::new(
+                signers
+                    .iter()
+                    .map(|s| (s.author(), s.sign(&ledger_info).unwrap()))
+                    .collect(),
+            );
+            let aggregated_signature = verifier
+                .aggregate_signatures(partial_signatures.signatures_iter())
+                .unwrap();
+            ledger_infos.push(LedgerInfoWithSignatures::new(
+                ledger_info,
+                aggregated_signature,
+            ));
+            signers = next_signers;
+            verifier = next_verifier;
+        }
+
+        // A node running epoch 2 that has fallen behind receives a proof spanning epochs 2..=5.
+        let proof = EpochChangeProof::new(ledger_infos[1..5].to_vec(), /* more = */ false);
+        let current_epoch_state = EpochState {
+            epoch: 2,
+            verifier: verifiers[1].clone(),
+        };
+
+        // epoch() is the first (current) epoch; verify() returns the last (target) ledger info.
+        assert_eq!(proof.epoch().unwrap(), 2);
+        let verified = proof.verify(&current_epoch_state).unwrap();
+        assert_eq!(verified.ledger_info().epoch(), 5);
+
+        // The first ledger info is the one at our current epoch, and the value a current-epoch
+        // consumer must use. It is distinct from what verify() returns.
+        let first = proof.ledger_info_with_sigs.first().unwrap();
+        assert_eq!(first.ledger_info().epoch(), proof.epoch().unwrap());
+        assert_ne!(first.ledger_info().epoch(), verified.ledger_info().epoch());
+    }
 }
