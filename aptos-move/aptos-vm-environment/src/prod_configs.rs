@@ -118,37 +118,44 @@ pub fn get_layout_caches() -> bool {
 /// Returns [TypeBuilder] used by the Aptos blockchain in production.
 pub fn aptos_prod_ty_builder(
     gas_feature_version: u64,
+    features: &Features,
     gas_params: &AptosGasParameters,
 ) -> TypeBuilder {
     if gas_feature_version >= RELEASE_V1_15 {
         let max_ty_size = gas_params.vm.txn.max_ty_size;
         let max_ty_depth = gas_params.vm.txn.max_ty_depth;
 
-        let check_depth_on_type_counts_v2 = gas_feature_version >= RELEASE_V1_42;
-        let count_function_type_node = gas_feature_version >= RELEASE_V1_49;
-        TypeBuilder::with_limits(
+        ty_builder_for(
+            gas_feature_version,
+            features,
             max_ty_size.into(),
             max_ty_depth.into(),
-            check_depth_on_type_counts_v2,
-            count_function_type_node,
         )
     } else {
-        aptos_default_ty_builder(false, false)
+        aptos_default_ty_builder(gas_feature_version, features)
     }
 }
 
 /// Returns default [TypeBuilder], used only when:
 ///  1. Type size gas parameters are not yet in gas schedule (before 1.15).
 ///   2. No gas parameters are found on-chain.
-pub fn aptos_default_ty_builder(
-    check_depth_on_type_counts_v2: bool,
-    count_function_type_node: bool,
+pub fn aptos_default_ty_builder(gas_feature_version: u64, features: &Features) -> TypeBuilder {
+    ty_builder_for(gas_feature_version, features, 128, 20)
+}
+
+/// Applies gas-version and feature gates consistently across production and default builders.
+fn ty_builder_for(
+    gas_feature_version: u64,
+    features: &Features,
+    max_ty_size: u64,
+    max_ty_depth: u64,
 ) -> TypeBuilder {
     TypeBuilder::with_limits(
-        128,
-        20,
-        check_depth_on_type_counts_v2,
-        count_function_type_node,
+        max_ty_size,
+        max_ty_depth,
+        gas_feature_version >= RELEASE_V1_42,
+        gas_feature_version >= RELEASE_V1_49,
+        features.is_enabled(FeatureFlag::CHECK_FUNCTION_TYPE_ABILITIES),
     )
 }
 
@@ -169,6 +176,8 @@ pub fn aptos_prod_verifier_config(
     let sig_checker_v2_fix_script_ty_param_count =
         features.is_enabled(FeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX);
     let sig_checker_v2_fix_function_signatures = gas_feature_version >= RELEASE_V1_34;
+    let check_function_type_abilities =
+        features.is_enabled(FeatureFlag::CHECK_FUNCTION_TYPE_ABILITIES);
     let enable_enum_types = features.is_enabled(FeatureFlag::ENABLE_ENUM_TYPES);
     // Resource access control was never enabled and has been removed. Access specifiers
     // are permanently rejected by the verifier.
@@ -220,6 +229,7 @@ pub fn aptos_prod_verifier_config(
         _use_signature_checker_v2: true,
         sig_checker_v2_fix_script_ty_param_count,
         sig_checker_v2_fix_function_signatures,
+        check_function_type_abilities,
         enable_enum_types,
         enable_resource_access_control,
         enable_function_values,

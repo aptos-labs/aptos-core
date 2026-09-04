@@ -698,6 +698,15 @@ pub fn verification_error(status: StatusCode, kind: IndexKind, idx: TableIndex) 
     PartialVMError::new(status).at_index(kind, idx)
 }
 
+/// Constructs the shared error for function abilities outside `AbilitySet::PUBLIC_FUNCTIONS`.
+#[cold]
+#[inline(never)]
+pub fn excess_function_type_abilities_error() -> PartialVMError {
+    PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED).with_message(
+        "function type has invalid abilities: only copy, drop, and store are allowed".to_string(),
+    )
+}
+
 impl fmt::Debug for PartialVMError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.0, f)

@@ -6,7 +6,9 @@
 use crate::VerifierConfig;
 use move_binary_format::{
     binary_views::BinaryIndexedView,
-    errors::{Location, PartialVMError, PartialVMResult, VMResult},
+    errors::{
+        excess_function_type_abilities_error, Location, PartialVMError, PartialVMResult, VMResult,
+    },
     file_format::{
         Bytecode, CodeUnit, CompiledModule, CompiledScript, FieldDefinition,
         FieldInstantiationIndex, FunctionDefinition, FunctionHandle, FunctionHandleIndex,
@@ -173,7 +175,13 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
             },
             Function(params, results, abilities) => {
                 assert_abilities(*abilities, required_abilities)?;
-                if self.sig_checker_v2_fix_function_signatures {
+                if self.config.check_function_type_abilities
+                    && !abilities.is_valid_for_function_type()
+                {
+                    // Function types cannot carry `key` or undefined abilities.
+                    return Err(excess_function_type_abilities_error());
+                }
+                if self.config.sig_checker_v2_fix_function_signatures {
                     for ty in params.iter().chain(results) {
                         self.check_ty(
                             ty,
@@ -301,8 +309,7 @@ fn check_phantom_params(
 
 struct SignatureChecker<'a, const N: usize> {
     resolver: BinaryIndexedView<'a>,
-    // If enabled, recurses into function signature to check type signatures.
-    sig_checker_v2_fix_function_signatures: bool,
+    config: &'a VerifierConfig,
 
     // Here the arena is used as a scoped interner, allowing us to store references in the
     // caches below.
@@ -345,12 +352,12 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
     fn new(
         constraints: &'a Arena<BitsetTypeParameterConstraints<N>>,
         resolver: BinaryIndexedView<'a>,
-        sig_checker_v2_fix_function_signatures: bool,
+        config: &'a VerifierConfig,
     ) -> Self {
         Self {
             resolver,
             constraints,
-            sig_checker_v2_fix_function_signatures,
+            config,
 
             ty_results: RefCell::new(BTreeMap::new()),
             sig_results: RefCell::new(BTreeMap::new()),
@@ -1150,11 +1157,7 @@ fn verify_module_impl<const N: usize>(
     module: &CompiledModule,
 ) -> PartialVMResult<()> {
     let arena = Arena::<BitsetTypeParameterConstraints<N>>::new();
-    let checker = SignatureChecker::new(
-        &arena,
-        BinaryIndexedView::Module(module),
-        config.sig_checker_v2_fix_function_signatures,
-    );
+    let checker = SignatureChecker::new(&arena, BinaryIndexedView::Module(module), config);
 
     // Check if all signatures & instantiations are well-formed without any specific contexts.
     // This is only needed if we want to keep the binary format super clean.
@@ -1177,11 +1180,7 @@ fn verify_script_impl<const N: usize>(
     script: &CompiledScript,
 ) -> PartialVMResult<()> {
     let arena = Arena::<BitsetTypeParameterConstraints<N>>::new();
-    let checker = SignatureChecker::new(
-        &arena,
-        BinaryIndexedView::Script(script),
-        config.sig_checker_v2_fix_function_signatures,
-    );
+    let checker = SignatureChecker::new(&arena, BinaryIndexedView::Script(script), config);
 
     // Check if all signatures & instantiations are well-formed without any specific contexts.
     // This is only needed if we want to keep the binary format super clean.

@@ -65,6 +65,9 @@ pub struct VerifierConfig {
     /// If enabled, signature checker V2 also checks parameter and return types in function
     /// signatures.
     pub sig_checker_v2_fix_function_signatures: bool,
+    /// Rejects function types whose abilities are not a subset of
+    /// `AbilitySet::PUBLIC_FUNCTIONS` when enabled.
+    pub check_function_type_abilities: bool,
 }
 
 /// Scope of verification.
@@ -262,6 +265,7 @@ impl Default for VerifierConfig {
 
             sig_checker_v2_fix_script_ty_param_count: true,
             sig_checker_v2_fix_function_signatures: true,
+            check_function_type_abilities: true,
 
             enable_enum_types: true,
             enable_resource_access_control: false,
@@ -311,6 +315,7 @@ impl VerifierConfig {
             _use_signature_checker_v2: true,
             sig_checker_v2_fix_script_ty_param_count: true,
             sig_checker_v2_fix_function_signatures: true,
+            check_function_type_abilities: true,
 
             enable_enum_types: true,
             enable_resource_access_control: false,

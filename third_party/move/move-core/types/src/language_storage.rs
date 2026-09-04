@@ -694,6 +694,50 @@ mod tests {
         }
     }
 
+    /// Ensures the generator exercises function tags covered by the canonical-string uniqueness
+    /// property.
+    #[test]
+    fn test_arbitrary_type_tag_generates_function_tags() {
+        use proptest::{strategy::ValueTree, test_runner::TestRunner};
+
+        let mut runner = TestRunner::deterministic();
+        let strategy = any::<TypeTag>();
+        let saw_function = (0..2000).any(|_| {
+            let tag = strategy.new_tree(&mut runner).unwrap().current();
+            tag.preorder_traversal_iter()
+                .any(|inner| matches!(inner, TypeTag::Function(_)))
+        });
+        assert!(
+            saw_function,
+            "the TypeTag proptest generator never produced a function tag"
+        );
+    }
+
+    /// Demonstrates that BCS preserves undefined function-ability bits while canonical strings
+    /// omit them.
+    #[test]
+    fn test_unknown_function_ability_bits_collide_in_canonical_string() {
+        let valid = make_function_tag(vec![], vec![], AbilitySet::PUBLIC_FUNCTIONS);
+        let unknown_bit = make_function_tag(
+            vec![],
+            vec![],
+            bcs::from_bytes::<AbilitySet>(&[0x17]).expect("Deserialize accepts any ability byte"),
+        );
+
+        assert_ne!(valid, unknown_bit);
+        assert_eq!(
+            valid.to_canonical_string(),
+            unknown_bit.to_canonical_string()
+        );
+        assert_eq!(
+            unknown_bit.to_canonical_string(),
+            "||() has copy + drop + store"
+        );
+
+        let encoded = bcs::to_bytes(&unknown_bit).unwrap();
+        assert_eq!(bcs::from_bytes::<TypeTag>(&encoded).unwrap(), unknown_bit);
+    }
+
     #[test]
     fn test_tag_iter() {
         let tag = TypeTag::from_str("vector<0x1::a::A<u8, 0x2::b::B, vector<vector<0x3::c::C>>>>")

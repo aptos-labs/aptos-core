@@ -63,6 +63,7 @@ memory-stats = { workspace = true }
 move-bytecode-utils = { workspace = true }
 move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true }
+tempfile = { workspace = true }
 test-case = { workspace = true }
 thousands = { workspace = true }
 tokio = { workspace = true }
