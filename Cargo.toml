@@ -1016,6 +1016,12 @@ futures-sink = { git = "https://github.com/aptos-labs/futures-rs", branch = "bac
 futures-io = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
 futures-task = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
 futures-macro = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+# jemalloc 5.3.1 before dependents accept tikv-jemalloc 0.7: this rev carries the 0.7.0
+# content while still versioned 0.6.1+5.3.1 (the commit right before the version bump),
+# so every ^0.6 requirement (librocksdb-sys, indexer processors) resolves to it, keeping
+# a single `links = "jemalloc"` package in the graph. Drop once rust-rocksdb and
+# aptos-indexer-processors-v2 move to tikv-jemalloc 0.7.
+tikv-jemalloc-sys = { git = "https://github.com/tikv/jemallocator", rev = "e16f89e4305fc45c089d8c782e8727c9eb5335e0" }
 ark-ec = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
 ark-ff = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
 ark-ff-macros = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
