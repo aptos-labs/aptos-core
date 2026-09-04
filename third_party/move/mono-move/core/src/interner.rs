@@ -230,6 +230,13 @@ pub fn type_tag_of(ty: InternedType) -> Option<TypeTag> {
 
 /// The owned [`language_storage::ModuleId`] for an interned module ID, or
 /// [`None`] if the interned name is not a valid identifier.
+//
+// TODO(cleanup): validate every module name before it is interned, then make
+// this conversion infallible and remove invalid-name handling from callers.
+//
+// Before removing the `Option`, audit all interning entry points, especially
+// paths that accept deserialized identifiers or values built by unchecked
+// constructors.
 pub fn module_id_of(module_id: InternedModuleId) -> Option<language_storage::ModuleId> {
     let module_id = view_module_id(module_id);
     Some(language_storage::ModuleId::new(

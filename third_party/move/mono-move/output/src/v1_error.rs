@@ -16,9 +16,8 @@
 //! records which of the three a message is, so callers comparing against V1
 //! can tell when a mismatch is expected.
 //!
-//! TODO(cleanup): `unit_test.rs` still classifies runtime and loader errors
-//! itself rather than through this mapping, and the transactional-test adapter,
-//! once it exists, will render `VMError`s from this mapping.
+//! TODO(cleanup): render transactional-test `VMError`s from this mapping
+//! together with the attached error location.
 //!
 //! TODO(cleanup): **exact parity with V1 is not a goal.** These statuses
 //! become the `VMStatus` a transaction commits with, so for now they are what
@@ -301,8 +300,16 @@ fn describe_loader_error(err: &LoaderError) -> V1Equivalent {
         L::FunctionNotFound { .. } => {
             V1ErrorInfo::with_mono_message(StatusCode::FUNCTION_RESOLUTION_FAILURE, err)
         },
-        // V1 runs both of these successfully, so it has no corresponding
-        // failure to describe.
+        // MonoMove-only loading or lowering gaps have no corresponding V1
+        // failure and therefore map to `NoV1Failure`.
+        //
+        // TODO(correctness): `NativeFunctionNotLoadable` is ambiguous. If V1
+        // also lacks the declared native's implementation, V1 reports
+        // `MISSING_DEPENDENCY` at the native definition while this mapping
+        // reports no V1 failure. Distinguishing the cases requires V1's native
+        // table. Because only special addresses may publish native declarations,
+        // this can occur only if a framework release declares a native without
+        // registering its implementation.
         L::NativeFunctionNotLoadable { .. } | L::LoweringSkipped { .. } => {
             return V1Equivalent::NoV1Failure
         },

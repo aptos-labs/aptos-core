@@ -8,7 +8,9 @@ use anyhow::{anyhow, Context, Result};
 use codespan_reporting::term::termcolor::Buffer;
 use legacy_move_compiler::{compiled_unit::CompiledUnit, shared::known_attributes::KnownAttribute};
 use move_asm::assembler::{self, Options as AsmOptions};
-use move_binary_format::CompiledModule;
+use move_binary_format::{
+    access::ModuleAccess, file_format::FunctionDefinitionIndex, CompiledModule,
+};
 use move_compiler_v2::Options;
 use move_model::metadata::LanguageVersion;
 use std::{io::Write, path::Path};
@@ -115,6 +117,18 @@ pub fn compile_move_source(source: &str) -> Result<Vec<CompiledModule>> {
         language_version: Some(LanguageVersion::latest_stable()),
         ..Options::default()
     })
+}
+
+/// Returns the definition index of `name`, including native functions, or
+/// [`None`] if `module` does not define it.
+pub fn function_def_index(module: &CompiledModule, name: &str) -> Option<FunctionDefinitionIndex> {
+    let position = module.function_defs().iter().position(|fdef| {
+        module
+            .identifier_at(module.function_handle_at(fdef.function).name)
+            .as_str()
+            == name
+    })?;
+    Some(FunctionDefinitionIndex(position as u16))
 }
 
 /// Assemble `.masm` source text into a single module.

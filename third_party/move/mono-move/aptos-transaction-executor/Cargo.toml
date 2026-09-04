@@ -26,6 +26,7 @@ mono-move-loader = { workspace = true }
 mono-move-natives = { workspace = true }
 mono-move-output = { workspace = true }
 mono-move-runtime = { workspace = true }
+move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }

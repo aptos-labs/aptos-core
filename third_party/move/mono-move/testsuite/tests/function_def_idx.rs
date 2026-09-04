@@ -5,14 +5,11 @@
 //! resolvable by name on a loaded module (natives included), and recoverable
 //! from the natives registry via `name_by_idx`.
 
-use mono_move_core::{
-    native::NativeIdx, types::EMPTY_TYPE_LIST, FunctionDefinitionIndex, GasMeter,
-};
+use mono_move_core::{native::NativeIdx, types::EMPTY_TYPE_LIST, GasMeter};
 use mono_move_global_context::GlobalContext;
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
 use mono_move_runtime::ProductionNativeRegistry;
 use mono_move_testsuite::{engine::build_natives, InMemoryModuleProvider};
-use move_binary_format::access::ModuleAccess;
 use move_core_types::{account_address::AccountAddress, ident_str, identifier::IdentStr};
 
 /// A native before and after `main` so the Move-body def index is neither 0
@@ -30,17 +27,8 @@ fn def_idx_stamped_and_resolvable_by_name() {
     let modules = mono_move_testsuite::compile_move_source(SOURCE).expect("compilation failed");
     let module = &modules[0];
     let def_position = |name: &str| {
-        let position = module
-            .function_defs()
-            .iter()
-            .position(|fdef| {
-                module
-                    .identifier_at(module.function_handle_at(fdef.function).name)
-                    .as_str()
-                    == name
-            })
-            .expect("function not found in compiled module");
-        FunctionDefinitionIndex(position as u16)
+        mono_move_testsuite::function_def_index(module, name)
+            .expect("function not found in compiled module")
     };
 
     let mut module_provider = InMemoryModuleProvider::new();

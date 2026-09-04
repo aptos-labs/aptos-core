@@ -71,7 +71,8 @@
 //!
 //! Must follow an execute directive, and takes no argument. Both VMs must fail
 //! with a VM error, and MonoMove's failure, mapped into V1 terms, must match the
-//! status code, sub-status, and message the V1 VM reported. The expected value
+//! status code, sub-status, message, and error location (module or script, plus
+//! the faulting function and bytecode offset) the V1 VM reported. The expected value
 //! comes from V1 at run time rather than a literal in the test.
 //!
 //! Move aborts are not covered: they carry no VM error to map, and both VMs
@@ -79,8 +80,8 @@
 //!
 //! This is the only directive that reads the mapped description instead of
 //! MonoMove's native error text, so it exercises the mapping. It fails
-//! if the error has no V1 equivalent, or if the mapping cannot reproduce V1's
-//! message or sub-status.
+//! if the error has no V1 equivalent, if the mapping cannot reproduce V1's
+//! message or sub-status, or if MonoMove never located the failure.
 //!
 //! Multiple check directives may follow a single execute step; each is
 //! verified independently.
@@ -115,8 +116,8 @@ pub enum Check {
     /// collections deterministically.
     GcCount(usize),
     /// Both VMs must fail with a VM error, and MonoMove's failure, mapped into
-    /// V1 terms, must match the status, sub-status, and message the V1 VM
-    /// reported. Move aborts are not covered.
+    /// V1 terms, must match the status, sub-status, message, and error location the
+    /// V1 VM reported. Move aborts are not covered.
     ErrorParity,
 }
 
