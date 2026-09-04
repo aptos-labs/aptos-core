@@ -24,7 +24,7 @@ pub mod tracing;
 pub mod config;
 pub mod module_traversal;
 
-mod debug;
+pub mod debug;
 pub mod source_locator;
 
 mod frame;
