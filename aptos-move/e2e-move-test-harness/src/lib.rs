@@ -111,42 +111,39 @@ pub enum BlockSplit {
 impl<O: OutputLogger> MoveHarnessImpl<O> {
     const DEFAULT_MAX_GAS_PER_TXN: u64 = 20_000_000;
 
-    /// Creates a new harness.
-    pub fn new() -> Self {
-        register_package_hooks(Box::new(AptosPackageHooks {}));
-        Self {
-            executor: FakeExecutorImpl::from_head_genesis(),
-            txn_seq_no: BTreeMap::default(),
-            default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
-            max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
-        }
-    }
-
-    pub fn new_with_executor(executor: FakeExecutorImpl<O>) -> Self {
+    fn from_executor(executor: FakeExecutorImpl<O>, default_gas_unit_price: u64) -> Self {
         register_package_hooks(Box::new(AptosPackageHooks {}));
         Self {
             executor,
             txn_seq_no: BTreeMap::default(),
-            default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
+            default_gas_unit_price,
             max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
         }
     }
 
+    /// Creates a new harness.
+    pub fn new() -> Self {
+        Self::from_executor(
+            FakeExecutorImpl::from_head_genesis(),
+            DEFAULT_GAS_UNIT_PRICE,
+        )
+    }
+
+    pub fn new_with_executor(executor: FakeExecutorImpl<O>) -> Self {
+        Self::from_executor(executor, DEFAULT_GAS_UNIT_PRICE)
+    }
+
     pub fn new_with_validators(count: u64) -> Self {
-        register_package_hooks(Box::new(AptosPackageHooks {}));
-        Self {
-            executor: FakeExecutorImpl::from_head_genesis_with_count(count),
-            txn_seq_no: BTreeMap::default(),
-            default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
-            max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
-        }
+        Self::from_executor(
+            FakeExecutorImpl::from_head_genesis_with_count(count),
+            DEFAULT_GAS_UNIT_PRICE,
+        )
     }
 
     /// Creates a new harness with TESTNET chain id. Timed features have real
     /// activation dates on testnet, making them individually toggleable via
     /// [`Self::set_timed_feature`].
     pub fn new_testnet() -> Self {
-        register_package_hooks(Box::new(AptosPackageHooks {}));
         // Use from_head_genesis (which applies the genesis write set with TESTING chain id),
         // then override the on-chain chain id to TESTNET. We must set it after genesis
         // because apply_write_set overwrites the chain id resource.
@@ -155,12 +152,7 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
             .state_store()
             .set_chain_id(ChainId::testnet())
             .expect("failed to set chain id");
-        Self {
-            executor,
-            txn_seq_no: BTreeMap::default(),
-            default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
-            max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
-        }
+        Self::from_executor(executor, DEFAULT_GAS_UNIT_PRICE)
     }
 
     /// Creates a [`MoveHarness`] from a remote network state at the version specified by the
@@ -177,8 +169,6 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
         txn_id: u64,
         api_key: Option<&str>,
     ) -> Self {
-        register_package_hooks(Box::new(AptosPackageHooks {}));
-
         let executor = match api_key {
             Some(api_key) => {
                 FakeExecutorImpl::from_remote_state_with_api_key(network_url, txn_id, api_key)
@@ -194,12 +184,7 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
         )
         .unwrap();
 
-        Self {
-            executor,
-            txn_seq_no: BTreeMap::default(),
-            default_gas_unit_price: gas_params.vm.txn.min_price_per_gas_unit.into(),
-            max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
-        }
+        Self::from_executor(executor, gas_params.vm.txn.min_price_per_gas_unit.into())
     }
 
     /// Creates a [`MoveHarness`] from a remote network state at the version specified by the
@@ -705,10 +690,42 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
         self.create_object_code_deployment_built_package(account, package, patch_metadata)
     }
 
+    /// Runs `f` with `ENABLE_MONO_MOVE` off, restoring the flags afterwards.
+    ///
+    /// MonoMove cannot execute module publishing, so package setup goes through
+    /// the V1 VM. The publish helpers below do this already; a test that builds
+    /// its publish transaction by hand and runs it via [`Self::run`] has to wrap
+    /// the call itself.
+    // TODO(completeness): Audit every call site once MonoMove stops needing the
+    // fallback. Publishing is the only reason for it today.
+    pub fn without_mono_move<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
+        let features = self
+            .executor
+            .state_store()
+            .get_features()
+            .expect("failed to read features");
+        if !features.is_mono_move_enabled() {
+            return f(self);
+        }
+
+        let mut without = features.clone();
+        without.disable(FeatureFlag::ENABLE_MONO_MOVE);
+        let store = self.executor.state_store();
+        store.set_features(without).expect("failed to set features");
+
+        let result = f(self);
+
+        let store = self.executor.state_store();
+        store
+            .set_features(features)
+            .expect("failed to restore features");
+        result
+    }
+
     /// Runs transaction which publishes the Move Package.
     pub fn publish_package(&mut self, account: &Account, path: &Path) -> TransactionStatus {
         let txn = self.create_publish_package(account, path, None, |_| {});
-        self.run(txn)
+        self.without_mono_move(|h| h.run(txn))
     }
 
     /// Runs the transaction which publishes the Move Package to an object.
@@ -719,7 +736,7 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
         options: BuildOptions,
     ) -> TransactionStatus {
         let txn = self.create_object_code_deployment_package(account, path, options, |_| {});
-        self.run(txn)
+        self.without_mono_move(|h| h.run(txn))
     }
 
     /// Creates a transaction which publishes the passed already-built Move Package to an object,
@@ -735,7 +752,7 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
     ) -> TransactionStatus {
         let txn =
             self.create_object_code_upgrade_package(account, path, options, |_| {}, code_object);
-        self.run(txn)
+        self.without_mono_move(|h| h.run(txn))
     }
 
     /// Marks all the packages in the `code_object` as immutable.
@@ -748,12 +765,12 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
             account,
             aptos_stdlib::object_code_deployment_freeze_code_object(code_object),
         );
-        self.run(txn)
+        self.without_mono_move(|h| h.run(txn))
     }
 
     pub fn evaluate_publish_gas(&mut self, account: &Account, path: &Path) -> u64 {
         let txn = self.create_publish_package(account, path, None, |_| {});
-        let output = self.run_raw(txn);
+        let output = self.without_mono_move(|h| h.run_raw(txn));
         assert_success!(output.status().to_owned());
         output.gas_used()
     }
@@ -764,10 +781,11 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
         path: &Path,
     ) -> (TransactionGasLog, u64, Option<FeeStatement>) {
         let txn = self.create_publish_package(account, path, None, |_| {});
-        let (output, gas_log) = self
-            .executor
-            .execute_transaction_with_gas_profiler(txn, &AuxiliaryInfo::default())
-            .unwrap();
+        let (output, gas_log) = self.without_mono_move(|h| {
+            h.executor
+                .execute_transaction_with_gas_profiler(txn, &AuxiliaryInfo::default())
+                .unwrap()
+        });
         if matches!(output.status(), TransactionStatus::Keep(_)) {
             self.executor.apply_write_set(output.write_set());
         }
@@ -786,7 +804,7 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
         options: BuildOptions,
     ) -> TransactionStatus {
         let txn = self.create_publish_package(account, path, Some(options), |_| {});
-        self.run(txn)
+        self.without_mono_move(|h| h.run(txn))
     }
 
     /// Runs transaction which publishes the Move Package, and alllows to patch the metadata
@@ -797,7 +815,7 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
         metadata_patcher: impl FnMut(&mut PackageMetadata),
     ) -> TransactionStatus {
         let txn = self.create_publish_package(account, path, None, metadata_patcher);
-        self.run(txn)
+        self.without_mono_move(|h| h.run(txn))
     }
 
     pub fn fast_forward(&mut self, seconds: u64) {

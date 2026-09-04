@@ -1,0 +1,253 @@
+name: "mono-move-tests-parity"
+
+# Runs the normal Aptos test suites with MONO_MOVE_ENV=1 and diffs the outcome
+# against failing.toml and skipped.toml. Advisory, never required: it is
+# label-gated, and a skipped required check leaves a PR unmergeable.
+#
+# See third_party/move/mono-move/aptos-tests-parity/README.md.
+on:
+  # `pull_request`, never `pull_request_target`: this runs untrusted PR code on a
+  # self-hosted runner, and `pull_request_target` would hand that code a writable
+  # token in the base-repo context.
+  pull_request:
+    types: [labeled, opened, synchronize, reopened]
+  workflow_dispatch:
+
+concurrency:
+  group: mono-move-tests-parity-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+  PARITY: third_party/move/mono-move/aptos-tests-parity/check_parity.py
+
+jobs:
+  unit-tests:
+    # Dispatch, or a same-repo (non-fork) PR carrying the label.
+    if: |
+      github.event_name != 'pull_request' ||
+      (
+        contains(github.event.pull_request.labels.*.name, 'mono-move-e2e-tests') &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      )
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      # Install Move Prover tools, matching the rust-unit-tests job.
+      - name: Run dev_setup.sh
+        run: scripts/dev_setup.sh -b -y
+
+      - name: Run postgres database
+        run: docker run --detach -p 5432:5432 cimg/postgres:14.2
+
+      # Same invocation as .github/actions/rust-unit-tests, plus MONO_MOVE_ENV
+      # and the skip filter.
+      - name: Run unit tests with MonoMove defaulted on
+        run: |
+          FILTER=$(python3 "$PARITY" --skip-filter)
+          echo "filter: $FILTER"
+          # Exit 100 means tests failed, which is what this job measures. Any
+          # other code is a build, filter or setup error, and the results would
+          # be partial: fail the step instead of checking them.
+          cargo nextest run \
+            --profile ci \
+            --cargo-profile ci \
+            --locked \
+            --workspace \
+            --exclude smoke-test \
+            --exclude aptos-testcases \
+            --exclude aptos-keyless-circuit \
+            --exclude aptos-batch-encryption \
+            --retries 3 \
+            --no-fail-fast \
+            --message-format libtest-json \
+            -E "$FILTER" > unit-results.json || { code=$?; [ "$code" -eq 100 ] || exit "$code"; }
+        env:
+          MONO_MOVE_ENV: "1"
+          NEXTEST_EXPERIMENTAL_LIBTEST_JSON: 1
+          INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+          RUST_MIN_STACK: "1073741824"
+          MVP_TEST_ON_CI: "true"
+          Z3_EXE: /home/runner/bin/z3
+          CVC5_EXE: /home/runner/bin/cvc5
+          DOTNET_ROOT: /home/runner/.dotnet
+          BOOGIE_EXE: /home/runner/.dotnet/tools/boogie
+
+      - name: Upload unit test results
+        if: "!cancelled()"
+        uses: actions/upload-artifact@v4
+        with:
+          name: mono-move-parity-unit-results
+          path: unit-results.json
+          retention-days: 14
+
+      - name: Check parity
+        if: "!cancelled()"
+        run: |
+          set +e
+          python3 "$PARITY" --check unit-results.json 2>&1 | tee parity.txt
+          status=${PIPESTATUS[0]}
+          {
+            echo '## MonoMove parity: unit tests'
+            echo '```'
+            cat parity.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+  # Build steps are copied from .github/workflows/smoke-tests.yaml. Only the run
+  # step differs.
+  build-smoke-aptos-node:
+    if: |
+      github.event_name != 'pull_request' ||
+      (
+        contains(github.event.pull_request.labels.*.name, 'mono-move-e2e-tests') &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      )
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build aptos-node
+        run: cargo build --locked --package=aptos-node --features=failpoints,smoke-test --release
+      - name: Save aptos-node binary to cache
+        uses: runs-on/cache/save@v4
+        with:
+          path: target/release/aptos-node
+          key: mono-move-parity-aptos-node-${{ github.run_id }}
+
+  build-smoke-tests:
+    if: |
+      github.event_name != 'pull_request' ||
+      (
+        contains(github.event.pull_request.labels.*.name, 'mono-move-e2e-tests') &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      )
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build smoke test archive and helper binaries
+        run: |
+          cargo build --locked --release --package aptos --package aptos-debugger
+          # LOCAL_SWARM_NODE_RELEASE must be set at compile time (option_env!) so the
+          # test binary uses the release aptos-node binary instead of building a debug one.
+          LOCAL_SWARM_NODE_RELEASE=1 cargo nextest archive --locked --release --package smoke-test --archive-file smoke-test-archive.tar.zst
+      - name: Save smoke test artifacts to cache
+        uses: runs-on/cache/save@v4
+        with:
+          path: |
+            target/release/aptos
+            target/release/aptos-debugger
+            smoke-test-archive.tar.zst
+          key: mono-move-parity-smoke-archive-${{ github.run_id }}
+
+  smoke-tests:
+    needs: [build-smoke-aptos-node, build-smoke-tests]
+    runs-on: runs-on,cpu=16,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        partition: [1, 2, 3, 4, 5, 6, 7, 8]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run postgres database
+        run: docker run --detach -p 5432:5432 cimg/postgres:14.2
+
+      - name: Restore aptos-node binary from cache
+        uses: runs-on/cache/restore@v4
+        with:
+          path: target/release/aptos-node
+          key: mono-move-parity-aptos-node-${{ github.run_id }}
+          fail-on-cache-miss: true
+
+      - name: Restore smoke test archive and helper binaries from cache
+        uses: runs-on/cache/restore@v4
+        with:
+          path: |
+            target/release/aptos
+            target/release/aptos-debugger
+            smoke-test-archive.tar.zst
+          key: mono-move-parity-smoke-archive-${{ github.run_id }}
+          fail-on-cache-miss: true
+
+      # LocalSwarm builds genesis in this process, so the variable belongs here
+      # and the node binary needs no rebuild.
+      - name: Run smoke tests partition ${{ matrix.partition }}/8 with MonoMove defaulted on
+        run: |
+          set -o pipefail
+          chmod +x target/release/aptos-node target/release/aptos target/release/aptos-debugger
+          FILTER=$(python3 "$PARITY" --skip-filter)
+          echo "filter: $FILTER"
+          # Exit 100 means tests failed, which is what this job measures. Any
+          # other code is a build, filter or setup error, and the results would
+          # be partial: fail the step instead of checking them.
+          SMOKE_TEST_PREBUILD_BINARIES=1 \
+          SMOKE_TEST_BIN_DIR=${{ github.workspace }}/target/release \
+          LOCAL_SWARM_NODE_RELEASE=1 \
+          cargo nextest run \
+            --archive-file smoke-test-archive.tar.zst \
+            --workspace-remap . \
+            --profile smoke-test \
+            --partition count:${{ matrix.partition }}/8 \
+            --no-fail-fast \
+            --message-format libtest-json \
+            -E "$FILTER" > smoke-results-${{ matrix.partition }}.json || { code=$?; [ "$code" -eq 100 ] || exit "$code"; }
+        env:
+          MONO_MOVE_ENV: "1"
+          NEXTEST_EXPERIMENTAL_LIBTEST_JSON: 1
+          RUST_MIN_STACK: "1073741824"
+
+      # Checked together in `smoke-parity`: one partition cannot tell a listed
+      # test that started passing from one that landed in another partition.
+      - name: Upload smoke test results
+        if: "!cancelled()"
+        uses: actions/upload-artifact@v4
+        with:
+          name: mono-move-parity-smoke-results-${{ matrix.partition }}
+          path: smoke-results-${{ matrix.partition }}.json
+          retention-days: 14
+
+      - name: Upload smoke test logs for failed and flaky tests
+        if: "!cancelled()"
+        uses: actions/upload-artifact@v4
+        with:
+          name: mono-move-parity-smoke-logs-${{ matrix.partition }}
+          include-hidden-files: true
+          path: |
+            /tmp/.tmp*
+            !/tmp/.tmp*/**/db/
+          retention-days: 14
+
+  smoke-parity:
+    needs: smoke-tests
+    # Check even when a partition went red; the two lists decide whether its
+    # failures are known.
+    if: "!cancelled() && needs.smoke-tests.result != 'skipped'"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download every partition's results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: mono-move-parity-smoke-results-*
+          path: smoke-results
+          merge-multiple: true
+      - name: Check parity
+        run: |
+          set +e
+          python3 "$PARITY" --check smoke-results/*.json 2>&1 | tee parity.txt
+          status=${PIPESTATUS[0]}
+          {
+            echo '## MonoMove parity: smoke tests'
+            echo '```'
+            cat parity.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"

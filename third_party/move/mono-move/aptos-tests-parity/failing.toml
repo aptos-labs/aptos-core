@@ -1,0 +1,1336 @@
+# Tests that run under MonoMove and fail. Anything absent from this file and from
+# skipped.toml must pass. See README.md.
+#
+# Regenerate. Download results.json from the mono-move-tests-parity workflow, or
+# produce it locally:
+#
+#   FILTER=$(python3 third_party/move/mono-move/aptos-tests-parity/check_parity.py --skip-filter)
+#   MONO_MOVE_ENV=1 RUST_MIN_STACK=1073741824 NEXTEST_EXPERIMENTAL_LIBTEST_JSON=1 \
+#     cargo nextest run --profile ci --workspace --no-fail-fast \
+#     --message-format libtest-json -E "$FILTER" > results.json
+#
+#   python3 third_party/move/mono-move/aptos-tests-parity/check_parity.py --update results.json
+
+[[test]]
+name = "aptos-dynamic-transaction-composer::aptos_dynamic_transaction_composer$tests::chained_deposit"
+note = "Scripts are not supported by MonoMove."
+
+[[test]]
+name = "aptos-dynamic-transaction-composer::aptos_dynamic_transaction_composer$tests::simple_builder"
+note = "Scripts are not supported by MonoMove."
+
+[[test]]
+name = "aptos-dynamic-transaction-composer::aptos_dynamic_transaction_composer$tests::test_module"
+note = "Scripts are not supported by MonoMove."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::access_path_test::access_path_panic"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::aggregator::test_aggregator_lifetime_lower_limit"
+note = "Aggregators V1 are not supported by MonoMove."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::aggregator::test_aggregator_lifetime_upper_limit"
+note = "Aggregators V1 are not supported by MonoMove."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::aggregator::test_aggregator_materialize_overflow"
+note = "Aggregators V1 are not supported by MonoMove."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::aggregator::test_aggregator_materialize_underflow"
+note = "Aggregators V1 are not supported by MonoMove."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::aggregator::test_aggregator_overflow"
+note = "Aggregators V1 are not supported by MonoMove."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::aggregator::test_aggregator_supply_switch::blocksplit_singletxnperblock_expects"
+note = "Aggregators V1 are not supported by MonoMove."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::aggregator::test_aggregator_supply_switch::blocksplit_splitintothree_first_len_10_second_len_12_expects"
+note = "Aggregators V1 are not supported by MonoMove."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::aggregator::test_aggregator_supply_switch::blocksplit_whole_expects"
+note = "Aggregators V1 are not supported by MonoMove."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::aggregator::test_aggregator_underflow"
+note = "Aggregators V1 are not supported by MonoMove."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::aggregator::test_aggregators_e2e::blocksplit_singletxnperblock_false_expects"
+note = "Aggregators V1 are not supported by MonoMove."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::aggregator::test_aggregators_e2e::blocksplit_singletxnperblock_true_expects"
+note = "Aggregators V1 are not supported by MonoMove."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::aggregator::test_aggregators_e2e::blocksplit_whole_false_expects"
+note = "Aggregators V1 are not supported by MonoMove."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::aggregator::test_aggregators_e2e::blocksplit_whole_true_expects"
+note = "Aggregators V1 are not supported by MonoMove."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::aggregator_v2::test_too_many_aggregators_in_a_resource::usetype_useresourcegrouptype_expects"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::aggregator_v2::test_too_many_aggregators_in_a_resource::usetype_useresourcetype_expects"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::aggregator_v2_function_values::test_function_value_captures_aggregator"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::aggregator_v2_function_values::test_function_value_captures_aggregator_is_not_storable"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::aggregator_v2_function_values::test_function_value_uses_aggregator_is_storable"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::aggregator_v2_runtime_checks::run_all_tests"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::any::test_any_with_function_values"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::attributes::test_bad_fun_attribute_in_compiled_module"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::attributes::test_bad_view_attribute_in_compiled_module"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::attributes::verify_module_events_fail_when_not_enabled"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::attributes::verify_resource_group_member_fails_when_not_enabled"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::attributes::verify_resource_groups_fail_when_not_enabled"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::bcs::test_bcs_to_bytes_execution_limit"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::bcs::test_bcs_to_bytes_value_size_metering"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::bcs::test_constant_serialized_size_dag_no_stall"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::bcs::test_from_bytes_value_node_metering"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::bcs::test_function_value_serialization"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::bcs::test_load_resource_value_node_metering"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::bcs::test_table_load_value_node_metering"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::closure_stale_generic_ability::coin_duplication_prevented_by_ability_recheck_when_revalidation_disabled"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::closure_stale_generic_ability::coin_duplication_prevented_when_revalidation_enabled"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::constructor_args::constructor_args_bad_runtime"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::cryptoalgebra::crypto_algebra_type_tag_limit_exceeded_handled"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::dependencies::exceeding_max_num_dependencies::false_false_expects"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::dependencies::exceeding_max_num_dependencies::false_true_expects"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::dependencies::exceeding_max_num_dependencies::true_false_expects"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::dependencies::exceeding_max_num_dependencies::true_true_expects"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::dependencies::test_script_with_dependencies"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::enum_upgrade_fv::enum_upgrade"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::enum_variant_tag_serialization::out_of_range_variant_tag_does_not_stall_block"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::error_map::error_map"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::error_map::error_map_unspecified_abort_code"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::fee_payer::test_account_not_exist_and_move_abort_with_fee_payer_create_account"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::fee_payer::test_account_not_exist_move_abort_with_fee_payer_out_of_gas"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::fee_payer::test_account_not_exist_with_fee_payer"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::fee_payer::test_existing_account_with_fee_payer"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::fee_payer::test_existing_account_with_fee_payer_aborts"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::function_value_depth::test_vm_value_too_deep_with_function_values"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::function_value_layout_dag::captured_layout_dag_over_cap_rejected"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::function_value_layout_dag::captured_layout_dag_under_cap_succeeds"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::function_value_serialization_restriction::closure_serialization_fails_while_flag_on"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::function_value_serialization_restriction::closure_serialization_works_while_flag_off"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::function_values::function_value_persistent"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::function_values::function_value_registry"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::fv_as_table_keys::fv_in_table"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::fv_as_table_keys::fv_in_table_with_captured_vars"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::fv_as_table_keys::fv_in_table_with_refs"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::gas_profiling::test_gas_profiling_report"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::generic_cmp::function_generic_cmp"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::generic_cmp::function_signer_cmp"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::governance_updates::alt_execution_limit_for_gov_proposals"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::governance_updates::large_transactions"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::hot_state::test_aggregator_v1_delta_write_excludes_promotion"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::hot_state::test_aggregator_v1_materialized_read_excludes_promotion"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::hot_state::test_block_promotions_cover_reads_and_exclude_writes"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::hot_state::test_config_reads_are_promoted"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::hot_state::test_exists_on_absent_resource_is_recorded"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::hot_state::test_module_reads_are_promoted"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::hot_state::test_plain_resource_read_is_promoted"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::hot_state::test_republished_module_not_promoted"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::hot_state::test_resource_group_member_read_promotes_group_key"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_maybe_initialize_aborts_when_feature_disabled"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_maybe_initialize_account_self_init_survives_key_rotation"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_maybe_initialize_flag_upgradable_to_only_once"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_maybe_initialize_no_rerun_without_upgrade"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_maybe_initialize_only_once_flag_is_immutable"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_maybe_initialize_only_once_survives_upgrade"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_maybe_initialize_reruns_after_upgrade"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_maybe_initialize_runs_on_first_deployment"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::init_module_api::init_maybe_initialize_script_caller_aborts"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::init_module_closure_store::stale_closure_memo_kept_when_timed_feature_disabled"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::init_module_closure_store::stale_closure_memo_re_resolved_after_same_txn_upgrade::eager_loading"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::init_module_closure_store::stale_closure_memo_re_resolved_after_same_txn_upgrade::lazy_loading"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::keyless_feature_gating::test_feature_gating_with_zk_off"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::keyless_feature_gating::test_feature_gating_with_zk_on"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::keyless_feature_gating::test_federated_keyless_at_jwk_addr"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::keyless_feature_gating::test_federated_keyless_override_at_0x1"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::keyless_feature_gating::test_proof_simulation"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::keyless_feature_gating::test_rotate_vk"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::large_package_publishing::large_package_object_code_deployment_basic"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::large_package_publishing::large_package_object_code_deployment_upgrade_success_compat"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::large_package_publishing::large_package_publishing_basic"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::large_package_publishing::large_package_upgrade_fail_compat"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::large_package_publishing::large_package_upgrade_fail_immutable"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::large_package_publishing::large_package_upgrade_fail_overlapping_module"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::large_package_publishing::large_package_upgrade_success_compat"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::layout_caches::test_layout_cache_successful_reads"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::lazy_natives::lazy_natives"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::legacy_bytecode_publishing::legacy_v5_module_publishing_is_gated"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::macros::test_macros"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::memory_quota::add_vec_to_table"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::memory_quota::clone_large_vectors"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::memory_quota::deeply_nested_structs"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::memory_quota::test_poc_display_recursion_overflow_thread_diff"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::memory_quota::test_poc_nested_struct_drop_overflow_thread_diff"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::metadata::test_compilation_metadata"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::metadata::test_compilation_metadata_for_script"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::metadata::test_duplicate_compilation_metadata_entries"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::metadata::test_duplicate_entries"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::metadata::test_malformed_metadata_value"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::metadata::test_unknown_metadata_key"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::mint_nft::mint_nft_e2e"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::module_event::test_event_emission_not_allowed_in_scripts"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::mono_move::dependent_transfers_block_matches_v1"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::mono_move::single_transfer_block_matches_v1"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::mono_move::transfer_to_fresh_recipient_block_matches_v1"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::move_executor_coverage::test_coverage"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::move_executor_coverage::test_function_usage_observer"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::nft_dao::test_nft_dao_txn_arguments"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::offer_rotation_capability::offer_rotation_capability_test"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::offer_signer_capability::offer_signer_capability_v2"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::orderless_proof_guards::multisig_create_with_existing_account_and_revoke_auth_key_rejected_in_orderless_txn"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::orderless_proof_guards::multisig_create_with_existing_account_rejected_in_orderless_txn"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::orderless_proof_guards::offer_rotation_capability_rejected_in_multisig_payload"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::orderless_proof_guards::offer_rotation_capability_rejected_in_orderless_txn"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::orderless_proof_guards::offer_signer_capability_rejected_in_orderless_txn"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::orderless_proof_guards::rotate_authentication_key_rejected_in_orderless_txn"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::orderless_proof_guards::rotate_authentication_key_with_rotation_capability_rejected_in_orderless_txn"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::orderless_proof_guards::upsert_ed25519_backup_key_rejected_in_orderless_txn"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::per_category_gas_limits::io_limit_reached_by_load_resource"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::public_option::test_public_option_cross_module"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::public_struct_args::test_generic_container_with_private_type_arg_rejected"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::public_struct_args::test_negative_phantom_option_package"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::public_struct_args::test_option_in_public_struct"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::public_struct_args::test_option_private_type_package"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::public_struct_args::test_pack_default_features"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::public_struct_args::test_pack_feature_disabled"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::public_struct_args::test_pair_type_params_package"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::public_structs_enums_upgrade::test_public_struct_args_feature_disabled_then_enabled"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::randomness_test_and_abort::test_and_abort_defense_is_sound_and_correct"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::randomness_test_and_abort::test_unbiasable_annotation"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::rotate_auth_key::rotate_auth_key_ed25519_to_ed25519"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::rotate_auth_key::rotate_auth_key_ed25519_to_multi_ed25519"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::rotate_auth_key::rotate_auth_key_twice"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::rotate_auth_key::rotate_auth_key_with_rotation_capability_e2e"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::scripts::test_script_with_object_parameter"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::scripts::test_script_with_signer_parameter"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::scripts::test_script_with_type_parameter"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::scripts::test_two_to_two_transfer"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::serialize_effects_determinism::cold_vs_warm_status_matches"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::simple_defi::exchange_e2e_test"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::stake::test_staking_rewards"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::state_metadata::test_metadata_tracking"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::storage_refund::test_refunds"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::string_args::huge_string_args_are_not_allowed"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::string_args::string_args_bad_length"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::string_args::string_args_bad_utf8"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::string_utils::test_function_value_formatting_in_modules::case_1"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::string_utils::test_function_value_formatting_in_scripts"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::transaction_context::test_transaction_context_entry_function_payload"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::transaction_context::test_transaction_context_multisig_payload"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_approved_gov_script_with_txn_limits_request_rejected"
+note = "MonoMove does not support transaction limits."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_delegation_pool_insufficient_stake"
+note = "MonoMove does not support transaction limits."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_delegation_pool_not_found"
+note = "MonoMove does not support transaction limits."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_delegation_pool_not_in_validator_set"
+note = "MonoMove does not support transaction limits."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_delegation_pool_zero_stake"
+note = "MonoMove does not support transaction limits."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_feature_disabled"
+note = "MonoMove does not support transaction limits."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_high_limit_txn_gas_price_too_low"
+note = "MonoMove does not support transaction limits."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_invalid_multiplier_1x"
+note = "MonoMove does not support transaction limits."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_invalid_multiplier_larger_than_100x"
+note = "MonoMove does not support transaction limits."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_multiplier_not_available"
+note = "MonoMove does not support transaction limits."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_not_delegated_voter"
+note = "MonoMove does not support transaction limits."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_not_stake_pool_owner"
+note = "MonoMove does not support transaction limits."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_sender_stake_ignored_for_fee_payer_txn"
+note = "MonoMove does not support transaction limits."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_stake_pool_owner_not_enough_stake"
+note = "MonoMove does not support transaction limits."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_stake_pool_owner_not_enough_stake_for_io"
+note = "MonoMove does not support transaction limits."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::transaction_limits::test_stake_pool_owner_not_in_validator_set"
+note = "MonoMove does not support transaction limits."
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::type_too_large::type_too_large"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::vm::encrypted_transaction_charges_decryption_surcharge"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::vm::encrypted_transaction_rejected_below_min_gas_price"
+note = "TODO"
+
+[[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::vm::failed_encrypted_transaction_increments_sequence_number"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$account_abstraction::test_ethereum_derivable_account"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$account_abstraction::test_solana_derivable_account"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$aptos_cli::validator::test_analyze_validators"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$aptos_cli::validator::test_join_and_leave_validator"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$aptos_cli::validator::test_large_total_stake"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$aptos_cli::validator::test_nodes_rewards"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$aptos_cli::validator::test_owner_create_and_delegate_flow"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$aptos_cli::validator::test_register_and_update_validator"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$aptos_cli::validator::test_show_validator_set"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$chunky_dkg::correctness::chunky_dkg_correctness"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$chunky_dkg::enable_feature::chunky_dkg_enable_feature"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$chunky_dkg::epoch_timeout::epoch_timeout_watchdog_force_ends_epoch"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$chunky_dkg::governance_recovery::chunky_dkg_stall_governance_recovery"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$chunky_dkg::shadow_mode::chunky_dkg_shadow_mode"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$chunky_dkg::shadow_mode::chunky_dkg_shadow_mode_grace_period_failpoint"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$chunky_dkg::shadow_mode::chunky_dkg_shadow_to_v1"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$chunky_dkg::stall_recovery::chunky_dkg_stall_recovery"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$chunky_dkg::with_validator_down::chunky_dkg_with_validator_down"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$client::test_basic_fault_tolerance"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$client::test_basic_restartability"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$client::test_concurrent_transfers_single_node"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$client::test_create_mint_transfer_block_metadata"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$client::test_latest_events_and_transactions"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$consensus::batch_v2_rollout::test_batch_v2_tx_rollout"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$consensus::consensus_fault_tolerance::test_changing_working_consensus"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$consensus::consensus_fault_tolerance::test_execution_retry"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$consensus::consensus_fault_tolerance::test_fault_tolerance_of_network_receive"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$consensus::consensus_fault_tolerance::test_fault_tolerance_of_network_send"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$consensus::consensus_fault_tolerance::test_faulty_votes"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$consensus::consensus_fault_tolerance::test_no_failures"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$consensus::consensus_fault_tolerance::test_ordered_only_cert"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$consensus::consensus_fault_tolerance::test_round_timeout_msg_rollout"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$consensus::optqs_fault_tolerance::test_remote_batch_read_from_block_voters"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$consensus::quorum_store_fault_tolerance::test_batch_id_on_restart_same_db"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$consensus::quorum_store_fault_tolerance::test_batch_id_on_restart_wiped_db"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$consensus::quorum_store_fault_tolerance::test_onchain_config_quorum_store_enabled_and_disabled"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$consensus::quorum_store_fault_tolerance::test_remote_batch_reads"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$consensus::quorum_store_fault_tolerance::test_swarm_with_bad_non_qs_node"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$consensus_key_rotation::consensus_key_rotation"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_fast_sync_epoch_changes"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_fullnode_restart"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_fullnode_restart_wipe"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_fullnode_sync"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_fullnode_sync_disable_quorum_store"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_fullnode_sync_disconnected"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_fullnode_sync_multiple_nodes"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_public_fullnode_sync"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_validator_restart"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_validator_restart_wipe"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$decryption::secret_share_rpc_path::secret_share_rpc_path"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$decryption::test_decryption_v1_to_v3_transition"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$decryption::test_decryption_v2_to_v3_transition"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$decryption::test_encryption_key_rotation_and_encrypted_txns"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$decryption::test_fee_payer_encrypted_transaction"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$execution::block_epilogue_upgrade_test"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$execution::fallback_test"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$full_nodes::test_full_node_basic_flow"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$fullnode::test_indexer"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$fullnode::test_internal_indexer_with_fast_sync"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$genesis::test_validator_genesis_transaction_and_db_restore_flow"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$hot_state::test_hot_state_fullnode_execution_sync"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$hot_state::test_hot_state_fullnode_output_sync"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$hot_state::test_hot_state_fullnode_restart_across_v1_boundary"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$hot_state::test_hot_state_fullnode_sync_across_v1_boundary"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$hot_state::test_hot_state_validator_restart"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$inspection_service::test_inspection_service_connection"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$jwks::jwk_consensus_basic::jwk_consensus_basic"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$jwks::jwk_consensus_per_issuer::jwk_consensus_per_issuer"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$jwks::jwk_consensus_per_key::jwk_consensus_per_key"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$jwks::jwk_consensus_provider_change_mind::jwk_consensus_provider_change_mind"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$jwks::jwk_patching"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$keyless::federated_keyless_should_fail_when_feature_flag_is_unset"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$keyless::federated_keyless_should_fail_when_fed_jwk_is_missing"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$keyless::federated_keyless_should_work_otherwise"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$keyless::test_keyless_groth16_verifies"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$keyless::test_keyless_groth16_verifies_using_rust_sdk"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$keyless::test_keyless_groth16_verifies_using_rust_sdk_from_jwt"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$keyless::test_keyless_groth16_with_bad_tw_signature"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$keyless::test_keyless_groth16_with_mauled_proof"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$keyless::test_keyless_no_extra_field_groth16_verifies"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$keyless::test_keyless_no_training_wheels_groth16_verifies"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$keyless::test_keyless_oidc_txn_verifies"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$keyless::test_keyless_oidc_txn_with_bad_jwt_sig"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$keyless::test_keyless_oidc_txn_with_expired_epk"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$keyless::test_keyless_rotate_vk"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$keyless::test_keyless_secure_test_jwk_initialized_at_genesis"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$priority_fee::test_high_gas_limit_parallel"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$priority_fee::test_high_gas_limit_sequential"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$priority_fee::test_low_gas_limit_parallel"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$priority_fee::test_low_gas_limit_sequential"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$randomness::disable_feature_0::disable_feature_0"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$randomness::disable_feature_1::disable_feature_1"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$randomness::dkg_with_validator_down::dkg_with_validator_down"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$randomness::dkg_with_validator_join_leave::dkg_with_validator_join_leave"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$randomness::e2e_basic_consumption::e2e_basic_consumption"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$randomness::e2e_correctness::randomness_correctness"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$randomness::enable_feature_0::enable_feature_0"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$randomness::enable_feature_1::enable_feature_1"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$randomness::enable_feature_2::enable_feature_2"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$randomness::entry_func_attrs::randomness_attr_000"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$randomness::optimistic_verification::optimistic_verification"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$randomness::randomness_stall_recovery::randomness_stall_recovery"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$randomness::validator_restart_during_dkg::validator_restart_during_dkg"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$rest_api::test_basic_client"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$rest_api::test_bcs"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$rest_api::test_gas_estimation_txns_limit"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$rest_api::test_view_function"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$rosetta::test_account_balance"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$rosetta::test_block"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$rosetta::test_block_transactions"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$rosetta::test_delegation_pool_operations"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$rosetta::test_invalid_transaction_gas_charged"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$rosetta::test_network"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$rosetta::test_transfer"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$slh_dsa::test_slh_dsa_feature_disabled"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$slh_dsa::test_slh_dsa_feature_enabled"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$smoke_test_environment::test_prevent_starting_nodes_twice"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_fullnode_execution_sync_epoch_changes"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_fullnode_fast_and_intelligent_sync_epoch_changes"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_fullnode_fast_sync_epoch_changes"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_fullnode_fast_sync_no_epoch_changes"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_fullnode_intelligent_sync_epoch_changes"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_fullnode_output_sync_epoch_changes"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_fullnode_output_sync_exponential_backoff"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_single_validator_reboot"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_validator_execution_sync_epoch_changes"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_validator_fast_sync_and_participate_epoch_changes"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_validator_fast_sync_exponential_backoff_epoch_changes"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_validator_intelligent_sync_epoch_changes"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_validator_output_sync_epoch_changes"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_validator_output_sync_exponential_backoff"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$state_sync::test_validator_sync_and_participate_epoch_changes"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$storage::test_db_restart"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$storage::test_db_restore"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$sui_derivable_account::test_sui_derivable_account"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$test_smoke_tests::test_aptos_node_after_get_bin"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$transaction_filter::test_consensus_block_filter"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$transaction_filter::test_mempool_transaction_filter"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$transaction_filter::test_quorum_store_batch_filter"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$transaction_tracing::test_transaction_tracing"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$txn_broadcast::test_txn_broadcast"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$txn_emitter::test_txn_emmitter_low_funds"
+note = "TODO"
+
+[[test]]
+name = "smoke-test::smoke_test$txn_emitter::test_txn_emmitter_with_high_pending_latency"
+note = "TODO"

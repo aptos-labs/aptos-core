@@ -35,7 +35,7 @@ use aptos_types::{
     },
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo, BlockError,
-        BlockExecutionResult, BlockOutput, TransactionOutput, TransactionStatus,
+        BlockExecutionResult, BlockOutput, Transaction, TransactionOutput, TransactionStatus,
     },
     write_set::{TransactionWrite, WriteOp},
 };
@@ -423,12 +423,22 @@ impl<
             .try_lock(&state_view, transaction_slice_metadata)
             .map_err(|status| BlockError::new(status.to_string()))?;
 
+        // MonoMove discards a genesis transaction, and a discard outside a block is
+        // a hard error. Genesis is always executed alone, at the start of a chunk.
+        // TODO(completeness): Support GenesisTransaction on MonoMove.
+        let is_genesis = num_txns > 0
+            && matches!(
+                signature_verified_block.get_txn(0).borrow_into_inner(),
+                Transaction::GenesisTransaction(_)
+            );
+
         // TODO(correctness): Remove when parallel execution is supported.
         let mut config = config;
-        let is_mono_move = module_cache_manager_guard
-            .environment()
-            .features()
-            .is_mono_move_enabled();
+        let is_mono_move = !is_genesis
+            && module_cache_manager_guard
+                .environment()
+                .features()
+                .is_mono_move_enabled();
         if is_mono_move {
             config.local.concurrency_level = 1;
         }
