@@ -30,7 +30,7 @@ fun pack_nested() {
   code:
     0: VecPack [16] <- [[0], [0]] (size=1, desc=0) @2
     1: VecPack [24] <- [[1]] (size=1, desc=0) @4
-    2: VecPack [8] <- [[16], [24]] (size=8, desc=2) @5
+    2: VecPack [8] <- [[16], [24]] (size=8, desc=3) @5
     3: SlotBorrow [32] <- &[8] @7
     4: StoreImm8 [48] <- #0 @8
     5: VecBorrow [56] <- &[32][[48]] (elem_size=8) @9

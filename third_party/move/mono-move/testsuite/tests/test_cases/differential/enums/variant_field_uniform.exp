@@ -5,7 +5,7 @@ fun read_value() {
   frame_data_size: 48
   entry_gas: 95
   code:
-    0: EnumNew [8] desc=2 tag #0 @1
+    0: EnumNew [8] desc=3 tag #0 @1
     1: HeapMoveTo8 [8]+8 <- [0] @1
     2: SlotBorrow [16] <- &[8] @3
     3: HeapReadOffset(8) [32] <- (*[16]).8 @4
@@ -20,7 +20,7 @@ fun run_computed() {
   entry_gas: 211
   code:
     0: StoreImm8 [24] <- #0 @1
-    1: EnumNew [16] desc=2 tag #1 @2
+    1: EnumNew [16] desc=3 tag #1 @2
     2: HeapMoveTo8 [16]+8 <- [0] @2
     3: HeapMoveTo8 [16]+16 <- [24] @2
     4: SlotBorrow [80] <- &[16] @4
@@ -38,7 +38,7 @@ fun run_simple() {
   frame_data_size: 56
   entry_gas: 183
   code:
-    0: EnumNew [16] desc=2 tag #0 @1
+    0: EnumNew [16] desc=3 tag #0 @1
     1: HeapMoveTo8 [16]+8 <- [0] @1
     2: SlotBorrow [80] <- &[16] @3
     3: Move8 [96] <- [8] @5

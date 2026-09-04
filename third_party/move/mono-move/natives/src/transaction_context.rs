@@ -3,11 +3,13 @@
 
 //! Natives for the `transaction_context` module, plus the extension backing them.
 
-use crate::{
-    address_derivation::{auid_address, table_handle},
-    monomorphic_natives, NativeEntry,
+use crate::{monomorphic_natives, NativeEntry};
+use aptos_types::{
+    error,
+    transaction::{
+        authenticator::AuthenticationKey, user_transaction_context::UserTransactionContext,
+    },
 };
-use aptos_types::{error, transaction::user_transaction_context::UserTransactionContext};
 use mono_move_core::{
     native::{
         NativeContext, NativeContextFamily, NativeExtension, NativeStatus, TableHandle, VMValue,
@@ -15,6 +17,22 @@ use mono_move_core::{
     VMResult,
 };
 use move_core_types::account_address::AccountAddress;
+use sha3::{Digest, Sha3_256};
+
+/// Derives an AUID address: `sha3_256(txn_hash || auid_counter_le ||
+/// DeriveAuid)`.
+fn auid_address(txn_hash: &[u8], auid_counter: u64) -> AccountAddress {
+    AuthenticationKey::auid(txn_hash.to_vec(), auid_counter).account_address()
+}
+
+/// Derives a table handle: `sha3_256(txn_hash || table_count_be_u32)`. Unlike
+/// the AUID derivation, no scheme byte is appended.
+fn table_handle(txn_hash: &[u8], table_count: u32) -> TableHandle {
+    let mut hasher = Sha3_256::new();
+    hasher.update(txn_hash);
+    hasher.update(table_count.to_be_bytes());
+    TableHandle::new(AccountAddress::new(hasher.finalize().into()))
+}
 
 /// Carries transaction context information, such as transaction hashes or chain
 /// ID.
@@ -439,4 +457,18 @@ pub fn make_all_transaction_context_natives<F: NativeContextFamily>() -> Vec<Nat
             native_monotonically_increasing_counter_for_test_only
         ),
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn auid_known_answer() {
+        let addr = auid_address(&[0u8; 32], 1);
+        assert_eq!(
+            addr.to_hex_literal(),
+            "0x777e34c52ecee7cd877e439f7cbf8f5a2394c369855c7bb8a140fced68b3aed6"
+        );
+    }
 }
