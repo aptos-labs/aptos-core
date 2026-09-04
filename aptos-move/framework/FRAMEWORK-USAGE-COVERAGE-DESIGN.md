@@ -422,15 +422,14 @@ versions before tasks are created, and the resolved range is included in the
 manifest.
 
 The replay scheduler is extended with a framework-usage worker mode while
-retaining the same archive snapshot provisioning and cleanup behavior. The CI
-workflow writes result shards to a run-specific prefix in the fixed
-`aptos-framework-usage-reports` bucket. Before scheduling workers, it requires
-that the bucket enforce public access prevention and uniform bucket-level
-access. Object names use the requested range and workflow run identity. The
-worker must successfully upload the shard before its Kubernetes job is
-considered successful.
+retaining the same archive snapshot provisioning and cleanup behavior.
+Completed workers delimit their bounded result shard in their Kubernetes pod
+logs; the GitHub runner extracts and validates each shard before merging. No
+GCS bucket is used for framework-usage results. To keep log retrieval bounded,
+each collection run is limited to 10,000 transactions; larger ranges must be
+split across runs.
 
-After every task succeeds, the GitHub runner downloads and merges the shards.
+After every task succeeds, the GitHub runner extracts and merges the shards.
 The merge step rejects:
 
 - incompatible schema versions
@@ -457,9 +456,8 @@ Each publication also updates stable `framework-usage/<network>/index.html` and
 `framework-usage/<network>/framework-usage.json` URLs. The merged JSON records
 its UTC generation timestamp, which the HTML displays in its header.
 
-The result bucket should have a lifecycle policy. CI cleanup always removes
-pods and temporary PVCs, and final reports remain available through the private
-Pages site.
+CI cleanup always removes pods and temporary PVCs, and final reports remain
+available through the private Pages site.
 
 ## Report Interpretation
 
