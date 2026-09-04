@@ -26,6 +26,7 @@ use rayon::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashSet,
     fmt::{Display, Formatter},
     sync::Arc,
     vec::IntoIter,
@@ -347,8 +348,30 @@ impl ExecutionPoolWindow {
     }
 
     /// Verifies the execution pool window contents and returns an error if the data is invalid
-    pub fn verify_window_contents(&self, _expected_window_size: u64) -> Result<(), Error> {
-        Ok(()) // TODO: Implement this method!
+    pub fn verify_window_contents(&self, expected_window_size: u64) -> Result<(), Error> {
+        let expected_window_size = usize::try_from(expected_window_size).map_err(|error| {
+            Error::InvalidMessageError(format!(
+                "The expected execution pool window size cannot be represented! Error: {:?}",
+                error
+            ))
+        })?;
+
+        if self.block_ids.len() != expected_window_size {
+            return Err(Error::InvalidMessageError(format!(
+                "Execution pool window size does not match the expected size! Expected: {:?}, Received: {:?}",
+                expected_window_size,
+                self.block_ids.len()
+            )));
+        }
+
+        let unique_block_ids: HashSet<_> = self.block_ids.iter().collect();
+        if unique_block_ids.len() != self.block_ids.len() {
+            return Err(Error::InvalidMessageError(
+                "Execution pool window contains duplicate block IDs!".to_string(),
+            ));
+        }
+
+        Ok(())
     }
 }
 
@@ -1729,6 +1752,40 @@ mod test {
 
         // Verify the ordered block and ensure it passes
         ordered_block.verify_ordered_blocks().unwrap();
+    }
+
+    #[test]
+    fn test_verify_execution_pool_window_contents() {
+        // Verify that an empty window is valid when an empty window is expected
+        let execution_pool_window = ExecutionPoolWindow::new(vec![]);
+        assert_ok!(execution_pool_window.verify_window_contents(0));
+
+        // Create a valid execution pool window
+        let block_ids = vec![
+            HashValue::random(),
+            HashValue::random(),
+            HashValue::random(),
+        ];
+        let execution_pool_window = ExecutionPoolWindow::new(block_ids);
+
+        // Verify that a window with the expected number of unique block IDs is valid
+        assert_ok!(execution_pool_window.verify_window_contents(3));
+
+        // Verify that undersized and oversized windows are invalid
+        let error = execution_pool_window.verify_window_contents(4).unwrap_err();
+        assert_matches!(error, Error::InvalidMessageError(_));
+        let error = execution_pool_window.verify_window_contents(2).unwrap_err();
+        assert_matches!(error, Error::InvalidMessageError(_));
+
+        // Verify that duplicate block IDs are invalid
+        let duplicate_block_id = HashValue::random();
+        let execution_pool_window = ExecutionPoolWindow::new(vec![
+            duplicate_block_id,
+            HashValue::random(),
+            duplicate_block_id,
+        ]);
+        let error = execution_pool_window.verify_window_contents(3).unwrap_err();
+        assert_matches!(error, Error::InvalidMessageError(_));
     }
 
     #[test]
