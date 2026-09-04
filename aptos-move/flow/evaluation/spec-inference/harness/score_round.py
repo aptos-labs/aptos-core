@@ -21,7 +21,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from .artifacts import canonical_json, load_object, sha256_file, write_json
+from .artifacts import canonical_json, load_object, sha256_file, tree_hash, write_json
 from .compatibility import changed_stages, tool_executables
 from .config import ExperimentConfig
 from .mutants import NO_MUTANTS, overlapping_mutations, score_mutants
@@ -52,6 +52,20 @@ def _require_scoring_apparatus_agrees(
                 f"{expected_config} but scoring was given {actual_config}: a "
                 "strict-success result must be measured by the apparatus that "
                 "produced the run"
+            )
+    # The scoring code is part of the apparatus, not a neutral observer of it:
+    # how a mutation is applied, when a result counts as killed, and what
+    # `strict_success` requires all live in this tree. A run pins the harness it
+    # ran under for the same reason, and scoring reads the same pin.
+    expected_harness = record.get("controller_harness_sha256")
+    if expected_harness is not None:
+        actual_harness = tree_hash(Path(__file__).resolve().parent)
+        if actual_harness != expected_harness:
+            raise ValueError(
+                f"harness changed since run {run_id} was recorded: expected "
+                f"{expected_harness}, scoring with {actual_harness}; how a "
+                "mutation is applied and classified is part of what a "
+                "strict-success result claims"
             )
     expected_stages = record.get("stage_executables")
     if expected_stages:

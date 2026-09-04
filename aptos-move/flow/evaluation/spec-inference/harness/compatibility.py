@@ -221,6 +221,10 @@ def tool_executables(config: ExperimentConfig) -> dict[str, dict[str, Any]]:
         ("wp_inference", config.inference_command),
         ("enriched_compile", config.compile_command),
         ("prover", config.prove_command),
+        # The judge that decides `operational_success`, and therefore which
+        # runs are scored at all. The configuration digest binds the command's
+        # words; this binds what those words execute.
+        ("check_candidate", config.check_candidate_command),
     ):
         # A stage may be unconfigured, in which case there is no executable to
         # identify -- rather than an executable that failed to resolve.

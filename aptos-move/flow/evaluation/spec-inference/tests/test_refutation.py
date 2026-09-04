@@ -892,6 +892,21 @@ class ScoringApparatusTest(unittest.TestCase):
         self.assertIn("stage executable(s) changed", message)
         self.assertIn("z3", message)
 
+    def test_a_modified_harness_cannot_score_the_run(self) -> None:
+        # The scoring code is part of the apparatus: how a mutation is applied,
+        # when a result counts as killed, and what strict success requires all
+        # live in this tree.
+        message = self._score({"controller_harness_sha256": "f" * 64})
+        self.assertIn("harness changed since run", message)
+
+    def test_the_acceptance_check_is_part_of_the_apparatus(self) -> None:
+        # `check_candidate_command` decides `operational_success`, and so which
+        # runs are scored at all. The configuration digest binds the command's
+        # words; this binds what those words execute.
+        from harness.compatibility import tool_executables
+
+        self.assertIn("check_candidate", tool_executables(self._config()))
+
     def test_a_run_that_pinned_nothing_is_still_scorable(self) -> None:
         # Rounds recorded before the apparatus was pinned stay scorable, as
         # they stay runnable on the controller side.
@@ -1026,6 +1041,7 @@ class ToolchainDigestTest(unittest.TestCase):
             config = mock.Mock(
                 compile_command=["python3", str(wrapper)],
                 inference_command=[], prove_command=[],
+                check_candidate_command=[],
             )
             first = tool_executables(config)["compile"]
             self.assertIn(str(wrapper), first.get("arguments", {}))
@@ -1043,7 +1059,8 @@ class ToolchainDigestTest(unittest.TestCase):
             boogie = Path(temporary) / "boogie"
             boogie.write_text("#!/bin/sh\n", encoding="utf-8")
             config = mock.Mock(
-                compile_command=[], inference_command=[], prove_command=[]
+                compile_command=[], inference_command=[], prove_command=[],
+                check_candidate_command=[],
             )
             with mock.patch.dict("os.environ", {"BOOGIE_EXE": str(boogie)}):
                 recorded = tool_executables(config)
