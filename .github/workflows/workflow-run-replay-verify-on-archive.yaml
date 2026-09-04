@@ -27,7 +27,7 @@ on:
       END_TIME:
         required: false
         type: string
-        description: 'Optional end time. Same formats as START_TIME. Mutually exclusive with END_VERSION.'
+        description: "Optional end time. Same formats as START_TIME. Mutually exclusive with END_VERSION."
       DRY_RUN:
         required: false
         type: boolean
@@ -81,7 +81,7 @@ on:
       END_TIME:
         required: false
         type: string
-        description: 'Optional end time. Same formats as START_TIME. Mutually exclusive with END_VERSION.'
+        description: "Optional end time. Same formats as START_TIME. Mutually exclusive with END_VERSION."
       DRY_RUN:
         required: false
         type: boolean
@@ -186,7 +186,7 @@ jobs:
           create_credentials_file: true
 
       # This is required since we need to switch from aptos-ci to aptos-devinfra-0
-      - name: Setup credentials  
+      - name: Setup credentials
         run: |
           echo "GOOGLE_APPLICATION_CREDENTIALS=${{ steps.auth.outputs.credentials_file_path }}" >> $GITHUB_ENV
           echo "CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE=${{ steps.auth.outputs.credentials_file_path }}" >> $GITHUB_ENV 
