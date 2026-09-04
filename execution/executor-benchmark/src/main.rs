@@ -454,8 +454,8 @@ enum Command {
 
         /// Generate the blocks, write them here, and exit without executing.
         /// Leaves --checkpoint-dir holding the initialized DB the blocks were
-        /// generated against; pass that as --data-dir when replaying. Feature
-        /// flips are skipped, since each replay applies its own.
+        /// generated against; pass that as --data-dir when replaying. No feature
+        /// flip is applied, since each replay applies its own.
         #[clap(long, value_parser, conflicts_with = "replay_blocks")]
         dump_blocks: Option<PathBuf>,
 
@@ -543,8 +543,8 @@ where
             replay_blocks,
         } => {
             let block_source = match (dump_blocks, replay_blocks) {
-                (Some(path), None) => BlockSource::Record(path),
-                (None, Some(path)) => BlockSource::Replay(path),
+                (Some(blocks_path), None) => BlockSource::Record { blocks_path },
+                (None, Some(blocks_path)) => BlockSource::Replay { blocks_path },
                 (None, None) => BlockSource::Generate,
                 (Some(_), Some(_)) => unreachable!("clap rejects both"),
             };

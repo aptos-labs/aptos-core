@@ -5,13 +5,10 @@
 
 """Calibrated speedup bands for the mono-move e2e performance job.
 
-The calibrated quantity is a speedup ratio -- MonoMove throughput over legacy
-MoveVM throughput on the same recorded blocks -- not an absolute TPS. Machine
-speed cancels out of a ratio, so these numbers stay meaningful across runner
-changes in a way absolute TPS does not.
-
-Imported by run_e2e_perf_test.py for `speedup_band` and `load_calibration`, and
-run directly to recalibrate.
+The calibrated quantity is a speedup ratio -- MonoMove throughput over V1 MoveVM
+throughput on the same recorded blocks -- not an absolute TPS. Machine speed
+cancels out of a ratio, so these numbers stay meaningful across runner changes in
+a way absolute TPS does not.
 """
 
 import argparse
@@ -19,6 +16,7 @@ import datetime
 import json
 import os
 import re
+import statistics
 from collections import defaultdict
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -53,8 +51,7 @@ def speedup_band(median_speedup, num_samples, lowest_over_median, highest_over_m
     """Band a new speedup must fall in to count as unchanged.
 
     Widens the observed spread by a factor that shrinks as samples accumulate, so
-    a thinly sampled workload gets a forgiving band. Same formula as `tps_band` in
-    testsuite/single_node_performance_calibration.py, applied to a ratio.
+    a thinly sampled workload gets a forgiving band.
     """
     widen = 1 + 10.0 / num_samples
     slack = 1.0 / num_samples
@@ -137,24 +134,16 @@ def query_humio(query_string, time_interval):
 
 
 def humio_query(branch):
-    if branch is not None:
-        prefix = f"""
+    prefix = f"""
         github.job.name = "{JOB_NAME}"
-        | github.workflow.head_branch = "{branch}"
-        | "{GREP_KEY}"
-        | parseJson(message)
-        """
-    else:
-        prefix = f"""
-        github.job.name = "{JOB_NAME}"
-        | github.workflow.head_branch = "main"
+        | github.workflow.head_branch = "{branch or "main"}"
         | "{GREP_KEY}"
         | parseJson(message)
         """
     return (
         prefix
         + """
-        | groupBy([workload, metric, code_perf_version], function=[count(as="num_samples"), min(speedup, as="min_speedup"), max(speedup, as="max_speedup"), percentile(field=speedup, accuracy=0.001, percentiles=[50])])
+        | groupBy([workload, metric], function=[count(as="num_samples"), min(speedup, as="min_speedup"), max(speedup, as="max_speedup"), percentile(field=speedup, accuracy=0.001, percentiles=[50])])
         | lowest_over_median := min_speedup / _50
         | highest_over_median := max_speedup / _50
         | format("%.3f", field=_50, as="median_speedup")
@@ -206,15 +195,14 @@ def rows_from_jsonl(paths):
 
     rows = []
     for (workload, metric), values in sorted(samples.items()):
-        values.sort()
-        median = values[len(values) // 2]
+        median = statistics.median(values)
         rows.append(
             {
                 "workload": workload,
                 "metric": metric,
                 "num_samples": str(len(values)),
-                "lowest_over_median": f"{values[0] / median:.3f}",
-                "highest_over_median": f"{values[-1] / median:.3f}",
+                "lowest_over_median": f"{min(values) / median:.3f}",
+                "highest_over_median": f"{max(values) / median:.3f}",
                 "median_speedup": f"{median:.3f}",
             }
         )
@@ -227,10 +215,10 @@ def changelog_path(tsv_path):
 
 def changelog_header():
     return (
-        "# mono-move e2e performance calibration log\n\n"
+        "# MonoMove end-to-end performance calibration log\n\n"
         "Recalibration history, newest first. Each entry lists the workloads whose "
         "calibrated speedup drifted out of band, as `old -> new`; new rows show `new`. "
-        "A speedup is MonoMove throughput over legacy MoveVM throughput on the same "
+        "A speedup is MonoMove throughput over V1 MoveVM throughput on the same "
         "recorded blocks, so a number above 1.00x means MonoMove is faster.\n"
     )
 
@@ -280,23 +268,37 @@ def update_changelog(tsv_path, triggers, unparseable):
         print(f"Updated {path}")
 
 
+def stored_cells(key, row):
+    """A row already in the .tsv, back in column order."""
+    return [
+        key[0],
+        key[1],
+        str(row["num_samples"]),
+        f"{row['lowest_over_median']:.3f}",
+        f"{row['highest_over_median']:.3f}",
+        f"{row['median_speedup']:.3f}",
+    ]
+
+
 def write_tsv(path, rows, keep_old, existing):
+    """Rewrite the calibration, merging fresh rows over the stored ones.
+
+    A row the query did not return keeps its stored value. A workload that
+    failed, or was filtered out, for the whole query window must not lose its
+    calibration and come back uncalibrated.
+
+    Sorted by key, so a recalibration diff shows only what moved.
+    """
+    merged = {key: stored_cells(key, row) for key, row in existing.items()}
+    for row in rows:
+        key = (row["workload"], row["metric"])
+        if key not in keep_old:
+            merged[key] = [row[c] for c in COLUMNS]
+
     with open(path, "w") as f:
         f.write("# " + "  ".join(COLUMNS) + "\n")
-        for row in rows:
-            key = (row["workload"], row["metric"])
-            if key in keep_old:
-                cells = [
-                    key[0],
-                    key[1],
-                    str(existing[key]["num_samples"]),
-                    f"{existing[key]['lowest_over_median']:.3f}",
-                    f"{existing[key]['highest_over_median']:.3f}",
-                    f"{existing[key]['median_speedup']:.3f}",
-                ]
-            else:
-                cells = [row[c] for c in COLUMNS]
-            f.write("\t".join(cells) + "\n")
+        for key in sorted(merged):
+            f.write("\t".join(merged[key]) + "\n")
     print(f"Written to {path}")
 
 

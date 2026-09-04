@@ -1,10 +1,6 @@
 name: "calibrate-mono-move-e2e-perf"
 
 on:
-  # Dispatch only for now. mono-move-e2e-perf is report-only, so it has no
-  # failure to trigger on. Add a `workflow_run: [completed]` failure trigger,
-  # mirroring calibrate-execution-performance.yaml, when the first workload
-  # flips to blocking=True.
   workflow_dispatch:
     inputs:
       branch:
@@ -38,10 +34,14 @@ jobs:
       - name: Run mono-move e2e performance calibration
         env:
           HUMIO_READ_TOKEN: ${{ secrets.HUMIO_READ_TOKEN }}
+          # Passed through the environment, not interpolated into the script, so
+          # a dispatch cannot put shell syntax in front of the token.
+          BRANCH: ${{ inputs.branch }}
+          TIME_INTERVAL: ${{ inputs.time-interval || '60h' }}
         run: |
-          python3 testsuite/mono_move/e2e-perf/calibrate_e2e_perf_test.py \
-            ${{ inputs.branch && format('--branch {0}', inputs.branch) || '' }} \
-            --time-interval "${{ inputs.time-interval || '60h' }}"
+          python3 third_party/move/mono-move/testsuite/e2e-perf/calibrate_e2e_perf_test.py \
+            ${BRANCH:+--branch "$BRANCH"} \
+            --time-interval "$TIME_INTERVAL"
 
       - name: Create Pull Request
         id: create-pr
@@ -55,8 +55,8 @@ jobs:
             Auto-generated calibration update for the mono-move e2e performance job.
 
             Updates:
-            - `testsuite/mono_move/e2e-perf/e2e_perf_speedup.tsv`
-            - `testsuite/mono_move/e2e-perf/e2e_perf_speedup_changelog.md`
+            - `third_party/move/mono-move/testsuite/e2e-perf/e2e_perf_speedup.tsv`
+            - `third_party/move/mono-move/testsuite/e2e-perf/e2e_perf_speedup_changelog.md`
 
             The changelog entry shows each workload's speedup as `old -> new`, so the
             diff is readable without opening the .tsv.

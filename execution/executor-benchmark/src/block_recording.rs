@@ -8,9 +8,33 @@
 //! produce different transaction streams. Recording one run and replaying it
 //! removes that difference.
 //!
-//! Only user transactions are recorded. Block metadata carries an epoch and a
-//! timestamp that go stale as soon as a replay commits anything, so replay mints
-//! a fresh metadata transaction per block from the target DB.
+//! # The two directories
+//!
+//! Every benchmark run takes a `source_dir` (`--data-dir`) and a
+//! `checkpoint_dir` (`--checkpoint-dir`). The run copies the DB in `source_dir`
+//! into `checkpoint_dir` and works on the copy, so `source_dir` is left
+//! untouched and can be reused by the next run.
+//!
+//! Recording and replaying chain those two directories:
+//!
+//! 1. A recording run reads the warmup DB from `source_dir`, initializes the
+//!    workload into `checkpoint_dir`, writes the generated blocks to a file, and
+//!    stops. Nothing is executed and no feature flag is flipped, so
+//!    `checkpoint_dir` holds exactly the state the blocks were generated
+//!    against.
+//! 2. Each replay run passes that `checkpoint_dir` as its own `source_dir`. The
+//!    workload is already initialized there, so the replay only flips its
+//!    feature flags and executes the recorded blocks against its own fresh copy.
+//!
+//! Replays are therefore independent of each other: each one starts from the
+//! same recorded base and throws its copy away.
+//!
+//! # What is recorded
+//!
+//! The user transactions of each block. Block metadata is dropped and re-minted
+//! per block at replay: the recorded one carries the epoch and timestamp of the
+//! recording, and the replay's own feature flip moves both. Anything else in a
+//! block is rejected at record time rather than dropped.
 
 use anyhow::{bail, Result};
 use aptos_logger::info;
@@ -97,8 +121,8 @@ impl RecordedBlocks {
                 "recorded blocks do not match the DB being replayed against: \
                  recorded (version {}, base_usecs {}, epoch {}), \
                  found (version {}, base_usecs {}, epoch {}). \
-                 The replay must start from the same checkpoint the recording did, \
-                 and apply the same number of feature flips.",
+                 A replay has to start from the DB the recording left behind, \
+                 and check this before applying its own feature flip.",
                 h.version,
                 h.base_usecs,
                 h.epoch,
@@ -111,19 +135,24 @@ impl RecordedBlocks {
     }
 }
 
-/// Keeps the user transactions of each block, dropping block metadata and any
-/// other non-user transaction.
+/// Strips the block metadata transaction, which a replay mints fresh against
+/// its own DB.
+///
+/// Panics on any other non-user transaction. A generated block holds nothing
+/// else today, and a new kind turning up needs a decision on how a replay
+/// reproduces it rather than a silent drop.
 pub fn user_transactions(block: Vec<Transaction>) -> Vec<SignedTransaction> {
     block
         .into_iter()
         .filter_map(|txn| match txn {
             Transaction::UserTransaction(txn) => Some(txn),
-            Transaction::GenesisTransaction(_)
-            | Transaction::BlockMetadata(_)
-            | Transaction::BlockMetadataExt(_)
+            Transaction::BlockMetadata(_) | Transaction::BlockMetadataExt(_) => None,
+            other @ (Transaction::GenesisTransaction(_)
             | Transaction::StateCheckpoint(_)
             | Transaction::ValidatorTransaction(_)
-            | Transaction::BlockEpilogue(_) => None,
+            | Transaction::BlockEpilogue(_)) => {
+                panic!("cannot record a {} transaction", other.type_name())
+            },
         })
         .collect()
 }

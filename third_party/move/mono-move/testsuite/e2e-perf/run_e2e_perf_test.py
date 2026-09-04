@@ -3,7 +3,7 @@
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
-"""End-to-end performance comparison of MonoMove against the legacy MoveVM.
+"""End-to-end performance comparison of MonoMove against the V1 MoveVM.
 
 Both VMs execute byte-identical blocks. Each workload is generated once and
 written to a file (`--dump-blocks`), then replayed (`--replay-blocks`) once per
@@ -13,22 +13,23 @@ difference in speed.
 
 The two replays differ only in a feature flip applied after workload
 initialization: MonoMove gets `--enable-feature-after-init ENABLE_MONO_MOVE`,
-legacy gets `--disable-feature-after-init`. Both run the same governance script
-and the same epoch change, so the only difference is the flag's value.
+V1 gets `--disable-feature-after-init`. Both run the same governance script and
+the same epoch change, so the only difference is the flag's value.
 
-Initialization always runs on the legacy VM. MonoMove discards module-publish
+Initialization always runs on the V1 VM. MonoMove discards module-publish
 payloads, so a workload that publishes modules could not be set up under it.
 
 Run locally:
 
     REPEATS=1 NUM_BLOCKS_PER_TEST=3 NUM_INIT_ACCOUNTS=20000 \\
       ONLY_WORKLOADS=no-op,apt-fa-transfer \\
-      python3 testsuite/mono_move/e2e-perf/run_e2e_perf_test.py
+      python3 third_party/move/mono-move/testsuite/e2e-perf/run_e2e_perf_test.py
 """
 
 import json
 import os
 import re
+import shutil
 import statistics
 import sys
 import tempfile
@@ -46,15 +47,18 @@ from calibrate_e2e_perf_test import (
     speedup_band,
 )
 
-# Bump after a change that moves the numbers, so runs on top of this commit are
-# easy to separate from older ones in Humio.
-CODE_PERF_VERSION = "v1"
-
 MONO_MOVE_FLAG = "ENABLE_MONO_MOVE"
 
-# A workload whose measurements spread wider than this under either VM is
-# reported as noisy and can never be a regression.
-NOISY_SPREAD = 0.10
+# A workload whose repeats range wider than this under either VM is reported as
+# noisy and can never be a regression.
+MAX_DEVIATION = 0.10
+
+# Under SELF_COMPARE both sides run V1 over identical bytes, so every ratio
+# should come out at 1.00x and anything past this is the harness's own error.
+# Much tighter than MAX_DEVIATION: that one bounds the range within one VM's
+# repeats, while this one bounds a difference that should not exist at all. The
+# measured floor is under 1%, so this still leaves room for a noisier runner.
+SELF_COMPARE_MAX_DEVIATION = 0.03
 
 # The throughput metrics the verdict rests on. Only the two that measure Move
 # execution itself. Everything else in the pipeline is disk bound and swings by
@@ -75,24 +79,57 @@ NEUTRAL_STAGE_HIGH = 1.25
 class Workload:
     """One transaction type, measured on both VMs.
 
+    `description` is rendered into the report, so a reader does not have to go
+    look up what a workload name means.
+
     `blocking` is False while a workload's band is still being established: a
     regression is reported but does not fail the job.
     """
 
     name: str
     block_size: int
+    description: str
     blocking: bool = False
 
 
 WORKLOADS = [
-    Workload("no-op", block_size=1000),
-    Workload("apt-fa-transfer", block_size=500),
-    Workload("account-generation", block_size=500),
-    Workload("modify-global-resource", block_size=500),
-    Workload("batch100-transfer", block_size=100),
-    Workload("token-v2-ambassador-mint", block_size=500),
-    Workload("liquidity-pool-swap", block_size=500),
-    Workload("order-book-no-matches1-market", block_size=500),
+    Workload(
+        "no-op",
+        block_size=1000,
+        description="Entry function with an empty body. Full transaction "
+        "overhead, no Move computation and no application state.",
+    ),
+    Workload(
+        "apt-fa-transfer",
+        block_size=500,
+        description="One APT fungible asset transfer per transaction.",
+    ),
+    Workload(
+        "account-generation",
+        block_size=500,
+        description="Creates one new account per transaction.",
+    ),
+    Workload(
+        "batch100-transfer",
+        block_size=100,
+        description="100 APT transfers in one transaction.",
+    ),
+    Workload(
+        "token-v2-ambassador-mint",
+        block_size=500,
+        description="Mints a Token v2 ambassador NFT.",
+    ),
+    Workload(
+        "liquidity-pool-swap",
+        block_size=500,
+        description="One swap against a liquidity pool per transaction.",
+    ),
+    Workload(
+        "order-book-no-matches1-market",
+        block_size=500,
+        description="Places orders on a single market whose buy and sell prices "
+        "never overlap, so every order rests in the book.",
+    ),
 ]
 
 
@@ -104,7 +141,6 @@ class RunStats:
     # Per-stage throughput, from the "(component TPS: X)" the benchmark prints.
     stage_tps: dict
     output_bytes_per_txn: float
-    output_bytes_per_sec: float
     mono_move_enabled: bool
 
     def metric(self, name):
@@ -112,15 +148,13 @@ class RunStats:
             return self.tps
         if name == "output_bytes_per_txn":
             return self.output_bytes_per_txn
-        if name == "output_bytes_per_sec":
-            return self.output_bytes_per_sec
         return self.stage_tps[name]
 
 
 @dataclass
 class WorkloadResult:
     workload: Workload
-    legacy_runs: list = field(default_factory=list)
+    v1_runs: list = field(default_factory=list)
     mono_runs: list = field(default_factory=list)
     speedup: dict = field(default_factory=dict)
     # Per metric, the wider of the two VMs' (max - min) / median.
@@ -221,9 +255,6 @@ NUMBER = r"(\d+\.?\d*)"
 def extract_run_stats(output):
     """Parse the "Overall" measurement block the benchmark prints at the end."""
     tps = float(get_only(re.findall(r"Overall TPS: " + NUMBER + r" txn/s", output), "TPS"))
-    output_bps = float(
-        get_only(re.findall(r"Overall output: " + NUMBER + r" bytes/s", output), "bytes/s")
-    )
     output_bpt = float(
         get_only(
             re.findall(r"Overall output: " + NUMBER + r" bytes/txn", output), "bytes/txn"
@@ -259,7 +290,6 @@ def extract_run_stats(output):
         tps=tps,
         stage_tps=stage_tps,
         output_bytes_per_txn=output_bpt,
-        output_bytes_per_sec=output_bps,
         mono_move_enabled=mono_move_was_enabled(output),
     )
 
@@ -267,8 +297,8 @@ def extract_run_stats(output):
 def mono_move_was_enabled(output):
     """Whether the run's post-init flip turned MonoMove on.
 
-    An unapplied flag would give a legacy-versus-legacy comparison reporting a
-    flat 1.00x, which looks exactly like "MonoMove is no faster".
+    An unapplied flag would give a V1-versus-V1 comparison reporting a flat
+    1.00x, which looks exactly like "MonoMove is no faster".
     """
     matches = re.findall(
         r"Feature flag overrides after init: enable=\[([^\]]*)\] disable=\[([^\]]*)\]",
@@ -293,7 +323,6 @@ METRICS = [
     "commit",
     "sigver",
     "output_bytes_per_txn",
-    "output_bytes_per_sec",
 ]
 
 
@@ -306,7 +335,7 @@ def summarize(runs, metric):
 
 def verdict_for(workload, speedup, spread, calibration):
     """Classify the execution speedup against the workload's calibrated band."""
-    if any(spread[m] > NOISY_SPREAD for m in VERDICT_METRICS):
+    if any(spread[m] > MAX_DEVIATION for m in VERDICT_METRICS):
         return "noisy"
 
     row = calibration.get((workload.name, "execution"))
@@ -382,18 +411,29 @@ def replay(workload, recorded_db_dir, checkpoint_dir, blocks_path, mono):
     return extract_run_stats(output)
 
 
+def workload_dirs(workload, tmpdir):
+    """The blocks file, the recorded DB, and the replay checkpoint.
+
+    The last two are full copies of the warmup DB, so they are dropped once the
+    workload is done rather than kept for the rest of the run.
+    """
+    return (
+        os.path.join(tmpdir, f"{workload.name}.blocks"),
+        os.path.join(tmpdir, f"{workload.name}-recorded-db"),
+        os.path.join(tmpdir, f"{workload.name}-cp"),
+    )
+
+
 def run_workload(workload, db_dir, tmpdir, calibration):
     result = WorkloadResult(workload=workload)
 
-    blocks_path = os.path.join(tmpdir, f"{workload.name}.blocks")
-    recorded_db = os.path.join(tmpdir, f"{workload.name}-recorded-db")
+    blocks_path, recorded_db, checkpoint = workload_dirs(workload, tmpdir)
     record(workload, db_dir, recorded_db, blocks_path)
 
     # Alternating rather than grouping the two VMs' runs is what makes the median
     # robust: thermal drift and noisy neighbours hit both equally.
     for _ in range(REPEATS):
-        checkpoint = os.path.join(tmpdir, f"{workload.name}-cp")
-        result.legacy_runs.append(
+        result.v1_runs.append(
             replay(workload, recorded_db, checkpoint, blocks_path, mono=False)
         )
         result.mono_runs.append(
@@ -407,27 +447,27 @@ def run_workload(workload, db_dir, tmpdir, calibration):
         )
 
     if not SELF_COMPARE:
-        if any(r.mono_move_enabled for r in result.legacy_runs):
-            raise ValueError("legacy run enabled MonoMove")
+        if any(r.mono_move_enabled for r in result.v1_runs):
+            raise ValueError("V1 run enabled MonoMove")
         if not all(r.mono_move_enabled for r in result.mono_runs):
             raise ValueError("MonoMove run did not enable MonoMove")
 
     for metric in METRICS:
-        legacy_median, legacy_spread = summarize(result.legacy_runs, metric)
+        v1_median, v1_spread = summarize(result.v1_runs, metric)
         mono_median, mono_spread = summarize(result.mono_runs, metric)
-        result.speedup[metric] = mono_median / legacy_median if legacy_median else 0.0
-        result.spread[metric] = max(legacy_spread, mono_spread)
+        result.speedup[metric] = mono_median / v1_median if v1_median else 0.0
+        result.spread[metric] = max(v1_spread, mono_spread)
 
     if SELF_COMPARE:
-        # Both sides ran legacy on the same bytes, so every deviation from 1.00x
+        # Both sides ran V1 on the same bytes, so every deviation from 1.00x
         # is the harness's own measurement error. Every calibrated band has to
         # sit above whatever this reports.
         for metric in VERDICT_METRICS + ["output_bytes_per_txn"]:
             value = result.speedup[metric]
-            if abs(value - 1.0) > NOISY_SPREAD:
+            if abs(value - 1.0) > SELF_COMPARE_MAX_DEVIATION:
                 result.warnings.append(
                     f"{metric} came out at {value:.2f}x under SELF_COMPARE, but both "
-                    f"runs were legacy; that is harness noise, not a speedup"
+                    f"runs were V1; that is harness noise, not a speedup"
                 )
     else:
         for stage in NEUTRAL_STAGES:
@@ -449,7 +489,7 @@ def run_workload(workload, db_dir, tmpdir, calibration):
 def emit_json_lines(result, test_index):
     """One line per calibrated metric, for Humio to aggregate."""
     for metric in CALIBRATED_METRICS:
-        legacy_median, _ = summarize(result.legacy_runs, metric)
+        v1_median, _ = summarize(result.v1_runs, metric)
         mono_median, _ = summarize(result.mono_runs, metric)
         print(
             json.dumps(
@@ -457,12 +497,11 @@ def emit_json_lines(result, test_index):
                     "grep": GREP_KEY,
                     "run_source": RUN_SOURCE,
                     "runner_name": RUNNER_NAME,
-                    "code_perf_version": CODE_PERF_VERSION,
                     "workload": result.workload.name,
                     "metric": metric,
                     "speedup": result.speedup[metric],
                     "spread": result.spread[metric],
-                    "legacy": legacy_median,
+                    "v1": v1_median,
                     "mono": mono_median,
                     "block_size": result.workload.block_size,
                     "blocks": NUM_BLOCKS,
@@ -486,7 +525,7 @@ def headline_table(results, failures):
         rows.append(
             [
                 r.workload.name,
-                f"{statistics.median([x.tps for x in r.legacy_runs]):.0f}",
+                f"{statistics.median([x.tps for x in r.v1_runs]):.0f}",
                 f"{statistics.median([x.tps for x in r.mono_runs]):.0f}",
                 ratio(r.speedup["total"]),
                 ratio(r.speedup["execution"]),
@@ -501,12 +540,12 @@ def headline_table(results, failures):
         rows,
         headers=[
             "workload",
-            "legacy t/s",
-            "mono t/s",
-            "total",
-            "execution",
-            "inner blk exe",
-            "spread",
+            "V1 txn/s",
+            "MonoMove txn/s",
+            "total speedup",
+            "execution speedup",
+            "Block-STM speedup",
+            "run-to-run range",
             "verdict",
         ],
         tablefmt="github",
@@ -516,31 +555,23 @@ def headline_table(results, failures):
 def output_size_table(results):
     rows = []
     for r in results:
-        legacy_bpt, _ = summarize(r.legacy_runs, "output_bytes_per_txn")
+        v1_bpt, _ = summarize(r.v1_runs, "output_bytes_per_txn")
         mono_bpt, _ = summarize(r.mono_runs, "output_bytes_per_txn")
-        legacy_bps, _ = summarize(r.legacy_runs, "output_bytes_per_sec")
-        mono_bps, _ = summarize(r.mono_runs, "output_bytes_per_sec")
         rows.append(
             [
                 r.workload.name,
-                f"{legacy_bpt:.0f}",
+                f"{v1_bpt:.0f}",
                 f"{mono_bpt:.0f}",
                 ratio(r.speedup["output_bytes_per_txn"]),
-                f"{legacy_bps / 1e6:.2f}",
-                f"{mono_bps / 1e6:.2f}",
-                ratio(r.speedup["output_bytes_per_sec"]),
             ]
         )
     return tabulate(
         rows,
         headers=[
             "workload",
-            "legacy B/txn",
-            "mono B/txn",
-            "B/txn",
-            "legacy MB/s",
-            "mono MB/s",
-            "MB/s",
+            "V1 bytes/txn",
+            "MonoMove bytes/txn",
+            "bytes/txn ratio",
         ],
         tablefmt="github",
     )
@@ -549,14 +580,16 @@ def output_size_table(results):
 def pipeline_table(results):
     rows = []
     for r in results:
+        v1_exec, _ = summarize(r.v1_runs, "execution")
+        mono_exec, _ = summarize(r.mono_runs, "execution")
         rows.append(
             [
                 r.workload.name,
                 ratio(r.speedup["ledger_update"]),
                 ratio(r.speedup["commit"]),
                 ratio(r.speedup["sigver"]),
-                ", ".join(f"{x.stage_tps['execution']:.0f}" for x in r.legacy_runs),
-                ", ".join(f"{x.stage_tps['execution']:.0f}" for x in r.mono_runs),
+                f"{v1_exec:.0f}",
+                f"{mono_exec:.0f}",
             ]
         )
     return tabulate(
@@ -566,23 +599,117 @@ def pipeline_table(results):
             "ledger update",
             "commit",
             "sigver",
-            "legacy exec t/s per repeat",
-            "mono exec t/s per repeat",
+            "V1 exec txn/s",
+            "MonoMove exec txn/s",
         ],
         tablefmt="github",
     )
 
 
-def build_report(results, failures):
-    title = "MonoMove vs legacy MoveVM, sequential execution"
+def per_repeat_table(results):
+    rows = []
+    for r in results:
+        rows.append(
+            [
+                r.workload.name,
+                ", ".join(f"{x.stage_tps['execution']:.0f}" for x in r.v1_runs),
+                ", ".join(f"{x.stage_tps['execution']:.0f}" for x in r.mono_runs),
+            ]
+        )
+    return tabulate(
+        rows,
+        headers=[
+            "workload",
+            "V1 exec txn/s",
+            "MonoMove exec txn/s",
+        ],
+        tablefmt="github",
+    )
+
+
+def glossary(selected, results):
+    """Everything a reader needs to interpret the tables above it.
+
+    Collapsed, so it costs no vertical space in the PR comment until someone
+    wants it.
+    """
+    parts = [
+        "<details>",
+        "<summary>Column reference, verdicts, workloads, pipeline stages</summary>",
+        "",
+        "#### Columns",
+        "",
+        "Every throughput is a median over the repeats, and every ratio is "
+        "MonoMove over V1.",
+        "",
+        "- `V1 txn/s`, `MonoMove txn/s` — throughput of the whole pipeline.",
+        "- `total speedup` — the whole pipeline: signature verification, "
+        "execution, ledger update, commit.",
+        "- `execution speedup` — the executor's execute stage alone.",
+        "- `Block-STM speedup` — `BlockExecutor::execute_block`, run "
+        "sequentially here. The innermost of the three timers and the closest "
+        "proxy for VM-only time: it leaves out the block setup and output "
+        "conversion that `execution` carries.",
+        "- `run-to-run range` — `(max - min) / median` across one VM's repeats, "
+        "reported for whichever VM and whichever of the two execution metrics "
+        "came out worse. It says how repeatable each side was, not how uncertain "
+        "the ratio is: the two VMs run alternating, so drift hits both and "
+        "largely cancels in the ratio. Past "
+        f"{MAX_DEVIATION * 100:.0f}% the verdict becomes `noisy`.",
+        "- `bytes/txn` — what each VM wrote per transaction.",
+        "",
+        "The stages nest: `total` ⊃ `execution` ⊃ `Block-STM`.",
+        "",
+        "#### Verdicts",
+        "",
+        "- `ok` — the execution speedup landed inside the workload's calibrated "
+        "band.",
+        "- `improvement`, `regression` — above or below that band.",
+        "- `noisy` — the range was too wide to judge either way.",
+        "- `uncalibrated` — no band recorded for this workload yet.",
+        "- `failed` — the workload did not finish; the reason is listed above.",
+        "- `self-compare` — V1 ran on both sides, so there is nothing to judge.",
+        "",
+        "#### Workloads",
+        "",
+    ]
+    parts += [
+        f"- `{w.name}` — {w.description} Blocks of {w.block_size} transactions."
+        for w in selected
+    ]
+    parts += [
+        "",
+        "#### Pipeline stages",
+        "",
+        "None of these run Move code. Signature verification does identical work "
+        "in both replays, so it sits near 1.00x and whatever it deviates by is "
+        "noise and core contention with the concurrent execution stage. Ledger "
+        "update and commit move with output size, so they track the bytes/txn "
+        "ratio above rather than staying flat.",
+        "",
+        pipeline_table(results),
+        "",
+        "#### Execution throughput per repeat",
+        "",
+        "The raw values behind the medians, in the order they ran.",
+        "",
+        per_repeat_table(results),
+        "",
+        "</details>",
+    ]
+    return "\n".join(parts)
+
+
+def build_report(selected, results, failures):
+    title = "MonoMove vs V1 MoveVM, sequential execution"
     if SELF_COMPARE:
-        title += " (SELF_COMPARE: legacy vs legacy, everything should be 1.00x)"
+        title += " (SELF_COMPARE: V1 vs V1, everything should be 1.00x)"
 
     parts = [
         f"### {title}",
         "",
         f"{NUM_BLOCKS} blocks, {REPEATS} repeats per VM, {NUM_ACCOUNTS} account DB, "
-        f"`{BUILD}` build. Ratios are MonoMove over legacy; above 1.00x means "
+        f"`{BUILD}` build. Ratios are MonoMove over V1; above 1.00x means "
         f"MonoMove is faster.",
         "",
         "Gas is not compared. MonoMove runs unmetered, so its gas metrics are zero.",
@@ -598,29 +725,21 @@ def build_report(results, failures):
         spread = max(r.spread[m] for r in results for m in VERDICT_METRICS)
         parts += [
             f"Noise floor: largest deviation from 1.00x is {deviation * 100:.1f}%, "
-            f"largest spread is {spread * 100:.1f}%. Every calibrated band and "
-            f"`NOISY_SPREAD` has to sit above these. Record them in the README.",
+            f"largest range is {spread * 100:.1f}%. Every calibrated band and "
+            f"`MAX_DEVIATION` has to sit above these. Record them in the README.",
             "",
         ]
 
     parts += [
         "#### Output size",
         "",
-        "Bytes per transaction says whether the two VMs wrote the same thing. "
-        "MonoMove runs unmetered, so it writes no fee slots and emits no fee "
-        "statement; it sits below 1.00x on every workload. What matters is that the "
-        "ratio stays where it was calibrated. A drop means MonoMove skipped real "
-        "work, and the speedup next to it is not a speedup.",
+        "Bytes per transaction records what each VM wrote. The two need not "
+        "match: MonoMove is unmetered today, so it writes no fee slots, and it "
+        "copies on every `borrow_global_mut`, so its write set is an "
+        "overapproximation. Either can change. What the calibration catches is "
+        "the ratio moving away from where it was measured.",
         "",
         output_size_table(results),
-        "",
-        "#### Pipeline stages",
-        "",
-        "None of these run Move code. Signature verification should sit at 1.00x. "
-        "Ledger update and commit move with output size, so they track the B/txn "
-        "ratio above rather than staying flat.",
-        "",
-        pipeline_table(results),
     ]
 
     warnings = [(r.workload.name, w) for r in results for w in r.warnings]
@@ -631,6 +750,8 @@ def build_report(results, failures):
     if failures:
         parts += ["", "#### Failed workloads", ""]
         parts += [f"- `{name}`: {message}" for name, message in failures]
+
+    parts += ["", glossary(selected, results)]
 
     return "\n".join(parts) + "\n"
 
@@ -664,13 +785,16 @@ def main():
                 print(f"Workload {workload.name} failed: {e}")
                 failures.append((workload.name, str(e)))
                 continue
+            finally:
+                for path in workload_dirs(workload, tmpdir)[1:]:
+                    shutil.rmtree(path, ignore_errors=True)
             results.append(result)
             # A self-compare produces no speedups, so it must not reach the
             # calibration history.
             if not SELF_COMPARE:
                 emit_json_lines(result, test_index)
 
-    report = build_report(results, failures)
+    report = build_report(selected, results, failures)
     print()
     print(report)
 

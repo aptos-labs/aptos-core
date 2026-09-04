@@ -112,19 +112,25 @@ pub fn default_benchmark_features() -> Features {
 }
 
 /// Where the measured run's blocks come from.
+///
+/// Every run takes two directories. `source_dir` (`--data-dir`) holds the DB the
+/// run starts from and is only read. `checkpoint_dir` (`--checkpoint-dir`) gets a
+/// fresh copy of it, and everything the run writes lands there. Recording and
+/// replaying chain the two: a recording's `checkpoint_dir` is the `source_dir`
+/// every replay of it starts from.
 #[derive(Clone, Debug, Default)]
 pub enum BlockSource {
     /// Generate blocks and execute them.
     #[default]
     Generate,
-    /// Generate blocks, write them to the given path, and exit without executing
-    /// or flipping any feature flags. Leaves `checkpoint_dir` holding the
-    /// initialized, pre-flip DB the blocks were generated against, which is what
-    /// a replay must start from.
-    Record(PathBuf),
-    /// Execute blocks read from the given path. Skips workload initialization,
-    /// since `data_dir` is expected to be a recording's `checkpoint_dir`.
-    Replay(PathBuf),
+    /// Generate blocks, write them to `blocks_path`, and exit without executing
+    /// them or flipping any feature flags. Leaves the initialized, pre-flip DB
+    /// the blocks were generated against in `checkpoint_dir`.
+    Record { blocks_path: PathBuf },
+    /// Execute the blocks in `blocks_path`. Workload initialization is skipped:
+    /// `source_dir` is the `checkpoint_dir` a recording left behind, so the
+    /// workload is already set up there.
+    Replay { blocks_path: PathBuf },
 }
 
 /// Feature flags to toggle on-chain after the init/publish phase and before the
@@ -318,7 +324,7 @@ enum InitializedBenchmarkWorkload {
 
 /// Commits one block that runs the governance feature-toggle script, applying
 /// `overrides` to the on-chain `Features` and reconfiguring so the change takes
-/// effect for the next block. Runs under the legacy VM. The block executor
+/// effect for the next block. Runs under the V1 VM. The block executor
 /// rereads `Features` from committed state each block, so the measured run picks
 /// up the new flags. Panics if the flip transaction is not committed as a
 /// success.
@@ -369,7 +375,7 @@ fn apply_features_after_init(
     commit_single_block(db, vec![ts.next_block_metadata_txn(db), txn]);
 }
 
-/// Commits `txns` as one block under the legacy VM and waits for it to land.
+/// Commits `txns` as one block under the V1 VM and waits for it to land.
 /// Panics if the block does not advance the committed version.
 fn commit_single_block(db: &DbReaderWriter, txns: Vec<Transaction>) {
     let version_before = db.reader.expect_synced_version();
@@ -427,9 +433,9 @@ where
     let root_account = TransactionGenerator::read_root_account(genesis_key, &db);
     let root_account = Arc::new(root_account);
 
-    if let BlockSource::Replay(path) = &block_source {
+    if let BlockSource::Replay { blocks_path } = &block_source {
         return Some(replay_benchmark::<V>(
-            path,
+            blocks_path,
             &db,
             &root_account,
             ts,
@@ -526,18 +532,18 @@ where
     };
 
     let recording = match &block_source {
-        BlockSource::Record(path) => Some(path.clone()),
+        BlockSource::Record { blocks_path } => Some(blocks_path.clone()),
         BlockSource::Generate => None,
         // Returned above, before any workload initialization.
-        BlockSource::Replay(_) => unreachable!(),
+        BlockSource::Replay { .. } => unreachable!(),
     };
 
     // Flip requested feature flags after init/publish but before the measured
     // run, so the flip is not counted in the measured transactions.
     //
-    // A recording run skips this. Its checkpoint_dir becomes the base a replay
-    // starts from, and the replay applies the flip itself, so flipping here
-    // would leave the recording one epoch ahead of every replay.
+    // A recording is the one run that does not flip. Its DB is the shared base
+    // every replay starts from, so it has to stay neutral between the VMs being
+    // compared; each replay flips on top of it.
     if recording.is_none() && !features_after_init.is_empty() {
         apply_features_after_init(&db, &root_account, &ts, &features_after_init);
         // The flip ends the epoch, so refresh the cached epoch; otherwise the
@@ -575,6 +581,13 @@ where
         let now = BenchmarkTimestamp::from_db(&db);
         (start_version, now.base_usecs(), now.epoch())
     });
+
+    // A recording never executes, so a generator that blocks in
+    // `wait_until_ready` until its transactions commit would never be released.
+    assert!(
+        recording.is_none() || transaction_feedback.is_none(),
+        "cannot record a workload that needs transaction feedback"
+    );
 
     // A recording never executes, so it collects blocks instead of building a
     // pipeline.
@@ -715,12 +728,12 @@ where
 
 /// Executes blocks recorded by an earlier [`BlockSource::Record`] run.
 ///
-/// The recording's `checkpoint_dir` is this run's `data_dir`, so the workload is
-/// already initialized and only the feature flip is left to apply. That flip is
-/// what makes two replays of the same file differ.
+/// The recording's `checkpoint_dir` is this run's `source_dir`, so the workload
+/// is already initialized and only the feature flip is left to apply. That flip
+/// is what makes two replays of the same file differ.
 #[allow(clippy::too_many_arguments)]
 fn replay_benchmark<V>(
-    path: &Path,
+    blocks_path: &Path,
     db: &DbReaderWriter,
     root_account: &LocalAccount,
     ts: Arc<BenchmarkTimestamp>,
@@ -737,9 +750,9 @@ where
     // the loop below relies on.
     pipeline_config.generate_then_execute = true;
 
-    let recorded = RecordedBlocks::read(path).expect("failed to read recorded blocks");
+    let recorded = RecordedBlocks::read(blocks_path).expect("failed to read recorded blocks");
 
-    // Checked before the flip, since the recording was taken before its own.
+    // Checked before the flip, since the recording never applied one.
     recorded
         .check_replayable_at(
             db.reader.expect_synced_version(),

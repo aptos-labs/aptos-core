@@ -15,10 +15,6 @@ liquidity-pool-swap	execution	5	0.998	1.017	5.274
 liquidity-pool-swap	inner_block_executor	5	0.993	1.011	5.496
 liquidity-pool-swap	output_bytes_per_txn	5	1.000	1.000	0.756
 liquidity-pool-swap	total	5	0.989	1.007	5.191
-modify-global-resource	execution	5	0.970	1.011	3.553
-modify-global-resource	inner_block_executor	5	0.971	1.010	3.704
-modify-global-resource	output_bytes_per_txn	5	1.000	1.000	0.285
-modify-global-resource	total	5	0.759	1.058	3.036
 no-op	execution	5	0.986	1.009	3.730
 no-op	inner_block_executor	5	0.986	1.015	3.831
 no-op	output_bytes_per_txn	5	1.000	1.000	0.238

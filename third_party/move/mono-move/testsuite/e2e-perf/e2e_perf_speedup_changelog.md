@@ -1,6 +1,6 @@
-# mono-move e2e performance calibration log
+# MonoMove end-to-end performance calibration log
 
-Recalibration history, newest first. Each entry lists the workloads whose calibrated speedup drifted out of band, as `old -> new`; new rows show `new`. A speedup is MonoMove throughput over legacy MoveVM throughput on the same recorded blocks, so a number above 1.00x means MonoMove is faster.
+Recalibration history, newest first. Each entry lists the workloads whose calibrated speedup drifted out of band, as `old -> new`; new rows show `new`. A speedup is MonoMove throughput over V1 MoveVM throughput on the same recorded blocks, so a number above 1.00x means MonoMove is faster.
 
 ## 2026-09-04
 
@@ -22,10 +22,6 @@ Recalibration history, newest first. Each entry lists the workloads whose calibr
 | liquidity-pool-swap | inner_block_executor | 5 | new |
 | liquidity-pool-swap | output_bytes_per_txn | 5 | new |
 | liquidity-pool-swap | total | 5 | new |
-| modify-global-resource | execution | 5 | new |
-| modify-global-resource | inner_block_executor | 5 | new |
-| modify-global-resource | output_bytes_per_txn | 5 | new |
-| modify-global-resource | total | 5 | new |
 | no-op | execution | 5 | new |
 | no-op | inner_block_executor | 5 | new |
 | no-op | output_bytes_per_txn | 5 | new |
