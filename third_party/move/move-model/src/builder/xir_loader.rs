@@ -8,7 +8,7 @@
 //! constructors used by the binary module loader.
 
 use crate::{
-    ast::{Attribute, ModuleName, Spec},
+    ast::{Attribute, FriendDecl, ModuleName, Spec},
     model::{
         FieldData, FieldId, FunId, FunctionData, FunctionKind, GlobalEnv, Loc, Parameter,
         QualifiedId, StructData, StructId, StructVariant, TypeParameter,
@@ -26,6 +26,9 @@ pub struct XirModuleData {
     pub name: ModuleName,
     pub structs: Vec<XirStructData>,
     pub functions: Vec<XirFunctionData>,
+    /// Modules this one grants friend access to. A `Friend`-visible
+    /// declaration says only that it *is* friend-visible; this says to whom.
+    pub friends: Vec<FriendDecl>,
 }
 
 pub struct XirStructData {
@@ -149,7 +152,7 @@ impl GlobalEnv {
             module.name,
             vec![],
             vec![],
-            vec![],
+            module.friends,
             BTreeMap::new(),
             structs,
             functions,

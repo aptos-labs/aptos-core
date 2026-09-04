@@ -31,6 +31,11 @@ pub enum SpecSort {
     Enum(usize),
     EnumInst(usize, Vec<SpecSort>),
     Vector(Box<SpecSort>),
+    /// A function value type. Opaque: no specification operation accepts it,
+    /// so any spec expression reaching one is reported as ill-sorted. Present
+    /// because a declared local or field may *have* a function type even
+    /// though this fragment models no operation over one.
+    Fun,
 }
 
 impl fmt::Display for SpecSort {
@@ -45,6 +50,7 @@ impl fmt::Display for SpecSort {
             SpecSort::Enum(r) => write!(f, "enum {}", r),
             SpecSort::EnumInst(r, args) => write!(f, "enum {}<{:?}>", r, args),
             SpecSort::Vector(t) => write!(f, "vector<{}>", t),
+            SpecSort::Fun => write!(f, "function value"),
         }
     }
 }
@@ -78,6 +84,7 @@ impl SpecSort {
             },
             Type::Vector(t) => SpecSort::Vector(Box::new(SpecSort::of(t))),
             Type::Ref(t) | Type::MutRef(t) => SpecSort::of(t),
+            Type::Fun(..) => SpecSort::Fun,
         }
     }
 
@@ -118,6 +125,13 @@ pub enum ClausePos {
 }
 
 /// The typing context of one function's specification.
+///
+/// **Assumes a closed module.** Resource ids are bounds-checked against
+/// `structs.len()`, so any id past the end is reported as undeclared. That is
+/// correct for [`crate::Module`], which has no external-declaration table. It
+/// would *not* be correct for a format where out-of-range ids index an external
+/// table; such a format must supply the combined count here, or not use this
+/// checker.
 pub struct SpecCheckCtx<'a> {
     pub structs: &'a [Struct],
     /// Declared types of all locals (parameters first).
