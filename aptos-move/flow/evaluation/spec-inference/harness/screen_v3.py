@@ -1,8 +1,8 @@
-"""Treatment-blind compatibility screening for the corpus-v3 package.
+"""Treatment-blind compatibility screening for the corpus-v3.1 package.
 
 `screen.py` drives the corpus-v1 shape: one overlay patch and snapshot per
 sample, thirty selected records, a `source_commit` at the manifest root.
-corpus-v3 is a single package with targets named inside it, so it needs its own
+corpus-v3.1 is a single package with targets named inside it, so it needs its own
 driver rather than a manifest bent to fit the other one.
 
 The screen is blind to any arm: for each target it compiles the unmodified
@@ -15,11 +15,11 @@ Writes one result per target plus a summary, so `screening_status` in the
 manifest is evidenced rather than asserted:
 
     python3 -m harness.screen_v3 \\
-      --manifest corpus-v3/manifest.json \\
+      --manifest corpus-v3.1/manifest.json \\
       --experiment-config config/default.json \\
       --corpus-config config/corpus.json \\
-      --results-dir corpus-v3/screening \\
-      --output corpus-v3/screening/summary.json
+      --results-dir corpus-v3.1/screening \\
+      --output corpus-v3.1/screening/summary.json
 """
 
 from __future__ import annotations
@@ -35,7 +35,14 @@ from pathlib import Path
 from typing import Any
 
 from .artifacts import canonical_json, load_object, sha256_file, tree_hash, write_json
-from .compatibility import check_compatibility, tool_executables
+from .compatibility import (
+    apparatus_reached_a_verdict,
+    binary_sha256,
+    check_compatibility,
+    is_well_formed,
+    prove_reference,
+    tool_executables,
+)
 from dataclasses import asdict
 
 from .config import ExperimentConfig
@@ -100,7 +107,7 @@ async def screen_corpus_v3(
             "reference_package": reference["package"],
             "reference_sha256": reference["reference_sha256"],
             # WP alone does not reach a verifying contract: a task property, not
-            # a defect. See corpus-v3/README.md and issue #20490 for one cause.
+            # a defect. See corpus-v3.1/README.md and issue #20490 for one cause.
             "wp_hard": wp_hard,
             "wp_failure_kind": result.get("failure_kind") if wp_hard else None,
             "apparatus_ok": apparatus_ok,
@@ -132,7 +139,7 @@ async def screen_corpus_v3(
         # the corpus did not change.
         "tools": {
             "move_flow": config.check_candidate_command[:1],
-            "move_flow_sha256": _binary_sha256(config.check_candidate_command[0]),
+            "move_flow_sha256": binary_sha256(config.check_candidate_command[0]),
             # Screening also drives the compile, inference and prove commands,
             # which the config may point at different executables. Recording
             # only the checker leaves those unpinned.
@@ -153,71 +160,6 @@ async def screen_corpus_v3(
     return report
 
 
-def apparatus_reached_a_verdict(result: dict[str, Any]) -> bool:
-    """Whether the screen actually measured the target.
-
-    `check_compatibility` reports `infrastructure_failure` for tooling that was
-    unavailable and `compatibility_timeout` for a stage that ran out of time.
-    Neither is evidence about the target, so neither can be read as one.
-    """
-    if result.get("failure_kind") in ("infrastructure_failure", "compatibility_timeout"):
-        return False
-    # Every stage the screen ran, not only WP. A prover that dies on the
-    # inferred source says as little about the target as a WP that dies on the
-    # original, and `_failure_kind` lands both on `implementation_failure`;
-    # reading only the inference stage admitted a target whose enriched proof
-    # had crashed as a screened, WP-hard corpus member.
-    return all(
-        _stage_reached_a_verdict(result.get(stage))
-        for stage in ("compile", "wp_inference", "enriched_compile", "prover")
-    )
-
-
-def _stage_reached_a_verdict(stage: dict[str, Any] | None) -> bool:
-    """Whether one stage's exit says anything about the target.
-
-    Success is a verdict, and so is a non-zero exit carrying a stage report: a
-    tool that declines with a diagnosis has diagnosed something. A crash
-    arrives with neither, and `_failure_kind` cannot tell the two apart. A
-    negative return code is a signal, which is never a refusal.
-
-    A stage that did not run has no return code and is not held against the
-    target: when WP declines there is nothing to recompile or prove.
-    """
-    stage = stage or {}
-    returncode = stage.get("returncode")
-    if returncode in (0, None):
-        return True
-    return returncode > 0 and bool(stage.get("stage_report"))
-
-
-def is_well_formed(result: dict[str, Any]) -> bool:
-    """Whether the target itself is admissible, given a working apparatus.
-
-    Inference failing is a property of the task, not a defect in it: an
-    uninvariant loop makes WP drop what the havoc left unconstrained, and in an
-    evaluation that is an error rather than an empty `aborts_if_is_partial`
-    contract -- so the loop targets, which are the interesting ones, report a
-    failed inference stage. When WP declines there is nothing to recompile, so
-    requiring the enriched compile would eject exactly the tasks worth asking.
-
-    But a failed inference stage covers two different things, and only one of
-    them is about the target. WP that could not run at all says nothing, and
-    admitting it records an unscreened task as a corpus member.
-    """
-    compiles = (result.get("compile") or {}).get("returncode") == 0
-    inferred = (result.get("wp_inference") or {}).get("returncode") == 0
-    enriched_ok = (
-        (result.get("enriched_compile") or {}).get("returncode") == 0
-        if inferred
-        else True
-    )
-    return compiles and enriched_ok and apparatus_reached_a_verdict(result)
-
-def _binary_sha256(name: str) -> str | None:
-    """The digest of the tool the screen actually invoked, if it is on PATH."""
-    resolved = shutil.which(name)
-    return sha256_file(Path(resolved)) if resolved else None
 
 async def _prove_reference(
     config: ExperimentConfig,
@@ -239,57 +181,9 @@ async def _prove_reference(
     if not (package / "Move.toml").is_file():
         raise SystemExit(
             f"no assembled reference for {record['task_id']} at {package}; "
-            "run `python3 corpus-v3/build_references.py` first"
+            "run `python3 corpus-v3.1/build_references.py` first"
         )
-    with tempfile.TemporaryDirectory(prefix="move-inference-reference-") as temporary:
-        outcome = await run_command(
-            render_command(
-                config.prove_command,
-                package=package,
-                baseline=package,
-                target=record["target"],
-                timeout=threshold,
-                output=Path(temporary) / "reference.json",
-            ),
-            timeout_seconds=max(120, threshold * 4),
-        )
-        # A reference with contradictory assumptions proves every
-        # postcondition, so a successful prove says nothing about solvability
-        # on its own. `validate_mutants` refuses such a reference before
-        # certifying essentiality; the screen has to refuse it before
-        # certifying that the task is solvable at all.
-        inconsistency = await run_command(
-            render_command(
-                [*config.prove_command, "--check-inconsistency"],
-                package=package,
-                baseline=package,
-                target=record["target"],
-                timeout=threshold,
-                output=Path(temporary) / "inconsistency.json",
-            ),
-            timeout_seconds=max(120, threshold * 4),
-        )
-        vacuous = "inconsistent assumption" in inconsistency.diagnostics
-        # Silence only means something if the check reached a verdict: a
-        # timeout or a missing solver produces the same absence of the
-        # diagnostic as a sound reference does.
-        vacuity_checked = inconsistency.succeeded and not vacuous
-    # `returncode == 0` is not success: a process can exit zero while the
-    # watchdog is tearing it down, and `succeeded` also covers an
-    # infrastructure error. A reference that did not finish proving has not
-    # proved anything.
-    # The assembled reference is a generated, gitignored tree, so recording a
-    # boolean and a path leaves the evidence unpinned: rebuilding the corpus or
-    # editing a reference patch without reassembling produces a proof about
-    # content that no longer exists. `validate_mutants` pins essentiality the
-    # same way, for the same reason.
-    return {
-        "proved": outcome.succeeded and vacuity_checked,
-        "vacuity_checked": vacuity_checked,
-        "vacuous": vacuous,
-        "package": str(package),
-        "reference_sha256": tree_hash(package),
-    }
+    return await prove_reference(config, package, [record["target"]], threshold)
 
 
 def main() -> None:

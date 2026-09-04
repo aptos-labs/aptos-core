@@ -18,6 +18,10 @@ FRAMEWORK = "aptos-move/framework/aptos-framework"
 EXPERIMENTAL = "aptos-move/framework/aptos-experimental"
 
 
+#: Inventory schemas this selection can read. Additive versions only.
+SUPPORTED_INVENTORY_SCHEMAS = frozenset({1, 2, 3})
+
+
 def build_provenance(
     inventory_path: Path,
     config_path: Path,
@@ -25,8 +29,19 @@ def build_provenance(
 ) -> dict[str, Any]:
     inventory = load_object(inventory_path)
     config = load_object(config_path)
-    if inventory.get("schema_version") != 1 or config.get("schema_version") != 1:
-        raise ValueError("unsupported inventory or corpus configuration schema")
+    # The inventory schema has only ever grown: every version adds candidate
+    # fields and removes none, so a selection written against version 1 reads a
+    # later one unchanged. Pinning to 1 meant selection silently could not run
+    # on a current inventory at all -- which is how the corpus came to be
+    # stratified without the fields later versions added.
+    if (
+        inventory.get("schema_version") not in SUPPORTED_INVENTORY_SCHEMAS
+        or config.get("schema_version") != 1
+    ):
+        raise ValueError(
+            "unsupported inventory or corpus configuration schema: inventory "
+            f"{inventory.get('schema_version')}, config {config.get('schema_version')}"
+        )
     commit = inventory["source_commit"]
     seed = hashlib.sha256((commit + config["selection_seed_suffix"]).encode()).hexdigest()
     records = [dict(candidate) for candidate in inventory["candidates"]]
@@ -49,7 +64,12 @@ def build_provenance(
     # an earlier function choice from the same module.
     for root in (FRAMEWORK, EXPERIMENTAL):
         for granularity in ("module", "function"):
-            quota = int(quotas[root][granularity])
+            # A frame the policy describes but the corpus draws nothing from
+            # contributes no tasks: the policy says which candidates are
+            # eligible, the quotas say how many of them a corpus takes.
+            quota = int(quotas.get(root, {}).get(granularity, 0))
+            if quota == 0:
+                continue
             pool = [
                 record
                 for record in records
@@ -144,6 +164,7 @@ def build_provenance(
             else None
         ),
         "thresholds": thresholds,
+        "quotas": config["quotas"],
         "minimum_feature_counts": config["minimum_feature_counts"],
         "selected_counts": {f"{root}:{granularity}": count for (root, granularity), count in sorted(selected_counts.items())},
         "selected_feature_counts": dict(sorted(feature_counts.items())),
@@ -168,6 +189,7 @@ def _greedy_select(
     feature_counts = Counter(
         feature for record in already_selected for feature in record["feature_strata"]
     )
+    shapes = {_shape(record) for record in already_selected}
     remaining = list(pool)
     while len(chosen) < quota:
         feasible = []
@@ -190,6 +212,13 @@ def _greedy_select(
                 for item in already_selected + chosen
             ):
                 continue
+            # Two candidates with the same granularity and the same semantic
+            # features are the same task twice: a corpus of thirty small
+            # straight-line getters measures one thing thirty times. Size and
+            # call-depth are properties of the sample rather than of what the
+            # contract has to say, so they do not distinguish a shape.
+            if _shape(record) in shapes:
+                continue
             deficit_gain = sum(
                 max(0, int(minimums.get(feature, 0)) - feature_counts[feature])
                 for feature in set(record["feature_strata"])
@@ -201,7 +230,28 @@ def _greedy_select(
         chosen.append(selected)
         remaining.remove(selected)
         feature_counts.update(selected["feature_strata"])
+        shapes.add(_shape(selected))
     return chosen
+
+
+#: Strata that say how a target is reached rather than what its contract says.
+SHAPE_INSENSITIVE_STRATA = frozenset({"deep-calls", "shallow-calls"})
+
+
+def _shape(record: dict[str, Any]) -> tuple[str, frozenset[str]]:
+    """What a task teaches.
+
+    Two candidates with the same granularity and the same semantic features are
+    the same task twice, and a corpus of thirty small straight-line getters
+    measures one thing thirty times. Size stays in the signature: a five-line
+    accessor and a two-hundred-line settlement function share a stratum set and
+    are not the same problem. Call depth does not: it describes how the target
+    is reached, not what has to be said about it.
+    """
+    return (
+        record["granularity"],
+        frozenset(set(record["feature_strata"]) - SHAPE_INSENSITIVE_STRATA),
+    )
 
 
 def _add_size_and_depth_strata(records: list[dict[str, Any]]) -> dict[str, int]:
@@ -253,6 +303,27 @@ def _assign_stable_ids(records: list[dict[str, Any]]) -> None:
         record["task_id"] = f"{prefix}-{slug}-{counters[f'{prefix}-{slug}']:03d}"
 
 
+#: Screening outcomes that exclude a candidate rather than demanding a repair.
+#:
+#: Each is a measurement of what the apparatus can do with the target, made
+#: without reference to any arm: the stage timed out, the prover or inference
+#: could not carry the target, or the inferred contract rests on a boundary
+#: nobody has reviewed. A corpus cannot measure a target it cannot screen, and
+#: dropping one for that reason chooses membership on the apparatus rather than
+#: on an arm's behaviour. An infrastructure failure is not among them: it says
+#: the tooling broke, not that the target is beyond it.
+# A task leaves the corpus only for a measured reason: the apparatus timed out,
+# the target is not well-formed, or its reference does not prove. WP falling
+# short of a verifying contract is a property of the task, never an exclusion.
+SCREENING_EXCLUSION_REASONS = frozenset(
+    {
+        "compatibility_timeout",
+        "implementation_failure",
+        "reference_unproved",
+    }
+)
+
+
 def _apply_screening_ledger(
     records: list[dict[str, Any]], commit: str, ledger: dict[str, Any]
 ) -> None:
@@ -270,10 +341,10 @@ def _apply_screening_ledger(
         record["compatibility_screen"] = entry
         if entry.get("passed") is not True:
             reason = entry.get("reason")
-            if reason != "compatibility_timeout":
+            if reason not in SCREENING_EXCLUSION_REASONS:
                 raise ValueError(
                     f"screening result for {record['task_id']} requires a fix or rerun; "
-                    "only a measured compatibility timeout may exclude a candidate"
+                    f"only a measured screening failure may exclude a candidate, not {reason}"
                 )
             record["eligibility"] = "excluded"
             record["decision_reason"] = reason

@@ -7,7 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SPEC = importlib.util.spec_from_file_location(
-    "select_round", ROOT / "corpus-v3" / "select_round.py"
+    "select_round", ROOT / "corpus-v3.1" / "select_round.py"
 )
 select_round = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(select_round)
@@ -25,15 +25,20 @@ class RoundSelectionTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.manifest = json.loads(
-            (ROOT / "corpus-v3" / "manifest.json").read_text(encoding="utf-8")
+            (ROOT / "corpus-v3.1" / "manifest.json").read_text(encoding="utf-8")
         )
         cls.recorded = json.loads(
-            (ROOT / "corpus-v3" / "metadata" / "selection.json").read_text(
+            (ROOT / "corpus-v3.1" / "metadata" / "selection.json").read_text(
                 encoding="utf-8"
             )
         )
 
     def test_the_recorded_selection_is_what_the_rule_produces(self) -> None:
+        if not select_round.SOURCES.is_dir():
+            self.skipTest(
+                "private Etna-derived sources are not materialized; "
+                "run corpus-v3.1/build.py"
+            )
         derived = select_round.select(
             self.manifest["records"],
             self.recorded["size"],

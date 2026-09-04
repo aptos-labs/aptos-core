@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 from harness.prepare import (
+    _blank_inline_spec_blocks,
     _blank_spec_blocks,
     _copy_standalone_package,
     _remove_target_references,
@@ -62,6 +63,33 @@ class PrepareTests(unittest.TestCase):
         self.assertEqual(source.count("\n"), prepared.count("\n"))
         self.assertNotIn("ensures result == x", prepared)
         self.assertIn("spec other()", prepared)
+
+    def test_blank_inline_spec_blocks_strips_only_the_target_body(self) -> None:
+        source = """module a::m {
+    fun target(v: &mut vector<u64>) {
+        let i = 0;
+        while (i < 3) {
+            i = i + 1;
+        } spec {
+            invariant i <= 3;
+        };
+        spec { assert i == 3; };
+    }
+
+    fun other() {
+        while (true) {} spec { invariant true; };
+    }
+}
+"""
+        prepared, count = _blank_inline_spec_blocks(source, "target")
+        self.assertEqual(count, 2)
+        self.assertEqual(len(source), len(prepared))
+        self.assertEqual(source.count("\n"), prepared.count("\n"))
+        self.assertNotIn("invariant i <= 3", prepared)
+        self.assertNotIn("assert i == 3", prepared)
+        self.assertIn("invariant true", prepared)
+        # The statement terminator after the loop survives, so the body still parses.
+        self.assertRegex(prepared, r"\}\s+;")
 
     def test_copy_resolves_transitive_local_dependencies_and_aliases(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

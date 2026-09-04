@@ -40,6 +40,9 @@ def refresh_recipes(corpus_root: Path, package_inventory_path: Path | None = Non
         for record in manifest["preparation"]["records"]
     }
     for record in manifest["records"]:
+        # A reserve or excluded candidate was never prepared: no patch, no digest.
+        if record.get("selection_status", "selected") != "selected":
+            continue
         task_id = record["task_id"]
         patch = resolve_within(corpus_root, record["preparation_patch"], "preparation_patch")
         with tempfile.TemporaryDirectory(
@@ -122,7 +125,11 @@ def refresh_recipes(corpus_root: Path, package_inventory_path: Path | None = Non
     write_json(manifest_path, manifest)
     _write_corpus_catalog_readme(
         corpus_root,
-        manifest["records"],
+        [
+            record
+            for record in manifest["records"]
+            if record.get("selection_status", "selected") == "selected"
+        ],
         shared_metadata,
         manifest["source_commit"],
     )
@@ -137,6 +144,10 @@ def _refresh_dependency_closures(manifest: dict, inventory: dict) -> None:
         if candidate["granularity"] == "function"
     }
     for record in manifest["records"]:
+        # Only selected samples are in the shared package; a reserve or an
+        # excluded candidate has no target there to find.
+        if record.get("selection_status", "selected") != "selected":
+            continue
         module = record["module"]
         targets = (
             [record["package_module_target"]]
