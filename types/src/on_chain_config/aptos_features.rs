@@ -225,6 +225,8 @@ pub enum FeatureFlag {
     /// (a module self-initializes on first use rather than via a genesis-time `init_module`).
     /// While disabled, that entry point aborts.
     LAZY_MODULE_INITIALIZATION = 127,
+    /// When enabled, new MonoMove VM is used for execution instead of the V1 Move VM.
+    ENABLE_MONO_MOVE = 128,
 }
 
 impl FeatureFlag {
@@ -588,6 +590,10 @@ impl Features {
 
     pub fn is_closure_bcs_serialization_disabled(&self) -> bool {
         self.is_enabled(FeatureFlag::DISABLE_CLOSURE_BCS_SERIALIZATION)
+    }
+
+    pub fn is_mono_move_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ENABLE_MONO_MOVE)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

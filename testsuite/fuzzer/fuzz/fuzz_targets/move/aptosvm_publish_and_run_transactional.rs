@@ -7,6 +7,7 @@ use aptos_block_executor::code_cache_global_manager::AptosModuleCacheManager;
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
 use aptos_transaction_simulation::GENESIS_CHANGE_SET_HEAD;
 use aptos_types::{
+    block_executor::config::BlockExecutorLocalConfig,
     chain_id::ChainId,
     on_chain_config::{Features, TimedFeaturesBuilder},
     transaction::{
@@ -127,7 +128,9 @@ fn run_case(input: RunnableStateWithOperations) -> Result<(), Corpus> {
     // Enable runtime reference-safety checks for the Move VM
     // prod_configs::set_paranoid_ref_checks(true);
 
-    let module_cache_manager = AptosModuleCacheManager::new();
+    let module_cache_manager = AptosModuleCacheManager::new(
+        BlockExecutorLocalConfig::default_with_concurrency_level(FUZZER_CONCURRENCY_LEVEL),
+    );
     AptosVM::set_concurrency_level_once(FUZZER_CONCURRENCY_LEVEL);
     let mut vm = FakeExecutor::from_genesis_with_module_cache_manager(
         &VM_WRITE_SET,
