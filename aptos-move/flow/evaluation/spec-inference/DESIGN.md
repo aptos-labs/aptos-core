@@ -80,7 +80,7 @@ into a parameter.
 | corpus | source | status |
 |---|---|---|
 | [`corpus-v1/`](corpus-v1/README.md) | Aptos framework + experimental, pinned revision | superseded as a benchmark; retained as infrastructure |
-| [`corpus-v3/`](corpus-v3/README.md) | Etna | **the benchmark.** The full run is planned on this corpus |
+| [`corpus-v3.1/`](corpus-v3.1/README.md) | Etna | **the benchmark.** The full run is planned on this corpus |
 
 **V3 is the final benchmark target.** Rounds are planned and reported against
 it; V1 is kept for the reasons below, not as a run target.
@@ -120,8 +120,8 @@ tasks.
 not, so everything derived from it is generated from a pinned commit of a
 private repository — `aptos-labs/etna` at
 `dd23678f980266360e050037fb78317b13753068` — into gitignored trees: the corpus
-package (`corpus-v3/package/sources/`) and the reference packages
-(`corpus-v3/references/build/`). What is committed is recipes, specifications,
+package (`corpus-v3.1/package/sources/`) and the reference packages
+(`corpus-v3.1/references/build/`). What is committed is recipes, specifications,
 digests, and anchors — our own text plus hashes. A mutant stores an offset and
 a SHA-256 into the generated file rather than the code it rewrites, and a
 reference is committed as a patch that only *adds* specification lines.
@@ -572,8 +572,8 @@ counts are the stable resource result; dollar costs are derived from them.
 - [ ] Analysis uses task-level blocking and includes failed runs at the cap.
 
 **The Etna sources are not committed.** `aptos-core` is public and Etna is not,
-so `corpus-v3/package/sources/` is gitignored and only the recipe lives here;
-`corpus-v3/build.py --verify` regenerates in place and fails, naming files, if
+so `corpus-v3.1/package/sources/` is gitignored and only the recipe lives here;
+`corpus-v3.1/build.py --verify` regenerates in place and fails, naming files, if
 any digest differs from the manifest. Any published artifact built from this
 corpus needs its own disclosure decision — contract shapes can be described
 without reproducing proprietary source, but the package itself cannot be
