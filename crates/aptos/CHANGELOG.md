@@ -4,6 +4,11 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+- _No changes yet._
+
+## [9.6.0]
+- Add `aptos governance propose-bundle` and `aptos governance execute-bundle`, which submit and execute a governance bundle's proposal using the bundle's compiled scripts. `execute-bundle` resumes from the step the chain expects next.
+- `aptos governance propose` and `execute-proposal` now print a hint pointing at the bundle commands.
 - `aptos move compile --optimize extra` no longer inlines calls to functions in other modules.
 
 ## [9.5.1]

@@ -1,7 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! On-disk layout and `bundle.toml` manifest for a governance bundle.
+//! On-disk layout and `bundle.toml` manifest for a governance bundle, and the
+//! checks a bundle must pass (see [`verify`]).
 //!
 //! A governance bundle is a single self-contained directory packaging one
 //! on-chain governance proposal, along with additional artifacts for
@@ -17,6 +18,8 @@
 //! ├── bytecode/N-*.mv        # the compiled scripts actually deployed
 //! └── summary/*.md           # human-reviewable change summaries
 //! ```
+
+pub mod verify;
 
 use anyhow::{anyhow, bail, Context, Result};
 use serde::{Deserialize, Serialize};
@@ -86,6 +89,22 @@ pub struct IntegritySection {
 }
 
 impl BundleManifest {
+    /// Build the manifest for the files currently under `bundle_dir`, with the
+    /// checksums and digest computed.
+    pub fn new(bundle_dir: &Path, bundle: BundleSection, source: SourceSection) -> Result<Self> {
+        let mut manifest = Self {
+            format_version: BUNDLE_FORMAT_VERSION,
+            bundle,
+            source,
+            integrity: IntegritySection {
+                digest: String::new(),
+            },
+            checksums: compute_checksums(bundle_dir)?,
+        };
+        manifest.integrity.digest = manifest.compute_digest();
+        Ok(manifest)
+    }
+
     /// Serialize and write the manifest to `<bundle_dir>/bundle.toml`.
     pub fn write(&self, bundle_dir: &Path) -> Result<()> {
         let contents = toml::to_string_pretty(self)
@@ -190,7 +209,7 @@ fn normalize_for_checksum<'a>(rel: &str, bytes: &'a [u8]) -> Cow<'a, [u8]> {
 /// A single difference found while comparing recorded checksums against the
 /// files actually present on disk.
 #[derive(Debug)]
-pub enum ChecksumError {
+pub(crate) enum ChecksumError {
     /// File is listed in the manifest but missing on disk.
     Missing(String),
     /// File is present on disk but not listed in the manifest.
@@ -222,7 +241,7 @@ impl std::fmt::Display for ChecksumError {
 }
 
 /// Compare the manifest's recorded checksums against the files on disk.
-pub fn verify_checksums(
+pub(crate) fn verify_checksums(
     bundle_dir: &Path,
     expected: &BTreeMap<String, String>,
 ) -> Result<Vec<ChecksumError>> {
@@ -251,18 +270,28 @@ pub fn verify_checksums(
     Ok(errors)
 }
 
-/// The bundle's compiled scripts as `(file stem, bytecode)`, sorted by file
-/// name (which is zero-padded, so lexical order is step order).
-pub fn load_compiled_scripts(bundle_dir: &Path) -> Result<Vec<(String, Vec<u8>)>> {
-    let dir = bundle_dir.join(BYTECODE_DIR);
-    let mut paths: Vec<PathBuf> = fs::read_dir(&dir)
-        .with_context(|| format!("failed to read {}", dir.display()))?
+/// The bundle's compiled script files, sorted by file name (which is
+/// zero-padded, so lexical order is step order).
+pub(crate) fn compiled_script_paths(bundle_dir: &Path) -> Vec<PathBuf> {
+    let Ok(entries) = fs::read_dir(bundle_dir.join(BYTECODE_DIR)) else {
+        return vec![];
+    };
+    let mut paths: Vec<PathBuf> = entries
         .filter_map(|e| e.ok().map(|e| e.path()))
         .filter(|p| p.extension().map(|x| x == "mv").unwrap_or(false))
         .collect();
     paths.sort();
+    paths
+}
+
+/// The bundle's compiled scripts as `(file stem, bytecode)`, in step order.
+pub fn load_compiled_scripts(bundle_dir: &Path) -> Result<Vec<(String, Vec<u8>)>> {
+    let paths = compiled_script_paths(bundle_dir);
     if paths.is_empty() {
-        bail!("no compiled scripts found in {}", dir.display());
+        bail!(
+            "no compiled scripts found in {}",
+            bundle_dir.join(BYTECODE_DIR).display()
+        );
     }
 
     paths
@@ -280,33 +309,6 @@ pub fn load_compiled_scripts(bundle_dir: &Path) -> Result<Vec<(String, Vec<u8>)>
         .collect()
 }
 
-/// Git revision and branch the bundle was generated from, read from the working
-/// tree at `core_path`.
-pub struct SourceInfo {
-    pub commit: String,
-    pub branch: Option<String>,
-}
-
-/// Read the current commit and branch from the git repository containing
-/// `core_path`.
-pub fn read_source_info(core_path: &Path) -> Result<SourceInfo> {
-    let repo = git2::Repository::discover(core_path)
-        .with_context(|| format!("failed to open git repo at {}", core_path.display()))?;
-    let head = repo.head().context("failed to resolve git HEAD")?;
-    let commit = head
-        .peel_to_commit()
-        .context("failed to peel HEAD to a commit")?
-        .id()
-        .to_string();
-    // Only report an actual branch (a detached HEAD's shorthand is a commit hash).
-    let branch = if head.is_branch() {
-        head.shorthand().map(|s| s.to_string())
-    } else {
-        None
-    };
-    Ok(SourceInfo { commit, branch })
-}
-
 /// Create the bundle directory, refusing to overwrite an existing one.
 pub fn create_bundle_dir(bundle_dir: &Path) -> Result<()> {
     if bundle_dir.exists() {
@@ -318,4 +320,117 @@ pub fn create_bundle_dir(bundle_dir: &Path) -> Result<()> {
     fs::create_dir_all(bundle_dir)
         .with_context(|| format!("failed to create {}", bundle_dir.display()))?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sha3::Sha3_256;
+
+    /// A minimal bundle on disk: one compiled script with its stamped source, a
+    /// metadata file, a summary with one unticked box, and a sealed manifest.
+    fn write_bundle(dir: &Path) -> BundleManifest {
+        for sub_dir in [SCRIPTS_DIR, BYTECODE_DIR, SUMMARY_DIR] {
+            fs::create_dir_all(dir.join(sub_dir)).unwrap();
+        }
+        let blob = b"bytecode";
+        fs::write(dir.join(BYTECODE_DIR).join("0-step.mv"), blob).unwrap();
+        fs::write(
+            dir.join(SCRIPTS_DIR).join("0-step.move"),
+            format!(
+                "// Script hash: {}\nscript {{ fun main() {{}} }}",
+                hex::encode(Sha3_256::digest(blob))
+            ),
+        )
+        .unwrap();
+        fs::write(dir.join(METADATA_JSON), b"{}").unwrap();
+        fs::write(dir.join(SUMMARY_DIR).join("notes.md"), "- [ ] reviewed\n").unwrap();
+
+        let manifest = BundleManifest::new(
+            dir,
+            BundleSection {
+                name: "test".to_string(),
+                created_at: "now".to_string(),
+            },
+            SourceSection {
+                branch: None,
+                commit: "abc".to_string(),
+            },
+        )
+        .unwrap();
+        manifest.write(dir).unwrap();
+        manifest
+    }
+
+    #[test]
+    fn manifest_round_trips_and_verifies() {
+        let dir = tempfile::tempdir().unwrap();
+        let written = write_bundle(dir.path());
+
+        let read = verify::verify(dir.path(), false).unwrap();
+        assert_eq!(read.integrity.digest, written.integrity.digest);
+
+        let scripts = load_compiled_scripts(dir.path()).unwrap();
+        assert_eq!(scripts, vec![("0-step".to_string(), b"bytecode".to_vec())]);
+    }
+
+    #[test]
+    fn verification_reports_every_problem() {
+        let dir = tempfile::tempdir().unwrap();
+        write_bundle(dir.path());
+
+        fs::write(dir.path().join(BYTECODE_DIR).join("0-step.mv"), b"tampered").unwrap();
+        fs::write(dir.path().join("extra.txt"), b"extra").unwrap();
+        fs::remove_file(dir.path().join(METADATA_JSON)).unwrap();
+
+        let message = verify::verify(dir.path(), false).unwrap_err().to_string();
+        for problem in [
+            "checksum mismatch for bytecode/0-step.mv",
+            "unexpected file (not in manifest): extra.txt",
+            "missing file (listed in manifest): metadata.json",
+            "missing metadata.json",
+            "does not match the hash stamped on its source",
+        ] {
+            assert!(message.contains(problem), "{}", message);
+        }
+    }
+
+    #[test]
+    fn ticking_a_summary_box_keeps_checksums_stable() {
+        let dir = tempfile::tempdir().unwrap();
+        write_bundle(dir.path());
+        let message = verify::verify(dir.path(), true).unwrap_err().to_string();
+        assert!(
+            message.contains("notes.md has unchecked boxes"),
+            "{}",
+            message
+        );
+
+        fs::write(
+            dir.path().join(SUMMARY_DIR).join("notes.md"),
+            "- [x] reviewed\n",
+        )
+        .unwrap();
+        verify::verify(dir.path(), true).unwrap();
+        assert_eq!(
+            verify::signoff_status(dir.path())
+                .into_iter()
+                .map(|(_, ticked, total)| (ticked, total))
+                .collect::<Vec<_>>(),
+            vec![(1, 1)]
+        );
+    }
+
+    #[test]
+    fn unsupported_format_version_is_rejected() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut manifest = write_bundle(dir.path());
+        manifest.format_version = BUNDLE_FORMAT_VERSION + 1;
+        manifest.write(dir.path()).unwrap();
+
+        let err = BundleManifest::read(dir.path()).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("unsupported bundle format version"));
+    }
 }

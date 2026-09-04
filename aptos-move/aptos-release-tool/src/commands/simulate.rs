@@ -7,8 +7,9 @@
 //! deploy-testnet submits -- against a fork of the target network. The
 //! bundle's script sources are never recompiled; they are audit material.
 
-use crate::{bundle, network::NetworkSelection};
+use crate::network::NetworkSelection;
 use anyhow::Result;
+use aptos_governance_bundle as bundle;
 use std::path::Path;
 
 pub async fn run(
@@ -18,7 +19,7 @@ pub async fn run(
     node_api_key: Option<String>,
 ) -> Result<()> {
     // Gate on the bundle's own integrity before simulating its scripts.
-    crate::commands::verify::run(bundle_path, false)?;
+    crate::commands::verify_bundle::run(bundle_path, false)?;
 
     let scripts = bundle::load_compiled_scripts(bundle_path)?;
 
