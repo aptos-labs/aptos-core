@@ -1,0 +1,101 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 131,
+        "offset": 2252,
+        "sha256": "cc788cbbc984624d1fa6981aa91265ac27a6ad9e92afeba271fd3e467dec62b9"
+      },
+      "edit": {
+        "at": 110,
+        "kind": "substitute",
+        "length": 19,
+        "to": "std::option::some(0)"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/configs/epoch_timeout_config.move",
+      "mutant_id": "AF-epoch-timeout-config-007-disabled-has-grace-period",
+      "obligation_category": "normal-result",
+      "rationale": "The disabled config carries no grace period. Pins `ensures result == { none }`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 77,
+        "offset": 2941,
+        "sha256": "996fc5fb874bbc0671de6a5125645e6a0f6752226b7e58ccae0e0265d75c2477"
+      },
+      "edit": {
+        "at": 41,
+        "kind": "substitute",
+        "length": 36,
+        "to": "std::option::some(grace_period_secs + 1)"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/configs/epoch_timeout_config.move",
+      "mutant_id": "AF-epoch-timeout-config-007-grace-period-off-by-one",
+      "obligation_category": "normal-result",
+      "rationale": "The stored grace period is the argument. Pins `ensures result == { some(grace_period_secs) }`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 141,
+        "offset": 1923,
+        "sha256": "2fa823caf4ff3a1cc37d8e786e46e42a6834a3a1f31f2023cfac26b26e002bf0"
+      },
+      "edit": {
+        "at": 90,
+        "kind": "substitute",
+        "length": 51,
+        "to": "if (!exists<EpochTimeoutConfig>(@aptos_framework)) {"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/configs/epoch_timeout_config.move",
+      "mutant_id": "AF-epoch-timeout-config-007-apply-branches-swapped",
+      "obligation_category": "abort",
+      "rationale": "Applying a pending config never aborts. Pins `OnNewEpochApply`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204"
+}

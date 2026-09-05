@@ -1,0 +1,101 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 120,
+        "offset": 2649,
+        "sha256": "6b85dedf0b8a20cd403ebc3adb44d7a211aac9c7e65f555b4118702f5bb102a8"
+      },
+      "edit": {
+        "at": 85,
+        "kind": "substitute",
+        "length": 35,
+        "to": "registry.registered.contains(&exchange)"
+      },
+      "essential": true,
+      "file": "sources/AptosExperimental/trading/position/trading_native_capability.move",
+      "mutant_id": "AX-trading-native-capability-010-denied-reads-registered",
+      "obligation_category": "normal-result",
+      "rationale": "`is_denied` reports the deny list. Pins `ensures result == spec_contains_key(denied, exchange)`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 112,
+        "offset": 3205,
+        "sha256": "431727d547bc107b3becd030384f576f5e6b25b34e044fcaa0438ae0795da0e0"
+      },
+      "edit": {
+        "at": 68,
+        "kind": "substitute",
+        "length": 44,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/AptosExperimental/trading/position/trading_native_capability.move",
+      "mutant_id": "AX-trading-native-capability-010-register-does-nothing",
+      "obligation_category": "normal-result",
+      "rationale": "Registering records the exchange. Pins `ensures spec_contains_key(registered, exchange)`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 45,
+        "offset": 3893,
+        "sha256": "729314c410138a5814207d69c62165d4562eca47d14853b72b4e5fd12ddcc758"
+      },
+      "edit": {
+        "at": 12,
+        "kind": "substitute",
+        "length": 33,
+        "to": "true,"
+      },
+      "essential": true,
+      "file": "sources/AptosExperimental/trading/position/trading_native_capability.move",
+      "mutant_id": "AX-trading-native-capability-010-denied-exchanges-active",
+      "obligation_category": "abort",
+      "rationale": "A denied exchange is not active. Pins `spec_active_aborts`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204"
+}

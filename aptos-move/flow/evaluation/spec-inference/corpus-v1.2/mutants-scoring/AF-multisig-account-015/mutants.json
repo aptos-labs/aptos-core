@@ -1,0 +1,101 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 201,
+        "offset": 23585,
+        "sha256": "9cb84535491da0c32c71aeaeb193c27f05973e32ddeea5c80fd1d07131d11534"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 33,
+        "to": "!is_owner(owner, multisig_account)"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/multisig_account.move",
+      "mutant_id": "AF-multisig-account-015-owner-negated",
+      "obligation_category": "normal-result",
+      "rationale": "Owner membership must gate execution the right way round. Pins `result ==> owner in owners`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 201,
+        "offset": 23585,
+        "sha256": "9cb84535491da0c32c71aeaeb193c27f05973e32ddeea5c80fd1d07131d11534"
+      },
+      "edit": {
+        "at": 124,
+        "kind": "substitute",
+        "length": 6,
+        "to": "+ 2 &&"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/multisig_account.move",
+      "mutant_id": "AF-multisig-account-015-sequence-off-by-one",
+      "obligation_category": "normal-result",
+      "rationale": "The executable transaction is exactly the next one. Pins `result ==> sequence_number == last_executed + 1`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 172,
+        "offset": 23189,
+        "sha256": "893fcd8bdac31e441f4e1310bfc099a6a20e64a4edd24b82f4a200d7913bb6de"
+      },
+      "edit": {
+        "at": 108,
+        "kind": "substitute",
+        "length": 64,
+        "to": "if (sequence_number == 0) { return false };"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/multisig_account.move",
+      "mutant_id": "AF-multisig-account-015-zero-sequence-returns-false",
+      "obligation_category": "abort",
+      "rationale": "Sequence number zero is not a transaction and must abort, not answer `false`. Pins the `sequence_number == 0` half of the range abort.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204"
+}

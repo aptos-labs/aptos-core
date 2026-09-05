@@ -1,0 +1,101 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 107,
+        "offset": 1889,
+        "sha256": "c36260dd8909739dc8bedf09b2f338ce8a07f29e00f3d0b7108661ce45d2d3da"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 52,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/aptos_coin.move",
+      "mutant_id": "AF-aptos-coin-010-store-dropped",
+      "obligation_category": "normal-result",
+      "rationale": "The mint capability must be stored. Pins `ensures exists<MintCapStore>(addr)`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 82,
+        "offset": 2761,
+        "sha256": "a674f6a5971566cf55bf58d4521dc07b96255845259451be80d4f2c482d6caa9"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 74,
+        "to": "if (!exists<MintCapStore>(@aptos_framework)) { return };\n        let MintCapStore { mint_cap } = move_from<MintCapStore>(@aptos_framework);"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/aptos_coin.move",
+      "mutant_id": "AF-aptos-coin-010-destroy-returns-when-missing",
+      "obligation_category": "abort",
+      "rationale": "Destroying a missing store must abort. Pins `aborts_if !exists<MintCapStore>`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 37,
+        "offset": 6270,
+        "sha256": "e75484ef0647c652b5909cd25f4bbd8b1c876c1deddbfb9853d3dabece3c4d53"
+      },
+      "edit": {
+        "at": 16,
+        "kind": "substitute",
+        "length": 18,
+        "to": "element.to != addr"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/aptos_coin.move",
+      "mutant_id": "AF-aptos-coin-010-find-wrong-match",
+      "obligation_category": "normal-result",
+      "rationale": "The index found names a delegation to `addr`. Pins the result post-condition.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204"
+}

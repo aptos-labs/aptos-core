@@ -15,7 +15,7 @@ This file is the runbook. It says how to run things, not how they work.
 | [`DESIGN.md`](DESIGN.md) | the design: experimental arms and contrasts, what a task is, where the corpus comes from, how a round executes, how a result is scored, the analysis plan, and the validity and contamination arguments |
 | [`CLAUDE.md`](CLAUDE.md) | working rules for editing this tree — dependency-contract methodology, loop/`sathard` methodology, the safe working sequence |
 | [`corpus-v3.1/README.md`](corpus-v3.1/README.md) | the benchmark corpus: targets, what makes them hard, mutants, what is left before the full run |
-| [`corpus-v1/README.md`](corpus-v1/README.md) | the retained framework corpus and the pipeline that built it |
+| [`corpus-v1.1/README.md`](corpus-v1.1/README.md) | the retained framework corpus and the pipeline that built it |
 | [`sandbox/README.md`](sandbox/README.md) | the sandbox: threat model, the two confinement layers, why the solver is proxied, and the explicit non-goals |
 | [`analysis/README.md`](analysis/README.md) | one-off round analysis, deliberately outside `harness/` |
 
@@ -32,7 +32,7 @@ This file is the runbook. It says how to run things, not how they work.
   credential wrapper.
 - `config/` — `default.json` (execution) and `corpus.json` (selection).
 - `schemas/` — published artifact contracts.
-- `corpus-v3.1/` — the benchmark corpus. `corpus-v1/` — retained infrastructure.
+- `corpus-v3.1/` — the benchmark corpus. `corpus-v1.1/` — retained infrastructure.
 - `tests/` — dependency-free fixtures; `analysis/` — round analysis.
 - `evaluation-artifacts/` — generated round material, gitignored.
 
@@ -131,8 +131,8 @@ the controller refuses a run whose two roots resolve equal. Omit the refutation
 root to run without the mechanism; omit `--mutants-root` and the round cannot
 report strict success at all.
 
-A corpus may withhold that set instead of refuting with it. corpus-v1 does:
-schedule it with `--disqualification-mutants-root corpus-v1/mutants` and run
+A corpus may withhold that set instead of refuting with it. corpus-v1.1 does:
+schedule it with `--disqualification-mutants-root corpus-v1.1/mutants` and run
 with no `--refutation-mutants-root`, so a contract gets no
 second attempt at the counterexamples, and the set is applied after the round
 as a gate -- a mutation that survives refutes the contract, and the run is
@@ -140,8 +140,8 @@ disqualified rather than measured:
 
 ```text
 .venv/bin/python -m harness.score_round --config ROUND/config.json \
-  --round-dir ROUND --mutants-root corpus-v1/mutants-scoring \
-  --disqualification-mutants-root corpus-v1/mutants
+  --round-dir ROUND --mutants-root corpus-v1.1/mutants-scoring \
+  --disqualification-mutants-root corpus-v1.1/mutants
 ```
 
 The two readings differ only in whether the session was given a second attempt

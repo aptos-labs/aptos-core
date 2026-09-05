@@ -57,7 +57,7 @@ package that is otherwise complete and provable.
 
 - `corpus-vN/package/` is a single editable Move package, vendored so it
   declares no external dependencies and relocates cleanly.
-- `corpus-v1/samples/<task-id>/README.md` is the human-facing recipe: target,
+- `corpus-v1.1/samples/<task-id>/README.md` is the human-facing recipe: target,
   source file, dependency closure, aliases, allowed edits, hashes, preparation
   patch. Samples are **overlays**, never independent package copies.
 - `materialize_task` copies the shared package, applies the preparation patch,
@@ -79,7 +79,7 @@ into a parameter.
 
 | corpus | source | status |
 |---|---|---|
-| [`corpus-v1/`](corpus-v1/README.md) | Aptos framework + experimental, pinned revision | superseded as a benchmark; retained as infrastructure |
+| [`corpus-v1.1/`](corpus-v1.1/README.md) | Aptos framework + experimental, pinned revision | superseded as a benchmark; retained as infrastructure |
 | [`corpus-v3.1/`](corpus-v3.1/README.md) | Etna | **the benchmark.** The full run is planned on this corpus |
 
 **V3 is the final benchmark target.** Rounds are planned and reported against
@@ -93,7 +93,7 @@ may be recall rather than inference. It is kept because it is the only
 is the only source of higher-order/iterator and global-state coverage, which the
 V3 pool structurally lacks. Its 8,000-plus lines of authored opaque dependency
 contracts are the proof infrastructure behind
-[`corpus-v1/metadata/prover-repairs.md`](corpus-v1/metadata/prover-repairs.md).
+[`corpus-v1.1/metadata/prover-repairs.md`](corpus-v1.1/metadata/prover-repairs.md).
 
 *V2* was an earlier cut of the same Etna source and has been removed; it lives
 in git history. It saturated — nearly every cell succeeded for every arm, so

@@ -1,0 +1,101 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 163,
+        "offset": 1602,
+        "sha256": "e64856f3661ff2abab90f65749ba93b7de948ab40d30fef3600b36ca741bb239"
+      },
+      "edit": {
+        "at": 149,
+        "kind": "substitute",
+        "length": 14,
+        "to": "user_leverage: 0,"
+      },
+      "essential": true,
+      "file": "sources/AptosExperimental/trading/position/native_position_types.move",
+      "mutant_id": "AX-native-position-types-005-zero-leverage",
+      "obligation_category": "normal-result",
+      "rationale": "Every field is stored as given. Pins the constructor post-condition.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 23,
+        "offset": 624,
+        "sha256": "a9d4f78be2a12d8f5752ef5a2ba1f53e28236b7932b3355157b52152585df271"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 9,
+        "to": "idx.index / 2"
+      },
+      "essential": true,
+      "file": "sources/AptosExperimental/trading/position/native_position_types.move",
+      "mutant_id": "AX-native-position-types-005-halved-index-value",
+      "obligation_category": "normal-result",
+      "rationale": "The accessor returns the stored index. Pins `ensures result == idx.index`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 38,
+        "offset": 2661,
+        "sha256": "565c3d32ec697dac6dfed9b638bbf49aa20b37156025cb7f352464d951512a14"
+      },
+      "edit": {
+        "at": 0,
+        "kind": "substitute",
+        "length": 22,
+        "to": "            timestamp + 1,"
+      },
+      "essential": true,
+      "file": "sources/AptosExperimental/trading/position/native_position_types.move",
+      "mutant_id": "AX-native-position-types-005-unpack-bumps-timestamp",
+      "obligation_category": "normal-result",
+      "rationale": "Unpacking returns the stored fields. Pins `ensures result_9 == pos.timestamp`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204"
+}

@@ -1,0 +1,101 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 107,
+        "offset": 1889,
+        "sha256": "c36260dd8909739dc8bedf09b2f338ce8a07f29e00f3d0b7108661ce45d2d3da"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 52,
+        "to": "if (exists<MintCapStore>(@aptos_framework)) {\n            move_to(aptos_framework, MintCapStore { mint_cap })\n        };"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/aptos_coin.move",
+      "mutant_id": "AF-aptos-coin-010-store-skipped",
+      "obligation_category": "normal-result",
+      "rationale": "The mint capability must be stored. Pins `ensures exists<MintCapStore>(addr)`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 104,
+        "offset": 2694,
+        "sha256": "d91e3c2060c29a1f73cf0b49bdc769ac8fe678ab10b96f4692dff5ab4169f718"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 58,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/aptos_coin.move",
+      "mutant_id": "AF-aptos-coin-010-destroy-no-framework-check",
+      "obligation_category": "abort",
+      "rationale": "Only the framework signer may destroy. Pins `aborts_if addr != @aptos_framework`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 77,
+        "offset": 6022,
+        "sha256": "b694304fcc30a0eba68484c97157399063b26586dd088af0cea1965c0d475628"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 69,
+        "to": "if (!exists<Delegations>(@core_resources)) { return option::none() };\n        let delegations = &borrow_global<Delegations>(@core_resources).inner;"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/aptos_coin.move",
+      "mutant_id": "AF-aptos-coin-010-find-returns-when-missing",
+      "obligation_category": "abort",
+      "rationale": "A missing delegation table must abort. Pins `aborts_if !exists<Delegations>`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204"
+}

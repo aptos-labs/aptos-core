@@ -1,0 +1,101 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 63,
+        "offset": 54950,
+        "sha256": "eaa51440ca2e594c9a83174a2edd65e878cd56bc4cfc9a03c42a0291a2a5e5f8"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 55,
+        "to": "account_resource.signer_capability_offer.for.extract();\n        account_resource.signer_capability_offer.for.fill(offerer_addr);"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/account/account.move",
+      "mutant_id": "AF-account-036-refill-after-extract",
+      "obligation_category": "normal-result",
+      "rationale": "The offer must stay cleared on return. Pins `ensures is_none(offer.for)`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 159,
+        "offset": 54790,
+        "sha256": "8081c6747542d6a77c26221bafca28bec997967c055a57cfe31e21a48f825961"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 77,
+        "to": "assert_account_resource_with_error(offerer_addr, ENO_SUCH_SIGNER_CAPABILITY);\n        assert!(Account[offerer_addr].sequence_number > 0, 1);"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/account/account.move",
+      "mutant_id": "AF-account-036-extra-abort-on-fresh-account",
+      "obligation_category": "abort",
+      "rationale": "No other abort exists. Pins the completeness of the abort conditions.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 63,
+        "offset": 54950,
+        "sha256": "eaa51440ca2e594c9a83174a2edd65e878cd56bc4cfc9a03c42a0291a2a5e5f8"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 55,
+        "to": "if (account_resource.sequence_number == 0) {\n            account_resource.signer_capability_offer.for.extract();\n        } else { return };"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/account/account.move",
+      "mutant_id": "AF-account-036-clear-only-fresh-accounts",
+      "obligation_category": "normal-result",
+      "rationale": "Every account is revoked the same way. Pins `ensures is_none(offer.for)` and the abort when no offer exists.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204"
+}

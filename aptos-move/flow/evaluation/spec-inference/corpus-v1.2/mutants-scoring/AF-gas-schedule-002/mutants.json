@@ -1,0 +1,101 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 87,
+        "offset": 6364,
+        "sha256": "92b9e40ae86387884c8e41467f99d038d5b9edb017101cc7f2ced5c1c06a4a43"
+      },
+      "edit": {
+        "at": 68,
+        "kind": "substitute",
+        "length": 19,
+        "to": "= GasScheduleV2 { feature_version: new_gas_schedule.feature_version, entries: vector[] };"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/configs/gas_schedule.move",
+      "mutant_id": "AF-gas-schedule-002-drops-entries",
+      "obligation_category": "normal-result",
+      "rationale": "The stored schedule is the pending one. Pins `OnNewEpochApply`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 53,
+        "offset": 6473,
+        "sha256": "be265d6150b5a0fad11a57ec1878666152f367175f23f513b16a9065e16ff15f"
+      },
+      "edit": {
+        "at": 16,
+        "kind": "substitute",
+        "length": 37,
+        "to": "move_to(framework, GasScheduleV2 { feature_version: 0, entries: vector[] });\n                let _ = new_gas_schedule;"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/configs/gas_schedule.move",
+      "mutant_id": "AF-gas-schedule-002-publishes-empty",
+      "obligation_category": "normal-result",
+      "rationale": "A first-time apply publishes the pending schedule. Pins `OnNewEpochApply`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 199,
+        "offset": 6026,
+        "sha256": "5c25756d58c3ebbd1b6466f37d8d7b81a117bb0be14fb515d16352761dd04939"
+      },
+      "edit": {
+        "at": 150,
+        "kind": "substitute",
+        "length": 49,
+        "to": "if (config_buffer::does_exist<GasScheduleV2>() && exists<GasScheduleV2>(@aptos_framework)) {"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/configs/gas_schedule.move",
+      "mutant_id": "AF-gas-schedule-002-skips-first-apply",
+      "obligation_category": "normal-result",
+      "rationale": "A pending schedule is applied even when none is published yet. Pins `OnNewEpochApply`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204"
+}
