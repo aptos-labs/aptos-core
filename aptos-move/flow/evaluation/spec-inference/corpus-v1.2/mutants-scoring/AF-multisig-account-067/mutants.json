@@ -1,0 +1,101 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 98,
+        "offset": 71241,
+        "sha256": "96810b431bb9a62c1972ebe47e0e7de3fa4355f3d21c0e73395ab2201b1c84b6"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 24,
+        "to": "let n = owners.length() / 2;"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/multisig_account.move",
+      "mutant_id": "AF-multisig-account-067-checks-half",
+      "obligation_category": "abort",
+      "rationale": "Every owner is checked. Pins both abort conditions over the whole vector.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 115,
+        "offset": 71340,
+        "sha256": "18df99c4d2bf38450b4ce79e9c4ea8c7206908a1d99642502d7c4938807b9d94"
+      },
+      "edit": {
+        "at": 20,
+        "kind": "substitute",
+        "length": 26,
+        "to": "owner == &multisig_account"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/multisig_account.move",
+      "mutant_id": "AF-multisig-account-067-self-owner-required",
+      "obligation_category": "abort",
+      "rationale": "Ordinary owners must pass. Pins the exact self-ownership abort condition.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 98,
+        "offset": 71241,
+        "sha256": "96810b431bb9a62c1972ebe47e0e7de3fa4355f3d21c0e73395ab2201b1c84b6"
+      },
+      "edit": {
+        "at": 41,
+        "kind": "substitute",
+        "length": 15,
+        "to": "while (i + 1 < n) {"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/multisig_account.move",
+      "mutant_id": "AF-multisig-account-067-skips-last-owner",
+      "obligation_category": "abort",
+      "rationale": "The last owner is checked too. Pins both abort conditions over the whole vector.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204"
+}

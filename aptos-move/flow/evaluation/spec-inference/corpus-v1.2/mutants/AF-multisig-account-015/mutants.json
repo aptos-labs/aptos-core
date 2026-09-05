@@ -1,0 +1,101 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 201,
+        "offset": 23585,
+        "sha256": "9cb84535491da0c32c71aeaeb193c27f05973e32ddeea5c80fd1d07131d11534"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 33,
+        "to": "true"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/multisig_account.move",
+      "mutant_id": "AF-multisig-account-015-ignore-owner",
+      "obligation_category": "normal-result",
+      "rationale": "A non-owner must never be able to execute. Pins `result ==> owner in owners`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 172,
+        "offset": 23189,
+        "sha256": "893fcd8bdac31e441f4e1310bfc099a6a20e64a4edd24b82f4a200d7913bb6de"
+      },
+      "edit": {
+        "at": 108,
+        "kind": "substitute",
+        "length": 64,
+        "to": "if (sequence_number == 0\n            || sequence_number >= MultisigAccount[multisig_account].next_sequence_number) {\n            return false\n        };"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/multisig_account.move",
+      "mutant_id": "AF-multisig-account-015-out-of-range-returns-false",
+      "obligation_category": "abort",
+      "rationale": "An out-of-range sequence number must abort rather than answer `false`. Pins `aborts_if sequence_number == 0 || sequence_number >= next_sequence_number`. Deleting the assertion alone does not: `vote` aborts on the same range and the transaction table borrow aborts on the same key, so the abort is over-determined and no contract can see the deletion. Returning early removes every abort path.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 201,
+        "offset": 23585,
+        "sha256": "9cb84535491da0c32c71aeaeb193c27f05973e32ddeea5c80fd1d07131d11534"
+      },
+      "edit": {
+        "at": 57,
+        "kind": "substitute",
+        "length": 70,
+        "to": "sequence_number >= last_resolved_sequence_number(multisig_account) + 1"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/multisig_account.move",
+      "mutant_id": "AF-multisig-account-015-sequence-inequality",
+      "obligation_category": "normal-result",
+      "rationale": "Only the next transaction may execute. Pins `result ==> sequence_number == last_executed + 1`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204"
+}

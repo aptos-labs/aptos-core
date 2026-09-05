@@ -1,0 +1,495 @@
+diff --git a/.move-inference-task.json b/.move-inference-task.json
+new file mode 100644
+index 0000000000..aea6dc3e08
+--- /dev/null
++++ b/.move-inference-task.json
+@@ -0,0 +1,327 @@
++{
++  "called_function_dependencies": [
++    "0x1::big_ordered_map::add",
++    "0x1::big_ordered_map::contains",
++    "0x1::big_ordered_map::new",
++    "0x1::big_ordered_map::remove",
++    "0x1::error::canonical",
++    "0x1::features::is_enabled",
++    "0x1::signer::borrow_address",
++    "0x1::system_addresses::assert_aptos_framework",
++    "0x7::trading_native_capability::assert_active"
++  ],
++  "granularity": "module",
++  "package_module_target": "0x7::trading_native_capability",
++  "schema_version": 3,
++  "source_commit": "1ffaa408ec8899d19e0933b1680dce339051cd9f",
++  "source_path": "sources/AptosExperimental/trading/position/trading_native_capability.move",
++  "spec_function_dependencies": [
++    "0x1::big_ordered_map::spec_contains_key",
++    "0x1::features::spec_is_enabled",
++    "0x1::signer::$address_of",
++    "0x1::signer::$borrow_address",
++    "0x7::trading_native_capability::spec_active_aborts",
++    "0x7::trading_native_capability::spec_registry"
++  ],
++  "target_functions": [
++    "register",
++    "init_module",
++    "assert_active",
++    "assert_valid",
++    "deny",
++    "get_capability",
++    "is_denied",
++    "reenable"
++  ],
++  "task_id": "AX-trading-native-capability-010",
++  "transitive_called_function_dependencies": [
++    "0x1::bcs::constant_serialized_size",
++    "0x1::bcs::serialized_size",
++    "0x1::big_ordered_map::add",
++    "0x1::big_ordered_map::add_at",
++    "0x1::big_ordered_map::add_or_upsert_impl",
++    "0x1::big_ordered_map::contains",
++    "0x1::big_ordered_map::destroy_empty_node",
++    "0x1::big_ordered_map::destroy_inner_child",
++    "0x1::big_ordered_map::find_leaf",
++    "0x1::big_ordered_map::find_leaf_path",
++    "0x1::big_ordered_map::get_max_degree",
++    "0x1::big_ordered_map::internal_lower_bound",
++    "0x1::big_ordered_map::internal_new_end_iter",
++    "0x1::big_ordered_map::iter_is_end",
++    "0x1::big_ordered_map::new",
++    "0x1::big_ordered_map::new_inner_child",
++    "0x1::big_ordered_map::new_iter",
++    "0x1::big_ordered_map::new_leaf_child",
++    "0x1::big_ordered_map::new_node",
++    "0x1::big_ordered_map::new_node_with_children",
++    "0x1::big_ordered_map::new_with_config",
++    "0x1::big_ordered_map::process_rebalance_after_child_removal",
++    "0x1::big_ordered_map::remove",
++    "0x1::big_ordered_map::remove_at_with_iter_hint",
++    "0x1::big_ordered_map::replace_root",
++    "0x1::big_ordered_map::update_key",
++    "0x1::big_ordered_map::validate_dynamic_size_and_init_max_degrees",
++    "0x1::big_ordered_map::validate_size_and_init_max_degrees",
++    "0x1::big_ordered_map::validate_static_size_and_init_max_degrees",
++    "0x1::cmp::compare",
++    "0x1::cmp::is_eq",
++    "0x1::cmp::is_gt",
++    "0x1::cmp::is_lt",
++    "0x1::error::canonical",
++    "0x1::error::invalid_argument",
++    "0x1::error::invalid_state",
++    "0x1::error::permission_denied",
++    "0x1::features::contains",
++    "0x1::features::is_enabled",
++    "0x1::features::is_trading_native_enabled",
++    "0x1::math64::max",
++    "0x1::math64::min",
++    "0x1::mem::replace",
++    "0x1::mem::swap",
++    "0x1::option::borrow",
++    "0x1::option::borrow_mut",
++    "0x1::option::destroy_none",
++    "0x1::option::destroy_some",
++    "0x1::option::fill",
++    "0x1::option::is_none",
++    "0x1::option::is_some",
++    "0x1::option::none",
++    "0x1::option::some",
++    "0x1::ordered_map::add",
++    "0x1::ordered_map::append_disjoint",
++    "0x1::ordered_map::append_impl",
++    "0x1::ordered_map::binary_search",
++    "0x1::ordered_map::destroy_empty",
++    "0x1::ordered_map::internal_find",
++    "0x1::ordered_map::internal_lower_bound",
++    "0x1::ordered_map::internal_new_begin_iter",
++    "0x1::ordered_map::internal_new_end_iter",
++    "0x1::ordered_map::is_empty",
++    "0x1::ordered_map::iter_add",
++    "0x1::ordered_map::iter_borrow",
++    "0x1::ordered_map::iter_borrow_key",
++    "0x1::ordered_map::iter_is_begin",
++    "0x1::ordered_map::iter_is_end",
++    "0x1::ordered_map::iter_prev",
++    "0x1::ordered_map::iter_remove",
++    "0x1::ordered_map::iter_replace",
++    "0x1::ordered_map::length",
++    "0x1::ordered_map::new",
++    "0x1::ordered_map::remove",
++    "0x1::ordered_map::remove_or_none",
++    "0x1::ordered_map::replace_key_inplace",
++    "0x1::ordered_map::trim",
++    "0x1::ordered_map::upsert",
++    "0x1::signer::address_of",
++    "0x1::signer::borrow_address",
++    "0x1::storage_slots_allocator::add_link",
++    "0x1::storage_slots_allocator::borrow",
++    "0x1::storage_slots_allocator::borrow_mut",
++    "0x1::storage_slots_allocator::fill_reserved_slot",
++    "0x1::storage_slots_allocator::free_reserved_slot",
++    "0x1::storage_slots_allocator::is_null_index",
++    "0x1::storage_slots_allocator::is_special_unused_index",
++    "0x1::storage_slots_allocator::maybe_pop_from_reuse_queue",
++    "0x1::storage_slots_allocator::maybe_push_to_reuse_queue",
++    "0x1::storage_slots_allocator::new",
++    "0x1::storage_slots_allocator::next_slot_index",
++    "0x1::storage_slots_allocator::remove",
++    "0x1::storage_slots_allocator::remove_and_reserve",
++    "0x1::storage_slots_allocator::remove_link",
++    "0x1::storage_slots_allocator::reserve_slot",
++    "0x1::storage_slots_allocator::reserved_to_index",
++    "0x1::storage_slots_allocator::stored_to_index",
++    "0x1::system_addresses::assert_aptos_framework",
++    "0x1::system_addresses::is_aptos_framework_address",
++    "0x1::table::add",
++    "0x1::table::add_box",
++    "0x1::table::borrow",
++    "0x1::table::borrow_box",
++    "0x1::table::borrow_box_mut",
++    "0x1::table::borrow_mut",
++    "0x1::table::new",
++    "0x1::table::new_table_handle",
++    "0x1::table::remove",
++    "0x1::table::remove_box",
++    "0x1::table_with_length::add",
++    "0x1::table_with_length::borrow",
++    "0x1::table_with_length::borrow_mut",
++    "0x1::table_with_length::new",
++    "0x1::table_with_length::remove",
++    "0x1::vector::append",
++    "0x1::vector::borrow",
++    "0x1::vector::borrow_mut",
++    "0x1::vector::destroy_empty",
++    "0x1::vector::empty",
++    "0x1::vector::insert",
++    "0x1::vector::is_empty",
++    "0x1::vector::length",
++    "0x1::vector::move_range",
++    "0x1::vector::pop_back",
++    "0x1::vector::push_back",
++    "0x1::vector::remove",
++    "0x1::vector::replace",
++    "0x1::vector::reverse",
++    "0x1::vector::reverse_append",
++    "0x1::vector::reverse_slice",
++    "0x1::vector::singleton",
++    "0x1::vector::swap",
++    "0x1::vector::trim",
++    "0x7::trading_native_capability::assert_active"
++  ],
++  "transitive_function_dependencies": [
++    "0x1::bcs::constant_serialized_size",
++    "0x1::bcs::serialized_size",
++    "0x1::big_ordered_map::add",
++    "0x1::big_ordered_map::add_at",
++    "0x1::big_ordered_map::add_or_upsert_impl",
++    "0x1::big_ordered_map::contains",
++    "0x1::big_ordered_map::destroy_empty_node",
++    "0x1::big_ordered_map::destroy_inner_child",
++    "0x1::big_ordered_map::find_leaf",
++    "0x1::big_ordered_map::find_leaf_path",
++    "0x1::big_ordered_map::get_max_degree",
++    "0x1::big_ordered_map::internal_lower_bound",
++    "0x1::big_ordered_map::internal_new_end_iter",
++    "0x1::big_ordered_map::iter_is_end",
++    "0x1::big_ordered_map::new",
++    "0x1::big_ordered_map::new_inner_child",
++    "0x1::big_ordered_map::new_iter",
++    "0x1::big_ordered_map::new_leaf_child",
++    "0x1::big_ordered_map::new_node",
++    "0x1::big_ordered_map::new_node_with_children",
++    "0x1::big_ordered_map::new_with_config",
++    "0x1::big_ordered_map::process_rebalance_after_child_removal",
++    "0x1::big_ordered_map::remove",
++    "0x1::big_ordered_map::remove_at_with_iter_hint",
++    "0x1::big_ordered_map::replace_root",
++    "0x1::big_ordered_map::update_key",
++    "0x1::big_ordered_map::validate_dynamic_size_and_init_max_degrees",
++    "0x1::big_ordered_map::validate_size_and_init_max_degrees",
++    "0x1::big_ordered_map::validate_static_size_and_init_max_degrees",
++    "0x1::cmp::compare",
++    "0x1::cmp::is_eq",
++    "0x1::cmp::is_gt",
++    "0x1::cmp::is_lt",
++    "0x1::error::canonical",
++    "0x1::error::invalid_argument",
++    "0x1::error::invalid_state",
++    "0x1::error::permission_denied",
++    "0x1::features::contains",
++    "0x1::features::is_enabled",
++    "0x1::features::is_trading_native_enabled",
++    "0x1::math64::max",
++    "0x1::math64::min",
++    "0x1::mem::replace",
++    "0x1::mem::swap",
++    "0x1::option::borrow",
++    "0x1::option::borrow_mut",
++    "0x1::option::destroy_none",
++    "0x1::option::destroy_some",
++    "0x1::option::fill",
++    "0x1::option::is_none",
++    "0x1::option::is_some",
++    "0x1::option::none",
++    "0x1::option::some",
++    "0x1::ordered_map::add",
++    "0x1::ordered_map::append_disjoint",
++    "0x1::ordered_map::append_impl",
++    "0x1::ordered_map::binary_search",
++    "0x1::ordered_map::destroy_empty",
++    "0x1::ordered_map::internal_find",
++    "0x1::ordered_map::internal_lower_bound",
++    "0x1::ordered_map::internal_new_begin_iter",
++    "0x1::ordered_map::internal_new_end_iter",
++    "0x1::ordered_map::is_empty",
++    "0x1::ordered_map::iter_add",
++    "0x1::ordered_map::iter_borrow",
++    "0x1::ordered_map::iter_borrow_key",
++    "0x1::ordered_map::iter_is_begin",
++    "0x1::ordered_map::iter_is_end",
++    "0x1::ordered_map::iter_prev",
++    "0x1::ordered_map::iter_remove",
++    "0x1::ordered_map::iter_replace",
++    "0x1::ordered_map::length",
++    "0x1::ordered_map::new",
++    "0x1::ordered_map::remove",
++    "0x1::ordered_map::remove_or_none",
++    "0x1::ordered_map::replace_key_inplace",
++    "0x1::ordered_map::trim",
++    "0x1::ordered_map::upsert",
++    "0x1::signer::address_of",
++    "0x1::signer::borrow_address",
++    "0x1::storage_slots_allocator::add_link",
++    "0x1::storage_slots_allocator::borrow",
++    "0x1::storage_slots_allocator::borrow_mut",
++    "0x1::storage_slots_allocator::fill_reserved_slot",
++    "0x1::storage_slots_allocator::free_reserved_slot",
++    "0x1::storage_slots_allocator::is_null_index",
++    "0x1::storage_slots_allocator::is_special_unused_index",
++    "0x1::storage_slots_allocator::maybe_pop_from_reuse_queue",
++    "0x1::storage_slots_allocator::maybe_push_to_reuse_queue",
++    "0x1::storage_slots_allocator::new",
++    "0x1::storage_slots_allocator::next_slot_index",
++    "0x1::storage_slots_allocator::remove",
++    "0x1::storage_slots_allocator::remove_and_reserve",
++    "0x1::storage_slots_allocator::remove_link",
++    "0x1::storage_slots_allocator::reserve_slot",
++    "0x1::storage_slots_allocator::reserved_to_index",
++    "0x1::storage_slots_allocator::stored_to_index",
++    "0x1::system_addresses::assert_aptos_framework",
++    "0x1::system_addresses::is_aptos_framework_address",
++    "0x1::table::add",
++    "0x1::table::add_box",
++    "0x1::table::borrow",
++    "0x1::table::borrow_box",
++    "0x1::table::borrow_box_mut",
++    "0x1::table::borrow_mut",
++    "0x1::table::new",
++    "0x1::table::new_table_handle",
++    "0x1::table::remove",
++    "0x1::table::remove_box",
++    "0x1::table_with_length::add",
++    "0x1::table_with_length::borrow",
++    "0x1::table_with_length::borrow_mut",
++    "0x1::table_with_length::new",
++    "0x1::table_with_length::remove",
++    "0x1::vector::append",
++    "0x1::vector::borrow",
++    "0x1::vector::borrow_mut",
++    "0x1::vector::destroy_empty",
++    "0x1::vector::empty",
++    "0x1::vector::insert",
++    "0x1::vector::is_empty",
++    "0x1::vector::length",
++    "0x1::vector::move_range",
++    "0x1::vector::pop_back",
++    "0x1::vector::push_back",
++    "0x1::vector::remove",
++    "0x1::vector::replace",
++    "0x1::vector::reverse",
++    "0x1::vector::reverse_append",
++    "0x1::vector::reverse_slice",
++    "0x1::vector::singleton",
++    "0x1::vector::swap",
++    "0x1::vector::trim",
++    "0x7::trading_native_capability::assert_active"
++  ],
++  "transitive_module_dependencies": [
++    "0x1::bcs",
++    "0x1::big_ordered_map",
++    "0x1::cmp",
++    "0x1::error",
++    "0x1::features",
++    "0x1::fixed_point32",
++    "0x1::math64",
++    "0x1::mem",
++    "0x1::option",
++    "0x1::ordered_map",
++    "0x1::signer",
++    "0x1::storage_slots_allocator",
++    "0x1::system_addresses",
++    "0x1::table",
++    "0x1::table_with_length",
++    "0x1::vector"
++  ]
++}
+diff --git a/sources/AptosExperimental/trading/position/trading_native_capability.spec.move b/sources/AptosExperimental/trading/position/trading_native_capability.spec.move
+index a0afbca576..d05ea0cc0d 100644
+--- a/sources/AptosExperimental/trading/position/trading_native_capability.spec.move
++++ b/sources/AptosExperimental/trading/position/trading_native_capability.spec.move
+@@ -14,85 +14,85 @@ spec aptos_experimental::trading_native_capability {
+             || big_ordered_map::spec_contains_key(spec_registry().denied, addr)
+     }
+ 
+-    spec init_module(deployer: &signer) {
+-        pragma opaque;
+-        aborts_if signer::address_of(deployer) != @aptos_experimental;
+-        modifies global<ExchangeRegistry>(@aptos_experimental);
+-        ensures exists<ExchangeRegistry>(@aptos_experimental);
+-        ensures old(exists<ExchangeRegistry>(@aptos_experimental))
+-            ==> spec_registry() == old(spec_registry());
+-        ensures !old(exists<ExchangeRegistry>(@aptos_experimental))
+-            ==> big_ordered_map::spec_len(spec_registry().registered) == 0
+-                && big_ordered_map::spec_len(spec_registry().denied) == 0;
+-    }
++                                         
++                      
++                                                                      
++                                                               
++                                                              
++                                                                  
++                                                        
++                                                                   
++                                                                          
++                                                                          
++     
+ 
+-    spec is_denied(exchange: address): bool {
+-        pragma opaque;
+-        aborts_if !exists<ExchangeRegistry>(@aptos_experimental);
+-        ensures result == big_ordered_map::spec_contains_key(spec_registry().denied, exchange);
+-    }
++                                             
++                      
++                                                                 
++                                                                                               
++     
+ 
+-    spec register(framework: &signer, exchange: address) {
+-        pragma opaque;
+-        aborts_if signer::address_of(framework) != @aptos_framework;
+-        aborts_if !features::spec_is_enabled(TRADING_NATIVE);
+-        aborts_if !exists<ExchangeRegistry>(@aptos_experimental);
+-        modifies global<ExchangeRegistry>(@aptos_experimental);
+-        ensures big_ordered_map::spec_contains_key(spec_registry().registered, exchange);
+-        ensures spec_registry().denied == old(spec_registry().denied);
+-        ensures spec_registry().registered
+-            == (if (big_ordered_map::spec_contains_key(old(spec_registry().registered), exchange)) {
+-                old(spec_registry().registered)
+-            } else {
+-                big_ordered_map::spec_set(old(spec_registry().registered), exchange, Empty {})
+-            });
+-    }
++                                                          
++                      
++                                                                    
++                                                             
++                                                                 
++                                                               
++                                                                                         
++                                                                      
++                                          
++                                                                                                    
++                                               
++                    
++                                                                                              
++               
++     
+ 
+-    spec assert_active(addr: address) {
+-        pragma opaque;
+-        aborts_if spec_active_aborts(addr);
+-    }
++                                       
++                      
++                                           
++     
+ 
+-    spec get_capability(exchange: &signer): TradingNativeCapability {
+-        pragma opaque;
+-        aborts_if spec_active_aborts(signer::address_of(exchange));
+-        ensures result == TradingNativeCapability { exchange: signer::address_of(exchange) };
+-    }
++                                                                     
++                      
++                                                                   
++                                                                                             
++     
+ 
+-    spec assert_valid(cap: &TradingNativeCapability) {
+-        pragma opaque;
+-        aborts_if spec_active_aborts(cap.exchange);
+-    }
++                                                      
++                      
++                                                   
++     
+ 
+-    spec deny(framework: &signer, exchange: address) {
+-        pragma opaque;
+-        aborts_if signer::address_of(framework) != @aptos_framework;
+-        aborts_if !exists<ExchangeRegistry>(@aptos_experimental);
+-        modifies global<ExchangeRegistry>(@aptos_experimental);
+-        ensures big_ordered_map::spec_contains_key(spec_registry().denied, exchange);
+-        ensures spec_registry().registered == old(spec_registry().registered);
+-        ensures spec_registry().denied
+-            == (if (big_ordered_map::spec_contains_key(old(spec_registry().denied), exchange)) {
+-                old(spec_registry().denied)
+-            } else {
+-                big_ordered_map::spec_set(old(spec_registry().denied), exchange, Empty {})
+-            });
+-    }
++                                                      
++                      
++                                                                    
++                                                                 
++                                                               
++                                                                                     
++                                                                              
++                                      
++                                                                                                
++                                           
++                    
++                                                                                          
++               
++     
+ 
+-    spec reenable(framework: &signer, exchange: address) {
+-        pragma opaque;
+-        aborts_if signer::address_of(framework) != @aptos_framework;
+-        aborts_if !exists<ExchangeRegistry>(@aptos_experimental);
+-        modifies global<ExchangeRegistry>(@aptos_experimental);
+-        ensures !big_ordered_map::spec_contains_key(spec_registry().denied, exchange);
+-        ensures spec_registry().registered == old(spec_registry().registered);
+-        ensures spec_registry().denied
+-            == (if (big_ordered_map::spec_contains_key(old(spec_registry().denied), exchange)) {
+-                big_ordered_map::spec_remove(old(spec_registry().denied), exchange)
+-            } else {
+-                old(spec_registry().denied)
+-            });
+-    }
++                                                          
++                      
++                                                                    
++                                                                 
++                                                               
++                                                                                      
++                                                                              
++                                      
++                                                                                                
++                                                                                   
++                    
++                                           
++               
++     
+ 
+     spec exchange(cap: &TradingNativeCapability): address {
+         pragma opaque;

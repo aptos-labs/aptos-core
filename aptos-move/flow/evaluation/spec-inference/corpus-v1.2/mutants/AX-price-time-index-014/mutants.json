@@ -1,0 +1,37 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 95,
+        "offset": 2999,
+        "sha256": "65bc779b098b40d426c147e6dcb7785bcd412d2f8e4b695f1adb33473351ca5b"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 20,
+        "to": "assert!(1 == 2, 1);\n        PriceTimeIndex::V1 {"
+      },
+      "essential": true,
+      "file": "sources/AptosExperimental/trading/order_book/price_time_index.move",
+      "mutant_id": "AX-price-time-index-014-always-aborts",
+      "obligation_category": "abort",
+      "rationale": "Construction never aborts. Pins `aborts_if false`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204"
+}

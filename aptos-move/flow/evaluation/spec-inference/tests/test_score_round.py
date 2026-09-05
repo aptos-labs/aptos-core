@@ -55,7 +55,7 @@ class UnscorableRunTest(unittest.TestCase):
 class DisqualificationGateTest(unittest.TestCase):
     """A withheld set refutes a contract instead of teaching it.
 
-    corpus-v1 does not show its refutation set during a run, so a contract gets
+    corpus-v1.1 does not show its refutation set during a run, so a contract gets
     no second attempt at the counterexamples in it. The set is applied here
     instead, and a mutation that survives voids the run rather than costing it
     a fraction of a mutation score.

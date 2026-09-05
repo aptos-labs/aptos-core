@@ -492,7 +492,7 @@ class CorpusRoundTest(unittest.TestCase):
             )
 
     def test_a_shared_package_recipe_starts_each_task_from_its_prepared_tree(self) -> None:
-        # A corpus-v1 record names the shared package and a preparation patch
+        # A corpus-v1.1 record names the shared package and a preparation patch
         # that removes the target's reference contract; a run must start from
         # the patched tree, not from the package the corpus keeps for proving.
         from harness.artifacts import tree_hash

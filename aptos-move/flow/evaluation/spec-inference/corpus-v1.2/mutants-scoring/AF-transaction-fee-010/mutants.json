@@ -1,0 +1,101 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 230,
+        "offset": 4982,
+        "sha256": "b6f19bc599c5add253e61f96304ee92f571ce039ddd7c4503aec6fafc975ef55"
+      },
+      "edit": {
+        "at": 167,
+        "kind": "substitute",
+        "length": 63,
+        "to": "if (!exists<AptosFAMintCapabilities>(@aptos_framework)) {\n            move_to(aptos_framework, AptosFAMintCapabilities { mint_ref })\n        };"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/transaction_fee.move",
+      "mutant_id": "AF-transaction-fee-010-silently-skips-fa-cap",
+      "obligation_category": "abort",
+      "rationale": "Storing twice must abort. Pins `aborts_if exists<AptosFAMintCapabilities>(addr)`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 71,
+        "offset": 5213,
+        "sha256": "df7224e5dfb720d7128792af03904f7d8c6c3fc9864aecde39b59da8067e0723"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 63,
+        "to": "move_to(aptos_framework, AptosCoinMintCapability { mint_cap });\n        if (exists<AptosCoinMintCapability>(@aptos_framework)) { abort 7 };"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/transaction_fee.move",
+      "mutant_id": "AF-transaction-fee-010-aborts-after-coin-cap",
+      "obligation_category": "abort",
+      "rationale": "The function succeeds when its conditions hold. Pins the completeness of the abort conditions.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 99,
+        "offset": 4820,
+        "sha256": "b6d0a634135a220d319ab698fc0a39d0b2cec290a2fe6b8147bebcc7634dce46"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 58,
+        "to": "assert!(std::signer::address_of(aptos_framework) == @aptos_framework\n            || std::signer::address_of(aptos_framework) == @0x2, 0);"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/transaction_fee.move",
+      "mutant_id": "AF-transaction-fee-010-accepts-address-two",
+      "obligation_category": "abort",
+      "rationale": "Only the framework address may store. Pins the exact signer abort condition.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204"
+}

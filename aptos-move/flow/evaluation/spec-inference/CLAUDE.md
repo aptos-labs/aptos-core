@@ -6,7 +6,7 @@ its reporting requirements are defined in the
 [design](DESIGN.md).
 [`DESIGN.md`](DESIGN.md) describes the architecture: what a task is, where the
 corpus comes from, how a round executes, and how a result is scored. Read that
-design, `DESIGN.md`, this file, `README.md`, and `corpus-v1/README.md` before
+design, `DESIGN.md`, this file, `README.md`, and `corpus-v1.1/README.md` before
 making material changes.
 
 ## Goal and current checkpoint
@@ -27,7 +27,7 @@ do not overwrite or silently combine prior artifacts.
 
 Do **not** launch a benchmark round until the shared dependency-contract gate
 passes. The current authoritative gate is
-`corpus-v1/metadata/dependency-contract-audit.json`; it currently has
+`corpus-v1.1/metadata/dependency-contract-audit.json`; it currently has
 `ready: true`. The latest audit has 307 ordinary opaque contracts, 12
 documented expert assumptions, 28 private intrinsic-model boundaries, 40
 native bindings, and 77 direct intrinsic bindings. It has no partial-abort,
@@ -38,18 +38,18 @@ still predates dependency repairs and must be rerun before a benchmark round.
 
 ## Corpus model
 
-`corpus-v1/framework/` is the single editable Move package shared by every
+`corpus-v1.1/framework/` is the single editable Move package shared by every
 sample. It is a union of the selected targets' source-level dependency closure.
 It is deliberately editable: dependency implementations may need loop
 invariants or complete contracts to make the corpus provable.
 
-`corpus-v1/samples/<task-id>/README.md` is the human-facing task recipe. It names
+`corpus-v1.1/samples/<task-id>/README.md` is the human-facing task recipe. It names
 the target, target source file, dependency closure, aliases, allowed edits,
 hashes, and preparation patch. Samples are overlays; do not create or maintain
 independent framework copies for each one. The package's module-to-file mapping
-is `corpus-v1/framework/corpus-modules.json`.
+is `corpus-v1.1/framework/corpus-modules.json`.
 
-Keep durable corpus evidence inside `corpus-v1/`:
+Keep durable corpus evidence inside `corpus-v1.1/`:
 
 - `manifest.json`: source identity and all sample recipes.
 - `metadata/`: inventory, selection, contract audit, target-body proof output,
@@ -60,7 +60,7 @@ Keep durable corpus evidence inside `corpus-v1/`:
 Only generated development-round material belongs in
 `evaluation-artifacts/`. Do not leave phase-specific or one-off JSON files
 beside the corpus root; either remove superseded generated artifacts when
-explicitly authorized or consolidate stable metadata under `corpus-v1/metadata/`.
+explicitly authorized or consolidate stable metadata under `corpus-v1.1/metadata/`.
 
 `AF` means **Aptos Framework** and `AX` means **Aptos Experimental**.
 
@@ -93,7 +93,7 @@ For every authored opaque dependency contract:
   rationale. A diagnostic body-proof attempt may use a temporary package copy
   that changes only `verify = false` to `verify = true`; leave `opaque` intact.
   Record the same classification in
-  `corpus-v1/metadata/trusted-verification-boundaries.json`. Undocumented skips
+  `corpus-v1.1/metadata/trusted-verification-boundaries.json`. Undocumented skips
   remain audit blockers. This exception never applies to specifications
   produced by an experimental arm: agents may not claim success by disabling
   verification.
@@ -123,7 +123,7 @@ add focused regression coverage where practical; it is not a candidate
 exclusion. Re-screen all affected tasks afterward. Behavior-preserving repairs
 to shared dependency code are allowed for a documented proof/infrastructure
 reason. Preserve the rationale and proof evidence in
-`corpus-v1/metadata/prover-repairs.md`.
+`corpus-v1.1/metadata/prover-repairs.md`.
 
 ## Loop, HOF, and `sathard` methodology
 
@@ -278,7 +278,7 @@ contract is authored for the intrinsic function itself.
 3. Repair one coherent dependency boundary or loop at a time. Preserve all
    existing user work in the dirty tree.
 4. Prove a strengthened opaque dependency bottom-up before relying on it in a
-   caller. Record the output in `corpus-v1/metadata/`.
+   caller. Record the output in `corpus-v1.1/metadata/`.
 5. Refresh the audit and then rerun compatibility screening for affected
    samples. A target that exceeds the configured screening threshold is
    excluded/replaced only before arm runs and only through the recorded reserve
@@ -290,7 +290,7 @@ The user has explicitly authorized fixing Flow and prover bugs discovered by
 this work. Do not change target behavior merely to simplify an evaluation
 sample. Do not modify real framework packages outside this isolated corpus
 without a separate request; the normal cached-package rebuild rule applies to
-`aptos-move/framework/`, not to `corpus-v1/framework/`.
+`aptos-move/framework/`, not to `corpus-v1.1/framework/`.
 
 ## Running and verification
 
@@ -299,11 +299,11 @@ commands and artifact paths are in `README.md`; the key dependency gate is:
 
 ```bash
 move-inference-verify-dependency-contracts \
-  --package corpus-v1/framework \
-  --manifest corpus-v1/manifest.json \
-  --trusted-boundaries corpus-v1/metadata/trusted-verification-boundaries.json \
+  --package corpus-v1.1/framework \
+  --manifest corpus-v1.1/manifest.json \
+  --trusted-boundaries corpus-v1.1/metadata/trusted-verification-boundaries.json \
   --move-flow /absolute/path/to/move-flow \
-  --output corpus-v1/metadata/dependency-contract-verification.json
+  --output corpus-v1.1/metadata/dependency-contract-verification.json
 ```
 
 Real Claude Code + GLM development runs use the local wrapper through the

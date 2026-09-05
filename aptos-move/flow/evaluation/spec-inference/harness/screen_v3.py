@@ -1,6 +1,6 @@
 """Treatment-blind compatibility screening for the corpus-v3.1 package.
 
-`screen.py` drives the corpus-v1 shape: one overlay patch and snapshot per
+`screen.py` drives the corpus-v1.1 shape: one overlay patch and snapshot per
 sample, thirty selected records, a `source_commit` at the manifest root.
 corpus-v3.1 is a single package with targets named inside it, so it needs its own
 driver rather than a manifest bent to fit the other one.
@@ -87,7 +87,7 @@ async def screen_corpus_v3(
         )
         reference = await _prove_reference(config, manifest_path, record, threshold)
         # `check_compatibility` also requires that WP's unaided output verify.
-        # That is the right bar for a prepared corpus-v1 sample, where the
+        # That is the right bar for a prepared corpus-v1.1 sample, where the
         # dependency contracts have to be complete before a target is asked of
         # anyone. Here the target *is* the task, and a target WP cannot do
         # unaided is the interesting kind -- admitting only what WP already

@@ -1,0 +1,101 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 70,
+        "offset": 9957,
+        "sha256": "3a923256aac9cc611c99ce2adac638dde50989575d05c606fa2ad81d88efd5f7"
+      },
+      "edit": {
+        "at": 47,
+        "kind": "substitute",
+        "length": 23,
+        "to": "= voting_duration_secs + 1;"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/aptos_governance.move",
+      "mutant_id": "AF-aptos-governance-034-duration-off-by-one",
+      "obligation_category": "normal-result",
+      "rationale": "The stored duration is the argument. Pins `ensures voting_duration_secs == voting_duration_secs`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 188,
+        "offset": 9768,
+        "sha256": "ec9b3ef53716595bf9abd29fa159ef5f3232d2fe9e45a3688f02ca5911272b0f"
+      },
+      "edit": {
+        "at": 42,
+        "kind": "substitute",
+        "length": 58,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/aptos_governance.move",
+      "mutant_id": "AF-aptos-governance-034-no-framework-check",
+      "obligation_category": "abort",
+      "rationale": "Only the framework signer may update. Pins `aborts_if addr != @aptos_framework`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 70,
+        "offset": 10028,
+        "sha256": "a18548998d548868f6909da14cd7e55ea138085754142f17ff11eefe115bad1e"
+      },
+      "edit": {
+        "at": 47,
+        "kind": "substitute",
+        "length": 23,
+        "to": "= min_voting_threshold / 2;"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/aptos_governance.move",
+      "mutant_id": "AF-aptos-governance-034-threshold-halved",
+      "obligation_category": "normal-result",
+      "rationale": "The stored threshold is the argument. Pins `ensures min_voting_threshold == min_voting_threshold`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204"
+}
