@@ -4,7 +4,8 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
-- _No changes yet._
+- Add `aptos governance propose-bundle` and `aptos governance execute-bundle`, which submit and execute a governance bundle's proposal using the bundle's compiled scripts. `execute-bundle` resumes from the step the chain expects next.
+- `aptos governance propose` and `execute-proposal` now print a hint pointing at the bundle commands.
 
 ## [9.5.1]
 - Change default REST URLs for `aptos init` from `fullnode.*.aptoslabs.com` to `api.*.aptoslabs.com` for mainnet, testnet, and devnet.

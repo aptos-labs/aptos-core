@@ -155,19 +155,6 @@ pub fn write_feature_flag_summary(
     Ok(())
 }
 
-/// Scan a summary file's contents for unchecked checkboxes (`[ ]`). Used by
-/// `verify --require-signoff`.
-pub fn has_unchecked_boxes(contents: &str) -> bool {
-    contents.contains("[ ]")
-}
-
-/// Count `(ticked, total)` checkboxes in a summary file's contents.
-pub fn box_counts(contents: &str) -> (usize, usize) {
-    let ticked = contents.matches("[x]").count() + contents.matches("[X]").count();
-    let unchecked = contents.matches("[ ]").count();
-    (ticked, ticked + unchecked)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

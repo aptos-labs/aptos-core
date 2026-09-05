@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+pub mod bundle;
 pub mod delegation_pool;
 pub mod utils;
 
@@ -61,6 +62,8 @@ pub enum GovernanceTool {
     ListProposals(ListProposals),
     VerifyProposal(VerifyProposal),
     ExecuteProposal(ExecuteProposal),
+    ProposeBundle(bundle::ProposeBundle),
+    ExecuteBundle(bundle::ExecuteBundle),
     GenerateUpgradeProposal(GenerateUpgradeProposal),
     ApproveExecutionHash(ApproveExecutionHash),
     #[clap(subcommand)]
@@ -74,6 +77,8 @@ impl GovernanceTool {
             Propose(tool) => tool.execute_serialized().await,
             Vote(tool) => tool.execute_serialized().await,
             ExecuteProposal(tool) => tool.execute_serialized().await,
+            ProposeBundle(tool) => tool.execute_serialized().await,
+            ExecuteBundle(tool) => tool.execute_serialized().await,
             GenerateUpgradeProposal(tool) => tool.execute_serialized_success().await,
             ShowProposal(tool) => tool.execute_serialized().await,
             ListProposals(tool) => tool.execute_serialized().await,
@@ -280,6 +285,8 @@ async fn get_proposal(
 }
 
 /// Submit a governance proposal
+///
+/// For a governance bundle, use `propose-bundle` instead.
 #[derive(Parser)]
 pub struct SubmitProposal {
     #[clap(flatten)]
@@ -350,27 +357,30 @@ impl SubmitProposalArgs {
         #[cfg(not(feature = "no-upload-proposal"))]
         let bytes = get_metadata_from_url(&self.metadata_url).await?;
 
-        let metadata: ProposalMetadata = serde_json::from_slice(&bytes).map_err(|err| {
-            CliError::CommandArgumentError(format!(
-                "Metadata is not in a proper JSON format: {}",
-                err
-            ))
-        })?;
-        Url::parse(&metadata.source_code_url).map_err(|err| {
-            CliError::CommandArgumentError(format!(
-                "Source code URL {} is invalid {}",
-                metadata.source_code_url, err
-            ))
-        })?;
-        Url::parse(&metadata.discussion_url).map_err(|err| {
-            CliError::CommandArgumentError(format!(
-                "Discussion URL {} is invalid {}",
-                metadata.discussion_url, err
-            ))
-        })?;
+        let metadata = parse_proposal_metadata(&bytes)?;
         let metadata_hash = HashValue::sha3_256_of(&bytes);
         Ok((metadata, metadata_hash))
     }
+}
+
+/// Parse proposal metadata JSON, requiring its URLs to be well-formed.
+fn parse_proposal_metadata(bytes: &[u8]) -> CliTypedResult<ProposalMetadata> {
+    let metadata: ProposalMetadata = serde_json::from_slice(bytes).map_err(|err| {
+        CliError::CommandArgumentError(format!("Metadata is not in a proper JSON format: {}", err))
+    })?;
+    Url::parse(&metadata.source_code_url).map_err(|err| {
+        CliError::CommandArgumentError(format!(
+            "Source code URL {} is invalid {}",
+            metadata.source_code_url, err
+        ))
+    })?;
+    Url::parse(&metadata.discussion_url).map_err(|err| {
+        CliError::CommandArgumentError(format!(
+            "Discussion URL {} is invalid {}",
+            metadata.discussion_url, err
+        ))
+    })?;
+    Ok(metadata)
 }
 
 #[async_trait]
@@ -380,6 +390,11 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
     }
 
     async fn execute(mut self) -> CliTypedResult<ProposalSubmissionSummary> {
+        eprintln!(
+            "Note: to submit a governance bundle, use `aptos governance propose-bundle`, which \
+             takes the compiled scripts and metadata from the bundle."
+        );
+
         // Validate the proposal metadata
         let (script_hash, metadata_hash) = self.args.compile_proposals().await?;
         prompt_yes_with_override(
@@ -387,35 +402,57 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
             self.args.txn_options.prompt_options,
         )?;
 
-        let txn: Transaction = if self.args.is_multi_step {
-            self.args
-                .txn_options
-                .submit_transaction(aptos_stdlib::aptos_governance_create_proposal_v2(
-                    self.pool_address_args.pool_address,
-                    script_hash.to_vec(),
-                    self.args.metadata_url.to_string().as_bytes().to_vec(),
-                    metadata_hash.to_hex().as_bytes().to_vec(),
-                    true,
-                ))
-                .await?
-        } else {
-            self.args
-                .txn_options
-                .submit_transaction(aptos_stdlib::aptos_governance_create_proposal(
-                    self.pool_address_args.pool_address,
-                    script_hash.to_vec(),
-                    self.args.metadata_url.to_string().as_bytes().to_vec(),
-                    metadata_hash.to_hex().as_bytes().to_vec(),
-                ))
-                .await?
-        };
-        let txn_summary = TransactionSummary::from(&txn);
-        let proposal_id = extract_proposal_id(&txn)?;
-        Ok(ProposalSubmissionSummary {
-            proposal_id,
-            transaction: txn_summary,
-        })
+        create_proposal(
+            &self.args.txn_options,
+            self.pool_address_args.pool_address,
+            script_hash,
+            &self.args.metadata_url,
+            metadata_hash,
+            self.args.is_multi_step,
+        )
+        .await
     }
+}
+
+/// Create the on-chain proposal for a script's execution hash and report its id.
+async fn create_proposal(
+    txn_options: &TransactionOptions,
+    pool_address: AccountAddress,
+    script_hash: HashValue,
+    metadata_url: &Url,
+    metadata_hash: HashValue,
+    is_multi_step: bool,
+) -> CliTypedResult<ProposalSubmissionSummary> {
+    let metadata_url = metadata_url.to_string().as_bytes().to_vec();
+    let metadata_hash = metadata_hash.to_hex().as_bytes().to_vec();
+    let payload = if is_multi_step {
+        aptos_stdlib::aptos_governance_create_proposal_v2(
+            pool_address,
+            script_hash.to_vec(),
+            metadata_url,
+            metadata_hash,
+            true,
+        )
+    } else {
+        aptos_stdlib::aptos_governance_create_proposal(
+            pool_address,
+            script_hash.to_vec(),
+            metadata_url,
+            metadata_hash,
+        )
+    };
+    let txn = txn_options.submit_transaction(payload).await?;
+    Ok(ProposalSubmissionSummary {
+        proposal_id: extract_proposal_id(&txn)?,
+        transaction: TransactionSummary::from(&txn),
+    })
+}
+
+/// The transaction executing one step of a proposal.
+fn execution_payload(bytecode: Vec<u8>, proposal_id: u64) -> TransactionPayload {
+    TransactionPayload::Script(Script::new(bytecode, vec![], vec![
+        TransactionArgument::U64(proposal_id),
+    ]))
 }
 
 /// Retrieve the Metadata from the given URL
@@ -780,6 +817,8 @@ impl std::fmt::Display for ProposalMetadata {
 }
 
 /// Execute a proposal that has passed voting requirements
+///
+/// For a governance bundle, use `execute-bundle` instead.
 #[derive(Parser)]
 pub struct ExecuteProposal {
     /// Proposal Id being executed
@@ -798,6 +837,11 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
     }
 
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
+        eprintln!(
+            "Note: to execute a governance bundle, use `aptos governance execute-bundle`, which \
+             runs the bundle's compiled scripts in order and resumes where it left off."
+        );
+
         let (bytecode, _script_hash) = self.compile_proposal_args.compile(
             &DiagWriter::stderr(),
             "ExecuteProposal",
@@ -805,11 +849,8 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
         )?;
         // TODO: Check hash so we don't do a failed roundtrip?
 
-        let args = vec![TransactionArgument::U64(self.proposal_id)];
-        let txn = TransactionPayload::Script(Script::new(bytecode, vec![], args));
-
         self.txn_options
-            .submit_transaction(txn)
+            .submit_transaction(execution_payload(bytecode, self.proposal_id))
             .await
             .map(TransactionSummary::from)
     }
