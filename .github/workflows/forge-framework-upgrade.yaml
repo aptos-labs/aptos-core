@@ -1,0 +1,161 @@
+# Forge framework upgrade test. Was land-blocking in docker-build-test.yaml; that job
+# is now opt-in via the CICD:run-framework-upgrade-test label, and scheduled/manual runs
+# live here. Structure follows forge-stable.yaml.
+name: Forge Framework Upgrade
+
+permissions:
+  issues: write
+  pull-requests: write
+  contents: read
+  id-token: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      TARGET_BRANCH:
+        required: false
+        type: string
+        description: >-
+          Branch to upgrade to. Defaults to the branch selected above. Images must
+          already be built for it.
+      FORGE_CLUSTER_NAME:
+        required: false
+        type: string
+        description: The Forge k8s cluster to be used for test
+      FORGE_RUNNER_DURATION_SECS:
+        required: false
+        type: string
+        description: Duration of the forge test run, in seconds
+        default: "300"
+
+  # No pull_request or push trigger: a run here is a full Forge swarm, which is the
+  # cost this workflow exists to move off PRs.
+  # schedule: # NOTE: the schedule is dictated by PIES
+
+env:
+  AWS_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_REGION: us-west-2
+
+jobs:
+  permission-check:
+    runs-on: 2cpu-gh-ubuntu24-x64
+    steps:
+      - name: Check repository permission for user which triggered workflow
+        uses: sushichop/action-repository-permission@13d208f5ae7a6a3fc0e5a7c2502c214983f0241c
+        with:
+          required-permission: write
+          comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
+
+  # Resolves the two image tags the suite upgrades between.
+  #
+  # Actions are pinned @main, not `./`: a `./` ref loads the action from the dispatched
+  # ref, running that branch's code with credentials configured. Same as forge-stable.
+  determine-test-metadata:
+    needs: [permission-check]
+    if: |
+      !failure() && !cancelled() && needs.permission-check.result == 'success'
+    runs-on: 2cpu-gh-ubuntu24-x64
+    steps:
+      - uses: actions/checkout@v4
+
+      # The actions below interpolate their inputs unquoted into Bash, and `${{ }}` is
+      # substituted before Bash parses. Git permits $( ) in branch names, so read the
+      # value via `env` (never expression-substituted) and validate the charset.
+      - name: Resolve and validate target branch
+        id: target
+        env:
+          RAW_TARGET: ${{ inputs.TARGET_BRANCH || github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${RAW_TARGET}" ]]; then
+            echo "::error::No target branch resolved"
+            exit 1
+          fi
+          if ! [[ "${RAW_TARGET}" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]]; then
+            echo "::error::Refusing target branch with unexpected characters"
+            exit 1
+          fi
+          echo "BRANCH=${RAW_TARGET}" >> "$GITHUB_OUTPUT"
+
+          # Baseline is resolved separately: a release branch against its predecessor,
+          # anything else against "main" (newest aptos-release-vX.Y, by version). Passing
+          # a feature branch through instead takes determine_target_branch()'s
+          # personal-branch path, which orders by tip commit date and can pick an older
+          # release that merely had a recent hotfix.
+          if [[ "${RAW_TARGET}" =~ ^aptos-release-v ]]; then
+            echo "BASE_BRANCH=${RAW_TARGET}" >> "$GITHUB_OUTPUT"
+          else
+            echo "BASE_BRANCH=main" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Target branch: ${RAW_TARGET}"
+
+      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+        id: docker-setup
+        with:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          EXPORT_GCP_PROJECT_VARIABLES: "false"
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
+      # Upgrade target. No variants: framework_upgrade needs only the plain validator
+      # image, and requiring failpoints/performance would skip past the branch's own
+      # commits (those are never built for a PR branch) onto an ancestor on main.
+      - uses: aptos-labs/aptos-core/.github/actions/get-latest-docker-image-tag@main
+        id: get-latest-image-tag
+        with:
+          branch: ${{ steps.target.outputs.BRANCH }}
+
+      # Upgrade baseline. Must not be empty: the action only resolves a last released
+      # image when base-branch is set, otherwise it falls back to the latest image on the
+      # current branch and the suite would "upgrade" the binary under test to itself.
+      - uses: aptos-labs/aptos-core/.github/actions/determine-or-use-target-branch-and-get-last-released-image@main
+        id: get-last-released-image-tag
+        with:
+          base-branch: ${{ steps.target.outputs.BASE_BRANCH }}
+          variants: "failpoints performance"
+
+      # Timestamped so concurrent runs cannot collide on one k8s namespace.
+      - name: Derive Forge namespace suffix
+        id: normalize
+        run: |
+          GHA_TRIGGER_EVENT_NAME=${{ github.event_name == 'workflow_dispatch' && 'w-d' || github.event_name }}
+          TIMESTAMP=$(date +%s)
+          FORGE_NAMESPACE_SUFFIX="fwup-${GHA_TRIGGER_EVENT_NAME}-${TIMESTAMP}"
+          FORGE_NAMESPACE_SUFFIX=${FORGE_NAMESPACE_SUFFIX:0:30}
+          echo "FORGE_NAMESPACE_SUFFIX=${FORGE_NAMESPACE_SUFFIX}" >> "$GITHUB_OUTPUT"
+
+      - name: Write summary
+        run: |
+          echo "## Framework upgrade test" >> $GITHUB_STEP_SUMMARY
+          echo "Upgrading FROM \`${{ steps.get-last-released-image-tag.outputs.IMAGE_TAG }}\` (branch \`${{ steps.get-last-released-image-tag.outputs.TARGET_BRANCH }}\`)" >> $GITHUB_STEP_SUMMARY
+          echo "Upgrading TO \`${{ steps.get-latest-image-tag.outputs.IMAGE_TAG }}\` (branch \`${{ steps.target.outputs.BRANCH }}\`)" >> $GITHUB_STEP_SUMMARY
+
+    outputs:
+      IMAGE_TAG_NEW: ${{ steps.get-latest-image-tag.outputs.IMAGE_TAG }}
+      IMAGE_TAG_BASELINE: ${{ steps.get-last-released-image-tag.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE_SUFFIX: ${{ steps.normalize.outputs.FORGE_NAMESPACE_SUFFIX }}
+
+  forge-framework-upgrade-test:
+    needs:
+      - permission-check
+      - determine-test-metadata
+    if: |
+      !failure() && !cancelled() && needs.permission-check.result == 'success'
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      # Swarm starts on IMAGE_TAG (last release) and upgrades to images Forge resolves
+      # from GIT_SHA's history.
+      GIT_SHA: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG_NEW }}
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG_BASELINE }}
+      FORGE_TEST_SUITE: framework_upgrade
+      FORGE_RUNNER_DURATION_SECS: ${{ fromJSON(inputs.FORGE_RUNNER_DURATION_SECS || '300') }}
+      FORGE_CLUSTER_NAME: ${{ inputs.FORGE_CLUSTER_NAME }}
+      COMMENT_HEADER: forge-framework-upgrade
+      FORGE_NAMESPACE: forge-framework-upgrade-${{ needs.determine-test-metadata.outputs.FORGE_NAMESPACE_SUFFIX }}
+      SEND_RESULTS_TO_TRUNK: true
