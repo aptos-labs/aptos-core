@@ -377,7 +377,7 @@ def MModule.toJson (module : MModule) : JsonResult Json := do
     encodeFun decl info
   let fields := [
     ("schema", .str "move-xir-module"),
-    ("version", nat 5),
+    ("version", nat 6),
     ("module", Json.mkObj [
       ("address", .str (encodeAddress module.address)),
       ("name", .str module.name),
@@ -511,7 +511,7 @@ def decodeMModule (text : String) : JsonResult MModule := do
   let schema ← (← json.getObjVal? "schema").getStr?
   unless schema = "move-xir-module" do throw s!"unsupported XIR schema `{schema}`"
   let version ← (← json.getObjVal? "version").getNat?
-  unless version = 3 || version = 4 || version = 5 do
+  unless version = 3 || version = 4 || version = 5 || version = 6 do
     throw s!"unsupported XIR schema version {version}"
   let moduleJson ← json.getObjVal? "module"
   let address ← decodeAddress (← (← moduleJson.getObjVal? "address").getStr?)
@@ -526,7 +526,7 @@ def decodeMModule (text : String) : JsonResult MModule := do
     | .ok value => value.getArr?
     | .error _ => pure #[]
   let legacy := Json.mkObj [
-    ("version", nat 10),
+    ("version", nat 11),
     ("structs", .arr structsJson),
     ("funs", .arr functionsJson)
   ]
