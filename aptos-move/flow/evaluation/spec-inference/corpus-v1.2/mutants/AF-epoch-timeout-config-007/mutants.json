@@ -1,0 +1,101 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 51,
+        "offset": 2779,
+        "sha256": "4eea8843d305077ecc5ed90c9274f96cf522afcd5a8d4ea3920606c9fa3c5185"
+      },
+      "edit": {
+        "at": 29,
+        "kind": "substitute",
+        "length": 22,
+        "to": "true,"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/configs/epoch_timeout_config.move",
+      "mutant_id": "AF-epoch-timeout-config-007-zero-grace-period-allowed",
+      "obligation_category": "abort",
+      "rationale": "A zero grace period must abort. Pins `aborts_if grace_period_secs == 0`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 108,
+        "offset": 3329,
+        "sha256": "12c96d07ce7905bb21aeb52c809aee74597cac93a4fba68cb5d4864b6f36b265"
+      },
+      "edit": {
+        "at": 12,
+        "kind": "substitute",
+        "length": 79,
+        "to": "{ let _ = borrow_global<EpochTimeoutConfig>(@aptos_framework).force_end_grace_period_secs; std::option::none<u64>() }"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/configs/epoch_timeout_config.move",
+      "mutant_id": "AF-epoch-timeout-config-007-getter-ignores-config",
+      "obligation_category": "normal-result",
+      "rationale": "The getter reports the stored value. Pins `ensures exists ==> result == stored`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 107,
+        "offset": 1205,
+        "sha256": "b6d614617adc2a8e62b701a9796c277338d512d0679194364a69dfbc6f3a25b3"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 52,
+        "to": "if (true) {"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/configs/epoch_timeout_config.move",
+      "mutant_id": "AF-epoch-timeout-config-007-initialize-republishes",
+      "obligation_category": "abort",
+      "rationale": "A second initialize keeps the resource and does not abort. Pins the idempotence of `InitializeResource`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204"
+}

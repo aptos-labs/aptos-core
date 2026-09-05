@@ -1,0 +1,101 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 115,
+        "offset": 71340,
+        "sha256": "18df99c4d2bf38450b4ce79e9c4ea8c7206908a1d99642502d7c4938807b9d94"
+      },
+      "edit": {
+        "at": 12,
+        "kind": "substitute",
+        "length": 103,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/multisig_account.move",
+      "mutant_id": "AF-multisig-account-067-self-owner-allowed",
+      "obligation_category": "abort",
+      "rationale": "The multisig account cannot own itself. Pins `aborts_if exists i: owners[i] == multisig_account`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 71,
+        "offset": 71518,
+        "sha256": "135f6243d324e2de78a780694bab273a3525e2d2cff58b0a6e2cc00767cc7185"
+      },
+      "edit": {
+        "at": 12,
+        "kind": "substitute",
+        "length": 59,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/multisig_account.move",
+      "mutant_id": "AF-multisig-account-067-duplicates-allowed",
+      "obligation_category": "abort",
+      "rationale": "Duplicate owners must abort. Pins the duplicate abort condition.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 61,
+        "offset": 71456,
+        "sha256": "03af9b664a34d2574c919e92f0676bf40cbe7c455d654bfe7067391a4866a928"
+      },
+      "edit": {
+        "at": 12,
+        "kind": "substitute",
+        "length": 49,
+        "to": "let (found, _) = (false, 0);"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/multisig_account.move",
+      "mutant_id": "AF-multisig-account-067-never-finds-duplicates",
+      "obligation_category": "abort",
+      "rationale": "Duplicates are detected against every earlier owner. Pins the duplicate abort condition.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204"
+}

@@ -204,7 +204,7 @@ Dependency = {{ local = "../dependency" }}
                     encoding="utf-8",
                 )
 
-            package_store = Path(temporary) / "corpus-v1/packages"
+            package_store = Path(temporary) / "corpus-v1.1/packages"
             shared_packages: dict[str, Path] = {}
             destinations = []
             for index, root in enumerate(roots):

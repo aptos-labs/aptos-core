@@ -1,0 +1,101 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 73,
+        "offset": 90329,
+        "sha256": "f2af934246a7a4c3744eaf84f9185196965926d9f984565d83eda36e7ce12ca7"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 24,
+        "to": "while (v2.length() > 1) {"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/stake.move",
+      "mutant_id": "AF-stake-004-leaves-one",
+      "obligation_category": "normal-result",
+      "rationale": "Every element moves. Pins `ensures len(v2) == 0`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 73,
+        "offset": 90329,
+        "sha256": "f2af934246a7a4c3744eaf84f9185196965926d9f984565d83eda36e7ce12ca7"
+      },
+      "edit": {
+        "at": 45,
+        "kind": "substitute",
+        "length": 28,
+        "to": "v1.insert(0, v2.pop_back());"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/stake.move",
+      "mutant_id": "AF-stake-004-inserts-at-front",
+      "obligation_category": "normal-result",
+      "rationale": "The old prefix of `v1` is preserved. Pins the prefix and suffix post-conditions.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 73,
+        "offset": 90329,
+        "sha256": "f2af934246a7a4c3744eaf84f9185196965926d9f984565d83eda36e7ce12ca7"
+      },
+      "edit": {
+        "at": 45,
+        "kind": "substitute",
+        "length": 28,
+        "to": "v1.push_back(v2.remove(0));"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/stake.move",
+      "mutant_id": "AF-stake-004-takes-from-front",
+      "obligation_category": "normal-result",
+      "rationale": "Elements arrive in reverse order of `v2`. Pins the suffix post-condition.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204"
+}

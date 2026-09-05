@@ -1,0 +1,101 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 264,
+        "offset": 18718,
+        "sha256": "31637b9b33bbc266ef13ea46545891f558f376a941f7a192d29bc09d32138502"
+      },
+      "edit": {
+        "at": 185,
+        "kind": "substitute",
+        "length": 79,
+        "to": "let s = borrow_global<VestingContract>(vesting_contract_address).vesting_schedule;\n        s.start_timestamp_secs = 0;\n        s\n    }"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/vesting.move",
+      "mutant_id": "AF-vesting-042-zeroes-start",
+      "obligation_category": "normal-result",
+      "rationale": "The schedule is returned unchanged. Pins the result post-condition.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 264,
+        "offset": 18718,
+        "sha256": "31637b9b33bbc266ef13ea46545891f558f376a941f7a192d29bc09d32138502"
+      },
+      "edit": {
+        "at": 185,
+        "kind": "substitute",
+        "length": 79,
+        "to": "let s = borrow_global<VestingContract>(vesting_contract_address).vesting_schedule;\n        s.period_duration = s.period_duration + 1;\n        s\n    }"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/vesting.move",
+      "mutant_id": "AF-vesting-042-bumps-period",
+      "obligation_category": "normal-result",
+      "rationale": "The schedule is returned unchanged. Pins the result post-condition.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 264,
+        "offset": 18718,
+        "sha256": "31637b9b33bbc266ef13ea46545891f558f376a941f7a192d29bc09d32138502"
+      },
+      "edit": {
+        "at": 185,
+        "kind": "substitute",
+        "length": 79,
+        "to": "let s = borrow_global<VestingContract>(vesting_contract_address).vesting_schedule;\n        s.last_vested_period = 0;\n        s\n    }"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/vesting.move",
+      "mutant_id": "AF-vesting-042-zeroes-last-vested",
+      "obligation_category": "normal-result",
+      "rationale": "The schedule is returned unchanged. Pins the result post-condition.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204"
+}

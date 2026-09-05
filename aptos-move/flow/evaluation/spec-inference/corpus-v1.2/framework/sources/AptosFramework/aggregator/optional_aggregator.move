@@ -1,0 +1,309 @@
+/// This module provides an interface to aggregate integers either via
+/// aggregator (parallelizable) or via normal integers.
+module aptos_framework::optional_aggregator {
+    use std::error;
+    use std::option::{Self, Option};
+
+    use aptos_framework::aggregator_factory;
+    use aptos_framework::aggregator::{Self, Aggregator};
+
+    friend aptos_framework::coin;
+    friend aptos_framework::fungible_asset;
+
+    /// The value of aggregator underflows (goes below zero). Raised by native code.
+    const EAGGREGATOR_OVERFLOW: u64 = 1;
+
+    /// Aggregator feature is not supported. Raised by native code.
+    const EAGGREGATOR_UNDERFLOW: u64 = 2;
+
+    /// OptionalAggregator (Agg V1) switch not supported any more.
+    const ESWITCH_DEPRECATED: u64 = 3;
+
+    const MAX_U128: u128 = 340282366920938463463374607431768211455;
+
+    /// Wrapper around integer with a custom overflow limit. Supports add, subtract and read just like `Aggregator`.
+    struct Integer has store {
+        value: u128,
+        limit: u128,
+    }
+
+    /// Creates a new integer which overflows on exceeding a `limit`.
+    fun new_integer(limit: u128): Integer {
+        Integer {
+            value: 0,
+            limit,
+        }
+    }
+
+    /// Adds `value` to integer. Aborts on overflowing the limit.
+    fun add_integer(integer: &mut Integer, value: u128) {
+        assert!(
+            value <= (integer.limit - integer.value),
+            error::out_of_range(EAGGREGATOR_OVERFLOW)
+        );
+        integer.value += value;
+    }
+
+    /// Subtracts `value` from integer. Aborts on going below zero.
+    fun sub_integer(integer: &mut Integer, value: u128) {
+        assert!(value <= integer.value, error::out_of_range(EAGGREGATOR_UNDERFLOW));
+        integer.value -= value;
+    }
+
+    /// Returns an overflow limit of integer.
+    fun limit(integer: &Integer): u128 {
+        integer.limit
+    }
+
+    /// Returns a value stored in this integer.
+    fun read_integer(integer: &Integer): u128 {
+        integer.value
+    }
+
+    /// Destroys an integer.
+    fun destroy_integer(integer: Integer) {
+        let Integer { value: _, limit: _ } = integer;
+    }
+
+    /// Contains either an aggregator or a normal integer, both overflowing on limit.
+    struct OptionalAggregator has store {
+        // Parallelizable.
+        aggregator: Option<Aggregator>,
+        // Non-parallelizable.
+        integer: Option<Integer>,
+    }
+
+    /// Creates a new optional aggregator.
+    friend fun new(parallelizable: bool): OptionalAggregator {
+        if (parallelizable) {
+            OptionalAggregator {
+                aggregator: option::some(aggregator_factory::create_aggregator_internal()),
+                integer: option::none(),
+            }
+        } else {
+            OptionalAggregator {
+                aggregator: option::none(),
+                integer: option::some(new_integer(MAX_U128)),
+            }
+        }
+    }
+
+    /// Switches from parallelizable to non-parallelizable implementation.
+    public fun switch(optional_aggregator: &mut OptionalAggregator) {
+        if (optional_aggregator.aggregator.is_some()) {
+            let aggregator = optional_aggregator.aggregator.extract();
+            let limit = aggregator::limit(&aggregator);
+            let value = aggregator::read(&aggregator);
+            aggregator::destroy(aggregator);
+            optional_aggregator.integer.fill(Integer {
+                value, limit
+            });
+            return;
+        }
+
+        // Do not allow upgrades to parallelizable.
+        abort error::invalid_state(ESWITCH_DEPRECATED)
+    }
+
+    /// Destroys optional aggregator.
+    public fun destroy(optional_aggregator: OptionalAggregator) {
+        if (is_parallelizable(&optional_aggregator)) {
+            destroy_optional_aggregator(optional_aggregator);
+        } else {
+            destroy_optional_integer(optional_aggregator);
+        }
+    }
+
+    /// Destroys parallelizable optional aggregator and returns its limit.
+    fun destroy_optional_aggregator(optional_aggregator: OptionalAggregator): u128 {
+        let OptionalAggregator { aggregator, integer } = optional_aggregator;
+        let limit = aggregator::limit(aggregator.borrow());
+        aggregator::destroy(aggregator.destroy_some());
+        integer.destroy_none();
+        limit
+    }
+
+    /// Destroys non-parallelizable optional aggregator and returns its limit.
+    fun destroy_optional_integer(optional_aggregator: OptionalAggregator): u128 {
+        let OptionalAggregator { aggregator, integer } = optional_aggregator;
+        let limit = limit(integer.borrow());
+        destroy_integer(integer.destroy_some());
+        aggregator.destroy_none();
+        limit
+    }
+
+    /// Adds `value` to optional aggregator, aborting on exceeding the `limit`.
+    public fun add(optional_aggregator: &mut OptionalAggregator, value: u128) {
+        if (optional_aggregator.aggregator.is_some()) {
+            let aggregator = optional_aggregator.aggregator.borrow_mut();
+            aggregator::add(aggregator, value);
+        } else {
+            let integer = optional_aggregator.integer.borrow_mut();
+            add_integer(integer, value);
+        }
+    }
+
+    /// Subtracts `value` from optional aggregator, aborting on going below zero.
+    public fun sub(optional_aggregator: &mut OptionalAggregator, value: u128) {
+        if (optional_aggregator.aggregator.is_some()) {
+            let aggregator = optional_aggregator.aggregator.borrow_mut();
+            aggregator::sub(aggregator, value);
+        } else {
+            let integer = optional_aggregator.integer.borrow_mut();
+            sub_integer(integer, value);
+        }
+    }
+
+    /// Returns the value stored in optional aggregator.
+    public fun read(optional_aggregator: &OptionalAggregator): u128 {
+        if (optional_aggregator.aggregator.is_some()) {
+            let aggregator = optional_aggregator.aggregator.borrow();
+            aggregator::read(aggregator)
+        } else {
+            let integer = optional_aggregator.integer.borrow();
+            read_integer(integer)
+        }
+    }
+
+    /// Returns true if optional aggregator uses parallelizable implementation.
+    public fun is_parallelizable(optional_aggregator: &OptionalAggregator): bool {
+        optional_aggregator.aggregator.is_some()
+    }
+
+    #[test(account = @aptos_framework)]
+    fun optional_aggregator_switch_to_integer_test(account: signer) {
+        aggregator_factory::initialize_aggregator_factory(&account);
+        let aggregator = new(true);
+        add(&mut aggregator, 100);
+        switch(&mut aggregator);
+        assert!(!is_parallelizable(&aggregator), 0);
+        assert!(read(&aggregator) == 100, 0);
+        destroy(aggregator);
+    }
+
+    #[test(account = @aptos_framework)]
+    #[expected_failure(abort_code = 0x030003, location = Self)]
+    fun optional_aggregator_switch_to_aggregator_fail_test(account: signer) {
+        aggregator_factory::initialize_aggregator_factory(&account);
+        let aggregator = new(false);
+        switch(&mut aggregator);
+        destroy(aggregator);
+    }
+
+    #[test(account = @aptos_framework)]
+    fun optional_aggregator_test_integer(account: signer) {
+        aggregator_factory::initialize_aggregator_factory(&account);
+
+        let aggregator = new(false);
+        assert!(!is_parallelizable(&aggregator), 0);
+
+        add(&mut aggregator, 12);
+        add(&mut aggregator, 3);
+        assert!(read(&aggregator) == 15, 0);
+
+        sub(&mut aggregator, 10);
+        assert!(read(&aggregator) == 5, 0);
+
+        add(&mut aggregator, 12);
+        add(&mut aggregator, 3);
+        assert!(read(&aggregator) == 20, 0);
+
+        sub(&mut aggregator, 10);
+        assert!(read(&aggregator) == 10, 0);
+
+        destroy(aggregator);
+    }
+
+    #[test(account = @aptos_framework)]
+    fun optional_aggregator_test_aggregator(account: signer) {
+        aggregator_factory::initialize_aggregator_factory(&account);
+        let aggregator = new(true);
+        assert!(is_parallelizable(&aggregator), 0);
+
+        add(&mut aggregator, 12);
+        add(&mut aggregator, 3);
+        assert!(read(&aggregator) == 15, 0);
+
+        sub(&mut aggregator, 10);
+        assert!(read(&aggregator) == 5, 0);
+
+        add(&mut aggregator, 12);
+        add(&mut aggregator, 3);
+        assert!(read(&aggregator) == 20, 0);
+
+        sub(&mut aggregator, 10);
+        assert!(read(&aggregator) == 10, 0);
+
+        destroy(aggregator);
+    }
+
+    #[test(account = @aptos_framework)]
+    fun optional_aggregator_destroy_test(account: signer) {
+        aggregator_factory::initialize_aggregator_factory(&account);
+
+        let aggregator = new(false);
+        destroy(aggregator);
+
+        let aggregator = new(true);
+        destroy(aggregator);
+
+        let aggregator = new(false);
+        assert!(destroy_optional_integer(aggregator) == MAX_U128, 0);
+
+        let aggregator = new(true);
+        assert!(destroy_optional_aggregator(aggregator) == MAX_U128, 0);
+    }
+
+    #[test(account = @aptos_framework)]
+    #[expected_failure(abort_code = 0x020001, location = Self)]
+    fun non_parallelizable_aggregator_overflow_test(account: signer) {
+        aggregator_factory::initialize_aggregator_factory(&account);
+        let aggregator = new(false);
+        add(&mut aggregator, MAX_U128 - 15);
+
+        // Overflow!
+        add(&mut aggregator, 16);
+
+        destroy(aggregator);
+    }
+
+    #[test(account = @aptos_framework)]
+    #[expected_failure(abort_code = 0x020002, location = Self)]
+    fun non_parallelizable_aggregator_underflow_test(account: signer) {
+        aggregator_factory::initialize_aggregator_factory(&account);
+        let aggregator = new(false);
+
+        // Underflow!
+        sub(&mut aggregator, 100);
+        add(&mut aggregator, 100);
+
+        destroy(aggregator);
+    }
+
+    #[test(account = @aptos_framework)]
+    #[expected_failure(abort_code = 0x020001, location = aptos_framework::aggregator)]
+    fun parallelizable_aggregator_overflow_test(account: signer) {
+        aggregator_factory::initialize_aggregator_factory(&account);
+        let aggregator = new(true);
+        add(&mut aggregator, MAX_U128 - 15);
+
+        // Overflow!
+        add(&mut aggregator, 16);
+
+        destroy(aggregator);
+    }
+
+    #[test(account = @aptos_framework)]
+    #[expected_failure(abort_code = 0x020002, location = aptos_framework::aggregator)]
+    fun parallelizable_aggregator_underflow_test(account: signer) {
+        aggregator_factory::initialize_aggregator_factory(&account);
+        let aggregator = new(true);
+
+        // Underflow!
+        add(&mut aggregator, 99);
+        sub(&mut aggregator, 100);
+        add(&mut aggregator, 100);
+
+        destroy(aggregator);
+    }
+}

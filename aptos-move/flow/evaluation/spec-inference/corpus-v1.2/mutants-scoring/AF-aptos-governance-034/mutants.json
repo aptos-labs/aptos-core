@@ -1,0 +1,101 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 76,
+        "offset": 10099,
+        "sha256": "d90e227df84dfad48d0b988e840a87e9b597f2fa6cc1cde46dfe2601ef56db3f"
+      },
+      "edit": {
+        "at": 50,
+        "kind": "substitute",
+        "length": 26,
+        "to": "= governance_config.required_proposer_stake;"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/aptos_governance.move",
+      "mutant_id": "AF-aptos-governance-034-stake-unchanged",
+      "obligation_category": "normal-result",
+      "rationale": "The proposer stake must be updated. Pins `ensures required_proposer_stake == required_proposer_stake`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 133,
+        "offset": 9870,
+        "sha256": "744e638dda74ecbd980818e8f0ac5062ed74f9fdf5a320885ba3c9d88a4c620b"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 78,
+        "to": "if (!exists<GovernanceConfig>(@aptos_framework)) { return };\n        let governance_config = borrow_global_mut<GovernanceConfig>(@aptos_framework);"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/aptos_governance.move",
+      "mutant_id": "AF-aptos-governance-034-return-when-missing",
+      "obligation_category": "abort",
+      "rationale": "A missing config must abort. Pins `aborts_if !exists<GovernanceConfig>`.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 70,
+        "offset": 9957,
+        "sha256": "3a923256aac9cc611c99ce2adac638dde50989575d05c606fa2ad81d88efd5f7"
+      },
+      "edit": {
+        "at": 47,
+        "kind": "substitute",
+        "length": 23,
+        "to": "= 0;"
+      },
+      "essential": true,
+      "file": "sources/AptosFramework/aptos_governance.move",
+      "mutant_id": "AF-aptos-governance-034-duration-zeroed",
+      "obligation_category": "normal-result",
+      "rationale": "The stored duration is the argument, not a constant. Pins the duration post-condition.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204"
+}
