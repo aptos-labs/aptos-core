@@ -8,8 +8,8 @@ Specification inference is a compile-and-prove loop, not a test loop:
 
 - `{{ tool(name="move_spec_check") }}` decides whether the work is
   done, and is the only thing that does.
-- `{{ tool(name="move_package_verify") }}` proves a scope while the contract is
-  still taking shape.
+- `{{ tool(name="move_package_verify") }}` localizes a verification failure
+  after the candidate check reports one.
 - `{{ tool(name="move_package_status") }}`,
   `{{ tool(name="move_package_manifest") }}` and
   `{{ tool(name="move_package_query") }}` answer questions about the package.
