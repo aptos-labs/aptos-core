@@ -437,7 +437,7 @@ pub struct Violation {
     pub path: String,
     pub line: usize,
     pub message: String,
-    /// Function and source context used internally to distinguish otherwise
+    /// Enclosing scope and source context used internally to distinguish otherwise
     /// identical weakening sites. These are deliberately omitted from the JSON
     /// report; `path` and `line` remain its public location.
     #[serde(skip)]
@@ -549,7 +549,7 @@ pub fn check_specification(
                 violations.push(Violation {
                     code: "axiom".to_string(),
                     message: "`axiom` is forbidden: it is assumed, never proved".to_string(),
-                    ..location_of(env, package, &condition.loc)
+                    ..location_in_module(env, package, &module, &condition.loc)
                 });
             }
         }
@@ -1331,6 +1331,17 @@ fn location_of(env: &GlobalEnv, package: &Path, loc: &Loc) -> Violation {
     }
 }
 
+fn location_in_module(
+    env: &GlobalEnv,
+    package: &Path,
+    module: &ModuleEnv<'_>,
+    loc: &Loc,
+) -> Violation {
+    let mut violation = location_of(env, package, loc);
+    violation.function = Some(format!("module {}", module.get_name().display_full(env)));
+    violation
+}
+
 fn location_in_function(
     env: &GlobalEnv,
     package: &Path,
@@ -1836,6 +1847,51 @@ mod tests {
         assert_eq!(1, added.len());
         assert!(inherited.is_empty());
         assert_eq!("abstract_condition", added[0].code);
+    }
+
+    #[test]
+    fn moving_a_module_axiom_between_modules_is_rejected() {
+        let source = "module 0xCAFE::a { fun target(): u64 { 0 } }
+module 0xCAFE::b { fun helper(): u64 { 0 } }";
+        let baseline = crate::tests::common::make_package("baseline", &[
+            ("modules", source),
+            (
+                "modules.spec.move",
+                "spec 0xCAFE::a { spec module { axiom true; } }
+spec 0xCAFE::b { spec module {} }",
+            ),
+        ]);
+        let candidate = crate::tests::common::make_package("candidate", &[
+            ("modules", source),
+            (
+                "modules.spec.move",
+                "spec 0xCAFE::a { spec module {} }
+spec 0xCAFE::b { spec module { axiom true; } }",
+            ),
+        ]);
+        let scan = |package: &Path| {
+            let env = crate::experiment::build_model(package).expect("model");
+            assert!(
+                !env.has_errors(),
+                "probe package does not compile:\n{}",
+                crate::mcp::package_data::render_diagnostics(&env).join("\n")
+            );
+            check_specification(&env, package, Some("a::target"), &[], &BTreeSet::new())
+                .expect("check")
+                .violations
+        };
+
+        let baseline_violations = scan(baseline.path());
+        let candidate_violations = scan(candidate.path());
+        let (added, inherited) = added_weakenings(
+            candidate.path(),
+            candidate_violations,
+            &weakening_sites(baseline.path(), &baseline_violations),
+        );
+
+        assert_eq!(1, added.len());
+        assert!(inherited.is_empty());
+        assert_eq!("axiom", added[0].code);
     }
 
     #[test]
