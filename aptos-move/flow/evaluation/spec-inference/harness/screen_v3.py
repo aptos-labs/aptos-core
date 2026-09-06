@@ -1,8 +1,8 @@
-"""Treatment-blind compatibility screening for the corpus-v3.1 package.
+"""Treatment-blind compatibility screening for the corpus-v3.2 package.
 
 `screen.py` drives the corpus-v1.1 shape: one overlay patch and snapshot per
 sample, thirty selected records, a `source_commit` at the manifest root.
-corpus-v3.1 is a single package with targets named inside it, so it needs its own
+corpus-v3.2 is a single package with targets named inside it, so it needs its own
 driver rather than a manifest bent to fit the other one.
 
 The screen is blind to any arm: for each target it compiles the unmodified
@@ -15,11 +15,11 @@ Writes one result per target plus a summary, so `screening_status` in the
 manifest is evidenced rather than asserted:
 
     python3 -m harness.screen_v3 \\
-      --manifest corpus-v3.1/manifest.json \\
+      --manifest corpus-v3.2/manifest.json \\
       --experiment-config config/default.json \\
       --corpus-config config/corpus.json \\
-      --results-dir corpus-v3.1/screening \\
-      --output corpus-v3.1/screening/summary.json
+      --results-dir corpus-v3.2/screening \\
+      --output corpus-v3.2/screening/summary.json
 """
 
 from __future__ import annotations
@@ -107,7 +107,7 @@ async def screen_corpus_v3(
             "reference_package": reference["package"],
             "reference_sha256": reference["reference_sha256"],
             # WP alone does not reach a verifying contract: a task property, not
-            # a defect. See corpus-v3.1/README.md and issue #20490 for one cause.
+            # a defect. See corpus-v3.2/README.md and issue #20490 for one cause.
             "wp_hard": wp_hard,
             "wp_failure_kind": result.get("failure_kind") if wp_hard else None,
             "apparatus_ok": apparatus_ok,
@@ -181,7 +181,7 @@ async def _prove_reference(
     if not (package / "Move.toml").is_file():
         raise SystemExit(
             f"no assembled reference for {record['task_id']} at {package}; "
-            "run `python3 corpus-v3.1/build_references.py` first"
+            "run `python3 corpus-v3.2/build_references.py` first"
         )
     return await prove_reference(config, package, [record["target"]], threshold)
 

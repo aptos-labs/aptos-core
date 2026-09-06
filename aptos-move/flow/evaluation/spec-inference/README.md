@@ -14,7 +14,7 @@ This file is the runbook. It says how to run things, not how they work.
 |---|---|
 | [`DESIGN.md`](DESIGN.md) | the design: experimental arms and contrasts, what a task is, where the corpus comes from, how a round executes, how a result is scored, the analysis plan, and the validity and contamination arguments |
 | [`CLAUDE.md`](CLAUDE.md) | working rules for editing this tree — dependency-contract methodology, loop/`sathard` methodology, the safe working sequence |
-| [`corpus-v3.1/README.md`](corpus-v3.1/README.md) | the benchmark corpus: targets, what makes them hard, mutants, what is left before the full run |
+| [`corpus-v3.2/README.md`](corpus-v3.2/README.md) | the benchmark corpus: targets, selection, reference specifications, mutants, and run readiness |
 | [`corpus-v1.1/README.md`](corpus-v1.1/README.md) | the retained framework corpus and the pipeline that built it |
 | [`sandbox/README.md`](sandbox/README.md) | the sandbox: threat model, the two confinement layers, why the solver is proxied, and the explicit non-goals |
 | [`analysis/README.md`](analysis/README.md) | one-off round analysis, deliberately outside `harness/` |
@@ -32,7 +32,7 @@ This file is the runbook. It says how to run things, not how they work.
   credential wrapper.
 - `config/` — `default.json` (execution) and `corpus.json` (selection).
 - `schemas/` — published artifact contracts.
-- `corpus-v3.1/` — the benchmark corpus. `corpus-v1.1/` — retained infrastructure.
+- `corpus-v3.2/` — the benchmark corpus. `corpus-v1.1/` — retained infrastructure.
 - `tests/` — dependency-free fixtures; `analysis/` — round analysis.
 - `evaluation-artifacts/` — generated round material, gitignored.
 
@@ -64,7 +64,7 @@ be improved between rounds; a change never rewrites a finished round.
 **1. Check the corpus rebuilds to the bytes that were screened.**
 
 ```text
-python3 corpus-v3.1/build.py --verify
+python3 corpus-v3.2/build.py --verify
 ```
 
 **2. Render one plugin per arm, into the round directory.** Rendering per round
@@ -75,7 +75,8 @@ shared telemetry path in a plugin; the controller injects a run-local one.
 for arm in agent-only hybrid-guided hybrid-flexible; do
   move-flow plugin ROUND/plugins/acceptance/$arm \
     --inference-tactic $arm --evaluation-mode \
-    --feedback-level acceptance --flow-source-commit COMMIT
+    --feedback-level acceptance --max-verification-timeout 20 \
+    --flow-source-commit COMMIT
 done
 ```
 
@@ -83,7 +84,9 @@ done
 read as a single `acceptance` level. Its paths resolve **relative to
 `plugins.json` itself**, so with the layout above the entries are
 `plugins/acceptance/<arm>` -- a repository-relative path produces a doubled one
-and fails when the scheduler reads the plugin manifest. Every plugin must declare the level its
+and fails when the scheduler reads the plugin manifest. The map keys use the
+schedule names `agent_only`, `hybrid_guided`, and `hybrid_flexible`; the plugin
+directory names may retain hyphens. Every plugin must declare the level its
 cell was scheduled with, and the round's `config.json` is a copy of
 `config/default.json` with the round's `source_commit`.
 
@@ -105,8 +108,8 @@ non-durable commit costs is the ability to *fetch* the apparatus later.
 
 ```text
 move-inference-pilot \
-  --corpus-manifest corpus-v3.1/manifest.json \
-  --mutants-root corpus-v3.1/mutants-scoring \
+  --corpus-manifest corpus-v3.2/manifest.json \
+  --mutants-root corpus-v3.2/mutants-scoring \
   --plugins ROUND/plugins.json \
   --output-dir ROUND/schedule \
   --source-commit COMMIT \
@@ -118,12 +121,12 @@ move-inference-pilot \
 `--mutants-root` turns on strict scoring and requires a manifest per scheduled
 task, so a round cannot fall back to core scoring in silence.
 
-It takes the **held-out** set, `corpus-v3.1/mutants-scoring`. The other set,
-`corpus-v3.1/mutants`, is what refutation shows the agent, and it is passed at
+It takes the **held-out** set, `corpus-v3.2/mutants-scoring`. The other set,
+`corpus-v3.2/mutants`, is what refutation shows the agent, and it is passed at
 launch instead:
 
 ```text
-move-inference-run-pilot ... --refutation-mutants-root $PWD/corpus-v3.1/mutants
+move-inference-run-pilot ... --refutation-mutants-root $PWD/corpus-v3.2/mutants
 ```
 
 Scoring an arm on the set it was shown would score it on what it was told, so
@@ -150,12 +153,12 @@ was shown, or one the round is scored on.
 
 A round may run a subset. Which subset is a corpus decision, made from the
 corpus's own description of each task -- never from an arm's behaviour --
-by `corpus-v3.1/select_round.py`, and recorded both as `round_selection` on every
-manifest record and in `corpus-v3.1/metadata/selection.json`. Held-back samples
+by `corpus-v3.2/select_round.py`, and recorded both as `round_selection` on every
+manifest record and in `corpus-v3.2/metadata/selection.json`. Held-back samples
 stay in the corpus for a later round. Schedule the recorded selection with:
 
 ```text
---tasks $(python3 -c "import json;print(' '.join(json.load(open('corpus-v3.1/metadata/selection.json'))['selected']))")
+--tasks $(python3 -c "import json;print(' '.join(json.load(open('corpus-v3.2/metadata/selection.json'))['selected']))")
 ```
 
 ### What to measure
@@ -203,7 +206,7 @@ move-inference-run-pilot --config ROUND/config.json \
 
 move-inference-audit-pilot --config ROUND/config.json \
   --schedule-dir ROUND/schedule --artifacts-dir ROUND/runs \
-  --forbidden-path /absolute/path/to/corpus-v3.1/mutants \
+  --forbidden-path /absolute/path/to/corpus-v3.2/mutants \
   --output ROUND/audit.json
 ```
 
@@ -220,7 +223,7 @@ mounted beside it.
 
 ```text
 .venv/bin/python -m harness.score_round --config ROUND/config.json \
-  --round-dir ROUND --mutants-root corpus-v3.1/mutants
+  --round-dir ROUND --mutants-root corpus-v3.2/mutants-scoring
 ```
 
 ## Analyse a finished round

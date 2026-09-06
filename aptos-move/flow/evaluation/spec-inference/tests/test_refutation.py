@@ -704,7 +704,7 @@ class ReferencePatchTest(unittest.TestCase):
         import importlib.util
 
         spec = importlib.util.spec_from_file_location(
-            "build_references", ROOT / "corpus-v3.1" / "build_references.py"
+            "build_references", ROOT / "corpus-v3.2" / "build_references.py"
         )
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
@@ -1333,15 +1333,15 @@ class MountReadabilityTest(unittest.TestCase):
     def test_a_root_under_the_plugin_is_refused(self) -> None:
         from harness.pilot_sandbox import _require_confined_mount
 
-        root = (ROOT / "corpus-v3.1" / "mutants").resolve()
+        root = (ROOT / "corpus-v3.2" / "mutants").resolve()
         with self.assertRaises(SystemExit) as raised:
-            _require_confined_mount(root, ((ROOT / "corpus-v3.1").resolve(),))
+            _require_confined_mount(root, ((ROOT / "corpus-v3.2").resolve(),))
         self.assertIn("can read", str(raised.exception))
 
     def test_a_root_outside_the_readable_trees_is_accepted(self) -> None:
         from harness.pilot_sandbox import _require_confined_mount
 
-        root = (ROOT / "corpus-v3.1" / "mutants").resolve()
+        root = (ROOT / "corpus-v3.2" / "mutants").resolve()
         _require_confined_mount(root, ((ROOT / "harness").resolve(),))
 
 
@@ -1432,7 +1432,7 @@ class MountConfinementTest(unittest.TestCase):
     """
 
     def test_the_corpus_root_is_accepted(self) -> None:
-        _require_confined_mount((ROOT / "corpus-v3.1" / "mutants").resolve())
+        _require_confined_mount((ROOT / "corpus-v3.2" / "mutants").resolve())
 
     def test_tmp_is_refused(self) -> None:
         with self.assertRaises(SystemExit) as raised:
@@ -1514,7 +1514,7 @@ class AuthoringPathTest(unittest.TestCase):
         import importlib.util
 
         spec = importlib.util.spec_from_file_location(
-            "author_mutants", ROOT / "corpus-v3.1" / "author_mutants.py"
+            "author_mutants", ROOT / "corpus-v3.2" / "author_mutants.py"
         )
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
