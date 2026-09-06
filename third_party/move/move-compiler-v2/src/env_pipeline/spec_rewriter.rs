@@ -854,22 +854,33 @@ fn derive_spec_fun(
 ///
 /// The memory comes from [`ExpData::directly_old_memory`], so it includes what a
 /// behavioral predicate's target reads in its pre-state, not only what sits
-/// under a literal `old(..)`. Such a body has no `old(..)` of its own yet still
-/// needs both states: the predicate's evaluator takes the target's memory in
-/// both, so any pre-state memory makes the spec fun two-state.
+/// under a literal `old(..)`. Mutation builtins are inherently two-state and
+/// contribute the resource they update. Such a body has no `old(..)` of its own
+/// yet still needs both states.
 pub fn compute_direct_old_usage(
     body: &Exp,
     env: &GlobalEnv,
 ) -> (bool, BTreeSet<QualifiedInstId<StructId>>) {
-    let old_memory = body.directly_old_memory(env);
-    let mut has_old_op = false;
+    let mut old_memory = body.directly_old_memory(env);
+    let mut uses_old = !old_memory.is_empty();
     body.visit_post_order(&mut |exp| {
-        if matches!(exp, ExpData::Call(_, Operation::Old, _)) {
-            has_old_op = true;
+        match exp {
+            ExpData::Call(_, Operation::Old, _) => uses_old = true,
+            ExpData::Call(
+                id,
+                Operation::SpecPublish(_) | Operation::SpecRemove(_) | Operation::SpecUpdate(_),
+                _,
+            ) => {
+                uses_old = true;
+                let inst = env.get_node_instantiation(*id);
+                let (mid, sid, sinst) = inst[0].require_struct();
+                old_memory.insert(mid.qualified_inst(sid, sinst.to_owned()));
+            },
+            _ => {},
         }
         true
     });
-    (has_old_op || !old_memory.is_empty(), old_memory)
+    (uses_old, old_memory)
 }
 
 /// Derive used_memory and old_memory from a `FunParamAccessOf` entry.
@@ -1904,5 +1915,24 @@ mod tests {
         assert!(converter.rewrite_node_id(id).is_none());
 
         assert_eq!(env.get_quant_weight(id), Some(9));
+    }
+
+    #[test]
+    fn spec_update_is_inherently_two_state() {
+        let env = fresh_env();
+        let mid = ModuleId::new(0);
+        let sid = StructId::new(env.symbol_pool().make("Resource"));
+        let id = env.new_node(Loc::default(), BOOL_TYPE.clone());
+        env.set_node_instantiation(id, vec![Type::Struct(mid, sid, vec![])]);
+        let body =
+            ExpData::Call(id, Operation::SpecUpdate(MemoryRange::default()), vec![]).into_exp();
+
+        let (uses_old, old_memory) = compute_direct_old_usage(&body, &env);
+
+        assert!(uses_old);
+        assert_eq!(
+            old_memory,
+            BTreeSet::from([mid.qualified_inst(sid, vec![])])
+        );
     }
 }

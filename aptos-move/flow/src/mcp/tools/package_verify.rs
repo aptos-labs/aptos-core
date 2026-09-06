@@ -243,6 +243,7 @@ impl FlowSession {
         let telemetry = self.telemetry().clone();
         let telemetry_package = self.resolve_package_path(&params.package_path);
         let telemetry_filter = filter.clone();
+        let package_timeout_secs = self.tool_timeout().as_secs().max(1);
 
         if vc_timeout == 0 || vc_timeout > MAX_VC_TIMEOUT {
             return Ok(CallToolResult::error(vec![Content::text(
@@ -429,6 +430,10 @@ impl FlowSession {
             options.backend.vc_timeout = vc_timeout;
             let attribution_budget =
                 Duration::from_secs(options.backend.process_timeout_secs(vc_timeout));
+            // The per-root watchdog kills each Boogie process group. Also cap
+            // the aggregate package run so many roots cannot retain the cached
+            // package lock for an unbounded sum of individually bounded jobs.
+            options.backend.package_timeout_secs = package_timeout_secs;
             options.backend.package_error_limit = MAX_PACKAGE_ERROR_LIMIT;
             options.backend.split_vcs_by_assert = split_vcs_by_assert;
             if split_vcs_by_assert {

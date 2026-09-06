@@ -2578,9 +2578,10 @@ fn verification_scope(filter: Option<&str>) -> VerificationScope {
 /// and every `spec` construct -- function, struct, module and schema blocks,
 /// `spec fun` definitions, inline `spec { ... }` blocks -- is stripped from
 /// the `.move` files before their text is compared, with comments removed and
-/// whitespace collapsed. Compiled bytecode is not a usable witness: an inline
-/// function's specification is compiled into its callers, so a contract alone
-/// changed the module image.
+/// whitespace collapsed. `use` declarations remain because aliases and method
+/// bindings participate in runtime name resolution. Compiled bytecode is not a
+/// usable witness: an inline function's specification is compiled into its
+/// callers, so a contract alone changed the module image.
 ///
 /// Digests of the specification-free text of every `.move` file under
 /// `sources/`, keyed by package-relative path.
@@ -2625,9 +2626,9 @@ fn collect_move_sources(dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
 }
 
 /// The implementation text of a Move source: specification constructs,
-/// comments and whitespace differences removed. `use` declarations are
-/// dropped as well: a specification may need an alias the implementation did
-/// not, and an alias cannot change what the existing code does.
+/// comments and whitespace differences removed. Imports remain because
+/// retargeting an alias or `use fun` binding changes runtime resolution without
+/// changing the call-site text.
 pub(crate) fn strip_specifications(source: &str) -> String {
     let (code, masked) = strip_comments(source);
     let code = code.as_bytes();
@@ -2640,31 +2641,27 @@ pub(crate) fn strip_specifications(source: &str) -> String {
             i = skip_spec_construct(masked, i + 4);
             continue;
         }
-        if keyword_at(masked, i, b"use") && at_statement_start(masked, i) {
-            i = masked[i..]
-                .iter()
-                .position(|byte| *byte == b';')
-                .map_or(masked.len(), |offset| i + offset + 1);
-            continue;
-        }
         out.push(code[i]);
         out_masked.push(masked[i]);
         i += 1;
     }
-    collapse_block_parentheses(&canonical_spacing(&out, &out_masked))
+    let (out, out_masked) = canonical_spacing(&out, &out_masked);
+    collapse_block_parentheses(&out, &out_masked)
 }
 
 /// Whitespace reduced to what separates two identifier characters, and the
 /// statement terminator before a closing brace dropped: `while (c) { .. }`
 /// and `while (c) { .. } spec { .. };` end the same unit-valued statement.
 /// String literals are implementation and are copied as written.
-fn canonical_spacing(code: &[u8], masked: &[u8]) -> String {
+fn canonical_spacing(code: &[u8], masked: &[u8]) -> (Vec<u8>, Vec<u8>) {
     let is_ident = |byte: u8| byte.is_ascii_alphanumeric() || byte == b'_';
     let mut out: Vec<u8> = Vec::with_capacity(code.len());
+    let mut out_masked: Vec<u8> = Vec::with_capacity(code.len());
     let mut pending_space = false;
     for (byte, mask) in code.iter().zip(masked) {
         if *mask == b'_' {
             out.push(*byte);
+            out_masked.push(*mask);
             continue;
         }
         if byte.is_ascii_whitespace() {
@@ -2673,31 +2670,50 @@ fn canonical_spacing(code: &[u8], masked: &[u8]) -> String {
         }
         if pending_space && out.last().is_some_and(|last| is_ident(*last)) && is_ident(*byte) {
             out.push(b' ');
+            out_masked.push(b' ');
         }
         pending_space = false;
         out.push(*byte);
+        out_masked.push(*mask);
     }
-    let mut out = String::from_utf8_lossy(&out).into_owned();
     // An empty statement at either end of a block is void: the terminator
-    // before a closing brace, and the one a stripped leading block leaves.
-    while out.contains(";}") || out.contains("{;") {
-        out = out.replace(";}", "}").replace("{;", "{");
+    // before a closing brace, and the one a stripped leading block leaves. Use
+    // the masked copy so the same byte sequences inside literals remain part
+    // of the implementation digest.
+    loop {
+        let mut changed = false;
+        let mut next = Vec::with_capacity(out.len());
+        let mut next_masked = Vec::with_capacity(out_masked.len());
+        for i in 0..out.len() {
+            let empty_terminator = out_masked[i] == b';'
+                && (i > 0 && out_masked[i - 1] == b'{' || out_masked.get(i + 1) == Some(&b'}'));
+            if empty_terminator {
+                changed = true;
+                continue;
+            }
+            next.push(out[i]);
+            next_masked.push(out_masked[i]);
+        }
+        out = next;
+        out_masked = next_masked;
+        if !changed {
+            break;
+        }
     }
-    out
+    (out, out_masked)
 }
 
 /// `({ e })` is `(e)`: the block a `while ({ spec { ... }; c })` header wraps
 /// its condition in is left behind once the specification is stripped.
-fn collapse_block_parentheses(text: &str) -> String {
-    let bytes = text.as_bytes();
-    let mut out = String::with_capacity(text.len());
+fn collapse_block_parentheses(code: &[u8], masked: &[u8]) -> String {
+    let mut out = Vec::with_capacity(code.len());
     let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i..].starts_with(b"({") {
+    while i < code.len() {
+        if masked[i..].starts_with(b"({") {
             let open = i + 1;
             let mut depth = 0usize;
             let mut close = None;
-            for (offset, byte) in bytes[open..].iter().enumerate() {
+            for (offset, byte) in masked[open..].iter().enumerate() {
                 match byte {
                     b'{' => depth += 1,
                     b'}' => {
@@ -2711,23 +2727,28 @@ fn collapse_block_parentheses(text: &str) -> String {
                 }
             }
             if let Some(close) = close {
-                let inner = &text[open + 1..close];
-                let after = bytes[close + 1..]
+                let inner = &masked[open + 1..close];
+                let after = masked[close + 1..]
                     .iter()
                     .position(|byte| !byte.is_ascii_whitespace());
-                let closes_paren = after.is_some_and(|offset| bytes[close + 1 + offset] == b')');
-                if closes_paren && !inner.contains(';') && !inner.contains('{') {
-                    out.push('(');
-                    out.push_str(&collapse_block_parentheses(inner.trim()));
+                let closes_paren = after.is_some_and(|offset| masked[close + 1 + offset] == b')');
+                if closes_paren && !inner.contains(&b';') && !inner.contains(&b'{') {
+                    out.push(b'(');
+                    let inner_start = open + 1;
+                    out.extend_from_slice(
+                        collapse_block_parentheses(&code[inner_start..close], inner)
+                            .trim()
+                            .as_bytes(),
+                    );
                     i = close + 1 + after.expect("a closing parenthesis follows");
                     continue;
                 }
             }
         }
-        out.push(bytes[i] as char);
+        out.push(code[i]);
         i += 1;
     }
-    out
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 /// The end of the `spec` construct whose keyword ends at `from`: past the
@@ -2771,14 +2792,6 @@ fn keyword_at(masked: &[u8], i: usize, word: &[u8]) -> bool {
         && masked
             .get(i + word.len())
             .is_none_or(|byte| !is_ident(*byte))
-}
-
-fn at_statement_start(masked: &[u8], i: usize) -> bool {
-    masked[..i]
-        .iter()
-        .rev()
-        .find(|byte| !byte.is_ascii_whitespace())
-        .is_none_or(|byte| matches!(byte, b'{' | b'}' | b';'))
 }
 
 /// The source without comments, and a same-length copy whose string
@@ -3004,7 +3017,7 @@ mod tests {
             "while (i < n) { acc = acc + i; i = i + 1; }; acc } }",
         );
         let spec_only = concat!(
-            "module 0x42::guard { use std::vector; public fun f(x: u64): u64 { ",
+            "module 0x42::guard { public fun f(x: u64): u64 { ",
             "let acc = 0; let i = 0; let n = x; ",
             "while ({ spec { invariant i <= n; invariant n == x; }; i < n }) { ",
             "acc = acc + i; i = i + 1; }; acc } ",
@@ -3037,9 +3050,27 @@ mod tests {
             strip_specifications(baseline),
             strip_specifications(runtime_change)
         );
+        let imported_a = "module 0x42::guard { use 0x42::a as M; fun f() { M::run() } }";
+        let imported_b = "module 0x42::guard { use 0x42::b as M; fun f() { M::run() } }";
+        assert_ne!(
+            strip_specifications(imported_a),
+            strip_specifications(imported_b),
+            "retargeting a runtime alias must change the implementation digest"
+        );
         // A string literal is implementation, even one that spells `spec {`.
         let literal = "module 0x42::guard { public fun f(): vector<u8> { b\"spec { }\" } }";
         assert!(strip_specifications(literal).contains("spec { }"));
+        for (left, right) in [("b\";}\"", "b\"}\""), ("b\"({x})\"", "b\"(x)\"")] {
+            assert_ne!(
+                strip_specifications(&format!(
+                    "module 0x42::guard {{ fun f(): vector<u8> {{ {left} }} }}"
+                )),
+                strip_specifications(&format!(
+                    "module 0x42::guard {{ fun f(): vector<u8> {{ {right} }} }}"
+                )),
+                "string contents must remain part of the implementation digest"
+            );
+        }
     }
 
     #[test]

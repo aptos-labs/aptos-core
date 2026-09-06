@@ -3538,6 +3538,10 @@ impl ModuleBuilder<'_, '_> {
                     ExpData::Call(_, Operation::Tuple, items) => items,
                     other => vec![other.into_exp()],
                 };
+                if components.is_empty() {
+                    et.error(loc, "`decreases` requires at least one component");
+                    return;
+                }
                 for component in &components {
                     let ty = et.get_node_type(component.node_id());
                     if !ty.is_number() {

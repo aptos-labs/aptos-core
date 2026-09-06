@@ -437,6 +437,13 @@ pub struct Violation {
     pub path: String,
     pub line: usize,
     pub message: String,
+    /// Qualified function and its source line, used internally to distinguish
+    /// otherwise identical weakening sites. These are deliberately omitted
+    /// from the JSON report; `path` and `line` remain its public location.
+    #[serde(skip)]
+    pub function: Option<String>,
+    #[serde(skip)]
+    pub function_line: Option<usize>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -548,6 +555,7 @@ pub fn check_specification(
                 module.get_name().display_full(env),
                 function.get_name().display(env.symbol_pool())
             );
+            let at = |loc: &Loc| location_in_function(env, package, &function, loc);
             // A lemma is proved unless its verification is disabled, in which
             // case every `apply` of it assumes it. That holds whatever the
             // filter selects, so it is checked for the whole target module.
@@ -556,7 +564,7 @@ pub fn check_specification(
                     code: "unproved_lemma".to_string(),
                     message: "a lemma with verification disabled is assumed, not proved"
                         .to_string(),
-                    ..location_of(env, package, &function.get_loc())
+                    ..at(&function.get_loc())
                 });
             }
             // An assumption constrains whatever proof reaches it. The prover
@@ -569,7 +577,7 @@ pub fn check_specification(
                     code: "unjustified_assumption".to_string(),
                     message: "`assume` in a proof block is forbidden: it is trusted, not proved"
                         .to_string(),
-                    ..location_of(env, package, &loc)
+                    ..at(&loc)
                 });
             }
             for condition in &conditions {
@@ -579,12 +587,12 @@ pub fn check_specification(
                         message: "`assume` is forbidden: it narrows what is verified without \
                                   declaring a precondition"
                             .to_string(),
-                        ..location_of(env, package, &condition.loc)
+                        ..at(&condition.loc)
                     }),
                     ConditionKind::Axiom(_) => violations.push(Violation {
                         code: "axiom".to_string(),
                         message: "`axiom` is forbidden: it is assumed, never proved".to_string(),
-                        ..location_of(env, package, &condition.loc)
+                        ..at(&condition.loc)
                     }),
                     _ => {},
                 }
@@ -598,7 +606,7 @@ pub fn check_specification(
                         "`pragma unroll = {depth}` is forbidden: a loop without an invariant is \
                          unrolled to that depth, so the proof covers only {depth} iterations"
                     ),
-                    ..location_of(env, package, &function.get_loc())
+                    ..at(&function.get_loc())
                 });
             }
             for (pragma, reason) in OBLIGATION_SUPPRESSING_PRAGMAS {
@@ -606,7 +614,7 @@ pub fn check_specification(
                     violations.push(Violation {
                         code: "suppressed_obligation".to_string(),
                         message: format!("`pragma {pragma}` is forbidden: {reason}"),
-                        ..location_of(env, package, &function.get_loc())
+                        ..at(&function.get_loc())
                     });
                 }
             }
@@ -624,8 +632,6 @@ pub fn check_specification(
             }
             any_target = true;
             let spec = function.get_spec();
-            let at = |loc: &Loc| location_of(env, package, loc);
-
             // Pragmas that suppress or qualify the proof obligation.
             if function.is_pragma_false(VERIFY_PRAGMA) {
                 violations.push(Violation {
@@ -778,6 +784,8 @@ pub fn check_specification(
             message: format!(
                 "required contract category `{category}` is absent from the specification"
             ),
+            function: None,
+            function_line: None,
         })
         .collect::<Vec<_>>();
 
@@ -1040,12 +1048,16 @@ pub fn partial_abort_boundary(
                 continue;
             }
             let callee = env.get_function(callee_qid);
-            if callee.is_pragma_true(ABORTS_IF_IS_PARTIAL_PRAGMA, || false) && justified(&callee) {
+            let is_contract_boundary = callee.is_opaque() || callee.is_native_or_intrinsic();
+            if is_contract_boundary
+                && callee.is_pragma_true(ABORTS_IF_IS_PARTIAL_PRAGMA, || false)
+                && justified(&callee)
+            {
                 return Some(callee.get_full_name_str());
             }
             // Opaque is where the caller's proof stops: past it only the
             // contract is visible, and the body no longer bears on the caller.
-            if !callee.is_opaque() && !callee.is_native_or_intrinsic() {
+            if !is_contract_boundary {
                 pending.push(callee_qid);
             }
         }
@@ -1204,13 +1216,15 @@ fn is_inline_marker(exp: &Exp) -> bool {
 }
 
 /// A `Violation` carrying only the position, for struct-update syntax.
-/// A weakening's site, stable under the line shifts an edit causes.
+/// A weakening's site, stable under line shifts before its function while
+/// binding the construct to its original function and relative source site.
 ///
 /// Line numbers move when a candidate rewrites the specification above them,
 /// so an identity built from one would report a construct the baseline already
-/// had as newly introduced. The text at the site does not move: an `assume` is
-/// keyed by its own line, and a pragma -- reported at the function it governs,
-/// which a candidate may not change -- by that function's signature.
+/// had as newly introduced. The function identity prevents a candidate from
+/// moving an inherited construct into the checked target, and the line relative
+/// to that function prevents relocation within the same body. The text keeps
+/// otherwise unrelated constructs apart.
 fn weakening_site(package: &Path, violation: &Violation) -> String {
     let text = std::fs::read_to_string(package.join(&violation.path))
         .ok()
@@ -1221,12 +1235,19 @@ fn weakening_site(package: &Path, violation: &Violation) -> String {
                 .map(|line| line.trim().to_string())
         })
         .unwrap_or_default();
-    // NUL joins the parts: no path, code or message contains one, so no two
-    // distinct sites can render to the same key.
+    let function = violation.function.as_deref().unwrap_or_default();
+    let relative_line = violation
+        .function_line
+        .map(|start| violation.line.saturating_sub(start).to_string())
+        .unwrap_or_default();
+    // NUL joins the parts: no component contains one, so no two distinct sites
+    // can render to the same key.
     [
         violation.code.as_str(),
         violation.path.as_str(),
         violation.message.as_str(),
+        function,
+        relative_line.as_str(),
         text.as_str(),
     ]
     .join("\0")
@@ -1282,7 +1303,21 @@ fn location_of(env: &GlobalEnv, package: &Path, loc: &Loc) -> Violation {
         path,
         line,
         message: String::new(),
+        function: None,
+        function_line: None,
     }
+}
+
+fn location_in_function(
+    env: &GlobalEnv,
+    package: &Path,
+    function: &FunctionEnv<'_>,
+    loc: &Loc,
+) -> Violation {
+    let mut violation = location_of(env, package, loc);
+    violation.function = Some(function.get_full_name_str());
+    violation.function_line = Some(location_of(env, package, &function.get_loc()).line);
+    violation
 }
 
 fn has_property(env: &GlobalEnv, spec: &Spec, name: &str) -> bool {
@@ -1344,6 +1379,8 @@ pub fn check_edit_scope(
             path: relative.clone(),
             line: 1,
             message: "file is outside the task's declared editable paths".to_string(),
+            function: None,
+            function_line: None,
         })
         .collect();
     Ok((changed, violations))
@@ -1553,6 +1590,45 @@ mod tests {
     }
 
     #[test]
+    fn moving_an_inherited_weakening_to_another_function_is_rejected() {
+        let baseline_source = "module 0xCAFE::m {
+    fun helper(x: u64): u64 {
+        spec { assume x > 0; };
+        x
+    }
+    fun target(x: u64): u64 { x }
+}";
+        let candidate_source = "module 0xCAFE::m {
+    fun helper(x: u64): u64 { x }
+    fun target(x: u64): u64 {
+        spec { assume x > 0; };
+        x
+    }
+}";
+        let baseline = crate::tests::common::make_package("baseline", &[("m", baseline_source)]);
+        let candidate = crate::tests::common::make_package("candidate", &[("m", candidate_source)]);
+        let scan = |package: &Path| {
+            let env = crate::experiment::build_model(package).expect("model");
+            assert!(!env.has_errors(), "probe module does not compile");
+            check_specification(&env, package, Some("m"), &[], &BTreeSet::new())
+                .expect("check")
+                .violations
+        };
+        let baseline_violations = scan(baseline.path());
+        let candidate_violations = scan(candidate.path());
+
+        let (added, inherited) = added_weakenings(
+            candidate.path(),
+            candidate_violations,
+            &weakening_sites(baseline.path(), &baseline_violations),
+        );
+
+        assert_eq!(1, added.len());
+        assert!(inherited.is_empty());
+        assert_eq!("unjustified_assumption", added[0].code);
+    }
+
+    #[test]
     fn suppressing_pragmas_are_rejected() {
         let report = check_module(
             "module 0xCAFE::m {
@@ -1616,6 +1692,21 @@ mod tests {
         assert!(!caller_is_flagged(
             "pragma aborts_if_is_partial;\n        aborts_if [inferred] x == 0;"
         ));
+
+        // An inferred marker on a transparent helper cannot justify a partial
+        // caller: the prover sees through that helper to its body.
+        let transparent =
+            source("pragma aborts_if_is_partial;\n        aborts_if [inferred] x == 0;")
+                .replace("        pragma opaque;\n", "");
+        let caller_line = transparent
+            .lines()
+            .position(|line| line.contains("fun caller"))
+            .expect("caller present")
+            + 1;
+        let report = check_module(&transparent, &[]);
+        assert!(report.violations.iter().any(|violation| {
+            violation.code == "partial_aborts" && violation.line == caller_line
+        }));
     }
 
     #[test]
@@ -1740,6 +1831,8 @@ mod tests {
                     path: "sources/m.move".to_string(),
                     line: 1,
                     message: "file is outside the task's declared editable paths".to_string(),
+                    function: None,
+                    function_line: None,
                 }],
                 assumed_contracts: Vec::new(),
                 contract_coverage: ContractCoverage {

@@ -77,14 +77,22 @@ pub struct LoopHeadObservation {
     pub facts: Vec<String>,
 }
 
-/// How many paths through the bounded DAG the loop-invariant evidence
-/// diagnostic may explore before it declines.
+/// How much aggregate work the loop-invariant evidence diagnostic may perform
+/// before it declines.
 ///
-/// Evidence unrolls every loop in the function, so the path count grows as
-/// `(depth + 1)^loops`. The budget is what one function's diagnostic is worth,
-/// not a correctness bound: exceeding it produces a note explaining why no
-/// evidence is offered, and inference itself is unaffected.
+/// One loop is unrolled per analysis, while all other loops are rebuilt and
+/// summarized. For `l` missing loops this costs roughly `l` full-function
+/// analyses over `l` loop regions, each with `depth + 1` bounded paths. The
+/// budget is what one function's diagnostic is worth, not a correctness bound:
+/// exceeding it produces a note and inference itself is unaffected.
+const MAX_BOUNDED_EVIDENCE_WORK: usize = 512;
 const MAX_BOUNDED_EVIDENCE_PATHS: usize = 512;
+
+fn bounded_evidence_work(loop_count: usize, depth: usize) -> usize {
+    loop_count
+        .saturating_mul(loop_count)
+        .saturating_mul(depth.saturating_add(1))
+}
 
 pub struct LoopAnalysisProcessor {}
 
@@ -233,6 +241,30 @@ impl LoopAnalysisProcessor {
         missing: &LoopsWithoutInvariants,
         depth: usize,
     ) -> LoopInvariantEvidence {
+        let loop_count = missing.0.len();
+        let estimated_work = bounded_evidence_work(loop_count, depth);
+        if estimated_work > MAX_BOUNDED_EVIDENCE_WORK {
+            return LoopInvariantEvidence(
+                missing
+                    .0
+                    .iter()
+                    .map(|loop_info| LoopInvariantEvidenceForLoop {
+                        loop_id: loop_info.loop_id,
+                        depth,
+                        carried_names: loop_info
+                            .carried
+                            .iter()
+                            .map(|(_, name)| name.clone())
+                            .collect(),
+                        heads: vec![],
+                        partial_notes: vec![],
+                        unavailable: Some(format!(
+                            "the function has {loop_count} loops requiring about {estimated_work} bounded-evidence work units at depth {depth} (budget {MAX_BOUNDED_EVIDENCE_WORK})"
+                        )),
+                    })
+                    .collect(),
+            );
+        }
         LoopInvariantEvidence(
             missing
                 .0
@@ -299,12 +331,10 @@ impl LoopAnalysisProcessor {
         let summarized_loops = loops_for_transform.fat_loops.len();
         let unrolled_loops = loops_for_unrolling.fat_loops.len();
 
-        // Bounded evidence unrolls *every* loop in the function, not just the one
-        // being reported, so a function with `l` loops yields on the order of
-        // `(depth + 1)^l` paths through the bounded DAG -- and a full weakest
-        // precondition is then computed once per head over that DAG. At depth 3
-        // this is 4 paths for one loop and about a million for ten, which is the
-        // difference between a diagnostic and a hang.
+        // Bounded evidence unrolls the selected loop and summarizes the rest.
+        // Still guard the resulting DAG before computing a full weakest
+        // precondition once per displayed head. The aggregate cost of repeating
+        // this analysis for every missing loop is guarded above.
         //
         // This is a diagnostic: it exists to suggest an invariant, and declining
         // to guess costs the caller a note while spending the budget costs them
@@ -892,5 +922,16 @@ impl LoopAnalysisProcessor {
         }
 
         (builder.data, head_labels)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{bounded_evidence_work, MAX_BOUNDED_EVIDENCE_WORK};
+
+    #[test]
+    fn bounded_evidence_budget_counts_all_loop_analyses() {
+        assert!(bounded_evidence_work(11, 3) <= MAX_BOUNDED_EVIDENCE_WORK);
+        assert!(bounded_evidence_work(12, 3) > MAX_BOUNDED_EVIDENCE_WORK);
     }
 }

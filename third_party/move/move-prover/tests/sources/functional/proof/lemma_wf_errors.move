@@ -60,6 +60,15 @@ module 0x42::lemma_wf_errors {
                 apply bad_component(n - 1);
             }
         }
+
+        lemma empty_measure(n: num) {
+            decreases (); // error: requires at least one component
+            ensures n == n;
+        } proof {
+            if (n > 0) {
+                apply empty_measure(n - 1);
+            }
+        }
     }
 
     fun g(x: u64): u64 {
