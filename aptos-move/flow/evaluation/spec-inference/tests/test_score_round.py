@@ -13,6 +13,7 @@ from harness.score_round import (
     PendingScore,
     _disqualification_manifest,
     _score_pending,
+    score_round,
 )
 
 
@@ -135,6 +136,44 @@ class DisqualificationGateTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "not scheduled"):
                 _disqualification_manifest(
                     root / "gate", "T", "run-1", scored, root, [], None
+                )
+
+    def test_a_bound_gate_cannot_be_omitted_when_scoring(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            run = root / "runs" / "r1"
+            mutants = root / "mutants" / "T"
+            run.mkdir(parents=True)
+            mutants.mkdir(parents=True)
+            manifest = mutants / "mutants.json"
+            manifest.write_text(json.dumps({"mutants": []}), encoding="utf-8")
+            (run / "run.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "r1",
+                        "task_id": "T",
+                        "target": "m::f",
+                        "package_relpath": "pkg",
+                        "mutant_manifest_sha256": sha256_file(manifest),
+                        "disqualification_mutant_manifest_sha256": "d" * 64,
+                        "result": {
+                            "eventual_judge": {"state": "operational_success"}
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                ValueError, "--disqualification-mutants-root was not provided"
+            ):
+                asyncio.run(
+                    score_round(
+                        config=mock.MagicMock(),
+                        round_dir=root,
+                        mutants_root=root / "mutants",
+                        timeout_seconds=1,
+                    )
                 )
 
     def test_a_gate_cannot_repeat_mutant_ids(self) -> None:

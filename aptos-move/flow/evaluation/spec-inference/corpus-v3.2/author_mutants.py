@@ -1,4 +1,4 @@
-"""Author an anchored mutant set from readable edit descriptions.
+"""Author an anchored mutant set from readable local edit descriptions.
 
 A mutant records an offset, a length and a digest -- never source text -- so
 that a corpus change invalidates it loudly instead of silently relocating the
@@ -11,7 +11,11 @@ The anchor must occur exactly once in the file. A unique anchor is what makes
 the offset meaningful; two occurrences mean the recorded offset is a guess
 about which one was intended.
 
-    python3 corpus-v3.2/author_mutants.py --spec corpus-v3.2/mutant-specs/scoring.json \
+Private-source descriptions belong under the gitignored
+``mutant-specs/private/`` directory. The generated manifests contain only the
+offset, digest, and minimal edit needed at run time and are safe to commit.
+
+    python3 corpus-v3.2/author_mutants.py --spec corpus-v3.2/mutant-specs/private/scoring.json \
       --package corpus-v3.2/package --out corpus-v3.2/mutants-scoring
 """
 

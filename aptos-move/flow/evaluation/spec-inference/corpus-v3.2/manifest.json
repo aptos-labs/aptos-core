@@ -6,7 +6,7 @@
   "deps/bcs.move": "e35293b8d4aa2f1a7d7d990161c3ddc7b9bd75730aaf9f75e6807147fa56a57f",
   "deps/bit_vector.move": "c44927e11766924fa46b849a7af9c3aa64373f983e423a52eb3fa69f90fbe5a3",
   "deps/bit_vector.spec.move": "3cec7900bcf3cc6cf81cc599e6f62500937b876972b9301877001c29c0e50f13",
-  "deps/cmp.move": "08b5bd8827ceff8b417994fa5e004554f1613c79b2bd4e8670b11c7e41a63b5d",
+  "deps/cmp.move": "547b193b8d07282f84dd0f8ed0b92e6ca4af2c83f7c3e7177844690ee7c00725",
   "deps/error.move": "601e2dfc1912e2511af75629f11786bd364732bd44e7d3e4da566c7f8096d784",
   "deps/features.move": "34cc4cc34b784b500a927695ca9f7e5bb9f64b6e1b58e82cded74980273ebc5e",
   "deps/features.spec.move": "12b57b7027559f650e1e240de55619a4702efebc65aa0145f1014aae10c0dfdd",
@@ -44,7 +44,7 @@
  },
  "provenance": {
   "aptos_core": {
-   "commit": "85c9f540b060a46c9171de4823e4bce5be8220b8",
+   "commit": "5e1e5be7c5665676afc1a20f53f484bb1258598d",
    "reconstructible": true,
    "tracked_modifications": false
   },

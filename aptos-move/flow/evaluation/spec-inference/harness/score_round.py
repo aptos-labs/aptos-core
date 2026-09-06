@@ -194,6 +194,14 @@ async def score_round(
         task_id = record["task_id"]
         target = record["target"]
         mutant_digest = record["mutant_manifest_sha256"]
+        disqualification_digest = record.get(
+            "disqualification_mutant_manifest_sha256"
+        )
+        if disqualification_digest is not None and disqualification_root is None:
+            raise ValueError(
+                f"run {run_id} is bound to a disqualification mutant set but "
+                "--disqualification-mutants-root was not provided"
+            )
         # A run that did not reach operational success records no eventual
         # judge at all, so the key is present and null. Mutation scoring is
         # gated on that judge -- it is the authority that this very tree
@@ -292,7 +300,7 @@ async def score_round(
                         manifest,
                         baseline,
                         record.get("refutation_mutant_identities"),
-                        record.get("disqualification_mutant_manifest_sha256"),
+                        disqualification_digest,
                     )
                     if disqualification_root is not None
                     else None,

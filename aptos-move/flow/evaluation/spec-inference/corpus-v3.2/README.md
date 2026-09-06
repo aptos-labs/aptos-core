@@ -226,10 +226,12 @@ recorded apparatus identity, and the refutation root at **launch** time
 round runs `scoring_mode: core`, where `strict_success` is false by
 construction and says nothing about the contract.
 
-The scoring set is authored from readable edit descriptions in
-[`mutant-specs/scoring.json`](mutant-specs/scoring.json); `author_mutants.py`
-computes the offsets and digests and rejects an anchor that does not occur
-exactly once in its file.
+The scoring set is authored with `author_mutants.py`, which computes offsets
+and digests and rejects an anchor that does not occur exactly once in its file.
+Readable descriptions for public and corpus-authored sources are kept in
+[`mutant-specs/`](mutant-specs/). Descriptions that quote private Etna source
+belong in the gitignored `mutant-specs/private/` directory; the committed
+runtime manifests retain only anchored digests and minimal edits.
 
 Two first drafts were dropped for the reason stated above -- abort codes are out
 of scope. Both weakened a guard from `x > 0` to `x >= 0`; the zero then reached

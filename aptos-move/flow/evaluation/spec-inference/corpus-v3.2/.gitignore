@@ -4,3 +4,4 @@ references/build/
 mutants/references/
 .etna/
 inspect/
+mutant-specs/private/
