@@ -1,6 +1,6 @@
 diff --git a/.move-inference-task.json b/.move-inference-task.json
 new file mode 100644
-index 0000000000..6e240697a0
+index 0000000000..cfdd364c61
 --- /dev/null
 +++ b/.move-inference-task.json
 @@ -0,0 +1,350 @@
@@ -37,7 +37,7 @@ index 0000000000..6e240697a0
 +  "granularity": "module",
 +  "package_module_target": "0x1::code",
 +  "schema_version": 3,
-+  "source_commit": "1ffaa408ec8899d19e0933b1680dce339051cd9f",
++  "source_commit": "950e413e46090d2056740c36dd7a77b1764b6936",
 +  "source_path": "sources/AptosFramework/code.move",
 +  "spec_function_dependencies": [
 +    "0x1::code::spec_allowed_deps",

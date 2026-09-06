@@ -1,6 +1,6 @@
 diff --git a/.move-inference-task.json b/.move-inference-task.json
 new file mode 100644
-index 0000000000..8079063274
+index 0000000000..541fda88a3
 --- /dev/null
 +++ b/.move-inference-task.json
 @@ -0,0 +1,501 @@
@@ -27,7 +27,7 @@ index 0000000000..8079063274
 +  "granularity": "function",
 +  "package_module_target": "0x7::dead_mans_switch_operations::cleanup_expired_bulk_order",
 +  "schema_version": 3,
-+  "source_commit": "1ffaa408ec8899d19e0933b1680dce339051cd9f",
++  "source_commit": "950e413e46090d2056740c36dd7a77b1764b6936",
 +  "source_path": "sources/AptosExperimental/trading/market/dead_mans_switch_operations.move",
 +  "spec_function_dependencies": [
 +    "0x1::big_ordered_map::$iter_is_end",

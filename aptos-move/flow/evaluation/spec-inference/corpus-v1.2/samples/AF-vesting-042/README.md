@@ -12,9 +12,9 @@ giving the independent workspace to an agent.
 - Original source: `aptos-move/framework/aptos-framework/sources/vesting.move`
 - Source inside the shared package: `sources/AptosFramework/vesting.move`
 - Source root: `aptos-move/framework/aptos-framework`
-- Aptos Core commit: `1ffaa408ec8899d19e0933b1680dce339051cd9f`
+- Aptos Core commit: `950e413e46090d2056740c36dd7a77b1764b6936`
 - Shared package SHA-256: `5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204`
-- Prepared tree SHA-256: `8500d52c1906b4bdce81feee9c197538fa791f22afdef291d03472270fa99586`
+- Prepared tree SHA-256: `28d8ab8b0c04495e3568f0576450e5eb9f4e8681304d9d18b8e88b116a380f2f`
 - Required contract categories: `normal-result`, `state-transition`
 
 Target functions:

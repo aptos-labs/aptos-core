@@ -1,6 +1,6 @@
 diff --git a/.move-inference-task.json b/.move-inference-task.json
 new file mode 100644
-index 0000000000..0c0f490499
+index 0000000000..44f3cacfa4
 --- /dev/null
 +++ b/.move-inference-task.json
 @@ -0,0 +1,215 @@
@@ -12,7 +12,7 @@ index 0000000000..0c0f490499
 +  "granularity": "function",
 +  "package_module_target": "0x1::transaction_fee::store_aptos_coin_mint_cap",
 +  "schema_version": 3,
-+  "source_commit": "1ffaa408ec8899d19e0933b1680dce339051cd9f",
++  "source_commit": "950e413e46090d2056740c36dd7a77b1764b6936",
 +  "source_path": "sources/AptosFramework/transaction_fee.move",
 +  "spec_function_dependencies": [
 +    "0x1::aggregator::spec_aggregator_get_val",

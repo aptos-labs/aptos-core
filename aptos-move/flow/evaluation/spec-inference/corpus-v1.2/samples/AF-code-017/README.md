@@ -12,9 +12,9 @@ giving the independent workspace to an agent.
 - Original source: `aptos-move/framework/aptos-framework/sources/code.move`
 - Source inside the shared package: `sources/AptosFramework/code.move`
 - Source root: `aptos-move/framework/aptos-framework`
-- Aptos Core commit: `1ffaa408ec8899d19e0933b1680dce339051cd9f`
+- Aptos Core commit: `950e413e46090d2056740c36dd7a77b1764b6936`
 - Shared package SHA-256: `5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204`
-- Prepared tree SHA-256: `839e468abcbeb6ee10d4f15ef12484f1e4afb2bf6d6bf471e647a8c54ec3ca45`
+- Prepared tree SHA-256: `a9705d27ef13a2c0b35ac7934c29b4bf4082051577e78a55fe9289f27207abc2`
 - Required contract categories: `normal-result`, `abort`, `state-transition`, `frame`, `loop-invariant`
 
 Target functions:

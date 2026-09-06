@@ -12,9 +12,9 @@ giving the independent workspace to an agent.
 - Original source: `aptos-move/framework/aptos-framework/sources/configs/epoch_timeout_config.move`
 - Source inside the shared package: `sources/AptosFramework/configs/epoch_timeout_config.move`
 - Source root: `aptos-move/framework/aptos-framework`
-- Aptos Core commit: `1ffaa408ec8899d19e0933b1680dce339051cd9f`
+- Aptos Core commit: `950e413e46090d2056740c36dd7a77b1764b6936`
 - Shared package SHA-256: `5b885c344c622fa55054a3d51f8afcafdb5b6dc927e9c7a989ba86b229ee3204`
-- Prepared tree SHA-256: `ff13f5869a47c57dec7a696c345139d8b9cecfbe8ccdd69aa6322d59579867fd`
+- Prepared tree SHA-256: `b38691eb679e7ff4bc29438f15bc03776a7a017a29e2135ce081f42d8b77ebc6`
 - Required contract categories: `normal-result`, `abort`, `state-transition`, `frame`
 
 Target functions:

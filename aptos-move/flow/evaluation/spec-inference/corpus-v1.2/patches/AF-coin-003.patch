@@ -1,6 +1,6 @@
 diff --git a/.move-inference-task.json b/.move-inference-task.json
 new file mode 100644
-index 0000000000..706e6c47f7
+index 0000000000..d49231223c
 --- /dev/null
 +++ b/.move-inference-task.json
 @@ -0,0 +1,268 @@
@@ -20,7 +20,7 @@ index 0000000000..706e6c47f7
 +  "granularity": "function",
 +  "package_module_target": "0x1::coin::balance",
 +  "schema_version": 3,
-+  "source_commit": "1ffaa408ec8899d19e0933b1680dce339051cd9f",
++  "source_commit": "950e413e46090d2056740c36dd7a77b1764b6936",
 +  "source_path": "sources/AptosFramework/coin.move",
 +  "spec_function_dependencies": [
 +    "0x1::dispatchable_fungible_asset::spec_derived_balance_at",

@@ -1,6 +1,6 @@
 diff --git a/.move-inference-task.json b/.move-inference-task.json
 new file mode 100644
-index 0000000000..c496b06a62
+index 0000000000..066fd473d0
 --- /dev/null
 +++ b/.move-inference-task.json
 @@ -0,0 +1,367 @@
@@ -16,7 +16,7 @@ index 0000000000..c496b06a62
 +  "granularity": "function",
 +  "package_module_target": "0x7::pending_order_book_index::take_ready_price_move_up_orders",
 +  "schema_version": 3,
-+  "source_commit": "1ffaa408ec8899d19e0933b1680dce339051cd9f",
++  "source_commit": "950e413e46090d2056740c36dd7a77b1764b6936",
 +  "source_path": "sources/AptosExperimental/trading/order_book/pending_order_book_index.move",
 +  "spec_function_dependencies": [],
 +  "target_functions": [
