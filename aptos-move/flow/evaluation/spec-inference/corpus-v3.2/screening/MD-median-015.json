@@ -2,7 +2,7 @@
   "apparatus_ok": true,
   "exceeded_stage": null,
   "passed": true,
-  "reference_package": "/home/wrw/aptos-core/.worktrees/dev1/aptos-move/flow/evaluation/spec-inference/corpus-v3.2/references/build/extracted_median",
+  "reference_package": "references/build/extracted_median",
   "reference_proved": true,
   "reference_sha256": "5bee9e2c3b2b7a5d473a41ef2db2fd9745222cea29a59e53135b3c2ef053afbe",
   "schema_version": 2,

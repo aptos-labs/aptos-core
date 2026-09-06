@@ -2,7 +2,7 @@
   "apparatus_ok": true,
   "exceeded_stage": null,
   "passed": true,
-  "reference_package": "/home/wrw/aptos-core/.worktrees/dev1/aptos-move/flow/evaluation/spec-inference/corpus-v3.2/references/build/extracted_tier_leverage",
+  "reference_package": "references/build/extracted_tier_leverage",
   "reference_proved": true,
   "reference_sha256": "62071dda6921e574ef4717060422205e852a0a4beca191cdd5aad9af34552d06",
   "schema_version": 2,

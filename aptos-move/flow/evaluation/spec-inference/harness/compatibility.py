@@ -193,7 +193,17 @@ def stage_identity(entry: dict[str, Any] | None) -> dict[str, Any]:
     means a field added to the record later is compared by default, which is
     the safe direction.
     """
-    return {key: value for key, value in (entry or {}).items() if key != "path"}
+    identity = {
+        key: value for key, value in (entry or {}).items() if key != "path"
+    }
+    arguments = identity.get("arguments")
+    if isinstance(arguments, dict):
+        # Argument paths are useful while diagnosing a local run, but the
+        # ordered content digests are the portable identity.  Keeping the map
+        # keys would make a relocated wrapper look different and would expose
+        # the checkout layout when this identity is published as evidence.
+        identity["arguments"] = list(arguments.values())
+    return identity
 
 
 def changed_stages(

@@ -2,7 +2,7 @@
   "apparatus_ok": true,
   "exceeded_stage": null,
   "passed": true,
-  "reference_package": "/home/wrw/aptos-core/.worktrees/dev1/aptos-move/flow/evaluation/spec-inference/corpus-v3.2/references/build/extracted_payout_math",
+  "reference_package": "references/build/extracted_payout_math",
   "reference_proved": true,
   "reference_sha256": "50c0735a483ecee4e97ec4d588307db2b4b2aa9bfdd705ef8b8ba53b43c341cb",
   "schema_version": 2,

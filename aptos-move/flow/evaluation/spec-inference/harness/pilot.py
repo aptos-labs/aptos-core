@@ -19,7 +19,7 @@ from typing import Any
 
 from .identifiers import require_plain_name
 from .artifacts import canonical_json, sha256_file, tree_hash, write_json
-from .compatibility import tool_executables
+from .compatibility import changed_stages, tool_executables
 from .config import ExperimentConfig, FEEDBACK_LEVELS, RunSpec
 from .materialize import materialize_task
 from .mutants import NO_MUTANTS, mutation_fingerprint, require_unique_mutant_ids
@@ -801,10 +801,11 @@ def _require_screening_agrees(
                 f"{summary_path} records no stage executables, so the toolchain "
                 "that screened these targets is unknown; re-run screening"
             )
-        if recorded_stages != apparatus["stage_executables"]:
+        changed = changed_stages(recorded_stages, apparatus["stage_executables"])
+        if changed:
             raise ValueError(
                 f"{summary_path} screened with a different toolchain than the "
-                "round is scheduled with; re-run screening"
+                f"round is scheduled with ({', '.join(changed)}); re-run screening"
             )
     for result in summary.get("results") or ():
         if result.get("passed") and not result.get("reference_sha256"):

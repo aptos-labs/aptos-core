@@ -284,8 +284,9 @@ is gitignored, and only recipes, specifications, digests and anchors are
 tracked.
 
 Committed screening records retain verdicts, timings, reference hashes, and
-tool identities, but omit raw compiler and prover diagnostics because their
-source frames can quote the generated Etna files.
+path-free tool identities. They omit raw compiler and prover diagnostics
+because their source frames can quote the generated Etna files, and use
+corpus-relative reference labels so they do not expose a local checkout path.
 
 | | |
 |---|---|

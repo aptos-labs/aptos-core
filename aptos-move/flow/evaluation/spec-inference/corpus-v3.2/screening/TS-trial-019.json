@@ -2,7 +2,7 @@
   "apparatus_ok": true,
   "exceeded_stage": null,
   "passed": true,
-  "reference_package": "/home/wrw/aptos-core/.worktrees/dev1/aptos-move/flow/evaluation/spec-inference/corpus-v3.2/references/build/extracted_trial_size",
+  "reference_package": "references/build/extracted_trial_size",
   "reference_proved": true,
   "reference_sha256": "5f278076fd061d1c750b66ffc3b1edeadf5d2ec38a2bf1201cc47a2745668d95",
   "schema_version": 2,

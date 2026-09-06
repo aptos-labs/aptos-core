@@ -1238,8 +1238,20 @@ class ToolchainIdentityTest(unittest.TestCase):
         return ""
 
     def test_a_matching_toolchain_clears(self) -> None:
-        stages = {"prover": {"path": "/p", "sha256": "e" * 64}}
-        self.assertEqual("", self._check(stages, stages))
+        recorded = {
+            "prover": {
+                "sha256": "e" * 64,
+                "arguments": ["f" * 64],
+            }
+        }
+        scheduled = {
+            "prover": {
+                "path": "/another/checkout/prover",
+                "sha256": "e" * 64,
+                "arguments": {"/another/checkout/wrapper.py": "f" * 64},
+            }
+        }
+        self.assertEqual("", self._check(recorded, scheduled))
 
     def test_a_changed_prover_does_not_clear(self) -> None:
         message = self._check(

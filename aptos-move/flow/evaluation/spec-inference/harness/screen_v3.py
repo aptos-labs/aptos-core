@@ -41,6 +41,7 @@ from .compatibility import (
     check_compatibility,
     is_well_formed,
     prove_reference,
+    stage_identity,
     tool_executables,
 )
 from dataclasses import asdict
@@ -104,7 +105,12 @@ async def screen_corpus_v3(
             "passed": bool(well_formed and reference["proved"]),
             "well_formed": well_formed,
             "reference_proved": reference["proved"],
-            "reference_package": reference["package"],
+            # The package is always assembled beneath the corpus root.  Its
+            # digest identifies the content; a corpus-relative label identifies
+            # the package without publishing the machine's checkout path.
+            "reference_package": str(
+                Path(reference["package"]).relative_to(manifest_path.parent)
+            ),
             "reference_sha256": reference["reference_sha256"],
             # WP alone does not reach a verifying contract: a task property, not
             # a defect. See corpus-v3.2/README.md and issue #20490 for one cause.
@@ -148,7 +154,10 @@ async def screen_corpus_v3(
             # Screening also drives the compile, inference and prove commands,
             # which the config may point at different executables. Recording
             # only the checker leaves those unpinned.
-            "stage_executables": tool_executables(config),
+            "stage_executables": {
+                name: stage_identity(entry)
+                for name, entry in tool_executables(config).items()
+            },
             "experiment_config_sha256": hashlib.sha256(
                 canonical_json(asdict(config))
             ).hexdigest(),

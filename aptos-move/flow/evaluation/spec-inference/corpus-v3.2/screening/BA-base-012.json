@@ -2,7 +2,7 @@
   "apparatus_ok": true,
   "exceeded_stage": null,
   "passed": true,
-  "reference_package": "/home/wrw/aptos-core/.worktrees/dev1/aptos-move/flow/evaluation/spec-inference/corpus-v3.2/references/build/extracted_base_math",
+  "reference_package": "references/build/extracted_base_math",
   "reference_proved": true,
   "reference_sha256": "9713773a75b5c6ffcab659f83e31682d40891baa4e821e2087ae09bec395277b",
   "schema_version": 2,

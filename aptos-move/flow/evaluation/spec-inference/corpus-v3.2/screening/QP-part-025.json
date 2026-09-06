@@ -2,7 +2,7 @@
   "apparatus_ok": true,
   "exceeded_stage": null,
   "passed": true,
-  "reference_package": "/home/wrw/aptos-core/.worktrees/dev1/aptos-move/flow/evaluation/spec-inference/corpus-v3.2/references/build/lomuto_partition",
+  "reference_package": "references/build/lomuto_partition",
   "reference_proved": true,
   "reference_sha256": "e7b1eece3169d8fbe8a9fb15c026fc0c5b3173d36121a982a3b16e7633bbaab3",
   "schema_version": 2,

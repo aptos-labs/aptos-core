@@ -2,7 +2,7 @@
   "apparatus_ok": true,
   "exceeded_stage": null,
   "passed": true,
-  "reference_package": "/home/wrw/aptos-core/.worktrees/dev1/aptos-move/flow/evaluation/spec-inference/corpus-v3.2/references/build/extracted_work_units",
+  "reference_package": "references/build/extracted_work_units",
   "reference_proved": true,
   "reference_sha256": "402e40515f83dd0d924325bbbc04917a555e9884083abfe3fd36dd622e122db0",
   "schema_version": 2,

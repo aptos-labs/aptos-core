@@ -2,7 +2,7 @@
   "apparatus_ok": true,
   "exceeded_stage": null,
   "passed": true,
-  "reference_package": "/home/wrw/aptos-core/.worktrees/dev1/aptos-move/flow/evaluation/spec-inference/corpus-v3.2/references/build/extracted_bulk_order_utils",
+  "reference_package": "references/build/extracted_bulk_order_utils",
   "reference_proved": true,
   "reference_sha256": "89ba7a12375e6066cbfcf88cb3cc8f232c99af449f4e14688978241cfc96611a",
   "schema_version": 2,
