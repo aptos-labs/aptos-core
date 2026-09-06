@@ -13,10 +13,10 @@ use std::{ptr::NonNull, sync::Arc};
 use thiserror::Error;
 
 /// Version of the read value (which can come from storage or from other
-/// transaction write).
-// TODO(completeness):
-//   Replace with Block-STM transaction index and incarnation pair.
-pub type Version = u64;
+/// transaction write). [`None`] means the value comes from pre-block storage,
+/// [`Some`] carries the Block-STM transaction index and incarnation that wrote
+/// it.
+pub type Version = Option<(u32, u32)>;
 
 /// Key into the in-memory global storage of a single transaction.
 ///
@@ -45,6 +45,13 @@ pub enum InMemoryStorageKey {
         address: AccountAddress,
         ty: InternedType,
     },
+    /// A resource group's own storage slot, identified by the address it is
+    /// published under and the group's type. Group members keep their
+    /// [`Self::Resource`] keys and are addressed as tags within this slot.
+    ResourceGroup {
+        address: AccountAddress,
+        group_ty: InternedType,
+    },
     /// A table item, identified by its table handle and the serialized bytes of
     /// its key.
     TableItem {
@@ -62,6 +69,12 @@ impl InMemoryStorageKey {
         Self::Resource { address, ty }
     }
 
+    /// Builds a resource group key from its publishing address and interned
+    /// group type.
+    pub fn resource_group(address: AccountAddress, group_ty: InternedType) -> Self {
+        Self::ResourceGroup { address, group_ty }
+    }
+
     /// Builds a table item key from its handle, serialized key bytes, and stored value type.
     pub fn table_item(handle: TableHandle, key: Box<[u8]>, value_ty: InternedType) -> Self {
         Self::TableItem {
@@ -76,6 +89,7 @@ impl InMemoryStorageKey {
     pub fn address(&self) -> AccountAddress {
         match self {
             Self::Resource { address, .. } => *address,
+            Self::ResourceGroup { address, .. } => *address,
             Self::TableItem { handle, .. } => handle.address(),
         }
     }
@@ -84,16 +98,20 @@ impl InMemoryStorageKey {
     pub fn value_ty(&self) -> InternedType {
         match self {
             Self::Resource { ty, .. } => *ty,
+            Self::ResourceGroup { group_ty, .. } => *group_ty,
             Self::TableItem { value_ty, .. } => *value_ty,
         }
     }
 
-    /// The own storage slot for a non-group-member key: a standalone resource or a
-    /// table item. Table items are never resource-group members, so they always
-    /// land here.
+    /// The own storage slot for a non-group-member key: a standalone resource, a
+    /// resource group, or a table item. Table items are never resource-group
+    /// members, so they always land here.
     pub fn as_state_key(&self) -> anyhow::Result<StateKey> {
         Ok(match self {
             Self::Resource { address, ty } => StateKey::resource(address, &nominal_tag(*ty)?)?,
+            Self::ResourceGroup { address, group_ty } => {
+                StateKey::resource_group(address, &nominal_tag(*group_ty)?)
+            },
             InMemoryStorageKey::TableItem { handle, key, .. } => {
                 StateKey::table_item(&AptosTableHandle(handle.address()), key)
             },
@@ -121,12 +139,19 @@ pub fn nominal_tag(ty: InternedType) -> anyhow::Result<StructTag> {
 pub enum ResourceProviderError {
     #[error("resource provider invariant violation: {0}")]
     InvariantViolation(String),
+    /// The read cannot be served because the parallel execution this
+    /// transaction runs under has been halted or the value it depends on is
+    /// still unresolved. The transaction's outcome must be thrown away, not
+    /// committed.
+    #[error("resource provider speculative abort: {0}")]
+    SpeculativeAbort(String),
 }
 
 impl IntoExecutionError for ResourceProviderError {
     fn kind(&self) -> ExecutionErrorKind {
         match self {
-            ResourceProviderError::InvariantViolation(_) => ExecutionErrorKind::InvariantViolation,
+            ResourceProviderError::InvariantViolation(_)
+            | ResourceProviderError::SpeculativeAbort(_) => ExecutionErrorKind::InvariantViolation,
         }
     }
 }
@@ -135,9 +160,11 @@ impl IntoExecutionError for ResourceProviderError {
 /// points into an arena owned by whoever produced the read: a storage provider,
 /// or another transaction's frozen heap. Retaining the pin keeps that arena
 /// from being freed while the read is held.
-//
-// TODO(cleanup): give this a method (or supertrait) once read-set validation
-// needs to inspect the backing allocation.
+///
+/// This trait must stay method-free. Under parallel execution a pin is held by
+/// threads other than the one that owns the arena, and those arenas are
+/// interior-mutable and `!Sync`. Holding the pin is sound only because a holder
+/// cannot reach the arena through it.
 pub trait ReadPin {}
 
 /// Storage read returned to the VM. Every VM execution records reads of any
@@ -145,7 +172,11 @@ pub trait ReadPin {}
 #[derive(Clone)]
 pub enum StorageRead {
     /// Value does not exist at this key.
-    DoesNotExist,
+    DoesNotExist {
+        /// Version of this negative read from Block-STM. Used for read-set
+        /// validation.
+        version: Version,
+    },
     /// Value is allocated in some other arena or cache. For example, it can be
     /// a cached DB read or a write from soe transaction at lower version.
     ExternalHeap {
@@ -158,6 +189,16 @@ pub enum StorageRead {
         /// Keeps the arena `ptr` points into alive while this read is retained.
         pin: Arc<dyn ReadPin>,
     },
+}
+
+impl StorageRead {
+    /// The Block-STM version this read observed.
+    pub fn version(&self) -> Version {
+        match self {
+            StorageRead::DoesNotExist { version } => *version,
+            StorageRead::ExternalHeap { version, .. } => *version,
+        }
+    }
 }
 
 /// Returns resource data from storage. Storage backend is not fixed and can be
@@ -188,6 +229,6 @@ impl ResourceProvider for NoResourceProvider {
         _key: &InMemoryStorageKey,
         _group: Option<InternedType>,
     ) -> Result<StorageRead, ResourceProviderError> {
-        Ok(StorageRead::DoesNotExist)
+        Ok(StorageRead::DoesNotExist { version: None })
     }
 }

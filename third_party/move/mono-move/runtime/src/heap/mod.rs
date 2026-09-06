@@ -21,8 +21,8 @@ use crate::{
         write_u64, MemoryRegion,
     },
     types::{
-        DEFAULT_HEAP_SIZE, FORWARDED_MARKER, META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET,
-        VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+        FORWARDED_MARKER, META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, VEC_DATA_OFFSET,
+        VEC_LENGTH_OFFSET,
     },
 };
 use mono_move_core::{
@@ -32,9 +32,9 @@ use mono_move_core::{
     DescriptorId, DescriptorProvider, FrameOffset, Function, LayoutProvider, ObjectDescriptorInner,
     ReadPin, RootPool, VMInternalError, VMResult, CAPTURED_DATA_VALUES_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DATA_SIZE, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
-    FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE,
+    FRAME_METADATA_SIZE, MAX_ALIGN, OBJECT_HEADER_SIZE,
 };
-use std::{cell::RefCell, ptr::NonNull};
+use std::{cell::RefCell, ptr::NonNull, sync::Arc};
 
 // ---------------------------------------------------------------------------
 // Macros
@@ -199,11 +199,10 @@ pub(crate) mod macros {
 /// allocation sizes (e.g. a corrupted descriptor or attacker-controlled
 /// capacity in `alloc_vec`) before we compute a bump-pointer offset.
 ///
-/// Tied to [`DEFAULT_HEAP_SIZE`] — anything larger could never succeed
-/// regardless. The constant exists so the bound can be detached from
-/// `DEFAULT_HEAP_SIZE` once heaps become per-context configurable
-/// (likely driven by gas limits).
-const MAX_SINGLE_ALLOCATION_SIZE: usize = DEFAULT_HEAP_SIZE;
+/// Set to the largest buffer the runtime ever creates, so it rejects only
+/// sizes no heap could ever serve. Each allocation is still bounded by its own
+/// heap's buffer, which for a session heap is `DEFAULT_HEAP_SIZE`.
+const MAX_SINGLE_ALLOCATION_SIZE: usize = MAX_SEGMENT_BYTES;
 
 /// True if `bump_ptr + size` still lies within the heap buffer (or one
 /// byte past the end). Compares integer addresses to avoid forming an
@@ -238,12 +237,20 @@ impl Heap {
     /// every heap object is fully written before any byte of it is read, and
     /// nothing reads the unbumped tail `[bump_ptr, buffer.end)`.
     pub fn new(size: usize) -> Self {
-        let buffer = MemoryRegion::new_uninit(size);
+        Self::from_buffer(MemoryRegion::new_uninit(size))
+    }
+
+    fn from_buffer(buffer: MemoryRegion) -> Self {
         Self {
             bump_ptr: buffer.as_ptr(),
             buffer,
             gc_count: 0,
         }
+    }
+
+    /// Bytes allocated so far. An upper bound on how much is still live.
+    pub(crate) fn used(&self) -> usize {
+        self.bump_ptr as usize - self.buffer.as_ptr() as usize
     }
 
     /// Rewinds the bump pointer to the start of the buffer, discarding all allocations. The buffer
@@ -274,12 +281,18 @@ impl Heap {
 /// its allocations never move. It exposes no APIs; wrapping keeps the raw [`Heap`]
 /// methods unreachable so the only thing a holder can do is keep the heap alive,
 /// which is exactly what pinning a read against another transaction's heap needs.
-pub struct FrozenHeap(#[allow(dead_code)] Heap);
+pub struct FrozenHeap(#[allow(dead_code)] Vec<Heap>);
 
 impl FrozenHeap {
     /// Freezes a session heap.
     pub fn new(heap: Heap) -> Self {
-        Self(heap)
+        Self(vec![heap])
+    }
+
+    /// Freezes several heaps as one pin, for when the values handed on may
+    /// point into any of them.
+    pub(crate) fn from_heaps(heaps: Vec<Heap>) -> Self {
+        Self(heaps)
     }
 }
 
@@ -314,6 +327,94 @@ impl SharedArena {
 }
 
 impl ReadPin for SharedArena {}
+
+/// Size of one [`SegmentedArena`] segment. Small enough that an owner touching
+/// few values does not reserve much, large enough that most blocks fit in one
+/// or two segments.
+const SEGMENT_BYTES: usize = 4 * 1024 * 1024;
+
+/// Ceiling on a single segment. A value that needs more than this could not be
+/// used by the interpreter either, whose per-transaction heap is far smaller.
+const MAX_SEGMENT_BYTES: usize = 64 * 1024 * 1024;
+
+/// An append-only arena that grows by adding [`SharedArena`] segments.
+///
+/// Values materialized from storage stay reachable long after the transaction
+/// that read them finished, so nothing here is ever reset or collected while
+/// the block runs. Each allocation hands back the segment it landed in, and the
+/// value pins that segment.
+///
+/// [`SharedArena`] is interior-mutable and `!Sync`, yet a pin on a segment may
+/// be held by another thread. That is sound only because [`ReadPin`] exposes no
+/// methods: a pin holder cannot reach the heap, and the arena's owner is the
+/// only one that ever allocates in it.
+pub struct SegmentedArena {
+    segments: RefCell<Vec<Arc<SharedArena>>>,
+}
+
+impl SegmentedArena {
+    pub fn new() -> Self {
+        Self {
+            segments: RefCell::new(vec![new_segment(SEGMENT_BYTES)]),
+        }
+    }
+
+    /// Runs `alloc` against a segment until it succeeds, growing the arena when
+    /// the current segment has too little room left. Returns what `alloc`
+    /// produced together with the segment to pin it by.
+    ///
+    /// `alloc` returns [`None`] only when it ran out of room; anything it must
+    /// not be retried for belongs in `T`. It may run several times, and
+    /// whatever it allocated in a segment it then failed in is left behind as
+    /// unreachable slack.
+    ///
+    /// Whether this succeeds must not depend on how much the owner allocated
+    /// before, or two Block-STM schedules could disagree on whether the same
+    /// value can be read. Hence every retry starts from an empty segment whose
+    /// size depends only on the attempt number.
+    pub fn alloc_in<T>(
+        &self,
+        alloc: impl Fn(&Arc<SharedArena>) -> Option<T>,
+    ) -> Option<(T, Arc<SharedArena>)> {
+        let mut segments = self.segments.borrow_mut();
+
+        let current = segments.last().expect("Arena is never empty").clone();
+        if let Some(value) = alloc(&current) {
+            return Some((value, current));
+        }
+
+        // Too little room left: retire the current segment and grow.
+        let fresh = new_segment(SEGMENT_BYTES);
+        if let Some(value) = alloc(&fresh) {
+            segments.push(fresh.clone());
+            return Some((value, fresh));
+        }
+
+        // The value outgrows a whole segment, so give it one of its own. Such a
+        // segment never becomes the allocation target; only the pin returned
+        // here keeps it alive.
+        let mut size = SEGMENT_BYTES;
+        while size < MAX_SEGMENT_BYTES {
+            size = size.saturating_mul(2).min(MAX_SEGMENT_BYTES);
+            let private = new_segment(size);
+            if let Some(value) = alloc(&private) {
+                return Some((value, private));
+            }
+        }
+        None
+    }
+}
+
+impl Default for SegmentedArena {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+fn new_segment(size: usize) -> Arc<SharedArena> {
+    #[allow(clippy::arc_with_non_send_sync)]
+    Arc::new(SharedArena::new(size))
+}
 
 /// Outcome of a bump-allocation attempt.
 #[derive(Debug)]
@@ -1003,14 +1104,33 @@ pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
     }
 
     // Phase 2: Cheney-style breadth-first scan of copied objects.
-    // `scan_ptr` is a raw cursor — header start of the next object to
-    // scan. Object pointers (data starts) are `scan_ptr + H`.
+    gc_scan_to_space(provider, &mut scanner, &to_space)?;
+
+    // Phase 3: swap — drop old heap, adopt new one. The bump cursor
+    // semantics match `free_ptr` directly (both are raw header-start
+    // cursors).
+    let RootScanner { free_ptr, .. } = scanner;
+    heap.buffer = to_space;
+    heap.bump_ptr = free_ptr;
+    Ok(())
+}
+
+/// Cheney's breadth-first scan: walks the objects already copied into
+/// `to_space`, copying whatever they in turn reference, until the cursor stops
+/// moving.
+fn gc_scan_to_space<P: DescriptorProvider + ?Sized>(
+    provider: &P,
+    scanner: &mut RootScanner<'_>,
+    to_space: &MemoryRegion,
+) -> VMResult<()> {
+    // `scan_ptr` is a raw cursor — header start of the next object to scan.
+    // Object pointers (data starts) are `scan_ptr + H`.
     let mut scan_ptr = to_space.as_ptr();
     while (scan_ptr as usize) < scanner.cursor() {
         // SAFETY: scan_ptr advances through to-space by each object's
         // aligned size. Object headers were copied verbatim by
         // gc_copy_object, so descriptor_id and size are valid as long
-        // as the object-header-integrity invariant holds (see above).
+        // as the object-header-integrity invariant holds.
         unsafe {
             let obj_ptr = scan_ptr.add(OBJECT_HEADER_SIZE);
             let descriptor_id = read_descriptor(obj_ptr);
@@ -1023,19 +1143,73 @@ pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
             if descriptor_id == FORWARDED_MARKER {
                 invariant_violation!(GcForwardingMarkerInToSpace);
             }
-            gc_scan_object(provider, &mut scanner, obj_ptr, DescriptorId(descriptor_id))?;
+            gc_scan_object(provider, scanner, obj_ptr, DescriptorId(descriptor_id))?;
 
             scan_ptr = scan_ptr.add(obj_size);
         }
     }
-
-    // Phase 3: swap — drop old heap, adopt new one. The bump cursor
-    // semantics match `free_ptr` directly (both are raw header-start
-    // cursors).
-    let RootScanner { free_ptr, .. } = scanner;
-    heap.buffer = to_space;
-    heap.bump_ptr = free_ptr;
     Ok(())
+}
+
+/// Copies everything `rws` and `extensions` still reach into a heap of its own,
+/// leaving `heap`'s buffer holding nothing live.
+///
+/// A session ends with its call stack gone, so those two are the only roots. The
+/// writes that survive a transaction are usually a few hundred bytes, while the
+/// session heap they sit in is megabytes and stays reachable for the rest of the
+/// block. Handing on the small copy rather than the whole session heap is what
+/// lets the session heap be reused.
+///
+/// The new buffer is sized to what the session allocated. Live data cannot
+/// exceed that, so the copy can never overflow it.
+///
+/// Returns the new heap together with whether the copy finished. A copy that
+/// stopped part way leaves `rws` pointing into both heaps, so a caller that
+/// gets an error must keep `heap` alive as well.
+///
+/// # Safety assumptions
+///
+/// The object-header-integrity and pointer-slot-accuracy invariants documented
+/// on [`gc_collect`], for the read-write set and extension roots.
+pub(crate) fn evacuate_session_roots<P: DescriptorProvider + ?Sized>(
+    heap: &Heap,
+    provider: &P,
+    rws: &mut ResourceReadWriteSet,
+    extensions: &NativeExtensions,
+) -> (Heap, VMResult<()>) {
+    // `new_uninit` is safe for the same reason it is in `gc_collect`: the copy
+    // fills to-space contiguously up to `free_ptr`, and nothing reads past it.
+    // The size floor keeps `MemoryRegion::new`'s non-zero assertion happy when
+    // the session allocated nothing.
+    let to_space = MemoryRegion::new_uninit(heap.used().max(MAX_ALIGN));
+    let mut scanner = RootScanner {
+        heap,
+        free_ptr: to_space.as_ptr(),
+    };
+
+    rws.scan(&mut scanner);
+    // SAFETY: the session is over, so no native holds an extension borrow, and
+    // the closure only relocates.
+    let result = unsafe {
+        extensions
+            .relocate_all_roots(&mut |base| scanner.relocate(base))
+            .map_err(|_| {
+                VMInternalError::new(RuntimeError::InvariantViolation(
+                    RuntimeInvariantViolation::ExtensionBorrowedDuringGC,
+                ))
+            })
+            .and_then(|()| gc_scan_to_space(provider, &mut scanner, &to_space))
+    };
+
+    let RootScanner { free_ptr, .. } = scanner;
+    (
+        Heap {
+            bump_ptr: free_ptr,
+            buffer: to_space,
+            gc_count: 0,
+        },
+        result,
+    )
 }
 
 /// Returns true if `ptr` is a valid object pointer (data-region start)
@@ -1259,4 +1433,64 @@ fn gc_scan_object<P: DescriptorProvider + ?Sized>(
         },
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod segmented_arena_tests {
+    use super::*;
+
+    const PAYLOAD: usize = SEGMENT_BYTES / 2;
+
+    fn alloc_in_segment(segment: &SharedArena, payload: usize) -> Option<NonNull<u8>> {
+        segment.with_heap_mut(|heap: &mut Heap| {
+            heap.alloc_object(OBJECT_HEADER_SIZE + payload, DescriptorId(0))
+        })
+    }
+
+    fn alloc(arena: &SegmentedArena, payload: usize) -> Option<NonNull<u8>> {
+        arena
+            .alloc_in(|segment| alloc_in_segment(segment, payload))
+            .map(|(ptr, _)| ptr)
+    }
+
+    /// Leaves the arena's newest segment without room for another `PAYLOAD`.
+    fn fill_newest_segment(arena: &SegmentedArena) {
+        let segment = arena.segments.borrow().last().unwrap().clone();
+        while alloc_in_segment(&segment, PAYLOAD).is_some() {}
+    }
+
+    #[test]
+    fn grows_past_a_full_segment() {
+        let arena = SegmentedArena::new();
+        fill_newest_segment(&arena);
+        assert!(alloc(&arena, PAYLOAD).is_some());
+        assert_eq!(arena.segments.borrow().len(), 2);
+    }
+
+    #[test]
+    fn success_does_not_depend_on_prior_allocations() {
+        // The point of growing: the same value must be admissible no matter how
+        // full the arena was, or two Block-STM schedules could disagree on
+        // whether it can be read.
+        let fresh = SegmentedArena::new();
+        assert!(alloc(&fresh, PAYLOAD).is_some());
+
+        let used = SegmentedArena::new();
+        fill_newest_segment(&used);
+        assert!(alloc(&used, PAYLOAD).is_some());
+    }
+
+    #[test]
+    fn oversized_value_gets_a_private_segment() {
+        let arena = SegmentedArena::new();
+        // Bigger than a whole segment, so only the doubling ladder can serve it.
+        let (_, segment) = arena
+            .alloc_in(|segment| alloc_in_segment(segment, SEGMENT_BYTES + 1))
+            .expect("A value just over a segment still fits under the cap");
+        assert!(!Arc::ptr_eq(
+            &segment,
+            arena.segments.borrow().last().unwrap()
+        ));
+        assert_eq!(arena.segments.borrow().len(), 1);
+    }
 }

@@ -358,6 +358,18 @@ impl<'a> AptosModuleCacheManagerGuard<'a> {
         Self::none_for_state_view(&MockStateView::empty())
     }
 
+    /// Like [AptosModuleCacheManagerGuard::none], but with a MonoMove global
+    /// context sized for `num_workers` parallel workers. Use for testing only.
+    #[cfg(test)]
+    pub(crate) fn none_with_workers(num_workers: usize) -> Self {
+        use aptos_types::state_store::MockStateView;
+        AptosModuleCacheManagerGuard::None {
+            environment: AptosEnvironment::new(&MockStateView::empty()),
+            module_cache: GlobalModuleCache::empty(),
+            global_context: Arc::new(GlobalContext::with_num_execution_workers(num_workers)),
+        }
+    }
+
     /// A guard in [AptosModuleCacheManagerGuard::None] state with empty module cache and the
     /// environment initialized based on the provided state. Use for testing only.
     #[cfg(test)]

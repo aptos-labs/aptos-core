@@ -25,7 +25,6 @@ move-value-view = { workspace = true }
 rand = { workspace = true }
 shared-dsa = { workspace = true }
 thiserror = { workspace = true }
-triomphe = { workspace = true }
 
 [dev-dependencies]
 move-value-view-derive = { workspace = true }
