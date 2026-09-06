@@ -7,6 +7,13 @@ spec 0x42::file_signature_alias {
         aborts_if [inferred] false;
     }
 
+
+    spec keep_local(value: Local): Local {
+        pragma opaque = true;
+        ensures [inferred] result == value;
+        aborts_if [inferred] false;
+    }
+
 }
 /*
 Verification:

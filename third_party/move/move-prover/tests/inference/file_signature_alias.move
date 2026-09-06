@@ -13,8 +13,14 @@ module 0x42::file_signature_alias {
     use 0x1::X;
     use 0x2::X::T;
 
+    public struct Local has copy, drop {}
+
     public fun identity(value: T): T {
         let _same_named_module_is_used = X::S {};
+        value
+    }
+
+    public fun keep_local(value: Local): Local {
         value
     }
 }

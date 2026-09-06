@@ -345,6 +345,7 @@ impl<'env> ModelBuilder<'env> {
             used_modules: BTreeSet::new(),
             use_module_qualification: false,
             display_module_addr: false,
+            fully_qualify_external_types: false,
             recursive_vars: None,
         }
     }

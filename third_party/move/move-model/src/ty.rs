@@ -3770,6 +3770,8 @@ pub struct TypeDisplayContext<'a> {
     pub use_module_qualification: bool,
     /// Whether to display module addresses in types, to accommodate special cases
     pub display_module_addr: bool,
+    /// Whether types outside the current module must include their address.
+    pub fully_qualify_external_types: bool,
     /// Var types that are recursive and should appear as `..` in display
     pub recursive_vars: Option<BTreeSet<u32>>,
 }
@@ -3786,6 +3788,7 @@ impl<'a> TypeDisplayContext<'a> {
             used_modules: BTreeSet::new(),
             use_module_qualification: false,
             display_module_addr: false,
+            fully_qualify_external_types: false,
             recursive_vars: None,
         }
     }
@@ -3811,6 +3814,7 @@ impl<'a> TypeDisplayContext<'a> {
             used_modules: BTreeSet::new(),
             use_module_qualification: false,
             display_module_addr: false,
+            fully_qualify_external_types: false,
             recursive_vars: None,
         }
     }
@@ -4064,6 +4068,17 @@ impl TypeDisplay<'_> {
             .display(env.symbol_pool())
             .to_string();
         let struct_name = struct_symbol.display(env.symbol_pool()).to_string();
+
+        if self.context.fully_qualify_external_types
+            && !self.context.is_current_module(&struct_module_name)
+        {
+            return format!(
+                "0x{}::{}::{}",
+                struct_module_addr.short_str_lossless(),
+                struct_module_idstr,
+                struct_name
+            );
+        }
 
         // If we are not able to get the type info, OR
         // the type is not inside or the host module is not imported into the current module,

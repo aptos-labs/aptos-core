@@ -688,7 +688,7 @@ fn generate_fresh_spec_file(
             // signature types so a same-named alias cannot retarget a type or
             // suppress the import that would otherwise disambiguate it.
             let mut signature_tctx = fun.get_type_display_ctx();
-            signature_tctx.display_module_addr = true;
+            signature_tctx.fully_qualify_external_types = true;
             sourcifier.print_fun_spec_with_signature_type_display_ctx(&fun, signature_tctx);
         }
         fun.get_mut_spec().conditions = original_conditions;
